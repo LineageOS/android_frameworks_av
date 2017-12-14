@@ -18,7 +18,13 @@
 #define ANDROID_JAUDIOTRACK_H
 
 #include <jni.h>
+#include <media/AudioResamplerPublic.h>
+#include <media/VolumeShaper.h>
 #include <system/audio.h>
+#include <utils/Errors.h>
+
+#include <media/AudioTimestamp.h>   // It has dependency on audio.h/Errors.h, but doesn't
+                                    // include them in it. Therefore it is included here at last.
 
 namespace android {
 
@@ -112,8 +118,42 @@ public:
      */
     status_t getPosition(uint32_t *position);
 
+    // TODO: Does this comment apply same to Java AudioTrack::getTimestamp?
+    // Changed the return type from status_t to bool, since Java AudioTrack::getTimestamp returns
+    // boolean. Will Java getTimestampWithStatus() be public?
+    /* Poll for a timestamp on demand.
+     * Use if EVENT_NEW_TIMESTAMP is not delivered often enough for your needs,
+     * or if you need to get the most recent timestamp outside of the event callback handler.
+     * Caution: calling this method too often may be inefficient;
+     * if you need a high resolution mapping between frame position and presentation time,
+     * consider implementing that at application level, based on the low resolution timestamps.
+     * Returns true if timestamp is valid.
+     * The timestamp parameter is undefined on return, if false is returned.
+     */
+    bool getTimeStamp(AudioTimestamp& timestamp);
+
+    /* Set source playback rate for timestretch
+     * 1.0 is normal speed: < 1.0 is slower, > 1.0 is faster
+     * 1.0 is normal pitch: < 1.0 is lower pitch, > 1.0 is higher pitch
+     *
+     * AUDIO_TIMESTRETCH_SPEED_MIN <= speed <= AUDIO_TIMESTRETCH_SPEED_MAX
+     * AUDIO_TIMESTRETCH_PITCH_MIN <= pitch <= AUDIO_TIMESTRETCH_PITCH_MAX
+     *
+     * Speed increases the playback rate of media, but does not alter pitch.
+     * Pitch increases the "tonal frequency" of media, but does not affect the playback rate.
+     */
+    status_t setPlaybackRate(const AudioPlaybackRate &playbackRate);
+
+    /* Return current playback rate */
+    const AudioPlaybackRate getPlaybackRate();
+
+    /* Sets the volume shaper object */
+    media::VolumeShaper::Status applyVolumeShaper(
+            const sp<media::VolumeShaper::Configuration>& configuration,
+            const sp<media::VolumeShaper::Operation>& operation);
+
     /* Set the send level for this track. An auxiliary effect should be attached
-     * to the track with attachAuxEffect(). Level must be >= 0.0 and <= 1.0.
+     * to the track with attachEffect(). Level must be >= 0.0 and <= 1.0.
      */
     status_t setAuxEffectSendLevel(float level);
 
@@ -126,8 +166,8 @@ public:
      *
      * Returned status (from utils/Errors.h) can be:
      *  - NO_ERROR: successful operation
-     *  - INVALID_OPERATION: the effect is not an auxiliary effect.
-     *  - BAD_VALUE: The specified effect ID is invalid
+     *  - INVALID_OPERATION: The effect is not an auxiliary effect.
+     *  - BAD_VALUE: The specified effect ID is invalid.
      */
     status_t attachAuxEffect(int effectId);
 
@@ -148,6 +188,29 @@ public:
      * If the track was previously paused, volume is ramped up over the first mix buffer.
      */
     status_t start();
+
+    // TODO: Does this comment still applies? It seems not. (obtainBuffer, AudioFlinger, ...)
+    /* As a convenience we provide a write() interface to the audio buffer.
+     * Input parameter 'size' is in byte units.
+     * This is implemented on top of obtainBuffer/releaseBuffer. For best
+     * performance use callbacks. Returns actual number of bytes written >= 0,
+     * or one of the following negative status codes:
+     *      INVALID_OPERATION   AudioTrack is configured for static buffer or streaming mode
+     *      BAD_VALUE           size is invalid
+     *      WOULD_BLOCK         when obtainBuffer() returns same, or
+     *                          AudioTrack was stopped during the write
+     *      DEAD_OBJECT         when AudioFlinger dies or the output device changes and
+     *                          the track cannot be automatically restored.
+     *                          The application needs to recreate the AudioTrack
+     *                          because the audio device changed or AudioFlinger died.
+     *                          This typically occurs for direct or offload tracks
+     *                          or if mDoNotReconnect is true.
+     *      or any other error code returned by IAudioTrack::start() or restoreTrack_l().
+     * Default behavior is to only return when all data has been transferred. Set 'blocking' to
+     * false for the method to return immediately without waiting to try multiple times to write
+     * the full content of the buffer.
+     */
+    ssize_t write(const void* buffer, size_t size, bool blocking = true);
 
     // TODO: Does this comment equally apply to the Java AudioTrack::stop()?
     /* Stop a track.
@@ -185,11 +248,22 @@ public:
      */
     uint32_t getSampleRate();
 
+    /* Returns the buffer duration in microseconds at current playback rate. */
+    status_t getBufferDurationInUs(int64_t *duration);
+
     audio_format_t format();
 
 private:
     jclass mAudioTrackCls;
     jobject mAudioTrackObj;
+
+    /* Creates a Java VolumeShaper.Configuration object from VolumeShaper::Configuration */
+    jobject createVolumeShaperConfigurationObj(
+            const sp<media::VolumeShaper::Configuration>& config);
+
+    /* Creates a Java VolumeShaper.Operation object from VolumeShaper::Operation */
+    jobject createVolumeShaperOperationObj(
+            const sp<media::VolumeShaper::Operation>& operation);
 
     status_t javaToNativeStatus(int javaStatus);
 };
