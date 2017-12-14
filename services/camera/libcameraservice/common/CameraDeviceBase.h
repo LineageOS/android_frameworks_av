@@ -349,6 +349,11 @@ class CameraDeviceBase : public virtual RefBase {
     virtual status_t setConsumerSurfaces(int streamId,
             const std::vector<sp<Surface>>& consumers) = 0;
 
+    /**
+     * Drop buffers for stream of streamId if dropping is true. If dropping is false, do not
+     * drop buffers for stream of streamId.
+     */
+    virtual status_t dropStreamBuffers(bool /*dropping*/, int /*streamId*/) = 0;
 };
 
 }; // namespace android
