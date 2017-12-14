@@ -25,13 +25,14 @@
 #include <utils/String8.h>
 #include <utils/RefBase.h>
 
-#include <media/mediaplayer2.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTimestamp.h>
 #include <media/AVSyncSettings.h>
 #include <media/BufferingSettings.h>
 #include <media/Metadata.h>
+#include <media/mediaplayer2.h>
+#include <media/stagefright/foundation/AHandler.h>
 
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
 // global, and not in android::
@@ -68,7 +69,7 @@ enum player2_type {
 #define AUDIO_SINK_MIN_DEEP_BUFFER_DURATION_US 5000000
 
 // abstract base class - use MediaPlayer2Interface
-class MediaPlayer2Base : public RefBase
+class MediaPlayer2Base : public AHandler
 {
 public:
     // callback mechanism for passing messages to MediaPlayer2 object
@@ -293,6 +294,8 @@ public:
     virtual status_t dump(int /* fd */, const Vector<String16>& /* args */) const {
         return INVALID_OPERATION;
     }
+
+    virtual void onMessageReceived(const sp<AMessage> & /* msg */) override { }
 
     // Modular DRM
     virtual status_t prepareDrm(const uint8_t /* uuid */[16], const Vector<uint8_t>& /* drmSessionId */) {

@@ -41,7 +41,7 @@ static const int kDumpLockSleepUs = 20000;
 namespace android {
 
 // key for media statistics
-static const char *kKeyPlayer = "nuplayer";
+static const char *kKeyPlayer = "nuplayer2";
 // attrs for media statistics
 static const char *kPlayerVMime = "android.media.mediaplayer.video.mime";
 static const char *kPlayerVCodec = "android.media.mediaplayer.video.codec";
@@ -75,6 +75,7 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid)
       mRebufferingEvents(0),
       mRebufferingAtExit(false),
       mLooper(new ALooper),
+      mNuPlayer2Looper(new ALooper),
       mMediaClock(new MediaClock),
       mPlayer(new NuPlayer2(pid, mMediaClock)),
       mPlayerFlags(0),
@@ -85,6 +86,7 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid)
       mAutoLoop(false) {
     ALOGD("NuPlayer2Driver(%p) created, clientPid(%d)", this, pid);
     mLooper->setName("NuPlayer2Driver Looper");
+    mNuPlayer2Looper->setName("NuPlayer2 Looper");
 
     mMediaClock->init();
 
@@ -92,18 +94,19 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid)
     mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
     mAnalyticsItem->generateSessionID();
 
-    mLooper->start(
+    mNuPlayer2Looper->start(
             false, /* runOnCallingThread */
             true,  /* canCallJava */
             PRIORITY_AUDIO);
 
-    mLooper->registerHandler(mPlayer);
+    mNuPlayer2Looper->registerHandler(mPlayer);
 
     mPlayer->setDriver(this);
 }
 
 NuPlayer2Driver::~NuPlayer2Driver() {
     ALOGV("~NuPlayer2Driver(%p)", this);
+    mNuPlayer2Looper->stop();
     mLooper->stop();
 
     // finalize any pending metrics, usually a no-op.
@@ -117,6 +120,12 @@ NuPlayer2Driver::~NuPlayer2Driver() {
 }
 
 status_t NuPlayer2Driver::initCheck() {
+    mLooper->start(
+            false, /* runOnCallingThread */
+            true,  /* canCallJava */
+            PRIORITY_AUDIO);
+
+    mLooper->registerHandler(this);
     return OK;
 }
 
@@ -381,7 +390,7 @@ status_t NuPlayer2Driver::stop() {
 
         case STATE_PAUSED:
             mState = STATE_STOPPED;
-            notifyListener_l(MEDIA2_STOPPED);
+            sendNotifyOnLooper(MEDIA2_STOPPED);
             break;
 
         case STATE_PREPARED:
@@ -416,7 +425,7 @@ status_t NuPlayer2Driver::pause() {
 
         case STATE_RUNNING:
             mState = STATE_PAUSED;
-            notifyListener_l(MEDIA2_PAUSED);
+            sendNotifyOnLooper(MEDIA2_PAUSED);
             mPlayer->pause();
             break;
 
@@ -440,7 +449,7 @@ status_t NuPlayer2Driver::setPlaybackSettings(const AudioPlaybackRate &rate) {
         Mutex::Autolock autoLock(mLock);
         if (rate.mSpeed == 0.f && mState == STATE_RUNNING) {
             mState = STATE_PAUSED;
-            notifyListener_l(MEDIA2_PAUSED);
+            sendNotifyOnLooper(MEDIA2_PAUSED);
         } else if (rate.mSpeed != 0.f
                 && (mState == STATE_PAUSED
                     || mState == STATE_STOPPED_AND_PREPARED
@@ -478,7 +487,7 @@ status_t NuPlayer2Driver::seekTo(int msec, MediaPlayer2SeekMode mode) {
             mAtEOS = false;
             mSeekInProgress = true;
             // seeks can take a while, so we essentially paused
-            notifyListener_l(MEDIA2_PAUSED);
+            sendNotifyOnLooper(MEDIA2_PAUSED);
             mPlayer->seekToAsync(seekTimeUs, mode, true /* needNotify */);
             break;
         }
@@ -651,7 +660,7 @@ status_t NuPlayer2Driver::reset() {
         {
             CHECK(mIsAsyncPrepare);
 
-            notifyListener_l(MEDIA2_PREPARED);
+            sendNotifyOnLooper(MEDIA2_PREPARED);
             break;
         }
 
@@ -660,7 +669,7 @@ status_t NuPlayer2Driver::reset() {
     }
 
     if (mState != STATE_STOPPED) {
-        notifyListener_l(MEDIA2_STOPPED);
+        sendNotifyOnLooper(MEDIA2_STOPPED);
     }
 
     mState = STATE_RESET_IN_PROGRESS;
@@ -704,7 +713,7 @@ status_t NuPlayer2Driver::invoke(const Parcel &request, Parcel *reply) {
     int32_t methodId;
     status_t ret = request.readInt32(&methodId);
     if (ret != OK) {
-        ALOGE("Failed to retrieve the requested method to invoke");
+        ALOGE("Failed to retrieve the requested method to invoke, err(%d)", ret);
         return ret;
     }
 
@@ -939,6 +948,19 @@ status_t NuPlayer2Driver::dump(
     return OK;
 }
 
+void NuPlayer2Driver::onMessageReceived(const sp<AMessage> &msg) {
+    switch (msg->what()) {
+        case kWhatNotifyListener: {
+            int32_t msgId;
+            CHECK(msg->findInt32("messageId", &msgId));
+            notifyListener(msgId);
+            break;
+        }
+        default:
+            break;
+    }
+}
+
 void NuPlayer2Driver::notifyListener(
         int msg, int ext1, int ext2, const Parcel *in) {
     Mutex::Autolock autoLock(mLock);
@@ -1005,6 +1027,12 @@ void NuPlayer2Driver::notifyListener_l(
     mLock.unlock();
     sendEvent(msg, ext1, ext2, in);
     mLock.lock();
+}
+
+void NuPlayer2Driver::sendNotifyOnLooper(int msgId) {
+    sp<AMessage> msg = new AMessage(kWhatNotifyListener, this);
+    msg->setInt32("messageId", msgId);
+    msg->post();
 }
 
 void NuPlayer2Driver::notifySetDataSourceCompleted(status_t err) {
