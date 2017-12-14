@@ -31,6 +31,12 @@ class MediaExtractorFactory {
 public:
     static sp<IMediaExtractor> Create(
             const sp<DataSource> &source, const char *mime = NULL);
+    // Creates media extractor from the given file descriptor. To avoid binder calls for
+    // reading file data, this tries to create remote file source in extractor service.
+    // If that fails, this falls back to local file source. The data source used for extractor
+    // will be alsp returned with |out|.
+    static sp<IMediaExtractor> CreateFromFd(
+            int fd, int64_t offset, int64_t length, const char *mime, sp<DataSource> *out);
     static sp<MediaExtractor> CreateFromService(
             const sp<DataSource> &source, const char *mime = NULL);
 

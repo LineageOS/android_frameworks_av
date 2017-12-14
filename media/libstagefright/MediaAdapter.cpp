@@ -45,17 +45,24 @@ status_t MediaAdapter::start(MetaData * /* params */) {
 }
 
 status_t MediaAdapter::stop() {
-    Mutex::Autolock autoLock(mAdapterLock);
-    if (mStarted) {
-        mStarted = false;
-        // If stop() happens immediately after a pushBuffer(), we should
-        // clean up the mCurrentMediaBuffer
-        if (mCurrentMediaBuffer != NULL) {
-            mCurrentMediaBuffer->release();
+    MediaBuffer *currentBuffer = NULL;
+    {
+        Mutex::Autolock autoLock(mAdapterLock);
+        if (mStarted) {
+            mStarted = false;
+            // If stop() happens immediately after a pushBuffer(), we should
+            // clean up the mCurrentMediaBuffer. But need to release without
+            // the lock as signalBufferReturned() will acquire the lock.
+            currentBuffer = mCurrentMediaBuffer;
             mCurrentMediaBuffer = NULL;
+
+            // While read() is still waiting, we should signal it to finish.
+            mBufferReadCond.signal();
         }
-        // While read() is still waiting, we should signal it to finish.
-        mBufferReadCond.signal();
+    }
+    if (currentBuffer != NULL) {
+        currentBuffer->release();
+        currentBuffer = NULL;
     }
     return OK;
 }
@@ -97,7 +104,6 @@ status_t MediaAdapter::read(
 
     *buffer = mCurrentMediaBuffer;
     mCurrentMediaBuffer = NULL;
-    (*buffer)->setObserver(this);
 
     return OK;
 }
@@ -114,6 +120,7 @@ status_t MediaAdapter::pushBuffer(MediaBuffer *buffer) {
         return INVALID_OPERATION;
     }
     mCurrentMediaBuffer = buffer;
+    mCurrentMediaBuffer->setObserver(this);
     mBufferReadCond.signal();
 
     ALOGV("wait for the buffer returned @ pushBuffer! %p", buffer);

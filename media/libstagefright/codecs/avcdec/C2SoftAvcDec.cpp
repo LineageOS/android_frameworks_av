@@ -20,6 +20,7 @@
 
 #include <cmath>
 #include <thread>
+#include <cinttypes>
 
 #include "ih264_typedefs.h"
 #include "iv.h"
@@ -1044,7 +1045,8 @@ bool C2SoftAvcDec::process(const std::unique_ptr<C2Work> &work, std::shared_ptr<
         work->worklets.front()->output.ordinal = work->input.ordinal;
     };
     if (buffer.capacity() == 0) {
-        ALOGV("empty input: %llu", work->input.ordinal.frame_index);
+        ALOGV("empty input: %" PRIu64, work->input.ordinal.frame_index);
+
         // TODO: result?
         fillEmptyWork(work);
         if ((work->input.flags & C2BufferPack::FLAG_END_OF_STREAM)) {
@@ -1052,7 +1054,7 @@ bool C2SoftAvcDec::process(const std::unique_ptr<C2Work> &work, std::shared_ptr<
         }
         done = true;
     } else if (work->input.flags & C2BufferPack::FLAG_END_OF_STREAM) {
-        ALOGV("input EOS: %llu", work->input.ordinal.frame_index);
+        ALOGV("input EOS: %" PRIu64, work->input.ordinal.frame_index);
         eos = true;
     }
 

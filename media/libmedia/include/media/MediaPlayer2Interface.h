@@ -25,13 +25,14 @@
 #include <utils/String8.h>
 #include <utils/RefBase.h>
 
-#include <media/mediaplayer2.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTimestamp.h>
 #include <media/AVSyncSettings.h>
 #include <media/BufferingSettings.h>
 #include <media/Metadata.h>
+#include <media/mediaplayer2.h>
+#include <media/stagefright/foundation/AHandler.h>
 
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
 // global, and not in android::
@@ -67,14 +68,14 @@ enum player2_type {
 // duration below which we do not allow deep audio buffering
 #define AUDIO_SINK_MIN_DEEP_BUFFER_DURATION_US 5000000
 
-// callback mechanism for passing messages to MediaPlayer2 object
-typedef void (*notify_callback_f)(void* cookie,
-        int msg, int ext1, int ext2, const Parcel *obj);
-
 // abstract base class - use MediaPlayer2Interface
-class MediaPlayer2Base : public RefBase
+class MediaPlayer2Base : public AHandler
 {
 public:
+    // callback mechanism for passing messages to MediaPlayer2 object
+    typedef void (*NotifyCallback)(const wp<MediaPlayer2Engine> &listener,
+            int msg, int ext1, int ext2, const Parcel *obj);
+
     // AudioSink: abstraction layer for audio output
     class AudioSink : public RefBase {
     public:
@@ -158,7 +159,7 @@ public:
         virtual status_t    enableAudioDeviceCallback(bool enabled);
     };
 
-                        MediaPlayer2Base() : mCookie(0), mNotify(0) {}
+                        MediaPlayer2Base() : mClient(0), mNotify(0) {}
     virtual             ~MediaPlayer2Base() {}
     virtual status_t    initCheck() = 0;
     virtual bool        hardwareOutput() = 0;
@@ -272,27 +273,29 @@ public:
     };
 
     void        setNotifyCallback(
-            void* cookie, notify_callback_f notifyFunc) {
+            const wp<MediaPlayer2Engine> &client, NotifyCallback notifyFunc) {
         Mutex::Autolock autoLock(mNotifyLock);
-        mCookie = cookie; mNotify = notifyFunc;
+        mClient = client; mNotify = notifyFunc;
     }
 
     void        sendEvent(int msg, int ext1=0, int ext2=0,
                           const Parcel *obj=NULL) {
-        notify_callback_f notifyCB;
-        void* cookie;
+        NotifyCallback notifyCB;
+        wp<MediaPlayer2Engine> client;
         {
             Mutex::Autolock autoLock(mNotifyLock);
             notifyCB = mNotify;
-            cookie = mCookie;
+            client = mClient;
         }
 
-        if (notifyCB) notifyCB(cookie, msg, ext1, ext2, obj);
+        if (notifyCB) notifyCB(client, msg, ext1, ext2, obj);
     }
 
     virtual status_t dump(int /* fd */, const Vector<String16>& /* args */) const {
         return INVALID_OPERATION;
     }
+
+    virtual void onMessageReceived(const sp<AMessage> & /* msg */) override { }
 
     // Modular DRM
     virtual status_t prepareDrm(const uint8_t /* uuid */[16], const Vector<uint8_t>& /* drmSessionId */) {
@@ -305,9 +308,9 @@ public:
 private:
     friend class MediaPlayer2Manager;
 
-    Mutex               mNotifyLock;
-    void*               mCookie;
-    notify_callback_f   mNotify;
+    Mutex                  mNotifyLock;
+    wp<MediaPlayer2Engine> mClient;
+    NotifyCallback         mNotify;
 };
 
 // Implement this class for media players that use the AudioFlinger software mixer

@@ -65,8 +65,8 @@ class MediaPlayer2Factory {
                                       const sp<DataSource> &source);
 
     static sp<MediaPlayer2Base> createPlayer(player2_type playerType,
-                                             void* cookie,
-                                             notify_callback_f notifyFunc,
+                                             const wp<MediaPlayer2Engine> &client,
+                                             MediaPlayer2Base::NotifyCallback notifyFunc,
                                              pid_t pid);
 
     static void registerBuiltinFactories();

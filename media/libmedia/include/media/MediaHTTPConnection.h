@@ -20,6 +20,8 @@
 
 #include <media/stagefright/foundation/ABase.h>
 #include <utils/KeyedVector.h>
+#include <utils/RefBase.h>
+#include <utils/String8.h>
 
 namespace android {
 
