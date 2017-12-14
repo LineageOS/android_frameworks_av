@@ -25,10 +25,6 @@ LOCAL_VENDOR_MODULE := true
 LOCAL_32_BIT_ONLY := true
 LOCAL_INIT_RC := android.hardware.media.omx@1.0-service.rc
 
-ifeq ($(PRODUCT_FULL_TREBLE),true)
-LOCAL_CFLAGS += -DUSE_VNDBINDER
-endif
-
 include $(BUILD_EXECUTABLE)
 
 # service seccomp policy
