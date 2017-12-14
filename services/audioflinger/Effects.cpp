@@ -72,9 +72,10 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
       // prior to configure().
       mConfig{{}, {}},
       mStatus(NO_INIT), mState(IDLE),
-      // mMaxDisableWaitCnt is set by configure() and not used before then
-      // mDisableWaitCnt is set by process() and updateState() and not used before then
+      mMaxDisableWaitCnt(1), // set by configure(), should be >= 1
+      mDisableWaitCnt(0),    // set by process() and updateState()
       mSuspended(false),
+      mOffloaded(false),
       mAudioFlinger(thread->mAudioFlinger)
 #ifdef FLOAT_EFFECT_CHAIN
       , mSupportsFloat(false)
