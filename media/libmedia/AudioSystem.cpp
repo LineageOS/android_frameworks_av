@@ -1335,4 +1335,18 @@ void AudioSystem::AudioPolicyServiceClient::binderDied(const wp<IBinder>& who __
     ALOGW("AudioPolicyService server died!");
 }
 
+status_t AudioSystem::getAudioData(int par, unsigned long size, char * buffer)
+{
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == 0) return 0;
+    return af->getAudioData(par, size, buffer);
+}
+
+status_t AudioSystem::setAudioData(int par, unsigned long size, char * buffer)
+{
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == 0) return 0;
+    return af->setAudioData(par, size, buffer);
+}
+
 } // namespace android
