@@ -14,6 +14,10 @@ include $(BUILD_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
 
+ifeq ($(AUDIO_KEY),true)
+LOCAL_CFLAGS += -MTK_MT6582
+endif
+
 LOCAL_SRC_FILES:= \
     AudioTrack.cpp \
     AudioTrackShared.cpp \
