@@ -331,9 +331,6 @@ public:
 
     static status_t registerPolicyMixes(Vector<AudioMix> mixes, bool registration);
 
-    static status_t getAudioData(int par, unsigned long size, char * buffer);
-    static status_t setAudioData(int par, unsigned long size, char * buffer);
-
     static status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,
                                       audio_io_handle_t *handle);
