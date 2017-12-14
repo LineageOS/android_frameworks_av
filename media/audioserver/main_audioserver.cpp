@@ -35,12 +35,19 @@
 #include "AAudioService.h"
 #include "utility/AAudioUtilities.h"
 #include "MediaLogService.h"
+#include "MediaUtils.h"
 #include "SoundTriggerHwService.h"
 
 using namespace android;
 
 int main(int argc __unused, char **argv)
 {
+    // TODO: update with refined parameters
+    limitProcessMemory(
+        "audio.maxmem", /* "ro.audio.maxmem", property that defines limit */
+        (size_t)512 * (1 << 20), /* SIZE_MAX, upper limit in bytes */
+        20 /* upper limit as percentage of physical RAM */);
+
     signal(SIGPIPE, SIG_IGN);
 
     bool doLog = (bool) property_get_bool("ro.test_harness", 0);
