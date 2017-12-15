@@ -58,10 +58,6 @@ struct ThrottledSource : public DataSource {
         return mSource->DrmInitialization(mime);
     }
 
-    virtual void getDrmInfo(sp<DecryptHandle> &handle, DrmManagerClient **client) {
-        mSource->getDrmInfo(handle, client);
-    };
-
     virtual String8 getMIMEType() const {
         return mSource->getMIMEType();
     }

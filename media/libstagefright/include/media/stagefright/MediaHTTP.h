@@ -50,7 +50,6 @@ protected:
     virtual ~MediaHTTP();
 
     virtual sp<DecryptHandle> DrmInitialization(const char* mime);
-    virtual void getDrmInfo(sp<DecryptHandle> &handle, DrmManagerClient **client);
     virtual String8 getUri();
     virtual String8 getMIMEType() const;
 

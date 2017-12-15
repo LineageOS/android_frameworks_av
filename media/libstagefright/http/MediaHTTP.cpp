@@ -176,12 +176,6 @@ sp<DecryptHandle> MediaHTTP::DrmInitialization(const char* mime) {
     return mDecryptHandle;
 }
 
-void MediaHTTP::getDrmInfo(
-        sp<DecryptHandle> &handle, DrmManagerClient **client) {
-    handle = mDecryptHandle;
-    *client = mDrmManagerClient;
-}
-
 String8 MediaHTTP::getUri() {
     if (mInitCheck != OK) {
         return String8::empty();
