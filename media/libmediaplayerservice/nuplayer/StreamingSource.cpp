@@ -28,6 +28,7 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/MediaKeys.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 
@@ -114,7 +115,7 @@ void NuPlayer::StreamingSource::onReadBuffer() {
             int32_t mask;
             if (extra != NULL
                     && extra->findInt32(
-                        IStreamListener::kKeyDiscontinuityMask, &mask)) {
+                        kIStreamListenerKeyDiscontinuityMask, &mask)) {
                 if (mask == 0) {
                     ALOGE("Client specified an illegal discontinuity type.");
                     setError(ERROR_UNSUPPORTED);
@@ -142,7 +143,7 @@ void NuPlayer::StreamingSource::onReadBuffer() {
                     int64_t mediaTimeUs;
                     memcpy(&mediaTimeUs, &buffer[2], sizeof(mediaTimeUs));
 
-                    extra->setInt64(IStreamListener::kKeyMediaTimeUs, mediaTimeUs);
+                    extra->setInt64(kATSParserKeyMediaTimeUs, mediaTimeUs);
                 }
 
                 mTSParser->signalDiscontinuity(
