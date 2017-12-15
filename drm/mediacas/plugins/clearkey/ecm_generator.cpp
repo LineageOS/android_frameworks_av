@@ -38,8 +38,6 @@ const uint32_t kContentKeyByteSize = 16;
 const uint16_t kTotalEcmSize =
         kEcmClearFieldsSize + kContentKeyByteSize; // clear fields + clear key
 
-const uint32_t kKeyLength = 16;
-
 #define UNALIGNED_LOAD32(_p) (*reinterpret_cast<const uint32_t *>(_p))
 
 static uint32_t Load32(const void *p) {
