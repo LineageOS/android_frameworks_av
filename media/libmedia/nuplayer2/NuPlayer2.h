@@ -27,6 +27,7 @@ namespace android {
 struct ABuffer;
 struct AMediaCryptoWrapper;
 struct AMessage;
+struct ANativeWindowWrapper;
 struct AudioPlaybackRate;
 struct AVSyncSettings;
 class IDataSource;
@@ -58,8 +59,7 @@ struct NuPlayer2 : public AHandler {
 
     void prepareAsync();
 
-    void setVideoSurfaceTextureAsync(
-            const sp<IGraphicBufferProducer> &bufferProducer);
+    void setVideoSurfaceTextureAsync(const sp<ANativeWindowWrapper> &nww);
 
     void setAudioSink(const sp<MediaPlayer2Base::AudioSink> &sink);
     status_t setPlaybackSettings(const AudioPlaybackRate &rate);
@@ -167,7 +167,7 @@ private:
     Mutex mSourceLock;  // guard |mSource|.
     sp<Source> mSource;
     uint32_t mSourceFlags;
-    sp<Surface> mSurface;
+    sp<ANativeWindowWrapper> mNativeWindow;
     sp<MediaPlayer2Base::AudioSink> mAudioSink;
     sp<DecoderBase> mVideoDecoder;
     bool mOffloadAudio;
@@ -320,7 +320,7 @@ private:
     void performDecoderFlush(FlushCommand audio, FlushCommand video);
     void performReset();
     void performScanSources();
-    void performSetSurface(const sp<Surface> &wrapper);
+    void performSetSurface(const sp<ANativeWindowWrapper> &nw);
     void performResumeDecoders(bool needNotify);
 
     void onSourceNotify(const sp<AMessage> &msg);

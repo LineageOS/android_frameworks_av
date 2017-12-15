@@ -17,9 +17,9 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NdkWrapper"
 
-#include "NdkWrapper.h"
+#include <media/NdkWrapper.h>
 
-#include <gui/Surface.h>
+#include <android/native_window.h>
 #include <log/log.h>
 #include <media/NdkMediaCodec.h>
 #include <media/NdkMediaCrypto.h>
@@ -473,6 +473,31 @@ void AMediaFormatWrapper::setBuffer(const char* name, void* data, size_t size) {
 }
 
 
+//////////// ANativeWindowWrapper
+ANativeWindowWrapper::ANativeWindowWrapper(ANativeWindow *aNativeWindow)
+    : mANativeWindow(aNativeWindow) {
+    if (aNativeWindow != NULL) {
+        ANativeWindow_acquire(aNativeWindow);
+    }
+}
+
+ANativeWindowWrapper::~ANativeWindowWrapper() {
+    release();
+}
+
+status_t ANativeWindowWrapper::release() {
+    if (mANativeWindow != NULL) {
+        ANativeWindow_release(mANativeWindow);
+        mANativeWindow = NULL;
+    }
+    return OK;
+}
+
+ANativeWindow *ANativeWindowWrapper::getANativeWindow() const {
+    return mANativeWindow;
+}
+
+
 //////////// AMediaDrmWrapper
 AMediaDrmWrapper::AMediaDrmWrapper(const uint8_t uuid[16]) {
     mAMediaDrm = AMediaDrm_createByUUID(uuid);
@@ -838,7 +863,7 @@ status_t AMediaCodecWrapper::getName(AString *outComponentName) const {
 
 status_t AMediaCodecWrapper::configure(
     const sp<AMediaFormatWrapper> &format,
-    const sp<Surface> &surface,
+    const sp<ANativeWindowWrapper> &nww,
     const sp<AMediaCryptoWrapper> &crypto,
     uint32_t flags) {
     if (mAMediaCodec == NULL) {
@@ -848,7 +873,7 @@ status_t AMediaCodecWrapper::configure(
     media_status_t err = AMediaCodec_configure(
             mAMediaCodec,
             format->getAMediaFormat(),
-            surface.get(),
+            (nww == NULL ? NULL : nww->getANativeWindow()),
             crypto == NULL ? NULL : crypto->getAMediaCrypto(),
             flags);
 
@@ -969,12 +994,13 @@ status_t AMediaCodecWrapper::releaseOutputBuffer(size_t idx, bool render) {
         AMediaCodec_releaseOutputBuffer(mAMediaCodec, idx, render));
 }
 
-status_t AMediaCodecWrapper::setOutputSurface(const sp<Surface> &surface) {
+status_t AMediaCodecWrapper::setOutputSurface(const sp<ANativeWindowWrapper> &nww) {
     if (mAMediaCodec == NULL) {
         return DEAD_OBJECT;
     }
     return translateErrorCode(
-        AMediaCodec_setOutputSurface(mAMediaCodec, surface.get()));
+        AMediaCodec_setOutputSurface(mAMediaCodec,
+                                     (nww == NULL ? NULL : nww->getANativeWindow())));
 }
 
 status_t AMediaCodecWrapper::releaseOutputBufferAtTime(size_t idx, int64_t timestampNs) {

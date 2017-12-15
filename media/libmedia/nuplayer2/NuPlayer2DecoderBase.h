@@ -25,10 +25,10 @@
 namespace android {
 
 struct ABuffer;
+struct ANativeWindowWrapper;
 struct MediaCodec;
 class MediaBuffer;
 class MediaCodecBuffer;
-class Surface;
 
 struct NuPlayer2::DecoderBase : public AHandler {
     explicit DecoderBase(const sp<AMessage> &notify);
@@ -41,7 +41,7 @@ struct NuPlayer2::DecoderBase : public AHandler {
     void pause();
 
     void setRenderer(const sp<Renderer> &renderer);
-    virtual status_t setVideoSurface(const sp<Surface> &) { return INVALID_OPERATION; }
+    virtual status_t setVideoSurface(const sp<ANativeWindowWrapper> &) { return INVALID_OPERATION; }
 
     void signalFlush();
     void signalResume(bool notifyComplete);

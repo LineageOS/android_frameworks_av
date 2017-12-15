@@ -34,13 +34,13 @@ struct NuPlayer2::Decoder : public DecoderBase {
             pid_t pid,
             uid_t uid,
             const sp<Renderer> &renderer = NULL,
-            const sp<Surface> &surface = NULL,
+            const sp<ANativeWindowWrapper> &nww = NULL,
             const sp<CCDecoder> &ccDecoder = NULL);
 
     virtual sp<AMessage> getStats() const;
 
     // sets the output surface of video decoders.
-    virtual status_t setVideoSurface(const sp<Surface> &surface);
+    virtual status_t setVideoSurface(const sp<ANativeWindowWrapper> &nww);
 
     virtual status_t releaseCrypto();
 
@@ -70,7 +70,7 @@ private:
         kMaxNumVideoTemporalLayers = 32,
     };
 
-    sp<Surface> mSurface;
+    sp<ANativeWindowWrapper> mNativeWindow;
 
     sp<Source> mSource;
     sp<Renderer> mRenderer;

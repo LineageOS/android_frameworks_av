@@ -246,6 +246,7 @@ cc_library_shared {
         "IStreamSource.cpp",
         "MediaUtils.cpp",
         "Metadata.cpp",
+        "NdkWrapper.cpp",
     ],
 
     shared_libs: [
@@ -254,6 +255,8 @@ cc_library_shared {
         "libgui",
         "liblog",
         "libmediaextractor",
+        "libmediandk",
+        "libnativewindow",
         "libstagefright_foundation",
         "libui",
         "libutils",
@@ -261,6 +264,7 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "libbinder",
+        "libmediandk",
     ],
 
     header_libs: [
@@ -328,6 +332,7 @@ cc_library_shared {
         "libmediandk",
         "libmediautils",
         "libmemunreachable",
+        "libnativewindow",
         "libpowermanager",
         "libstagefright_httplive",
         "libstagefright_player2",

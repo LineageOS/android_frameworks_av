@@ -33,13 +33,13 @@ struct AMediaCrypto;
 struct AMediaDrm;
 struct AMediaFormat;
 struct AMediaExtractor;
+struct ANativeWindow;
 struct PsshInfo;
 
 namespace android {
 
 struct AMessage;
 class MetaData;
-class Surface;
 
 struct AMediaFormatWrapper : public RefBase {
     static sp<AMediaFormatWrapper> Create(const sp<AMessage> &message);
@@ -82,6 +82,23 @@ private:
     AMediaFormat *mAMediaFormat;
 
     DISALLOW_EVIL_CONSTRUCTORS(AMediaFormatWrapper);
+};
+
+struct ANativeWindowWrapper : public RefBase {
+    ANativeWindowWrapper(ANativeWindow *aNativeWindow);
+
+    // the returned ANativeWindow is still owned by this wrapper.
+    ANativeWindow *getANativeWindow() const;
+
+    status_t release();
+
+protected:
+    virtual ~ANativeWindowWrapper();
+
+private:
+    ANativeWindow *mANativeWindow;
+
+    DISALLOW_EVIL_CONSTRUCTORS(ANativeWindowWrapper);
 };
 
 struct AMediaDrmWrapper : public RefBase {
@@ -205,7 +222,7 @@ struct AMediaCodecWrapper : public RefBase {
 
     status_t configure(
             const sp<AMediaFormatWrapper> &format,
-            const sp<Surface> &surface,
+            const sp<ANativeWindowWrapper> &nww,
             const sp<AMediaCryptoWrapper> &crypto,
             uint32_t flags);
 
@@ -239,7 +256,7 @@ struct AMediaCodecWrapper : public RefBase {
 
     status_t releaseOutputBuffer(size_t idx, bool render);
 
-    status_t setOutputSurface(const sp<Surface> &surface);
+    status_t setOutputSurface(const sp<ANativeWindowWrapper> &nww);
 
     status_t releaseOutputBufferAtTime(size_t idx, int64_t timestampNs);
 

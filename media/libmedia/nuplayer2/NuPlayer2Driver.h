@@ -43,8 +43,7 @@ struct NuPlayer2Driver : public MediaPlayer2Interface {
 
     virtual status_t setDataSource(const sp<DataSource>& dataSource);
 
-    virtual status_t setVideoSurfaceTexture(
-            const sp<IGraphicBufferProducer> &bufferProducer);
+    virtual status_t setVideoSurfaceTexture(const sp<ANativeWindowWrapper> &nww);
 
     virtual status_t getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) override;

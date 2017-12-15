@@ -4,7 +4,6 @@ cc_library_static {
         "JWakeLock.cpp",
         "GenericSource.cpp",
         "HTTPLiveSource.cpp",
-        "NdkWrapper.cpp",
         "NuPlayer2.cpp",
         "NuPlayer2CCDecoder.cpp",
         "NuPlayer2Decoder.cpp",
@@ -23,6 +22,7 @@ cc_library_static {
     ],
 
     include_dirs: [
+        "frameworks/av/media/libmedia/include",
         "frameworks/av/media/libstagefright",
         "frameworks/av/media/libstagefright/httplive",
         "frameworks/av/media/libstagefright/include",

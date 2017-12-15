@@ -18,7 +18,6 @@
 #define LOG_TAG "GenericSource"
 
 #include "GenericSource.h"
-#include "NdkWrapper.h"
 #include "NuPlayer2Drm.h"
 
 #include "AnotherPacketSource.h"
@@ -29,6 +28,7 @@
 #include <media/MediaHTTPService.h>
 #include <media/MediaExtractor.h>
 #include <media/MediaSource.h>
+#include <media/NdkWrapper.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
