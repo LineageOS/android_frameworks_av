@@ -24,6 +24,7 @@
 #include "EffectsFactoryHalHidl.h"
 #include "HidlUtils.h"
 
+using ::android::hardware::audio::common::V2_0::HidlUtils;
 using ::android::hardware::audio::common::V2_0::Uuid;
 using ::android::hardware::audio::effect::V2_0::IEffect;
 using ::android::hardware::audio::effect::V2_0::Result;
