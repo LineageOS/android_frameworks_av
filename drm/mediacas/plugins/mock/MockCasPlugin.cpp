@@ -146,7 +146,7 @@ status_t MockCasPlugin::processEcm(
     if (session == NULL) {
         return BAD_VALUE;
     }
-    ALOGV("ECM: size=%d", ecm.size());
+    ALOGV("ECM: size=%zu", ecm.size());
     ALOGV("ECM: data=%s", arrayToString(ecm).string());
 
     return OK;
@@ -156,7 +156,7 @@ status_t MockCasPlugin::processEmm(const CasEmm& emm) {
     ALOGV("processEmm");
     Mutex::Autolock lock(mLock);
 
-    ALOGV("EMM: size=%d", emm.size());
+    ALOGV("EMM: size=%zu", emm.size());
     ALOGV("EMM: data=%s", arrayToString(emm).string());
 
     return OK;
