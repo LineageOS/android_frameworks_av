@@ -323,7 +323,7 @@ int32_t AAudioConvert_framesToBytes(int32_t numFrames,
     const int32_t maxBytesPerFrame = maxChannels * sizeof(float);
     // Prevent overflow by limiting multiplicands.
     if (bytesPerFrame > maxBytesPerFrame || numFrames > (0x3FFFFFFF / maxBytesPerFrame)) {
-        ALOGE("size overflow, numFrames = %d, frameSize = %zd", numFrames, bytesPerFrame);
+        ALOGE("size overflow, numFrames = %d, frameSize = %d", numFrames, bytesPerFrame);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
     *sizeInBytes = numFrames * bytesPerFrame;
