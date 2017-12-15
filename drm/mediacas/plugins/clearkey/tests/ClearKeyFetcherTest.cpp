@@ -93,7 +93,7 @@ TEST_F(ClearKeyFetcherTest, Success) {
     uint64_t asset_id;
     std::vector<KeyFetcher::KeyInfo> keys;
     EXPECT_EQ(OK, fetcher.ObtainKey(ecm_, &asset_id, &keys));
-    EXPECT_EQ(2, keys.size());
+    EXPECT_EQ(2U, keys.size());
     EXPECT_EQ(0, keys[0].key_id);
     EXPECT_EQ(content_key_[0]->size(), keys[0].key_bytes->size());
     EXPECT_EQ(0, memcmp(content_key_[0]->data(),

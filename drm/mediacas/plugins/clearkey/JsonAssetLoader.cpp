@@ -36,8 +36,6 @@ const String8 kEncryptionKeyTag("encryption_key");
 const String8 kCasTypeTag("cas_type");
 const String8 kBase64Padding("=");
 
-const uint32_t kKeyLength = 16;
-
 JsonAssetLoader::JsonAssetLoader() {
 }
 
