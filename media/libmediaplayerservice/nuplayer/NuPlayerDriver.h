@@ -113,6 +113,8 @@ private:
         STATE_STOPPED_AND_PREPARED,     // equivalent to PAUSED, but seek complete
     };
 
+    std::string stateString(State state);
+
     mutable Mutex mLock;
     Condition mCondition;
 
