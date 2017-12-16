@@ -70,6 +70,8 @@ cc_library_static {
         "-Werror",
     ],
 
+    version_script: "exports.lds",
+
     //addressing b/25409744
     //sanitize: {
     //    misc_undefined: [

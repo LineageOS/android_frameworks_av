@@ -30,6 +30,8 @@ cc_library_static {
         "-Werror",
     ],
 
+    version_script: "exports.lds",
+
     include_dirs: [
         "frameworks/av/media/libstagefright/include",
         "frameworks/native/include/media/openmax",
