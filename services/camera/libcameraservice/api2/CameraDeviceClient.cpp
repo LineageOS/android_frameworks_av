@@ -668,7 +668,7 @@ binder::Status CameraDeviceClient::createInputStream(
 
     if (mInputStream.configured) {
         String8 msg = String8::format("Camera %s: Already has an input stream "
-                "configured (ID %zd)", mCameraIdStr.string(), mInputStream.id);
+                "configured (ID %d)", mCameraIdStr.string(), mInputStream.id);
         ALOGE("%s: %s", __FUNCTION__, msg.string() );
         return STATUS_ERROR(CameraService::ERROR_ALREADY_EXISTS, msg.string());
     }
