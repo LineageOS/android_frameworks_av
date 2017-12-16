@@ -3484,7 +3484,7 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
 #ifdef USE_XML_AUDIO_POLICY_CONF
     mVolumeCurves(new VolumeCurvesCollection()),
     mConfig(mHwModulesAll, mAvailableOutputDevices, mAvailableInputDevices,
-            mDefaultOutputDevice, static_cast<VolumeCurvesCollection*>(mVolumeCurves)),
+            mDefaultOutputDevice, static_cast<VolumeCurvesCollection*>(mVolumeCurves.get())),
 #else
     mVolumeCurves(new StreamDescriptorCollection()),
     mConfig(mHwModulesAll, mAvailableOutputDevices, mAvailableInputDevices,

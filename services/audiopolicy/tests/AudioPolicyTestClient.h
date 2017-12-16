@@ -22,7 +22,7 @@ namespace android {
 class AudioPolicyTestClient : public AudioPolicyClientInterface
 {
 public:
-    virtual ~AudioPolicyTestClient() {}
+    virtual ~AudioPolicyTestClient() = default;
 
     // AudioPolicyClientInterface Implementation
     audio_module_handle_t loadHwModule(const char* /*name*/) override { return 0; }

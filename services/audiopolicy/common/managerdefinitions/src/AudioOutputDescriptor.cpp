@@ -431,6 +431,9 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
                         __FUNCTION__, mDevice, device);
 
     if (status == NO_ERROR) {
+        LOG_ALWAYS_FATAL_IF(*output == AUDIO_IO_HANDLE_NONE,
+                            "%s openOutput returned output handle %d for device %08x",
+                            __FUNCTION__, *output, device);
         mSamplingRate = lConfig.sample_rate;
         mChannelMask = lConfig.channel_mask;
         mFormat = lConfig.format;
