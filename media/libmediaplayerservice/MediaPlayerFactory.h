@@ -65,8 +65,7 @@ class MediaPlayerFactory {
                                      const sp<DataSource> &source);
 
     static sp<MediaPlayerBase> createPlayer(player_type playerType,
-                                            const wp<IMediaPlayer> &client,
-                                            notify_callback_f notifyFunc,
+                                            const sp<MediaPlayerBase::Listener> &listener,
                                             pid_t pid);
 
     static void registerBuiltinFactories();
