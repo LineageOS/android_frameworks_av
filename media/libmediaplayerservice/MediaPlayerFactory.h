@@ -59,8 +59,7 @@ class MediaPlayerFactory {
                                      const sp<IStreamSource> &source);
 
     static sp<MediaPlayerBase> createPlayer(player_type playerType,
-                                            void* cookie,
-                                            notify_callback_f notifyFunc);
+                                            const sp<MediaPlayerBase::Listener> &listener);
 
     static void registerBuiltinFactories();
 

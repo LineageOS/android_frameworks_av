@@ -49,7 +49,7 @@ class MediaRecorderClient;
 #if CALLBACK_ANTAGONIZER
 class Antagonizer {
 public:
-    Antagonizer(notify_callback_f cb, void* client);
+    Antagonizer(const sp<MediaPlayerBase::Listener> &listener);
     void start() { mActive = true; }
     void stop() { mActive = false; }
     void kill();
@@ -57,12 +57,11 @@ private:
     static const int interval;
     Antagonizer();
     static int callbackThread(void* cookie);
-    Mutex               mLock;
-    Condition           mCondition;
-    bool                mExit;
-    bool                mActive;
-    void*               mClient;
-    notify_callback_f   mCb;
+    Mutex                         mLock;
+    Condition                     mCondition;
+    bool                          mExit;
+    bool                          mActive;
+    sp<MediaPlayerBase::Listener> mListener;
 };
 #endif
 
@@ -189,7 +188,6 @@ class MediaPlayerService : public BnMediaPlayerService
         };
 
     }; // AudioOutput
-
 
     class AudioCache : public MediaPlayerBase::AudioSink
     {
@@ -384,8 +382,7 @@ private:
         void                    setDataSource_post(const sp<MediaPlayerBase>& p,
                                                    status_t status);
 
-        static  void            notify(void* cookie, int msg,
-                                       int ext1, int ext2, const Parcel *obj);
+        static  void            notify(int msg, int ext1, int ext2, const Parcel *obj);
 
                 pid_t           pid() const { return mPid; }
         virtual status_t        dump(int fd, const Vector<String16>& args) const;
@@ -425,22 +422,37 @@ private:
         // Disconnect from the currently connected ANativeWindow.
         void disconnectNativeWindow();
 
-        mutable     Mutex                       mLock;
-                    sp<MediaPlayerBase>         mPlayer;
-                    sp<MediaPlayerService>      mService;
-                    sp<IMediaPlayerClient>      mClient;
-                    sp<AudioOutput>             mAudioOutput;
-                    pid_t                       mPid;
-                    status_t                    mStatus;
-                    bool                        mLoop;
-                    int32_t                     mConnId;
-                    int                         mAudioSessionId;
-                    uid_t                       mUID;
-                    sp<ANativeWindow>           mConnectedWindow;
-                    sp<IBinder>                 mConnectedWindowBinder;
-                    struct sockaddr_in          mRetransmitEndpoint;
-                    bool                        mRetransmitEndpointValid;
-                    sp<Client>                  mNextClient;
+        class Listener : public MediaPlayerBase::Listener {
+        public:
+            Listener(const wp<Client> &client) : mClient(client) {}
+            virtual ~Listener() {}
+            virtual void notify(int msg, int ext1, int ext2, const Parcel *obj) {
+                sp<Client> client = mClient.promote();
+                if (client != NULL) {
+                    client->notify(msg, ext1, ext2, obj);
+                }
+            }
+        private:
+            wp<Client> mClient;
+        };
+
+        mutable     Mutex                         mLock;
+                    sp<MediaPlayerBase>           mPlayer;
+                    sp<MediaPlayerService>        mService;
+                    sp<IMediaPlayerClient>        mClient;
+                    sp<AudioOutput>               mAudioOutput;
+                    pid_t                         mPid;
+                    status_t                      mStatus;
+                    bool                          mLoop;
+                    int32_t                       mConnId;
+                    int                           mAudioSessionId;
+                    uid_t                         mUID;
+                    sp<ANativeWindow>             mConnectedWindow;
+                    sp<IBinder>                   mConnectedWindowBinder;
+                    struct sockaddr_in            mRetransmitEndpoint;
+                    bool                          mRetransmitEndpointValid;
+                    sp<Client>                    mNextClient;
+                    sp<MediaPlayerBase::Listener> mListener;
 
         // Metadata filters.
         media::Metadata::Filter mMetadataAllow;  // protected by mLock
@@ -453,7 +465,7 @@ private:
         media::Metadata::Filter mMetadataUpdated;  // protected by mLock
 
 #if CALLBACK_ANTAGONIZER
-                    Antagonizer*                mAntagonizer;
+                    Antagonizer*                  mAntagonizer;
 #endif
     }; // Client
 
