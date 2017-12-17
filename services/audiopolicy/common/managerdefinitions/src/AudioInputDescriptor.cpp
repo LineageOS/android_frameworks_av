@@ -223,6 +223,9 @@ status_t AudioInputDescriptor::open(const audio_config_t *config,
                         __FUNCTION__, mDevice, device);
 
     if (status == NO_ERROR) {
+        LOG_ALWAYS_FATAL_IF(*input == AUDIO_IO_HANDLE_NONE,
+                            "%s openInput returned input handle %d for device %08x",
+                            __FUNCTION__, *input, device);
         mSamplingRate = lConfig.sample_rate;
         mChannelMask = lConfig.channel_mask;
         mFormat = lConfig.format;

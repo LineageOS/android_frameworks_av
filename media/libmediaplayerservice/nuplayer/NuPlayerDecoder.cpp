@@ -752,6 +752,8 @@ bool NuPlayer::Decoder::handleAnOutputBuffer(
         reply->setInt32("eos", true);
     }
 
+    mNumFramesTotal += !mIsAudio;
+
     if (mSkipRenderingUntilMediaTimeUs >= 0) {
         if (timeUs < mSkipRenderingUntilMediaTimeUs) {
             ALOGV("[%s] dropping buffer at time %lld as requested.",
@@ -769,8 +771,6 @@ bool NuPlayer::Decoder::handleAnOutputBuffer(
 
         mSkipRenderingUntilMediaTimeUs = -1;
     }
-
-    mNumFramesTotal += !mIsAudio;
 
     // wait until 1st frame comes out to signal resume complete
     notifyResumeCompleteIfNecessary();

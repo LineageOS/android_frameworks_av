@@ -67,11 +67,15 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
     : mPinned(pinned),
       mThread(thread), mChain(chain), mId(id), mSessionId(sessionId),
       mDescriptor(*desc),
-      // mConfig cleared in constructor body, set by configure()
+      // clear mConfig to ensure consistent initial value of buffer framecount
+      // in case buffers are associated by setInBuffer() or setOutBuffer()
+      // prior to configure().
+      mConfig{{}, {}},
       mStatus(NO_INIT), mState(IDLE),
-      // mMaxDisableWaitCnt is set by configure() and not used before then
-      // mDisableWaitCnt is set by process() and updateState() and not used before then
+      mMaxDisableWaitCnt(1), // set by configure(), should be >= 1
+      mDisableWaitCnt(0),    // set by process() and updateState()
       mSuspended(false),
+      mOffloaded(false),
       mAudioFlinger(thread->mAudioFlinger)
 #ifdef FLOAT_EFFECT_CHAIN
       , mSupportsFloat(false)
@@ -79,11 +83,6 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
 {
     ALOGV("Constructor %p pinned %d", this, pinned);
     int lStatus;
-
-    // clear configuration to ensure consistent initial value of buffer framecount
-    // in case buffers are associated by setInBuffer() or setOutBuffer()
-    // prior to configure().
-    memset(&mConfig, 0, sizeof(mConfig));
 
     // create effect engine from effect factory
     mStatus = -ENODEV;
@@ -579,8 +578,11 @@ status_t AudioFlinger::EffectModule::configure()
         }
     }
 
-    mMaxDisableWaitCnt = (MAX_DISABLE_TIME_MS * mConfig.outputCfg.samplingRate) /
-            (1000 * mConfig.outputCfg.buffer.frameCount);
+    // mConfig.outputCfg.buffer.frameCount cannot be zero.
+    mMaxDisableWaitCnt = (uint32_t)std::max(
+            (uint64_t)1, // mMaxDisableWaitCnt must be greater than zero.
+            (uint64_t)MAX_DISABLE_TIME_MS * mConfig.outputCfg.samplingRate
+                / ((uint64_t)1000 * mConfig.outputCfg.buffer.frameCount));
 
 exit:
     // TODO: consider clearing mConfig on error.

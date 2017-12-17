@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <inttypes.h>
 #include <mutex>
 #include <time.h>
 #include <pthread.h>
@@ -250,10 +251,14 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
             audioStream->unregisterPlayerBase();
             delete audioStream;
         } else {
-            ALOGW("%s attempt to close failed. Close from another thread.", __func__);
+            ALOGW("%s attempt to close failed. Close it from another thread.", __func__);
         }
     }
-    ALOGD("AAudioStream_close(%p) returned %d ---------", stream, result);
+    // We're potentially freeing `stream` above, so its use here makes some
+    // static analysis tools unhappy. Casting to uintptr_t helps assure
+    // said tools that we're not doing anything bad here.
+    ALOGD("AAudioStream_close(%#" PRIxPTR ") returned %d ---------",
+          reinterpret_cast<uintptr_t>(stream), result);
     return result;
 }
 

@@ -55,6 +55,7 @@ static const char *kPlayerDuration = "android.media.mediaplayer.durationMs";
 static const char *kPlayerPlaying = "android.media.mediaplayer.playingMs";
 static const char *kPlayerError = "android.media.mediaplayer.err";
 static const char *kPlayerErrorCode = "android.media.mediaplayer.errcode";
+static const char *kPlayerErrorState = "android.media.mediaplayer.errstate";
 static const char *kPlayerDataSourceType = "android.media.mediaplayer.dataSource";
 //
 static const char *kPlayerRebuffering = "android.media.mediaplayer.rebufferingMs";
@@ -993,6 +994,7 @@ void NuPlayerDriver::notifyListener_l(
                 if (ext2 != 0) {
                     mAnalyticsItem->setInt32(kPlayerErrorCode, ext2);
                 }
+                mAnalyticsItem->setCString(kPlayerErrorState, stateString(mState).c_str());
             }
             mAtEOS = true;
             break;
@@ -1087,6 +1089,32 @@ status_t NuPlayerDriver::releaseDrm()
     ALOGV("releaseDrm ret: %d", ret);
 
     return ret;
+}
+
+std::string NuPlayerDriver::stateString(State state) {
+    const char *rval = NULL;
+    char rawbuffer[16];  // allows "%d"
+
+    switch (state) {
+        case STATE_IDLE: rval = "IDLE"; break;
+        case STATE_SET_DATASOURCE_PENDING: rval = "SET_DATASOURCE_PENDING"; break;
+        case STATE_UNPREPARED: rval = "UNPREPARED"; break;
+        case STATE_PREPARING: rval = "PREPARING"; break;
+        case STATE_PREPARED: rval = "PREPARED"; break;
+        case STATE_RUNNING: rval = "RUNNING"; break;
+        case STATE_PAUSED: rval = "PAUSED"; break;
+        case STATE_RESET_IN_PROGRESS: rval = "RESET_IN_PROGRESS"; break;
+        case STATE_STOPPED: rval = "STOPPED"; break;
+        case STATE_STOPPED_AND_PREPARING: rval = "STOPPED_AND_PREPARING"; break;
+        case STATE_STOPPED_AND_PREPARED: rval = "STOPPED_AND_PREPARED"; break;
+        default:
+            // yes, this buffer is shared and vulnerable to races
+            snprintf(rawbuffer, sizeof(rawbuffer), "%d", state);
+            rval = rawbuffer;
+            break;
+    }
+
+    return rval;
 }
 
 }  // namespace android

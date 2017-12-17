@@ -3474,10 +3474,22 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
 }
 #endif
 
-AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterface)
+AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterface,
+                                       bool /*forTesting*/)
     :
+    mUidCached(getuid()),
+    mpClientInterface(clientInterface),
     mLimitRingtoneVolume(false), mLastVoiceVolume(-1.0f),
     mA2dpSuspended(false),
+#ifdef USE_XML_AUDIO_POLICY_CONF
+    mVolumeCurves(new VolumeCurvesCollection()),
+    mConfig(mHwModulesAll, mAvailableOutputDevices, mAvailableInputDevices,
+            mDefaultOutputDevice, static_cast<VolumeCurvesCollection*>(mVolumeCurves.get())),
+#else
+    mVolumeCurves(new StreamDescriptorCollection()),
+    mConfig(mHwModulesAll, mAvailableOutputDevices, mAvailableInputDevices,
+            mDefaultOutputDevice),
+#endif
     mAudioPortGeneration(1),
     mBeaconMuteRefCount(0),
     mBeaconPlayingRefCount(0),
@@ -3487,49 +3499,48 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     mMusicEffectOutput(AUDIO_IO_HANDLE_NONE),
     mHasComputedSoundTriggerSupportsConcurrentCapture(false)
 {
-    mUidCached = getuid();
-    mpClientInterface = clientInterface;
+}
 
-    // TODO: remove when legacy conf file is removed. true on devices that use DRC on the
-    // DEVICE_CATEGORY_SPEAKER path to boost soft sounds, used to adjust volume curves accordingly.
-    // Note: remove also speaker_drc_enabled from global configuration of XML config file.
-    bool speakerDrcEnabled = false;
+AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterface)
+        : AudioPolicyManager(clientInterface, false /*forTesting*/)
+{
+    loadConfig();
+    initialize();
+}
 
+void AudioPolicyManager::loadConfig() {
 #ifdef USE_XML_AUDIO_POLICY_CONF
-    mVolumeCurves = new VolumeCurvesCollection();
-    AudioPolicyConfig config(mHwModulesAll, mAvailableOutputDevices, mAvailableInputDevices,
-                             mDefaultOutputDevice, speakerDrcEnabled,
-                             static_cast<VolumeCurvesCollection *>(mVolumeCurves));
-    if (deserializeAudioPolicyXmlConfig(config) != NO_ERROR) {
+    if (deserializeAudioPolicyXmlConfig(getConfig()) != NO_ERROR) {
 #else
-    mVolumeCurves = new StreamDescriptorCollection();
-    AudioPolicyConfig config(mHwModulesAll, mAvailableOutputDevices, mAvailableInputDevices,
-                             mDefaultOutputDevice, speakerDrcEnabled);
-    if ((ConfigParsingUtils::loadConfig(AUDIO_POLICY_VENDOR_CONFIG_FILE, config) != NO_ERROR) &&
-            (ConfigParsingUtils::loadConfig(AUDIO_POLICY_CONFIG_FILE, config) != NO_ERROR)) {
+    if ((ConfigParsingUtils::loadConfig(AUDIO_POLICY_VENDOR_CONFIG_FILE, getConfig()) != NO_ERROR)
+           && (ConfigParsingUtils::loadConfig(AUDIO_POLICY_CONFIG_FILE, getConfig()) != NO_ERROR)) {
 #endif
         ALOGE("could not load audio policy configuration file, setting defaults");
-        config.setDefault();
+        getConfig().setDefault();
     }
-    // must be done after reading the policy (since conditionned by Speaker Drc Enabling)
-    mVolumeCurves->initializeVolumeCurves(speakerDrcEnabled);
+}
+
+status_t AudioPolicyManager::initialize() {
+    mVolumeCurves->initializeVolumeCurves(getConfig().isSpeakerDrcEnabled());
 
     // Once policy config has been parsed, retrieve an instance of the engine and initialize it.
     audio_policy::EngineInstance *engineInstance = audio_policy::EngineInstance::getInstance();
     if (!engineInstance) {
         ALOGE("%s:  Could not get an instance of policy engine", __FUNCTION__);
-        return;
+        return NO_INIT;
     }
     // Retrieve the Policy Manager Interface
     mEngine = engineInstance->queryInterface<AudioPolicyManagerInterface>();
     if (mEngine == NULL) {
         ALOGE("%s: Failed to get Policy Engine Interface", __FUNCTION__);
-        return;
+        return NO_INIT;
     }
     mEngine->setObserver(this);
     status_t status = mEngine->initCheck();
-    (void) status;
-    ALOG_ASSERT(status == NO_ERROR, "Policy engine not initialized(err=%d)", status);
+    if (status != NO_ERROR) {
+        LOG_FATAL("Policy engine not initialized(err=%d)", status);
+        return status;
+    }
 
     // mAvailableOutputDevices and mAvailableInputDevices now contain all attached devices
     // open all output streams needed to access attached devices
@@ -3692,11 +3703,16 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     // make sure default device is reachable
     if (mDefaultOutputDevice == 0 || mAvailableOutputDevices.indexOf(mDefaultOutputDevice) < 0) {
         ALOGE("Default device %08x is unreachable", mDefaultOutputDevice->type());
+        status = NO_INIT;
     }
 
-    ALOGE_IF((mPrimaryOutput == 0), "Failed to open primary output");
+    if (mPrimaryOutput == 0) {
+        ALOGE("Failed to open primary output");
+        status = NO_INIT;
+    }
 
     updateDevicesAndOutputs();
+    return status;
 }
 
 AudioPolicyManager::~AudioPolicyManager()

@@ -23,6 +23,7 @@ cc_library_shared {
         "-Wall",
         "-fvisibility=hidden",
     ],
+    version_script: "exports.lds",
 
     sanitize: {
         cfi: true,
