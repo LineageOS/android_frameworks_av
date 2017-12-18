@@ -37,17 +37,15 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaErrors.h>
 
-using ::android::hardware::drm::V1_0::EventType;
-using ::android::hardware::drm::V1_0::IDrmFactory;
-using ::android::hardware::drm::V1_0::IDrmPlugin;
-using ::android::hardware::drm::V1_0::KeyedVector;
-using ::android::hardware::drm::V1_0::KeyRequestType;
-using ::android::hardware::drm::V1_0::KeyStatus;
-using ::android::hardware::drm::V1_0::KeyStatusType;
-using ::android::hardware::drm::V1_0::KeyType;
-using ::android::hardware::drm::V1_0::KeyValue;
-using ::android::hardware::drm::V1_0::SecureStop;
-using ::android::hardware::drm::V1_0::Status;
+using drm::V1_0::KeyedVector;
+using drm::V1_0::KeyRequestType;
+using drm::V1_0::KeyStatusType;
+using drm::V1_0::KeyType;
+using drm::V1_0::KeyValue;
+using drm::V1_1::HdcpLevel;;
+using drm::V1_0::SecureStop;
+using drm::V1_1::SecurityLevel;
+using drm::V1_0::Status;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
@@ -57,6 +55,8 @@ using ::android::hidl::manager::V1_0::IServiceManager;
 using ::android::sp;
 
 namespace android {
+
+#define INIT_CHECK() {if (mInitCheck != OK) return mInitCheck;}
 
 static inline int getCallingPid() {
     return IPCThreadState::self()->getCallingPid();
@@ -87,6 +87,42 @@ static String8 toString8(const hidl_string &string) {
 
 static hidl_string toHidlString(const String8& string) {
     return hidl_string(string.string());
+}
+
+static DrmPlugin::SecurityLevel toSecurityLevel(SecurityLevel level) {
+    switch(level) {
+    case SecurityLevel::SW_SECURE_CRYPTO:
+        return DrmPlugin::kSecurityLevelSwSecureCrypto;
+    case SecurityLevel::SW_SECURE_DECODE:
+        return DrmPlugin::kSecurityLevelSwSecureDecode;
+    case SecurityLevel::HW_SECURE_CRYPTO:
+        return DrmPlugin::kSecurityLevelHwSecureCrypto;
+    case SecurityLevel::HW_SECURE_DECODE:
+        return DrmPlugin::kSecurityLevelHwSecureDecode;
+    case SecurityLevel::HW_SECURE_ALL:
+        return DrmPlugin::kSecurityLevelHwSecureAll;
+    default:
+        return DrmPlugin::kSecurityLevelUnknown;
+    }
+}
+
+static DrmPlugin::HdcpLevel toHdcpLevel(HdcpLevel level) {
+    switch(level) {
+    case HdcpLevel::HDCP_NONE:
+        return DrmPlugin::kHdcpNone;
+    case HdcpLevel::HDCP_V1:
+        return DrmPlugin::kHdcpV1;
+    case HdcpLevel::HDCP_V2:
+        return DrmPlugin::kHdcpV2;
+    case HdcpLevel::HDCP_V2_1:
+        return DrmPlugin::kHdcpV2_1;
+    case HdcpLevel::HDCP_V2_2:
+        return DrmPlugin::kHdcpV2_2;
+    case HdcpLevel::HDCP_NO_OUTPUT:
+        return DrmPlugin::kHdcpNoOutput;
+    default:
+        return DrmPlugin::kHdcpLevelUnknown;
+    }
 }
 
 
@@ -407,6 +443,7 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
     for (size_t i = 0; i < mFactories.size(); i++) {
         if (mFactories[i]->isCryptoSchemeSupported(uuid)) {
             mPlugin = makeDrmPlugin(mFactories[i], uuid, appPackageName);
+            mPluginV1_1 = drm::V1_1::IDrmPlugin::castFrom(mPlugin);
         }
     }
 
@@ -425,9 +462,7 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
 
 status_t DrmHal::destroyPlugin() {
     Mutex::Autolock autoLock(mLock);
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     closeOpenSessions();
     reportMetrics();
@@ -445,10 +480,7 @@ status_t DrmHal::destroyPlugin() {
 
 status_t DrmHal::openSession(Vector<uint8_t> &sessionId) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     status_t  err = UNKNOWN_ERROR;
 
@@ -491,10 +523,7 @@ status_t DrmHal::openSession(Vector<uint8_t> &sessionId) {
 
 status_t DrmHal::closeSession(Vector<uint8_t> const &sessionId) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     Return<Status> status = mPlugin->closeSession(toHidlVec(sessionId));
     if (status.isOk()) {
@@ -519,10 +548,7 @@ status_t DrmHal::getKeyRequest(Vector<uint8_t> const &sessionId,
         String8> const &optionalParameters, Vector<uint8_t> &request,
         String8 &defaultUrl, DrmPlugin::KeyRequestType *keyRequestType) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -574,10 +600,7 @@ status_t DrmHal::getKeyRequest(Vector<uint8_t> const &sessionId,
 status_t DrmHal::provideKeyResponse(Vector<uint8_t> const &sessionId,
         Vector<uint8_t> const &response, Vector<uint8_t> &keySetId) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -598,10 +621,7 @@ status_t DrmHal::provideKeyResponse(Vector<uint8_t> const &sessionId,
 
 status_t DrmHal::removeKeys(Vector<uint8_t> const &keySetId) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     return toStatusT(mPlugin->removeKeys(toHidlVec(keySetId)));
 }
@@ -609,10 +629,7 @@ status_t DrmHal::removeKeys(Vector<uint8_t> const &keySetId) {
 status_t DrmHal::restoreKeys(Vector<uint8_t> const &sessionId,
         Vector<uint8_t> const &keySetId) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -623,10 +640,7 @@ status_t DrmHal::restoreKeys(Vector<uint8_t> const &sessionId,
 status_t DrmHal::queryKeyStatus(Vector<uint8_t> const &sessionId,
         KeyedVector<String8, String8> &infoMap) const {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -650,10 +664,7 @@ status_t DrmHal::getProvisionRequest(String8 const &certType,
         String8 const &certAuthority, Vector<uint8_t> &request,
         String8 &defaultUrl) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     status_t err = UNKNOWN_ERROR;
 
@@ -675,10 +686,7 @@ status_t DrmHal::getProvisionRequest(String8 const &certType,
 status_t DrmHal::provideProvisionResponse(Vector<uint8_t> const &response,
         Vector<uint8_t> &certificate, Vector<uint8_t> &wrappedKey) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     status_t err = UNKNOWN_ERROR;
 
@@ -698,10 +706,7 @@ status_t DrmHal::provideProvisionResponse(Vector<uint8_t> const &response,
 
 status_t DrmHal::getSecureStops(List<Vector<uint8_t>> &secureStops) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     status_t err = UNKNOWN_ERROR;
 
@@ -720,10 +725,7 @@ status_t DrmHal::getSecureStops(List<Vector<uint8_t>> &secureStops) {
 
 status_t DrmHal::getSecureStop(Vector<uint8_t> const &ssid, Vector<uint8_t> &secureStop) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     status_t err = UNKNOWN_ERROR;
 
@@ -741,22 +743,139 @@ status_t DrmHal::getSecureStop(Vector<uint8_t> const &ssid, Vector<uint8_t> &sec
 
 status_t DrmHal::releaseSecureStops(Vector<uint8_t> const &ssRelease) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     return toStatusT(mPlugin->releaseSecureStop(toHidlVec(ssRelease)));
 }
 
 status_t DrmHal::releaseAllSecureStops() {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     return toStatusT(mPlugin->releaseAllSecureStops());
+}
+
+status_t DrmHal::getHdcpLevels(DrmPlugin::HdcpLevel *connected,
+            DrmPlugin::HdcpLevel *max) const {
+    Mutex::Autolock autoLock(mLock);
+    INIT_CHECK();
+
+    if (connected == NULL || max == NULL) {
+        return BAD_VALUE;
+    }
+    status_t err = UNKNOWN_ERROR;
+
+    if (mPluginV1_1 == NULL) {
+        return ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    *connected = DrmPlugin::kHdcpLevelUnknown;
+    *max = DrmPlugin::kHdcpLevelUnknown;
+
+    Return<void> hResult = mPluginV1_1->getHdcpLevels(
+            [&](Status status, const HdcpLevel& hConnected, const HdcpLevel& hMax) {
+                if (status == Status::OK) {
+                    *connected = toHdcpLevel(hConnected);
+                    *max = toHdcpLevel(hMax);
+                }
+                err = toStatusT(status);
+            }
+    );
+
+    return hResult.isOk() ? err : DEAD_OBJECT;
+}
+
+status_t DrmHal::getNumberOfSessions(uint32_t *open, uint32_t *max) const {
+    Mutex::Autolock autoLock(mLock);
+    INIT_CHECK();
+
+    if (open == NULL || max == NULL) {
+        return BAD_VALUE;
+    }
+    status_t err = UNKNOWN_ERROR;
+
+    *open = 0;
+    *max = 0;
+
+    if (mPluginV1_1 == NULL) {
+        return ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    Return<void> hResult = mPluginV1_1->getNumberOfSessions(
+            [&](Status status, uint32_t hOpen, uint32_t hMax) {
+                if (status == Status::OK) {
+                    *open = hOpen;
+                    *max = hMax;
+                }
+                err = toStatusT(status);
+            }
+    );
+
+    return hResult.isOk() ? err : DEAD_OBJECT;
+}
+
+status_t DrmHal::getSecurityLevel(Vector<uint8_t> const &sessionId,
+        DrmPlugin::SecurityLevel *level) const {
+    Mutex::Autolock autoLock(mLock);
+    INIT_CHECK();
+
+    if (level == NULL) {
+        return BAD_VALUE;
+    }
+    status_t err = UNKNOWN_ERROR;
+
+    if (mPluginV1_1 == NULL) {
+        return ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    *level = DrmPlugin::kSecurityLevelUnknown;
+
+    Return<void> hResult = mPluginV1_1->getSecurityLevel(toHidlVec(sessionId),
+            [&](Status status, SecurityLevel hLevel) {
+                if (status == Status::OK) {
+                    *level = toSecurityLevel(hLevel);
+                }
+                err = toStatusT(status);
+            }
+    );
+
+    return hResult.isOk() ? err : DEAD_OBJECT;
+}
+
+status_t DrmHal::setSecurityLevel(Vector<uint8_t> const &sessionId,
+        const DrmPlugin::SecurityLevel& level) {
+    Mutex::Autolock autoLock(mLock);
+    INIT_CHECK();
+
+    if (mPluginV1_1 == NULL) {
+        return ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    SecurityLevel hSecurityLevel;
+
+    switch(level) {
+    case DrmPlugin::kSecurityLevelSwSecureCrypto:
+        hSecurityLevel = SecurityLevel::SW_SECURE_CRYPTO;
+        break;
+    case DrmPlugin::kSecurityLevelSwSecureDecode:
+        hSecurityLevel = SecurityLevel::SW_SECURE_DECODE;
+        break;
+    case DrmPlugin::kSecurityLevelHwSecureCrypto:
+        hSecurityLevel = SecurityLevel::HW_SECURE_CRYPTO;
+        break;
+    case DrmPlugin::kSecurityLevelHwSecureDecode:
+        hSecurityLevel = SecurityLevel::HW_SECURE_DECODE;
+        break;
+    case DrmPlugin::kSecurityLevelHwSecureAll:
+        hSecurityLevel = SecurityLevel::HW_SECURE_ALL;
+        break;
+    default:
+        return ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    Status status = mPluginV1_1->setSecurityLevel(toHidlVec(sessionId),
+            hSecurityLevel);
+    return toStatusT(status);
 }
 
 status_t DrmHal::getPropertyString(String8 const &name, String8 &value ) const {
@@ -767,10 +886,7 @@ status_t DrmHal::getPropertyString(String8 const &name, String8 &value ) const {
 status_t DrmHal::getPropertyStringInternal(String8 const &name, String8 &value) const {
     // This function is internal to the class and should only be called while
     // mLock is already held.
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     status_t err = UNKNOWN_ERROR;
 
@@ -794,10 +910,7 @@ status_t DrmHal::getPropertyByteArray(String8 const &name, Vector<uint8_t> &valu
 status_t DrmHal::getPropertyByteArrayInternal(String8 const &name, Vector<uint8_t> &value ) const {
     // This function is internal to the class and should only be called while
     // mLock is already held.
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     status_t err = UNKNOWN_ERROR;
 
@@ -815,12 +928,9 @@ status_t DrmHal::getPropertyByteArrayInternal(String8 const &name, Vector<uint8_
 
 status_t DrmHal::setPropertyString(String8 const &name, String8 const &value ) const {
     Mutex::Autolock autoLock(mLock);
+    INIT_CHECK();
 
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
-
-    Status status =  mPlugin->setPropertyString(toHidlString(name),
+    Status status = mPlugin->setPropertyString(toHidlString(name),
             toHidlString(value));
     return toStatusT(status);
 }
@@ -828,10 +938,7 @@ status_t DrmHal::setPropertyString(String8 const &name, String8 const &value ) c
 status_t DrmHal::setPropertyByteArray(String8 const &name,
                                    Vector<uint8_t> const &value ) const {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     Status status = mPlugin->setPropertyByteArray(toHidlString(name),
             toHidlVec(value));
@@ -842,10 +949,7 @@ status_t DrmHal::setPropertyByteArray(String8 const &name,
 status_t DrmHal::setCipherAlgorithm(Vector<uint8_t> const &sessionId,
                                  String8 const &algorithm) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -857,10 +961,7 @@ status_t DrmHal::setCipherAlgorithm(Vector<uint8_t> const &sessionId,
 status_t DrmHal::setMacAlgorithm(Vector<uint8_t> const &sessionId,
                               String8 const &algorithm) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -873,10 +974,7 @@ status_t DrmHal::encrypt(Vector<uint8_t> const &sessionId,
         Vector<uint8_t> const &keyId, Vector<uint8_t> const &input,
         Vector<uint8_t> const &iv, Vector<uint8_t> &output) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -899,10 +997,7 @@ status_t DrmHal::decrypt(Vector<uint8_t> const &sessionId,
         Vector<uint8_t> const &keyId, Vector<uint8_t> const &input,
         Vector<uint8_t> const &iv, Vector<uint8_t> &output) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -925,10 +1020,7 @@ status_t DrmHal::sign(Vector<uint8_t> const &sessionId,
         Vector<uint8_t> const &keyId, Vector<uint8_t> const &message,
         Vector<uint8_t> &signature) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -951,10 +1043,7 @@ status_t DrmHal::verify(Vector<uint8_t> const &sessionId,
         Vector<uint8_t> const &keyId, Vector<uint8_t> const &message,
         Vector<uint8_t> const &signature, bool &match) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -979,10 +1068,7 @@ status_t DrmHal::signRSA(Vector<uint8_t> const &sessionId,
         String8 const &algorithm, Vector<uint8_t> const &message,
         Vector<uint8_t> const &wrappedKey, Vector<uint8_t> &signature) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
+    INIT_CHECK();
 
     if (!checkPermission("android.permission.ACCESS_DRM_CERTIFICATES")) {
         return -EPERM;

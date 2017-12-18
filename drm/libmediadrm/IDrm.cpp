@@ -55,7 +55,11 @@ enum {
     VERIFY,
     SET_LISTENER,
     GET_SECURE_STOP,
-    RELEASE_ALL_SECURE_STOPS
+    RELEASE_ALL_SECURE_STOPS,
+    GET_HDCP_LEVELS,
+    GET_NUMBER_OF_SESSIONS,
+    GET_SECURITY_LEVEL,
+    SET_SECURITY_LEVEL,
 };
 
 struct BpDrm : public BpInterface<IDrm> {
@@ -347,6 +351,82 @@ struct BpDrm : public BpInterface<IDrm> {
         }
 
         value = reply.readString8();
+        return reply.readInt32();
+    }
+
+    virtual status_t getHdcpLevels(DrmPlugin::HdcpLevel *connected,
+            DrmPlugin::HdcpLevel *max) const {
+        Parcel data, reply;
+
+        if (connected == NULL || max == NULL) {
+            return BAD_VALUE;
+        }
+
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(GET_HDCP_LEVELS, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
+        *connected = static_cast<DrmPlugin::HdcpLevel>(reply.readInt32());
+        *max = static_cast<DrmPlugin::HdcpLevel>(reply.readInt32());
+        return reply.readInt32();
+    }
+
+    virtual status_t getNumberOfSessions(uint32_t *open, uint32_t *max) const {
+        Parcel data, reply;
+
+        if (open == NULL || max == NULL) {
+            return BAD_VALUE;
+        }
+
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(GET_NUMBER_OF_SESSIONS, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
+        *open = reply.readInt32();
+        *max = reply.readInt32();
+        return reply.readInt32();
+    }
+
+    virtual status_t getSecurityLevel(Vector<uint8_t> const &sessionId,
+            DrmPlugin::SecurityLevel *level) const {
+        Parcel data, reply;
+
+        if (level == NULL) {
+            return BAD_VALUE;
+        }
+
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        writeVector(data, sessionId);
+        status_t status = remote()->transact(GET_SECURITY_LEVEL, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
+        *level = static_cast<DrmPlugin::SecurityLevel>(reply.readInt32());
+        return reply.readInt32();
+    }
+
+    virtual status_t setSecurityLevel(Vector<uint8_t> const &sessionId,
+            const DrmPlugin::SecurityLevel& level) {
+        Parcel data, reply;
+
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        writeVector(data, sessionId);
+        data.writeInt32(static_cast<uint32_t>(level));
+
+        status_t status = remote()->transact(SET_SECURITY_LEVEL, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
         return reply.readInt32();
     }
 
@@ -785,6 +865,53 @@ status_t BnDrm::onTransact(
         {
             CHECK_INTERFACE(IDrm, data, reply);
             reply->writeInt32(releaseAllSecureStops());
+            return OK;
+        }
+
+        case GET_HDCP_LEVELS:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            DrmPlugin::HdcpLevel connected = DrmPlugin::kHdcpLevelUnknown;
+            DrmPlugin::HdcpLevel max = DrmPlugin::kHdcpLevelUnknown;
+            status_t result = getHdcpLevels(&connected, &max);
+            reply->writeInt32(connected);
+            reply->writeInt32(max);
+            reply->writeInt32(result);
+            return OK;
+        }
+
+        case GET_NUMBER_OF_SESSIONS:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            uint32_t open = 0, max = 0;
+            status_t result = getNumberOfSessions(&open, &max);
+            reply->writeInt32(open);
+            reply->writeInt32(max);
+            reply->writeInt32(result);
+            return OK;
+        }
+
+        case GET_SECURITY_LEVEL:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            Vector<uint8_t> sessionId;
+            readVector(data, sessionId);
+            DrmPlugin::SecurityLevel level = DrmPlugin::kSecurityLevelUnknown;
+            status_t result = getSecurityLevel(sessionId, &level);
+            reply->writeInt32(level);
+            reply->writeInt32(result);
+            return OK;
+        }
+
+        case SET_SECURITY_LEVEL:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            Vector<uint8_t> sessionId;
+            readVector(data, sessionId);
+            DrmPlugin::SecurityLevel level =
+                    static_cast<DrmPlugin::SecurityLevel>(data.readInt32());
+            status_t result = setSecurityLevel(sessionId, level);
+            reply->writeInt32(result);
             return OK;
         }
 

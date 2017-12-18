@@ -133,6 +133,35 @@ public:
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
+    virtual status_t getHdcpLevels(HdcpLevel *connectedLevel,
+            HdcpLevel *maxLevel) const {
+        UNUSED(connectedLevel);
+        UNUSED(maxLevel);
+        return android::ERROR_DRM_CANNOT_HANDLE;
+    }
+
+
+    virtual status_t getNumberOfSessions(uint32_t *currentSessions,
+            uint32_t *maxSessions) const {
+        UNUSED(currentSessions);
+        UNUSED(maxSessions);
+        return android::ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    virtual status_t getSecurityLevel(Vector<uint8_t> const &sessionId,
+            SecurityLevel *level) const {
+        UNUSED(sessionId);
+        UNUSED(level);
+        return android::ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    virtual status_t setSecurityLevel(Vector<uint8_t> const &sessionId,
+            const SecurityLevel& level) {
+        UNUSED(sessionId);
+        UNUSED(level);
+        return android::ERROR_DRM_CANNOT_HANDLE;
+    }
+
     virtual status_t getPropertyString(
             const String8& name, String8& value) const;
 
