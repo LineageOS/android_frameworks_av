@@ -236,7 +236,7 @@ private:
         // mEvent, mLength, mData[...], duplicate mLength
         static const size_t kOverhead = sizeof(entry) + sizeof(ending);
         // endind length of previous entry
-        static const size_t kPreviousLengthOffset = - sizeof(ending) +
+        static const ssize_t kPreviousLengthOffset = - sizeof(ending) +
             offsetof(ending, length);
     };
 
