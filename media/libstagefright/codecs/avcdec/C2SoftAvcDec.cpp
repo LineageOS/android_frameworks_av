@@ -875,7 +875,6 @@ status_t C2SoftAvcDec::initDecoder() {
             ALOGE("Error in create: 0x%x",
                     s_create_op.s_ivd_create_op_t.u4_error_code);
             deInitDecoder();
-            mCodecCtx = NULL;
             return UNKNOWN_ERROR;
         }
     }
@@ -914,6 +913,7 @@ status_t C2SoftAvcDec::deInitDecoder() {
                     s_delete_op.s_ivd_delete_op_t.u4_error_code);
             return UNKNOWN_ERROR;
         }
+        mCodecCtx = NULL;
     }
 
     mChangingResolution = false;
