@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef _MTP_DATABASE_H
-#define _MTP_DATABASE_H
+#ifndef _I_MTP_DATABASE_H
+#define _I_MTP_DATABASE_H
 
 #include "MtpTypes.h"
 
@@ -25,27 +25,24 @@ class MtpDataPacket;
 class MtpProperty;
 class MtpObjectInfo;
 
-class MtpDatabase {
+class IMtpDatabase {
 public:
-    virtual ~MtpDatabase() {}
+    virtual ~IMtpDatabase() {}
 
-    // called from SendObjectInfo to reserve a database entry for the incoming file
+    // Called from SendObjectInfo to reserve a database entry for the incoming file.
     virtual MtpObjectHandle         beginSendObject(const char* path,
                                             MtpObjectFormat format,
                                             MtpObjectHandle parent,
-                                            MtpStorageID storage,
-                                            uint64_t size,
-                                            time_t modified) = 0;
+                                            MtpStorageID storage) = 0;
 
-    // called to report success or failure of the SendObject file transfer
-    // success should signal a notification of the new object's creation,
-    // failure should remove the database entry created in beginSendObject
-    virtual void                    endSendObject(const char* path,
-                                            MtpObjectHandle handle,
-                                            MtpObjectFormat format,
+    // Called to report success or failure of the SendObject file transfer.
+    virtual void                    endSendObject(MtpObjectHandle handle,
                                             bool succeeded) = 0;
-
-    virtual void                    doScanDirectory(const char* path) = 0;
+    
+    // Called to rescan a file, such as after an edit.
+    virtual void                    rescanFile(const char* path,
+                                            MtpObjectHandle handle,
+                                            MtpObjectFormat format) = 0;
 
     virtual MtpObjectHandleList*    getObjectList(MtpStorageID storageID,
                                             MtpObjectFormat format,
@@ -93,7 +90,8 @@ public:
                                             int64_t& outFileLength,
                                             MtpObjectFormat& outFormat) = 0;
 
-    virtual MtpResponseCode         deleteFile(MtpObjectHandle handle) = 0;
+    virtual MtpResponseCode         beginDeleteObject(MtpObjectHandle handle) = 0;
+    virtual void                    endDeleteObject(MtpObjectHandle handle, bool succeeded) = 0;
 
     virtual MtpObjectHandleList*    getObjectReferences(MtpObjectHandle handle) = 0;
 
@@ -105,14 +103,18 @@ public:
 
     virtual MtpProperty*            getDevicePropertyDesc(MtpDeviceProperty property) = 0;
 
-    virtual MtpResponseCode         moveObject(MtpObjectHandle handle, MtpObjectHandle newParent,
-                                            MtpStorageID newStorage, MtpString& newPath) = 0;
+    virtual MtpResponseCode         beginMoveObject(MtpObjectHandle handle, MtpObjectHandle newParent,
+                                            MtpStorageID newStorage) = 0;
 
-    virtual void                    sessionStarted() = 0;
+    virtual void                    endMoveObject(MtpObjectHandle oldParent, MtpObjectHandle newParent,
+                                            MtpStorageID oldStorage, MtpStorageID newStorage,
+                                            MtpObjectHandle handle, bool succeeded) = 0;
 
-    virtual void                    sessionEnded() = 0;
+    virtual MtpResponseCode         beginCopyObject(MtpObjectHandle handle, MtpObjectHandle newParent,
+                                            MtpStorageID newStorage);
+    virtual void                    endCopyObject(MtpObjectHandle handle, bool succeeded);
 };
 
 }; // namespace android
 
-#endif // _MTP_DATABASE_H
+#endif // _I_MTP_DATABASE_H
