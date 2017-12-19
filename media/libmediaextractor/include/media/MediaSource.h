@@ -72,10 +72,6 @@ struct MediaSource : public virtual RefBase {
         void clearSeekTo();
         bool getSeekTo(int64_t *time_us, SeekMode *mode) const;
 
-        // TODO: remove this if unused.
-        void setLateBy(int64_t lateness_us);
-        int64_t getLateBy() const;
-
         void setNonBlocking();
         void clearNonBlocking();
         bool getNonBlocking() const;
@@ -93,7 +89,6 @@ struct MediaSource : public virtual RefBase {
         uint32_t mOptions;
         int64_t mSeekTimeUs;
         SeekMode mSeekMode;
-        int64_t mLatenessUs;
         bool mNonBlocking;
     } __attribute__((packed)); // sent through Binder
 
