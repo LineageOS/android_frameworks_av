@@ -77,19 +77,6 @@ MediaBuffer::MediaBuffer(size_t size)
     }
 }
 
-MediaBuffer::MediaBuffer(const sp<GraphicBuffer>& graphicBuffer)
-    : mObserver(NULL),
-      mRefCount(0),
-      mData(NULL),
-      mSize(1),
-      mRangeOffset(0),
-      mRangeLength(mSize),
-      mGraphicBuffer(graphicBuffer),
-      mOwnsData(false),
-      mMetaData(new MetaData),
-      mOriginal(NULL) {
-}
-
 MediaBuffer::MediaBuffer(const sp<ABuffer> &buffer)
     : mObserver(NULL),
       mRefCount(0),
@@ -135,12 +122,10 @@ void MediaBuffer::add_ref() {
 }
 
 void *MediaBuffer::data() const {
-    CHECK(mGraphicBuffer == NULL);
     return mData;
 }
 
 size_t MediaBuffer::size() const {
-    CHECK(mGraphicBuffer == NULL);
     return mSize;
 }
 
@@ -153,17 +138,13 @@ size_t MediaBuffer::range_length() const {
 }
 
 void MediaBuffer::set_range(size_t offset, size_t length) {
-    if ((mGraphicBuffer == NULL) && (offset + length > mSize)) {
+    if (offset + length > mSize) {
         ALOGE("offset = %zu, length = %zu, mSize = %zu", offset, length, mSize);
     }
-    CHECK((mGraphicBuffer != NULL) || (offset + length <= mSize));
+    CHECK(offset + length <= mSize);
 
     mRangeOffset = offset;
     mRangeLength = length;
-}
-
-sp<GraphicBuffer> MediaBuffer::graphicBuffer() const {
-    return mGraphicBuffer;
 }
 
 sp<MetaData> MediaBuffer::meta_data() {
@@ -199,8 +180,6 @@ void MediaBuffer::setObserver(MediaBufferObserver *observer) {
 }
 
 MediaBuffer *MediaBuffer::clone() {
-    CHECK(mGraphicBuffer == NULL);
-
     MediaBuffer *buffer = new MediaBuffer(mData, mSize);
     buffer->set_range(mRangeOffset, mRangeLength);
     buffer->mMetaData = new MetaData(*mMetaData.get());

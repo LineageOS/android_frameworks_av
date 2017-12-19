@@ -32,7 +32,6 @@ MediaSource::ReadOptions::ReadOptions() {
 void MediaSource::ReadOptions::reset() {
     mOptions = 0;
     mSeekTimeUs = 0;
-    mLatenessUs = 0;
     mNonBlocking = false;
 }
 
@@ -65,14 +64,6 @@ bool MediaSource::ReadOptions::getSeekTo(
     *time_us = mSeekTimeUs;
     *mode = mSeekMode;
     return (mOptions & kSeekTo_Option) != 0;
-}
-
-void MediaSource::ReadOptions::setLateBy(int64_t lateness_us) {
-    mLatenessUs = lateness_us;
-}
-
-int64_t MediaSource::ReadOptions::getLateBy() const {
-    return mLatenessUs;
 }
 
 }  // namespace android
