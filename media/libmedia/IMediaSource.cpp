@@ -212,11 +212,6 @@ public:
         return remote()->transact(PAUSE, data, &reply);
     }
 
-    virtual status_t setBuffers(const Vector<MediaBuffer *> & buffers __unused) {
-        ALOGV("setBuffers NOT IMPLEMENTED");
-        return ERROR_UNSUPPORTED; // default
-    }
-
 private:
 
     uint32_t mBuffersSinceStop; // Buffer tracking variable

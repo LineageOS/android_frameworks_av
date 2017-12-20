@@ -341,15 +341,6 @@ int64_t NuPlayer::GenericSource::getLastReadPosition() {
     }
 }
 
-status_t NuPlayer::GenericSource::setBuffers(
-        bool audio, Vector<MediaBuffer *> &buffers) {
-    Mutex::Autolock _l(mLock);
-    if (mIsSecure && !audio && mVideoTrack.mSource != NULL) {
-        return mVideoTrack.mSource->setBuffers(buffers);
-    }
-    return INVALID_OPERATION;
-}
-
 bool NuPlayer::GenericSource::isStreaming() const {
     Mutex::Autolock _l(mLock);
     return mIsStreaming;

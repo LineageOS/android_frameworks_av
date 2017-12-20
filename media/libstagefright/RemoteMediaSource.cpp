@@ -44,10 +44,6 @@ status_t RemoteMediaSource::pause() {
     return mSource->pause();
 }
 
-status_t RemoteMediaSource::setBuffers(const Vector<MediaBuffer *> &buffers) {
-    return mSource->setBuffers(buffers);
-}
-
 status_t RemoteMediaSource::setStopTimeUs(int64_t stopTimeUs) {
     return mSource->setStopTimeUs(stopTimeUs);
 }

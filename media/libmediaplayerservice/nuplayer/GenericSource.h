@@ -82,8 +82,6 @@ struct NuPlayer::GenericSource : public NuPlayer::Source,
         int64_t seekTimeUs,
         MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC) override;
 
-    virtual status_t setBuffers(bool audio, Vector<MediaBuffer *> &buffers);
-
     virtual bool isStreaming() const;
 
     // Modular DRM

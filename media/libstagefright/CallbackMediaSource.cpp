@@ -44,8 +44,4 @@ status_t CallbackMediaSource::pause() {
     return mSource->pause();
 }
 
-status_t CallbackMediaSource::setBuffers(const Vector<MediaBuffer *> &buffers) {
-    return mSource->setBuffers(buffers);
-}
-
 }  // namespace android
