@@ -104,11 +104,24 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
                                            ? AUDIO_PORT_HANDLE_NONE
                                            : getDeviceId();
 
+    const audio_content_type_t contentType =
+            AAudioConvert_contentTypeToInternal(builder.getContentType());
+    const audio_source_t source =
+            AAudioConvert_inputPresetToAudioSource(builder.getInputPreset());
+
+    const audio_attributes_t attributes = {
+            .content_type = contentType,
+            .usage = AUDIO_USAGE_UNKNOWN, // only used for output
+            .source = source,
+            .flags = flags, // If attributes are set then the other flags parameter is ignored.
+            .tags = ""
+    };
+
     mAudioRecord = new AudioRecord(
             mOpPackageName // const String16& opPackageName TODO does not compile
             );
     mAudioRecord->set(
-            AUDIO_SOURCE_VOICE_RECOGNITION,
+            AUDIO_SOURCE_DEFAULT, // ignored because we pass attributes below
             getSampleRate(),
             format,
             channelMask,
@@ -122,7 +135,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             flags,
             AUDIO_UID_INVALID, // DEFAULT uid
             -1,                // DEFAULT pid
-            NULL,              // DEFAULT audio_attributes_t
+            &attributes,
             selectedDeviceId
             );
 
