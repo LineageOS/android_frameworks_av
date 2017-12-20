@@ -20,6 +20,7 @@
 #include <math.h>
 #include <utils/Log.h>
 #include <cutils/properties.h>
+#include <media/AudioPolicyHelper.h>
 #include "media/ToneGenerator.h"
 
 
@@ -1044,7 +1045,7 @@ bool ToneGenerator::startTone(tone_type toneType, int durationMs) {
         }
     }
 
-    ALOGV("startTone");
+    ALOGV("startTone toneType %d", toneType);
 
     mLock.lock();
 
@@ -1196,9 +1197,16 @@ bool ToneGenerator::initAudioTrack() {
     mpAudioTrack = new AudioTrack();
     ALOGV("AudioTrack(%p) created", mpAudioTrack.get());
 
+    audio_attributes_t attr;
+    audio_stream_type_t streamType = mStreamType;
+    if (mStreamType == AUDIO_STREAM_VOICE_CALL) {
+        streamType = AUDIO_STREAM_DTMF;
+    }
+    stream_type_to_audio_attributes(streamType, &attr);
+
     const size_t frameCount = mProcessSize;
     status_t status = mpAudioTrack->set(
-            mStreamType,
+            AUDIO_STREAM_DEFAULT,
             0,    // sampleRate
             AUDIO_FORMAT_PCM_16_BIT,
             AUDIO_CHANNEL_OUT_MONO,
@@ -1210,7 +1218,11 @@ bool ToneGenerator::initAudioTrack() {
             0,    // sharedBuffer
             mThreadCanCallJava,
             AUDIO_SESSION_ALLOCATE,
-            AudioTrack::TRANSFER_CALLBACK);
+            AudioTrack::TRANSFER_CALLBACK,
+            nullptr,
+            AUDIO_UID_INVALID,
+            -1,
+            &attr);
 
     if (status != NO_ERROR) {
         ALOGE("AudioTrack(%p) set failed with error %d", mpAudioTrack.get(), status);
