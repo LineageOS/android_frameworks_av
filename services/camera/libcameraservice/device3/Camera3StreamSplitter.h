@@ -17,6 +17,8 @@
 #ifndef ANDROID_SERVERS_STREAMSPLITTER_H
 #define ANDROID_SERVERS_STREAMSPLITTER_H
 
+#include <unordered_set>
+
 #include <gui/IConsumerListener.h>
 #include <gui/IProducerListener.h>
 #include <gui/BufferItemConsumer.h>
@@ -254,6 +256,10 @@ private:
     typedef std::vector<sp<GraphicBuffer>> OutputSlots;
     std::unordered_map<sp<IGraphicBufferProducer>, std::unique_ptr<OutputSlots>,
             GBPHash> mOutputSlots;
+
+    //A set of buffers that could potentially stay in some of the outputs after removal
+    //and therefore should be detached from the input queue.
+    std::unordered_set<uint64_t> mDetachedBuffers;
 
     // Latest onFrameAvailable return value
     std::atomic<status_t> mOnFrameAvailableRes{0};

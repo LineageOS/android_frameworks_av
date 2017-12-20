@@ -275,9 +275,17 @@ status_t Camera3StreamSplitter::removeOutputLocked(size_t surfaceId) {
     //still attached to the removed surface.
     std::vector<uint64_t> pendingBufferIds;
     auto& outputSlots = *mOutputSlots[gbp];
-    for (const auto &it : outputSlots) {
-        if (it.get() != nullptr) {
-            pendingBufferIds.push_back(it->getId());
+    for (size_t i = 0; i < outputSlots.size(); i++) {
+        if (outputSlots[i] != nullptr) {
+            pendingBufferIds.push_back(outputSlots[i]->getId());
+            auto rc = gbp->detachBuffer(i);
+            if (rc != NO_ERROR) {
+                //Buffers that fail to detach here will be scheduled for detach in the
+                //input buffer queue and the rest of the registered outputs instead.
+                //This will help ensure that camera stops accessing buffers that still
+                //can get referenced by the disconnected output.
+                mDetachedBuffers.emplace(outputSlots[i]->getId());
+            }
         }
     }
     mOutputs[surfaceId] = nullptr;
@@ -521,10 +529,11 @@ void Camera3StreamSplitter::decrementBufRefCountLocked(uint64_t id, size_t surfa
     uint64_t bufferId = tracker_ptr->getBuffer()->getId();
     int consumerSlot = -1;
     uint64_t frameNumber;
-    for (const auto &it : mInputSlots) {
-        if (it.second.mGraphicBuffer->getId() == bufferId) {
-            consumerSlot = it.second.mSlot;
-            frameNumber = it.second.mFrameNumber;
+    auto inputSlot = mInputSlots.begin();
+    for (; inputSlot != mInputSlots.end(); inputSlot++) {
+        if (inputSlot->second.mGraphicBuffer->getId() == bufferId) {
+            consumerSlot = inputSlot->second.mSlot;
+            frameNumber = inputSlot->second.mFrameNumber;
             break;
         }
     }
@@ -533,6 +542,12 @@ void Camera3StreamSplitter::decrementBufRefCountLocked(uint64_t id, size_t surfa
         return;
     }
 
+    auto detachBuffer = mDetachedBuffers.find(bufferId);
+    bool detach = (detachBuffer != mDetachedBuffers.end());
+    if (detach) {
+        mDetachedBuffers.erase(detachBuffer);
+        mInputSlots.erase(inputSlot);
+    }
     // Temporarily unlock mutex to avoid circular lock:
     // 1. This function holds splitter lock, calls releaseBuffer which triggers
     // onBufferReleased in Camera3OutputStream. onBufferReleased waits on the
@@ -544,15 +559,23 @@ void Camera3StreamSplitter::decrementBufRefCountLocked(uint64_t id, size_t surfa
     mMutex.unlock();
     int res = NO_ERROR;
     if (consumer != nullptr) {
-        res = consumer->releaseBuffer(consumerSlot, frameNumber,
-                EGL_NO_DISPLAY, EGL_NO_SYNC_KHR, tracker_ptr->getMergedFence());
+        if (detach) {
+            res = consumer->detachBuffer(consumerSlot);
+        } else {
+            res = consumer->releaseBuffer(consumerSlot, frameNumber,
+                    EGL_NO_DISPLAY, EGL_NO_SYNC_KHR, tracker_ptr->getMergedFence());
+        }
     } else {
         SP_LOGE("%s: consumer has become null!", __FUNCTION__);
     }
     mMutex.lock();
-    // If the producer of this queue is disconnected, -22 error will occur
+
     if (res != NO_ERROR) {
-        SP_LOGE("%s: releaseBuffer returns %d", __FUNCTION__, res);
+        if (detach) {
+            SP_LOGE("%s: detachBuffer returns %d", __FUNCTION__, res);
+        } else {
+            SP_LOGE("%s: releaseBuffer returns %d", __FUNCTION__, res);
+        }
     }
 }
 
@@ -625,6 +648,17 @@ void Camera3StreamSplitter::onBufferReleasedByOutputLocked(
     }
     SP_LOGV("%s: dequeued buffer %" PRId64 " %p from output %p", __FUNCTION__,
             buffer->getId(), buffer.get(), from.get());
+
+    auto detachBuffer = mDetachedBuffers.find(buffer->getId());
+    bool detach = (detachBuffer != mDetachedBuffers.end());
+    if (detach) {
+        res = from->detachBuffer(slot);
+        if (res == NO_ERROR) {
+            outputSlots[slot] = nullptr;
+        } else {
+            SP_LOGE("%s: detach buffer from output failed (%d)", __FUNCTION__, res);
+        }
+    }
 
     // Check to see if this is the last outstanding reference to this buffer
     decrementBufRefCountLocked(buffer->getId(), surfaceId);

@@ -54,40 +54,6 @@ struct IStreamListener : public IInterface {
 
     virtual void queueBuffer(size_t index, size_t size) = 0;
 
-    // When signalling a discontinuity you can optionally
-    // specify an int64_t PTS timestamp in "msg".
-    // If present, rendering of data following the discontinuity
-    // will be suppressed until media time reaches this timestamp.
-    static const char *const kKeyResumeAtPTS;
-
-    // When signalling a discontinuity you can optionally
-    // specify the type(s) of discontinuity, i.e. if the
-    // audio format has changed, the video format has changed,
-    // time has jumped or any combination thereof.
-    // To do so, include a non-zero int32_t value
-    // under the key "kKeyDiscontinuityMask" when issuing the DISCONTINUITY
-    // command.
-    // If there is a change in audio/video format, The new logical stream
-    // must start with proper codec initialization
-    // information for playback to continue, i.e. SPS and PPS in the case
-    // of AVC video etc.
-    // If this key is not present, only a time discontinuity is assumed.
-    // The value should be a bitmask of values from
-    // ATSParser::DiscontinuityType.
-    static const char *const kKeyDiscontinuityMask;
-
-    // Optionally signalled as part of a discontinuity that includes
-    // DISCONTINUITY_TIME. It indicates the media time (in us) to be associated
-    // with the next PTS occuring in the stream. The value is of type int64_t.
-    static const char *const kKeyMediaTimeUs;
-
-    // Optionally signalled as part of a discontinuity that includes
-    // DISCONTINUITY_TIME. It indicates the media time (in us) of a recent
-    // sample from the same content, and is used as a hint for the parser to
-    // handle PTS wraparound. This is required when a new parser is created
-    // to continue parsing content from the same timeline.
-    static const char *const kKeyRecentMediaTimeUs;
-
     virtual void issueCommand(
             Command cmd, bool synchronous, const sp<AMessage> &msg = NULL) = 0;
 };

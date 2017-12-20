@@ -29,6 +29,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ByteUtils.h>
+#include <media/stagefright/foundation/MediaKeys.h>
 #include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaDefs.h>
@@ -341,7 +342,7 @@ void ATSParser::Program::signalDiscontinuity(
     if ((type & DISCONTINUITY_TIME)
             && extra != NULL
             && extra->findInt64(
-                IStreamListener::kKeyMediaTimeUs, &mediaTimeUs)) {
+                kATSParserKeyMediaTimeUs, &mediaTimeUs)) {
         mFirstPTSValid = false;
     }
 
@@ -1032,7 +1033,7 @@ void ATSParser::Stream::signalDiscontinuity(
         uint64_t resumeAtPTS;
         if (extra != NULL
                 && extra->findInt64(
-                    IStreamListener::kKeyResumeAtPTS,
+                    kATSParserKeyResumeAtPTS,
                     (int64_t *)&resumeAtPTS)) {
             int64_t resumeAtMediaTimeUs =
                 mProgram->convertPTSToTimestamp(resumeAtPTS);
@@ -1694,12 +1695,12 @@ void ATSParser::signalDiscontinuity(
         DiscontinuityType type, const sp<AMessage> &extra) {
     int64_t mediaTimeUs;
     if ((type & DISCONTINUITY_TIME) && extra != NULL) {
-        if (extra->findInt64(IStreamListener::kKeyMediaTimeUs, &mediaTimeUs)) {
+        if (extra->findInt64(kATSParserKeyMediaTimeUs, &mediaTimeUs)) {
             mAbsoluteTimeAnchorUs = mediaTimeUs;
         }
         if ((mFlags & TS_TIMESTAMPS_ARE_ABSOLUTE)
                 && extra->findInt64(
-                    IStreamListener::kKeyRecentMediaTimeUs, &mediaTimeUs)) {
+                    kATSParserKeyRecentMediaTimeUs, &mediaTimeUs)) {
             if (mAbsoluteTimeAnchorUs >= 0ll) {
                 mediaTimeUs -= mAbsoluteTimeAnchorUs;
             }
