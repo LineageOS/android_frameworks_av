@@ -31,6 +31,7 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ByteUtils.h>
+#include <media/stagefright/foundation/MediaKeys.h>
 #include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
@@ -1693,12 +1694,12 @@ status_t PlaylistFetcher::extractAndQueueAccessUnitsFromTs(const sp<ABuffer> &bu
         sp<AMessage> extra = new AMessage;
         // Since we are using absolute timestamps, signal an offset of 0 to prevent
         // ATSParser from skewing the timestamps of access units.
-        extra->setInt64(IStreamListener::kKeyMediaTimeUs, 0);
+        extra->setInt64(kATSParserKeyMediaTimeUs, 0);
 
         // When adapting, signal a recent media time to the parser,
         // so that PTS wrap around is handled for the new variant.
         if (mStartTimeUs >= 0 && !mStartTimeUsRelative) {
-            extra->setInt64(IStreamListener::kKeyRecentMediaTimeUs, mStartTimeUs);
+            extra->setInt64(kATSParserKeyRecentMediaTimeUs, mStartTimeUs);
         }
 
         mTSParser->signalDiscontinuity(

@@ -29,6 +29,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AUtils.h>
+#include <media/stagefright/foundation/MediaKeys.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
@@ -560,7 +561,7 @@ status_t MPEG2TSExtractor::seek(int64_t seekTimeUs,
 status_t MPEG2TSExtractor::queueDiscontinuityForSeek(int64_t actualSeekTimeUs) {
     // Signal discontinuity
     sp<AMessage> extra(new AMessage);
-    extra->setInt64(IStreamListener::kKeyMediaTimeUs, actualSeekTimeUs);
+    extra->setInt64(kATSParserKeyMediaTimeUs, actualSeekTimeUs);
     mParser->signalDiscontinuity(ATSParser::DISCONTINUITY_TIME, extra);
 
     // After discontinuity, impl should only have discontinuities
