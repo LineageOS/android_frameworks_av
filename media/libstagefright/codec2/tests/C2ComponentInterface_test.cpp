@@ -108,7 +108,7 @@ private:
             : name(name_), result(result_) {}
     };
 
-    // queryOnStack() and queryonHeap() both call an interface's query_nb() and
+    // queryOnStack() and queryonHeap() both call an interface's query_vb() and
     // check if a component has a parameter whose type is |T|.
     // If a component has, the value should be copied into an argument, that is
     // |p| in queryOnStack() and |heapParams| in queryOnHeap().
@@ -136,8 +136,8 @@ private:
     // "Unsupport" means here a component doesn't have the parameter.
     template <typename T> void queryUnsupportedParam();
 
-    // Execute an interface's config_nb(). |T| is a single parameter type, not std::vector.
-    // config() creates std::vector<C2Param *const> {p} and passes it to config_nb().
+    // Execute an interface's config_vb(). |T| is a single parameter type, not std::vector.
+    // config() creates std::vector<C2Param *const> {p} and passes it to config_vb().
     template <typename T>
     c2_status_t
     config(T *const p,
@@ -196,7 +196,7 @@ template <> std::unique_ptr<C2PortMimeConfig::input> makeParam() {
 
 template <typename T> c2_status_t C2CompIntfTest::queryOnStack(T *const p) {
     std::vector<C2Param *const> stackParams{p};
-    return mIntf->query_nb(stackParams, {}, nullptr);
+    return mIntf->query_vb(stackParams, {}, C2_DONT_BLOCK, nullptr);
 }
 
 template <typename T>
@@ -206,7 +206,7 @@ c2_status_t C2CompIntfTest::queryOnHeap(
     if (p.forStream()) {
         index |= ((p.stream() << 17) & 0x01FE0000) | 0x02000000;
     }
-    return mIntf->query_nb({}, {index}, heapParams);
+    return mIntf->query_vb({}, {index}, C2_DONT_BLOCK, heapParams);
 }
 
 template <typename T> void C2CompIntfTest::getValue(T *const param) {
@@ -261,7 +261,7 @@ template <typename T>
 c2_status_t C2CompIntfTest::config(
         T *const p, std::vector<std::unique_ptr<C2SettingResult>> *const failures) {
     std::vector<C2Param *const> params{p};
-    return mIntf->config_nb(params, failures);
+    return mIntf->config_vb(params, C2_DONT_BLOCK, failures);
 }
 
 // Create a new parameter copied from |p|.
@@ -279,8 +279,8 @@ void C2CompIntfTest::configReadOnlyParam(const T &newParam) {
     std::vector<C2Param *const> params{p.get()};
     std::vector<std::unique_ptr<C2SettingResult>> failures;
 
-    // config_nb should be failed because a parameter is read-only.
-    ASSERT_EQ(C2_BAD_VALUE, mIntf->config_nb(params, &failures));
+    // config_vb should be failed because a parameter is read-only.
+    ASSERT_EQ(C2_BAD_VALUE, mIntf->config_vb(params, C2_DONT_BLOCK, &failures));
     ASSERT_EQ(1u, failures.size());
     EXPECT_EQ(C2SettingResult::READ_ONLY, failures[0]->failure);
 }
@@ -291,13 +291,13 @@ void C2CompIntfTest::configWritableParamValidValue(const T &newParam, c2_status_
 
     std::vector<C2Param *const> params{p.get()};
     std::vector<std::unique_ptr<C2SettingResult>> failures;
-    // In most cases, config_nb return C2_OK and the parameter's value should be changed
+    // In most cases, config_vb return C2_OK and the parameter's value should be changed
     // to |newParam|, which is confirmed in a caller of configWritableParamValueValue().
     // However, this can return ~~~~ and the parameter's values is not changed,
     // because there may be dependent limitations between fields or between parameters.
     // TODO(hiroh): I have to fill the return value. Comments in C2Component.h doesn't mention
     // about the return value when conflict happens. I set C2_BAD_VALUE to it temporarily now.
-    c2_status_t stConfig = mIntf->config_nb(params, &failures);
+    c2_status_t stConfig = mIntf->config_vb(params, C2_DONT_BLOCK, &failures);
     if (stConfig == C2_OK) {
         EXPECT_EQ(0u, failures.size());
     } else {
@@ -314,9 +314,9 @@ void C2CompIntfTest::configWritableParamInvalidValue(const T &newParam) {
 
     std::vector<C2Param *const> params{p.get()};
     std::vector<std::unique_ptr<C2SettingResult>> failures;
-    // Although a parameter is writable, config_nb should be failed,
+    // Although a parameter is writable, config_vb should be failed,
     // because a new value is invalid.
-    ASSERT_EQ(C2_BAD_VALUE, mIntf->config_nb(params, &failures));
+    ASSERT_EQ(C2_BAD_VALUE, mIntf->config_vb(params, C2_DONT_BLOCK, &failures));
     ASSERT_EQ(1u, failures.size());
     EXPECT_EQ(C2SettingResult::BAD_VALUE, failures[0]->failure);
 }
@@ -594,7 +594,7 @@ void C2CompIntfTest::outputResults(const std::string &name) {
                     C2ParamField(param.get(), &field_type_name_::field_name_)) \
         };                                                              \
         ASSERT_EQ(C2_OK,                                                \
-                  mIntf->querySupportedValues_nb(validValueInfos));     \
+                  mIntf->querySupportedValues_vb(validValueInfos, C2_DONT_BLOCK));     \
         ASSERT_EQ(1u, validValueInfos.size());                          \
         std::vector<decltype(param->field_name_)> validValues;          \
         std::vector<decltype(param->field_name_)> invalidValues;        \

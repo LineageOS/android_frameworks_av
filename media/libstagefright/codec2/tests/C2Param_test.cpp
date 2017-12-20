@@ -2403,19 +2403,13 @@ public:
         return 0;
     }
 
-    virtual c2_status_t commit_sm(
+    virtual c2_status_t config_vb(
             const std::vector<C2Param* const> &params,
+            c2_blocking_t mayBlock,
             std::vector<std::unique_ptr<C2SettingResult>>* const failures) override {
         (void)params;
         (void)failures;
-        return C2_OMITTED;
-    }
-
-    virtual c2_status_t config_nb(
-            const std::vector<C2Param* const> &params,
-            std::vector<std::unique_ptr<C2SettingResult>>* const failures) override {
-        (void)params;
-        (void)failures;
+        (void)mayBlock;
         return C2_OMITTED;
     }
 
@@ -2424,11 +2418,13 @@ public:
         return C2_OMITTED;
     }
 
-    virtual c2_status_t query_nb(
+    virtual c2_status_t query_vb(
             const std::vector<C2Param* const> &stackParams,
             const std::vector<C2Param::Index> &heapParamIndices,
+            c2_blocking_t mayBlock,
             std::vector<std::unique_ptr<C2Param>>* const heapParams) const override {
         for (C2Param* const param : stackParams) {
+            (void)mayBlock;
             if (!*param) { // param is already invalid - remember it
                 continue;
             }
@@ -2490,8 +2486,10 @@ public:
         }
     };
 
-    virtual c2_status_t querySupportedValues_nb(
-            std::vector<C2FieldSupportedValuesQuery> &fields) const override {
+    virtual c2_status_t querySupportedValues_vb(
+            std::vector<C2FieldSupportedValuesQuery> &fields,
+            c2_blocking_t mayBlock) const override {
+        (void)mayBlock;
         for (C2FieldSupportedValuesQuery &query : fields) {
             if (query.field == C2ParamField(&mDomainInfo, &C2ComponentDomainInfo::mValue)) {
                 query.values = C2FieldSupportedValues(
@@ -2713,7 +2711,7 @@ TEST_F(C2ParamTest, ReflectorTest) {
         C2FieldSupportedValuesQuery::Current(C2ParamField(&domainInfo, &C2ComponentDomainInfo::mValue)),
     };
 
-    EXPECT_EQ(C2_OK, comp->querySupportedValues_nb(query));
+    EXPECT_EQ(C2_OK, comp->querySupportedValues_vb(query, C2_DONT_BLOCK));
 
     for (const C2FieldSupportedValuesQuery &q : query) {
         dumpFSV(q.values, &domainInfo.mValue);

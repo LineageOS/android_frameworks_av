@@ -216,11 +216,11 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
     std::shared_ptr<C2Component> component;
     (void)store->createComponent("c2.google.avc.decoder", &component);
 
-    (void)component->setListener_sm(mListener);
+    (void)component->setListener_vb(mListener, C2_DONT_BLOCK);
     std::unique_ptr<C2PortBlockPoolsTuning::output> pools =
         C2PortBlockPoolsTuning::output::alloc_unique({ (uint64_t)C2BlockPool::BASIC_GRAPHIC });
     std::vector<std::unique_ptr<C2SettingResult>> result;
-    (void)component->intf()->config_nb({pools.get()}, &result);
+    (void)component->intf()->config_vb({pools.get()}, C2_DONT_BLOCK, &result);
     component->start();
 
     for (int i = 0; i < 8; ++i) {

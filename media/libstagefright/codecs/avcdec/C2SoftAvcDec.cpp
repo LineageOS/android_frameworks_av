@@ -443,10 +443,12 @@ c2_node_id_t C2SoftAvcDecIntf::getId() const {
     return mId;
 }
 
-c2_status_t C2SoftAvcDecIntf::query_nb(
+c2_status_t C2SoftAvcDecIntf::query_vb(
         const std::vector<C2Param* const> & stackParams,
         const std::vector<C2Param::Index> & heapParamIndices,
+        c2_blocking_t mayBlock,
         std::vector<std::unique_ptr<C2Param>>* const heapParams) const {
+    (void)mayBlock;
     for (C2Param* const param : stackParams) {
         if (!*param) {
             continue;
@@ -478,9 +480,11 @@ c2_status_t C2SoftAvcDecIntf::query_nb(
     return C2_OK;
 }
 
-c2_status_t C2SoftAvcDecIntf::config_nb(
+c2_status_t C2SoftAvcDecIntf::config_vb(
         const std::vector<C2Param* const> &params,
+        c2_blocking_t mayBlock,
         std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
+    (void)mayBlock;
     c2_status_t err = C2_OK;
     for (C2Param *param : params) {
         uint32_t index = restoreIndex(param);
@@ -509,13 +513,6 @@ c2_status_t C2SoftAvcDecIntf::config_nb(
     return err;
 }
 
-c2_status_t C2SoftAvcDecIntf::commit_sm(
-        const std::vector<C2Param* const> &params,
-        std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
-    // TODO
-    return config_nb(params, failures);
-}
-
 c2_status_t C2SoftAvcDecIntf::createTunnel_sm(c2_node_id_t targetComponent) {
     // Tunneling is not supported
     (void) targetComponent;
@@ -538,8 +535,9 @@ c2_status_t C2SoftAvcDecIntf::querySupportedParams_nb(
     return C2_OK;
 }
 
-c2_status_t C2SoftAvcDecIntf::querySupportedValues_nb(
-        std::vector<C2FieldSupportedValuesQuery> &fields) const {
+c2_status_t C2SoftAvcDecIntf::querySupportedValues_vb(
+        std::vector<C2FieldSupportedValuesQuery> &fields, c2_blocking_t mayBlock) const {
+    (void)mayBlock;
     c2_status_t res = C2_OK;
     for (C2FieldSupportedValuesQuery &query : fields) {
         if (mSupportedValues.count(query.field) == 0) {

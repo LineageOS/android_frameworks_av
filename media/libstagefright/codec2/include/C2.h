@@ -128,6 +128,7 @@ enum c2_status_t : int32_t {
     TIMED_OUT           = -ETIMEDOUT,
     UNKNOWN_ERROR       = -EFAULT,
     UNKNOWN_TRANSACTION = -EBADMSG,
+    WOULD_BLOCK         = -EWOULDBLOCK,
 #endif
 
     C2_OK        = OK,                   ///< operation completed successfully
@@ -141,6 +142,7 @@ enum c2_status_t : int32_t {
     C2_DUPLICATE = ALREADY_EXISTS,       ///< object already exists
     C2_NOT_FOUND = NAME_NOT_FOUND,       ///< object not found
     C2_BAD_STATE = INVALID_OPERATION,    ///< operation is not permitted in the current state
+    C2_BLOCKING  = WOULD_BLOCK,          ///< operation would block but blocking is not permitted
 
     // bad environment
     C2_NO_MEMORY = NO_MEMORY,            ///< not enough memory to complete operation
@@ -154,6 +156,24 @@ enum c2_status_t : int32_t {
     // unknown fatal
     C2_CORRUPTED = UNKNOWN_ERROR,        ///< some unexpected error prevented the operation
     C2_NO_INIT   = NO_INIT,              ///< status has not been initialized
+};
+
+/**
+ * Type that describes the desired blocking behavior for variable blocking calls. Blocking in this
+ * API is used in a somewhat modified meaning such that operations that merely update variables
+ * protected by mutexes are still considered "non-blocking" (always used in quotes).
+ */
+enum c2_blocking_t : int32_t {
+    /**
+     * The operation SHALL be "non-blocking". This means that it shall not perform any file
+     * operations, or call/wait on other processes. It may use a protected region as long as the
+     * mutex is never used to protect code that is otherwise "may block".
+     */
+    C2_DONT_BLOCK = false,
+    /**
+     * The operation MAY be temporarily blocking.
+     */
+    C2_MAY_BLOCK = true,
 };
 
 /// @}
