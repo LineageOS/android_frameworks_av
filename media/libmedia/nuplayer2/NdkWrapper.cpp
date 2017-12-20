@@ -25,6 +25,7 @@
 #include <media/NdkMediaCrypto.h>
 #include <media/NdkMediaDrm.h>
 #include <media/NdkMediaFormat.h>
+#include <media/NdkMediaExtractor.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -176,7 +177,6 @@ static cryptoinfo_mode_t translateToCryptoInfoMode(CryptoPlugin::Mode mode) {
 
     return ret;
 }
-
 
 //////////// AMediaFormatWrapper
 // static
@@ -991,6 +991,128 @@ status_t AMediaCodecWrapper::setParameters(const sp<AMediaFormatWrapper> &params
     }
     return translateErrorCode(
         AMediaCodec_setParameters(mAMediaCodec, params->getAMediaFormat()));
+}
+
+//////////// AMediaExtractorWrapper
+
+AMediaExtractorWrapper::AMediaExtractorWrapper(AMediaExtractor *aMediaExtractor)
+    : mAMediaExtractor(aMediaExtractor) {
+}
+
+AMediaExtractorWrapper::~AMediaExtractorWrapper() {
+    release();
+}
+
+status_t AMediaExtractorWrapper::release() {
+    if (mAMediaExtractor != NULL) {
+        media_status_t err = AMediaExtractor_delete(mAMediaExtractor);
+        mAMediaExtractor = NULL;
+        return translateErrorCode(err);
+    }
+    return OK;
+}
+
+AMediaExtractor *AMediaExtractorWrapper::getAMediaExtractor() const {
+    return mAMediaExtractor;
+}
+
+status_t AMediaExtractorWrapper::setDataSource(int fd, off64_t offset, off64_t length) {
+    if (mAMediaExtractor == NULL) {
+        return DEAD_OBJECT;
+    }
+    return translateErrorCode(AMediaExtractor_setDataSourceFd(
+            mAMediaExtractor, fd, offset, length));
+}
+
+status_t AMediaExtractorWrapper::setDataSource(const char *location) {
+    if (mAMediaExtractor == NULL) {
+        return DEAD_OBJECT;
+    }
+    return translateErrorCode(AMediaExtractor_setDataSource(mAMediaExtractor, location));
+}
+
+size_t AMediaExtractorWrapper::getTrackCount() {
+    if (mAMediaExtractor == NULL) {
+        return 0;
+    }
+    return AMediaExtractor_getTrackCount(mAMediaExtractor);
+}
+
+sp<AMediaFormatWrapper> AMediaExtractorWrapper::getTrackFormat(size_t idx) {
+    if (mAMediaExtractor == NULL) {
+        return NULL;
+    }
+    return new AMediaFormatWrapper(AMediaExtractor_getTrackFormat(mAMediaExtractor, idx));
+}
+
+status_t AMediaExtractorWrapper::selectTrack(size_t idx) {
+    if (mAMediaExtractor == NULL) {
+        return DEAD_OBJECT;
+    }
+    return translateErrorCode(AMediaExtractor_selectTrack(mAMediaExtractor, idx));
+}
+
+status_t AMediaExtractorWrapper::unselectTrack(size_t idx) {
+    if (mAMediaExtractor == NULL) {
+        return DEAD_OBJECT;
+    }
+    return translateErrorCode(AMediaExtractor_unselectTrack(mAMediaExtractor, idx));
+}
+
+ssize_t AMediaExtractorWrapper::readSampleData(const sp<ABuffer> &buffer) {
+    if (mAMediaExtractor == NULL) {
+        return -1;
+    }
+    return AMediaExtractor_readSampleData(mAMediaExtractor, buffer->data(), buffer->capacity());
+}
+
+uint32_t AMediaExtractorWrapper::getSampleFlags() {
+    if (mAMediaExtractor == NULL) {
+        return 0;
+    }
+    return AMediaExtractor_getSampleFlags(mAMediaExtractor);
+}
+
+int AMediaExtractorWrapper::getSampleTrackIndex() {
+    if (mAMediaExtractor == NULL) {
+        return -1;
+    }
+    return AMediaExtractor_getSampleTrackIndex(mAMediaExtractor);
+}
+
+int64_t AMediaExtractorWrapper::getSampleTime() {
+    if (mAMediaExtractor == NULL) {
+        return -1;
+    }
+    return AMediaExtractor_getSampleTime(mAMediaExtractor);
+}
+
+bool AMediaExtractorWrapper::advance() {
+    if (mAMediaExtractor == NULL) {
+        return false;
+    }
+    return AMediaExtractor_advance(mAMediaExtractor);
+}
+
+status_t AMediaExtractorWrapper::seekTo(int64_t seekPosUs, SeekMode mode) {
+    if (mAMediaExtractor == NULL) {
+        return DEAD_OBJECT;
+    }
+    return AMediaExtractor_seekTo(mAMediaExtractor, seekPosUs, mode);
+}
+
+PsshInfo* AMediaExtractorWrapper::getPsshInfo() {
+    if (mAMediaExtractor == NULL) {
+        return NULL;
+    }
+    return AMediaExtractor_getPsshInfo(mAMediaExtractor);
+}
+
+sp<AMediaCodecCryptoInfoWrapper> AMediaExtractorWrapper::getSampleCryptoInfo() {
+    if (mAMediaExtractor == NULL) {
+        return NULL;
+    }
+    return new AMediaCodecCryptoInfoWrapper(AMediaExtractor_getSampleCryptoInfo(mAMediaExtractor));
 }
 
 }  // namespace android
