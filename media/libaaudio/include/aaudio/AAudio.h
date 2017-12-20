@@ -137,6 +137,149 @@ enum {
 };
 typedef int32_t aaudio_performance_mode_t;
 
+/**
+ * The USAGE attribute expresses "why" you are playing a sound, what is this sound used for.
+ * This information is used by certain platforms or routing policies
+ * to make more refined volume or routing decisions.
+ *
+ * Note that these match the equivalent values in AudioAttributes in the Android Java API.
+ */
+enum {
+    /**
+     * Use this for streaming media, music performance, video, podcasts, etcetera.
+     */
+    AAUDIO_USAGE_MEDIA = 1,
+
+    /**
+     * Use this for voice over IP, telephony, etcetera.
+     */
+    AAUDIO_USAGE_VOICE_COMMUNICATION = 2,
+
+    /**
+     * Use this for sounds associated with telephony such as busy tones, DTMF, etcetera.
+     */
+    AAUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING = 3,
+
+    /**
+     * Use this to demand the users attention.
+     */
+    AAUDIO_USAGE_ALARM = 4,
+
+    /**
+     * Use this for notifying the user when a message has arrived or some
+     * other background event has occured.
+     */
+    AAUDIO_USAGE_NOTIFICATION = 5,
+
+    /**
+     * Use this when the phone rings.
+     */
+    AAUDIO_USAGE_NOTIFICATION_RINGTONE = 6,
+
+    /**
+     * Use this to attract the users attention when, for example, the battery is low.
+     */
+    AAUDIO_USAGE_NOTIFICATION_EVENT = 10,
+
+    /**
+     * Use this for screen readers, etcetera.
+     */
+    AAUDIO_USAGE_ASSISTANCE_ACCESSIBILITY = 11,
+
+    /**
+     * Use this for driving or navigation directions.
+     */
+    AAUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE = 12,
+
+    /**
+     * Use this for user interface sounds, beeps, etcetera.
+     */
+    AAUDIO_USAGE_ASSISTANCE_SONIFICATION = 13,
+
+    /**
+     * Use this for game audio and sound effects.
+     */
+    AAUDIO_USAGE_GAME = 14,
+
+    /**
+     * Use this for audio responses to user queries, audio instructions or help utterances.
+     */
+    AAUDIO_USAGE_ASSISTANT = 16
+};
+typedef int32_t aaudio_usage_t;
+
+/**
+ * The CONTENT_TYPE attribute describes "what" you are playing.
+ * It expresses the general category of the content. This information is optional.
+ * But in case it is known (for instance {@link #AAUDIO_CONTENT_TYPE_MOVIE} for a
+ * movie streaming service or {@link #AAUDIO_CONTENT_TYPE_SPEECH} for
+ * an audio book application) this information might be used by the audio framework to
+ * enforce audio focus.
+ *
+ * Note that these match the equivalent values in AudioAttributes in the Android Java API.
+ */
+enum {
+
+    /**
+     * Use this for spoken voice, audio books, etcetera.
+     */
+    AAUDIO_CONTENT_TYPE_SPEECH = 1,
+
+    /**
+     * Use this for pre-recorded or live music.
+     */
+    AAUDIO_CONTENT_TYPE_MUSIC = 2,
+
+    /**
+     * Use this for a movie or video soundtrack.
+     */
+    AAUDIO_CONTENT_TYPE_MOVIE = 3,
+
+    /**
+     * Use this for sound is designed to accompany a user action,
+     * such as a click or beep sound made when the user presses a button.
+     */
+    AAUDIO_CONTENT_TYPE_SONIFICATION = 4
+};
+typedef int32_t aaudio_content_type_t;
+
+/**
+ * Defines the audio source.
+ * An audio source defines both a default physical source of audio signal, and a recording
+ * configuration.
+ *
+ * Note that these match the equivalent values in MediaRecorder.AudioSource in the Android Java API.
+ */
+enum {
+    /**
+     * Use this preset when other presets do not apply.
+     */
+    AAUDIO_INPUT_PRESET_GENERIC = 1,
+
+    /**
+     * Use this preset when recording video.
+     */
+    AAUDIO_INPUT_PRESET_CAMCORDER = 5,
+
+    /**
+     * Use this preset when doing speech recognition.
+     */
+    AAUDIO_INPUT_PRESET_VOICE_RECOGNITION = 6,
+
+    /**
+     * Use this preset when doing telephony or voice messaging.
+     */
+    AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION = 7,
+
+    /**
+     * Use this preset to obtain an input with no effects.
+     * Note that this input will not have automatic gain control
+     * so the recorded volume may be very low.
+     */
+    AAUDIO_INPUT_PRESET_UNPROCESSED = 9,
+};
+typedef int32_t aaudio_input_preset_t;
+
 typedef struct AAudioStreamStruct         AAudioStream;
 typedef struct AAudioStreamBuilderStruct  AAudioStreamBuilder;
 
@@ -306,6 +449,52 @@ AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilde
  */
 AAUDIO_API void AAudioStreamBuilder_setPerformanceMode(AAudioStreamBuilder* builder,
                                                 aaudio_performance_mode_t mode);
+
+/**
+ * Set the intended use case for the stream.
+ *
+ * The AAudio system will use this information to optimize the
+ * behavior of the stream.
+ * This could, for example, affect how volume and focus is handled for the stream.
+ *
+ * The default, if you do not call this function, is AAUDIO_USAGE_MEDIA.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param usage the desired usage, eg. AAUDIO_USAGE_GAME
+ */
+AAUDIO_API void AAudioStreamBuilder_setUsage(AAudioStreamBuilder* builder,
+                                                       aaudio_usage_t usage);
+
+/**
+ * Set the type of audio data that the stream will carry.
+ *
+ * The AAudio system will use this information to optimize the
+ * behavior of the stream.
+ * This could, for example, affect whether a stream is paused when a notification occurs.
+ *
+ * The default, if you do not call this function, is AAUDIO_CONTENT_TYPE_MUSIC.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param contentType the type of audio data, eg. AAUDIO_CONTENT_TYPE_SPEECH
+ */
+AAUDIO_API void AAudioStreamBuilder_setContentType(AAudioStreamBuilder* builder,
+                                             aaudio_content_type_t contentType);
+
+/**
+ * Set the input (capture) preset for the stream.
+ *
+ * The AAudio system will use this information to optimize the
+ * behavior of the stream.
+ * This could, for example, affect which microphones are used and how the
+ * recorded data is processed.
+ *
+ * The default, if you do not call this function, is AAUDIO_INPUT_PRESET_GENERIC.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param inputPreset the desired configuration for recording
+ */
+AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
+                                                   aaudio_input_preset_t inputPreset);
 
 /**
  * Return one of these values from the data callback function.
@@ -819,6 +1008,30 @@ AAUDIO_API aaudio_result_t AAudioStream_getTimestamp(AAudioStream* stream,
                                       clockid_t clockid,
                                       int64_t *framePosition,
                                       int64_t *timeNanoseconds);
+
+/**
+ * Return the use case for the stream.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return frames read
+ */
+AAUDIO_API aaudio_usage_t AAudioStream_getUsage(AAudioStream* stream);
+
+/**
+ * Return the content type for the stream.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return content type, for example AAUDIO_CONTENT_TYPE_MUSIC
+ */
+AAUDIO_API aaudio_content_type_t AAudioStream_getContentType(AAudioStream* stream);
+
+/**
+ * Return the input preset for the stream.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return input preset, for example AAUDIO_INPUT_PRESET_CAMCORDER
+ */
+AAUDIO_API aaudio_input_preset_t AAudioStream_getInputPreset(AAudioStream* stream);
 
 #ifdef __cplusplus
 }
