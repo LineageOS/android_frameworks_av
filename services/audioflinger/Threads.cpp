@@ -6774,7 +6774,7 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
             recordTrack->clearSyncStartEvent();
         } else {
             // do not wait for the event for more than AudioSystem::kSyncRecordStartTimeOutMs
-            recordTrack->mFramesToDrop = -
+            recordTrack->mFramesToDrop = -(ssize_t)
                     ((AudioSystem::kSyncRecordStartTimeOutMs * recordTrack->mSampleRate) / 1000);
         }
     }
