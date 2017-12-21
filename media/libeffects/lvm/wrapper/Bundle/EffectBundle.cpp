@@ -198,7 +198,7 @@ extern "C" int EffectCreate(const effect_uuid_t *uuid,
                             int32_t             ioId __unused,
                             effect_handle_t  *pHandle){
     int ret = 0;
-    int sessionNo;
+    int sessionNo = -1;
     int i;
     EffectContext *pContext = NULL;
     bool newBundle = false;
@@ -218,21 +218,26 @@ extern "C" int EffectCreate(const effect_uuid_t *uuid,
         LvmGlobalBundle_init();
     }
 
-    // Find next available sessionNo
+    // Find sessionNo: if one already exists for the sessionId use it,
+    // otherwise choose the first available empty slot.
     for(i=0; i<LVM_MAX_SESSIONS; i++){
-        if((SessionIndex[i] == LVM_UNUSED_SESSION)||(SessionIndex[i] == sessionId)){
-            sessionNo       = i;
-            SessionIndex[i] = sessionId;
-            ALOGV("\tEffectCreate: Allocating SessionNo %d for SessionId %d\n", sessionNo,sessionId);
+        if (SessionIndex[i] == sessionId) {
+            sessionNo = i;
             break;
         }
+        if (sessionNo < 0 && SessionIndex[i] == LVM_UNUSED_SESSION) {
+            sessionNo = i;
+            // do not break; allow loop to continue to search for a sessionId match.
+        }
     }
-
-    if(i==LVM_MAX_SESSIONS){
+    if (sessionNo < 0) {
         ALOGV("\tLVM_ERROR : Cannot find memory to allocate for current session");
         ret = -EINVAL;
         goto exit;
     }
+
+    SessionIndex[sessionNo] = sessionId;
+    ALOGV("\tEffectCreate: Allocating sessionNo %d for sessionId %d\n", sessionNo, sessionId);
 
     pContext = new EffectContext;
 
