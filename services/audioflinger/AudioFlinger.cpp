@@ -3207,7 +3207,7 @@ void AudioFlinger::dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_hand
 status_t AudioFlinger::getAudioData(int par, unsigned long size, char * buffer)
 {
     status_t result = BAD_VALUE;
-    ALOGV("getAudioData: par=%d, size=%lu, buffer=%p", par, size, buffer);
+    ALOGV("getAudioData: par=%d, size=%d, buffer=%p", par, size, buffer);
     Mutex::Autolock _l(mLock);
     if (mPrimaryHardwareDev != NULL) {
         audio_hw_device_t *dev = mPrimaryHardwareDev->hwDevice();
@@ -3225,7 +3225,7 @@ status_t AudioFlinger::getAudioData(int par, unsigned long size, char * buffer)
 status_t AudioFlinger::setAudioData(int par, unsigned long size, char * buffer)
 {
     status_t result = BAD_VALUE;
-    ALOGV("setAudioData: par=%d, size=%lu, buffer=%p", par, size, buffer);
+    ALOGV("setAudioData: par=%d, size=%d, buffer=%p", par, size, buffer);
     Mutex::Autolock _l(mLock);
     if (mPrimaryHardwareDev != NULL) {
         audio_hw_device_t *dev = mPrimaryHardwareDev->hwDevice();
