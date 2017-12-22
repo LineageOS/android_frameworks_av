@@ -838,6 +838,11 @@ status_t DrmHal::setPropertyByteArray(String8 const &name,
     return toStatusT(status);
 }
 
+status_t DrmHal::getMetrics(MediaAnalyticsItem* metrics) {
+    // TODO: Replace this with real metrics.
+    metrics->setCString("/drm/mediadrm/dummymetric", "dummy");
+    return OK;
+}
 
 status_t DrmHal::setCipherAlgorithm(Vector<uint8_t> const &sessionId,
                                  String8 const &algorithm) {
@@ -1029,6 +1034,7 @@ void DrmHal::writeByteArray(Parcel &obj, hidl_vec<uint8_t> const &vec)
         obj.writeInt32(0);
     }
 }
+
 
 void DrmHal::reportMetrics() const
 {

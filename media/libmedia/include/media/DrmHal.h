@@ -24,6 +24,7 @@
 
 #include <media/IDrm.h>
 #include <media/IDrmClient.h>
+#include <media/MediaAnalyticsItem.h>
 #include <utils/threads.h>
 
 using ::android::hardware::drm::V1_0::EventType;
@@ -104,6 +105,7 @@ struct DrmHal : public BnDrm,
     virtual status_t setPropertyString(String8 const &name, String8 const &value ) const;
     virtual status_t setPropertyByteArray(String8 const &name,
                                           Vector<uint8_t> const &value ) const;
+    virtual status_t getMetrics(MediaAnalyticsItem *item);
 
     virtual status_t setCipherAlgorithm(Vector<uint8_t> const &sessionId,
                                         String8 const &algorithm);

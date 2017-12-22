@@ -46,6 +46,7 @@ enum {
     GET_PROPERTY_BYTE_ARRAY,
     SET_PROPERTY_STRING,
     SET_PROPERTY_BYTE_ARRAY,
+    GET_METRICS,
     SET_CIPHER_ALGORITHM,
     SET_MAC_ALGORITHM,
     ENCRYPT,
@@ -393,6 +394,18 @@ struct BpDrm : public BpInterface<IDrm> {
         return reply.readInt32();
     }
 
+    virtual status_t getMetrics(MediaAnalyticsItem *item) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(GET_METRICS, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
+        item->readFromParcel(reply);
+        return reply.readInt32();
+    }
 
     virtual status_t setCipherAlgorithm(Vector<uint8_t> const &sessionId,
                                         String8 const &algorithm) {
@@ -826,6 +839,17 @@ status_t BnDrm::onTransact(
             Vector<uint8_t> value;
             readVector(data, value);
             reply->writeInt32(setPropertyByteArray(name, value));
+            return OK;
+        }
+
+        case GET_METRICS:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+
+            MediaAnalyticsItem item;
+            status_t result = getMetrics(&item);
+            item.writeToParcel(reply);
+            reply->writeInt32(result);
             return OK;
         }
 
