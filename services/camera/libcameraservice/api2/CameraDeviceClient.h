@@ -255,8 +255,17 @@ private:
     binder::Status createSurfaceFromGbp(OutputStreamInfo& streamInfo, bool isStreamInfoValid,
             sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp);
 
+
+    // Utility method to insert the surface into SurfaceMap
+    binder::Status insertGbpLocked(const sp<IGraphicBufferProducer>& gbp,
+            /*out*/SurfaceMap* surfaceMap,
+            /*out*/Vector<int32_t>* streamIds);
+
     // IGraphicsBufferProducer binder -> Stream ID + Surface ID for output streams
     KeyedVector<sp<IBinder>, StreamSurfaceId> mStreamMap;
+
+    // Stream ID -> OutputConfiguration. Used for looking up Surface by stream/surface index
+    KeyedVector<int32_t, hardware::camera2::params::OutputConfiguration> mConfiguredOutputs;
 
     struct InputStreamConfiguration {
         bool configured;

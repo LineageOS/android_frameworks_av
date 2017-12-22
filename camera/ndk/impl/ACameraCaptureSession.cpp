@@ -159,7 +159,7 @@ camera_status_t ACameraCaptureSession::updateOutputConfiguration(ACaptureSession
     dev->lockDeviceForSessionOps();
     {
         Mutex::Autolock _l(mSessionLock);
-        ret = dev->updateOutputConfiguration(output);
+        ret = dev->updateOutputConfigurationLocked(output);
     }
     dev->unlockDevice();
     return ret;

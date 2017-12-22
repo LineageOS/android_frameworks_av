@@ -123,9 +123,9 @@ class CameraDevice final : public RefBase {
             /*out*/int* captureSequenceId,
             bool isRepeating);
 
-    camera_status_t updateOutputConfiguration(ACaptureSessionOutput *output);
+    camera_status_t updateOutputConfigurationLocked(ACaptureSessionOutput *output);
 
-    static camera_status_t allocateCaptureRequest(
+    camera_status_t allocateCaptureRequest(
             const ACaptureRequest* request, sp<CaptureRequest>& outReq);
 
     static ACaptureRequest* allocateACaptureRequest(sp<CaptureRequest>& req);
