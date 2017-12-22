@@ -138,7 +138,8 @@ class Camera3Device :
 
     status_t deleteStream(int id) override;
 
-    status_t configureStreams(int operatingMode =
+    status_t configureStreams(const CameraMetadata& sessionParams,
+            int operatingMode =
             static_cast<int>(hardware::camera::device::V3_2::StreamConfigurationMode::NORMAL_MODE))
             override;
     status_t getInputBufferProducer(
@@ -236,6 +237,9 @@ class Camera3Device :
 
     // Current stream configuration mode;
     int                        mOperatingMode;
+    // Current session wide parameters
+    hardware::camera2::impl::CameraMetadataNative mSessionParams;
+
     // Constant to use for no set operating mode
     static const int           NO_MODE = -1;
 
@@ -272,7 +276,8 @@ class Camera3Device :
         // Caller takes ownership of requestTemplate
         status_t constructDefaultRequestSettings(camera3_request_template_t templateId,
                 /*out*/ camera_metadata_t **requestTemplate);
-        status_t configureStreams(/*inout*/ camera3_stream_configuration *config);
+        status_t configureStreams(const camera_metadata_t *sessionParams,
+                /*inout*/ camera3_stream_configuration *config);
         status_t processCaptureRequest(camera3_capture_request_t *request);
         status_t processBatchCaptureRequests(
                 std::vector<camera3_capture_request_t*>& requests,
@@ -550,7 +555,8 @@ class Camera3Device :
      * Take the currently-defined set of streams and configure the HAL to use
      * them. This is a long-running operation (may be several hundered ms).
      */
-    status_t           configureStreamsLocked(int operatingMode);
+    status_t           configureStreamsLocked(int operatingMode,
+            const CameraMetadata& sessionParams);
 
     /**
      * Cancel stream configuration that did not finish successfully.

@@ -157,6 +157,7 @@ CameraDevice::createCaptureRequest(
 camera_status_t
 CameraDevice::createCaptureSession(
         const ACaptureSessionOutputContainer*       outputs,
+        const ACaptureRequest* sessionParameters,
         const ACameraCaptureSession_stateCallbacks* callbacks,
         /*out*/ACameraCaptureSession** session) {
     sp<ACameraCaptureSession> currentSession = mCurrentSession.promote();
@@ -172,7 +173,7 @@ CameraDevice::createCaptureSession(
     }
 
     // Create new session
-    ret = configureStreamsLocked(outputs);
+    ret = configureStreamsLocked(outputs, sessionParameters);
     if (ret != ACAMERA_OK) {
         ALOGE("Fail to create new session. cannot configure streams");
         return ret;
@@ -460,7 +461,7 @@ CameraDevice::notifySessionEndOfLifeLocked(ACameraCaptureSession* session) {
     }
 
     // No new session, unconfigure now
-    camera_status_t ret = configureStreamsLocked(nullptr);
+    camera_status_t ret = configureStreamsLocked(nullptr, nullptr);
     if (ret != ACAMERA_OK) {
         ALOGE("Unconfigure stream failed. Device might still be configured! ret %d", ret);
     }
@@ -618,7 +619,8 @@ CameraDevice::getSurfaceFromANativeWindow(
 }
 
 camera_status_t
-CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outputs) {
+CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outputs,
+        const ACaptureRequest* sessionParameters) {
     ACaptureSessionOutputContainer emptyOutput;
     if (outputs == nullptr) {
         outputs = &emptyOutput;
@@ -714,7 +716,11 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
         mConfiguredOutputs.insert(std::make_pair(streamId, outputPair));
     }
 
-    remoteRet = mRemote->endConfigure(/*isConstrainedHighSpeed*/ false);
+    CameraMetadata params;
+    if ((sessionParameters != nullptr) && (sessionParameters->settings != nullptr)) {
+        params.append(sessionParameters->settings->getInternalData());
+    }
+    remoteRet = mRemote->endConfigure(/*isConstrainedHighSpeed*/ false, params);
     if (remoteRet.serviceSpecificErrorCode() == hardware::ICameraService::ERROR_ILLEGAL_ARGUMENT) {
         ALOGE("Camera device %s cannnot support app output configuration: %s", getId(),
                 remoteRet.toString8().string());

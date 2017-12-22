@@ -10,6 +10,7 @@ LIBCAMERA2NDK {
     ACameraDevice_close;
     ACameraDevice_createCaptureRequest;
     ACameraDevice_createCaptureSession;
+    ACameraDevice_createCaptureSessionWithSessionParameters;
     ACameraDevice_getId;
     ACameraManager_create;
     ACameraManager_delete;

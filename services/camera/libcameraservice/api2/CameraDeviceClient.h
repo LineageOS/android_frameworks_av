@@ -85,7 +85,8 @@ public:
 
     virtual binder::Status beginConfigure() override;
 
-    virtual binder::Status endConfigure(int operatingMode) override;
+    virtual binder::Status endConfigure(int operatingMode,
+            const hardware::camera2::impl::CameraMetadataNative& sessionParams) override;
 
     // Returns -EBUSY if device is not idle or in error state
     virtual binder::Status deleteStream(int streamId) override;

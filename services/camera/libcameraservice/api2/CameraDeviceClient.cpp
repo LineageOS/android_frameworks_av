@@ -359,7 +359,8 @@ binder::Status CameraDeviceClient::beginConfigure() {
     return binder::Status::ok();
 }
 
-binder::Status CameraDeviceClient::endConfigure(int operatingMode) {
+binder::Status CameraDeviceClient::endConfigure(int operatingMode,
+        const hardware::camera2::impl::CameraMetadataNative& sessionParams) {
     ATRACE_CALL();
     ALOGV("%s: ending configure (%d input stream, %zu output surfaces)",
             __FUNCTION__, mInputStream.configured ? 1 : 0,
@@ -405,7 +406,7 @@ binder::Status CameraDeviceClient::endConfigure(int operatingMode) {
         }
     }
 
-    status_t err = mDevice->configureStreams(operatingMode);
+    status_t err = mDevice->configureStreams(sessionParams, operatingMode);
     if (err == BAD_VALUE) {
         String8 msg = String8::format("Camera %s: Unsupported set of inputs/outputs provided",
                 mCameraIdStr.string());

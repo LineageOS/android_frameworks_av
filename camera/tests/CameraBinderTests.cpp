@@ -476,7 +476,8 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
         res = device->createStream(output, &streamId);
         EXPECT_TRUE(res.isOk()) << res;
         EXPECT_LE(0, streamId);
-        res = device->endConfigure(/*isConstrainedHighSpeed*/ false);
+        CameraMetadata sessionParams;
+        res = device->endConfigure(/*isConstrainedHighSpeed*/ false, sessionParams);
         EXPECT_TRUE(res.isOk()) << res;
         EXPECT_FALSE(callbacks->hadError());
 
@@ -574,7 +575,7 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
         EXPECT_TRUE(res.isOk()) << res;
         res = device->deleteStream(streamId);
         EXPECT_TRUE(res.isOk()) << res;
-        res = device->endConfigure(/*isConstrainedHighSpeed*/ false);
+        res = device->endConfigure(/*isConstrainedHighSpeed*/ false, sessionParams);
         EXPECT_TRUE(res.isOk()) << res;
 
         sleep(/*second*/1); // allow some time for errors to show up, if any

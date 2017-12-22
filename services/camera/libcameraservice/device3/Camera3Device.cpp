@@ -55,6 +55,8 @@
 #include "device3/Camera3SharedOutputStream.h"
 #include "CameraService.h"
 
+#include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
+
 using namespace android::camera3;
 using namespace android::hardware::camera;
 using namespace android::hardware::camera::device::V3_2;
@@ -1102,7 +1104,7 @@ sp<Camera3Device::CaptureRequest> Camera3Device::setUpRequestLocked(
     if (mStatus == STATUS_UNCONFIGURED || mNeedConfig) {
         // This point should only be reached via API1 (API2 must explicitly call configureStreams)
         // so unilaterally select normal operating mode.
-        res = configureStreamsLocked(CAMERA3_STREAM_CONFIGURATION_NORMAL_MODE);
+        res = configureStreamsLocked(CAMERA3_STREAM_CONFIGURATION_NORMAL_MODE, mSessionParams);
         // Stream configuration failed. Client might try other configuraitons.
         if (res != OK) {
             CLOGE("Can't set up streams: %s (%d)", strerror(-res), res);
@@ -1205,8 +1207,8 @@ status_t Camera3Device::createInputStream(
     // Continue captures if active at start
     if (wasActive) {
         ALOGV("%s: Restarting activity to reconfigure streams", __FUNCTION__);
-        // Reuse current operating mode for new stream config
-        res = configureStreamsLocked(mOperatingMode);
+        // Reuse current operating mode and session parameters for new stream config
+        res = configureStreamsLocked(mOperatingMode, mSessionParams);
         if (res != OK) {
             ALOGE("%s: Can't reconfigure device for new stream %d: %s (%d)",
                     __FUNCTION__, mNextStreamId, strerror(-res), res);
@@ -1360,8 +1362,8 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
     // Continue captures if active at start
     if (wasActive) {
         ALOGV("%s: Restarting activity to reconfigure streams", __FUNCTION__);
-        // Reuse current operating mode for new stream config
-        res = configureStreamsLocked(mOperatingMode);
+        // Reuse current operating mode and session parameters for new stream config
+        res = configureStreamsLocked(mOperatingMode, mSessionParams);
         if (res != OK) {
             CLOGE("Can't reconfigure device for new stream %d: %s (%d)",
                     mNextStreamId, strerror(-res), res);
@@ -1499,14 +1501,29 @@ status_t Camera3Device::deleteStream(int id) {
     return res;
 }
 
-status_t Camera3Device::configureStreams(int operatingMode) {
+status_t Camera3Device::configureStreams(const CameraMetadata& sessionParams, int operatingMode) {
     ATRACE_CALL();
     ALOGV("%s: E", __FUNCTION__);
 
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
-    return configureStreamsLocked(operatingMode);
+    //Filter out any incoming session parameters
+    const CameraMetadata params(sessionParams);
+    CameraMetadata filteredParams;
+    camera_metadata_entry_t availableSessionKeys = mDeviceInfo.find(
+            ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
+    if (availableSessionKeys.count > 0) {
+        for (size_t i = 0; i < availableSessionKeys.count; i++) {
+            camera_metadata_ro_entry entry = params.find(
+                    availableSessionKeys.data.i32[i]);
+            if (entry.count > 0) {
+                filteredParams.update(entry);
+            }
+        }
+    }
+
+    return configureStreamsLocked(operatingMode, filteredParams);
 }
 
 status_t Camera3Device::getInputBufferProducer(
@@ -2188,7 +2205,8 @@ void Camera3Device::cancelStreamsConfigurationLocked() {
     mNeedConfig = true;
 }
 
-status_t Camera3Device::configureStreamsLocked(int operatingMode) {
+status_t Camera3Device::configureStreamsLocked(int operatingMode,
+        const CameraMetadata& sessionParams) {
     ATRACE_CALL();
     status_t res;
 
@@ -2272,7 +2290,9 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode) {
     // Do the HAL configuration; will potentially touch stream
     // max_buffers, usage, priv fields.
 
-    res = mInterface->configureStreams(&config);
+    const camera_metadata_t *sessionBuffer = sessionParams.getAndLock();
+    res = mInterface->configureStreams(sessionBuffer, &config);
+    sessionParams.unlock(sessionBuffer);
 
     if (res == BAD_VALUE) {
         // HAL rejected this set of streams as unsupported, clean up config
@@ -2337,6 +2357,14 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode) {
     }
 
     // Update device state
+    const camera_metadata_t *newSessionParams = sessionParams.getAndLock();
+    const camera_metadata_t *currentSessionParams = mSessionParams.getAndLock();
+    bool updateSessionParams = (newSessionParams != currentSessionParams) ? true : false;
+    sessionParams.unlock(newSessionParams);
+    mSessionParams.unlock(currentSessionParams);
+    if (updateSessionParams)  {
+        mSessionParams = sessionParams;
+    }
 
     mNeedConfig = false;
 
@@ -3224,17 +3252,18 @@ status_t Camera3Device::HalInterface::constructDefaultRequestSettings(
     return res;
 }
 
-status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configuration *config) {
+status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *sessionParams,
+        camera3_stream_configuration *config) {
     ATRACE_NAME("CameraHal::configureStreams");
     if (!valid()) return INVALID_OPERATION;
     status_t res = OK;
 
     // Convert stream config to HIDL
     std::set<int> activeStreams;
-    StreamConfiguration requestedConfiguration;
-    requestedConfiguration.streams.resize(config->num_streams);
+    device::V3_4::StreamConfiguration requestedConfiguration;
+    requestedConfiguration.v3_2.streams.resize(config->num_streams);
     for (size_t i = 0; i < config->num_streams; i++) {
-        Stream &dst = requestedConfiguration.streams[i];
+        Stream &dst = requestedConfiguration.v3_2.streams[i];
         camera3_stream_t *src = config->streams[i];
 
         Camera3Stream* cam3stream = Camera3Stream::cast(src);
@@ -3281,29 +3310,50 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
 
     res = mapToStreamConfigurationMode(
             (camera3_stream_configuration_mode_t) config->operation_mode,
-            /*out*/ &requestedConfiguration.operationMode);
+            /*out*/ &requestedConfiguration.v3_2.operationMode);
     if (res != OK) {
         return res;
     }
+
+    requestedConfiguration.sessionParams.setToExternal(
+            reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(sessionParams)),
+            get_camera_metadata_size(sessionParams));
 
     // Invoke configureStreams
 
     device::V3_3::HalStreamConfiguration finalConfiguration;
     common::V1_0::Status status;
 
-    // See if we have v3.3 HAL
+    // See if we have v3.4 or v3.3 HAL
+    sp<device::V3_4::ICameraDeviceSession> hidlSession_3_4;
     sp<device::V3_3::ICameraDeviceSession> hidlSession_3_3;
-    auto castResult = device::V3_3::ICameraDeviceSession::castFrom(mHidlSession);
-    if (castResult.isOk()) {
-        hidlSession_3_3 = castResult;
+    auto castResult_3_4 = device::V3_4::ICameraDeviceSession::castFrom(mHidlSession);
+    if (castResult_3_4.isOk()) {
+        hidlSession_3_4 = castResult_3_4;
     } else {
-        ALOGE("%s: Transaction error when casting ICameraDeviceSession: %s", __FUNCTION__,
-                castResult.description().c_str());
+        auto castResult_3_3 = device::V3_3::ICameraDeviceSession::castFrom(mHidlSession);
+        if (castResult_3_3.isOk()) {
+            hidlSession_3_3 = castResult_3_3;
+        }
     }
-    if (hidlSession_3_3 != nullptr) {
+
+    if (hidlSession_3_4 != nullptr) {
+        // We do; use v3.4 for the call
+        ALOGV("%s: v3.4 device found", __FUNCTION__);
+        auto err = hidlSession_3_4->configureStreams_3_4(requestedConfiguration,
+            [&status, &finalConfiguration]
+            (common::V1_0::Status s, const device::V3_3::HalStreamConfiguration& halConfiguration) {
+                finalConfiguration = halConfiguration;
+                status = s;
+            });
+        if (!err.isOk()) {
+            ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
+            return DEAD_OBJECT;
+        }
+    } else if (hidlSession_3_3 != nullptr) {
         // We do; use v3.3 for the call
         ALOGV("%s: v3.3 device found", __FUNCTION__);
-        auto err = hidlSession_3_3->configureStreams_3_3(requestedConfiguration,
+        auto err = hidlSession_3_3->configureStreams_3_3(requestedConfiguration.v3_2,
             [&status, &finalConfiguration]
             (common::V1_0::Status s, const device::V3_3::HalStreamConfiguration& halConfiguration) {
                 finalConfiguration = halConfiguration;
@@ -3317,7 +3367,7 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
         // We don't; use v3.2 call and construct a v3.3 HalStreamConfiguration
         ALOGV("%s: v3.2 device found", __FUNCTION__);
         HalStreamConfiguration finalConfiguration_3_2;
-        auto err = mHidlSession->configureStreams(requestedConfiguration,
+        auto err = mHidlSession->configureStreams(requestedConfiguration.v3_2,
                 [&status, &finalConfiguration_3_2]
                 (common::V1_0::Status s, const HalStreamConfiguration& halConfiguration) {
                     finalConfiguration_3_2 = halConfiguration;
@@ -3331,7 +3381,7 @@ status_t Camera3Device::HalInterface::configureStreams(camera3_stream_configurat
         for (size_t i = 0; i < finalConfiguration_3_2.streams.size(); i++) {
             finalConfiguration.streams[i].v3_2 = finalConfiguration_3_2.streams[i];
             finalConfiguration.streams[i].overrideDataSpace =
-                    requestedConfiguration.streams[i].dataSpace;
+                    requestedConfiguration.v3_2.streams[i].dataSpace;
         }
     }
 

@@ -235,7 +235,7 @@ ACameraMetadata::getTags(/*out*/int32_t* numTags,
 }
 
 const CameraMetadata&
-ACameraMetadata::getInternalData() {
+ACameraMetadata::getInternalData() const {
     return mData;
 }
 
