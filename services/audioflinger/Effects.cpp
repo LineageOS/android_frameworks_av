@@ -1279,12 +1279,9 @@ static std::string dumpInOutBuffer(bool isInput, const sp<EffectBufferHalInterfa
 
 void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unused)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
     String8 result;
 
-    snprintf(buffer, SIZE, "\tEffect ID %d:\n", mId);
-    result.append(buffer);
+    result.appendFormat("\tEffect ID %d:\n", mId);
 
     bool locked = AudioFlinger::dumpTryLock(mLock);
     // failed to lock - AudioFlinger is probably deadlocked
@@ -1293,51 +1290,46 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unu
     }
 
     result.append("\t\tSession Status State Engine:\n");
-    snprintf(buffer, SIZE, "\t\t%05d   %03d    %03d   %p\n",
+    result.appendFormat("\t\t%05d   %03d    %03d   %p\n",
             mSessionId, mStatus, mState, mEffectInterface.get());
-    result.append(buffer);
 
     result.append("\t\tDescriptor:\n");
     char uuidStr[64];
     AudioEffect::guidToString(&mDescriptor.uuid, uuidStr, sizeof(uuidStr));
-    snprintf(buffer, SIZE, "\t\t- UUID: %s\n", uuidStr);
-    result.append(buffer);
+    result.appendFormat("\t\t- UUID: %s\n", uuidStr);
     AudioEffect::guidToString(&mDescriptor.type, uuidStr, sizeof(uuidStr));
-    snprintf(buffer, SIZE, "\t\t- TYPE: %s\n", uuidStr);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "\t\t- apiVersion: %08X\n\t\t- flags: %08X (%s)\n",
+    result.appendFormat("\t\t- TYPE: %s\n", uuidStr);
+    result.appendFormat("\t\t- apiVersion: %08X\n\t\t- flags: %08X (%s)\n",
             mDescriptor.apiVersion,
             mDescriptor.flags,
             effectFlagsToString(mDescriptor.flags).string());
-    result.append(buffer);
-    snprintf(buffer, SIZE, "\t\t- name: %s\n",
+    result.appendFormat("\t\t- name: %s\n",
             mDescriptor.name);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "\t\t- implementor: %s\n",
+
+    result.appendFormat("\t\t- implementor: %s\n",
             mDescriptor.implementor);
-    result.append(buffer);
+
+    result.appendFormat("\t\t- data: %s\n", mSupportsFloat ? "float" : "int16");
 
     result.append("\t\t- Input configuration:\n");
-    result.append("\t\t\tFrames  Smp rate Channels Format Buffer\n");
-    snprintf(buffer, SIZE, "\t\t\t%05zu   %05d    %08x %6d (%s) %p\n",
+    result.append("\t\t\tBuffer     Frames  Smp rate Channels Format\n");
+    result.appendFormat("\t\t\t%p %05zu   %05d    %08x %6d (%s)\n",
+            mConfig.inputCfg.buffer.raw,
             mConfig.inputCfg.buffer.frameCount,
             mConfig.inputCfg.samplingRate,
             mConfig.inputCfg.channels,
             mConfig.inputCfg.format,
-            formatToString((audio_format_t)mConfig.inputCfg.format).c_str(),
-            mConfig.inputCfg.buffer.raw);
-    result.append(buffer);
+            formatToString((audio_format_t)mConfig.inputCfg.format).c_str());
 
     result.append("\t\t- Output configuration:\n");
     result.append("\t\t\tBuffer     Frames  Smp rate Channels Format\n");
-    snprintf(buffer, SIZE, "\t\t\t%p %05zu   %05d    %08x %d (%s)\n",
+    result.appendFormat("\t\t\t%p %05zu   %05d    %08x %6d (%s)\n",
             mConfig.outputCfg.buffer.raw,
             mConfig.outputCfg.buffer.frameCount,
             mConfig.outputCfg.samplingRate,
             mConfig.outputCfg.channels,
             mConfig.outputCfg.format,
             formatToString((audio_format_t)mConfig.outputCfg.format).c_str());
-    result.append(buffer);
 
 #ifdef FLOAT_EFFECT_CHAIN
 
@@ -1349,13 +1341,13 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unu
             dumpInOutBuffer(false /* isInput */, mOutConversionBuffer).c_str());
 #endif
 
-    snprintf(buffer, SIZE, "\t\t%zu Clients:\n", mHandles.size());
-    result.append(buffer);
+    result.appendFormat("\t\t%zu Clients:\n", mHandles.size());
     result.append("\t\t\t  Pid Priority Ctrl Locked client server\n");
+    char buffer[256];
     for (size_t i = 0; i < mHandles.size(); ++i) {
         EffectHandle *handle = mHandles[i];
         if (handle != NULL && !handle->disconnected()) {
-            handle->dumpToBuffer(buffer, SIZE);
+            handle->dumpToBuffer(buffer, sizeof(buffer));
             result.append(buffer);
         }
     }
