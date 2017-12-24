@@ -162,7 +162,7 @@ public:
     virtual std::vector<std::shared_ptr<const C2Component::Traits>> listComponents() override;
     virtual std::shared_ptr<C2ParamReflector> getParamReflector() const override;
     virtual C2String getName() const override;
-    virtual c2_status_t querySupportedValues_nb(
+    virtual c2_status_t querySupportedValues_sm(
             std::vector<C2FieldSupportedValuesQuery> &fields) const override;
     virtual c2_status_t querySupportedParams_nb(
             std::vector<std::shared_ptr<C2ParamDescriptor>> *const params) const override;
@@ -179,10 +179,6 @@ public:
     virtual c2_status_t config_sm(
             const std::vector<C2Param *const> &params,
             std::vector<std::unique_ptr<C2SettingResult>> *const failures) override;
-    virtual c2_status_t commit_sm(
-            const std::vector<C2Param *const> &params,
-            std::vector<std::unique_ptr<C2SettingResult>> *const failures) override;
-
     C2PlatformComponentStore();
 
     virtual ~C2PlatformComponentStore() override = default;
@@ -434,14 +430,6 @@ c2_status_t C2PlatformComponentStore::config_sm(
     return params.empty() ? C2_OK : C2_BAD_INDEX;
 }
 
-c2_status_t C2PlatformComponentStore::commit_sm(
-        const std::vector<C2Param *const> &params,
-        std::vector<std::unique_ptr<C2SettingResult>> *const failures) {
-    // there are no supported configs
-    (void)failures;
-    return params.empty() ? C2_OK : C2_BAD_INDEX;
-}
-
 std::vector<std::shared_ptr<const C2Component::Traits>> C2PlatformComponentStore::listComponents() {
     // This method SHALL return within 500ms.
     std::vector<std::shared_ptr<const C2Component::Traits>> list;
@@ -511,7 +499,7 @@ c2_status_t C2PlatformComponentStore::querySupportedParams_nb(
     return C2_OK;
 }
 
-c2_status_t C2PlatformComponentStore::querySupportedValues_nb(
+c2_status_t C2PlatformComponentStore::querySupportedValues_sm(
         std::vector<C2FieldSupportedValuesQuery> &fields) const {
     // there are no supported config params
     return fields.empty() ? C2_OK : C2_BAD_INDEX;

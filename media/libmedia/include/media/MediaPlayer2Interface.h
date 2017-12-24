@@ -43,8 +43,7 @@ namespace android {
 class DataSource;
 struct MediaHTTPService;
 class Parcel;
-class Surface;
-class IGraphicBufferProducer;
+struct ANativeWindowWrapper;
 
 template<typename T> class SortedVector;
 
@@ -183,9 +182,8 @@ public:
         return INVALID_OPERATION;
     }
 
-    // pass the buffered IGraphicBufferProducer to the media player service
-    virtual status_t    setVideoSurfaceTexture(
-                                const sp<IGraphicBufferProducer>& bufferProducer) = 0;
+    // pass the buffered native window to the media player service
+    virtual status_t    setVideoSurfaceTexture(const sp<ANativeWindowWrapper>& nww) = 0;
 
     virtual status_t    getBufferingSettings(
                                 BufferingSettings* buffering /* nonnull */) {

@@ -69,15 +69,15 @@ void C2SoftAvcDecTest::testReadOnlyParam(const T *expected, const T *invalid) {
 template <typename T>
 void C2SoftAvcDecTest::testReadOnlyParamOnStack(const T *expected, const T *invalid) {
     T param;
-    ASSERT_EQ(C2_OK, mIntf->query_nb({&param}, {}, nullptr));
+    ASSERT_EQ(C2_OK, mIntf->query_vb({&param}, {}, C2_DONT_BLOCK, nullptr));
     ASSERT_EQ(*expected, param);
 
     std::vector<C2Param * const> params{ (C2Param * const)invalid };
     std::vector<std::unique_ptr<C2SettingResult>> failures;
-    ASSERT_EQ(C2_BAD_VALUE, mIntf->config_nb(params, &failures));
+    ASSERT_EQ(C2_BAD_VALUE, mIntf->config_vb(params, C2_DONT_BLOCK, &failures));
 
     // The param must not change after failed config.
-    ASSERT_EQ(C2_OK, mIntf->query_nb({&param}, {}, nullptr));
+    ASSERT_EQ(C2_OK, mIntf->query_vb({&param}, {}, C2_DONT_BLOCK, nullptr));
     ASSERT_EQ(*expected, param);
 }
 
@@ -90,17 +90,17 @@ void C2SoftAvcDecTest::testReadOnlyParamOnHeap(const T *expected, const T *inval
         index |= ((expected->stream() << 17) & 0x01FE0000) | 0x02000000;
     }
 
-    ASSERT_EQ(C2_OK, mIntf->query_nb({}, {index}, &heapParams));
+    ASSERT_EQ(C2_OK, mIntf->query_vb({}, {index}, C2_DONT_BLOCK, &heapParams));
     ASSERT_EQ(1u, heapParams.size());
     ASSERT_EQ(*expected, *heapParams[0]);
 
     std::vector<C2Param * const> params{ (C2Param * const)invalid };
     std::vector<std::unique_ptr<C2SettingResult>> failures;
-    ASSERT_EQ(C2_BAD_VALUE, mIntf->config_nb(params, &failures));
+    ASSERT_EQ(C2_BAD_VALUE, mIntf->config_vb(params, C2_DONT_BLOCK, &failures));
 
     // The param must not change after failed config.
     heapParams.clear();
-    ASSERT_EQ(C2_OK, mIntf->query_nb({}, {index}, &heapParams));
+    ASSERT_EQ(C2_OK, mIntf->query_vb({}, {index}, C2_DONT_BLOCK, &heapParams));
     ASSERT_EQ(1u, heapParams.size());
     ASSERT_EQ(*expected, *heapParams[0]);
 }
@@ -115,17 +115,17 @@ void C2SoftAvcDecTest::testReadOnlyFlexParam(
         index |= ((expected->stream() << 17) & 0x01FE0000) | 0x02000000;
     }
 
-    ASSERT_EQ(C2_OK, mIntf->query_nb({}, {index}, &heapParams));
+    ASSERT_EQ(C2_OK, mIntf->query_vb({}, {index}, C2_DONT_BLOCK, &heapParams));
     ASSERT_EQ(1u, heapParams.size());
     ASSERT_EQ(*expected, *heapParams[0]);
 
     std::vector<C2Param * const> params{ invalid.get() };
     std::vector<std::unique_ptr<C2SettingResult>> failures;
-    ASSERT_EQ(C2_BAD_VALUE, mIntf->config_nb(params, &failures));
+    ASSERT_EQ(C2_BAD_VALUE, mIntf->config_vb(params, C2_DONT_BLOCK, &failures));
 
     // The param must not change after failed config.
     heapParams.clear();
-    ASSERT_EQ(C2_OK, mIntf->query_nb({}, {index}, &heapParams));
+    ASSERT_EQ(C2_OK, mIntf->query_vb({}, {index}, C2_DONT_BLOCK, &heapParams));
     ASSERT_EQ(1u, heapParams.size());
     ASSERT_EQ(*expected, *heapParams[0]);
 }

@@ -71,12 +71,20 @@ T max(const T& x, const T& y) {
 
 // Set kUseNewMixer to true to use the new mixer engine always. Otherwise the
 // original code will be used for stereo sinks, the new mixer for multichannel.
-static const bool kUseNewMixer = true;
+static constexpr bool kUseNewMixer = true;
 
 // Set kUseFloat to true to allow floating input into the mixer engine.
 // If kUseNewMixer is false, this is ignored or may be overridden internally
 // because of downmix/upmix support.
-static const bool kUseFloat = true;
+static constexpr bool kUseFloat = true;
+
+#ifdef FLOAT_AUX
+using TYPE_AUX = float;
+static_assert(kUseNewMixer && kUseFloat,
+        "kUseNewMixer and kUseFloat must be true for FLOAT_AUX option");
+#else
+using TYPE_AUX = int32_t; // q4.27
+#endif
 
 // Set to default copy buffer size in frames for input processing.
 static const size_t kCopyBufferFrameCount = 256;
@@ -861,16 +869,25 @@ inline void AudioMixer::track_t::adjustVolumeRamp(bool aux, bool useFloat)
             }
         }
     }
-    /* TODO: aux is always integer regardless of output buffer type */
+
     if (aux) {
-        if (((auxInc>0) && (((prevAuxLevel+auxInc)>>16) >= auxLevel)) ||
-                ((auxInc<0) && (((prevAuxLevel+auxInc)>>16) <= auxLevel))) {
+#ifdef FLOAT_AUX
+        if (useFloat) {
+            if ((mAuxInc > 0.f && mPrevAuxLevel + mAuxInc >= mAuxLevel) ||
+                    (mAuxInc < 0.f && mPrevAuxLevel + mAuxInc <= mAuxLevel)) {
+                auxInc = 0;
+                prevAuxLevel = auxLevel << 16;
+                mAuxInc = 0.f;
+                mPrevAuxLevel = mAuxLevel;
+            }
+        } else
+#endif
+        if ((auxInc > 0 && ((prevAuxLevel + auxInc) >> 16) >= auxLevel) ||
+                (auxInc < 0 && ((prevAuxLevel + auxInc) >> 16) <= auxLevel)) {
             auxInc = 0;
             prevAuxLevel = auxLevel << 16;
-            mAuxInc = 0.;
+            mAuxInc = 0.f;
             mPrevAuxLevel = mAuxLevel;
-        } else {
-            //ALOGV("aux ramp: %d %d %d", auxLevel << 16, prevAuxLevel, auxInc);
         }
     }
 }
@@ -1694,7 +1711,7 @@ void AudioMixer::process__OneTrack16BitsStereoNoResampling(state_t* state)
 /* MIXTYPE     (see AudioMixerOps.h MIXTYPE_* enumeration)
  * TO: int32_t (Q4.27) or float
  * TI: int32_t (Q4.27) or int16_t (Q0.15) or float
- * TA: int32_t (Q4.27)
+ * TA: int32_t (Q4.27) or float
  */
 template <int MIXTYPE,
         typename TO, typename TI, typename TV, typename TA, typename TAV>
@@ -1738,7 +1755,7 @@ static void volumeRampMulti(uint32_t channels, TO* out, size_t frameCount,
 /* MIXTYPE     (see AudioMixerOps.h MIXTYPE_* enumeration)
  * TO: int32_t (Q4.27) or float
  * TI: int32_t (Q4.27) or int16_t (Q0.15) or float
- * TA: int32_t (Q4.27)
+ * TA: int32_t (Q4.27) or float
  */
 template <int MIXTYPE,
         typename TO, typename TI, typename TV, typename TA, typename TAV>
@@ -1778,7 +1795,7 @@ static void volumeMulti(uint32_t channels, TO* out, size_t frameCount,
  * ADJUSTVOL   (set to true if volume ramp parameters needs adjustment afterwards)
  * TO: int32_t (Q4.27) or float
  * TI: int32_t (Q4.27) or int16_t (Q0.15) or float
- * TA: int32_t (Q4.27)
+ * TA: int32_t (Q4.27) or float
  */
 template <int MIXTYPE, bool USEFLOATVOL, bool ADJUSTVOL,
     typename TO, typename TI, typename TA>
@@ -1788,13 +1805,25 @@ void AudioMixer::volumeMix(TO *out, size_t outFrames,
     if (USEFLOATVOL) {
         if (ramp) {
             volumeRampMulti<MIXTYPE>(t->mMixerChannelCount, out, outFrames, in, aux,
-                    t->mPrevVolume, t->mVolumeInc, &t->prevAuxLevel, t->auxInc);
+                    t->mPrevVolume, t->mVolumeInc,
+#ifdef FLOAT_AUX
+                    &t->mPrevAuxLevel, t->mAuxInc
+#else
+                    &t->prevAuxLevel, t->auxInc
+#endif
+                );
             if (ADJUSTVOL) {
                 t->adjustVolumeRamp(aux != NULL, true);
             }
         } else {
             volumeMulti<MIXTYPE>(t->mMixerChannelCount, out, outFrames, in, aux,
-                    t->mVolume, t->auxLevel);
+                    t->mVolume,
+#ifdef FLOAT_AUX
+                    t->mAuxLevel
+#else
+                    t->auxLevel
+#endif
+            );
         }
     } else {
         if (ramp) {
@@ -1851,7 +1880,7 @@ void AudioMixer::process_NoResampleOneTrack(state_t* state)
         }
 
         const size_t outFrames = b.frameCount;
-        volumeMix<MIXTYPE, is_same<TI, float>::value, false> (
+        volumeMix<MIXTYPE, is_same<TI, float>::value /* USEFLOATVOL */, false /* ADJUSTVOL */> (
                 out, outFrames, in, aux, ramp, t);
 
         out += outFrames * channels;
@@ -1874,7 +1903,7 @@ void AudioMixer::process_NoResampleOneTrack(state_t* state)
  * MIXTYPE     (see AudioMixerOps.h MIXTYPE_* enumeration)
  * TO: int32_t (Q4.27) or float
  * TI: int32_t (Q4.27) or int16_t (Q0.15) or float
- * TA: int32_t (Q4.27)
+ * TA: int32_t (Q4.27) or float
  */
 template <int MIXTYPE, typename TO, typename TI, typename TA>
 void AudioMixer::track__Resample(track_t* t, TO* out, size_t outFrameCount, TO* temp, TA* aux)
@@ -1890,7 +1919,7 @@ void AudioMixer::track__Resample(track_t* t, TO* out, size_t outFrameCount, TO* 
         memset(temp, 0, outFrameCount * t->mMixerChannelCount * sizeof(TO));
         t->resampler->resample((int32_t*)temp, outFrameCount, t->bufferProvider);
 
-        volumeMix<MIXTYPE, is_same<TI, float>::value, true>(
+        volumeMix<MIXTYPE, is_same<TI, float>::value /* USEFLOATVOL */, true /* ADJUSTVOL */>(
                 out, outFrameCount, temp, aux, ramp, t);
 
     } else { // constant volume gain
@@ -1905,7 +1934,7 @@ void AudioMixer::track__Resample(track_t* t, TO* out, size_t outFrameCount, TO* 
  * MIXTYPE     (see AudioMixerOps.h MIXTYPE_* enumeration)
  * TO: int32_t (Q4.27) or float
  * TI: int32_t (Q4.27) or int16_t (Q0.15) or float
- * TA: int32_t (Q4.27)
+ * TA: int32_t (Q4.27) or float
  */
 template <int MIXTYPE, typename TO, typename TI, typename TA>
 void AudioMixer::track__NoResample(track_t* t, TO* out, size_t frameCount,
@@ -1914,7 +1943,7 @@ void AudioMixer::track__NoResample(track_t* t, TO* out, size_t frameCount,
     ALOGVV("track__NoResample\n");
     const TI *in = static_cast<const TI *>(t->in);
 
-    volumeMix<MIXTYPE, is_same<TI, float>::value, true>(
+    volumeMix<MIXTYPE, is_same<TI, float>::value /* USEFLOATVOL */, true /* ADJUSTVOL */>(
             out, frameCount, in, aux, t->needsRamp(), t);
 
     // MIXTYPE_MONOEXPAND reads a single input channel and expands to NCHAN output channels.
@@ -1990,11 +2019,11 @@ AudioMixer::hook_t AudioMixer::getTrackHook(int trackType, uint32_t channelCount
     case TRACKTYPE_RESAMPLE:
         switch (mixerInFormat) {
         case AUDIO_FORMAT_PCM_FLOAT:
-            return (AudioMixer::hook_t)
-                    track__Resample<MIXTYPE_MULTI, float /*TO*/, float /*TI*/, int32_t /*TA*/>;
+            return (AudioMixer::hook_t)track__Resample<
+                    MIXTYPE_MULTI, float /*TO*/, float /*TI*/, TYPE_AUX>;
         case AUDIO_FORMAT_PCM_16_BIT:
-            return (AudioMixer::hook_t)\
-                    track__Resample<MIXTYPE_MULTI, int32_t, int16_t, int32_t>;
+            return (AudioMixer::hook_t)track__Resample<
+                    MIXTYPE_MULTI, int32_t /*TO*/, int16_t /*TI*/, TYPE_AUX>;
         default:
             LOG_ALWAYS_FATAL("bad mixerInFormat: %#x", mixerInFormat);
             break;
@@ -2003,11 +2032,11 @@ AudioMixer::hook_t AudioMixer::getTrackHook(int trackType, uint32_t channelCount
     case TRACKTYPE_NORESAMPLEMONO:
         switch (mixerInFormat) {
         case AUDIO_FORMAT_PCM_FLOAT:
-            return (AudioMixer::hook_t)
-                    track__NoResample<MIXTYPE_MONOEXPAND, float, float, int32_t>;
+            return (AudioMixer::hook_t)track__NoResample<
+                            MIXTYPE_MONOEXPAND, float /*TO*/, float /*TI*/, TYPE_AUX>;
         case AUDIO_FORMAT_PCM_16_BIT:
-            return (AudioMixer::hook_t)
-                    track__NoResample<MIXTYPE_MONOEXPAND, int32_t, int16_t, int32_t>;
+            return (AudioMixer::hook_t)track__NoResample<
+                            MIXTYPE_MONOEXPAND, int32_t /*TO*/, int16_t /*TI*/, TYPE_AUX>;
         default:
             LOG_ALWAYS_FATAL("bad mixerInFormat: %#x", mixerInFormat);
             break;
@@ -2016,11 +2045,11 @@ AudioMixer::hook_t AudioMixer::getTrackHook(int trackType, uint32_t channelCount
     case TRACKTYPE_NORESAMPLE:
         switch (mixerInFormat) {
         case AUDIO_FORMAT_PCM_FLOAT:
-            return (AudioMixer::hook_t)
-                    track__NoResample<MIXTYPE_MULTI, float, float, int32_t>;
+            return (AudioMixer::hook_t)track__NoResample<
+                    MIXTYPE_MULTI, float /*TO*/, float /*TI*/, TYPE_AUX>;
         case AUDIO_FORMAT_PCM_16_BIT:
-            return (AudioMixer::hook_t)
-                    track__NoResample<MIXTYPE_MULTI, int32_t, int16_t, int32_t>;
+            return (AudioMixer::hook_t)track__NoResample<
+                    MIXTYPE_MULTI, int32_t /*TO*/, int16_t /*TI*/, TYPE_AUX>;
         default:
             LOG_ALWAYS_FATAL("bad mixerInFormat: %#x", mixerInFormat);
             break;
@@ -2055,11 +2084,11 @@ AudioMixer::process_hook_t AudioMixer::getProcessHook(int processType, uint32_t 
     case AUDIO_FORMAT_PCM_FLOAT:
         switch (mixerOutFormat) {
         case AUDIO_FORMAT_PCM_FLOAT:
-            return process_NoResampleOneTrack<MIXTYPE_MULTI_SAVEONLY,
-                    float /*TO*/, float /*TI*/, int32_t /*TA*/>;
+            return process_NoResampleOneTrack<
+                    MIXTYPE_MULTI_SAVEONLY, float /*TO*/, float /*TI*/, TYPE_AUX>;
         case AUDIO_FORMAT_PCM_16_BIT:
-            return process_NoResampleOneTrack<MIXTYPE_MULTI_SAVEONLY,
-                    int16_t, float, int32_t>;
+            return process_NoResampleOneTrack<
+                    MIXTYPE_MULTI_SAVEONLY, int16_t /*TO*/, float /*TI*/, TYPE_AUX>;
         default:
             LOG_ALWAYS_FATAL("bad mixerOutFormat: %#x", mixerOutFormat);
             break;
@@ -2068,11 +2097,11 @@ AudioMixer::process_hook_t AudioMixer::getProcessHook(int processType, uint32_t 
     case AUDIO_FORMAT_PCM_16_BIT:
         switch (mixerOutFormat) {
         case AUDIO_FORMAT_PCM_FLOAT:
-            return process_NoResampleOneTrack<MIXTYPE_MULTI_SAVEONLY,
-                    float, int16_t, int32_t>;
+            return process_NoResampleOneTrack<
+                    MIXTYPE_MULTI_SAVEONLY, float /*TO*/, int16_t /*TI*/, TYPE_AUX>;
         case AUDIO_FORMAT_PCM_16_BIT:
-            return process_NoResampleOneTrack<MIXTYPE_MULTI_SAVEONLY,
-                    int16_t, int16_t, int32_t>;
+            return process_NoResampleOneTrack<
+                    MIXTYPE_MULTI_SAVEONLY, int16_t /*TO*/, int16_t /*TI*/, TYPE_AUX>;
         default:
             LOG_ALWAYS_FATAL("bad mixerOutFormat: %#x", mixerOutFormat);
             break;

@@ -31,11 +31,10 @@ struct sockaddr_in;
 
 namespace android {
 
+struct ANativeWindowWrapper;
 class Parcel;
-class Surface;
 class IDataSource;
 struct IStreamSource;
-class IGraphicBufferProducer;
 struct MediaHTTPService;
 struct AudioPlaybackRate;
 struct AVSyncSettings;
@@ -56,8 +55,7 @@ public:
     virtual status_t        setDataSource(int fd, int64_t offset, int64_t length) = 0;
     virtual status_t        setDataSource(const sp<IStreamSource>& source) = 0;
     virtual status_t        setDataSource(const sp<IDataSource>& source) = 0;
-    virtual status_t        setVideoSurfaceTexture(
-                                    const sp<IGraphicBufferProducer>& bufferProducer) = 0;
+    virtual status_t        setVideoSurfaceTexture(const sp<ANativeWindowWrapper>& nww) = 0;
     virtual status_t        getBufferingSettings(
                                     BufferingSettings* buffering /* nonnull */) = 0;
     virtual status_t        setBufferingSettings(const BufferingSettings& buffering) = 0;

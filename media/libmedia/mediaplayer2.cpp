@@ -29,14 +29,13 @@
 #include <binder/IServiceManager.h>
 #include <binder/IPCThreadState.h>
 
-#include <gui/Surface.h>
-
 #include <media/mediaplayer2.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/AVSyncSettings.h>
 #include <media/IDataSource.h>
 #include <media/MediaAnalyticsItem.h>
+#include <media/NdkWrapper.h>
 
 #include <binder/MemoryBase.h>
 
@@ -231,13 +230,12 @@ status_t MediaPlayer2::getMetadata(bool update_only, bool apply_filter, Parcel *
     return mPlayer->getMetadata(update_only, apply_filter, metadata);
 }
 
-status_t MediaPlayer2::setVideoSurfaceTexture(
-        const sp<IGraphicBufferProducer>& bufferProducer)
+status_t MediaPlayer2::setVideoSurfaceTexture(const sp<ANativeWindowWrapper>& nww)
 {
     ALOGV("setVideoSurfaceTexture");
     Mutex::Autolock _l(mLock);
     if (mPlayer == 0) return NO_INIT;
-    return mPlayer->setVideoSurfaceTexture(bufferProducer);
+    return mPlayer->setVideoSurfaceTexture(nww);
 }
 
 status_t MediaPlayer2::getBufferingSettings(BufferingSettings* buffering /* nonnull */)

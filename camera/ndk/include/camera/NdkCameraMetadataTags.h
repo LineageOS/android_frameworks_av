@@ -2877,6 +2877,59 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS =            // int32[n]
             ACAMERA_REQUEST_START + 15,
+    /**
+     * <p>A subset of the available request keys that the camera device
+     * can pass as part of the capture session initialization.</p>
+     *
+     * <p>Type: int32[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>This is a subset of ACAMERA_REQUEST_AVAILABLE_REQUEST_KEYS which
+     * contains a list of keys that are difficult to apply per-frame and
+     * can result in unexpected delays when modified during the capture session
+     * lifetime. Typical examples include parameters that require a
+     * time-consuming hardware re-configuration or internal camera pipeline
+     * change. For performance reasons we advise clients to pass their initial
+     * values as part of
+     * {@link ACameraDevice_createCaptureSessionWithSessionParameters }.i
+     * Once the camera capture session is enabled it is also recommended to avoid
+     * changing them from their initial values set in
+     * {@link ACameraDevice_createCaptureSessionWithSessionParameters }.
+     * Control over session parameters can still be exerted in capture requests
+     * but clients should be aware and expect delays during their application.
+     * An example usage scenario could look like this:</p>
+     * <ul>
+     * <li>The camera client starts by quering the session parameter key list via
+     *   {@link ACameraManager_getCameraCharacteristics }.</li>
+     * <li>Before triggering the capture session create sequence, a capture request
+     *   must be built via
+     *   {@link ACameraDevice_createCaptureRequest }
+     *   using an appropriate template matching the particular use case.</li>
+     * <li>The client should go over the list of session parameters and check
+     *   whether some of the keys listed matches with the parameters that
+     *   they intend to modify as part of the first capture request.</li>
+     * <li>If there is no such match, the capture request can be  passed
+     *   unmodified to
+     *   {@link ACameraDevice_createCaptureSessionWithSessionParameters }.</li>
+     * <li>If matches do exist, the client should update the respective values
+     *   and pass the request to
+     *   {@link ACameraDevice_createCaptureSessionWithSessionParameters }.</li>
+     * <li>After the capture session initialization completes the session parameter
+     *   key list can continue to serve as reference when posting or updating
+     *   further requests. As mentioned above further changes to session
+     *   parameters should ideally be avoided, if updates are necessary
+     *   however clients could expect a delay/glitch during the
+     *   parameter switch.</li>
+     * </ul>
+     *
+     * @see ACAMERA_REQUEST_AVAILABLE_REQUEST_KEYS
+     */
+    ACAMERA_REQUEST_AVAILABLE_SESSION_KEYS =                    // int32[n]
+            ACAMERA_REQUEST_START + 16,
     ACAMERA_REQUEST_END,
 
     /**

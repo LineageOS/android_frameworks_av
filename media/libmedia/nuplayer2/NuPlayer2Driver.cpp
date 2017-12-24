@@ -219,8 +219,7 @@ status_t NuPlayer2Driver::setDataSource(const sp<DataSource> &source) {
     return mAsyncResult;
 }
 
-status_t NuPlayer2Driver::setVideoSurfaceTexture(
-        const sp<IGraphicBufferProducer> &bufferProducer) {
+status_t NuPlayer2Driver::setVideoSurfaceTexture(const sp<ANativeWindowWrapper> &nww) {
     ALOGV("setVideoSurfaceTexture(%p)", this);
     Mutex::Autolock autoLock(mLock);
 
@@ -239,7 +238,7 @@ status_t NuPlayer2Driver::setVideoSurfaceTexture(
 
     mSetSurfaceInProgress = true;
 
-    mPlayer->setVideoSurfaceTextureAsync(bufferProducer);
+    mPlayer->setVideoSurfaceTextureAsync(nww);
 
     while (mSetSurfaceInProgress) {
         mCondition.wait(mLock);

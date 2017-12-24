@@ -2042,8 +2042,8 @@ status_t AudioFlinger::openOutput(audio_module_handle_t module,
                                   uint32_t *latencyMs,
                                   audio_output_flags_t flags)
 {
-    ALOGI("openOutput() this %p, module %d Device %x, SamplingRate %d, Format %#08x, Channels %x, "
-              "flags %x",
+    ALOGI("openOutput() this %p, module %d Device %#x, SamplingRate %d, Format %#08x, "
+              "Channels %#x, flags %#x",
               this, module,
               (devices != NULL) ? *devices : 0,
               config->sample_rate,
@@ -2285,8 +2285,8 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
     sp<StreamInHalInterface> inStream;
     status_t status = inHwHal->openInputStream(
             *input, devices, &halconfig, flags, address.string(), source, &inStream);
-    ALOGV("openInput_l() openInputStream returned input %p, devices %x, SamplingRate %d"
-           ", Format %#x, Channels %x, flags %#x, status %d addr %s",
+    ALOGV("openInput_l() openInputStream returned input %p, devices %#x, SamplingRate %d"
+           ", Format %#x, Channels %#x, flags %#x, status %d addr %s",
             inStream.get(),
             devices,
             halconfig.sample_rate,

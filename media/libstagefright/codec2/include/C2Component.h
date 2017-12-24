@@ -37,17 +37,17 @@ namespace android {
 class C2Component;
 
 struct C2FieldSupportedValuesQuery {
-    enum Type : uint32_t {
+    enum type_t : uint32_t {
         POSSIBLE, ///< query all possible values regardless of other settings
         CURRENT,  ///< query currently possible values given dependent settings
     };
 
     const C2ParamField field;
-    const Type type;
+    const type_t type;
     c2_status_t status;
     C2FieldSupportedValues values;
 
-    C2FieldSupportedValuesQuery(const C2ParamField &field_, Type type_)
+    C2FieldSupportedValuesQuery(const C2ParamField &field_, type_t type_)
         : field(field_), type(type_), status(C2_NO_INIT) { }
 
     static C2FieldSupportedValuesQuery&&
@@ -78,8 +78,8 @@ public:
      * This is a unique name for this component or component interface 'class'; however, multiple
      * instances of this component SHALL have the same name.
      *
-     * This method MUST be supported in any state. This call does not change the state nor the
-     * internal states of the component.
+     * When attached to a component, this method MUST be supported in any component state.
+     * This call does not change the state nor the internal configuration of the component.
      *
      * This method MUST be "non-blocking" and return within 1ms.
      *
@@ -92,8 +92,8 @@ public:
      * Returns a unique ID for this component or interface object.
      * This ID is used as work targets, unique work IDs, and when configuring tunneling.
      *
-     * This method MUST be supported in any state. This call does not change the state nor the
-     * internal states of the component.
+     * When attached to a component, this method MUST be supported in any component state.
+     * This call does not change the state nor the internal configuration of the component.
      *
      * This method MUST be "non-blocking" and return within 1ms.
      *
@@ -104,115 +104,115 @@ public:
     /**
      * Queries a set of parameters from the component or interface object.
      * Querying is performed at best effort: the component SHALL query all supported parameters and
-     * skip unsupported ones, or heap allocated parameters that could not be allocated. Any errors
-     * are communicated in the return value. Additionally, preallocated (e.g. stack) parameters that
-     * could not be queried are invalidated. Parameters to be allocated on the heap are omitted from
-     * the result.
+     * skip unsupported ones, heap allocated parameters that could not be allocated or parameters
+     * that could not be queried without blocking. Any errors are communicated in the return value.
+     * Additionally, preallocated (e.g. stack) parameters that could not be queried are invalidated.
+     * Invalid or blocking parameters to be allocated on the heap are omitted from the result.
      *
      * \note Parameter values do not depend on the order of query.
      *
      * \todo This method cannot be used to query info-buffers. Is that a problem?
      *
-     * This method MUST be supported in any state. This call does not change the state nor the
-     * internal states of the component.
+     * When attached to a component, this method MUST be supported in any component state except
+     * released.
+     * This call does not change the state nor the internal configuration of the component.
      *
-     * This method MUST be "non-blocking" and return within 1ms.
+     * This method has a variable blocking behavior based on state.
+     * In the stopped state this method MUST be "non-blocking" and return within 1ms.
+     * In the running states this method may be momentarily blocking, but MUST return within 5ms.
      *
-     * \param[in,out] stackParams   a list of params queried. These are initialized specific to each
-     *                      setting; e.g. size and index are set and rest of the members are
-     *                      cleared.
-     *                      \note Flexible settings that are of incorrect size will be invalidated.
-     * \param[in] heapParamIndices a vector of param indices for params to be queried and returned on the
-     *                      heap. These parameters will be returned in heapParams. Unsupported param
-     *                      indices will be ignored.
-     * \param[out] heapParams    a list of params where to which the supported heap parameters will be
-     *                      appended in the order they appear in heapParamIndices.
+     * \param[in,out] stackParams  a list of params queried. These are initialized specific to each
+     *                             setting; e.g. size and index are set and rest of the members are
+     *                             cleared.
+     *                             \note Flexible settings that are of incorrect size will be
+     *                             invalidated.
+     * \param[in] heapParamIndices a vector of param indices for params to be queried and returned
+     *                             on the heap. These parameters will be returned in heapParams.
+     *                             Unsupported param indices will be ignored.
+     * \param[in] mayBlock         if true (C2_MAY_BLOCK), implementation may momentarily block.
+     *                             Otherwise (C2_DONT_BLOCK), it must be "non-blocking".
+     * \param[out] heapParams      a list of params where to which the supported heap parameters
+     *                             will be appended in the order they appear in heapParamIndices.
      *
      * \retval C2_OK        all parameters could be queried
      * \retval C2_BAD_INDEX all supported parameters could be queried, but some parameters were not
      *                      supported
+     * \retval C2_BAD_STATE when called in the released component state (user error)
+     *                      (this error code is only allowed for interfaces connected to components)
      * \retval C2_NO_MEMORY could not allocate memory for a supported parameter
+     * \retval C2_BLOCKING  the operation must block to complete but mayBlock is false
+     *                      (this error code is only allowed for interfaces connected to components)
+     * \retval C2_TIMED_OUT could not query the parameters within the time limit (unexpected)
+     *                      (this error code is only allowed for interfaces connected to components
+     *                      in the running state)
      * \retval C2_CORRUPTED some unknown error prevented the querying of the parameters
      *                      (unexpected)
+     *                      (this error code is only allowed for interfaces connected to components)
      */
-    virtual c2_status_t query_nb(
+    virtual c2_status_t query_vb(
         const std::vector<C2Param* const> &stackParams,
         const std::vector<C2Param::Index> &heapParamIndices,
+        c2_blocking_t mayBlock,
         std::vector<std::unique_ptr<C2Param>>* const heapParams) const = 0;
 
     /**
      * Sets a set of parameters for the component or interface object.
-     * Tuning is performed at best effort: the component SHALL update all supported configuration at
-     * best effort (unless configured otherwise) and skip unsupported ones. Any errors are
-     * communicated in the return value and in |failures|.
+     *
+     * Tuning is performed at best effort: the component SHALL process the configuration updates in
+     * the order they appear in |params|. If any parameter update fails, the component shall
+     * communicate the failure in the return value and in |failures|, and still process the
+     * remaining parameters. Unsupported parameters are skipped, though they are communicated in
+     * ther return value. Most parameters are updated at best effort - such that even if client
+     * specifies an unsupported value for a field, the closest supported value is used. On the
+     * other hand, strict parameters only accept specific values for their fields, and if the client
+     * specifies an unsupported value, the parameter setting shall fail for that field.
+     * If the client tries to change the value of a field that requires momentary blocking without
+     * setting |mayBlock| to C2_MAY_BLOCK, that parameter shall also be skipped and a specific
+     * return value shall be used. Final values for all parameters set are propagated back to the
+     * caller in |params|.
      *
      * \note Parameter tuning DOES depend on the order of the tuning parameters. E.g. some parameter
-     * update may allow some subsequent parameter update.
+     * update may allow some subsequent values for further parameter updates.
      *
-     * This method MUST be supported in any state.
+     * When attached to a component, this method MUST be supported in any component state except
+     * released.
      *
-     * This method MUST be "non-blocking" and return within 1ms.
+     * This method has a variable blocking behavior based on state.
+     * In the stopped state this method MUST be "non-blocking" and return within 1ms.
+     * In the running states this method may be momentarily blocking, but MUST return within 5ms.
      *
-     * \param[in,out] params          a list of parameter updates. These will be updated to the actual
-     *                      parameter values after the updates (this is because tuning is performed
-     *                      at best effort).
-     *                      \todo params that could not be updated are not marked here, so are
-     *                      confusing - are they "existing" values or intended to be configured
-     *                      values?
-     * \param[out] failures        a list of parameter failures
+     * \param[in,out] params a list of parameter updates. These will be updated to the actual
+     *                       parameter values after the updates (this is because tuning is performed
+     *                       at best effort).
+     *                       \todo params that could not be updated are not marked here, so are
+     *                       confusing - are they "existing" values or intended to be configured
+     *                       values?
+     * \param[in] mayBlock   if true (C2_MAY_BLOCK), implementation may momentarily block.
+     *                       Otherwise (C2_DONT_BLOCK), it must be "non-blocking".
+     * \param[out] failures  a list of parameter failures and optional guidance
      *
      * \retval C2_OK        all parameters could be updated successfully
      * \retval C2_BAD_INDEX all supported parameters could be updated successfully, but some
      *                      parameters were not supported
      * \retval C2_BAD_VALUE some supported parameters could not be updated successfully because
      *                      they contained unsupported values. These are returned in |failures|.
+     * \retval C2_BAD_STATE when called in the released component state (user error)
+     *                      (this error code is only allowed for interfaces connected to components)
      * \retval C2_NO_MEMORY some supported parameters could not be updated successfully because
      *                      they contained unsupported values, but could not allocate a failure
      *                      object for them.
+     * \retval C2_TIMED_OUT could not set the parameters within the time limit (unexpected)
+     *                      (this error code is only allowed for interfaces connected to components
+     *                      in the running state)
+     * \retval C2_BLOCKING  the operation must block to complete but mayBlock is false
+     *                      (this error code is only allowed for interfaces connected to components)
      * \retval C2_CORRUPTED some unknown error prevented the update of the parameters
      *                      (unexpected)
+     *                      (this error code is only allowed for interfaces connected to components)
      */
-    virtual c2_status_t config_nb(
+    virtual c2_status_t config_vb(
             const std::vector<C2Param* const> &params,
-            std::vector<std::unique_ptr<C2SettingResult>>* const failures) = 0;
-
-    /**
-     * Atomically sets a set of parameters for the component or interface object.
-     *
-     * \note This method is used mainly for reserving resources for a component.
-     *
-     * The component SHALL update all supported configuration at
-     * best effort(TBD) (unless configured otherwise) and skip unsupported ones. Any errors are
-     * communicated in the return value and in |failures|.
-     *
-     * \note Parameter tuning DOES depend on the order of the tuning parameters. E.g. some parameter
-     * update may allow some subsequent parameter update.
-     *
-     * This method MUST be supported in any state.
-     *
-     * This method may be momentarily blocking, but MUST return within 5ms.
-     *
-     * \param params[in,out]          a list of parameter updates. These will be updated to the actual
-     *                      parameter values after the updates (this is because tuning is performed
-     *                      at best effort).
-     *                      \todo params that could not be updated are not marked here, so are
-     *                      confusing - are they "existing" values or intended to be configured
-     *                      values?
-     * \param failures[out]        a list of parameter failures
-     *
-     * \retval C2_OK        all parameters could be updated successfully
-     * \retval C2_BAD_INDEX all supported parameters could be updated successfully, but some
-     *                      parameters were not supported
-     * \retval C2_BAD_VALUE some supported parameters could not be updated successfully because
-     *                      they contained unsupported values. These are returned in |failures|.
-     * \retval C2_NO_MEMORY some supported parameters could not be updated successfully because
-     *                      they contained unsupported values, but could not allocate a failure
-     *                      object for them.
-     * \retval C2_CORRUPTED some unknown error prevented the update of the parameters
-     *                      (unexpected)
-     */
-    virtual c2_status_t commit_sm(
-            const std::vector<C2Param* const> &params,
+            c2_blocking_t mayBlock,
             std::vector<std::unique_ptr<C2SettingResult>>* const failures) = 0;
 
     // TUNNELING
@@ -224,7 +224,8 @@ public:
      * If the component is successfully created, subsequent work items queued may include a
      * tunneled path between these components.
      *
-     * This method MUST be supported in any state.
+     * When attached to a component, this method MUST be supported in any component state except
+     * released.
      *
      * This method may be momentarily blocking, but MUST return within 5ms.
      *
@@ -233,9 +234,12 @@ public:
      * \retval C2_DUPLICATE the tunnel already exists
      * \retval C2_OMITTED   tunneling is not supported by this component
      * \retval C2_CANNOT_DO the specific tunnel is not supported
+     * \retval C2_BAD_STATE when called in the released component state (user error)
+     *                      (this error code is only allowed for interfaces connected to components)
      *
      * \retval C2_TIMED_OUT could not create the tunnel within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented the creation of the tunnel (unexpected)
+     *                      (this error code is only allowed for interfaces connected to components)
      */
     virtual c2_status_t createTunnel_sm(c2_node_id_t targetComponent) = 0;
 
@@ -246,7 +250,8 @@ public:
      * After releasing a tunnel, subsequent work items queued MUST NOT include a tunneled
      * path between these components.
      *
-     * This method MUST be supported in any state.
+     * When attached to a component, this method MUST be supported in any component state except
+     * released.
      *
      * This method may be momentarily blocking, but MUST return within 5ms.
      *
@@ -254,9 +259,12 @@ public:
      * \retval C2_BAD_INDEX the target component does not exist
      * \retval C2_NOT_FOUND the tunnel does not exist
      * \retval C2_OMITTED   tunneling is not supported by this component
+     * \retval C2_BAD_STATE when called in the released component state (user error)
+     *                      (this error code is only allowed for interfaces connected to components)
      *
      * \retval C2_TIMED_OUT could not mark the tunnel for release within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented the release of the tunnel (unexpected)
+     *                      (this error code is only allowed for interfaces connected to components)
      */
     virtual c2_status_t releaseTunnel_sm(c2_node_id_t targetComponent) = 0;
 
@@ -266,11 +274,16 @@ public:
     /**
      * Returns the set of supported parameters.
      *
+     * When attached to a component, this method MUST be supported in any component state except
+     * released.
+     *
      * This method MUST be "non-blocking" and return within 1ms.
      *
      * \param[out] params a vector of supported parameters will be appended to this vector.
      *
      * \retval C2_OK        the operation completed successfully.
+     * \retval C2_BAD_STATE when called in the released component state (user error)
+     *                      (this error code is only allowed for interfaces connected to components)
      * \retval C2_NO_MEMORY not enough memory to complete this method.
      */
     virtual c2_status_t querySupportedParams_nb(
@@ -285,15 +298,31 @@ public:
      * as a status for each field. Component shall process all fields queried even if some queries
      * fail.
      *
-     * This method MUST be "non-blocking" and return within 1ms.
+     * When attached to a component, this method MUST be supported in any component state except
+     * released.
+     *
+     * This method has a variable blocking behavior based on state.
+     * In the stopped state this method MUST be "non-blocking" and return within 1ms.
+     * In the running states this method may be momentarily blocking, but MUST return within 5ms.
      *
      * \param[in out] fields a vector of fields descriptor structures.
+     * \param[in] mayBlock   if true (C2_MAY_BLOCK), implementation may momentarily block.
+     *                       Otherwise (C2_DONT_BLOCK), it must be "non-blocking".
      *
      * \retval C2_OK        the operation completed successfully.
+     * \retval C2_BAD_STATE when called in the released component state (user error)
+     *                      (this error code is only allowed for interfaces connected to components)
      * \retval C2_BAD_INDEX at least one field was not recognized as a component field
+     * \retval C2_TIMED_OUT could not query supported values within the time limit (unexpected)
+     *                      (this error code is only allowed for interfaces connected to components
+     *                      in the running state)
+     * \retval C2_BLOCKING  the operation must block to complete but mayBlock is false
+     *                      (this error code is only allowed for interfaces connected to components)
+     * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
+     *                      (this error code is only allowed for interfaces connected to components)
      */
-    virtual c2_status_t querySupportedValues_nb(
-            std::vector<C2FieldSupportedValuesQuery> &fields) const = 0;
+    virtual c2_status_t querySupportedValues_vb(
+            std::vector<C2FieldSupportedValuesQuery> &fields, c2_blocking_t mayBlock) const = 0;
 
     virtual ~C2ComponentInterface() = default;
 };
@@ -315,22 +344,24 @@ public:
 
         // virtual void onComponentReleased(<id>) = 0;
 
-    protected:
         virtual ~Listener() = default;
     };
 
     /**
      * Sets the listener for this component
      *
-     * This method MUST be supported in all states. The listener can only be set to non-null value
-     * in non-running state (that does not include tripped or error). It can be set to nullptr in
-     * any state. Components only use the listener in running state.
+     * This method MUST be supported in all states except released.
+     * The listener can only be set to non-null value in stopped state (that does not include
+     * tripped or error). It can be set to nullptr in both stopped and running states.
+     * Components only use the listener in running state.
      *
      * If listener is nullptr, the component SHALL guarantee that no more listener callbacks are
      * done to the original listener once this method returns. (Any pending listener callbacks will
      * need to be completed during this call - hence this call may be temporarily blocking.)
      *
-     * This method may be momentarily blocking, but must return within 5ms.
+     * This method has a variable blocking behavior based on state.
+     * In the stopped state this method MUST be "non-blocking" and return within 1ms.
+     * In the running states this method may be momentarily blocking, but MUST return within 5ms.
      *
      * Component SHALL handle listener notifications from the same thread (the thread used is
      * at the component's discretion.)
@@ -340,34 +371,38 @@ public:
      * put the burden on the client to clear the listener - wait for its deletion - at which point
      * it is guaranteed that no more listener callbacks will occur.
      *
-     * \todo TBD is this needed? or move it to createComponent()
+     * \param[in] listener the component listener object
+     * \param[in] mayBlock if true (C2_MAY_BLOCK), implementation may momentarily block.
+     *                     Otherwise (C2_DONT_BLOCK), it must be "non-blocking".
      *
-     * \param listener the component listener object
-     *
-     * \retval C2_BAD_STATE attempting to change the listener in the running state (user error)
+     * \retval C2_BAD_STATE attempting to change the listener in the running state to a non-null
+     *                      value (user error), or called in the released state
+     * \retval C2_BLOCKING  the operation must block to complete but mayBlock is false
      * \retval C2_OK        listener was updated successfully.
      */
-    virtual c2_status_t setListener_sm(const std::shared_ptr<Listener> &listener) = 0;
+    virtual c2_status_t setListener_vb(
+            const std::shared_ptr<Listener> &listener, c2_blocking_t mayBlock) = 0;
+
+    enum domain_t : uint32_t;
+    enum kind_t : uint32_t;
+    typedef uint32_t rank_t;
 
     /**
      * Information about a component.
      */
     struct Traits {
     // public:
-    // TBD
-    #if 0
-        C2String name;             ///< name of the component
-        C2DomainKind domain;       ///< component domain (e.g. audio or video)
-        C2ComponentKind type;      ///< component type (e.g. encoder, decoder or filter)
+        C2String name; ///< name of the component
+        domain_t domain; ///< component domain (e.g. audio or video)
+        kind_t kind; ///< component kind (e.g. encoder, decoder or filter)
+        rank_t rank; ///< rank used to determine component ordering (the lower the sooner)
         C2StringLiteral mediaType; ///< media type supported by the component
-        C2ComponentPriority priority; ///< priority used to determine component ordering
 
         /**
          * name alias(es) for backward compatibility.
          * \note Multiple components can have the same alias as long as their media-type differs.
          */
         std::vector<C2StringLiteral> aliases; ///< name aliases for backward compatibility
-    #endif
     };
 
     // METHODS AVAILABLE WHEN RUNNING
@@ -376,9 +411,9 @@ public:
     /**
      * Queues up work for the component.
      *
-     * This method MUST be supported in running (including tripped) states.
+     * This method MUST be supported in running (including tripped and error) states.
      *
-     * This method MUST be "non-blocking" and return within 1ms
+     * This method MUST be "non-blocking" and return within 1 ms
      *
      * It is acceptable for this method to return OK and return an error value using the
      * onWorkDone() callback.
@@ -386,6 +421,7 @@ public:
      * \retval C2_OK        the work was successfully queued
      * \retval C2_BAD_INDEX some component(s) in the work do(es) not exist
      * \retval C2_CANNOT_DO the components are not tunneled
+     * \retval C2_BAD_STATE when called in the stopped or released state (user error)
      *
      * \retval C2_NO_MEMORY not enough memory to queue the work
      * \retval C2_CORRUPTED some unknown error prevented queuing the work (unexpected)
@@ -396,13 +432,14 @@ public:
      * Announces a work to be queued later for the component. This reserves a slot for the queue
      * to ensure correct work ordering even if the work is queued later.
      *
-     * This method MUST be supported in running (including tripped) states.
+     * This method MUST be supported in running (including tripped and error) states.
      *
      * This method MUST be "non-blocking" and return within 1 ms
      *
      * \retval C2_OK        the work announcement has been successfully recorded
      * \retval C2_BAD_INDEX some component(s) in the work outline do(es) not exist
      * \retval C2_CANNOT_DO the componentes are not tunneled
+     * \retval C2_BAD_STATE when called in the stopped or released state (user error)
      *
      * \retval C2_NO_MEMORY not enough memory to record the work announcement
      * \retval C2_CORRUPTED some unknown error prevented recording the announcement (unexpected)
@@ -415,9 +452,10 @@ public:
     enum flush_mode_t : uint32_t {
         /// flush work from this component only
         FLUSH_COMPONENT,
+
         /// flush work from this component and all components connected downstream from it via
         /// tunneling
-        FLUSH_CHAIN,
+        FLUSH_CHAIN = (1 << 16),
     };
 
     /**
@@ -433,7 +471,7 @@ public:
      * \todo we could simply take a list of numbers and flush those... this is bad for decoders
      *       also, what would happen to fine grade references?
      *
-     * This method MUST be supported in running (including tripped) states.
+     * This method MUST be supported in running (including tripped and error) states.
      *
      * This method may be momentarily blocking, but must return within 5ms.
      *
@@ -447,18 +485,26 @@ public:
      * \param mode flush mode
      *
      * \retval C2_OK        the component has been successfully flushed
+     * \retval C2_BAD_STATE when called in the stopped or released state (user error)
      * \retval C2_TIMED_OUT the flush could not be completed within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented flushing from completion (unexpected)
      */
     virtual c2_status_t flush_sm(flush_mode_t mode, std::list<std::unique_ptr<C2Work>>* const flushedWork) = 0;
 
     enum drain_mode_t : uint32_t {
-        /// drain component only
-        DRAIN_COMPONENT,
+        /// drain component only and add an "end-of-stream" marker. Component shall process all
+        /// queued work and complete the current stream. If new input is received, it shall start
+        /// a new stream. \todo define what a stream is.
+        DRAIN_COMPONENT_WITH_EOS,
+        /// drain component without setting "end-of-stream" marker. Component shall process all
+        /// queued work but shall expect more work items for the same stream.
+        DRAIN_COMPONENT_NO_EOS = (1 << 0),
+
         /// marks the last work item with a persistent "end-of-stream" marker that will drain
         /// downstream components
         /// \todo this may confuse work-ordering downstream
-        DRAIN_CHAIN,
+        DRAIN_CHAIN = (1 << 16),
+
         /**
          * \todo define this; we could place EOS to all upstream components, just this component, or
          *       all upstream and downstream component.
@@ -470,10 +516,10 @@ public:
      * Drains the component, and optionally downstream components. This is a signalling method;
      * as such it does not wait for any work completion.
      *
-     * Marks last work item as "end-of-stream", so component is notified not to wait for further
-     * work before it processes work already queued. This method is called to set the end-of-stream
-     * flag after work has been queued. Client can continue to queue further work immediately after
-     * this method returns.
+     * Marks last work item as "drain-till-here", so component is notified not to wait for further
+     * work before it processes work already queued. This method can also used to set the
+     * end-of-stream flag after work has been queued. Client can continue to queue further work
+     * immediately after this method returns.
      *
      * This method MUST be supported in running (including tripped) states.
      *
@@ -484,6 +530,9 @@ public:
      * \param mode drain mode
      *
      * \retval C2_OK        the drain request has been successfully recorded
+     * \retval C2_BAD_STATE when called in the stopped or released state (user error)
+     * \retval C2_BAD_VALUE the drain mode is not supported by the component
+     *                      \todo define supported modes discovery
      * \retval C2_TIMED_OUT the flush could not be completed within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented flushing from completion (unexpected)
      */
@@ -495,13 +544,26 @@ public:
     /**
      * Starts the component.
      *
-     * This method MUST be supported in stopped state.
+     * This method MUST be supported in stopped state, as well as during the tripped state.
+     *
+     * If the return value is C2_OK, the component shall be in the running state.
+     * If the return value is C2_BAD_STATE or C2_DUPLICATE, no state change is expected as a
+     * response to this call.
+     * Otherwise, the component shall be in the stopped state.
+     *
+     * \note If a component is in the tripped state and start() is called while the component
+     * configuration still results in a trip, start shall succeed and a new onTripped callback
+     * should be used to communicate the configuration conflict that results in the new trip.
      *
      * \todo This method MUST return within 500ms. Seems this should be able to return quickly, as
      * there are no immediate guarantees. Though there are guarantees for responsiveness immediately
      * after start returns.
      *
-     * \retval C2_OK        the component has started successfully
+     * \retval C2_OK        the component has started (or resumed) successfully
+     * \retval C2_DUPLICATE when called during another start call from another thread
+     * \retval C2_BAD_STATE when called in any state other than the stopped state or tripped state,
+     *                      including when called during another state change call from another
+     *                      thread (user error)
      * \retval C2_NO_MEMORY not enough memory to start the component
      * \retval C2_TIMED_OUT the component could not be started within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented starting the component (unexpected)
@@ -515,39 +577,56 @@ public:
      *
      * This method MUST return withing 500ms.
      *
-     * Upon this call, all pending work SHALL be abandoned.
+     * Upon this call, all pending work SHALL be abandoned and all buffer references SHALL be
+     * released.
+     * If the return value is C2_BAD_STATE or C2_DUPLICATE, no state change is expected as a
+     * response to this call.
+     * For all other return values, the component shall be in the stopped state.
      *
      * \todo should this return completed work, since client will just free it? Perhaps just to
      * verify accounting.
      *
      * This does not alter any settings and tunings that may have resulted in a tripped state.
      * (Is this material given the definition? Perhaps in case we want to start again.)
+     *
+     * \retval C2_OK        the component has started successfully
+     * \retval C2_DUPLICATE when called during another stop call from another thread
+     * \retval C2_BAD_STATE when called in any state other than the running state, including when
+     *                      called during another state change call from another thread (user error)
+     * \retval C2_TIMED_OUT the component could not be stopped within the time limit (unexpected)
+     * \retval C2_CORRUPTED some unknown error prevented stopping the component (unexpected)
      */
     virtual c2_status_t stop() = 0;
 
     /**
      * Resets the component.
      *
-     * This method MUST be supported in all (including tripped) state.
+     * This method MUST be supported in all (including tripped) states other than released.
      *
      * This method MUST be supported during any other blocking call.
      *
      * This method MUST return withing 500ms.
      *
-     * After this call returns all work is/must be abandoned, all references should be released.
+     * After this call returns all work SHALL be abandoned, all buffer references SHALL be released.
+     * If the return value is C2_BAD_STATE or C2_DUPLICATE, no state change is expected as a
+     * response to this call.
+     * For all other return values, the component shall be in the stopped state.
      *
      * \todo should this return completed work, since client will just free it? Also, if it unblocks
      * a stop, where should completed work be returned?
      *
      * This brings settings back to their default - "guaranteeing" no tripped space.
      *
-     * \todo reclaim support - it seems that since ownership is passed, this will allow reclaiming stuff.
+     * \todo reclaim support - it seems that since ownership is passed, this will allow reclaiming
+     * stuff.
      *
      * \retval C2_OK        the component has been reset
+     * \retval C2_DUPLICATE when called during another reset call from another thread
+     * \retval C2_BAD_STATE when called in the released state
      * \retval C2_TIMED_OUT the component could not be reset within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented resetting the component (unexpected)
      */
-    virtual void reset() = 0;
+    virtual c2_status_t reset() = 0;
 
     /**
      * Releases the component.
@@ -557,11 +636,12 @@ public:
      * This method MUST return withing 500ms. Upon return all references shall be abandoned.
      *
      * \retval C2_OK        the component has been released
+     * \retval C2_DUPLICATE the component is already released
      * \retval C2_BAD_STATE the component is running
      * \retval C2_TIMED_OUT the component could not be released within the time limit (unexpected)
      * \retval C2_CORRUPTED some unknown error prevented releasing the component (unexpected)
      */
-    virtual void release() = 0;
+    virtual c2_status_t release() = 0;
 
     /**
      * Returns the interface for this component.
@@ -812,45 +892,6 @@ public:
             const std::vector<C2Param* const> &params,
             std::vector<std::unique_ptr<C2SettingResult>>* const failures) = 0;
 
-    /**
-     * Atomically sets a set of system-wide parameters.
-     *
-     * \note There are no settable system-wide parameters defined thus far, but may be added in the
-     * future.
-     *
-     * The component store SHALL update all supported configuration at best effort(TBD)
-     * (unless configured otherwise) and skip unsupported ones. If any errors are encountered
-     * (other than unsupported parameters), the configuration SHALL be aborted as if it did not
-     * happen.
-     *
-     * \note Parameter tuning DOES depend on the order of the tuning parameters. E.g. some parameter
-     * update may allow some subsequent parameter update.
-     *
-     * This method may be momentarily blocking, but MUST return within 5ms.
-     *
-     * \param params[in,out] a list of parameter updates. These will be updated to the actual
-     *                       parameter values after the updates (this is because tuning is performed
-     *                       at best effort).
-     *                       \todo params that could not be updated are not marked here, so are
-     *                       confusing - are they "existing" values or intended to be configured
-     *                       values?
-     * \param failures[out]  a list of parameter failures
-     *
-     * \retval C2_OK        all parameters could be updated successfully
-     * \retval C2_BAD_INDEX all supported parameters could be updated successfully, but some
-     *                      parameters were not supported
-     * \retval C2_BAD_VALUE some supported parameters could not be updated successfully because
-     *                      they contained unsupported values. These are returned in |failures|.
-     * \retval C2_NO_MEMORY some supported parameters could not be updated successfully because
-     *                      they contained unsupported values, but could not allocate a failure
-     *                      object for them.
-     * \retval C2_CORRUPTED some unknown error prevented the update of the parameters
-     *                      (unexpected)
-     */
-    virtual c2_status_t commit_sm(
-            const std::vector<C2Param* const> &params,
-            std::vector<std::unique_ptr<C2SettingResult>>* const failures) = 0;
-
     // REFLECTION MECHANISM (USED FOR EXTENSION)
     // =============================================================================================
 
@@ -888,14 +929,14 @@ public:
      * as a status for each field. Store shall process all fields queried even if some queries
      * fail.
      *
-     * This method MUST be "non-blocking" and return within 1ms.
+     * This method may be momentarily blocking, but MUST return within 5ms.
      *
      * \param[in out] fields a vector of fields descriptor structures.
      *
      * \retval C2_OK        the operation completed successfully.
      * \retval C2_BAD_INDEX at least one field was not recognized as a component store field
      */
-    virtual c2_status_t querySupportedValues_nb(
+    virtual c2_status_t querySupportedValues_sm(
             std::vector<C2FieldSupportedValuesQuery> &fields) const = 0;
 
     virtual ~C2ComponentStore() = default;

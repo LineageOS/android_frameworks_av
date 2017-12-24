@@ -19,7 +19,7 @@
 
 #include "NuPlayer2Drm.h"
 
-#include "NdkWrapper.h"
+#include <media/NdkWrapper.h>
 #include <utils/Log.h>
 
 

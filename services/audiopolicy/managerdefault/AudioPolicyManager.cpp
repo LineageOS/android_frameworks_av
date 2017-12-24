@@ -804,7 +804,8 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
         flags = (audio_output_flags_t)(flags | AUDIO_OUTPUT_FLAG_HW_AV_SYNC);
     }
 
-    ALOGV("getOutputForAttr() device 0x%x, sampling rate %d, format %x, channel mask %x, flags %x",
+    ALOGV("getOutputForAttr() device 0x%x, sampling rate %d, format %#x, channel mask %#x, "
+          "flags %#x",
           device, config->sample_rate, config->format, config->channel_mask, flags);
 
     *output = getOutputForDevice(device, session, *stream, config, flags);
@@ -972,7 +973,7 @@ non_direct_output:
         output = selectOutput(outputs, flags, config->format);
     }
     ALOGW_IF((output == 0), "getOutputForDevice() could not find output for stream %d, "
-            "sampling rate %d, format %d, channels %x, flags %x",
+            "sampling rate %d, format %#x, channels %#x, flags %#x",
             stream, config->sample_rate, config->format, config->channel_mask, flags);
 
     return output;
@@ -1401,7 +1402,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
                                              input_type_t *inputType,
                                              audio_port_handle_t *portId)
 {
-    ALOGV("getInputForAttr() source %d, sampling rate %d, format %d, channel mask %x,"
+    ALOGV("getInputForAttr() source %d, sampling rate %d, format %#x, channel mask %#x,"
             "session %d, flags %#x",
           attr->source, config->sample_rate, config->format, config->channel_mask, session, flags);
 
@@ -1705,7 +1706,7 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
         !audio_formats_match(profileFormat, lConfig.format) ||
         (profileChannelMask != lConfig.channel_mask)) {
         ALOGW("getInputForAttr() failed opening input: sampling rate %d"
-              ", format %d, channel mask %x",
+              ", format %#x, channel mask %#x",
               profileSamplingRate, profileFormat, profileChannelMask);
         if (input != AUDIO_IO_HANDLE_NONE) {
             inputDesc->close();

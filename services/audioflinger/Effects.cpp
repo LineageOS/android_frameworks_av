@@ -342,9 +342,9 @@ void AudioFlinger::EffectModule::process()
         if (isProcessImplemented()) {
             if (auxType) {
                 // We overwrite the aux input buffer here and clear after processing.
-                // Note that aux input buffers are format q4_27.
 #ifdef FLOAT_EFFECT_CHAIN
                 if (mSupportsFloat) {
+#ifndef FLOAT_AUX
                     // Do in-place float conversion for auxiliary effect input buffer.
                     static_assert(sizeof(float) <= sizeof(int32_t),
                             "in-place conversion requires sizeof(float) <= sizeof(int32_t)");
@@ -353,13 +353,21 @@ void AudioFlinger::EffectModule::process()
                             mConfig.inputCfg.buffer.f32,
                             mConfig.inputCfg.buffer.s32,
                             mConfig.inputCfg.buffer.frameCount);
+#endif // !FLOAT_AUX
                 } else
-#endif
+#endif // FLOAT_EFFECT_CHAIN
                 {
+#ifdef FLOAT_AUX
+                    memcpy_to_i16_from_float(
+                            mConfig.inputCfg.buffer.s16,
+                            mConfig.inputCfg.buffer.f32,
+                            mConfig.inputCfg.buffer.frameCount);
+#else
                     memcpy_to_i16_from_q4_27(
                             mConfig.inputCfg.buffer.s16,
                             mConfig.inputCfg.buffer.s32,
                             mConfig.inputCfg.buffer.frameCount);
+#endif
                 }
             }
 #ifdef FLOAT_EFFECT_CHAIN
@@ -419,9 +427,13 @@ void AudioFlinger::EffectModule::process()
 
         // clear auxiliary effect input buffer for next accumulation
         if (auxType) {
-            // input always q4_27 regardless of FLOAT_EFFECT_CHAIN.
+#ifdef FLOAT_AUX
+            const size_t size =
+                    mConfig.inputCfg.buffer.frameCount * inChannelCount * sizeof(float);
+#else
             const size_t size =
                     mConfig.inputCfg.buffer.frameCount * inChannelCount * sizeof(int32_t);
+#endif
             memset(mConfig.inputCfg.buffer.raw, 0, size);
         }
     } else if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_INSERT &&

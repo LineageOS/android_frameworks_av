@@ -35,6 +35,7 @@
 
 namespace android {
 
+struct ANativeWindowWrapper;
 struct AudioPlaybackRate;
 class AudioTrack;
 struct AVSyncSettings;
@@ -244,7 +245,7 @@ private:
         // MediaPlayer2Engine interface
         virtual void            disconnect();
         virtual status_t        setVideoSurfaceTexture(
-                                        const sp<IGraphicBufferProducer>& bufferProducer);
+                const sp<ANativeWindowWrapper>& nww) override;
         virtual status_t        setBufferingSettings(const BufferingSettings& buffering) override;
         virtual status_t        getBufferingSettings(
                                         BufferingSettings* buffering /* nonnull */) override;
@@ -286,7 +287,7 @@ private:
                                         const sp<media::VolumeShaper::Operation>& operation) override;
         virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) override;
 
-        sp<MediaPlayer2Base>     createPlayer(player2_type playerType);
+        sp<MediaPlayer2Base>    createPlayer(player2_type playerType);
 
         virtual status_t        setDataSource(
                         const sp<MediaHTTPService> &httpService,
@@ -299,7 +300,7 @@ private:
         virtual status_t        setDataSource(const sp<IDataSource> &source);
 
 
-        sp<MediaPlayer2Base>     setDataSource_pre(player2_type playerType);
+        sp<MediaPlayer2Base>    setDataSource_pre(player2_type playerType);
         status_t                setDataSource_post(const sp<MediaPlayer2Base>& p,
                                                    status_t status);
 
@@ -375,8 +376,7 @@ private:
                     audio_session_t              mAudioSessionId;
                     audio_attributes_t *         mAudioAttributes;
                     uid_t                        mUid;
-                    sp<ANativeWindow>            mConnectedWindow;
-                    sp<IBinder>                  mConnectedWindowBinder;
+                    sp<ANativeWindowWrapper>     mConnectedWindow;
                     struct sockaddr_in           mRetransmitEndpoint;
                     bool                         mRetransmitEndpointValid;
                     sp<Client>                   mNextClient;

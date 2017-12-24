@@ -29,12 +29,19 @@ SimpleC2Component::SimpleC2Component(
     : mIntf(intf) {
 }
 
-c2_status_t SimpleC2Component::setListener_sm(const std::shared_ptr<C2Component::Listener> &listener) {
+c2_status_t SimpleC2Component::setListener_vb(
+        const std::shared_ptr<C2Component::Listener> &listener, c2_blocking_t mayBlock) {
     Mutexed<ExecState>::Locked state(mExecState);
     if (state->mState == RUNNING) {
-        return C2_BAD_STATE;
+        if (listener) {
+            return C2_BAD_STATE;
+        } else if (!mayBlock) {
+            return C2_BLOCKING;
+        }
     }
     state->mListener = listener;
+    // TODO: wait for listener change to have taken place before returning
+    // (e.g. if there is an ongoing listener callback)
     return C2_OK;
 }
 
@@ -167,7 +174,7 @@ c2_status_t SimpleC2Component::stop() {
     return C2_OK;
 }
 
-void SimpleC2Component::reset() {
+c2_status_t SimpleC2Component::reset() {
     {
         Mutexed<ExecState>::Locked state(mExecState);
         state->mState = UNINITIALIZED;
@@ -181,15 +188,17 @@ void SimpleC2Component::reset() {
         pending->clear();
     }
     onReset();
+    return C2_OK;
 }
 
-void SimpleC2Component::release() {
+c2_status_t SimpleC2Component::release() {
     {
         Mutexed<ExecState>::Locked state(mExecState);
         mExitRequested = true;
         state->mThread.join();
     }
     onRelease();
+    return C2_OK;
 }
 
 std::shared_ptr<C2ComponentInterface> SimpleC2Component::intf() {

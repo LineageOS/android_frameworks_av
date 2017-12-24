@@ -212,7 +212,8 @@ class CameraDeviceBase : public virtual RefBase {
      * - BAD_VALUE if the set of streams was invalid (e.g. fmts or sizes)
      * - INVALID_OPERATION if the device was in the wrong state
      */
-    virtual status_t configureStreams(int operatingMode = 0) = 0;
+    virtual status_t configureStreams(const CameraMetadata& sessionParams,
+            int operatingMode = 0) = 0;
 
     // get the buffer producer of the input stream
     virtual status_t getInputBufferProducer(

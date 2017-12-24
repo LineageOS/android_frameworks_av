@@ -121,7 +121,7 @@ BufLogStream::BufLogStream(unsigned int id,
     } else {
         mTag[0] = 0;
     }
-    ALOGV("Creating BufLogStream id:%d tag:%s format:%d ch:%d sr:%d maxbytes:%zu", mId, mTag,
+    ALOGV("Creating BufLogStream id:%d tag:%s format:%#x ch:%d sr:%d maxbytes:%zu", mId, mTag,
             mFormat, mChannels, mSamplingRate, mMaxBytes);
 
     //open file (s), info about tag, format, etc.

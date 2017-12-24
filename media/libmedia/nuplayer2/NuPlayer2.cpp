@@ -24,7 +24,6 @@
 #include "NuPlayer2.h"
 
 #include "HTTPLiveSource.h"
-#include "NdkWrapper.h"
 #include "NuPlayer2CCDecoder.h"
 #include "NuPlayer2Decoder.h"
 #include "NuPlayer2DecoderBase.h"
@@ -45,6 +44,7 @@
 #include <media/AudioResamplerPublic.h>
 #include <media/AVSyncSettings.h>
 #include <media/MediaCodecBuffer.h>
+#include <media/NdkWrapper.h>
 
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -57,12 +57,10 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
 
-#include <gui/IGraphicBufferProducer.h>
-#include <gui/Surface.h>
-
-
 #include "ESDS.h"
 #include <media/stagefright/Utils.h>
+
+#include <system/window.h>
 
 namespace android {
 
@@ -143,16 +141,16 @@ private:
 };
 
 struct NuPlayer2::SetSurfaceAction : public Action {
-    explicit SetSurfaceAction(const sp<Surface> &surface)
-        : mSurface(surface) {
+    explicit SetSurfaceAction(const sp<ANativeWindowWrapper> &nww)
+        : mNativeWindow(nww) {
     }
 
     virtual void execute(NuPlayer2 *player) {
-        player->performSetSurface(mSurface);
+        player->performSetSurface(mNativeWindow);
     }
 
 private:
-    sp<Surface> mSurface;
+    sp<ANativeWindowWrapper> mNativeWindow;
 
     DISALLOW_EVIL_CONSTRUCTORS(SetSurfaceAction);
 };
@@ -407,14 +405,13 @@ void NuPlayer2::prepareAsync() {
     (new AMessage(kWhatPrepare, this))->post();
 }
 
-void NuPlayer2::setVideoSurfaceTextureAsync(
-        const sp<IGraphicBufferProducer> &bufferProducer) {
+void NuPlayer2::setVideoSurfaceTextureAsync(const sp<ANativeWindowWrapper> &nww) {
     sp<AMessage> msg = new AMessage(kWhatSetVideoSurface, this);
 
-    if (bufferProducer == NULL) {
+    if (nww == NULL || nww->getANativeWindow() == NULL) {
         msg->setObject("surface", NULL);
     } else {
-        msg->setObject("surface", new Surface(bufferProducer, true /* controlledByApp */));
+        msg->setObject("surface", nww);
     }
 
     msg->post();
@@ -792,10 +789,10 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
 
             sp<RefBase> obj;
             CHECK(msg->findObject("surface", &obj));
-            sp<Surface> surface = static_cast<Surface *>(obj.get());
+            sp<ANativeWindowWrapper> nww = static_cast<ANativeWindowWrapper *>(obj.get());
 
             ALOGD("onSetVideoSurface(%p, %s video decoder)",
-                    surface.get(),
+                    (nww == NULL ? NULL : nww->getANativeWindow()),
                     (mSource != NULL && mStarted && mSource->getFormat(false /* audio */) != NULL
                             && mVideoDecoder != NULL) ? "have" : "no");
 
@@ -803,9 +800,9 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
             // be in preparing state and it could take long time.
             // When mStarted is true, mSource must have been set.
             if (mSource == NULL || !mStarted || mSource->getFormat(false /* audio */) == NULL
-                    // NOTE: mVideoDecoder's mSurface is always non-null
-                    || (mVideoDecoder != NULL && mVideoDecoder->setVideoSurface(surface) == OK)) {
-                performSetSurface(surface);
+                    // NOTE: mVideoDecoder's mNativeWindow is always non-null
+                    || (mVideoDecoder != NULL && mVideoDecoder->setVideoSurface(nww) == OK)) {
+                performSetSurface(nww);
                 break;
             }
 
@@ -814,7 +811,7 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
                             (obj != NULL ? FLUSH_CMD_FLUSH : FLUSH_CMD_NONE) /* audio */,
                                            FLUSH_CMD_SHUTDOWN /* video */));
 
-            mDeferredActions.push_back(new SetSurfaceAction(surface));
+            mDeferredActions.push_back(new SetSurfaceAction(nww));
 
             if (obj != NULL) {
                 if (mStarted) {
@@ -1033,7 +1030,7 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
 
             // initialize video before audio because successful initialization of
             // video may change deep buffer mode of audio.
-            if (mSurface != NULL) {
+            if (mNativeWindow != NULL && mNativeWindow->getANativeWindow() != NULL) {
                 if (instantiateDecoder(false, &mVideoDecoder) == -EWOULDBLOCK) {
                     rescan = true;
                 }
@@ -1219,7 +1216,8 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
                 if (mSource != nullptr) {
                     if (audio) {
                         if (mVideoDecoderError || mSource->getFormat(false /* audio */) == NULL
-                                || mSurface == NULL || mVideoDecoder == NULL) {
+                                || mNativeWindow == NULL || mNativeWindow->getANativeWindow() == NULL
+                                || mVideoDecoder == NULL) {
                             // When both audio and video have error, or this stream has only audio
                             // which has error, notify client of error.
                             notifyListener(MEDIA2_ERROR, MEDIA2_ERROR_UNKNOWN, err);
@@ -1505,7 +1503,7 @@ status_t NuPlayer2::onInstantiateSecureDecoders() {
 
     // TRICKY: We rely on mRenderer being null, so that decoder does not start requesting
     // data on instantiation.
-    if (mSurface != NULL) {
+    if (mNativeWindow != NULL && mNativeWindow->getANativeWindow() != NULL) {
         err = instantiateDecoder(false, &mVideoDecoder);
         if (err != OK) {
             return err;
@@ -1934,7 +1932,7 @@ status_t NuPlayer2::instantiateDecoder(
         notify->setInt32("generation", mVideoDecoderGeneration);
 
         *decoder = new Decoder(
-                notify, mSource, mPID, mUID, mRenderer, mSurface, mCCDecoder);
+                notify, mSource, mPID, mUID, mRenderer, mNativeWindow, mCCDecoder);
         mVideoDecoderError = false;
 
         // enable FRC if high-quality AV sync is requested, even if not
@@ -2141,8 +2139,9 @@ void NuPlayer2::queueDecoderShutdown(
 
 status_t NuPlayer2::setVideoScalingMode(int32_t mode) {
     mVideoScalingMode = mode;
-    if (mSurface != NULL) {
-        status_t ret = native_window_set_scaling_mode(mSurface.get(), mVideoScalingMode);
+    if (mNativeWindow != NULL && mNativeWindow->getANativeWindow() != NULL) {
+        status_t ret = native_window_set_scaling_mode(
+                mNativeWindow->getANativeWindow(), mVideoScalingMode);
         if (ret != OK) {
             ALOGE("Failed to set scaling mode (%d): %s",
                 -ret, strerror(-ret));
@@ -2375,10 +2374,10 @@ void NuPlayer2::performScanSources() {
     }
 }
 
-void NuPlayer2::performSetSurface(const sp<Surface> &surface) {
+void NuPlayer2::performSetSurface(const sp<ANativeWindowWrapper> &nww) {
     ALOGV("performSetSurface");
 
-    mSurface = surface;
+    mNativeWindow = nww;
 
     // XXX - ignore error from setVideoScalingMode for now
     setVideoScalingMode(mVideoScalingMode);

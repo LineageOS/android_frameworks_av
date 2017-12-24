@@ -631,7 +631,7 @@ status_t AudioSystem::AudioFlingerClient::getInputBufferSize(
         || (channelMask != mInChannelMask)) {
         size_t inBuffSize = af->getInputBufferSize(sampleRate, format, channelMask);
         if (inBuffSize == 0) {
-            ALOGE("AudioSystem::getInputBufferSize failed sampleRate %d format %#x channelMask %x",
+            ALOGE("AudioSystem::getInputBufferSize failed sampleRate %d format %#x channelMask %#x",
                     sampleRate, format, channelMask);
             return BAD_VALUE;
         }

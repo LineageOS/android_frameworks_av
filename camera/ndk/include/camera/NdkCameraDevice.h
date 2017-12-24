@@ -720,6 +720,39 @@ camera_status_t ACaptureSessionSharedOutput_add(ACaptureSessionOutput *output, A
 camera_status_t ACaptureSessionSharedOutput_remove(ACaptureSessionOutput *output,
         ANativeWindow* anw);
 
+/**
+ * Create a new camera capture session similar to {@link ACameraDevice_createCaptureSession}. This
+ * function allows clients to pass additional session parameters during session initialization. For
+ * further information about session parameters see {@link ACAMERA_REQUEST_AVAILABLE_SESSION_KEYS}.
+ *
+ * @param device the camera device of interest.
+ * @param outputs the {@link ACaptureSessionOutputContainer} describes all output streams.
+ * @param sessionParameters An optional capture request that contains the initial values of session
+ *                          parameters advertised in
+ *                          {@link ACAMERA_REQUEST_AVAILABLE_SESSION_KEYS}.
+ * @param callbacks the {@link ACameraCaptureSession_stateCallbacks}
+ *                  capture session state callbacks.
+ * @param session the created {@link ACameraCaptureSession} will be filled here if the method call
+ *                succeeds.
+ *
+ * @return <ul>
+ *         <li>{@link ACAMERA_OK} if the method call succeeds. The created capture session will be
+ *                                filled in session argument.</li>
+ *         <li>{@link ACAMERA_ERROR_INVALID_PARAMETER} if any of device, outputs, callbacks or
+ *                                session is NULL.</li>
+ *         <li>{@link ACAMERA_ERROR_CAMERA_DISCONNECTED} if the camera device is closed.</li>
+ *         <li>{@link ACAMERA_ERROR_CAMERA_DEVICE} if the camera device encounters fatal error.</li>
+ *         <li>{@link ACAMERA_ERROR_CAMERA_SERVICE} if the camera service encounters fatal error.
+ *         </li>
+ *         <li>{@link ACAMERA_ERROR_UNKNOWN} if the method fails for some other reasons.</li></ul>
+ */
+camera_status_t ACameraDevice_createCaptureSessionWithSessionParameters(
+        ACameraDevice* device,
+        const ACaptureSessionOutputContainer* outputs,
+        const ACaptureRequest* sessionParameters,
+        const ACameraCaptureSession_stateCallbacks* callbacks,
+        /*out*/ACameraCaptureSession** session);
+
 #endif /* __ANDROID_API__ >= 28 */
 
 __END_DECLS

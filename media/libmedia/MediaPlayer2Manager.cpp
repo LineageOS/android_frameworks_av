@@ -38,7 +38,6 @@
 #include <binder/IServiceManager.h>
 #include <binder/MemoryHeapBase.h>
 #include <binder/MemoryBase.h>
-#include <gui/Surface.h>
 #include <utils/Errors.h>  // for status_t
 #include <utils/String8.h>
 #include <utils/SystemClock.h>
@@ -52,6 +51,8 @@
 #include <media/Metadata.h>
 #include <media/AudioTrack.h>
 #include <media/MemoryLeakTrackUtil.h>
+#include <media/NdkWrapper.h>
+
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaErrors.h>
@@ -737,9 +738,9 @@ status_t MediaPlayer2Manager::Client::setDataSource(
 }
 
 void MediaPlayer2Manager::Client::disconnectNativeWindow_l() {
-    if (mConnectedWindow != NULL) {
+    if (mConnectedWindow != NULL && mConnectedWindow->getANativeWindow() != NULL) {
         status_t err = nativeWindowDisconnect(
-                mConnectedWindow.get(), "disconnectNativeWindow");
+                mConnectedWindow->getANativeWindow(), "disconnectNativeWindow");
 
         if (err != OK) {
             ALOGW("nativeWindowDisconnect returned an error: %s (%d)",
@@ -750,21 +751,20 @@ void MediaPlayer2Manager::Client::disconnectNativeWindow_l() {
 }
 
 status_t MediaPlayer2Manager::Client::setVideoSurfaceTexture(
-        const sp<IGraphicBufferProducer>& bufferProducer)
+        const sp<ANativeWindowWrapper>& nww)
 {
-    ALOGV("[%d] setVideoSurfaceTexture(%p)", mConnId, bufferProducer.get());
+    ALOGV("[%d] setVideoSurfaceTexture(%p)",
+          mConnId,
+          (nww == NULL ? NULL : nww->getANativeWindow()));
     sp<MediaPlayer2Base> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
 
-    sp<IBinder> binder(IInterface::asBinder(bufferProducer));
-    if (mConnectedWindowBinder == binder) {
-        return OK;
-    }
-
-    sp<ANativeWindow> anw;
-    if (bufferProducer != NULL) {
-        anw = new Surface(bufferProducer, true /* controlledByApp */);
-        status_t err = nativeWindowConnect(anw.get(), "setVideoSurfaceTexture");
+    if (nww != NULL && nww->getANativeWindow() != NULL) {
+        if (mConnectedWindow != NULL
+            && mConnectedWindow->getANativeWindow() == nww->getANativeWindow()) {
+            return OK;
+        }
+        status_t err = nativeWindowConnect(nww->getANativeWindow(), "setVideoSurfaceTexture");
 
         if (err != OK) {
             ALOGE("setVideoSurfaceTexture failed: %d", err);
@@ -783,19 +783,18 @@ status_t MediaPlayer2Manager::Client::setVideoSurfaceTexture(
     // Note that we must set the player's new GraphicBufferProducer before
     // disconnecting the old one.  Otherwise queue/dequeue calls could be made
     // on the disconnected ANW, which may result in errors.
-    status_t err = p->setVideoSurfaceTexture(bufferProducer);
+    status_t err = p->setVideoSurfaceTexture(nww);
 
     mLock.lock();
     disconnectNativeWindow_l();
 
     if (err == OK) {
-        mConnectedWindow = anw;
-        mConnectedWindowBinder = binder;
+        mConnectedWindow = nww;
         mLock.unlock();
-    } else {
+    } else if (nww != NULL) {
         mLock.unlock();
         status_t err = nativeWindowDisconnect(
-                anw.get(), "disconnectNativeWindow");
+                nww->getANativeWindow(), "disconnectNativeWindow");
 
         if (err != OK) {
             ALOGW("nativeWindowDisconnect returned an error: %s (%d)",
