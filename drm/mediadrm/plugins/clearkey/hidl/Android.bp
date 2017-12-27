@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2014 The Android Open Source Project
+// Copyright (C) 2018 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,12 +14,14 @@
 // limitations under the License.
 //
 
-cc_library_shared {
-    name: "libdrmclearkeyplugin",
+cc_binary {
+    name: "android.hardware.drm@1.1-service.clearkey",
+    vendor: true,
 
     srcs: [
         "AesCtrDecryptor.cpp",
-        "ClearKeyUUID.cpp",
+        "Base64.cpp",
+        "Buffer.cpp",
         "CreatePluginFactories.cpp",
         "CryptoFactory.cpp",
         "CryptoPlugin.cpp",
@@ -29,29 +31,34 @@ cc_library_shared {
         "JsonWebKey.cpp",
         "Session.cpp",
         "SessionLibrary.cpp",
-        "Utils.cpp",
+        "service.cpp",
     ],
 
-    vendor: true,
-    relative_install_path: "mediadrm",
+    relative_install_path: "hw",
 
     cflags: ["-Wall", "-Werror"],
+    init_rc: ["android.hardware.drm@1.1-service.clearkey.rc"],
 
     shared_libs: [
+        "android.hardware.drm@1.0",
+        "android.hardware.drm@1.1",
+        "libbase",
+        "libbinder",
         "libcrypto",
+        "libhidlbase",
+        "libhidlmemory",
+        "libhidltransport",
         "liblog",
-        "libstagefright_foundation",
         "libutils",
     ],
 
-    static_libs: ["libjsmn"],
-
-    include_dirs: [
-        "frameworks/native/include",
-        "frameworks/av/include",
+    static_libs: [
+        "libclearkeycommon",
+        "libjsmn",
     ],
 
-    export_include_dirs: ["."],
+    local_include_dirs: ["include"],
+
     export_static_lib_headers: ["libjsmn"],
 
     sanitize: {
@@ -59,7 +66,3 @@ cc_library_shared {
     },
 }
 
-//########################################################################
-// Build unit tests
-
-subdirs = ["tests"]

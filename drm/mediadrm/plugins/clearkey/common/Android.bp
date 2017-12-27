@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2014 The Android Open Source Project
+// Copyright (C) 2018 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,28 +13,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// ----------------------------------------------------------------
-// Builds ClearKey Drm Tests
-//
 
-cc_test {
-    name: "ClearKeyDrmUnitTest",
+cc_library_static {
+    name: "libclearkeycommon",
     vendor: true,
+
+    srcs: [
+        "ClearKeyUUID.cpp",
+        "Utils.cpp",
+    ],
 
     cflags: ["-Wall", "-Werror"],
 
-    srcs: [
-        "AesCtrDecryptorUnittest.cpp",
-        "InitDataParserUnittest.cpp",
-        "JsonWebKeyUnittest.cpp",
-    ],
+    include_dirs: ["frameworks/av/include"],
 
-    shared_libs: [
-        "libcrypto",
-        "libdrmclearkeyplugin",
-        "liblog",
-        "libstagefright_foundation",
-        "libutils",
-    ],
-    header_libs: ["media_plugin_headers"],
+    shared_libs: ["libutils"],
+
+    export_include_dirs: ["include"],
+
+    sanitize: {
+        integer_overflow: true,
+    },
 }
+
