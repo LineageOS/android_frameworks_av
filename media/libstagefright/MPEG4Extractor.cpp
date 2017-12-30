@@ -3067,7 +3067,7 @@ status_t MPEG4Extractor::parseColorInfo(off64_t offset, size_t size) {
 
     int32_t type = U32_AT(&buffer[0]);
     if ((type == FOURCC('n', 'c', 'l', 'x') && size >= 11)
-            || (type == FOURCC('n', 'c', 'l', 'c' && size >= 10))) {
+            || (type == FOURCC('n', 'c', 'l', 'c') && size >= 10)) {
         int32_t primaries = U16_AT(&buffer[4]);
         int32_t transfer = U16_AT(&buffer[6]);
         int32_t coeffs = U16_AT(&buffer[8]);
@@ -4635,6 +4635,8 @@ status_t MPEG4Source::read(
         }
         if (size > mBuffer->size()) {
             ALOGE("buffer too small: %zu > %zu", size, mBuffer->size());
+            mBuffer->release();
+            mBuffer = NULL;
             return ERROR_BUFFER_TOO_SMALL;
         }
     }
@@ -4921,6 +4923,8 @@ status_t MPEG4Source::fragmentedRead(
         }
         if (size > mBuffer->size()) {
             ALOGE("buffer too small: %zu > %zu", size, mBuffer->size());
+            mBuffer->release();
+            mBuffer = NULL;
             return ERROR_BUFFER_TOO_SMALL;
         }
     }
