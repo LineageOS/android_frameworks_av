@@ -7795,6 +7795,7 @@ status_t ACodec::setVendorParameters(const sp<AMessage> &params) {
     // don't bother component if we don't have vendor extensions as they may not have implemented
     // the android vendor extension support, which will lead to unnecessary OMX failure logs.
     if (vendorKeys.empty()) {
+        mVendorExtensionsStatus = kExtensionsNone;
         return OK;
     }
 
