@@ -1406,7 +1406,9 @@ CameraDevice::ServiceCallback::onCaptureStarted(
 binder::Status
 CameraDevice::ServiceCallback::onResultReceived(
         const CameraMetadata& metadata,
-        const CaptureResultExtras& resultExtras) {
+        const CaptureResultExtras& resultExtras,
+        const std::vector<PhysicalCaptureResultInfo>& physicalResultInfos) {
+    (void) physicalResultInfos;
     binder::Status ret = binder::Status::ok();
 
     sp<CameraDevice> dev = mDevice.promote();

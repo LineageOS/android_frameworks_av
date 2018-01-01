@@ -115,6 +115,10 @@ status_t Camera3DummyStream::dropBuffers(bool /*dropping*/) {
     return OK;
 }
 
+const String8& Camera3DummyStream::getPhysicalCameraId() const {
+    return DUMMY_ID;
+}
+
 status_t Camera3DummyStream::setConsumers(const std::vector<sp<Surface>>& /*consumers*/) {
     ALOGE("%s: Stream %d: Dummy stream doesn't support set consumer surface!",
             __FUNCTION__, mId);

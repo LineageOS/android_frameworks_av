@@ -78,6 +78,11 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
      * Drop buffers if dropping is true. If dropping is false, do not drop buffers.
      */
     virtual status_t dropBuffers(bool /*dropping*/) = 0;
+
+    /**
+     * Query the physical camera id for the output stream.
+     */
+    virtual const String8& getPhysicalCameraId() const = 0;
 };
 
 } // namespace camera3

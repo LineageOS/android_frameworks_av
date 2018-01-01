@@ -39,6 +39,8 @@
 
 #include <inttypes.h>
 
+#include <utility>
+
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include <utils/Timers.h>
@@ -874,11 +876,9 @@ status_t Camera3Device::submitRequestsHelper(
     return res;
 }
 
-// Only one processCaptureResult should be called at a time, so
-// the locks won't block. The locks are present here simply to enforce this.
-hardware::Return<void> Camera3Device::processCaptureResult(
+hardware::Return<void> Camera3Device::processCaptureResult_3_4(
         const hardware::hidl_vec<
-                hardware::camera::device::V3_2::CaptureResult>& results) {
+                hardware::camera::device::V3_4::CaptureResult>& results) {
     // Ideally we should grab mLock, but that can lead to deadlock, and
     // it's not super important to get up to date value of mStatus for this
     // warning print, hence skipping the lock here
@@ -902,45 +902,121 @@ hardware::Return<void> Camera3Device::processCaptureResult(
         }
     }
     for (const auto& result : results) {
-        processOneCaptureResultLocked(result);
+        processOneCaptureResultLocked(result.v3_2, result.physicalCameraMetadata);
     }
     mProcessCaptureResultLock.unlock();
     return hardware::Void();
 }
 
+// Only one processCaptureResult should be called at a time, so
+// the locks won't block. The locks are present here simply to enforce this.
+hardware::Return<void> Camera3Device::processCaptureResult(
+        const hardware::hidl_vec<
+                hardware::camera::device::V3_2::CaptureResult>& results) {
+    hardware::hidl_vec<hardware::camera::device::V3_4::PhysicalCameraMetadata> noPhysMetadata;
+
+    // Ideally we should grab mLock, but that can lead to deadlock, and
+    // it's not super important to get up to date value of mStatus for this
+    // warning print, hence skipping the lock here
+    if (mStatus == STATUS_ERROR) {
+        // Per API contract, HAL should act as closed after device error
+        // But mStatus can be set to error by framework as well, so just log
+        // a warning here.
+        ALOGW("%s: received capture result in error state.", __FUNCTION__);
+    }
+
+    if (mProcessCaptureResultLock.tryLock() != OK) {
+        // This should never happen; it indicates a wrong client implementation
+        // that doesn't follow the contract. But, we can be tolerant here.
+        ALOGE("%s: callback overlapped! waiting 1s...",
+                __FUNCTION__);
+        if (mProcessCaptureResultLock.timedLock(1000000000 /* 1s */) != OK) {
+            ALOGE("%s: cannot acquire lock in 1s, dropping results",
+                    __FUNCTION__);
+            // really don't know what to do, so bail out.
+            return hardware::Void();
+        }
+    }
+    for (const auto& result : results) {
+        processOneCaptureResultLocked(result, noPhysMetadata);
+    }
+    mProcessCaptureResultLock.unlock();
+    return hardware::Void();
+}
+
+status_t Camera3Device::readOneCameraMetadataLocked(
+        uint64_t fmqResultSize, hardware::camera::device::V3_2::CameraMetadata& resultMetadata,
+        const hardware::camera::device::V3_2::CameraMetadata& result) {
+    if (fmqResultSize > 0) {
+        resultMetadata.resize(fmqResultSize);
+        if (mResultMetadataQueue == nullptr) {
+            return NO_MEMORY; // logged in initialize()
+        }
+        if (!mResultMetadataQueue->read(resultMetadata.data(), fmqResultSize)) {
+            ALOGE("%s: Cannot read camera metadata from fmq, size = %" PRIu64,
+                    __FUNCTION__, fmqResultSize);
+            return INVALID_OPERATION;
+        }
+    } else {
+        resultMetadata.setToExternal(const_cast<uint8_t *>(result.data()),
+                result.size());
+    }
+
+    if (resultMetadata.size() != 0) {
+        status_t res;
+        const camera_metadata_t* metadata =
+                reinterpret_cast<const camera_metadata_t*>(resultMetadata.data());
+        size_t expected_metadata_size = resultMetadata.size();
+        if ((res = validate_camera_metadata_structure(metadata, &expected_metadata_size)) != OK) {
+            ALOGE("%s: Invalid camera metadata received by camera service from HAL: %s (%d)",
+                    __FUNCTION__, strerror(-res), res);
+            return INVALID_OPERATION;
+        }
+    }
+
+    return OK;
+}
+
 void Camera3Device::processOneCaptureResultLocked(
-        const hardware::camera::device::V3_2::CaptureResult& result) {
+        const hardware::camera::device::V3_2::CaptureResult& result,
+        const hardware::hidl_vec<
+                hardware::camera::device::V3_4::PhysicalCameraMetadata> physicalCameraMetadatas) {
     camera3_capture_result r;
     status_t res;
     r.frame_number = result.frameNumber;
 
+    // Read and validate the result metadata.
     hardware::camera::device::V3_2::CameraMetadata resultMetadata;
-    if (result.fmqResultSize > 0) {
-        resultMetadata.resize(result.fmqResultSize);
-        if (mResultMetadataQueue == nullptr) {
-            return; // logged in initialize()
-        }
-        if (!mResultMetadataQueue->read(resultMetadata.data(), result.fmqResultSize)) {
-            ALOGE("%s: Frame %d: Cannot read camera metadata from fmq, size = %" PRIu64,
-                    __FUNCTION__, result.frameNumber, result.fmqResultSize);
-            return;
-        }
-    } else {
-        resultMetadata.setToExternal(const_cast<uint8_t *>(result.result.data()),
-                result.result.size());
+    res = readOneCameraMetadataLocked(result.fmqResultSize, resultMetadata, result.result);
+    if (res != OK) {
+        ALOGE("%s: Frame %d: Failed to read capture result metadata",
+                __FUNCTION__, result.frameNumber);
+        return;
     }
+    r.result = reinterpret_cast<const camera_metadata_t*>(resultMetadata.data());
 
-    if (resultMetadata.size() != 0) {
-        r.result = reinterpret_cast<const camera_metadata_t*>(resultMetadata.data());
-        size_t expected_metadata_size = resultMetadata.size();
-        if ((res = validate_camera_metadata_structure(r.result, &expected_metadata_size)) != OK) {
-            ALOGE("%s: Frame %d: Invalid camera metadata received by camera service from HAL: %s (%d)",
-                    __FUNCTION__, result.frameNumber, strerror(-res), res);
+    // Read and validate physical camera metadata
+    size_t physResultCount = physicalCameraMetadatas.size();
+    std::vector<const char*> physCamIds(physResultCount);
+    std::vector<const camera_metadata_t *> phyCamMetadatas(physResultCount);
+    std::vector<hardware::camera::device::V3_2::CameraMetadata> physResultMetadata;
+    physResultMetadata.resize(physResultCount);
+    for (size_t i = 0; i < physicalCameraMetadatas.size(); i++) {
+        res = readOneCameraMetadataLocked(physicalCameraMetadatas[i].fmqMetadataSize,
+                physResultMetadata[i], physicalCameraMetadatas[i].metadata);
+        if (res != OK) {
+            ALOGE("%s: Frame %d: Failed to read capture result metadata for camera %s",
+                    __FUNCTION__, result.frameNumber,
+                    physicalCameraMetadatas[i].physicalCameraId.c_str());
             return;
         }
-    } else {
-        r.result = nullptr;
+        physCamIds[i] = physicalCameraMetadatas[i].physicalCameraId.c_str();
+        phyCamMetadatas[i] = reinterpret_cast<const camera_metadata_t*>(
+                physResultMetadata[i].data());
     }
+    r.num_physcam_metadata = physResultCount;
+    r.physcam_ids = physCamIds.data();
+    r.physcam_metadata = phyCamMetadatas.data();
 
     std::vector<camera3_stream_buffer_t> outputBuffers(result.outputBuffers.size());
     std::vector<buffer_handle_t> outputBufferHandles(result.outputBuffers.size());
@@ -1806,6 +1882,7 @@ status_t Camera3Device::getNextResult(CaptureResult *frame) {
     CaptureResult &result = *(mResultQueue.begin());
     frame->mResultExtras = result.mResultExtras;
     frame->mMetadata.acquire(result.mMetadata);
+    frame->mPhysicalMetadatas = std::move(result.mPhysicalMetadatas);
     mResultQueue.erase(mResultQueue.begin());
 
     return OK;
@@ -2579,13 +2656,14 @@ void Camera3Device::setErrorStateLockedV(const char *fmt, va_list args) {
 
 status_t Camera3Device::registerInFlight(uint32_t frameNumber,
         int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
-        bool hasAppCallback, nsecs_t maxExpectedDuration) {
+        bool hasAppCallback, nsecs_t maxExpectedDuration,
+        std::set<String8>& physicalCameraIds) {
     ATRACE_CALL();
     Mutex::Autolock l(mInFlightLock);
 
     ssize_t res;
     res = mInFlightMap.add(frameNumber, InFlightRequest(numBuffers, resultExtras, hasInput,
-            hasAppCallback, maxExpectedDuration));
+            hasAppCallback, maxExpectedDuration, physicalCameraIds));
     if (res < 0) return res;
 
     if (mInFlightMap.size() == 1) {
@@ -2825,7 +2903,8 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
         CaptureResultExtras &resultExtras,
         CameraMetadata &collectedPartialResult,
         uint32_t frameNumber,
-        bool reprocess) {
+        bool reprocess,
+        const std::vector<PhysicalCaptureResultInfo>& physicalMetadatas) {
     ATRACE_CALL();
     if (pendingMetadata.isEmpty())
         return;
@@ -2854,6 +2933,7 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
     CaptureResult captureResult;
     captureResult.mResultExtras = resultExtras;
     captureResult.mMetadata = pendingMetadata;
+    captureResult.mPhysicalMetadatas = physicalMetadatas;
 
     // Append any previous partials to form a complete result
     if (mUsePartialResult && !collectedPartialResult.isEmpty()) {
@@ -2868,6 +2948,15 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
         SET_ERR("No timestamp provided by HAL for frame %d!",
                 frameNumber);
         return;
+    }
+    for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
+        camera_metadata_entry timestamp =
+                physicalMetadata.mPhysicalCameraMetadata.find(ANDROID_SENSOR_TIMESTAMP);
+        if (timestamp.count == 0) {
+            SET_ERR("No timestamp provided by HAL for physical camera %s frame %d!",
+                    String8(physicalMetadata.mPhysicalCameraId).c_str(), frameNumber);
+            return;
+        }
     }
 
     mTagMonitor.monitorMetadata(TagMonitor::RESULT,
@@ -2904,7 +2993,6 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
 
     bool isPartialResult = false;
     CameraMetadata collectedPartialResult;
-    CaptureResultExtras resultExtras;
     bool hasInputBufferInRequest = false;
 
     // Get shutter timestamp and resultExtras from list of in-flight requests,
@@ -2945,6 +3033,11 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
                 return;
             }
             isPartialResult = (result->partial_result < mNumPartialResults);
+            if (isPartialResult && result->num_physcam_metadata) {
+                SET_ERR("Result is malformed for frame %d: partial_result not allowed for"
+                        " physical camera result", frameNumber);
+                return;
+            }
             if (isPartialResult) {
                 request.collectedPartialResult.append(result->result);
             }
@@ -2961,10 +3054,27 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
 
         // Did we get the (final) result metadata for this capture?
         if (result->result != NULL && !isPartialResult) {
+            if (request.physicalCameraIds.size() != result->num_physcam_metadata) {
+                SET_ERR("Requested physical Camera Ids %d not equal to number of metadata %d",
+                        request.physicalCameraIds.size(), result->num_physcam_metadata);
+                return;
+            }
             if (request.haveResultMetadata) {
                 SET_ERR("Called multiple times with metadata for frame %d",
                         frameNumber);
                 return;
+            }
+            for (uint32_t i = 0; i < result->num_physcam_metadata; i++) {
+                String8 physicalId(result->physcam_ids[i]);
+                std::set<String8>::iterator cameraIdIter =
+                        request.physicalCameraIds.find(physicalId);
+                if (cameraIdIter != request.physicalCameraIds.end()) {
+                    request.physicalCameraIds.erase(cameraIdIter);
+                } else {
+                    SET_ERR("Total result for frame %d has already returned for camera %s",
+                            frameNumber, physicalId.c_str());
+                    return;
+                }
             }
             if (mUsePartialResult &&
                     !request.collectedPartialResult.isEmpty()) {
@@ -3010,15 +3120,21 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
         }
 
         if (result->result != NULL && !isPartialResult) {
+            for (uint32_t i = 0; i < result->num_physcam_metadata; i++) {
+                CameraMetadata physicalMetadata;
+                physicalMetadata.append(result->physcam_metadata[i]);
+                request.physicalMetadatas.push_back({String16(result->physcam_ids[i]),
+                        physicalMetadata});
+            }
             if (shutterTimestamp == 0) {
                 request.pendingMetadata = result->result;
                 request.collectedPartialResult = collectedPartialResult;
-            } else if (request.hasCallback) {
+           } else if (request.hasCallback) {
                 CameraMetadata metadata;
                 metadata = result->result;
                 sendCaptureResult(metadata, request.resultExtras,
                     collectedPartialResult, frameNumber,
-                    hasInputBufferInRequest);
+                    hasInputBufferInRequest, request.physicalMetadatas);
             }
         }
 
@@ -3204,7 +3320,7 @@ void Camera3Device::notifyShutter(const camera3_shutter_msg_t &msg,
                 // send pending result and buffers
                 sendCaptureResult(r.pendingMetadata, r.resultExtras,
                     r.collectedPartialResult, msg.frame_number,
-                    r.hasInputBuffer);
+                    r.hasInputBuffer, r.physicalMetadatas);
             }
             returnOutputBuffers(r.pendingOutputBuffers.array(),
                 r.pendingOutputBuffers.size(), r.shutterTimestamp);
@@ -3218,7 +3334,6 @@ void Camera3Device::notifyShutter(const camera3_shutter_msg_t &msg,
                 msg.frame_number);
     }
 }
-
 
 CameraMetadata Camera3Device::getLatestRequestLocked() {
     ALOGV("%s", __FUNCTION__);
@@ -4657,6 +4772,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         outputBuffers->insertAt(camera3_stream_buffer_t(), 0,
                 captureRequest->mOutputStreams.size());
         halRequest->output_buffers = outputBuffers->array();
+        std::set<String8> requestedPhysicalCameras;
         for (size_t j = 0; j < captureRequest->mOutputStreams.size(); j++) {
             sp<Camera3OutputStreamInterface> outputStream = captureRequest->mOutputStreams.editItemAt(j);
 
@@ -4687,8 +4803,18 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
 
                 return TIMED_OUT;
             }
-            halRequest->num_output_buffers++;
 
+            String8 physicalCameraId = outputStream->getPhysicalCameraId();
+
+            if (!physicalCameraId.isEmpty()) {
+                // Physical stream isn't supported for input request.
+                if (halRequest->input_buffer) {
+                    CLOGE("Physical stream is not supported for input request");
+                    return INVALID_OPERATION;
+                }
+                requestedPhysicalCameras.insert(physicalCameraId);
+            }
+            halRequest->num_output_buffers++;
         }
         totalNumBuffers += halRequest->num_output_buffers;
 
@@ -4711,7 +4837,8 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 totalNumBuffers, captureRequest->mResultExtras,
                 /*hasInput*/halRequest->input_buffer != NULL,
                 hasCallback,
-                calculateMaxExpectedDuration(halRequest->settings));
+                calculateMaxExpectedDuration(halRequest->settings),
+                requestedPhysicalCameras);
         ALOGVV("%s: registered in flight requestId = %" PRId32 ", frameNumber = %" PRId64
                ", burstId = %" PRId32 ".",
                 __FUNCTION__,

@@ -74,7 +74,8 @@ class CameraDevice final : public RefBase {
         binder::Status onCaptureStarted(const CaptureResultExtras& resultExtras,
                               int64_t timestamp) override;
         binder::Status onResultReceived(const CameraMetadata& metadata,
-                              const CaptureResultExtras& resultExtras) override;
+                              const CaptureResultExtras& resultExtras,
+                              const std::vector<PhysicalCaptureResultInfo>& physicalResultInfos) override;
         binder::Status onPrepared(int streamId) override;
         binder::Status onRequestQueueEmpty() override;
         binder::Status onRepeatingRequestError(int64_t lastFrameNumber,

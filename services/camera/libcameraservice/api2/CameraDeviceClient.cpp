@@ -1697,7 +1697,8 @@ void CameraDeviceClient::onResultAvailable(const CaptureResult& result) {
     // Thread-safe. No lock necessary.
     sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = mRemoteCallback;
     if (remoteCb != NULL) {
-        remoteCb->onResultReceived(result.mMetadata, result.mResultExtras);
+        remoteCb->onResultReceived(result.mMetadata, result.mResultExtras,
+                result.mPhysicalMetadatas);
     }
 }
 
