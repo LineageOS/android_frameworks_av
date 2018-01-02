@@ -30,6 +30,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <audio_utils/sndfile.h>
+
 // Tag for machine readable results as property = value pairs
 #define LOOPBACK_RESULT_TAG      "RESULT: "
 #define LOOPBACK_SAMPLE_RATE     48000
@@ -37,6 +39,7 @@
 #define MILLIS_PER_SECOND        1000
 
 #define MAX_ZEROTH_PARTIAL_BINS  40
+constexpr double MAX_ECHO_GAIN = 10.0; // based on experiments, otherwise autocorrelation too noisy
 
 static const float s_Impulse[] = {
         0.0f, 0.0f, 0.0f, 0.0f, 0.2f, // silence on each side of the impulse
@@ -156,6 +159,8 @@ static int measureLatencyFromEchos(const float *haystack, int haystackSize,
                             const float *needle, int needleSize,
                             LatencyReport *report) {
     const double threshold = 0.1;
+    printf("measureLatencyFromEchos: haystackSize = %d, needleSize = %d\n",
+           haystackSize, needleSize);
 
     // Find first peak
     int first = (int) (findFirstMatch(haystack,
@@ -173,7 +178,7 @@ static int measureLatencyFromEchos(const float *haystack, int haystackSize,
                                       needleSize,
                                       threshold) + 0.5);
 
-    printf("first = %d, again at %d\n", first, again);
+    printf("measureLatencyFromEchos: first = %d, again at %d\n", first, again);
     first = again;
 
     // Allocate results array
@@ -270,37 +275,60 @@ public:
         return mData;
     }
 
+    void setSampleRate(int32_t sampleRate) {
+        mSampleRate = sampleRate;
+    }
+
+    int32_t getSampleRate() {
+        return mSampleRate;
+    }
+
     int save(const char *fileName, bool writeShorts = true) {
+        SNDFILE *sndFile = nullptr;
         int written = 0;
-        const int chunkSize = 64;
-        FILE *fid = fopen(fileName, "wb");
-        if (fid == NULL) {
+        SF_INFO info = {
+                .frames = mFrameCounter,
+                .samplerate = mSampleRate,
+                .channels = 1,
+                .format = SF_FORMAT_WAV | (writeShorts ? SF_FORMAT_PCM_16 : SF_FORMAT_FLOAT)
+        };
+
+        sndFile = sf_open(fileName, SFM_WRITE, &info);
+        if (sndFile == nullptr) {
+            printf("AudioRecording::save(%s) failed to open file\n", fileName);
             return -errno;
         }
 
-        if (writeShorts) {
-            int16_t buffer[chunkSize];
-            int32_t framesLeft = mFrameCounter;
-            int32_t cursor = 0;
-            while (framesLeft) {
-                int32_t framesToWrite = framesLeft < chunkSize ? framesLeft : chunkSize;
-                for (int i = 0; i < framesToWrite; i++) {
-                    buffer[i] = (int16_t) (mData[cursor++] * 32767);
-                }
-                written += fwrite(buffer, sizeof(int16_t), framesToWrite, fid);
-                framesLeft -= framesToWrite;
-            }
-        } else {
-            written = (int) fwrite(mData, sizeof(float), mFrameCounter, fid);
-        }
-        fclose(fid);
+        written = sf_writef_float(sndFile, mData, mFrameCounter);
+
+        sf_close(sndFile);
         return written;
+    }
+
+    int load(const char *fileName) {
+        SNDFILE *sndFile = nullptr;
+        SF_INFO info;
+
+        sndFile = sf_open(fileName, SFM_READ, &info);
+        if (sndFile == nullptr) {
+            printf("AudioRecording::load(%s) failed to open file\n", fileName);
+            return -errno;
+        }
+
+        assert(info.channels == 1);
+
+        allocate(info.frames);
+        mFrameCounter = sf_readf_float(sndFile, mData, info.frames);
+
+        sf_close(sndFile);
+        return mFrameCounter;
     }
 
 private:
     float  *mData = nullptr;
     int32_t mFrameCounter = 0;
     int32_t mMaxFrames = 0;
+    int32_t mSampleRate = 48000; // common default
 };
 
 // ====================================================================================
@@ -320,11 +348,25 @@ public:
 
     virtual void printStatus() {};
 
+    virtual int getResult() {
+        return -1;
+    }
+
     virtual bool isDone() {
         return false;
     }
 
-    void setSampleRate(int32_t sampleRate) {
+    virtual int save(const char *fileName) {
+        (void) fileName;
+        return AAUDIO_ERROR_UNIMPLEMENTED;
+    }
+
+    virtual int load(const char *fileName) {
+        (void) fileName;
+        return AAUDIO_ERROR_UNIMPLEMENTED;
+    }
+
+    virtual void setSampleRate(int32_t sampleRate) {
         mSampleRate = sampleRate;
     }
 
@@ -395,7 +437,13 @@ class EchoAnalyzer : public LoopbackProcessor {
 public:
 
     EchoAnalyzer() : LoopbackProcessor() {
-        audioRecorder.allocate(2 * LOOPBACK_SAMPLE_RATE);
+        mAudioRecording.allocate(2 * getSampleRate());
+        mAudioRecording.setSampleRate(getSampleRate());
+    }
+
+    void setSampleRate(int32_t sampleRate) override {
+        LoopbackProcessor::setSampleRate(sampleRate);
+        mAudioRecording.setSampleRate(sampleRate);
     }
 
     void reset() override {
@@ -406,8 +454,12 @@ public:
         mState = STATE_INITIAL_SILENCE;
     }
 
+    virtual int getResult() {
+        return mState == STATE_DONE ? 0 : -1;
+    }
+
     virtual bool isDone() {
-        return mState == STATE_DONE;
+        return mState == STATE_DONE || mState == STATE_FAILED;
     }
 
     void setGain(float gain) {
@@ -423,30 +475,23 @@ public:
         printf("EchoAnalyzer ---------------\n");
         printf(LOOPBACK_RESULT_TAG "measured.gain          = %f\n", mMeasuredLoopGain);
         printf(LOOPBACK_RESULT_TAG "echo.gain              = %f\n", mEchoGain);
-        printf(LOOPBACK_RESULT_TAG "frame.count            = %d\n", mFrameCounter);
         printf(LOOPBACK_RESULT_TAG "test.state             = %d\n", mState);
         if (mMeasuredLoopGain >= 0.9999) {
             printf("   ERROR - clipping, turn down volume slightly\n");
         } else {
             const float *needle = s_Impulse;
             int needleSize = (int) (sizeof(s_Impulse) / sizeof(float));
-            float *haystack = audioRecorder.getData();
-            int haystackSize = audioRecorder.size();
-            measureLatencyFromEchos(haystack, haystackSize, needle, needleSize, &latencyReport);
-            if (latencyReport.confidence < 0.01) {
-                printf("   ERROR - confidence too low = %f\n", latencyReport.confidence);
+            float *haystack = mAudioRecording.getData();
+            int haystackSize = mAudioRecording.size();
+            measureLatencyFromEchos(haystack, haystackSize, needle, needleSize, &mLatencyReport);
+            if (mLatencyReport.confidence < 0.01) {
+                printf("   ERROR - confidence too low = %f\n", mLatencyReport.confidence);
             } else {
-                double latencyMillis = 1000.0 * latencyReport.latencyInFrames / getSampleRate();
-                printf(LOOPBACK_RESULT_TAG "latency.frames        = %8.2f\n", latencyReport.latencyInFrames);
+                double latencyMillis = 1000.0 * mLatencyReport.latencyInFrames / getSampleRate();
+                printf(LOOPBACK_RESULT_TAG "latency.frames        = %8.2f\n", mLatencyReport.latencyInFrames);
                 printf(LOOPBACK_RESULT_TAG "latency.msec          = %8.2f\n", latencyMillis);
-                printf(LOOPBACK_RESULT_TAG "latency.confidence    = %8.6f\n", latencyReport.confidence);
+                printf(LOOPBACK_RESULT_TAG "latency.confidence    = %8.6f\n", mLatencyReport.confidence);
             }
-        }
-
-        {
-#define ECHO_FILENAME "/data/oboe_echo.raw"
-            int written = audioRecorder.save(ECHO_FILENAME);
-            printf("Echo wrote %d mono samples to %s on Android device\n", written, ECHO_FILENAME);
         }
     }
 
@@ -491,13 +536,18 @@ public:
                 // If we get several in a row then go to next state.
                 if (peak > mPulseThreshold) {
                     if (mDownCounter-- <= 0) {
-                        nextState = STATE_WAITING_FOR_SILENCE;
                         //printf("%5d: switch to STATE_WAITING_FOR_SILENCE, measured peak = %f\n",
                         //       mLoopCounter, peak);
                         mDownCounter = 8;
                         mMeasuredLoopGain = peak;  // assumes original pulse amplitude is one
                         // Calculate gain that will give us a nice decaying echo.
                         mEchoGain = mDesiredEchoGain / mMeasuredLoopGain;
+                        if (mEchoGain > MAX_ECHO_GAIN) {
+                            printf("ERROR - loop gain too low. Increase the volume.\n");
+                            nextState = STATE_FAILED;
+                        } else {
+                            nextState = STATE_WAITING_FOR_SILENCE;
+                        }
                     }
                 } else {
                     mDownCounter = 8;
@@ -524,14 +574,14 @@ public:
                 break;
 
             case STATE_SENDING_PULSE:
-                audioRecorder.write(inputData, inputChannelCount, numFrames);
+                mAudioRecording.write(inputData, inputChannelCount, numFrames);
                 sendImpulse(outputData, outputChannelCount);
                 nextState = STATE_GATHERING_ECHOS;
                 //printf("%5d: switch to STATE_GATHERING_ECHOS\n", mLoopCounter);
                 break;
 
             case STATE_GATHERING_ECHOS:
-                numWritten = audioRecorder.write(inputData, inputChannelCount, numFrames);
+                numWritten = mAudioRecording.write(inputData, inputChannelCount, numFrames);
                 peak = measurePeakAmplitude(inputData, inputChannelCount, numFrames);
                 if (peak > mMeasuredLoopGain) {
                     mMeasuredLoopGain = peak;  // AGC might be raising gain so adjust it on the fly.
@@ -565,6 +615,14 @@ public:
         mLoopCounter++;
     }
 
+    int save(const char *fileName) override {
+        return mAudioRecording.save(fileName);
+    }
+
+    int load(const char *fileName) override {
+        return mAudioRecording.load(fileName);
+    }
+
 private:
 
     enum echo_state_t {
@@ -573,22 +631,22 @@ private:
         STATE_WAITING_FOR_SILENCE,
         STATE_SENDING_PULSE,
         STATE_GATHERING_ECHOS,
-        STATE_DONE
+        STATE_DONE,
+        STATE_FAILED
     };
 
-    int           mDownCounter = 500;
-    int           mLoopCounter = 0;
-    float         mPulseThreshold = 0.02f;
-    float         mSilenceThreshold = 0.002f;
-    float         mMeasuredLoopGain = 0.0f;
-    float         mDesiredEchoGain = 0.95f;
-    float         mEchoGain = 1.0f;
-    echo_state_t  mState = STATE_INITIAL_SILENCE;
-    int32_t       mFrameCounter = 0;
+    int             mDownCounter = 500;
+    int             mLoopCounter = 0;
+    float           mPulseThreshold = 0.02f;
+    float           mSilenceThreshold = 0.002f;
+    float           mMeasuredLoopGain = 0.0f;
+    float           mDesiredEchoGain = 0.95f;
+    float           mEchoGain = 1.0f;
+    echo_state_t    mState = STATE_INITIAL_SILENCE;
 
-    AudioRecording     audioRecorder;
-    LatencyReport      latencyReport;
-    PeakDetector       mPeakDetector;
+    AudioRecording  mAudioRecording; // contains only the input after the gain detection burst
+    LatencyReport   mLatencyReport;
+    // PeakDetector    mPeakDetector;
 };
 
 
@@ -601,6 +659,10 @@ private:
  */
 class SineAnalyzer : public LoopbackProcessor {
 public:
+
+    virtual int getResult() {
+        return mState == STATE_LOCKED ? 0 : -1;
+    }
 
     void report() override {
         printf("SineAnalyzer ------------------\n");
