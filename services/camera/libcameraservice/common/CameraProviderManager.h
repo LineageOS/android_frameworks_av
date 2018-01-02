@@ -293,6 +293,7 @@ private:
             virtual status_t setTorchMode(bool enabled) = 0;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const = 0;
             virtual bool isAPI1Compatible() const = 0;
+            virtual status_t dumpState(int fd) const = 0;
             virtual status_t getCameraCharacteristics(CameraMetadata *characteristics) const {
                 (void) characteristics;
                 return INVALID_OPERATION;
@@ -326,6 +327,7 @@ private:
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
             //In case of Device1Info assume that we are always API1 compatible
             virtual bool isAPI1Compatible() const override { return true; }
+            virtual status_t dumpState(int fd) const override;
             DeviceInfo1(const std::string& name, const metadata_vendor_id_t tagId,
                     const std::string &id, uint16_t minorVersion,
                     const hardware::camera::common::V1_0::CameraResourceCost& resourceCost,
@@ -343,6 +345,7 @@ private:
             virtual status_t setTorchMode(bool enabled) override;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
             virtual bool isAPI1Compatible() const override;
+            virtual status_t dumpState(int fd) const override;
             virtual status_t getCameraCharacteristics(
                     CameraMetadata *characteristics) const override;
 
