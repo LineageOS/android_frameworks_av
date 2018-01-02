@@ -726,15 +726,14 @@ status_t MediaPlayer2Manager::Client::setDataSource(
 }
 
 status_t MediaPlayer2Manager::Client::setDataSource(
-        const sp<IDataSource> &source) {
-    sp<DataSource> dataSource = CreateDataSourceFromIDataSource(source);
-    player2_type playerType = MediaPlayer2Factory::getPlayerType(this, dataSource);
+        const sp<DataSource> &source) {
+    player2_type playerType = MediaPlayer2Factory::getPlayerType(this, source);
     sp<MediaPlayer2Base> p = setDataSource_pre(playerType);
     if (p == NULL) {
         return NO_INIT;
     }
     // now set data source
-    return mStatus = setDataSource_post(p, p->setDataSource(dataSource));
+    return mStatus = setDataSource_post(p, p->setDataSource(source));
 }
 
 void MediaPlayer2Manager::Client::disconnectNativeWindow_l() {

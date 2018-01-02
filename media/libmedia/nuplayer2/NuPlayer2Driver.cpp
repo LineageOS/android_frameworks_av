@@ -40,6 +40,42 @@ static const int kDumpLockSleepUs = 20000;
 
 namespace android {
 
+struct ParcelWrapper : public RefBase {
+    static sp<ParcelWrapper> Create(const Parcel *p) {
+        if (p != NULL) {
+            sp<ParcelWrapper> pw = new ParcelWrapper();
+            if (pw->appendFrom(p) == OK) {
+                return pw;
+            }
+        }
+        return NULL;
+    }
+
+    const Parcel *getParcel() {
+        return mParcel;
+    }
+
+protected:
+    virtual ~ParcelWrapper() {
+        if (mParcel != NULL) {
+            delete mParcel;
+        }
+    }
+
+private:
+    ParcelWrapper()
+        : mParcel(NULL) { }
+
+    status_t appendFrom(const Parcel *p) {
+        if (mParcel == NULL) {
+            mParcel = new Parcel;
+        }
+        return mParcel->appendFrom(p, 0 /* start */, p->dataSize());
+    }
+
+    Parcel *mParcel;
+};
+
 // key for media statistics
 static const char *kKeyPlayer = "nuplayer2";
 // attrs for media statistics
@@ -390,7 +426,7 @@ status_t NuPlayer2Driver::stop() {
 
         case STATE_PAUSED:
             mState = STATE_STOPPED;
-            sendNotifyOnLooper(MEDIA2_STOPPED);
+            notifyListener_l(MEDIA2_STOPPED);
             break;
 
         case STATE_PREPARED:
@@ -425,7 +461,7 @@ status_t NuPlayer2Driver::pause() {
 
         case STATE_RUNNING:
             mState = STATE_PAUSED;
-            sendNotifyOnLooper(MEDIA2_PAUSED);
+            notifyListener_l(MEDIA2_PAUSED);
             mPlayer->pause();
             break;
 
@@ -449,7 +485,7 @@ status_t NuPlayer2Driver::setPlaybackSettings(const AudioPlaybackRate &rate) {
         Mutex::Autolock autoLock(mLock);
         if (rate.mSpeed == 0.f && mState == STATE_RUNNING) {
             mState = STATE_PAUSED;
-            sendNotifyOnLooper(MEDIA2_PAUSED);
+            notifyListener_l(MEDIA2_PAUSED);
         } else if (rate.mSpeed != 0.f
                 && (mState == STATE_PAUSED
                     || mState == STATE_STOPPED_AND_PREPARED
@@ -487,7 +523,7 @@ status_t NuPlayer2Driver::seekTo(int msec, MediaPlayer2SeekMode mode) {
             mAtEOS = false;
             mSeekInProgress = true;
             // seeks can take a while, so we essentially paused
-            sendNotifyOnLooper(MEDIA2_PAUSED);
+            notifyListener_l(MEDIA2_PAUSED);
             mPlayer->seekToAsync(seekTimeUs, mode, true /* needNotify */);
             break;
         }
@@ -660,7 +696,7 @@ status_t NuPlayer2Driver::reset() {
         {
             CHECK(mIsAsyncPrepare);
 
-            sendNotifyOnLooper(MEDIA2_PREPARED);
+            notifyListener_l(MEDIA2_PREPARED);
             break;
         }
 
@@ -669,7 +705,7 @@ status_t NuPlayer2Driver::reset() {
     }
 
     if (mState != STATE_STOPPED) {
-        sendNotifyOnLooper(MEDIA2_STOPPED);
+        notifyListener_l(MEDIA2_STOPPED);
     }
 
     mState = STATE_RESET_IN_PROGRESS;
@@ -952,8 +988,17 @@ void NuPlayer2Driver::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatNotifyListener: {
             int32_t msgId;
+            int32_t ext1 = 0;
+            int32_t ext2 = 0;
             CHECK(msg->findInt32("messageId", &msgId));
-            notifyListener(msgId);
+            msg->findInt32("ext1", &ext1);
+            msg->findInt32("ext2", &ext2);
+            sp<ParcelWrapper> in;
+            sp<RefBase> obj;
+            if (msg->findObject("parcel", &obj) && obj != NULL) {
+                in = static_cast<ParcelWrapper *>(obj.get());
+            }
+            sendEvent(msgId, ext1, ext2, (in == NULL ? NULL : in->getParcel()));
             break;
         }
         default:
@@ -1025,15 +1070,12 @@ void NuPlayer2Driver::notifyListener_l(
             break;
     }
 
-    mLock.unlock();
-    sendEvent(msg, ext1, ext2, in);
-    mLock.lock();
-}
-
-void NuPlayer2Driver::sendNotifyOnLooper(int msgId) {
-    sp<AMessage> msg = new AMessage(kWhatNotifyListener, this);
-    msg->setInt32("messageId", msgId);
-    msg->post();
+    sp<AMessage> notify = new AMessage(kWhatNotifyListener, this);
+    notify->setInt32("messageId", msg);
+    notify->setInt32("ext1", ext1);
+    notify->setInt32("ext2", ext2);
+    notify->setObject("parcel", ParcelWrapper::Create(in));
+    notify->post();
 }
 
 void NuPlayer2Driver::notifySetDataSourceCompleted(status_t err) {

@@ -32,13 +32,13 @@ struct sockaddr_in;
 namespace android {
 
 struct ANativeWindowWrapper;
-class Parcel;
-class IDataSource;
+struct AVSyncSettings;
+struct AudioPlaybackRate;
+struct BufferingSettings;
+class DataSource;
 struct IStreamSource;
 struct MediaHTTPService;
-struct AudioPlaybackRate;
-struct AVSyncSettings;
-struct BufferingSettings;
+class Parcel;
 
 typedef MediaSource::ReadOptions::SeekMode MediaPlayer2SeekMode;
 
@@ -54,7 +54,7 @@ public:
 
     virtual status_t        setDataSource(int fd, int64_t offset, int64_t length) = 0;
     virtual status_t        setDataSource(const sp<IStreamSource>& source) = 0;
-    virtual status_t        setDataSource(const sp<IDataSource>& source) = 0;
+    virtual status_t        setDataSource(const sp<DataSource>& source) = 0;
     virtual status_t        setVideoSurfaceTexture(const sp<ANativeWindowWrapper>& nww) = 0;
     virtual status_t        getBufferingSettings(
                                     BufferingSettings* buffering /* nonnull */) = 0;
