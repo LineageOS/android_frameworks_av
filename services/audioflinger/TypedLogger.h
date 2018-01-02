@@ -62,7 +62,8 @@ constexpr uint64_t FNV_prime<uint64_t>() {
 }
 
 template <typename T, size_t n>
-constexpr T fnv1a(const char (&file)[n], int i = n - 1) {
+__attribute__((no_sanitize("unsigned-integer-overflow")))
+constexpr T fnv1a(const char (&file)[n], ssize_t i = (ssize_t)n - 1) {
     return i == -1 ? offset_basis<T>() : (fnv1a<T>(file, i - 1) ^ file[i]) * FNV_prime<T>();
 }
 
