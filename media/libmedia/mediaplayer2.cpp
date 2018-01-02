@@ -33,7 +33,7 @@
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/AVSyncSettings.h>
-#include <media/IDataSource.h>
+#include <media/DataSource.h>
 #include <media/MediaAnalyticsItem.h>
 #include <media/NdkWrapper.h>
 
@@ -183,9 +183,9 @@ status_t MediaPlayer2::setDataSource(int fd, int64_t offset, int64_t length)
     return err;
 }
 
-status_t MediaPlayer2::setDataSource(const sp<IDataSource> &source)
+status_t MediaPlayer2::setDataSource(const sp<DataSource> &source)
 {
-    ALOGV("setDataSource(IDataSource)");
+    ALOGV("setDataSource(DataSource)");
     status_t err = UNKNOWN_ERROR;
     sp<MediaPlayer2Engine> player(MediaPlayer2Manager::get().create(this, mAudioSessionId));
     if ((NO_ERROR != doSetRetransmitEndpoint(player)) ||

@@ -35,6 +35,8 @@ namespace android {
 
 struct AVSyncSettings;
 struct ANativeWindowWrapper;
+class DataSource;
+struct MediaHTTPService;
 
 enum media2_event_type {
     MEDIA2_NOP               = 0, // interface test message
@@ -193,8 +195,6 @@ public:
     virtual void notify(int msg, int ext1, int ext2, const Parcel *obj) = 0;
 };
 
-struct MediaHTTPService;
-
 class MediaPlayer2 : public MediaPlayer2EngineClient
 {
 public:
@@ -208,7 +208,7 @@ public:
                     const KeyedVector<String8, String8> *headers);
 
             status_t        setDataSource(int fd, int64_t offset, int64_t length);
-            status_t        setDataSource(const sp<IDataSource> &source);
+            status_t        setDataSource(const sp<DataSource> &source);
             status_t        setVideoSurfaceTexture(const sp<ANativeWindowWrapper>& nww);
             status_t        setListener(const sp<MediaPlayer2Listener>& listener);
             status_t        getBufferingSettings(BufferingSettings* buffering /* nonnull */);

@@ -39,7 +39,7 @@ struct ANativeWindowWrapper;
 struct AudioPlaybackRate;
 class AudioTrack;
 struct AVSyncSettings;
-class IDataSource;
+class DataSource;
 struct MediaHTTPService;
 class MediaPlayer2EngineClient;
 
@@ -297,7 +297,7 @@ private:
         virtual status_t        setDataSource(int fd, int64_t offset, int64_t length);
 
         virtual status_t        setDataSource(const sp<IStreamSource> &source);
-        virtual status_t        setDataSource(const sp<IDataSource> &source);
+        virtual status_t        setDataSource(const sp<DataSource> &source);
 
 
         sp<MediaPlayer2Base>    setDataSource_pre(player2_type playerType);
