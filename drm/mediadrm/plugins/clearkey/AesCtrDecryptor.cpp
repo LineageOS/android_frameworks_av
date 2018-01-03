@@ -36,6 +36,11 @@ android::status_t AesCtrDecryptor::decrypt(const android::Vector<uint8_t>& key,
     uint8_t previousEncryptedCounter[kBlockSize];
     memset(previousEncryptedCounter, 0, kBlockSize);
 
+    if (key.size() != kBlockSize || (sizeof(Iv) / sizeof(uint8_t)) != kBlockSize) {
+        android_errorWriteLog(0x534e4554, "63982768");
+        return android::ERROR_DRM_DECRYPT;
+    }
+
     size_t offset = 0;
     AES_KEY opensslKey;
     AES_set_encrypt_key(key.array(), kBlockBitCount, &opensslKey);
