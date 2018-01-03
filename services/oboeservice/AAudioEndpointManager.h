@@ -47,7 +47,7 @@ public:
     std::string dump() const;
 
     /**
-     * Find a service endpoint for the given deviceId and direction.
+     * Find a service endpoint for the given deviceId, sessionId and direction.
      * If an endpoint does not already exist then try to create one.
      *
      * @param audioService

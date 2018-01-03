@@ -250,6 +250,13 @@ aaudio_result_t AAudioConvert_androidToAAudioResult(status_t status) {
     return result;
 }
 
+audio_session_t AAudioConvert_aaudioToAndroidSessionId(aaudio_session_id_t sessionId) {
+    // If not a valid sessionId then convert to a safe value of AUDIO_SESSION_ALLOCATE.
+    return (sessionId < AAUDIO_SESSION_ID_MIN)
+           ? AUDIO_SESSION_ALLOCATE
+           : (audio_session_t) sessionId;
+}
+
 audio_format_t AAudioConvert_aaudioToAndroidDataFormat(aaudio_format_t aaudioFormat) {
     audio_format_t androidFormat;
     switch (aaudioFormat) {

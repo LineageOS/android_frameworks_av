@@ -133,6 +133,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     setSampleRate(configurationOutput.getSampleRate());
     setSamplesPerFrame(configurationOutput.getSamplesPerFrame());
     setDeviceId(configurationOutput.getDeviceId());
+    setSessionId(configurationOutput.getSessionId());
     setSharingMode(configurationOutput.getSharingMode());
 
     setUsage(configurationOutput.getUsage());

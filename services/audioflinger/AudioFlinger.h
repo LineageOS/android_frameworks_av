@@ -271,6 +271,7 @@ public:
                             audio_config_base_t *config,
                             const AudioClient& client,
                             audio_port_handle_t *deviceId,
+                            audio_session_t *sessionId,
                             const sp<MmapStreamCallback>& callback,
                             sp<MmapStreamInterface>& interface,
                             audio_port_handle_t *handle);

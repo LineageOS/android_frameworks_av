@@ -56,6 +56,8 @@ status_t AAudioStreamConfiguration::writeToParcel(Parcel* parcel) const {
     if (status != NO_ERROR) goto error;
     status = parcel->writeInt32((int32_t) getInputPreset());
     if (status != NO_ERROR) goto error;
+    status = parcel->writeInt32(getSessionId());
+    if (status != NO_ERROR) goto error;
     return NO_ERROR;
 error:
     ALOGE("AAudioStreamConfiguration.writeToParcel(): write failed = %d", status);
@@ -94,6 +96,9 @@ status_t AAudioStreamConfiguration::readFromParcel(const Parcel* parcel) {
     status = parcel->readInt32(&value);
     if (status != NO_ERROR) goto error;
     setInputPreset((aaudio_input_preset_t) value);
+    status = parcel->readInt32(&value);
+    if (status != NO_ERROR) goto error;
+    setSessionId(value);
     return NO_ERROR;
 error:
     ALOGE("AAudioStreamConfiguration.readFromParcel(): read failed = %d", status);

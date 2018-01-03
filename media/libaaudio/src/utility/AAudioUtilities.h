@@ -27,6 +27,9 @@
 
 #include "aaudio/AAudio.h"
 
+
+constexpr aaudio_session_id_t AAUDIO_SESSION_ID_MIN = 1; // must be positive
+
 /**
  * Convert an AAudio result into the closest matching Android status.
  */
@@ -36,6 +39,13 @@ android::status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result);
  * Convert an Android status into the closest matching AAudio result.
  */
 aaudio_result_t AAudioConvert_androidToAAudioResult(android::status_t status);
+
+/**
+ * Convert an aaudio_session_id_t to a value that is safe to pass to AudioFlinger.
+ * @param sessionId
+ * @return safe value
+ */
+audio_session_t AAudioConvert_aaudioToAndroidSessionId(aaudio_session_id_t sessionId);
 
 /**
  * Convert an array of floats to an array of int16_t.
