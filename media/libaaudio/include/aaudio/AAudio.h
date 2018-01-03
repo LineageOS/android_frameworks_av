@@ -123,17 +123,17 @@ enum {
     /**
      * No particular performance needs. Default.
      */
-            AAUDIO_PERFORMANCE_MODE_NONE = 10,
+    AAUDIO_PERFORMANCE_MODE_NONE = 10,
 
     /**
      * Extending battery life is most important.
      */
-            AAUDIO_PERFORMANCE_MODE_POWER_SAVING,
+    AAUDIO_PERFORMANCE_MODE_POWER_SAVING,
 
     /**
      * Reducing latency is most important.
      */
-            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
+    AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
 };
 typedef int32_t aaudio_performance_mode_t;
 
@@ -279,6 +279,25 @@ enum {
     AAUDIO_INPUT_PRESET_UNPROCESSED = 9,
 };
 typedef int32_t aaudio_input_preset_t;
+
+enum {
+    /**
+     * Do not allocate a session ID.
+     * Effects cannot be used with this stream.
+     * Default.
+     */
+    AAUDIO_SESSION_ID_NONE = -1,
+
+    /**
+     * Allocate a session ID that can be used to attach and control
+     * effects using the Java AudioEffects API.
+     * Note that the use of this flag may result in higher latency.
+     *
+     * Note that this matches the value of AudioManager.AUDIO_SESSION_ID_GENERATE.
+     */
+    AAUDIO_SESSION_ID_ALLOCATE = 0,
+};
+typedef int32_t aaudio_session_id_t;
 
 typedef struct AAudioStreamStruct         AAudioStream;
 typedef struct AAudioStreamBuilderStruct  AAudioStreamBuilder;
@@ -495,6 +514,32 @@ AAUDIO_API void AAudioStreamBuilder_setContentType(AAudioStreamBuilder* builder,
  */
 AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
                                                    aaudio_input_preset_t inputPreset);
+
+/** Set the requested session ID.
+ *
+ * The session ID can be used to associate a stream with effects processors.
+ * The effects are controlled using the Android AudioEffect Java API.
+ *
+ * The default, if you do not call this function, is AAUDIO_SESSION_ID_NONE.
+ *
+ * If set to AAUDIO_SESSION_ID_ALLOCATE then a session ID will be allocated
+ * when the stream is opened.
+ *
+ * The allocated session ID can be obtained by calling AAudioStream_getSessionId()
+ * and then used with this function when opening another stream.
+ * This allows effects to be shared between streams.
+ *
+ * Session IDs from AAudio can be used the Android Java APIs and vice versa.
+ * So a session ID from an AAudio stream can be passed to Java
+ * and effects applied using the Java AudioEffect API.
+ *
+ * Allocated session IDs will always be positive and nonzero.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param sessionId an allocated sessionID or AAUDIO_SESSION_ID_ALLOCATE
+ */
+AAUDIO_API void AAudioStreamBuilder_setSessionId(AAudioStreamBuilder* builder,
+                                                aaudio_session_id_t sessionId);
 
 /**
  * Return one of these values from the data callback function.
@@ -981,6 +1026,28 @@ AAUDIO_API int64_t AAudioStream_getFramesWritten(AAudioStream* stream);
  * @return frames read
  */
 AAUDIO_API int64_t AAudioStream_getFramesRead(AAudioStream* stream);
+
+/**
+ * Passes back the session ID associated with this stream.
+ *
+ * The session ID can be used to associate a stream with effects processors.
+ * The effects are controlled using the Android AudioEffect Java API.
+ *
+ * If AAudioStreamBuilder_setSessionId() was called with AAUDIO_SESSION_ID_ALLOCATE
+ * then a new session ID should be allocated once when the stream is opened.
+ *
+ * If AAudioStreamBuilder_setSessionId() was called with a previously allocated
+ * session ID then that value should be returned.
+ *
+ * If AAudioStreamBuilder_setSessionId() was not called then this function should
+ * return AAUDIO_SESSION_ID_NONE.
+ *
+ * The sessionID for a stream should not change once the stream has been opened.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return session ID or AAUDIO_SESSION_ID_NONE
+ */
+AAUDIO_API aaudio_session_id_t AAudioStream_getSessionId(AAudioStream* stream);
 
 /**
  * Passes back the time at which a particular frame was presented.
