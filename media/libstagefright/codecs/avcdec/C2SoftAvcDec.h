@@ -67,7 +67,7 @@ struct ivd_video_decode_op_t;
     diff = (((end).tv_sec - (start).tv_sec) * 1000000) + \
             ((end).tv_usec - (start).tv_usec);
 
-
+#if 0
 class C2SoftAvcDecIntf : public C2ComponentInterface {
 public:
     struct SupportedValuesWithFields {
@@ -139,6 +139,7 @@ private:
     void updateSupportedValues();
     friend class C2SoftAvcDec;
 };
+#endif
 
 class C2SoftAvcDec : public SimpleC2Component {
 public:
@@ -146,15 +147,17 @@ public:
     virtual ~C2SoftAvcDec();
 
     // From SimpleC2Component
-    virtual c2_status_t onInit() override;
-    virtual c2_status_t onStop() override;
-    virtual void onReset() override;
-    virtual void onRelease() override;
-    virtual c2_status_t onFlush_sm() override;
-    virtual c2_status_t onDrain_nb() override;
-    virtual bool process(
+    c2_status_t onInit() override;
+    c2_status_t onStop() override;
+    void onReset() override;
+    void onRelease() override;
+    c2_status_t onFlush_sm() override;
+    void process(
             const std::unique_ptr<C2Work> &work,
-            std::shared_ptr<C2BlockPool> pool) override;
+            const std::shared_ptr<C2BlockPool> &pool) override;
+    c2_status_t drain(
+            uint32_t drainMode,
+            const std::shared_ptr<C2BlockPool> &pool) override;
 
 private:
     Mutex mColorAspectsLock;
@@ -215,6 +218,13 @@ private:
     status_t setNumCores();
     status_t resetDecoder();
     status_t resetPlugin();
+
+    c2_status_t ensureDecoderState(const std::shared_ptr<C2BlockPool> &pool);
+    void finishWork(uint64_t index, const std::unique_ptr<C2Work> &work);
+    c2_status_t drainInternal(
+            uint32_t drainMode,
+            const std::shared_ptr<C2BlockPool> &pool,
+            const std::unique_ptr<C2Work> &work);
 
     bool setDecodeArgs(
             ivd_video_decode_ip_t *ps_dec_ip,

@@ -42,7 +42,10 @@ cc_library_shared {
         "optional",
     ],
 
-    srcs: ["SimpleC2Component.cpp"],
+    srcs: [
+        "SimpleC2Component.cpp",
+        "SimpleC2Interface.cpp",
+    ],
 
     include_dirs: [
     ],
