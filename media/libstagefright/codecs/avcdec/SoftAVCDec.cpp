@@ -274,10 +274,6 @@ status_t SoftAVC::initDecoder() {
 
         status = ivdec_api_function(mCodecCtx, (void *)&s_create_ip, (void *)&s_create_op);
 
-        mCodecCtx = (iv_obj_t*)s_create_op.s_ivd_create_op_t.pv_handle;
-        mCodecCtx->pv_fxns = dec_fxns;
-        mCodecCtx->u4_size = sizeof(iv_obj_t);
-
         if (status != IV_SUCCESS) {
             ALOGE("Error in create: 0x%x",
                     s_create_op.s_ivd_create_op_t.u4_error_code);
@@ -285,6 +281,10 @@ status_t SoftAVC::initDecoder() {
             mCodecCtx = NULL;
             return UNKNOWN_ERROR;
         }
+
+        mCodecCtx = (iv_obj_t*)s_create_op.s_ivd_create_op_t.pv_handle;
+        mCodecCtx->pv_fxns = dec_fxns;
+        mCodecCtx->u4_size = sizeof(iv_obj_t);
     }
 
     /* Reset the plugin state */
@@ -530,7 +530,7 @@ void SoftAVC::onQueueFilled(OMX_U32 portIndex) {
                 notifyEmptyBufferDone(inHeader);
 
                 if (!(inHeader->nFlags & OMX_BUFFERFLAG_EOS)) {
-                    continue;
+                    return;
                 }
 
                 mReceivedEOS = true;
