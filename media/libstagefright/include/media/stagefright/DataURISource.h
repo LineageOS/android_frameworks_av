@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 The Android Open Source Project
+ * Copyright (C) 2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,32 +18,59 @@
 
 #define DATA_URI_SOURCE_H_
 
+#include <stdio.h>
+
 #include <media/stagefright/DataSource.h>
-#include <media/stagefright/foundation/ABase.h>
+#include <media/stagefright/MediaErrors.h>
+#include <media/stagefright/foundation/AString.h>
 
 namespace android {
 
-struct ABuffer;
+class DataUriSource : public DataSource {
+public:
+    DataUriSource(const char *uri);
 
-struct DataURISource : public DataSource {
-    static sp<DataURISource> Create(const char *uri);
+    virtual status_t initCheck() const {
+        return mInited;
+    }
 
-    virtual status_t initCheck() const;
     virtual ssize_t readAt(off64_t offset, void *data, size_t size);
-    virtual status_t getSize(off64_t *size);
+
+    virtual status_t getSize(off64_t *size) {
+        if (mInited != OK) {
+            return mInited;
+        }
+
+        *size = mData.size();
+        return OK;
+    }
+
+    virtual String8 getUri() {
+        return mDataUri;
+    }
+
+    virtual String8 getMIMEType() const {
+        return mMimeType;
+    }
 
 protected:
-    virtual ~DataURISource();
+    virtual ~DataUriSource() {
+        // Nothing to delete.
+    }
 
 private:
-    sp<ABuffer> mBuffer;
+    const String8 mDataUri;
 
-    DataURISource(const sp<ABuffer> &buffer);
+    String8 mMimeType;
+    // Use AString because individual bytes may not be valid UTF8 chars.
+    AString mData;
+    status_t mInited;
 
-    DISALLOW_EVIL_CONSTRUCTORS(DataURISource);
+    // Disallow copy and assign.
+    DataUriSource(const DataUriSource &);
+    DataUriSource &operator=(const DataUriSource &);
 };
 
 }  // namespace android
 
 #endif  // DATA_URI_SOURCE_H_
-
