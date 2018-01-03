@@ -113,6 +113,18 @@ cc_test {
 }
 
 cc_test {
+    name: "test_session_id",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_session_id.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
     name: "test_aaudio_monkey",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_aaudio_monkey.cpp"],
