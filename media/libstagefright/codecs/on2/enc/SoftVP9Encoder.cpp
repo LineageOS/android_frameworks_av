@@ -69,6 +69,13 @@ vpx_codec_err_t SoftVP9Encoder::setCodecSpecificControls() {
               codecReturn);
         return codecReturn;
     }
+    codecReturn = vpx_codec_control(mCodecContext, VP9E_SET_ROW_MT, 1);
+    if (codecReturn != VPX_CODEC_OK) {
+        ALOGE("Error setting VP9E_SET_ROW_MT to 1. vpx_codec_control() "
+              "returned %d", codecReturn);
+        return codecReturn;
+    }
+
     // For VP9, we always set CPU_USED to 8 (because the realtime default is 0
     // which is too slow).
     codecReturn = vpx_codec_control(mCodecContext, VP8E_SET_CPUUSED, 8);
