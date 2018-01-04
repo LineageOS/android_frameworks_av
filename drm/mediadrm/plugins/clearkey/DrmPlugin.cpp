@@ -142,25 +142,24 @@ status_t DrmPlugin::getPropertyByteArray(
     ssize_t index = mByteArrayProperties.indexOfKey(name);
     if (index < 0) {
         ALOGE("App requested unknown property: %s", name.string());
-        return android::BAD_VALUE;
+        return android::ERROR_DRM_CANNOT_HANDLE;
     }
     value = mByteArrayProperties.valueAt(index);
     return android::OK;
 }
 
 status_t DrmPlugin::setPropertyByteArray(
-        const String8& name, const Vector<uint8_t>& value) {
+        const String8& name, const Vector<uint8_t>& value)
+{
+    UNUSED(value);
     if (0 == name.compare(kDeviceIdKey)) {
         ALOGD("Cannot set immutable property: %s", name.string());
-        return android::BAD_VALUE;
+        return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
-    ssize_t status = mByteArrayProperties.replaceValueFor(name, value);
-    if (status >= 0) {
-        return android::OK;
-    }
+    // Setting of undefined properties is not supported
     ALOGE("Failed to set property byte array, key=%s", name.string());
-    return android::BAD_VALUE;
+    return android::ERROR_DRM_CANNOT_HANDLE;
 }
 
 status_t DrmPlugin::getPropertyString(
@@ -168,7 +167,7 @@ status_t DrmPlugin::getPropertyString(
     ssize_t index = mStringProperties.indexOfKey(name);
     if (index < 0) {
         ALOGE("App requested unknown property: %s", name.string());
-        return android::BAD_VALUE;
+        return android::ERROR_DRM_CANNOT_HANDLE;
     }
     value = mStringProperties.valueAt(index);
     return android::OK;
@@ -182,12 +181,18 @@ status_t DrmPlugin::setPropertyString(
             kVendorKey.string(), kVersionKey.string());
     if (immutableKeys.contains(name.string())) {
         ALOGD("Cannot set immutable property: %s", name.string());
-        return android::BAD_VALUE;
+        return android::ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    ssize_t index = mStringProperties.indexOfKey(name);
+    if (index < 0) {
+        ALOGE("Cannot set undefined property string, key=%s", name.string());
+        return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
     if (mStringProperties.add(name, value) < 0) {
         ALOGE("Failed to set property string, key=%s", name.string());
-        return android::BAD_VALUE;
+        return android::ERROR_DRM_UNKNOWN;
     }
     return android::OK;
 }
