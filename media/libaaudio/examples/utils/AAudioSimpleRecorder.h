@@ -178,7 +178,6 @@ public:
 
     aaudio_result_t close() {
         if (mStream != nullptr) {
-            printf("call AAudioStream_close(%p)\n", mStream);  fflush(stdout);
             AAudioStream_close(mStream);
             mStream = nullptr;
         }
