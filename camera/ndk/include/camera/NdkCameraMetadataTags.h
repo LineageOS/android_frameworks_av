@@ -4908,6 +4908,23 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL =                     // byte (acamera_metadata_enum_android_info_supported_hardware_level_t)
             ACAMERA_INFO_START,
+    /**
+     * <p>A short string for manufacturer version information about the camera device, such as
+     * ISP hardware, sensors, etc.</p>
+     *
+     * <p>Type: byte</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>This can be used in <a href="https://developer.android.com/reference/android/media/ExifInterface.html#TAG_IMAGE_DESCRIPTION">TAG_IMAGE_DESCRIPTION</a>
+     * in jpeg EXIF. This key may be absent if no version information is available on the
+     * device.</p>
+     */
+    ACAMERA_INFO_VERSION =                                      // byte
+            ACAMERA_INFO_START + 1,
     ACAMERA_INFO_END,
 
     /**
