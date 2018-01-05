@@ -178,6 +178,12 @@ class Camera3Device :
      */
     status_t setConsumerSurfaces(int streamId, const std::vector<sp<Surface>>& consumers) override;
 
+    /**
+     * Drop buffers for stream of streamId if dropping is true. If dropping is false, do not
+     * drop buffers for stream of streamId.
+     */
+    status_t dropStreamBuffers(bool dropping, int streamId) override;
+
   private:
 
     // internal typedefs
