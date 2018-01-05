@@ -1273,6 +1273,13 @@ float AudioSystem::getStreamVolumeDB(audio_stream_type_t stream, int index, audi
     return aps->getStreamVolumeDB(stream, index, device);
 }
 
+status_t AudioSystem::getMicrophones(std::vector<media::MicrophoneInfo> *microphones)
+{
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == 0) return PERMISSION_DENIED;
+    return af->getMicrophones(microphones);
+}
+
 // ---------------------------------------------------------------------------
 
 int AudioSystem::AudioPolicyServiceClient::addAudioPortCallback(

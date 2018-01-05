@@ -23,11 +23,13 @@
 #include <media/AudioIoDescriptor.h>
 #include <media/IAudioFlingerClient.h>
 #include <media/IAudioPolicyServiceClient.h>
+#include <media/MicrophoneInfo.h>
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
 #include <utils/Errors.h>
 #include <utils/Mutex.h>
+#include <vector>
 
 namespace android {
 
@@ -335,6 +337,8 @@ public:
 
     static float    getStreamVolumeDB(
             audio_stream_type_t stream, int index, audio_devices_t device);
+
+    static status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones);
 
     // ----------------------------------------------------------------------------
 
