@@ -14,16 +14,71 @@
  * limitations under the License.
  */
 
+//#define LOG_NDEBUG 0
+#define LOG_TAG "RemoteMediaExtractor"
+#include <utils/Log.h>
+
 #include <media/stagefright/InterfaceUtils.h>
+#include <media/MediaAnalyticsItem.h>
 #include <media/MediaSource.h>
 #include <media/stagefright/RemoteMediaExtractor.h>
 
+// still doing some on/off toggling here.
+#define MEDIA_LOG       1
+
 namespace android {
 
-RemoteMediaExtractor::RemoteMediaExtractor(const sp<MediaExtractor> &extractor)
-    :mExtractor(extractor) {}
+// key for media statistics
+static const char *kKeyExtractor = "extractor";
 
-RemoteMediaExtractor::~RemoteMediaExtractor() {}
+// attrs for media statistics
+static const char *kExtractorMime = "android.media.mediaextractor.mime";
+static const char *kExtractorTracks = "android.media.mediaextractor.ntrk";
+static const char *kExtractorFormat = "android.media.mediaextractor.fmt";
+
+RemoteMediaExtractor::RemoteMediaExtractor(const sp<MediaExtractor> &extractor)
+    :mExtractor(extractor) {
+
+    mAnalyticsItem = nullptr;
+    if (MEDIA_LOG) {
+        mAnalyticsItem = new MediaAnalyticsItem(kKeyExtractor);
+        (void) mAnalyticsItem->generateSessionID();
+
+        // track the container format (mpeg, aac, wvm, etc)
+        size_t ntracks = extractor->countTracks();
+        mAnalyticsItem->setCString(kExtractorFormat, extractor->name());
+        // tracks (size_t)
+        mAnalyticsItem->setInt32(kExtractorTracks, ntracks);
+        // metadata
+        sp<MetaData> pMetaData = extractor->getMetaData();
+        if (pMetaData != nullptr) {
+            String8 xx = pMetaData->toString();
+            // 'titl' -- but this verges into PII
+            // 'mime'
+            const char *mime = nullptr;
+            if (pMetaData->findCString(kKeyMIMEType, &mime)) {
+                mAnalyticsItem->setCString(kExtractorMime,  mime);
+            }
+            // what else is interesting and not already available?
+        }
+    }
+}
+
+RemoteMediaExtractor::~RemoteMediaExtractor() {
+    // log the current record, provided it has some information worth recording
+    if (MEDIA_LOG) {
+        if (mAnalyticsItem != nullptr) {
+            if (mAnalyticsItem->count() > 0) {
+                mAnalyticsItem->setFinalized(true);
+                mAnalyticsItem->selfrecord();
+            }
+        }
+    }
+    if (mAnalyticsItem != nullptr) {
+        delete mAnalyticsItem;
+        mAnalyticsItem = nullptr;
+    }
+}
 
 size_t RemoteMediaExtractor::countTracks() {
     return mExtractor->countTracks();
@@ -43,7 +98,12 @@ sp<MetaData> RemoteMediaExtractor::getMetaData() {
 }
 
 status_t RemoteMediaExtractor::getMetrics(Parcel *reply) {
-    return mExtractor->getMetrics(reply);
+    if (mAnalyticsItem == nullptr || reply == nullptr) {
+        return UNKNOWN_ERROR;
+    }
+
+    mAnalyticsItem->writeToParcel(reply);
+    return OK;
 }
 
 uint32_t RemoteMediaExtractor::flags() const {

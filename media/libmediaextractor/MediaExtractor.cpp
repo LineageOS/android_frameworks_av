@@ -19,15 +19,11 @@
 #include <utils/Log.h>
 #include <pwd.h>
 
-#include <media/MediaAnalyticsItem.h>
 #include <media/MediaExtractor.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MetaData.h>
 
 namespace android {
-
-// key for media statistics
-static const char *kKeyExtractor = "extractor";
 
 MediaExtractor::MediaExtractor() {
     if (!LOG_NDEBUG) {
@@ -35,50 +31,12 @@ MediaExtractor::MediaExtractor() {
         struct passwd *pw = getpwuid(uid);
         ALOGV("extractor created in uid: %d (%s)", getuid(), pw->pw_name);
     }
-
-    mAnalyticsItem = NULL;
-    if (MEDIA_LOG) {
-        mAnalyticsItem = new MediaAnalyticsItem(kKeyExtractor);
-        (void) mAnalyticsItem->generateSessionID();
-    }
 }
 
-MediaExtractor::~MediaExtractor() {
-
-    // log the current record, provided it has some information worth recording
-    if (MEDIA_LOG) {
-        if (mAnalyticsItem != NULL) {
-            if (mAnalyticsItem->count() > 0) {
-                mAnalyticsItem->setFinalized(true);
-                mAnalyticsItem->selfrecord();
-            }
-        }
-    }
-    if (mAnalyticsItem != NULL) {
-        delete mAnalyticsItem;
-        mAnalyticsItem = NULL;
-    }
-}
+MediaExtractor::~MediaExtractor() {}
 
 sp<MetaData> MediaExtractor::getMetaData() {
     return new MetaData;
-}
-
-status_t MediaExtractor::getMetrics(Parcel *reply) {
-
-    if (mAnalyticsItem == NULL || reply == NULL) {
-        return UNKNOWN_ERROR;
-    }
-
-    populateMetrics();
-    mAnalyticsItem->writeToParcel(reply);
-
-    return OK;
-}
-
-void MediaExtractor::populateMetrics() {
-    ALOGV("MediaExtractor::populateMetrics");
-    // normally overridden in subclasses
 }
 
 uint32_t MediaExtractor::flags() const {
