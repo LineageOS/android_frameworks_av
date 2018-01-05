@@ -255,8 +255,8 @@ ParsingResult parse(const char* path) {
     XMLDocument doc;
     doc.LoadFile(path);
     if (doc.Error()) {
-        ALOGE("Failed to parse %s: Tinyxml2 error (%d): %s %s", path,
-              doc.ErrorID(), doc.GetErrorStr1(), doc.GetErrorStr2());
+        ALOGE("Failed to parse %s: Tinyxml2 error (%d): %s", path,
+              doc.ErrorID(), doc.ErrorStr());
         return {nullptr, 0};
     }
 
