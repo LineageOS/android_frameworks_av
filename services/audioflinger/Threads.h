@@ -623,8 +623,7 @@ public:
     static const int8_t kMaxTrackRetriesOffload = 20;
     static const int8_t kMaxTrackStartupRetriesOffload = 100;
     static const int8_t kMaxTrackStopRetriesOffload = 2;
-    // 14 tracks max per client allows for 2 misbehaving application leaving 4 available tracks.
-    static const uint32_t kMaxTracksPerUid = 14;
+    static constexpr uint32_t kMaxTracksPerUid = 40;
 
     // Maximum delay (in nanoseconds) for upcoming buffers in suspend mode, otherwise
     // if delay is greater, the estimated time for timeLoopNextNs is reset.
