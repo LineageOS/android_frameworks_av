@@ -110,7 +110,7 @@ public:
                                           audio_stream_type_t *stream,
                                           uid_t uid,
                                           const audio_config_t *config,
-                                          audio_output_flags_t flags,
+                                          audio_output_flags_t *flags,
                                           audio_port_handle_t *selectedDeviceId,
                                           audio_port_handle_t *portId);
         virtual status_t startOutput(audio_io_handle_t output,
@@ -629,7 +629,7 @@ private:
                 audio_session_t session,
                 audio_stream_type_t stream,
                 const audio_config_t *config,
-                audio_output_flags_t flags);
+                audio_output_flags_t *flags);
         // internal method to return the input handle for the given device and format
         audio_io_handle_t getInputForDevice(audio_devices_t device,
                 String8 address,

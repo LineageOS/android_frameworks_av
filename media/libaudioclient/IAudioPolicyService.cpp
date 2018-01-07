@@ -174,6 +174,7 @@ public:
                                         audio_io_handle_t *output,
                                         audio_session_t session,
                                         audio_stream_type_t *stream,
+                                        pid_t pid,
                                         uid_t uid,
                                         const audio_config_t *config,
                                         audio_output_flags_t flags,
@@ -217,6 +218,7 @@ public:
                 data.writeInt32(1);
                 data.writeInt32(*stream);
             }
+            data.writeInt32(pid);
             data.writeInt32(uid);
             data.write(config, sizeof(audio_config_t));
             data.writeInt32(static_cast <uint32_t>(flags));
@@ -968,6 +970,7 @@ status_t BnAudioPolicyService::onTransact(
             if (hasStream) {
                 stream = (audio_stream_type_t)data.readInt32();
             }
+            pid_t pid = (pid_t)data.readInt32();
             uid_t uid = (uid_t)data.readInt32();
             audio_config_t config;
             memset(&config, 0, sizeof(audio_config_t));
@@ -978,7 +981,7 @@ status_t BnAudioPolicyService::onTransact(
             audio_port_handle_t portId = (audio_port_handle_t)data.readInt32();
             audio_io_handle_t output = 0;
             status_t status = getOutputForAttr(hasAttributes ? &attr : NULL,
-                    &output, session, &stream, uid,
+                    &output, session, &stream, pid, uid,
                     &config,
                     flags, &selectedDeviceId, &portId);
             reply->writeInt32(status);

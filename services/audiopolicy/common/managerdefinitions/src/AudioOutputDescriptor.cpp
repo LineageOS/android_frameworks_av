@@ -333,6 +333,10 @@ bool SwAudioOutputDescriptor::isFixedVolume(audio_devices_t device)
             return true;
         }
     }
+    if (device == AUDIO_DEVICE_OUT_TELEPHONY_TX) {
+        ALOGV("max gain when output device is telephony tx");
+        return true;
+    }
     return false;
 }
 
