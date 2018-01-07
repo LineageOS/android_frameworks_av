@@ -38,7 +38,7 @@ namespace android {
 template <class T> std::unique_ptr<T> alloc_unique_cstr(const char *cstr) {
     size_t len = strlen(cstr);
     std::unique_ptr<T> ptr = T::alloc_unique(len);
-    memcpy(ptr->m.mValue, cstr, len);
+    memcpy(ptr->m.value, cstr, len);
     return ptr;
 }
 
@@ -202,7 +202,7 @@ template <typename T> c2_status_t C2CompIntfTest::queryOnStack(T *const p) {
 template <typename T>
 c2_status_t C2CompIntfTest::queryOnHeap(
         const T &p, std::vector<std::unique_ptr<C2Param>> *const heapParams) {
-    uint32_t index = p.type();
+    uint32_t index = p.index() & ~0x03FE0000;
     if (p.forStream()) {
         index |= ((p.stream() << 17) & 0x01FE0000) | 0x02000000;
     }
@@ -369,12 +369,12 @@ void C2CompIntfTest::getTestValues(
     const auto &c2FSV = validValueInfos;
 
     switch (c2FSV.type) {
-    case C2FieldSupportedValues::Type::EMPTY: {
+    case C2FieldSupportedValues::type_t::EMPTY: {
         invalidValues->emplace_back(TField(0));
         // TODO(hiroh) : Should other invalid values be tested?
         break;
     }
-    case C2FieldSupportedValues::Type::RANGE: {
+    case C2FieldSupportedValues::type_t::RANGE: {
         const auto &range = c2FSV.range;
         auto rmin = prim2Value(range.min);
         auto rmax = prim2Value(range.max);
@@ -448,7 +448,7 @@ void C2CompIntfTest::getTestValues(
         }
         break;
     }
-    case C2FieldSupportedValues::Type::VALUES: {
+    case C2FieldSupportedValues::type_t::VALUES: {
         for (const C2Value::Primitive &prim : c2FSV.values) {
             validValues->emplace_back(prim2Value(prim));
         }
@@ -462,7 +462,7 @@ void C2CompIntfTest::getTestValues(
         }
         break;
     }
-    case C2FieldSupportedValues::Type::FLAGS: {
+    case C2FieldSupportedValues::type_t::FLAGS: {
         // TODO(hiroh) : Implement the case that param.type is FLAGS.
         break;
     }
@@ -605,21 +605,21 @@ void C2CompIntfTest::outputResults(const std::string &name) {
 
 #define TEST_VSSTRUCT_WRITABLE_FIELD(TParam_, field_type_name_)         \
     do {                                                                \
-        TEST_GENERAL_WRITABLE_FIELD(TParam_, field_type_name_, mWidth); \
-        TEST_GENERAL_WRITABLE_FIELD(TParam_, field_type_name_, mHeight);\
+        TEST_GENERAL_WRITABLE_FIELD(TParam_, field_type_name_, width);  \
+        TEST_GENERAL_WRITABLE_FIELD(TParam_, field_type_name_, height); \
     } while (0)
 
 #define TEST_U32_WRITABLE_FIELD(TParam_, field_type_name_)              \
-  TEST_GENERAL_WRITABLE_FIELD(TParam_, field_type_name_, mValue)
+  TEST_GENERAL_WRITABLE_FIELD(TParam_, field_type_name_, value)
 
 #define TEST_ENUM_WRITABLE_FIELD(TParam_, field_type_name_)             \
-  TEST_GENERAL_WRITABLE_FIELD(TParam_, field_type_name_, mValue)
+  TEST_GENERAL_WRITABLE_FIELD(TParam_, field_type_name_, value)
 
 // TODO(hiroh): Support parameters based on char[] and uint32_t[].
 //#define TEST_STRING_WRITABLE_FIELD(TParam_, field_type_name_)
-// TEST_GENERAL_WRITABLE_FIELD(TParam_, field_type_name_, m.mValue)
+// TEST_GENERAL_WRITABLE_FIELD(TParam_, field_type_name_, m.value)
 //#define TEST_U32ARRAY_WRITABLE_FIELD(Tparam_, field_type_name_)
-// TEST_GENERAL_WRITABLE_FIELD(Tparam_, uint32_t[], field_type_name_, mValues)
+// TEST_GENERAL_WRITABLE_FIELD(Tparam_, uint32_t[], field_type_name_, values)
 
 #define EACH_TEST(TParam_, field_type_name_, test_name)                 \
     do {                                                                \

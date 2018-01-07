@@ -1862,7 +1862,8 @@ constexpr size_t minFlattenedSize(
 inline size_t getFlattenedSize(HGraphicBufferProducer::QueueBufferInput const& t) {
     return minFlattenedSize(t) +
             getFenceFlattenedSize(t.fence) +
-            getFlattenedSize(t.surfaceDamage);
+            getFlattenedSize(t.surfaceDamage) +
+            sizeof(HdrMetadata::validTypes);
 }
 
 /**
@@ -1916,7 +1917,12 @@ inline status_t flatten(HGraphicBufferProducer::QueueBufferInput const& t,
     if (status != NO_ERROR) {
         return status;
     }
-    return flatten(t.surfaceDamage, buffer, size);
+    status = flatten(t.surfaceDamage, buffer, size);
+    if (status != NO_ERROR) {
+        return status;
+    }
+    FlattenableUtils::write(buffer, size, decltype(HdrMetadata::validTypes)(0));
+    return NO_ERROR;
 }
 
 /**
@@ -1968,6 +1974,7 @@ inline status_t unflatten(
     if (status != NO_ERROR) {
         return status;
     }
+    // HdrMetadata ignored
     return unflatten(&(t->surfaceDamage), buffer, size);
 }
 

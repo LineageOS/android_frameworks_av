@@ -191,14 +191,23 @@ enum c2_blocking_t : int32_t {
 #define C2_INTERNAL __attribute__((internal_linkage))
 
 #define DEFINE_OTHER_COMPARISON_OPERATORS(type) \
-    inline bool operator!=(const type &other) { return !(*this == other); } \
-    inline bool operator<=(const type &other) { return (*this == other) || (*this < other); } \
-    inline bool operator>=(const type &other) { return !(*this < other); } \
-    inline bool operator>(const type &other) { return !(*this < other) && !(*this == other); }
+    inline bool operator!=(const type &other) const { return !(*this == other); } \
+    inline bool operator<=(const type &other) const { return (*this == other) || (*this < other); } \
+    inline bool operator>=(const type &other) const { return !(*this < other); } \
+    inline bool operator>(const type &other) const { return !(*this < other) && !(*this == other); }
 
 #define DEFINE_FIELD_BASED_COMPARISON_OPERATORS(type, field) \
     inline bool operator<(const type &other) const { return field < other.field; } \
     inline bool operator==(const type &other) const { return field == other.field; } \
+    DEFINE_OTHER_COMPARISON_OPERATORS(type)
+
+#define DEFINE_FIELD_AND_MASK_BASED_COMPARISON_OPERATORS(type, field, mask) \
+    inline bool operator<(const type &other) const { \
+        return (field & mask) < (other.field & (mask)); \
+    } \
+    inline bool operator==(const type &other) const { \
+        return (field & mask) == (other.field & (mask)); \
+    } \
     DEFINE_OTHER_COMPARISON_OPERATORS(type)
 
 /// \cond INTERNAL
@@ -213,7 +222,7 @@ template<typename T>
 struct c2_types<T> {
     typedef typename std::decay<T>::type wide_type;
     typedef wide_type narrow_type;
-    typedef wide_type mintype;
+    typedef wide_type min_type; // type for min(T...)
 };
 
 /** specialization for two types */
@@ -229,7 +238,7 @@ struct c2_types<T, U> {
     typedef typename std::decay<
             typename std::conditional<sizeof(T) < sizeof(U), T, U>::type>::type narrow_type;
     typedef typename std::conditional<
-            std::is_signed<T>::value, wide_type, narrow_type>::type mintype;
+            std::is_signed<T>::value, wide_type, narrow_type>::type min_type;
 };
 
 /// @}
@@ -249,7 +258,7 @@ struct c2_types<T, U, V...> {
     /** Narrowest type of the template parameter types. */
     typedef typename c2_types<typename c2_types<T, U>::narrow_type, V...>::narrow_type narrow_type;
     /** Type that accommodates the minimum value for any input for the template parameter types. */
-    typedef typename c2_types<typename c2_types<T, U>::mintype, V...>::mintype mintype;
+    typedef typename c2_types<typename c2_types<T, U>::min_type, V...>::min_type min_type;
 };
 
 /**
@@ -282,11 +291,11 @@ constexpr typename c2_types<T, U, V...>::wide_type c2_max(const T a, const U b, 
  *  \ingroup utils_internal
  * specialization for two values */
 template<typename T, typename U>
-inline constexpr typename c2_types<T, U>::mintype c2_min(const T a, const U b) {
+inline constexpr typename c2_types<T, U>::min_type c2_min(const T a, const U b) {
     typedef typename c2_types<T, U>::wide_type wide_type;
     return ({
         wide_type a_(a), b_(b);
-        static_cast<typename c2_types<T, U>::mintype>(a_ < b_ ? a_ : b_);
+        static_cast<typename c2_types<T, U>::min_type>(a_ < b_ ? a_ : b_);
     });
 }
 
@@ -302,12 +311,12 @@ inline constexpr typename c2_types<T, U>::mintype c2_min(const T a, const U b) {
  * @return the smallest of the input arguments.
  */
 template<typename T, typename U, typename... V>
-constexpr typename c2_types<T, U, V...>::mintype c2_min(const T a, const U b, const V ... c) {
-    typedef typename c2_types<U, V...>::mintype rest_type;
+constexpr typename c2_types<T, U, V...>::min_type c2_min(const T a, const U b, const V ... c) {
+    typedef typename c2_types<U, V...>::min_type rest_type;
     typedef typename c2_types<T, rest_type>::wide_type wide_type;
     return ({
         wide_type a_(a), b_(c2_min(b, c...));
-        static_cast<typename c2_types<T, rest_type>::mintype>(a_ < b_ ? a_ : b_);
+        static_cast<typename c2_types<T, rest_type>::min_type>(a_ < b_ ? a_ : b_);
     });
 }
 

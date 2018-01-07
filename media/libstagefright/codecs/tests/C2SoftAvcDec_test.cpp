@@ -31,7 +31,7 @@ namespace {
 template <class T>
 std::unique_ptr<T> alloc_unique_cstr(const char *cstr) {
     std::unique_ptr<T> ptr = T::alloc_unique(strlen(cstr) + 1);
-    strcpy(ptr->m.mValue, cstr);
+    strcpy(ptr->m.value, cstr);
     return ptr;
 }
 
@@ -85,10 +85,7 @@ template <typename T>
 void C2SoftAvcDecTest::testReadOnlyParamOnHeap(const T *expected, const T *invalid) {
     std::vector<std::unique_ptr<C2Param>> heapParams;
 
-    uint32_t index = expected->type();
-    if (expected->forStream()) {
-        index |= ((expected->stream() << 17) & 0x01FE0000) | 0x02000000;
-    }
+    uint32_t index = expected->index();
 
     ASSERT_EQ(C2_OK, mIntf->query_vb({}, {index}, C2_DONT_BLOCK, &heapParams));
     ASSERT_EQ(1u, heapParams.size());
@@ -110,10 +107,7 @@ void C2SoftAvcDecTest::testReadOnlyFlexParam(
         const std::unique_ptr<T> &expected, const std::unique_ptr<T> &invalid) {
     std::vector<std::unique_ptr<C2Param>> heapParams;
 
-    uint32_t index = expected->type();
-    if (expected->forStream()) {
-        index |= ((expected->stream() << 17) & 0x01FE0000) | 0x02000000;
-    }
+    uint32_t index = expected->index();
 
     ASSERT_EQ(C2_OK, mIntf->query_vb({}, {index}, C2_DONT_BLOCK, &heapParams));
     ASSERT_EQ(1u, heapParams.size());

@@ -337,7 +337,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
         std::shared_ptr<C2LinearBlock> block;
         mLinearPool->fetchLinearBlock(
                 size,
-                { C2MemoryUsage::kSoftwareRead, C2MemoryUsage::kSoftwareWrite },
+                { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
                 &block);
         C2WriteView view = block->map().get();
         if (view.error() != C2_OK) {

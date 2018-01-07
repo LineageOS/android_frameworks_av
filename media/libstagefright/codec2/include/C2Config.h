@@ -41,7 +41,7 @@ DEFINE_C2_ENUM_VALUE_AUTO_HELPER(name, type, prefix, __VA_ARGS__)
 enum name : type { __VA_ARGS__ }; \
 DEFINE_C2_ENUM_VALUE_CUSTOM_HELPER(name, type, names, __VA_ARGS__)
 
-enum C2ParamIndexKind : C2Param::ParamIndex {
+enum C2ParamIndexKind : C2Param::type_index_t {
     /// domain
     kParamIndexDomain,
 
@@ -232,12 +232,12 @@ struct C2BaseTuning {
 //   - critical parameters? (interlaced? profile? level?)
 
 struct C2VideoSizeStruct {
-    int32_t mWidth;     ///< video width
-    int32_t mHeight;    ///< video height
+    int32_t width;     ///< video width
+    int32_t height;    ///< video height
 
     DEFINE_AND_DESCRIBE_BASE_C2STRUCT(VideoSize)
-    C2FIELD(mWidth, "width")
-    C2FIELD(mHeight, "height")
+    C2FIELD(width, "width")
+    C2FIELD(height, "height")
 };
 
 // video size for video decoder [OUT]

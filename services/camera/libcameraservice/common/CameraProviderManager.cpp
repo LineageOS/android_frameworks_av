@@ -643,6 +643,14 @@ status_t CameraProviderManager::ProviderInfo::dump(int fd, const Vector<String16
             dprintf(fd, "  API2 camera characteristics:\n");
             info2.dump(fd, /*verbosity*/ 2, /*indentation*/ 4);
         }
+
+        dprintf(fd, "== Camera HAL device %s (v%d.%d) dumpState: ==\n", device->mName.c_str(),
+                device->mVersion.get_major(), device->mVersion.get_minor());
+        res = device->dumpState(fd);
+        if (res != OK) {
+            dprintf(fd, "   <Error dumping device %s state: %s (%d)>\n",
+                    device->mName.c_str(), strerror(-res), res);
+        }
     }
     return OK;
 }
@@ -908,6 +916,17 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo1::getCameraInfo(
     return OK;
 }
 
+status_t CameraProviderManager::ProviderInfo::DeviceInfo1::dumpState(int fd) const {
+    native_handle_t* handle = native_handle_create(1,0);
+    handle->data[0] = fd;
+    hardware::Return<Status> s = mInterface->dumpState(handle);
+    native_handle_delete(handle);
+    if (!s.isOk()) {
+        return INVALID_OPERATION;
+    }
+    return mapToStatusT(s);
+}
+
 CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string& name,
         const metadata_vendor_id_t tagId, const std::string &id,
         uint16_t minorVersion,
@@ -1009,6 +1028,17 @@ bool CameraProviderManager::ProviderInfo::DeviceInfo3::isAPI1Compatible() const 
     }
 
     return isBackwardCompatible;
+}
+
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::dumpState(int fd) const {
+    native_handle_t* handle = native_handle_create(1,0);
+    handle->data[0] = fd;
+    auto ret = mInterface->dumpState(handle);
+    native_handle_delete(handle);
+    if (!ret.isOk()) {
+        return INVALID_OPERATION;
+    }
+    return OK;
 }
 
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getCameraCharacteristics(

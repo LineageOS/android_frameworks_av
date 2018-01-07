@@ -37,10 +37,10 @@
 
 // Tag for machine readable results as property = value pairs
 #define RESULT_TAG              "RESULT: "
-#define SAMPLE_RATE             48000
 #define NUM_SECONDS             5
 #define NUM_INPUT_CHANNELS      1
-#define FILENAME                "/data/oboe_input.raw"
+#define FILENAME_ALL            "/data/loopback_all.wav"
+#define FILENAME_ECHOS          "/data/loopback_echos.wav"
 #define APP_VERSION             "0.1.22"
 
 struct LoopbackData {
@@ -61,7 +61,7 @@ struct LoopbackData {
 
     SineAnalyzer       sineAnalyzer;
     EchoAnalyzer       echoAnalyzer;
-    AudioRecording     audioRecorder;
+    AudioRecording     audioRecording;
     LoopbackProcessor *loopbackProcessor;
 };
 
@@ -126,7 +126,7 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
             result = AAUDIO_CALLBACK_RESULT_STOP;
         } else if (framesRead > 0) {
 
-            myData->audioRecorder.write(myData->inputData,
+            myData->audioRecording.write(myData->inputData,
                                         myData->actualInputChannelCount,
                                         numFrames);
 
@@ -176,7 +176,8 @@ static void usage() {
     printf("              p for _POWER_SAVING\n");
     printf("          -t{test}          select test mode\n");
     printf("              m for sine magnitude\n");
-    printf("              e for echo latency (default)\n\n");
+    printf("              e for echo latency (default)\n");
+    printf("              f for file latency, analyzes %s\n\n", FILENAME_ECHOS);
     printf("          -x                use EXCLUSIVE mode for output\n");
     printf("          -X                use EXCLUSIVE mode for input\n");
     printf("Example:  aaudio_loopback -n2 -pl -Pl -x\n");
@@ -205,6 +206,7 @@ static aaudio_performance_mode_t parsePerformanceMode(char c) {
 enum {
     TEST_SINE_MAGNITUDE = 0,
     TEST_ECHO_LATENCY,
+    TEST_FILE_LATENCY,
 };
 
 static int parseTestMode(char c) {
@@ -216,6 +218,9 @@ static int parseTestMode(char c) {
             break;
         case 'e':
             testMode = TEST_ECHO_LATENCY;
+            break;
+        case 'f':
+            testMode = TEST_FILE_LATENCY;
             break;
         default:
             printf("ERROR in value test mode %c\n", c);
@@ -254,13 +259,13 @@ void printAudioGraph(AudioRecording &recording, int numSamples) {
 int main(int argc, const char **argv)
 {
 
-    AAudioArgsParser     argParser;
-    AAudioSimplePlayer   player;
-    AAudioSimpleRecorder recorder;
-    LoopbackData         loopbackData;
-    AAudioStream        *outputStream = nullptr;
+    AAudioArgsParser      argParser;
+    AAudioSimplePlayer    player;
+    AAudioSimpleRecorder  recorder;
+    LoopbackData          loopbackData;
+    AAudioStream         *outputStream = nullptr;
 
-    aaudio_result_t      result = AAUDIO_OK;
+    aaudio_result_t       result = AAUDIO_OK;
     aaudio_sharing_mode_t requestedInputSharingMode     = AAUDIO_SHARING_MODE_SHARED;
     int                   requestedInputChannelCount = NUM_INPUT_CHANNELS;
     const aaudio_format_t requestedInputFormat = AAUDIO_FORMAT_PCM_I16;
@@ -268,6 +273,7 @@ int main(int argc, const char **argv)
     aaudio_format_t       actualInputFormat;
     aaudio_format_t       actualOutputFormat;
     aaudio_performance_mode_t inputPerformanceLevel = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
+    int32_t               actualSampleRate = 0;
 
     int testMode = TEST_ECHO_LATENCY;
     double gain = 1.0;
@@ -324,7 +330,6 @@ int main(int argc, const char **argv)
 
     int32_t requestedDuration = argParser.getDurationSeconds();
     int32_t recordingDuration = std::min(60, requestedDuration);
-    loopbackData.audioRecorder.allocate(recordingDuration * SAMPLE_RATE);
 
     switch(testMode) {
         case TEST_SINE_MAGNITUDE:
@@ -333,6 +338,16 @@ int main(int argc, const char **argv)
         case TEST_ECHO_LATENCY:
             loopbackData.echoAnalyzer.setGain(gain);
             loopbackData.loopbackProcessor = &loopbackData.echoAnalyzer;
+            break;
+        case TEST_FILE_LATENCY: {
+            loopbackData.echoAnalyzer.setGain(gain);
+
+            loopbackData.loopbackProcessor = &loopbackData.echoAnalyzer;
+            int read = loopbackData.loopbackProcessor->load(FILENAME_ECHOS);
+            printf("main() read %d mono samples from %s on Android device\n", read, FILENAME_ECHOS);
+            loopbackData.loopbackProcessor->report();
+            return 0;
+        }
             break;
         default:
             exit(1);
@@ -344,13 +359,17 @@ int main(int argc, const char **argv)
     result = player.open(argParser, MyDataCallbackProc, MyErrorCallbackProc, &loopbackData);
     if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  player.open() returned %d\n", result);
-        goto finish;
+        exit(1);
     }
     outputStream = player.getStream();
     argParser.compareWithStream(outputStream);
 
     actualOutputFormat = AAudioStream_getFormat(outputStream);
     assert(actualOutputFormat == AAUDIO_FORMAT_PCM_FLOAT);
+
+    actualSampleRate = AAudioStream_getSampleRate(outputStream);
+    loopbackData.audioRecording.allocate(recordingDuration * actualSampleRate);
+    loopbackData.audioRecording.setSampleRate(actualSampleRate);
 
     printf("INPUT stream ----------------------------------------\n");
     // Use different parameters for the input.
@@ -380,7 +399,7 @@ int main(int argc, const char **argv)
 
     // Allocate a buffer for the audio data.
     loopbackData.inputFramesMaximum = 32 * framesPerBurst;
-    loopbackData.inputBuffersToDiscard = 100;
+    loopbackData.inputBuffersToDiscard = 200;
 
     loopbackData.inputData = new int16_t[loopbackData.inputFramesMaximum
                                          * loopbackData.actualInputChannelCount];
@@ -436,25 +455,31 @@ int main(int argc, const char **argv)
         }
     }
 
-    printf("input error = %d = %s\n",
-                loopbackData.inputError, AAudio_convertResultToText(loopbackData.inputError));
+    if (loopbackData.loopbackProcessor->getResult() < 0) {
+        printf("Test failed!\n");
+    } else {
+        printf("input error = %d = %s\n",
+               loopbackData.inputError, AAudio_convertResultToText(loopbackData.inputError));
 
-    printf("AAudioStream_getXRunCount %d\n", AAudioStream_getXRunCount(outputStream));
-    printf("framesRead    = %8d\n", (int) AAudioStream_getFramesRead(outputStream));
-    printf("framesWritten = %8d\n", (int) AAudioStream_getFramesWritten(outputStream));
-    printf("min numFrames = %8d\n", (int) loopbackData.minNumFrames);
-    printf("max numFrames = %8d\n", (int) loopbackData.maxNumFrames);
+        printf("AAudioStream_getXRunCount %d\n", AAudioStream_getXRunCount(outputStream));
+        printf("framesRead    = %8d\n", (int) AAudioStream_getFramesRead(outputStream));
+        printf("framesWritten = %8d\n", (int) AAudioStream_getFramesWritten(outputStream));
+        printf("min numFrames = %8d\n", (int) loopbackData.minNumFrames);
+        printf("max numFrames = %8d\n", (int) loopbackData.maxNumFrames);
 
-    if (loopbackData.inputError == AAUDIO_OK) {
-        if (testMode == TEST_SINE_MAGNITUDE) {
-            printAudioGraph(loopbackData.audioRecorder, 200);
+        if (loopbackData.inputError == AAUDIO_OK) {
+            if (testMode == TEST_SINE_MAGNITUDE) {
+                printAudioGraph(loopbackData.audioRecording, 200);
+            }
+            loopbackData.loopbackProcessor->report();
         }
-        loopbackData.loopbackProcessor->report();
-    }
 
-    {
-        int written = loopbackData.audioRecorder.save(FILENAME);
-        printf("main() wrote %d mono samples to %s on Android device\n", written, FILENAME);
+        int written = loopbackData.loopbackProcessor->save(FILENAME_ECHOS);
+        printf("main() wrote %d mono samples to %s on Android device\n", written,
+               FILENAME_ECHOS);
+        printf("main() loopbackData.audioRecording.getSampleRate() = %d\n", loopbackData.audioRecording.getSampleRate());
+        written = loopbackData.audioRecording.save(FILENAME_ALL);
+        printf("main() wrote %d mono samples to %s on Android device\n", written, FILENAME_ALL);
     }
 
 finish:

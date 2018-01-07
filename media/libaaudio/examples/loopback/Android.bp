@@ -3,6 +3,10 @@ cc_test {
     gtest: false,
     srcs: ["src/loopback.cpp"],
     cflags: ["-Wall", "-Werror"],
-    shared_libs: ["libaaudio"],
+    static_libs: ["libsndfile"],
+    shared_libs: [
+        "libaaudio",
+        "libaudioutils",
+        ],
     header_libs: ["libaaudio_example_utils"],
 }
