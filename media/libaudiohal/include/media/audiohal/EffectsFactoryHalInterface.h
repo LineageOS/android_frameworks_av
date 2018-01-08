@@ -48,6 +48,10 @@ class EffectsFactoryHalInterface : public RefBase
 
     static sp<EffectsFactoryHalInterface> create();
 
+    virtual status_t allocateBuffer(size_t size, sp<EffectBufferHalInterface>* buffer) = 0;
+    virtual status_t mirrorBuffer(void* external, size_t size,
+                                  sp<EffectBufferHalInterface>* buffer) = 0;
+
     // Helper function to compare effect uuid to EFFECT_UUID_NULL.
     static bool isNullUuid(const effect_uuid_t *pEffectUuid);
 

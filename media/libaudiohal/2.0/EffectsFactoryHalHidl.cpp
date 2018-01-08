@@ -20,6 +20,7 @@
 #include <cutils/native_handle.h>
 
 #include "ConversionHelperHidl.h"
+#include "EffectBufferHalHidl.h"
 #include "EffectHalHidl.h"
 #include "EffectsFactoryHalHidl.h"
 #include "HidlUtils.h"
@@ -31,16 +32,6 @@ using ::android::hardware::audio::effect::V2_0::Result;
 using ::android::hardware::Return;
 
 namespace android {
-
-// static
-sp<EffectsFactoryHalInterface> EffectsFactoryHalInterface::create() {
-    return new EffectsFactoryHalHidl();
-}
-
-// static
-bool EffectsFactoryHalInterface::isNullUuid(const effect_uuid_t *pEffectUuid) {
-    return memcmp(pEffectUuid, EFFECT_UUID_NULL, sizeof(effect_uuid_t)) == 0;
-}
 
 EffectsFactoryHalHidl::EffectsFactoryHalHidl() : ConversionHelperHidl("EffectsFactory") {
     mEffectsFactory = IEffectsFactory::getService();
@@ -145,5 +136,15 @@ status_t EffectsFactoryHalHidl::dumpEffects(int fd) {
     native_handle_delete(hidlHandle);
     return processReturn(__FUNCTION__, ret);
 }
+
+status_t EffectsFactoryHalHidl::allocateBuffer(size_t size, sp<EffectBufferHalInterface>* buffer) {
+    return EffectBufferHalHidl::allocate(size, buffer);
+}
+
+status_t EffectsFactoryHalHidl::mirrorBuffer(void* external, size_t size,
+                          sp<EffectBufferHalInterface>* buffer) {
+    return EffectBufferHalHidl::mirror(external, size, buffer);
+}
+
 
 } // namespace android

@@ -1,5 +1,5 @@
 cc_library_shared {
-    name: "libaudiohal",
+    name: "libaudiohal@2.0",
 
     srcs: [
         "DeviceHalLocal.cpp",
@@ -8,7 +8,6 @@ cc_library_shared {
         "StreamHalLocal.cpp",
 
         "ConversionHelperHidl.cpp",
-        "HalDeathHandlerHidl.cpp",
         "DeviceHalHidl.cpp",
         "DevicesFactoryHalHidl.cpp",
         "EffectBufferHalHidl.cpp",
@@ -17,12 +16,14 @@ cc_library_shared {
         "StreamHalHidl.cpp",
     ],
 
+    export_include_dirs: ["."],
+
     cflags: [
         "-Wall",
         "-Werror",
     ],
-
     shared_libs: [
+        "libaudiohal_deathhandler",
         "libaudioutils",
         "libcutils",
         "liblog",
@@ -45,5 +46,9 @@ cc_library_shared {
     ],
     header_libs: [
         "libaudiohal_headers"
+    ],
+
+    export_shared_lib_headers: [
+        "libfmq",
     ],
 }
