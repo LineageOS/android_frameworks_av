@@ -16,6 +16,24 @@
       "revId": "deebe5a37b250df375327f327c90ecbc7238a651",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7beca364_c6a15945",
+        "filename": "include/media/AudioSession.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2018-01-09T13:04:33Z",
+      "side": 1,
+      "message": "https://github.com/LineageOS/android_lineage-sdk/blob/staging/lineage-15.1/lineage/jni/src/org_lineageos_platform_internal_LineageAudioService.cpp#L30\n\nThat\u0027s how the other exported headers are structured as well",
+      "parentUuid": "ffbd4284_a50e3d79",
+      "revId": "deebe5a37b250df375327f327c90ecbc7238a651",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
