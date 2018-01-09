@@ -1647,19 +1647,15 @@ status_t NuPlayer2::GenericSource::checkDrmInfo()
         return OK; // source without DRM info
     }
 
-    Parcel parcel;
-    NuPlayer2Drm::retrieveDrmInfo(pssh, psshsize, &parcel);
-    ALOGV("checkDrmInfo: MEDIA2_DRM_INFO PSSH size: %d  Parcel size: %d  objects#: %d",
-          (int)psshsize, (int)parcel.dataSize(), (int)parcel.objectsCount());
+    sp<ABuffer> drmInfoBuffer = NuPlayer2Drm::retrieveDrmInfo(pssh, psshsize);
+    ALOGV("checkDrmInfo: MEDIA2_DRM_INFO PSSH size: %d drmInfoBuffer size: %d",
+          (int)psshsize, (int)drmInfoBuffer->size());
 
-    if (parcel.dataSize() == 0) {
-        ALOGE("checkDrmInfo: Unexpected parcel size: 0");
+    if (drmInfoBuffer->size() == 0) {
+        ALOGE("checkDrmInfo: Unexpected drmInfoBuffer size: 0");
         return UNKNOWN_ERROR;
     }
 
-    // Can't pass parcel as a message to the player. Converting Parcel->ABuffer to pass it
-    // to the Player's onSourceNotify then back to Parcel for calling driver's notifyListener.
-    sp<ABuffer> drmInfoBuffer = ABuffer::CreateAsCopy(parcel.data(), parcel.dataSize());
     notifyDrmInfo(drmInfoBuffer);
 
     return OK;
