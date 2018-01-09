@@ -1,0 +1,44 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "53eda27b_88e62de4",
+        "filename": "media/libstagefright/SurfaceUtils.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 112,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-01-09T05:20:15Z",
+      "side": 1,
+      "message": "I think you want: \"%\" PRIu64",
+      "range": {
+        "startLine": 112,
+        "startChar": 58,
+        "endLine": 112,
+        "endChar": 63
+      },
+      "revId": "5d506bff1d5f9b024d76471e3598d61645f2dc18",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7dfbadda_002c3e6a",
+        "filename": "media/libstagefright/SurfaceUtils.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 126,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-01-09T05:20:15Z",
+      "side": 1,
+      "message": "I think you want: \"%\" PRIu64",
+      "revId": "5d506bff1d5f9b024d76471e3598d61645f2dc18",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
