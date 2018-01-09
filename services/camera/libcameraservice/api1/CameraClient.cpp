@@ -504,7 +504,7 @@ void CameraClient::releaseRecordingFrame(const sp<IMemory>& mem) {
 
 void CameraClient::releaseRecordingFrameHandle(native_handle_t *handle) {
     if (handle == nullptr) return;
-
+    Mutex::Autolock lock(mLock);
     sp<IMemory> dataPtr;
     {
         Mutex::Autolock l(mAvailableCallbackBuffersLock);
@@ -528,17 +528,22 @@ void CameraClient::releaseRecordingFrameHandle(native_handle_t *handle) {
         return;
     }
 
-    VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(dataPtr->pointer());
-    metadata->eType = kMetadataBufferTypeNativeHandleSource;
-    metadata->pHandle = handle;
-
-    mHardware->releaseRecordingFrame(dataPtr);
+    if (mHardware != nullptr) {
+        VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(dataPtr->pointer());
+        metadata->eType = kMetadataBufferTypeNativeHandleSource;
+        metadata->pHandle = handle;
+        mHardware->releaseRecordingFrame(dataPtr);
+    }
 }
 
 void CameraClient::releaseRecordingFrameHandleBatch(const std::vector<native_handle_t*>& handles) {
+    Mutex::Autolock lock(mLock);
+    bool disconnected = (mHardware == nullptr);
     size_t n = handles.size();
     std::vector<sp<IMemory>> frames;
-    frames.reserve(n);
+    if (!disconnected) {
+        frames.reserve(n);
+    }
     bool error = false;
     for (auto& handle : handles) {
         sp<IMemory> dataPtr;
@@ -562,10 +567,12 @@ void CameraClient::releaseRecordingFrameHandleBatch(const std::vector<native_han
             break;
         }
 
-        VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(dataPtr->pointer());
-        metadata->eType = kMetadataBufferTypeNativeHandleSource;
-        metadata->pHandle = handle;
-        frames.push_back(dataPtr);
+        if (!disconnected) {
+            VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(dataPtr->pointer());
+            metadata->eType = kMetadataBufferTypeNativeHandleSource;
+            metadata->pHandle = handle;
+            frames.push_back(dataPtr);
+        }
     }
 
     if (error) {
@@ -573,7 +580,7 @@ void CameraClient::releaseRecordingFrameHandleBatch(const std::vector<native_han
             native_handle_close(handle);
             native_handle_delete(handle);
         }
-    } else {
+    } else if (!disconnected) {
         mHardware->releaseRecordingFrameBatch(frames);
     }
     return;
