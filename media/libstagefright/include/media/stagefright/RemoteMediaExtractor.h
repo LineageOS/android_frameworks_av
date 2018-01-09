@@ -22,6 +22,8 @@
 
 namespace android {
 
+class MediaAnalyticsItem;
+
 // IMediaExtractor wrapper to the MediaExtractor.
 class RemoteMediaExtractor : public BnMediaExtractor {
 public:
@@ -42,6 +44,8 @@ public:
 
 private:
     sp<MediaExtractor> mExtractor;
+
+    MediaAnalyticsItem *mAnalyticsItem;
 
     explicit RemoteMediaExtractor(const sp<MediaExtractor> &extractor);
 

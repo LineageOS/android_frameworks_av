@@ -24,14 +24,10 @@
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 
-// still doing some on/off toggling here.
-#define MEDIA_LOG       1
-
 namespace android {
 
 class DataSource;
 class IMediaSource;
-class MediaAnalyticsItem;
 class MediaExtractorFactory;
 class MetaData;
 class Parcel;
@@ -54,8 +50,6 @@ public:
     // Return container specific meta-data. The default implementation
     // returns an empty metadata object.
     virtual sp<MetaData> getMetaData();
-
-    status_t getMetrics(Parcel *reply);
 
     enum Flags {
         CAN_SEEK_BACKWARD  = 1,  // the "seek 10secs back button"
@@ -123,14 +117,9 @@ protected:
     MediaExtractor();
     virtual ~MediaExtractor();
 
-    MediaAnalyticsItem *mAnalyticsItem;
-
-    virtual void populateMetrics();
-
 private:
     MediaExtractor(const MediaExtractor &);
     MediaExtractor &operator=(const MediaExtractor &);
-    friend class MediaExtractorFactory;
 };
 
 // purposely not defined anywhere so that this will fail to link if

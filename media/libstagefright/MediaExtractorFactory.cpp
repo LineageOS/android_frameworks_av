@@ -37,11 +37,6 @@
 
 namespace android {
 
-// attrs for media statistics
-static const char *kExtractorMime = "android.media.mediaextractor.mime";
-static const char *kExtractorTracks = "android.media.mediaextractor.ntrk";
-static const char *kExtractorFormat = "android.media.mediaextractor.fmt";
-
 // static
 sp<IMediaExtractor> MediaExtractorFactory::Create(
         const sp<DataSource> &source, const char *mime) {
@@ -133,31 +128,6 @@ sp<MediaExtractor> MediaExtractorFactory::CreateFromService(
          mime, confidence);
 
     MediaExtractor *ret = creator(source, meta);
-
-    if (ret != NULL) {
-        // track the container format (mpeg, aac, wvm, etc)
-        if (MEDIA_LOG) {
-            if (ret->mAnalyticsItem != NULL) {
-                size_t ntracks = ret->countTracks();
-                ret->mAnalyticsItem->setCString(kExtractorFormat,  ret->name());
-                // tracks (size_t)
-                ret->mAnalyticsItem->setInt32(kExtractorTracks,  ntracks);
-                // metadata
-                sp<MetaData> pMetaData = ret->getMetaData();
-                if (pMetaData != NULL) {
-                    String8 xx = pMetaData->toString();
-                    // 'titl' -- but this verges into PII
-                    // 'mime'
-                    const char *mime = NULL;
-                    if (pMetaData->findCString(kKeyMIMEType, &mime)) {
-                        ret->mAnalyticsItem->setCString(kExtractorMime,  mime);
-                    }
-                    // what else is interesting and not already available?
-                }
-            }
-        }
-    }
-
     return ret;
 }
 

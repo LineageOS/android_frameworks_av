@@ -1,5 +1,6 @@
 cc_library_shared {
     name: "libmediaextractor",
+
     include_dirs: [
         "frameworks/av/include",
         "frameworks/av/media/libmediaextractor/include",
@@ -14,7 +15,6 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libmediametrics",
         "libstagefright_foundation",
         "libutils",
         "libcutils",
