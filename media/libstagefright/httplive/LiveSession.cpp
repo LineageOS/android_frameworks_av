@@ -1014,7 +1014,8 @@ void LiveSession::onConnect(const sp<AMessage> &msg) {
         mFetcherLooper = new ALooper();
 
         mFetcherLooper->setName("Fetcher");
-        mFetcherLooper->start(false, false);
+        mFetcherLooper->start(false, /* runOnCallingThread */
+                              true  /* canCallJava */);
     }
 
     // create fetcher to fetch the master playlist

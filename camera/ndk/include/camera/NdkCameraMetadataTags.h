@@ -837,10 +837,13 @@ typedef enum acamera_metadata_tag {
      *
      * <p>This control (except for MANUAL) is only effective if
      * <code>ACAMERA_CONTROL_MODE != OFF</code> and any 3A routine is active.</p>
-     * <p>ZERO_SHUTTER_LAG will be supported if ACAMERA_REQUEST_AVAILABLE_CAPABILITIES
-     * contains PRIVATE_REPROCESSING or YUV_REPROCESSING. MANUAL will be supported if
-     * ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains MANUAL_SENSOR. Other intent values are
-     * always supported.</p>
+     * <p>All intents are supported by all devices, except that:
+     *   * ZERO_SHUTTER_LAG will be supported if ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains
+     * PRIVATE_REPROCESSING or YUV_REPROCESSING.
+     *   * MANUAL will be supported if ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains
+     * MANUAL_SENSOR.
+     *   * MOTION_TRACKING will be supported if ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains
+     * MOTION_TRACKING.</p>
      *
      * @see ACAMERA_CONTROL_MODE
      * @see ACAMERA_REQUEST_AVAILABLE_CAPABILITIES
@@ -2235,34 +2238,31 @@ typedef enum acamera_metadata_tag {
      * </ul></p>
      *
      * <p>The position of the camera device's lens optical center,
-     * as a three-dimensional vector <code>(x,y,z)</code>, relative to the
-     * optical center of the largest camera device facing in the
-     * same direction as this camera, in the <a href="https://developer.android.com/reference/android/hardware/SensorEvent.html">Android sensor coordinate
-     * axes</a>. Note that only the axis definitions are shared with
-     * the sensor coordinate system, but not the origin.</p>
-     * <p>If this device is the largest or only camera device with a
-     * given facing, then this position will be <code>(0, 0, 0)</code>; a
-     * camera device with a lens optical center located 3 cm from
-     * the main sensor along the +X axis (to the right from the
-     * user's perspective) will report <code>(0.03, 0, 0)</code>.</p>
-     * <p>To transform a pixel coordinates between two cameras
-     * facing the same direction, first the source camera
-     * ACAMERA_LENS_RADIAL_DISTORTION must be corrected for.  Then
-     * the source camera ACAMERA_LENS_INTRINSIC_CALIBRATION needs
-     * to be applied, followed by the ACAMERA_LENS_POSE_ROTATION
-     * of the source camera, the translation of the source camera
-     * relative to the destination camera, the
-     * ACAMERA_LENS_POSE_ROTATION of the destination camera, and
-     * finally the inverse of ACAMERA_LENS_INTRINSIC_CALIBRATION
-     * of the destination camera. This obtains a
-     * radial-distortion-free coordinate in the destination
-     * camera pixel coordinates.</p>
-     * <p>To compare this against a real image from the destination
-     * camera, the destination camera image then needs to be
-     * corrected for radial distortion before comparison or
-     * sampling.</p>
+     * as a three-dimensional vector <code>(x,y,z)</code>.</p>
+     * <p>Prior to Android P, or when ACAMERA_LENS_POSE_REFERENCE is PRIMARY_CAMERA, this position
+     * is relative to the optical center of the largest camera device facing in the same
+     * direction as this camera, in the <a href="https://developer.android.com/reference/android/hardware/SensorEvent.html">Android sensor
+     * coordinate axes</a>. Note that only the axis definitions are shared with the sensor
+     * coordinate system, but not the origin.</p>
+     * <p>If this device is the largest or only camera device with a given facing, then this
+     * position will be <code>(0, 0, 0)</code>; a camera device with a lens optical center located 3 cm
+     * from the main sensor along the +X axis (to the right from the user's perspective) will
+     * report <code>(0.03, 0, 0)</code>.</p>
+     * <p>To transform a pixel coordinates between two cameras facing the same direction, first
+     * the source camera ACAMERA_LENS_RADIAL_DISTORTION must be corrected for.  Then the source
+     * camera ACAMERA_LENS_INTRINSIC_CALIBRATION needs to be applied, followed by the
+     * ACAMERA_LENS_POSE_ROTATION of the source camera, the translation of the source camera
+     * relative to the destination camera, the ACAMERA_LENS_POSE_ROTATION of the destination
+     * camera, and finally the inverse of ACAMERA_LENS_INTRINSIC_CALIBRATION of the destination
+     * camera. This obtains a radial-distortion-free coordinate in the destination camera pixel
+     * coordinates.</p>
+     * <p>To compare this against a real image from the destination camera, the destination camera
+     * image then needs to be corrected for radial distortion before comparison or sampling.</p>
+     * <p>When ACAMERA_LENS_POSE_REFERENCE is GYROSCOPE, then this position is relative to
+     * the center of the primary gyroscope on the device.</p>
      *
      * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
+     * @see ACAMERA_LENS_POSE_REFERENCE
      * @see ACAMERA_LENS_POSE_ROTATION
      * @see ACAMERA_LENS_RADIAL_DISTORTION
      */
@@ -2433,6 +2433,26 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_LENS_RADIAL_DISTORTION =                            // float[6]
             ACAMERA_LENS_START + 11,
+    /**
+     * <p>The origin for ACAMERA_LENS_POSE_TRANSLATION.</p>
+     *
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_lens_pose_reference_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>Different calibration methods and use cases can produce better or worse results
+     * depending on the selected coordinate origin.</p>
+     * <p>For devices designed to support the MOTION_TRACKING capability, the GYROSCOPE origin
+     * makes device calibration and later usage by applications combining camera and gyroscope
+     * information together simpler.</p>
+     */
+    ACAMERA_LENS_POSE_REFERENCE =                               // byte (acamera_metadata_enum_android_lens_pose_reference_t)
+            ACAMERA_LENS_START + 12,
     ACAMERA_LENS_END,
 
     /**
@@ -2895,7 +2915,7 @@ typedef enum acamera_metadata_tag {
      * time-consuming hardware re-configuration or internal camera pipeline
      * change. For performance reasons we advise clients to pass their initial
      * values as part of
-     * {@link ACameraDevice_createCaptureSessionWithSessionParameters }.i
+     * {@link ACameraDevice_createCaptureSessionWithSessionParameters }.
      * Once the camera capture session is enabled it is also recommended to avoid
      * changing them from their initial values set in
      * {@link ACameraDevice_createCaptureSessionWithSessionParameters }.
@@ -5717,6 +5737,15 @@ typedef enum acamera_metadata_enum_acamera_control_capture_intent {
      */
     ACAMERA_CONTROL_CAPTURE_INTENT_MANUAL                            = 6,
 
+    /**
+     * <p>This request is for a motion tracking use case, where
+     * the application will use camera and inertial sensor data to
+     * locate and track objects in the world.</p>
+     * <p>The camera device auto-exposure routine will limit the exposure time
+     * of the camera to no more than 20 milliseconds, to minimize motion blur.</p>
+     */
+    ACAMERA_CONTROL_CAPTURE_INTENT_MOTION_TRACKING                   = 7,
+
 } acamera_metadata_enum_android_control_capture_intent_t;
 
 // ACAMERA_CONTROL_EFFECT_MODE
@@ -6428,6 +6457,28 @@ typedef enum acamera_metadata_enum_acamera_lens_state {
 
 } acamera_metadata_enum_android_lens_state_t;
 
+// ACAMERA_LENS_POSE_REFERENCE
+typedef enum acamera_metadata_enum_acamera_lens_pose_reference {
+    /**
+     * <p>The value of ACAMERA_LENS_POSE_TRANSLATION is relative to the optical center of
+     * the largest camera device facing the same direction as this camera.</p>
+     * <p>This default value for API levels before Android P.</p>
+     *
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     */
+    ACAMERA_LENS_POSE_REFERENCE_PRIMARY_CAMERA                       = 0,
+
+    /**
+     * <p>The value of ACAMERA_LENS_POSE_TRANSLATION is relative to the position of the
+     * primary gyroscope of this Android device.</p>
+     * <p>This is the value reported by all devices that support the MOTION_TRACKING capability.</p>
+     *
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     */
+    ACAMERA_LENS_POSE_REFERENCE_GYROSCOPE                            = 1,
+
+} acamera_metadata_enum_android_lens_pose_reference_t;
+
 
 // ACAMERA_LENS_INFO_FOCUS_DISTANCE_CALIBRATION
 typedef enum acamera_metadata_enum_acamera_lens_info_focus_distance_calibration {
@@ -6760,6 +6811,7 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * </ul>
      * </li>
      * <li>The ACAMERA_DEPTH_DEPTH_IS_EXCLUSIVE entry is listed by this device.</li>
+     * <li>As of Android P, the ACAMERA_LENS_POSE_REFERENCE entry is listed by this device.</li>
      * <li>A LIMITED camera with only the DEPTH_OUTPUT capability does not have to support
      *   normal YUV_420_888, JPEG, and PRIV-format outputs. It only has to support the DEPTH16
      *   format.</li>
@@ -6775,11 +6827,56 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * @see ACAMERA_DEPTH_DEPTH_IS_EXCLUSIVE
      * @see ACAMERA_LENS_FACING
      * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
+     * @see ACAMERA_LENS_POSE_REFERENCE
      * @see ACAMERA_LENS_POSE_ROTATION
      * @see ACAMERA_LENS_POSE_TRANSLATION
      * @see ACAMERA_LENS_RADIAL_DISTORTION
      */
     ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_DEPTH_OUTPUT              = 8,
+
+    /**
+     * <p>The device supports controls and metadata required for accurate motion tracking for
+     * use cases such as augmented reality, electronic image stabilization, and so on.</p>
+     * <p>This means this camera device has accurate optical calibration and timestamps relative
+     * to the inertial sensors.</p>
+     * <p>This capability requires the camera device to support the following:</p>
+     * <ul>
+     * <li>Capture request templates <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#TEMPLATE_MOTION_TRACKING_PREVIEW">CameraDevice#TEMPLATE_MOTION_TRACKING_PREVIEW</a> and <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#TEMPLATE_MOTION_TRACKING_BEST">CameraDevice#TEMPLATE_MOTION_TRACKING_BEST</a> are defined.</li>
+     * <li>The stream configurations listed in <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#createCaptureSession">CameraDevice#createCaptureSession</a> for MOTION_TRACKING are
+     *   supported, either at 30 or 60fps maximum frame rate.</li>
+     * <li>The following camera characteristics and capture result metadata are provided:<ul>
+     * <li>ACAMERA_LENS_INTRINSIC_CALIBRATION</li>
+     * <li>ACAMERA_LENS_RADIAL_DISTORTION</li>
+     * <li>ACAMERA_LENS_POSE_ROTATION</li>
+     * <li>ACAMERA_LENS_POSE_TRANSLATION</li>
+     * <li>ACAMERA_LENS_POSE_REFERENCE with value GYROSCOPE</li>
+     * </ul>
+     * </li>
+     * <li>The ACAMERA_SENSOR_INFO_TIMESTAMP_SOURCE field has value <code>REALTIME</code>. When compared to
+     *   timestamps from the device's gyroscopes, the clock difference for events occuring at
+     *   the same actual time instant will be less than 1 ms.</li>
+     * <li>The value of the ACAMERA_SENSOR_ROLLING_SHUTTER_SKEW field is accurate to within 1 ms.</li>
+     * <li>The value of ACAMERA_SENSOR_EXPOSURE_TIME is guaranteed to be available in the
+     *   capture result.</li>
+     * <li>The ACAMERA_CONTROL_CAPTURE_INTENT control supports MOTION_TRACKING to limit maximum
+     *   exposure to 20 milliseconds.</li>
+     * <li>The stream configurations required for MOTION_TRACKING (listed at <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#createCaptureSession">CameraDevice#createCaptureSession</a>) can operate at least at
+     *   30fps; optionally, they can operate at 60fps, and '[60, 60]' is listed in
+     *   ACAMERA_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES.</li>
+     * </ul>
+     *
+     * @see ACAMERA_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES
+     * @see ACAMERA_CONTROL_CAPTURE_INTENT
+     * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
+     * @see ACAMERA_LENS_POSE_REFERENCE
+     * @see ACAMERA_LENS_POSE_ROTATION
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     * @see ACAMERA_LENS_RADIAL_DISTORTION
+     * @see ACAMERA_SENSOR_EXPOSURE_TIME
+     * @see ACAMERA_SENSOR_INFO_TIMESTAMP_SOURCE
+     * @see ACAMERA_SENSOR_ROLLING_SHUTTER_SKEW
+     */
+    ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_MOTION_TRACKING           = 10,
 
 } acamera_metadata_enum_android_request_available_capabilities_t;
 

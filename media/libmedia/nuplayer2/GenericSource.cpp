@@ -354,6 +354,9 @@ NuPlayer2::GenericSource::~GenericSource() {
         mLooper->unregisterHandler(id());
         mLooper->stop();
     }
+    if (mDataSource != NULL) {
+        mDataSource->close();
+    }
     resetDataSource();
 }
 

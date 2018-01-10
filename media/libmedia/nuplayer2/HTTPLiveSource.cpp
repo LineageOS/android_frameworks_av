@@ -103,7 +103,8 @@ void NuPlayer2::HTTPLiveSource::prepareAsync() {
     if (mLiveLooper == NULL) {
         mLiveLooper = new ALooper;
         mLiveLooper->setName("http live");
-        mLiveLooper->start();
+        mLiveLooper->start(false, /* runOnCallingThread */
+                           true /* canCallJava */);
 
         mLiveLooper->registerHandler(this);
     }
