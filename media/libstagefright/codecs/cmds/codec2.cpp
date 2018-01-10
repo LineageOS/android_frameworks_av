@@ -52,6 +52,7 @@
 #include <gui/SurfaceComposerClient.h>
 
 #include <util/C2ParamUtils.h>
+#include <C2AllocatorGralloc.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
 #include <C2Component.h>
@@ -250,8 +251,9 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
             const std::shared_ptr<C2Buffer> &output = work->worklets.front()->output.buffers[0];
             if (output) {
                 const C2ConstGraphicBlock &block = output->data().graphicBlocks().front();
+                native_handle_t *grallocHandle = UnwrapNativeCodec2GrallocHandle(block.handle());
                 sp<GraphicBuffer> buffer(new GraphicBuffer(
-                        block.handle(),
+                        grallocHandle,
                         GraphicBuffer::CLONE_HANDLE,
                         block.width(),
                         block.height(),
@@ -259,6 +261,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
                         1,
                         (uint64_t)GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN,
                         block.width()));
+                native_handle_delete(grallocHandle);
 
                 status_t err = igbp->attachBuffer(&slot, buffer);
 
