@@ -33,24 +33,36 @@
 namespace android {
 
 /**
- * BufferChannelBase implementation for ACodec.
+ * BufferChannelBase implementation for CCodec.
  */
 class CCodecBufferChannel : public BufferChannelBase {
 public:
+    /**
+     * Base class for representation of buffers at one port.
+     */
     class Buffers {
     public:
         Buffers() = default;
         virtual ~Buffers() = default;
 
-        inline void setAlloc(const std::shared_ptr<C2BlockPool> &alloc) { mAlloc = alloc; }
+        /**
+         * Set format for MediaCodec-facing buffers.
+         */
         inline void setFormat(const sp<AMessage> &format) { mFormat = format; }
-        inline const std::shared_ptr<C2BlockPool> &getAlloc() { return mAlloc; }
+
+        /**
+         * Returns true if the buffers are operating under array mode.
+         */
+        virtual bool isArrayMode() { return false; }
+
+        /**
+         * Fills the vector with MediaCodecBuffer's if in array mode; otherwise,
+         * no-op.
+         */
+        virtual void getArray(Vector<sp<MediaCodecBuffer>> *) {}
 
     protected:
-        // Input: this object uses it to allocate input buffers with which the
-        // client fills.
-        // Output: this object passes it to the component.
-        std::shared_ptr<C2BlockPool> mAlloc;
+        // Format to be used for creating MediaCodec-facing buffers.
         sp<AMessage> mFormat;
 
     private:
@@ -62,9 +74,40 @@ public:
         using Buffers::Buffers;
         virtual ~InputBuffers() = default;
 
+        /**
+         * Set a block pool to obtain input memory blocks.
+         */
+        inline void setPool(const std::shared_ptr<C2BlockPool> &pool) { mPool = pool; }
+
+        /**
+         * Get a new MediaCodecBuffer for input and its corresponding index.
+         * Returns false if no new buffer can be obtained at the moment.
+         */
         virtual bool requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) = 0;
+
+        /**
+         * Release the buffer obtained from requestNewBuffer() and get the
+         * associated C2Buffer object back. Returns empty shared_ptr if the
+         * buffer is not on file.
+         */
         virtual std::shared_ptr<C2Buffer> releaseBuffer(const sp<MediaCodecBuffer> &buffer) = 0;
+
+        /**
+         * Flush internal state. After this call, no index or buffer previously
+         * returned from requestNewBuffer() is valid.
+         */
         virtual void flush() = 0;
+
+        /**
+         * Return array-backed version of input buffers. The returned object
+         * shall retain the internal state so that it will honor index and
+         * buffer from previous calls of requestNewBuffer().
+         */
+        virtual std::unique_ptr<InputBuffers> toArrayMode() = 0;
+
+    protected:
+        // Pool to obtain blocks for input buffers.
+        std::shared_ptr<C2BlockPool> mPool;
 
     private:
         DISALLOW_EVIL_CONSTRUCTORS(InputBuffers);
@@ -75,12 +118,46 @@ public:
         using Buffers::Buffers;
         virtual ~OutputBuffers() = default;
 
+        /**
+         * Register output C2Buffer from the component and obtain corresponding
+         * index and MediaCodecBuffer object. Returns false if registration
+         * fails.
+         */
         virtual bool registerBuffer(
                 const std::shared_ptr<C2Buffer> &buffer,
                 size_t *index,
                 sp<MediaCodecBuffer> *codecBuffer) = 0;
+
+        /**
+         * Register codec specific data as a buffer to be consistent with
+         * MediaCodec behavior.
+         */
+        virtual bool registerCsd(
+                const C2StreamCsdInfo::output * /* csd */,
+                size_t * /* index */,
+                sp<MediaCodecBuffer> * /* codecBuffer */) {
+            return false;
+        }
+
+        /**
+         * Release the buffer obtained from registerBuffer() and get the
+         * associated C2Buffer object back. Returns empty shared_ptr if the
+         * buffer is not on file.
+         */
         virtual std::shared_ptr<C2Buffer> releaseBuffer(const sp<MediaCodecBuffer> &buffer) = 0;
-        virtual void flush(const std::list<std::unique_ptr<C2Work>> &flushedWork);
+
+        /**
+         * Flush internal state. After this call, no index or buffer previously
+         * returned from registerBuffer() is valid.
+         */
+        virtual void flush(const std::list<std::unique_ptr<C2Work>> &flushedWork) = 0;
+
+        /**
+         * Return array-backed version of output buffers. The returned object
+         * shall retain the internal state so that it will honor index and
+         * buffer from previous calls of registerBuffer().
+         */
+        virtual std::unique_ptr<OutputBuffers> toArrayMode() = 0;
 
     private:
         DISALLOW_EVIL_CONSTRUCTORS(OutputBuffers);
@@ -151,12 +228,34 @@ public:
 private:
     class QueueGuard;
 
+    /**
+     * Special mutex-like object with the following properties:
+     *
+     * - At STOPPED state (initial, or after stop())
+     *   - QueueGuard object gets created at STOPPED state, and the client is
+     *     supposed to return immediately.
+     * - At RUNNING state (after start())
+     *   - Each QueueGuard object
+     */
     class QueueSync {
     public:
+        /**
+         * At construction the sync object is in STOPPED state.
+         */
         inline QueueSync() : mCount(-1) {}
         ~QueueSync() = default;
 
+        /**
+         * Transition to RUNNING state when stopped. No-op if already in RUNNING
+         * state.
+         */
         void start();
+
+        /**
+         * At RUNNING state, wait until all QueueGuard object created during
+         * RUNNING state are destroyed, and then transition to STOPPED state.
+         * No-op if already in STOPPED state.
+         */
         void stop();
 
     private:
@@ -186,6 +285,7 @@ private:
     std::function<void(status_t, enum ActionCode)> mOnError;
     std::shared_ptr<C2BlockPool> mInputAllocator;
     QueueSync mQueueSync;
+
     Mutexed<std::unique_ptr<InputBuffers>> mInputBuffers;
     Mutexed<std::unique_ptr<OutputBuffers>> mOutputBuffers;
 

@@ -552,7 +552,7 @@ void MediaCodec::PostReplyWithError(const sp<AReplyToken> &replyID, int32_t err)
 //static
 sp<CodecBase> MediaCodec::GetCodecBase(const AString &name, bool nameIsType) {
     static bool ccodecEnabled = property_get_bool("debug.stagefright.ccodec", false);
-    if (ccodecEnabled && !nameIsType && name.startsWithIgnoreCase("codec2.")) {
+    if (ccodecEnabled && !nameIsType && name.startsWithIgnoreCase("c2.")) {
         return new CCodec;
     } else if (nameIsType || name.startsWithIgnoreCase("omx.")) {
         // at this time only ACodec specifies a mime type.

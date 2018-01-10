@@ -117,9 +117,6 @@ cc_library_shared {
         "android.hardware.media.omx@1.0",
         "android.hardware.graphics.allocator@2.0",
         "android.hardware.graphics.mapper@2.0",
-
-        // XXX: hack
-        "libstagefright_soft_c2avcdec",
     ],
 
     static_libs: [
@@ -135,7 +132,6 @@ cc_library_shared {
         "libstagefright_id3",
         "libFLAC",
 
-        // XXX: hack
         "libstagefright_codec2_vndk",
     ],
 

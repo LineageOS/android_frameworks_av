@@ -18,10 +18,9 @@
 #define LOG_TAG "CCodec"
 #include <utils/Log.h>
 
-// XXX: HACK
-#include "codecs/avcdec/C2SoftAvcDec.h"
-
 #include <thread>
+
+#include <C2PlatformSupport.h>
 
 #include <gui/Surface.h>
 #include <media/stagefright/CCodec.h>
@@ -181,8 +180,18 @@ void CCodec::allocate(const AString &componentName) {
     // TODO: use C2ComponentStore to create component
     mListener.reset(new CCodecListener(mChannel));
 
-    std::shared_ptr<C2Component> comp(new C2SoftAvcDec(componentName.c_str(), 0));
-    comp->setListener_vb(mListener, C2_DONT_BLOCK);
+    std::shared_ptr<C2Component> comp;
+    c2_status_t err = GetCodec2PlatformComponentStore()->createComponent(
+            componentName.c_str(), &comp);
+    if (err != C2_OK) {
+        Mutexed<State>::Locked state(mState);
+        state->mState = RELEASED;
+        state.unlock();
+        mCallback->onError(err, ACTION_CODE_FATAL);
+        state.lock();
+        return;
+    }
+    comp->setListener_vb(mListener, C2_MAY_BLOCK);
     {
         Mutexed<State>::Locked state(mState);
         if (state->mState != ALLOCATING) {
@@ -231,6 +240,26 @@ void CCodec::configure(const sp<AMessage> &msg) {
         if (msg->findObject("native-window", &obj)) {
             sp<Surface> surface = static_cast<Surface *>(obj.get());
             setSurface(surface);
+        }
+
+        // XXX: hack
+        bool audio = mime.startsWithIgnoreCase("audio/");
+        if (encoder) {
+            outputFormat->setString("mime", mime);
+            inputFormat->setString("mime", AStringPrintf("%s/raw", audio ? "audio" : "video"));
+            if (audio) {
+                inputFormat->setInt32("channel-count", 1);
+                inputFormat->setInt32("sample-rate", 44100);
+                outputFormat->setInt32("channel-count", 1);
+                outputFormat->setInt32("sample-rate", 44100);
+            }
+        } else {
+            inputFormat->setString("mime", mime);
+            outputFormat->setString("mime", AStringPrintf("%s/raw", audio ? "audio" : "video"));
+            if (audio) {
+                outputFormat->setInt32("channel-count", 2);
+                outputFormat->setInt32("sample-rate", 44100);
+            }
         }
 
         // TODO
