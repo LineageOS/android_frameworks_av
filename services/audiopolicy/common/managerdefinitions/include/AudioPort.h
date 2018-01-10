@@ -84,12 +84,7 @@ public:
     bool hasDynamicAudioProfile() const { return mProfiles.hasDynamicProfile(); }
 
     // searches for an exact match
-    status_t checkExactAudioProfile(uint32_t samplingRate,
-                                    audio_channel_mask_t channelMask,
-                                    audio_format_t format) const
-    {
-        return mProfiles.checkExactProfile(samplingRate, channelMask, format);
-    }
+    virtual status_t checkExactAudioProfile(const struct audio_port_config *config) const;
 
     // searches for a compatible match, currently implemented for input
     // parameters are input|output, returned value is the best match.

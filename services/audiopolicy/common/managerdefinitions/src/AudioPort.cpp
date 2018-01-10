@@ -137,6 +137,26 @@ void AudioPort::importAudioPort(const sp<AudioPort>& port, bool force __unused)
     }
 }
 
+status_t AudioPort::checkExactAudioProfile(const struct audio_port_config *config) const
+{
+    status_t status = NO_ERROR;
+    auto config_mask = config->config_mask;
+    if (config_mask & AUDIO_PORT_CONFIG_GAIN) {
+        config_mask &= ~AUDIO_PORT_CONFIG_GAIN;
+        status = checkGain(&config->gain, config->gain.index);
+        if (status != NO_ERROR) {
+            return status;
+        }
+    }
+    if (config_mask != 0) {
+        // TODO should we check sample_rate / channel_mask / format separately?
+        status = mProfiles.checkExactProfile(config->sample_rate,
+                                             config->channel_mask,
+                                             config->format);
+    }
+    return status;
+}
+
 void AudioPort::pickSamplingRate(uint32_t &pickedRate,const SampleRateVector &samplingRates) const
 {
     pickedRate = 0;
@@ -388,9 +408,7 @@ status_t AudioPortConfig::applyAudioPortConfig(const struct audio_port_config *c
         status = NO_INIT;
         goto exit;
     }
-    status = audioport->checkExactAudioProfile(config->sample_rate,
-                                               config->channel_mask,
-                                               config->format);
+    status = audioport->checkExactAudioProfile(config);
     if (status != NO_ERROR) {
         goto exit;
     }
@@ -404,10 +422,6 @@ status_t AudioPortConfig::applyAudioPortConfig(const struct audio_port_config *c
         mFormat = config->format;
     }
     if (config->config_mask & AUDIO_PORT_CONFIG_GAIN) {
-        status = audioport->checkGain(&config->gain, config->gain.index);
-        if (status != NO_ERROR) {
-            goto exit;
-        }
         mGain = config->gain;
     }
 
