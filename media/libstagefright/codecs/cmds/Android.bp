@@ -6,28 +6,19 @@ cc_binary {
     ],
 
     include_dirs: [
-        "frameworks/av/media/libstagefright/codec2/include",
-        "frameworks/av/media/libstagefright/codec2/vndk/include",
     ],
 
     shared_libs: [
-        "android.hardware.graphics.allocator@2.0",
-        "android.hardware.graphics.mapper@2.0",
         "libbinder",
         "libcutils",
         "libgui",
-        "libhidlbase",
-        "libion",
         "liblog",
         "libstagefright",
         "libstagefright_codec2",
+        "libstagefright_codec2_vndk",
         "libstagefright_foundation",
         "libui",
         "libutils",
-    ],
-
-    static_libs: [
-        "libstagefright_codec2_vndk",
     ],
 
     cflags: [
