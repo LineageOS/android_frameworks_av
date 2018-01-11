@@ -29,8 +29,6 @@
 #include <utils/SortedVector.h>
 #include <utils/threads.h>
 
-#include <media/stagefright/foundation/AString.h>
-
 #include <binder/IServiceManager.h>
 #include <media/IMediaAnalyticsService.h>
 #include <media/MediaAnalyticsItem.h>
@@ -205,13 +203,9 @@ uid_t MediaAnalyticsItem::getUid() const {
     return mUid;
 }
 
-MediaAnalyticsItem &MediaAnalyticsItem::setPkgName(AString pkgName) {
+MediaAnalyticsItem &MediaAnalyticsItem::setPkgName(const std::string &pkgName) {
     mPkgName = pkgName;
     return *this;
-}
-
-AString MediaAnalyticsItem::getPkgName() const {
-    return mPkgName;
 }
 
 MediaAnalyticsItem &MediaAnalyticsItem::setPkgVersionCode(int64_t pkgVersionCode) {
@@ -727,11 +721,11 @@ int32_t MediaAnalyticsItem::writeToParcel(Parcel *data) {
 }
 
 
-AString MediaAnalyticsItem::toString() {
+std::string MediaAnalyticsItem::toString() {
    return toString(-1);
 }
 
-AString MediaAnalyticsItem::toString(int version) {
+std::string MediaAnalyticsItem::toString(int version) {
 
     // v0 : released with 'o'
     // v1 : bug fix (missing pid/finalized separator),
@@ -744,7 +738,7 @@ AString MediaAnalyticsItem::toString(int version) {
         version = PROTO_LAST;
     }
 
-    AString result;
+    std::string result;
     char buffer[512];
 
     if (version == PROTO_V0) {
@@ -841,7 +835,7 @@ bool MediaAnalyticsItem::selfrecord() {
 bool MediaAnalyticsItem::selfrecord(bool forcenew) {
 
     if (DEBUG_API) {
-        AString p = this->toString();
+        std::string p = this->toString();
         ALOGD("selfrecord of: %s [forcenew=%d]", p.c_str(), forcenew);
     }
 
@@ -850,13 +844,13 @@ bool MediaAnalyticsItem::selfrecord(bool forcenew) {
     if (svc != NULL) {
         MediaAnalyticsItem::SessionID_t newid = svc->submit(this, forcenew);
         if (newid == SessionIDInvalid) {
-            AString p = this->toString();
+            std::string p = this->toString();
             ALOGW("Failed to record: %s [forcenew=%d]", p.c_str(), forcenew);
             return false;
         }
         return true;
     } else {
-        AString p = this->toString();
+        std::string p = this->toString();
         ALOGW("Unable to record: %s [forcenew=%d]", p.c_str(), forcenew);
         return false;
     }

@@ -389,7 +389,7 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
     nsecs_t ts_since = 0;
     String16 helpOption("-help");
     String16 onlyOption("-only");
-    AString only;
+    std::string only;
     int n = args.size();
 
     for (int i = 0; i < n; i++) {
@@ -553,7 +553,7 @@ void MediaAnalyticsService::dumpSummaries(String8 &result, nsecs_t ts_since, con
                 if (only != NULL && strcmp(only, (*it)->getKey()) != 0) {
                     ALOGV("Told to omit '%s'", (*it)->getKey());
                 }
-                AString distilled = (*it)->dumpSummary(slot, only);
+                std::string distilled = (*it)->dumpSummary(slot, only);
                 result.append(distilled.c_str());
             }
         }
@@ -605,7 +605,7 @@ String8 MediaAnalyticsService::dumpQueue(List<MediaAnalyticsItem *> *theList, ns
                 ALOGV("Omit '%s', it's not '%s'", (*it)->getKey().c_str(), only);
                 continue;
             }
-            AString entry = (*it)->toString(mDumpProto);
+            std::string entry = (*it)->toString(mDumpProto);
             result.appendFormat("%5d: %s\n", slot, entry.c_str());
             slot++;
         }
@@ -746,7 +746,7 @@ void MediaAnalyticsService::deleteItem(List<MediaAnalyticsItem *> *l, MediaAnaly
     }
 }
 
-static AString allowedKeys[] =
+static std::string allowedKeys[] =
 {
     "codec",
     "extractor"
@@ -760,7 +760,7 @@ bool MediaAnalyticsService::contentValid(MediaAnalyticsItem *item, bool isTruste
     // untrusted uids can only send us a limited set of keys
     if (isTrusted == false) {
         // restrict to a specific set of keys
-        AString key = item->getKey();
+        std::string key = item->getKey();
 
         size_t i;
         for(i = 0; i < nAllowedKeys; i++) {
@@ -854,7 +854,7 @@ void MediaAnalyticsService::setPkgInfo(MediaAnalyticsItem *item, uid_t uid, bool
             return setPkgInfo(item, uid, setName, setVersion);
         }
     } else {
-        AString pkg;
+        std::string pkg;
         std::string installer = "";
         int64_t versionCode = 0;
 
@@ -896,7 +896,7 @@ void MediaAnalyticsService::setPkgInfo(MediaAnalyticsItem *item, uid_t uid, bool
             }
 
             // strip any leading "shared:" strings that came back
-            if (pkg.startsWith("shared:")) {
+            if (pkg.compare(0, 7, "shared:") == 0) {
                 pkg.erase(0, 7);
             }
 

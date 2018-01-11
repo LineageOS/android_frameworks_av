@@ -136,8 +136,8 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
     // mapping uids to package names
     struct UidToPkgMap {
         uid_t uid;
-        AString pkg;
-        AString installer;
+        std::string pkg;
+        std::string installer;
         int64_t versionCode;
         nsecs_t expiration;
     };

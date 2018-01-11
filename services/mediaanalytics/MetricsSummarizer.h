@@ -18,10 +18,10 @@
 #ifndef ANDROID_METRICSSUMMARIZER_H
 #define ANDROID_METRICSSUMMARIZER_H
 
+#include <string>
 #include <utils/threads.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
-#include <utils/String8.h>
 #include <utils/List.h>
 
 #include <media/IMediaAnalyticsService.h>
@@ -49,8 +49,8 @@ class MetricsSummarizer
     virtual void mergeRecord(MediaAnalyticsItem &have, MediaAnalyticsItem &incoming);
 
     // dump the summarized records (for dumpsys)
-    AString dumpSummary(int &slot);
-    AString dumpSummary(int &slot, const char *only);
+    std::string dumpSummary(int &slot);
+    std::string dumpSummary(int &slot, const char *only);
 
     void setIgnorables(const char **);
     const char **getIgnorables();
