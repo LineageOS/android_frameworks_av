@@ -84,23 +84,28 @@ protected:
     virtual c2_status_t onFlush_sm() = 0;
 
     /**
-     * Drain the component.
-     */
-    virtual c2_status_t onDrain_nb() = 0;
-
-    /**
      * Process the given work and finish pending work using finish().
      *
      * \param[in,out]   work    the work to process
      * \param[in]       pool    the pool to use for allocating output blocks.
-     *
-     * \retval true             |work| is done and ready for return to client
-     * \retval false            more data is needed for the |work| to be done;
-     *                          mark |work| as pending.
      */
-    virtual bool process(
+    virtual void process(
             const std::unique_ptr<C2Work> &work,
-            std::shared_ptr<C2BlockPool> pool) = 0;
+            const std::shared_ptr<C2BlockPool> &pool) = 0;
+
+    /**
+     * Drain the component and finish pending work using finish().
+     *
+     * \param[in]   drainMode   mode of drain.
+     * \param[in]   pool        the pool to use for allocating output blocks.
+     *
+     * \retval C2_OK            The component has drained all pending output
+     *                          work.
+     * \retval C2_OMITTED       Unsupported mode (e.g. DRAIN_CHAIN)
+     */
+    virtual c2_status_t drain(
+            uint32_t drainMode,
+            const std::shared_ptr<C2BlockPool> &pool) = 0;
 
     // for derived classes
     /**
@@ -115,6 +120,21 @@ protected:
      * \param[in]   fillWork      the function to fill the retrieved work.
      */
     void finish(uint64_t frameIndex, std::function<void(const std::unique_ptr<C2Work> &)> fillWork);
+
+    std::shared_ptr<C2Buffer> createLinearBuffer(
+            const std::shared_ptr<C2LinearBlock> &block);
+
+    std::shared_ptr<C2Buffer> createLinearBuffer(
+            const std::shared_ptr<C2LinearBlock> &block, size_t offset, size_t size);
+
+    std::shared_ptr<C2Buffer> createGraphicBuffer(
+            const std::shared_ptr<C2GraphicBlock> &block);
+
+    std::shared_ptr<C2Buffer> createGraphicBuffer(
+            const std::shared_ptr<C2GraphicBlock> &block,
+            const C2Rect &crop);
+
+    static constexpr uint32_t NO_DRAIN = ~0u;
 
 private:
     const std::shared_ptr<C2ComponentInterface> mIntf;
@@ -135,10 +155,30 @@ private:
     };
     Mutexed<ExecState> mExecState;
 
-    struct WorkQueue {
+    class WorkQueue {
+    public:
+        inline WorkQueue() : mGeneration(0ul) {}
+
+        inline uint64_t generation() const { return mGeneration; }
+        inline void incGeneration() { ++mGeneration; }
+
+        std::unique_ptr<C2Work> pop_front();
+        void push_back(std::unique_ptr<C2Work> work);
+        bool empty() const;
+        uint32_t drainMode() const;
+        void markDrain(uint32_t drainMode);
+        void clear();
+
         Condition mCondition;
-        std::list<std::unique_ptr<C2Work>> mQueue;
+
+    private:
+        struct Entry {
+            std::unique_ptr<C2Work> work;
+            uint32_t drainMode;
+        };
+
         uint64_t mGeneration;
+        std::list<Entry> mQueue;
     };
     Mutexed<WorkQueue> mWorkQueue;
 
