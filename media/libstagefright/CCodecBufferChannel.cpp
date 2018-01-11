@@ -21,6 +21,7 @@
 #include <numeric>
 #include <thread>
 
+#include <C2AllocatorGralloc.h>
 #include <C2PlatformSupport.h>
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
@@ -729,8 +730,9 @@ status_t CCodecBufferChannel::renderOutputBuffer(
         return UNKNOWN_ERROR;
     }
 
+    native_handle_t *grallocHandle = UnwrapNativeCodec2GrallocHandle(blocks.front().handle());
     sp<GraphicBuffer> graphicBuffer(new GraphicBuffer(
-            blocks.front().handle(),
+            grallocHandle,
             GraphicBuffer::CLONE_HANDLE,
             blocks.front().width(),
             blocks.front().height(),
@@ -740,6 +742,7 @@ status_t CCodecBufferChannel::renderOutputBuffer(
             (uint64_t)GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN,
             // TODO
             blocks.front().width()));
+    native_handle_delete(grallocHandle);
 
     status_t result = (*surface)->attachBuffer(graphicBuffer.get());
     if (result != OK) {

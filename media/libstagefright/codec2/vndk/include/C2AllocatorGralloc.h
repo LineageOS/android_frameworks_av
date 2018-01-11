@@ -24,12 +24,18 @@
 
 namespace android {
 
+/**
+ * Unwrap the native handle from a Codec2 handle allocated by C2AllocatorGralloc.
+ *
+ * @param handle a handle allocated by C2AllocatorGralloc. This includes handles returned for a
+ * graphic block allocation handle returned.
+ *
+ * @return a new NON-OWNING native handle that must be deleted using native_handle_delete.
+ */
+native_handle_t*UnwrapNativeCodec2GrallocHandle(const C2Handle *const handle);
+
 class C2AllocatorGralloc : public C2Allocator {
 public:
-    // (usage, capacity) => (align, heapMask, flags)
-    typedef std::function<int (C2MemoryUsage, size_t,
-                      /* => */ size_t*, unsigned*, unsigned*)> usage_mapper_fn;
-
     virtual id_t getId() const override;
 
     virtual C2String getName() const override;
