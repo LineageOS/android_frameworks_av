@@ -234,6 +234,17 @@ aaudio_result_t AudioStream::createThread(int64_t periodNanoseconds,
     if (err != 0) {
         return AAudioConvert_androidToAAudioResult(-errno);
     } else {
+        // Name the thread with an increasing index, "AAudio_#", for debugging.
+        static std::atomic<uint32_t> nextThreadIndex{1};
+        char name[16]; // max length for a pthread_name
+        uint32_t index = nextThreadIndex++;
+        // Wrap the index so that we do not hit the 16 char limit
+        // and to avoid hard-to-read large numbers.
+        index = index % 100000;  // arbitrary
+        snprintf(name, sizeof(name), "AAudio_%u", index);
+        err = pthread_setname_np(mThread, name);
+        ALOGW_IF((err != 0), "Could not set name of AAudio thread. err = %d", err);
+
         mHasThread = true;
         return AAUDIO_OK;
     }

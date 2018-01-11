@@ -42,7 +42,7 @@ using namespace aaudio;   // TODO just import names needed
 
 AAudioServiceStreamBase::AAudioServiceStreamBase(AAudioService &audioService)
         : mUpMessageQueue(nullptr)
-        , mTimestampThread()
+        , mTimestampThread("AATime")
         , mAtomicTimestamp()
         , mAudioService(audioService) {
     mMmapClient.clientUid = -1;
