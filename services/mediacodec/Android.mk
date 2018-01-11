@@ -5,6 +5,7 @@ include $(CLEAR_VARS)
 # seccomp is not required for coverage build.
 ifneq ($(NATIVE_COVERAGE),true)
 LOCAL_REQUIRED_MODULES_arm := mediacodec.policy
+LOCAL_REQUIRED_MODULES_x86 := mediacodec.policy
 endif
 LOCAL_SRC_FILES := main_codecservice.cpp
 LOCAL_SHARED_LIBRARIES := \
@@ -31,7 +32,7 @@ LOCAL_INIT_RC := android.hardware.media.omx@1.0-service.rc
 include $(BUILD_EXECUTABLE)
 
 # service seccomp policy
-ifeq ($(TARGET_ARCH), $(filter $(TARGET_ARCH), arm arm64))
+ifeq ($(TARGET_ARCH), $(filter $(TARGET_ARCH), x86 x86_64 arm arm64))
 include $(CLEAR_VARS)
 LOCAL_MODULE := mediacodec.policy
 LOCAL_MODULE_CLASS := ETC
