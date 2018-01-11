@@ -78,10 +78,14 @@ private:
     sp<ALooper> mLooper;
     sp<AHandlerReflector<ARTPWriter> > mReflector;
 
+    bool mIsIPv6;
     int mRTPSocket, mRTCPSocket;
     struct sockaddr_in mLocalAddr;
     struct sockaddr_in mRTPAddr;
     struct sockaddr_in mRTCPAddr;
+    struct sockaddr_in6 mLocalAddr6;
+    struct sockaddr_in6 mRTPAddr6;
+    struct sockaddr_in6 mRTCPAddr6;
 
     AString mProfileLevel;
     AString mSeqParamSet;
@@ -126,6 +130,7 @@ private:
     void sendAMRData(MediaBufferBase *mediaBuf);
 
     void send(const sp<ABuffer> &buffer, bool isRTCP);
+    void makeSocketPairAndBind(String8& localIp, int localPort, String8& remoteIp, int remotePort);
 
     DISALLOW_EVIL_CONSTRUCTORS(ARTPWriter);
 };
