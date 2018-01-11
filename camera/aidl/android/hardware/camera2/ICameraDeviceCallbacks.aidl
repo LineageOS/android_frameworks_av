@@ -30,6 +30,7 @@ interface ICameraDeviceCallbacks
     const int ERROR_CAMERA_REQUEST = 3;
     const int ERROR_CAMERA_RESULT = 4;
     const int ERROR_CAMERA_BUFFER = 5;
+    const int ERROR_CAMERA_DISABLED = 6;
 
     oneway void onDeviceError(int errorCode, in CaptureResultExtras resultExtras);
     oneway void onDeviceIdle();
