@@ -174,6 +174,7 @@ SimplePlayer::~SimplePlayer() {
 
 void SimplePlayer::onWorkDone(
         std::weak_ptr<C2Component> component, std::vector<std::unique_ptr<C2Work>> workItems) {
+    ALOGV("SimplePlayer::onWorkDone");
     (void) component;
     ULock l(mProcessedLock);
     for (auto & item : workItems) {
@@ -245,31 +246,34 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
             }
             int slot;
             sp<Fence> fence;
+            ALOGV("Render: Frame #%" PRId64, work->worklets.front()->output.ordinal.frame_index);
             const std::shared_ptr<C2Buffer> &output = work->worklets.front()->output.buffers[0];
-            const C2ConstGraphicBlock &block = output->data().graphicBlocks().front();
-            sp<GraphicBuffer> buffer(new GraphicBuffer(
-                    block.handle(),
-                    GraphicBuffer::CLONE_HANDLE,
-                    block.width(),
-                    block.height(),
-                    HAL_PIXEL_FORMAT_YV12,
-                    1,
-                    (uint64_t)GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN,
-                    block.width()));
+            if (output) {
+                const C2ConstGraphicBlock &block = output->data().graphicBlocks().front();
+                sp<GraphicBuffer> buffer(new GraphicBuffer(
+                        block.handle(),
+                        GraphicBuffer::CLONE_HANDLE,
+                        block.width(),
+                        block.height(),
+                        HAL_PIXEL_FORMAT_YV12,
+                        1,
+                        (uint64_t)GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN,
+                        block.width()));
 
-            status_t err = igbp->attachBuffer(&slot, buffer);
+                status_t err = igbp->attachBuffer(&slot, buffer);
 
-            IGraphicBufferProducer::QueueBufferInput qbi(
-                    work->worklets.front()->output.ordinal.timestamp * 1000ll,
-                    false,
-                    HAL_DATASPACE_UNKNOWN,
-                    Rect(block.width(), block.height()),
-                    NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW,
-                    0,
-                    Fence::NO_FENCE,
-                    0);
-            IGraphicBufferProducer::QueueBufferOutput qbo;
-            err = igbp->queueBuffer(slot, qbi, &qbo);
+                IGraphicBufferProducer::QueueBufferInput qbi(
+                        work->worklets.front()->output.ordinal.timestamp * 1000ll,
+                        false,
+                        HAL_DATASPACE_UNKNOWN,
+                        Rect(block.width(), block.height()),
+                        NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW,
+                        0,
+                        Fence::NO_FENCE,
+                        0);
+                IGraphicBufferProducer::QueueBufferOutput qbo;
+                err = igbp->queueBuffer(slot, qbi, &qbo);
+            }
 
             work->input.buffers.clear();
             work->worklets.clear();
@@ -278,6 +282,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
             mWorkQueue.push_back(std::move(work));
             mQueueCondition.notify_all();
         }
+        ALOGV("render loop finished");
     });
 
     long numFrames = 0;
@@ -365,11 +370,12 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
 
         ++numFrames;
     }
+    ALOGV("main loop finished");
     source->stop();
-    component->release();
-
     running.store(false);
     surfaceThread.join();
+
+    component->release();
     printf("\n");
 }
 

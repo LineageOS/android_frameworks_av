@@ -1,4 +1,4 @@
-cc_library_static {
+cc_library {
     name: "libstagefright_codec2_vndk",
 
     srcs: [

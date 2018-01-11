@@ -622,7 +622,7 @@ static void usage(const char *me) {
     fprintf(stderr, "       -o playback audio\n");
     fprintf(stderr, "       -w(rite) filename (write to .mp4 file)\n");
     fprintf(stderr, "       -k seek test\n");
-    fprintf(stderr, "       -O(verride) name of the component\n");
+    fprintf(stderr, "       -N(ame) of the component\n");
     fprintf(stderr, "       -x display a histogram of decoding times/fps "
                     "(video only)\n");
     fprintf(stderr, "       -q don't show progress indicator\n");
@@ -708,7 +708,7 @@ int main(int argc, char **argv) {
     sp<ALooper> looper;
 
     int res;
-    while ((res = getopt(argc, argv, "haqn:lm:b:ptsrow:kO:xSTd:D:")) >= 0) {
+    while ((res = getopt(argc, argv, "haqn:lm:b:ptsrow:kN:xSTd:D:")) >= 0) {
         switch (res) {
             case 'a':
             {
@@ -737,7 +737,7 @@ int main(int argc, char **argv) {
                 break;
             }
 
-            case 'O':
+            case 'N':
             {
                 gComponentNameOverride.setTo(optarg);
                 break;

@@ -2,7 +2,10 @@ LOCAL_PATH := $(call my-dir)
 
 # service executable
 include $(CLEAR_VARS)
+# seccomp is not required for coverage build.
+ifneq ($(NATIVE_COVERAGE),true)
 LOCAL_REQUIRED_MODULES_arm := mediacodec.policy
+endif
 LOCAL_SRC_FILES := main_codecservice.cpp
 LOCAL_SHARED_LIBRARIES := \
     libmedia_omx \
