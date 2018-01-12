@@ -53,6 +53,7 @@ static uint64_t u64at(const uint8_t *data) {
 const int64_t ARTPConnection::kSelectTimeoutUs = 1000LL;
 
 struct ARTPConnection::StreamInfo {
+    bool isIPv6;
     int mRTPSocket;
     int mRTCPSocket;
     sp<ASessionDescription> mSessionDesc;
@@ -63,6 +64,7 @@ struct ARTPConnection::StreamInfo {
     int64_t mNumRTCPPacketsReceived;
     int64_t mNumRTPPacketsReceived;
     struct sockaddr_in mRemoteRTCPAddr;
+    struct sockaddr_in6 mRemoteRTCPAddr6;
 
     bool mIsInjected;
 };
@@ -149,68 +151,92 @@ void ARTPConnection::MakePortPair(
 void ARTPConnection::MakeRTPSocketPair(
         int *rtpSocket, int *rtcpSocket, const char *localIp, const char *remoteIp,
         unsigned localPort, unsigned remotePort) {
-    *rtpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    bool isIPv6 = false;
+    if (strchr(localIp, ':') != NULL)
+        isIPv6 = true;
+
+    *rtpSocket = socket(isIPv6 ? AF_INET6 : AF_INET, SOCK_DGRAM, 0);
     CHECK_GE(*rtpSocket, 0);
 
     bumpSocketBufferSize(*rtpSocket);
 
-    *rtcpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    *rtcpSocket = socket(isIPv6 ? AF_INET6 : AF_INET, SOCK_DGRAM, 0);
     CHECK_GE(*rtcpSocket, 0);
 
     bumpSocketBufferSize(*rtcpSocket);
 
-    struct sockaddr_in addr;
-    memset(addr.sin_zero, 0, sizeof(addr.sin_zero));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = inet_addr(localIp);
-    addr.sin_port = htons(localPort);
+    struct sockaddr *addr;
+    struct sockaddr_in addr4;
+    struct sockaddr_in6 addr6;
+
+    if (isIPv6) {
+        addr = (struct sockaddr *)&addr6;
+        memset(&addr6, 0, sizeof(addr6));
+        addr6.sin6_family = AF_INET6;
+        inet_pton(AF_INET6, localIp, &addr6.sin6_addr);
+        addr6.sin6_port = htons((uint16_t)localPort);
+    } else {
+        addr = (struct sockaddr *)&addr4;
+        memset(&addr4, 0, sizeof(addr4));
+        addr4.sin_family = AF_INET;
+        addr4.sin_addr.s_addr = inet_addr(localIp);
+        addr4.sin_port = htons((uint16_t)localPort);
+    }
 
     int sockopt = 1;
-    setsockopt(*rtpSocket, SOL_SOCKET, SO_REUSEADDR, (int *)&sockopt, sizeof(sockopt));
     setsockopt(*rtpSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
-    setsockopt(*rtcpSocket, SOL_SOCKET, SO_REUSEADDR, (int *)&sockopt, sizeof(sockopt));
     setsockopt(*rtcpSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
 
-    if (bind(*rtpSocket,
-             (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
-        ALOGI("rtp socket successfully binded. addr=%s:%d", inet_ntoa(addr.sin_addr), localPort);
+    int sizeSockSt = isIPv6 ? sizeof(addr6) : sizeof(addr4);
+
+    if (bind(*rtpSocket, addr, sizeSockSt) == 0) {
+        ALOGI("rtp socket successfully binded. addr=%s:%d", localIp, localPort);
     } else {
-        ALOGE("failed to bind rtp socket addr=%s:%d err=%s", inet_ntoa(addr.sin_addr),
-            localPort, strerror(errno));
+        ALOGE("failed to bind rtp socket addr=%s:%d err=%s", localIp, localPort, strerror(errno));
         return;
     }
 
-    addr.sin_port = htons(localPort + 1);
+    if (isIPv6)
+        addr6.sin6_port = htons(localPort + 1);
+    else
+        addr4.sin_port = htons(localPort + 1);
 
-    if (bind(*rtcpSocket,
-             (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
-        ALOGI("rtcp socket successfully binded. addr=%s:%d", inet_ntoa(addr.sin_addr),
-                localPort + 1);
+    if (bind(*rtcpSocket, addr, sizeSockSt) == 0) {
+        ALOGI("rtcp socket successfully binded. addr=%s:%d", localIp, localPort + 1);
     } else {
-        ALOGE("failed to bind rtcp socket addr=%s:%d err=%s", inet_ntoa(addr.sin_addr),
+        ALOGE("failed to bind rtcp socket addr=%s:%d err=%s", localIp,
                 localPort + 1, strerror(errno));
     }
 
     // Re uses addr variable as remote addr.
-    memset(addr.sin_zero, 0, sizeof(addr.sin_zero));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = inet_addr(remoteIp);
-    addr.sin_port = htons(remotePort);
-    if (connect(*rtpSocket, (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
-        ALOGI("rtp socket successfully connected to remote=%s:%d", inet_ntoa(addr.sin_addr),
-                remotePort);
+    if (isIPv6) {
+        memset(&addr6, 0, sizeof(addr6));
+        addr6.sin6_family = AF_INET6;
+        inet_pton(AF_INET6, remoteIp, &addr6.sin6_addr);
+        addr6.sin6_port = htons((uint16_t)remotePort);
     } else {
-        ALOGE("failed to connect rtp socket to remote addr=%s:%d err=%s", inet_ntoa(addr.sin_addr),
+        memset(&addr4, 0, sizeof(addr4));
+        addr4.sin_family = AF_INET;
+        addr4.sin_addr.s_addr = inet_addr(remoteIp);
+        addr4.sin_port = htons((uint16_t)remotePort);
+    }
+    if (connect(*rtpSocket, addr, sizeSockSt) == 0) {
+        ALOGI("rtp socket successfully connected to remote=%s:%d", remoteIp, remotePort);
+    } else {
+        ALOGE("failed to connect rtp socket to remote addr=%s:%d err=%s", remoteIp,
                 remotePort, strerror(errno));
         return;
     }
 
-    addr.sin_port = htons(remotePort + 1);
-    if (connect(*rtcpSocket, (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
-        ALOGI("rtcp socket successfully connected to remote=%s:%d", inet_ntoa(addr.sin_addr),
-                remotePort);
+    if (isIPv6)
+        addr6.sin6_port = htons(remotePort + 1);
+    else
+        addr4.sin_port = htons(remotePort + 1);
+
+    if (connect(*rtcpSocket, addr, sizeSockSt) == 0) {
+        ALOGI("rtcp socket successfully connected to remote=%s:%d", remoteIp, remotePort + 1);
     } else {
-        ALOGE("failed to connect rtcp socket addr=%s:%d err=%s", inet_ntoa(addr.sin_addr),
+        ALOGE("failed to connect rtcp socket addr=%s:%d err=%s", remoteIp,
                 remotePort + 1, strerror(errno));
         return;
     }
@@ -275,6 +301,7 @@ void ARTPConnection::onAddStream(const sp<AMessage> &msg) {
     info->mNumRTCPPacketsReceived = 0;
     info->mNumRTPPacketsReceived = 0;
     memset(&info->mRemoteRTCPAddr, 0, sizeof(info->mRemoteRTCPAddr));
+    memset(&info->mRemoteRTCPAddr6, 0, sizeof(info->mRemoteRTCPAddr6));
 
     if (!injected) {
         postPollEvent();
@@ -411,12 +438,21 @@ void ARTPConnection::onPollStreams() {
             if (buffer->size() > 0) {
                 ALOGV("Sending RR...");
 
+                struct sockaddr* pRemoteRTCPAddr;
+                int sizeSockSt;
+                if (s->isIPv6) {
+                    pRemoteRTCPAddr = (struct sockaddr *)&s->mRemoteRTCPAddr6;
+                    sizeSockSt = sizeof(struct sockaddr_in6);
+                } else {
+                    pRemoteRTCPAddr = (struct sockaddr *)&s->mRemoteRTCPAddr;
+                    sizeSockSt = sizeof(struct sockaddr_in);
+                }
+
                 ssize_t n;
                 do {
                     n = sendto(
-                        s->mRTCPSocket, buffer->data(), buffer->size(), 0,
-                        (const struct sockaddr *)&s->mRemoteRTCPAddr,
-                        sizeof(s->mRemoteRTCPAddr));
+                            s->mRTCPSocket, buffer->data(), buffer->size(), 0,
+                            pRemoteRTCPAddr, sizeSockSt);
                 } while (n < 0 && errno == EINTR);
 
                 if (n <= 0) {
@@ -448,9 +484,18 @@ status_t ARTPConnection::receive(StreamInfo *s, bool receiveRTP) {
 
     sp<ABuffer> buffer = new ABuffer(65536);
 
+    struct sockaddr *pRemoteRTCPAddr;
+    int sizeSockSt;
+    if (s->isIPv6) {
+        pRemoteRTCPAddr = (struct sockaddr *)&s->mRemoteRTCPAddr6;
+        sizeSockSt = sizeof(struct sockaddr_in6);
+    } else {
+        pRemoteRTCPAddr = (struct sockaddr *)&s->mRemoteRTCPAddr;
+        sizeSockSt = sizeof(struct sockaddr_in);
+    }
     socklen_t remoteAddrLen =
         (!receiveRTP && s->mNumRTCPPacketsReceived == 0)
-            ? sizeof(s->mRemoteRTCPAddr) : 0;
+            ? sizeSockSt : 0;
 
     ssize_t nbytes;
     do {
@@ -459,7 +504,7 @@ status_t ARTPConnection::receive(StreamInfo *s, bool receiveRTP) {
             buffer->data(),
             buffer->capacity(),
             0,
-            remoteAddrLen > 0 ? (struct sockaddr *)&s->mRemoteRTCPAddr : NULL,
+            remoteAddrLen > 0 ? pRemoteRTCPAddr : NULL,
             remoteAddrLen > 0 ? &remoteAddrLen : NULL);
     } while (nbytes < 0 && errno == EINTR);
 
