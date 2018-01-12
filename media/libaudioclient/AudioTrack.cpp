@@ -31,6 +31,8 @@
 #include <media/IAudioFlinger.h>
 #include <media/AudioPolicyHelper.h>
 #include <media/AudioResamplerPublic.h>
+#include <media/MediaAnalyticsItem.h>
+#include <media/TypeConverter.h>
 
 #define WAIT_PERIOD_MS                  10
 #define WAIT_STREAM_END_TIMEOUT_SEC     120
@@ -157,6 +159,65 @@ status_t AudioTrack::getMinFrameCount(
 
 // ---------------------------------------------------------------------------
 
+static std::string audioContentTypeString(audio_content_type_t value) {
+    std::string contentType;
+    if (AudioContentTypeConverter::toString(value, contentType)) {
+        return contentType;
+    }
+    char rawbuffer[16];  // room for "%d"
+    snprintf(rawbuffer, sizeof(rawbuffer), "%d", value);
+    return rawbuffer;
+}
+
+static std::string audioUsageString(audio_usage_t value) {
+    std::string usage;
+    if (UsageTypeConverter::toString(value, usage)) {
+        return usage;
+    }
+    char rawbuffer[16];  // room for "%d"
+    snprintf(rawbuffer, sizeof(rawbuffer), "%d", value);
+    return rawbuffer;
+}
+
+void AudioTrack::MediaMetrics::gather(const AudioTrack *track)
+{
+
+    // key for media statistics is defined in the header
+    // attrs for media statistics
+    static constexpr char kAudioTrackStreamType[] = "android.media.audiotrack.streamtype";
+    static constexpr char kAudioTrackContentType[] = "android.media.audiotrack.type";
+    static constexpr char kAudioTrackUsage[] = "android.media.audiotrack.usage";
+    static constexpr char kAudioTrackSampleRate[] = "android.media.audiotrack.samplerate";
+    static constexpr char kAudioTrackChannelMask[] = "android.media.audiotrack.channelmask";
+    static constexpr char kAudioTrackUnderrunFrames[] = "android.media.audiotrack.underrunframes";
+    static constexpr char kAudioTrackStartupGlitch[] = "android.media.audiotrack.glitch.startup";
+
+    // constructor guarantees mAnalyticsItem is valid
+
+    // must gather underrun info before cleaning mProxy information.
+    const int32_t underrunFrames = track->getUnderrunFrames();
+    if (underrunFrames != 0) {
+        mAnalyticsItem->setInt32(kAudioTrackUnderrunFrames, underrunFrames);
+    }
+
+    if (track->mTimestampStartupGlitchReported) {
+        mAnalyticsItem->setInt32(kAudioTrackStartupGlitch, 1);
+    }
+
+    if (track->mStreamType != -1) {
+        // deprecated, but this will tell us who still uses it.
+        mAnalyticsItem->setInt32(kAudioTrackStreamType, track->mStreamType);
+    }
+    // XXX: consider including from mAttributes: source type
+    mAnalyticsItem->setCString(kAudioTrackContentType,
+                               audioContentTypeString(track->mAttributes.content_type).c_str());
+    mAnalyticsItem->setCString(kAudioTrackUsage,
+                               audioUsageString(track->mAttributes.usage).c_str());
+    mAnalyticsItem->setInt32(kAudioTrackSampleRate, track->mSampleRate);
+    mAnalyticsItem->setInt64(kAudioTrackChannelMask, track->mChannelMask);
+}
+
+
 AudioTrack::AudioTrack()
     : mStatus(NO_INIT),
       mState(STATE_STOPPED),
@@ -236,6 +297,9 @@ AudioTrack::AudioTrack(
 
 AudioTrack::~AudioTrack()
 {
+    // pull together the numbers, before we clean up our structures
+    mMediaMetrics.gather(this);
+
     if (mStatus == NO_ERROR) {
         // Make sure that callback function exits in the case where
         // it is looping on buffer full condition in obtainBuffer().
