@@ -18,21 +18,16 @@
 
 #define GRAPHIC_BUFFER_SOURCE_H_
 
-#include <gui/IGraphicBufferProducer.h>
+#include <binder/Status.h>
 #include <gui/BufferQueue.h>
+#include <gui/IGraphicBufferProducer.h>
 #include <utils/RefBase.h>
 
 #include <media/hardware/VideoAPI.h>
-#include <media/IOMX.h>
-#include <media/OMXFenceParcelable.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AHandlerReflector.h>
 #include <media/stagefright/foundation/ALooper.h>
-
-#include <android/BnGraphicBufferSource.h>
-#include <android/BnOMXBufferSource.h>
-
-#include "IOmxNodeWrapper.h"
+#include <media/stagefright/gbs/ComponentWrapper.h>
 
 namespace android {
 
@@ -41,7 +36,7 @@ using ::android::binder::Status;
 struct FrameDropper;
 
 /*
- * This class is used to feed OMX codecs from a Surface via BufferQueue or
+ * This class is used to feed codecs from a Surface via BufferQueue or
  * HW producer.
  *
  * Instances of the class don't run on a dedicated thread.  Instead,
@@ -49,7 +44,7 @@ struct FrameDropper;
  *
  *  - Availability of a new frame of data from the BufferQueue (notified
  *    via the onFrameAvailable callback).
- *  - The return of a codec buffer (via OnEmptyBufferDone).
+ *  - The return of a codec buffer.
  *  - Application signaling end-of-stream.
  *  - Transition to or from "executing" state.
  *
@@ -91,39 +86,37 @@ public:
         return mProducer;
     }
 
-    // OmxBufferSource interface
-    // ------------------------------
-
-    // This is called when OMX transitions to OMX_StateExecuting, which means
+    // This is called when component transitions to running state, which means
     // we can start handing it buffers.  If we already have buffers of data
     // sitting in the BufferQueue, this will send them to the codec.
-    Status onOmxExecuting();
+    Status start();
 
-    // This is called when OMX transitions to OMX_StateIdle, indicating that
+    // This is called when component transitions to stopped, indicating that
     // the codec is meant to return all buffers back to the client for them
     // to be freed. Do NOT submit any more buffers to the component.
-    Status onOmxIdle();
+    Status stop();
 
-    // This is called when OMX transitions to OMX_StateLoaded, indicating that
+    // This is called when component transitions to released, indicating that
     // we are shutting down.
-    Status onOmxLoaded();
+    Status release();
 
     // A "codec buffer", i.e. a buffer that can be used to pass data into
     // the encoder, has been allocated.  (This call does not call back into
-    // OMXNodeInstance.)
+    // component.)
     Status onInputBufferAdded(int32_t bufferId);
 
-    // Called from OnEmptyBufferDone.  If we have a BQ buffer available,
-    // fill it with a new frame of data; otherwise, just mark it as available.
+    // Called when encoder is no longer using the buffer.  If we have a BQ
+    // buffer available, fill it with a new frame of data; otherwise, just mark
+    // it as available.
     Status onInputBufferEmptied(int32_t bufferId, int fenceFd);
 
     // IGraphicBufferSource interface
     // ------------------------------
 
-    // Configure the buffer source to be used with an OMX node with the default
+    // Configure the buffer source to be used with a component with the default
     // data space.
     status_t configure(
-        const sp<IOmxNodeWrapper> &omxNode,
+        const sp<ComponentWrapper> &component,
         int32_t dataSpace,
         int32_t bufferCount,
         uint32_t frameWidth,
@@ -335,10 +328,10 @@ private:
     // called when the data space of the input buffer changes
     void onDataspaceChanged_l(android_dataspace dataspace, android_pixel_format pixelFormat);
 
-    // Pointer back to the Omx node that created us.  We send buffers here.
-    sp<IOmxNodeWrapper> mOMXNode;
+    // Pointer back to the component that created us.  We send buffers here.
+    sp<ComponentWrapper> mComponent;
 
-    // Set by omxExecuting() / omxIdling().
+    // Set by start() / stop().
     bool mExecuting;
 
     bool mSuspended;
