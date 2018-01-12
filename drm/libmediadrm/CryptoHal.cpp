@@ -331,10 +331,13 @@ ssize_t CryptoHal::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
             return status;
         }
         secure = false;
-    } else {
+    } else if (destination.mType == kDestinationTypeNativeHandle) {
         hDestination.type = BufferType::NATIVE_HANDLE;
         hDestination.secureMemory = hidl_handle(destination.mHandle);
         secure = true;
+    } else {
+        android_errorWriteLog(0x534e4554, "70526702");
+        return UNKNOWN_ERROR;
     }
 
     ::SharedBuffer hSource;
