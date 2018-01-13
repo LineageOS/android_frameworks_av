@@ -21,6 +21,7 @@
 #include <cutils/sched_policy.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTimestamp.h>
+#include <media/MediaAnalyticsItem.h>
 #include <media/Modulo.h>
 #include <utils/RefBase.h>
 #include <utils/threads.h>
@@ -688,6 +689,24 @@ private:
                                               // activity and connected devices
     wp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
 
+private:
+    class MediaMetrics {
+      public:
+        MediaMetrics() : mAnalyticsItem(new MediaAnalyticsItem("audiorecord")) {
+        }
+        ~MediaMetrics() {
+            // mAnalyticsItem alloc failure will be flagged in the constructor
+            // don't log empty records
+            if (mAnalyticsItem->count() > 0) {
+                mAnalyticsItem->setFinalized(true);
+                mAnalyticsItem->selfrecord();
+            }
+        }
+        void gather(const AudioRecord *record);
+      private:
+        std::unique_ptr<MediaAnalyticsItem> mAnalyticsItem;
+    };
+    MediaMetrics mMediaMetrics;
 };
 
 }; // namespace android

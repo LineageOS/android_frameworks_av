@@ -26,6 +26,8 @@
 #include <utils/Log.h>
 #include <private/media/AudioTrackShared.h>
 #include <media/IAudioFlinger.h>
+#include <media/MediaAnalyticsItem.h>
+#include <media/TypeConverter.h>
 
 #define WAIT_PERIOD_MS          10
 
@@ -64,6 +66,34 @@ status_t AudioRecord::getMinFrameCount(
 }
 
 // ---------------------------------------------------------------------------
+
+static std::string audioFormatTypeString(audio_format_t value) {
+    std::string formatType;
+    if (FormatConverter::toString(value, formatType)) {
+        return formatType;
+    }
+    char rawbuffer[16];  // room for "%d"
+    snprintf(rawbuffer, sizeof(rawbuffer), "%d", value);
+    return rawbuffer;
+}
+
+void AudioRecord::MediaMetrics::gather(const AudioRecord *record)
+{
+    // key for media statistics is defined in the header
+    // attrs for media statistics
+    static constexpr char kAudioRecordChannelCount[] = "android.media.audiorecord.channels";
+    static constexpr char kAudioRecordFormat[] = "android.media.audiorecord.format";
+    static constexpr char kAudioRecordLatency[] = "android.media.audiorecord.latency";
+    static constexpr char kAudioRecordSampleRate[] = "android.media.audiorecord.samplerate";
+
+    // constructor guarantees mAnalyticsItem is valid
+
+    mAnalyticsItem->setInt32(kAudioRecordLatency, record->mLatency);
+    mAnalyticsItem->setInt32(kAudioRecordSampleRate, record->mSampleRate);
+    mAnalyticsItem->setInt32(kAudioRecordChannelCount, record->mChannelCount);
+    mAnalyticsItem->setCString(kAudioRecordFormat,
+                               audioFormatTypeString(record->mFormat).c_str());
+}
 
 AudioRecord::AudioRecord(const String16 &opPackageName)
     : mActive(false), mStatus(NO_INIT), mOpPackageName(opPackageName),
@@ -105,6 +135,8 @@ AudioRecord::AudioRecord(
 
 AudioRecord::~AudioRecord()
 {
+    mMediaMetrics.gather(this);
+
     if (mStatus == NO_ERROR) {
         // Make sure that callback function exits in the case where
         // it is looping on buffer empty condition in obtainBuffer().
