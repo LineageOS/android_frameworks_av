@@ -177,6 +177,24 @@ AAUDIO_API void AAudioStreamBuilder_setSharingMode(AAudioStreamBuilder* builder,
     streamBuilder->setSharingMode(sharingMode);
 }
 
+AAUDIO_API void AAudioStreamBuilder_setUsage(AAudioStreamBuilder* builder,
+                                             aaudio_usage_t usage) {
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setUsage(usage);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setContentType(AAudioStreamBuilder* builder,
+                                                   aaudio_content_type_t contentType) {
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setContentType(contentType);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
+                                                   aaudio_input_preset_t inputPreset) {
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setInputPreset(inputPreset);
+}
+
 AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilder* builder,
                                                         int32_t frames)
 {
@@ -445,6 +463,24 @@ AAUDIO_API aaudio_sharing_mode_t AAudioStream_getSharingMode(AAudioStream* strea
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getSharingMode();
+}
+
+AAUDIO_API aaudio_usage_t AAudioStream_getUsage(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getUsage();
+}
+
+AAUDIO_API aaudio_content_type_t AAudioStream_getContentType(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getContentType();
+}
+
+AAUDIO_API aaudio_input_preset_t AAudioStream_getInputPreset(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getInputPreset();
 }
 
 AAUDIO_API int64_t AAudioStream_getFramesWritten(AAudioStream* stream)

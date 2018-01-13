@@ -121,9 +121,22 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
                                            ? AUDIO_PORT_HANDLE_NONE
                                            : getDeviceId();
 
+    const audio_content_type_t contentType =
+            AAudioConvert_contentTypeToInternal(builder.getContentType());
+    const audio_usage_t usage =
+            AAudioConvert_usageToInternal(builder.getUsage());
+
+    const audio_attributes_t attributes = {
+            .content_type = contentType,
+            .usage = usage,
+            .source = AUDIO_SOURCE_DEFAULT, // only used for recording
+            .flags = flags, // If attributes are set then the other flags parameter is ignored.
+            .tags = ""
+    };
+
     mAudioTrack = new AudioTrack();
     mAudioTrack->set(
-            (audio_stream_type_t) AUDIO_STREAM_MUSIC,
+            AUDIO_STREAM_DEFAULT,  // ignored because we pass attributes below
             getSampleRate(),
             format,
             channelMask,
@@ -139,7 +152,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             NULL,    // DEFAULT audio_offload_info_t
             AUDIO_UID_INVALID, // DEFAULT uid
             -1,      // DEFAULT pid
-            NULL,    // DEFAULT audio_attributes_t
+            &attributes,
             // WARNING - If doNotReconnect set true then audio stops after plugging and unplugging
             // headphones a few times.
             false,   // DEFAULT doNotReconnect,
