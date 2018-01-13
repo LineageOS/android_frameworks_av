@@ -331,7 +331,8 @@ NBLog::EntryIterator NBLog::HistogramEntry::copyWithAuthor(
     *(int*) (buffer + sizeof(entry) + sizeof(HistTsEntry)) = author;
     // Update lengths
     buffer[offsetof(entry, length)] = sizeof(HistTsEntryWithAuthor);
-    buffer[sizeof(buffer) + Entry::kPreviousLengthOffset] = sizeof(HistTsEntryWithAuthor);
+    buffer[offsetof(entry, data) + sizeof(HistTsEntryWithAuthor) + offsetof(ending, length)]
+        = sizeof(HistTsEntryWithAuthor);
     // Write new buffer into FIFO
     dst->write(buffer, sizeof(buffer));
     return EntryIterator(mEntry).next();
