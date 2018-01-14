@@ -18,11 +18,38 @@
 #define LOG_TAG "SimpleC2Component"
 #include <media/stagefright/foundation/ADebug.h>
 
-#include <C2PlatformSupport.h>
+#include <inttypes.h>
 
+#include <C2PlatformSupport.h>
 #include <SimpleC2Component.h>
 
 namespace android {
+
+std::unique_ptr<C2Work> SimpleC2Component::WorkQueue::pop_front() {
+    std::unique_ptr<C2Work> work = std::move(mQueue.front().work);
+    mQueue.pop_front();
+    return work;
+}
+
+void SimpleC2Component::WorkQueue::push_back(std::unique_ptr<C2Work> work) {
+    mQueue.push_back({ std::move(work), NO_DRAIN });
+}
+
+bool SimpleC2Component::WorkQueue::empty() const {
+    return mQueue.empty();
+}
+
+void SimpleC2Component::WorkQueue::clear() {
+    mQueue.clear();
+}
+
+uint32_t SimpleC2Component::WorkQueue::drainMode() const {
+    return mQueue.front().drainMode;
+}
+
+void SimpleC2Component::WorkQueue::markDrain(uint32_t drainMode) {
+    mQueue.push_back({ nullptr, drainMode });
+}
 
 SimpleC2Component::SimpleC2Component(
         const std::shared_ptr<C2ComponentInterface> &intf)
@@ -55,7 +82,7 @@ c2_status_t SimpleC2Component::queue_nb(std::list<std::unique_ptr<C2Work>> * con
     {
         Mutexed<WorkQueue>::Locked queue(mWorkQueue);
         while (!items->empty()) {
-            queue->mQueue.push_back(std::move(items->front()));
+            queue->push_back(std::move(items->front()));
             items->pop_front();
         }
         queue->mCondition.broadcast();
@@ -79,10 +106,12 @@ c2_status_t SimpleC2Component::flush_sm(
     }
     {
         Mutexed<WorkQueue>::Locked queue(mWorkQueue);
-        ++queue->mGeneration;
-        while (!queue->mQueue.empty()) {
-            flushedWork->push_back(std::move(queue->mQueue.front()));
-            queue->mQueue.pop_front();
+        queue->incGeneration();
+        while (!queue->empty()) {
+            std::unique_ptr<C2Work> work = queue->pop_front();
+            if (work) {
+                flushedWork->push_back(std::move(work));
+            }
         }
     }
     {
@@ -96,8 +125,10 @@ c2_status_t SimpleC2Component::flush_sm(
     return onFlush_sm();
 }
 
-c2_status_t SimpleC2Component::drain_nb(drain_mode_t drainThrough) {
-    (void) drainThrough;
+c2_status_t SimpleC2Component::drain_nb(drain_mode_t drainMode) {
+    if (drainMode == DRAIN_CHAIN) {
+        return C2_OMITTED;
+    }
     {
         Mutexed<ExecState>::Locked state(mExecState);
         if (state->mState != RUNNING) {
@@ -106,14 +137,11 @@ c2_status_t SimpleC2Component::drain_nb(drain_mode_t drainThrough) {
     }
     {
         Mutexed<WorkQueue>::Locked queue(mWorkQueue);
-        if (!queue->mQueue.empty()) {
-            const std::unique_ptr<C2Work> &work = queue->mQueue.back();
-            work->input.flags = (C2BufferPack::flags_t)(work->input.flags | C2BufferPack::FLAG_END_OF_STREAM);
-            return C2_OK;
-        }
+        queue->markDrain(drainMode);
+        queue->mCondition.broadcast();
     }
 
-    return onDrain_nb();
+    return C2_OK;
 }
 
 c2_status_t SimpleC2Component::start() {
@@ -161,7 +189,7 @@ c2_status_t SimpleC2Component::stop() {
     }
     {
         Mutexed<WorkQueue>::Locked queue(mWorkQueue);
-        queue->mQueue.clear();
+        queue->clear();
     }
     {
         Mutexed<PendingWork>::Locked pending(mPendingWork);
@@ -181,7 +209,7 @@ c2_status_t SimpleC2Component::reset() {
     }
     {
         Mutexed<WorkQueue>::Locked queue(mWorkQueue);
-        queue->mQueue.clear();
+        queue->clear();
     }
     {
         Mutexed<PendingWork>::Locked pending(mPendingWork);
@@ -192,11 +220,13 @@ c2_status_t SimpleC2Component::reset() {
 }
 
 c2_status_t SimpleC2Component::release() {
+    std::thread releasing;
     {
         Mutexed<ExecState>::Locked state(mExecState);
-        mExitRequested = true;
-        state->mThread.join();
+        releasing = std::move(state->mThread);
     }
+    mExitRequested = true;
+    releasing.join();
     onRelease();
     return C2_OK;
 }
@@ -221,6 +251,7 @@ void SimpleC2Component::finish(
     {
         Mutexed<PendingWork>::Locked pending(mPendingWork);
         if (pending->count(frameIndex) == 0) {
+            ALOGW("unknown frame index: %" PRIu64, frameIndex);
             return;
         }
         work = std::move(pending->at(frameIndex));
@@ -230,34 +261,56 @@ void SimpleC2Component::finish(
         fillWork(work);
         Mutexed<ExecState>::Locked state(mExecState);
         state->mListener->onWorkDone_nb(shared_from_this(), vec(work));
+        ALOGV("returning pending work");
     }
 }
 
 void SimpleC2Component::processQueue() {
     std::unique_ptr<C2Work> work;
     uint64_t generation;
+    int32_t drainMode;
     {
         Mutexed<WorkQueue>::Locked queue(mWorkQueue);
         nsecs_t deadline = systemTime() + ms2ns(250);
-        while (queue->mQueue.empty()) {
-            status_t err = queue.waitForConditionRelative(
-                    queue->mCondition, std::max(deadline - systemTime(), (nsecs_t)0));
+        while (queue->empty()) {
+            nsecs_t now = systemTime();
+            if (now >= deadline) {
+                return;
+            }
+            status_t err = queue.waitForConditionRelative(queue->mCondition, deadline - now);
             if (err == TIMED_OUT) {
                 return;
             }
         }
 
-        generation = queue->mGeneration;
-        work = std::move(queue->mQueue.front());
-        queue->mQueue.pop_front();
-    }
-    if (!work) {
-        return;
+        generation = queue->generation();
+        drainMode = queue->drainMode();
+        work = queue->pop_front();
     }
 
-    // TODO: grab pool ID from intf
     if (!mOutputBlockPool) {
-        c2_status_t err = GetCodec2BlockPool(C2BlockPool::BASIC_GRAPHIC, shared_from_this(), &mOutputBlockPool);
+        c2_status_t err = [this] {
+            // TODO: don't use query_vb
+            C2StreamFormatConfig::output outputFormat(0u);
+            c2_status_t err = intf()->query_vb(
+                    { &outputFormat },
+                    {},
+                    C2_DONT_BLOCK,
+                    nullptr);
+            if (err != C2_OK) {
+                return err;
+            }
+            err = GetCodec2BlockPool(
+                    (outputFormat.value == C2FormatVideo)
+                    ? C2BlockPool::BASIC_GRAPHIC
+                    : C2BlockPool::BASIC_LINEAR,
+                    shared_from_this(),
+                    &mOutputBlockPool);
+            if (err != C2_OK) {
+                return err;
+            }
+            return C2_OK;
+        }();
         if (err != C2_OK) {
             Mutexed<ExecState>::Locked state(mExecState);
             state->mListener->onError_nb(shared_from_this(), err);
@@ -265,10 +318,20 @@ void SimpleC2Component::processQueue() {
         }
     }
 
-    bool done = process(work, mOutputBlockPool);
+    if (!work) {
+        c2_status_t err = drain(drainMode, mOutputBlockPool);
+        if (err != C2_OK) {
+            Mutexed<ExecState>::Locked state(mExecState);
+            state->mListener->onError_nb(shared_from_this(), err);
+        }
+        return;
+    }
+
+    process(work, mOutputBlockPool);
     {
         Mutexed<WorkQueue>::Locked queue(mWorkQueue);
-        if (queue->mGeneration != generation) {
+        if (queue->generation() != generation) {
+            ALOGW("work form old generation: was %" PRIu64 " now %" PRIu64, queue->generation(), generation);
             work->result = C2_NOT_FOUND;
             queue.unlock();
             {
@@ -279,10 +342,12 @@ void SimpleC2Component::processQueue() {
             return;
         }
     }
-    if (done) {
+    if (work->worklets_processed != 0u) {
         Mutexed<ExecState>::Locked state(mExecState);
+        ALOGV("returning this work");
         state->mListener->onWorkDone_nb(shared_from_this(), vec(work));
     } else {
+        ALOGV("queue pending work");
         std::unique_ptr<C2Work> unexpected;
         {
             Mutexed<PendingWork>::Locked pending(mPendingWork);
@@ -299,6 +364,47 @@ void SimpleC2Component::processQueue() {
             state->mListener->onWorkDone_nb(shared_from_this(), vec(unexpected));
         }
     }
+}
+
+namespace {
+
+class GraphicBuffer : public C2Buffer {
+public:
+    GraphicBuffer(
+            const std::shared_ptr<C2GraphicBlock> &block,
+            const C2Rect &crop)
+        : C2Buffer({ block->share(crop, ::android::C2Fence()) }) {}
+};
+
+
+class LinearBuffer : public C2Buffer {
+public:
+    LinearBuffer(
+            const std::shared_ptr<C2LinearBlock> &block, size_t offset, size_t size)
+        : C2Buffer({ block->share(offset, size, ::android::C2Fence()) }) {}
+};
+
+}  // namespace
+
+std::shared_ptr<C2Buffer> SimpleC2Component::createLinearBuffer(
+        const std::shared_ptr<C2LinearBlock> &block) {
+    return createLinearBuffer(block, block->offset(), block->size());
+}
+
+std::shared_ptr<C2Buffer> SimpleC2Component::createLinearBuffer(
+        const std::shared_ptr<C2LinearBlock> &block, size_t offset, size_t size) {
+    return std::make_shared<LinearBuffer>(block, offset, size);
+}
+
+std::shared_ptr<C2Buffer> SimpleC2Component::createGraphicBuffer(
+        const std::shared_ptr<C2GraphicBlock> &block) {
+    return createGraphicBuffer(block, C2Rect(0, 0, block->width(), block->height()));
+}
+
+std::shared_ptr<C2Buffer> SimpleC2Component::createGraphicBuffer(
+        const std::shared_ptr<C2GraphicBlock> &block,
+        const C2Rect &crop) {
+    return std::make_shared<GraphicBuffer>(block, crop);
 }
 
 } // namespace android

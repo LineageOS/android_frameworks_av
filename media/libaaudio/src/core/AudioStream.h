@@ -204,6 +204,18 @@ public:
 
     virtual aaudio_direction_t getDirection() const = 0;
 
+    aaudio_usage_t getUsage() const {
+        return mUsage;
+    }
+
+    aaudio_content_type_t getContentType() const {
+        return mContentType;
+    }
+
+    aaudio_input_preset_t getInputPreset() const {
+        return mInputPreset;
+    }
+
     /**
      * This is only valid after setSamplesPerFrame() and setFormat() have been called.
      */
@@ -471,6 +483,9 @@ private:
     aaudio_format_t             mFormat = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_stream_state_t       mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
     aaudio_performance_mode_t   mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
+    aaudio_usage_t              mUsage           = AAUDIO_USAGE_MEDIA;
+    aaudio_content_type_t       mContentType     = AAUDIO_CONTENT_TYPE_MUSIC;
+    aaudio_input_preset_t       mInputPreset     = AAUDIO_INPUT_PRESET_GENERIC;
 
     // callback ----------------------------------
 

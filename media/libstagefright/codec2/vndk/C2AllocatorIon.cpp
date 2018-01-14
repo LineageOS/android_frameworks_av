@@ -27,35 +27,67 @@
 
 namespace android {
 
+/* size_t <=> int(lo), int(hi) conversions */
+constexpr inline int size2intLo(size_t s) {
+    return int(s & 0xFFFFFFFF);
+}
+
+constexpr inline int size2intHi(size_t s) {
+    // cast to uint64_t as size_t may be 32 bits wide
+    return int((uint64_t(s) >> 32) & 0xFFFFFFFF);
+}
+
+constexpr inline size_t ints2size(int intLo, int intHi) {
+    // convert in 2 stages to 64 bits as intHi may be negative
+    return size_t(unsigned(intLo)) | size_t(uint64_t(unsigned(intHi)) << 32);
+}
+
 /* ========================================= ION HANDLE ======================================== */
+/**
+ * ION handle
+ *
+ * There can be only a sole ion client per process, this is captured in the ion fd that is passed
+ * to the constructor, but this should be managed by the ion buffer allocator/mapper.
+ *
+ * ion uses ion_user_handle_t for buffers. We don't store this in the native handle as
+ * it requires an ion_free to decref. Instead, we share the buffer to get an fd that also holds
+ * a refcount.
+ *
+ * This handle will not capture mapped fd-s as updating that would require a global mutex.
+ */
+
 struct C2HandleIon : public C2Handle {
-    C2HandleIon(int ionFd, ion_user_handle_t buffer) : C2Handle(cHeader),
-          mFds{ ionFd, buffer },
-          mInts{ kMagic } { }
+    // ion handle owns ionFd(!) and bufferFd
+    C2HandleIon(int bufferFd, size_t size)
+        : C2Handle(cHeader),
+          mFds{ bufferFd },
+          mInts{ int(size & 0xFFFFFFFF), int((uint64_t(size) >> 32) & 0xFFFFFFFF), kMagic } { }
 
     static bool isValid(const C2Handle * const o);
 
-    int ionFd() const { return mFds.mIon; }
-    ion_user_handle_t buffer() const { return mFds.mBuffer; }
-
-    void setBuffer(ion_user_handle_t bufferFd) { mFds.mBuffer = bufferFd; }
+    int bufferFd() const { return mFds.mBuffer; }
+    size_t size() const {
+        return size_t(unsigned(mInts.mSizeLo))
+                | size_t(uint64_t(unsigned(mInts.mSizeHi)) << 32);
+    }
 
 protected:
     struct {
-        int mIon;
-        int mBuffer; // ion_user_handle_t
+        int mBuffer; // shared ion buffer
     } mFds;
     struct {
+        int mSizeLo; // low 32-bits of size
+        int mSizeHi; // high 32-bits of size
         int mMagic;
     } mInts;
 
 private:
     typedef C2HandleIon _type;
     enum {
-        kMagic = 'ion1',
+        kMagic = '\xc2io\x00',
         numFds = sizeof(mFds) / sizeof(int),
         numInts = sizeof(mInts) / sizeof(int),
-        version = sizeof(C2Handle) + sizeof(mFds) + sizeof(mInts)
+        version = sizeof(C2Handle)
     };
     //constexpr static C2Handle cHeader = { version, numFds, numInts, {} };
     const static C2Handle cHeader;
@@ -82,6 +114,7 @@ bool C2HandleIon::isValid(const C2Handle * const o) {
 /* ======================================= ION ALLOCATION ====================================== */
 class C2AllocationIon : public C2LinearAllocation {
 public:
+    /* Interface methods */
     virtual c2_status_t map(
         size_t offset, size_t size, C2MemoryUsage usage, int *fence,
         void **addr /* nonnull */) override;
@@ -94,57 +127,108 @@ public:
     // internal methods
     C2AllocationIon(int ionFd, size_t size, size_t align, unsigned heapMask, unsigned flags);
     C2AllocationIon(int ionFd, size_t size, int shareFd);
-    int dup() const;
+
     c2_status_t status() const;
 
 protected:
     class Impl;
     Impl *mImpl;
+
+    // TODO: we could make this encapsulate shared_ptr and copiable
+    C2_DO_NOT_COPY(C2AllocationIon);
 };
 
 class C2AllocationIon::Impl {
-public:
-    // NOTE: using constructor here instead of a factory method as we will need the
-    // error value and this simplifies the error handling by the wrapper.
-    Impl(int ionFd, size_t capacity, size_t align, unsigned heapMask, unsigned flags)
-        : mInit(C2_OK),
-          mHandle(ionFd, -1),
+private:
+    /**
+     * Constructs an ion allocation.
+     *
+     * \note We always create an ion allocation, even if the allocation or import fails
+     * so that we can capture the error.
+     *
+     * \param ionFd     ion client (ownership transferred to created object)
+     * \param capacity  size of allocation
+     * \param bufferFd  buffer handle (ownership transferred to created object). Must be
+     *                  invalid if err is not 0.
+     * \param buffer    ion buffer user handle (ownership transferred to created object). Must be
+     *                  invalid if err is not 0.
+     * \param err       errno during buffer allocation or import
+     */
+    Impl(int ionFd, size_t capacity, int bufferFd, ion_user_handle_t buffer, int err)
+        : mIonFd(ionFd),
+          mHandle(bufferFd, capacity),
+          mBuffer(buffer),
+          mInit(c2_map_errno<ENOMEM, EACCES, EINVAL>(err)),
           mMapFd(-1),
-          mCapacity(capacity) {
-        ion_user_handle_t buffer = -1;
-        int ret = ion_alloc(mHandle.ionFd(), mCapacity, align, heapMask, flags, &buffer);
-        if (ret == 0) {
-            mHandle.setBuffer(buffer);
-        } else {
-            mInit = c2_map_errno<ENOMEM, EACCES, EINVAL>(-ret);
+          mMapSize(0) {
+        if (mInit != C2_OK) {
+            // close ionFd now on error
+            if (mIonFd >= 0) {
+                close(mIonFd);
+                mIonFd = -1;
+            }
+            // C2_CHECK(bufferFd < 0);
+            // C2_CHECK(buffer < 0);
         }
     }
 
-    Impl(int ionFd, size_t capacity, int shareFd)
-        : mInit(C2_OK),
-          mHandle(ionFd, -1),
-          mMapFd(-1),
-          mCapacity(capacity) {
-        ion_user_handle_t buffer;
-        int ret = ion_import(mHandle.ionFd(), shareFd, &buffer);
-        switch (-ret) {
-        case 0:
-            mHandle.setBuffer(buffer);
-            break;
-        case EBADF: // bad ion handle - should not happen
-        case ENOTTY: // bad ion driver
-            mInit = C2_CORRUPTED;
-            break;
-        default:
-            mInit = c2_map_errno<ENOMEM, EACCES, EINVAL>(-ret);
-            break;
+public:
+    /**
+     * Constructs an ion allocation by importing a shared buffer fd.
+     *
+     * \param ionFd     ion client (ownership transferred to created object)
+     * \param capacity  size of allocation
+     * \param bufferFd  buffer handle (ownership transferred to created object)
+     *
+     * \return created ion allocation (implementation) which may be invalid if the
+     * import failed.
+     */
+    static Impl *Import(int ionFd, size_t capacity, int bufferFd) {
+        ion_user_handle_t buffer = -1;
+        int ret = ion_import(ionFd, bufferFd, &buffer);
+        return new Impl(ionFd, capacity, bufferFd, buffer, ret);
+    }
+
+    /**
+     * Constructs an ion allocation by allocating an ion buffer.
+     *
+     * \param ionFd     ion client (ownership transferred to created object)
+     * \param size      size of allocation
+     * \param align     desired alignment of allocation
+     * \param heapMask  mask of heaps considered
+     * \param flags     ion allocation flags
+     *
+     * \return created ion allocation (implementation) which may be invalid if the
+     * allocation failed.
+     */
+    static Impl *Alloc(int ionFd, size_t size, size_t align, unsigned heapMask, unsigned flags) {
+        int bufferFd = -1;
+        ion_user_handle_t buffer = -1;
+        int ret = ion_alloc(ionFd, size, align, heapMask, flags, &buffer);
+        if (ret == 0) {
+            // get buffer fd for native handle constructor
+            ret = ion_share(ionFd, buffer, &bufferFd);
+            if (ret != 0) {
+                ion_free(ionFd, buffer);
+                buffer = -1;
+            }
         }
-        (void)mCapacity; // TODO
+        return new Impl(ionFd, size, bufferFd, buffer, ret);
     }
 
     c2_status_t map(size_t offset, size_t size, C2MemoryUsage usage, int *fenceFd, void **addr) {
         (void)fenceFd; // TODO: wait for fence
         *addr = nullptr;
+        if (mMapSize > 0) {
+            // TODO: technically we should return DUPLICATE here, but our block views don't
+            // actually unmap, so we end up remapping an ion buffer multiple times.
+            //
+            // return C2_DUPLICATE;
+        }
+        if (size == 0) {
+            return C2_BAD_VALUE;
+        }
+
         int prot = PROT_NONE;
         int flags = MAP_PRIVATE;
         if (usage.consumer & C2MemoryUsage::CPU_READ) {
@@ -161,7 +245,7 @@ public:
 
         c2_status_t err = C2_OK;
         if (mMapFd == -1) {
-            int ret = ion_map(mHandle.ionFd(), mHandle.buffer(), mapSize, prot,
+            int ret = ion_map(mIonFd, mBuffer, mapSize, prot,
                               flags, mapOffset, (unsigned char**)&mMapAddr, &mMapFd);
             if (ret) {
                 mMapFd = -1;
@@ -187,6 +271,9 @@ public:
     }
 
     c2_status_t unmap(void *addr, size_t size, int *fenceFd) {
+        if (mMapFd < 0 || mMapSize == 0) {
+            return C2_NOT_FOUND;
+        }
         if (addr != (uint8_t *)mMapAddr + mMapAlignmentBytes ||
                 size + mMapAlignmentBytes != mMapSize) {
             return C2_BAD_VALUE;
@@ -196,44 +283,43 @@ public:
             return c2_map_errno<EINVAL>(errno);
         }
         if (fenceFd) {
-            *fenceFd = -1;
+            *fenceFd = -1; // not using fences
         }
+        mMapSize = 0;
         return C2_OK;
     }
 
     ~Impl() {
-        if (mMapFd != -1) {
+        if (mMapFd >= 0) {
             close(mMapFd);
             mMapFd = -1;
         }
-
-        (void)ion_free(mHandle.ionFd(), mHandle.buffer());
+        if (mInit == C2_OK) {
+            (void)ion_free(mIonFd, mBuffer);
+        }
+        if (mIonFd >= 0) {
+            close(mIonFd);
+        }
+        native_handle_close(&mHandle);
     }
 
     c2_status_t status() const {
         return mInit;
     }
 
-    const C2Handle * handle() const {
+    const C2Handle *handle() const {
         return &mHandle;
     }
 
-    int dup() const {
-        int fd = -1;
-        if (mInit != 0 || ion_share(mHandle.ionFd(), mHandle.buffer(), &fd) != 0) {
-            fd = -1;
-        }
-        return fd;
-    }
-
 private:
-    c2_status_t mInit;
+    int mIonFd;
     C2HandleIon mHandle;
+    ion_user_handle_t mBuffer;
+    c2_status_t mInit;
     int mMapFd; // only one for now
     void *mMapAddr;
     size_t mMapAlignmentBytes;
     size_t mMapSize;
-    size_t mCapacity;
 };
 
 c2_status_t C2AllocationIon::map(
@@ -268,15 +354,11 @@ C2AllocationIon::~C2AllocationIon() {
 
 C2AllocationIon::C2AllocationIon(int ionFd, size_t size, size_t align, unsigned heapMask, unsigned flags)
     : C2LinearAllocation(size),
-      mImpl(new Impl(ionFd, size, align, heapMask, flags)) { }
+      mImpl(Impl::Alloc(ionFd, size, align, heapMask, flags)) { }
 
 C2AllocationIon::C2AllocationIon(int ionFd, size_t size, int shareFd)
     : C2LinearAllocation(size),
-      mImpl(new Impl(ionFd, size, shareFd)) { }
-
-int C2AllocationIon::dup() const {
-    return mImpl->dup();
-}
+      mImpl(Impl::Import(ionFd, size, shareFd)) { }
 
 /* ======================================= ION ALLOCATOR ====================================== */
 C2AllocatorIon::C2AllocatorIon() : mInit(C2_OK), mIonFd(ion_open()) {
@@ -328,7 +410,7 @@ c2_status_t C2AllocatorIon::newLinearAllocation(
 #endif
 
     std::shared_ptr<C2AllocationIon> alloc
-        = std::make_shared<C2AllocationIon>(mIonFd, capacity, align, heapMask, flags);
+        = std::make_shared<C2AllocationIon>(dup(mIonFd), capacity, align, heapMask, flags);
     c2_status_t ret = alloc->status();
     if (ret == C2_OK) {
         *allocation = alloc;
@@ -350,7 +432,7 @@ c2_status_t C2AllocatorIon::priorLinearAllocation(
     // TODO: get capacity and validate it
     const C2HandleIon *h = static_cast<const C2HandleIon*>(handle);
     std::shared_ptr<C2AllocationIon> alloc
-        = std::make_shared<C2AllocationIon>(mIonFd, 0 /* capacity */, h->buffer());
+        = std::make_shared<C2AllocationIon>(dup(mIonFd), h->size(), h->bufferFd());
     c2_status_t ret = alloc->status();
     if (ret == C2_OK) {
         *allocation = alloc;

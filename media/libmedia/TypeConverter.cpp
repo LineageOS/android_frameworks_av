@@ -277,6 +277,16 @@ const AudioModeConverter::Table AudioModeConverter::mTable[] = {
     TERMINATOR
 };
 
+template<>
+const AudioContentTypeConverter::Table AudioContentTypeConverter::mTable[] = {
+    MAKE_STRING_FROM_ENUM(AUDIO_CONTENT_TYPE_UNKNOWN),
+    MAKE_STRING_FROM_ENUM(AUDIO_CONTENT_TYPE_SPEECH),
+    MAKE_STRING_FROM_ENUM(AUDIO_CONTENT_TYPE_MUSIC),
+    MAKE_STRING_FROM_ENUM(AUDIO_CONTENT_TYPE_MOVIE),
+    MAKE_STRING_FROM_ENUM(AUDIO_CONTENT_TYPE_SONIFICATION),
+    TERMINATOR
+};
+
 template <>
 const UsageTypeConverter::Table UsageTypeConverter::mTable[] = {
     MAKE_STRING_FROM_ENUM(AUDIO_USAGE_UNKNOWN),

@@ -22,6 +22,7 @@
 #include <media/AudioTimestamp.h>
 #include <media/IAudioTrack.h>
 #include <media/AudioResamplerPublic.h>
+#include <media/MediaAnalyticsItem.h>
 #include <media/Modulo.h>
 #include <utils/threads.h>
 
@@ -1182,6 +1183,25 @@ private:
     pid_t                   mClientPid;
 
     wp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
+
+private:
+    class MediaMetrics {
+      public:
+        MediaMetrics() : mAnalyticsItem(new MediaAnalyticsItem("audiotrack")) {
+        }
+        ~MediaMetrics() {
+            // mAnalyticsItem alloc failure will be flagged in the constructor
+            // don't log empty records
+            if (mAnalyticsItem->count() > 0) {
+                mAnalyticsItem->setFinalized(true);
+                mAnalyticsItem->selfrecord();
+            }
+        }
+        void gather(const AudioTrack *track);
+      private:
+        std::unique_ptr<MediaAnalyticsItem> mAnalyticsItem;
+    };
+    MediaMetrics mMediaMetrics;
 };
 
 }; // namespace android

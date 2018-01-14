@@ -26,6 +26,7 @@
 #include "aaudio/AAudio.h"
 #include <aaudio/AAudioTesting.h>
 #include <math.h>
+#include <system/audio-base.h>
 
 #include "utility/AAudioUtilities.h"
 
@@ -281,6 +282,61 @@ aaudio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t androidFo
         break;
     }
     return aaudioFormat;
+}
+
+// Make a message string from the condition.
+#define STATIC_ASSERT(condition) static_assert(condition, #condition)
+
+audio_usage_t AAudioConvert_usageToInternal(aaudio_usage_t usage) {
+    // The public aaudio_content_type_t constants are supposed to have the same
+    // values as the internal audio_content_type_t values.
+    STATIC_ASSERT(AAUDIO_USAGE_MEDIA == AUDIO_USAGE_MEDIA);
+    STATIC_ASSERT(AAUDIO_USAGE_VOICE_COMMUNICATION == AUDIO_USAGE_VOICE_COMMUNICATION);
+    STATIC_ASSERT(AAUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING
+                  == AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING);
+    STATIC_ASSERT(AAUDIO_USAGE_ALARM == AUDIO_USAGE_ALARM);
+    STATIC_ASSERT(AAUDIO_USAGE_NOTIFICATION == AUDIO_USAGE_NOTIFICATION);
+    STATIC_ASSERT(AAUDIO_USAGE_NOTIFICATION_RINGTONE
+                  == AUDIO_USAGE_NOTIFICATION_TELEPHONY_RINGTONE);
+    STATIC_ASSERT(AAUDIO_USAGE_NOTIFICATION_EVENT == AUDIO_USAGE_NOTIFICATION_EVENT);
+    STATIC_ASSERT(AAUDIO_USAGE_ASSISTANCE_ACCESSIBILITY == AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY);
+    STATIC_ASSERT(AAUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE
+                  == AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE);
+    STATIC_ASSERT(AAUDIO_USAGE_ASSISTANCE_SONIFICATION == AUDIO_USAGE_ASSISTANCE_SONIFICATION);
+    STATIC_ASSERT(AAUDIO_USAGE_GAME == AUDIO_USAGE_GAME);
+    STATIC_ASSERT(AAUDIO_USAGE_ASSISTANT == AUDIO_USAGE_ASSISTANT);
+    if (usage == AAUDIO_UNSPECIFIED) {
+        usage = AAUDIO_USAGE_MEDIA;
+    }
+    return (audio_usage_t) usage; // same value
+}
+
+audio_content_type_t AAudioConvert_contentTypeToInternal(aaudio_content_type_t contentType) {
+    // The public aaudio_content_type_t constants are supposed to have the same
+    // values as the internal audio_content_type_t values.
+    STATIC_ASSERT(AAUDIO_CONTENT_TYPE_MUSIC == AUDIO_CONTENT_TYPE_MUSIC);
+    STATIC_ASSERT(AAUDIO_CONTENT_TYPE_SPEECH == AUDIO_CONTENT_TYPE_SPEECH);
+    STATIC_ASSERT(AAUDIO_CONTENT_TYPE_SONIFICATION == AUDIO_CONTENT_TYPE_SONIFICATION);
+    STATIC_ASSERT(AAUDIO_CONTENT_TYPE_MOVIE == AUDIO_CONTENT_TYPE_MOVIE);
+    if (contentType == AAUDIO_UNSPECIFIED) {
+        contentType = AAUDIO_CONTENT_TYPE_MUSIC;
+    }
+    return (audio_content_type_t) contentType; // same value
+}
+
+audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t preset) {
+    // The public aaudio_input_preset_t constants are supposed to have the same
+    // values as the internal audio_source_t values.
+    STATIC_ASSERT(AAUDIO_UNSPECIFIED == AUDIO_SOURCE_DEFAULT);
+    STATIC_ASSERT(AAUDIO_INPUT_PRESET_GENERIC == AUDIO_SOURCE_MIC);
+    STATIC_ASSERT(AAUDIO_INPUT_PRESET_CAMCORDER == AUDIO_SOURCE_CAMCORDER);
+    STATIC_ASSERT(AAUDIO_INPUT_PRESET_VOICE_RECOGNITION == AUDIO_SOURCE_VOICE_RECOGNITION);
+    STATIC_ASSERT(AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION == AUDIO_SOURCE_VOICE_COMMUNICATION);
+    STATIC_ASSERT(AAUDIO_INPUT_PRESET_UNPROCESSED == AUDIO_SOURCE_UNPROCESSED);
+    if (preset == AAUDIO_UNSPECIFIED) {
+        preset = AAUDIO_INPUT_PRESET_GENERIC;
+    }
+    return (audio_source_t) preset; // same value
 }
 
 int32_t AAudioConvert_framesToBytes(int32_t numFrames,

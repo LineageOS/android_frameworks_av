@@ -167,6 +167,29 @@ audio_format_t AAudioConvert_aaudioToAndroidDataFormat(aaudio_format_t aaudio_fo
 
 aaudio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t format);
 
+
+/**
+ * Note that this function does not validate the passed in value.
+ * That is done somewhere else.
+ * @return internal value
+ */
+
+audio_usage_t AAudioConvert_usageToInternal(aaudio_usage_t usage);
+
+/**
+ * Note that this function does not validate the passed in value.
+ * That is done somewhere else.
+ * @return internal value
+ */
+audio_content_type_t AAudioConvert_contentTypeToInternal(aaudio_content_type_t contentType);
+
+/**
+ * Note that this function does not validate the passed in value.
+ * That is done somewhere else.
+ * @return internal audio source
+ */
+audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t preset);
+
 /**
  * @return the size of a sample of the given format in bytes or AAUDIO_ERROR_ILLEGAL_ARGUMENT
  */

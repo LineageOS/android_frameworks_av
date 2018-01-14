@@ -4301,10 +4301,16 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     // because we're about to decrement the last sp<> on those tracks.
                     block = FastMixerStateQueue::BLOCK_UNTIL_ACKED;
                 } else {
-                    LOG_ALWAYS_FATAL("fast track %d should have been active; "
+                    // ALOGW rather than LOG_ALWAYS_FATAL because it seems there are cases where an
+                    // AudioTrack may start (which may not be with a start() but with a write()
+                    // after underrun) and immediately paused or released.  In that case the
+                    // FastTrack state hasn't had time to update.
+                    // TODO Remove the ALOGW when this theory is confirmed.
+                    ALOGW("fast track %d should have been active; "
                             "mState=%d, mTrackMask=%#x, recentUnderruns=%u, isShared=%d",
                             j, track->mState, state->mTrackMask, recentUnderruns,
                             track->sharedBuffer() != 0);
+                    // Since the FastMixer state already has the track inactive, do nothing here.
                 }
                 tracksToRemove->add(track);
                 // Avoids a misleading display in dumpsys

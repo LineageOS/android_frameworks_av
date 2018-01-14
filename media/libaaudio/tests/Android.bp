@@ -124,3 +124,15 @@ cc_test {
         "libutils",
     ],
 }
+
+cc_test {
+    name: "test_attributes",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_attributes.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}

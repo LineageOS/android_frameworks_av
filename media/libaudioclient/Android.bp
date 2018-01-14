@@ -47,6 +47,9 @@ cc_library_shared {
         "libdl",
         "libaudioutils",
         "libaudiomanager",
+        "libmedia_helper",
+        "libmediametrics",
+        "libstagefright_foundation",
     ],
     export_shared_lib_headers: ["libbinder"],
 
