@@ -74,14 +74,27 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     }
 
     // Copy parameters from the Builder because the Builder may be deleted after this call.
+    // TODO AudioStream should be a subclass of AudioStreamParameters
     mSamplesPerFrame = builder.getSamplesPerFrame();
     mSampleRate = builder.getSampleRate();
     mDeviceId = builder.getDeviceId();
     mFormat = builder.getFormat();
     mSharingMode = builder.getSharingMode();
     mSharingModeMatchRequired = builder.isSharingModeMatchRequired();
-
     mPerformanceMode = builder.getPerformanceMode();
+
+    mUsage = builder.getUsage();
+    if (mUsage == AAUDIO_UNSPECIFIED) {
+        mUsage = AAUDIO_USAGE_MEDIA;
+    }
+    mContentType = builder.getContentType();
+    if (mContentType == AAUDIO_UNSPECIFIED) {
+        mContentType = AAUDIO_CONTENT_TYPE_MUSIC;
+    }
+    mInputPreset = builder.getInputPreset();
+    if (mInputPreset == AAUDIO_UNSPECIFIED) {
+        mInputPreset = AAUDIO_INPUT_PRESET_GENERIC;
+    }
 
     // callbacks
     mFramesPerDataCallback = builder.getFramesPerDataCallback();

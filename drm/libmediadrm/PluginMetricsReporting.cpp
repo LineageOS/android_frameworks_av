@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "PluginMetricsReporting"
 #include <utils/Log.h>
+#include <inttypes.h>
 
 #include <media/PluginMetricsReporting.h>
 
@@ -81,10 +82,7 @@ status_t reportMetricsGroup(const MetricsGroup& metricsGroup,
 
     analyticsItem.setFinalized(true);
     if (!analyticsItem.selfrecord()) {
-      // Note the cast to int is because we build on 32 and 64 bit.
-      // The cast prevents a peculiar printf problem where one format cannot
-      // satisfy both.
-      ALOGE("selfrecord() returned false. sessioId %d", (int) sessionId);
+      ALOGE("selfrecord() returned false. sessioId %" PRId64, sessionId);
     }
 
     for (int i = 0; i < metricsGroup.metric_sub_group_size(); ++i) {

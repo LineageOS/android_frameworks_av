@@ -42,6 +42,9 @@ void AAudioStreamParameters::copyFrom(const AAudioStreamParameters &other) {
     mAudioFormat     = other.mAudioFormat;
     mDirection       = other.mDirection;
     mBufferCapacity  = other.mBufferCapacity;
+    mUsage           = other.mUsage;
+    mContentType     = other.mContentType;
+    mInputPreset     = other.mInputPreset;
 }
 
 aaudio_result_t AAudioStreamParameters::validate() const {
@@ -98,6 +101,54 @@ aaudio_result_t AAudioStreamParameters::validate() const {
             // break;
     }
 
+    switch (mUsage) {
+        case AAUDIO_UNSPECIFIED:
+        case AAUDIO_USAGE_MEDIA:
+        case AAUDIO_USAGE_VOICE_COMMUNICATION:
+        case AAUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING:
+        case AAUDIO_USAGE_ALARM:
+        case AAUDIO_USAGE_NOTIFICATION:
+        case AAUDIO_USAGE_NOTIFICATION_RINGTONE:
+        case AAUDIO_USAGE_NOTIFICATION_EVENT:
+        case AAUDIO_USAGE_ASSISTANCE_ACCESSIBILITY:
+        case AAUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE:
+        case AAUDIO_USAGE_ASSISTANCE_SONIFICATION:
+        case AAUDIO_USAGE_GAME:
+        case AAUDIO_USAGE_ASSISTANT:
+            break; // valid
+        default:
+            ALOGE("usage not valid = %d", mUsage);
+            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
+            // break;
+    }
+
+    switch (mContentType) {
+        case AAUDIO_UNSPECIFIED:
+        case AAUDIO_CONTENT_TYPE_MUSIC:
+        case AAUDIO_CONTENT_TYPE_MOVIE:
+        case AAUDIO_CONTENT_TYPE_SONIFICATION:
+        case AAUDIO_CONTENT_TYPE_SPEECH:
+            break; // valid
+        default:
+            ALOGE("content type not valid = %d", mContentType);
+            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
+            // break;
+    }
+
+    switch (mInputPreset) {
+        case AAUDIO_UNSPECIFIED:
+        case AAUDIO_INPUT_PRESET_GENERIC:
+        case AAUDIO_INPUT_PRESET_CAMCORDER:
+        case AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION:
+        case AAUDIO_INPUT_PRESET_VOICE_RECOGNITION:
+        case AAUDIO_INPUT_PRESET_UNPROCESSED:
+            break; // valid
+        default:
+            ALOGE("input preset not valid = %d", mInputPreset);
+            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
+            // break;
+    }
+
     return AAUDIO_OK;
 }
 
@@ -109,5 +160,8 @@ void AAudioStreamParameters::dump() const {
     ALOGD("mAudioFormat     = %6d", (int)mAudioFormat);
     ALOGD("mDirection       = %6d", mDirection);
     ALOGD("mBufferCapacity  = %6d", mBufferCapacity);
+    ALOGD("mUsage           = %6d", mUsage);
+    ALOGD("mContentType     = %6d", mContentType);
+    ALOGD("mInputPreset     = %6d", mInputPreset);
 }
 

@@ -72,13 +72,6 @@ std::string AAudioServiceEndpointMMAP::dump() const {
 
 aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamRequest &request) {
     aaudio_result_t result = AAUDIO_OK;
-    const audio_attributes_t attributes = {
-            .content_type = AUDIO_CONTENT_TYPE_MUSIC,
-            .usage = AUDIO_USAGE_MEDIA,
-            .source = AUDIO_SOURCE_VOICE_RECOGNITION,
-            .flags = AUDIO_FLAG_LOW_LATENCY,
-            .tags = ""
-    };
     audio_config_base_t config;
     audio_port_handle_t deviceId;
 
@@ -87,6 +80,24 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
 
     copyFrom(request.getConstantConfiguration());
 
+    aaudio_direction_t direction = getDirection();
+
+    const audio_content_type_t contentType =
+            AAudioConvert_contentTypeToInternal(getContentType());
+    const audio_usage_t usage = (direction == AAUDIO_DIRECTION_OUTPUT)
+            ? AAudioConvert_usageToInternal(getUsage())
+            : AUDIO_USAGE_UNKNOWN;
+    const audio_source_t source = (direction == AAUDIO_DIRECTION_INPUT)
+            ? AAudioConvert_inputPresetToAudioSource(getInputPreset())
+            : AUDIO_SOURCE_DEFAULT;
+
+    const audio_attributes_t attributes = {
+            .content_type = contentType,
+            .usage = usage,
+            .source = source,
+            .flags = AUDIO_FLAG_LOW_LATENCY,
+            .tags = ""
+    };
     mMmapClient.clientUid = request.getUserId();
     mMmapClient.clientPid = request.getProcessId();
     mMmapClient.packageName.setTo(String16(""));
@@ -108,7 +119,6 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
 
     int32_t aaudioSamplesPerFrame = getSamplesPerFrame();
 
-    aaudio_direction_t direction = getDirection();
     if (direction == AAUDIO_DIRECTION_OUTPUT) {
         config.channel_mask = (aaudioSamplesPerFrame == AAUDIO_UNSPECIFIED)
                               ? AUDIO_CHANNEL_OUT_STEREO

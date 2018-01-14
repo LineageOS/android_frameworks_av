@@ -2597,6 +2597,7 @@ void AudioFlinger::purgeStaleEffects_l() {
 
     for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
         sp<PlaybackThread> t = mPlaybackThreads.valueAt(i);
+        Mutex::Autolock _l(t->mLock);
         for (size_t j = 0; j < t->mEffectChains.size(); j++) {
             sp<EffectChain> ec = t->mEffectChains[j];
             if (ec->sessionId() > AUDIO_SESSION_OUTPUT_MIX) {
@@ -2606,6 +2607,7 @@ void AudioFlinger::purgeStaleEffects_l() {
     }
     for (size_t i = 0; i < mRecordThreads.size(); i++) {
         sp<RecordThread> t = mRecordThreads.valueAt(i);
+        Mutex::Autolock _l(t->mLock);
         for (size_t j = 0; j < t->mEffectChains.size(); j++) {
             sp<EffectChain> ec = t->mEffectChains[j];
             chains.push(ec);

@@ -20,6 +20,7 @@
 
 #include <android/hardware/graphics/allocator/2.0/IAllocator.h>
 #include <android/hardware/graphics/mapper/2.0/IMapper.h>
+#include <cutils/native_handle.h>
 #include <hardware/gralloc.h>
 
 #include <C2AllocatorGralloc.h>
@@ -50,6 +51,111 @@ static c2_status_t maperr2error(Error maperr) {
     return C2_CORRUPTED;
 }
 
+static
+bool native_handle_is_invalid(const native_handle_t *const handle) {
+    // perform basic validation of a native handle
+    if (handle == nullptr) {
+        // null handle is considered valid
+        return false;
+    }
+    return ((size_t)handle->version != sizeof(native_handle_t) ||
+            handle->numFds < 0 ||
+            handle->numInts < 0 ||
+            // for sanity assume handles must occupy less memory than INT_MAX bytes
+            handle->numFds > int((INT_MAX - handle->version) / sizeof(int)) - handle->numInts);
+}
+
+class C2HandleGralloc : public C2Handle {
+private:
+    struct ExtraData {
+        uint32_t width;
+        uint32_t height;
+        uint32_t format;
+        uint32_t usage_lo;
+        uint32_t usage_hi;
+        uint32_t magic;
+    };
+
+    enum {
+        NUM_INTS = sizeof(ExtraData) / sizeof(int),
+    };
+    const static uint32_t MAGIC = '\xc2gr\x00';
+
+    static
+    const ExtraData* getExtraData(const C2Handle *const handle) {
+        if (handle == nullptr
+                || native_handle_is_invalid(handle)
+                || handle->numInts < NUM_INTS) {
+            return nullptr;
+        }
+        return reinterpret_cast<const ExtraData*>(
+                &handle->data[handle->numFds + handle->numInts - NUM_INTS]);
+    }
+
+    static
+    ExtraData *getExtraData(C2Handle *const handle) {
+        return const_cast<ExtraData *>(getExtraData(const_cast<const C2Handle *const>(handle)));
+    }
+
+public:
+    static bool isValid(const C2Handle *const o) {
+        if (o == nullptr) { // null handle is always valid
+            return true;
+        }
+        const ExtraData *xd = getExtraData(o);
+        // we cannot validate width/height/format/usage without accessing gralloc driver
+        return xd != nullptr && xd->magic == MAGIC;
+    }
+
+    static C2HandleGralloc* WrapNativeHandle(
+            const native_handle_t *const handle,
+            uint32_t width, uint32_t height, uint32_t format, uint64_t usage) {
+        //CHECK(handle != nullptr);
+        if (native_handle_is_invalid(handle) ||
+            handle->numInts > int((INT_MAX - handle->version) / sizeof(int)) - NUM_INTS - handle->numFds) {
+            return nullptr;
+        }
+        ExtraData xd = { width, height, format, uint32_t(usage & 0xFFFFFFFF), uint32_t(usage >> 32), MAGIC };
+        native_handle_t *res = native_handle_create(handle->numFds, handle->numInts + NUM_INTS);
+        if (res != nullptr) {
+            memcpy(&res->data, &handle->data, sizeof(int) * (handle->numFds + handle->numInts));
+            *getExtraData(res) = xd;
+        }
+        return reinterpret_cast<C2HandleGralloc *>(res);
+    }
+
+    static native_handle_t* UnwrapNativeHandle(const C2Handle *const handle) {
+        const ExtraData *xd = getExtraData(handle);
+        if (xd == nullptr || xd->magic != MAGIC) {
+            return nullptr;
+        }
+        native_handle_t *res = native_handle_create(handle->numFds, handle->numInts - NUM_INTS);
+        if (res != nullptr) {
+            memcpy(&res->data, &handle->data, sizeof(int) * (res->numFds + res->numInts));
+        }
+        return res;
+    }
+
+    static const C2HandleGralloc* Import(
+            const C2Handle *const handle,
+            uint32_t *width, uint32_t *height, uint32_t *format, uint64_t *usage) {
+        const ExtraData *xd = getExtraData(handle);
+        if (xd == nullptr) {
+            return nullptr;
+        }
+        *width = xd->width;
+        *height = xd->height;
+        *format = xd->format;
+        *usage = xd->usage_lo | (uint64_t(xd->usage_hi) << 32);
+
+        return reinterpret_cast<const C2HandleGralloc *>(handle);
+    }
+};
+
+native_handle_t* UnwrapNativeCodec2GrallocHandle(const C2Handle *const handle) {
+    return C2HandleGralloc::UnwrapNativeHandle(handle);
+}
+
 class C2AllocationGralloc : public C2GraphicAllocation {
 public:
     virtual ~C2AllocationGralloc() override;
@@ -59,7 +165,7 @@ public:
             C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) override;
     virtual c2_status_t unmap(C2Fence *fenceFd /* nullable */) override;
     virtual bool isValid() const override { return true; }
-    virtual const C2Handle *handle() const override { return mHandle; }
+    virtual const C2Handle *handle() const override { return mLockedHandle ? : mHandle; }
     virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const override;
 
     // internal methods
@@ -67,26 +173,31 @@ public:
     C2AllocationGralloc(
               const IMapper::BufferDescriptorInfo &info,
               const sp<IMapper> &mapper,
-              hidl_handle &handle);
+              hidl_handle &hidlHandle,
+              const C2HandleGralloc *const handle);
     int dup() const;
     c2_status_t status() const;
 
 private:
     const IMapper::BufferDescriptorInfo mInfo;
     const sp<IMapper> mMapper;
-    const hidl_handle mHandle;
+    const hidl_handle mHidlHandle;
+    const C2HandleGralloc *mHandle;
     buffer_handle_t mBuffer;
+    const C2HandleGralloc *mLockedHandle;
     bool mLocked;
 };
 
 C2AllocationGralloc::C2AllocationGralloc(
           const IMapper::BufferDescriptorInfo &info,
           const sp<IMapper> &mapper,
-          hidl_handle &handle)
+          hidl_handle &hidlHandle,
+          const C2HandleGralloc *const handle)
     : C2GraphicAllocation(info.width, info.height),
       mInfo(info),
       mMapper(mapper),
-      mHandle(std::move(handle)),
+      mHidlHandle(std::move(hidlHandle)),
+      mHandle(handle),
       mBuffer(nullptr),
       mLocked(false) {}
 
@@ -117,7 +228,7 @@ c2_status_t C2AllocationGralloc::map(
     c2_status_t err = C2_OK;
     if (!mBuffer) {
         mMapper->importBuffer(
-                mHandle, [&err, this](const auto &maperr, const auto &buffer) {
+                mHidlHandle, [&err, this](const auto &maperr, const auto &buffer) {
                     err = maperr2error(maperr);
                     if (err == C2_OK) {
                         mBuffer = static_cast<buffer_handle_t>(buffer);
@@ -126,6 +237,11 @@ c2_status_t C2AllocationGralloc::map(
         if (err != C2_OK) {
             return err;
         }
+        if (mBuffer == nullptr) {
+            return C2_CORRUPTED;
+        }
+        mLockedHandle = C2HandleGralloc::WrapNativeHandle(
+                mBuffer, mInfo.width, mInfo.height, (uint32_t)mInfo.format, mInfo.usage);
     }
 
     if (mInfo.format == PixelFormat::YCBCR_420_888 || mInfo.format == PixelFormat::YV12) {
@@ -321,17 +437,30 @@ c2_status_t C2AllocatorGralloc::Impl::newGraphicAllocation(
         return err;
     }
 
-    allocation->reset(new C2AllocationGralloc(info, mMapper, buffer));
+
+    allocation->reset(new C2AllocationGralloc(
+            info, mMapper, buffer,
+            C2HandleGralloc::WrapNativeHandle(
+                    buffer.getNativeHandle(),
+                    info.width, info.height, (uint32_t)info.format, info.usage)));
     return C2_OK;
 }
 
 c2_status_t C2AllocatorGralloc::Impl::priorGraphicAllocation(
         const C2Handle *handle,
         std::shared_ptr<C2GraphicAllocation> *allocation) {
-    (void) handle;
+    IMapper::BufferDescriptorInfo info;
+    info.layerCount = 1u;
+    const C2HandleGralloc *grallocHandle = C2HandleGralloc::Import(
+            handle,
+            &info.width, &info.height, (uint32_t *)&info.format, (uint64_t *)&info.usage);
+    if (grallocHandle == nullptr) {
+        return C2_BAD_VALUE;
+    }
 
-    // TODO: need to figure out BufferDescriptorInfo from the handle.
-    allocation->reset();
+    hidl_handle hidlHandle = C2HandleGralloc::UnwrapNativeHandle(grallocHandle);
+
+    allocation->reset(new C2AllocationGralloc(info, mMapper, hidlHandle, grallocHandle));
     return C2_OMITTED;
 }
 
