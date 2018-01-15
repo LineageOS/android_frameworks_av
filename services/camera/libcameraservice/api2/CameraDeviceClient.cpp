@@ -175,7 +175,7 @@ binder::Status CameraDeviceClient::submitRequestList(
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, "Empty request list");
     }
 
-    List<const CameraMetadata> metadataRequestList;
+    List<const CameraDeviceBase::PhysicalCameraSettingsList> metadataRequestList;
     std::list<const SurfaceMap> surfaceMapList;
     submitInfo->mRequestId = mRequestIdCounter;
     uint32_t loopCounter = 0;
@@ -193,26 +193,70 @@ binder::Status CameraDeviceClient::submitRequestList(
                         mCameraIdStr.string());
                 return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                         "Repeating reprocess requests not supported");
+            } else if (request.mPhysicalCameraSettings.size() > 1) {
+                ALOGE("%s: Camera %s: reprocess requests not supported for "
+                        "multiple physical cameras.", __FUNCTION__,
+                        mCameraIdStr.string());
+                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                        "Reprocess requests not supported for multiple cameras");
             }
         }
 
-        CameraMetadata metadata(request.mMetadata);
-        if (metadata.isEmpty()) {
-            ALOGE("%s: Camera %s: Sent empty metadata packet. Rejecting request.",
-                   __FUNCTION__, mCameraIdStr.string());
+        if (request.mPhysicalCameraSettings.empty()) {
+            ALOGE("%s: Camera %s: request doesn't contain any settings.", __FUNCTION__,
+                    mCameraIdStr.string());
             return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                    "Request settings are empty");
-        } else if (request.mSurfaceList.isEmpty() && request.mStreamIdxList.size() == 0) {
+                    "Request doesn't contain any settings");
+        }
+
+        //The first capture settings should always match the logical camera id
+        String8 logicalId(request.mPhysicalCameraSettings.begin()->id.c_str());
+        if (mDevice->getId() != logicalId) {
+            ALOGE("%s: Camera %s: Invalid camera request settings.", __FUNCTION__,
+                    mCameraIdStr.string());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                    "Invalid camera request settings");
+        }
+
+        CameraDeviceBase::PhysicalCameraSettingsList physicalSettingsList;
+        for (const auto& it : request.mPhysicalCameraSettings) {
+            String8 physicalId(it.id.c_str());
+            if ((physicalId != mDevice->getId()) && !checkPhysicalCameraId(physicalId)) {
+                ALOGE("%s: Camera %s: Physical camera id: %s is invalid.", __FUNCTION__,
+                        mCameraIdStr.string(), physicalId.string());
+                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                        "Invalid physical camera id");
+            }
+
+            CameraMetadata metadata(it.settings);
+            if (metadata.isEmpty()) {
+                ALOGE("%s: Camera %s: Sent empty metadata packet. Rejecting request.",
+                        __FUNCTION__, mCameraIdStr.string());
+                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                        "Request settings are empty");
+            }
+
+            if (!enforceRequestPermissions(metadata)) {
+                // Callee logs
+                return STATUS_ERROR(CameraService::ERROR_PERMISSION_DENIED,
+                        "Caller does not have permission to change restricted controls");
+            }
+
+            physicalSettingsList.push_back({it.id, metadata});
+        }
+
+        if (streaming && (physicalSettingsList.size() > 1)) {
+            ALOGE("%s: Camera %s: Individual physical camera settings are not supported in "
+                    "streaming requests. Rejecting request.", __FUNCTION__, mCameraIdStr.string());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                    "Streaming request contains individual physical requests");
+        }
+
+        if (request.mSurfaceList.isEmpty() && request.mStreamIdxList.size() == 0) {
             ALOGE("%s: Camera %s: Requests must have at least one surface target. "
                     "Rejecting request.", __FUNCTION__, mCameraIdStr.string());
             return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                     "Request has no output targets");
-        }
-
-        if (!enforceRequestPermissions(metadata)) {
-            // Callee logs
-            return STATUS_ERROR(CameraService::ERROR_PERMISSION_DENIED,
-                    "Caller does not have permission to change restricted controls");
         }
 
         /**
@@ -261,20 +305,22 @@ binder::Status CameraDeviceClient::submitRequestList(
             }
         }
 
-        metadata.update(ANDROID_REQUEST_OUTPUT_STREAMS, &outputStreamIds[0],
-                        outputStreamIds.size());
+        physicalSettingsList.begin()->metadata.update(ANDROID_REQUEST_OUTPUT_STREAMS,
+                &outputStreamIds[0], outputStreamIds.size());
 
         if (request.mIsReprocess) {
-            metadata.update(ANDROID_REQUEST_INPUT_STREAMS, &mInputStream.id, 1);
+            physicalSettingsList.begin()->metadata.update(ANDROID_REQUEST_INPUT_STREAMS,
+                    &mInputStream.id, 1);
         }
 
-        metadata.update(ANDROID_REQUEST_ID, &(submitInfo->mRequestId), /*size*/1);
+        physicalSettingsList.begin()->metadata.update(ANDROID_REQUEST_ID,
+                &(submitInfo->mRequestId), /*size*/1);
         loopCounter++; // loopCounter starts from 1
         ALOGV("%s: Camera %s: Creating request with ID %d (%d of %zu)",
                 __FUNCTION__, mCameraIdStr.string(), submitInfo->mRequestId,
                 loopCounter, requests.size());
 
-        metadataRequestList.push_back(metadata);
+        metadataRequestList.push_back(physicalSettingsList);
         surfaceMapList.push_back(surfaceMap);
     }
     mRequestIdCounter++;

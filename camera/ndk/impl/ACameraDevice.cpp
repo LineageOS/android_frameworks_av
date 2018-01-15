@@ -372,7 +372,8 @@ CameraDevice::allocateCaptureRequest(
         const ACaptureRequest* request, /*out*/sp<CaptureRequest>& outReq) {
     camera_status_t ret;
     sp<CaptureRequest> req(new CaptureRequest());
-    req->mMetadata = request->settings->getInternalData();
+    req->mPhysicalCameraSettings.push_back({std::string(mCameraId.string()),
+            request->settings->getInternalData()});
     req->mIsReprocess = false; // NDK does not support reprocessing yet
     req->mContext = request->context;
     req->mSurfaceConverted = true; // set to true, and fill in stream/surface idx to speed up IPC
@@ -418,7 +419,7 @@ CameraDevice::allocateCaptureRequest(
 ACaptureRequest*
 CameraDevice::allocateACaptureRequest(sp<CaptureRequest>& req) {
     ACaptureRequest* pRequest = new ACaptureRequest();
-    CameraMetadata clone = req->mMetadata;
+    CameraMetadata clone = req->mPhysicalCameraSettings.begin()->settings;
     pRequest->settings = new ACameraMetadata(clone.release(), ACameraMetadata::ACM_REQUEST);
     pRequest->targets  = new ACameraOutputTargets();
     for (size_t i = 0; i < req->mSurfaceList.size(); i++) {

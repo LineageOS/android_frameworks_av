@@ -65,6 +65,12 @@ class CameraDeviceBase : public virtual RefBase {
      */
     virtual const CameraMetadata& info() const = 0;
 
+    struct PhysicalCameraSettings {
+        std::string cameraId;
+        CameraMetadata metadata;
+    };
+    typedef List<PhysicalCameraSettings> PhysicalCameraSettingsList;
+
     /**
      * Submit request for capture. The CameraDevice takes ownership of the
      * passed-in buffer.
@@ -76,7 +82,7 @@ class CameraDeviceBase : public virtual RefBase {
      * Submit a list of requests.
      * Output lastFrameNumber is the expected last frame number of the list of requests.
      */
-    virtual status_t captureList(const List<const CameraMetadata> &requests,
+    virtual status_t captureList(const List<const PhysicalCameraSettingsList> &requests,
                                  const std::list<const SurfaceMap> &surfaceMaps,
                                  int64_t *lastFrameNumber = NULL) = 0;
 
@@ -92,7 +98,7 @@ class CameraDeviceBase : public virtual RefBase {
      * Submit a list of requests for streaming.
      * Output lastFrameNumber is the last frame number of the previous streaming request.
      */
-    virtual status_t setStreamingRequestList(const List<const CameraMetadata> &requests,
+    virtual status_t setStreamingRequestList(const List<const PhysicalCameraSettingsList> &requests,
                                              const std::list<const SurfaceMap> &surfaceMaps,
                                              int64_t *lastFrameNumber = NULL) = 0;
 

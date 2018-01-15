@@ -317,6 +317,9 @@ TEST(CameraServiceBinderTest, CheckBinderCameraService) {
     EXPECT_TRUE(res.isOk()) << res;
 
     EXPECT_EQ(numCameras, static_cast<const int>(statuses.size()));
+    for (const auto &it : statuses) {
+        listener->onStatusChanged(it.status, String16(it.cameraId));
+    }
 
     for (int32_t i = 0; i < numCameras; i++) {
         String16 cameraId = String16(String8::format("%d", i));
@@ -421,6 +424,9 @@ protected:
         serviceListener = new TestCameraServiceListener();
         std::vector<hardware::CameraStatus> statuses;
         service->addListener(serviceListener, &statuses);
+        for (const auto &it : statuses) {
+            serviceListener->onStatusChanged(it.status, String16(it.cameraId));
+        }
         service->getNumberOfCameras(hardware::ICameraService::CAMERA_TYPE_BACKWARD_COMPATIBLE,
                 &numCameras);
     }
@@ -439,8 +445,9 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
     ASSERT_NOT_NULL(service);
     EXPECT_TRUE(serviceListener->waitForNumCameras(numCameras));
     for (int32_t i = 0; i < numCameras; i++) {
+        String8 cameraId8 = String8::format("%d", i);
         // Make sure we're available, or skip device tests otherwise
-        String16 cameraId(String8::format("%d",i));
+        String16 cameraId(cameraId8);
         int32_t s = serviceListener->getStatus(cameraId);
         EXPECT_EQ(hardware::ICameraServiceListener::STATUS_PRESENT, s);
         if (s != hardware::ICameraServiceListener::STATUS_PRESENT) {
@@ -488,7 +495,7 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
         EXPECT_TRUE(res.isOk()) << res;
 
         hardware::camera2::CaptureRequest request;
-        request.mMetadata = requestTemplate;
+        request.mPhysicalCameraSettings.push_back({cameraId8.string(), requestTemplate});
         request.mSurfaceList.add(surface);
         request.mIsReprocess = false;
         int64_t lastFrameNumber = 0;
@@ -515,7 +522,7 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
                 /*out*/&requestTemplate);
         EXPECT_TRUE(res.isOk()) << res;
         hardware::camera2::CaptureRequest request2;
-        request2.mMetadata = requestTemplate;
+        request2.mPhysicalCameraSettings.push_back({cameraId8.string(), requestTemplate});
         request2.mSurfaceList.add(surface);
         request2.mIsReprocess = false;
         callbacks->clearStatus();
@@ -548,10 +555,10 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
         EXPECT_TRUE(res.isOk()) << res;
         android::hardware::camera2::CaptureRequest request3;
         android::hardware::camera2::CaptureRequest request4;
-        request3.mMetadata = requestTemplate;
+        request3.mPhysicalCameraSettings.push_back({cameraId8.string(), requestTemplate});
         request3.mSurfaceList.add(surface);
         request3.mIsReprocess = false;
-        request4.mMetadata = requestTemplate2;
+        request4.mPhysicalCameraSettings.push_back({cameraId8.string(), requestTemplate2});
         request4.mSurfaceList.add(surface);
         request4.mIsReprocess = false;
         std::vector<hardware::camera2::CaptureRequest> requestList;
@@ -584,4 +591,63 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
         closeDevice(p);
     }
 
+};
+
+TEST_F(CameraClientBinderTest, CheckBinderCaptureRequest) {
+    sp<CaptureRequest> requestOriginal, requestParceled;
+    sp<IGraphicBufferProducer> gbProducer;
+    sp<IGraphicBufferConsumer> gbConsumer;
+    BufferQueue::createBufferQueue(&gbProducer, &gbConsumer);
+    sp<Surface> surface(new Surface(gbProducer, /*controlledByApp*/false));
+    Vector<sp<Surface>> surfaceList;
+    surfaceList.push_back(surface);
+    std::string physicalDeviceId1 = "0";
+    std::string physicalDeviceId2 = "1";
+    CameraMetadata physicalDeviceSettings1, physicalDeviceSettings2;
+    uint8_t intent1 = ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW;
+    uint8_t intent2 = ANDROID_CONTROL_CAPTURE_INTENT_VIDEO_RECORD;
+    EXPECT_EQ(OK, physicalDeviceSettings1.update(ANDROID_CONTROL_CAPTURE_INTENT, &intent1, 1));
+    EXPECT_EQ(OK, physicalDeviceSettings2.update(ANDROID_CONTROL_CAPTURE_INTENT, &intent2, 1));
+
+    requestParceled = new CaptureRequest();
+    Parcel p;
+    EXPECT_TRUE(requestParceled->readFromParcel(&p) != OK);
+    p.writeInt32(0);
+    p.setDataPosition(0);
+    EXPECT_TRUE(requestParceled->readFromParcel(&p) != OK);
+    p.freeData();
+    p.writeInt32(-1);
+    p.setDataPosition(0);
+    EXPECT_TRUE(requestParceled->readFromParcel(&p) != OK);
+    p.freeData();
+    p.writeInt32(1);
+    p.setDataPosition(0);
+    EXPECT_TRUE(requestParceled->readFromParcel(&p) != OK);
+
+    requestOriginal = new CaptureRequest();
+    requestOriginal->mPhysicalCameraSettings.push_back({physicalDeviceId1,
+            physicalDeviceSettings1});
+    requestOriginal->mPhysicalCameraSettings.push_back({physicalDeviceId2,
+            physicalDeviceSettings2});
+    requestOriginal->mSurfaceList.push_back(surface);
+    requestOriginal->mIsReprocess = false;
+    requestOriginal->mSurfaceConverted = false;
+
+    p.freeData();
+    EXPECT_TRUE(requestOriginal->writeToParcel(&p) == OK);
+    p.setDataPosition(0);
+    EXPECT_TRUE(requestParceled->readFromParcel(&p) == OK);
+    EXPECT_EQ(requestParceled->mIsReprocess, false);
+    EXPECT_FALSE(requestParceled->mSurfaceList.empty());
+    EXPECT_EQ(2u, requestParceled->mPhysicalCameraSettings.size());
+    auto it = requestParceled->mPhysicalCameraSettings.begin();
+    EXPECT_EQ(physicalDeviceId1, it->id);
+    EXPECT_TRUE(it->settings.exists(ANDROID_CONTROL_CAPTURE_INTENT));
+    auto entry = it->settings.find(ANDROID_CONTROL_CAPTURE_INTENT);
+    EXPECT_EQ(entry.data.u8[0], intent1);
+    it++;
+    EXPECT_EQ(physicalDeviceId2, it->id);
+    EXPECT_TRUE(it->settings.exists(ANDROID_CONTROL_CAPTURE_INTENT));
+    entry = it->settings.find(ANDROID_CONTROL_CAPTURE_INTENT);
+    EXPECT_EQ(entry.data.u8[0], intent2);
 };
