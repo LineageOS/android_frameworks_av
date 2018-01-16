@@ -139,10 +139,18 @@ cc_library_static {
     },
 }
 
+filegroup {
+    name: "mediaupdateservice_aidl",
+    srcs: [
+        "aidl/android/media/IMediaExtractorUpdateService.aidl",
+    ],
+}
+
 cc_library_shared {
     name: "libmedia",
 
     srcs: [
+        ":mediaupdateservice_aidl",
         "IDataSource.cpp",
         "BufferingSettings.cpp",
         "mediaplayer.cpp",
@@ -178,6 +186,11 @@ cc_library_shared {
         "Visualizer.cpp",
         "StringArray.cpp",
     ],
+
+    aidl: {
+        local_include_dirs: ["aidl"],
+        export_aidl_headers: true,
+    },
 
     shared_libs: [
         "liblog",

@@ -36,16 +36,15 @@ sp<IMediaExtractor> MediaExtractorService::makeExtractor(
 
     sp<DataSource> localSource = CreateDataSourceFromIDataSource(remoteSource);
 
-    sp<MediaExtractor> extractor = MediaExtractorFactory::CreateFromService(localSource, mime);
+    sp<IMediaExtractor> extractor = MediaExtractorFactory::CreateFromService(localSource, mime);
 
     ALOGV("extractor service created %p (%s)",
             extractor.get(),
             extractor == nullptr ? "" : extractor->name());
 
     if (extractor != nullptr) {
-        sp<IMediaExtractor> ret = CreateIMediaExtractorFromMediaExtractor(extractor);
-        registerMediaExtractor(ret, localSource, mime);
-        return ret;
+        registerMediaExtractor(extractor, localSource, mime);
+        return extractor;
     }
     return nullptr;
 }
