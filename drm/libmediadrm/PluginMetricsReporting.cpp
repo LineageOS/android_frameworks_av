@@ -47,7 +47,7 @@ status_t reportMetricsGroup(const MetricsGroup& metricsGroup,
 
     // Report the package name.
     if (metricsGroup.has_app_package_name()) {
-      AString app_package_name(metricsGroup.app_package_name().c_str(),
+        std::string app_package_name(metricsGroup.app_package_name().c_str(),
                                metricsGroup.app_package_name().size());
       analyticsItem.setPkgName(app_package_name);
     }
