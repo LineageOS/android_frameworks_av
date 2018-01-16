@@ -112,6 +112,8 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
           mDeviceId, mPerformanceMode,
           (isDataCallbackSet() ? "ON" : "OFF"),
           mFramesPerDataCallback);
+    ALOGI("open() usage = %d, contentType = %d, inputPreset = %d",
+          mUsage, mContentType, mInputPreset);
 
     return AAUDIO_OK;
 }

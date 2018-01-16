@@ -112,6 +112,10 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     request.getConfiguration().setDirection(getDirection());
     request.getConfiguration().setSharingMode(getSharingMode());
 
+    request.getConfiguration().setUsage(getUsage());
+    request.getConfiguration().setContentType(getContentType());
+    request.getConfiguration().setInputPreset(getInputPreset());
+
     request.getConfiguration().setBufferCapacity(builder.getBufferCapacity());
 
     mServiceStreamHandle = mServiceInterface.openStream(request, configurationOutput);
@@ -130,6 +134,10 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     setSamplesPerFrame(configurationOutput.getSamplesPerFrame());
     setDeviceId(configurationOutput.getDeviceId());
     setSharingMode(configurationOutput.getSharingMode());
+
+    setUsage(configurationOutput.getUsage());
+    setContentType(configurationOutput.getContentType());
+    setInputPreset(configurationOutput.getInputPreset());
 
     // Save device format so we can do format conversion and volume scaling together.
     mDeviceFormat = configurationOutput.getFormat();
