@@ -189,16 +189,22 @@ void AudioTrack::MediaMetrics::gather(const AudioTrack *track)
     static constexpr char kAudioTrackUsage[] = "android.media.audiotrack.usage";
     static constexpr char kAudioTrackSampleRate[] = "android.media.audiotrack.samplerate";
     static constexpr char kAudioTrackChannelMask[] = "android.media.audiotrack.channelmask";
+#if 0
+    // XXX: disabled temporarily for b/72027185
     static constexpr char kAudioTrackUnderrunFrames[] = "android.media.audiotrack.underrunframes";
+#endif
     static constexpr char kAudioTrackStartupGlitch[] = "android.media.audiotrack.glitch.startup";
 
     // constructor guarantees mAnalyticsItem is valid
 
+#if 0
+    // XXX: disabled temporarily for b/72027185
     // must gather underrun info before cleaning mProxy information.
     const int32_t underrunFrames = track->getUnderrunFrames();
     if (underrunFrames != 0) {
         mAnalyticsItem->setInt32(kAudioTrackUnderrunFrames, underrunFrames);
     }
+#endif
 
     if (track->mTimestampStartupGlitchReported) {
         mAnalyticsItem->setInt32(kAudioTrackStartupGlitch, 1);
