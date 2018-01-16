@@ -1801,10 +1801,15 @@ bool AudioPolicyManager::soundTriggerSupportsConcurrentCapture() {
 
 status_t AudioPolicyManager::startInput(audio_io_handle_t input,
                                         audio_session_t session,
+                                        bool silenced,
                                         concurrency_type__mask_t *concurrency)
 {
-    ALOGV("startInput() input %d", input);
+
+    ALOGV("AudioPolicyManager::startInput(input:%d, session:%d, silenced:%d, concurrency:%d)",
+            input, session, silenced, *concurrency);
+
     *concurrency = API_INPUT_CONCURRENCY_NONE;
+
     ssize_t index = mInputs.indexOfKey(input);
     if (index < 0) {
         ALOGW("startInput() unknown input %d", input);
@@ -1839,12 +1844,33 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
             return INVALID_OPERATION;
         }
 
-        Vector< sp<AudioInputDescriptor> > activeInputs = mInputs.getActiveInputs();
-        for (const auto& activeDesc : activeInputs) {
-            if (is_virtual_input_device(activeDesc->mDevice)) {
-                continue;
-            }
+        Vector<sp<AudioInputDescriptor>> activeInputs = mInputs.getActiveInputs();
 
+        // If a UID is idle and records silence and another not silenced recording starts
+        // from another UID (idle or active) we stop the current idle UID recording in
+        // favor of the new one - "There can be only one" TM
+        if (!silenced) {
+            for (const auto& activeDesc : activeInputs) {
+                if ((audioSession->flags() & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0 &&
+                        activeDesc->getId() == inputDesc->getId()) {
+                     continue;
+                }
+
+                AudioSessionCollection activeSessions = activeDesc->getAudioSessions(
+                        true /*activeOnly*/);
+                sp<AudioSession> activeSession = activeSessions.valueAt(0);
+                if (activeSession->isSilenced()) {
+                    audio_io_handle_t activeInput = activeDesc->mIoHandle;
+                    audio_session_t activeSessionId = activeSession->session();
+                    stopInput(activeInput, activeSessionId);
+                    releaseInput(activeInput, activeSessionId);
+                    ALOGV("startInput(%d) stopping silenced input %d", input, activeInput);
+                    activeInputs = mInputs.getActiveInputs();
+                }
+            }
+        }
+
+        for (const auto& activeDesc : activeInputs) {
             if ((audioSession->flags() & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0 &&
                     activeDesc->getId() == inputDesc->getId()) {
                 continue;
@@ -1881,10 +1907,6 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
 
         // if capture is allowed, preempt currently active HOTWORD captures
         for (const auto& activeDesc : activeInputs) {
-            if (is_virtual_input_device(activeDesc->mDevice)) {
-                continue;
-            }
-
             if (allowConcurrentWithSoundTrigger && activeDesc->isSoundTrigger()) {
                 continue;
             }
@@ -1906,6 +1928,9 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
         }
     }
 #endif
+
+    // Make sure we start with the correct silence state
+    audioSession->setSilenced(silenced);
 
     // increment activity count before calling getNewInputDevice() below as only active sessions
     // are considered for device selection
@@ -2039,7 +2064,6 @@ status_t AudioPolicyManager::stopInput(audio_io_handle_t input,
 void AudioPolicyManager::releaseInput(audio_io_handle_t input,
                                       audio_session_t session)
 {
-
     ALOGV("releaseInput() %d", input);
     ssize_t index = mInputs.indexOfKey(input);
     if (index < 0) {
@@ -3389,6 +3413,23 @@ float AudioPolicyManager::getStreamVolumeDB(
         audio_stream_type_t stream, int index, audio_devices_t device)
 {
     return computeVolume(stream, index, device);
+}
+
+void AudioPolicyManager::setRecordSilenced(uid_t uid, bool silenced)
+{
+    ALOGV("AudioPolicyManager:setRecordSilenced(uid:%d, silenced:%d)", uid, silenced);
+
+    Vector<sp<AudioInputDescriptor> > activeInputs = mInputs.getActiveInputs();
+    for (size_t i = 0; i < activeInputs.size(); i++) {
+        sp<AudioInputDescriptor> activeDesc = activeInputs[i];
+        AudioSessionCollection activeSessions = activeDesc->getAudioSessions(true);
+        for (size_t j = 0; j < activeSessions.size(); j++) {
+            sp<AudioSession> activeSession = activeSessions.valueAt(j);
+            if (activeSession->uid() == uid) {
+                activeSession->setSilenced(silenced);
+            }
+        }
+    }
 }
 
 status_t AudioPolicyManager::disconnectAudioSource(const sp<AudioSourceDescriptor>& sourceDesc)

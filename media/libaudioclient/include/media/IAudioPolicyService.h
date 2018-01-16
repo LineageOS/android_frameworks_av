@@ -84,7 +84,10 @@ public:
                               audio_port_handle_t *selectedDeviceId,
                               audio_port_handle_t *portId) = 0;
     virtual status_t startInput(audio_io_handle_t input,
-                                audio_session_t session) = 0;
+                                audio_session_t session,
+                                audio_devices_t device,
+                                uid_t uid,
+                                bool *silenced) = 0;
     virtual status_t stopInput(audio_io_handle_t input,
                                audio_session_t session) = 0;
     virtual void releaseInput(audio_io_handle_t input,

@@ -48,6 +48,7 @@ enum {
     SET_MODE,
     SET_MIC_MUTE,
     GET_MIC_MUTE,
+    SET_RECORD_SILENCED,
     SET_PARAMETERS,
     GET_PARAMETERS,
     REGISTER_CLIENT,
@@ -304,6 +305,15 @@ public:
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
         remote()->transact(GET_MIC_MUTE, data, &reply);
         return reply.readInt32();
+    }
+
+    virtual void setRecordSilenced(uid_t uid, bool silenced)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+        data.writeInt32(uid);
+        data.writeInt32(silenced ? 1 : 0);
+        remote()->transact(SET_RECORD_SILENCED, data, &reply);
     }
 
     virtual status_t setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs)
@@ -859,6 +869,7 @@ status_t BnAudioFlinger::onTransact(
         case RELEASE_AUDIO_PATCH:
         case LIST_AUDIO_PATCHES:
         case SET_AUDIO_PORT_CONFIG:
+        case SET_RECORD_SILENCED:
             ALOGW("%s: transaction %d received from PID %d",
                   __func__, code, IPCThreadState::self()->getCallingPid());
             return INVALID_OPERATION;
@@ -1022,6 +1033,15 @@ status_t BnAudioFlinger::onTransact(
         case GET_MIC_MUTE: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             reply->writeInt32( getMicMute() );
+            return NO_ERROR;
+        } break;
+        case SET_RECORD_SILENCED: {
+            CHECK_INTERFACE(IAudioFlinger, data, reply);
+            uid_t uid = data.readInt32();
+            audio_source_t source;
+            data.read(&source, sizeof(audio_source_t));
+            bool silenced = data.readInt32() == 1;
+            setRecordSilenced(uid, silenced);
             return NO_ERROR;
         } break;
         case SET_PARAMETERS: {
