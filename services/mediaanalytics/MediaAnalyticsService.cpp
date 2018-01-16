@@ -74,25 +74,10 @@
 
 #include "MediaAnalyticsService.h"
 
-#include "MetricsSummarizer.h"
-#include "MetricsSummarizerCodec.h"
-#include "MetricsSummarizerExtractor.h"
-#include "MetricsSummarizerPlayer.h"
-#include "MetricsSummarizerRecorder.h"
-
-
 namespace android {
 
     using namespace android::base;
     using namespace android::content::pm;
-
-
-
-// summarized records
-// up to 36 sets, each covering an hour -- so at least 1.5 days
-// (will be longer if there are hours without any media action)
-static const nsecs_t kNewSetIntervalNs = 3600*(1000*1000*1000ll);
-static const int kMaxRecordSets = 36;
 
 // individual records kept in memory: age or count
 // age: <= 36 hours (1.5 days)
@@ -108,57 +93,9 @@ void MediaAnalyticsService::instantiate() {
             String16(kServiceName), new MediaAnalyticsService());
 }
 
-// handle sets of summarizers
-MediaAnalyticsService::SummarizerSet::SummarizerSet() {
-    mSummarizers = new List<MetricsSummarizer *>();
-}
-
-MediaAnalyticsService::SummarizerSet::~SummarizerSet() {
-    // empty the list
-    List<MetricsSummarizer *> *l = mSummarizers;
-    while (l->size() > 0) {
-        MetricsSummarizer *summarizer = *(l->begin());
-        l->erase(l->begin());
-        delete summarizer;
-    }
-}
-
-void MediaAnalyticsService::newSummarizerSet() {
-    ALOGD("MediaAnalyticsService::newSummarizerSet");
-    MediaAnalyticsService::SummarizerSet *set = new MediaAnalyticsService::SummarizerSet();
-    nsecs_t now = systemTime(SYSTEM_TIME_REALTIME);
-    set->setStarted(now);
-
-    set->appendSummarizer(new MetricsSummarizerExtractor("extractor"));
-    set->appendSummarizer(new MetricsSummarizerCodec("codec"));
-    set->appendSummarizer(new MetricsSummarizerPlayer("nuplayer"));
-    set->appendSummarizer(new MetricsSummarizerRecorder("recorder"));
-
-    // ALWAYS at the end, since it catches everything
-    set->appendSummarizer(new MetricsSummarizer(NULL));
-
-    // inject this set at the BACK of the list.
-    mSummarizerSets->push_back(set);
-    mCurrentSet = set;
-
-    // limit the # that we have
-    if (mMaxRecordSets > 0) {
-        List<SummarizerSet *> *l = mSummarizerSets;
-        while (l->size() > (size_t) mMaxRecordSets) {
-            ALOGD("Deleting oldest record set....");
-            MediaAnalyticsService::SummarizerSet *oset = *(l->begin());
-            l->erase(l->begin());
-            delete oset;
-            mSetsDiscarded++;
-        }
-    }
-}
-
 MediaAnalyticsService::MediaAnalyticsService()
         : mMaxRecords(kMaxRecords),
           mMaxRecordAgeNs(kMaxRecordAgeNs),
-          mMaxRecordSets(kMaxRecordSets),
-          mNewSetInterval(kNewSetIntervalNs),
           mDumpProto(MediaAnalyticsItem::PROTO_V1),
           mDumpProtoDefault(MediaAnalyticsItem::PROTO_V1) {
 
@@ -166,9 +103,6 @@ MediaAnalyticsService::MediaAnalyticsService()
     // clear our queues
     mOpen = new List<MediaAnalyticsItem *>();
     mFinalized = new List<MediaAnalyticsItem *>();
-
-    mSummarizerSets = new List<MediaAnalyticsService::SummarizerSet *>();
-    newSummarizerSet();
 
     mItemsSubmitted = 0;
     mItemsFinalized = 0;
@@ -204,8 +138,6 @@ MediaAnalyticsService::~MediaAnalyticsService() {
     }
     delete mFinalized;
     mFinalized = NULL;
-
-    // XXX: clean out the summaries
 }
 
 
@@ -315,13 +247,11 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
                 oitem = NULL;
             } else {
                 oitem->setFinalized(true);
-                summarize(oitem);
                 saveItem(mFinalized, oitem, 0);
             }
             // new record could itself be marked finalized...
             id = item->getSessionID();
             if (finalizing) {
-                summarize(item);
                 saveItem(mFinalized, item, 0);
                 mItemsFinalized++;
             } else {
@@ -332,7 +262,6 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
             oitem->merge(item);
             id = oitem->getSessionID();
             if (finalizing) {
-                summarize(oitem);
                 saveItem(mFinalized, oitem, 0);
                 mItemsFinalized++;
             }
@@ -350,7 +279,6 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
                 delete item;
                 item = NULL;
             } else {
-                summarize(item);
                 saveItem(mFinalized, item, 0);
                 mItemsFinalized++;
             }
@@ -379,8 +307,6 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
     }
 
     // crack any parameters
-    String16 summaryOption("-summary");
-    bool summary = false;
     String16 protoOption("-proto");
     int chosenProto = mDumpProtoDefault;
     String16 clearOption("-clear");
@@ -396,8 +322,6 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
         String8 myarg(args[i]);
         if (args[i] == clearOption) {
             clear = true;
-        } else if (args[i] == summaryOption) {
-            summary = true;
         } else if (args[i] == protoOption) {
             i++;
             if (i < n) {
@@ -444,7 +368,6 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
             result.append("Recognized parameters:\n");
             result.append("-help        this help message\n");
             result.append("-proto #     dump using protocol #");
-            result.append("-summary     show summary info\n");
             result.append("-clear       clears out saved records\n");
             result.append("-only X      process records for component X\n");
             result.append("-since X     include records since X\n");
@@ -464,12 +387,7 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
 
     dumpHeaders(result, ts_since);
 
-    // want exactly 1, to avoid confusing folks that parse the output
-    if (summary) {
-        dumpSummaries(result, ts_since, only.c_str());
-    } else {
-        dumpRecent(result, ts_since, only.c_str());
-    }
+    dumpRecent(result, ts_since, only.c_str());
 
 
     if (clear) {
@@ -523,40 +441,6 @@ void MediaAnalyticsService::dumpHeaders(String8 &result, nsecs_t ts_since) {
             "Dumping Queue entries more recent than: %" PRId64 "\n",
             (int64_t) ts_since);
         result.append(buffer);
-    }
-}
-
-// dump summary info
-void MediaAnalyticsService::dumpSummaries(String8 &result, nsecs_t ts_since, const char *only) {
-    const size_t SIZE = 512;
-    char buffer[SIZE];
-    int slot = 0;
-
-    snprintf(buffer, SIZE, "\nSummarized Metrics:\n");
-    result.append(buffer);
-
-    if (only != NULL && *only == '\0') {
-        only = NULL;
-    }
-
-    // have each of the distillers dump records
-    if (mSummarizerSets != NULL) {
-        List<SummarizerSet *>::iterator itSet = mSummarizerSets->begin();
-        for (; itSet != mSummarizerSets->end(); itSet++) {
-            nsecs_t when = (*itSet)->getStarted();
-            if (when < ts_since) {
-                continue;
-            }
-            List<MetricsSummarizer *> *list = (*itSet)->getSummarizers();
-            List<MetricsSummarizer *>::iterator it = list->begin();
-            for (; it != list->end(); it++) {
-                if (only != NULL && strcmp(only, (*it)->getKey()) != 0) {
-                    ALOGV("Told to omit '%s'", (*it)->getKey());
-                }
-                std::string distilled = (*it)->dumpSummary(slot, only);
-                result.append(distilled.c_str());
-            }
-        }
     }
 }
 
@@ -783,45 +667,6 @@ bool MediaAnalyticsService::contentValid(MediaAnalyticsItem *item, bool isTruste
 bool MediaAnalyticsService::rateLimited(MediaAnalyticsItem *) {
 
     return false;
-}
-
-// insert into the appropriate summarizer.
-// we make our own copy to save/summarize
-void MediaAnalyticsService::summarize(MediaAnalyticsItem *item) {
-
-    ALOGV("MediaAnalyticsService::summarize()");
-
-    if (item == NULL) {
-        return;
-    }
-
-    nsecs_t now = systemTime(SYSTEM_TIME_REALTIME);
-    if (mCurrentSet == NULL
-        || (mCurrentSet->getStarted() + mNewSetInterval < now)) {
-        newSummarizerSet();
-    }
-
-    if (mCurrentSet == NULL) {
-        return;
-    }
-
-    List<MetricsSummarizer *> *summarizers = mCurrentSet->getSummarizers();
-    List<MetricsSummarizer *>::iterator it = summarizers->begin();
-    for (; it != summarizers->end(); it++) {
-        if ((*it)->isMine(*item)) {
-            break;
-        }
-    }
-    if (it == summarizers->end()) {
-        ALOGD("no handler for type %s", item->getKey().c_str());
-        return;               // no handler
-    }
-
-    // invoke the summarizer. summarizer will make whatever copies
-    // it wants; the caller retains ownership of item.
-
-    (*it)->handleRecord(item);
-
 }
 
 // how long we hold package info before we re-fetch it
