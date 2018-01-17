@@ -297,7 +297,8 @@ bool FastThread::threadLoop()
                     size_t i = mBounds & (mDumpState->mSamplingN - 1);
                     mBounds = (mBounds & 0xFFFF0000) | ((mBounds + 1) & 0xFFFF);
                     if (mFull) {
-                        mBounds += 0x10000;
+                        //mBounds += 0x10000;
+                        __builtin_add_overflow(mBounds, 0x10000, &mBounds);
                     } else if (!(mBounds & (mDumpState->mSamplingN - 1))) {
                         mFull = true;
                     }
