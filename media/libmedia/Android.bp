@@ -319,6 +319,7 @@ cc_library_shared {
 
     srcs: [
         "AudioParameter.cpp",
+        "JAudioTrack.cpp",
         "MediaPlayer2Factory.cpp",
         "MediaPlayer2Manager.cpp",
         "TestPlayerStub.cpp",
@@ -327,6 +328,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "libandroid_runtime",
         "libaudioclient",
         "libbinder",
         "libcutils",
