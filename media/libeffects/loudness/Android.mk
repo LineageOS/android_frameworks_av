@@ -19,6 +19,6 @@ LOCAL_MODULE_RELATIVE_PATH := soundfx
 LOCAL_MODULE:= libldnhncr
 
 LOCAL_HEADER_LIBRARIES := \
-    libaudioeffects
+    android.hardware.audio.effect.legacy@2.0 \
 
 include $(BUILD_SHARED_LIBRARY)

@@ -8,7 +8,7 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SHARED_LIBRARIES := \
-    libaudioutils \
+    libaudioutils_system \
     libaudioprocessing \
     libcutils \
     liblog \
@@ -44,7 +44,7 @@ LOCAL_STATIC_LIBRARIES := \
 
 LOCAL_SHARED_LIBRARIES := \
     libaudioprocessing \
-    libaudioutils \
+    libaudioutils_system \
     libcutils \
     liblog \
     libutils \
@@ -73,7 +73,7 @@ LOCAL_STATIC_LIBRARIES := \
 
 LOCAL_SHARED_LIBRARIES := \
     libaudioprocessing \
-    libaudioutils \
+    libaudioutils_system \
     libcutils \
     liblog \
     libutils \
