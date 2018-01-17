@@ -49,4 +49,11 @@ LOCAL_JNI_SHARED_LIBRARIES := \
     liboggextractor \
     libwavextractor \
 
+# TODO: Remove dependency with other support libraries.
+LOCAL_STATIC_ANDROID_LIBRARIES += \
+    android-support-v4 \
+    android-support-v7-appcompat \
+    android-support-v7-palette
+LOCAL_USE_AAPT2 := true
+
 include $(BUILD_PACKAGE)
