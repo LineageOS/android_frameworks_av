@@ -28,14 +28,11 @@ import com.android.widget.MediaController2Impl;
 import com.android.widget.VideoView2Impl;
 
 public class ApiFactory implements StaticProvider {
-    private final Context mContext;
 
-    public ApiFactory(Context context) {
-        mContext = context;
-    }
-
-    public static Object initialize(Context context) throws ReflectiveOperationException {
-        return new ApiFactory(context);
+    public static Object initialize(Context appContext, Context libContext)
+            throws ReflectiveOperationException {
+        ApiHelper.initialize(appContext, libContext);
+        return new ApiFactory();
     }
 
     @Override
