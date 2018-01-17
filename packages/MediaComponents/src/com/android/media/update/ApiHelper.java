@@ -39,11 +39,11 @@ public class ApiHelper {
         mLibTheme = libTheme;
     }
 
-    public Resources getLibResources() {
-        return mLibResources;
+    public static Resources getLibResources() {
+        return sInstance.mLibResources;
     }
 
-    public Resources.Theme getLibTheme() {
-        return mLibTheme;
+    public static Resources.Theme getLibTheme() {
+        return sInstance.mLibTheme;
     }
 }

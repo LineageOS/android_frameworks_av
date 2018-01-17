@@ -32,6 +32,8 @@ LOCAL_PROGUARD_FLAG_FILES := proguard.cfg
 
 LOCAL_MULTILIB := first
 
+LOCAL_JAVA_LIBRARIES += android-support-annotations
+
 # Embed native libraries in package, rather than installing to /system/lib*.
 # TODO: Find a right way to include libs in the apk. b/72066556
 LOCAL_MODULE_TAGS := samples
