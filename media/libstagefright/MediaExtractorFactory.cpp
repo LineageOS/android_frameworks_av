@@ -38,7 +38,7 @@
 
 namespace android {
 
-static const char *kUpdateApkPath = "/system/priv-app/MediaUpdate/MediaUpdate.apk";
+static const char *kUpdateApkPath = "/system/app/MediaUpdate/MediaUpdate.apk";
 
 // static
 sp<IMediaExtractor> MediaExtractorFactory::Create(

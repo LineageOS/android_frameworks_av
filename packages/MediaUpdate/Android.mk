@@ -20,7 +20,6 @@ include $(CLEAR_VARS)
 
 LOCAL_PACKAGE_NAME := MediaUpdate
 LOCAL_MODULE_OWNER := google
-LOCAL_PRIVILEGED_MODULE := true
 
 # TODO: create a separate key for this package.
 LOCAL_CERTIFICATE := platform
@@ -34,6 +33,7 @@ LOCAL_PROGUARD_FLAG_FILES := proguard.cfg
 LOCAL_MULTILIB := first
 
 # Embed native libraries in package, rather than installing to /system/lib*.
+# TODO: Find a right way to include libs in the apk. b/72066556
 LOCAL_MODULE_TAGS := samples
 
 # To embed native libraries in package, uncomment the lines below.
