@@ -19,6 +19,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <string>
 #include <inttypes.h>
 
 #include <utils/threads.h>
@@ -87,21 +88,21 @@ bool MetricsSummarizer::isMine(MediaAnalyticsItem &item)
 {
     if (mKey == NULL)
         return true;
-    AString itemKey = item.getKey();
+    std::string itemKey = item.getKey();
     if (strcmp(mKey, itemKey.c_str()) != 0) {
         return false;
     }
     return true;
 }
 
-AString MetricsSummarizer::dumpSummary(int &slot)
+std::string MetricsSummarizer::dumpSummary(int &slot)
 {
     return dumpSummary(slot, NULL);
 }
 
-AString MetricsSummarizer::dumpSummary(int &slot, const char *only)
+std::string MetricsSummarizer::dumpSummary(int &slot, const char *only)
 {
-    AString value = "";
+    std::string value;
 
     List<MediaAnalyticsItem *>::iterator it = mSummaries->begin();
     if (it != mSummaries->end()) {
@@ -110,7 +111,7 @@ AString MetricsSummarizer::dumpSummary(int &slot, const char *only)
             if (only != NULL && strcmp(only, (*it)->getKey().c_str()) != 0) {
                 continue;
             }
-            AString entry = (*it)->toString();
+            std::string entry = (*it)->toString();
             snprintf(buf, sizeof(buf), "%5d: ", slot);
             value.append(buf);
             value.append(entry.c_str());
