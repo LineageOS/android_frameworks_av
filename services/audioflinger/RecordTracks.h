@@ -66,6 +66,8 @@ public:
             void        setSilenced(bool silenced) { mSilenced = silenced; }
             bool        isSilenced() const { return mSilenced; }
 
+            status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+
 private:
     friend class AudioFlinger;  // for mState
 
