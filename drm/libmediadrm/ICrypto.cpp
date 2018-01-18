@@ -16,14 +16,14 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "ICrypto"
-#include <utils/Log.h>
-
 #include <binder/Parcel.h>
 #include <binder/IMemory.h>
+#include <cutils/log.h>
 #include <media/ICrypto.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
+#include <utils/Log.h>
 
 namespace android {
 
@@ -362,6 +362,17 @@ status_t BnCrypto::onTransact(
                     reply->writeInt32(BAD_VALUE);
                     return OK;
                 }
+                sp<IMemory> dest = destination.mSharedMemory;
+                if (totalSize > dest->size() ||
+                        (size_t)dest->offset() > dest->size() - totalSize) {
+                    reply->writeInt32(BAD_VALUE);
+                    android_errorWriteLog(0x534e4554, "71389378");
+                    return OK;
+                }
+            } else {
+                reply->writeInt32(BAD_VALUE);
+                android_errorWriteLog(0x534e4554, "70526702");
+                return OK;
             }
 
             AString errorDetailMsg;
