@@ -21,7 +21,7 @@ LOCAL_REQUIRED_MODULES_x86 := mediaextractor.policy
 
 # extractor libraries
 LOCAL_REQUIRED_MODULES := \
-    MediaUpdate \
+    MediaComponents \
 
 LOCAL_SRC_FILES := main_extractorservice.cpp
 LOCAL_SHARED_LIBRARIES := libmedia libmediaextractorservice libbinder libutils \

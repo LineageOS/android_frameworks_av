@@ -38,7 +38,7 @@
 
 namespace android {
 
-static const char *kUpdateApkPath = "/system/app/MediaUpdate/MediaUpdate.apk";
+static const char *kSystemApkPath = "/system/app/MediaComponents/MediaComponents.apk";
 
 // static
 sp<IMediaExtractor> MediaExtractorFactory::Create(
@@ -297,7 +297,7 @@ void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
 
     std::shared_ptr<List<sp<ExtractorPlugin>>> newList(new List<sp<ExtractorPlugin>>());
 
-    RegisterExtractors(kUpdateApkPath, *newList);
+    RegisterExtractors(kSystemApkPath, *newList);
 
     if (newUpdateApkPath != nullptr) {
         RegisterExtractors(newUpdateApkPath, *newList);

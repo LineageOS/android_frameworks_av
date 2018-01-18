@@ -18,7 +18,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_PACKAGE_NAME := MediaUpdate
+LOCAL_PACKAGE_NAME := MediaComponents
 LOCAL_MODULE_OWNER := google
 
 # TODO: create a separate key for this package.
