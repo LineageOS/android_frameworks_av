@@ -420,6 +420,7 @@ protected:
 
     /**
      * This should not be called after the open() call.
+     * TODO for multiple setters: assert(mState == AAUDIO_STREAM_STATE_UNINITIALIZED)
      */
     void setSampleRate(int32_t sampleRate) {
         mSampleRate = sampleRate;
@@ -466,6 +467,27 @@ protected:
 
     int64_t getPeriodNanoseconds() {
         return mPeriodNanoseconds.load(std::memory_order_acquire);
+    }
+
+    /**
+     * This should not be called after the open() call.
+     */
+    void setUsage(aaudio_usage_t usage) {
+        mUsage = usage;
+    }
+
+    /**
+     * This should not be called after the open() call.
+     */
+    void setContentType(aaudio_content_type_t contentType) {
+        mContentType = contentType;
+    }
+
+    /**
+     * This should not be called after the open() call.
+     */
+    void setInputPreset(aaudio_input_preset_t inputPreset) {
+        mInputPreset = inputPreset;
     }
 
 private:

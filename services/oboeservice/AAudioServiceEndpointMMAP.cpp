@@ -98,6 +98,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
             .flags = AUDIO_FLAG_LOW_LATENCY,
             .tags = ""
     };
+    ALOGV("open() MMAP attributes.usage = %d, content_type = %d, source = %d",
+          attributes.usage, attributes.content_type, attributes.source);
+
     mMmapClient.clientUid = request.getUserId();
     mMmapClient.clientPid = request.getProcessId();
     mMmapClient.packageName.setTo(String16(""));
