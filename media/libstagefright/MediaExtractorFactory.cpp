@@ -15,7 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "MediaExtractor"
+#define LOG_TAG "MediaExtractorFactory"
 #include <utils/Log.h>
 
 #include <binder/IServiceManager.h>
@@ -31,11 +31,14 @@
 #include <media/IMediaExtractorService.h>
 #include <cutils/properties.h>
 #include <utils/String8.h>
+#include <ziparchive/zip_archive.h>
 
 #include <dirent.h>
 #include <dlfcn.h>
 
 namespace android {
+
+static const char *kSystemApkPath = "/system/app/MediaComponents/MediaComponents.apk";
 
 // static
 sp<IMediaExtractor> MediaExtractorFactory::Create(
@@ -45,8 +48,7 @@ sp<IMediaExtractor> MediaExtractorFactory::Create(
     if (!property_get_bool("media.stagefright.extractremote", true)) {
         // local extractor
         ALOGW("creating media extractor in calling process");
-        sp<MediaExtractor> extractor = CreateFromService(source, mime);
-        return CreateIMediaExtractorFromMediaExtractor(extractor);
+        return CreateFromService(source, mime);
     } else {
         // remote extractor
         ALOGV("get service manager");
@@ -103,11 +105,12 @@ sp<IMediaExtractor> MediaExtractorFactory::CreateFromFd(
     return Create(*out, mime);
 }
 
-sp<MediaExtractor> MediaExtractorFactory::CreateFromService(
+sp<IMediaExtractor> MediaExtractorFactory::CreateFromService(
         const sp<DataSource> &source, const char *mime) {
 
-    ALOGV("MediaExtractorFactory::%s %s", __func__, mime);
-    RegisterDefaultSniffers();
+    ALOGV("MediaExtractorFactory::CreateFromService %s", mime);
+
+    UpdateExtractors(nullptr);
 
     // initialize source decryption if needed
     source->DrmInitialization(nullptr /* mime */);
@@ -117,7 +120,8 @@ sp<MediaExtractor> MediaExtractorFactory::CreateFromService(
     MediaExtractor::CreatorFunc creator = NULL;
     String8 tmp;
     float confidence;
-    creator = sniff(source, &tmp, &confidence, &meta);
+    sp<ExtractorPlugin> plugin;
+    creator = sniff(source, &tmp, &confidence, &meta, plugin);
     if (!creator) {
         ALOGV("FAILED to autodetect media content.");
         return NULL;
@@ -128,39 +132,64 @@ sp<MediaExtractor> MediaExtractorFactory::CreateFromService(
          mime, confidence);
 
     MediaExtractor *ret = creator(source, meta);
-    return ret;
+    return CreateIMediaExtractorFromMediaExtractor(ret, plugin);
 }
 
-Mutex MediaExtractorFactory::gSnifferMutex;
-List<MediaExtractor::ExtractorDef> MediaExtractorFactory::gSniffers;
-bool MediaExtractorFactory::gSniffersRegistered = false;
+//static
+void MediaExtractorFactory::LoadPlugins(const ::std::string& apkPath) {
+    // TODO: Verify apk path with package manager in extractor process.
+    ALOGV("Load plugins from: %s", apkPath.c_str());
+    UpdateExtractors(apkPath.empty() ? nullptr : apkPath.c_str());
+}
+
+struct ExtractorPlugin : public RefBase {
+    MediaExtractor::ExtractorDef def;
+    void *libHandle;
+    String8 libPath;
+
+    ExtractorPlugin(MediaExtractor::ExtractorDef definition, void *handle, String8 &path)
+        : def(definition), libHandle(handle), libPath(path) { }
+    ~ExtractorPlugin() {
+        if (libHandle != nullptr) {
+            ALOGV("closing handle for %s %d", libPath.c_str(), def.extractor_version);
+            dlclose(libHandle);
+        }
+    }
+};
+
+Mutex MediaExtractorFactory::gPluginMutex;
+std::shared_ptr<List<sp<ExtractorPlugin>>> MediaExtractorFactory::gPlugins;
+bool MediaExtractorFactory::gPluginsRegistered = false;
 
 // static
 MediaExtractor::CreatorFunc MediaExtractorFactory::sniff(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence, sp<AMessage> *meta) {
+        const sp<DataSource> &source, String8 *mimeType, float *confidence, sp<AMessage> *meta,
+        sp<ExtractorPlugin> &plugin) {
     *mimeType = "";
     *confidence = 0.0f;
     meta->clear();
 
+    std::shared_ptr<List<sp<ExtractorPlugin>>> plugins;
     {
-        Mutex::Autolock autoLock(gSnifferMutex);
-        if (!gSniffersRegistered) {
+        Mutex::Autolock autoLock(gPluginMutex);
+        if (!gPluginsRegistered) {
             return NULL;
         }
+        plugins = gPlugins;
     }
 
     MediaExtractor::CreatorFunc curCreator = NULL;
     MediaExtractor::CreatorFunc bestCreator = NULL;
-    for (List<MediaExtractor::ExtractorDef>::iterator it = gSniffers.begin();
-         it != gSniffers.end(); ++it) {
+    for (auto it = plugins->begin(); it != plugins->end(); ++it) {
         String8 newMimeType;
         float newConfidence;
         sp<AMessage> newMeta;
-        if ((curCreator = (*it).sniff(source, &newMimeType, &newConfidence, &newMeta))) {
+        if ((curCreator = (*it)->def.sniff(source, &newMimeType, &newConfidence, &newMeta))) {
             if (newConfidence > *confidence) {
                 *mimeType = newMimeType;
                 *confidence = newConfidence;
                 *meta = newMeta;
+                plugin = *it;
                 bestCreator = curCreator;
             }
         }
@@ -170,95 +199,112 @@ MediaExtractor::CreatorFunc MediaExtractorFactory::sniff(
 }
 
 // static
-void MediaExtractorFactory::RegisterSniffer_l(const MediaExtractor::ExtractorDef &def) {
+void MediaExtractorFactory::RegisterExtractor(const sp<ExtractorPlugin> &plugin,
+        List<sp<ExtractorPlugin>> &pluginList) {
     // sanity check check struct version, uuid, name
-    if (def.def_version == 0 || def.def_version > MediaExtractor::EXTRACTORDEF_VERSION) {
-        ALOGE("don't understand extractor format %u, ignoring.", def.def_version);
+    if (plugin->def.def_version == 0
+            || plugin->def.def_version > MediaExtractor::EXTRACTORDEF_VERSION) {
+        ALOGE("don't understand extractor format %u, ignoring.", plugin->def.def_version);
         return;
     }
-    if (memcmp(&def.extractor_uuid, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", 16) == 0) {
+    if (memcmp(&plugin->def.extractor_uuid, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", 16) == 0) {
         ALOGE("invalid UUID, ignoring");
         return;
     }
-    if (def.extractor_name == NULL || strlen(def.extractor_name) == 0) {
+    if (plugin->def.extractor_name == NULL || strlen(plugin->def.extractor_name) == 0) {
         ALOGE("extractors should have a name, ignoring");
         return;
     }
 
-    for (List<MediaExtractor::ExtractorDef>::iterator it = gSniffers.begin();
-            it != gSniffers.end(); ++it) {
-        if (memcmp(&((*it).extractor_uuid), &def.extractor_uuid, 16) == 0) {
+    for (auto it = pluginList.begin(); it != pluginList.end(); ++it) {
+        if (memcmp(&((*it)->def.extractor_uuid), &plugin->def.extractor_uuid, 16) == 0) {
             // there's already an extractor with the same uuid
-            if ((*it).extractor_version < def.extractor_version) {
+            if ((*it)->def.extractor_version < plugin->def.extractor_version) {
                 // this one is newer, replace the old one
                 ALOGW("replacing extractor '%s' version %u with version %u",
-                        def.extractor_name,
-                        (*it).extractor_version,
-                        def.extractor_version);
-                gSniffers.erase(it);
+                        plugin->def.extractor_name,
+                        (*it)->def.extractor_version,
+                        plugin->def.extractor_version);
+                pluginList.erase(it);
                 break;
             } else {
                 ALOGW("ignoring extractor '%s' version %u in favor of version %u",
-                        def.extractor_name,
-                        def.extractor_version,
-                        (*it).extractor_version);
+                        plugin->def.extractor_name,
+                        plugin->def.extractor_version,
+                        (*it)->def.extractor_version);
                 return;
             }
         }
     }
-    ALOGV("registering extractor for %s", def.extractor_name);
-    gSniffers.push_back(def);
+    ALOGV("registering extractor for %s", plugin->def.extractor_name);
+    pluginList.push_back(plugin);
 }
 
-// static
-void MediaExtractorFactory::RegisterDefaultSniffers() {
-    Mutex::Autolock autoLock(gSnifferMutex);
-    if (gSniffersRegistered) {
-        return;
-    }
-
-    auto registerExtractors = [](const char *libDirPath) -> void {
-        DIR *libDir = opendir(libDirPath);
-        if (libDir) {
-            struct dirent* libEntry;
-            while ((libEntry = readdir(libDir))) {
-                String8 libPath = String8(libDirPath) + libEntry->d_name;
+//static
+void MediaExtractorFactory::RegisterExtractors(
+        const char *apkPath, List<sp<ExtractorPlugin>> &pluginList) {
+    ALOGV("search for plugins at %s", apkPath);
+    ZipArchiveHandle zipHandle;
+    int32_t ret = OpenArchive(apkPath, &zipHandle);
+    if (ret == 0) {
+        char abi[PROPERTY_VALUE_MAX];
+        property_get("ro.product.cpu.abi", abi, "arm64-v8a");
+        ZipString prefix(String8::format("lib/%s/", abi).c_str());
+        ZipString suffix("extractor.so");
+        void* cookie;
+        ret = StartIteration(zipHandle, &cookie, &prefix, &suffix);
+        if (ret == 0) {
+            ZipEntry entry;
+            ZipString name;
+            while (Next(cookie, &entry, &name) == 0) {
+                String8 libPath = String8(apkPath) + "!/" +
+                    String8(reinterpret_cast<const char*>(name.name), name.name_length);
                 void *libHandle = dlopen(libPath.string(), RTLD_NOW | RTLD_LOCAL);
                 if (libHandle) {
-                    MediaExtractor::GetExtractorDef getsniffer =
-                            (MediaExtractor::GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
-                    if (getsniffer) {
+                    MediaExtractor::GetExtractorDef getDef =
+                        (MediaExtractor::GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
+                    if (getDef) {
                         ALOGV("registering sniffer for %s", libPath.string());
-                        RegisterSniffer_l(getsniffer());
+                        RegisterExtractor(
+                                new ExtractorPlugin(getDef(), libHandle, libPath), pluginList);
                     } else {
                         ALOGW("%s does not contain sniffer", libPath.string());
                         dlclose(libHandle);
                     }
                 } else {
-                    ALOGW("couldn't dlopen(%s)", libPath.string());
+                    ALOGW("couldn't dlopen(%s) %s", libPath.string(), strerror(errno));
                 }
             }
-
-            closedir(libDir);
+            EndIteration(cookie);
         } else {
-            ALOGE("couldn't opendir(%s)", libDirPath);
+            ALOGW("couldn't find plugins from %s, %d", apkPath, ret);
         }
-    };
-
-    registerExtractors("/system/lib"
-#ifdef __LP64__
-            "64"
-#endif
-            "/extractors/");
-
-    registerExtractors("/vendor/lib"
-#ifdef __LP64__
-            "64"
-#endif
-            "/extractors/");
-
-    gSniffersRegistered = true;
+        CloseArchive(zipHandle);
+    } else {
+        ALOGW("couldn't open(%s) %d", apkPath, ret);
+    }
 }
 
+// static
+void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
+    Mutex::Autolock autoLock(gPluginMutex);
+    if (newUpdateApkPath != nullptr) {
+        gPluginsRegistered = false;
+    }
+    if (gPluginsRegistered) {
+        return;
+    }
+
+    std::shared_ptr<List<sp<ExtractorPlugin>>> newList(new List<sp<ExtractorPlugin>>());
+
+    RegisterExtractors(kSystemApkPath, *newList);
+
+    if (newUpdateApkPath != nullptr) {
+        RegisterExtractors(newUpdateApkPath, *newList);
+    }
+
+    gPlugins = newList;
+    gPluginsRegistered = true;
+}
 
 }  // namespace android

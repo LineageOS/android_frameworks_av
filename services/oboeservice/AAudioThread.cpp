@@ -27,12 +27,26 @@
 
 using namespace aaudio;
 
+std::atomic<uint32_t> AAudioThread::mNextThreadIndex{1};
 
-AAudioThread::AAudioThread()
-    : mRunnable(nullptr)
-    , mHasThread(false) {
+AAudioThread::AAudioThread(const char *prefix) {
+    setup(prefix);
+}
+
+AAudioThread::AAudioThread() {
+    setup("AAudio");
+}
+
+void AAudioThread::setup(const char *prefix) {
     // mThread is a pthread_t of unknown size so we need memset().
     memset(&mThread, 0, sizeof(mThread));
+
+    // Name the thread with an increasing index, "prefix_#", for debugging.
+    uint32_t index = mNextThreadIndex++;
+    // Wrap the index so that we do not hit the 16 char limit
+    // and to avoid hard-to-read large numbers.
+    index = index % 100000; // arbitrary
+    snprintf(mName, sizeof(mName), "%s_%u", prefix, index);
 }
 
 void AAudioThread::dispatch() {
@@ -64,6 +78,8 @@ aaudio_result_t AAudioThread::start(Runnable *runnable) {
         ALOGE("start() - pthread_create() returned %d %s", err, strerror(err));
         return AAudioConvert_androidToAAudioResult(-err);
     } else {
+        int err = pthread_setname_np(mThread, mName);
+        ALOGW_IF((err != 0), "Could not set name of AAudioThread. err = %d", err);
         mHasThread = true;
         return AAUDIO_OK;
     }

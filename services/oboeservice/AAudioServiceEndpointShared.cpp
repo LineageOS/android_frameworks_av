@@ -60,18 +60,16 @@ aaudio_result_t AAudioServiceEndpointShared::open(const aaudio::AAudioStreamRequ
     aaudio_result_t result = AAUDIO_OK;
     const AAudioStreamConfiguration &configuration = request.getConstantConfiguration();
 
+    copyFrom(configuration);
     mRequestedDeviceId = configuration.getDeviceId();
-    setDirection(configuration.getDirection());
 
     AudioStreamBuilder builder;
+    builder.copyFrom(configuration);
+
     builder.setSharingMode(AAUDIO_SHARING_MODE_EXCLUSIVE);
     // Don't fall back to SHARED because that would cause recursion.
     builder.setSharingModeMatchRequired(true);
-    builder.setDeviceId(mRequestedDeviceId);
-    builder.setFormat(configuration.getFormat());
-    builder.setSampleRate(configuration.getSampleRate());
-    builder.setSamplesPerFrame(configuration.getSamplesPerFrame());
-    builder.setDirection(configuration.getDirection());
+
     builder.setBufferCapacity(DEFAULT_BUFFER_CAPACITY);
 
     result = mStreamInternal->open(builder);

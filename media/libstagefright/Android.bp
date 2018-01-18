@@ -112,6 +112,7 @@ cc_library_shared {
         "libRScpp",
         "libhidlbase",
         "libhidlmemory",
+        "libziparchive",
         "android.hidl.allocator@1.0",
         "android.hardware.cas.native@1.0",
         "android.hardware.media.omx@1.0",
@@ -211,6 +212,7 @@ cc_library_shared {
         "libmedia_helper",
         "libstagefright_foundation",
         "libdl",
+        "libziparchive",
     ],
 
     static_libs: [

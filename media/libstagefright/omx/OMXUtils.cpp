@@ -215,6 +215,9 @@ bool DescribeDefaultColorFormat(DescribeColorFormat2Params &params) {
         fmt != OMX_COLOR_FormatYUV420PackedSemiPlanar &&
         fmt != (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_YV12) {
         ALOGW("do not know color format 0x%x = %d", fmt, fmt);
+        if (fmt == OMX_COLOR_FormatYUV420Planar16) {
+            ALOGW("Cannot describe color format OMX_COLOR_FormatYUV420Planar16");
+        }
         return false;
     }
 

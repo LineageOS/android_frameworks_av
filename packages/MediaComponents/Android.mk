@@ -18,9 +18,8 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_PACKAGE_NAME := MediaUpdate
+LOCAL_PACKAGE_NAME := MediaComponents
 LOCAL_MODULE_OWNER := google
-LOCAL_PRIVILEGED_MODULE := true
 
 # TODO: create a separate key for this package.
 LOCAL_CERTIFICATE := platform
@@ -30,5 +29,24 @@ LOCAL_CERTIFICATE := platform
 
 LOCAL_SRC_FILES := $(call all-java-files-under, src)
 LOCAL_PROGUARD_FLAG_FILES := proguard.cfg
+
+LOCAL_MULTILIB := first
+
+# Embed native libraries in package, rather than installing to /system/lib*.
+# TODO: Find a right way to include libs in the apk. b/72066556
+LOCAL_MODULE_TAGS := samples
+
+# To embed native libraries in package, uncomment the lines below.
+LOCAL_JNI_SHARED_LIBRARIES := \
+    libaacextractor \
+    libamrextractor \
+    libflacextractor \
+    libmidiextractor \
+    libmkvextractor \
+    libmp3extractor \
+    libmp4extractor \
+    libmpeg2extractor \
+    liboggextractor \
+    libwavextractor \
 
 include $(BUILD_PACKAGE)

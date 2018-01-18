@@ -17,9 +17,9 @@ LIBAAUDIO {
     AAudioStreamBuilder_setSharingMode;
     AAudioStreamBuilder_setDirection;
     AAudioStreamBuilder_setBufferCapacityInFrames;
-    AAudioStreamBuilder_setUsage;
-    AAudioStreamBuilder_setContentType;
-    AAudioStreamBuilder_setInputPreset;
+    AAudioStreamBuilder_setUsage;       # introduced=28
+    AAudioStreamBuilder_setContentType; # introduced=28
+    AAudioStreamBuilder_setInputPreset; # introduced=28
     AAudioStreamBuilder_openStream;
     AAudioStreamBuilder_delete;
     AAudioStream_close;
@@ -45,9 +45,9 @@ LIBAAUDIO {
     AAudioStream_getFormat;
     AAudioStream_getSharingMode;
     AAudioStream_getDirection;
-    AAudioStream_getUsage;
-    AAudioStream_getContentType;
-    AAudioStream_getInputPreset;
+    AAudioStream_getUsage;       # introduced=28
+    AAudioStream_getContentType; # introduced=28
+    AAudioStream_getInputPreset; # introduced=28
     AAudioStream_getFramesWritten;
     AAudioStream_getFramesRead;
     AAudioStream_getTimestamp;

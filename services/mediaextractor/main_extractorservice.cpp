@@ -30,6 +30,7 @@
 // from LOCAL_C_INCLUDES
 #include "IcuUtils.h"
 #include "MediaExtractorService.h"
+#include "MediaExtractorUpdateService.h"
 #include "MediaUtils.h"
 #include "minijail.h"
 
@@ -63,6 +64,16 @@ int main(int argc __unused, char** argv)
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();
     MediaExtractorService::instantiate();
+
+    // TODO: Uncomment below once sepolicy change is landed.
+    /*
+    char value[PROPERTY_VALUE_MAX];
+    property_get("ro.build.type", value, "unknown");
+    if (strcmp(value, "userdebug") == 0 || strcmp(value, "eng") == 0) {
+        media::MediaExtractorUpdateService::instantiate();
+    }
+    */
+
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
 }

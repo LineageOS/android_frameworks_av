@@ -31,13 +31,15 @@ sp<DataSource> CreateDataSourceFromIDataSource(const sp<IDataSource> &source);
 sp<IDataSource> CreateIDataSourceFromDataSource(const sp<DataSource> &source);
 
 // Creates an IMediaExtractor wrapper to the given MediaExtractor.
-sp<IMediaExtractor> CreateIMediaExtractorFromMediaExtractor(const sp<MediaExtractor> &extractor);
+sp<IMediaExtractor> CreateIMediaExtractorFromMediaExtractor(
+        const sp<MediaExtractor> &extractor, const sp<RefBase> &plugin);
 
 // Creates a MediaSource which wraps the given IMediaSource object.
 sp<MediaSource> CreateMediaSourceFromIMediaSource(const sp<IMediaSource> &source);
 
 // Creates an IMediaSource wrapper to the given MediaSource.
-sp<IMediaSource> CreateIMediaSourceFromMediaSource(const sp<MediaSource> &source);
+sp<IMediaSource> CreateIMediaSourceFromMediaSource(
+        const sp<MediaSource> &source, const sp<RefBase> &plugin);
 
 }  // namespace android
 

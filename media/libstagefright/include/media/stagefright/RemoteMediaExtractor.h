@@ -27,7 +27,7 @@ class MediaAnalyticsItem;
 // IMediaExtractor wrapper to the MediaExtractor.
 class RemoteMediaExtractor : public BnMediaExtractor {
 public:
-    static sp<IMediaExtractor> wrap(const sp<MediaExtractor> &extractor);
+    static sp<IMediaExtractor> wrap(const sp<MediaExtractor> &extractor, const sp<RefBase> &plugin);
 
     virtual ~RemoteMediaExtractor();
     virtual size_t countTracks();
@@ -44,10 +44,11 @@ public:
 
 private:
     sp<MediaExtractor> mExtractor;
+    sp<RefBase> mExtractorPlugin;
 
     MediaAnalyticsItem *mAnalyticsItem;
 
-    explicit RemoteMediaExtractor(const sp<MediaExtractor> &extractor);
+    explicit RemoteMediaExtractor(const sp<MediaExtractor> &extractor, const sp<RefBase> &plugin);
 
     DISALLOW_EVIL_CONSTRUCTORS(RemoteMediaExtractor);
 };
