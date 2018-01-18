@@ -18,10 +18,11 @@
 #include <utils/Log.h>
 
 #include "../include/SoftwareRenderer.h"
-
 #include <cutils/properties.h> // for property_get
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/ColorUtils.h>
+#include <media/stagefright/SurfaceUtils.h>
 #include <system/window.h>
 #include <ui/Fence.h>
 #include <ui/GraphicBufferMapper.h>
@@ -29,7 +30,6 @@
 #include <ui/Rect.h>
 
 namespace android {
-
 
 static int ALIGN(int x, int y) {
     // y must be a power of 2.
@@ -50,7 +50,9 @@ SoftwareRenderer::SoftwareRenderer(
       mCropBottom(0),
       mCropWidth(0),
       mCropHeight(0),
-      mRotationDegrees(rotation) {
+      mRotationDegrees(rotation),
+      mDataSpace(HAL_DATASPACE_UNKNOWN) {
+    memset(&mHDRStaticInfo, 0, sizeof(mHDRStaticInfo));
 }
 
 SoftwareRenderer::~SoftwareRenderer() {
@@ -130,6 +132,13 @@ void SoftwareRenderer::resetFormatIfChanged(const sp<AMessage> &format) {
                 bufHeight = (mCropHeight + 1) & ~1;
                 break;
             }
+            case OMX_COLOR_FormatYUV420Planar16:
+            {
+                halFormat = HAL_PIXEL_FORMAT_RGBA_1010102;
+                bufWidth = (mCropWidth + 1) & ~1;
+                bufHeight = (mCropHeight + 1) & ~1;
+                break;
+            }
             default:
             {
                 break;
@@ -140,6 +149,10 @@ void SoftwareRenderer::resetFormatIfChanged(const sp<AMessage> &format) {
     if (halFormat == HAL_PIXEL_FORMAT_RGB_565) {
         mConverter = new ColorConverter(
                 mColorFormat, OMX_COLOR_Format16bitRGB565);
+        CHECK(mConverter->isValid());
+    } else if (mColorFormat == OMX_COLOR_FormatYUV420Planar16) {
+        mConverter = new ColorConverter(
+                mColorFormat, OMX_COLOR_Format32BitRGBA1010102);
         CHECK(mConverter->isValid());
     }
 
@@ -365,12 +378,29 @@ skip_copying:
     // color conversion to RGB. For now, just mark dataspace for YUV rendering.
     android_dataspace dataSpace;
     if (format->findInt32("android._dataspace", (int32_t *)&dataSpace) && dataSpace != mDataSpace) {
+        mDataSpace = dataSpace;
+
+        if (mConverter != NULL) {
+            // graphics only supports full range RGB. ColorConverter should have
+            // converted any YUV to full range.
+            dataSpace = (android_dataspace)
+                    ((dataSpace & ~HAL_DATASPACE_RANGE_MASK) | HAL_DATASPACE_RANGE_FULL);
+        }
+
         ALOGD("setting dataspace on output surface to #%x", dataSpace);
         if ((err = native_window_set_buffers_data_space(mNativeWindow.get(), dataSpace))) {
             ALOGW("failed to set dataspace on surface (%d)", err);
         }
-        mDataSpace = dataSpace;
     }
+    if (format->contains("hdr-static-info")) {
+        HDRStaticInfo info;
+        if (ColorUtils::getHDRStaticInfoFromFormat(format, &info)
+            && memcmp(&mHDRStaticInfo, &info, sizeof(info))) {
+            setNativeWindowHdrMetadata(mNativeWindow.get(), &info);
+            mHDRStaticInfo = info;
+        }
+    }
+
     if ((err = mNativeWindow->queueBuffer(mNativeWindow.get(), buf, -1)) != 0) {
         ALOGW("Surface::queueBuffer returned error %d", err);
     } else {

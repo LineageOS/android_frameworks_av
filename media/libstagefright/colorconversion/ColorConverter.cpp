@@ -19,13 +19,28 @@
 #include <utils/Log.h>
 
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/ColorConverter.h>
 #include <media/stagefright/MediaErrors.h>
 
 #include "libyuv/convert_from.h"
 #include "libyuv/video_common.h"
 
+#include <sys/time.h>
+
 #define USE_LIBYUV
+#define PERF_PROFILING 0
+
+
+#if defined(__aarch64__) || defined(__ARM_NEON__)
+#define USE_NEON_Y410 1
+#else
+#define USE_NEON_Y410 0
+#endif
+
+#if USE_NEON_Y410
+#include <arm_neon.h>
+#endif
 
 namespace android {
 
@@ -47,6 +62,9 @@ bool ColorConverter::isValid() const {
             return mDstFormat == OMX_COLOR_Format16bitRGB565
                     || mDstFormat == OMX_COLOR_Format32BitRGBA8888
                     || mDstFormat == OMX_COLOR_Format32bitBGRA8888;
+
+        case OMX_COLOR_FormatYUV420Planar16:
+            return mDstFormat == OMX_COLOR_Format32BitRGBA1010102;
 
         case OMX_COLOR_FormatCbYCrY:
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
@@ -81,8 +99,14 @@ ColorConverter::BitmapParams::BitmapParams(
 
     case OMX_COLOR_Format32bitBGRA8888:
     case OMX_COLOR_Format32BitRGBA8888:
+    case OMX_COLOR_Format32BitRGBA1010102:
         mBpp = 4;
         mStride = 4 * mWidth;
+        break;
+
+    case OMX_COLOR_FormatYUV420Planar16:
+        mBpp = 2;
+        mStride = 2 * mWidth;
         break;
 
     case OMX_COLOR_FormatYUV420Planar:
@@ -145,6 +169,19 @@ status_t ColorConverter::convert(
             err = convertYUV420Planar(src, dst);
 #endif
             break;
+
+        case OMX_COLOR_FormatYUV420Planar16:
+        {
+#if PERF_PROFILING
+            int64_t startTimeUs = ALooper::GetNowUs();
+#endif
+            err = convertYUV420Planar16(src, dst);
+#if PERF_PROFILING
+            int64_t endTimeUs = ALooper::GetNowUs();
+            ALOGD("convertYUV420Planar16 took %lld us", (long long) (endTimeUs - startTimeUs));
+#endif
+            break;
+        }
 
         case OMX_COLOR_FormatCbYCrY:
             err = convertCbYCrY(src, dst);
@@ -405,6 +442,234 @@ status_t ColorConverter::convertYUV420Planar(
 
     return OK;
 }
+
+/*
+ * Pack 10-bit YUV into RGBA_1010102.
+ *
+ * Media sends 10-bit YUV in a RGBA_1010102 format buffer. SF will handle
+ * the conversion to RGB using RenderEngine fallback.
+ *
+ * We do not perform a YUV->RGB conversion here, however the conversion with
+ * BT2020 to Full range is below for reference:
+ *
+ *   B = 1.168  *(Y - 64) + 2.148  *(U - 512)
+ *   G = 1.168  *(Y - 64) - 0.652  *(V - 512) - 0.188  *(U - 512)
+ *   R = 1.168  *(Y - 64) + 1.683  *(V - 512)
+ *
+ *   B = 1196/1024  *(Y - 64) + 2200/1024  *(U - 512)
+ *   G = .................... -  668/1024  *(V - 512) - 192/1024  *(U - 512)
+ *   R = .................... + 1723/1024  *(V - 512)
+ *
+ *   min_B = (1196  *(- 64) + 2200  *(- 512)) / 1024 = -1175
+ *   min_G = (1196  *(- 64) - 668  *(1023 - 512) - 192  *(1023 - 512)) / 1024 = -504
+ *   min_R = (1196  *(- 64) + 1723  *(- 512)) / 1024 = -937
+ *
+ *   max_B = (1196  *(1023 - 64) + 2200  *(1023 - 512)) / 1024 = 2218
+ *   max_G = (1196  *(1023 - 64) - 668  *(- 512) - 192  *(- 512)) / 1024 = 1551
+ *   max_R = (1196  *(1023 - 64) + 1723  *(1023 - 512)) / 1024 = 1980
+ *
+ *   clip range -1175 .. 2218
+ *
+ */
+
+#if !USE_NEON_Y410
+
+status_t ColorConverter::convertYUV420Planar16(
+        const BitmapParams &src, const BitmapParams &dst) {
+    uint8_t *dst_ptr = (uint8_t *)dst.mBits
+        + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp;
+
+    const uint8_t *src_y =
+        (const uint8_t *)src.mBits + src.mCropTop * src.mStride + src.mCropLeft * src.mBpp;
+
+    const uint8_t *src_u =
+        (const uint8_t *)src.mBits + src.mStride * src.mHeight
+        + (src.mCropTop / 2) * (src.mStride / 2) + (src.mCropLeft / 2) * src.mBpp;
+
+    const uint8_t *src_v =
+        src_u + (src.mStride / 2) * (src.mHeight / 2);
+
+    // Converting two lines at a time, slightly faster
+    for (size_t y = 0; y < src.cropHeight(); y += 2) {
+        uint32_t *dst_top = (uint32_t *) dst_ptr;
+        uint32_t *dst_bot = (uint32_t *) (dst_ptr + dst.mStride);
+        uint16_t *ptr_ytop = (uint16_t*) src_y;
+        uint16_t *ptr_ybot = (uint16_t*) (src_y + src.mStride);
+        uint16_t *ptr_u = (uint16_t*) src_u;
+        uint16_t *ptr_v = (uint16_t*) src_v;
+
+        uint32_t u01, v01, y01, y23, y45, y67, uv0, uv1;
+        size_t x = 0;
+        for (; x < src.cropWidth() - 3; x += 4) {
+            u01 = *((uint32_t*)ptr_u); ptr_u += 2;
+            v01 = *((uint32_t*)ptr_v); ptr_v += 2;
+
+            y01 = *((uint32_t*)ptr_ytop); ptr_ytop += 2;
+            y23 = *((uint32_t*)ptr_ytop); ptr_ytop += 2;
+            y45 = *((uint32_t*)ptr_ybot); ptr_ybot += 2;
+            y67 = *((uint32_t*)ptr_ybot); ptr_ybot += 2;
+
+            uv0 = (u01 & 0x3FF) | ((v01 & 0x3FF) << 20);
+            uv1 = (u01 >> 16) | ((v01 >> 16) << 20);
+
+            *dst_top++ = ((y01 & 0x3FF) << 10) | uv0;
+            *dst_top++ = ((y01 >> 16) << 10) | uv0;
+            *dst_top++ = ((y23 & 0x3FF) << 10) | uv1;
+            *dst_top++ = ((y23 >> 16) << 10) | uv1;
+
+            *dst_bot++ = ((y45 & 0x3FF) << 10) | uv0;
+            *dst_bot++ = ((y45 >> 16) << 10) | uv0;
+            *dst_bot++ = ((y67 & 0x3FF) << 10) | uv1;
+            *dst_bot++ = ((y67 >> 16) << 10) | uv1;
+        }
+
+        // There should be at most 2 more pixels to process. Note that we don't
+        // need to consider odd case as the buffer is always aligned to even.
+        if (x < src.cropWidth()) {
+            u01 = *ptr_u;
+            v01 = *ptr_v;
+            y01 = *((uint32_t*)ptr_ytop);
+            y45 = *((uint32_t*)ptr_ybot);
+            uv0 = (u01 & 0x3FF) | ((v01 & 0x3FF) << 20);
+            *dst_top++ = ((y01 & 0x3FF) << 10) | uv0;
+            *dst_top++ = ((y01 >> 16) << 10) | uv0;
+            *dst_bot++ = ((y45 & 0x3FF) << 10) | uv0;
+            *dst_bot++ = ((y45 >> 16) << 10) | uv0;
+        }
+
+        src_y += src.mStride * 2;
+        src_u += src.mStride / 2;
+        src_v += src.mStride / 2;
+        dst_ptr += dst.mStride * 2;
+    }
+
+    return OK;
+}
+
+#else
+
+status_t ColorConverter::convertYUV420Planar16(
+        const BitmapParams &src, const BitmapParams &dst) {
+    uint8_t *out = (uint8_t *)dst.mBits
+        + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp;
+
+    const uint8_t *src_y =
+        (const uint8_t *)src.mBits + src.mCropTop * src.mStride + src.mCropLeft * src.mBpp;
+
+    const uint8_t *src_u =
+        (const uint8_t *)src.mBits + src.mStride * src.mHeight
+        + (src.mCropTop / 2) * (src.mStride / 2) + (src.mCropLeft / 2) * src.mBpp;
+
+    const uint8_t *src_v =
+        src_u + (src.mStride / 2) * (src.mHeight / 2);
+
+    for (size_t y = 0; y < src.cropHeight(); y++) {
+        uint16_t *ptr_y = (uint16_t*) src_y;
+        uint16_t *ptr_u = (uint16_t*) src_u;
+        uint16_t *ptr_v = (uint16_t*) src_v;
+        uint32_t *ptr_out = (uint32_t *) out;
+
+        // Process 16-pixel at a time.
+        uint32_t *ptr_limit = ptr_out + (src.cropWidth() & ~15);
+        while (ptr_out < ptr_limit) {
+            uint16x4_t u0123 = vld1_u16(ptr_u); ptr_u += 4;
+            uint16x4_t u4567 = vld1_u16(ptr_u); ptr_u += 4;
+            uint16x4_t v0123 = vld1_u16(ptr_v); ptr_v += 4;
+            uint16x4_t v4567 = vld1_u16(ptr_v); ptr_v += 4;
+            uint16x4_t y0123 = vld1_u16(ptr_y); ptr_y += 4;
+            uint16x4_t y4567 = vld1_u16(ptr_y); ptr_y += 4;
+            uint16x4_t y89ab = vld1_u16(ptr_y); ptr_y += 4;
+            uint16x4_t ycdef = vld1_u16(ptr_y); ptr_y += 4;
+
+            uint32x2_t uvtempl;
+            uint32x4_t uvtempq;
+
+            uvtempq = vaddw_u16(vshll_n_u16(v0123, 20), u0123);
+
+            uvtempl = vget_low_u32(uvtempq);
+            uint32x4_t uv0011 = vreinterpretq_u32_u64(
+                    vaddw_u32(vshll_n_u32(uvtempl, 32), uvtempl));
+
+            uvtempl = vget_high_u32(uvtempq);
+            uint32x4_t uv2233 = vreinterpretq_u32_u64(
+                    vaddw_u32(vshll_n_u32(uvtempl, 32), uvtempl));
+
+            uvtempq = vaddw_u16(vshll_n_u16(v4567, 20), u4567);
+
+            uvtempl = vget_low_u32(uvtempq);
+            uint32x4_t uv4455 = vreinterpretq_u32_u64(
+                    vaddw_u32(vshll_n_u32(uvtempl, 32), uvtempl));
+
+            uvtempl = vget_high_u32(uvtempq);
+            uint32x4_t uv6677 = vreinterpretq_u32_u64(
+                    vaddw_u32(vshll_n_u32(uvtempl, 32), uvtempl));
+
+            uint32x4_t dsttemp;
+
+            dsttemp = vorrq_u32(uv0011, vshll_n_u16(y0123, 10));
+            vst1q_u32(ptr_out, dsttemp); ptr_out += 4;
+
+            dsttemp = vorrq_u32(uv2233, vshll_n_u16(y4567, 10));
+            vst1q_u32(ptr_out, dsttemp); ptr_out += 4;
+
+            dsttemp = vorrq_u32(uv4455, vshll_n_u16(y89ab, 10));
+            vst1q_u32(ptr_out, dsttemp); ptr_out += 4;
+
+            dsttemp = vorrq_u32(uv6677, vshll_n_u16(ycdef, 10));
+            vst1q_u32(ptr_out, dsttemp); ptr_out += 4;
+        }
+
+        src_y += src.mStride;
+        if (y & 1) {
+            src_u += src.mStride / 2;
+            src_v += src.mStride / 2;
+        }
+        out += dst.mStride;
+    }
+
+    // Process the left-overs out-of-loop, 2-pixel at a time. Note that we don't
+    // need to consider odd case as the buffer is always aligned to even.
+    if (src.cropWidth() & 15) {
+        size_t xstart = (src.cropWidth() & ~15);
+
+        uint8_t *out = (uint8_t *)dst.mBits + dst.mCropTop * dst.mStride
+                + (dst.mCropLeft + xstart) * dst.mBpp;
+
+        const uint8_t *src_y = (const uint8_t *)src.mBits + src.mCropTop * src.mStride
+                + (src.mCropLeft + xstart) * src.mBpp;
+
+        const uint8_t *src_u = (const uint8_t *)src.mBits + src.mStride * src.mHeight
+            + (src.mCropTop / 2) * (src.mStride / 2)
+            + ((src.mCropLeft + xstart) / 2) * src.mBpp;
+
+        const uint8_t *src_v = src_u + (src.mStride / 2) * (src.mHeight / 2);
+
+        for (size_t y = 0; y < src.cropHeight(); y++) {
+            uint16_t *ptr_y = (uint16_t*) src_y;
+            uint16_t *ptr_u = (uint16_t*) src_u;
+            uint16_t *ptr_v = (uint16_t*) src_v;
+            uint32_t *ptr_out = (uint32_t *) out;
+            for (size_t x = xstart; x < src.cropWidth(); x += 2) {
+                uint16_t u = *ptr_u++;
+                uint16_t v = *ptr_v++;
+                uint32_t y01 = *((uint32_t*)ptr_y); ptr_y += 2;
+                uint32_t uv = u | (((uint32_t)v) << 20);
+                *ptr_out++ = ((y01 & 0x3FF) << 10) | uv;
+                *ptr_out++ = ((y01 >> 16) << 10) | uv;
+            }
+            src_y += src.mStride;
+            if (y & 1) {
+                src_u += src.mStride / 2;
+                src_v += src.mStride / 2;
+            }
+            out += dst.mStride;
+        }
+    }
+
+    return OK;
+}
+
+#endif // USE_NEON_Y410
 
 status_t ColorConverter::convertQCOMYUV420SemiPlanar(
         const BitmapParams &src, const BitmapParams &dst) {

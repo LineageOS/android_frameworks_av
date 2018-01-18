@@ -22,6 +22,7 @@
 #include <media/stagefright/FrameRenderTracker.h>
 #include <utils/RefBase.h>
 #include <system/window.h>
+#include <media/hardware/VideoAPI.h>
 
 #include <list>
 
@@ -55,6 +56,7 @@ private:
     int32_t mCropWidth, mCropHeight;
     int32_t mRotationDegrees;
     android_dataspace mDataSpace;
+    HDRStaticInfo mHDRStaticInfo;
     FrameRenderTracker mRenderTracker;
 
     SoftwareRenderer(const SoftwareRenderer &);
