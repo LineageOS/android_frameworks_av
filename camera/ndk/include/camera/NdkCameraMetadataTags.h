@@ -4562,6 +4562,85 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_STATISTICS_LENS_SHADING_MAP_MODE =                  // byte (acamera_metadata_enum_android_statistics_lens_shading_map_mode_t)
             ACAMERA_STATISTICS_START + 16,
+    /**
+     * <p>Whether the camera device outputs the OIS data in output
+     * result metadata.</p>
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_statistics_ois_data_mode_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     *   <li>ACaptureRequest</li>
+     * </ul></p>
+     *
+     * <p>When set to ON,
+     * ACAMERA_STATISTICS_OIS_TIMESTAMPS, android.statistics.oisShiftPixelX,
+     * android.statistics.oisShiftPixelY will provide OIS data in the output result metadata.</p>
+     *
+     * @see ACAMERA_STATISTICS_OIS_TIMESTAMPS
+     */
+    ACAMERA_STATISTICS_OIS_DATA_MODE =                          // byte (acamera_metadata_enum_android_statistics_ois_data_mode_t)
+            ACAMERA_STATISTICS_START + 17,
+    /**
+     * <p>An array of timestamps of OIS samples, in nanoseconds.</p>
+     *
+     * <p>Type: int64[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>The array contains the timestamps of OIS samples. The timestamps are in the same
+     * timebase as and comparable to ACAMERA_SENSOR_TIMESTAMP.</p>
+     *
+     * @see ACAMERA_SENSOR_TIMESTAMP
+     */
+    ACAMERA_STATISTICS_OIS_TIMESTAMPS =                         // int64[n]
+            ACAMERA_STATISTICS_START + 18,
+    /**
+     * <p>An array of shifts of OIS samples, in x direction.</p>
+     *
+     * <p>Type: float[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>The array contains the amount of shifts in x direction, in pixels, based on OIS samples.
+     * A positive value is a shift from left to right in active array coordinate system. For
+     * example, if the optical center is (1000, 500) in active array coordinates, an shift of
+     * (3, 0) puts the new optical center at (1003, 500).</p>
+     * <p>The number of shifts must match the number of timestamps in
+     * ACAMERA_STATISTICS_OIS_TIMESTAMPS.</p>
+     *
+     * @see ACAMERA_STATISTICS_OIS_TIMESTAMPS
+     */
+    ACAMERA_STATISTICS_OIS_X_SHIFTS =                           // float[n]
+            ACAMERA_STATISTICS_START + 19,
+    /**
+     * <p>An array of shifts of OIS samples, in y direction.</p>
+     *
+     * <p>Type: float[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>The array contains the amount of shifts in y direction, in pixels, based on OIS samples.
+     * A positive value is a shift from top to bottom in active array coordinate system. For
+     * example, if the optical center is (1000, 500) in active array coordinates, an shift of
+     * (0, 5) puts the new optical center at (1000, 505).</p>
+     * <p>The number of shifts must match the number of timestamps in
+     * ACAMERA_STATISTICS_OIS_TIMESTAMPS.</p>
+     *
+     * @see ACAMERA_STATISTICS_OIS_TIMESTAMPS
+     */
+    ACAMERA_STATISTICS_OIS_Y_SHIFTS =                           // float[n]
+            ACAMERA_STATISTICS_START + 20,
     ACAMERA_STATISTICS_END,
 
     /**
@@ -4634,6 +4713,24 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_STATISTICS_INFO_AVAILABLE_LENS_SHADING_MAP_MODES =  // byte[n]
             ACAMERA_STATISTICS_INFO_START + 7,
+    /**
+     * <p>List of OIS data output modes for ACAMERA_STATISTICS_OIS_DATA_MODE that
+     * are supported by this camera device.</p>
+     *
+     * @see ACAMERA_STATISTICS_OIS_DATA_MODE
+     *
+     * <p>Type: byte[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>If no OIS data output is available for this camera device, this key will
+     * contain only OFF.</p>
+     */
+    ACAMERA_STATISTICS_INFO_AVAILABLE_OIS_DATA_MODES =          // byte[n]
+            ACAMERA_STATISTICS_INFO_START + 8,
     ACAMERA_STATISTICS_INFO_END,
 
     /**
@@ -7225,6 +7322,20 @@ typedef enum acamera_metadata_enum_acamera_statistics_lens_shading_map_mode {
     ACAMERA_STATISTICS_LENS_SHADING_MAP_MODE_ON                      = 1,
 
 } acamera_metadata_enum_android_statistics_lens_shading_map_mode_t;
+
+// ACAMERA_STATISTICS_OIS_DATA_MODE
+typedef enum acamera_metadata_enum_acamera_statistics_ois_data_mode {
+    /**
+     * <p>Do not include OIS data in the capture result.</p>
+     */
+    ACAMERA_STATISTICS_OIS_DATA_MODE_OFF                             = 0,
+
+    /**
+     * <p>Include OIS data in the capture result.</p>
+     */
+    ACAMERA_STATISTICS_OIS_DATA_MODE_ON                              = 1,
+
+} acamera_metadata_enum_android_statistics_ois_data_mode_t;
 
 
 
