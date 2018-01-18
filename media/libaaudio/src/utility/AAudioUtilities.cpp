@@ -341,7 +341,7 @@ audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t pres
     STATIC_ASSERT(AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION == AUDIO_SOURCE_VOICE_COMMUNICATION);
     STATIC_ASSERT(AAUDIO_INPUT_PRESET_UNPROCESSED == AUDIO_SOURCE_UNPROCESSED);
     if (preset == AAUDIO_UNSPECIFIED) {
-        preset = AAUDIO_INPUT_PRESET_GENERIC;
+        preset = AAUDIO_INPUT_PRESET_VOICE_RECOGNITION;
     }
     return (audio_source_t) preset; // same value
 }

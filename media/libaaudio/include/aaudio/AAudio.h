@@ -510,7 +510,9 @@ AAUDIO_API void AAudioStreamBuilder_setContentType(AAudioStreamBuilder* builder,
  * This could, for example, affect which microphones are used and how the
  * recorded data is processed.
  *
- * The default, if you do not call this function, is AAUDIO_INPUT_PRESET_GENERIC.
+ * The default, if you do not call this function, is AAUDIO_INPUT_PRESET_VOICE_RECOGNITION.
+ * That is because VOICE_RECOGNITION is the preset with the lowest latency
+ * on many platforms.
  *
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @param inputPreset the desired configuration for recording

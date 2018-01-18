@@ -76,7 +76,7 @@ static void checkAttributes(aaudio_performance_mode_t perfMode,
 
     aaudio_input_preset_t expectedPreset =
             (preset == DONT_SET || preset == AAUDIO_UNSPECIFIED)
-            ? AAUDIO_INPUT_PRESET_GENERIC // default
+            ? AAUDIO_INPUT_PRESET_VOICE_RECOGNITION // default
             : preset;
     EXPECT_EQ(expectedPreset, AAudioStream_getInputPreset(aaudioStream));
 
