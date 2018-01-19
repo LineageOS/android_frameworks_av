@@ -16,7 +16,8 @@
 
 package com.android.media.update;
 
-import android.content.Context;
+import android.content.res.Resources;
+import android.content.res.Resources.Theme;
 import android.media.update.MediaController2Provider;
 import android.media.update.VideoView2Provider;
 import android.media.update.StaticProvider;
@@ -28,10 +29,9 @@ import com.android.widget.MediaController2Impl;
 import com.android.widget.VideoView2Impl;
 
 public class ApiFactory implements StaticProvider {
-
-    public static Object initialize(Context appContext, Context libContext)
+    public static Object initialize(Resources libResources, Theme libTheme)
             throws ReflectiveOperationException {
-        ApiHelper.initialize(appContext, libContext);
+        ApiHelper.initialize(libResources, libTheme);
         return new ApiFactory();
     }
 
