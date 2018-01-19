@@ -127,6 +127,9 @@ enum {
 
     /**
      * Extending battery life is most important.
+     *
+     * This mode is not supported in input streams.
+     * Mode NONE will be used if this is requested.
      */
             AAUDIO_PERFORMANCE_MODE_POWER_SAVING,
 
@@ -526,7 +529,13 @@ typedef int32_t aaudio_data_callback_result_t;
  * For an input stream, this function should read and process numFrames of data
  * from the audioData buffer.
  *
- * Note that this callback function should be considered a "real-time" function.
+ * The audio data is passed through the buffer. So do NOT call AAudioStream_read() or
+ * AAudioStream_write() on the stream that is making the callback.
+ *
+ * Note that numFrames can vary unless AAudioStreamBuilder_setFramesPerDataCallback()
+ * is called.
+ *
+ * Also note that this callback function should be considered a "real-time" function.
  * It must not do anything that could cause an unbounded delay because that can cause the
  * audio to glitch or pop.
  *
@@ -537,6 +546,7 @@ typedef int32_t aaudio_data_callback_result_t;
  * <li>any network operations such as streaming</li>
  * <li>use any mutexes or other synchronization primitives</li>
  * <li>sleep</li>
+ * <li>stop or close the stream</li>
  * </ul>
  *
  * If you need to move data, eg. MIDI commands, in or out of the callback function then
@@ -545,7 +555,7 @@ typedef int32_t aaudio_data_callback_result_t;
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @param userData the same address that was passed to AAudioStreamBuilder_setCallback()
  * @param audioData a pointer to the audio data
- * @param numFrames the number of frames to be processed
+ * @param numFrames the number of frames to be processed, which can vary
  * @return AAUDIO_CALLBACK_RESULT_*
  */
 typedef aaudio_data_callback_result_t (*AAudioStream_dataCallback)(
@@ -620,17 +630,18 @@ typedef void (*AAudioStream_errorCallback)(
         aaudio_result_t error);
 
 /**
- * Request that AAudio call this functions if any error occurs on a callback thread.
+ * Request that AAudio call this function if any error occurs or the stream is disconnected.
  *
  * It will be called, for example, if a headset or a USB device is unplugged causing the stream's
- * device to be unavailable.
- * In response, this function could signal or launch another thread to reopen a
- * stream on another device. Do not reopen the stream in this callback.
- *
- * This will not be called because of actions by the application, such as stopping
- * or closing a stream.
- *
+ * device to be unavailable or "disconnected".
  * Another possible cause of error would be a timeout or an unanticipated internal error.
+ *
+ * In response, this function should signal or create another thread to stop
+ * and close this stream. The other thread could then reopen a stream on another device.
+ * Do not stop or close the stream, or reopen the new stream, directly from this callback.
+ *
+ * This callback will not be called because of actions by the application, such as stopping
+ * or closing a stream.
  *
  * Note that the AAudio callbacks will never be called simultaneously from multiple threads.
  *
@@ -743,11 +754,13 @@ AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream* stream);
  * This will update the current client state.
  *
  * <pre><code>
- * aaudio_stream_state_t currentState;
- * aaudio_result_t result = AAudioStream_getState(stream, &currentState);
- * while (result == AAUDIO_OK && currentState != AAUDIO_STREAM_STATE_PAUSING) {
+ * aaudio_result_t result = AAUDIO_OK;
+ * aaudio_stream_state_t currentState = AAudioStream_getState(stream);
+ * aaudio_stream_state_t inputState = currentState;
+ * while (result == AAUDIO_OK && currentState != AAUDIO_STREAM_STATE_PAUSED) {
  *     result = AAudioStream_waitForStateChange(
- *                                   stream, currentState, &currentState, MY_TIMEOUT_NANOS);
+ *                                   stream, inputState, &currentState, MY_TIMEOUT_NANOS);
+ *     inputState = currentState;
  * }
  * </code></pre>
  *
@@ -872,10 +885,10 @@ AAUDIO_API int32_t AAudioStream_getBufferCapacityInFrames(AAudioStream* stream);
  * This call can be used if the application needs to know the value of numFrames before
  * the stream is started. This is not normally necessary.
  *
- * If a specific size was requested by calling AAudioStreamBuilder_setCallbackSizeInFrames()
+ * If a specific size was requested by calling AAudioStreamBuilder_setFramesPerDataCallback()
  * then this will be the same size.
  *
- * If AAudioStreamBuilder_setCallbackSizeInFrames() was not called then this will
+ * If AAudioStreamBuilder_setFramesPerDataCallback() was not called then this will
  * return the size chosen by AAudio, or AAUDIO_UNSPECIFIED.
  *
  * AAUDIO_UNSPECIFIED indicates that the callback buffer size for this stream
