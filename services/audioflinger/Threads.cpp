@@ -1176,6 +1176,7 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
 
     switch (mType) {
     case MIXER: {
+#ifndef MULTICHANNEL_EFFECT_CHAIN
         // Reject any effect on mixer multichannel sinks.
         // TODO: fix both format and multichannel issues with effects.
         if (mChannelCount != FCC_2) {
@@ -1183,6 +1184,7 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
                     " thread %s", desc->name, mChannelCount, mThreadName);
             return BAD_VALUE;
         }
+#endif
         audio_output_flags_t flags = mOutput->flags;
         if (hasFastMixer() || (flags & AUDIO_OUTPUT_FLAG_FAST)) {
             if (sessionId == AUDIO_SESSION_OUTPUT_MIX) {
@@ -1229,6 +1231,7 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
                 desc->name, mThreadName);
         return BAD_VALUE;
     case DUPLICATING:
+#ifndef MULTICHANNEL_EFFECT_CHAIN
         // Reject any effect on mixer multichannel sinks.
         // TODO: fix both format and multichannel issues with effects.
         if (mChannelCount != FCC_2) {
@@ -1236,6 +1239,7 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
                     " on DUPLICATING thread %s", desc->name, mChannelCount, mThreadName);
             return BAD_VALUE;
         }
+#endif
         if ((sessionId == AUDIO_SESSION_OUTPUT_STAGE) || (sessionId == AUDIO_SESSION_OUTPUT_MIX)) {
             ALOGW("checkEffectCompatibility_l(): global effect %s on DUPLICATING"
                     " thread %s", desc->name, mThreadName);
