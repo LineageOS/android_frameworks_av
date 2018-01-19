@@ -41,6 +41,7 @@ public:
     static sp<IMediaExtractor> CreateFromService(
             const sp<DataSource> &source, const char *mime = NULL);
     static void LoadPlugins(const ::std::string& apkPath);
+    static status_t dump(int fd, const Vector<String16>& args);
 
 private:
     static Mutex gPluginMutex;
