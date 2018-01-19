@@ -144,12 +144,16 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
             ? MmapStreamInterface::DIRECTION_OUTPUT
             : MmapStreamInterface::DIRECTION_INPUT;
 
+    aaudio_session_id_t requestedSessionId = getSessionId();
+    audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
+
     // Open HAL stream. Set mMmapStream
     status_t status = MmapStreamInterface::openMmapStream(streamDirection,
                                                           &attributes,
                                                           &config,
                                                           mMmapClient,
                                                           &deviceId,
+                                                          &sessionId,
                                                           this, // callback
                                                           mMmapStream,
                                                           &mPortHandle);
@@ -164,6 +168,17 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
         ALOGW("open() - openMmapStream() failed to set deviceId");
     }
     setDeviceId(deviceId);
+
+    if (sessionId == AUDIO_SESSION_ALLOCATE) {
+        ALOGW("open() - openMmapStream() failed to set sessionId");
+    }
+
+    aaudio_session_id_t actualSessionId =
+            (requestedSessionId == AAUDIO_SESSION_ID_NONE)
+            ? AAUDIO_SESSION_ID_NONE
+            : (aaudio_session_id_t) sessionId;
+    setSessionId(actualSessionId);
+    ALOGD("open() deviceId = %d, sessionId = %d", getDeviceId(), getSessionId());
 
     // Create MMAP/NOIRQ buffer.
     int32_t minSizeFrames = getBufferCapacity();

@@ -117,6 +117,9 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             .tags = ""
     };
 
+    aaudio_session_id_t requestedSessionId = builder.getSessionId();
+    audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
+
     mAudioRecord = new AudioRecord(
             mOpPackageName // const String16& opPackageName TODO does not compile
             );
@@ -130,7 +133,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             callbackData,
             notificationFrames,
             false /*threadCanCallJava*/,
-            AUDIO_SESSION_ALLOCATE,
+            sessionId,
             streamTransferType,
             flags,
             AUDIO_UID_INVALID, // DEFAULT uid
@@ -189,6 +192,13 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
 
     setState(AAUDIO_STREAM_STATE_OPEN);
     setDeviceId(mAudioRecord->getRoutedDeviceId());
+
+    aaudio_session_id_t actualSessionId =
+            (requestedSessionId == AAUDIO_SESSION_ID_NONE)
+            ? AAUDIO_SESSION_ID_NONE
+            : (aaudio_session_id_t) mAudioRecord->getSessionId();
+    setSessionId(actualSessionId);
+
     mAudioRecord->addAudioDeviceCallback(mDeviceCallback);
 
     return AAUDIO_OK;

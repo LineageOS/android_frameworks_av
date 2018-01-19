@@ -64,6 +64,7 @@ std::string AAudioServiceEndpoint::dump() const {
     result << "    ContentType:          " << getContentType() << "\n";
     result << "    InputPreset:          " << getInputPreset() << "\n";
     result << "    Reference Count:      " << mOpenCount << "\n";
+    result << "    Session Id:           " << getSessionId() << "\n";
     result << "    Connected:            " << mConnected.load() << "\n";
     result << "    Registered Streams:" << "\n";
     result << AAudioServiceStreamShared::dumpHeader() << "\n";
@@ -111,6 +112,10 @@ bool AAudioServiceEndpoint::matches(const AAudioStreamConfiguration& configurati
     }
     if (configuration.getDeviceId() != AAUDIO_UNSPECIFIED &&
         configuration.getDeviceId() != getDeviceId()) {
+        return false;
+    }
+    if (configuration.getSessionId() != AAUDIO_SESSION_ID_ALLOCATE &&
+        configuration.getSessionId() != getSessionId()) {
         return false;
     }
     if (configuration.getSampleRate() != AAUDIO_UNSPECIFIED &&

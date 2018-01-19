@@ -196,10 +196,17 @@ AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
 }
 
 AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilder* builder,
-                                                        int32_t frames)
+                                                              int32_t frames)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setBufferCapacity(frames);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setSessionId(AAudioStreamBuilder* builder,
+                                                 aaudio_session_id_t sessionId)
+{
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setSessionId(sessionId);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setDataCallback(AAudioStreamBuilder* builder,
@@ -481,6 +488,12 @@ AAUDIO_API aaudio_input_preset_t AAudioStream_getInputPreset(AAudioStream* strea
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getInputPreset();
+}
+
+AAUDIO_API int32_t AAudioStream_getSessionId(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getSessionId();
 }
 
 AAUDIO_API int64_t AAudioStream_getFramesWritten(AAudioStream* stream)

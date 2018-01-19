@@ -134,6 +134,11 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             .tags = ""
     };
 
+    static_assert(AAUDIO_UNSPECIFIED == AUDIO_SESSION_ALLOCATE, "Session IDs should match");
+
+    aaudio_session_id_t requestedSessionId = builder.getSessionId();
+    audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
+
     mAudioTrack = new AudioTrack();
     mAudioTrack->set(
             AUDIO_STREAM_DEFAULT,  // ignored because we pass attributes below
@@ -147,7 +152,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             notificationFrames,
             0,       // DEFAULT sharedBuffer*/,
             false,   // DEFAULT threadCanCallJava
-            AUDIO_SESSION_ALLOCATE,
+            sessionId,
             streamTransferType,
             NULL,    // DEFAULT audio_offload_info_t
             AUDIO_UID_INVALID, // DEFAULT uid
@@ -193,6 +198,13 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     setState(AAUDIO_STREAM_STATE_OPEN);
     setDeviceId(mAudioTrack->getRoutedDeviceId());
+
+    aaudio_session_id_t actualSessionId =
+            (requestedSessionId == AAUDIO_SESSION_ID_NONE)
+            ? AAUDIO_SESSION_ID_NONE
+            : (aaudio_session_id_t) mAudioTrack->getSessionId();
+    setSessionId(actualSessionId);
+
     mAudioTrack->addAudioDeviceCallback(mDeviceCallback);
 
     // Update performance mode based on the actual stream flags.
