@@ -146,9 +146,14 @@ struct ExtractorPlugin : public RefBase {
     MediaExtractor::ExtractorDef def;
     void *libHandle;
     String8 libPath;
+    String8 uuidString;
 
     ExtractorPlugin(MediaExtractor::ExtractorDef definition, void *handle, String8 &path)
-        : def(definition), libHandle(handle), libPath(path) { }
+        : def(definition), libHandle(handle), libPath(path) {
+        for (size_t i = 0; i < sizeof MediaExtractor::ExtractorDef::extractor_uuid; i++) {
+            uuidString.appendFormat("%02x", def.extractor_uuid.b[i]);
+        }
+    }
     ~ExtractorPlugin() {
         if (libHandle != nullptr) {
             ALOGV("closing handle for %s %d", libPath.c_str(), def.extractor_version);
@@ -306,5 +311,21 @@ void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
     gPlugins = newList;
     gPluginsRegistered = true;
 }
+
+status_t MediaExtractorFactory::dump(int fd, const Vector<String16>&) {
+    Mutex::Autolock autoLock(gPluginMutex);
+    String8 out;
+    out.append("Available extractors:\n");
+    for (auto it = gPlugins->begin(); it != gPlugins->end(); ++it) {
+        out.appendFormat("  %25s: uuid(%s), version(%u), path(%s)\n",
+                (*it)->def.extractor_name,
+                (*it)->uuidString.c_str(),
+                (*it)->def.extractor_version,
+                (*it)->libPath.c_str());
+    }
+    write(fd, out.string(), out.size());
+    return OK;
+}
+
 
 }  // namespace android
