@@ -244,7 +244,10 @@ public:
                                     audio_port_handle_t *portId);
 
     static status_t startInput(audio_io_handle_t input,
-                               audio_session_t session);
+                               audio_session_t session,
+                               audio_devices_t device,
+                               uid_t uid,
+                               bool *silenced);
     static status_t stopInput(audio_io_handle_t input,
                               audio_session_t session);
     static void releaseInput(audio_io_handle_t input,

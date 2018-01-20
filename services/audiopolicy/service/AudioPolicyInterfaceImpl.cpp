@@ -362,14 +362,22 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
 }
 
 status_t AudioPolicyService::startInput(audio_io_handle_t input,
-                                        audio_session_t session)
+                                        audio_session_t session,
+                                        audio_devices_t device,
+                                        uid_t uid,
+                                        bool *silenced)
 {
+    // If UID inactive it records silence until becoming active
+    *silenced = !mUidPolicy->isUidActive(uid) && !is_virtual_input_device(device);
+
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
+
     Mutex::Autolock _l(mLock);
-    AudioPolicyInterface::concurrency_type__mask_t concurrency;
-    status_t status = mAudioPolicyManager->startInput(input, session, &concurrency);
+    AudioPolicyInterface::concurrency_type__mask_t concurrency =
+            AudioPolicyInterface::API_INPUT_CONCURRENCY_NONE;
+    status_t status = mAudioPolicyManager->startInput(input, session, silenced, &concurrency);
 
     if (status == NO_ERROR) {
         LOG_ALWAYS_FATAL_IF(concurrency & ~AudioPolicyInterface::API_INPUT_CONCURRENCY_ALL,

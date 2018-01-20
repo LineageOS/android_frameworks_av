@@ -1396,6 +1396,9 @@ public:
 
             void        checkBtNrec();
 
+            // Sets the UID records silence
+            void        setRecordSilenced(uid_t uid, bool silenced);
+
 private:
             // Enter standby if not already in standby, and set mStandby flag
             void    standbyIfNotAlreadyInStandby();

@@ -135,6 +135,7 @@ public:
         // indicates to the audio policy manager that the input starts being used.
         virtual status_t startInput(audio_io_handle_t input,
                                     audio_session_t session,
+                                    bool silenced,
                                     concurrency_type__mask_t *concurrency);
 
         // indicates to the audio policy manager that the input stops being used.
@@ -234,6 +235,8 @@ public:
 
         // return the strategy corresponding to a given stream type
         routing_strategy getStrategy(audio_stream_type_t stream) const;
+
+        virtual void setRecordSilenced(uid_t uid, bool silenced);
 
 protected:
         // A constructor that allows more fine-grained control over initialization process,
