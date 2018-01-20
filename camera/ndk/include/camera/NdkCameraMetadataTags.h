@@ -1646,7 +1646,7 @@ typedef enum acamera_metadata_tag {
      * <p>Whether a significant scene change is detected within the currently-set AF
      * region(s).</p>
      *
-     * <p>Type: int32 (acamera_metadata_enum_android_control_af_scene_change_t)</p>
+     * <p>Type: byte (acamera_metadata_enum_android_control_af_scene_change_t)</p>
      *
      * <p>This tag may appear in:
      * <ul>
@@ -1658,11 +1658,9 @@ typedef enum acamera_metadata_tag {
      * significant illumination change, this value will be set to DETECTED for a single capture
      * result. Otherwise the value will be NOT_DETECTED. The threshold for detection is similar
      * to what would trigger a new passive focus scan to begin in CONTINUOUS autofocus modes.</p>
-     * <p>afSceneChange may be DETECTED only if afMode is AF_MODE_CONTINUOUS_VIDEO or
-     * AF_MODE_CONTINUOUS_PICTURE. In other AF modes, afSceneChange must be NOT_DETECTED.</p>
      * <p>This key will be available if the camera device advertises this key via {@link ACAMERA_REQUEST_AVAILABLE_RESULT_KEYS }.</p>
      */
-    ACAMERA_CONTROL_AF_SCENE_CHANGE =                           // int32 (acamera_metadata_enum_android_control_af_scene_change_t)
+    ACAMERA_CONTROL_AF_SCENE_CHANGE =                           // byte (acamera_metadata_enum_android_control_af_scene_change_t)
             ACAMERA_CONTROL_START + 42,
     ACAMERA_CONTROL_END,
 
