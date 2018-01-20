@@ -35,6 +35,7 @@ namespace {
 // Hardcoded name for the passthrough HAL implementation, since it can't be discovered via the
 // service manager
 const std::string kLegacyProviderName("legacy/0");
+const std::string kExternalProviderName("external/0");
 
 // Slash-separated list of provider types to consider for use via the old camera API
 const std::string kStandardProviderTypes("internal/legacy");
@@ -69,6 +70,7 @@ status_t CameraProviderManager::initialize(wp<CameraProviderManager::StatusListe
 
     // See if there's a passthrough HAL, but let's not complain if there's not
     addProviderLocked(kLegacyProviderName, /*expected*/ false);
+    addProviderLocked(kExternalProviderName, /*expected*/ false);
 
     return OK;
 }
