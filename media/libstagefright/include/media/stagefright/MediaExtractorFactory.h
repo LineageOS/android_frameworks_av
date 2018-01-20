@@ -48,8 +48,10 @@ private:
     static std::shared_ptr<List<sp<ExtractorPlugin>>> gPlugins;
     static bool gPluginsRegistered;
 
-    static void RegisterExtractors(
+    static void RegisterExtractorsInApk(
             const char *apkPath, List<sp<ExtractorPlugin>> &pluginList);
+    static void RegisterExtractorsInSystem(
+            const char *libDirPath, List<sp<ExtractorPlugin>> &pluginList);
     static void RegisterExtractor(
             const sp<ExtractorPlugin> &plugin, List<sp<ExtractorPlugin>> &pluginList);
 
