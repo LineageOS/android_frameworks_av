@@ -59,6 +59,7 @@ private:
 
 /// \endcond
 
+#undef DEFINE_C2_ENUM_VALUE_AUTO_HELPER
 #define DEFINE_C2_ENUM_VALUE_AUTO_HELPER(name, type, prefix, ...) \
 template<> C2FieldDescriptor::named_values_type C2FieldDescriptor::namedValuesFor(const name &r __unused) { \
     return C2ParamUtils::sanitizeEnumValues( \
@@ -67,6 +68,7 @@ template<> C2FieldDescriptor::named_values_type C2FieldDescriptor::namedValuesFo
             prefix); \
 }
 
+#undef DEFINE_C2_ENUM_VALUE_CUSTOM_HELPER
 #define DEFINE_C2_ENUM_VALUE_CUSTOM_HELPER(name, type, names, ...) \
 template<> C2FieldDescriptor::named_values_type C2FieldDescriptor::namedValuesFor(const name &r __unused) { \
     return C2ParamUtils::customEnumValues( \
@@ -259,6 +261,21 @@ public:
             namedValues.emplace_back(item.first, item.second);
         }
         return namedValues;
+    }
+
+    /// safe(r) parsing from parameter blob
+    static
+    C2Param *ParseFirst(const uint8_t *blob, size_t size) {
+        // _mSize must fit into size, but really C2Param must also to be a valid param
+        if (size < sizeof(C2Param)) {
+            return nullptr;
+        }
+        // _mSize must match length
+        C2Param *param = (C2Param*)blob;
+        if (param->size() > size) {
+            return nullptr;
+        }
+        return param;
     }
 };
 

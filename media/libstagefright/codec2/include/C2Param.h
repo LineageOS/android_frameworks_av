@@ -397,8 +397,8 @@ public:
 
     /// safe(r) type cast from pointer and size
     inline static C2Param* From(void *addr, size_t len) {
-        // _mSize must fit into size
-        if (len < sizeof(_mSize) + offsetof(C2Param, _mSize)) {
+        // _mSize must fit into size, but really C2Param must also to be a valid param
+        if (len < sizeof(C2Param)) {
             return nullptr;
         }
         // _mSize must match length
@@ -446,7 +446,7 @@ public:
     // if other is the same kind of (valid) param as this, copy it into this and return true.
     // otherwise, do not copy anything, and return false.
     inline bool updateFrom(const C2Param &other) {
-        if (other._mSize == _mSize && other._mIndex == _mIndex && _mSize > 0) {
+        if (other._mSize <= _mSize && other._mIndex == _mIndex && _mSize > 0) {
             memcpy(this, &other, _mSize);
             return true;
         }
@@ -620,6 +620,8 @@ struct _C2FieldId {
 #endif
 
 private:
+    friend struct _C2ParamInspector;
+
     uint32_t _mOffset; // offset of field
     uint32_t _mSize;   // size of field
 };
@@ -720,6 +722,8 @@ struct C2ParamField {
     DEFINE_OTHER_COMPARISON_OPERATORS(C2ParamField)
 
 private:
+    friend struct _C2ParamInspector;
+
     C2Param::Index _mIndex; ///< parameter index
     _C2FieldId _mFieldId;   ///< field identifier
 };
