@@ -112,6 +112,11 @@ size_t JAudioTrack::channelCount() {
     return env->CallIntMethod(mAudioTrackObj, jGetChannelCount);
 }
 
+uint32_t JAudioTrack::latency() {
+    // TODO: Currently hard-coded as returning zero.
+    return 0;
+}
+
 status_t JAudioTrack::getPosition(uint32_t *position) {
     if (position == NULL) {
         return BAD_VALUE;
@@ -125,7 +130,7 @@ status_t JAudioTrack::getPosition(uint32_t *position) {
     return NO_ERROR;
 }
 
-bool JAudioTrack::getTimeStamp(AudioTimestamp& timestamp) {
+bool JAudioTrack::getTimestamp(AudioTimestamp& timestamp) {
     JNIEnv *env = AndroidRuntime::getJNIEnv();
 
     jclass jAudioTimeStampCls = env->FindClass("android/media/AudioTimestamp");
@@ -390,6 +395,51 @@ audio_format_t JAudioTrack::format() {
     jmethodID jGetAudioFormat = env->GetMethodID(mAudioTrackCls, "getAudioFormat", "()I");
     int javaFormat = env->CallIntMethod(mAudioTrackObj, jGetAudioFormat);
     return audioFormatToNative(javaFormat);
+}
+
+status_t JAudioTrack::dump(int fd, const Vector<String16>& args __unused) const
+{
+    String8 result;
+
+    result.append(" JAudioTrack::dump\n");
+
+    // TODO: Remove logs that includes unavailable information from below.
+//    result.appendFormat("  status(%d), state(%d), session Id(%d), flags(%#x)\n",
+//                        mStatus, mState, mSessionId, mFlags);
+//    result.appendFormat("  stream type(%d), left - right volume(%f, %f)\n",
+//                        (mStreamType == AUDIO_STREAM_DEFAULT) ?
+//                                audio_attributes_to_stream_type(&mAttributes) : mStreamType,
+//                        mVolume[AUDIO_INTERLEAVE_LEFT], mVolume[AUDIO_INTERLEAVE_RIGHT]);
+//    result.appendFormat("  format(%#x), channel mask(%#x), channel count(%u)\n",
+//                  format(), mChannelMask, channelCount());
+//    result.appendFormat("  sample rate(%u), original sample rate(%u), speed(%f)\n",
+//            getSampleRate(), mOriginalSampleRate, mPlaybackRate.mSpeed);
+//    result.appendFormat("  frame count(%zu), req. frame count(%zu)\n",
+//                  frameCount(), mReqFrameCount);
+//    result.appendFormat("  notif. frame count(%u), req. notif. frame count(%u),"
+//            " req. notif. per buff(%u)\n",
+//             mNotificationFramesAct, mNotificationFramesReq, mNotificationsPerBufferReq);
+//    result.appendFormat("  latency (%d), selected device Id(%d), routed device Id(%d)\n",
+//                        latency(), mSelectedDeviceId, getRoutedDeviceId());
+//    result.appendFormat("  output(%d) AF latency (%u) AF frame count(%zu) AF SampleRate(%u)\n",
+//                        mOutput, mAfLatency, mAfFrameCount, mAfSampleRate);
+    ::write(fd, result.string(), result.size());
+    return NO_ERROR;
+}
+
+audio_port_handle_t JAudioTrack::getRoutedDeviceId() {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jGetRoutedDevice = env->GetMethodID(mAudioTrackCls, "getRoutedDevice",
+            "()Landroid/media/AudioDeviceInfo;");
+    jobject jAudioDeviceInfoObj = env->CallObjectMethod(mAudioTrackObj, jGetRoutedDevice);
+    if (env->IsSameObject(jAudioDeviceInfoObj, NULL)) {
+        return AUDIO_PORT_HANDLE_NONE;
+    }
+
+    jclass jAudioDeviceInfoCls = env->FindClass("Landroid/media/AudioDeviceInfo");
+    jmethodID jGetId = env->GetMethodID(jAudioDeviceInfoCls, "getId", "()I");
+    jint routedDeviceId = env->CallIntMethod(jAudioDeviceInfoObj, jGetId);
+    return routedDeviceId;
 }
 
 jobject JAudioTrack::createVolumeShaperConfigurationObj(

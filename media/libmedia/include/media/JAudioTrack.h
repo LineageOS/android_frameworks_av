@@ -104,6 +104,12 @@ public:
     size_t frameCount();
     size_t channelCount();
 
+    /* Returns this track's estimated latency in milliseconds.
+     * This includes the latency due to AudioTrack buffer size, AudioMixer (if any)
+     * and audio hardware driver.
+     */
+    uint32_t latency();
+
     /* Return the total number of frames played since playback start.
      * The counter will wrap (overflow) periodically, e.g. every ~27 hours at 44.1 kHz.
      * It is reset to zero by flush(), reload(), and stop().
@@ -130,7 +136,7 @@ public:
      * Returns true if timestamp is valid.
      * The timestamp parameter is undefined on return, if false is returned.
      */
-    bool getTimeStamp(AudioTimestamp& timestamp);
+    bool getTimestamp(AudioTimestamp& timestamp);
 
     /* Set source playback rate for timestretch
      * 1.0 is normal speed: < 1.0 is slower, > 1.0 is faster
@@ -252,6 +258,17 @@ public:
     status_t getBufferDurationInUs(int64_t *duration);
 
     audio_format_t format();
+
+    /*
+     * Dumps the state of an audio track.
+     * Not a general-purpose API; intended only for use by media player service to dump its tracks.
+     */
+    status_t dump(int fd, const Vector<String16>& args) const;
+
+    /* Returns the ID of the audio device actually used by the output to which this AudioTrack is
+     * attached. When the AudioTrack is inactive, it will return AUDIO_PORT_HANDLE_NONE.
+     */
+    audio_port_handle_t getRoutedDeviceId();
 
 private:
     jclass mAudioTrackCls;
