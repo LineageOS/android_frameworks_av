@@ -448,7 +448,7 @@ c2_node_id_t C2SoftAvcDecIntf::getId() const {
 }
 
 c2_status_t C2SoftAvcDecIntf::query_vb(
-        const std::vector<C2Param* const> & stackParams,
+        const std::vector<C2Param*> & stackParams,
         const std::vector<C2Param::Index> & heapParamIndices,
         c2_blocking_t mayBlock,
         std::vector<std::unique_ptr<C2Param>>* const heapParams) const {
@@ -485,7 +485,7 @@ c2_status_t C2SoftAvcDecIntf::query_vb(
 }
 
 c2_status_t C2SoftAvcDecIntf::config_vb(
-        const std::vector<C2Param* const> &params,
+        const std::vector<C2Param*> &params,
         c2_blocking_t mayBlock,
         std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
     (void)mayBlock;
