@@ -102,8 +102,8 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::findExclusiveEndpoint_l(
         }
     }
 
-    ALOGV("findExclusiveEndpoint_l(), found %p for device = %d",
-          endpoint.get(), configuration.getDeviceId());
+    ALOGV("findExclusiveEndpoint_l(), found %p for device = %d, sessionId = %d",
+          endpoint.get(), configuration.getDeviceId(), configuration.getSessionId());
     return endpoint;
 }
 
@@ -118,8 +118,8 @@ sp<AAudioServiceEndpointShared> AAudioEndpointManager::findSharedEndpoint_l(
         }
     }
 
-    ALOGV("findSharedEndpoint_l(), found %p for device = %d",
-          endpoint.get(), configuration.getDeviceId());
+    ALOGV("findSharedEndpoint_l(), found %p for device = %d, sessionId = %d",
+          endpoint.get(), configuration.getDeviceId(), configuration.getSessionId());
     return endpoint;
 }
 
@@ -151,19 +151,17 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
         return nullptr;
     } else {
         sp<AAudioServiceEndpointMMAP> endpointMMap = new AAudioServiceEndpointMMAP();
-        ALOGD("openEndpoint(),created MMAP %p", endpointMMap.get());
+        ALOGD("openExclusiveEndpoint(), no match so try to open MMAP %p for dev %d",
+              endpointMMap.get(), configuration.getDeviceId());
         endpoint = endpointMMap;
 
         aaudio_result_t result = endpoint->open(request);
         if (result != AAUDIO_OK) {
-            ALOGE("openEndpoint(), open failed");
+            ALOGE("openExclusiveEndpoint(), open failed");
             endpoint.clear();
         } else {
             mExclusiveStreams.push_back(endpointMMap);
         }
-
-        ALOGD("openEndpoint(), created %p for device = %d",
-              endpoint.get(), configuration.getDeviceId());
     }
 
     if (endpoint.get() != nullptr) {
@@ -209,7 +207,7 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openSharedEndpoint(
                 mSharedStreams.push_back(endpoint);
             }
         }
-        ALOGD("openSharedEndpoint(), created %p for device = %d, dir = %d",
+        ALOGD("openSharedEndpoint(), created %p, requested device = %d, dir = %d",
               endpoint.get(), configuration.getDeviceId(), (int)direction);
         IPCThreadState::self()->restoreCallingIdentity(token);
     }

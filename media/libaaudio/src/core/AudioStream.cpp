@@ -108,8 +108,10 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
           mSampleRate, mSamplesPerFrame, mFormat,
           AudioStream_convertSharingModeToShortText(mSharingMode),
           (getDirection() == AAUDIO_DIRECTION_OUTPUT) ? "OUTPUT" : "INPUT");
-    ALOGI("open() device = %d, perfMode = %d, callback: %s with frames = %d",
-          mDeviceId, mPerformanceMode,
+    ALOGI("open() device = %d, sessionId = %d, perfMode = %d, callback: %s with frames = %d",
+          mDeviceId,
+          mSessionId,
+          mPerformanceMode,
           (isDataCallbackSet() ? "ON" : "OFF"),
           mFramesPerDataCallback);
     ALOGI("open() usage = %d, contentType = %d, inputPreset = %d",

@@ -16,36 +16,34 @@
 
 package com.android.media.update;
 
-import android.content.Context;
 import android.content.res.Resources;
+import android.content.res.Resources.Theme;
 
 public class ApiHelper {
     private static ApiHelper sInstance;
-    private final Context mAppContext;
     private final Resources mLibResources;
-    private final Resources.Theme mLibTheme;
+    private final Theme mLibTheme;
 
     public static ApiHelper getInstance() {
         return sInstance;
     }
 
-    static void initialize(Context appContext, Context libContext) {
+    static void initialize(Resources libResources, Theme libTheme) {
         if (sInstance == null) {
-            sInstance = new ApiHelper(appContext, libContext);
+            sInstance = new ApiHelper(libResources, libTheme);
         }
     }
 
-    private ApiHelper(Context appContext, Context libContext) {
-        mAppContext = appContext;
-        mLibResources = libContext.getResources();
-        mLibTheme = libContext.getTheme();
+    private ApiHelper(Resources libResources, Theme libTheme) {
+        mLibResources = libResources;
+        mLibTheme = libTheme;
     }
 
-    public Resources getLibResources() {
-        return mLibResources;
+    public static Resources getLibResources() {
+        return sInstance.mLibResources;
     }
 
-    public Resources.Theme getLibTheme() {
-        return mLibTheme;
+    public static Resources.Theme getLibTheme() {
+        return sInstance.mLibTheme;
     }
 }

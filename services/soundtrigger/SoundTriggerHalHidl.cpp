@@ -17,17 +17,87 @@
 #define LOG_TAG "SoundTriggerHalHidl"
 //#define LOG_NDEBUG 0
 
+#include <android/hidl/allocator/1.0/IAllocator.h>
 #include <media/audiohal/hidl/HalDeathHandler.h>
 #include <utils/Log.h>
 #include "SoundTriggerHalHidl.h"
+#include <hidlmemory/mapping.h>
 #include <hwbinder/IPCThreadState.h>
 #include <hwbinder/ProcessState.h>
 
 namespace android {
 
-using android::hardware::Return;
-using android::hardware::ProcessState;
-using android::hardware::audio::common::V2_0::AudioDevice;
+using ::android::hardware::ProcessState;
+using ::android::hardware::Return;
+using ::android::hardware::Status;
+using ::android::hardware::Void;
+using ::android::hardware::audio::common::V2_0::AudioDevice;
+using ::android::hardware::hidl_memory;
+using ::android::hidl::allocator::V1_0::IAllocator;
+using ::android::hidl::memory::V1_0::IMemory;
+
+namespace {
+
+// Backs up by the vector with the contents of shared memory.
+// It is assumed that the passed hidl_vector is empty, so it's
+// not cleared if the memory is a null object.
+// The caller needs to keep the returned sp<IMemory> as long as
+// the data is needed.
+std::pair<bool, sp<IMemory>> memoryAsVector(const hidl_memory& m, hidl_vec<uint8_t>* vec) {
+    sp<IMemory> memory;
+    if (m.size() == 0) {
+        return std::make_pair(true, memory);
+    }
+    memory = mapMemory(m);
+    if (memory != nullptr) {
+        memory->read();
+        vec->setToExternal(static_cast<uint8_t*>(static_cast<void*>(memory->getPointer())),
+                memory->getSize());
+        return std::make_pair(true, memory);
+    }
+    ALOGE("%s: Could not map HIDL memory to IMemory", __func__);
+    return std::make_pair(false, memory);
+}
+
+// Moves the data from the vector into allocated shared memory,
+// emptying the vector.
+// It is assumed that the passed hidl_memory is a null object, so it's
+// not reset if the vector is empty.
+// The caller needs to keep the returned sp<IMemory> as long as
+// the data is needed.
+std::pair<bool, sp<IMemory>> moveVectorToMemory(hidl_vec<uint8_t>* v, hidl_memory* mem) {
+    sp<IMemory> memory;
+    if (v->size() == 0) {
+        return std::make_pair(true, memory);
+    }
+    sp<IAllocator> ashmem = IAllocator::getService("ashmem");
+    if (ashmem == 0) {
+        ALOGE("Failed to retrieve ashmem allocator service");
+        return std::make_pair(false, memory);
+    }
+    bool success = false;
+    Return<void> r = ashmem->allocate(v->size(), [&](bool s, const hidl_memory& m) {
+        success = s;
+        if (success) *mem = m;
+    });
+    if (r.isOk() && success) {
+        memory = hardware::mapMemory(*mem);
+        if (memory != 0) {
+            memory->update();
+            memcpy(memory->getPointer(), v->data(), v->size());
+            memory->commit();
+            v->resize(0);
+            return std::make_pair(true, memory);
+        } else {
+            ALOGE("Failed to map allocated ashmem");
+        }
+    } else {
+        ALOGE("Failed to allocate %llu bytes from ashmem", (unsigned long long)v->size());
+    }
+    return std::make_pair(false, memory);
+}
+
+}  // namespace
 
 /* static */
 sp<SoundTriggerHalInterface> SoundTriggerHalInterface::connectModule(const char *moduleName)
@@ -94,35 +164,61 @@ int SoundTriggerHalHidl::loadSoundModel(struct sound_trigger_sound_model *sound_
                         "loadSoundModel(): wrap around in sound model IDs, num loaded models %zd",
                         mSoundModels.size());
 
-    ISoundTriggerHw::SoundModel *halSoundModel =
-            convertSoundModelToHal(sound_model);
-    if (halSoundModel == NULL) {
-        return -EINVAL;
-    }
-
     Return<void> hidlReturn;
     int ret;
     SoundModelHandle halHandle;
-    {
-        AutoMutex lock(mHalLock);
-        if (sound_model->type == SOUND_MODEL_TYPE_KEYPHRASE) {
+    sp<V2_1_ISoundTriggerHw> soundtrigger_2_1 = toService2_1(soundtrigger);
+    if (sound_model->type == SOUND_MODEL_TYPE_KEYPHRASE) {
+        if (!soundtrigger_2_1) {
+            ISoundTriggerHw::PhraseSoundModel halSoundModel;
+            convertPhraseSoundModelToHal(&halSoundModel, sound_model);
+            AutoMutex lock(mHalLock);
             hidlReturn = soundtrigger->loadPhraseSoundModel(
-                    *(const ISoundTriggerHw::PhraseSoundModel *)halSoundModel,
+                    halSoundModel,
                     this, modelId, [&](int32_t retval, auto res) {
-                ret = retval;
-                halHandle = res;
-            });
-
+                        ret = retval;
+                        halHandle = res;
+                    });
         } else {
-            hidlReturn = soundtrigger->loadSoundModel(*halSoundModel,
+            V2_1_ISoundTriggerHw::PhraseSoundModel halSoundModel;
+            auto result = convertPhraseSoundModelToHal(&halSoundModel, sound_model);
+            if (result.first) {
+                AutoMutex lock(mHalLock);
+                hidlReturn = soundtrigger_2_1->loadPhraseSoundModel_2_1(
+                        halSoundModel,
+                        this, modelId, [&](int32_t retval, auto res) {
+                            ret = retval;
+                            halHandle = res;
+                        });
+            } else {
+                return NO_MEMORY;
+            }
+        }
+    } else {
+        if (!soundtrigger_2_1) {
+            ISoundTriggerHw::SoundModel halSoundModel;
+            convertSoundModelToHal(&halSoundModel, sound_model);
+            AutoMutex lock(mHalLock);
+            hidlReturn = soundtrigger->loadSoundModel(halSoundModel,
                     this, modelId, [&](int32_t retval, auto res) {
-                ret = retval;
-                halHandle = res;
-            });
+                        ret = retval;
+                        halHandle = res;
+                    });
+        } else {
+            V2_1_ISoundTriggerHw::SoundModel halSoundModel;
+            auto result = convertSoundModelToHal(&halSoundModel, sound_model);
+            if (result.first) {
+                AutoMutex lock(mHalLock);
+                hidlReturn = soundtrigger_2_1->loadSoundModel_2_1(halSoundModel,
+                        this, modelId, [&](int32_t retval, auto res) {
+                            ret = retval;
+                            halHandle = res;
+                        });
+            } else {
+                return NO_MEMORY;
+            }
         }
     }
-
-    delete halSoundModel;
 
     if (hidlReturn.isOk()) {
         if (ret == 0) {
@@ -185,16 +281,27 @@ int SoundTriggerHalHidl::startRecognition(sound_model_handle_t handle,
     model->mRecognitionCallback = callback;
     model->mRecognitionCookie = cookie;
 
-    ISoundTriggerHw::RecognitionConfig *halConfig =
-            convertRecognitionConfigToHal(config);
-
+    sp<V2_1_ISoundTriggerHw> soundtrigger_2_1 = toService2_1(soundtrigger);
     Return<int32_t> hidlReturn(0);
-    {
-        AutoMutex lock(mHalLock);
-        hidlReturn = soundtrigger->startRecognition(model->mHalHandle, *halConfig, this, handle);
-    }
 
-    delete halConfig;
+    if (!soundtrigger_2_1) {
+        ISoundTriggerHw::RecognitionConfig halConfig;
+        convertRecognitionConfigToHal(&halConfig, config);
+        {
+            AutoMutex lock(mHalLock);
+            hidlReturn = soundtrigger->startRecognition(model->mHalHandle, halConfig, this, handle);
+        }
+    } else {
+        V2_1_ISoundTriggerHw::RecognitionConfig halConfig;
+        auto result = convertRecognitionConfigToHal(&halConfig, config);
+        if (result.first) {
+            AutoMutex lock(mHalLock);
+            hidlReturn = soundtrigger_2_1->startRecognition_2_1(
+                    model->mHalHandle, halConfig, this, handle);
+        } else {
+            return NO_MEMORY;
+        }
+    }
 
     if (!hidlReturn.isOk()) {
         ALOGE("startRecognition error %s", hidlReturn.description().c_str());
@@ -275,6 +382,12 @@ sp<ISoundTriggerHw> SoundTriggerHalHidl::getService()
     return mISoundTrigger;
 }
 
+sp<V2_1_ISoundTriggerHw> SoundTriggerHalHidl::toService2_1(const sp<ISoundTriggerHw>& s)
+{
+    auto castResult_2_1 = V2_1_ISoundTriggerHw::castFrom(s);
+    return castResult_2_1.isOk() ? static_cast<sp<V2_1_ISoundTriggerHw>>(castResult_2_1) : nullptr;
+}
+
 sp<SoundTriggerHalHidl::SoundModel> SoundTriggerHalHidl::getModel(sound_model_handle_t handle)
 {
     AutoMutex lock(mLock);
@@ -347,40 +460,52 @@ void SoundTriggerHalHidl::convertTriggerPhraseToHal(
     halTriggerPhrase->text = triggerPhrase->text;
 }
 
-ISoundTriggerHw::SoundModel *SoundTriggerHalHidl::convertSoundModelToHal(
+
+void SoundTriggerHalHidl::convertTriggerPhrasesToHal(
+        hidl_vec<ISoundTriggerHw::Phrase> *halTriggerPhrases,
+        struct sound_trigger_phrase_sound_model *keyPhraseModel)
+{
+    halTriggerPhrases->resize(keyPhraseModel->num_phrases);
+    for (unsigned int i = 0; i < keyPhraseModel->num_phrases; i++) {
+        convertTriggerPhraseToHal(&(*halTriggerPhrases)[i], &keyPhraseModel->phrases[i]);
+    }
+}
+
+void SoundTriggerHalHidl::convertSoundModelToHal(ISoundTriggerHw::SoundModel *halModel,
         const struct sound_trigger_sound_model *soundModel)
 {
-    ISoundTriggerHw::SoundModel *halModel = NULL;
-    if (soundModel->type == SOUND_MODEL_TYPE_KEYPHRASE) {
-        ISoundTriggerHw::PhraseSoundModel *halKeyPhraseModel =
-                new ISoundTriggerHw::PhraseSoundModel();
-        struct sound_trigger_phrase_sound_model *keyPhraseModel =
-                (struct sound_trigger_phrase_sound_model *)soundModel;
-        ISoundTriggerHw::Phrase *halPhrases =
-                new ISoundTriggerHw::Phrase[keyPhraseModel->num_phrases];
-
-
-        for (unsigned int i = 0; i < keyPhraseModel->num_phrases; i++) {
-            convertTriggerPhraseToHal(&halPhrases[i],
-                                      &keyPhraseModel->phrases[i]);
-        }
-        halKeyPhraseModel->phrases.setToExternal(halPhrases, keyPhraseModel->num_phrases);
-        // FIXME: transfer buffer ownership. should have a method for that in hidl_vec
-        halKeyPhraseModel->phrases.resize(keyPhraseModel->num_phrases);
-
-        delete[] halPhrases;
-
-        halModel = (ISoundTriggerHw::SoundModel *)halKeyPhraseModel;
-    } else {
-        halModel = new ISoundTriggerHw::SoundModel();
-    }
     halModel->type = (SoundModelType)soundModel->type;
     convertUuidToHal(&halModel->uuid, &soundModel->uuid);
     convertUuidToHal(&halModel->vendorUuid, &soundModel->vendor_uuid);
     halModel->data.setToExternal((uint8_t *)soundModel + soundModel->data_offset, soundModel->data_size);
-    halModel->data.resize(soundModel->data_size);
+}
 
-    return halModel;
+std::pair<bool, sp<IMemory>> SoundTriggerHalHidl::convertSoundModelToHal(
+        V2_1_ISoundTriggerHw::SoundModel *halModel,
+        const struct sound_trigger_sound_model *soundModel)
+{
+    convertSoundModelToHal(&halModel->header, soundModel);
+    return moveVectorToMemory(&halModel->header.data, &halModel->data);
+}
+
+void SoundTriggerHalHidl::convertPhraseSoundModelToHal(
+        ISoundTriggerHw::PhraseSoundModel *halKeyPhraseModel,
+        const struct sound_trigger_sound_model *soundModel)
+{
+    struct sound_trigger_phrase_sound_model *keyPhraseModel =
+            (struct sound_trigger_phrase_sound_model *)soundModel;
+    convertTriggerPhrasesToHal(&halKeyPhraseModel->phrases, keyPhraseModel);
+    convertSoundModelToHal(&halKeyPhraseModel->common, soundModel);
+}
+
+std::pair<bool, sp<IMemory>> SoundTriggerHalHidl::convertPhraseSoundModelToHal(
+        V2_1_ISoundTriggerHw::PhraseSoundModel *halKeyPhraseModel,
+        const struct sound_trigger_sound_model *soundModel)
+{
+    struct sound_trigger_phrase_sound_model *keyPhraseModel =
+            (struct sound_trigger_phrase_sound_model *)soundModel;
+    convertTriggerPhrasesToHal(&halKeyPhraseModel->phrases, keyPhraseModel);
+    return convertSoundModelToHal(&halKeyPhraseModel->common, soundModel);
 }
 
 void SoundTriggerHalHidl::convertPhraseRecognitionExtraToHal(
@@ -390,52 +515,42 @@ void SoundTriggerHalHidl::convertPhraseRecognitionExtraToHal(
     halExtra->id = extra->id;
     halExtra->recognitionModes = extra->recognition_modes;
     halExtra->confidenceLevel = extra->confidence_level;
-    ConfidenceLevel *halLevels =
-            new ConfidenceLevel[extra->num_levels];
-    for (unsigned int i = 0; i < extra->num_levels; i++) {
-        halLevels[i].userId = extra->levels[i].user_id;
-        halLevels[i].levelPercent = extra->levels[i].level;
-    }
-    halExtra->levels.setToExternal(halLevels, extra->num_levels);
-    // FIXME: transfer buffer ownership. should have a method for that in hidl_vec
     halExtra->levels.resize(extra->num_levels);
-
-    delete[] halLevels;
+    for (unsigned int i = 0; i < extra->num_levels; i++) {
+        halExtra->levels[i].userId = extra->levels[i].user_id;
+        halExtra->levels[i].levelPercent = extra->levels[i].level;
+    }
 }
 
-
-ISoundTriggerHw::RecognitionConfig *SoundTriggerHalHidl::convertRecognitionConfigToHal(
+void SoundTriggerHalHidl::convertRecognitionConfigToHal(
+        ISoundTriggerHw::RecognitionConfig *halConfig,
         const struct sound_trigger_recognition_config *config)
 {
-    ISoundTriggerHw::RecognitionConfig *halConfig =
-            new ISoundTriggerHw::RecognitionConfig();
-
     halConfig->captureHandle = config->capture_handle;
     halConfig->captureDevice = (AudioDevice)config->capture_device;
     halConfig->captureRequested = (uint32_t)config->capture_requested;
 
-    PhraseRecognitionExtra *halExtras =
-            new PhraseRecognitionExtra[config->num_phrases];
-
+    halConfig->phrases.resize(config->num_phrases);
     for (unsigned int i = 0; i < config->num_phrases; i++) {
-        convertPhraseRecognitionExtraToHal(&halExtras[i],
+        convertPhraseRecognitionExtraToHal(&halConfig->phrases[i],
                                   &config->phrases[i]);
     }
-    halConfig->phrases.setToExternal(halExtras, config->num_phrases);
-    // FIXME: transfer buffer ownership. should have a method for that in hidl_vec
-    halConfig->phrases.resize(config->num_phrases);
-
-    delete[] halExtras;
 
     halConfig->data.setToExternal((uint8_t *)config + config->data_offset, config->data_size);
+}
 
-    return halConfig;
+std::pair<bool, sp<IMemory>> SoundTriggerHalHidl::convertRecognitionConfigToHal(
+        V2_1_ISoundTriggerHw::RecognitionConfig *halConfig,
+        const struct sound_trigger_recognition_config *config)
+{
+    convertRecognitionConfigToHal(&halConfig->header, config);
+    return moveVectorToMemory(&halConfig->header.data, &halConfig->data);
 }
 
 
 // ISoundTriggerHwCallback
 ::android::hardware::Return<void> SoundTriggerHalHidl::recognitionCallback(
-        const ISoundTriggerHwCallback::RecognitionEvent& halEvent,
+        const V2_0_ISoundTriggerHwCallback::RecognitionEvent& halEvent,
         CallbackCookie cookie)
 {
     sp<SoundModel> model;
@@ -459,7 +574,7 @@ ISoundTriggerHw::RecognitionConfig *SoundTriggerHalHidl::convertRecognitionConfi
 }
 
 ::android::hardware::Return<void> SoundTriggerHalHidl::phraseRecognitionCallback(
-        const ISoundTriggerHwCallback::PhraseRecognitionEvent& halEvent,
+        const V2_0_ISoundTriggerHwCallback::PhraseRecognitionEvent& halEvent,
         CallbackCookie cookie)
 {
     sp<SoundModel> model;
@@ -471,14 +586,13 @@ ISoundTriggerHw::RecognitionConfig *SoundTriggerHalHidl::convertRecognitionConfi
         }
     }
 
-    struct sound_trigger_recognition_event *event = convertRecognitionEventFromHal(
-                                   (const ISoundTriggerHwCallback::RecognitionEvent *)&halEvent);
+    struct sound_trigger_phrase_recognition_event *event =
+            convertPhraseRecognitionEventFromHal(&halEvent);
     if (event == NULL) {
         return Return<void>();
     }
-
-    event->model = model->mHandle;
-    model->mRecognitionCallback(event, model->mRecognitionCookie);
+    event->common.model = model->mHandle;
+    model->mRecognitionCallback(&event->common, model->mRecognitionCookie);
 
     free(event);
 
@@ -486,7 +600,7 @@ ISoundTriggerHw::RecognitionConfig *SoundTriggerHalHidl::convertRecognitionConfi
 }
 
 ::android::hardware::Return<void> SoundTriggerHalHidl::soundModelCallback(
-        const ISoundTriggerHwCallback::ModelEvent& halEvent,
+        const V2_0_ISoundTriggerHwCallback::ModelEvent& halEvent,
         CallbackCookie cookie)
 {
     sp<SoundModel> model;
@@ -511,9 +625,37 @@ ISoundTriggerHw::RecognitionConfig *SoundTriggerHalHidl::convertRecognitionConfi
     return Return<void>();
 }
 
+::android::hardware::Return<void> SoundTriggerHalHidl::recognitionCallback_2_1(
+        const ISoundTriggerHwCallback::RecognitionEvent& event, CallbackCookie cookie) {
+    // The data vector in the 'header' part of V2.1 structure is empty, thus copying is cheap.
+    V2_0_ISoundTriggerHwCallback::RecognitionEvent event_2_0 = event.header;
+    auto result = memoryAsVector(event.data, &event_2_0.data);
+    return result.first ? recognitionCallback(event_2_0, cookie) : Void();
+}
+
+::android::hardware::Return<void> SoundTriggerHalHidl::phraseRecognitionCallback_2_1(
+        const ISoundTriggerHwCallback::PhraseRecognitionEvent& event, int32_t cookie) {
+    V2_0_ISoundTriggerHwCallback::PhraseRecognitionEvent event_2_0;
+    // The data vector in the 'header' part of V2.1 structure is empty, thus copying is cheap.
+    event_2_0.common = event.common.header;
+    event_2_0.phraseExtras.setToExternal(
+            const_cast<PhraseRecognitionExtra*>(event.phraseExtras.data()),
+            event.phraseExtras.size());
+    auto result = memoryAsVector(event.common.data, &event_2_0.common.data);
+    return result.first ? phraseRecognitionCallback(event_2_0, cookie) : Void();
+}
+
+::android::hardware::Return<void> SoundTriggerHalHidl::soundModelCallback_2_1(
+        const ISoundTriggerHwCallback::ModelEvent& event, CallbackCookie cookie) {
+    // The data vector in the 'header' part of V2.1 structure is empty, thus copying is cheap.
+    V2_0_ISoundTriggerHwCallback::ModelEvent event_2_0 = event.header;
+    auto result = memoryAsVector(event.data, &event_2_0.data);
+    return result.first ? soundModelCallback(event_2_0, cookie) : Void();
+}
+
 
 struct sound_trigger_model_event *SoundTriggerHalHidl::convertSoundModelEventFromHal(
-                                              const ISoundTriggerHwCallback::ModelEvent *halEvent)
+                                              const V2_0_ISoundTriggerHwCallback::ModelEvent *halEvent)
 {
     struct sound_trigger_model_event *event = (struct sound_trigger_model_event *)malloc(
             sizeof(struct sound_trigger_model_event) +
@@ -550,37 +692,55 @@ void SoundTriggerHalHidl::convertPhraseRecognitionExtraFromHal(
 }
 
 
-struct sound_trigger_recognition_event *SoundTriggerHalHidl::convertRecognitionEventFromHal(
-        const ISoundTriggerHwCallback::RecognitionEvent *halEvent)
+struct sound_trigger_phrase_recognition_event* SoundTriggerHalHidl::convertPhraseRecognitionEventFromHal(
+        const V2_0_ISoundTriggerHwCallback::PhraseRecognitionEvent *halPhraseEvent)
 {
-    struct sound_trigger_recognition_event *event;
-
-    if (halEvent->type == SoundModelType::KEYPHRASE) {
-        struct sound_trigger_phrase_recognition_event *phraseEvent =
-                (struct sound_trigger_phrase_recognition_event *)malloc(
-                        sizeof(struct sound_trigger_phrase_recognition_event) +
-                        halEvent->data.size());
-        if (phraseEvent == NULL) {
-            return NULL;
-        }
-        const ISoundTriggerHwCallback::PhraseRecognitionEvent *halPhraseEvent =
-                (const ISoundTriggerHwCallback::PhraseRecognitionEvent *)halEvent;
-
-        for (unsigned int i = 0; i < halPhraseEvent->phraseExtras.size(); i++) {
-            convertPhraseRecognitionExtraFromHal(&phraseEvent->phrase_extras[i],
-                                                 &halPhraseEvent->phraseExtras[i]);
-        }
-        phraseEvent->num_phrases = halPhraseEvent->phraseExtras.size();
-        event = (struct sound_trigger_recognition_event *)phraseEvent;
-        event->data_offset = sizeof(sound_trigger_phrase_recognition_event);
-    } else {
-        event = (struct sound_trigger_recognition_event *)malloc(
-                sizeof(struct sound_trigger_recognition_event) + halEvent->data.size());
-        if (event == NULL) {
-            return NULL;
-        }
-        event->data_offset = sizeof(sound_trigger_recognition_event);
+    if (halPhraseEvent->common.type != SoundModelType::KEYPHRASE) {
+        ALOGE("Received non-keyphrase event type as PhraseRecognitionEvent");
+        return NULL;
     }
+    struct sound_trigger_phrase_recognition_event *phraseEvent =
+            (struct sound_trigger_phrase_recognition_event *)malloc(
+                    sizeof(struct sound_trigger_phrase_recognition_event) +
+                    halPhraseEvent->common.data.size());
+    if (phraseEvent == NULL) {
+        return NULL;
+    }
+    phraseEvent->common.data_offset = sizeof(sound_trigger_phrase_recognition_event);
+
+    for (unsigned int i = 0; i < halPhraseEvent->phraseExtras.size(); i++) {
+        convertPhraseRecognitionExtraFromHal(&phraseEvent->phrase_extras[i],
+                                             &halPhraseEvent->phraseExtras[i]);
+    }
+    phraseEvent->num_phrases = halPhraseEvent->phraseExtras.size();
+
+    fillRecognitionEventFromHal(&phraseEvent->common, &halPhraseEvent->common);
+    return phraseEvent;
+}
+
+struct sound_trigger_recognition_event *SoundTriggerHalHidl::convertRecognitionEventFromHal(
+        const V2_0_ISoundTriggerHwCallback::RecognitionEvent *halEvent)
+{
+    if (halEvent->type == SoundModelType::KEYPHRASE) {
+        ALOGE("Received keyphrase event type as RecognitionEvent");
+        return NULL;
+    }
+    struct sound_trigger_recognition_event *event;
+    event = (struct sound_trigger_recognition_event *)malloc(
+            sizeof(struct sound_trigger_recognition_event) + halEvent->data.size());
+    if (event == NULL) {
+        return NULL;
+    }
+    event->data_offset = sizeof(sound_trigger_recognition_event);
+
+    fillRecognitionEventFromHal(event, halEvent);
+    return event;
+}
+
+void SoundTriggerHalHidl::fillRecognitionEventFromHal(
+        struct sound_trigger_recognition_event *event,
+        const V2_0_ISoundTriggerHwCallback::RecognitionEvent *halEvent)
+{
     event->status = (int)halEvent->status;
     event->type = (sound_trigger_sound_model_type_t)halEvent->type;
     // event->model to be set by caller
@@ -597,8 +757,6 @@ struct sound_trigger_recognition_event *SoundTriggerHalHidl::convertRecognitionE
     uint8_t *dst = (uint8_t *)event + event->data_offset;
     uint8_t *src = (uint8_t *)&halEvent->data[0];
     memcpy(dst, src, halEvent->data.size());
-
-    return event;
 }
 
 } // namespace android

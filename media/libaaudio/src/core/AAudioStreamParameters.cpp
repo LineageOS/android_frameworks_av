@@ -38,6 +38,7 @@ void AAudioStreamParameters::copyFrom(const AAudioStreamParameters &other) {
     mSamplesPerFrame = other.mSamplesPerFrame;
     mSampleRate      = other.mSampleRate;
     mDeviceId        = other.mDeviceId;
+    mSessionId       = other.mSessionId;
     mSharingMode     = other.mSharingMode;
     mAudioFormat     = other.mAudioFormat;
     mDirection       = other.mDirection;
@@ -57,6 +58,15 @@ aaudio_result_t AAudioStreamParameters::validate() const {
     if (mDeviceId < 0) {
         ALOGE("deviceId out of range = %d", mDeviceId);
         return AAUDIO_ERROR_OUT_OF_RANGE;
+    }
+
+    // All Session ID values are legal.
+    switch (mSessionId) {
+        case AAUDIO_SESSION_ID_NONE:
+        case AAUDIO_SESSION_ID_ALLOCATE:
+            break;
+        default:
+            break;
     }
 
     switch (mSharingMode) {
@@ -154,6 +164,7 @@ aaudio_result_t AAudioStreamParameters::validate() const {
 
 void AAudioStreamParameters::dump() const {
     ALOGD("mDeviceId        = %6d", mDeviceId);
+    ALOGD("mSessionId       = %6d", mSessionId);
     ALOGD("mSampleRate      = %6d", mSampleRate);
     ALOGD("mSamplesPerFrame = %6d", mSamplesPerFrame);
     ALOGD("mSharingMode     = %6d", (int)mSharingMode);
@@ -164,4 +175,3 @@ void AAudioStreamParameters::dump() const {
     ALOGD("mContentType     = %6d", mContentType);
     ALOGD("mInputPreset     = %6d", mInputPreset);
 }
-

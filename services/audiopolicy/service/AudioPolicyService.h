@@ -24,6 +24,7 @@
 #include <utils/Vector.h>
 #include <utils/SortedVector.h>
 #include <binder/BinderService.h>
+#include <binder/IUidObserver.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
 #include <media/IAudioPolicyService.h>
@@ -33,8 +34,12 @@
 #include "AudioPolicyEffects.h"
 #include "managerdefault/AudioPolicyManager.h"
 
+#include <unordered_map>
+#include <unordered_set>
 
 namespace android {
+
+using namespace std;
 
 // ----------------------------------------------------------------------------
 
@@ -97,7 +102,10 @@ public:
                                      audio_port_handle_t *selectedDeviceId = NULL,
                                      audio_port_handle_t *portId = NULL);
     virtual status_t startInput(audio_io_handle_t input,
-                                audio_session_t session);
+                                audio_session_t session,
+                                audio_devices_t device,
+                                uid_t uid,
+                                bool *silenced);
     virtual status_t stopInput(audio_io_handle_t input,
                                audio_session_t session);
     virtual void releaseInput(audio_io_handle_t input,
@@ -235,6 +243,57 @@ private:
 
             status_t dumpInternals(int fd);
 
+    // Handles binder shell commands
+    virtual status_t shellCommand(int in, int out, int err, Vector<String16>& args);
+
+    // Sets whether the given UID records only silence
+    virtual void setRecordSilenced(uid_t uid, bool silenced);
+
+    // Overrides the UID state as if it is idle
+    status_t handleSetUidState(Vector<String16>& args, int err);
+
+    // Clears the override for the UID state
+    status_t handleResetUidState(Vector<String16>& args, int err);
+
+    // Gets the UID state
+    status_t handleGetUidState(Vector<String16>& args, int out, int err);
+
+    // Prints the shell command help
+    status_t printHelp(int out);
+
+    // If recording we need to make sure the UID is allowed to do that. If the UID is idle
+    // then it cannot record and gets buffers with zeros - silence. As soon as the UID
+    // transitions to an active state we will start reporting buffers with data. This approach
+    // transparently handles recording while the UID transitions between idle/active state
+    // avoiding to get stuck in a state receiving non-empty buffers while idle or in a state
+    // receiving empty buffers while active.
+    class UidPolicy : public BnUidObserver {
+    public:
+        explicit UidPolicy(wp<AudioPolicyService> service)
+                : mService(service) {}
+
+        void registerSelf();
+        void unregisterSelf();
+
+        bool isUidActive(uid_t uid);
+
+        void onUidGone(uid_t uid, bool disabled);
+        void onUidActive(uid_t uid);
+        void onUidIdle(uid_t uid, bool disabled);
+
+        void addOverrideUid(uid_t uid, bool active);
+        void removeOverrideUid(uid_t uid);
+
+    private:
+        bool isUidActiveLocked(uid_t uid);
+        void updateOverrideUid(uid_t uid, bool active, bool insert);
+
+        Mutex mUidLock;
+        wp<AudioPolicyService> mService;
+        std::unordered_set<uid_t> mActiveUids;
+        std::unordered_map<uid_t, bool> mOverrideUids;
+    };
+
     // Thread used for tone playback and to send audio config commands to audio flinger
     // For tone playback, using a separate thread is necessary to avoid deadlock with mLock because
     // startTone() and stopTone() are normally called with mLock locked and requesting a tone start
@@ -306,7 +365,6 @@ private:
                                                         const audio_config_base_t *deviceConfig,
                                                         audio_patch_handle_t patchHandle);
                     void        insertCommand_l(AudioCommand *command, int delayMs = 0);
-
     private:
         class AudioCommandData;
 
@@ -575,6 +633,8 @@ private:
     // Manage all effects configured in audio_effects.conf
     sp<AudioPolicyEffects> mAudioPolicyEffects;
     audio_mode_t mPhoneState;
+
+    sp<UidPolicy> mUidPolicy;
 };
 
 } // namespace android

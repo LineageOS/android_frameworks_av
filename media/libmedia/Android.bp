@@ -235,6 +235,8 @@ cc_library_shared {
         "-Wall",
     ],
 
+    version_script: "exports.lds",
+
     sanitize: {
         misc_undefined: [
             "unsigned-integer-overflow",

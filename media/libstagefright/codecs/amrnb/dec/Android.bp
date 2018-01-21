@@ -50,6 +50,8 @@ cc_library_static {
         "-Werror",
     ],
 
+    version_script: "exports.lds",
+
     //sanitize: {
     //    misc_undefined: [
     //        "signed-integer-overflow",
@@ -84,6 +86,8 @@ cc_library_shared {
         "-DOSCL_IMPORT_REF=",
         "-Werror",
     ],
+
+    version_script: "exports.lds",
 
     //sanitize: {
     //    misc_undefined: [

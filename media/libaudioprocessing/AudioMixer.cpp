@@ -1469,13 +1469,14 @@ void AudioMixer::process__genericNoResampling(state_t* state)
         int32_t *out = t1.mainBuffer;
         size_t numFrames = 0;
         do {
+            const size_t frameCount = min((size_t)BLOCKSIZE, state->frameCount - numFrames);
             memset(outTemp, 0, sizeof(outTemp));
             e2 = e1;
             while (e2) {
                 const int i = 31 - __builtin_clz(e2);
                 e2 &= ~(1<<i);
                 track_t& t = state->tracks[i];
-                size_t outFrames = BLOCKSIZE;
+                size_t outFrames = frameCount;
                 int32_t *aux = NULL;
                 if (CC_UNLIKELY(t.needs & NEEDS_AUX)) {
                     aux = t.auxBuffer + numFrames;
@@ -1490,7 +1491,7 @@ void AudioMixer::process__genericNoResampling(state_t* state)
                     }
                     size_t inFrames = (t.frameCount > outFrames)?outFrames:t.frameCount;
                     if (inFrames > 0) {
-                        t.hook(&t, outTemp + (BLOCKSIZE - outFrames) * t.mMixerChannelCount,
+                        t.hook(&t, outTemp + (frameCount - outFrames) * t.mMixerChannelCount,
                                 inFrames, state->resampleTemp, aux);
                         t.frameCount -= inFrames;
                         outFrames -= inFrames;
@@ -1501,7 +1502,7 @@ void AudioMixer::process__genericNoResampling(state_t* state)
                     if (t.frameCount == 0 && outFrames) {
                         t.bufferProvider->releaseBuffer(&t.buffer);
                         t.buffer.frameCount = (state->frameCount - numFrames) -
-                                (BLOCKSIZE - outFrames);
+                                (frameCount - outFrames);
                         t.bufferProvider->getNextBuffer(&t.buffer);
                         t.in = t.buffer.raw;
                         if (t.in == NULL) {
@@ -1515,12 +1516,12 @@ void AudioMixer::process__genericNoResampling(state_t* state)
             }
 
             convertMixerFormat(out, t1.mMixerFormat, outTemp, t1.mMixerInFormat,
-                    BLOCKSIZE * t1.mMixerChannelCount);
+                    frameCount * t1.mMixerChannelCount);
             // TODO: fix ugly casting due to choice of out pointer type
             out = reinterpret_cast<int32_t*>((uint8_t*)out
-                    + BLOCKSIZE * t1.mMixerChannelCount
+                    + frameCount * t1.mMixerChannelCount
                         * audio_bytes_per_sample(t1.mMixerFormat));
-            numFrames += BLOCKSIZE;
+            numFrames += frameCount;
         } while (numFrames < state->frameCount);
     }
 

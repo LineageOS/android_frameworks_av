@@ -123,17 +123,20 @@ enum {
     /**
      * No particular performance needs. Default.
      */
-            AAUDIO_PERFORMANCE_MODE_NONE = 10,
+    AAUDIO_PERFORMANCE_MODE_NONE = 10,
 
     /**
      * Extending battery life is most important.
+     *
+     * This mode is not supported in input streams.
+     * Mode NONE will be used if this is requested.
      */
-            AAUDIO_PERFORMANCE_MODE_POWER_SAVING,
+    AAUDIO_PERFORMANCE_MODE_POWER_SAVING,
 
     /**
      * Reducing latency is most important.
      */
-            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
+    AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
 };
 typedef int32_t aaudio_performance_mode_t;
 
@@ -279,6 +282,25 @@ enum {
     AAUDIO_INPUT_PRESET_UNPROCESSED = 9,
 };
 typedef int32_t aaudio_input_preset_t;
+
+enum {
+    /**
+     * Do not allocate a session ID.
+     * Effects cannot be used with this stream.
+     * Default.
+     */
+    AAUDIO_SESSION_ID_NONE = -1,
+
+    /**
+     * Allocate a session ID that can be used to attach and control
+     * effects using the Java AudioEffects API.
+     * Note that the use of this flag may result in higher latency.
+     *
+     * Note that this matches the value of AudioManager.AUDIO_SESSION_ID_GENERATE.
+     */
+    AAUDIO_SESSION_ID_ALLOCATE = 0,
+};
+typedef int32_t aaudio_session_id_t;
 
 typedef struct AAudioStreamStruct         AAudioStream;
 typedef struct AAudioStreamBuilderStruct  AAudioStreamBuilder;
@@ -496,6 +518,32 @@ AAUDIO_API void AAudioStreamBuilder_setContentType(AAudioStreamBuilder* builder,
 AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
                                                    aaudio_input_preset_t inputPreset);
 
+/** Set the requested session ID.
+ *
+ * The session ID can be used to associate a stream with effects processors.
+ * The effects are controlled using the Android AudioEffect Java API.
+ *
+ * The default, if you do not call this function, is AAUDIO_SESSION_ID_NONE.
+ *
+ * If set to AAUDIO_SESSION_ID_ALLOCATE then a session ID will be allocated
+ * when the stream is opened.
+ *
+ * The allocated session ID can be obtained by calling AAudioStream_getSessionId()
+ * and then used with this function when opening another stream.
+ * This allows effects to be shared between streams.
+ *
+ * Session IDs from AAudio can be used the Android Java APIs and vice versa.
+ * So a session ID from an AAudio stream can be passed to Java
+ * and effects applied using the Java AudioEffect API.
+ *
+ * Allocated session IDs will always be positive and nonzero.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param sessionId an allocated sessionID or AAUDIO_SESSION_ID_ALLOCATE
+ */
+AAUDIO_API void AAudioStreamBuilder_setSessionId(AAudioStreamBuilder* builder,
+                                                aaudio_session_id_t sessionId);
+
 /**
  * Return one of these values from the data callback function.
  */
@@ -526,7 +574,13 @@ typedef int32_t aaudio_data_callback_result_t;
  * For an input stream, this function should read and process numFrames of data
  * from the audioData buffer.
  *
- * Note that this callback function should be considered a "real-time" function.
+ * The audio data is passed through the buffer. So do NOT call AAudioStream_read() or
+ * AAudioStream_write() on the stream that is making the callback.
+ *
+ * Note that numFrames can vary unless AAudioStreamBuilder_setFramesPerDataCallback()
+ * is called.
+ *
+ * Also note that this callback function should be considered a "real-time" function.
  * It must not do anything that could cause an unbounded delay because that can cause the
  * audio to glitch or pop.
  *
@@ -537,6 +591,7 @@ typedef int32_t aaudio_data_callback_result_t;
  * <li>any network operations such as streaming</li>
  * <li>use any mutexes or other synchronization primitives</li>
  * <li>sleep</li>
+ * <li>stop or close the stream</li>
  * </ul>
  *
  * If you need to move data, eg. MIDI commands, in or out of the callback function then
@@ -545,7 +600,7 @@ typedef int32_t aaudio_data_callback_result_t;
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @param userData the same address that was passed to AAudioStreamBuilder_setCallback()
  * @param audioData a pointer to the audio data
- * @param numFrames the number of frames to be processed
+ * @param numFrames the number of frames to be processed, which can vary
  * @return AAUDIO_CALLBACK_RESULT_*
  */
 typedef aaudio_data_callback_result_t (*AAudioStream_dataCallback)(
@@ -620,17 +675,18 @@ typedef void (*AAudioStream_errorCallback)(
         aaudio_result_t error);
 
 /**
- * Request that AAudio call this functions if any error occurs on a callback thread.
+ * Request that AAudio call this function if any error occurs or the stream is disconnected.
  *
  * It will be called, for example, if a headset or a USB device is unplugged causing the stream's
- * device to be unavailable.
- * In response, this function could signal or launch another thread to reopen a
- * stream on another device. Do not reopen the stream in this callback.
- *
- * This will not be called because of actions by the application, such as stopping
- * or closing a stream.
- *
+ * device to be unavailable or "disconnected".
  * Another possible cause of error would be a timeout or an unanticipated internal error.
+ *
+ * In response, this function should signal or create another thread to stop
+ * and close this stream. The other thread could then reopen a stream on another device.
+ * Do not stop or close the stream, or reopen the new stream, directly from this callback.
+ *
+ * This callback will not be called because of actions by the application, such as stopping
+ * or closing a stream.
  *
  * Note that the AAudio callbacks will never be called simultaneously from multiple threads.
  *
@@ -743,11 +799,13 @@ AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream* stream);
  * This will update the current client state.
  *
  * <pre><code>
- * aaudio_stream_state_t currentState;
- * aaudio_result_t result = AAudioStream_getState(stream, &currentState);
- * while (result == AAUDIO_OK && currentState != AAUDIO_STREAM_STATE_PAUSING) {
+ * aaudio_result_t result = AAUDIO_OK;
+ * aaudio_stream_state_t currentState = AAudioStream_getState(stream);
+ * aaudio_stream_state_t inputState = currentState;
+ * while (result == AAUDIO_OK && currentState != AAUDIO_STREAM_STATE_PAUSED) {
  *     result = AAudioStream_waitForStateChange(
- *                                   stream, currentState, &currentState, MY_TIMEOUT_NANOS);
+ *                                   stream, inputState, &currentState, MY_TIMEOUT_NANOS);
+ *     inputState = currentState;
  * }
  * </code></pre>
  *
@@ -872,10 +930,10 @@ AAUDIO_API int32_t AAudioStream_getBufferCapacityInFrames(AAudioStream* stream);
  * This call can be used if the application needs to know the value of numFrames before
  * the stream is started. This is not normally necessary.
  *
- * If a specific size was requested by calling AAudioStreamBuilder_setCallbackSizeInFrames()
+ * If a specific size was requested by calling AAudioStreamBuilder_setFramesPerDataCallback()
  * then this will be the same size.
  *
- * If AAudioStreamBuilder_setCallbackSizeInFrames() was not called then this will
+ * If AAudioStreamBuilder_setFramesPerDataCallback() was not called then this will
  * return the size chosen by AAudio, or AAUDIO_UNSPECIFIED.
  *
  * AAUDIO_UNSPECIFIED indicates that the callback buffer size for this stream
@@ -981,6 +1039,28 @@ AAUDIO_API int64_t AAudioStream_getFramesWritten(AAudioStream* stream);
  * @return frames read
  */
 AAUDIO_API int64_t AAudioStream_getFramesRead(AAudioStream* stream);
+
+/**
+ * Passes back the session ID associated with this stream.
+ *
+ * The session ID can be used to associate a stream with effects processors.
+ * The effects are controlled using the Android AudioEffect Java API.
+ *
+ * If AAudioStreamBuilder_setSessionId() was called with AAUDIO_SESSION_ID_ALLOCATE
+ * then a new session ID should be allocated once when the stream is opened.
+ *
+ * If AAudioStreamBuilder_setSessionId() was called with a previously allocated
+ * session ID then that value should be returned.
+ *
+ * If AAudioStreamBuilder_setSessionId() was not called then this function should
+ * return AAUDIO_SESSION_ID_NONE.
+ *
+ * The sessionID for a stream should not change once the stream has been opened.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return session ID or AAUDIO_SESSION_ID_NONE
+ */
+AAUDIO_API aaudio_session_id_t AAudioStream_getSessionId(AAudioStream* stream);
 
 /**
  * Passes back the time at which a particular frame was presented.

@@ -63,6 +63,9 @@ public:
 
     virtual bool        isFastTrack() const { return (mFlags & AUDIO_INPUT_FLAG_FAST) != 0; }
 
+            void        setSilenced(bool silenced) { mSilenced = silenced; }
+            bool        isSilenced() const { return mSilenced; }
+
 private:
     friend class AudioFlinger;  // for mState
 
@@ -91,6 +94,8 @@ private:
             // used by the record thread to convert frames to proper destination format
             RecordBufferConverter              *mRecordBufferConverter;
             audio_input_flags_t                mFlags;
+
+            bool                               mSilenced;
 };
 
 // playback track, used by PatchPanel

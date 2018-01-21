@@ -52,6 +52,9 @@ class MmapStreamInterface : public virtual RefBase
      * \param[in,out] deviceId audio device the stream should preferably be routed to/from
      *                       Requested as input,
      *                       Actual as output
+     * \param[in,out] sessionId audio sessionId for the stream
+     *                       Requested as input, may be AUDIO_SESSION_ALLOCATE
+     *                       Actual as output
      * \param[in] callback the MmapStreamCallback interface used by AudioFlinger to notify
      *                     condition changes affecting the stream operation
      * \param[out] interface the MmapStreamInterface interface controlling the created stream
@@ -66,6 +69,7 @@ class MmapStreamInterface : public virtual RefBase
                                            audio_config_base_t *config,
                                            const AudioClient& client,
                                            audio_port_handle_t *deviceId,
+                                           audio_session_t *sessionId,
                                            const sp<MmapStreamCallback>& callback,
                                            sp<MmapStreamInterface>& interface,
                                            audio_port_handle_t *handle);

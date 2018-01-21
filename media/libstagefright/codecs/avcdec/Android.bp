@@ -13,6 +13,8 @@ cc_library_shared {
         "-Werror",
     ],
 
+    version_script: "exports.lds",
+
     include_dirs: [
         "external/libavc/decoder",
         "external/libavc/common",

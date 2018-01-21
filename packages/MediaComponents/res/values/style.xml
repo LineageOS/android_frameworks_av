@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="TransportControlsButton">
+        <item name="android:background">@null</item>
+        <item name="android:layout_width">70dp</item>
+        <item name="android:layout_height">40dp</item>
+    </style>
+
+    <style name="TransportControlsButton.Previous">
+        <item name="android:src">@drawable/ic_skip_previous</item>
+    </style>
+
+    <style name="TransportControlsButton.Next">
+        <item name="android:src">@drawable/ic_skip_next</item>
+    </style>
+
+    <style name="TransportControlsButton.Pause">
+        <item name="android:src">@drawable/ic_pause_circle_filled</item>
+    </style>
+
+    <style name="TransportControlsButton.Ffwd">
+        <item name="android:src">@drawable/ic_forward_30</item>
+    </style>
+
+    <style name="TransportControlsButton.Rew">
+        <item name="android:src">@drawable/ic_rewind_10</item>
+    </style>
+
+
+    <style name="TitleBarButton">
+        <item name="android:background">@null</item>
+        <item name="android:layout_width">36dp</item>
+        <item name="android:layout_height">36dp</item>
+        <item name="android:layout_margin">10dp</item>
+    </style>
+
+    <style name="TitleBarButton.MediaRouteButton">
+        <item name="android:src">@drawable/ic_cast</item>
+    </style>
+
+
+    <style name="BottomBarButton">
+        <item name="android:background">@null</item>
+        <item name="android:layout_width">24dp</item>
+        <item name="android:layout_height">24dp</item>
+        <item name="android:layout_margin">10dp</item>
+    </style>
+
+    <style name="BottomBarButton.CC">
+        <item name="android:src">@drawable/ic_media_cc_disabled</item>
+    </style>
+
+    <style name="BottomBarButton.FullScreen">
+        <item name="android:src">@drawable/ic_fullscreen</item>
+    </style>
+
+    <style name="BottomBarButton.Overflow">
+        <item name="android:src">@drawable/ic_chevron_right</item>
+    </style>
+
+</resources>
+

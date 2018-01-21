@@ -112,6 +112,14 @@ public:
         mInputPreset = inputPreset;
     }
 
+    aaudio_session_id_t getSessionId() const {
+        return mSessionId;
+    }
+
+    void setSessionId(aaudio_session_id_t sessionId) {
+        mSessionId = sessionId;
+    }
+
     int32_t calculateBytesPerFrame() const {
         return getSamplesPerFrame() * AAudioConvert_formatToSizeInBytes(getFormat());
     }
@@ -137,6 +145,7 @@ private:
     aaudio_content_type_t      mContentType     = AAUDIO_UNSPECIFIED;
     aaudio_input_preset_t      mInputPreset     = AAUDIO_UNSPECIFIED;
     int32_t                    mBufferCapacity  = AAUDIO_UNSPECIFIED;
+    aaudio_session_id_t        mSessionId       = AAUDIO_SESSION_ID_NONE;
 };
 
 } /* namespace aaudio */

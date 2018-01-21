@@ -152,6 +152,8 @@ cc_library_shared {
         "-Wall",
     ],
 
+    version_script: "exports.lds",
+
     product_variables: {
         debuggable: {
             // enable experiments only in userdebug and eng builds

@@ -32,6 +32,8 @@ LOCAL_PROGUARD_FLAG_FILES := proguard.cfg
 
 LOCAL_MULTILIB := first
 
+LOCAL_JAVA_LIBRARIES += android-support-annotations
+
 # Embed native libraries in package, rather than installing to /system/lib*.
 # TODO: Find a right way to include libs in the apk. b/72066556
 LOCAL_MODULE_TAGS := samples
@@ -48,5 +50,12 @@ LOCAL_JNI_SHARED_LIBRARIES := \
     libmpeg2extractor \
     liboggextractor \
     libwavextractor \
+
+# TODO: Remove dependency with other support libraries.
+LOCAL_STATIC_ANDROID_LIBRARIES += \
+    android-support-v4 \
+    android-support-v7-appcompat \
+    android-support-v7-palette
+LOCAL_USE_AAPT2 := true
 
 include $(BUILD_PACKAGE)

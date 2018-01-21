@@ -262,6 +262,7 @@ status_t MmapStreamInterface::openMmapStream(MmapStreamInterface::stream_directi
                                              audio_config_base_t *config,
                                              const AudioClient& client,
                                              audio_port_handle_t *deviceId,
+                                             audio_session_t *sessionId,
                                              const sp<MmapStreamCallback>& callback,
                                              sp<MmapStreamInterface>& interface,
                                              audio_port_handle_t *handle)
@@ -274,7 +275,8 @@ status_t MmapStreamInterface::openMmapStream(MmapStreamInterface::stream_directi
     status_t ret = NO_INIT;
     if (af != 0) {
         ret = af->openMmapStream(
-                direction, attr, config, client, deviceId, callback, interface, handle);
+                direction, attr, config, client, deviceId,
+                sessionId, callback, interface, handle);
     }
     return ret;
 }
@@ -284,6 +286,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
                                       audio_config_base_t *config,
                                       const AudioClient& client,
                                       audio_port_handle_t *deviceId,
+                                      audio_session_t *sessionId,
                                       const sp<MmapStreamCallback>& callback,
                                       sp<MmapStreamInterface>& interface,
                                       audio_port_handle_t *handle)
@@ -292,8 +295,10 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
     if (ret != NO_ERROR) {
         return ret;
     }
-
-    audio_session_t sessionId = (audio_session_t) newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
+    audio_session_t actualSessionId = *sessionId;
+    if (actualSessionId == AUDIO_SESSION_ALLOCATE) {
+        actualSessionId = (audio_session_t) newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
+    }
     audio_stream_type_t streamType = AUDIO_STREAM_DEFAULT;
     audio_io_handle_t io = AUDIO_IO_HANDLE_NONE;
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
@@ -303,7 +308,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         fullConfig.channel_mask = config->channel_mask;
         fullConfig.format = config->format;
         ret = AudioSystem::getOutputForAttr(attr, &io,
-                                            sessionId,
+                                            actualSessionId,
                                             &streamType, client.clientUid,
                                             &fullConfig,
                                             (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ |
@@ -311,7 +316,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
                                             deviceId, &portId);
     } else {
         ret = AudioSystem::getInputForAttr(attr, &io,
-                                              sessionId,
+                                              actualSessionId,
                                               client.clientPid,
                                               client.clientUid,
                                               config,
@@ -326,13 +331,14 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
     sp<MmapThread> thread = mMmapThreads.valueFor(io);
     if (thread != 0) {
         interface = new MmapThreadHandle(thread);
-        thread->configure(attr, streamType, sessionId, callback, *deviceId, portId);
+        thread->configure(attr, streamType, actualSessionId, callback, *deviceId, portId);
         *handle = portId;
+        *sessionId = actualSessionId;
     } else {
         if (direction == MmapStreamInterface::DIRECTION_OUTPUT) {
-            AudioSystem::releaseOutput(io, streamType, sessionId);
+            AudioSystem::releaseOutput(io, streamType, actualSessionId);
         } else {
-            AudioSystem::releaseInput(io, sessionId);
+            AudioSystem::releaseInput(io, actualSessionId);
         }
         ret = NO_INIT;
     }
@@ -985,6 +991,21 @@ bool AudioFlinger::getMicMute() const
     mHardwareStatus = AUDIO_HW_IDLE;
 
     return mute;
+}
+
+void AudioFlinger::setRecordSilenced(uid_t uid, bool silenced)
+{
+    ALOGV("AudioFlinger::setRecordSilenced(uid:%d, silenced:%d)", uid, silenced);
+
+    // TODO: Notify MmapThreads
+
+    AutoMutex lock(mLock);
+    for (size_t i = 0; i < mRecordThreads.size(); i++) {
+        sp<RecordThread> thread = mRecordThreads.valueAt(i);
+        if (thread != 0) {
+            thread->setRecordSilenced(uid, silenced);
+        }
+    }
 }
 
 status_t AudioFlinger::setMasterMute(bool muted)

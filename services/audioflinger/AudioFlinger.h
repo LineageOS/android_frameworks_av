@@ -147,6 +147,8 @@ public:
     virtual     status_t    setMicMute(bool state);
     virtual     bool        getMicMute() const;
 
+    virtual     void        setRecordSilenced(uid_t uid, bool silenced);
+
     virtual     status_t    setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs);
     virtual     String8     getParameters(audio_io_handle_t ioHandle, const String8& keys) const;
 
@@ -271,6 +273,7 @@ public:
                             audio_config_base_t *config,
                             const AudioClient& client,
                             audio_port_handle_t *deviceId,
+                            audio_session_t *sessionId,
                             const sp<MmapStreamCallback>& callback,
                             sp<MmapStreamInterface>& interface,
                             audio_port_handle_t *handle);

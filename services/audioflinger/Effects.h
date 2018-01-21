@@ -173,6 +173,8 @@ mutable Mutex               mLock;      // mutex for process, commands and handl
     bool    mSupportsFloat;         // effect supports float processing
     sp<EffectBufferHalInterface> mInConversionBuffer;  // Buffers for HAL conversion if needed.
     sp<EffectBufferHalInterface> mOutConversionBuffer;
+    uint32_t mInChannelCountRequested;
+    uint32_t mOutChannelCountRequested;
 #endif
 };
 

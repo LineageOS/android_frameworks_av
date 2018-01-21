@@ -16,33 +16,37 @@
 
 package com.android.media.update;
 
-import android.content.Context;
-import android.media.update.MediaController2Provider;
+import android.content.res.Resources;
+import android.content.res.Resources.Theme;
+import android.media.update.MediaControlView2Provider;
 import android.media.update.VideoView2Provider;
 import android.media.update.StaticProvider;
 import android.media.update.ViewProvider;
-import android.widget.MediaController2;
+import android.support.annotation.Nullable;
+import android.util.AttributeSet;
+import android.widget.MediaControlView2;
 import android.widget.VideoView2;
 
-import com.android.widget.MediaController2Impl;
+import com.android.widget.MediaControlView2Impl;
 import com.android.widget.VideoView2Impl;
 
 public class ApiFactory implements StaticProvider {
-
-    public static Object initialize(Context appContext, Context libContext)
+    public static Object initialize(Resources libResources, Theme libTheme)
             throws ReflectiveOperationException {
-        ApiHelper.initialize(appContext, libContext);
+        ApiHelper.initialize(libResources, libTheme);
         return new ApiFactory();
     }
 
     @Override
-    public MediaController2Provider createMediaController2(
-            MediaController2 instance, ViewProvider superProvider) {
-        return new MediaController2Impl(instance, superProvider);
+    public MediaControlView2Provider createMediaControlView2(
+            MediaControlView2 instance, ViewProvider superProvider) {
+        return new MediaControlView2Impl(instance, superProvider);
     }
 
     @Override
-    public VideoView2Provider createVideoView2(VideoView2 instance, ViewProvider superProvider) {
-        return new VideoView2Impl(instance, superProvider);
+    public VideoView2Provider createVideoView2(
+            VideoView2 instance, ViewProvider superProvider,
+            @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+        return new VideoView2Impl(instance, superProvider, attrs, defStyleAttr, defStyleRes);
     }
 }

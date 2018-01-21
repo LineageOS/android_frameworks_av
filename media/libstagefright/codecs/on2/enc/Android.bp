@@ -13,6 +13,8 @@ cc_library_shared {
 
     cflags: ["-Wall", "-Werror"],
 
+    version_script: "exports.lds",
+
     include_dirs: [
         "frameworks/av/media/libstagefright/include",
         "frameworks/native/include/media/openmax",

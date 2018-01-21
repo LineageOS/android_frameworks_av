@@ -330,14 +330,22 @@ public:
     }
 
     virtual status_t startInput(audio_io_handle_t input,
-                                audio_session_t session)
+                                audio_session_t session,
+                                audio_devices_t device,
+                                uid_t uid,
+                                bool *silenced)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.writeInt32(input);
         data.writeInt32(session);
+        data.writeInt32(device);
+        data.writeInt32(uid);
+        data.writeInt32(*silenced ? 1 : 0);
         remote()->transact(START_INPUT, data, &reply);
-        return static_cast <status_t> (reply.readInt32());
+        status_t status = static_cast <status_t> (reply.readInt32());
+        *silenced = reply.readInt32() == 1;
+        return status;
     }
 
     virtual status_t stopInput(audio_io_handle_t input,
@@ -1045,7 +1053,12 @@ status_t BnAudioPolicyService::onTransact(
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             audio_io_handle_t input = static_cast <audio_io_handle_t>(data.readInt32());
             audio_session_t session = static_cast <audio_session_t>(data.readInt32());
-            reply->writeInt32(static_cast <uint32_t>(startInput(input, session)));
+            audio_devices_t device = static_cast <audio_devices_t>(data.readInt32());
+            uid_t uid = static_cast <uid_t>(data.readInt32());
+            bool silenced = data.readInt32() == 1;
+            status_t status = startInput(input, session, device, uid, &silenced);
+            reply->writeInt32(static_cast <uint32_t>(status));
+            reply->writeInt32(silenced ? 1 : 0);
             return NO_ERROR;
         } break;
 

@@ -1282,7 +1282,7 @@ typedef enum acamera_metadata_tag {
      * <p>State       | Transition Cause | New State | Notes
      * :------------:|:----------------:|:---------:|:-----------------------:
      * INACTIVE      |                  | INACTIVE  | Camera device auto exposure algorithm is disabled</p>
-     * <p>When ACAMERA_CONTROL_AE_MODE is AE_MODE_ON_*:</p>
+     * <p>When ACAMERA_CONTROL_AE_MODE is AE_MODE_ON*:</p>
      * <p>State        | Transition Cause                             | New State      | Notes
      * :-------------:|:--------------------------------------------:|:--------------:|:-----------------:
      * INACTIVE       | Camera device initiates AE scan              | SEARCHING      | Values changing
@@ -1303,10 +1303,13 @@ typedef enum acamera_metadata_tag {
      * LOCKED         | aeLock is ON and aePrecaptureTrigger is CANCEL| LOCKED        | Precapture trigger is ignored when AE is already locked
      * Any state (excluding LOCKED) | ACAMERA_CONTROL_AE_PRECAPTURE_TRIGGER is START | PRECAPTURE     | Start AE precapture metering sequence
      * Any state (excluding LOCKED) | ACAMERA_CONTROL_AE_PRECAPTURE_TRIGGER is CANCEL| INACTIVE       | Currently active precapture metering sequence is canceled</p>
+     * <p>If the camera device supports AE external flash mode (ON_EXTERNAL_FLASH is included in
+     * ACAMERA_CONTROL_AE_AVAILABLE_MODES), aeState must be FLASH_REQUIRED after the camera device
+     * finishes AE scan and it's too dark without flash.</p>
      * <p>For the above table, the camera device may skip reporting any state changes that happen
      * without application intervention (i.e. mode switch, trigger, locking). Any state that
      * can be skipped in that manner is called a transient state.</p>
-     * <p>For example, for above AE modes (AE_MODE_ON_*), in addition to the state transitions
+     * <p>For example, for above AE modes (AE_MODE_ON*), in addition to the state transitions
      * listed in above table, it is also legal for the camera device to skip one or more
      * transient states between two results. See below table for examples:</p>
      * <p>State        | Transition Cause                                            | New State      | Notes
@@ -1319,6 +1322,7 @@ typedef enum acamera_metadata_tag {
      * CONVERGED      | Camera device finished AE scan                              | FLASH_REQUIRED | Converged but too dark w/o flash after a new scan, transient states are skipped by camera device.
      * FLASH_REQUIRED | Camera device finished AE scan                              | CONVERGED      | Converged after a new scan, transient states are skipped by camera device.</p>
      *
+     * @see ACAMERA_CONTROL_AE_AVAILABLE_MODES
      * @see ACAMERA_CONTROL_AE_LOCK
      * @see ACAMERA_CONTROL_AE_MODE
      * @see ACAMERA_CONTROL_AE_PRECAPTURE_TRIGGER
@@ -5373,6 +5377,19 @@ typedef enum acamera_metadata_enum_acamera_control_ae_mode {
      * sequence.</p>
      */
     ACAMERA_CONTROL_AE_MODE_ON_AUTO_FLASH_REDEYE                     = 4,
+
+    /**
+     * <p>An external flash has been turned on.</p>
+     * <p>It informs the camera device that an external flash has been turned on, and that
+     * metering (and continuous focus if active) should be quickly recaculated to account
+     * for the external flash. Otherwise, this mode acts like ON.</p>
+     * <p>When the external flash is turned off, AE mode should be changed to one of the
+     * other available AE modes.</p>
+     * <p>If the camera device supports AE external flash mode, aeState must be
+     * FLASH_REQUIRED after the camera device finishes AE scan and it's too dark without
+     * flash.</p>
+     */
+    ACAMERA_CONTROL_AE_MODE_ON_EXTERNAL_FLASH                        = 5,
 
 } acamera_metadata_enum_android_control_ae_mode_t;
 

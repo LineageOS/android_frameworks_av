@@ -26,6 +26,7 @@
 #include <system/audio_effects/effect_aec.h>
 #include <system/audio_effects/effect_ns.h>
 #include <system/audio_effects/effect_visualizer.h>
+#include <audio_utils/channels.h>
 #include <audio_utils/primitives.h>
 #include <media/AudioEffect.h>
 #include <media/audiohal/EffectHalInterface.h>
@@ -292,7 +293,6 @@ void AudioFlinger::EffectModule::process()
         return;
     }
 
-    // TODO: Implement multichannel effects; here outChannelCount == FCC_2 == 2
     const uint32_t inChannelCount =
             audio_channel_count_from_out_mask(mConfig.inputCfg.channels);
     const uint32_t outChannelCount =
@@ -342,6 +342,7 @@ void AudioFlinger::EffectModule::process()
         if (isProcessImplemented()) {
             if (auxType) {
                 // We overwrite the aux input buffer here and clear after processing.
+                // aux input is always mono.
 #ifdef FLOAT_EFFECT_CHAIN
                 if (mSupportsFloat) {
 #ifndef FLOAT_AUX
@@ -371,6 +372,28 @@ void AudioFlinger::EffectModule::process()
                 }
             }
 #ifdef FLOAT_EFFECT_CHAIN
+            sp<EffectBufferHalInterface> inBuffer = mInBuffer;
+            sp<EffectBufferHalInterface> outBuffer = mOutBuffer;
+
+            if (!auxType && mInChannelCountRequested != inChannelCount) {
+                adjust_channels(
+                        inBuffer->audioBuffer()->f32, mInChannelCountRequested,
+                        mInConversionBuffer->audioBuffer()->f32, inChannelCount,
+                        sizeof(float),
+                        sizeof(float)
+                        * mInChannelCountRequested * mConfig.inputCfg.buffer.frameCount);
+                inBuffer = mInConversionBuffer;
+            }
+            if (mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE
+                    && mOutChannelCountRequested != outChannelCount) {
+                adjust_selected_channels(
+                        outBuffer->audioBuffer()->f32, mOutChannelCountRequested,
+                        mOutConversionBuffer->audioBuffer()->f32, outChannelCount,
+                        sizeof(float),
+                        sizeof(float)
+                        * mOutChannelCountRequested * mConfig.outputCfg.buffer.frameCount);
+                outBuffer = mOutConversionBuffer;
+            }
             if (!mSupportsFloat) { // convert input to int16_t as effect doesn't support float.
                 if (!auxType) {
                     if (mInConversionBuffer.get() == nullptr) {
@@ -379,8 +402,9 @@ void AudioFlinger::EffectModule::process()
                     }
                     memcpy_to_i16_from_float(
                             mInConversionBuffer->audioBuffer()->s16,
-                            mInBuffer->audioBuffer()->f32,
+                            inBuffer->audioBuffer()->f32,
                             inChannelCount * mConfig.inputCfg.buffer.frameCount);
+                    inBuffer = mInConversionBuffer;
                 }
                 if (mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
                     if (mOutConversionBuffer.get() == nullptr) {
@@ -389,20 +413,29 @@ void AudioFlinger::EffectModule::process()
                     }
                     memcpy_to_i16_from_float(
                             mOutConversionBuffer->audioBuffer()->s16,
-                            mOutBuffer->audioBuffer()->f32,
+                            outBuffer->audioBuffer()->f32,
                             outChannelCount * mConfig.outputCfg.buffer.frameCount);
+                    outBuffer = mOutConversionBuffer;
                 }
             }
 #endif
-
             ret = mEffectInterface->process();
-
 #ifdef FLOAT_EFFECT_CHAIN
             if (!mSupportsFloat) { // convert output int16_t back to float.
+                sp<EffectBufferHalInterface> target =
+                        mOutChannelCountRequested != outChannelCount
+                        ? mOutConversionBuffer : mOutBuffer;
+
                 memcpy_to_float_from_i16(
-                        mOutBuffer->audioBuffer()->f32,
+                        target->audioBuffer()->f32,
                         mOutConversionBuffer->audioBuffer()->s16,
                         outChannelCount * mConfig.outputCfg.buffer.frameCount);
+            }
+            if (mOutChannelCountRequested != outChannelCount) {
+                adjust_selected_channels(mOutConversionBuffer->audioBuffer()->f32, outChannelCount,
+                        mOutBuffer->audioBuffer()->f32, mOutChannelCountRequested,
+                        sizeof(float),
+                        sizeof(float) * outChannelCount * mConfig.outputCfg.buffer.frameCount);
             }
 #endif
         } else {
@@ -476,15 +509,28 @@ status_t AudioFlinger::EffectModule::configure()
     }
 
     // TODO: handle configuration of effects replacing track process
+    // TODO: handle configuration of input (record) SW effects above the HAL,
+    // similar to output EFFECT_FLAG_TYPE_INSERT/REPLACE,
+    // in which case input channel masks should be used here.
     channelMask = thread->channelMask();
+    mConfig.inputCfg.channels = channelMask;
     mConfig.outputCfg.channels = channelMask;
 
     if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
-        mConfig.inputCfg.channels = AUDIO_CHANNEL_OUT_MONO;
-        mConfig.outputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
-        ALOGV("Overriding auxiliary effect input as MONO and output as STEREO");
+        if (mConfig.inputCfg.channels != AUDIO_CHANNEL_OUT_MONO) {
+            mConfig.inputCfg.channels = AUDIO_CHANNEL_OUT_MONO;
+            ALOGV("Overriding auxiliary effect input channels %#x as MONO",
+                    mConfig.inputCfg.channels);
+        }
+#ifndef MULTICHANNEL_EFFECT_CHAIN
+        if (mConfig.outputCfg.channels != AUDIO_CHANNEL_OUT_STEREO) {
+            mConfig.outputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
+            ALOGV("Overriding auxiliary effect output channels %#x as STEREO",
+                    mConfig.outputCfg.channels);
+        }
+#endif
     } else {
-        mConfig.inputCfg.channels = channelMask;
+#ifndef MULTICHANNEL_EFFECT_CHAIN
         // TODO: Update this logic when multichannel effects are implemented.
         // For offloaded tracks consider mono output as stereo for proper effect initialization
         if (channelMask == AUDIO_CHANNEL_OUT_MONO) {
@@ -492,7 +538,12 @@ status_t AudioFlinger::EffectModule::configure()
             mConfig.outputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
             ALOGV("Overriding effect input and output as STEREO");
         }
+#endif
     }
+    mInChannelCountRequested =
+            audio_channel_count_from_out_mask(mConfig.inputCfg.channels);
+    mOutChannelCountRequested =
+            audio_channel_count_from_out_mask(mConfig.outputCfg.channels);
 
     mConfig.inputCfg.format = EFFECT_BUFFER_FORMAT;
     mConfig.outputCfg.format = EFFECT_BUFFER_FORMAT;
@@ -530,28 +581,58 @@ status_t AudioFlinger::EffectModule::configure()
     status_t cmdStatus;
     size = sizeof(int);
     status = mEffectInterface->command(EFFECT_CMD_SET_CONFIG,
-                                       sizeof(effect_config_t),
+                                       sizeof(mConfig),
                                        &mConfig,
                                        &size,
                                        &cmdStatus);
     if (status == NO_ERROR) {
         status = cmdStatus;
-#ifdef FLOAT_EFFECT_CHAIN
-        mSupportsFloat = true;
-#endif
     }
-#ifdef FLOAT_EFFECT_CHAIN
-    else {
-        ALOGV("EFFECT_CMD_SET_CONFIG failed with float format, retry with int16_t.");
-        mConfig.inputCfg.format = AUDIO_FORMAT_PCM_16_BIT;
-        mConfig.outputCfg.format = AUDIO_FORMAT_PCM_16_BIT;
+
+#ifdef MULTICHANNEL_EFFECT_CHAIN
+    if (status != NO_ERROR &&
+            (mConfig.inputCfg.channels != AUDIO_CHANNEL_OUT_STEREO
+                    || mConfig.outputCfg.channels != AUDIO_CHANNEL_OUT_STEREO)) {
+        // Older effects may require exact STEREO position mask.
+        if (mConfig.inputCfg.channels != AUDIO_CHANNEL_OUT_STEREO) {
+            ALOGV("Overriding effect input channels %#x as STEREO", mConfig.inputCfg.channels);
+            mConfig.inputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
+        }
+        if (mConfig.outputCfg.channels != AUDIO_CHANNEL_OUT_STEREO) {
+            ALOGV("Overriding effect output channels %#x as STEREO", mConfig.outputCfg.channels);
+            mConfig.outputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
+        }
+        size = sizeof(int);
         status = mEffectInterface->command(EFFECT_CMD_SET_CONFIG,
-                                           sizeof(effect_config_t),
+                                           sizeof(mConfig),
                                            &mConfig,
                                            &size,
                                            &cmdStatus);
         if (status == NO_ERROR) {
             status = cmdStatus;
+        }
+    }
+#endif
+
+#ifdef FLOAT_EFFECT_CHAIN
+    if (status == NO_ERROR) {
+        mSupportsFloat = true;
+    }
+
+    if (status != NO_ERROR) {
+        ALOGV("EFFECT_CMD_SET_CONFIG failed with float format, retry with int16_t.");
+        mConfig.inputCfg.format = AUDIO_FORMAT_PCM_16_BIT;
+        mConfig.outputCfg.format = AUDIO_FORMAT_PCM_16_BIT;
+        size = sizeof(int);
+        status = mEffectInterface->command(EFFECT_CMD_SET_CONFIG,
+                                           sizeof(mConfig),
+                                           &mConfig,
+                                           &size,
+                                           &cmdStatus);
+        if (status == NO_ERROR) {
+            status = cmdStatus;
+        }
+        if (status == NO_ERROR) {
             mSupportsFloat = false;
             ALOGVV("config worked with 16 bit");
         } else {
@@ -929,11 +1010,15 @@ void AudioFlinger::EffectModule::setInBuffer(const sp<EffectBufferHalInterface>&
     // the original buffer) when the output buffer is identical to the input buffer,
     // but we don't optimize for it here.
     const bool auxType = (mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY;
-    if (!auxType && !mSupportsFloat && mInBuffer.get() != nullptr) {
+    const uint32_t inChannelCount =
+            audio_channel_count_from_out_mask(mConfig.inputCfg.channels);
+    const bool formatMismatch = !mSupportsFloat || mInChannelCountRequested != inChannelCount;
+    if (!auxType && formatMismatch && mInBuffer.get() != nullptr) {
         // we need to translate - create hidl shared buffer and intercept
         const size_t inFrameCount = mConfig.inputCfg.buffer.frameCount;
-        const int inChannels = audio_channel_count_from_out_mask(mConfig.inputCfg.channels);
-        const size_t size = inChannels * inFrameCount * sizeof(int16_t);
+        // Use FCC_2 in case mInChannelCountRequested is mono and the effect is stereo.
+        const uint32_t inChannels = std::max((uint32_t)FCC_2, mInChannelCountRequested);
+        const size_t size = inChannels * inFrameCount * std::max(sizeof(int16_t), sizeof(float));
 
         ALOGV("%s: setInBuffer updating for inChannels:%d inFrameCount:%zu total size:%zu",
                 __func__, inChannels, inFrameCount, size);
@@ -970,10 +1055,14 @@ void AudioFlinger::EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>
 #ifdef FLOAT_EFFECT_CHAIN
     // Note: Any effect that does not accumulate does not need mOutConversionBuffer and
     // can do in-place conversion from int16_t to float.  We don't optimize here.
-    if (!mSupportsFloat && mOutBuffer.get() != nullptr) {
+    const uint32_t outChannelCount =
+            audio_channel_count_from_out_mask(mConfig.outputCfg.channels);
+    const bool formatMismatch = !mSupportsFloat || mOutChannelCountRequested != outChannelCount;
+    if (formatMismatch && mOutBuffer.get() != nullptr) {
         const size_t outFrameCount = mConfig.outputCfg.buffer.frameCount;
-        const int outChannels = audio_channel_count_from_out_mask(mConfig.outputCfg.channels);
-        const size_t size = outChannels * outFrameCount * sizeof(int16_t);
+        // Use FCC_2 in case mOutChannelCountRequested is mono and the effect is stereo.
+        const uint32_t outChannels = std::max((uint32_t)FCC_2, mOutChannelCountRequested);
+        const size_t size = outChannels * outFrameCount * std::max(sizeof(int16_t), sizeof(float));
 
         ALOGV("%s: setOutBuffer updating for outChannels:%d outFrameCount:%zu total size:%zu",
                 __func__, outChannels, outFrameCount, size);
@@ -1813,14 +1902,8 @@ void AudioFlinger::EffectChain::clearInputBuffer_l(const sp<ThreadBase>& thread)
     if (mInBuffer == NULL) {
         return;
     }
-    // TODO: This will change in the future, depending on multichannel
-    // and sample format changes for effects.
-    // Currently effects processing is only available for stereo, AUDIO_FORMAT_PCM_16_BIT
-    // (4 bytes frame size)
-
     const size_t frameSize =
-            audio_bytes_per_sample(EFFECT_BUFFER_FORMAT)
-            * std::min((uint32_t)FCC_2, thread->channelCount());
+            audio_bytes_per_sample(EFFECT_BUFFER_FORMAT) * thread->channelCount();
 
     memset(mInBuffer->audioBuffer()->raw, 0, thread->frameCount() * frameSize);
     mInBuffer->commit();

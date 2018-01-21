@@ -16,21 +16,22 @@
 
 package com.android.widget;
 
-import android.graphics.Canvas;
 import android.media.session.MediaController;
-import android.media.update.MediaController2Provider;
+import android.media.update.MediaControlView2Provider;
 import android.media.update.ViewProvider;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.View.OnClickListener;
-import android.widget.MediaController2;
+import android.widget.MediaControlView2;
 
-public class MediaController2Impl implements MediaController2Provider {
-    private final MediaController2 mInstance;
+public class MediaControlView2Impl implements MediaControlView2Provider {
+    private final MediaControlView2 mInstance;
     private final ViewProvider mSuperProvider;
 
-    public MediaController2Impl(MediaController2 instance, ViewProvider superProvider) {
+    static final String ACTION_SHOW_SUBTITLE = "showSubtitle";
+    static final String ACTION_HIDE_SUBTITLE = "hideSubtitle";
+
+    public MediaControlView2Impl(MediaControlView2 instance, ViewProvider superProvider) {
         mInstance = instance;
         mSuperProvider = superProvider;
 
@@ -39,11 +40,6 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void setController_impl(MediaController controller) {
-        // TODO: Implement
-    }
-
-    @Override
-    public void setAnchorView_impl(View view) {
         // TODO: Implement
     }
 
@@ -65,11 +61,6 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void hide_impl() {
-        // TODO: Implement
-    }
-
-    @Override
-    public void setPrevNextListeners_impl(OnClickListener next, OnClickListener prev) {
         // TODO: Implement
     }
 
@@ -125,33 +116,9 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public void onAttachedToWindow_impl() {
-        mSuperProvider.onAttachedToWindow_impl();
-        // TODO: Implement
-    }
-
-    @Override
-    public void onDetachedFromWindow_impl() {
-        mSuperProvider.onDetachedFromWindow_impl();
-        // TODO: Implement
-    }
-
-    @Override
-    public void onLayout_impl(boolean changed, int left, int top, int right, int bottom) {
-        mSuperProvider.onLayout_impl(changed, left, top, right, bottom);
-        // TODO: Implement
-    }
-
-    @Override
-    public void draw_impl(Canvas canvas) {
-        mSuperProvider.draw_impl(canvas);
-        // TODO: Implement
-    }
-
-    @Override
     public CharSequence getAccessibilityClassName_impl() {
         // TODO: Implement
-        return MediaController2.class.getName();
+        return MediaControlView2.class.getName();
     }
 
     @Override
