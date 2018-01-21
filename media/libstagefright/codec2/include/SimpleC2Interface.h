@@ -59,12 +59,12 @@ public:
     inline C2String getName() const override { return mName; }
     inline c2_node_id_t getId() const override { return mId; }
     c2_status_t query_vb(
-            const std::vector<C2Param* const> &stackParams,
+            const std::vector<C2Param*> &stackParams,
             const std::vector<C2Param::Index> &heapParamIndices,
             c2_blocking_t mayBlock,
             std::vector<std::unique_ptr<C2Param>>* const heapParams) const override;
     inline c2_status_t config_vb(
-            const std::vector<C2Param* const> &,
+            const std::vector<C2Param*> &,
             c2_blocking_t,
             std::vector<std::unique_ptr<C2SettingResult>>* const) override {
         return C2_OMITTED;
