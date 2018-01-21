@@ -284,6 +284,7 @@ class _C2LinearRangeAspect : public _C2LinearCapacityAspect {
 /// @{
 public:
     inline uint32_t offset() const { return mOffset; }
+    inline uint32_t endOffset() const { return mOffset + mSize; }
     inline uint32_t size() const { return mSize; }
 
 protected:
@@ -309,6 +310,32 @@ private:
     uint32_t mOffset;
     uint32_t mSize;
 /// @}
+};
+
+class C2_HIDE _C2LinearCapacityBase : public _C2LinearCapacityAspect {
+public:
+    inline explicit _C2LinearCapacityBase(size_t capacity)
+        : _C2LinearCapacityAspect(c2_min(capacity, std::numeric_limits<uint32_t>::max())) {}
+};
+
+/**
+ * Utility class for safe range calculations.
+ */
+class C2LinearRange : public _C2LinearRangeAspect {
+public:
+    inline C2LinearRange(const _C2LinearCapacityBase &parent, size_t offset, size_t size)
+        : _C2LinearRangeAspect(&parent, offset, size) {}
+};
+
+/**
+ * Utility class for simple capacity and range construction.
+ */
+class C2LinearCapacity : public _C2LinearCapacityBase {
+public:
+    using _C2LinearCapacityBase::_C2LinearCapacityBase;
+    inline C2LinearRange range(size_t offset, size_t size) {
+        return C2LinearRange(*this, offset, size);
+    }
 };
 
 /**
