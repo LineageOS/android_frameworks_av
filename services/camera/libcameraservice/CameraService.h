@@ -27,6 +27,7 @@
 #include <binder/AppOpsManager.h>
 #include <binder/BinderService.h>
 #include <binder/IAppOpsCallback.h>
+#include <binder/IUidObserver.h>
 #include <hardware/camera.h>
 
 #include <android/hardware/camera/common/1.0/types.h>
@@ -47,6 +48,8 @@
 #include <map>
 #include <memory>
 #include <utility>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace android {
 
@@ -163,6 +166,8 @@ public:
 
     virtual status_t    dump(int fd, const Vector<String16>& args);
 
+    virtual status_t    shellCommand(int in, int out, int err, const Vector<String16>& args);
+
     /////////////////////////////////////////////////////////////////////
     // Client functionality
 
@@ -233,6 +238,9 @@ public:
         // Check what API level is used for this client. This is used to determine which
         // superclass this can be cast to.
         virtual bool canCastToApiClient(apiLevel level) const;
+
+        // Block the client form using the camera
+        virtual void block();
     protected:
         BasicClient(const sp<CameraService>& cameraService,
                 const sp<IBinder>& remoteCallback,
@@ -506,6 +514,37 @@ private:
         CameraParameters mShimParams;
     }; // class CameraState
 
+    // Observer for UID lifecycle enforcing that UIDs in idle
+    // state cannot use the camera to protect user privacy.
+    class UidPolicy : public BnUidObserver {
+    public:
+        explicit UidPolicy(sp<CameraService> service)
+                : mService(service) {}
+
+        void registerSelf();
+        void unregisterSelf();
+
+        bool isUidActive(uid_t uid);
+
+        void onUidGone(uid_t uid, bool disabled);
+        void onUidActive(uid_t uid);
+        void onUidIdle(uid_t uid, bool disabled);
+
+        void addOverrideUid(uid_t uid, bool active);
+        void removeOverrideUid(uid_t uid);
+
+    private:
+        bool isUidActiveLocked(uid_t uid);
+        void updateOverrideUid(uid_t uid, bool active, bool insert);
+
+        Mutex mUidLock;
+        wp<CameraService> mService;
+        std::unordered_set<uid_t> mActiveUids;
+        std::unordered_map<uid_t, bool> mOverrideUids;
+    }; // class UidPolicy
+
+    sp<UidPolicy> mUidPolicy;
+
     // Delay-load the Camera HAL module
     virtual void onFirstRef();
 
@@ -754,6 +793,21 @@ private:
      * Sets Status to a service-specific error on failure
      */
     binder::Status      getLegacyParametersLazy(int cameraId, /*out*/CameraParameters* parameters);
+
+    // Blocks all clients from the UID
+    void blockClientsForUid(uid_t uid);
+
+    // Overrides the UID state as if it is idle
+    status_t handleSetUidState(const Vector<String16>& args, int err);
+
+    // Clears the override for the UID state
+    status_t handleResetUidState(const Vector<String16>& args, int err);
+
+    // Gets the UID state
+    status_t handleGetUidState(const Vector<String16>& args, int out, int err);
+
+    // Prints the shell command help
+    status_t printHelp(int out);
 
     static int getCallingPid();
 

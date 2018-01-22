@@ -2450,7 +2450,7 @@ public:
     }
 
     virtual c2_status_t config_vb(
-            const std::vector<C2Param* const> &params,
+            const std::vector<C2Param*> &params,
             c2_blocking_t mayBlock,
             std::vector<std::unique_ptr<C2SettingResult>>* const failures) override {
         (void)params;
@@ -2465,7 +2465,7 @@ public:
     }
 
     virtual c2_status_t query_vb(
-            const std::vector<C2Param* const> &stackParams,
+            const std::vector<C2Param*> &stackParams,
             const std::vector<C2Param::Index> &heapParamIndices,
             c2_blocking_t mayBlock,
             std::vector<std::unique_ptr<C2Param>>* const heapParams) const override {

@@ -33,14 +33,18 @@
 
 #include <android-base/macros.h>
 #include <android-base/parseint.h>
+#include <binder/ActivityManager.h>
 #include <binder/AppOpsManager.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
+#include <binder/PermissionController.h>
 #include <binder/ProcessInfoService.h>
+#include <binder/IResultReceiver.h>
 #include <cutils/atomic.h>
 #include <cutils/properties.h>
+#include <cutils/misc.h>
 #include <gui/Surface.h>
 #include <hardware/hardware.h>
 #include <memunreachable/memunreachable.h>
@@ -165,6 +169,8 @@ static void torch_mode_status_change(
 
 // ----------------------------------------------------------------------------
 
+static const String16 sManageCameraPermission("android.permission.MANAGE_CAMERA");
+
 CameraService::CameraService() :
         mEventLog(DEFAULT_EVENT_LOG_LENGTH),
         mNumberOfCameras(0), mNumberOfNormalCameras(0),
@@ -196,6 +202,9 @@ void CameraService::onFirstRef()
     }
 
     CameraService::pingCameraServiceProxy();
+
+    mUidPolicy = new UidPolicy(this);
+    mUidPolicy->registerSelf();
 }
 
 status_t CameraService::enumerateProviders() {
@@ -275,6 +284,7 @@ void CameraService::pingCameraServiceProxy() {
 
 CameraService::~CameraService() {
     VendorTagDescriptor::clearGlobalVendorTagDescriptor();
+    mUidPolicy->unregisterSelf();
 }
 
 void CameraService::onNewProviderRegistered() {
@@ -930,6 +940,15 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
         ALOGE("Permission Denial: can't use the camera pid=%d, uid=%d", clientPid, clientUid);
         return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
                 "Caller \"%s\" (PID %d, UID %d) cannot open camera \"%s\" without camera permission",
+                clientName8.string(), clientUid, clientPid, cameraId.string());
+    }
+
+    // Make sure the UID is in an active state to use the camera
+    if (!mUidPolicy->isUidActive(callingUid)) {
+        ALOGE("Access Denial: can't use the camera from an idle UID pid=%d, uid=%d",
+            clientPid, clientUid);
+        return STATUS_ERROR_FMT(ERROR_DISABLED,
+                "Caller \"%s\" (PID %d, UID %d) cannot open camera \"%s\" from background",
                 clientName8.string(), clientUid, clientPid, cameraId.string());
     }
 
@@ -1969,6 +1988,30 @@ status_t CameraService::onTransact(uint32_t code, const Parcel& data, Parcel* re
 
     // Permission checks
     switch (code) {
+        case SHELL_COMMAND_TRANSACTION: {
+            int in = data.readFileDescriptor();
+            int out = data.readFileDescriptor();
+            int err = data.readFileDescriptor();
+            int argc = data.readInt32();
+            Vector<String16> args;
+            for (int i = 0; i < argc && data.dataAvail() > 0; i++) {
+               args.add(data.readString16());
+            }
+            sp<IBinder> unusedCallback;
+            sp<IResultReceiver> resultReceiver;
+            status_t status;
+            if ((status = data.readNullableStrongBinder(&unusedCallback)) != NO_ERROR) {
+                return status;
+            }
+            if ((status = data.readNullableStrongBinder(&resultReceiver)) != NO_ERROR) {
+                return status;
+            }
+            status = shellCommand(in, out, err, args);
+            if (resultReceiver != nullptr) {
+                resultReceiver->send(status);
+            }
+            return NO_ERROR;
+        }
         case BnCameraService::NOTIFYSYSTEMEVENT: {
             if (pid != selfPid) {
                 // Ensure we're being called by system_server, or similar process with
@@ -2286,13 +2329,19 @@ void CameraService::BasicClient::opChanged(int32_t op, const String16& packageNa
     if (res != AppOpsManager::MODE_ALLOWED) {
         ALOGI("Camera %s: Access for \"%s\" revoked", mCameraIdStr.string(),
                 myName.string());
-        // Reset the client PID to allow server-initiated disconnect,
-        // and to prevent further calls by client.
-        mClientPid = getCallingPid();
-        CaptureResultExtras resultExtras; // a dummy result (invalid)
-        notifyError(hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_SERVICE, resultExtras);
-        disconnect();
+        block();
     }
+}
+
+void CameraService::BasicClient::block() {
+    ATRACE_CALL();
+
+    // Reset the client PID to allow server-initiated disconnect,
+    // and to prevent further calls by client.
+    mClientPid = getCallingPid();
+    CaptureResultExtras resultExtras; // a dummy result (invalid)
+    notifyError(hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DISABLED, resultExtras);
+    disconnect();
 }
 
 // ----------------------------------------------------------------------------
@@ -2327,6 +2376,98 @@ void CameraService::Client::OpsCallback::opChanged(int32_t op,
     sp<BasicClient> client = mClient.promote();
     if (client != NULL) {
         client->opChanged(op, packageName);
+    }
+}
+
+// ----------------------------------------------------------------------------
+//                  UidPolicy
+// ----------------------------------------------------------------------------
+
+void CameraService::UidPolicy::registerSelf() {
+    ActivityManager am;
+    am.registerUidObserver(this, ActivityManager::UID_OBSERVER_GONE
+            | ActivityManager::UID_OBSERVER_IDLE
+            | ActivityManager::UID_OBSERVER_ACTIVE,
+            ActivityManager::PROCESS_STATE_UNKNOWN,
+            String16("cameraserver"));
+}
+
+void CameraService::UidPolicy::unregisterSelf() {
+    ActivityManager am;
+    am.unregisterUidObserver(this);
+}
+
+void CameraService::UidPolicy::onUidGone(uid_t uid, bool disabled) {
+    onUidIdle(uid, disabled);
+}
+
+void CameraService::UidPolicy::onUidActive(uid_t uid) {
+    Mutex::Autolock _l(mUidLock);
+    mActiveUids.insert(uid);
+}
+
+void CameraService::UidPolicy::onUidIdle(uid_t uid, bool /* disabled */) {
+    bool deleted = false;
+    {
+        Mutex::Autolock _l(mUidLock);
+        if (mActiveUids.erase(uid) > 0) {
+            deleted = true;
+        }
+    }
+    if (deleted) {
+        sp<CameraService> service = mService.promote();
+        if (service != nullptr) {
+            service->blockClientsForUid(uid);
+        }
+    }
+}
+
+bool CameraService::UidPolicy::isUidActive(uid_t uid) {
+    // Non-app UIDs are considered always active
+    if (uid < FIRST_APPLICATION_UID) {
+        return true;
+    }
+    Mutex::Autolock _l(mUidLock);
+    return isUidActiveLocked(uid);
+}
+
+bool CameraService::UidPolicy::isUidActiveLocked(uid_t uid) {
+    // Non-app UIDs are considered always active
+    if (uid < FIRST_APPLICATION_UID) {
+        return true;
+    }
+    auto it = mOverrideUids.find(uid);
+    if (it != mOverrideUids.end()) {
+        return it->second;
+    }
+    return mActiveUids.find(uid) != mActiveUids.end();
+}
+
+void CameraService::UidPolicy::UidPolicy::addOverrideUid(uid_t uid, bool active) {
+    updateOverrideUid(uid, active, true);
+}
+
+void CameraService::UidPolicy::removeOverrideUid(uid_t uid) {
+    updateOverrideUid(uid, false, false);
+}
+
+void CameraService::UidPolicy::updateOverrideUid(uid_t uid, bool active, bool insert) {
+    bool wasActive = false;
+    bool isActive = false;
+    {
+        Mutex::Autolock _l(mUidLock);
+        wasActive = isUidActiveLocked(uid);
+        mOverrideUids.erase(uid);
+        if (insert) {
+            mOverrideUids.insert(std::pair<uid_t, bool>(uid, active));
+        }
+        isActive = isUidActiveLocked(uid);
+    }
+    if (wasActive != isActive && !isActive) {
+        sp<CameraService> service = mService.promote();
+        if (service != nullptr) {
+            service->blockClientsForUid(uid);
+        }
     }
 }
 
@@ -2789,6 +2930,94 @@ status_t CameraService::setTorchStatusLocked(const String8& cameraId,
     mTorchStatusMap.editValueAt(index) = status;
 
     return OK;
+}
+
+void CameraService::blockClientsForUid(uid_t uid) {
+    const auto clients = mActiveClientManager.getAll();
+    for (auto& current : clients) {
+        if (current != nullptr) {
+            const auto basicClient = current->getValue();
+            if (basicClient.get() != nullptr && basicClient->getClientUid() == uid) {
+                basicClient->block();
+            }
+        }
+    }
+}
+
+// NOTE: This is a remote API - make sure all args are validated
+status_t CameraService::shellCommand(int in, int out, int err, const Vector<String16>& args) {
+    if (!checkCallingPermission(sManageCameraPermission, nullptr, nullptr)) {
+        return PERMISSION_DENIED;
+    }
+    if (in == BAD_TYPE || out == BAD_TYPE || err == BAD_TYPE) {
+        return BAD_VALUE;
+    }
+    if (args.size() == 3 && args[0] == String16("set-uid-state")) {
+        return handleSetUidState(args, err);
+    } else if (args.size() == 2 && args[0] == String16("reset-uid-state")) {
+        return handleResetUidState(args, err);
+    } else if (args.size() == 2 && args[0] == String16("get-uid-state")) {
+        return handleGetUidState(args, out, err);
+    } else if (args.size() == 1 && args[0] == String16("help")) {
+        printHelp(out);
+        return NO_ERROR;
+    }
+    printHelp(err);
+    return BAD_VALUE;
+}
+
+status_t CameraService::handleSetUidState(const Vector<String16>& args, int err) {
+    PermissionController pc;
+    int uid = pc.getPackageUid(args[1], 0);
+    if (uid <= 0) {
+        ALOGE("Unknown package: '%s'", String8(args[1]).string());
+        dprintf(err, "Unknown package: '%s'\n", String8(args[1]).string());
+        return BAD_VALUE;
+    }
+    bool active = false;
+    if (args[2] == String16("active")) {
+        active = true;
+    } else if ((args[2] != String16("idle"))) {
+        ALOGE("Expected active or idle but got: '%s'", String8(args[2]).string());
+        return BAD_VALUE;
+    }
+    mUidPolicy->addOverrideUid(uid, active);
+    return NO_ERROR;
+}
+
+status_t CameraService::handleResetUidState(const Vector<String16>& args, int err) {
+    PermissionController pc;
+    int uid = pc.getPackageUid(args[1], 0);
+    if (uid < 0) {
+        ALOGE("Unknown package: '%s'", String8(args[1]).string());
+        dprintf(err, "Unknown package: '%s'\n", String8(args[1]).string());
+        return BAD_VALUE;
+    }
+    mUidPolicy->removeOverrideUid(uid);
+    return NO_ERROR;
+}
+
+status_t CameraService::handleGetUidState(const Vector<String16>& args, int out, int err) {
+    PermissionController pc;
+    int uid = pc.getPackageUid(args[1], 0);
+    if (uid <= 0) {
+        ALOGE("Unknown package: '%s'", String8(args[1]).string());
+        dprintf(err, "Unknown package: '%s'\n", String8(args[1]).string());
+        return BAD_VALUE;
+    }
+    if (mUidPolicy->isUidActive(uid)) {
+        return dprintf(out, "active\n");
+    } else {
+        return dprintf(out, "idle\n");
+    }
+}
+
+status_t CameraService::printHelp(int out) {
+    return dprintf(out, "Camera service commands:\n"
+        "  get-uid-state <PACKAGE> gets the uid state\n"
+        "  set-uid-state <PACKAGE> <active|idle> overrides the uid state\n"
+        "  reset-uid-state <PACKAGE> clears the uid state override\n"
+        "  help print this message\n");
 }
 
 }; // namespace android

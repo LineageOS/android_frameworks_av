@@ -137,7 +137,7 @@ private:
     template <typename T> void queryUnsupportedParam();
 
     // Execute an interface's config_vb(). |T| is a single parameter type, not std::vector.
-    // config() creates std::vector<C2Param *const> {p} and passes it to config_vb().
+    // config() creates std::vector<C2Param *> {p} and passes it to config_vb().
     template <typename T>
     c2_status_t
     config(T *const p,
@@ -195,7 +195,7 @@ template <> std::unique_ptr<C2PortMimeConfig::input> makeParam() {
     } while (false)
 
 template <typename T> c2_status_t C2CompIntfTest::queryOnStack(T *const p) {
-    std::vector<C2Param *const> stackParams{p};
+    std::vector<C2Param*> stackParams{p};
     return mIntf->query_vb(stackParams, {}, C2_DONT_BLOCK, nullptr);
 }
 
@@ -260,7 +260,7 @@ template <typename T> void C2CompIntfTest::queryUnsupportedParam() {
 template <typename T>
 c2_status_t C2CompIntfTest::config(
         T *const p, std::vector<std::unique_ptr<C2SettingResult>> *const failures) {
-    std::vector<C2Param *const> params{p};
+    std::vector<C2Param*> params{p};
     return mIntf->config_vb(params, C2_DONT_BLOCK, failures);
 }
 
@@ -276,7 +276,7 @@ template <typename T>
 void C2CompIntfTest::configReadOnlyParam(const T &newParam) {
     std::unique_ptr<T> p = makeParamFrom(newParam);
 
-    std::vector<C2Param *const> params{p.get()};
+    std::vector<C2Param*> params{p.get()};
     std::vector<std::unique_ptr<C2SettingResult>> failures;
 
     // config_vb should be failed because a parameter is read-only.
@@ -289,7 +289,7 @@ template <typename T>
 void C2CompIntfTest::configWritableParamValidValue(const T &newParam, c2_status_t *configResult) {
     std::unique_ptr<T> p = makeParamFrom(newParam);
 
-    std::vector<C2Param *const> params{p.get()};
+    std::vector<C2Param*> params{p.get()};
     std::vector<std::unique_ptr<C2SettingResult>> failures;
     // In most cases, config_vb return C2_OK and the parameter's value should be changed
     // to |newParam|, which is confirmed in a caller of configWritableParamValueValue().
@@ -312,7 +312,7 @@ template <typename T>
 void C2CompIntfTest::configWritableParamInvalidValue(const T &newParam) {
     std::unique_ptr<T> p = makeParamFrom(newParam);
 
-    std::vector<C2Param *const> params{p.get()};
+    std::vector<C2Param*> params{p.get()};
     std::vector<std::unique_ptr<C2SettingResult>> failures;
     // Although a parameter is writable, config_vb should be failed,
     // because a new value is invalid.
