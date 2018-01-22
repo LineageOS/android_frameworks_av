@@ -128,7 +128,6 @@ cc_library_shared {
         "libstagefright_timedtext",
         "libvpx",
         "libwebm",
-        "libstagefright_mpeg2support",
         "libstagefright_esds",
         "libstagefright_id3",
         "libFLAC",
@@ -173,7 +172,7 @@ cc_library_shared {
     },
 }
 
-cc_library_shared {
+cc_library {
     name: "libstagefright_player2",
 
     srcs: [
@@ -190,7 +189,6 @@ cc_library_shared {
         "NuCachedSource2.cpp",
         "RemoteMediaExtractor.cpp",
         "RemoteMediaSource.cpp",
-        "SurfaceUtils.cpp",
         "Utils.cpp",
         "VideoFrameScheduler.cpp",
         "http/MediaHTTP.cpp",
@@ -202,7 +200,6 @@ cc_library_shared {
         "libdrmframework",
         "libgui",
         "liblog",
-        "libmedia_omx",
         "libmedia_player2_util",
         "libaudioclient",
         "libmediaextractor",
@@ -213,15 +210,15 @@ cc_library_shared {
         "libutils",
         "libmedia_helper",
         "libstagefright_foundation",
-        "libdl",
         "libziparchive",
     ],
 
     static_libs: [
         "libstagefright_esds",
-        "libstagefright_id3",
-        "libstagefright_mpeg2support",
-        "libstagefright_timedtext",
+    ],
+
+    header_libs:[
+        "media_plugin_headers",
     ],
 
     export_shared_lib_headers: [

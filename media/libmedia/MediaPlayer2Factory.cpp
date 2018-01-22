@@ -22,7 +22,6 @@
 #include <cutils/properties.h>
 #include <media/DataSource.h>
 #include <media/MediaPlayer2Engine.h>
-#include <media/stagefright/FileSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <utils/Errors.h>
 #include <utils/misc.h>

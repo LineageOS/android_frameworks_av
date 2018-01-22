@@ -40,6 +40,7 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/SurfaceUtils.h>
 
+#include <system/window.h>
 #include "ATSParser.h"
 
 namespace android {
@@ -241,22 +242,25 @@ void NuPlayer2::Decoder::onMessageReceived(const sp<AMessage> &msg) {
                 //
                 // at this point MediaPlayer2Manager::client has already connected to the
                 // surface, which MediaCodec does not expect
-                err = nativeWindowDisconnect(nww->getANativeWindow(), "kWhatSetVideoSurface(nww)");
+                err = native_window_api_disconnect(nww->getANativeWindow(),
+                                                   NATIVE_WINDOW_API_MEDIA);
                 if (err == OK) {
                     err = mCodec->setOutputSurface(nww);
                     ALOGI_IF(err, "codec setOutputSurface returned: %d", err);
                     if (err == OK) {
                         // reconnect to the old surface as MPS::Client will expect to
                         // be able to disconnect from it.
-                        (void)nativeWindowConnect(mNativeWindow->getANativeWindow(),
-                                                  "kWhatSetVideoSurface(mNativeWindow)");
+                        (void)native_window_api_connect(mNativeWindow->getANativeWindow(),
+                                                        NATIVE_WINDOW_API_MEDIA);
+
                         mNativeWindow = nww;
                     }
                 }
                 if (err != OK) {
                     // reconnect to the new surface on error as MPS::Client will expect to
                     // be able to disconnect from it.
-                    (void)nativeWindowConnect(nww->getANativeWindow(), "kWhatSetVideoSurface(err)");
+                    (void)native_window_api_connect(nww->getANativeWindow(),
+                                                    NATIVE_WINDOW_API_MEDIA);
                 }
             }
 
@@ -326,7 +330,8 @@ void NuPlayer2::Decoder::onConfigure(const sp<AMessage> &format) {
     status_t err;
     if (mNativeWindow != NULL && mNativeWindow->getANativeWindow() != NULL) {
         // disconnect from surface as MediaCodec will reconnect
-        err = nativeWindowDisconnect(mNativeWindow->getANativeWindow(), "onConfigure");
+        err = native_window_api_disconnect(mNativeWindow->getANativeWindow(),
+                                           NATIVE_WINDOW_API_MEDIA);
         // We treat this as a warning, as this is a preparatory step.
         // Codec will try to connect to the surface, which is where
         // any error signaling will occur.
@@ -540,7 +545,8 @@ void NuPlayer2::Decoder::onShutdown(bool notifyComplete) {
 
         if (mNativeWindow != NULL && mNativeWindow->getANativeWindow() != NULL) {
             // reconnect to surface as MediaCodec disconnected from it
-            status_t error = nativeWindowConnect(mNativeWindow->getANativeWindow(), "onShutdown");
+            status_t error = native_window_api_connect(mNativeWindow->getANativeWindow(),
+                                                       NATIVE_WINDOW_API_MEDIA);
             ALOGW_IF(error != NO_ERROR,
                     "[%s] failed to connect to native window, error=%d",
                     mComponentName.c_str(), error);
