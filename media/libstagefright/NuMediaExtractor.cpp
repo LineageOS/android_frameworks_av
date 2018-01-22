@@ -660,6 +660,28 @@ status_t NuMediaExtractor::readSampleData(const sp<ABuffer> &buffer) {
     return err;
 }
 
+status_t NuMediaExtractor::getSampleSize(size_t *sampleSize) {
+    Mutex::Autolock autoLock(mLock);
+
+    ssize_t minIndex = fetchAllTrackSamples();
+
+    if (minIndex < 0) {
+        return ERROR_END_OF_STREAM;
+    }
+
+    TrackInfo *info = &mSelectedTracks.editItemAt(minIndex);
+    auto it = info->mSamples.begin();
+    *sampleSize = it->mBuffer->range_length();
+
+    if (info->mTrackFlags & kIsVorbis) {
+        // Each sample's data is suffixed by the number of page samples
+        // or -1 if not available.
+        *sampleSize += sizeof(int32_t);
+    }
+
+    return OK;
+}
+
 status_t NuMediaExtractor::getSampleTrackIndex(size_t *trackIndex) {
     Mutex::Autolock autoLock(mLock);
 
