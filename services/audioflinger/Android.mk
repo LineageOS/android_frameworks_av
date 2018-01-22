@@ -87,6 +87,10 @@ endif
 endif
 #QTI Resampler
 
+ifeq ($(BOARD_HAS_MTK_HARDWARE),true)
+LOCAL_CFLAGS += -DLEGACY_AUDIO_BLOB
+endif
+
 LOCAL_MODULE:= libaudioflinger
 
 LOCAL_SRC_FILES += \
