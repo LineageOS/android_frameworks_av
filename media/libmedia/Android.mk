@@ -75,6 +75,11 @@ LOCAL_SRC_FILES:= \
     StringArray.cpp \
     AudioPolicy.cpp
 
+ifeq ($(MTK_HARDWARE),true)
+LOCAL_SRC_FILES += \
+    MTKAudioStubs.cpp
+endif
+
 LOCAL_SHARED_LIBRARIES := \
 	libui liblog libcutils libutils libbinder libsonivox libicuuc libicui18n libexpat \
         libcamera_client libstagefright_foundation \
