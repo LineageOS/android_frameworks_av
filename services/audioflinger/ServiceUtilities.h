@@ -26,4 +26,5 @@ bool captureHotwordAllowed(pid_t pid, uid_t uid);
 bool settingsAllowed();
 bool modifyAudioRoutingAllowed();
 bool dumpAllowed();
+bool modifyPhoneStateAllowed(pid_t pid, uid_t uid);
 }

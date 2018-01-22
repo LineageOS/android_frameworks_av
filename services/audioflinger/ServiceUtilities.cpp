@@ -153,4 +153,11 @@ bool dumpAllowed() {
     return ok;
 }
 
+bool modifyPhoneStateAllowed(pid_t pid, uid_t uid) {
+    static const String16 sModifyPhoneState("android.permission.MODIFY_PHONE_STATE");
+    bool ok = checkPermission(sModifyPhoneState, pid, uid);
+    if (!ok) ALOGE("Request requires android.permission.MODIFY_PHONE_STATE");
+    return ok;
+}
+
 } // namespace android

@@ -309,7 +309,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         fullConfig.format = config->format;
         ret = AudioSystem::getOutputForAttr(attr, &io,
                                             actualSessionId,
-                                            &streamType, client.clientUid,
+                                            &streamType, client.clientPid, client.clientUid,
                                             &fullConfig,
                                             (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ |
                                                     AUDIO_OUTPUT_FLAG_DIRECT),
@@ -690,7 +690,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
     output.selectedDeviceId = input.selectedDeviceId;
 
     lStatus = AudioSystem::getOutputForAttr(&input.attr, &output.outputId, sessionId, &streamType,
-                                            clientUid, &input.config, input.flags,
+                                            clientPid, clientUid, &input.config, input.flags,
                                             &output.selectedDeviceId, &portId);
 
     if (lStatus != NO_ERROR || output.outputId == AUDIO_IO_HANDLE_NONE) {

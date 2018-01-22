@@ -158,6 +158,7 @@ status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *attr,
                                               audio_io_handle_t *output,
                                               audio_session_t session,
                                               audio_stream_type_t *stream,
+                                              pid_t pid,
                                               uid_t uid,
                                               const audio_config_t *config,
                                               audio_output_flags_t flags,
@@ -176,9 +177,26 @@ status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *attr,
                 "%s uid %d tried to pass itself off as %d", __FUNCTION__, callingUid, uid);
         uid = callingUid;
     }
-    return mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid,
+    audio_output_flags_t originalFlags = flags;
+    status_t result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid,
                                                  config,
-                                                 flags, selectedDeviceId, portId);
+                                                 &flags, selectedDeviceId, portId);
+
+    // FIXME: Introduce a way to check for the the telephony device before opening the output
+    if ((result == NO_ERROR) &&
+        (flags & AUDIO_OUTPUT_FLAG_INCALL_MUSIC) &&
+        !modifyPhoneStateAllowed(pid, uid)) {
+        // If the app tries to play music through the telephony device and doesn't have permission
+        // the fallback to the default output device.
+        mAudioPolicyManager->releaseOutput(*output, *stream, session);
+        flags = originalFlags;
+        *selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+        *portId = AUDIO_PORT_HANDLE_NONE;
+        result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid,
+                                                 config,
+                                                 &flags, selectedDeviceId, portId);
+    }
+    return result;
 }
 
 status_t AudioPolicyService::startOutput(audio_io_handle_t output,
