@@ -43,7 +43,15 @@ struct AMediaDataSource {
 };
 
 NdkDataSource::NdkDataSource(AMediaDataSource *dataSource)
-    : mDataSource(dataSource) {
+    : mDataSource(AMediaDataSource_new()) {
+      AMediaDataSource_setReadAt(mDataSource, dataSource->readAt);
+      AMediaDataSource_setGetSize(mDataSource, dataSource->getSize);
+      AMediaDataSource_setClose(mDataSource, dataSource->close);
+      AMediaDataSource_setUserdata(mDataSource, dataSource->userdata);
+}
+
+NdkDataSource::~NdkDataSource() {
+    AMediaDataSource_delete(mDataSource);
 }
 
 status_t NdkDataSource::initCheck() const {
