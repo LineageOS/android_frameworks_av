@@ -46,6 +46,13 @@ struct ARTPSource : public RefBase {
     void addReceiverReport(const sp<ABuffer> &buffer);
     void addFIR(const sp<ABuffer> &buffer);
 
+    void noticeAbandonBuffer(int cnt=1);
+
+    int32_t mFirstSeqNumber;
+    int32_t mFirstRtpTime;
+    int64_t mFirstSysTime;
+    int32_t mClockRate;
+
 private:
     uint32_t mID;
     uint32_t mHighestSeqNumber;
