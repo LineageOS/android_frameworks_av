@@ -7387,6 +7387,37 @@ typedef enum acamera_metadata_enum_acamera_info_supported_hardware_level {
      */
     ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL_3                          = 3,
 
+    /**
+     * <p>This camera device is backed by an external camera connected to this Android device.</p>
+     * <p>The device has capability identical to a LIMITED level device, with the following
+     * exceptions:</p>
+     * <ul>
+     * <li>The device may not report lens/sensor related information such as<ul>
+     * <li>ACAMERA_LENS_FOCAL_LENGTH</li>
+     * <li>ACAMERA_LENS_INFO_HYPERFOCAL_DISTANCE</li>
+     * <li>ACAMERA_SENSOR_INFO_PHYSICAL_SIZE</li>
+     * <li>ACAMERA_SENSOR_INFO_WHITE_LEVEL</li>
+     * <li>ACAMERA_SENSOR_BLACK_LEVEL_PATTERN</li>
+     * <li>ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT</li>
+     * <li>ACAMERA_SENSOR_ROLLING_SHUTTER_SKEW</li>
+     * </ul>
+     * </li>
+     * <li>The device will report 0 for ACAMERA_SENSOR_ORIENTATION</li>
+     * <li>The device has less guarantee on stable framerate, as the framerate partly depends
+     *   on the external camera being used.</li>
+     * </ul>
+     *
+     * @see ACAMERA_LENS_FOCAL_LENGTH
+     * @see ACAMERA_LENS_INFO_HYPERFOCAL_DISTANCE
+     * @see ACAMERA_SENSOR_BLACK_LEVEL_PATTERN
+     * @see ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT
+     * @see ACAMERA_SENSOR_INFO_PHYSICAL_SIZE
+     * @see ACAMERA_SENSOR_INFO_WHITE_LEVEL
+     * @see ACAMERA_SENSOR_ORIENTATION
+     * @see ACAMERA_SENSOR_ROLLING_SHUTTER_SKEW
+     */
+    ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL                   = 4,
+
 } acamera_metadata_enum_android_info_supported_hardware_level_t;
 
 
