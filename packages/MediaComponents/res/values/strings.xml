@@ -84,6 +84,7 @@
 
     <string name="lockscreen_pause_button_content_description">Pause</string>
     <string name="lockscreen_play_button_content_description">Play</string>
+    <string name="lockscreen_replay_button_content_description">Replay</string>
 
     <!-- Text for error alert when a video container is not valid for progressive download/playback. -->
     <string name="VideoView2_error_text_invalid_progressive_playback">This video isn\'t valid for streaming to this device.</string>
