@@ -34,22 +34,19 @@ LOCAL_MULTILIB := first
 
 LOCAL_JAVA_LIBRARIES += android-support-annotations
 
-# Embed native libraries in package, rather than installing to /system/lib*.
-# TODO: Find a right way to include libs in the apk. b/72066556
-LOCAL_MODULE_TAGS := samples
-
 # To embed native libraries in package, uncomment the lines below.
-LOCAL_JNI_SHARED_LIBRARIES := \
-    libaacextractor \
-    libamrextractor \
-    libflacextractor \
-    libmidiextractor \
-    libmkvextractor \
-    libmp3extractor \
-    libmp4extractor \
-    libmpeg2extractor \
-    liboggextractor \
-    libwavextractor \
+#LOCAL_MODULE_TAGS := samples
+#LOCAL_JNI_SHARED_LIBRARIES := \
+#    libaacextractor \
+#    libamrextractor \
+#    libflacextractor \
+#    libmidiextractor \
+#    libmkvextractor \
+#    libmp3extractor \
+#    libmp4extractor \
+#    libmpeg2extractor \
+#    liboggextractor \
+#    libwavextractor \
 
 # TODO: Remove dependency with other support libraries.
 LOCAL_STATIC_ANDROID_LIBRARIES += \
