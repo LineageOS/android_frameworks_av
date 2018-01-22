@@ -140,6 +140,75 @@ android_dataspace Camera3Stream::getOriginalDataSpace() const {
     return mOriginalDataSpace;
 }
 
+status_t Camera3Stream::forceToIdle() {
+    ATRACE_CALL();
+    Mutex::Autolock l(mLock);
+    status_t res;
+
+    switch (mState) {
+        case STATE_ERROR:
+        case STATE_CONSTRUCTED:
+        case STATE_IN_CONFIG:
+        case STATE_PREPARING:
+        case STATE_IN_RECONFIG:
+            ALOGE("%s: Invalid state: %d", __FUNCTION__, mState);
+            res = NO_INIT;
+            break;
+        case STATE_CONFIGURED:
+            if (hasOutstandingBuffersLocked()) {
+                sp<StatusTracker> statusTracker = mStatusTracker.promote();
+                if (statusTracker != 0) {
+                    statusTracker->markComponentIdle(mStatusId, Fence::NO_FENCE);
+                }
+            }
+
+            mState = STATE_IN_IDLE;
+            res = OK;
+
+            break;
+        default:
+            ALOGE("%s: Unknown state %d", __FUNCTION__, mState);
+            res = NO_INIT;
+    }
+
+    return res;
+}
+
+status_t Camera3Stream::restoreConfiguredState() {
+    ATRACE_CALL();
+    Mutex::Autolock l(mLock);
+    status_t res;
+
+    switch (mState) {
+        case STATE_ERROR:
+        case STATE_CONSTRUCTED:
+        case STATE_IN_CONFIG:
+        case STATE_PREPARING:
+        case STATE_IN_RECONFIG:
+        case STATE_CONFIGURED:
+            ALOGE("%s: Invalid state: %d", __FUNCTION__, mState);
+            res = NO_INIT;
+            break;
+        case STATE_IN_IDLE:
+            if (hasOutstandingBuffersLocked()) {
+                sp<StatusTracker> statusTracker = mStatusTracker.promote();
+                if (statusTracker != 0) {
+                    statusTracker->markComponentActive(mStatusId);
+                }
+            }
+
+            mState = STATE_CONFIGURED;
+            res = OK;
+
+            break;
+        default:
+            ALOGE("%s: Unknown state %d", __FUNCTION__, mState);
+            res = NO_INIT;
+    }
+
+    return res;
+}
+
 camera3_stream* Camera3Stream::startConfiguration() {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
@@ -150,6 +219,7 @@ camera3_stream* Camera3Stream::startConfiguration() {
             ALOGE("%s: In error state", __FUNCTION__);
             return NULL;
         case STATE_CONSTRUCTED:
+        case STATE_IN_IDLE:
             // OK
             break;
         case STATE_IN_CONFIG:
@@ -177,6 +247,11 @@ camera3_stream* Camera3Stream::startConfiguration() {
         ALOGE("%s: Cannot query consumer endpoint usage!",
                 __FUNCTION__);
         return NULL;
+    }
+
+    if (mState == STATE_IN_IDLE) {
+        // Skip configuration.
+        return this;
     }
 
     // Stop tracking if currently doing so
@@ -219,6 +294,9 @@ status_t Camera3Stream::finishConfiguration() {
             ALOGE("%s: Cannot finish configuration that hasn't been started",
                     __FUNCTION__);
             return INVALID_OPERATION;
+        case STATE_IN_IDLE:
+            //Skip configuration in this state
+            return OK;
         default:
             ALOGE("%s: Unknown state", __FUNCTION__);
             return INVALID_OPERATION;
@@ -267,6 +345,7 @@ status_t Camera3Stream::cancelConfiguration() {
             return INVALID_OPERATION;
         case STATE_IN_CONFIG:
         case STATE_IN_RECONFIG:
+        case STATE_IN_IDLE:
             // OK
             break;
         case STATE_CONSTRUCTED:
@@ -282,7 +361,9 @@ status_t Camera3Stream::cancelConfiguration() {
     mUsage = mOldUsage;
     camera3_stream::max_buffers = mOldMaxBuffers;
 
-    mState = (mState == STATE_IN_RECONFIG) ? STATE_CONFIGURED : STATE_CONSTRUCTED;
+    mState = ((mState == STATE_IN_RECONFIG) || (mState == STATE_IN_IDLE)) ? STATE_CONFIGURED :
+            STATE_CONSTRUCTED;
+
     return OK;
 }
 

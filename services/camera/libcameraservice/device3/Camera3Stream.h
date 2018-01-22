@@ -68,6 +68,12 @@ namespace camera3 {
  *    duration.  In this state, only prepareNextBuffer() and cancelPrepare()
  *    may be called.
  *
+ *  STATE_IN_IDLE: This is a temporary state only intended to be used for input
+ *    streams and only for the case where we need to re-configure the camera device
+ *    while the input stream has an outstanding buffer. All other streams should not
+ *    be able to switch to this state. For them this is invalid and should be handled
+ *    as an unknown state.
+ *
  * Transition table:
  *
  *    <none>               => STATE_CONSTRUCTED:
@@ -98,6 +104,11 @@ namespace camera3 {
  *        all stream buffers, or cancelPrepare is called.
  *    STATE_CONFIGURED     => STATE_ABANDONED:
  *        When the buffer queue of the stream is abandoned.
+ *    STATE_CONFIGURED     => STATE_IN_IDLE:
+ *        Only for an input stream which has an outstanding buffer.
+ *    STATE_IN_IDLE     => STATE_CONFIGURED:
+ *        After the internal re-configuration, the input should revert back to
+ *        the configured state.
  *
  * Status Tracking:
  *    Each stream is tracked by StatusTracker as a separate component,
@@ -108,7 +119,9 @@ namespace camera3 {
  *
  *    - ACTIVE: One or more buffers have been handed out (with #getBuffer).
  *    - IDLE: All buffers have been returned (with #returnBuffer), and their
- *          respective release_fence(s) have been signaled.
+ *          respective release_fence(s) have been signaled. The only exception to this
+ *          rule is an input stream that moves to "STATE_IN_IDLE" during internal
+ *          re-configuration.
  *
  *    A typical use case is output streams. When the HAL has any buffers
  *    dequeued, the stream is marked ACTIVE. When the HAL returns all buffers
@@ -386,6 +399,19 @@ class Camera3Stream :
      */
     bool             isAbandoned() const;
 
+    /**
+     * Switch a configured stream with possibly outstanding buffers in idle
+     * state. Configuration for such streams will be skipped assuming there
+     * are no changes to the stream parameters.
+     */
+    status_t         forceToIdle();
+
+    /**
+     * Restore a forced idle stream to configured state, marking it active
+     * in case it contains outstanding buffers.
+     */
+    status_t         restoreConfiguredState();
+
   protected:
     const int mId;
     /**
@@ -414,7 +440,8 @@ class Camera3Stream :
         STATE_IN_RECONFIG,
         STATE_CONFIGURED,
         STATE_PREPARING,
-        STATE_ABANDONED
+        STATE_ABANDONED,
+        STATE_IN_IDLE
     } mState;
 
     mutable Mutex mLock;
