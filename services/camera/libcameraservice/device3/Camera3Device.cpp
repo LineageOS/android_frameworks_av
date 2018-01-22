@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2013-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1230,6 +1230,7 @@ status_t Camera3Device::createInputStream(
 status_t Camera3Device::createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
+            const String8& physicalCameraId,
             std::vector<int> *surfaceIds, int streamSetId, bool isShared, uint64_t consumerUsage) {
     ATRACE_CALL();
 
@@ -1242,12 +1243,14 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
     consumers.push_back(consumer);
 
     return createStream(consumers, /*hasDeferredConsumer*/ false, width, height,
-            format, dataSpace, rotation, id, surfaceIds, streamSetId, isShared, consumerUsage);
+            format, dataSpace, rotation, id, physicalCameraId, surfaceIds, streamSetId,
+            isShared, consumerUsage);
 }
 
 status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
         android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
+        const String8& physicalCameraId,
         std::vector<int> *surfaceIds, int streamSetId, bool isShared, uint64_t consumerUsage) {
     ATRACE_CALL();
 
@@ -1255,8 +1258,9 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
     nsecs_t maxExpectedDuration = getExpectedInFlightDuration();
     Mutex::Autolock l(mLock);
     ALOGV("Camera %s: Creating new stream %d: %d x %d, format %d, dataspace %d rotation %d"
-            " consumer usage %" PRIu64 ", isShared %d", mId.string(), mNextStreamId, width, height, format,
-            dataSpace, rotation, consumerUsage, isShared);
+            " consumer usage %" PRIu64 ", isShared %d, physicalCameraId %s", mId.string(),
+            mNextStreamId, width, height, format, dataSpace, rotation, consumerUsage, isShared,
+            physicalCameraId.string());
 
     status_t res;
     bool wasActive = false;
@@ -1316,7 +1320,7 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         }
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, blobBufferSize, format, dataSpace, rotation,
-                mTimestampOffset, streamSetId);
+                mTimestampOffset, physicalCameraId, streamSetId);
     } else if (format == HAL_PIXEL_FORMAT_RAW_OPAQUE) {
         ssize_t rawOpaqueBufferSize = getRawOpaqueBufferSize(width, height);
         if (rawOpaqueBufferSize <= 0) {
@@ -1325,19 +1329,19 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         }
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, rawOpaqueBufferSize, format, dataSpace, rotation,
-                mTimestampOffset, streamSetId);
+                mTimestampOffset, physicalCameraId, streamSetId);
     } else if (isShared) {
         newStream = new Camera3SharedOutputStream(mNextStreamId, consumers,
                 width, height, format, consumerUsage, dataSpace, rotation,
-                mTimestampOffset, streamSetId);
+                mTimestampOffset, physicalCameraId, streamSetId);
     } else if (consumers.size() == 0 && hasDeferredConsumer) {
         newStream = new Camera3OutputStream(mNextStreamId,
                 width, height, format, consumerUsage, dataSpace, rotation,
-                mTimestampOffset, streamSetId);
+                mTimestampOffset, physicalCameraId, streamSetId);
     } else {
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, format, dataSpace, rotation,
-                mTimestampOffset, streamSetId);
+                mTimestampOffset, physicalCameraId, streamSetId);
     }
 
     size_t consumerCount = consumers.size();
@@ -3322,10 +3326,13 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
 
     // Convert stream config to HIDL
     std::set<int> activeStreams;
-    device::V3_4::StreamConfiguration requestedConfiguration;
-    requestedConfiguration.v3_2.streams.resize(config->num_streams);
+    device::V3_2::StreamConfiguration requestedConfiguration3_2;
+    device::V3_4::StreamConfiguration requestedConfiguration3_4;
+    requestedConfiguration3_2.streams.resize(config->num_streams);
+    requestedConfiguration3_4.streams.resize(config->num_streams);
     for (size_t i = 0; i < config->num_streams; i++) {
-        Stream &dst = requestedConfiguration.v3_2.streams[i];
+        device::V3_2::Stream &dst3_2 = requestedConfiguration3_2.streams[i];
+        device::V3_4::Stream &dst3_4 = requestedConfiguration3_4.streams[i];
         camera3_stream_t *src = config->streams[i];
 
         Camera3Stream* cam3stream = Camera3Stream::cast(src);
@@ -3344,14 +3351,18 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
                         __FUNCTION__, streamId, config->streams[i]->stream_type);
                 return BAD_VALUE;
         }
-        dst.id = streamId;
-        dst.streamType = streamType;
-        dst.width = src->width;
-        dst.height = src->height;
-        dst.format = mapToPixelFormat(src->format);
-        dst.usage = mapToConsumerUsage(cam3stream->getUsage());
-        dst.dataSpace = mapToHidlDataspace(src->data_space);
-        dst.rotation = mapToStreamRotation((camera3_stream_rotation_t) src->rotation);
+        dst3_2.id = streamId;
+        dst3_2.streamType = streamType;
+        dst3_2.width = src->width;
+        dst3_2.height = src->height;
+        dst3_2.format = mapToPixelFormat(src->format);
+        dst3_2.usage = mapToConsumerUsage(cam3stream->getUsage());
+        dst3_2.dataSpace = mapToHidlDataspace(src->data_space);
+        dst3_2.rotation = mapToStreamRotation((camera3_stream_rotation_t) src->rotation);
+        dst3_4.v3_2 = dst3_2;
+        if (src->physical_camera_id != nullptr) {
+            dst3_4.physicalCameraId = src->physical_camera_id;
+        }
 
         activeStreams.insert(streamId);
         // Create Buffer ID map if necessary
@@ -3370,19 +3381,20 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
         }
     }
 
+    StreamConfigurationMode operationMode;
     res = mapToStreamConfigurationMode(
             (camera3_stream_configuration_mode_t) config->operation_mode,
-            /*out*/ &requestedConfiguration.v3_2.operationMode);
+            /*out*/ &operationMode);
     if (res != OK) {
         return res;
     }
-
-    requestedConfiguration.sessionParams.setToExternal(
+    requestedConfiguration3_2.operationMode = operationMode;
+    requestedConfiguration3_4.operationMode = operationMode;
+    requestedConfiguration3_4.sessionParams.setToExternal(
             reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(sessionParams)),
             get_camera_metadata_size(sessionParams));
 
     // Invoke configureStreams
-
     device::V3_3::HalStreamConfiguration finalConfiguration;
     common::V1_0::Status status;
 
@@ -3400,22 +3412,28 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
     }
 
     if (hidlSession_3_4 != nullptr) {
-        // We do; use v3.4 for the call
+        // We do; use v3.4 for the call, and construct a v3.4
+        // HalStreamConfiguration
         ALOGV("%s: v3.4 device found", __FUNCTION__);
-        auto err = hidlSession_3_4->configureStreams_3_4(requestedConfiguration,
-            [&status, &finalConfiguration]
-            (common::V1_0::Status s, const device::V3_3::HalStreamConfiguration& halConfiguration) {
-                finalConfiguration = halConfiguration;
+        device::V3_4::HalStreamConfiguration finalConfiguration3_4;
+        auto err = hidlSession_3_4->configureStreams_3_4(requestedConfiguration3_4,
+            [&status, &finalConfiguration3_4]
+            (common::V1_0::Status s, const device::V3_4::HalStreamConfiguration& halConfiguration) {
+                finalConfiguration3_4 = halConfiguration;
                 status = s;
             });
         if (!err.isOk()) {
             ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
             return DEAD_OBJECT;
         }
+        finalConfiguration.streams.resize(finalConfiguration3_4.streams.size());
+        for (size_t i = 0; i < finalConfiguration3_4.streams.size(); i++) {
+            finalConfiguration.streams[i] = finalConfiguration3_4.streams[i].v3_3;
+        }
     } else if (hidlSession_3_3 != nullptr) {
         // We do; use v3.3 for the call
         ALOGV("%s: v3.3 device found", __FUNCTION__);
-        auto err = hidlSession_3_3->configureStreams_3_3(requestedConfiguration.v3_2,
+        auto err = hidlSession_3_3->configureStreams_3_3(requestedConfiguration3_2,
             [&status, &finalConfiguration]
             (common::V1_0::Status s, const device::V3_3::HalStreamConfiguration& halConfiguration) {
                 finalConfiguration = halConfiguration;
@@ -3429,7 +3447,7 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
         // We don't; use v3.2 call and construct a v3.3 HalStreamConfiguration
         ALOGV("%s: v3.2 device found", __FUNCTION__);
         HalStreamConfiguration finalConfiguration_3_2;
-        auto err = mHidlSession->configureStreams(requestedConfiguration.v3_2,
+        auto err = mHidlSession->configureStreams(requestedConfiguration3_2,
                 [&status, &finalConfiguration_3_2]
                 (common::V1_0::Status s, const HalStreamConfiguration& halConfiguration) {
                     finalConfiguration_3_2 = halConfiguration;
@@ -3443,7 +3461,7 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
         for (size_t i = 0; i < finalConfiguration_3_2.streams.size(); i++) {
             finalConfiguration.streams[i].v3_2 = finalConfiguration_3_2.streams[i];
             finalConfiguration.streams[i].overrideDataSpace =
-                    requestedConfiguration.v3_2.streams[i].dataSpace;
+                    requestedConfiguration3_2.streams[i].dataSpace;
         }
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2013-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -508,6 +508,7 @@ binder::Status CameraDeviceClient::createStream(
     size_t numBufferProducers = bufferProducers.size();
     bool deferredConsumer = outputConfiguration.isDeferred();
     bool isShared = outputConfiguration.isShared();
+    String8 physicalCameraId = String8(outputConfiguration.getPhysicalCameraId());
 
     if (numBufferProducers > MAX_SURFACES_PER_STREAM) {
         ALOGE("%s: GraphicBufferProducer count %zu for stream exceeds limit of %d",
@@ -529,6 +530,12 @@ binder::Status CameraDeviceClient::createStream(
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
     }
 
+    if (!checkPhysicalCameraId(physicalCameraId)) {
+        String8 msg = String8::format("Camera %s: Camera doesn't support physicalCameraId %s.",
+                    mCameraIdStr.string(), physicalCameraId.string());
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
     std::vector<sp<Surface>> surfaces;
     std::vector<sp<IBinder>> binders;
     status_t err;
@@ -578,7 +585,8 @@ binder::Status CameraDeviceClient::createStream(
     err = mDevice->createStream(surfaces, deferredConsumer, streamInfo.width,
             streamInfo.height, streamInfo.format, streamInfo.dataSpace,
             static_cast<camera3_stream_rotation_t>(outputConfiguration.getRotation()),
-            &streamId, &surfaceIds, outputConfiguration.getSurfaceSetID(), isShared);
+            &streamId, physicalCameraId, &surfaceIds, outputConfiguration.getSurfaceSetID(),
+            isShared);
 
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
@@ -640,10 +648,12 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
     int streamId = camera3::CAMERA3_STREAM_ID_INVALID;
     std::vector<sp<Surface>> noSurface;
     std::vector<int> surfaceIds;
+    String8 physicalCameraId(outputConfiguration.getPhysicalCameraId());
     err = mDevice->createStream(noSurface, /*hasDeferredConsumer*/true, width,
             height, format, dataSpace,
             static_cast<camera3_stream_rotation_t>(outputConfiguration.getRotation()),
-            &streamId, &surfaceIds, outputConfiguration.getSurfaceSetID(), isShared,
+            &streamId, physicalCameraId, &surfaceIds,
+            outputConfiguration.getSurfaceSetID(), isShared,
             consumerUsage);
 
     if (err != OK) {
@@ -1057,6 +1067,43 @@ binder::Status CameraDeviceClient::createSurfaceFromGbp(
         }
     }
     return binder::Status::ok();
+}
+
+bool CameraDeviceClient::checkPhysicalCameraId(const String8& physicalCameraId) {
+    if (0 == physicalCameraId.size()) {
+        return true;
+    }
+
+    CameraMetadata staticInfo = mDevice->info();
+    camera_metadata_entry_t entryCap;
+    bool isLogicalCam = false;
+
+    entryCap = staticInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    for (size_t i = 0; i < entryCap.count; ++i) {
+        uint8_t capability = entryCap.data.u8[i];
+        if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA) {
+            isLogicalCam = true;
+        }
+    }
+    if (!isLogicalCam) {
+        return false;
+    }
+
+    camera_metadata_entry_t entryIds = staticInfo.find(ANDROID_LOGICAL_MULTI_CAMERA_PHYSICAL_IDS);
+    const uint8_t* ids = entryIds.data.u8;
+    size_t start = 0;
+    for (size_t i = 0; i < entryIds.count; ++i) {
+        if (ids[i] == '\0') {
+            if (start != i) {
+                String8 currentId((const char*)ids+start);
+                if (currentId == physicalCameraId) {
+                    return true;
+                }
+            }
+            start = i+1;
+        }
+    }
+    return false;
 }
 
 bool CameraDeviceClient::roundBufferDimensionNearest(int32_t width, int32_t height,

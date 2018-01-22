@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2016-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,10 +27,11 @@ Camera3SharedOutputStream::Camera3SharedOutputStream(int id,
         uint32_t width, uint32_t height, int format,
         uint64_t consumerUsage, android_dataspace dataSpace,
         camera3_stream_rotation_t rotation,
-        nsecs_t timestampOffset, int setId) :
+        nsecs_t timestampOffset, const String8& physicalCameraId,
+        int setId) :
         Camera3OutputStream(id, CAMERA3_STREAM_OUTPUT, width, height,
-                            format, dataSpace, rotation, consumerUsage,
-                            timestampOffset, setId) {
+                            format, dataSpace, rotation, physicalCameraId,
+                            consumerUsage, timestampOffset, setId) {
     size_t consumerCount = std::min(surfaces.size(), kMaxOutputs);
     if (surfaces.size() > consumerCount) {
         ALOGE("%s: Trying to add more consumers than the maximum ", __func__);

@@ -69,6 +69,7 @@ typedef enum acamera_metadata_section {
     ACAMERA_SYNC,
     ACAMERA_REPROCESS,
     ACAMERA_DEPTH,
+    ACAMERA_LOGICAL_MULTI_CAMERA,
     ACAMERA_SECTION_COUNT,
 
     ACAMERA_VENDOR = 0x8000
@@ -104,6 +105,9 @@ typedef enum acamera_metadata_section_start {
     ACAMERA_SYNC_START             = ACAMERA_SYNC              << 16,
     ACAMERA_REPROCESS_START        = ACAMERA_REPROCESS         << 16,
     ACAMERA_DEPTH_START            = ACAMERA_DEPTH             << 16,
+    ACAMERA_LOGICAL_MULTI_CAMERA_START
+                                   = ACAMERA_LOGICAL_MULTI_CAMERA
+                                                                << 16,
     ACAMERA_VENDOR_START           = ACAMERA_VENDOR            << 16
 } acamera_metadata_section_start_t;
 
@@ -5165,6 +5169,29 @@ typedef enum acamera_metadata_tag {
             ACAMERA_DEPTH_START + 4,
     ACAMERA_DEPTH_END,
 
+    /**
+     * <p>The accuracy of frame timestamp synchronization between physical cameras</p>
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_logical_multi_camera_sensor_sync_type_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>The accuracy of the frame timestamp synchronization determines the physical cameras'
+     * ability to start exposure at the same time. If the sensorSyncType is CALIBRATED,
+     * the physical camera sensors usually run in master-slave mode so that their shutter
+     * time is synchronized. For APPROXIMATE sensorSyncType, the camera sensors usually run in
+     * master-master mode, and there could be offset between their start of exposure.</p>
+     * <p>In both cases, all images generated for a particular capture request still carry the same
+     * timestamps, so that they can be used to look up the matching frame number and
+     * onCaptureStarted callback.</p>
+     */
+    ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE =             // byte (acamera_metadata_enum_android_logical_multi_camera_sensor_sync_type_t)
+            ACAMERA_LOGICAL_MULTI_CAMERA_START + 1,
+    ACAMERA_LOGICAL_MULTI_CAMERA_END,
+
 } acamera_metadata_tag_t;
 
 /**
@@ -6895,6 +6922,52 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      */
     ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_MOTION_TRACKING           = 10,
 
+    /**
+     * <p>The camera device is a logical camera backed by two or more physical cameras that are
+     * also exposed to the application.</p>
+     * <p>This capability requires the camera device to support the following:</p>
+     * <ul>
+     * <li>This camera device must list the following static metadata entries in <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html">CameraCharacteristics</a>:<ul>
+     * <li>android.logicalMultiCamera.physicalIds</li>
+     * <li>ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE</li>
+     * </ul>
+     * </li>
+     * <li>The underlying physical cameras' static metadata must list the following entries,
+     *   so that the application can correlate pixels from the physical streams:<ul>
+     * <li>ACAMERA_LENS_POSE_REFERENCE</li>
+     * <li>ACAMERA_LENS_POSE_ROTATION</li>
+     * <li>ACAMERA_LENS_POSE_TRANSLATION</li>
+     * <li>ACAMERA_LENS_INTRINSIC_CALIBRATION</li>
+     * <li>ACAMERA_LENS_RADIAL_DISTORTION</li>
+     * </ul>
+     * </li>
+     * <li>The logical camera device must be LIMITED or higher device.</li>
+     * </ul>
+     * <p>Both the logical camera device and its underlying physical devices support the
+     * mandatory stream combinations required for their device levels.</p>
+     * <p>Additionally, for each guaranteed stream combination, the logical camera supports:</p>
+     * <ul>
+     * <li>Replacing one logical {@link AIMAGE_FORMAT_YUV_420_888 YUV_420_888}
+     *   or raw stream with two physical streams of the same size and format, each from a
+     *   separate physical camera, given that the size and format are supported by both
+     *   physical cameras.</li>
+     * <li>Adding two raw streams, each from one physical camera, if the logical camera doesn't
+     *   advertise RAW capability, but the underlying physical cameras do. This is usually
+     *   the case when the physical cameras have different sensor sizes.</li>
+     * </ul>
+     * <p>Using physical streams in place of a logical stream of the same size and format will
+     * not slow down the frame rate of the capture, as long as the minimum frame duration
+     * of the physical and logical streams are the same.</p>
+     *
+     * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
+     * @see ACAMERA_LENS_POSE_REFERENCE
+     * @see ACAMERA_LENS_POSE_ROTATION
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     * @see ACAMERA_LENS_RADIAL_DISTORTION
+     * @see ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE
+     */
+    ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA      = 11,
+
 } acamera_metadata_enum_android_request_available_capabilities_t;
 
 
@@ -7503,6 +7576,25 @@ typedef enum acamera_metadata_enum_acamera_depth_depth_is_exclusive {
     ACAMERA_DEPTH_DEPTH_IS_EXCLUSIVE_TRUE                            = 1,
 
 } acamera_metadata_enum_android_depth_depth_is_exclusive_t;
+
+
+// ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE
+typedef enum acamera_metadata_enum_acamera_logical_multi_camera_sensor_sync_type {
+    /**
+     * <p>A software mechanism is used to synchronize between the physical cameras. As a result,
+     * the timestamp of an image from a physical stream is only an approximation of the
+     * image sensor start-of-exposure time.</p>
+     */
+    ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE_APPROXIMATE        = 0,
+
+    /**
+     * <p>The camera device supports frame timestamp synchronization at the hardware level,
+     * and the timestamp of a physical stream image accurately reflects its
+     * start-of-exposure time.</p>
+     */
+    ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE_CALIBRATED         = 1,
+
+} acamera_metadata_enum_android_logical_multi_camera_sensor_sync_type_t;
 
 
 #endif /* __ANDROID_API__ >= 24 */
