@@ -20,6 +20,7 @@ import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
 
 import android.content.Context;
+import android.media.MediaSession2.CommandGroup;
 import android.os.HandlerThread;
 import android.support.annotation.CallSuper;
 import android.support.annotation.NonNull;
@@ -106,7 +107,7 @@ abstract class MediaSession2TestBase {
 
         @CallSuper
         @Override
-        public void onConnected(long commands) {
+        public void onConnected(CommandGroup commands) {
             super.onConnected(commands);
             connectLatch.countDown();
         }

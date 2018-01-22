@@ -22,6 +22,9 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.media.IMediaSession2;
 import android.media.IMediaSession2Callback;
+import android.media.MediaSession2;
+import android.media.MediaSession2.Command;
+import android.media.MediaSession2.CommandGroup;
 import android.media.MediaController2;
 import android.media.MediaController2.ControllerCallback;
 import android.media.MediaPlayerBase;
@@ -29,6 +32,7 @@ import android.media.MediaSessionService2;
 import android.media.SessionToken;
 import android.media.session.PlaybackState;
 import android.media.update.MediaController2Provider;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -197,66 +201,38 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void play_impl() {
-        final IMediaSession2 binder = mSessionBinder;
-        if (binder != null) {
-            try {
-                binder.play(mSessionCallbackStub);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
-            }
-        } else {
-            Log.w(TAG, "Session isn't active", new IllegalStateException());
-        }
+        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_START);
     }
 
     @Override
     public void pause_impl() {
-        final IMediaSession2 binder = mSessionBinder;
-        if (binder != null) {
-            try {
-                binder.pause(mSessionCallbackStub);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
-            }
-        } else {
-            Log.w(TAG, "Session isn't active", new IllegalStateException());
-        }
+        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE);
     }
 
     @Override
     public void stop_impl() {
-        final IMediaSession2 binder = mSessionBinder;
-        if (binder != null) {
-            try {
-                binder.stop(mSessionCallbackStub);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
-            }
-        } else {
-            Log.w(TAG, "Session isn't active", new IllegalStateException());
-        }
+        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_STOP);
     }
 
     @Override
     public void skipToPrevious_impl() {
-        final IMediaSession2 binder = mSessionBinder;
-        if (binder != null) {
-            try {
-                binder.skipToPrevious(mSessionCallbackStub);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
-            }
-        } else {
-            Log.w(TAG, "Session isn't active", new IllegalStateException());
-        }
+        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM);
     }
 
     @Override
     public void skipToNext_impl() {
+        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM);
+    }
+
+    private void sendCommand(int code) {
+        // TODO(jaewan): optimization) Cache Command objects?
+        Command command = new Command(code);
+        // TODO(jaewan): Check if the command is in the allowed group.
+
         final IMediaSession2 binder = mSessionBinder;
         if (binder != null) {
             try {
-                binder.skipToNext(mSessionCallbackStub);
+                binder.sendCommand(mSessionCallbackStub, command.toBundle(), null);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -356,13 +332,14 @@ public class MediaController2Impl implements MediaController2Provider {
 
     // Called when the result for connecting to the session was delivered.
     // Should be used without a lock to prevent potential deadlock.
-    private void onConnectionChangedNotLocked(IMediaSession2 sessionBinder, long commands) {
+    private void onConnectionChangedNotLocked(IMediaSession2 sessionBinder,
+            CommandGroup commandGroup) {
         if (DEBUG) {
             Log.d(TAG, "onConnectionChangedNotLocked sessionBinder=" + sessionBinder);
         }
         boolean release = false;
         try {
-            if (sessionBinder == null) {
+            if (sessionBinder == null || commandGroup == null) {
                 // Connection rejected.
                 release = true;
                 return;
@@ -391,7 +368,7 @@ public class MediaController2Impl implements MediaController2Provider {
             }
             // TODO(jaewan): Keep commands to prevents illegal API calls.
             mCallbackExecutor.execute(() -> {
-                mCallback.onConnected(commands);
+                mCallback.onConnected(commandGroup);
             });
             if (registerCallbackForPlaybackNeeded) {
                 registerCallbackForPlaybackNotLocked();
@@ -431,7 +408,7 @@ public class MediaController2Impl implements MediaController2Provider {
         }
 
         @Override
-        public void onConnectionChanged(IMediaSession2 sessionBinder, long commands)
+        public void onConnectionChanged(IMediaSession2 sessionBinder, Bundle commandGroup)
                 throws RuntimeException {
             final MediaController2Impl controller;
             try {
@@ -440,7 +417,8 @@ public class MediaController2Impl implements MediaController2Provider {
                 Log.w(TAG, "Don't fail silently here. Highly likely a bug");
                 return;
             }
-            controller.onConnectionChangedNotLocked(sessionBinder, commands);
+            controller.onConnectionChangedNotLocked(
+                    sessionBinder, CommandGroup.fromBundle(commandGroup));
         }
     }
 

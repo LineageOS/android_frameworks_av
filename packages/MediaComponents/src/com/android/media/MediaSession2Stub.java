@@ -22,10 +22,12 @@ import android.content.Context;
 import android.media.IMediaSession2;
 import android.media.IMediaSession2Callback;
 import android.media.MediaSession2;
-import android.media.MediaSession2.CommandFlags;
+import android.media.MediaSession2.Command;
+import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.session.PlaybackState;
 import android.os.Binder;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -73,7 +75,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     ((ControllerInfoImpl) list.get(i).getProvider()).getControllerBinder();
             try {
                 // Should be used without a lock hold to prevent potential deadlock.
-                callbackBinder.onConnectionChanged(null, 0);
+                callbackBinder.onConnectionChanged(null, null);
             } catch (RemoteException e) {
                 // Controller is gone. Should be fine because we're destroying.
             }
@@ -110,32 +112,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void play(IMediaSession2Callback caller) throws RemoteException {
-        onCommand(caller, MediaSession2.COMMAND_FLAG_PLAYBACK_START);
-    }
-
-    @Override
-    public void pause(IMediaSession2Callback caller) throws RemoteException {
-        onCommand(caller, MediaSession2.COMMAND_FLAG_PLAYBACK_PAUSE);
-    }
-
-    @Override
-    public void stop(IMediaSession2Callback caller) throws RemoteException {
-        onCommand(caller, MediaSession2.COMMAND_FLAG_PLAYBACK_STOP);
-    }
-
-    @Override
-    public void skipToPrevious(IMediaSession2Callback caller) throws RemoteException {
-        onCommand(caller, MediaSession2.COMMAND_FLAG_PLAYBACK_SKIP_PREV_ITEM);
-    }
-
-    @Override
-    public void skipToNext(IMediaSession2Callback caller) throws RemoteException {
-        onCommand(caller, MediaSession2.COMMAND_FLAG_PLAYBACK_SKIP_NEXT_ITEM);
-    }
-
-    private void onCommand(IMediaSession2Callback caller, @CommandFlags long command)
-            throws IllegalArgumentException {
+    public void sendCommand(IMediaSession2Callback caller, Bundle command, Bundle args)
+            throws RuntimeException {
         ControllerInfo controller = getController(caller);
         if (controller == null) {
             if (DEBUG) {
@@ -143,7 +121,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             }
             return;
         }
-        mCommandHandler.postCommand(controller, command);
+        mCommandHandler.postCommand(controller, Command.fromBundle(command), args);
     }
 
     @Deprecated
@@ -247,13 +225,12 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             switch (msg.what) {
                 case MSG_CONNECT:
                     ControllerInfo request = (ControllerInfo) msg.obj;
-                    long allowedCommands = session.getCallback().onConnect(request);
+                    CommandGroup allowedCommands = session.getCallback().onConnect(request);
                     // Don't reject connection for the request from trusted app.
                     // Otherwise server will fail to retrieve session's information to dispatch
                     // media keys to.
-                    boolean accept = (allowedCommands != 0) || request.isTrusted();
-                    ControllerInfoImpl impl =
-                            (ControllerInfoImpl) request.getProvider();
+                    boolean accept = allowedCommands != null || request.isTrusted();
+                    ControllerInfoImpl impl = (ControllerInfoImpl) request.getProvider();
                     if (accept) {
                         synchronized (mLock) {
                             mControllers.put(impl.getId(), request);
@@ -266,15 +243,16 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     try {
                         impl.getControllerBinder().onConnectionChanged(
                                 accept ? MediaSession2Stub.this : null,
-                                allowedCommands);
+                                allowedCommands == null ? null : allowedCommands.toBundle());
                     } catch (RemoteException e) {
                         // Controller may be died prematurely.
                     }
                     break;
                 case MSG_COMMAND:
                     CommandParam param = (CommandParam) msg.obj;
-                    long command = param.command;
-                    boolean accepted = session.getCallback().onCommand(param.controller, command);
+                    Command command = param.command;
+                    boolean accepted = session.getCallback().onCommandRequest(
+                            param.controller, command);
                     if (!accepted) {
                         // Don't run rejected command.
                         if (DEBUG) {
@@ -284,19 +262,24 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                         return;
                     }
 
-                    // Switch cannot be used because command is long, but switch only supports
-                    // int.
-                    // TODO(jaewan): Replace this with the switch
-                    if (command == MediaSession2.COMMAND_FLAG_PLAYBACK_START) {
-                        session.getInstance().play();
-                    } else if (command == MediaSession2.COMMAND_FLAG_PLAYBACK_PAUSE) {
-                        session.getInstance().pause();
-                    } else if (command == MediaSession2.COMMAND_FLAG_PLAYBACK_STOP) {
-                        session.getInstance().stop();
-                    } else if (command == MediaSession2.COMMAND_FLAG_PLAYBACK_SKIP_PREV_ITEM) {
-                        session.getInstance().skipToPrevious();
-                    } else if (command == MediaSession2.COMMAND_FLAG_PLAYBACK_SKIP_NEXT_ITEM) {
-                        session.getInstance().skipToNext();
+                    switch (param.command.getCommandCode()) {
+                        case MediaSession2.COMMAND_CODE_PLAYBACK_START:
+                            session.getInstance().play();
+                            break;
+                        case MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE:
+                            session.getInstance().pause();
+                            break;
+                        case MediaSession2.COMMAND_CODE_PLAYBACK_STOP:
+                            session.getInstance().stop();
+                            break;
+                        case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM:
+                            session.getInstance().skipToPrevious();
+                            break;
+                        case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM:
+                            session.getInstance().skipToNext();
+                            break;
+                        default:
+                            // TODO(jaewan): Handle custom command.
                     }
                     break;
             }
@@ -306,19 +289,21 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             obtainMessage(MSG_CONNECT, request).sendToTarget();
         }
 
-        public void postCommand(ControllerInfo controller, @CommandFlags long command) {
-            CommandParam param = new CommandParam(controller, command);
+        public void postCommand(ControllerInfo controller, Command command, Bundle args) {
+            CommandParam param = new CommandParam(controller, command, args);
             obtainMessage(MSG_COMMAND, param).sendToTarget();
         }
     }
 
     private static class CommandParam {
         public final ControllerInfo controller;
-        public final @CommandFlags long command;
+        public final Command command;
+        public final Bundle args;
 
-        private CommandParam(ControllerInfo controller, long command) {
+        private CommandParam(ControllerInfo controller, Command command, Bundle args) {
             this.controller = controller;
             this.command = command;
+            this.args = args;
         }
     }
 }

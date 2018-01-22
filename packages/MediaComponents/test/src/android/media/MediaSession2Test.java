@@ -209,15 +209,15 @@ public class MediaSession2Test extends MediaSession2TestBase {
         assertFalse(mPlayer.mCountDownLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
         assertFalse(mPlayer.mPauseCalled);
         assertEquals(1, callback.commands.size());
-        assertEquals(MediaSession2.COMMAND_FLAG_PLAYBACK_PAUSE,
-                (long) callback.commands.get(0));
+        assertEquals(MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE,
+                (long) callback.commands.get(0).getCommandCode());
         controller.skipToNext();
         assertTrue(mPlayer.mCountDownLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
         assertTrue(mPlayer.mSkipToNextCalled);
         assertFalse(mPlayer.mPauseCalled);
         assertEquals(2, callback.commands.size());
-        assertEquals(MediaSession2.COMMAND_FLAG_PLAYBACK_SKIP_NEXT_ITEM,
-                (long) callback.commands.get(1));
+        assertEquals(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM,
+                (long) callback.commands.get(1).getCommandCode());
     }
 
     @Test
@@ -236,28 +236,28 @@ public class MediaSession2Test extends MediaSession2TestBase {
 
     public class MockOnConnectCallback extends SessionCallback {
         @Override
-        public long onConnect(ControllerInfo controllerInfo) {
+        public MediaSession2.CommandGroup onConnect(ControllerInfo controllerInfo) {
             if (Process.myUid() != controllerInfo.getUid()) {
-                return 0;
+                return null;
             }
             assertEquals(mContext.getPackageName(), controllerInfo.getPackageName());
             assertEquals(Process.myUid(), controllerInfo.getUid());
             assertFalse(controllerInfo.isTrusted());
             // Reject all
-            return 0;
+            return null;
         }
     }
 
     public class MockOnCommandCallback extends SessionCallback {
-        public final ArrayList<Long> commands = new ArrayList<>();
+        public final ArrayList<MediaSession2.Command> commands = new ArrayList<>();
 
         @Override
-        public boolean onCommand(ControllerInfo controllerInfo, long command) {
+        public boolean onCommandRequest(ControllerInfo controllerInfo, MediaSession2.Command command) {
             assertEquals(mContext.getPackageName(), controllerInfo.getPackageName());
             assertEquals(Process.myUid(), controllerInfo.getUid());
             assertFalse(controllerInfo.isTrusted());
             commands.add(command);
-            if (command == MediaSession2.COMMAND_FLAG_PLAYBACK_PAUSE) {
+            if (command.getCommandCode() == MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE) {
                 return false;
             }
             return true;

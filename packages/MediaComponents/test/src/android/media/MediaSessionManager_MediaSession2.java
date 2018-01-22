@@ -115,9 +115,9 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
             mSession = new MediaSession2.Builder(mContext, new MockPlayer(0)).setId(TAG)
                     .setSessionCallback(new SessionCallback() {
                         @Override
-                        public long onConnect(ControllerInfo controller) {
+                        public MediaSession2.CommandGroup onConnect(ControllerInfo controller) {
                             // Reject all connection request.
-                            return 0;
+                            return null;
                         }
                     }).build();
         });
