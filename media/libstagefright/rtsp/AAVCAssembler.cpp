@@ -51,7 +51,52 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
         return NOT_ENOUGH_DATA;
     }
 
+    sp<ABuffer> buffer = *queue->begin();
+    int32_t rtpTime;
+    CHECK(buffer->meta()->findInt32("rtp-time", &rtpTime));
+    int64_t startTime = source->mFirstSysTime / 1000;
+    int64_t nowTime = ALooper::GetNowUs() / 1000;
+    int64_t playedTime = nowTime - startTime;
+    int32_t playedTimeRtp = source->mFirstRtpTime +
+        (((uint32_t)playedTime) * (source->mClockRate / 1000));
+    const int32_t jitterTime = source->mClockRate / 5;  // 200ms
+    int32_t expiredTimeInJb = rtpTime + jitterTime;
+    bool isExpired = expiredTimeInJb <= (playedTimeRtp);
+    bool isTooLate = expiredTimeInJb < (playedTimeRtp - jitterTime);
+    ALOGV("start=%lld, now=%lld, played=%lld", (long long)startTime,
+            (long long)nowTime, (long long)playedTime);
+    ALOGV("rtp-time(JB)=%d, played-rtp-time(JB)=%d, expired-rtp-time(JB)=%d isExpired=%d",
+            rtpTime, playedTimeRtp, expiredTimeInJb, isExpired);
+
+    if (!isExpired) {
+        ALOGV("buffering in jitter buffer.");
+        return NOT_ENOUGH_DATA;
+    }
+
+    if (isTooLate) {
+        ALOGV("buffer arrived too lately..");
+        ALOGW("start=%lld, now=%lld, played=%lld", (long long)startTime,
+                (long long)nowTime, (long long)playedTime);
+        ALOGW("rtp-time(JB)=%d, plyed-rtp-time(JB)=%d, exp-rtp-time(JB)=%d diff=%lld isExpired=%d",
+                rtpTime, playedTimeRtp, expiredTimeInJb,
+                ((long long)playedTimeRtp) - expiredTimeInJb, isExpired);
+        ALOGW("expected Seq. NO =%d", buffer->int32Data());
+
+        List<sp<ABuffer> >::iterator it = queue->begin();
+        while (it != queue->end()) {
+            CHECK((*it)->meta()->findInt32("rtp-time", &rtpTime));
+            if (rtpTime + jitterTime >= playedTimeRtp) {
+                mNextExpectedSeqNo = (*it)->int32Data();
+                break;
+            }
+            it++;
+        }
+        source->noticeAbandonBuffer();
+    }
+
     if (mNextExpectedSeqNoValid) {
+        int32_t size = queue->size();
+        int32_t cnt = 0;
         List<sp<ABuffer> >::iterator it = queue->begin();
         while (it != queue->end()) {
             if ((uint32_t)(*it)->int32Data() >= mNextExpectedSeqNo) {
@@ -59,14 +104,17 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
             }
 
             it = queue->erase(it);
+            cnt++;
         }
 
+        if (cnt > 0) {
+            source->noticeAbandonBuffer(cnt);
+            ALOGW("delete %d of %d buffers", cnt, size);
+        }
         if (queue->empty()) {
             return NOT_ENOUGH_DATA;
         }
     }
-
-    sp<ABuffer> buffer = *queue->begin();
 
     if (!mNextExpectedSeqNoValid) {
         mNextExpectedSeqNoValid = true;
