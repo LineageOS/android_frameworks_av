@@ -494,7 +494,7 @@ private:
     status_t verifySupportForProfileAndLevel(int32_t profile, int32_t level);
 
     status_t configureBitrate(
-            int32_t bitrate, OMX_VIDEO_CONTROLRATETYPE bitrateMode);
+            OMX_VIDEO_CONTROLRATETYPE bitrateMode, int32_t bitrate, int32_t quality = 0);
     void configureEncoderLatency(const sp<AMessage> &msg);
 
     status_t setupErrorCorrectionParameters();
