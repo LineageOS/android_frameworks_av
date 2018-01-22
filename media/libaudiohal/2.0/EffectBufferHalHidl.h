@@ -32,6 +32,9 @@ namespace android {
 class EffectBufferHalHidl : public EffectBufferHalInterface
 {
   public:
+    static status_t allocate(size_t size, sp<EffectBufferHalInterface>* buffer);
+    static status_t mirror(void* external, size_t size, sp<EffectBufferHalInterface>* buffer);
+
     virtual audio_buffer_t* audioBuffer();
     virtual void* externalData() const;
 

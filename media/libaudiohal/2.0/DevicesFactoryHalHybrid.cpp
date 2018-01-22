@@ -23,11 +23,6 @@
 
 namespace android {
 
-// static
-sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
-    return new DevicesFactoryHalHybrid();
-}
-
 DevicesFactoryHalHybrid::DevicesFactoryHalHybrid()
         : mLocalFactory(new DevicesFactoryHalLocal()),
           mHidlFactory(new DevicesFactoryHalHidl()) {

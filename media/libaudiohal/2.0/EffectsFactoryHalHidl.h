@@ -21,6 +21,8 @@
 #include <android/hardware/audio/effect/2.0/types.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 
+#include "ConversionHelperHidl.h"
+
 namespace android {
 
 using ::android::hardware::audio::effect::V2_0::EffectDescriptor;
@@ -48,6 +50,10 @@ class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public Conversi
             sp<EffectHalInterface> *effect);
 
     virtual status_t dumpEffects(int fd);
+
+    status_t allocateBuffer(size_t size, sp<EffectBufferHalInterface>* buffer) override;
+    status_t mirrorBuffer(void* external, size_t size,
+                          sp<EffectBufferHalInterface>* buffer) override;
 
   private:
     friend class EffectsFactoryHalInterface;

@@ -37,6 +37,7 @@ using ::android::hardware::audio::common::V2_0::AudioPort;
 using ::android::hardware::audio::common::V2_0::AudioPortConfig;
 using ::android::hardware::audio::common::V2_0::AudioMode;
 using ::android::hardware::audio::common::V2_0::AudioSource;
+using ::android::hardware::audio::common::V2_0::HidlUtils;
 using ::android::hardware::audio::V2_0::DeviceAddress;
 using ::android::hardware::audio::V2_0::IPrimaryDevice;
 using ::android::hardware::audio::V2_0::ParameterValue;
