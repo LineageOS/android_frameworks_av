@@ -121,9 +121,6 @@ protected:
 
     void forceDisconnect(bool errorCallbackEnabled = true);
 
-    void onStart() { mCallbackEnabled.store(true); }
-    void onStop() { mCallbackEnabled.store(false); }
-
     int64_t incrementFramesWritten(int32_t frames) {
         return mFramesWritten.increment(frames);
     }
