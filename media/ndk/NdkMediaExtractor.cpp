@@ -51,7 +51,6 @@ static media_status_t translate_error(status_t err) {
 struct AMediaExtractor {
     sp<NuMediaExtractor> mImpl;
     sp<ABuffer> mPsshBuf;
-
 };
 
 extern "C" {
@@ -127,6 +126,13 @@ media_status_t AMediaExtractor_setDataSourceCustom(AMediaExtractor* mData, AMedi
 }
 
 EXPORT
+AMediaFormat* AMediaExtractor_getFileFormat(AMediaExtractor *mData) {
+    sp<AMessage> format;
+    mData->mImpl->getFileFormat(&format);
+    return AMediaFormat_fromMsg(&format);
+}
+
+EXPORT
 size_t AMediaExtractor_getTrackCount(AMediaExtractor *mData) {
     return mData->mImpl->countTracks();
 }
@@ -185,6 +191,16 @@ ssize_t AMediaExtractor_readSampleData(AMediaExtractor *mData, uint8_t *buffer, 
         return tmp->size();
     }
     return -1;
+}
+
+EXPORT
+ssize_t AMediaExtractor_getSampleSize(AMediaExtractor *mData) {
+    size_t sampleSize;
+    status_t err = mData->mImpl->getSampleSize(&sampleSize);
+    if (err != OK) {
+        return -1;
+    }
+    return sampleSize;
 }
 
 EXPORT
@@ -385,6 +401,15 @@ AMediaCodecCryptoInfo *AMediaExtractor_getSampleCryptoInfo(AMediaExtractor *ex) 
             (size_t*) crypteddata);
 }
 
+EXPORT
+int64_t AMediaExtractor_getCachedDuration(AMediaExtractor *ex) {
+    bool eos;
+    int64_t durationUs;
+    if (ex->mImpl->getCachedDuration(&durationUs, &eos)) {
+        return durationUs;
+    }
+    return -1;
+}
 
 } // extern "C"
 
