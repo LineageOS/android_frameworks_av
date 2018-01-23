@@ -38,8 +38,6 @@
 
 namespace android {
 
-static const char *kSystemApkPath = "/system/app/MediaComponents/MediaComponents.apk";
-
 // static
 sp<IMediaExtractor> MediaExtractorFactory::Create(
         const sp<DataSource> &source, const char *mime) {
@@ -246,7 +244,7 @@ void MediaExtractorFactory::RegisterExtractor(const sp<ExtractorPlugin> &plugin,
 }
 
 //static
-void MediaExtractorFactory::RegisterExtractors(
+void MediaExtractorFactory::RegisterExtractorsInApk(
         const char *apkPath, List<sp<ExtractorPlugin>> &pluginList) {
     ALOGV("search for plugins at %s", apkPath);
     ZipArchiveHandle zipHandle;
@@ -254,7 +252,8 @@ void MediaExtractorFactory::RegisterExtractors(
     if (ret == 0) {
         char abi[PROPERTY_VALUE_MAX];
         property_get("ro.product.cpu.abi", abi, "arm64-v8a");
-        ZipString prefix(String8::format("lib/%s/", abi).c_str());
+        String8 prefix8 = String8::format("lib/%s/", abi);
+        ZipString prefix(prefix8.c_str());
         ZipString suffix("extractor.so");
         void* cookie;
         ret = StartIteration(zipHandle, &cookie, &prefix, &suffix);
@@ -264,6 +263,8 @@ void MediaExtractorFactory::RegisterExtractors(
             while (Next(cookie, &entry, &name) == 0) {
                 String8 libPath = String8(apkPath) + "!/" +
                     String8(reinterpret_cast<const char*>(name.name), name.name_length);
+                // TODO: Open with a linker namespace so that it can be linked with sub-libraries
+                // within the apk instead of system libraries already loaded.
                 void *libHandle = dlopen(libPath.string(), RTLD_NOW | RTLD_LOCAL);
                 if (libHandle) {
                     MediaExtractor::GetExtractorDef getDef =
@@ -290,6 +291,38 @@ void MediaExtractorFactory::RegisterExtractors(
     }
 }
 
+//static
+void MediaExtractorFactory::RegisterExtractorsInSystem(
+        const char *libDirPath, List<sp<ExtractorPlugin>> &pluginList) {
+    ALOGV("search for plugins at %s", libDirPath);
+    DIR *libDir = opendir(libDirPath);
+    if (libDir) {
+        struct dirent* libEntry;
+        while ((libEntry = readdir(libDir))) {
+            String8 libPath = String8(libDirPath) + "/" + libEntry->d_name;
+            void *libHandle = dlopen(libPath.string(), RTLD_NOW | RTLD_LOCAL);
+            if (libHandle) {
+                MediaExtractor::GetExtractorDef getDef =
+                    (MediaExtractor::GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
+                if (getDef) {
+                    ALOGV("registering sniffer for %s", libPath.string());
+                    RegisterExtractor(
+                            new ExtractorPlugin(getDef(), libHandle, libPath), pluginList);
+                } else {
+                    ALOGW("%s does not contain sniffer", libPath.string());
+                    dlclose(libHandle);
+                }
+            } else {
+                ALOGW("couldn't dlopen(%s) %s", libPath.string(), strerror(errno));
+            }
+        }
+
+        closedir(libDir);
+    } else {
+        ALOGE("couldn't opendir(%s)", libDirPath);
+    }
+}
+
 // static
 void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
     Mutex::Autolock autoLock(gPluginMutex);
@@ -302,10 +335,20 @@ void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
 
     std::shared_ptr<List<sp<ExtractorPlugin>>> newList(new List<sp<ExtractorPlugin>>());
 
-    RegisterExtractors(kSystemApkPath, *newList);
+    RegisterExtractorsInSystem("/system/lib"
+#ifdef __LP64__
+            "64"
+#endif
+            "/extractors", *newList);
+
+    RegisterExtractorsInSystem("/vendor/lib"
+#ifdef __LP64__
+            "64"
+#endif
+            "/extractors", *newList);
 
     if (newUpdateApkPath != nullptr) {
-        RegisterExtractors(newUpdateApkPath, *newList);
+        RegisterExtractorsInApk(newUpdateApkPath, *newList);
     }
 
     gPlugins = newList;

@@ -40,7 +40,11 @@ struct CaptureRequest : public Parcelable {
     CaptureRequest(CaptureRequest&& rhs) noexcept;
     virtual ~CaptureRequest();
 
-    CameraMetadata          mMetadata;
+    struct PhysicalCameraSettings {
+        std::string id;
+        CameraMetadata settings;
+    };
+    std::vector<PhysicalCameraSettings> mPhysicalCameraSettings;
 
     // Used by NDK client to pass surfaces by stream/surface index.
     bool                    mSurfaceConverted = false;

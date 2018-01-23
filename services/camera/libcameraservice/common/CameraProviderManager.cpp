@@ -35,6 +35,7 @@ namespace {
 // Hardcoded name for the passthrough HAL implementation, since it can't be discovered via the
 // service manager
 const std::string kLegacyProviderName("legacy/0");
+const std::string kExternalProviderName("external/0");
 
 // Slash-separated list of provider types to consider for use via the old camera API
 const std::string kStandardProviderTypes("internal/legacy");
@@ -69,6 +70,7 @@ status_t CameraProviderManager::initialize(wp<CameraProviderManager::StatusListe
 
     // See if there's a passthrough HAL, but let's not complain if there's not
     addProviderLocked(kLegacyProviderName, /*expected*/ false);
+    addProviderLocked(kExternalProviderName, /*expected*/ false);
 
     return OK;
 }
@@ -601,6 +603,15 @@ status_t CameraProviderManager::ProviderInfo::addDevice(const std::string& name,
     return OK;
 }
 
+void CameraProviderManager::ProviderInfo::removeDevice(std::string id) {
+    for (auto it = mDevices.begin(); it != mDevices.end(); it++) {
+        if ((*it)->mId == id) {
+            mDevices.erase(it);
+            break;
+        }
+    }
+}
+
 status_t CameraProviderManager::ProviderInfo::dump(int fd, const Vector<String16>&) const {
     dprintf(fd, "== Camera Provider HAL %s (v2.4, %s) static info: %zu devices: ==\n",
             mProviderName.c_str(), mInterface->isRemote() ? "remote" : "passthrough",
@@ -682,6 +693,8 @@ hardware::Return<void> CameraProviderManager::ProviderInfo::cameraDeviceStatusCh
                 return hardware::Void();
             }
             addDevice(cameraDeviceName, newStatus, &id);
+        } else if (newStatus == CameraDeviceStatus::NOT_PRESENT) {
+            removeDevice(id);
         }
         listener = mManager->getStatusListener();
     }

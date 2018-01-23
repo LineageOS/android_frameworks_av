@@ -18,6 +18,7 @@
 // #define LOG_NDEBUG 0
 #define LOG_TAG "CameraRequest"
 #include <utils/Log.h>
+#include <utils/String16.h>
 
 #include <camera/camera2/CaptureRequest.h>
 
@@ -42,18 +43,39 @@ status_t CaptureRequest::readFromParcel(const android::Parcel* parcel) {
         return BAD_VALUE;
     }
 
-    mMetadata.clear();
     mSurfaceList.clear();
     mStreamIdxList.clear();
     mSurfaceIdxList.clear();
+    mPhysicalCameraSettings.clear();
 
     status_t err = OK;
 
-    if ((err = mMetadata.readFromParcel(parcel)) != OK) {
-        ALOGE("%s: Failed to read metadata from parcel", __FUNCTION__);
+    int32_t settingsCount;
+    if ((err = parcel->readInt32(&settingsCount)) != OK) {
+        ALOGE("%s: Failed to read the settings count from parcel: %d", __FUNCTION__, err);
         return err;
     }
-    ALOGV("%s: Read metadata from parcel", __FUNCTION__);
+
+    if (settingsCount <= 0) {
+        ALOGE("%s: Settings count %d should always be positive!", __FUNCTION__, settingsCount);
+        return BAD_VALUE;
+    }
+
+    for (int32_t i = 0; i < settingsCount; i++) {
+        String16 id;
+        if ((err = parcel->readString16(&id)) != OK) {
+            ALOGE("%s: Failed to read camera id!", __FUNCTION__);
+            return BAD_VALUE;
+        }
+
+        CameraMetadata settings;
+        if ((err = settings.readFromParcel(parcel)) != OK) {
+            ALOGE("%s: Failed to read metadata from parcel", __FUNCTION__);
+            return err;
+        }
+        ALOGV("%s: Read metadata from parcel", __FUNCTION__);
+        mPhysicalCameraSettings.push_back({std::string(String8(id).string()), settings});
+    }
 
     int isReprocess = 0;
     if ((err = parcel->readInt32(&isReprocess)) != OK) {
@@ -135,8 +157,23 @@ status_t CaptureRequest::writeToParcel(android::Parcel* parcel) const {
 
     status_t err = OK;
 
-    if ((err = mMetadata.writeToParcel(parcel)) != OK) {
+    int32_t settingsCount = static_cast<int32_t>(mPhysicalCameraSettings.size());
+
+    if ((err = parcel->writeInt32(settingsCount)) != OK) {
+        ALOGE("%s: Failed to write settings count!", __FUNCTION__);
         return err;
+    }
+
+    for (const auto &it : mPhysicalCameraSettings) {
+        if ((err = parcel->writeString16(String16(it.id.c_str()))) != OK) {
+            ALOGE("%s: Failed to camera id!", __FUNCTION__);
+            return err;
+        }
+
+        if ((err = it.settings.writeToParcel(parcel)) != OK) {
+            ALOGE("%s: Failed to write settings!", __FUNCTION__);
+            return err;
+        }
     }
 
     parcel->writeInt32(mIsReprocess ? 1 : 0);

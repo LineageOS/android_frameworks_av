@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2013-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -261,6 +261,10 @@ private:
     binder::Status insertGbpLocked(const sp<IGraphicBufferProducer>& gbp,
             /*out*/SurfaceMap* surfaceMap,
             /*out*/Vector<int32_t>* streamIds);
+
+    // Check that the physicalCameraId passed in is spported by the camera
+    // device.
+    bool checkPhysicalCameraId(const String8& physicalCameraId);
 
     // IGraphicsBufferProducer binder -> Stream ID + Surface ID for output streams
     KeyedVector<sp<IBinder>, StreamSurfaceId> mStreamMap;

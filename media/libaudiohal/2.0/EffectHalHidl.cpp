@@ -31,6 +31,7 @@ using ::android::hardware::audio::effect::V2_0::EffectBufferAccess;
 using ::android::hardware::audio::effect::V2_0::EffectConfigParameters;
 using ::android::hardware::audio::effect::V2_0::MessageQueueFlagBits;
 using ::android::hardware::audio::effect::V2_0::Result;
+using ::android::hardware::audio::common::V2_0::HidlUtils;
 using ::android::hardware::audio::common::V2_0::AudioChannelMask;
 using ::android::hardware::audio::common::V2_0::AudioFormat;
 using ::android::hardware::hidl_vec;

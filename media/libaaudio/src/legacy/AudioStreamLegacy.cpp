@@ -86,10 +86,15 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
             // AudioRecord::Buffer
             // TODO define our own AudioBuffer and pass it from the subclasses.
             AudioTrack::Buffer *audioBuffer = static_cast<AudioTrack::Buffer *>(info);
-            if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED || !mCallbackEnabled.load()) {
+            if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED) {
+                ALOGW("processCallbackCommon() data, stream disconnected");
+                audioBuffer->size = SIZE_STOP_CALLBACKS;
+            } else if (!mCallbackEnabled.load()) {
+                ALOGW("processCallbackCommon() stopping because callback disabled");
                 audioBuffer->size = SIZE_STOP_CALLBACKS;
             } else {
                 if (audioBuffer->frameCount == 0) {
+                    ALOGW("processCallbackCommon() data, frameCount is zero");
                     return;
                 }
 
@@ -106,7 +111,7 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
                 if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
                     audioBuffer->size = audioBuffer->frameCount * getBytesPerFrame();
                 } else { // STOP or invalid result
-                    ALOGW("%s() stop stream by faking an error", __func__);
+                    ALOGW("%s() callback requested stop, fake an error", __func__);
                     audioBuffer->size = SIZE_STOP_CALLBACKS;
                     // Disable the callback just in case AudioFlinger keeps trying to call us.
                     mCallbackEnabled.store(false);

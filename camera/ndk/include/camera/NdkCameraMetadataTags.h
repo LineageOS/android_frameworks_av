@@ -69,6 +69,7 @@ typedef enum acamera_metadata_section {
     ACAMERA_SYNC,
     ACAMERA_REPROCESS,
     ACAMERA_DEPTH,
+    ACAMERA_LOGICAL_MULTI_CAMERA,
     ACAMERA_SECTION_COUNT,
 
     ACAMERA_VENDOR = 0x8000
@@ -104,6 +105,9 @@ typedef enum acamera_metadata_section_start {
     ACAMERA_SYNC_START             = ACAMERA_SYNC              << 16,
     ACAMERA_REPROCESS_START        = ACAMERA_REPROCESS         << 16,
     ACAMERA_DEPTH_START            = ACAMERA_DEPTH             << 16,
+    ACAMERA_LOGICAL_MULTI_CAMERA_START
+                                   = ACAMERA_LOGICAL_MULTI_CAMERA
+                                                                << 16,
     ACAMERA_VENDOR_START           = ACAMERA_VENDOR            << 16
 } acamera_metadata_section_start_t;
 
@@ -1646,7 +1650,7 @@ typedef enum acamera_metadata_tag {
      * <p>Whether a significant scene change is detected within the currently-set AF
      * region(s).</p>
      *
-     * <p>Type: int32 (acamera_metadata_enum_android_control_af_scene_change_t)</p>
+     * <p>Type: byte (acamera_metadata_enum_android_control_af_scene_change_t)</p>
      *
      * <p>This tag may appear in:
      * <ul>
@@ -1658,11 +1662,9 @@ typedef enum acamera_metadata_tag {
      * significant illumination change, this value will be set to DETECTED for a single capture
      * result. Otherwise the value will be NOT_DETECTED. The threshold for detection is similar
      * to what would trigger a new passive focus scan to begin in CONTINUOUS autofocus modes.</p>
-     * <p>afSceneChange may be DETECTED only if afMode is AF_MODE_CONTINUOUS_VIDEO or
-     * AF_MODE_CONTINUOUS_PICTURE. In other AF modes, afSceneChange must be NOT_DETECTED.</p>
      * <p>This key will be available if the camera device advertises this key via {@link ACAMERA_REQUEST_AVAILABLE_RESULT_KEYS }.</p>
      */
-    ACAMERA_CONTROL_AF_SCENE_CHANGE =                           // int32 (acamera_metadata_enum_android_control_af_scene_change_t)
+    ACAMERA_CONTROL_AF_SCENE_CHANGE =                           // byte (acamera_metadata_enum_android_control_af_scene_change_t)
             ACAMERA_CONTROL_START + 42,
     ACAMERA_CONTROL_END,
 
@@ -4562,6 +4564,85 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_STATISTICS_LENS_SHADING_MAP_MODE =                  // byte (acamera_metadata_enum_android_statistics_lens_shading_map_mode_t)
             ACAMERA_STATISTICS_START + 16,
+    /**
+     * <p>Whether the camera device outputs the OIS data in output
+     * result metadata.</p>
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_statistics_ois_data_mode_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     *   <li>ACaptureRequest</li>
+     * </ul></p>
+     *
+     * <p>When set to ON,
+     * ACAMERA_STATISTICS_OIS_TIMESTAMPS, android.statistics.oisShiftPixelX,
+     * android.statistics.oisShiftPixelY will provide OIS data in the output result metadata.</p>
+     *
+     * @see ACAMERA_STATISTICS_OIS_TIMESTAMPS
+     */
+    ACAMERA_STATISTICS_OIS_DATA_MODE =                          // byte (acamera_metadata_enum_android_statistics_ois_data_mode_t)
+            ACAMERA_STATISTICS_START + 17,
+    /**
+     * <p>An array of timestamps of OIS samples, in nanoseconds.</p>
+     *
+     * <p>Type: int64[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>The array contains the timestamps of OIS samples. The timestamps are in the same
+     * timebase as and comparable to ACAMERA_SENSOR_TIMESTAMP.</p>
+     *
+     * @see ACAMERA_SENSOR_TIMESTAMP
+     */
+    ACAMERA_STATISTICS_OIS_TIMESTAMPS =                         // int64[n]
+            ACAMERA_STATISTICS_START + 18,
+    /**
+     * <p>An array of shifts of OIS samples, in x direction.</p>
+     *
+     * <p>Type: float[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>The array contains the amount of shifts in x direction, in pixels, based on OIS samples.
+     * A positive value is a shift from left to right in active array coordinate system. For
+     * example, if the optical center is (1000, 500) in active array coordinates, an shift of
+     * (3, 0) puts the new optical center at (1003, 500).</p>
+     * <p>The number of shifts must match the number of timestamps in
+     * ACAMERA_STATISTICS_OIS_TIMESTAMPS.</p>
+     *
+     * @see ACAMERA_STATISTICS_OIS_TIMESTAMPS
+     */
+    ACAMERA_STATISTICS_OIS_X_SHIFTS =                           // float[n]
+            ACAMERA_STATISTICS_START + 19,
+    /**
+     * <p>An array of shifts of OIS samples, in y direction.</p>
+     *
+     * <p>Type: float[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>The array contains the amount of shifts in y direction, in pixels, based on OIS samples.
+     * A positive value is a shift from top to bottom in active array coordinate system. For
+     * example, if the optical center is (1000, 500) in active array coordinates, an shift of
+     * (0, 5) puts the new optical center at (1000, 505).</p>
+     * <p>The number of shifts must match the number of timestamps in
+     * ACAMERA_STATISTICS_OIS_TIMESTAMPS.</p>
+     *
+     * @see ACAMERA_STATISTICS_OIS_TIMESTAMPS
+     */
+    ACAMERA_STATISTICS_OIS_Y_SHIFTS =                           // float[n]
+            ACAMERA_STATISTICS_START + 20,
     ACAMERA_STATISTICS_END,
 
     /**
@@ -4634,6 +4715,24 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_STATISTICS_INFO_AVAILABLE_LENS_SHADING_MAP_MODES =  // byte[n]
             ACAMERA_STATISTICS_INFO_START + 7,
+    /**
+     * <p>List of OIS data output modes for ACAMERA_STATISTICS_OIS_DATA_MODE that
+     * are supported by this camera device.</p>
+     *
+     * @see ACAMERA_STATISTICS_OIS_DATA_MODE
+     *
+     * <p>Type: byte[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>If no OIS data output is available for this camera device, this key will
+     * contain only OFF.</p>
+     */
+    ACAMERA_STATISTICS_INFO_AVAILABLE_OIS_DATA_MODES =          // byte[n]
+            ACAMERA_STATISTICS_INFO_START + 8,
     ACAMERA_STATISTICS_INFO_END,
 
     /**
@@ -5164,6 +5263,29 @@ typedef enum acamera_metadata_tag {
     ACAMERA_DEPTH_DEPTH_IS_EXCLUSIVE =                          // byte (acamera_metadata_enum_android_depth_depth_is_exclusive_t)
             ACAMERA_DEPTH_START + 4,
     ACAMERA_DEPTH_END,
+
+    /**
+     * <p>The accuracy of frame timestamp synchronization between physical cameras</p>
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_logical_multi_camera_sensor_sync_type_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>The accuracy of the frame timestamp synchronization determines the physical cameras'
+     * ability to start exposure at the same time. If the sensorSyncType is CALIBRATED,
+     * the physical camera sensors usually run in master-slave mode so that their shutter
+     * time is synchronized. For APPROXIMATE sensorSyncType, the camera sensors usually run in
+     * master-master mode, and there could be offset between their start of exposure.</p>
+     * <p>In both cases, all images generated for a particular capture request still carry the same
+     * timestamps, so that they can be used to look up the matching frame number and
+     * onCaptureStarted callback.</p>
+     */
+    ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE =             // byte (acamera_metadata_enum_android_logical_multi_camera_sensor_sync_type_t)
+            ACAMERA_LOGICAL_MULTI_CAMERA_START + 1,
+    ACAMERA_LOGICAL_MULTI_CAMERA_END,
 
 } acamera_metadata_tag_t;
 
@@ -6895,6 +7017,52 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      */
     ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_MOTION_TRACKING           = 10,
 
+    /**
+     * <p>The camera device is a logical camera backed by two or more physical cameras that are
+     * also exposed to the application.</p>
+     * <p>This capability requires the camera device to support the following:</p>
+     * <ul>
+     * <li>This camera device must list the following static metadata entries in <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html">CameraCharacteristics</a>:<ul>
+     * <li>android.logicalMultiCamera.physicalIds</li>
+     * <li>ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE</li>
+     * </ul>
+     * </li>
+     * <li>The underlying physical cameras' static metadata must list the following entries,
+     *   so that the application can correlate pixels from the physical streams:<ul>
+     * <li>ACAMERA_LENS_POSE_REFERENCE</li>
+     * <li>ACAMERA_LENS_POSE_ROTATION</li>
+     * <li>ACAMERA_LENS_POSE_TRANSLATION</li>
+     * <li>ACAMERA_LENS_INTRINSIC_CALIBRATION</li>
+     * <li>ACAMERA_LENS_RADIAL_DISTORTION</li>
+     * </ul>
+     * </li>
+     * <li>The logical camera device must be LIMITED or higher device.</li>
+     * </ul>
+     * <p>Both the logical camera device and its underlying physical devices support the
+     * mandatory stream combinations required for their device levels.</p>
+     * <p>Additionally, for each guaranteed stream combination, the logical camera supports:</p>
+     * <ul>
+     * <li>Replacing one logical {@link AIMAGE_FORMAT_YUV_420_888 YUV_420_888}
+     *   or raw stream with two physical streams of the same size and format, each from a
+     *   separate physical camera, given that the size and format are supported by both
+     *   physical cameras.</li>
+     * <li>Adding two raw streams, each from one physical camera, if the logical camera doesn't
+     *   advertise RAW capability, but the underlying physical cameras do. This is usually
+     *   the case when the physical cameras have different sensor sizes.</li>
+     * </ul>
+     * <p>Using physical streams in place of a logical stream of the same size and format will
+     * not slow down the frame rate of the capture, as long as the minimum frame duration
+     * of the physical and logical streams are the same.</p>
+     *
+     * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
+     * @see ACAMERA_LENS_POSE_REFERENCE
+     * @see ACAMERA_LENS_POSE_ROTATION
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     * @see ACAMERA_LENS_RADIAL_DISTORTION
+     * @see ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE
+     */
+    ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA      = 11,
+
 } acamera_metadata_enum_android_request_available_capabilities_t;
 
 
@@ -7226,6 +7394,20 @@ typedef enum acamera_metadata_enum_acamera_statistics_lens_shading_map_mode {
 
 } acamera_metadata_enum_android_statistics_lens_shading_map_mode_t;
 
+// ACAMERA_STATISTICS_OIS_DATA_MODE
+typedef enum acamera_metadata_enum_acamera_statistics_ois_data_mode {
+    /**
+     * <p>Do not include OIS data in the capture result.</p>
+     */
+    ACAMERA_STATISTICS_OIS_DATA_MODE_OFF                             = 0,
+
+    /**
+     * <p>Include OIS data in the capture result.</p>
+     */
+    ACAMERA_STATISTICS_OIS_DATA_MODE_ON                              = 1,
+
+} acamera_metadata_enum_android_statistics_ois_data_mode_t;
+
 
 
 // ACAMERA_TONEMAP_MODE
@@ -7387,6 +7569,37 @@ typedef enum acamera_metadata_enum_acamera_info_supported_hardware_level {
      */
     ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL_3                          = 3,
 
+    /**
+     * <p>This camera device is backed by an external camera connected to this Android device.</p>
+     * <p>The device has capability identical to a LIMITED level device, with the following
+     * exceptions:</p>
+     * <ul>
+     * <li>The device may not report lens/sensor related information such as<ul>
+     * <li>ACAMERA_LENS_FOCAL_LENGTH</li>
+     * <li>ACAMERA_LENS_INFO_HYPERFOCAL_DISTANCE</li>
+     * <li>ACAMERA_SENSOR_INFO_PHYSICAL_SIZE</li>
+     * <li>ACAMERA_SENSOR_INFO_WHITE_LEVEL</li>
+     * <li>ACAMERA_SENSOR_BLACK_LEVEL_PATTERN</li>
+     * <li>ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT</li>
+     * <li>ACAMERA_SENSOR_ROLLING_SHUTTER_SKEW</li>
+     * </ul>
+     * </li>
+     * <li>The device will report 0 for ACAMERA_SENSOR_ORIENTATION</li>
+     * <li>The device has less guarantee on stable framerate, as the framerate partly depends
+     *   on the external camera being used.</li>
+     * </ul>
+     *
+     * @see ACAMERA_LENS_FOCAL_LENGTH
+     * @see ACAMERA_LENS_INFO_HYPERFOCAL_DISTANCE
+     * @see ACAMERA_SENSOR_BLACK_LEVEL_PATTERN
+     * @see ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT
+     * @see ACAMERA_SENSOR_INFO_PHYSICAL_SIZE
+     * @see ACAMERA_SENSOR_INFO_WHITE_LEVEL
+     * @see ACAMERA_SENSOR_ORIENTATION
+     * @see ACAMERA_SENSOR_ROLLING_SHUTTER_SKEW
+     */
+    ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL                   = 4,
+
 } acamera_metadata_enum_android_info_supported_hardware_level_t;
 
 
@@ -7472,6 +7685,25 @@ typedef enum acamera_metadata_enum_acamera_depth_depth_is_exclusive {
     ACAMERA_DEPTH_DEPTH_IS_EXCLUSIVE_TRUE                            = 1,
 
 } acamera_metadata_enum_android_depth_depth_is_exclusive_t;
+
+
+// ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE
+typedef enum acamera_metadata_enum_acamera_logical_multi_camera_sensor_sync_type {
+    /**
+     * <p>A software mechanism is used to synchronize between the physical cameras. As a result,
+     * the timestamp of an image from a physical stream is only an approximation of the
+     * image sensor start-of-exposure time.</p>
+     */
+    ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE_APPROXIMATE        = 0,
+
+    /**
+     * <p>The camera device supports frame timestamp synchronization at the hardware level,
+     * and the timestamp of a physical stream image accurately reflects its
+     * start-of-exposure time.</p>
+     */
+    ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE_CALIBRATED         = 1,
+
+} acamera_metadata_enum_android_logical_multi_camera_sensor_sync_type_t;
 
 
 #endif /* __ANDROID_API__ >= 24 */

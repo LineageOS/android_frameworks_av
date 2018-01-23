@@ -244,11 +244,13 @@ aaudio_result_t AudioStreamRecord::requestStart()
         return AAudioConvert_androidToAAudioResult(err);
     }
 
+    // Enable callback before starting AudioTrack to avoid shutting
+    // down because of a race condition.
+    mCallbackEnabled.store(true);
     err = mAudioRecord->start();
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
     } else {
-        onStart();
         setState(AAUDIO_STREAM_STATE_STARTING);
     }
     return AAUDIO_OK;
@@ -258,11 +260,11 @@ aaudio_result_t AudioStreamRecord::requestStop() {
     if (mAudioRecord.get() == nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    onStop();
     setState(AAUDIO_STREAM_STATE_STOPPING);
     incrementFramesWritten(getFramesRead() - getFramesWritten()); // TODO review
     mTimestampPosition.set(getFramesRead());
     mAudioRecord->stop();
+    mCallbackEnabled.store(false);
     mFramesRead.reset32();
     mTimestampPosition.reset32();
     // Pass false to prevent errorCallback from being called after disconnect

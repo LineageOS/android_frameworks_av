@@ -93,7 +93,7 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     }
     mInputPreset = builder.getInputPreset();
     if (mInputPreset == AAUDIO_UNSPECIFIED) {
-        mInputPreset = AAUDIO_INPUT_PRESET_GENERIC;
+        mInputPreset = AAUDIO_INPUT_PRESET_VOICE_RECOGNITION;
     }
 
     // callbacks

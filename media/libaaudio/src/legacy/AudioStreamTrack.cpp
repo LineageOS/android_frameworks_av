@@ -271,11 +271,13 @@ aaudio_result_t AudioStreamTrack::requestStart() {
         return AAudioConvert_androidToAAudioResult(err);
     }
 
+    // Enable callback before starting AudioTrack to avoid shutting
+    // down because of a race condition.
+    mCallbackEnabled.store(true);
     err = mAudioTrack->start();
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
     } else {
-        onStart();
         setState(AAUDIO_STREAM_STATE_STARTING);
     }
     return AAUDIO_OK;
@@ -292,9 +294,9 @@ aaudio_result_t AudioStreamTrack::requestPause() {
               AAudio_convertStreamStateToText(getState()));
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    onStop();
     setState(AAUDIO_STREAM_STATE_PAUSING);
     mAudioTrack->pause();
+    mCallbackEnabled.store(false);
     status_t err = mAudioTrack->getPosition(&mPositionWhenPausing);
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
@@ -323,13 +325,13 @@ aaudio_result_t AudioStreamTrack::requestStop() {
         ALOGE("requestStop() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    onStop();
     setState(AAUDIO_STREAM_STATE_STOPPING);
     incrementFramesRead(getFramesWritten() - getFramesRead()); // TODO review
     mTimestampPosition.set(getFramesWritten());
     mFramesWritten.reset32();
     mTimestampPosition.reset32();
     mAudioTrack->stop();
+    mCallbackEnabled.store(false);
     return checkForDisconnectRequest(false);;
 }
 

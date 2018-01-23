@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 The Android Open Source Project
+ * Copyright (C) 2014-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -114,6 +114,7 @@ class Camera3DummyStream :
     static const android_dataspace DUMMY_DATASPACE = HAL_DATASPACE_UNKNOWN;
     static const camera3_stream_rotation_t DUMMY_ROTATION = CAMERA3_STREAM_ROTATION_0;
     static const uint64_t DUMMY_USAGE = GRALLOC_USAGE_HW_COMPOSER;
+    static const String8 DUMMY_ID;
 
     /**
      * Internal Camera3Stream interface

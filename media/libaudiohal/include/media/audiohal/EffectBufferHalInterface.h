@@ -26,6 +26,7 @@ namespace android {
 // Abstraction for an audio buffer. It may be a "mirror" for
 // a buffer that the effect chain doesn't own, or a buffer owned by
 // the effect chain.
+// Buffers are created from EffectsFactoryHalInterface
 class EffectBufferHalInterface : public RefBase
 {
   public:
@@ -48,9 +49,6 @@ class EffectBufferHalInterface : public RefBase
     virtual void commit() = 0;  // copies data to the external buffer, noop for allocated buffers
     virtual void update(size_t size) = 0;  // copies partial data from external buffer
     virtual void commit(size_t size) = 0;  // copies partial data to external buffer
-
-    static status_t allocate(size_t size, sp<EffectBufferHalInterface>* buffer);
-    static status_t mirror(void* external, size_t size, sp<EffectBufferHalInterface>* buffer);
 
   protected:
     // Subclasses can not be constructed directly by clients.

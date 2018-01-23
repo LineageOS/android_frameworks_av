@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2013-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,7 +82,8 @@ class Camera3OutputStream :
     Camera3OutputStream(int id, sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation,
-            nsecs_t timestampOffset, int setId = CAMERA3_STREAM_SET_ID_INVALID);
+            nsecs_t timestampOffset, const String8& physicalCameraId,
+            int setId = CAMERA3_STREAM_SET_ID_INVALID);
 
     /**
      * Set up a stream for formats that have a variable buffer size for the same
@@ -93,7 +94,8 @@ class Camera3OutputStream :
     Camera3OutputStream(int id, sp<Surface> consumer,
             uint32_t width, uint32_t height, size_t maxSize, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation,
-            nsecs_t timestampOffset, int setId = CAMERA3_STREAM_SET_ID_INVALID);
+            nsecs_t timestampOffset, const String8& physicalCameraId,
+            int setId = CAMERA3_STREAM_SET_ID_INVALID);
 
     /**
      * Set up a stream with deferred consumer for formats that have 2 dimensions, such as
@@ -103,6 +105,7 @@ class Camera3OutputStream :
     Camera3OutputStream(int id, uint32_t width, uint32_t height, int format,
             uint64_t consumerUsage, android_dataspace dataSpace,
             camera3_stream_rotation_t rotation, nsecs_t timestampOffset,
+            const String8& physicalCameraId,
             int setId = CAMERA3_STREAM_SET_ID_INVALID);
 
     virtual ~Camera3OutputStream();
@@ -194,6 +197,7 @@ class Camera3OutputStream :
     Camera3OutputStream(int id, camera3_stream_type_t type,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+            const String8& physicalCameraId,
             uint64_t consumerUsage = 0, nsecs_t timestampOffset = 0,
             int setId = CAMERA3_STREAM_SET_ID_INVALID);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +14,19 @@
  * limitations under the License.
  */
 
-#include <unistd.h>
+#include "DevicesFactoryHalHybrid.h"
+#include <android/hardware/audio/2.0/IDevicesFactory.h>
+
+using namespace ::android::hardware::audio;
 
 namespace android {
 
-extern pid_t getpid_cached;
-bool isTrustedCallingUid(uid_t uid);
-bool recordingAllowed(const String16& opPackageName, pid_t pid, uid_t uid);
-bool captureAudioOutputAllowed(pid_t pid, uid_t uid);
-bool captureHotwordAllowed(pid_t pid, uid_t uid);
-bool settingsAllowed();
-bool modifyAudioRoutingAllowed();
-bool dumpAllowed();
-bool modifyPhoneStateAllowed(pid_t pid, uid_t uid);
+// static
+sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
+    if (V2_0::IDevicesFactory::getService() != nullptr) {
+        return new DevicesFactoryHalHybrid();
+    }
+    return nullptr;
 }
+
+} // namespace android

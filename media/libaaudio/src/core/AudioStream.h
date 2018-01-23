@@ -515,9 +515,9 @@ private:
     aaudio_stream_state_t       mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
     aaudio_performance_mode_t   mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
 
-    aaudio_usage_t              mUsage           = AAUDIO_USAGE_MEDIA;
-    aaudio_content_type_t       mContentType     = AAUDIO_CONTENT_TYPE_MUSIC;
-    aaudio_input_preset_t       mInputPreset     = AAUDIO_INPUT_PRESET_GENERIC;
+    aaudio_usage_t              mUsage           = AAUDIO_UNSPECIFIED;
+    aaudio_content_type_t       mContentType     = AAUDIO_UNSPECIFIED;
+    aaudio_input_preset_t       mInputPreset     = AAUDIO_UNSPECIFIED;
 
     int32_t                     mSessionId = AAUDIO_UNSPECIFIED;
 
