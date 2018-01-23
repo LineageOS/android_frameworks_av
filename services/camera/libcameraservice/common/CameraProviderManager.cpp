@@ -601,6 +601,15 @@ status_t CameraProviderManager::ProviderInfo::addDevice(const std::string& name,
     return OK;
 }
 
+void CameraProviderManager::ProviderInfo::removeDevice(std::string id) {
+    for (auto it = mDevices.begin(); it != mDevices.end(); it++) {
+        if ((*it)->mId == id) {
+            mDevices.erase(it);
+            break;
+        }
+    }
+}
+
 status_t CameraProviderManager::ProviderInfo::dump(int fd, const Vector<String16>&) const {
     dprintf(fd, "== Camera Provider HAL %s (v2.4, %s) static info: %zu devices: ==\n",
             mProviderName.c_str(), mInterface->isRemote() ? "remote" : "passthrough",
@@ -674,6 +683,8 @@ hardware::Return<void> CameraProviderManager::ProviderInfo::cameraDeviceStatusCh
                 return hardware::Void();
             }
             addDevice(cameraDeviceName, newStatus, &id);
+        } else if (newStatus == CameraDeviceStatus::NOT_PRESENT) {
+            removeDevice(id);
         }
         listener = mManager->getStatusListener();
     }

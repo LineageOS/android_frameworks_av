@@ -306,6 +306,17 @@ void CameraService::addStates(const String8 id) {
     logDeviceAdded(id, "Device added");
 }
 
+void CameraService::removeStates(const String8 id) {
+    if (mFlashlight->hasFlashUnit(id)) {
+        mTorchStatusMap.removeItem(id);
+    }
+
+    {
+        Mutex::Autolock lock(mCameraStatesLock);
+        mCameraStates.erase(id);
+    }
+}
+
 void CameraService::onDeviceStatusChanged(const String8& id,
         CameraDeviceStatus newHalStatus) {
     ALOGI("%s: Status changed for cameraId=%s, newStatus=%d", __FUNCTION__,
@@ -370,6 +381,7 @@ void CameraService::onDeviceStatusChanged(const String8& id,
             clientToDisconnect->disconnect();
         }
 
+        removeStates(id);
     } else {
         if (oldStatus == StatusInternal::NOT_PRESENT) {
             logDeviceAdded(id, String8::format("Device status changed from %d to %d", oldStatus,
