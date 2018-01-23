@@ -146,7 +146,7 @@ filegroup {
     ],
 }
 
-cc_library_shared {
+cc_library {
     name: "libmedia",
 
     srcs: [
@@ -249,7 +249,7 @@ cc_library_shared {
     },
 }
 
-cc_library_shared {
+cc_library {
     name: "libmedia_player2_util",
 
     srcs: [
@@ -259,6 +259,7 @@ cc_library_shared {
         "IMediaExtractorService.cpp",
         "IMediaSource.cpp",
         "IStreamSource.cpp",
+        "MediaCodecBuffer.cpp",
         "MediaUtils.cpp",
         "Metadata.cpp",
         "NdkWrapper.cpp",
@@ -267,7 +268,6 @@ cc_library_shared {
     shared_libs: [
         "libbinder",
         "libcutils",
-        "libgui",
         "liblog",
         "libmediaextractor",
         "libmediandk",
@@ -287,9 +287,6 @@ cc_library_shared {
     ],
 
     static_libs: [
-        "libc_malloc_debug_backtrace",  // for memory heap analysis
-
-        "libstagefright_nuplayer2",
         "libstagefright_rtsp",
         "libstagefright_timedtext",
     ],
@@ -316,16 +313,14 @@ cc_library_shared {
     },
 }
 
-cc_library_shared {
+cc_library {
     name: "libmedia_player2",
 
     srcs: [
-        "AudioParameter.cpp",
         "JAudioTrack.cpp",
         "MediaPlayer2Factory.cpp",
         "MediaPlayer2Manager.cpp",
         "TestPlayerStub.cpp",
-        "TypeConverter.cpp",
         "mediaplayer2.cpp",
     ],
 
@@ -366,8 +361,7 @@ cc_library_shared {
     ],
 
     static_libs: [
-        "libc_malloc_debug_backtrace",  // for memory heap analysis
-
+        "libmedia_helper",
         "libstagefright_nuplayer2",
         "libstagefright_rtsp",
         "libstagefright_timedtext",

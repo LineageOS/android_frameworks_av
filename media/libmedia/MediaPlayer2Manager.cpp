@@ -64,6 +64,7 @@
 
 #include <memunreachable/memunreachable.h>
 #include <system/audio.h>
+#include <system/window.h>
 
 #include <private/android_filesystem_config.h>
 
@@ -470,8 +471,9 @@ status_t MediaPlayer2Manager::dump(int fd, const Vector<String16>& args)
         if (unreachableMemory) {
             result.append("\nDumping unreachable memory:\n");
             // TODO - should limit be an argument parameter?
-            std::string s = GetUnreachableMemoryString(true /* contents */, 10000 /* limit */);
-            result.append(s.c_str(), s.size());
+            // TODO: enable GetUnreachableMemoryString if it's part of stable API
+            //std::string s = GetUnreachableMemoryString(true /* contents */, 10000 /* limit */);
+            //result.append(s.c_str(), s.size());
         }
     }
     write(fd, result.string(), result.size());
@@ -738,8 +740,8 @@ status_t MediaPlayer2Manager::Client::setDataSource(
 
 void MediaPlayer2Manager::Client::disconnectNativeWindow_l() {
     if (mConnectedWindow != NULL && mConnectedWindow->getANativeWindow() != NULL) {
-        status_t err = nativeWindowDisconnect(
-                mConnectedWindow->getANativeWindow(), "disconnectNativeWindow");
+        status_t err = native_window_api_disconnect(
+                mConnectedWindow->getANativeWindow(), NATIVE_WINDOW_API_MEDIA);
 
         if (err != OK) {
             ALOGW("nativeWindowDisconnect returned an error: %s (%d)",
@@ -763,7 +765,8 @@ status_t MediaPlayer2Manager::Client::setVideoSurfaceTexture(
             && mConnectedWindow->getANativeWindow() == nww->getANativeWindow()) {
             return OK;
         }
-        status_t err = nativeWindowConnect(nww->getANativeWindow(), "setVideoSurfaceTexture");
+        status_t err = native_window_api_connect(
+                nww->getANativeWindow(), NATIVE_WINDOW_API_MEDIA);
 
         if (err != OK) {
             ALOGE("setVideoSurfaceTexture failed: %d", err);
@@ -792,8 +795,8 @@ status_t MediaPlayer2Manager::Client::setVideoSurfaceTexture(
         mLock.unlock();
     } else if (nww != NULL) {
         mLock.unlock();
-        status_t err = nativeWindowDisconnect(
-                nww->getANativeWindow(), "disconnectNativeWindow");
+        status_t err = native_window_api_disconnect(
+                nww->getANativeWindow(), NATIVE_WINDOW_API_MEDIA);
 
         if (err != OK) {
             ALOGW("nativeWindowDisconnect returned an error: %s (%d)",
