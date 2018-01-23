@@ -205,8 +205,8 @@ public class MediaController2Test extends MediaSession2TestBase {
     public void testControllerCallback_sessionRejects() throws InterruptedException {
         final MediaSession2.SessionCallback sessionCallback = new SessionCallback() {
             @Override
-            public long onConnect(ControllerInfo controller) {
-                return 0;
+            public MediaSession2.CommandGroup onConnect(ControllerInfo controller) {
+                return null;
             }
         };
         sHandler.postAndSync(() -> {

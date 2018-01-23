@@ -124,7 +124,7 @@ function runtest-MediaComponents() {
       if [[ "${OPTION_MIN}" != "true" ]]; then
         build_targets="${build_targets} droid"
       fi
-      m ${build_targets} -j || (echo "Build failed. stop" ; break)
+      m ${build_targets} -j || break
 
       ${adb} root
       ${adb} remount

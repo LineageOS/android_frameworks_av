@@ -59,7 +59,7 @@ public class MockMediaSessionService2 extends MediaSessionService2 {
 
     private class MySessionCallback extends SessionCallback {
         @Override
-        public long onConnect(ControllerInfo controller) {
+        public MediaSession2.CommandGroup onConnect(ControllerInfo controller) {
             if (Process.myUid() != controller.getUid()) {
                 // It's system app wants to listen changes. Ignore.
                 return super.onConnect(controller);
