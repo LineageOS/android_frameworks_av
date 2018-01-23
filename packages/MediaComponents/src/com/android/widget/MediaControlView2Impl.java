@@ -348,11 +348,8 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
      * @hide This doesn't work as advertised
      */
     protected View makeControllerView() {
-        View root = LayoutInflater.from(mInstance.getContext()).inflate(
-                R.layout.media_controller, null);
-
+        View root = ApiHelper.inflateLibLayout(mInstance.getContext(), R.layout.media_controller);
         initControllerView(root);
-
         return root;
     }
 
