@@ -62,8 +62,6 @@ cc_library {
         "AStringUtils.cpp",
         "ByteUtils.cpp",
         "ColorUtils.cpp",
-        "MediaBuffer.cpp",
-        "MediaBufferGroup.cpp",
         "MediaDefs.cpp",
         "MediaKeys.cpp",
         "MetaData.cpp",
