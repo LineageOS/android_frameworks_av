@@ -25,7 +25,6 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/MediaBuffer.h>
-#include <media/stagefright/MetaData.h>
 #include <media/stagefright/SimpleDecodingSource.h>
 
 #include "ARTPSession.h"

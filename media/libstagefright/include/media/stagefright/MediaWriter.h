@@ -24,8 +24,6 @@
 
 namespace android {
 
-class MetaData;
-
 struct MediaWriter : public RefBase {
     MediaWriter()
         : mMaxFileSizeLimitBytes(0),

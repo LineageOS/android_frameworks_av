@@ -30,7 +30,6 @@ namespace android {
 
 struct AMessage;
 class MediaBuffer;
-class MetaData;
 struct ABuffer;
 
 class MPEG4Writer : public MediaWriter {

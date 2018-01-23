@@ -28,7 +28,6 @@
 
 namespace android {
 
-class MetaData;
 class MediaBufferGroup;
 
 class IMediaSource : public IInterface {

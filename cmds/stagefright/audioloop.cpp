@@ -29,7 +29,6 @@
 #include <media/stagefright/AudioSource.h>
 #include <media/stagefright/MediaCodecSource.h>
 #include <media/stagefright/MediaDefs.h>
-#include <media/stagefright/MetaData.h>
 #include <media/stagefright/SimpleDecodingSource.h>
 #include "SineSource.h"
 

@@ -25,8 +25,6 @@
 
 namespace android {
 
-class MetaData;
-
 struct AMRWriter : public MediaWriter {
     AMRWriter(int fd);
 

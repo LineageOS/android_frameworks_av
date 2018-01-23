@@ -24,7 +24,6 @@
 namespace android {
 
 struct MediaSource;
-class MetaData;
 
 struct AACWriter : public MediaWriter {
     AACWriter(int fd);

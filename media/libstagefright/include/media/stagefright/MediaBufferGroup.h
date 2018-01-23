@@ -25,7 +25,6 @@
 namespace android {
 
 class MediaBuffer;
-class MetaData;
 
 class MediaBufferGroup : public MediaBufferObserver {
 public:
