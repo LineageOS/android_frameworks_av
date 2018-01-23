@@ -49,10 +49,20 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
             try {
                 binder.getBrowserRoot(getControllerStub(), rootHints);
             } catch (RemoteException e) {
-                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+                // TODO(jaewan): Handle disconnect.
+                if (DEBUG) {
+                    Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+                }
             }
         } else {
             Log.w(TAG, "Session isn't active", new IllegalStateException());
         }
+    }
+
+    public void onGetRootResult(
+            final Bundle rootHints, final String rootMediaId, final Bundle rootExtra) {
+        getCallbackExecutor().execute(() -> {
+            mCallback.onGetRootResult(rootHints, rootMediaId, rootExtra);
+        });
     }
 }

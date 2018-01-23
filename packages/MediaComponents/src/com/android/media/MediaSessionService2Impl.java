@@ -17,11 +17,7 @@
 package com.android.media;
 
 import static android.content.Context.NOTIFICATION_SERVICE;
-import static android.media.MediaSessionService2.DEFAULT_MEDIA_NOTIFICATION_CHANNEL_ID;
-import static android.media.MediaSessionService2.DEFAULT_MEDIA_NOTIFICATION_ID;
 
-import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -37,7 +33,7 @@ import android.os.Looper;
 import android.support.annotation.GuardedBy;
 import android.util.Log;
 
-// Need a test for session service itself.
+// TODO(jaewan): Need a test for session service itself.
 public class MediaSessionService2Impl implements MediaSessionService2Provider {
 
     private static final String TAG = "MPSessionService"; // to meet 23 char limit in Log tag
@@ -53,7 +49,6 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
     private Intent mStartSelfIntent;
 
     private boolean mIsRunningForeground;
-    private NotificationChannel mDefaultNotificationChannel;
     private MediaSession2 mSession;
 
     public MediaSessionService2Impl(MediaSessionService2 instance) {
@@ -65,6 +60,10 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
 
     @Override
     public MediaSession2 getSession_impl() {
+        return getSession();
+    }
+
+    MediaSession2 getSession() {
         synchronized (mLock) {
             return mSession;
         }
@@ -72,27 +71,9 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
 
     @Override
     public MediaNotification onUpdateNotification_impl(PlaybackState state) {
-        return createDefaultNotification(state);
+        // Provide default notification UI later.
+        return null;
     }
-
-    // TODO(jaewan): Remove this for framework release.
-    private MediaNotification createDefaultNotification(PlaybackState state) {
-        // TODO(jaewan): Place better notification here.
-        if (mDefaultNotificationChannel == null) {
-            mDefaultNotificationChannel = new NotificationChannel(
-                    DEFAULT_MEDIA_NOTIFICATION_CHANNEL_ID,
-                    DEFAULT_MEDIA_NOTIFICATION_CHANNEL_ID,
-                    NotificationManager.IMPORTANCE_DEFAULT);
-            mNotificationManager.createNotificationChannel(mDefaultNotificationChannel);
-        }
-        Notification notification = new Notification.Builder(
-                mInstance, DEFAULT_MEDIA_NOTIFICATION_CHANNEL_ID)
-                .setContentTitle(mInstance.getPackageName())
-                .setContentText("Playback state: " + state.getState())
-                .setSmallIcon(android.R.drawable.sym_def_app_icon).build();
-        return MediaNotification.create(DEFAULT_MEDIA_NOTIFICATION_ID, notification);
-    }
-
 
     @Override
     public void onCreate_impl() {
@@ -100,15 +81,13 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
                 NOTIFICATION_SERVICE);
         mStartSelfIntent = new Intent(mInstance, mInstance.getClass());
 
-        Intent serviceIntent = new Intent(mInstance, mInstance.getClass());
-        serviceIntent.setAction(MediaSessionService2.SERVICE_INTERFACE);
+        Intent serviceIntent = createServiceIntent();
         ResolveInfo resolveInfo = mInstance.getPackageManager()
-                .resolveService(serviceIntent,
-                        PackageManager.GET_META_DATA);
+                .resolveService(serviceIntent, PackageManager.GET_META_DATA);
         String id;
         if (resolveInfo == null || resolveInfo.serviceInfo == null) {
             throw new IllegalArgumentException("service " + mInstance + " doesn't implement"
-                    + MediaSessionService2.SERVICE_INTERFACE);
+                    + serviceIntent.getAction());
         } else if (resolveInfo.serviceInfo.metaData == null) {
             if (DEBUG) {
                 Log.d(TAG, "Failed to resolve ID for " + mInstance + ". Using empty id");
@@ -122,6 +101,14 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
         if (mSession == null || !id.equals(mSession.getToken().getId())) {
             throw new RuntimeException("Expected session with id " + id + ", but got " + mSession);
         }
+        // TODO(jaewan): Uncomment here.
+        // mSession.addPlaybackListener(mListener, mSession.getExecutor());
+    }
+
+    Intent createServiceIntent() {
+        Intent serviceIntent = new Intent(mInstance, mInstance.getClass());
+        serviceIntent.setAction(MediaSessionService2.SERVICE_INTERFACE);
+        return serviceIntent;
     }
 
     public IBinder onBind_impl(Intent intent) {
@@ -134,7 +121,7 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
     private void updateNotification(PlaybackState state) {
         MediaNotification mediaNotification = mInstance.onUpdateNotification(state);
         if (mediaNotification == null) {
-            mediaNotification = createDefaultNotification(state);
+            return;
         }
         switch((int) state.getState()) {
             case PlaybackState.STATE_PLAYING:

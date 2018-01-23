@@ -22,6 +22,7 @@ import android.content.res.Resources.Theme;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaController2;
+import android.media.MediaLibraryService2;
 import android.media.MediaPlayerBase;
 import android.media.MediaSession2;
 import android.media.MediaSession2.ControllerInfo;
@@ -44,6 +45,7 @@ import android.widget.VideoView2;
 
 import com.android.media.MediaBrowser2Impl;
 import com.android.media.MediaController2Impl;
+import com.android.media.MediaLibraryService2Impl;
 import com.android.media.MediaSession2Impl;
 import com.android.media.MediaSessionService2Impl;
 import com.android.widget.MediaControlView2Impl;
@@ -89,6 +91,12 @@ public class ApiFactory implements StaticProvider {
     public MediaSessionService2Provider createMediaSessionService2(
             MediaSessionService2 instance) {
         return new MediaSessionService2Impl(instance);
+    }
+
+    @Override
+    public MediaSessionService2Provider createMediaLibraryService2(
+            MediaLibraryService2 instance) {
+        return new MediaLibraryService2Impl(instance);
     }
 
     @Override

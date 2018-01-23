@@ -16,6 +16,7 @@
 
 package android.media;
 
+import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
 
@@ -28,6 +29,7 @@ import android.support.annotation.NonNull;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
 
+import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.util.concurrent.CountDownLatch;
@@ -43,12 +45,35 @@ import java.util.concurrent.TimeUnit;
 @RunWith(AndroidJUnit4.class)
 @SmallTest
 public class MediaBrowser2Test extends MediaController2Test {
-    private static final String TAG = "MediaPlayerBrowserTest";
+    private static final String TAG = "MediaBrowser2Test";
 
     @Override
     TestControllerInterface onCreateController(@NonNull SessionToken token,
             @NonNull TestControllerCallbackInterface callback) {
         return new TestMediaBrowser(mContext, token, new TestBrowserCallback(callback));
+    }
+
+    @Test
+    public void testGetBrowserRoot() throws InterruptedException {
+        final Bundle param = new Bundle();
+        param.putString(TAG, TAG);
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
+            @Override
+            public void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {
+                assertTrue(TestUtils.equals(param, rootHints));
+                assertEquals(MockMediaLibraryService2.ROOT_ID, rootMediaId);
+                assertTrue(TestUtils.equals(MockMediaLibraryService2.EXTRA, rootExtra));
+                latch.countDown();
+            }
+        };
+
+        final SessionToken token = MockMediaLibraryService2.getToken(mContext);
+        MediaBrowser2 browser =
+                (MediaBrowser2) createController(token,true, callback);
+        browser.getBrowserRoot(param);
+        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
     }
 
     public static class TestBrowserCallback extends BrowserCallback
@@ -77,7 +102,7 @@ public class MediaBrowser2Test extends MediaController2Test {
 
         @Override
         public void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {
-            // No-op here.
+            mCallbackProxy.onGetRootResult(rootHints, rootMediaId, rootExtra);
         }
 
         @Override

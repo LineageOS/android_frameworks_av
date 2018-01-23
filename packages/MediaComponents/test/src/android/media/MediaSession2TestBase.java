@@ -22,6 +22,7 @@ import static junit.framework.Assert.assertTrue;
 import android.content.Context;
 import android.media.MediaController2.ControllerCallback;
 import android.media.MediaSession2.CommandGroup;
+import android.os.Bundle;
 import android.os.HandlerThread;
 import android.support.annotation.CallSuper;
 import android.support.annotation.NonNull;
@@ -57,6 +58,9 @@ abstract class MediaSession2TestBase {
 
     interface TestControllerCallbackInterface {
         // Currently empty. Add methods in ControllerCallback/BrowserCallback that you want to test.
+
+        // Browser specific callbacks
+        default void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {}
     }
 
     interface WaitForConnectionInterface {

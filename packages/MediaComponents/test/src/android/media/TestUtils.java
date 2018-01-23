@@ -19,11 +19,13 @@ package android.media;
 import android.content.Context;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
+import android.os.Bundle;
 import android.os.Handler;
 
 import android.os.Looper;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -47,6 +49,14 @@ public final class TestUtils {
         return new PlaybackState.Builder().setState(state, 0, 1.0f).build();
     }
 
+    /**
+     * Finds the session with id in this test package.
+     *
+     * @param context
+     * @param id
+     * @return
+     */
+    // TODO(jaewan): Currently not working.
     public static SessionToken getServiceToken(Context context, String id) {
         MediaSessionManager manager =
                 (MediaSessionManager) context.getSystemService(Context.MEDIA_SESSION_SERVICE);
@@ -60,6 +70,33 @@ public final class TestUtils {
         }
         fail("Failed to find service");
         return null;
+    }
+
+    /**
+     * Compares contents of two bundles.
+     *
+     * @param a a bundle
+     * @param b another bundle
+     * @return {@code true} if two bundles are the same. {@code false} otherwise. This may be
+     *     incorrect if any bundle contains a bundle.
+     */
+    public static boolean equals(Bundle a, Bundle b) {
+        if (a == b) {
+            return true;
+        }
+        if (a == null || b == null) {
+            return false;
+        }
+        if (!a.keySet().containsAll(b.keySet())
+                || !b.keySet().containsAll(a.keySet())) {
+            return false;
+        }
+        for (String key : a.keySet()) {
+            if (!Objects.equals(a.get(key), b.get(key))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

@@ -51,9 +51,9 @@ import static org.junit.Assert.*;
 public class MediaController2Test extends MediaSession2TestBase {
     private static final String TAG = "MediaController2Test";
 
-    private MediaSession2 mSession;
-    private MediaController2 mController;
-    private MockPlayer mPlayer;
+    MediaSession2 mSession;
+    MediaController2 mController;
+    MockPlayer mPlayer;
 
     @Before
     @Override
@@ -331,11 +331,23 @@ public class MediaController2Test extends MediaSession2TestBase {
         mPlayer = (MockPlayer) mSession.getPlayer();
     }
 
+    // TODO(jaewan): Reenable when session manager detects app installs
     @Ignore
     @Test
-    public void testConnectToService() throws InterruptedException {
+    public void testConnectToService_sessionService() throws InterruptedException {
         connectToService(TestUtils.getServiceToken(mContext, MockMediaSessionService2.ID));
+        testConnectToService();
+    }
 
+    // TODO(jaewan): Reenable when session manager detects app installs
+    @Ignore
+    @Test
+    public void testConnectToService_libraryService() throws InterruptedException {
+        connectToService(TestUtils.getServiceToken(mContext, MockMediaLibraryService2.ID));
+        testConnectToService();
+    }
+
+    public void testConnectToService() throws InterruptedException {
         TestServiceRegistry serviceInfo = TestServiceRegistry.getInstance();
         ControllerInfo info = serviceInfo.getOnConnectControllerInfo();
         assertEquals(mContext.getPackageName(), info.getPackageName());
@@ -396,10 +408,24 @@ public class MediaController2Test extends MediaSession2TestBase {
         testControllerAfterSessionIsGone(id);
     }
 
+    // TODO(jaewan): Reenable when session manager detects app installs
     @Ignore
     @Test
     public void testRelease_sessionService() throws InterruptedException {
         connectToService(TestUtils.getServiceToken(mContext, MockMediaSessionService2.ID));
+        testReleaseFromService();
+    }
+
+    // TODO(jaewan): Reenable when session manager detects app installs
+    @Ignore
+    @Test
+    public void testRelease_libraryService() throws InterruptedException {
+        connectToService(TestUtils.getServiceToken(mContext, MockMediaSessionService2.ID));
+        testReleaseFromService();
+    }
+
+    private void testReleaseFromService() throws InterruptedException {
+        final String id = mController.getSessionToken().getId();
         final CountDownLatch latch = new CountDownLatch(1);
         TestServiceRegistry.getInstance().setServiceInstanceChangedCallback((service) -> {
             if (service == null) {
@@ -415,7 +441,7 @@ public class MediaController2Test extends MediaSession2TestBase {
 
         // Test whether the controller is notified about later release of the session or
         // re-creation.
-        testControllerAfterSessionIsGone(MockMediaSessionService2.ID);
+        testControllerAfterSessionIsGone(id);
     }
 
     private void testControllerAfterSessionIsGone(final String id) throws InterruptedException {
@@ -434,7 +460,6 @@ public class MediaController2Test extends MediaSession2TestBase {
         });
         testNoInteraction();
     }
-
 
     private void testNoInteraction() throws InterruptedException {
         final CountDownLatch latch = new CountDownLatch(1);
