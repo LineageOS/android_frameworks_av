@@ -17,6 +17,9 @@
 #ifndef DRM_METRICS_H_
 #define DRM_METRICS_H_
 
+#include <map>
+
+#include <android/hardware/drm/1.0/types.h>
 #include <media/CounterMetric.h>
 #include <media/EventMetric.h>
 
@@ -30,12 +33,29 @@ namespace android {
 class MediaDrmMetrics {
  public:
   explicit MediaDrmMetrics();
-  // Counter of times openSession was called.
+  // Count of openSession calls.
   CounterMetric<status_t> mOpenSessionCounter;
-  // Counter and timing of the getKeyRequest call.
+  // Count of closeSession calls.
+  CounterMetric<status_t> mCloseSessionCounter;
+  // Count and timing of getKeyRequest calls.
   EventMetric<status_t> mGetKeyRequestTiming;
+  // Count and timing of provideKeyResponse calls.
+  EventMetric<status_t> mProvideKeyResponseTiming;
+  // Count of getProvisionRequest calls.
+  CounterMetric<status_t> mGetProvisionRequestCounter;
+  // Count of provideProvisionResponse calls.
+  CounterMetric<status_t> mProvideProvisionResponseCounter;
 
-  // TODO: Add the full set of metrics to be captured.
+  // Count of key status events broken out by status type.
+  CounterMetric<::android::hardware::drm::V1_0::KeyStatusType>
+      mKeyStatusChangeCounter;
+  // Count of events broken out by event type
+  CounterMetric<::android::hardware::drm::V1_0::EventType> mEventCounter;
+
+  // Count getPropertyByteArray calls to retrieve the device unique id.
+  CounterMetric<status_t> mGetDeviceUniqueIdCounter;
+
+  // TODO: Add session start and end time support. These are a special case.
 
   // Export the metrics to a MediaAnalyticsItem.
   void Export(MediaAnalyticsItem* item);
