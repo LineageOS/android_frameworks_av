@@ -36,22 +36,40 @@
 
     <style name="BottomBarButton">
         <item name="android:background">@null</item>
-        <item name="android:layout_width">24dp</item>
-        <item name="android:layout_height">24dp</item>
-        <item name="android:layout_margin">10dp</item>
+        <item name="android:layout_width">44dp</item>
+        <item name="android:layout_height">34dp</item>
+        <item name="android:layout_marginTop">5dp</item>
+        <item name="android:layout_marginBottom">5dp</item>
+        <item name="android:paddingLeft">5dp</item>
+        <item name="android:paddingRight">5dp</item>
     </style>
 
     <style name="BottomBarButton.CC">
-        <item name="android:src">@drawable/ic_media_cc_disabled</item>
+        <item name="android:src">@drawable/ic_media_subtitle_disabled</item>
     </style>
 
     <style name="BottomBarButton.FullScreen">
         <item name="android:src">@drawable/ic_fullscreen</item>
     </style>
 
-    <style name="BottomBarButton.Overflow">
+    <style name="BottomBarButton.OverflowRight">
         <item name="android:src">@drawable/ic_chevron_right</item>
     </style>
 
-</resources>
+    <style name="BottomBarButton.OverflowLeft">
+        <item name="android:src">@drawable/ic_chevron_left</item>
+    </style>
 
+    <style name="BottomBarButton.Settings">
+        <item name="android:src">@drawable/ic_settings</item>
+    </style>
+
+    <style name="BottomBarButton.AspectRatio">
+        <item name="android:src">@drawable/ic_aspect_ratio</item>
+    </style>
+
+    <style name="BottomBarButton.Mute">
+        <item name="android:src">@drawable/ic_mute</item>
+    </style>
+
+</resources>

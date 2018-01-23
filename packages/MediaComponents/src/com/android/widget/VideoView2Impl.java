@@ -28,13 +28,15 @@ import android.media.MediaPlayer;
 import android.media.MediaPlayerBase;
 import android.media.Cea708CaptionRenderer;
 import android.media.ClosedCaptionRenderer;
+import android.media.MediaMetadata;
+import android.media.MediaPlayer;
 import android.media.Metadata;
 import android.media.PlaybackParams;
 import android.media.SubtitleController;
-import android.media.session.MediaSession;
-import android.media.session.PlaybackState;
 import android.media.TtmlRenderer;
 import android.media.WebVttRenderer;
+import android.media.session.MediaSession;
+import android.media.session.PlaybackState;
 import android.media.update.VideoView2Provider;
 import android.media.update.ViewProvider;
 import android.net.Uri;
@@ -51,13 +53,13 @@ import android.widget.FrameLayout.LayoutParams;
 import android.widget.MediaControlView2;
 import android.widget.VideoView2;
 
+import com.android.media.update.ApiHelper;
+import com.android.media.update.R;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import com.android.media.update.ApiHelper;
-import com.android.media.update.R;
 
 public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.SurfaceListener {
     private static final String TAG = "VideoView2";
@@ -84,6 +86,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     private VideoView2.OnErrorListener mOnErrorListener;
     private VideoView2.OnInfoListener mOnInfoListener;
     private VideoView2.OnViewTypeChangedListener mOnViewTypeChangedListener;
+    private VideoView2.OnFullScreenChangedListener mOnFullScreenChangedListener;
 
     private VideoViewInterface mCurrentView;
     private VideoTextureView mTextureView;
@@ -92,6 +95,8 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     private MediaPlayer mMediaPlayer;
     private MediaControlView2 mMediaControlView;
     private MediaSession mMediaSession;
+    private Metadata mMetadata;
+    private String mTitle;
 
     private PlaybackState.Builder mStateBuilder;
     private int mTargetState = STATE_IDLE;
@@ -111,8 +116,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     // Refer: https://docs.google.com/document/d/1nzAfns6i2hJ3RkaUre3QMT6wsDedJ5ONLiA_OOBFFX8/edit
     private float mFallbackSpeed;  // keep the original speed before 'pause' is called.
 
-    public VideoView2Impl(
-            VideoView2 instance, ViewProvider superProvider,
+    public VideoView2Impl(VideoView2 instance, ViewProvider superProvider,
             @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         mInstance = instance;
         mSuperProvider = superProvider;
@@ -286,6 +290,13 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     }
 
     @Override
+    public void setFullScreen_impl(boolean fullScreen) {
+        if (mOnFullScreenChangedListener != null) {
+            mOnFullScreenChangedListener.onFullScreenChanged(fullScreen);
+        }
+    }
+
+    @Override
     public void setSpeed_impl(float speed) {
         if (speed <= 0.0f) {
             Log.e(TAG, "Unsupported speed (" + speed + ") is ignored.");
@@ -408,6 +419,11 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     }
 
     @Override
+    public void setFullScreenChangedListener_impl(VideoView2.OnFullScreenChangedListener l) {
+        mOnFullScreenChangedListener = l;
+    }
+
+    @Override
     public void onAttachedToWindow_impl() {
         mSuperProvider.onAttachedToWindow_impl();
 
@@ -424,7 +440,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
         mMediaSession.release();
         mMediaSession = null;
     }
-
 
     @Override
     public CharSequence getAccessibilityClassName_impl() {
@@ -635,6 +650,13 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
             mCurrentState = STATE_PREPARING;
             mMediaPlayer.prepareAsync();
 
+            // Save file name as title since the file may not have a title Metadata.
+            mTitle = uri.getPath();
+            String scheme = uri.getScheme();
+            if (scheme != null && scheme.equals("file")) {
+                mTitle = uri.getLastPathSegment();
+            }
+
             if (DEBUG) {
                 Log.d(TAG, "openVideo(). mCurrentState=" + mCurrentState
                         + ", mTargetState=" + mTargetState);
@@ -683,26 +705,26 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     private void updatePlaybackState() {
         if (mStateBuilder == null) {
             // Get the capabilities of the player for this stream
-            Metadata data = mMediaPlayer.getMetadata(MediaPlayer.METADATA_ALL,
+            mMetadata = mMediaPlayer.getMetadata(MediaPlayer.METADATA_ALL,
                     MediaPlayer.BYPASS_METADATA_FILTER);
 
             // Add Play action as default
             long playbackActions = PlaybackState.ACTION_PLAY;
-            if (data != null) {
-                if (!data.has(Metadata.PAUSE_AVAILABLE)
-                        || data.getBoolean(Metadata.PAUSE_AVAILABLE)) {
+            if (mMetadata != null) {
+                if (!mMetadata.has(Metadata.PAUSE_AVAILABLE)
+                        || mMetadata.getBoolean(Metadata.PAUSE_AVAILABLE)) {
                     playbackActions |= PlaybackState.ACTION_PAUSE;
                 }
-                if (!data.has(Metadata.SEEK_BACKWARD_AVAILABLE)
-                        || data.getBoolean(Metadata.SEEK_BACKWARD_AVAILABLE)) {
+                if (!mMetadata.has(Metadata.SEEK_BACKWARD_AVAILABLE)
+                        || mMetadata.getBoolean(Metadata.SEEK_BACKWARD_AVAILABLE)) {
                     playbackActions |= PlaybackState.ACTION_REWIND;
                 }
-                if (!data.has(Metadata.SEEK_FORWARD_AVAILABLE)
-                        || data.getBoolean(Metadata.SEEK_FORWARD_AVAILABLE)) {
+                if (!mMetadata.has(Metadata.SEEK_FORWARD_AVAILABLE)
+                        || mMetadata.getBoolean(Metadata.SEEK_FORWARD_AVAILABLE)) {
                     playbackActions |= PlaybackState.ACTION_FAST_FORWARD;
                 }
-                if (!data.has(Metadata.SEEK_AVAILABLE)
-                        || data.getBoolean(Metadata.SEEK_AVAILABLE)) {
+                if (!mMetadata.has(Metadata.SEEK_AVAILABLE)
+                        || mMetadata.getBoolean(Metadata.SEEK_AVAILABLE)) {
                     playbackActions |= PlaybackState.ACTION_SEEK_TO;
                 }
             } else {
@@ -712,8 +734,8 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
             }
             mStateBuilder = new PlaybackState.Builder();
             mStateBuilder.setActions(playbackActions);
-            mStateBuilder.addCustomAction(MediaControlView2Impl.ACTION_SHOW_SUBTITLE, null, -1);
-            mStateBuilder.addCustomAction(MediaControlView2Impl.ACTION_HIDE_SUBTITLE, null, -1);
+            mStateBuilder.addCustomAction(MediaControlView2Impl.COMMAND_SHOW_SUBTITLE, null, -1);
+            mStateBuilder.addCustomAction(MediaControlView2Impl.COMMAND_HIDE_SUBTITLE, null, -1);
         }
         mStateBuilder.setState(getCorrespondingPlaybackState(),
                 mInstance.getCurrentPosition(), 1.0f);
@@ -736,7 +758,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
             case STATE_PREPARING:
                 return PlaybackState.STATE_CONNECTING;
             case STATE_PREPARED:
-                return PlaybackState.STATE_STOPPED;
+                return PlaybackState.STATE_PAUSED;
             case STATE_PLAYING:
                 return PlaybackState.STATE_PLAYING;
             case STATE_PAUSED:
@@ -820,16 +842,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                 mInstance.seekTo(seekToPosition);
             }
 
-            // Create and set playback state for MediaControlView2
-            updatePlaybackState();
-
-            // Get and set duration value as MediaMetadata for MediaControlView2
-            MediaMetadata.Builder builder = new MediaMetadata.Builder();
-            builder.putLong(MediaMetadata.METADATA_KEY_DURATION, mInstance.getDuration());
-            if (mMediaSession != null) {
-                mMediaSession.setMetadata(builder.build());
-            }
-
             if (videoWidth != 0 && videoHeight != 0) {
                 if (videoWidth != mVideoWidth || videoHeight != mVideoHeight) {
                     if (DEBUG) {
@@ -845,6 +857,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                     mVideoHeight = videoHeight;
                     mInstance.requestLayout();
                 }
+
                 if (needToStart()) {
                     mInstance.start();
                     if (mMediaControlView != null) {
@@ -865,6 +878,20 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                     mInstance.start();
                 }
             }
+            // Create and set playback state for MediaControlView2
+            updatePlaybackState();
+
+            // Get and set duration and title values as MediaMetadata for MediaControlView2
+            MediaMetadata.Builder builder = new MediaMetadata.Builder();
+            if (mMetadata != null && mMetadata.has(Metadata.TITLE)) {
+                mTitle = mMetadata.getString(Metadata.TITLE);
+            }
+            builder.putString(MediaMetadata.METADATA_KEY_TITLE, mTitle);
+            builder.putLong(MediaMetadata.METADATA_KEY_DURATION, mInstance.getDuration());
+
+            if (mMediaSession != null) {
+                mMediaSession.setMetadata(builder.build());
+            }
         }
     };
 
@@ -875,9 +902,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                     mTargetState = STATE_PLAYBACK_COMPLETED;
                     updatePlaybackState();
 
-                    if (mMediaControlView != null) {
-                        mMediaControlView.hide();
-                    }
                     if (mOnCompletionListener != null) {
                         mOnCompletionListener.onCompletion();
                     }
@@ -939,7 +963,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                                 .setPositiveButton(res.getString(R.string.VideoView2_error_button),
                                         new DialogInterface.OnClickListener() {
                                             public void onClick(DialogInterface dialog,
-                                                                int whichButton) {
+                                                    int whichButton) {
                                                 /* If we get here, there is no onError listener, so
                                                 * at least inform them that the video is over.
                                                 */
@@ -967,11 +991,15 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
         @Override
         public void onCommand(String command, Bundle args, ResultReceiver receiver) {
             switch (command) {
-                case MediaControlView2Impl.ACTION_SHOW_SUBTITLE:
+                case MediaControlView2Impl.COMMAND_SHOW_SUBTITLE:
                     mInstance.showSubtitle();
                     break;
-                case MediaControlView2Impl.ACTION_HIDE_SUBTITLE:
+                case MediaControlView2Impl.COMMAND_HIDE_SUBTITLE:
                     mInstance.hideSubtitle();
+                    break;
+                case MediaControlView2Impl.COMMAND_SET_FULLSCREEN:
+                    mInstance.setFullScreen(
+                            args.getBoolean(MediaControlView2Impl.ARGUMENT_KEY_FULLSCREEN));
                     break;
             }
         }
