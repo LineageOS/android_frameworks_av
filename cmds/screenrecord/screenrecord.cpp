@@ -73,6 +73,7 @@ static bool gMonotonicTime = false;     // use system monotonic time for timesta
 static enum {
     FORMAT_MP4, FORMAT_H264, FORMAT_FRAMES, FORMAT_RAW_FRAMES
 } gOutputFormat = FORMAT_MP4;           // data format for output
+static AString gCodecName = "";         // codec name override
 static bool gSizeSpecified = false;     // was size explicitly requested?
 static bool gWantInfoScreen = false;    // do we want initial info screen?
 static bool gWantFrameTime = false;     // do we want times on each frame?
@@ -154,6 +155,7 @@ static status_t prepareEncoder(float displayFps, sp<MediaCodec>* pCodec,
     if (gVerbose) {
         printf("Configuring recorder for %dx%d %s at %.2fMbps\n",
                 gVideoWidth, gVideoHeight, kMimeTypeAvc, gBitRate / 1000000.0);
+        fflush(stdout);
     }
 
     sp<AMessage> format = new AMessage;
@@ -169,11 +171,21 @@ static status_t prepareEncoder(float displayFps, sp<MediaCodec>* pCodec,
     looper->setName("screenrecord_looper");
     looper->start();
     ALOGV("Creating codec");
-    sp<MediaCodec> codec = MediaCodec::CreateByType(looper, kMimeTypeAvc, true);
-    if (codec == NULL) {
-        fprintf(stderr, "ERROR: unable to create %s codec instance\n",
-                kMimeTypeAvc);
-        return UNKNOWN_ERROR;
+    sp<MediaCodec> codec;
+    if (gCodecName.empty()) {
+        codec = MediaCodec::CreateByType(looper, kMimeTypeAvc, true);
+        if (codec == NULL) {
+            fprintf(stderr, "ERROR: unable to create %s codec instance\n",
+                    kMimeTypeAvc);
+            return UNKNOWN_ERROR;
+        }
+    } else {
+        codec = MediaCodec::CreateByComponentName(looper, gCodecName);
+        if (codec == NULL) {
+            fprintf(stderr, "ERROR: unable to create %s codec instance\n",
+                    gCodecName.c_str());
+            return UNKNOWN_ERROR;
+        }
     }
 
     err = codec->configure(format, NULL, NULL,
@@ -275,9 +287,11 @@ static status_t setDisplayProjection(
         if (gRotate) {
             printf("Rotated content area is %ux%u at offset x=%d y=%d\n",
                     outHeight, outWidth, offY, offX);
+            fflush(stdout);
         } else {
             printf("Content area is %ux%u at offset x=%d y=%d\n",
                     outWidth, outHeight, offX, offY);
+            fflush(stdout);
         }
     }
 
@@ -346,6 +360,7 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
         if (systemTime(CLOCK_MONOTONIC) > endWhenNsec) {
             if (gVerbose) {
                 printf("Time limit reached\n");
+                fflush(stdout);
             }
             break;
         }
@@ -483,6 +498,7 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
         printf("Encoder stopping; recorded %u frames in %" PRId64 " seconds\n",
                 debugNumFrames, nanoseconds_to_seconds(
                         systemTime(CLOCK_MONOTONIC) - startWhenNsec));
+        fflush(stdout);
     }
     return NO_ERROR;
 }
@@ -556,6 +572,7 @@ static status_t recordScreen(const char* fileName) {
         printf("Main display is %dx%d @%.2ffps (orientation=%u)\n",
                 mainDpyInfo.w, mainDpyInfo.h, mainDpyInfo.fps,
                 mainDpyInfo.orientation);
+        fflush(stdout);
     }
 
     bool rotated = isDeviceRotated(mainDpyInfo.orientation);
@@ -623,6 +640,7 @@ static status_t recordScreen(const char* fileName) {
         }
         if (gVerbose) {
             printf("Bugreport overlay created\n");
+            fflush(stdout);
         }
     } else {
         // Use the encoder's input surface as the virtual display surface.
@@ -715,6 +733,7 @@ static status_t recordScreen(const char* fileName) {
 
         if (gVerbose) {
             printf("Stopping encoder and muxer\n");
+            fflush(stdout);
         }
     }
 
@@ -761,6 +780,7 @@ static status_t notifyMediaScanner(const char* fileName) {
             printf(" %s", argv[i]);
         }
         putchar('\n');
+        fflush(stdout);
     }
 
     pid_t pid = fork();
@@ -898,6 +918,7 @@ int main(int argc, char* const argv[]) {
         { "show-frame-time",    no_argument,        NULL, 'f' },
         { "rotate",             no_argument,        NULL, 'r' },
         { "output-format",      required_argument,  NULL, 'o' },
+        { "codec-name",         required_argument,  NULL, 'N' },
         { "monotonic-time",     no_argument,        NULL, 'm' },
         { NULL,                 0,                  NULL, 0 }
     };
@@ -977,6 +998,9 @@ int main(int argc, char* const argv[]) {
                 fprintf(stderr, "Unknown format '%s'\n", optarg);
                 return 2;
             }
+            break;
+        case 'N':
+            gCodecName = optarg;
             break;
         case 'm':
             gMonotonicTime = true;
