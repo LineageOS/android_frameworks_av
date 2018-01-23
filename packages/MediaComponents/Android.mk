@@ -56,3 +56,5 @@ LOCAL_STATIC_ANDROID_LIBRARIES += \
 LOCAL_USE_AAPT2 := true
 
 include $(BUILD_PACKAGE)
+
+include $(call all-makefiles-under,$(LOCAL_PATH))
