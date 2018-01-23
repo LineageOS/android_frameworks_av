@@ -98,8 +98,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     private int mCurrentBufferPercentage;
     private int mSeekWhenPrepared;  // recording the seek position while preparing
 
-    private int mSurfaceWidth;
-    private int mSurfaceHeight;
     private int mVideoWidth;
     private int mVideoHeight;
 
@@ -120,8 +118,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
         mVideoWidth = 0;
         mVideoHeight = 0;
-        mSurfaceWidth = 0;
-        mSurfaceHeight = 0;
         mSpeed = 1.0f;
         mFallbackSpeed = mSpeed;
 
@@ -137,7 +133,8 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
         mTextureView = new VideoTextureView(mInstance.getContext());
         mSurfaceView = new VideoSurfaceView(mInstance.getContext());
         LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT,
-                LayoutParams.WRAP_CONTENT);
+                LayoutParams.MATCH_PARENT);
+        params.gravity = Gravity.CENTER;
         mTextureView.setLayoutParams(params);
         mSurfaceView.setLayoutParams(params);
         mTextureView.setSurfaceListener(this);
@@ -158,16 +155,12 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
         mSubtitleView.setBackgroundColor(0);
         mInstance.addView(mSubtitleView);
 
-        // Create MediaSession
-        mMediaSession = new MediaSession(mInstance.getContext(), "VideoView2MediaSession");
-        mMediaSession.setCallback(new MediaSessionCallback());
-
         // TODO: Need a common namespace for attributes those are defined in updatable library.
         boolean enableControlView = (attrs == null) || attrs.getAttributeBooleanValue(
-                "http://schemas.android.com/apk/com.android.media.api_provider",
+                "http://schemas.android.com/apk/com.android.media.update",
                 "enableControlView", true);
         if (enableControlView) {
-            setMediaControlView2_impl(new MediaControlView2(mInstance.getContext()));
+            mMediaControlView = new MediaControlView2(mInstance.getContext());
         }
     }
 
@@ -175,15 +168,9 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     public void setMediaControlView2_impl(MediaControlView2 mediaControlView) {
         mMediaControlView = mediaControlView;
 
-        // TODO: change this so that the CC button appears only where there is a subtitle track.
-        mMediaControlView.showCCButton();
-
-        // Get MediaController from MediaSession and set it inside MediaControlView2
-        mMediaControlView.setController(mMediaSession.getController());
-
-        LayoutParams params =
-                new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-        mInstance.addView(mMediaControlView, params);
+        if (mInstance.isAttachedToWindow()) {
+            attachMediaControlView();
+        }
     }
 
     @Override
@@ -415,6 +402,25 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     }
 
     @Override
+    public void onAttachedToWindow_impl() {
+        mSuperProvider.onAttachedToWindow_impl();
+
+        // Create MediaSession
+        mMediaSession = new MediaSession(mInstance.getContext(), "VideoView2MediaSession");
+        mMediaSession.setCallback(new MediaSessionCallback());
+
+        attachMediaControlView();
+    }
+
+    @Override
+    public void onDetachedFromWindow_impl() {
+        mSuperProvider.onDetachedFromWindow_impl();
+        mMediaSession.release();
+        mMediaSession = null;
+    }
+
+
+    @Override
     public CharSequence getAccessibilityClassName_impl() {
         return VideoView2.class.getName();
     }
@@ -509,9 +515,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                     + ", mTargetState=" + mTargetState + ", width/height: " + width + "/" + height
                     + ", " + view.toString());
         }
-        mSurfaceWidth = width;
-        mSurfaceHeight = height;
-
         if (needToStart()) {
             mInstance.start();
         }
@@ -535,8 +538,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
             Log.d(TAG, "onSurfaceChanged(). width/height: " + width + "/" + height
                     + ", " + view.toString());
         }
-        mSurfaceWidth = width;
-        mSurfaceHeight = height;
     }
 
     @Override
@@ -556,6 +557,18 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     ///////////////////////////////////////////////////
     // Protected or private methods
     ///////////////////////////////////////////////////
+
+    private void attachMediaControlView() {
+        // TODO: change this so that the CC button appears only where there is a subtitle track.
+        // mMediaControlView.showCCButton();
+
+        // Get MediaController from MediaSession and set it inside MediaControlView
+        mMediaControlView.setController(mMediaSession.getController());
+
+        LayoutParams params =
+                new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+        mInstance.addView(mMediaControlView, params);
+    }
 
     private boolean isInPlaybackState() {
         return (mMediaPlayer != null
@@ -660,8 +673,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                 mAudioManager.abandonAudioFocus(null);
             }
         }
-        mSurfaceWidth = 0;
-        mSurfaceHeight = 0;
         mVideoWidth = 0;
         mVideoHeight = 0;
     }
@@ -797,8 +808,8 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
             if (mMediaControlView != null) {
                 mMediaControlView.setEnabled(true);
             }
-            mVideoWidth = mp.getVideoWidth();
-            mVideoHeight = mp.getVideoHeight();
+            int videoWidth = mp.getVideoWidth();
+            int videoHeight = mp.getVideoHeight();
 
             // mSeekWhenPrepared may be changed after seekTo() call
             int seekToPosition = mSeekWhenPrepared;
@@ -816,39 +827,32 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                 mMediaSession.setMetadata(builder.build());
             }
 
-            if (mVideoWidth != 0 && mVideoHeight != 0) {
-                if (mVideoWidth != mSurfaceWidth || mVideoHeight != mSurfaceHeight) {
+            if (videoWidth != 0 && videoHeight != 0) {
+                if (videoWidth != mVideoWidth || videoHeight != mVideoHeight) {
                     if (DEBUG) {
                         Log.i(TAG, "OnPreparedListener() : ");
-                        Log.i(TAG, " video size: " + mVideoWidth + "/" + mVideoHeight);
-                        Log.i(TAG, " surface size: " + mSurfaceWidth + "/" + mSurfaceHeight);
+                        Log.i(TAG, " video size: " + videoWidth + "/" + videoHeight);
                         Log.i(TAG, " measuredSize: " + mInstance.getMeasuredWidth() + "/"
                                 + mInstance.getMeasuredHeight());
                         Log.i(TAG, " viewSize: " + mInstance.getWidth() + "/"
                                 + mInstance.getHeight());
                     }
 
-                    // TODO: It seems like that overriding onMeasure() is needed like legacy code.
-                    mSurfaceWidth = mVideoWidth;
-                    mSurfaceHeight = mVideoHeight;
+                    mVideoWidth = videoWidth;
+                    mVideoHeight = videoHeight;
                     mInstance.requestLayout();
                 }
-                if (mSurfaceWidth == mVideoWidth && mSurfaceHeight == mVideoHeight) {
-                    // We didn't actually change the size (it was already at the size
-                    // we need), so we won't get a "surface changed" callback, so
-                    // start the video here instead of in the callback.
-                    if (needToStart()) {
-                        mInstance.start();
-                        if (mMediaControlView != null) {
-                            mMediaControlView.show();
-                        }
-                    } else if (!mInstance.isPlaying() && (seekToPosition != 0
-                            || mInstance.getCurrentPosition() > 0)) {
-                        if (mMediaControlView != null) {
-                            // Show the media controls when we're paused into a video and
-                            // make them stick.
-                            mMediaControlView.show(0);
-                        }
+                if (needToStart()) {
+                    mInstance.start();
+                    if (mMediaControlView != null) {
+                        mMediaControlView.show();
+                    }
+                } else if (!mInstance.isPlaying() && (seekToPosition != 0
+                        || mInstance.getCurrentPosition() > 0)) {
+                    if (mMediaControlView != null) {
+                        // Show the media controls when we're paused into a video and
+                        // make them stick.
+                        mMediaControlView.show(0);
                     }
                 }
             } else {

@@ -231,6 +231,15 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     }
 
     @Override
+    public void onAttachedToWindow_impl() {
+        mSuperProvider.onAttachedToWindow_impl();
+    }
+    @Override
+    public void onDetachedFromWindow_impl() {
+        mSuperProvider.onDetachedFromWindow_impl();
+    }
+
+    @Override
     public CharSequence getAccessibilityClassName_impl() {
         return MediaControlView2.class.getName();
     }
