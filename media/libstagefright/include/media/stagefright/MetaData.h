@@ -24,7 +24,6 @@
 
 #include <binder/Parcel.h>
 #include <utils/RefBase.h>
-#include <utils/KeyedVector.h>
 #include <utils/String8.h>
 
 namespace android {
@@ -287,51 +286,10 @@ protected:
     virtual ~MetaData();
 
 private:
-    struct typed_data {
-        typed_data();
-        ~typed_data();
-
-        typed_data(const MetaData::typed_data &);
-        typed_data &operator=(const MetaData::typed_data &);
-
-        void clear();
-        void setData(uint32_t type, const void *data, size_t size);
-        void getData(uint32_t *type, const void **data, size_t *size) const;
-        // may include hexdump of binary data if verbose=true
-        String8 asString(bool verbose) const;
-
-    private:
-        uint32_t mType;
-        size_t mSize;
-
-        union {
-            void *ext_data;
-            float reservoir;
-        } u;
-
-        bool usesReservoir() const {
-            return mSize <= sizeof(u.reservoir);
-        }
-
-        void *allocateStorage(size_t size);
-        void freeStorage();
-
-        void *storage() {
-            return usesReservoir() ? &u.reservoir : u.ext_data;
-        }
-
-        const void *storage() const {
-            return usesReservoir() ? &u.reservoir : u.ext_data;
-        }
-    };
-
-    struct Rect {
-        int32_t mLeft, mTop, mRight, mBottom;
-    };
-
-    KeyedVector<uint32_t, typed_data> mItems;
-
-    // MetaData &operator=(const MetaData &);
+    struct typed_data;
+    struct Rect;
+    struct MetaDataInternal;
+    MetaDataInternal *mInternalData;
 };
 
 }  // namespace android

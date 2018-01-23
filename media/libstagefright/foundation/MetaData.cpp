@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MetaData"
 #include <inttypes.h>
+#include <utils/KeyedVector.h>
 #include <utils/Log.h>
 
 #include <stdlib.h>
@@ -29,30 +30,81 @@
 
 namespace android {
 
-MetaData::MetaData() {
+struct MetaData::typed_data {
+    typed_data();
+    ~typed_data();
+
+    typed_data(const MetaData::typed_data &);
+    typed_data &operator=(const MetaData::typed_data &);
+
+    void clear();
+    void setData(uint32_t type, const void *data, size_t size);
+    void getData(uint32_t *type, const void **data, size_t *size) const;
+    // may include hexdump of binary data if verbose=true
+    String8 asString(bool verbose) const;
+
+private:
+    uint32_t mType;
+    size_t mSize;
+
+    union {
+        void *ext_data;
+        float reservoir;
+    } u;
+
+    bool usesReservoir() const {
+        return mSize <= sizeof(u.reservoir);
+    }
+
+    void *allocateStorage(size_t size);
+    void freeStorage();
+
+    void *storage() {
+        return usesReservoir() ? &u.reservoir : u.ext_data;
+    }
+
+    const void *storage() const {
+        return usesReservoir() ? &u.reservoir : u.ext_data;
+    }
+};
+
+struct MetaData::Rect {
+    int32_t mLeft, mTop, mRight, mBottom;
+};
+
+
+struct MetaData::MetaDataInternal {
+    KeyedVector<uint32_t, MetaData::typed_data> mItems;
+};
+
+
+MetaData::MetaData()
+    : mInternalData(new MetaDataInternal()) {
 }
 
 MetaData::MetaData(const MetaData &from)
     : RefBase(),
-      mItems(from.mItems) {
+      mInternalData(new MetaDataInternal()) {
+    mInternalData->mItems = from.mInternalData->mItems;
 }
 
 MetaData::~MetaData() {
     clear();
+    delete mInternalData;
 }
 
 void MetaData::clear() {
-    mItems.clear();
+    mInternalData->mItems.clear();
 }
 
 bool MetaData::remove(uint32_t key) {
-    ssize_t i = mItems.indexOfKey(key);
+    ssize_t i = mInternalData->mItems.indexOfKey(key);
 
     if (i < 0) {
         return false;
     }
 
-    mItems.removeItemsAt(i);
+    mInternalData->mItems.removeItemsAt(i);
 
     return true;
 }
@@ -192,15 +244,15 @@ bool MetaData::setData(
         uint32_t key, uint32_t type, const void *data, size_t size) {
     bool overwrote_existing = true;
 
-    ssize_t i = mItems.indexOfKey(key);
+    ssize_t i = mInternalData->mItems.indexOfKey(key);
     if (i < 0) {
         typed_data item;
-        i = mItems.add(key, item);
+        i = mInternalData->mItems.add(key, item);
 
         overwrote_existing = false;
     }
 
-    typed_data &item = mItems.editValueAt(i);
+    typed_data &item = mInternalData->mItems.editValueAt(i);
 
     item.setData(type, data, size);
 
@@ -209,13 +261,13 @@ bool MetaData::setData(
 
 bool MetaData::findData(uint32_t key, uint32_t *type,
                         const void **data, size_t *size) const {
-    ssize_t i = mItems.indexOfKey(key);
+    ssize_t i = mInternalData->mItems.indexOfKey(key);
 
     if (i < 0) {
         return false;
     }
 
-    const typed_data &item = mItems.valueAt(i);
+    const typed_data &item = mInternalData->mItems.valueAt(i);
 
     item.getData(type, data, size);
 
@@ -223,7 +275,7 @@ bool MetaData::findData(uint32_t key, uint32_t *type,
 }
 
 bool MetaData::hasData(uint32_t key) const {
-    ssize_t i = mItems.indexOfKey(key);
+    ssize_t i = mInternalData->mItems.indexOfKey(key);
 
     if (i < 0) {
         return false;
@@ -369,11 +421,11 @@ static void MakeFourCCString(uint32_t x, char *s) {
 
 String8 MetaData::toString() const {
     String8 s;
-    for (int i = mItems.size(); --i >= 0;) {
-        int32_t key = mItems.keyAt(i);
+    for (int i = mInternalData->mItems.size(); --i >= 0;) {
+        int32_t key = mInternalData->mItems.keyAt(i);
         char cc[5];
         MakeFourCCString(key, cc);
-        const typed_data &item = mItems.valueAt(i);
+        const typed_data &item = mInternalData->mItems.valueAt(i);
         s.appendFormat("%s: %s", cc, item.asString(false).string());
         if (i != 0) {
             s.append(", ");
@@ -382,25 +434,25 @@ String8 MetaData::toString() const {
     return s;
 }
 void MetaData::dumpToLog() const {
-    for (int i = mItems.size(); --i >= 0;) {
-        int32_t key = mItems.keyAt(i);
+    for (int i = mInternalData->mItems.size(); --i >= 0;) {
+        int32_t key = mInternalData->mItems.keyAt(i);
         char cc[5];
         MakeFourCCString(key, cc);
-        const typed_data &item = mItems.valueAt(i);
+        const typed_data &item = mInternalData->mItems.valueAt(i);
         ALOGI("%s: %s", cc, item.asString(true /* verbose */).string());
     }
 }
 
 status_t MetaData::writeToParcel(Parcel &parcel) {
     status_t ret;
-    size_t numItems = mItems.size();
+    size_t numItems = mInternalData->mItems.size();
     ret = parcel.writeUint32(uint32_t(numItems));
     if (ret) {
         return ret;
     }
     for (size_t i = 0; i < numItems; i++) {
-        int32_t key = mItems.keyAt(i);
-        const typed_data &item = mItems.valueAt(i);
+        int32_t key = mInternalData->mItems.keyAt(i);
+        const typed_data &item = mInternalData->mItems.valueAt(i);
         uint32_t type;
         const void *data;
         size_t size;
