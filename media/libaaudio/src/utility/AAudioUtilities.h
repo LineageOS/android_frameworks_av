@@ -27,9 +27,6 @@
 
 #include "aaudio/AAudio.h"
 
-
-constexpr aaudio_session_id_t AAUDIO_SESSION_ID_MIN = 1; // must be positive
-
 /**
  * Convert an AAudio result into the closest matching Android status.
  */
