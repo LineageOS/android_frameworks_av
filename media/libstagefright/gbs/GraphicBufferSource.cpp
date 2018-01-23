@@ -22,9 +22,8 @@
 
 #define STRINGIFY_ENUMS // for asString in HardwareAPI.h/VideoAPI.h
 
-#include <media/stagefright/omx/GraphicBufferSource.h>
-#include <media/stagefright/omx/FrameDropper.h>
-#include <media/stagefright/omx/OMXUtils.h>
+#include <media/stagefright/gbs/GraphicBufferSource.h>
+#include <media/stagefright/gbs/FrameDropper.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ColorUtils.h>
@@ -34,9 +33,6 @@
 #include <ui/GraphicBuffer.h>
 #include <gui/BufferItem.h>
 #include <media/hardware/HardwareAPI.h>
-#include <media/openmax/OMX_Component.h>
-#include <media/openmax/OMX_IndexExt.h>
-#include <media/OMXBuffer.h>
 
 #include <inttypes.h>
 
@@ -361,9 +357,9 @@ GraphicBufferSource::~GraphicBufferSource() {
     }
 }
 
-Status GraphicBufferSource::onOmxExecuting() {
+Status GraphicBufferSource::start() {
     Mutex::Autolock autoLock(mMutex);
-    ALOGV("--> executing; available=%zu, submittable=%zd",
+    ALOGV("--> start; available=%zu, submittable=%zd",
             mAvailableBuffers.size(), mFreeCodecBuffers.size());
     CHECK(!mExecuting);
     mExecuting = true;
@@ -411,8 +407,8 @@ Status GraphicBufferSource::onOmxExecuting() {
     return Status::ok();
 }
 
-Status GraphicBufferSource::onOmxIdle() {
-    ALOGV("omxIdle");
+Status GraphicBufferSource::stop() {
+    ALOGV("stop");
 
     Mutex::Autolock autoLock(mMutex);
 
@@ -424,7 +420,7 @@ Status GraphicBufferSource::onOmxIdle() {
     return Status::ok();
 }
 
-Status GraphicBufferSource::onOmxLoaded(){
+Status GraphicBufferSource::release(){
     Mutex::Autolock autoLock(mMutex);
     if (mLooper != NULL) {
         mLooper->unregisterHandler(mReflector->id());
@@ -434,7 +430,7 @@ Status GraphicBufferSource::onOmxLoaded(){
         mLooper.clear();
     }
 
-    ALOGV("--> loaded; available=%zu+%d eos=%d eosSent=%d acquired=%d",
+    ALOGV("--> release; available=%zu+%d eos=%d eosSent=%d acquired=%d",
             mAvailableBuffers.size(), mNumAvailableUnacquiredBuffers,
             mEndOfStream, mEndOfStreamSent, mNumOutstandingAcquires);
 
@@ -442,7 +438,7 @@ Status GraphicBufferSource::onOmxLoaded(){
     mFreeCodecBuffers.clear();
     mSubmittedCodecBuffers.clear();
     mLatestBuffer.mBuffer.reset();
-    mOMXNode.clear();
+    mComponent.clear();
     mExecuting = false;
 
     return Status::ok();
@@ -537,7 +533,8 @@ void GraphicBufferSource::onDataspaceChanged_l(
     mLastDataspace = dataspace;
 
     if (ColorUtils::convertDataSpaceToV0(dataspace)) {
-        mOMXNode->dispatchDataSpaceChanged(mLastDataspace, mDefaultColorAspectsPacked, pixelFormat);
+        mComponent->dispatchDataSpaceChanged(
+                mLastDataspace, mDefaultColorAspectsPacked, pixelFormat);
     }
 }
 
@@ -631,7 +628,7 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
                 default:
                     TRESPASS_DBG("Unknown action type");
                     // return true here because we did consume an available buffer, so the
-                    // loop in onOmxExecuting will eventually terminate even if we hit this.
+                    // loop in start will eventually terminate even if we hit this.
                     return false;
             }
         }
@@ -799,7 +796,7 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
 
 status_t GraphicBufferSource::submitBuffer_l(const VideoBuffer &item) {
     CHECK(!mFreeCodecBuffers.empty());
-    IOMX::buffer_id codecBufferId = *mFreeCodecBuffers.begin();
+    uint32_t codecBufferId = *mFreeCodecBuffers.begin();
 
     ALOGV("submitBuffer_l [slot=%d, bufferId=%d]", item.mBuffer->getSlot(), codecBufferId);
 
@@ -815,15 +812,14 @@ status_t GraphicBufferSource::submitBuffer_l(const VideoBuffer &item) {
     }
 
     std::shared_ptr<AcquiredBuffer> buffer = item.mBuffer;
-    // use a GraphicBuffer for now as OMXNodeInstance is using GraphicBuffers to hold references
+    // use a GraphicBuffer for now as component is using GraphicBuffers to hold references
     // and it requires this graphic buffer to be able to hold its reference
     // and thus we would need to create a new GraphicBuffer from an ANWBuffer separate from the
     // acquired GraphicBuffer.
     // TODO: this can be reworked globally to use ANWBuffer references
     sp<GraphicBuffer> graphicBuffer = buffer->getGraphicBuffer();
-    status_t err = mOMXNode->emptyBuffer(
-            codecBufferId, OMX_BUFFERFLAG_ENDOFFRAME, graphicBuffer, codecTimeUs,
-            buffer->getAcquireFenceFd());
+    status_t err = mComponent->submitBuffer(
+            codecBufferId, graphicBuffer, codecTimeUs, buffer->getAcquireFenceFd());
 
     if (err != OK) {
         ALOGW("WARNING: emptyGraphicBuffer failed: 0x%x", err);
@@ -849,11 +845,10 @@ void GraphicBufferSource::submitEndOfInputStream_l() {
         ALOGV("submitEndOfInputStream_l: no codec buffers available");
         return;
     }
-    IOMX::buffer_id codecBufferId = *mFreeCodecBuffers.begin();
+    uint32_t codecBufferId = *mFreeCodecBuffers.begin();
 
     // We reject any additional incoming graphic buffers. There is no acquired buffer used for EOS
-    status_t err = mOMXNode->emptyBuffer(
-            codecBufferId, OMX_BUFFERFLAG_ENDOFFRAME | OMX_BUFFERFLAG_EOS);
+    status_t err = mComponent->submitEos(codecBufferId);
     if (err != OK) {
         ALOGW("emptyDirectBuffer EOS failed: 0x%x", err);
     } else {
@@ -959,7 +954,7 @@ void GraphicBufferSource::onFrameAvailable(const BufferItem& item __unused) {
 
 bool GraphicBufferSource::areWeDiscardingAvailableBuffers_l() {
     return mEndOfStreamSent // already sent EOS to codec
-            || mOMXNode == nullptr // there is no codec connected
+            || mComponent == nullptr // there is no codec connected
             || (mSuspended && mActionQueue.empty()) // we are suspended and not waiting for
                                                     // any further action
             || !mExecuting;
@@ -970,7 +965,7 @@ void GraphicBufferSource::onBufferAcquired_l(const VideoBuffer &buffer) {
         // This should only be possible if a new buffer was queued after
         // EOS was signaled, i.e. the app is misbehaving.
         ALOGW("onFrameAvailable: EOS is sent, ignoring frame");
-    } else if (mOMXNode == NULL || (mSuspended && mActionQueue.empty())) {
+    } else if (mComponent == NULL || (mSuspended && mActionQueue.empty())) {
         // FIXME: if we are suspended but have a resume queued we will stop repeating the last
         // frame. Is that the desired behavior?
         ALOGV("onFrameAvailable: suspended, ignoring frame");
@@ -1064,13 +1059,13 @@ void GraphicBufferSource::onSidebandStreamChanged() {
 }
 
 status_t GraphicBufferSource::configure(
-        const sp<IOmxNodeWrapper>& omxNode,
+        const sp<ComponentWrapper>& component,
         int32_t dataSpace,
         int32_t bufferCount,
         uint32_t frameWidth,
         uint32_t frameHeight,
         uint32_t consumerUsage) {
-    if (omxNode == NULL) {
+    if (component == NULL) {
         return BAD_VALUE;
     }
 
@@ -1088,7 +1083,7 @@ status_t GraphicBufferSource::configure(
 
     {
         Mutex::Autolock autoLock(mMutex);
-        mOMXNode = omxNode;
+        mComponent = component;
 
         err = mConsumer->setDefaultBufferSize(frameWidth, frameHeight);
         if (err != NO_ERROR) {
@@ -1320,7 +1315,7 @@ status_t GraphicBufferSource::signalEndOfInputStream() {
     // Set the end-of-stream flag.  If no frames are pending from the
     // BufferQueue, and a codec buffer is available, and we're executing,
     // and there is no stop timestamp, we initiate the EOS from here.
-    // Otherwise, we'll let codecBufferEmptied() (or omxExecuting) do it.
+    // Otherwise, we'll let codecBufferEmptied() (or start) do it.
     //
     // Note: if there are no pending frames and all codec buffers are
     // available, we *must* submit the EOS from here or we'll just
