@@ -741,7 +741,7 @@ status_t Camera3Device::checkStatusOkToCaptureLocked() {
 }
 
 status_t Camera3Device::convertMetadataListToRequestListLocked(
-        const List<const CameraMetadata> &metadataList,
+        const List<const PhysicalCameraSettingsList> &metadataList,
         const std::list<const SurfaceMap> &surfaceMaps,
         bool repeating,
         RequestList *requestList) {
@@ -751,7 +751,7 @@ status_t Camera3Device::convertMetadataListToRequestListLocked(
     }
 
     int32_t burstId = 0;
-    List<const CameraMetadata>::const_iterator metadataIt = metadataList.begin();
+    List<const PhysicalCameraSettingsList>::const_iterator metadataIt = metadataList.begin();
     std::list<const SurfaceMap>::const_iterator surfaceMapIt = surfaceMaps.begin();
     for (; metadataIt != metadataList.end() && surfaceMapIt != surfaceMaps.end();
             ++metadataIt, ++surfaceMapIt) {
@@ -765,12 +765,13 @@ status_t Camera3Device::convertMetadataListToRequestListLocked(
 
         // Setup burst Id and request Id
         newRequest->mResultExtras.burstId = burstId++;
-        if (metadataIt->exists(ANDROID_REQUEST_ID)) {
-            if (metadataIt->find(ANDROID_REQUEST_ID).count == 0) {
+        if (metadataIt->begin()->metadata.exists(ANDROID_REQUEST_ID)) {
+            if (metadataIt->begin()->metadata.find(ANDROID_REQUEST_ID).count == 0) {
                 CLOGE("RequestID entry exists; but must not be empty in metadata");
                 return BAD_VALUE;
             }
-            newRequest->mResultExtras.requestId = metadataIt->find(ANDROID_REQUEST_ID).data.i32[0];
+            newRequest->mResultExtras.requestId = metadataIt->begin()->metadata.find(
+                    ANDROID_REQUEST_ID).data.i32[0];
         } else {
             CLOGE("RequestID does not exist in metadata");
             return BAD_VALUE;
@@ -802,17 +803,19 @@ status_t Camera3Device::convertMetadataListToRequestListLocked(
 status_t Camera3Device::capture(CameraMetadata &request, int64_t* /*lastFrameNumber*/) {
     ATRACE_CALL();
 
-    List<const CameraMetadata> requests;
+    List<const PhysicalCameraSettingsList> requestsList;
     std::list<const SurfaceMap> surfaceMaps;
-    convertToRequestList(requests, surfaceMaps, request);
+    convertToRequestList(requestsList, surfaceMaps, request);
 
-    return captureList(requests, surfaceMaps, /*lastFrameNumber*/NULL);
+    return captureList(requestsList, surfaceMaps, /*lastFrameNumber*/NULL);
 }
 
-void Camera3Device::convertToRequestList(List<const CameraMetadata>& requests,
+void Camera3Device::convertToRequestList(List<const PhysicalCameraSettingsList>& requestsList,
         std::list<const SurfaceMap>& surfaceMaps,
         const CameraMetadata& request) {
-    requests.push_back(request);
+    PhysicalCameraSettingsList requestList;
+    requestList.push_back({std::string(getId().string()), request});
+    requestsList.push_back(requestList);
 
     SurfaceMap surfaceMap;
     camera_metadata_ro_entry streams = request.find(ANDROID_REQUEST_OUTPUT_STREAMS);
@@ -825,7 +828,7 @@ void Camera3Device::convertToRequestList(List<const CameraMetadata>& requests,
 }
 
 status_t Camera3Device::submitRequestsHelper(
-        const List<const CameraMetadata> &requests,
+        const List<const PhysicalCameraSettingsList> &requests,
         const std::list<const SurfaceMap> &surfaceMaps,
         bool repeating,
         /*out*/
@@ -1075,42 +1078,43 @@ void Camera3Device::notify(
     notify(&m);
 }
 
-status_t Camera3Device::captureList(const List<const CameraMetadata> &requests,
+status_t Camera3Device::captureList(const List<const PhysicalCameraSettingsList> &requestsList,
                                     const std::list<const SurfaceMap> &surfaceMaps,
                                     int64_t *lastFrameNumber) {
     ATRACE_CALL();
 
-    return submitRequestsHelper(requests, surfaceMaps, /*repeating*/false, lastFrameNumber);
+    return submitRequestsHelper(requestsList, surfaceMaps, /*repeating*/false, lastFrameNumber);
 }
 
 status_t Camera3Device::setStreamingRequest(const CameraMetadata &request,
                                             int64_t* /*lastFrameNumber*/) {
     ATRACE_CALL();
 
-    List<const CameraMetadata> requests;
+    List<const PhysicalCameraSettingsList> requestsList;
     std::list<const SurfaceMap> surfaceMaps;
-    convertToRequestList(requests, surfaceMaps, request);
+    convertToRequestList(requestsList, surfaceMaps, request);
 
-    return setStreamingRequestList(requests, /*surfaceMap*/surfaceMaps,
+    return setStreamingRequestList(requestsList, /*surfaceMap*/surfaceMaps,
                                    /*lastFrameNumber*/NULL);
 }
 
-status_t Camera3Device::setStreamingRequestList(const List<const CameraMetadata> &requests,
-                                                const std::list<const SurfaceMap> &surfaceMaps,
-                                                int64_t *lastFrameNumber) {
+status_t Camera3Device::setStreamingRequestList(
+        const List<const PhysicalCameraSettingsList> &requestsList,
+        const std::list<const SurfaceMap> &surfaceMaps, int64_t *lastFrameNumber) {
     ATRACE_CALL();
 
-    return submitRequestsHelper(requests, surfaceMaps, /*repeating*/true, lastFrameNumber);
+    return submitRequestsHelper(requestsList, surfaceMaps, /*repeating*/true, lastFrameNumber);
 }
 
 sp<Camera3Device::CaptureRequest> Camera3Device::setUpRequestLocked(
-        const CameraMetadata &request, const SurfaceMap &surfaceMap) {
+        const PhysicalCameraSettingsList &request, const SurfaceMap &surfaceMap) {
     status_t res;
 
     if (mStatus == STATUS_UNCONFIGURED || mNeedConfig) {
         // This point should only be reached via API1 (API2 must explicitly call configureStreams)
         // so unilaterally select normal operating mode.
-        res = filterParamsAndConfigureLocked(request, CAMERA3_STREAM_CONFIGURATION_NORMAL_MODE);
+        res = filterParamsAndConfigureLocked(request.begin()->metadata,
+                CAMERA3_STREAM_CONFIGURATION_NORMAL_MODE);
         // Stream configuration failed. Client might try other configuraitons.
         if (res != OK) {
             CLOGE("Can't set up streams: %s (%d)", strerror(-res), res);
@@ -2094,15 +2098,15 @@ status_t Camera3Device::dropStreamBuffers(bool dropping, int streamId) {
  */
 
 sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
-        const CameraMetadata &request, const SurfaceMap &surfaceMap) {
+        const PhysicalCameraSettingsList &request, const SurfaceMap &surfaceMap) {
     ATRACE_CALL();
     status_t res;
 
     sp<CaptureRequest> newRequest = new CaptureRequest;
-    newRequest->mSettings = request;
+    newRequest->mSettingsList = request;
 
     camera_metadata_entry_t inputStreams =
-            newRequest->mSettings.find(ANDROID_REQUEST_INPUT_STREAMS);
+            newRequest->mSettingsList.begin()->metadata.find(ANDROID_REQUEST_INPUT_STREAMS);
     if (inputStreams.count > 0) {
         if (mInputStream == NULL ||
                 mInputStream->getId() != inputStreams.data.i32[0]) {
@@ -2128,11 +2132,11 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
         }
 
         newRequest->mInputStream = mInputStream;
-        newRequest->mSettings.erase(ANDROID_REQUEST_INPUT_STREAMS);
+        newRequest->mSettingsList.begin()->metadata.erase(ANDROID_REQUEST_INPUT_STREAMS);
     }
 
     camera_metadata_entry_t streams =
-            newRequest->mSettings.find(ANDROID_REQUEST_OUTPUT_STREAMS);
+            newRequest->mSettingsList.begin()->metadata.find(ANDROID_REQUEST_OUTPUT_STREAMS);
     if (streams.count == 0) {
         CLOGE("Zero output streams specified!");
         return NULL;
@@ -2180,7 +2184,7 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
 
         newRequest->mOutputStreams.push(stream);
     }
-    newRequest->mSettings.erase(ANDROID_REQUEST_OUTPUT_STREAMS);
+    newRequest->mSettingsList.begin()->metadata.erase(ANDROID_REQUEST_OUTPUT_STREAMS);
     newRequest->mBatchSize = 1;
 
     return newRequest;
@@ -3615,13 +3619,29 @@ status_t Camera3Device::HalInterface::processBatchCaptureRequests(
     ATRACE_NAME("CameraHal::processBatchCaptureRequests");
     if (!valid()) return INVALID_OPERATION;
 
+    sp<device::V3_4::ICameraDeviceSession> hidlSession_3_4;
+    auto castResult_3_4 = device::V3_4::ICameraDeviceSession::castFrom(mHidlSession);
+    if (castResult_3_4.isOk()) {
+        hidlSession_3_4 = castResult_3_4;
+    }
+
     hardware::hidl_vec<device::V3_2::CaptureRequest> captureRequests;
+    hardware::hidl_vec<device::V3_4::CaptureRequest> captureRequests_3_4;
     size_t batchSize = requests.size();
-    captureRequests.resize(batchSize);
+    if (hidlSession_3_4 != nullptr) {
+        captureRequests_3_4.resize(batchSize);
+    } else {
+        captureRequests.resize(batchSize);
+    }
     std::vector<native_handle_t*> handlesCreated;
 
     for (size_t i = 0; i < batchSize; i++) {
-        wrapAsHidlRequest(requests[i], /*out*/&captureRequests[i], /*out*/&handlesCreated);
+        if (hidlSession_3_4 != nullptr) {
+            wrapAsHidlRequest(requests[i], /*out*/&captureRequests_3_4[i].v3_2,
+                    /*out*/&handlesCreated);
+        } else {
+            wrapAsHidlRequest(requests[i], /*out*/&captureRequests[i], /*out*/&handlesCreated);
+        }
     }
 
     std::vector<device::V3_2::BufferCache> cachesToRemove;
@@ -3642,7 +3662,12 @@ status_t Camera3Device::HalInterface::processBatchCaptureRequests(
     // Write metadata to FMQ.
     for (size_t i = 0; i < batchSize; i++) {
         camera3_capture_request_t* request = requests[i];
-        device::V3_2::CaptureRequest* captureRequest = &captureRequests[i];
+        device::V3_2::CaptureRequest* captureRequest;
+        if (hidlSession_3_4 != nullptr) {
+            captureRequest = &captureRequests_3_4[i].v3_2;
+        } else {
+            captureRequest = &captureRequests[i];
+        }
 
         if (request->settings != nullptr) {
             size_t settingsSize = get_camera_metadata_size(request->settings);
@@ -3664,12 +3689,46 @@ status_t Camera3Device::HalInterface::processBatchCaptureRequests(
             captureRequest->settings.resize(0);
             captureRequest->fmqSettingsSize = 0u;
         }
+
+        if (hidlSession_3_4 != nullptr) {
+            captureRequests_3_4[i].physicalCameraSettings.resize(request->num_physcam_settings);
+            for (size_t j = 0; j < request->num_physcam_settings; j++) {
+                size_t settingsSize = get_camera_metadata_size(request->physcam_settings[j]);
+                if (mRequestMetadataQueue != nullptr && mRequestMetadataQueue->write(
+                            reinterpret_cast<const uint8_t*>(request->physcam_settings[j]),
+                            settingsSize)) {
+                    captureRequests_3_4[i].physicalCameraSettings[j].settings.resize(0);
+                    captureRequests_3_4[i].physicalCameraSettings[j].fmqSettingsSize = settingsSize;
+                } else {
+                    if (mRequestMetadataQueue != nullptr) {
+                        ALOGW("%s: couldn't utilize fmq, fallback to hwbinder", __FUNCTION__);
+                    }
+                    captureRequests_3_4[i].physicalCameraSettings[j].settings.setToExternal(
+                            reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(
+                                    request->physcam_settings[j])),
+                            get_camera_metadata_size(request->physcam_settings[j]));
+                    captureRequests_3_4[i].physicalCameraSettings[j].fmqSettingsSize = 0u;
+                }
+                captureRequests_3_4[i].physicalCameraSettings[j].physicalCameraId =
+                    request->physcam_id[j];
+            }
+        }
     }
-    auto err = mHidlSession->processCaptureRequest(captureRequests, cachesToRemove,
+
+    hardware::details::return_status err;
+    if (hidlSession_3_4 != nullptr) {
+        err = hidlSession_3_4->processCaptureRequest_3_4(captureRequests_3_4, cachesToRemove,
             [&status, &numRequestProcessed] (auto s, uint32_t n) {
                 status = s;
                 *numRequestProcessed = n;
             });
+    } else {
+        err = mHidlSession->processCaptureRequest(captureRequests, cachesToRemove,
+            [&status, &numRequestProcessed] (auto s, uint32_t n) {
+                status = s;
+                *numRequestProcessed = n;
+            });
+    }
     if (!err.isOk()) {
         ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
         return DEAD_OBJECT;
@@ -4152,8 +4211,11 @@ bool Camera3Device::RequestThread::sendRequestsBatch() {
         }
 
         if (nextRequest.halRequest.settings != NULL) {
-            nextRequest.captureRequest->mSettings.unlock(nextRequest.halRequest.settings);
+            nextRequest.captureRequest->mSettingsList.begin()->metadata.unlock(
+                    nextRequest.halRequest.settings);
         }
+
+        cleanupPhysicalSettings(nextRequest.captureRequest, &nextRequest.halRequest);
 
         if (!triggerRemoveFailed) {
             // Remove any previously queued triggers (after unlock)
@@ -4223,8 +4285,11 @@ bool Camera3Device::RequestThread::sendRequestsOneByOne() {
         }
 
         if (nextRequest.halRequest.settings != NULL) {
-            nextRequest.captureRequest->mSettings.unlock(nextRequest.halRequest.settings);
+            nextRequest.captureRequest->mSettingsList.begin()->metadata.unlock(
+                    nextRequest.halRequest.settings);
         }
+
+        cleanupPhysicalSettings(nextRequest.captureRequest, &nextRequest.halRequest);
 
         // Remove any previously queued triggers (after unlock)
         res = removeTriggers(mPrevRequest);
@@ -4339,7 +4404,7 @@ bool Camera3Device::RequestThread::threadLoop() {
     // Get the latest request ID, if any
     int latestRequestId;
     camera_metadata_entry_t requestIdEntry = mNextRequests[mNextRequests.size() - 1].
-            captureRequest->mSettings.find(ANDROID_REQUEST_ID);
+            captureRequest->mSettingsList.begin()->metadata.find(ANDROID_REQUEST_ID);
     if (requestIdEntry.count > 0) {
         latestRequestId = requestIdEntry.data.i32[0];
     } else {
@@ -4351,7 +4416,7 @@ bool Camera3Device::RequestThread::threadLoop() {
     //  or a single request from streaming or burst. In either case the first element
     //  should contain the latest camera settings that we need to check for any session
     //  parameter updates.
-    if (updateSessionParameters(mNextRequests[0].captureRequest->mSettings)) {
+    if (updateSessionParameters(mNextRequests[0].captureRequest->mSettingsList.begin()->metadata)) {
         res = OK;
 
         //Input stream buffers are already acquired at this point so an input stream
@@ -4493,8 +4558,8 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
              * The request should be presorted so accesses in HAL
              *   are O(logn). Sidenote, sorting a sorted metadata is nop.
              */
-            captureRequest->mSettings.sort();
-            halRequest->settings = captureRequest->mSettings.getAndLock();
+            captureRequest->mSettingsList.begin()->metadata.sort();
+            halRequest->settings = captureRequest->mSettingsList.begin()->metadata.getAndLock();
             mPrevRequest = captureRequest;
             ALOGVV("%s: Request settings are NEW", __FUNCTION__);
 
@@ -4516,6 +4581,20 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             // leave request.settings NULL to indicate 'reuse latest given'
             ALOGVV("%s: Request settings are REUSED",
                    __FUNCTION__);
+        }
+
+        if (captureRequest->mSettingsList.size() > 1) {
+            halRequest->num_physcam_settings = captureRequest->mSettingsList.size() - 1;
+            halRequest->physcam_id = new const char* [halRequest->num_physcam_settings];
+            halRequest->physcam_settings =
+                new const camera_metadata* [halRequest->num_physcam_settings];
+            auto it = ++captureRequest->mSettingsList.begin();
+            size_t i = 0;
+            for (; it != captureRequest->mSettingsList.end(); it++, i++) {
+                halRequest->physcam_id[i] = it->cameraId.c_str();
+                it->metadata.sort();
+                halRequest->physcam_settings[i] = it->metadata.getAndLock();
+            }
         }
 
         uint32_t totalNumBuffers = 0;
@@ -4688,6 +4767,30 @@ nsecs_t Camera3Device::getExpectedInFlightDuration() {
             mExpectedInflightDuration : kMinInflightDuration;
 }
 
+void Camera3Device::RequestThread::cleanupPhysicalSettings(sp<CaptureRequest> request,
+        camera3_capture_request_t *halRequest) {
+    if ((request == nullptr) || (halRequest == nullptr)) {
+        ALOGE("%s: Invalid request!", __FUNCTION__);
+        return;
+    }
+
+    if (halRequest->num_physcam_settings > 0) {
+        if (halRequest->physcam_id != nullptr) {
+            delete [] halRequest->physcam_id;
+            halRequest->physcam_id = nullptr;
+        }
+        if (halRequest->physcam_settings != nullptr) {
+            auto it = ++(request->mSettingsList.begin());
+            size_t i = 0;
+            for (; it != request->mSettingsList.end(); it++, i++) {
+                it->metadata.unlock(halRequest->physcam_settings[i]);
+            }
+            delete [] halRequest->physcam_settings;
+            halRequest->physcam_settings = nullptr;
+        }
+    }
+}
+
 void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) {
     if (mNextRequests.empty()) {
         return;
@@ -4704,8 +4807,10 @@ void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) 
         Vector<camera3_stream_buffer_t>* outputBuffers = &nextRequest.outputBuffers;
 
         if (halRequest->settings != NULL) {
-            captureRequest->mSettings.unlock(halRequest->settings);
+            captureRequest->mSettingsList.begin()->metadata.unlock(halRequest->settings);
         }
+
+        cleanupPhysicalSettings(captureRequest, halRequest);
 
         if (captureRequest->mInputStream != NULL) {
             captureRequest->mInputBuffer.status = CAMERA3_BUFFER_STATUS_ERROR;
@@ -4970,7 +5075,7 @@ status_t Camera3Device::RequestThread::insertTriggers(
         return DEAD_OBJECT;
     }
 
-    CameraMetadata &metadata = request->mSettings;
+    CameraMetadata &metadata = request->mSettingsList.begin()->metadata;
     size_t count = mTriggerMap.size();
 
     for (size_t i = 0; i < count; ++i) {
@@ -5053,7 +5158,7 @@ status_t Camera3Device::RequestThread::removeTriggers(
     ATRACE_CALL();
     Mutex::Autolock al(mTriggerMutex);
 
-    CameraMetadata &metadata = request->mSettings;
+    CameraMetadata &metadata = request->mSettingsList.begin()->metadata;
 
     /**
      * Replace all old entries with their old values.
@@ -5118,7 +5223,7 @@ status_t Camera3Device::RequestThread::addDummyTriggerIds(
     static const int32_t dummyTriggerId = 1;
     status_t res;
 
-    CameraMetadata &metadata = request->mSettings;
+    CameraMetadata &metadata = request->mSettingsList.begin()->metadata;
 
     // If AF trigger is active, insert a dummy AF trigger ID if none already
     // exists
