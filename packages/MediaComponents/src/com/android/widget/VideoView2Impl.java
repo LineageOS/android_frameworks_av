@@ -559,9 +559,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     ///////////////////////////////////////////////////
 
     private void attachMediaControlView() {
-        // TODO: change this so that the CC button appears only where there is a subtitle track.
-        // mMediaControlView.showCCButton();
-
         // Get MediaController from MediaSession and set it inside MediaControlView
         mMediaControlView.setController(mMediaSession.getController());
 
