@@ -829,4 +829,15 @@ status_t MediaRecorder::enableAudioDeviceCallback(bool enabled)
     return mMediaRecorder->enableAudioDeviceCallback(enabled);
 }
 
+status_t MediaRecorder::getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones)
+{
+    ALOGV("getActiveMicrophones");
+
+    if (mMediaRecorder == NULL) {
+        ALOGE("media recorder is not initialized yet");
+        return INVALID_OPERATION;
+    }
+    return mMediaRecorder->getActiveMicrophones(activeMicrophones);
+}
+
 } // namespace android

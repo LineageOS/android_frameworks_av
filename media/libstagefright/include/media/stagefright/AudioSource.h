@@ -21,10 +21,13 @@
 #include <media/AudioRecord.h>
 #include <media/AudioSystem.h>
 #include <media/MediaSource.h>
+#include <media/MicrophoneInfo.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <utils/List.h>
 
 #include <system/audio.h>
+
+#include <vector>
 
 namespace android {
 
@@ -63,6 +66,9 @@ struct AudioSource : public MediaSource, public MediaBufferObserver {
     status_t getRoutedDeviceId(audio_port_handle_t* deviceId);
     status_t addAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
     status_t removeAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
+
+    status_t getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+
 
 protected:
     virtual ~AudioSource();

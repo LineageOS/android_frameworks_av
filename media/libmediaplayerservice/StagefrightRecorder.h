@@ -76,6 +76,8 @@ struct StagefrightRecorder : public MediaRecorderBase {
     virtual status_t getRoutedDeviceId(audio_port_handle_t* deviceId);
     virtual void setAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
     virtual status_t enableAudioDeviceCallback(bool enabled);
+    virtual status_t getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+
 
 private:
     mutable Mutex mLock;

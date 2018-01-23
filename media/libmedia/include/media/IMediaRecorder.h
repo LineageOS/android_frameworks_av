@@ -19,7 +19,9 @@
 #define ANDROID_IMEDIARECORDER_H
 
 #include <binder/IInterface.h>
+#include <media/MicrophoneInfo.h>
 #include <system/audio.h>
+#include <vector>
 
 namespace android {
 
@@ -69,6 +71,9 @@ public:
     virtual status_t setInputDevice(audio_port_handle_t deviceId) = 0;
     virtual status_t getRoutedDeviceId(audio_port_handle_t *deviceId) = 0;
     virtual status_t enableAudioDeviceCallback(bool enabled) = 0;
+    virtual status_t getActiveMicrophones(
+                        std::vector<media::MicrophoneInfo>* activeMicrophones) = 0;
+
 };
 
 // ----------------------------------------------------------------------------

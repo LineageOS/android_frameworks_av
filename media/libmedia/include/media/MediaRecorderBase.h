@@ -19,9 +19,12 @@
 #define MEDIA_RECORDER_BASE_H_
 
 #include <media/AudioSystem.h>
+#include <media/MicrophoneInfo.h>
 #include <media/mediarecorder.h>
 
 #include <system/audio.h>
+
+#include <vector>
 
 namespace android {
 
@@ -67,6 +70,9 @@ struct MediaRecorderBase {
     virtual status_t getRoutedDeviceId(audio_port_handle_t* deviceId) = 0;
     virtual void setAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback) = 0;
     virtual status_t enableAudioDeviceCallback(bool enabled) = 0;
+    virtual status_t getActiveMicrophones(
+                        std::vector<media::MicrophoneInfo>* activeMicrophones) = 0;
+
 
 
 protected:
