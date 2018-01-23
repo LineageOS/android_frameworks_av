@@ -19,6 +19,8 @@ package com.android.media.update;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
+import android.media.MediaBrowser2;
+import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaController2;
 import android.media.MediaPlayerBase;
 import android.media.MediaSession2;
@@ -27,6 +29,7 @@ import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
 import android.media.IMediaSession2Callback;
 import android.media.SessionToken;
+import android.media.update.MediaBrowser2Provider;
 import android.media.update.MediaControlView2Provider;
 import android.media.update.MediaController2Provider;
 import android.media.update.MediaSession2Provider;
@@ -39,6 +42,7 @@ import android.util.AttributeSet;
 import android.widget.MediaControlView2;
 import android.widget.VideoView2;
 
+import com.android.media.MediaBrowser2Impl;
 import com.android.media.MediaController2Impl;
 import com.android.media.MediaSession2Impl;
 import com.android.media.MediaSessionService2Impl;
@@ -59,6 +63,12 @@ public class ApiFactory implements StaticProvider {
             MediaController2 instance, Context context, SessionToken token,
             MediaController2.ControllerCallback callback, Executor executor) {
         return new MediaController2Impl(instance, context, token, callback, executor);
+    }
+
+    @Override
+    public MediaBrowser2Provider createMediaBrowser2(MediaBrowser2 instance, Context context,
+            SessionToken token, BrowserCallback callback, Executor executor) {
+        return new MediaBrowser2Impl(instance, context, token, callback, executor);
     }
 
     @Override

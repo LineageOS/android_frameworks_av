@@ -52,7 +52,7 @@ public class MediaController2Test extends MediaSession2TestBase {
     private static final String TAG = "MediaController2Test";
 
     private MediaSession2 mSession;
-    private MediaController2Wrapper mController;
+    private MediaController2 mController;
     private MockPlayer mPlayer;
 
     @Before
@@ -214,10 +214,11 @@ public class MediaController2Test extends MediaSession2TestBase {
             mSession = new MediaSession2.Builder(mContext, mPlayer)
                     .setSessionCallback(sessionCallback).build();
         });
-        MediaController2Wrapper controller = createController(mSession.getToken(), false, null);
+        MediaController2 controller =
+                createController(mSession.getToken(), false, null);
         assertNotNull(controller);
-        controller.waitForConnect(false);
-        controller.waitForDisconnect(true);
+        waitForConnect(controller, false);
+        waitForDisconnect(controller, true);
     }
 
     @Test
@@ -225,13 +226,13 @@ public class MediaController2Test extends MediaSession2TestBase {
         sHandler.postAndSync(() -> {
             mSession.setPlayer(null);
         });
-        mController.waitForDisconnect(true);
+        waitForDisconnect(mController, true);
     }
 
     @Test
     public void testControllerCallback_release() throws InterruptedException {
         mController.release();
-        mController.waitForDisconnect(true);
+        waitForDisconnect(mController, true);
     }
 
     @Test
@@ -422,7 +423,7 @@ public class MediaController2Test extends MediaSession2TestBase {
             // TODO(jaewan): Use Session.release later when we add the API.
             mSession.setPlayer(null);
         });
-        mController.waitForDisconnect(true);
+        waitForDisconnect(mController, true);
         testNoInteraction();
 
         // Test with the newly created session.

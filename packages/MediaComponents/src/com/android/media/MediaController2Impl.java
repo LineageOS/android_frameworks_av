@@ -188,6 +188,14 @@ public class MediaController2Impl implements MediaController2Provider {
         });
     }
 
+    IMediaSession2 getSessionBinder() {
+        return mSessionBinder;
+    }
+
+    MediaSession2CallbackStub getControllerStub() {
+        return mSessionCallbackStub;
+    }
+
     @Override
     public SessionToken getSessionToken_impl() {
         return mToken;
@@ -382,7 +390,8 @@ public class MediaController2Impl implements MediaController2Provider {
         }
     }
 
-    private static class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
+    // TODO(jaewan): Pull out this from the controller2, and rename it to the MediaBrowserStub
+    static class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
         private final WeakReference<MediaController2Impl> mController;
 
         private MediaSession2CallbackStub(MediaController2Impl controller) {

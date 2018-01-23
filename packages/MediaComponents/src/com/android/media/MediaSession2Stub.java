@@ -124,6 +124,12 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         mCommandHandler.postCommand(controller, Command.fromBundle(command), args);
     }
 
+    @Override
+    public void getBrowserRoot(IMediaSession2Callback caller, Bundle rootHints)
+            throws RuntimeException {
+        // TODO(jaewan): Implement this.
+    }
+
     @Deprecated
     @Override
     public PlaybackState getPlaybackState() throws RemoteException {
