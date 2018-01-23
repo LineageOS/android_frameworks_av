@@ -453,8 +453,9 @@ public:
 
     // Intended for AudioService to inform AudioFlinger of device's low RAM attribute,
     // and should be called at most once.  For a definition of what "low RAM" means, see
-    // android.app.ActivityManager.isLowRamDevice().
-    virtual status_t setLowRamDevice(bool isLowRamDevice) = 0;
+    // android.app.ActivityManager.isLowRamDevice().  The totalMemory parameter
+    // is obtained from android.app.ActivityManager.MemoryInfo.totalMem.
+    virtual status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) = 0;
 
     /* List available audio ports and their attributes */
     virtual status_t listAudioPorts(unsigned int *num_ports,

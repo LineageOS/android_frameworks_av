@@ -1056,11 +1056,11 @@ size_t AudioSystem::getPrimaryOutputFrameCount()
     return af->getPrimaryOutputFrameCount();
 }
 
-status_t AudioSystem::setLowRamDevice(bool isLowRamDevice)
+status_t AudioSystem::setLowRamDevice(bool isLowRamDevice, int64_t totalMemory)
 {
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == 0) return PERMISSION_DENIED;
-    return af->setLowRamDevice(isLowRamDevice);
+    return af->setLowRamDevice(isLowRamDevice, totalMemory);
 }
 
 void AudioSystem::clearAudioConfigCache()
