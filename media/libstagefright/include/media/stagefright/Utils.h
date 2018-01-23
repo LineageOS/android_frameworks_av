@@ -28,7 +28,6 @@
 
 namespace android {
 
-class MetaData;
 struct AMessage;
 status_t convertMetaDataToMessage(
         const sp<MetaData> &meta, sp<AMessage> *format);

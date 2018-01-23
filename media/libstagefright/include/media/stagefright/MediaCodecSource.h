@@ -30,7 +30,6 @@ struct AMessage;
 struct AReplyToken;
 class IGraphicBufferProducer;
 struct MediaCodec;
-class MetaData;
 
 struct MediaCodecSource : public MediaSource,
                           public MediaBufferObserver {
