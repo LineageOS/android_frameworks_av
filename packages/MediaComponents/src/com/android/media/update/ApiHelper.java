@@ -16,8 +16,13 @@
 
 package com.android.media.update;
 
+import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
+import android.content.res.XmlResourceParser;
+import android.view.ContextThemeWrapper;
+import android.view.LayoutInflater;
+import android.view.View;
 
 public class ApiHelper {
     private static ApiHelper sInstance;
@@ -45,5 +50,18 @@ public class ApiHelper {
 
     public static Resources.Theme getLibTheme() {
         return sInstance.mLibTheme;
+    }
+
+    public static LayoutInflater getLayoutInflater(Context context) {
+        LayoutInflater layoutInflater = LayoutInflater.from(context).cloneInContext(
+                new ContextThemeWrapper(context, getLibTheme()));
+        // TODO: call layoutInflater.setFactory2()
+        return layoutInflater;
+    }
+
+    public static View inflateLibLayout(Context context, int libResId) {
+        try (XmlResourceParser parser = getLibResources().getLayout(libResId)) {
+            return getLayoutInflater(context).inflate(parser, null);
+        }
     }
 }
