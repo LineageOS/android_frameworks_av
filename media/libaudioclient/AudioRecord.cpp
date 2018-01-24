@@ -77,22 +77,47 @@ static std::string audioFormatTypeString(audio_format_t value) {
     return rawbuffer;
 }
 
+static std::string audioSourceString(audio_source_t value) {
+    std::string source;
+    if (SourceTypeConverter::toString(value, source)) {
+        return source;
+    }
+    char rawbuffer[16];  // room for "%d"
+    snprintf(rawbuffer, sizeof(rawbuffer), "%d", value);
+    return rawbuffer;
+}
+
 void AudioRecord::MediaMetrics::gather(const AudioRecord *record)
 {
     // key for media statistics is defined in the header
     // attrs for media statistics
     static constexpr char kAudioRecordChannelCount[] = "android.media.audiorecord.channels";
-    static constexpr char kAudioRecordFormat[] = "android.media.audiorecord.format";
+    static constexpr char kAudioRecordEncoding[] = "android.media.audiorecord.encoding";
     static constexpr char kAudioRecordLatency[] = "android.media.audiorecord.latency";
     static constexpr char kAudioRecordSampleRate[] = "android.media.audiorecord.samplerate";
+    static constexpr char kAudioRecordSource[] = "android.media.audiotrack.source";
 
     // constructor guarantees mAnalyticsItem is valid
 
     mAnalyticsItem->setInt32(kAudioRecordLatency, record->mLatency);
     mAnalyticsItem->setInt32(kAudioRecordSampleRate, record->mSampleRate);
     mAnalyticsItem->setInt32(kAudioRecordChannelCount, record->mChannelCount);
-    mAnalyticsItem->setCString(kAudioRecordFormat,
+    mAnalyticsItem->setCString(kAudioRecordEncoding,
                                audioFormatTypeString(record->mFormat).c_str());
+    mAnalyticsItem->setCString(kAudioRecordSource,
+                               audioSourceString(record->mAttributes.source).c_str());
+}
+
+// hand the user a snapshot of the metrics.
+status_t AudioRecord::getMetrics(MediaAnalyticsItem * &item)
+{
+    mMediaMetrics.gather(this);
+    MediaAnalyticsItem *tmp = mMediaMetrics.dup();
+    if (tmp == nullptr) {
+        return BAD_VALUE;
+    }
+    item = tmp;
+    return NO_ERROR;
 }
 
 AudioRecord::AudioRecord(const String16 &opPackageName)

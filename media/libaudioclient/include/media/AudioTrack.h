@@ -386,6 +386,11 @@ public:
     /* Return the static buffer specified in constructor or set(), or 0 for streaming mode */
             sp<IMemory> sharedBuffer() const { return mSharedBuffer; }
 
+    /*
+     * return metrics information for the current track.
+     */
+            status_t getMetrics(MediaAnalyticsItem * &item);
+
     /* After it's created the track is not active. Call start() to
      * make it active. If set, the callback will start being called.
      * If the track was previously paused, volume is ramped up over the first mix buffer.
@@ -1198,6 +1203,7 @@ private:
             }
         }
         void gather(const AudioTrack *track);
+        MediaAnalyticsItem *dup() { return mAnalyticsItem->dup(); }
       private:
         std::unique_ptr<MediaAnalyticsItem> mAnalyticsItem;
     };
