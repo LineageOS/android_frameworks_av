@@ -21,6 +21,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.res.ColorStateList;
+import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.drawable.AnimationDrawable;
@@ -36,6 +37,7 @@ import android.util.SparseArray;
 import android.view.SoundEffectConstants;
 import android.view.View;
 
+import com.android.media.update.ApiHelper;
 import com.android.media.update.R;
 import com.android.support.mediarouter.media.MediaRouteSelector;
 import com.android.support.mediarouter.media.MediaRouter;
@@ -128,8 +130,11 @@ public class MediaRouteButton extends View {
         mRouter = MediaRouter.getInstance(context);
         mCallback = new MediaRouterCallback();
 
-        TypedArray a = context.obtainStyledAttributes(attrs,
+        Resources.Theme theme = ApiHelper.getLibResources().newTheme();
+        theme.applyStyle(MediaRouterThemeHelper.getRouterThemeId(context), true);
+        TypedArray a = theme.obtainStyledAttributes(attrs,
                 R.styleable.MediaRouteButton, defStyleAttr, 0);
+
         mButtonTint = a.getColorStateList(R.styleable.MediaRouteButton_mediaRouteButtonTint);
         mMinWidth = a.getDimensionPixelSize(
                 R.styleable.MediaRouteButton_android_minWidth, 0);
@@ -290,8 +295,9 @@ public class MediaRouteButton extends View {
      * button when the button is long pressed.
      */
     void setCheatSheetEnabled(boolean enable) {
-        TooltipCompat.setTooltipText(this,
-                enable ? getContext().getString(R.string.mr_button_content_description) : null);
+        TooltipCompat.setTooltipText(this, enable
+                ? ApiHelper.getLibResources().getString(R.string.mr_button_content_description)
+                : null);
     }
 
     @Override
@@ -533,7 +539,7 @@ public class MediaRouteButton extends View {
         } else {
             resId = R.string.mr_cast_button_disconnected;
         }
-        setContentDescription(getContext().getString(resId));
+        setContentDescription(ApiHelper.getLibResources().getString(resId));
     }
 
     private final class MediaRouterCallback extends MediaRouter.Callback {
@@ -590,7 +596,7 @@ public class MediaRouteButton extends View {
 
         @Override
         protected Drawable doInBackground(Void... params) {
-            return getContext().getResources().getDrawable(mResId);
+            return ApiHelper.getLibResources().getDrawable(mResId);
         }
 
         @Override

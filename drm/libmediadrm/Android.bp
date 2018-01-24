@@ -2,7 +2,9 @@
 // libmediadrm
 //
 
-cc_library_shared {
+// TODO: change it back to cc_library_shared when MediaPlayer2 switches to
+// using NdkMediaDrm, instead of MediaDrm.java.
+cc_library {
     name: "libmediadrm",
 
 
@@ -34,6 +36,7 @@ cc_library_shared {
         "libstagefright_foundation",
         "libutils",
         "android.hardware.drm@1.0",
+        "android.hardware.drm@1.1",
         "libhidlallocatorutils",
         "libhidlbase",
         "libhidltransport",

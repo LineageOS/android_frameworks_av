@@ -238,18 +238,19 @@ audio_devices_t Engine::getDeviceForStrategy(routing_strategy strategy) const
     const SwAudioOutputCollection &outputs = mApmObserver->getOutputs();
 
     return getDeviceForStrategyInt(strategy, availableOutputDevices,
-                                   availableInputDevices, outputs);
+                                   availableInputDevices, outputs, (uint32_t)AUDIO_DEVICE_NONE);
 }
 
 
-
 audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
-                                                DeviceVector availableOutputDevices,
-                                                DeviceVector availableInputDevices,
-                                                const SwAudioOutputCollection &outputs) const
+        DeviceVector availableOutputDevices,
+        DeviceVector availableInputDevices,
+        const SwAudioOutputCollection &outputs,
+        uint32_t outputDeviceTypesToIgnore) const
 {
     uint32_t device = AUDIO_DEVICE_NONE;
-    uint32_t availableOutputDevicesType = availableOutputDevices.types();
+    uint32_t availableOutputDevicesType =
+            availableOutputDevices.types() & ~outputDeviceTypesToIgnore;
 
     switch (strategy) {
 
@@ -260,38 +261,24 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
     case STRATEGY_SONIFICATION_RESPECTFUL:
         if (isInCall()) {
             device = getDeviceForStrategyInt(
-                    STRATEGY_SONIFICATION, availableOutputDevices, availableInputDevices, outputs);
-        } else if (outputs.isStreamActiveRemotely(AUDIO_STREAM_MUSIC,
-                SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)) {
-            // while media is playing on a remote device, use the the sonification behavior.
-            // Note that we test this usecase before testing if media is playing because
-            //   the isStreamActive() method only informs about the activity of a stream, not
-            //   if it's for local playback. Note also that we use the same delay between both tests
-            device = getDeviceForStrategyInt(
-                    STRATEGY_SONIFICATION, availableOutputDevices, availableInputDevices, outputs);
-            //user "safe" speaker if available instead of normal speaker to avoid triggering
-            //other acoustic safety mechanisms for notification
-            if ((device & AUDIO_DEVICE_OUT_SPEAKER) &&
-                    (availableOutputDevicesType & AUDIO_DEVICE_OUT_SPEAKER_SAFE)) {
-                device |= AUDIO_DEVICE_OUT_SPEAKER_SAFE;
-                device &= ~AUDIO_DEVICE_OUT_SPEAKER;
-            }
-        } else if (outputs.isStreamActive(
-                                AUDIO_STREAM_MUSIC, SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)
-                    || outputs.isStreamActive(
-                            AUDIO_STREAM_ACCESSIBILITY, SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY))
-        {
-            // while media/a11y is playing (or has recently played), use the same device
-            device = getDeviceForStrategyInt(
-                    STRATEGY_MEDIA, availableOutputDevices, availableInputDevices, outputs);
+                    STRATEGY_SONIFICATION, availableOutputDevices, availableInputDevices, outputs,
+                    outputDeviceTypesToIgnore);
         } else {
-            // when media is not playing anymore, fall back on the sonification behavior
-            device = getDeviceForStrategyInt(
-                    STRATEGY_SONIFICATION, availableOutputDevices, availableInputDevices, outputs);
-            //user "safe" speaker if available instead of normal speaker to avoid triggering
-            //other acoustic safety mechanisms for notification
-            if ((device & AUDIO_DEVICE_OUT_SPEAKER) &&
-                    (availableOutputDevicesType & AUDIO_DEVICE_OUT_SPEAKER_SAFE)) {
+            bool media_active_locally =
+                    outputs.isStreamActiveLocally(
+                            AUDIO_STREAM_MUSIC, SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)
+                    || outputs.isStreamActiveLocally(
+                            AUDIO_STREAM_ACCESSIBILITY, SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY);
+            // routing is same as media without the "remote" device
+            device = getDeviceForStrategyInt(STRATEGY_MEDIA,
+                    availableOutputDevices,
+                    availableInputDevices, outputs,
+                    AUDIO_DEVICE_OUT_REMOTE_SUBMIX | outputDeviceTypesToIgnore);
+            // if no media is playing on the device, check for mandatory use of "safe" speaker
+            // when media would have played on speaker, and the safe speaker path is available
+            if (!media_active_locally
+                    && (device & AUDIO_DEVICE_OUT_SPEAKER)
+                    && (availableOutputDevicesType & AUDIO_DEVICE_OUT_SPEAKER_SAFE)) {
                 device |= AUDIO_DEVICE_OUT_SPEAKER_SAFE;
                 device &= ~AUDIO_DEVICE_OUT_SPEAKER;
             }
@@ -302,7 +289,8 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
         if (!isInCall()) {
             // when off call, DTMF strategy follows the same rules as MEDIA strategy
             device = getDeviceForStrategyInt(
-                    STRATEGY_MEDIA, availableOutputDevices, availableInputDevices, outputs);
+                    STRATEGY_MEDIA, availableOutputDevices, availableInputDevices, outputs,
+                    outputDeviceTypesToIgnore);
             break;
         }
         // when in call, DTMF and PHONE strategies follow the same rules
@@ -408,7 +396,8 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
         // handleIncallSonification().
         if (isInCall()) {
             device = getDeviceForStrategyInt(
-                    STRATEGY_PHONE, availableOutputDevices, availableInputDevices, outputs);
+                    STRATEGY_PHONE, availableOutputDevices, availableInputDevices, outputs,
+                    outputDeviceTypesToIgnore);
             break;
         }
         // FALL THROUGH
@@ -463,11 +452,13 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
             if (outputs.isStreamActive(AUDIO_STREAM_RING) ||
                     outputs.isStreamActive(AUDIO_STREAM_ALARM)) {
                 return getDeviceForStrategyInt(
-                    STRATEGY_SONIFICATION, availableOutputDevices, availableInputDevices, outputs);
+                    STRATEGY_SONIFICATION, availableOutputDevices, availableInputDevices, outputs,
+                    outputDeviceTypesToIgnore);
             }
             if (isInCall()) {
                 return getDeviceForStrategyInt(
-                        STRATEGY_PHONE, availableOutputDevices, availableInputDevices, outputs);
+                        STRATEGY_PHONE, availableOutputDevices, availableInputDevices, outputs,
+                        outputDeviceTypesToIgnore);
             }
         }
         // For other cases, STRATEGY_ACCESSIBILITY behaves like STRATEGY_MEDIA
@@ -486,7 +477,8 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
         }
         if (isInCall() && (strategy == STRATEGY_MEDIA)) {
             device = getDeviceForStrategyInt(
-                    STRATEGY_PHONE, availableOutputDevices, availableInputDevices, outputs);
+                    STRATEGY_PHONE, availableOutputDevices, availableInputDevices, outputs,
+                    outputDeviceTypesToIgnore);
             break;
         }
         if ((device2 == AUDIO_DEVICE_NONE) &&

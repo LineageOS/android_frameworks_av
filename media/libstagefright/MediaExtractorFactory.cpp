@@ -26,7 +26,6 @@
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaExtractorFactory.h>
-#include <media/stagefright/MetaData.h>
 #include <media/IMediaExtractor.h>
 #include <media/IMediaExtractorService.h>
 #include <cutils/properties.h>

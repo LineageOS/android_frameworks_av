@@ -23,7 +23,7 @@
 #include <sys/types.h>
 
 #include <utils/Errors.h>
-#include <hardware/audio.h>
+#include <system/audio.h>
 
 #include "aaudio/AAudio.h"
 

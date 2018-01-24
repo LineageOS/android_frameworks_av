@@ -31,6 +31,7 @@
 #include <android/hardware/camera/device/3.2/ICameraDevice.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.3/ICameraDeviceSession.h>
+#include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
 #include <fmq/MessageQueue.h>
 #include <hardware/camera3.h>
@@ -297,7 +298,13 @@ class Camera3Device :
         void getInflightBufferKeys(std::vector<std::pair<int32_t, int32_t>>* out);
 
       private:
+        // Always valid
         sp<hardware::camera::device::V3_2::ICameraDeviceSession> mHidlSession;
+        // Valid if ICameraDeviceSession is @3.3 or newer
+        sp<hardware::camera::device::V3_3::ICameraDeviceSession> mHidlSession_3_3;
+        // Valid if ICameraDeviceSession is @3.4 or newer
+        sp<hardware::camera::device::V3_4::ICameraDeviceSession> mHidlSession_3_4;
+
         std::shared_ptr<RequestMetadataQueue> mRequestMetadataQueue;
 
         std::mutex mInflightLock;

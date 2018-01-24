@@ -16,8 +16,16 @@
 
 package com.android.media.update;
 
+import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
+import android.content.res.XmlResourceParser;
+import android.util.AttributeSet;
+import android.view.ContextThemeWrapper;
+import android.view.LayoutInflater;
+import android.view.View;
+
+import com.android.support.mediarouter.app.MediaRouteButton;
 
 public class ApiHelper {
     private static ApiHelper sInstance;
@@ -45,5 +53,32 @@ public class ApiHelper {
 
     public static Resources.Theme getLibTheme() {
         return sInstance.mLibTheme;
+    }
+
+    public static LayoutInflater getLayoutInflater(Context context) {
+        LayoutInflater layoutInflater = LayoutInflater.from(context).cloneInContext(
+                new ContextThemeWrapper(context, getLibTheme()));
+        layoutInflater.setFactory2(new LayoutInflater.Factory2() {
+            @Override
+            public View onCreateView(
+                    View parent, String name, Context context, AttributeSet attrs) {
+                if (MediaRouteButton.class.getCanonicalName().equals(name)) {
+                    return new MediaRouteButton(context, attrs);
+                }
+                return null;
+            }
+
+            @Override
+            public View onCreateView(String name, Context context, AttributeSet attrs) {
+                return onCreateView(null, name, context, attrs);
+            }
+        });
+        return layoutInflater;
+    }
+
+    public static View inflateLibLayout(Context context, int libResId) {
+        try (XmlResourceParser parser = getLibResources().getLayout(libResId)) {
+            return getLayoutInflater(context).inflate(parser, null);
+        }
     }
 }

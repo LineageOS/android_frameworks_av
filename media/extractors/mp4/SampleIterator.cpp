@@ -244,13 +244,14 @@ status_t SampleIterator::getSampleSizeDirect(
     switch (mTable->mSampleSizeFieldSize) {
         case 32:
         {
+            uint32_t x;
             if (mTable->mDataSource->readAt(
                         mTable->mSampleSizeOffset + 12 + 4 * sampleIndex,
-                        size, sizeof(*size)) < (ssize_t)sizeof(*size)) {
+                        &x, sizeof(x)) < (ssize_t)sizeof(x)) {
                 return ERROR_IO;
             }
 
-            *size = ntohl(*size);
+            *size = ntohl(x);
             break;
         }
 

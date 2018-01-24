@@ -24,7 +24,6 @@
 
 #include <binder/Parcel.h>
 #include <utils/RefBase.h>
-#include <utils/KeyedVector.h>
 #include <utils/String8.h>
 
 namespace android {
@@ -229,7 +228,7 @@ enum {
     kTypeD263        = 'd263',
 };
 
-class MetaData : public RefBase {
+class MetaData final : public RefBase {
 public:
     MetaData();
     MetaData(const MetaData &from);
@@ -279,59 +278,22 @@ public:
     String8 toString() const;
     void dumpToLog() const;
 
-    status_t writeToParcel(Parcel &parcel);
-    status_t updateFromParcel(const Parcel &parcel);
-    static sp<MetaData> createFromParcel(const Parcel &parcel);
-
 protected:
     virtual ~MetaData();
 
 private:
-    struct typed_data {
-        typed_data();
-        ~typed_data();
+    friend class BpMediaSource;
+    friend class BnMediaSource;
+    friend class BpMediaExtractor;
+    friend class BnMediaExtractor;
 
-        typed_data(const MetaData::typed_data &);
-        typed_data &operator=(const MetaData::typed_data &);
-
-        void clear();
-        void setData(uint32_t type, const void *data, size_t size);
-        void getData(uint32_t *type, const void **data, size_t *size) const;
-        // may include hexdump of binary data if verbose=true
-        String8 asString(bool verbose) const;
-
-    private:
-        uint32_t mType;
-        size_t mSize;
-
-        union {
-            void *ext_data;
-            float reservoir;
-        } u;
-
-        bool usesReservoir() const {
-            return mSize <= sizeof(u.reservoir);
-        }
-
-        void *allocateStorage(size_t size);
-        void freeStorage();
-
-        void *storage() {
-            return usesReservoir() ? &u.reservoir : u.ext_data;
-        }
-
-        const void *storage() const {
-            return usesReservoir() ? &u.reservoir : u.ext_data;
-        }
-    };
-
-    struct Rect {
-        int32_t mLeft, mTop, mRight, mBottom;
-    };
-
-    KeyedVector<uint32_t, typed_data> mItems;
-
-    // MetaData &operator=(const MetaData &);
+    status_t writeToParcel(Parcel &parcel);
+    status_t updateFromParcel(const Parcel &parcel);
+    static sp<MetaData> createFromParcel(const Parcel &parcel);
+    struct typed_data;
+    struct Rect;
+    struct MetaDataInternal;
+    MetaDataInternal *mInternalData;
 };
 
 }  // namespace android

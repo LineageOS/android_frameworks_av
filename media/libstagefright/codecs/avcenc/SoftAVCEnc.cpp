@@ -26,7 +26,6 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MetaData.h>
 #include <OMX_IndexExt.h>
 #include <OMX_VideoExt.h>
 

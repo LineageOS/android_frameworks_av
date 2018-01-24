@@ -17,7 +17,7 @@
 
 #define LOG_TAG "AAudioStreamParameters"
 #include <utils/Log.h>
-#include <hardware/audio.h>
+#include <system/audio.h>
 
 #include "AAudioStreamParameters.h"
 

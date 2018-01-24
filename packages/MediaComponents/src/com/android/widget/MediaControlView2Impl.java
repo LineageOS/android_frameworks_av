@@ -161,13 +161,6 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     }
 
     @Override
-    public void showCCButton_impl() {
-        if (mCCButton != null) {
-            mCCButton.setVisibility(View.VISIBLE);
-        }
-    }
-
-    @Override
     public boolean isPlaying_impl() {
         if (mPlaybackState != null) {
             return mPlaybackState.getState() == PlaybackState.STATE_PLAYING;
@@ -228,6 +221,15 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     @Override
     public void hideSubtitle_impl() {
         mController.sendCommand(ACTION_HIDE_SUBTITLE, null, null);
+    }
+
+    @Override
+    public void onAttachedToWindow_impl() {
+        mSuperProvider.onAttachedToWindow_impl();
+    }
+    @Override
+    public void onDetachedFromWindow_impl() {
+        mSuperProvider.onDetachedFromWindow_impl();
     }
 
     @Override
@@ -339,11 +341,8 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
      * @hide This doesn't work as advertised
      */
     protected View makeControllerView() {
-        View root = LayoutInflater.from(mInstance.getContext()).inflate(
-                R.layout.media_controller, null);
-
+        View root = ApiHelper.inflateLibLayout(mInstance.getContext(), R.layout.media_controller);
         initControllerView(root);
-
         return root;
     }
 

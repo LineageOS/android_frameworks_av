@@ -579,6 +579,19 @@ bool SwAudioOutputCollection::isStreamActive(audio_stream_type_t stream, uint32_
     return false;
 }
 
+bool SwAudioOutputCollection::isStreamActiveLocally(audio_stream_type_t stream, uint32_t inPastMs) const
+{
+    nsecs_t sysTime = systemTime();
+    for (size_t i = 0; i < this->size(); i++) {
+        const sp<SwAudioOutputDescriptor> outputDesc = this->valueAt(i);
+        if (outputDesc->isStreamActive(stream, inPastMs, sysTime)
+                && ((outputDesc->device() & APM_AUDIO_OUT_DEVICE_REMOTE_ALL) == 0)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool SwAudioOutputCollection::isStreamActiveRemotely(audio_stream_type_t stream,
                                                    uint32_t inPastMs) const
 {

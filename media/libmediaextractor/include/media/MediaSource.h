@@ -30,7 +30,6 @@
 namespace android {
 
 class MediaBuffer;
-class MetaData;
 class IMediaSource;
 
 struct MediaSource : public virtual RefBase {

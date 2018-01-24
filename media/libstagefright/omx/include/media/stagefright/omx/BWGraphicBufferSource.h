@@ -23,14 +23,14 @@
 #include <android/BnOMXBufferSource.h>
 #include <media/IOMX.h>
 
-#include "GraphicBufferSource.h"
+#include "OmxGraphicBufferSource.h"
 #include "IOmxNodeWrapper.h"
 
 namespace android {
 
 using ::android::binder::Status;
 using ::android::BnGraphicBufferSource;
-using ::android::GraphicBufferSource;
+using ::android::OmxGraphicBufferSource;
 using ::android::IOMXNode;
 using ::android::sp;
 
@@ -38,10 +38,10 @@ struct BWGraphicBufferSource : public BnGraphicBufferSource {
     struct BWOMXBufferSource;
     struct BWOmxNodeWrapper;
 
-    sp<GraphicBufferSource> mBase;
+    sp<OmxGraphicBufferSource> mBase;
     sp<IOMXBufferSource> mOMXBufferSource;
 
-    BWGraphicBufferSource(sp<GraphicBufferSource> const &base);
+    BWGraphicBufferSource(sp<OmxGraphicBufferSource> const &base);
 
     Status configure(
             const sp<IOMXNode>& omxNode, int32_t dataSpace) override;

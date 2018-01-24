@@ -27,7 +27,6 @@
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 #include <media/stagefright/VideoFrameScheduler.h>
 #include <media/MediaCodecBuffer.h>

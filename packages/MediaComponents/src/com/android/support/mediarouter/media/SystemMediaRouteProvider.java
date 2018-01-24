@@ -27,6 +27,7 @@ import android.os.Build;
 import android.support.annotation.RequiresApi;
 import android.view.Display;
 
+import com.android.media.update.ApiHelper;
 import com.android.media.update.R;
 
 import java.util.ArrayList;
@@ -266,7 +267,7 @@ abstract class SystemMediaRouteProvider extends MediaRouteProvider {
             mCallbackObj = createCallbackObj();
             mVolumeCallbackObj = createVolumeCallbackObj();
 
-            Resources r = context.getResources();
+            Resources r = ApiHelper.getLibResources();
             mUserRouteCategoryObj = MediaRouterJellybean.createRouteCategory(
                     mRouterObj, r.getString(R.string.mr_user_route_category_name), false);
 

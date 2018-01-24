@@ -16,9 +16,25 @@
 
 package com.android.media.update;
 
+import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
+import android.media.MediaBrowser2;
+import android.media.MediaBrowser2.BrowserCallback;
+import android.media.MediaController2;
+import android.media.MediaLibraryService2;
+import android.media.MediaPlayerBase;
+import android.media.MediaSession2;
+import android.media.MediaSession2.ControllerInfo;
+import android.media.MediaSession2.SessionCallback;
+import android.media.MediaSessionService2;
+import android.media.IMediaSession2Callback;
+import android.media.SessionToken;
+import android.media.update.MediaBrowser2Provider;
 import android.media.update.MediaControlView2Provider;
+import android.media.update.MediaController2Provider;
+import android.media.update.MediaSession2Provider;
+import android.media.update.MediaSessionService2Provider;
 import android.media.update.VideoView2Provider;
 import android.media.update.StaticProvider;
 import android.media.update.ViewProvider;
@@ -27,14 +43,60 @@ import android.util.AttributeSet;
 import android.widget.MediaControlView2;
 import android.widget.VideoView2;
 
+import com.android.media.MediaBrowser2Impl;
+import com.android.media.MediaController2Impl;
+import com.android.media.MediaLibraryService2Impl;
+import com.android.media.MediaSession2Impl;
+import com.android.media.MediaSessionService2Impl;
 import com.android.widget.MediaControlView2Impl;
 import com.android.widget.VideoView2Impl;
+
+import java.util.concurrent.Executor;
 
 public class ApiFactory implements StaticProvider {
     public static Object initialize(Resources libResources, Theme libTheme)
             throws ReflectiveOperationException {
         ApiHelper.initialize(libResources, libTheme);
         return new ApiFactory();
+    }
+
+    @Override
+    public MediaController2Provider createMediaController2(
+            MediaController2 instance, Context context, SessionToken token,
+            MediaController2.ControllerCallback callback, Executor executor) {
+        return new MediaController2Impl(instance, context, token, callback, executor);
+    }
+
+    @Override
+    public MediaBrowser2Provider createMediaBrowser2(MediaBrowser2 instance, Context context,
+            SessionToken token, BrowserCallback callback, Executor executor) {
+        return new MediaBrowser2Impl(instance, context, token, callback, executor);
+    }
+
+    @Override
+    public MediaSession2Provider createMediaSession2(MediaSession2 instance, Context context,
+            MediaPlayerBase player, String id, SessionCallback callback) {
+        return new MediaSession2Impl(instance, context, player, id, callback);
+    }
+
+    @Override
+    public MediaSession2Provider.ControllerInfoProvider createMediaSession2ControllerInfoProvider(
+            ControllerInfo instance, Context context, int uid, int pid, String packageName,
+            IMediaSession2Callback callback) {
+        return new MediaSession2Impl.ControllerInfoImpl(
+                instance, context, uid, pid, packageName, callback);
+    }
+
+    @Override
+    public MediaSessionService2Provider createMediaSessionService2(
+            MediaSessionService2 instance) {
+        return new MediaSessionService2Impl(instance);
+    }
+
+    @Override
+    public MediaSessionService2Provider createMediaLibraryService2(
+            MediaLibraryService2 instance) {
+        return new MediaLibraryService2Impl(instance);
     }
 
     @Override

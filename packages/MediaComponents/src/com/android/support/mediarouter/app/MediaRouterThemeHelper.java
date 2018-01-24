@@ -196,7 +196,7 @@ final class MediaRouterThemeHelper {
         return value.data;
     }
 
-    private static int getRouterThemeId(Context context) {
+    static int getRouterThemeId(Context context) {
         int themeId;
         if (isLightTheme(context)) {
             if (getControllerColor(context, 0) == COLOR_DARK_ON_LIGHT_BACKGROUND) {

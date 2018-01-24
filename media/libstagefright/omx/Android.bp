@@ -6,12 +6,11 @@ cc_library_shared {
     },
 
     srcs: [
-        "FrameDropper.cpp",
-        "GraphicBufferSource.cpp",
         "BWGraphicBufferSource.cpp",
         "OMXMaster.cpp",
         "OMXNodeInstance.cpp",
         "OMXUtils.cpp",
+        "OmxGraphicBufferSource.cpp",
         "SimpleSoftOMXComponent.cpp",
         "SoftOMXComponent.cpp",
         "SoftOMXPlugin.cpp",
@@ -49,6 +48,7 @@ cc_library_shared {
         "libgui",
         "libcutils",
         "libstagefright_foundation",
+        "libstagefright_gbs",
         "libstagefright_xmlparser",
         "libdl",
         "libhidlbase",

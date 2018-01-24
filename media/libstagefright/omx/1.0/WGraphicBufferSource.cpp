@@ -79,9 +79,9 @@ struct TWGraphicBufferSource::TWOmxNodeWrapper : public IOmxNodeWrapper {
 };
 
 struct TWGraphicBufferSource::TWOmxBufferSource : public IOmxBufferSource {
-    sp<GraphicBufferSource> mSource;
+    sp<OmxGraphicBufferSource> mSource;
 
-    TWOmxBufferSource(const sp<GraphicBufferSource> &source): mSource(source) {
+    TWOmxBufferSource(const sp<OmxGraphicBufferSource> &source): mSource(source) {
     }
 
     Return<void> onOmxExecuting() override {
@@ -115,7 +115,7 @@ struct TWGraphicBufferSource::TWOmxBufferSource : public IOmxBufferSource {
 
 // TWGraphicBufferSource
 TWGraphicBufferSource::TWGraphicBufferSource(
-        sp<GraphicBufferSource> const& base) :
+        sp<OmxGraphicBufferSource> const& base) :
     mBase(base),
     mOmxBufferSource(new TWOmxBufferSource(base)) {
 }

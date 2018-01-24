@@ -1,0 +1,15 @@
+cc_test {
+    name: "FrameDropper_test",
+
+    srcs: ["FrameDropper_test.cpp"],
+
+    shared_libs: [
+        "libstagefright_gbs",
+        "libutils",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+}

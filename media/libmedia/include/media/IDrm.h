@@ -79,6 +79,16 @@ struct IDrm : public IInterface {
     virtual status_t releaseSecureStops(Vector<uint8_t> const &ssRelease) = 0;
     virtual status_t releaseAllSecureStops() = 0;
 
+    virtual status_t getHdcpLevels(DrmPlugin::HdcpLevel *connectedLevel,
+            DrmPlugin::HdcpLevel *maxLevel)
+            const = 0;
+    virtual status_t getNumberOfSessions(uint32_t *currentSessions,
+            uint32_t *maxSessions) const = 0;
+    virtual status_t getSecurityLevel(Vector<uint8_t> const &sessionId,
+            DrmPlugin::SecurityLevel *level) const = 0;
+    virtual status_t setSecurityLevel(Vector<uint8_t> const &sessionId,
+            const DrmPlugin::SecurityLevel& level) = 0;
+
     virtual status_t getPropertyString(String8 const &name, String8 &value) const = 0;
     virtual status_t getPropertyByteArray(String8 const &name,
                                           Vector<uint8_t> &value) const = 0;

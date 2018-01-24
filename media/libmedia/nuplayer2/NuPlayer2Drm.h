@@ -18,7 +18,6 @@
 #define NUPLAYER2_DRM_H_
 
 #include <binder/Parcel.h>
-#include <media/stagefright/MetaData.h> // for CryptInfo
 
 
 namespace android {
