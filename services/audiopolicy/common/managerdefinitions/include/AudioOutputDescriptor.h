@@ -187,6 +187,15 @@ public:
     bool isStreamActiveRemotely(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
 
     /**
+     * return whether a stream is playing, but not on a "remote" device.
+     * Override to change the definition of a local/remote playback.
+     * Used for instance by policy manager to alter the speaker playback ("speaker safe" behavior)
+     * when media plays or not locally.
+     * For the base implementation, "remotely" means playing during screen mirroring.
+     */
+    bool isStreamActiveLocally(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
+
+    /**
      * returns the A2DP output handle if it is open or 0 otherwise
      */
     audio_io_handle_t getA2dpOutput() const;
