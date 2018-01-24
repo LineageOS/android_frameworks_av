@@ -158,6 +158,7 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
     @Test
     public void testGetMediaSessionService2Token() throws InterruptedException {
         boolean foundTestSessionService = false;
+        boolean foundTestLibraryService = false;
         List<SessionToken> tokens = mManager.getSessionServiceTokens();
         for (int i = 0; i < tokens.size(); i++) {
             SessionToken token = tokens.get(i);
@@ -167,15 +168,23 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
                 assertEquals(SessionToken.TYPE_SESSION_SERVICE, token.getType());
                 assertNull(token.getSessionBinder());
                 foundTestSessionService = true;
+            } else if (mContext.getPackageName().equals(token.getPackageName())
+                    && MockMediaLibraryService2.ID.equals(token.getId())) {
+                assertFalse(foundTestLibraryService);
+                assertEquals(SessionToken.TYPE_LIBRARY_SERVICE, token.getType());
+                assertNull(token.getSessionBinder());
+                foundTestLibraryService = true;
             }
         }
         assertTrue(foundTestSessionService);
+        assertTrue(foundTestLibraryService);
     }
 
     @Test
     public void testGetAllSessionTokens() throws InterruptedException {
         boolean foundTestSession = false;
         boolean foundTestSessionService = false;
+        boolean foundTestLibraryService = false;
         List<SessionToken> tokens = mManager.getAllSessionTokens();
         for (int i = 0; i < tokens.size(); i++) {
             SessionToken token = tokens.get(i);
@@ -192,12 +201,18 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
                     foundTestSessionService = true;
                     assertEquals(SessionToken.TYPE_SESSION_SERVICE, token.getType());
                     break;
+                case MockMediaLibraryService2.ID:
+                    assertFalse(foundTestLibraryService);
+                    assertEquals(SessionToken.TYPE_LIBRARY_SERVICE, token.getType());
+                    foundTestLibraryService = true;
+                    break;
                 default:
                     fail("Unexpected session " + token + " exists in the package");
             }
         }
         assertTrue(foundTestSession);
         assertTrue(foundTestSessionService);
+        assertTrue(foundTestLibraryService);
     }
 
     // Ensures if the session creation/release is notified to the server.

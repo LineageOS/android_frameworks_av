@@ -48,7 +48,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private final Context mContext;
     private final String mId;
     private final Handler mHandler;
-    private final SessionCallback mCallback;
     private final MediaSession2Stub mSessionStub;
     private final SessionToken mSessionToken;
 
@@ -76,8 +75,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mContext = context;
         mId = id;
         mHandler = new Handler(Looper.myLooper());
-        mCallback = callback;
-        mSessionStub = new MediaSession2Stub(this);
+        mSessionStub = new MediaSession2Stub(this, callback);
         // Ask server to create session token for following reasons.
         //   1. Make session ID unique per package.
         //      Server can only know if the package has another process and has another session
@@ -284,10 +282,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         return mInstance;
     }
 
-    SessionCallback getCallback() {
-        return mCallback;
-    }
-
     MediaPlayerBase getPlayer() {
         return mPlayer;
     }
@@ -419,6 +413,10 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         public void removeFlag(int flag) {
             mFlag &= ~flag;
+        }
+
+        public static ControllerInfoImpl from(ControllerInfo controller) {
+            return (ControllerInfoImpl) controller.getProvider();
         }
     }
 }

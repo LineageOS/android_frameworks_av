@@ -159,6 +159,9 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void release_impl() {
+        if (DEBUG) {
+            Log.d(TAG, "release from " + mToken);
+        }
         final IMediaSession2 binder;
         synchronized (mLock) {
             if (mIsReleased) {
@@ -186,6 +189,18 @@ public class MediaController2Impl implements MediaController2Provider {
         mCallbackExecutor.execute(() -> {
             mCallback.onDisconnected();
         });
+    }
+
+    IMediaSession2 getSessionBinder() {
+        return mSessionBinder;
+    }
+
+    MediaSession2CallbackStub getControllerStub() {
+        return mSessionCallbackStub;
+    }
+
+    Executor getCallbackExecutor() {
+        return mCallbackExecutor;
     }
 
     @Override
@@ -335,7 +350,8 @@ public class MediaController2Impl implements MediaController2Provider {
     private void onConnectionChangedNotLocked(IMediaSession2 sessionBinder,
             CommandGroup commandGroup) {
         if (DEBUG) {
-            Log.d(TAG, "onConnectionChangedNotLocked sessionBinder=" + sessionBinder);
+            Log.d(TAG, "onConnectionChangedNotLocked sessionBinder=" + sessionBinder
+                    + ", commands=" + commandGroup);
         }
         boolean release = false;
         try {
@@ -361,6 +377,9 @@ public class MediaController2Impl implements MediaController2Provider {
                     // so can be used without worrying about deadlock.
                     mSessionBinder.asBinder().linkToDeath(mDeathRecipient, 0);
                 } catch (RemoteException e) {
+                    if (DEBUG) {
+                        Log.d(TAG, "Session died too early.", e);
+                    }
                     release = true;
                     return;
                 }
@@ -382,7 +401,9 @@ public class MediaController2Impl implements MediaController2Provider {
         }
     }
 
-    private static class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
+    // TODO(jaewan): Pull out this from the controller2, and rename it to the MediaController2Stub
+    //               or MediaBrowser2Stub.
+    static class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
         private final WeakReference<MediaController2Impl> mController;
 
         private MediaSession2CallbackStub(MediaController2Impl controller) {
@@ -395,6 +416,15 @@ public class MediaController2Impl implements MediaController2Provider {
                 throw new IllegalStateException("Controller is released");
             }
             return controller;
+        }
+
+        // TODO(jaewan): Refactor code to get rid of these pattern.
+        private MediaBrowser2Impl getBrowser() throws IllegalStateException {
+            final MediaController2Impl controller = getController();
+            if (controller instanceof MediaBrowser2Impl) {
+                return (MediaBrowser2Impl) controller;
+            }
+            return null;
         }
 
         public void destroy() {
@@ -419,6 +449,19 @@ public class MediaController2Impl implements MediaController2Provider {
             }
             controller.onConnectionChangedNotLocked(
                     sessionBinder, CommandGroup.fromBundle(commandGroup));
+        }
+
+        @Override
+        public void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra)
+                throws RuntimeException {
+            final MediaBrowser2Impl browser;
+            try {
+                browser = getBrowser();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+                return;
+            }
+            browser.onGetRootResult(rootHints, rootMediaId, rootExtra);
         }
     }
 

@@ -228,10 +228,11 @@ public class MediaSession2Test extends MediaSession2TestBase {
             mSession = new MediaSession2.Builder(mContext, mPlayer)
                     .setSessionCallback(sessionCallback).build();
         });
-        MediaController2Wrapper controller = createController(mSession.getToken(), false, null);
+        MediaController2 controller =
+                createController(mSession.getToken(), false, null);
         assertNotNull(controller);
-        controller.waitForConnect(false);
-        controller.waitForDisconnect(true);
+        waitForConnect(controller, false);
+        waitForDisconnect(controller, true);
     }
 
     public class MockOnConnectCallback extends SessionCallback {

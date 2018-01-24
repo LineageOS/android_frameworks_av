@@ -18,9 +18,14 @@ package android.media;
 
 import static junit.framework.Assert.fail;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.Context;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
 import android.media.TestUtils.SyncHandler;
+import android.media.session.PlaybackState;
 import android.os.Process;
 
 /**
@@ -29,7 +34,13 @@ import android.os.Process;
 public class MockMediaSessionService2 extends MediaSessionService2 {
     // Keep in sync with the AndroidManifest.xml
     public static final String ID = "TestSession";
-    public MediaSession2 mSession;
+
+    private static final String DEFAULT_MEDIA_NOTIFICATION_CHANNEL_ID = "media_session_service";
+    private static final int DEFAULT_MEDIA_NOTIFICATION_ID = 1001;
+
+    private NotificationChannel mDefaultNotificationChannel;
+    private MediaSession2 mSession;
+    private NotificationManager mNotificationManager;
 
     @Override
     public MediaSession2 onCreateSession(String sessionId) {
@@ -49,12 +60,30 @@ public class MockMediaSessionService2 extends MediaSessionService2 {
     @Override
     public void onCreate() {
         super.onCreate();
+        mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
     }
 
     @Override
     public void onDestroy() {
         TestServiceRegistry.getInstance().cleanUp();
         super.onDestroy();
+    }
+
+    @Override
+    public MediaNotification onUpdateNotification(PlaybackState state) {
+        if (mDefaultNotificationChannel == null) {
+            mDefaultNotificationChannel = new NotificationChannel(
+                    DEFAULT_MEDIA_NOTIFICATION_CHANNEL_ID,
+                    DEFAULT_MEDIA_NOTIFICATION_CHANNEL_ID,
+                    NotificationManager.IMPORTANCE_DEFAULT);
+            mNotificationManager.createNotificationChannel(mDefaultNotificationChannel);
+        }
+        Notification notification = new Notification.Builder(
+                this, DEFAULT_MEDIA_NOTIFICATION_CHANNEL_ID)
+                .setContentTitle(getPackageName())
+                .setContentText("Playback state: " + state.getState())
+                .setSmallIcon(android.R.drawable.sym_def_app_icon).build();
+        return MediaNotification.create(DEFAULT_MEDIA_NOTIFICATION_ID, notification);
     }
 
     private class MySessionCallback extends SessionCallback {

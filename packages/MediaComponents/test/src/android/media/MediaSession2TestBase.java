@@ -20,7 +20,9 @@ import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
 
 import android.content.Context;
+import android.media.MediaController2.ControllerCallback;
 import android.media.MediaSession2.CommandGroup;
+import android.os.Bundle;
 import android.os.HandlerThread;
 import android.support.annotation.CallSuper;
 import android.support.annotation.NonNull;
@@ -49,6 +51,22 @@ abstract class MediaSession2TestBase {
 
     Context mContext;
     private List<MediaController2> mControllers = new ArrayList<>();
+
+    interface TestControllerInterface {
+        ControllerCallback getCallback();
+    }
+
+    interface TestControllerCallbackInterface {
+        // Currently empty. Add methods in ControllerCallback/BrowserCallback that you want to test.
+
+        // Browser specific callbacks
+        default void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {}
+    }
+
+    interface WaitForConnectionInterface {
+        void waitForConnect(boolean expect) throws InterruptedException;
+        void waitForDisconnect(boolean expect) throws InterruptedException;
+    }
 
     @BeforeClass
     public static void setUpThread() {
@@ -83,27 +101,64 @@ abstract class MediaSession2TestBase {
         }
     }
 
-    MediaController2Wrapper createController(SessionToken token) throws InterruptedException {
+    final MediaController2 createController(SessionToken token) throws InterruptedException {
         return createController(token, true, null);
     }
 
-    MediaController2Wrapper createController(@NonNull SessionToken token, boolean waitForConnect,
-            @Nullable TestControllerCallback callback)
+    final MediaController2 createController(@NonNull SessionToken token,
+            boolean waitForConnect, @Nullable TestControllerCallbackInterface callback)
             throws InterruptedException {
-        if (callback == null) {
-            callback = new TestControllerCallback();
+        TestControllerInterface instance = onCreateController(token, callback);
+        if (!(instance instanceof MediaController2)) {
+            throw new RuntimeException("Test has a bug. Expected MediaController2 but returned "
+                    + instance);
         }
-        MediaController2Wrapper controller = new MediaController2Wrapper(mContext, token, callback);
+        MediaController2 controller = (MediaController2) instance;
         mControllers.add(controller);
         if (waitForConnect) {
-            controller.waitForConnect(true);
+            waitForConnect(controller, true);
         }
         return controller;
     }
 
-    public static class TestControllerCallback extends MediaController2.ControllerCallback {
+    private static WaitForConnectionInterface getWaitForConnectionInterface(
+            MediaController2 controller) {
+        if (!(controller instanceof TestControllerInterface)) {
+            throw new RuntimeException("Test has a bug. Expected controller implemented"
+                    + " TestControllerInterface but got " + controller);
+        }
+        ControllerCallback callback = ((TestControllerInterface) controller).getCallback();
+        if (!(callback instanceof WaitForConnectionInterface)) {
+            throw new RuntimeException("Test has a bug. Expected controller with callback "
+                    + " implemented WaitForConnectionInterface but got " + controller);
+        }
+        return (WaitForConnectionInterface) callback;
+    }
+
+    public static void waitForConnect(MediaController2 controller, boolean expected)
+            throws InterruptedException {
+        getWaitForConnectionInterface(controller).waitForConnect(expected);
+    }
+
+    public static void waitForDisconnect(MediaController2 controller, boolean expected)
+            throws InterruptedException {
+        getWaitForConnectionInterface(controller).waitForDisconnect(expected);
+    }
+
+    TestControllerInterface onCreateController(@NonNull SessionToken token,
+            @NonNull TestControllerCallbackInterface callback) {
+        return new TestMediaController(mContext, token, new TestControllerCallback(callback));
+    }
+
+    public static class TestControllerCallback extends MediaController2.ControllerCallback
+            implements WaitForConnectionInterface {
+        public final TestControllerCallbackInterface mCallbackProxy;
         public final CountDownLatch connectLatch = new CountDownLatch(1);
         public final CountDownLatch disconnectLatch = new CountDownLatch(1);
+
+        TestControllerCallback(TestControllerCallbackInterface callbackProxy) {
+            mCallbackProxy = callbackProxy;
+        }
 
         @CallSuper
         @Override
@@ -118,31 +173,38 @@ abstract class MediaSession2TestBase {
             super.onDisconnected();
             disconnectLatch.countDown();
         }
+
+        @Override
+        public void waitForConnect(boolean expect) throws InterruptedException {
+            if (expect) {
+                assertTrue(connectLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+            } else {
+                assertFalse(connectLatch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+            }
+        }
+
+        @Override
+        public void waitForDisconnect(boolean expect) throws InterruptedException {
+            if (expect) {
+                assertTrue(disconnectLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+            } else {
+                assertFalse(disconnectLatch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+            }
+        }
     }
 
-    public class MediaController2Wrapper extends MediaController2 {
-        private final TestControllerCallback mCallback;
+    public class TestMediaController extends MediaController2 implements TestControllerInterface {
+        private final ControllerCallback mCallback;
 
-        public MediaController2Wrapper(@NonNull Context context, @NonNull SessionToken token,
-                @NonNull TestControllerCallback callback) {
+        public TestMediaController(@NonNull Context context, @NonNull SessionToken token,
+                @NonNull ControllerCallback callback) {
             super(context, token, callback, sHandlerExecutor);
             mCallback = callback;
         }
 
-        public void waitForConnect(boolean expect) throws InterruptedException {
-            if (expect) {
-                assertTrue(mCallback.connectLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
-            } else {
-                assertFalse(mCallback.connectLatch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
-            }
-        }
-
-        public void waitForDisconnect(boolean expect) throws InterruptedException {
-            if (expect) {
-                assertTrue(mCallback.disconnectLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
-            } else {
-                assertFalse(mCallback.disconnectLatch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
-            }
+        @Override
+        public ControllerCallback getCallback() {
+            return mCallback;
         }
     }
 }
