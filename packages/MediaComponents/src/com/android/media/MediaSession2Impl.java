@@ -17,25 +17,32 @@
 package com.android.media;
 
 import android.Manifest.permission;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.media.AudioAttributes;
 import android.media.IMediaSession2Callback;
-import android.media.MediaController2;
+import android.media.MediaItem2;
 import android.media.MediaPlayerBase;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Builder;
+import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
+import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
+import android.media.MediaSession2.PlaylistParam;
 import android.media.MediaSession2.SessionCallback;
 import android.media.SessionToken;
+import android.media.VolumeProvider;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
 import android.media.update.MediaSession2Provider;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.ResultReceiver;
 import android.util.Log;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -61,16 +68,21 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     /**
      * Can be only called by the {@link Builder#build()}.
-     *
+     * 
      * @param instance
      * @param context
      * @param player
      * @param id
      * @param callback
+     * @param volumeProvider
+     * @param ratingType
+     * @param sessionActivity
      */
     public MediaSession2Impl(MediaSession2 instance, Context context, MediaPlayerBase player,
-            String id, SessionCallback callback) {
+            String id, SessionCallback callback, VolumeProvider volumeProvider, int ratingType,
+            PendingIntent sessionActivity) {
         mInstance = instance;
+        // TODO(jaewan): Keep other params.
 
         // Argument checks are done by builder already.
         // Initialize finals first.
@@ -103,7 +115,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     //               setPlayer(null). Token can be available when player is null, and
     //               controller can also attach to session.
     @Override
-    public void setPlayer_impl(MediaPlayerBase player) throws IllegalArgumentException {
+    public void setPlayer_impl(MediaPlayerBase player, VolumeProvider volumeProvider) throws IllegalArgumentException {
         ensureCallingThread();
         if (player == null) {
             throw new IllegalArgumentException("player shouldn't be null");
@@ -202,43 +214,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public PlaybackState getPlaybackState_impl() {
-        ensureCallingThread();
-        ensurePlayer();
-        return mPlayer.getPlaybackState();
-    }
-
-    @Override
-    public void addPlaybackListener_impl(
-            MediaPlayerBase.PlaybackListener listener, Handler handler) {
-        if (listener == null) {
-            throw new IllegalArgumentException("listener shouldn't be null");
-        }
-        if (handler == null) {
-            throw new IllegalArgumentException("handler shouldn't be null");
-        }
-        ensureCallingThread();
-        if (PlaybackListenerHolder.contains(mListeners, listener)) {
-            Log.w(TAG, "listener is already added. Ignoring.");
-            return;
-        }
-        mListeners.add(new PlaybackListenerHolder(listener, handler));
-    }
-
-    @Override
-    public void removePlaybackListener_impl(MediaPlayerBase.PlaybackListener listener) {
-        if (listener == null) {
-            throw new IllegalArgumentException("listener shouldn't be null");
-        }
-        ensureCallingThread();
-        int idx = PlaybackListenerHolder.indexOf(mListeners, listener);
-        if (idx >= 0) {
-            mListeners.get(idx).removeCallbacksAndMessages(null);
-            mListeners.remove(idx);
-        }
-    }
-
-    @Override
     public void setCustomLayout_impl(ControllerInfo controller, List<CommandButton> layout) {
         ensureCallingThread();
         if (controller == null) {
@@ -248,6 +223,65 @@ public class MediaSession2Impl implements MediaSession2Provider {
             throw new IllegalArgumentException("layout shouldn't be null");
         }
         mSessionStub.notifyCustomLayoutNotLocked(controller, layout);
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////
+    // TODO(jaewan): Implement follows
+    //////////////////////////////////////////////////////////////////////////////////////
+    @Override
+    public void setPlayer_impl(MediaPlayerBase player) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void setAllowedCommands_impl(ControllerInfo controller, CommandGroup commands) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void notifyMetadataChanged_impl() {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void sendCustomCommand_impl(ControllerInfo controller, Command command, Bundle args,
+            ResultReceiver receiver) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void sendCustomCommand_impl(Command command, Bundle args) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void setPlaylist_impl(List<MediaItem2> playlist, PlaylistParam param) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void prepare_impl() {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void fastForward_impl() {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void rewind_impl() {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void seekTo_impl(long pos) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void setCurrentPlaylistItem_impl(int index) {
+        // TODO(jaewan): Implement
     }
 
     ///////////////////////////////////////////////////

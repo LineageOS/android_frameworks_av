@@ -16,12 +16,15 @@
 
 package com.android.media;
 
+import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.media.IMediaSession2;
 import android.media.IMediaSession2Callback;
+import android.media.MediaController2.PlaybackInfo;
+import android.media.MediaItem2;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
@@ -29,14 +32,19 @@ import android.media.MediaSession2.CommandGroup;
 import android.media.MediaController2;
 import android.media.MediaController2.ControllerCallback;
 import android.media.MediaPlayerBase;
+import android.media.MediaSession2.PlaylistParam;
 import android.media.MediaSessionService2;
+import android.media.PlaybackState2;
+import android.media.Rating2;
 import android.media.SessionToken;
 import android.media.session.PlaybackState;
 import android.media.update.MediaController2Provider;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
 import android.util.Log;
 
@@ -257,69 +265,128 @@ public class MediaController2Impl implements MediaController2Provider {
         }
     }
 
+    //////////////////////////////////////////////////////////////////////////////////////
+    // TODO(jaewan): Implement follows
+    //////////////////////////////////////////////////////////////////////////////////////
     @Override
-    public PlaybackState getPlaybackState_impl() {
-        final IMediaSession2 binder = mSessionBinder;
-        if (binder != null) {
-            try {
-                return binder.getPlaybackState();
-            } catch (RemoteException e) {
-                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
-            }
-        } else {
-            Log.w(TAG, "Session isn't active", new IllegalStateException());
-        }
-        // TODO(jaewan): What to return for error case?
+    public PendingIntent getSessionActivity_impl() {
+        // TODO(jaewan): Implement
         return null;
     }
 
     @Override
-    public void addPlaybackListener_impl(
-            MediaPlayerBase.PlaybackListener listener, Handler handler) {
-        if (listener == null) {
-            throw new IllegalArgumentException("listener shouldn't be null");
-        }
-        if (handler == null) {
-            throw new IllegalArgumentException("handler shouldn't be null");
-        }
-        boolean registerCallback;
-        synchronized (mLock) {
-            if (PlaybackListenerHolder.contains(mPlaybackListeners, listener)) {
-                throw new IllegalArgumentException("listener is already added. Ignoring.");
-            }
-            registerCallback = mPlaybackListeners.isEmpty();
-            mPlaybackListeners.add(new PlaybackListenerHolder(listener, handler));
-        }
-        if (registerCallback) {
-            registerCallbackForPlaybackNotLocked();
-        }
+    public int getRatingType_impl() {
+        // TODO(jaewan): Implement
+        return 0;
     }
 
     @Override
-    public void removePlaybackListener_impl(MediaPlayerBase.PlaybackListener listener) {
-        if (listener == null) {
-            throw new IllegalArgumentException("listener shouldn't be null");
-        }
-        boolean unregisterCallback;
-        synchronized (mLock) {
-            int idx = PlaybackListenerHolder.indexOf(mPlaybackListeners, listener);
-            if (idx >= 0) {
-                mPlaybackListeners.get(idx).removeCallbacksAndMessages(null);
-                mPlaybackListeners.remove(idx);
-            }
-            unregisterCallback = mPlaybackListeners.isEmpty();
-        }
-        if (unregisterCallback) {
-            final IMediaSession2 binder = mSessionBinder;
-            if (binder != null) {
-                // Lazy unregister
-                try {
-                    binder.unregisterCallback(mSessionCallbackStub, CALLBACK_FLAG_PLAYBACK);
-                } catch (RemoteException e) {
-                    Log.e(TAG, "Cannot connect to the service or the session is gone", e);
-                }
-            }
-        }
+    public void setVolumeTo_impl(int value, int flags) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void adjustVolume_impl(int direction, int flags) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public PlaybackInfo getPlaybackInfo_impl() {
+        // TODO(jaewan): Implement
+        return null;
+    }
+
+    @Override
+    public void prepareFromUri_impl(Uri uri, Bundle extras) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void prepareFromSearch_impl(String query, Bundle extras) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void prepareMediaId_impl(String mediaId, Bundle extras) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void playFromSearch_impl(String query, Bundle extras) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void playFromUri_impl(String uri, Bundle extras) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void playFromMediaId_impl(String mediaId, Bundle extras) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void setRating_impl(Rating2 rating) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void sendCustomCommand_impl(Command command, Bundle args, ResultReceiver cb) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public List<MediaItem2> getPlaylist_impl() {
+        // TODO(jaewan): Implement
+        return null;
+    }
+
+    @Override
+    public void prepare_impl() {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void fastForward_impl() {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void rewind_impl() {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void seekTo_impl(long pos) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void setCurrentPlaylistItem_impl(int index) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public PlaybackState2 getPlaybackState_impl() {
+        // TODO(jaewan): Implement
+        return null;
+    }
+
+    @Override
+    public void removePlaylistItem_impl(MediaItem2 index) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void addPlaylistItem_impl(int index, MediaItem2 item) {
+    // TODO(jaewan): Implement
+    }
+
+    @Override
+    public PlaylistParam getPlaylistParam_impl() {
+        // TODO(jaewan): Implement
+        return null;
     }
 
     ///////////////////////////////////////////////////

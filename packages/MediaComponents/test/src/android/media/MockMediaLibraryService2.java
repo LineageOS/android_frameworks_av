@@ -24,7 +24,6 @@ import android.media.MediaSession2.ControllerInfo;
 import android.media.TestUtils.SyncHandler;
 import android.os.Bundle;
 import android.os.Process;
-import android.service.media.MediaBrowserService.BrowserRoot;
 
 import javax.annotation.concurrent.GuardedBy;
 
