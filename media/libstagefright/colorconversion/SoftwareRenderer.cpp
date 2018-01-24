@@ -134,6 +134,10 @@ void SoftwareRenderer::resetFormatIfChanged(const sp<AMessage> &format) {
             }
             case OMX_COLOR_FormatYUV420Planar16:
             {
+                // Here we would convert OMX_COLOR_FormatYUV420Planar16 into
+                // OMX_COLOR_FormatYUV444Y410, and put it inside a buffer with
+                // format HAL_PIXEL_FORMAT_RGBA_1010102. Surfaceflinger will
+                // use render engine to convert it to RGB if needed.
                 halFormat = HAL_PIXEL_FORMAT_RGBA_1010102;
                 bufWidth = (mCropWidth + 1) & ~1;
                 bufHeight = (mCropHeight + 1) & ~1;
@@ -152,7 +156,7 @@ void SoftwareRenderer::resetFormatIfChanged(const sp<AMessage> &format) {
         CHECK(mConverter->isValid());
     } else if (mColorFormat == OMX_COLOR_FormatYUV420Planar16) {
         mConverter = new ColorConverter(
-                mColorFormat, OMX_COLOR_Format32BitRGBA1010102);
+                mColorFormat, OMX_COLOR_FormatYUV444Y410);
         CHECK(mConverter->isValid());
     }
 
@@ -380,7 +384,7 @@ skip_copying:
     if (format->findInt32("android._dataspace", (int32_t *)&dataSpace) && dataSpace != mDataSpace) {
         mDataSpace = dataSpace;
 
-        if (mConverter != NULL) {
+        if (mConverter != NULL && mConverter->isDstRGB()) {
             // graphics only supports full range RGB. ColorConverter should have
             // converted any YUV to full range.
             dataSpace = (android_dataspace)
