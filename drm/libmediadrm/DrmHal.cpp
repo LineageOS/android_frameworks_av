@@ -197,9 +197,9 @@ DrmHal::DrmHal()
 
 void DrmHal::closeOpenSessions() {
     if (mPlugin != NULL) {
-        for (size_t i = 0; i < mOpenSessions.size(); i++) {
-            mPlugin->closeSession(toHidlVec(mOpenSessions[i]));
-            DrmSessionManager::Instance()->removeSession(mOpenSessions[i]);
+        auto openSessions = mOpenSessions;
+        for (size_t i = 0; i < openSessions.size(); i++) {
+            closeSession(openSessions[i]);
         }
     }
     mOpenSessions.clear();
