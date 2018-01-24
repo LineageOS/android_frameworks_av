@@ -31,13 +31,12 @@ import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
-import android.media.MediaSession2.PlaylistParam;
+import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.media.PlaybackState2;
 import android.media.SessionToken2;
 import android.media.VolumeProvider;
 import android.media.session.MediaSessionManager;
-import android.media.session.PlaybackState;
 import android.media.update.MediaSession2Provider;
 import android.os.Bundle;
 import android.os.Handler;
@@ -81,9 +80,9 @@ public class MediaSession2Impl implements MediaSession2Provider {
      * @param ratingType
      * @param sessionActivity
      */
-    public MediaSession2Impl(MediaSession2 instance, Context context, MediaPlayerBase player,
-            String id, Executor callbackExecutor, SessionCallback callback,
-            VolumeProvider volumeProvider, int ratingType, PendingIntent sessionActivity) {
+    public MediaSession2Impl(Context context, MediaSession2 instance, MediaPlayerBase player,
+            String id, VolumeProvider volumeProvider, int ratingType, PendingIntent sessionActivity,
+            Executor callbackExecutor, SessionCallback callback) {
         mInstance = instance;
         // TODO(jaewan): Keep other params.
 
@@ -260,7 +259,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void setPlaylist_impl(List<MediaItem2> playlist, PlaylistParam param) {
+    public void setPlaylist_impl(List<MediaItem2> playlist, PlaylistParams param) {
         // TODO(jaewan): Implement
     }
 
@@ -380,7 +379,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         // {@link #CALLBACK_FLAG_SESSION_ACTIVENESS}
         private int mFlag;
 
-        public ControllerInfoImpl(ControllerInfo instance, Context context, int uid,
+        public ControllerInfoImpl(Context context, ControllerInfo instance, int uid,
                 int pid, String packageName, IMediaSession2Callback callback) {
             mInstance = instance;
             mUid = uid;

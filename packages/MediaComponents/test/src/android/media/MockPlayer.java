@@ -16,9 +16,7 @@
 
 package android.media;
 
-import android.media.MediaSession2.PlaylistParam;
-import android.media.session.PlaybackState;
-import android.os.Handler;
+import android.media.MediaSession2.PlaylistParams;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
@@ -137,7 +135,7 @@ public class MockPlayer extends MediaPlayerBase {
     }
 
     @Override
-    public void setPlaylist(List<MediaItem2> item, PlaylistParam param) {
+    public void setPlaylist(List<MediaItem2> item, PlaylistParams param) {
     }
 
     @Override

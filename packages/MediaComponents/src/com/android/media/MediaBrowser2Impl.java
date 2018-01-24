@@ -37,9 +37,9 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
     private final MediaBrowser2 mInstance;
     private final MediaBrowser2.BrowserCallback mCallback;
 
-    public MediaBrowser2Impl(MediaBrowser2 instance, Context context, SessionToken2 token,
-            BrowserCallback callback, Executor executor) {
-        super(instance, context, token, callback, executor);
+    public MediaBrowser2Impl(Context context, MediaBrowser2 instance, SessionToken2 token,
+            Executor executor, BrowserCallback callback) {
+        super(context, instance, token, executor, callback);
         mInstance = instance;
         mCallback = callback;
     }

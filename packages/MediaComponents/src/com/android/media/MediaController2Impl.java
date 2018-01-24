@@ -31,12 +31,11 @@ import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaController2;
 import android.media.MediaController2.ControllerCallback;
-import android.media.MediaSession2.PlaylistParam;
+import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSessionService2;
 import android.media.PlaybackState2;
 import android.media.Rating2;
 import android.media.SessionToken2;
-import android.media.session.PlaybackState;
 import android.media.update.MediaController2Provider;
 import android.net.Uri;
 import android.os.Bundle;
@@ -90,8 +89,8 @@ public class MediaController2Impl implements MediaController2Provider {
 
     // TODO(jaewan): Require session activeness changed listener, because controller can be
     //               available when the session's player is null.
-    public MediaController2Impl(MediaController2 instance, Context context, SessionToken2 token,
-            ControllerCallback callback, Executor executor) {
+    public MediaController2Impl(Context context, MediaController2 instance, SessionToken2 token,
+            Executor executor, ControllerCallback callback) {
         mInstance = instance;
 
         if (context == null) {
@@ -382,7 +381,7 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public PlaylistParam getPlaylistParam_impl() {
+    public PlaylistParams getPlaylistParam_impl() {
         // TODO(jaewan): Implement
         return null;
     }
