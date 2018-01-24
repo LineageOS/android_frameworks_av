@@ -83,32 +83,64 @@ enum {
     kParamIndexWorkOrdinal,
 };
 
+/**
+ * Information for ordering work items on a component port.
+ */
 struct C2WorkOrdinalStruct {
-    uint64_t timestamp;
-    uint64_t frame_index;    // submission ordinal on the initial component
-    uint64_t custom_ordinal; // can be given by the component, e.g. decode order
+//public:
+    c2_cntr64_t timestamp;     /** frame timestamp in microseconds */
+    c2_cntr64_t frameIndex;    /** submission ordinal on the initial component */
+    c2_cntr64_t customOrdinal; /** can be given by the component, e.g. decode order */
 
     DEFINE_AND_DESCRIBE_C2STRUCT(WorkOrdinal)
     C2FIELD(timestamp, "timestamp")
-    C2FIELD(frame_index, "frame-index")
-    C2FIELD(custom_ordinal, "custom-ordinal")
+    C2FIELD(frameIndex, "frame-index")
+    C2FIELD(customOrdinal, "custom-ordinal")
 };
 
-struct C2BufferPack {
+/**
+ * This structure represents a Codec 2.0 frame with its metadata.
+ *
+ * A frame basically consists of an ordered sets of buffers, configuration changes and info buffers
+ * along with some non-configuration metadata.
+ */
+struct C2FrameData {
 //public:
     enum flags_t : uint32_t {
-        FLAG_CODEC_CONFIG  = (1 << 0),
-        FLAG_DROP_FRAME    = (1 << 1),
-        FLAG_END_OF_STREAM = (1 << 2),
+        /**
+         * For input frames: no output frame shall be generated when processing this frame, but
+         * metadata shall still be processed.
+         * For output frames: this frame shall be discarded and but metadata is still valid.
+         */
+        FLAG_DROP_FRAME    = (1 << 0),
+        /**
+         * This frame is the last frame of the current stream. Further frames are part of a new
+         * stream.
+         */
+        FLAG_END_OF_STREAM = (1 << 1),
+        /**
+         * This frame shall be discarded with its metadata.
+         * This flag is only set by components - e.g. as a response to the flush command.
+         */
+        FLAG_DISCARD_FRAME = (1 << 2),
+        /**
+         * This frame contains only codec-specific configuration data, and no actual access unit.
+         *
+         * \deprecated pass codec configuration with using the \todo codec-specific configuration
+         * info together with the access unit.
+         */
+        FLAG_CODEC_CONFIG  = (1u << 31),
     };
 
+    /**
+     * Frame flags */
     flags_t  flags;
     C2WorkOrdinalStruct ordinal;
     std::vector<std::shared_ptr<C2Buffer>> buffers;
     //< for initial work item, these may also come from the parser - if provided
     //< for output buffers, these are the responses to requestedInfos
-    std::list<std::unique_ptr<C2Info>>       infos;
-    std::list<std::shared_ptr<C2InfoBuffer>> infoBuffers;
+    std::vector<std::unique_ptr<C2Param>>      configUpdate;
+    std::vector<std::shared_ptr<C2InfoBuffer>> infoBuffers;
 };
 
 struct C2Worklet {
@@ -116,59 +148,61 @@ struct C2Worklet {
     // IN
     c2_node_id_t component;
 
-    std::list<std::unique_ptr<C2Param>> tunings; //< tunings to be applied before processing this
-                                                 // worklet
-    std::list<C2Param::Type> requestedInfos;
-    std::vector<std::shared_ptr<C2BlockPool>> allocators; //< This vector shall be the same size as
-                                                          //< output.buffers. \deprecated
+    /** Configuration changes to be applied before processing this worklet. */
+    std::vector<std::unique_ptr<C2Tuning>> tunings;
+    std::vector<std::unique_ptr<C2SettingResult>> failures;
 
     // OUT
-    C2BufferPack output;
-    std::list<std::unique_ptr<C2SettingResult>> failures;
+    C2FrameData output;
 };
+
+/**
+ * Information about partial work-chains not part of the current work items.
+ *
+ * To be defined later.
+ */
+struct C2WorkChainInfo;
 
 /**
  * This structure holds information about all a single work item.
  *
  * This structure shall be passed by the client to the component for the first worklet. As such,
  * worklets must not be empty. The ownership of this object is passed.
- *
- * input:
- *      The input data to be processed. This is provided by the client with ownership. When the work
- *      is returned, the input buffer-pack's buffer vector shall contain nullptrs.
- *
- * worklets:
- *      The chain of components and associated allocators, tunings and info requests that the data
- *      must pass through. If this has more than a single element, the tunnels between successive
- *      components of the worklet chain must have been (successfully) pre-registered at the time
- *      the work is submitted. Allocating the output buffers in the worklets is the responsibility
- *      of each component. Upon work submission, each output buffer-pack shall be an appropriately
- *      sized vector containing nullptrs. When the work is completed/returned to the client,
- *
- * worklets_processed:
- *      It shall be initialized to 0 by the client when the work is submitted.
- *      It shall contain the number of worklets that were successfully processed when the work is
- *      returned. If this is less then the number of worklets, result must not be success.
- *      It must be in the range of [0, worklets.size()].
- *
- * result:
- *      The final outcome of the work. If 0 when work is returned, it is assumed that all worklets
- *      have been processed.
  */
 struct C2Work {
 //public:
-    // pre-chain infos (for portions of a tunneling chain that happend before this work-chain for
-    // this work item - due to framework facilitated (non-tunneled) work-chaining)
-    std::list<std::pair<std::unique_ptr<C2PortMimeConfig>, std::unique_ptr<C2Info>>> preChainInfos;
-    std::list<std::pair<std::unique_ptr<C2PortMimeConfig>, std::unique_ptr<C2Buffer>>> preChainInfoBlobs;
+    /// additional work chain info not part of this work
+    std::shared_ptr<C2WorkChainInfo> chainInfo;
 
-    C2BufferPack input;
+    /// The input data to be processed as part of this work/work-chain. This is provided by the
+    /// client with ownership. When the work is returned (via onWorkDone), the input buffer-pack's
+    /// buffer vector shall contain nullptrs.
+    C2FrameData input;
+
+    /// The chain of components, tunings (including output buffer pool IDs) and info requests that the
+    /// data must pass through. If this has more than a single element, the tunnels between successive
+    /// components of the worklet chain must have been (successfully) pre-registered at the time that
+    /// the work is submitted. Allocating the output buffers in the worklets is the responsibility of
+    /// each component. Upon work submission, each output buffer-pack shall be an appropriately sized
+    /// vector containing nullptrs. When the work is completed/returned to the client, output buffers
+    /// pointers from all but the final worklet shall be nullptrs.
     std::list<std::unique_ptr<C2Worklet>> worklets;
 
-    uint32_t worklets_processed;
+    /// Number of worklets successfully processed in this chain. This shall be initialized to 0 by the
+    /// client when the work is submitted. It shall contain the number of worklets that were
+    /// successfully processed when the work is returned to the client. If this is less then the number
+    /// of worklets, result must not be success. It must be in the range of [0, worklets.size()].
+    uint32_t workletsProcessed;
+
+    /// The final outcome of the work (corresponding to the current workletsProcessed). If 0 when
+    /// work is returned, it is assumed that all worklets have been processed.
     c2_status_t result;
 };
 
+/**
+ * Information about a future work to be submitted to the component. The information is used to
+ * reserve the work for work ordering purposes.
+ */
 struct C2WorkOutline {
 //public:
     C2WorkOrdinalStruct ordinal;

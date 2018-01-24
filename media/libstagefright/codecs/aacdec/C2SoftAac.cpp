@@ -316,9 +316,9 @@ void C2SoftAac::drainRingBuffer(
             work->worklets.front()->output.buffers.clear();
             work->worklets.front()->output.buffers.push_back(buffer);
             work->worklets.front()->output.ordinal = work->input.ordinal;
-            work->worklets_processed = 1u;
+            work->workletsProcessed = 1u;
         };
-        if (work && work->input.ordinal.frame_index == outInfo.frameIndex) {
+        if (work && work->input.ordinal.frameIndex == c2_cntr64_t(outInfo.frameIndex)) {
             fillWork(work);
         } else {
             finish(outInfo.frameIndex, fillWork);
@@ -332,7 +332,7 @@ void C2SoftAac::drainRingBuffer(
 void C2SoftAac::process(
         const std::unique_ptr<C2Work> &work,
         const std::shared_ptr<C2BlockPool> &pool) {
-    work->worklets_processed = 0u;
+    work->workletsProcessed = 0u;
     if (mSignalledError) {
         return;
     }
@@ -346,8 +346,8 @@ void C2SoftAac::process(
     size_t offset = 0u;
     size_t size = view.capacity();
 
-    bool eos = (work->input.flags & C2BufferPack::FLAG_END_OF_STREAM) != 0;
-    bool codecConfig = (work->input.flags & C2BufferPack::FLAG_CODEC_CONFIG) != 0;
+    bool eos = (work->input.flags & C2FrameData::FLAG_END_OF_STREAM) != 0;
+    bool codecConfig = (work->input.flags & C2FrameData::FLAG_CODEC_CONFIG) != 0;
 
     //TODO
 #if 0
@@ -381,8 +381,8 @@ void C2SoftAac::process(
     }
 
     Info inInfo;
-    inInfo.frameIndex = work->input.ordinal.frame_index;
-    inInfo.timestamp = work->input.ordinal.timestamp;
+    inInfo.frameIndex = work->input.ordinal.frameIndex.peeku();
+    inInfo.timestamp = work->input.ordinal.timestamp.peeku();
     inInfo.bufferSize = size;
     inInfo.decodedSizes.clear();
     while (size > 0u) {
@@ -604,13 +604,13 @@ c2_status_t C2SoftAac::drainInternal(
             work->worklets.front()->output.buffers.clear();
             work->worklets.front()->output.buffers.emplace_back(nullptr);
             work->worklets.front()->output.ordinal = work->input.ordinal;
-            work->worklets_processed = 1u;
+            work->workletsProcessed = 1u;
         };
         while (mBuffersInfo.size() > 1u) {
             finish(mBuffersInfo.front().frameIndex, fillEmptyWork);
             mBuffersInfo.pop_front();
         }
-        if (work->worklets_processed == 0u) {
+        if (work->workletsProcessed == 0u) {
             fillEmptyWork(work);
         }
         mBuffersInfo.clear();

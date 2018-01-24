@@ -665,16 +665,16 @@ status_t CCodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffe
     int32_t flags = 0;
     int32_t tmp = 0;
     if (buffer->meta()->findInt32("eos", &tmp) && tmp) {
-        flags |= C2BufferPack::FLAG_END_OF_STREAM;
+        flags |= C2FrameData::FLAG_END_OF_STREAM;
         ALOGV("input EOS");
     }
     if (buffer->meta()->findInt32("csd", &tmp) && tmp) {
-        flags |= C2BufferPack::FLAG_CODEC_CONFIG;
+        flags |= C2FrameData::FLAG_CODEC_CONFIG;
     }
     std::unique_ptr<C2Work> work(new C2Work);
-    work->input.flags = (C2BufferPack::flags_t)flags;
+    work->input.flags = (C2FrameData::flags_t)flags;
     work->input.ordinal.timestamp = timeUs;
-    work->input.ordinal.frame_index = mFrameIndex++;
+    work->input.ordinal.frameIndex = mFrameIndex++;
     work->input.buffers.clear();
     {
         Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(mInputBuffers);
@@ -724,7 +724,7 @@ status_t CCodecBufferChannel::renderOutputBuffer(
         return OK;
     }
 
-    std::list<C2ConstGraphicBlock> blocks = c2Buffer->data().graphicBlocks();
+    std::vector<C2ConstGraphicBlock> blocks = c2Buffer->data().graphicBlocks();
     if (blocks.size() != 1u) {
         ALOGE("# of graphic blocks expected to be 1, but %zu", blocks.size());
         return UNKNOWN_ERROR;
@@ -881,7 +881,7 @@ void CCodecBufferChannel::onWorkDone(std::vector<std::unique_ptr<C2Work>> workIt
         }
 
         const std::unique_ptr<C2Worklet> &worklet = work->worklets.front();
-        if (worklet->output.ordinal.frame_index < mFirstValidFrameIndex) {
+        if ((worklet->output.ordinal.frameIndex - mFirstValidFrameIndex.load()).peek() < 0) {
             // Discard frames from previous generation.
             continue;
         }
@@ -897,7 +897,7 @@ void CCodecBufferChannel::onWorkDone(std::vector<std::unique_ptr<C2Work>> workIt
         if (buffer) {
             // TODO: transfer infos() into buffer metadata
         }
-        for (const auto &info : worklet->output.infos) {
+        for (const auto &info : worklet->output.configUpdate) {
             if (info->coreIndex() == C2StreamCsdInfo::output::CORE_INDEX) {
                 ALOGV("csd found");
                 csdInfo = static_cast<const C2StreamCsdInfo::output *>(info.get());
@@ -905,7 +905,7 @@ void CCodecBufferChannel::onWorkDone(std::vector<std::unique_ptr<C2Work>> workIt
         }
 
         int32_t flags = 0;
-        if (worklet->output.flags & C2BufferPack::FLAG_END_OF_STREAM) {
+        if (worklet->output.flags & C2FrameData::FLAG_END_OF_STREAM) {
             flags |= MediaCodec::BUFFER_FLAG_EOS;
             ALOGV("output EOS");
         }
@@ -914,7 +914,7 @@ void CCodecBufferChannel::onWorkDone(std::vector<std::unique_ptr<C2Work>> workIt
         if (csdInfo != nullptr) {
             Mutexed<std::unique_ptr<OutputBuffers>>::Locked buffers(mOutputBuffers);
             if ((*buffers)->registerCsd(csdInfo, &index, &outBuffer)) {
-                outBuffer->meta()->setInt64("timeUs", worklet->output.ordinal.timestamp);
+                outBuffer->meta()->setInt64("timeUs", worklet->output.ordinal.timestamp.peek());
                 outBuffer->meta()->setInt32("flags", flags | MediaCodec::BUFFER_FLAG_CODECCONFIG);
                 ALOGV("csd index = %zu", index);
 
@@ -947,7 +947,7 @@ void CCodecBufferChannel::onWorkDone(std::vector<std::unique_ptr<C2Work>> workIt
             }
         }
 
-        outBuffer->meta()->setInt64("timeUs", worklet->output.ordinal.timestamp);
+        outBuffer->meta()->setInt64("timeUs", worklet->output.ordinal.timestamp.peek());
         outBuffer->meta()->setInt32("flags", flags);
         ALOGV("index = %zu", index);
         mCallback->onOutputBufferAvailable(index, outBuffer);

@@ -679,14 +679,14 @@ public:
      *
      * \param size    number of bytes to share
      * \param fence   fence to be used for the section
-     * \param blocks  list where the blocks of the section are appended to
+     * \param blocks  vector where the blocks of the section are appended to
      *
      * \retval C2_OK            the portion was successfully shared
      * \retval C2_NO_MEMORY     not enough memory to share the portion
      * \retval C2_TIMED_OUT     the operation timed out (unexpected)
      * \retval C2_CORRUPTED     some unknown error prevented sharing the data (unexpected)
      */
-    c2_status_t share(size_t size, C2Fence fence, std::list<C2ConstLinearBlock> &blocks);
+    c2_status_t share(size_t size, C2Fence fence, std::vector<C2ConstLinearBlock> &blocks);
 
     /**
      * Returns the beginning offset of this segment from the start of this circular block.
@@ -1203,14 +1203,14 @@ public:
      * \return a constant list of const linear blocks of this buffer.
      * \retval empty list if this buffer does not contain linear block(s).
      */
-    const std::list<C2ConstLinearBlock> linearBlocks() const;
+    const std::vector<C2ConstLinearBlock> linearBlocks() const;
 
     /**
      * Gets the graphic blocks of this buffer.
      * \return a constant list of const graphic blocks of this buffer.
      * \retval empty list if this buffer does not contain graphic block(s).
      */
-    const std::list<C2ConstGraphicBlock> graphicBlocks() const;
+    const std::vector<C2ConstGraphicBlock> graphicBlocks() const;
 
 private:
     class Impl;
@@ -1218,8 +1218,8 @@ private:
 
 protected:
     // no public constructor
-    explicit C2BufferData(const std::list<C2ConstLinearBlock> &blocks);
-    explicit C2BufferData(const std::list<C2ConstGraphicBlock> &blocks);
+    explicit C2BufferData(const std::vector<C2ConstLinearBlock> &blocks);
+    explicit C2BufferData(const std::vector<C2ConstGraphicBlock> &blocks);
 };
 
 /**
@@ -1301,7 +1301,7 @@ public:
      *
      * \return a constant list of info objects associated with this buffer.
      */
-    const std::list<std::shared_ptr<const C2Info>> infos() const;
+    const std::vector<std::shared_ptr<const C2Info>> info() const;
 
     /**
      * Attaches (or updates) an (existing) metadata for this buffer.
@@ -1328,8 +1328,8 @@ public:
 
 protected:
     // no public constructor
-    explicit C2Buffer(const std::list<C2ConstLinearBlock> &blocks);
-    explicit C2Buffer(const std::list<C2ConstGraphicBlock> &blocks);
+    explicit C2Buffer(const std::vector<C2ConstLinearBlock> &blocks);
+    explicit C2Buffer(const std::vector<C2ConstGraphicBlock> &blocks);
 
 private:
     class Impl;

@@ -721,11 +721,26 @@ struct C2ParamField {
 
     DEFINE_OTHER_COMPARISON_OPERATORS(C2ParamField)
 
+protected:
+    inline C2ParamField(C2Param::Index index, uint32_t offset, uint32_t size)
+        : _mIndex(index), _mFieldId(offset, size) {}
+
 private:
     friend struct _C2ParamInspector;
 
     C2Param::Index _mIndex; ///< parameter index
     _C2FieldId _mFieldId;   ///< field identifier
+};
+
+/**
+ * Structure uniquely specifying a field, an array element of a field, or a
+ * parameter in a configuration
+ */
+struct C2ParamOrField : public C2ParamField {
+//public:
+    template<typename S>
+    inline C2ParamOrField(S* param)
+        : C2ParamField(param->index(), 0u, param->size()) {}
 };
 
 /**

@@ -57,7 +57,7 @@ private:
 
     bool mSentCodecSpecificData;
     size_t mInputSize;
-    int64_t mInputTimeUs;
+    c2_cntr64_t mInputTimeUs;
 
     bool mSignalledError;
 

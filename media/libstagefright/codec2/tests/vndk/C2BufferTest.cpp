@@ -359,14 +359,14 @@ TEST_F(C2BufferTest, GraphicBlockPoolTest) {
 
 class BufferData : public C2BufferData {
 public:
-    explicit BufferData(const std::list<C2ConstLinearBlock> &blocks) : C2BufferData(blocks) {}
-    explicit BufferData(const std::list<C2ConstGraphicBlock> &blocks) : C2BufferData(blocks) {}
+    explicit BufferData(const std::vector<C2ConstLinearBlock> &blocks) : C2BufferData(blocks) {}
+    explicit BufferData(const std::vector<C2ConstGraphicBlock> &blocks) : C2BufferData(blocks) {}
 };
 
 class Buffer : public C2Buffer {
 public:
-    explicit Buffer(const std::list<C2ConstLinearBlock> &blocks) : C2Buffer(blocks) {}
-    explicit Buffer(const std::list<C2ConstGraphicBlock> &blocks) : C2Buffer(blocks) {}
+    explicit Buffer(const std::vector<C2ConstLinearBlock> &blocks) : C2Buffer(blocks) {}
+    explicit Buffer(const std::vector<C2ConstGraphicBlock> &blocks) : C2Buffer(blocks) {}
 };
 
 TEST_F(C2BufferTest, BufferDataTest) {
@@ -487,45 +487,45 @@ TEST_F(C2BufferTest, BufferTest) {
     std::shared_ptr<C2Info> info1(new C2Number1Info(1));
     std::shared_ptr<C2Info> info2(new C2Number2Info(2));
     buffer.reset(new Buffer( { block->share(0, kCapacity, C2Fence()) }));
-    EXPECT_TRUE(buffer->infos().empty());
+    EXPECT_TRUE(buffer->info().empty());
     EXPECT_FALSE(buffer->hasInfo(info1->type()));
     EXPECT_FALSE(buffer->hasInfo(info2->type()));
 
     ASSERT_EQ(C2_OK, buffer->setInfo(info1));
-    EXPECT_EQ(1u, buffer->infos().size());
-    EXPECT_EQ(*info1, *buffer->infos().front());
+    EXPECT_EQ(1u, buffer->info().size());
+    EXPECT_EQ(*info1, *buffer->info().front());
     EXPECT_TRUE(buffer->hasInfo(info1->type()));
     EXPECT_FALSE(buffer->hasInfo(info2->type()));
 
     ASSERT_EQ(C2_OK, buffer->setInfo(info2));
-    EXPECT_EQ(2u, buffer->infos().size());
+    EXPECT_EQ(2u, buffer->info().size());
     EXPECT_TRUE(buffer->hasInfo(info1->type()));
     EXPECT_TRUE(buffer->hasInfo(info2->type()));
 
     std::shared_ptr<C2Info> removed = buffer->removeInfo(info1->type());
     ASSERT_TRUE(removed);
     EXPECT_EQ(*removed, *info1);
-    EXPECT_EQ(1u, buffer->infos().size());
-    EXPECT_EQ(*info2, *buffer->infos().front());
+    EXPECT_EQ(1u, buffer->info().size());
+    EXPECT_EQ(*info2, *buffer->info().front());
     EXPECT_FALSE(buffer->hasInfo(info1->type()));
     EXPECT_TRUE(buffer->hasInfo(info2->type()));
 
     removed = buffer->removeInfo(info1->type());
     ASSERT_FALSE(removed);
-    EXPECT_EQ(1u, buffer->infos().size());
+    EXPECT_EQ(1u, buffer->info().size());
     EXPECT_FALSE(buffer->hasInfo(info1->type()));
     EXPECT_TRUE(buffer->hasInfo(info2->type()));
 
     std::shared_ptr<C2Info> info3(new C2Number2Info(3));
     ASSERT_EQ(C2_OK, buffer->setInfo(info3));
-    EXPECT_EQ(1u, buffer->infos().size());
+    EXPECT_EQ(1u, buffer->info().size());
     EXPECT_FALSE(buffer->hasInfo(info1->type()));
     EXPECT_TRUE(buffer->hasInfo(info2->type()));
 
     removed = buffer->removeInfo(info2->type());
     ASSERT_TRUE(removed);
     EXPECT_EQ(*info3, *removed);
-    EXPECT_TRUE(buffer->infos().empty());
+    EXPECT_TRUE(buffer->info().empty());
     EXPECT_FALSE(buffer->hasInfo(info1->type()));
     EXPECT_FALSE(buffer->hasInfo(info2->type()));
 }
