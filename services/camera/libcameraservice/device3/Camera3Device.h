@@ -554,8 +554,15 @@ class Camera3Device :
                                             const SurfaceMap &surfaceMap);
 
     /**
+     * Pause state updates to the client application.  Needed to mask out idle/active
+     * transitions during internal reconfigure
+     */
+    void pauseStateNotify(bool enable);
+
+    /**
      * Internally re-configure camera device using new session parameters.
-     * This will get triggered by the request thread.
+     * This will get triggered by the request thread. Be sure to call
+     * pauseStateNotify(true) before going idle in the requesting location.
      */
     bool reconfigureCamera(const CameraMetadata& sessionParams);
 
