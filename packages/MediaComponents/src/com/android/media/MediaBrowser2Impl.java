@@ -21,7 +21,7 @@ import android.media.IMediaSession2;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaSession2.CommandButton;
-import android.media.SessionToken;
+import android.media.SessionToken2;
 import android.media.update.MediaBrowser2Provider;
 import android.os.Bundle;
 import android.os.RemoteException;
@@ -37,7 +37,7 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
     private final MediaBrowser2 mInstance;
     private final MediaBrowser2.BrowserCallback mCallback;
 
-    public MediaBrowser2Impl(MediaBrowser2 instance, Context context, SessionToken token,
+    public MediaBrowser2Impl(MediaBrowser2 instance, Context context, SessionToken2 token,
             BrowserCallback callback, Executor executor) {
         super(instance, context, token, callback, executor);
         mInstance = instance;

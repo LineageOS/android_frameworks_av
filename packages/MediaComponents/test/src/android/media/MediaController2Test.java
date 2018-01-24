@@ -218,7 +218,7 @@ public class MediaController2Test extends MediaSession2TestBase {
         sHandler.postAndSync(() -> {
             mSession.close();
             mSession = new MediaSession2.Builder(mContext, mPlayer)
-                    .setSessionCallback(sessionCallback).build();
+                    .setSessionCallback(sHandlerExecutor, sessionCallback).build();
         });
         MediaController2 controller =
                 createController(mSession.getToken(), false, null);
@@ -279,7 +279,7 @@ public class MediaController2Test extends MediaSession2TestBase {
             });
             final MediaController2 controller = createController(mSession.getToken());
             testHandler.post(() -> {
-                final PlaybackState state = createPlaybackState(PlaybackState.STATE_ERROR);
+                final PlaybackState2 state = createPlaybackState(PlaybackState.STATE_ERROR);
                 for (int i = 0; i < 100; i++) {
                     // triggers call from session to controller.
                     player.notifyPlaybackState(state);
@@ -320,15 +320,15 @@ public class MediaController2Test extends MediaSession2TestBase {
     @Ignore
     @Test
     public void testGetServiceToken() {
-        SessionToken token = TestUtils.getServiceToken(mContext, MockMediaSessionService2.ID);
+        SessionToken2 token = TestUtils.getServiceToken(mContext, MockMediaSessionService2.ID);
         assertNotNull(token);
         assertEquals(mContext.getPackageName(), token.getPackageName());
         assertEquals(MockMediaSessionService2.ID, token.getId());
         assertNull(token.getSessionBinder());
-        assertEquals(SessionToken.TYPE_SESSION_SERVICE, token.getType());
+        assertEquals(SessionToken2.TYPE_SESSION_SERVICE, token.getType());
     }
 
-    private void connectToService(SessionToken token) throws InterruptedException {
+    private void connectToService(SessionToken2 token) throws InterruptedException {
         mController = createController(token);
         mSession = TestServiceRegistry.getInstance().getServiceInstance().getSession();
         mPlayer = (MockPlayer) mSession.getPlayer();

@@ -31,17 +31,15 @@ import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaController2;
 import android.media.MediaController2.ControllerCallback;
-import android.media.MediaPlayerBase;
 import android.media.MediaSession2.PlaylistParam;
 import android.media.MediaSessionService2;
 import android.media.PlaybackState2;
 import android.media.Rating2;
-import android.media.SessionToken;
+import android.media.SessionToken2;
 import android.media.session.PlaybackState;
 import android.media.update.MediaController2Provider;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
@@ -70,7 +68,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     private final Context mContext;
     private final MediaSession2CallbackStub mSessionCallbackStub;
-    private final SessionToken mToken;
+    private final SessionToken2 mToken;
     private final ControllerCallback mCallback;
     private final Executor mCallbackExecutor;
     private final IBinder.DeathRecipient mDeathRecipient;
@@ -92,7 +90,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     // TODO(jaewan): Require session activeness changed listener, because controller can be
     //               available when the session's player is null.
-    public MediaController2Impl(MediaController2 instance, Context context, SessionToken token,
+    public MediaController2Impl(MediaController2 instance, Context context, SessionToken2 token,
             ControllerCallback callback, Executor executor) {
         mInstance = instance;
 
@@ -213,7 +211,7 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public SessionToken getSessionToken_impl() {
+    public SessionToken2 getSessionToken_impl() {
         return mToken;
     }
 
@@ -405,7 +403,7 @@ public class MediaController2Impl implements MediaController2Provider {
         }
     }
 
-    private void pushPlaybackStateChanges(final PlaybackState state) {
+    private void pushPlaybackStateChanges(final PlaybackState2 state) {
         synchronized (mLock) {
             for (int i = 0; i < mPlaybackListeners.size(); i++) {
                 mPlaybackListeners.get(i).postPlaybackChange(state);
@@ -500,9 +498,9 @@ public class MediaController2Impl implements MediaController2Provider {
         }
 
         @Override
-        public void onPlaybackStateChanged(PlaybackState state) throws RuntimeException {
+        public void onPlaybackStateChanged(Bundle state) throws RuntimeException {
             final MediaController2Impl controller = getController();
-            controller.pushPlaybackStateChanges(state);
+            controller.pushPlaybackStateChanges(PlaybackState2.fromBundle(state));
         }
 
         @Override

@@ -40,19 +40,19 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         EXTRA.putString(ROOT_ID, ROOT_ID);
     }
     @GuardedBy("MockMediaLibraryService2.class")
-    private static SessionToken sToken;
+    private static SessionToken2 sToken;
 
     private MediaLibrarySession mSession;
 
     @Override
     public MediaLibrarySession onCreateSession(String sessionId) {
         final MockPlayer player = new MockPlayer(1);
-        SyncHandler handler = (SyncHandler) TestServiceRegistry.getInstance().getHandler();
+        final SyncHandler handler = (SyncHandler) TestServiceRegistry.getInstance().getHandler();
         try {
             handler.postAndSync(() -> {
                 TestLibrarySessionCallback callback = new TestLibrarySessionCallback();
-                mSession = new MediaLibrarySessionBuilder(
-                        MockMediaLibraryService2.this, player, callback)
+                mSession = new MediaLibrarySessionBuilder(MockMediaLibraryService2.this,
+                        player, (runnable) -> handler.post(runnable), callback)
                         .setId(sessionId).build();
             });
         } catch (InterruptedException e) {
@@ -67,10 +67,10 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         super.onDestroy();
     }
 
-    public static SessionToken getToken(Context context) {
+    public static SessionToken2 getToken(Context context) {
         synchronized (MockMediaLibraryService2.class) {
             if (sToken == null) {
-                sToken = new SessionToken(SessionToken.TYPE_LIBRARY_SERVICE,
+                sToken = new SessionToken2(SessionToken2.TYPE_LIBRARY_SERVICE,
                         context.getPackageName(), ID,
                         MockMediaLibraryService2.class.getName(), null);
             }

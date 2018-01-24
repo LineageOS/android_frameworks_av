@@ -29,6 +29,7 @@ import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
+import android.media.PlaybackState2;
 import android.media.session.PlaybackState;
 import android.os.Binder;
 import android.os.Bundle;
@@ -152,10 +153,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Deprecated
     @Override
-    public PlaybackState getPlaybackState() throws RemoteException {
+    public Bundle getPlaybackState() throws RemoteException {
         MediaSession2Impl session = getSession();
         // TODO(jaewan): Check if mPlayer.getPlaybackState() is safe here.
-        return session.getInstance().getPlayer().getPlaybackState();
+        return session.getInstance().getPlayer().getPlaybackState().toBundle();
     }
 
     @Deprecated
@@ -216,13 +217,13 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     // Should be used without a lock to prevent potential deadlock.
-    public void notifyPlaybackStateChangedNotLocked(PlaybackState state) {
+    public void notifyPlaybackStateChangedNotLocked(PlaybackState2 state) {
         final List<ControllerInfo> list = getControllersWithFlag(CALLBACK_FLAG_PLAYBACK);
         for (int i = 0; i < list.size(); i++) {
             IMediaSession2Callback callbackBinder =
                     ControllerInfoImpl.from(list.get(i)).getControllerBinder();
             try {
-                callbackBinder.onPlaybackStateChanged(state);
+                callbackBinder.onPlaybackStateChanged(state.toBundle());
             } catch (RemoteException e) {
                 Log.w(TAG, "Controller is gone", e);
                 // TODO(jaewan): What to do when the controller is gone?

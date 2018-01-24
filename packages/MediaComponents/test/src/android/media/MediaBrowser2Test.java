@@ -48,7 +48,7 @@ public class MediaBrowser2Test extends MediaController2Test {
     private static final String TAG = "MediaBrowser2Test";
 
     @Override
-    TestControllerInterface onCreateController(@NonNull SessionToken token,
+    TestControllerInterface onCreateController(@NonNull SessionToken2 token,
             @NonNull TestControllerCallbackInterface callback) {
         return new TestMediaBrowser(mContext, token, new TestBrowserCallback(callback));
     }
@@ -69,7 +69,7 @@ public class MediaBrowser2Test extends MediaController2Test {
             }
         };
 
-        final SessionToken token = MockMediaLibraryService2.getToken(mContext);
+        final SessionToken2 token = MockMediaLibraryService2.getToken(mContext);
         MediaBrowser2 browser =
                 (MediaBrowser2) createController(token,true, callback);
         browser.getBrowserRoot(param);
@@ -127,7 +127,7 @@ public class MediaBrowser2Test extends MediaController2Test {
     public class TestMediaBrowser extends MediaBrowser2 implements TestControllerInterface {
         private final BrowserCallback mCallback;
 
-        public TestMediaBrowser(@NonNull Context context, @NonNull SessionToken token,
+        public TestMediaBrowser(@NonNull Context context, @NonNull SessionToken2 token,
                 @NonNull ControllerCallback callback) {
             super(context, token, (BrowserCallback) callback, sHandlerExecutor);
             mCallback = (BrowserCallback) callback;

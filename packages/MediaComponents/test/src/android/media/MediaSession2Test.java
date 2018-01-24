@@ -208,7 +208,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
             mSession.close();
             mPlayer = new MockPlayer(1);
             mSession = new MediaSession2.Builder(mContext, mPlayer)
-                    .setSessionCallback(callback).build();
+                    .setSessionCallback(sHandlerExecutor, callback).build();
         });
         MediaController2 controller = createController(mSession.getToken());
         controller.pause();
@@ -232,7 +232,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
         sHandler.postAndSync(() -> {
             mSession.close();
             mSession = new MediaSession2.Builder(mContext, mPlayer)
-                    .setSessionCallback(sessionCallback).build();
+                    .setSessionCallback(sHandlerExecutor, sessionCallback).build();
         });
         MediaController2 controller =
                 createController(mSession.getToken(), false, null);

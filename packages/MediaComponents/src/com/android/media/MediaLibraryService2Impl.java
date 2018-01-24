@@ -31,6 +31,8 @@ import android.media.VolumeProvider;
 import android.media.update.MediaLibraryService2Provider;
 import android.os.Bundle;
 
+import java.util.concurrent.Executor;
+
 public class MediaLibraryService2Impl extends MediaSessionService2Impl implements
         MediaLibraryService2Provider {
     private final MediaSessionService2 mInstance;
@@ -66,11 +68,11 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
         private final MediaLibrarySessionCallback mCallback;
 
         public MediaLibrarySessionImpl(MediaLibrarySession instance, Context context,
-                MediaPlayerBase player, String id,
+                MediaPlayerBase player, String id, Executor callbackExecutor,
                 MediaLibrarySessionCallback callback, VolumeProvider volumeProvider, int ratingType,
                 PendingIntent sessionActivity) {
-            super(instance, context, player, id, callback, volumeProvider, ratingType,
-                    sessionActivity);
+            super(instance, context, player, id, callbackExecutor, callback, volumeProvider,
+                    ratingType, sessionActivity);
             mInstance = instance;
             mCallback = callback;
         }

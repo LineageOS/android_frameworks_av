@@ -33,7 +33,8 @@ import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParam;
 import android.media.MediaSession2.SessionCallback;
-import android.media.SessionToken;
+import android.media.PlaybackState2;
+import android.media.SessionToken2;
 import android.media.VolumeProvider;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
@@ -47,6 +48,7 @@ import android.util.Log;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
 
 public class MediaSession2Impl implements MediaSession2Provider {
     private static final String TAG = "MediaSession2";
@@ -57,8 +59,9 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private final Context mContext;
     private final String mId;
     private final Handler mHandler;
+    private final Executor mCallbackExecutor;
     private final MediaSession2Stub mSessionStub;
-    private final SessionToken mSessionToken;
+    private final SessionToken2 mSessionToken;
 
     private MediaPlayerBase mPlayer;
 
@@ -79,8 +82,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
      * @param sessionActivity
      */
     public MediaSession2Impl(MediaSession2 instance, Context context, MediaPlayerBase player,
-            String id, SessionCallback callback, VolumeProvider volumeProvider, int ratingType,
-            PendingIntent sessionActivity) {
+            String id, Executor callbackExecutor, SessionCallback callback,
+            VolumeProvider volumeProvider, int ratingType, PendingIntent sessionActivity) {
         mInstance = instance;
         // TODO(jaewan): Keep other params.
 
@@ -89,6 +92,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mContext = context;
         mId = id;
         mHandler = new Handler(Looper.myLooper());
+        mCallbackExecutor = callbackExecutor;
         mSessionStub = new MediaSession2Stub(this, callback);
         // Ask server to create session token for following reasons.
         //   1. Make session ID unique per package.
@@ -128,13 +132,14 @@ public class MediaSession2Impl implements MediaSession2Provider {
             // Player didn't changed. No-op.
             return;
         }
-        mHandler.removeCallbacksAndMessages(null);
+        // TODO(jaewan): Find equivalent for the executor
+        //mHandler.removeCallbacksAndMessages(null);
         if (mPlayer != null && mListener != null) {
             // This might not work for a poorly implemented player.
             mPlayer.removePlaybackListener(mListener);
         }
         mListener = new MyPlaybackListener(this, player);
-        player.addPlaybackListener(mListener, mHandler);
+        player.addPlaybackListener(mCallbackExecutor, mListener);
         notifyPlaybackStateChanged(player.getPlaybackState());
         mPlayer = player;
     }
@@ -159,7 +164,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     // TODO(jaewan): Change this to @NonNull
     @Override
-    public SessionToken getToken_impl() {
+    public SessionToken2 getToken_impl() {
         return mSessionToken;
     }
 
@@ -300,12 +305,14 @@ public class MediaSession2Impl implements MediaSession2Provider {
     //               1. Allow calls from random threads for all methods.
     //               2. Allow calls from random threads for all methods, except for the
     //                  {@link #setPlayer()}.
-    // TODO(jaewan): Should we pend command instead of exception?
     private void ensureCallingThread() {
+        // TODO(jaewan): Uncomment or remove
+        /*
         if (mHandler.getLooper() != Looper.myLooper()) {
             throw new IllegalStateException("Run this on the given thread");
-        }
+        }*/
     }
+
 
     private void ensurePlayer() {
         // TODO(jaewan): Should we pend command instead? Follow the decision from MP2.
@@ -319,7 +326,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         return mHandler;
     }
 
-    private void notifyPlaybackStateChanged(PlaybackState state) {
+    private void notifyPlaybackStateChanged(PlaybackState2 state) {
         // Notify to listeners added directly to this session
         for (int i = 0; i < mListeners.size(); i++) {
             mListeners.get(i).postPlaybackChange(state);
@@ -350,10 +357,9 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public void onPlaybackChanged(PlaybackState state) {
+        public void onPlaybackChanged(PlaybackState2 state) {
             MediaSession2Impl session = mSession.get();
-            if (session == null || session.getHandler().getLooper() != Looper.myLooper()
-                    || mPlayer != session.mInstance.getPlayer()) {
+            if (mPlayer != session.mInstance.getPlayer()) {
                 Log.w(TAG, "Unexpected playback state change notifications. Ignoring.",
                         new IllegalStateException());
                 return;

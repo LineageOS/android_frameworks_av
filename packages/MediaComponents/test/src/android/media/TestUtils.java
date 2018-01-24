@@ -45,8 +45,9 @@ public final class TestUtils {
      * @param state one of the PlaybackState.STATE_xxx.
      * @return a PlaybackState
      */
-    public static PlaybackState createPlaybackState(int state) {
-        return new PlaybackState.Builder().setState(state, 0, 1.0f).build();
+    public static PlaybackState2 createPlaybackState(int state) {
+        return new PlaybackState2(state, 0, 0, 1.0f,
+                0, 0, null);
     }
 
     /**
@@ -57,12 +58,12 @@ public final class TestUtils {
      * @return
      */
     // TODO(jaewan): Currently not working.
-    public static SessionToken getServiceToken(Context context, String id) {
+    public static SessionToken2 getServiceToken(Context context, String id) {
         MediaSessionManager manager =
                 (MediaSessionManager) context.getSystemService(Context.MEDIA_SESSION_SERVICE);
-        List<SessionToken> tokens = manager.getSessionServiceTokens();
+        List<SessionToken2> tokens = manager.getSessionServiceTokens();
         for (int i = 0; i < tokens.size(); i++) {
-            SessionToken token = tokens.get(i);
+            SessionToken2 token = tokens.get(i);
             if (context.getPackageName().equals(token.getPackageName())
                     && id.equals(token.getId())) {
                 return token;
