@@ -77,7 +77,7 @@ private:
 };
 
 // key for media statistics
-static const char *kKeyPlayer = "nuplayer2";
+static const char *kKeyPlayer = "nuplayer";
 // attrs for media statistics
 static const char *kPlayerVMime = "android.media.mediaplayer.video.mime";
 static const char *kPlayerVCodec = "android.media.mediaplayer.video.codec";
@@ -666,7 +666,7 @@ void NuPlayer2Driver::logMetrics(const char *where) {
 
         // re-init in case we prepare() and start() again.
         delete mAnalyticsItem ;
-        mAnalyticsItem = new MediaAnalyticsItem("nuplayer");
+        mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
         if (mAnalyticsItem) {
             mAnalyticsItem->generateSessionID();
             mAnalyticsItem->setUid(mClientUid);
