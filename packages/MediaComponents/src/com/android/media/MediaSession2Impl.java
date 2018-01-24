@@ -17,6 +17,7 @@
 package com.android.media;
 
 import android.Manifest.permission;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -67,16 +68,21 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     /**
      * Can be only called by the {@link Builder#build()}.
-     *
+     * 
      * @param instance
      * @param context
      * @param player
      * @param id
      * @param callback
+     * @param volumeProvider
+     * @param ratingType
+     * @param sessionActivity
      */
     public MediaSession2Impl(MediaSession2 instance, Context context, MediaPlayerBase player,
-            String id, SessionCallback callback) {
+            String id, SessionCallback callback, VolumeProvider volumeProvider, int ratingType,
+            PendingIntent sessionActivity) {
         mInstance = instance;
+        // TODO(jaewan): Keep other params.
 
         // Argument checks are done by builder already.
         // Initialize finals first.

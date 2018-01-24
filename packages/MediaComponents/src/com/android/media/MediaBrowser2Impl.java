@@ -61,6 +61,31 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
         }
     }
 
+    @Override
+    public void subscribe_impl(String parentId, Bundle options) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void unsubscribe_impl(String parentId, Bundle options) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void getItem_impl(String mediaId) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void getChildren_impl(String parentId, int page, int pageSize, Bundle options) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void search_impl(String query, int page, int pageSize, Bundle extras) {
+        // TODO(jaewan): Implement
+    }
+
     public void onGetRootResult(
             final Bundle rootHints, final String rootMediaId, final Bundle rootExtra) {
         getCallbackExecutor().execute(() -> {
