@@ -45,7 +45,7 @@ cc_library_shared {
         "libutils",
         "libbinder",
         "libdl",
-        "libaudioutils_system",
+        "libaudioutils",
         "libaudiomanager",
         "libmedia_helper",
         "libmediametrics",

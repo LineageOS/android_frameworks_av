@@ -49,7 +49,7 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libutils \
     liblog \
-    libaudioutils_system \
+    libaudioutils \
     libparameter \
     libmedia_helper \
     libxml2

@@ -35,10 +35,7 @@ LOCAL_C_INCLUDES += \
 	$(call include-path-for, audio-effects) \
 	$(call include-path-for, audio-utils) \
 
-LOCAL_HEADER_LIBRARIES += \
-    libhardware_headers \
-    android.hardware.audio.effect.legacy@2.0 \
-
+LOCAL_HEADER_LIBRARIES += libhardware_headers
 include $(BUILD_SHARED_LIBRARY)
 
 
@@ -70,11 +67,10 @@ LOCAL_C_INCLUDES += \
     $(LOCAL_PATH)/Reverb \
     $(LOCAL_PATH)/../lib/Common/lib/ \
     $(LOCAL_PATH)/../lib/Reverb/lib/ \
+    $(call include-path-for, audio-effects) \
     $(call include-path-for, audio-utils) \
 
-LOCAL_HEADER_LIBRARIES += \
-    libhardware_headers \
-    android.hardware.audio.effect.legacy@2.0 \
+LOCAL_HEADER_LIBRARIES += libhardware_headers
 
 LOCAL_SANITIZE := integer_overflow
 

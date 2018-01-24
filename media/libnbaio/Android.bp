@@ -8,6 +8,7 @@ cc_defaults {
     ],
     header_libs: [
         "libaudioclient_headers",
+        "libaudio_system_headers",
         "libmedia_headers",
     ],
     export_header_lib_headers: [
@@ -16,6 +17,7 @@ cc_defaults {
     ],
 
     shared_libs: [
+        "libaudioutils",
         "liblog",
         "libutils",
     ],
@@ -27,17 +29,9 @@ cc_defaults {
 // link against libnbaio and system modules can't link against libnbaio_mono. The rest of libnbaio
 // pulls in too many other dependencies.
 cc_library_shared {
-    name: "libnbaio_mono@2.0",
+    name: "libnbaio_mono",
     vendor: true,
     defaults: ["libnbaio_mono_defaults"],
-
-    shared_libs: [
-        "libaudioutils",
-    ],
-
-    header_libs: [
-        "android.hardware.audio.common.legacy@2.0",
-    ],
 }
 
 cc_library_shared {
@@ -60,15 +54,11 @@ cc_library_shared {
     // static_libs: ["libsndfile"],
 
     shared_libs: [
-        "libaudioutils_system",
+        "libaudioutils",
         "libbinder",
         "libcutils",
         "liblog",
         "libutils",
-    ],
-
-    header_libs: [
-        "libaudio_system_headers",
     ],
 
     cflags: [
