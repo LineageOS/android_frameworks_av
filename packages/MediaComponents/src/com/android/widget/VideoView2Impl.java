@@ -25,6 +25,7 @@ import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.MediaPlayer;
+import android.media.MediaPlayerBase;
 import android.media.Cea708CaptionRenderer;
 import android.media.ClosedCaptionRenderer;
 import android.media.Metadata;
@@ -328,6 +329,11 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
             throw new IllegalArgumentException("Illegal null AudioAttributes");
         }
         mAudioAttributes = attributes;
+    }
+
+    @Override
+    public void setRouteAttributes_impl(List<String> routeCategories, MediaPlayerBase player) {
+        // TODO: implement this.
     }
 
     @Override
