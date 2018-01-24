@@ -49,11 +49,10 @@
             android:text="North by Northwest"
             android:textColor="#FFFFFFFF" />
 
-        <ImageButton
-            android:id="@+id/cast"
+        <view class="com.android.support.mediarouter.app.MediaRouteButton" android:id="@+id/cast"
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"
-            style="@style/TitleBarButton.MediaRouteButton"/>
+            style="@style/TitleBarButton" />
 
     </RelativeLayout>
 

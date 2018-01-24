@@ -20,9 +20,12 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
 import android.content.res.XmlResourceParser;
+import android.util.AttributeSet;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.View;
+
+import com.android.support.mediarouter.app.MediaRouteButton;
 
 public class ApiHelper {
     private static ApiHelper sInstance;
@@ -55,7 +58,21 @@ public class ApiHelper {
     public static LayoutInflater getLayoutInflater(Context context) {
         LayoutInflater layoutInflater = LayoutInflater.from(context).cloneInContext(
                 new ContextThemeWrapper(context, getLibTheme()));
-        // TODO: call layoutInflater.setFactory2()
+        layoutInflater.setFactory2(new LayoutInflater.Factory2() {
+            @Override
+            public View onCreateView(
+                    View parent, String name, Context context, AttributeSet attrs) {
+                if (MediaRouteButton.class.getCanonicalName().equals(name)) {
+                    return new MediaRouteButton(context, attrs);
+                }
+                return null;
+            }
+
+            @Override
+            public View onCreateView(String name, Context context, AttributeSet attrs) {
+                return onCreateView(null, name, context, attrs);
+            }
+        });
         return layoutInflater;
     }
 
