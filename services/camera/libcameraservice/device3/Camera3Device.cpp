@@ -55,8 +55,6 @@
 #include "device3/Camera3SharedOutputStream.h"
 #include "CameraService.h"
 
-#include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
-
 using namespace android::camera3;
 using namespace android::hardware::camera;
 using namespace android::hardware::camera::device::V3_2;
@@ -669,13 +667,15 @@ status_t Camera3Device::dump(int fd, const Vector<String16> &args) {
     }
 
     if (dumpTemplates) {
-        const char *templateNames[] = {
+        const char *templateNames[CAMERA3_TEMPLATE_COUNT] = {
             "TEMPLATE_PREVIEW",
             "TEMPLATE_STILL_CAPTURE",
             "TEMPLATE_VIDEO_RECORD",
             "TEMPLATE_VIDEO_SNAPSHOT",
             "TEMPLATE_ZERO_SHUTTER_LAG",
-            "TEMPLATE_MANUAL"
+            "TEMPLATE_MANUAL",
+            "TEMPLATE_MOTION_TRACKING_PREVIEW",
+            "TEMPALTE_MOTION_TRACKING_BEST"
         };
 
         for (int i = 1; i < CAMERA3_TEMPLATE_COUNT; i++) {
@@ -3246,7 +3246,18 @@ Camera3Device::HalInterface::HalInterface(
             sp<ICameraDeviceSession> &session,
             std::shared_ptr<RequestMetadataQueue> queue) :
         mHidlSession(session),
-        mRequestMetadataQueue(queue) {}
+        mRequestMetadataQueue(queue) {
+    // Check with hardware service manager if we can downcast these interfaces
+    // Somewhat expensive, so cache the results at startup
+    auto castResult_3_4 = device::V3_4::ICameraDeviceSession::castFrom(mHidlSession);
+    if (castResult_3_4.isOk()) {
+        mHidlSession_3_4 = castResult_3_4;
+    }
+    auto castResult_3_3 = device::V3_3::ICameraDeviceSession::castFrom(mHidlSession);
+    if (castResult_3_3.isOk()) {
+        mHidlSession_3_3 = castResult_3_3;
+    }
+}
 
 Camera3Device::HalInterface::HalInterface() {}
 
@@ -3274,52 +3285,89 @@ status_t Camera3Device::HalInterface::constructDefaultRequestSettings(
     status_t res = OK;
 
     common::V1_0::Status status;
-    RequestTemplate id;
-    switch (templateId) {
-        case CAMERA3_TEMPLATE_PREVIEW:
-            id = RequestTemplate::PREVIEW;
-            break;
-        case CAMERA3_TEMPLATE_STILL_CAPTURE:
-            id = RequestTemplate::STILL_CAPTURE;
-            break;
-        case CAMERA3_TEMPLATE_VIDEO_RECORD:
-            id = RequestTemplate::VIDEO_RECORD;
-            break;
-        case CAMERA3_TEMPLATE_VIDEO_SNAPSHOT:
-            id = RequestTemplate::VIDEO_SNAPSHOT;
-            break;
-        case CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG:
-            id = RequestTemplate::ZERO_SHUTTER_LAG;
-            break;
-        case CAMERA3_TEMPLATE_MANUAL:
-            id = RequestTemplate::MANUAL;
-            break;
-        default:
-            // Unknown template ID
-            return BAD_VALUE;
-    }
-    auto err = mHidlSession->constructDefaultRequestSettings(id,
-            [&status, &requestTemplate]
+
+    auto requestCallback = [&status, &requestTemplate]
             (common::V1_0::Status s, const device::V3_2::CameraMetadata& request) {
-                status = s;
-                if (status == common::V1_0::Status::OK) {
-                    const camera_metadata *r =
-                            reinterpret_cast<const camera_metadata_t*>(request.data());
-                    size_t expectedSize = request.size();
-                    int ret = validate_camera_metadata_structure(r, &expectedSize);
-                    if (ret == OK || ret == CAMERA_METADATA_VALIDATION_SHIFTED) {
-                        *requestTemplate = clone_camera_metadata(r);
-                        if (*requestTemplate == nullptr) {
-                            ALOGE("%s: Unable to clone camera metadata received from HAL",
-                                    __FUNCTION__);
-                            status = common::V1_0::Status::INTERNAL_ERROR;
-                        }
-                    } else {
-                        ALOGE("%s: Malformed camera metadata received from HAL", __FUNCTION__);
+            status = s;
+            if (status == common::V1_0::Status::OK) {
+                const camera_metadata *r =
+                        reinterpret_cast<const camera_metadata_t*>(request.data());
+                size_t expectedSize = request.size();
+                int ret = validate_camera_metadata_structure(r, &expectedSize);
+                if (ret == OK || ret == CAMERA_METADATA_VALIDATION_SHIFTED) {
+                    *requestTemplate = clone_camera_metadata(r);
+                    if (*requestTemplate == nullptr) {
+                        ALOGE("%s: Unable to clone camera metadata received from HAL",
+                                __FUNCTION__);
                         status = common::V1_0::Status::INTERNAL_ERROR;
                     }
+                } else {
+                    ALOGE("%s: Malformed camera metadata received from HAL", __FUNCTION__);
+                    status = common::V1_0::Status::INTERNAL_ERROR;
                 }
-            });
+            }
+        };
+    hardware::Return<void> err;
+    if (mHidlSession_3_4 != nullptr) {
+        device::V3_4::RequestTemplate id;
+        switch (templateId) {
+            case CAMERA3_TEMPLATE_PREVIEW:
+                id = device::V3_4::RequestTemplate::PREVIEW;
+                break;
+            case CAMERA3_TEMPLATE_STILL_CAPTURE:
+                id = device::V3_4::RequestTemplate::STILL_CAPTURE;
+                break;
+            case CAMERA3_TEMPLATE_VIDEO_RECORD:
+                id = device::V3_4::RequestTemplate::VIDEO_RECORD;
+                break;
+            case CAMERA3_TEMPLATE_VIDEO_SNAPSHOT:
+                id = device::V3_4::RequestTemplate::VIDEO_SNAPSHOT;
+                break;
+            case CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG:
+                id = device::V3_4::RequestTemplate::ZERO_SHUTTER_LAG;
+                break;
+            case CAMERA3_TEMPLATE_MANUAL:
+                id = device::V3_4::RequestTemplate::MANUAL;
+                break;
+            case CAMERA3_TEMPLATE_MOTION_TRACKING_PREVIEW:
+                id = device::V3_4::RequestTemplate::MOTION_TRACKING_PREVIEW;
+                break;
+            case CAMERA3_TEMPLATE_MOTION_TRACKING_BEST:
+                id = device::V3_4::RequestTemplate::MOTION_TRACKING_BEST;
+                break;
+            default:
+                // Unknown template ID
+                return BAD_VALUE;
+        }
+        err = mHidlSession_3_4->constructDefaultRequestSettings_3_4(id, requestCallback);
+    } else {
+        RequestTemplate id;
+        switch (templateId) {
+            case CAMERA3_TEMPLATE_PREVIEW:
+                id = RequestTemplate::PREVIEW;
+                break;
+            case CAMERA3_TEMPLATE_STILL_CAPTURE:
+                id = RequestTemplate::STILL_CAPTURE;
+                break;
+            case CAMERA3_TEMPLATE_VIDEO_RECORD:
+                id = RequestTemplate::VIDEO_RECORD;
+                break;
+            case CAMERA3_TEMPLATE_VIDEO_SNAPSHOT:
+                id = RequestTemplate::VIDEO_SNAPSHOT;
+                break;
+            case CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG:
+                id = RequestTemplate::ZERO_SHUTTER_LAG;
+                break;
+            case CAMERA3_TEMPLATE_MANUAL:
+                id = RequestTemplate::MANUAL;
+                break;
+            default:
+                // Unknown template ID, or this HAL is too old to support it
+                return BAD_VALUE;
+        }
+        err = mHidlSession->constructDefaultRequestSettings(id, requestCallback);
+    }
+
     if (!err.isOk()) {
         ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
         res = DEAD_OBJECT;
@@ -3411,24 +3459,11 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
     common::V1_0::Status status;
 
     // See if we have v3.4 or v3.3 HAL
-    sp<device::V3_4::ICameraDeviceSession> hidlSession_3_4;
-    sp<device::V3_3::ICameraDeviceSession> hidlSession_3_3;
-    auto castResult_3_4 = device::V3_4::ICameraDeviceSession::castFrom(mHidlSession);
-    if (castResult_3_4.isOk()) {
-        hidlSession_3_4 = castResult_3_4;
-    } else {
-        auto castResult_3_3 = device::V3_3::ICameraDeviceSession::castFrom(mHidlSession);
-        if (castResult_3_3.isOk()) {
-            hidlSession_3_3 = castResult_3_3;
-        }
-    }
-
-    if (hidlSession_3_4 != nullptr) {
-        // We do; use v3.4 for the call, and construct a v3.4
-        // HalStreamConfiguration
+    if (mHidlSession_3_4 != nullptr) {
+        // We do; use v3.4 for the call
         ALOGV("%s: v3.4 device found", __FUNCTION__);
         device::V3_4::HalStreamConfiguration finalConfiguration3_4;
-        auto err = hidlSession_3_4->configureStreams_3_4(requestedConfiguration3_4,
+        auto err = mHidlSession_3_4->configureStreams_3_4(requestedConfiguration3_4,
             [&status, &finalConfiguration3_4]
             (common::V1_0::Status s, const device::V3_4::HalStreamConfiguration& halConfiguration) {
                 finalConfiguration3_4 = halConfiguration;
@@ -3442,10 +3477,10 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
         for (size_t i = 0; i < finalConfiguration3_4.streams.size(); i++) {
             finalConfiguration.streams[i] = finalConfiguration3_4.streams[i].v3_3;
         }
-    } else if (hidlSession_3_3 != nullptr) {
+    } else if (mHidlSession_3_3 != nullptr) {
         // We do; use v3.3 for the call
         ALOGV("%s: v3.3 device found", __FUNCTION__);
-        auto err = hidlSession_3_3->configureStreams_3_3(requestedConfiguration3_2,
+        auto err = mHidlSession_3_3->configureStreams_3_3(requestedConfiguration3_2,
             [&status, &finalConfiguration]
             (common::V1_0::Status s, const device::V3_3::HalStreamConfiguration& halConfiguration) {
                 finalConfiguration = halConfiguration;
