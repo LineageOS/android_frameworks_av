@@ -1,7 +1,6 @@
 // Effect configuration
 cc_library_shared {
     name: "libeffectsconfig",
-    vendor_available: true,
 
     srcs: ["src/EffectsConfig.cpp"],
 
@@ -19,4 +18,30 @@ cc_library_shared {
     export_header_lib_headers: ["libaudio_system_headers"],
 
     export_include_dirs: ["include"],
+}
+
+cc_library_shared {
+    name: "libeffectsconfig@2.0",
+    vendor: true,
+
+    srcs: ["src/EffectsConfig.cpp"],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "libtinyxml2",
+    ],
+
+    export_include_dirs: ["include"],
+
+    header_libs: [
+        "android.hardware.audio.common.legacy@2.0",
+    ],
+    export_header_lib_headers: [
+        "android.hardware.audio.common.legacy@2.0",
+    ],
 }

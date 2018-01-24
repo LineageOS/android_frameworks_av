@@ -6,7 +6,6 @@ cc_library_shared {
         "DevicesFactoryHalHybrid.cpp",
         "DevicesFactoryHalLocal.cpp",
         "StreamHalLocal.cpp",
-
         "ConversionHelperHidl.cpp",
         "DeviceHalHidl.cpp",
         "DevicesFactoryHalHidl.cpp",
@@ -14,6 +13,7 @@ cc_library_shared {
         "EffectHalHidl.cpp",
         "EffectsFactoryHalHidl.cpp",
         "StreamHalHidl.cpp",
+        "HidlUtils.cpp",
     ],
 
     export_include_dirs: ["."],
@@ -24,7 +24,7 @@ cc_library_shared {
     ],
     shared_libs: [
         "libaudiohal_deathhandler",
-        "libaudioutils",
+        "libaudioutils_system",
         "libcutils",
         "liblog",
         "libutils",
@@ -37,7 +37,6 @@ cc_library_shared {
         "libhidltransport",
         "android.hardware.audio@2.0",
         "android.hardware.audio.common@2.0",
-        "android.hardware.audio.common@2.0-util",
         "android.hardware.audio.effect@2.0",
         "android.hidl.allocator@1.0",
         "android.hidl.memory@1.0",
@@ -45,7 +44,8 @@ cc_library_shared {
         "libmediautils",
     ],
     header_libs: [
-        "libaudiohal_headers"
+        "libaudiohal_headers",
+        "libaudiohal_util",
     ],
 
     export_shared_lib_headers: [

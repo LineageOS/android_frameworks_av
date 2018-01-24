@@ -84,7 +84,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libaudioutils",
+        "libaudioutils_system",
         "libbinder",
         "libcamera_client",
         "libcutils",

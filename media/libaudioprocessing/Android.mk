@@ -20,7 +20,7 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 
 LOCAL_SHARED_LIBRARIES := \
     libaudiohal \
-    libaudioutils \
+    libaudioutils_system \
     libcutils \
     liblog \
     libnbaio \

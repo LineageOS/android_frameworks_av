@@ -11,6 +11,6 @@ LOCAL_C_INCLUDES := \
 LOCAL_SRC_FILES:= ../src/loopback.cpp
 LOCAL_CFLAGS := -Wall -Werror
 LOCAL_STATIC_LIBRARIES := libsndfile
-LOCAL_SHARED_LIBRARIES := libaaudio libaudioutils
+LOCAL_SHARED_LIBRARIES := libaaudio libaudioutils_system
 LOCAL_MODULE := aaudio_loopback
 include $(BUILD_EXECUTABLE)

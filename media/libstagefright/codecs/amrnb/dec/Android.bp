@@ -129,7 +129,7 @@ cc_test {
 
     shared_libs: [
         "libstagefright_amrnb_common",
-        "libaudioutils",
+        "libaudioutils_system",
         "liblog",
     ],
 

@@ -42,7 +42,7 @@ LOCAL_SHARED_LIBRARIES := \
     libaudiohal \
     libaudioprocessing \
     libaudiospdif \
-    libaudioutils \
+    libaudioutils_system \
     libcutils \
     libutils \
     liblog \

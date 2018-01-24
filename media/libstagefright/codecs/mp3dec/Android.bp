@@ -151,5 +151,5 @@ cc_test {
         "libsndfile",
     ],
 
-    shared_libs: ["libaudioutils"],
+    shared_libs: ["libaudioutils_system"],
 }

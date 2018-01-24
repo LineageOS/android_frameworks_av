@@ -1,11 +1,3 @@
-cc_library_headers {
-    name: "libeffects_headers",
-    vendor_available: true,
-    export_include_dirs: ["include"],
-    header_libs: ["libhardware_headers"],
-    export_header_lib_headers: ["libhardware_headers"],
-}
-
 // Effect factory library
 cc_library_shared {
     name: "libeffects",
@@ -21,21 +13,20 @@ cc_library_shared {
         "libcutils",
         "liblog",
         "libdl",
-        "libeffectsconfig",
+        "libeffectsconfig@2.0",
     ],
     cflags: ["-fvisibility=hidden"],
 
-    local_include_dirs:["include/media"],
+    export_include_dirs: ["."],
 
     header_libs: [
-        "libaudioeffects",
-        "libeffects_headers",
+        "android.hardware.audio.effect.legacy@2.0",
     ],
-    export_header_lib_headers: ["libeffects_headers"],
+    export_header_lib_headers: ["android.hardware.audio.effect.legacy@2.0"],
 }
 
 cc_binary {
-    name: "dumpEffectConfigFile",
+    name: "dumpEffectConfigFile@2.0",
     vendor: true,
     srcs: ["test/DumpConfig.cpp"],
 
@@ -47,10 +38,12 @@ cc_binary {
         "-Werror",
     ],
 
+    header_libs: [
+        "android.hardware.audio.effect.legacy@2.0",
+    ],
 
     shared_libs: [
-        "libeffectsconfig",
+        "libeffectsconfig@2.0",
         "libeffects",
     ],
-    local_include_dirs:[".", "include"],
 }

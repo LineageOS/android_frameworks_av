@@ -12,12 +12,8 @@ cc_library_headers {
     ],
 }
 
-cc_library {
-    name: "libmedia_helper",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+cc_defaults {
+    name: "libmedia_helper_defaults",
     srcs: ["AudioParameter.cpp", "TypeConverter.cpp"],
     cflags: [
         "-Werror",
@@ -28,9 +24,23 @@ cc_library {
     header_libs: [
         "libmedia_headers",
         "libaudioclient_headers",
-        "libaudio_system_headers",
     ],
     clang: true,
+}
+cc_library {
+    name: "libmedia_helper",
+    defaults: ["libmedia_helper_defaults"],
+    header_libs: [
+        "libaudio_system_headers",
+    ],
+}
+cc_library {
+    name: "libmedia_helper@2.0",
+    vendor: true,
+    defaults: ["libmedia_helper_defaults"],
+    header_libs: [
+        "android.hardware.audio.common.legacy@2.0",
+    ],
 }
 
 cc_library_shared {
@@ -206,7 +216,7 @@ cc_library {
         "libmediaextractor",
         "libgui",
         "libdl",
-        "libaudioutils",
+        "libaudioutils_system",
         "libaudioclient",
         "libmedia_omx",
     ],
