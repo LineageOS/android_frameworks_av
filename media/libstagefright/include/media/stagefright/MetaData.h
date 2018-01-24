@@ -228,7 +228,7 @@ enum {
     kTypeD263        = 'd263',
 };
 
-class MetaData : public RefBase {
+class MetaData final : public RefBase {
 public:
     MetaData();
     MetaData(const MetaData &from);
@@ -278,14 +278,18 @@ public:
     String8 toString() const;
     void dumpToLog() const;
 
-    status_t writeToParcel(Parcel &parcel);
-    status_t updateFromParcel(const Parcel &parcel);
-    static sp<MetaData> createFromParcel(const Parcel &parcel);
-
 protected:
     virtual ~MetaData();
 
 private:
+    friend class BpMediaSource;
+    friend class BnMediaSource;
+    friend class BpMediaExtractor;
+    friend class BnMediaExtractor;
+
+    status_t writeToParcel(Parcel &parcel);
+    status_t updateFromParcel(const Parcel &parcel);
+    static sp<MetaData> createFromParcel(const Parcel &parcel);
     struct typed_data;
     struct Rect;
     struct MetaDataInternal;
