@@ -632,8 +632,11 @@ void MediaAnalyticsService::deleteItem(List<MediaAnalyticsItem *> *l, MediaAnaly
 
 static std::string allowedKeys[] =
 {
+    "audiorecord",
+    "audiotrack",
     "codec",
-    "extractor"
+    "extractor",
+    "nuplayer",
 };
 
 static const int nAllowedKeys = sizeof(allowedKeys) / sizeof(allowedKeys[0]);
