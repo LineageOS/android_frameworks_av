@@ -4874,7 +4874,7 @@ void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& ar
 {
     PlaybackThread::dumpInternals(fd, args);
     dprintf(fd, "  Thread throttle time (msecs): %u\n", mThreadThrottleTimeMs);
-    dprintf(fd, "  AudioMixer tracks: 0x%08x\n", mAudioMixer->trackNames());
+    dprintf(fd, "  AudioMixer tracks: %s\n", mAudioMixer->trackNames().c_str());
     dprintf(fd, "  Master mono: %s\n", mMasterMono ? "on" : "off");
 
     if (hasFastMixer()) {
