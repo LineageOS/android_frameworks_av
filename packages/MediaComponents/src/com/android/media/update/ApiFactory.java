@@ -16,6 +16,7 @@
 
 package com.android.media.update;
 
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
@@ -30,6 +31,7 @@ import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
 import android.media.IMediaSession2Callback;
 import android.media.SessionToken;
+import android.media.VolumeProvider;
 import android.media.update.MediaBrowser2Provider;
 import android.media.update.MediaControlView2Provider;
 import android.media.update.MediaController2Provider;
@@ -75,7 +77,10 @@ public class ApiFactory implements StaticProvider {
 
     @Override
     public MediaSession2Provider createMediaSession2(MediaSession2 instance, Context context,
-            MediaPlayerBase player, String id, SessionCallback callback) {
+            MediaPlayerBase player, String id, SessionCallback callback,
+            VolumeProvider volumeProvider, int ratingType,
+            PendingIntent sessionActivity) {
+        // TOOD(jaewan): Keep and handles extra parameters
         return new MediaSession2Impl(instance, context, player, id, callback);
     }
 
