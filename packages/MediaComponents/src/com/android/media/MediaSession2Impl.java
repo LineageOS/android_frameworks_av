@@ -20,6 +20,7 @@ import android.Manifest.permission;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.media.AudioAttributes;
 import android.media.IMediaSession2Callback;
 import android.media.MediaController2;
 import android.media.MediaPlayerBase;
@@ -153,6 +154,16 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public List<ControllerInfo> getConnectedControllers_impl() {
         return mSessionStub.getControllers();
+    }
+
+    @Override
+    public void setAudioAttributes_impl(AudioAttributes attributes) {
+        // implement
+    }
+
+    @Override
+    public void setAudioFocusRequest_impl(int focusGain) {
+        // implement
     }
 
     @Override
