@@ -24,6 +24,7 @@ import android.media.IMediaSession2;
 import android.media.IMediaSession2Callback;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
+import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaController2;
 import android.media.MediaController2.ControllerCallback;
@@ -461,7 +462,38 @@ public class MediaController2Impl implements MediaController2Provider {
                 Log.w(TAG, "Don't fail silently here. Highly likely a bug");
                 return;
             }
+            if (browser == null) {
+                // TODO(jaewan): Revisit here. Could be a bug
+                return;
+            }
             browser.onGetRootResult(rootHints, rootMediaId, rootExtra);
+        }
+
+        @Override
+        public void onCustomLayoutChanged(List<Bundle> commandButtonlist) {
+            if (commandButtonlist == null) {
+                // Illegal call. Ignore
+                return;
+            }
+            final MediaBrowser2Impl browser;
+            try {
+                browser = getBrowser();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+                return;
+            }
+            if (browser == null) {
+                // TODO(jaewan): Revisit here. Could be a bug
+                return;
+            }
+            List<CommandButton> layout = new ArrayList<>();
+            for (int i = 0; i < commandButtonlist.size(); i++) {
+                CommandButton button = CommandButton.fromBundle(commandButtonlist.get(i));
+                if (button != null) {
+                    layout.add(button);
+                }
+            }
+            browser.onCustomLayoutChanged(layout);
         }
     }
 

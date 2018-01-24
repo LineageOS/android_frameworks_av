@@ -24,6 +24,7 @@ import android.media.IMediaSession2Callback;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
+import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
@@ -226,6 +227,26 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 Log.w(TAG, "Controller is gone", e);
                 // TODO(jaewan): What to do when the controller is gone?
             }
+        }
+    }
+
+    public void notifyCustomLayoutNotLocked(ControllerInfo controller, List<CommandButton> layout) {
+        // TODO(jaewan): It's OK to be called while it's connecting, but not OK if the connection
+        //               is rejected. Handle the case.
+        IMediaSession2Callback callbackBinder =
+                ControllerInfoImpl.from(controller).getControllerBinder();
+        try {
+            List<Bundle> layoutBundles = new ArrayList<>();
+            for (int i = 0; i < layout.size(); i++) {
+                Bundle bundle = layout.get(i).toBundle();
+                if (bundle != null) {
+                    layoutBundles.add(bundle);
+                }
+            }
+            callbackBinder.onCustomLayoutChanged(layoutBundles);
+        } catch (RemoteException e) {
+            Log.w(TAG, "Controller is gone", e);
+            // TODO(jaewan): What to do when the controller is gone?
         }
     }
 

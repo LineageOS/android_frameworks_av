@@ -25,6 +25,7 @@ import android.media.MediaController2;
 import android.media.MediaPlayerBase;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Builder;
+import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
 import android.media.SessionToken;
@@ -228,6 +229,18 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mListeners.get(idx).removeCallbacksAndMessages(null);
             mListeners.remove(idx);
         }
+    }
+
+    @Override
+    public void setCustomLayout_impl(ControllerInfo controller, List<CommandButton> layout) {
+        ensureCallingThread();
+        if (controller == null) {
+            throw new IllegalArgumentException("controller shouldn't be null");
+        }
+        if (layout == null) {
+            throw new IllegalArgumentException("layout shouldn't be null");
+        }
+        mSessionStub.notifyCustomLayoutNotLocked(controller, layout);
     }
 
     ///////////////////////////////////////////////////
