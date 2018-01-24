@@ -227,6 +227,7 @@ private:
 DrmHal::DrmHal()
    : mDrmSessionClient(new DrmSessionClient(this)),
      mFactories(makeDrmFactories()),
+     mOpenSessionCounter("/drm/mediadrm/open_session", "status"),
      mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT) {
 }
 
@@ -517,6 +518,8 @@ status_t DrmHal::openSession(Vector<uint8_t> &sessionId) {
                 mDrmSessionClient, sessionId);
         mOpenSessions.push(sessionId);
     }
+
+    mOpenSessionCounter.Increment(err);
     return err;
 }
 
@@ -985,8 +988,25 @@ status_t DrmHal::setPropertyByteArray(String8 const &name,
 }
 
 status_t DrmHal::getMetrics(MediaAnalyticsItem* metrics) {
-    // TODO: Replace this with real metrics.
-    metrics->setCString("/drm/mediadrm/dummymetric", "dummy");
+    // TODO: Move mOpenSessionCounter and suffixes to a separate class
+    // that manages the collection of metrics and exporting them.
+    std::string success_count_name =
+        mOpenSessionCounter.metric_name() + "/ok/count";
+    std::string error_count_name =
+        mOpenSessionCounter.metric_name() + "/error/count";
+    mOpenSessionCounter.ExportValues(
+        [&] (status_t status, int64_t value) {
+            if (status == OK) {
+                metrics->setInt64(success_count_name.c_str(), value);
+            } else {
+                int64_t total_errors(0);
+                metrics->getInt64(error_count_name.c_str(), &total_errors);
+                metrics->setInt64(error_count_name.c_str(),
+                                  total_errors + value);
+                // TODO: Add support for exporting the list of error values.
+                // This probably needs to be added to MediaAnalyticsItem.
+            }
+        });
     return OK;
 }
 
