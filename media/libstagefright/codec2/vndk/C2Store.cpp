@@ -408,6 +408,8 @@ C2PlatformComponentStore::C2PlatformComponentStore() {
     mComponents.emplace("c2.google.aac.decoder", "libstagefright_soft_c2aacdec.so");
     mComponents.emplace("c2.google.aac.encoder", "libstagefright_soft_c2aacenc.so");
     mComponents.emplace("c2.google.mp3.decoder", "libstagefright_soft_c2mp3dec.so");
+    mComponents.emplace("c2.google.g711.alaw.decoder", "libstagefright_soft_c2g711alawdec.so");
+    mComponents.emplace("c2.google.g711.mlaw.decoder", "libstagefright_soft_c2g711mlawdec.so");
 }
 
 c2_status_t C2PlatformComponentStore::copyBuffer(
