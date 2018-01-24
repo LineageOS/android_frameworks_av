@@ -7,7 +7,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libaudioutils_system",
+        "libaudioutils",
         "libbinder",
         "liblog",
         "libnbaio",

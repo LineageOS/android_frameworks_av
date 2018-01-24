@@ -78,7 +78,7 @@ cc_test {
 
     local_include_dirs: ["src"],
 
-    shared_libs: ["libaudioutils_system"],
+    shared_libs: ["libaudioutils"],
 
     sanitize: {
         misc_undefined: [

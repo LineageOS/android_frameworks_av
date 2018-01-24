@@ -32,8 +32,5 @@ LOCAL_CFLAGS += \
 LOCAL_CFLAGS += -fvisibility=hidden
 LOCAL_CFLAGS += -Wall -Werror
 
-LOCAL_HEADER_LIBRARIES += \
-    libhardware_headers \
-    android.hardware.audio.effect.legacy@2.0
-
+LOCAL_HEADER_LIBRARIES += libhardware_headers
 include $(BUILD_SHARED_LIBRARY)

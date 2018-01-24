@@ -6,7 +6,7 @@ cc_test {
     static_libs: ["libsndfile"],
     shared_libs: [
         "libaaudio",
-        "libaudioutils_system",
+        "libaudioutils",
         ],
     header_libs: ["libaaudio_example_utils"],
 }

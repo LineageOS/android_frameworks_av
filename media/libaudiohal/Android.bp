@@ -19,7 +19,7 @@ cc_library_shared {
     ],
 
     header_libs: [
-        "libaudiohal_headers",
+        "libaudiohal_headers"
     ]
 }
 
@@ -50,11 +50,4 @@ cc_library_headers {
     name: "libaudiohal_headers",
 
     export_include_dirs: ["include"],
-
-    header_libs: [
-        "libaudiohal_legacy_headers",
-    ],
-    export_header_lib_headers: [
-        "libaudiohal_legacy_headers",
-    ],
 }

@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include <hwbinder/IPCThreadState.h>
+#include <media/EffectsFactoryApi.h>
 #include <utils/Log.h>
 
 #include "ConversionHelperHidl.h"
