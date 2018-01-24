@@ -54,7 +54,7 @@ struct ivd_video_decode_op_t : public ::ivd_video_decode_op_t {};
 
 #define PRINT_TIME  ALOGV
 
-#define componentName                   "video_decoder.avc"
+constexpr char kComponentName[] = "c2.google.avc.decoder";
 // #define codingType                      OMX_VIDEO_CodingAVC
 #define CODEC_MIME_TYPE                 MEDIA_MIMETYPE_VIDEO_AVC
 
@@ -70,6 +70,18 @@ struct ivd_video_decode_op_t : public ::ivd_video_decode_op_t {};
 #define IVDEXT_CMD_CTL_SET_NUM_CORES    \
         (IVD_CONTROL_API_COMMAND_TYPE_T)IH264D_CMD_CTL_SET_NUM_CORES
 namespace {
+
+std::shared_ptr<C2ComponentInterface> BuildIntf(
+        const char *name, c2_node_id_t id,
+        std::function<void(C2ComponentInterface*)> deleter =
+            std::default_delete<C2ComponentInterface>()) {
+    return SimpleC2Interface::Builder(name, id, deleter)
+            .inputFormat(C2FormatCompressed)
+            .outputFormat(C2FormatVideo)
+            .inputMediaType(MEDIA_MIMETYPE_VIDEO_AVC)
+            .outputMediaType(MEDIA_MIMETYPE_VIDEO_RAW)
+            .build();
+}
 
 #if 0
 using SupportedValuesWithFields = C2SoftAvcDecIntf::SupportedValuesWithFields;
@@ -614,11 +626,7 @@ void C2SoftAvcDecIntf::updateSupportedValues() {
 C2SoftAvcDec::C2SoftAvcDec(
         const char *name,
         c2_node_id_t id)
-    : SimpleC2Component(
-          SimpleC2Interface::Builder(name, id)
-          .inputFormat(C2FormatCompressed)
-          .outputFormat(C2FormatVideo)
-          .build()),
+    : SimpleC2Component(BuildIntf(name, id)),
       mCodecCtx(NULL),
       mFlushOutBuffer(NULL),
       mIvColorFormat(IV_YUV_420P),
@@ -1327,21 +1335,18 @@ status_t C2SoftAvcDec::handleColorAspectsChange() {
 class C2SoftAvcDecFactory : public C2ComponentFactory {
 public:
     virtual c2_status_t createComponent(
-            c2_node_id_t id, std::shared_ptr<C2Component>* const component,
-            std::function<void(::C2Component*)> deleter) override {
-        *component = std::shared_ptr<C2Component>(new C2SoftAvcDec("avc", id), deleter);
+            c2_node_id_t id,
+            std::shared_ptr<C2Component>* const component,
+            std::function<void(C2Component*)> deleter) override {
+        *component = std::shared_ptr<C2Component>(new C2SoftAvcDec(kComponentName, id), deleter);
         return C2_OK;
     }
 
     virtual c2_status_t createInterface(
-            c2_node_id_t id, std::shared_ptr<C2ComponentInterface>* const interface,
-            std::function<void(::C2ComponentInterface*)> deleter) override {
-        *interface =
-              SimpleC2Interface::Builder("avc", id, deleter)
-              .inputFormat(C2FormatCompressed)
-              .outputFormat(C2FormatVideo)
-              .build();
-//            std::shared_ptr<C2ComponentInterface>(new C2SoftAvcDecIntf("avc", id), deleter);
+            c2_node_id_t id,
+            std::shared_ptr<C2ComponentInterface>* const interface,
+            std::function<void(C2ComponentInterface*)> deleter) override {
+        *interface = BuildIntf(kComponentName, id, deleter);
         return C2_OK;
     }
 

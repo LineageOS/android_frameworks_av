@@ -45,15 +45,38 @@ c2_status_t SimpleC2Interface::query_vb(
     if (heapParams) {
         heapParams->clear();
         for (const auto &index : heapParamIndices) {
-            if (index.coreIndex() != C2StreamFormatConfig::CORE_INDEX
-                    || !index.forStream()
-                    || index.stream() != 0u) {
-                heapParams->push_back(nullptr);
-            }
-            if (index.forInput()) {
-                heapParams->push_back(C2Param::Copy(mInputFormat));
-            } else {
-                heapParams->push_back(C2Param::Copy(mOutputFormat));
+            switch (index.type()) {
+                case C2StreamFormatConfig::input::PARAM_TYPE:
+                    if (index.stream() == 0u) {
+                        heapParams->push_back(C2Param::Copy(mInputFormat));
+                    } else {
+                        heapParams->push_back(nullptr);
+                    }
+                    break;
+                case C2StreamFormatConfig::output::PARAM_TYPE:
+                    if (index.stream() == 0u) {
+                        heapParams->push_back(C2Param::Copy(mOutputFormat));
+                    } else {
+                        heapParams->push_back(nullptr);
+                    }
+                    break;
+                case C2PortMimeConfig::input::PARAM_TYPE:
+                    if (mInputMediaType) {
+                        heapParams->push_back(C2Param::Copy(*mInputMediaType));
+                    } else {
+                        heapParams->push_back(nullptr);
+                    }
+                    break;
+                case C2PortMimeConfig::output::PARAM_TYPE:
+                    if (mOutputMediaType) {
+                        heapParams->push_back(C2Param::Copy(*mOutputMediaType));
+                    } else {
+                        heapParams->push_back(nullptr);
+                    }
+                    break;
+                default:
+                    heapParams->push_back(nullptr);
+                    break;
             }
         }
     }

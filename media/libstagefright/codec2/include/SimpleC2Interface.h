@@ -27,13 +27,9 @@ public:
     public:
         inline Builder(
                 const char *name,
-                c2_node_id_t id)
-            : mIntf(new SimpleC2Interface(name, id)) {}
-
-        inline Builder(
-                const char *name,
                 c2_node_id_t id,
-                std::function<void(::android::SimpleC2Interface*)> deleter)
+                std::function<void(C2ComponentInterface*)> deleter =
+                    std::default_delete<C2ComponentInterface>())
             : mIntf(new SimpleC2Interface(name, id), deleter) {}
 
         inline Builder &inputFormat(C2FormatKind input) {
@@ -44,6 +40,28 @@ public:
         inline Builder &outputFormat(C2FormatKind output) {
             mIntf->mOutputFormat.value = output;
             return *this;
+        }
+
+        inline Builder &inputMediaType(const char *mediaType, size_t maxLen = 128) {
+            mIntf->mInputMediaType = C2PortMimeConfig::input::AllocShared(maxLen);
+            std::strncpy(mIntf->mInputMediaType->m.value, mediaType, maxLen);
+            return *this;
+        }
+
+        inline Builder &outputMediaType(const char *mediaType, size_t maxLen = 128) {
+            mIntf->mOutputMediaType = C2PortMimeConfig::output::AllocShared(maxLen);
+            std::strncpy(mIntf->mOutputMediaType->m.value, mediaType, maxLen);
+            return *this;
+        }
+
+        template<size_t N>
+        inline Builder &inputMediaType(const char mediaType[N]) {
+            return inputMediaType(mediaType, N);
+        }
+
+        template<size_t N>
+        inline Builder &outputMediaType(const char mediaType[N]) {
+            return outputMediaType(mediaType, N);
         }
 
         inline std::shared_ptr<SimpleC2Interface> build() {
@@ -89,6 +107,8 @@ private:
     const c2_node_id_t mId;
     C2StreamFormatConfig::input mInputFormat;
     C2StreamFormatConfig::output mOutputFormat;
+    std::shared_ptr<C2PortMimeConfig::input> mInputMediaType;
+    std::shared_ptr<C2PortMimeConfig::output> mOutputMediaType;
 
     SimpleC2Interface() = delete;
 };

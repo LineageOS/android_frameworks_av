@@ -398,7 +398,7 @@ public:
         domain_t domain; ///< component domain (e.g. audio or video)
         kind_t kind; ///< component kind (e.g. encoder, decoder or filter)
         rank_t rank; ///< rank used to determine component ordering (the lower the sooner)
-        C2StringLiteral mediaType; ///< media type supported by the component
+        C2String mediaType; ///< media type supported by the component
 
         /**
          * name alias(es) for backward compatibility.

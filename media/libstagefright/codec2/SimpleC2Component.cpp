@@ -226,7 +226,9 @@ c2_status_t SimpleC2Component::release() {
         releasing = std::move(state->mThread);
     }
     mExitRequested = true;
-    releasing.join();
+    if (releasing.joinable()) {
+        releasing.join();
+    }
     onRelease();
     return C2_OK;
 }

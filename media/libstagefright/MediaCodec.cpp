@@ -421,13 +421,33 @@ void CodecCallback::onOutputBuffersChanged() {
 sp<MediaCodec> MediaCodec::CreateByType(
         const sp<ALooper> &looper, const AString &mime, bool encoder, status_t *err, pid_t pid,
         uid_t uid) {
-    sp<MediaCodec> codec = new MediaCodec(looper, pid, uid);
+    Vector<AString> matchingCodecs;
+    Vector<AString> owners;
 
-    const status_t ret = codec->init(mime, true /* nameIsType */, encoder);
+    MediaCodecList::findMatchingCodecs(
+            mime.c_str(),
+            encoder,
+            0,
+            &matchingCodecs,
+            &owners);
+
     if (err != NULL) {
-        *err = ret;
+        *err = NAME_NOT_FOUND;
     }
-    return ret == OK ? codec : NULL; // NULL deallocates codec.
+    for (size_t i = 0; i < matchingCodecs.size(); ++i) {
+        sp<MediaCodec> codec = new MediaCodec(looper, pid, uid);
+        AString componentName = matchingCodecs[i];
+        status_t ret = codec->init(componentName);
+        if (err != NULL) {
+            *err = ret;
+        }
+        if (ret == OK) {
+            return codec;
+        }
+        ALOGD("Allocating component '%s' failed (%d), try next one.",
+                componentName.c_str(), ret);
+    }
+    return NULL;
 }
 
 // static
@@ -435,7 +455,7 @@ sp<MediaCodec> MediaCodec::CreateByComponentName(
         const sp<ALooper> &looper, const AString &name, status_t *err, pid_t pid, uid_t uid) {
     sp<MediaCodec> codec = new MediaCodec(looper, pid, uid);
 
-    const status_t ret = codec->init(name, false /* nameIsType */, false /* encoder */);
+    const status_t ret = codec->init(name);
     if (err != NULL) {
         *err = ret;
     }
@@ -553,11 +573,11 @@ void MediaCodec::PostReplyWithError(const sp<AReplyToken> &replyID, int32_t err)
 }
 
 //static
-sp<CodecBase> MediaCodec::GetCodecBase(const AString &name, bool nameIsType) {
+sp<CodecBase> MediaCodec::GetCodecBase(const AString &name) {
     static bool ccodecEnabled = property_get_bool("debug.stagefright.ccodec", false);
-    if (ccodecEnabled && !nameIsType && name.startsWithIgnoreCase("c2.")) {
+    if (ccodecEnabled && name.startsWithIgnoreCase("c2.")) {
         return new CCodec;
-    } else if (nameIsType || name.startsWithIgnoreCase("omx.")) {
+    } else if (name.startsWithIgnoreCase("omx.")) {
         // at this time only ACodec specifies a mime type.
         return new ACodec;
     } else if (name.startsWithIgnoreCase("android.filter.")) {
@@ -567,48 +587,42 @@ sp<CodecBase> MediaCodec::GetCodecBase(const AString &name, bool nameIsType) {
     }
 }
 
-status_t MediaCodec::init(const AString &name, bool nameIsType, bool encoder) {
+status_t MediaCodec::init(const AString &name) {
     mResourceManagerService->init();
 
     // save init parameters for reset
     mInitName = name;
-    mInitNameIsType = nameIsType;
-    mInitIsEncoder = encoder;
 
     // Current video decoders do not return from OMX_FillThisBuffer
     // quickly, violating the OpenMAX specs, until that is remedied
     // we need to invest in an extra looper to free the main event
     // queue.
 
-    mCodec = GetCodecBase(name, nameIsType);
+    mCodec = GetCodecBase(name);
     if (mCodec == NULL) {
         return NAME_NOT_FOUND;
     }
 
     bool secureCodec = false;
-    if (nameIsType && !strncasecmp(name.c_str(), "video/", 6)) {
-        mIsVideo = true;
-    } else {
-        AString tmp = name;
-        if (tmp.endsWith(".secure")) {
-            secureCodec = true;
-            tmp.erase(tmp.size() - 7, 7);
-        }
-        const sp<IMediaCodecList> mcl = MediaCodecList::getInstance();
-        if (mcl == NULL) {
-            mCodec = NULL;  // remove the codec.
-            return NO_INIT; // if called from Java should raise IOException
-        }
-        ssize_t codecIdx = mcl->findCodecByName(tmp.c_str());
-        if (codecIdx >= 0) {
-            const sp<MediaCodecInfo> info = mcl->getCodecInfo(codecIdx);
-            Vector<AString> mimes;
-            info->getSupportedMimes(&mimes);
-            for (size_t i = 0; i < mimes.size(); i++) {
-                if (mimes[i].startsWith("video/")) {
-                    mIsVideo = true;
-                    break;
-                }
+    AString tmp = name;
+    if (tmp.endsWith(".secure")) {
+        secureCodec = true;
+        tmp.erase(tmp.size() - 7, 7);
+    }
+    const sp<IMediaCodecList> mcl = MediaCodecList::getInstance();
+    if (mcl == NULL) {
+        mCodec = NULL;  // remove the codec.
+        return NO_INIT; // if called from Java should raise IOException
+    }
+    ssize_t codecIdx = mcl->findCodecByName(tmp.c_str());
+    if (codecIdx >= 0) {
+        const sp<MediaCodecInfo> info = mcl->getCodecInfo(codecIdx);
+        Vector<AString> mimes;
+        info->getSupportedMimes(&mimes);
+        for (size_t i = 0; i < mimes.size(); i++) {
+            if (mimes[i].startsWith("video/")) {
+                mIsVideo = true;
+                break;
             }
         }
     }
@@ -638,22 +652,10 @@ status_t MediaCodec::init(const AString &name, bool nameIsType, bool encoder) {
 
     sp<AMessage> msg = new AMessage(kWhatInit, this);
     msg->setString("name", name);
-    msg->setInt32("nameIsType", nameIsType);
-
-    if (nameIsType) {
-        msg->setInt32("encoder", encoder);
-    }
 
     if (mAnalyticsItem != NULL) {
-        if (nameIsType) {
-            // name is the mime type
-            mAnalyticsItem->setCString(kCodecMime, name.c_str());
-        } else {
-            mAnalyticsItem->setCString(kCodecCodec, name.c_str());
-        }
+        mAnalyticsItem->setCString(kCodecCodec, name.c_str());
         mAnalyticsItem->setCString(kCodecMode, mIsVideo ? kCodecModeVideo : kCodecModeAudio);
-        if (nameIsType)
-            mAnalyticsItem->setInt32(kCodecEncoder, encoder);
     }
 
     status_t err;
@@ -719,6 +721,7 @@ status_t MediaCodec::configure(
         if (format->findInt32("level", &level)) {
             mAnalyticsItem->setInt32(kCodecLevel, level);
         }
+        mAnalyticsItem->setInt32(kCodecEncoder, (flags & CONFIGURE_FLAG_ENCODE) ? 1 : 0);
     }
 
     if (mIsVideo) {
@@ -743,8 +746,7 @@ status_t MediaCodec::configure(
         }
 
         // Prevent possible integer overflow in downstream code.
-        if (mInitIsEncoder
-                && (uint64_t)mVideoWidth * mVideoHeight > (uint64_t)INT32_MAX / 4) {
+        if ((uint64_t)mVideoWidth * mVideoHeight > (uint64_t)INT32_MAX / 4) {
             ALOGE("buffer size is too big, width=%d, height=%d", mVideoWidth, mVideoHeight);
             return BAD_VALUE;
         }
@@ -1023,7 +1025,7 @@ status_t MediaCodec::reset() {
     mHaveInputSurface = false;
 
     if (err == OK) {
-        err = init(mInitName, mInitNameIsType, mInitIsEncoder);
+        err = init(mInitName);
     }
     return err;
 }
@@ -1973,21 +1975,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             AString name;
             CHECK(msg->findString("name", &name));
 
-            int32_t nameIsType;
-            int32_t encoder = false;
-            CHECK(msg->findInt32("nameIsType", &nameIsType));
-            if (nameIsType) {
-                CHECK(msg->findInt32("encoder", &encoder));
-            }
-
             sp<AMessage> format = new AMessage;
-
-            if (nameIsType) {
-                format->setString("mime", name.c_str());
-                format->setInt32("encoder", encoder);
-            } else {
-                format->setString("componentName", name.c_str());
-            }
+            format->setString("componentName", name.c_str());
 
             mCodec->initiateAllocateComponent(format);
             break;
