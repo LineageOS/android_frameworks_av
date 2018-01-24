@@ -35,6 +35,7 @@ class DataSource;
 class IDataSource;
 struct IMediaHTTPService;
 struct MediaSource;
+class IMediaSource;
 class MediaBuffer;
 struct MediaClock;
 struct NuCachedSource2;

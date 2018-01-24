@@ -20,17 +20,13 @@
 
 #include <sys/types.h>
 
-#include <binder/IMemory.h>
-#include <binder/MemoryDealer.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
 #include <utils/RefBase.h>
-#include <utils/Vector.h>
 
 namespace android {
 
 class MediaBuffer;
-class IMediaSource;
 
 struct MediaSource : public virtual RefBase {
     MediaSource();

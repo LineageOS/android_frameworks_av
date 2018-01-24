@@ -27,6 +27,7 @@ namespace android {
 
 struct AMessage;
 class MediaCodecBuffer;
+class IMediaSource;
 class VideoFrame;
 
 struct FrameDecoder {

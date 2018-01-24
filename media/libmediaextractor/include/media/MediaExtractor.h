@@ -27,10 +27,7 @@
 namespace android {
 
 class DataSource;
-class IMediaSource;
-class MediaExtractorFactory;
 class MetaData;
-class Parcel;
 class String8;
 struct AMessage;
 struct MediaSource;
