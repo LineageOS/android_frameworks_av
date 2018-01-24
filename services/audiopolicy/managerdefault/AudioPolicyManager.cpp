@@ -2939,7 +2939,7 @@ status_t AudioPolicyManager::createAudioPatch(const struct audio_patch *patch,
                 sinkDeviceDesc->toAudioPortConfig(&newPatch.sinks[i], &patch->sinks[i]);
 
                 // create a software bridge in PatchPanel if:
-                // - source and sink devices are on differnt HW modules OR
+                // - source and sink devices are on different HW modules OR
                 // - audio HAL version is < 3.0
                 if (!srcDeviceDesc->hasSameHwModuleAs(sinkDeviceDesc) ||
                         (srcDeviceDesc->mModule->getHalVersionMajor() < 3)) {
