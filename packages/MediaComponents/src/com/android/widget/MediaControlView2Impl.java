@@ -184,59 +184,6 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     }
 
     @Override
-    public boolean isPlaying_impl() {
-        if (mPlaybackState != null) {
-            return mPlaybackState.getState() == PlaybackState.STATE_PLAYING;
-        }
-        return false;
-    }
-
-    @Override
-    public int getCurrentPosition_impl() {
-        mPlaybackState = mController.getPlaybackState();
-        if (mPlaybackState != null) {
-            return (int) mPlaybackState.getPosition();
-        }
-        return 0;
-    }
-
-    @Override
-    public int getBufferPercentage_impl() {
-        if (mDuration == 0) {
-            return 0;
-        }
-        mPlaybackState = mController.getPlaybackState();
-        if (mPlaybackState != null) {
-            return (int) (mPlaybackState.getBufferedPosition() * 100) / mDuration;
-        }
-        return 0;
-    }
-
-    @Override
-    public boolean canPause_impl() {
-        if (mPlaybackState != null) {
-            return (mPlaybackState.getActions() & PlaybackState.ACTION_PAUSE) != 0;
-        }
-        return true;
-    }
-
-    @Override
-    public boolean canSeekBackward_impl() {
-        if (mPlaybackState!= null) {
-            return (mPlaybackState.getActions() & PlaybackState.ACTION_REWIND) != 0;
-        }
-        return true;
-    }
-
-    @Override
-    public boolean canSeekForward_impl() {
-        if (mPlaybackState != null) {
-            return (mPlaybackState.getActions() & PlaybackState.ACTION_FAST_FORWARD) != 0;
-        }
-        return true;
-    }
-
-    @Override
     public void showSubtitle_impl() {
         mController.sendCommand(COMMAND_SHOW_SUBTITLE, null, null);
     }
@@ -267,17 +214,17 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     public void setButtonVisibility_impl(int button, boolean visible) {
         switch (button) {
             case MediaControlView2.BUTTON_PLAY_PAUSE:
-                if (mPlayPauseButton != null && mInstance.canPause()) {
+                if (mPlayPauseButton != null && canPause()) {
                     mPlayPauseButton.setVisibility((visible) ? View.VISIBLE : View.GONE);
                 }
                 break;
             case MediaControlView2.BUTTON_FFWD:
-                if (mFfwdButton != null && mInstance.canSeekForward()) {
+                if (mFfwdButton != null && canSeekForward()) {
                     mFfwdButton.setVisibility((visible) ? View.VISIBLE : View.GONE);
                 }
                 break;
             case MediaControlView2.BUTTON_REW:
-                if (mRewButton != null && mInstance.canSeekBackward()) {
+                if (mRewButton != null && canSeekBackward()) {
                     mRewButton.setVisibility((visible) ? View.VISIBLE : View.GONE);
                 }
                 break;
@@ -384,14 +331,14 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
             }
             return true;
         } else if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY) {
-            if (uniqueDown && !mInstance.isPlaying()) {
+            if (uniqueDown && !isPlaying()) {
                 togglePausePlayState();
                 mInstance.show(DEFAULT_TIMEOUT_MS);
             }
             return true;
         } else if (keyCode == KeyEvent.KEYCODE_MEDIA_STOP
                 || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE) {
-            if (uniqueDown && mInstance.isPlaying()) {
+            if (uniqueDown && isPlaying()) {
                 togglePausePlayState();
                 mInstance.show(DEFAULT_TIMEOUT_MS);
             }
@@ -440,6 +387,53 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     ///////////////////////////////////////////////////
     // Protected or private methods
     ///////////////////////////////////////////////////
+
+    private boolean isPlaying() {
+        if (mPlaybackState != null) {
+            return mPlaybackState.getState() == PlaybackState.STATE_PLAYING;
+        }
+        return false;
+    }
+
+    private int getCurrentPosition() {
+        mPlaybackState = mController.getPlaybackState();
+        if (mPlaybackState != null) {
+            return (int) mPlaybackState.getPosition();
+        }
+        return 0;
+    }
+
+    private int getBufferPercentage() {
+        if (mDuration == 0) {
+            return 0;
+        }
+        mPlaybackState = mController.getPlaybackState();
+        if (mPlaybackState != null) {
+            return (int) (mPlaybackState.getBufferedPosition() * 100) / mDuration;
+        }
+        return 0;
+    }
+
+    private boolean canPause() {
+        if (mPlaybackState != null) {
+            return (mPlaybackState.getActions() & PlaybackState.ACTION_PAUSE) != 0;
+        }
+        return true;
+    }
+
+    private boolean canSeekBackward() {
+        if (mPlaybackState != null) {
+            return (mPlaybackState.getActions() & PlaybackState.ACTION_REWIND) != 0;
+        }
+        return true;
+    }
+
+    private boolean canSeekForward() {
+        if (mPlaybackState != null) {
+            return (mPlaybackState.getActions() & PlaybackState.ACTION_FAST_FORWARD) != 0;
+        }
+        return true;
+    }
 
     /**
      * Create the view that holds the widgets that control playback.
@@ -538,13 +532,13 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
      */
     private void disableUnsupportedButtons() {
         try {
-            if (mPlayPauseButton != null && !mInstance.canPause()) {
+            if (mPlayPauseButton != null && !canPause()) {
                 mPlayPauseButton.setEnabled(false);
             }
-            if (mRewButton != null && !mInstance.canSeekBackward()) {
+            if (mRewButton != null && !canSeekBackward()) {
                 mRewButton.setEnabled(false);
             }
-            if (mFfwdButton != null && !mInstance.canSeekForward()) {
+            if (mFfwdButton != null && !canSeekForward()) {
                 mFfwdButton.setEnabled(false);
             }
             // TODO What we really should do is add a canSeek to the MediaPlayerControl interface;
@@ -554,7 +548,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
             // However, currently the flags SEEK_BACKWARD_AVAILABLE, SEEK_FORWARD_AVAILABLE,
             // and SEEK_AVAILABLE are all (un)set together; as such the aforementioned issue
             // shouldn't arise in existing applications.
-            if (mProgress != null && !mInstance.canSeekBackward() && !mInstance.canSeekForward()) {
+            if (mProgress != null && !canSeekBackward() && !canSeekForward()) {
                 mProgress.setEnabled(false);
             }
         } catch (IncompatibleClassChangeError ex) {
@@ -568,7 +562,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     private final Runnable mFadeOut = new Runnable() {
         @Override
         public void run() {
-            if (mInstance.isPlaying()) {
+            if (isPlaying()) {
                 mInstance.hide();
             }
         }
@@ -578,7 +572,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
         @Override
         public void run() {
             int pos = setProgress();
-            if (!mDragging && mShowing && mInstance.isPlaying()) {
+            if (!mDragging && mShowing && isPlaying()) {
                 mInstance.postDelayed(mShowProgress,
                         DEFAULT_PROGRESS_UPDATE_TIME_MS - (pos % DEFAULT_PROGRESS_UPDATE_TIME_MS));
             }
@@ -605,13 +599,13 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
             return 0;
         }
         int positionOnProgressBar = 0;
-        int currentPosition = mInstance.getCurrentPosition();
+        int currentPosition = getCurrentPosition();
         if (mDuration > 0) {
             positionOnProgressBar = (int) (MAX_PROGRESS * (long) currentPosition / mDuration);
         }
         if (mProgress != null && currentPosition != mDuration) {
             mProgress.setProgress(positionOnProgressBar);
-            mProgress.setSecondaryProgress(mInstance.getBufferPercentage() * 10);
+            mProgress.setSecondaryProgress(getBufferPercentage() * 10);
         }
 
         if (mEndTime != null) {
@@ -626,7 +620,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     }
 
     private void togglePausePlayState() {
-        if (mInstance.isPlaying()) {
+        if (isPlaying()) {
             mControls.pause();
             mPlayPauseButton.setImageDrawable(
                     ApiHelper.getLibResources().getDrawable(
@@ -728,7 +722,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     private final View.OnClickListener mRewListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            int pos = mInstance.getCurrentPosition() - REWIND_TIME_MS;
+            int pos = getCurrentPosition() - REWIND_TIME_MS;
             mControls.seekTo(pos);
             setProgress();
 
@@ -739,7 +733,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     private final View.OnClickListener mFfwdListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            int pos = mInstance.getCurrentPosition() + FORWARD_TIME_MS;
+            int pos = getCurrentPosition() + FORWARD_TIME_MS;
             mControls.seekTo(pos);
             setProgress();
 
