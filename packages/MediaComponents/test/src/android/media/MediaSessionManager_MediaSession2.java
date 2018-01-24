@@ -71,7 +71,7 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
         super.cleanUp();
         sHandler.removeCallbacksAndMessages(null);
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
         });
     }
 
@@ -111,7 +111,7 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
     @Test
     public void testGetSessionTokens_sessionRejected() throws InterruptedException {
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
             mSession = new MediaSession2.Builder(mContext, new MockPlayer(0)).setId(TAG)
                     .setSessionCallback(new SessionCallback() {
                         @Override
@@ -141,7 +141,7 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
     public void testGetMediaSession2Tokens_playerRemoved() throws InterruptedException {
         // Release
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
         });
         ensureChangeInSession();
 

@@ -106,17 +106,17 @@ public class TestServiceRegistry {
             if (mService != null) {
                 try {
                     if (mHandler.getLooper() == Looper.myLooper()) {
-                        mService.getSession().setPlayer(null);
+                        mService.getSession().close();
                     } else {
                         mHandler.postAndSync(() -> {
-                            mService.getSession().setPlayer(null);
+                            mService.getSession().close();
                         });
                     }
                 } catch (InterruptedException e) {
                     // No-op. Service containing session will die, but shouldn't be a huge issue.
                 }
                 // stopSelf() would not kill service while the binder connection established by
-                // bindService() exists, and setPlayer(null) above will do the job instead.
+                // bindService() exists, and close() above will do the job instead.
                 // So stopSelf() isn't really needed, but just for sure.
                 mService.stopSelf();
                 mService = null;

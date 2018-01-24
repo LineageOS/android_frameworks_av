@@ -104,43 +104,39 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public void setPlayer_impl(MediaPlayerBase player) throws IllegalArgumentException {
         ensureCallingThread();
-        // TODO(jaewan): Remove this when we don't inherits MediaPlayerBase.
-        if (player instanceof MediaSession2 || player instanceof MediaController2) {
-            throw new IllegalArgumentException("player doesn't accept MediaSession2 nor"
-                    + " MediaController2");
-        }
-        if (player != null && mPlayer == player) {
-            // Player didn't changed. No-op.
-            return;
+        if (player == null) {
+            throw new IllegalArgumentException("player shouldn't be null");
         }
         setPlayerInternal(player);
     }
 
     private void setPlayerInternal(MediaPlayerBase player) {
-        mHandler.removeCallbacksAndMessages(null);
-        if (mPlayer == null && player != null) {
-            if (DEBUG) {
-                Log.d(TAG, "session is ready to use, id=" + mId);
-            }
-        } else if (mPlayer != null && player == null) {
-            if (DEBUG) {
-                Log.d(TAG, "session is now unavailable, id=" + mId);
-            }
-            if (mSessionStub != null) {
-                // Invalidate previously published session stub.
-                mSessionStub.destroyNotLocked();
-            }
+        if (mPlayer == player) {
+            // Player didn't changed. No-op.
+            return;
         }
+        mHandler.removeCallbacksAndMessages(null);
         if (mPlayer != null && mListener != null) {
             // This might not work for a poorly implemented player.
             mPlayer.removePlaybackListener(mListener);
         }
-        if (player != null) {
-            mListener = new MyPlaybackListener(this, player);
-            player.addPlaybackListener(mListener, mHandler);
-            notifyPlaybackStateChanged(player.getPlaybackState());
-        }
+        mListener = new MyPlaybackListener(this, player);
+        player.addPlaybackListener(mListener, mHandler);
+        notifyPlaybackStateChanged(player.getPlaybackState());
         mPlayer = player;
+    }
+
+    @Override
+    public void close_impl() {
+        // Flush any pending messages.
+        mHandler.removeCallbacksAndMessages(null);
+        if (mSessionStub != null) {
+            if (DEBUG) {
+                Log.d(TAG, "session is now unavailable, id=" + mId);
+            }
+            // Invalidate previously published session stub.
+            mSessionStub.destroyNotLocked();
+        }
     }
 
     @Override

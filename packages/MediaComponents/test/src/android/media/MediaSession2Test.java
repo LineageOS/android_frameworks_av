@@ -65,7 +65,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
     public void cleanUp() throws Exception {
         super.cleanUp();
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
         });
     }
 
@@ -93,7 +93,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
             // Test if setPlayer doesn't crash with various situations.
             mSession.setPlayer(mPlayer);
             mSession.setPlayer(player);
-            mSession.setPlayer(null);
+            mSession.close();
         });
     }
 
@@ -199,7 +199,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
     public void testOnCommandCallback() throws InterruptedException {
         final MockOnCommandCallback callback = new MockOnCommandCallback();
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
             mPlayer = new MockPlayer(1);
             mSession = new MediaSession2.Builder(mContext, mPlayer)
                     .setSessionCallback(callback).build();
@@ -224,7 +224,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
     public void testOnConnectCallback() throws InterruptedException {
         final MockOnConnectCallback sessionCallback = new MockOnConnectCallback();
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
             mSession = new MediaSession2.Builder(mContext, mPlayer)
                     .setSessionCallback(sessionCallback).build();
         });
