@@ -210,6 +210,219 @@ enum c2_blocking_t : int32_t {
     } \
     DEFINE_OTHER_COMPARISON_OPERATORS(type)
 
+template<typename T, typename B>
+class C2_HIDE c2_cntr_t;
+
+/// \cond INTERNAL
+
+/// \defgroup utils_internal
+/// @{
+
+template<typename T>
+struct C2_HIDE _c2_cntr_compat_helper {
+    template<typename U, typename E=typename std::enable_if<std::is_integral<U>::value>::type>
+    __attribute__((no_sanitize("integer")))
+    inline static constexpr T get(const U &value) {
+        return T(value);
+    }
+
+    template<typename U, typename E=typename std::enable_if<(sizeof(U) >= sizeof(T))>::type>
+    __attribute__((no_sanitize("integer")))
+    inline static constexpr T get(const c2_cntr_t<U, void> &value) {
+        return T(value.mValue);
+    }
+};
+
+/// @}
+
+/// \endcond
+
+/**
+ * Integral counter type.
+ *
+ * This is basically an unsigned integral type that is NEVER checked for overflow/underflow - and
+ * comparison operators are redefined.
+ *
+ * \note Comparison of counter types is not fully transitive, e.g.
+ * it could be that a > b > c but a !> c.
+ * std::less<>, greater<>, less_equal<> and greater_equal<> specializations yield total ordering,
+ * but may not match semantic ordering of the values.
+ *
+ * Technically: counter types represent integer values: A * 2^N + value, where A can be arbitrary.
+ * This makes addition, subtraction, multiplication (as well as bitwise operations) well defined.
+ * However, division is in general not well defined, as the result may depend on A. This is also
+ * true for logical operators and boolean conversion.
+ *
+ * Even though well defined, bitwise operators are not implemented for counter types as they are not
+ * meaningful.
+ */
+template<typename T, typename B=typename std::enable_if<std::is_integral<T>::value && std::is_unsigned<T>::value>::type>
+class C2_HIDE c2_cntr_t {
+    using compat = _c2_cntr_compat_helper<T>;
+
+    T mValue;
+    constexpr static T HALF_RANGE = T(~0) ^ (T(~0) >> 1);
+
+    template<typename U>
+    friend struct _c2_cntr_compat_helper;
+public:
+
+    /**
+     * Default constructor. Initialized counter to 0.
+     */
+    inline constexpr c2_cntr_t() : mValue(T(0)) {}
+
+    /**
+     * Construct from a compatible type.
+     */
+    template<typename U>
+    inline constexpr c2_cntr_t(const U &value) : mValue(compat::get(value)) {}
+
+    /**
+     * Peek as underlying signed type.
+     */
+    __attribute__((no_sanitize("integer")))
+    inline constexpr typename std::make_signed<T>::type peek() const {
+        return static_cast<typename std::make_signed<T>::type>(mValue);
+    }
+
+    /**
+     * Peek as underlying unsigned type.
+     */
+    inline constexpr T peeku() const {
+        return mValue;
+    }
+
+    /**
+     * Peek as long long - e.g. for printing.
+     */
+    __attribute__((no_sanitize("integer")))
+    inline constexpr long long peekll() const {
+        return (long long)mValue;
+    }
+
+    /**
+     * Peek as unsigned long long - e.g. for printing.
+     */
+    __attribute__((no_sanitize("integer")))
+    inline constexpr unsigned long long peekull() const {
+        return (unsigned long long)mValue;
+    }
+
+    /**
+     * Convert to a smaller counter type. This is always safe.
+     */
+    template<typename U, typename E=typename std::enable_if<sizeof(U) < sizeof(T)>::type>
+    inline operator c2_cntr_t<U>() {
+        return c2_cntr_t<U>(mValue);
+    }
+
+    /**
+     * Arithmetic operators
+     */
+
+#define DEFINE_C2_CNTR_BINARY_OP(attrib, op, op_assign) \
+    template<typename U> \
+    attrib inline c2_cntr_t<T>& operator op_assign(const U &value) { \
+        mValue op_assign compat::get(value); \
+        return *this; \
+    } \
+    \
+    template<typename U, typename E=decltype(compat::get(U(0)))> \
+    attrib inline constexpr c2_cntr_t<T> operator op(const U &value) const { \
+        return c2_cntr_t<T>(mValue op compat::get(value)); \
+    } \
+    \
+    template<typename U, typename E=typename std::enable_if<sizeof(U) < sizeof(T)>::type> \
+    attrib inline constexpr c2_cntr_t<U> operator op(const c2_cntr_t<U> &value) const { \
+        return c2_cntr_t<U>(U(mValue) op value.peeku()); \
+    }
+
+#define DEFINE_C2_CNTR_UNARY_OP(attrib, op) \
+    attrib inline constexpr c2_cntr_t<T> operator op() const { \
+        return c2_cntr_t<T>(op mValue); \
+    }
+
+#define DEFINE_C2_CNTR_CREMENT_OP(attrib, op) \
+    attrib inline c2_cntr_t<T> &operator op() { \
+        op mValue; \
+        return *this; \
+    } \
+    attrib inline c2_cntr_t<T> operator op(int) { \
+        return c2_cntr_t<T, void>(mValue op); \
+    }
+
+    DEFINE_C2_CNTR_BINARY_OP(__attribute__((no_sanitize("integer"))), +, +=)
+    DEFINE_C2_CNTR_BINARY_OP(__attribute__((no_sanitize("integer"))), -, -=)
+    DEFINE_C2_CNTR_BINARY_OP(__attribute__((no_sanitize("integer"))), *, *=)
+
+    DEFINE_C2_CNTR_UNARY_OP(__attribute__((no_sanitize("integer"))), -)
+    DEFINE_C2_CNTR_UNARY_OP(__attribute__((no_sanitize("integer"))), +)
+
+    DEFINE_C2_CNTR_CREMENT_OP(__attribute__((no_sanitize("integer"))), ++)
+    DEFINE_C2_CNTR_CREMENT_OP(__attribute__((no_sanitize("integer"))), --)
+
+    template<typename U, typename E=typename std::enable_if<std::is_unsigned<U>::value>::type>
+    __attribute__((no_sanitize("integer")))
+    inline constexpr c2_cntr_t<T> operator<<(const U &value) const {
+        return c2_cntr_t<T>(mValue << value);
+    }
+
+    template<typename U, typename E=typename std::enable_if<std::is_unsigned<U>::value>::type>
+    __attribute__((no_sanitize("integer")))
+    inline c2_cntr_t<T> &operator<<=(const U &value) {
+        mValue <<= value;
+        return *this;
+    }
+
+    /**
+     * Comparison operators
+     */
+    __attribute__((no_sanitize("integer")))
+    inline constexpr bool operator<=(const c2_cntr_t<T> &other) const {
+        return T(other.mValue - mValue) < HALF_RANGE;
+    }
+
+    __attribute__((no_sanitize("integer")))
+    inline constexpr bool operator>=(const c2_cntr_t<T> &other) const {
+        return T(mValue - other.mValue) < HALF_RANGE;
+    }
+
+    inline constexpr bool operator==(const c2_cntr_t<T> &other) const {
+        return mValue == other.mValue;
+    }
+
+    inline constexpr bool operator!=(const c2_cntr_t<T> &other) const {
+        return !(*this == other);
+    }
+
+    inline constexpr bool operator<(const c2_cntr_t<T> &other) const {
+        return *this <= other && *this != other;
+    }
+
+    inline constexpr bool operator>(const c2_cntr_t<T> &other) const {
+        return *this >= other && *this != other;
+    }
+};
+
+template<typename U, typename T, typename E=typename std::enable_if<std::is_integral<U>::value>::type>
+inline constexpr c2_cntr_t<T> operator+(const U &a, const c2_cntr_t<T> &b) {
+    return b + a;
+}
+
+template<typename U, typename T, typename E=typename std::enable_if<std::is_integral<U>::value>::type>
+inline constexpr c2_cntr_t<T> operator-(const U &a, const c2_cntr_t<T> &b) {
+    return c2_cntr_t<T>(a) - b;
+}
+
+template<typename U, typename T, typename E=typename std::enable_if<std::is_integral<U>::value>::type>
+inline constexpr c2_cntr_t<T> operator*(const U &a, const c2_cntr_t<T> &b) {
+    return b * a;
+}
+
+typedef c2_cntr_t<uint32_t> c2_cntr32_t; /** 32-bit counter type */
+typedef c2_cntr_t<uint64_t> c2_cntr64_t; /** 64-bit counter type */
+
 /// \cond INTERNAL
 
 /// \defgroup utils_internal
@@ -325,5 +538,31 @@ constexpr typename c2_types<T, U, V...>::min_type c2_min(const T a, const U b, c
 #ifdef __ANDROID__
 } // namespace android
 #endif
+
+#include <functional>
+template<typename T>
+struct std::less<::android::c2_cntr_t<T>> {
+    constexpr bool operator()(const ::android::c2_cntr_t<T> &lh, const ::android::c2_cntr_t<T> &rh) const {
+        return lh.peeku() < rh.peeku();
+    }
+};
+template<typename T>
+struct std::less_equal<::android::c2_cntr_t<T>> {
+    constexpr bool operator()(const ::android::c2_cntr_t<T> &lh, const ::android::c2_cntr_t<T> &rh) const {
+        return lh.peeku() <= rh.peeku();
+    }
+};
+template<typename T>
+struct std::greater<::android::c2_cntr_t<T>> {
+    constexpr bool operator()(const ::android::c2_cntr_t<T> &lh, const ::android::c2_cntr_t<T> &rh) const {
+        return lh.peeku() > rh.peeku();
+    }
+};
+template<typename T>
+struct std::greater_equal<::android::c2_cntr_t<T>> {
+    constexpr bool operator()(const ::android::c2_cntr_t<T> &lh, const ::android::c2_cntr_t<T> &rh) const {
+        return lh.peeku() >= rh.peeku();
+    }
+};
 
 #endif  // C2_H_

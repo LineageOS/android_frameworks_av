@@ -735,18 +735,22 @@ class C2Value {
 public:
     /// A union of supported primitive types.
     union Primitive {
-        int32_t  i32;   ///< int32_t value
-        uint32_t u32;   ///< uint32_t value
-        int64_t  i64;   ///< int64_t value
-        uint64_t u64;   ///< uint64_t value
-        float    fp;    ///< float value
+        int32_t     i32;   ///< int32_t value
+        uint32_t    u32;   ///< uint32_t value
+        c2_cntr32_t c32;   ///< c2_cntr32_t value
+        int64_t     i64;   ///< int64_t value
+        uint64_t    u64;   ///< uint64_t value
+        c2_cntr64_t c64;   ///< c2_cntr64_t value
+        float       fp;    ///< float value
 
         // constructors - implicit
-        Primitive(int32_t value)  : i32(value) { }
-        Primitive(uint32_t value) : u32(value) { }
-        Primitive(int64_t value)  : i64(value) { }
-        Primitive(uint64_t value) : u64(value) { }
-        Primitive(float value)    : fp(value)  { }
+        Primitive(int32_t value)     : i32(value) { }
+        Primitive(uint32_t value)    : u32(value) { }
+        Primitive(c2_cntr32_t value) : c32(value) { }
+        Primitive(int64_t value)     : i64(value) { }
+        Primitive(uint64_t value)    : u64(value) { }
+        Primitive(c2_cntr64_t value) : c64(value) { }
+        Primitive(float value)       : fp(value)  { }
 
         Primitive() : u64(0) { }
 
@@ -759,8 +763,10 @@ public:
         NO_INIT,
         INT32,
         UINT32,
+        CNTR32,
         INT64,
         UINT64,
+        CNTR64,
         FLOAT,
     };
 
@@ -792,12 +798,16 @@ template<> inline const int32_t &C2Value::Primitive::ref<int32_t>() const { retu
 template<> inline const int64_t &C2Value::Primitive::ref<int64_t>() const { return i64; }
 template<> inline const uint32_t &C2Value::Primitive::ref<uint32_t>() const { return u32; }
 template<> inline const uint64_t &C2Value::Primitive::ref<uint64_t>() const { return u64; }
+template<> inline const c2_cntr32_t &C2Value::Primitive::ref<c2_cntr32_t>() const { return c32; }
+template<> inline const c2_cntr64_t &C2Value::Primitive::ref<c2_cntr64_t>() const { return c64; }
 template<> inline const float &C2Value::Primitive::ref<float>() const { return fp; }
 
 template<> constexpr C2Value::type_t C2Value::typeFor<int32_t>() { return INT32; }
 template<> constexpr C2Value::type_t C2Value::typeFor<int64_t>() { return INT64; }
 template<> constexpr C2Value::type_t C2Value::typeFor<uint32_t>() { return UINT32; }
 template<> constexpr C2Value::type_t C2Value::typeFor<uint64_t>() { return UINT64; }
+template<> constexpr C2Value::type_t C2Value::typeFor<c2_cntr32_t>() { return CNTR32; }
+template<> constexpr C2Value::type_t C2Value::typeFor<c2_cntr64_t>() { return CNTR64; }
 template<> constexpr C2Value::type_t C2Value::typeFor<float>() { return FLOAT; }
 
 /**
@@ -817,8 +827,10 @@ struct C2FieldDescriptor {
         // primitive types
         INT32   = C2Value::INT32,  ///< 32-bit signed integer
         UINT32  = C2Value::UINT32, ///< 32-bit unsigned integer
+        CNTR32  = C2Value::CNTR32, ///< 32-bit counter
         INT64   = C2Value::INT64,  ///< 64-bit signed integer
         UINT64  = C2Value::UINT64, ///< 64-bit signed integer
+        CNTR64  = C2Value::CNTR64, ///< 64-bit counter
         FLOAT   = C2Value::FLOAT,  ///< 32-bit floating point
 
         // array types
@@ -903,13 +915,15 @@ private:
     // 2) this is at parameter granularity.
 
     // type resolution
-    inline static type_t getType(int32_t*)  { return INT32; }
-    inline static type_t getType(uint32_t*) { return UINT32; }
-    inline static type_t getType(int64_t*)  { return INT64; }
-    inline static type_t getType(uint64_t*) { return UINT64; }
-    inline static type_t getType(float*)    { return FLOAT; }
-    inline static type_t getType(char*)     { return STRING; }
-    inline static type_t getType(uint8_t*)  { return BLOB; }
+    inline static type_t getType(int32_t*)     { return INT32; }
+    inline static type_t getType(uint32_t*)    { return UINT32; }
+    inline static type_t getType(c2_cntr32_t*) { return CNTR32; }
+    inline static type_t getType(int64_t*)     { return INT64; }
+    inline static type_t getType(uint64_t*)    { return UINT64; }
+    inline static type_t getType(c2_cntr64_t*) { return CNTR64; }
+    inline static type_t getType(float*)       { return FLOAT; }
+    inline static type_t getType(char*)        { return STRING; }
+    inline static type_t getType(uint8_t*)     { return BLOB; }
 
     template<typename T,
              class=typename std::enable_if<std::is_enum<T>::value>::type>
@@ -936,8 +950,10 @@ template<> inline C2FieldDescriptor::named_values_type C2FieldDescriptor::namedV
 // non-enumerated integral types.
 DEFINE_NO_NAMED_VALUES_FOR(int32_t)
 DEFINE_NO_NAMED_VALUES_FOR(uint32_t)
+DEFINE_NO_NAMED_VALUES_FOR(c2_cntr32_t)
 DEFINE_NO_NAMED_VALUES_FOR(int64_t)
 DEFINE_NO_NAMED_VALUES_FOR(uint64_t)
+DEFINE_NO_NAMED_VALUES_FOR(c2_cntr64_t)
 DEFINE_NO_NAMED_VALUES_FOR(uint8_t)
 DEFINE_NO_NAMED_VALUES_FOR(char)
 DEFINE_NO_NAMED_VALUES_FOR(float)
