@@ -1271,7 +1271,8 @@ void CCodecBufferChannel::onWorkDone(const std::unique_ptr<C2Work> &work) {
 
     // NOTE: MediaCodec usage supposedly have only one worklet
     if (work->worklets.size() != 1u) {
-        ALOGE("incorrect number of worklets: %zu", work->worklets.size());
+        ALOGE("onWorkDone: incorrect number of worklets: %zu",
+                work->worklets.size());
         mOnError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
         return;
     }
@@ -1281,18 +1282,24 @@ void CCodecBufferChannel::onWorkDone(const std::unique_ptr<C2Work> &work) {
         // Discard frames from previous generation.
         return;
     }
+    std::shared_ptr<C2Buffer> buffer;
     // NOTE: MediaCodec usage supposedly have only one output stream.
-    if (worklet->output.buffers.size() != 1u) {
-        ALOGE("incorrect number of output buffers: %zu", worklet->output.buffers.size());
+    if (worklet->output.buffers.size() > 1u) {
+        ALOGE("onWorkDone: incorrect number of output buffers: %zu",
+                worklet->output.buffers.size());
         mOnError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
         return;
+    } else if (worklet->output.buffers.size() == 1u) {
+        buffer = worklet->output.buffers[0];
+        if (!buffer) {
+            ALOGW("onWorkDone: nullptr found in buffers; ignored.");
+        }
     }
 
-    const std::shared_ptr<C2Buffer> &buffer = worklet->output.buffers[0];
     const C2StreamCsdInfo::output *csdInfo = nullptr;
     for (const std::unique_ptr<C2Param> &info : worklet->output.configUpdate) {
         if (info->coreIndex() == C2StreamCsdInfo::output::CORE_INDEX) {
-            ALOGV("csd found");
+            ALOGV("onWorkDone: csd found");
             csdInfo = static_cast<const C2StreamCsdInfo::output *>(info.get());
         }
     }
@@ -1300,7 +1307,7 @@ void CCodecBufferChannel::onWorkDone(const std::unique_ptr<C2Work> &work) {
     int32_t flags = 0;
     if (worklet->output.flags & C2FrameData::FLAG_END_OF_STREAM) {
         flags |= MediaCodec::BUFFER_FLAG_EOS;
-        ALOGV("output EOS");
+        ALOGV("onWorkDone: output EOS");
     }
 
     sp<MediaCodecBuffer> outBuffer;
@@ -1310,13 +1317,13 @@ void CCodecBufferChannel::onWorkDone(const std::unique_ptr<C2Work> &work) {
         if ((*buffers)->registerCsd(csdInfo, &index, &outBuffer)) {
             outBuffer->meta()->setInt64("timeUs", worklet->output.ordinal.timestamp.peek());
             outBuffer->meta()->setInt32("flags", flags | MediaCodec::BUFFER_FLAG_CODECCONFIG);
-            ALOGV("csd index = %zu", index);
+            ALOGV("onWorkDone: csd index = %zu", index);
 
             buffers.unlock();
             mCallback->onOutputBufferAvailable(index, outBuffer);
             buffers.lock();
         } else {
-            ALOGE("unable to register csd");
+            ALOGE("onWorkDone: unable to register csd");
             buffers.unlock();
             mOnError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
             buffers.lock();
@@ -1325,7 +1332,7 @@ void CCodecBufferChannel::onWorkDone(const std::unique_ptr<C2Work> &work) {
     }
 
     if (!buffer && !flags) {
-        ALOGV("Not reporting output buffer");
+        ALOGV("onWorkDone: Not reporting output buffer");
         return;
     }
 
@@ -1347,7 +1354,7 @@ void CCodecBufferChannel::onWorkDone(const std::unique_ptr<C2Work> &work) {
     {
         Mutexed<std::unique_ptr<OutputBuffers>>::Locked buffers(mOutputBuffers);
         if (!(*buffers)->registerBuffer(buffer, &index, &outBuffer)) {
-            ALOGE("unable to register output buffer");
+            ALOGE("onWorkDone: unable to register output buffer");
             buffers.unlock();
             mOnError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
             buffers.lock();
@@ -1357,7 +1364,7 @@ void CCodecBufferChannel::onWorkDone(const std::unique_ptr<C2Work> &work) {
 
     outBuffer->meta()->setInt64("timeUs", worklet->output.ordinal.timestamp.peek());
     outBuffer->meta()->setInt32("flags", flags);
-    ALOGV("out buffer index = %zu", index);
+    ALOGV("onWorkDone: out buffer index = %zu", index);
     mCallback->onOutputBufferAvailable(index, outBuffer);
 }
 
