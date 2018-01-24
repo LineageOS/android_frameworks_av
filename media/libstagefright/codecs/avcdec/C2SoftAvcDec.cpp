@@ -206,14 +206,14 @@ private:
 
 void fillEmptyWork(const std::unique_ptr<C2Work> &work) {
     uint32_t flags = 0;
-    if ((work->input.flags & C2BufferPack::FLAG_END_OF_STREAM)) {
-        flags |= C2BufferPack::FLAG_END_OF_STREAM;
+    if ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM)) {
+        flags |= C2FrameData::FLAG_END_OF_STREAM;
     }
-    work->worklets.front()->output.flags = (C2BufferPack::flags_t)flags;
+    work->worklets.front()->output.flags = (C2FrameData::flags_t)flags;
     work->worklets.front()->output.buffers.clear();
     work->worklets.front()->output.buffers.emplace_back(nullptr);
     work->worklets.front()->output.ordinal = work->input.ordinal;
-    work->worklets_processed = 1u;
+    work->workletsProcessed = 1u;
 }
 
 }  // namespace
@@ -1061,17 +1061,17 @@ void C2SoftAvcDec::finishWork(uint64_t index, const std::unique_ptr<C2Work> &wor
     std::shared_ptr<C2Buffer> buffer = createGraphicBuffer(std::move(mAllocatedBlock));
     auto fillWork = [buffer](const std::unique_ptr<C2Work> &work) {
         uint32_t flags = 0;
-        if (work->input.flags & C2BufferPack::FLAG_END_OF_STREAM) {
-            flags |= C2BufferPack::FLAG_END_OF_STREAM;
+        if (work->input.flags & C2FrameData::FLAG_END_OF_STREAM) {
+            flags |= C2FrameData::FLAG_END_OF_STREAM;
             ALOGV("EOS");
         }
-        work->worklets.front()->output.flags = (C2BufferPack::flags_t)flags;
+        work->worklets.front()->output.flags = (C2FrameData::flags_t)flags;
         work->worklets.front()->output.buffers.clear();
         work->worklets.front()->output.buffers.push_back(buffer);
         work->worklets.front()->output.ordinal = work->input.ordinal;
-        work->worklets_processed = 1u;
+        work->workletsProcessed = 1u;
     };
-    if (work && index == work->input.ordinal.frame_index) {
+    if (work && c2_cntr64_t(index) == work->input.ordinal.frameIndex) {
         fillWork(work);
     } else {
         finish(index, fillWork);
@@ -1084,25 +1084,25 @@ void C2SoftAvcDec::process(
     bool eos = false;
 
     work->result = C2_OK;
-    work->worklets_processed = 0u;
+    work->workletsProcessed = 0u;
 
     const C2ConstLinearBlock &buffer =
         work->input.buffers[0]->data().linearBlocks().front();
     if (buffer.capacity() == 0) {
-        ALOGV("empty input: %llu", (long long)work->input.ordinal.frame_index);
+        ALOGV("empty input: %llu", work->input.ordinal.frameIndex.peekull());
         // TODO: result?
         fillEmptyWork(work);
-        if ((work->input.flags & C2BufferPack::FLAG_END_OF_STREAM)) {
+        if ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM)) {
             eos = true;
         }
         return;
-    } else if (work->input.flags & C2BufferPack::FLAG_END_OF_STREAM) {
-        ALOGV("input EOS: %llu", (long long)work->input.ordinal.frame_index);
+    } else if (work->input.flags & C2FrameData::FLAG_END_OF_STREAM) {
+        ALOGV("input EOS: %llu", work->input.ordinal.frameIndex.peekull());
         eos = true;
     }
 
     C2ReadView input = work->input.buffers[0]->data().linearBlocks().front().map().get();
-    uint32_t workIndex = work->input.ordinal.frame_index & 0xFFFFFFFF;
+    uint32_t workIndex = work->input.ordinal.frameIndex.peeku() & 0xFFFFFFFF;
     size_t inOffset = 0u;
 
     while (inOffset < input.capacity()) {
@@ -1266,7 +1266,7 @@ c2_status_t C2SoftAvcDec::drainInternal(
     }
 
     if (drainMode == DRAIN_COMPONENT_WITH_EOS
-            && work && work->worklets_processed == 0u) {
+            && work && work->workletsProcessed == 0u) {
         fillEmptyWork(work);
     }
 

@@ -176,12 +176,12 @@ status_t C2SoftAacEnc::setAudioParams() {
 void C2SoftAacEnc::process(
         const std::unique_ptr<C2Work> &work,
         const std::shared_ptr<C2BlockPool> &pool) {
-    work->worklets_processed = 0u;
+    work->workletsProcessed = 0u;
 
     if (mSignalledError) {
         return;
     }
-    bool eos = (work->input.flags & C2BufferPack::FLAG_END_OF_STREAM) != 0;
+    bool eos = (work->input.flags & C2FrameData::FLAG_END_OF_STREAM) != 0;
 
     if (!mSentCodecSpecificData) {
         // The very first thing we want to output is the codec specific
@@ -215,7 +215,7 @@ void C2SoftAacEnc::process(
 #if defined(LOG_NDEBUG) && !LOG_NDEBUG
         hexdump(csd->m.value, csd->flexCount());
 #endif
-        work->worklets.front()->output.infos.push_back(std::move(csd));
+        work->worklets.front()->output.configUpdate.push_back(std::move(csd));
 
         mOutBufferSize = encInfo.maxOutBufBytes;
         mNumBytesPerInputFrame = encInfo.frameLength * mNumChannels * sizeof(int16_t);
@@ -225,7 +225,7 @@ void C2SoftAacEnc::process(
     }
 
     C2ReadView view = work->input.buffers[0]->data().linearBlocks().front().map().get();
-    uint64_t timestamp = mInputTimeUs;
+    uint64_t timestamp = mInputTimeUs.peeku();
 
     size_t numFrames = (view.capacity() + mInputSize + (eos ? mNumBytesPerInputFrame - 1 : 0))
             / mNumBytesPerInputFrame;
@@ -336,11 +336,11 @@ void C2SoftAacEnc::process(
     }
 
     work->worklets.front()->output.flags =
-        (C2BufferPack::flags_t)(eos ? C2BufferPack::FLAG_END_OF_STREAM : 0);
+        (C2FrameData::flags_t)(eos ? C2FrameData::FLAG_END_OF_STREAM : 0);
     work->worklets.front()->output.buffers.clear();
     work->worklets.front()->output.ordinal = work->input.ordinal;
     work->worklets.front()->output.ordinal.timestamp = timestamp;
-    work->worklets_processed = 1u;
+    work->workletsProcessed = 1u;
     if (nOutputBytes) {
         work->worklets.front()->output.buffers.push_back(
                 createLinearBuffer(block, 0, nOutputBytes));
@@ -350,7 +350,7 @@ void C2SoftAacEnc::process(
 
 #if 0
     ALOGI("sending %d bytes of data (time = %lld us, flags = 0x%08lx)",
-          nOutputBytes, mInputTimeUs, outHeader->nFlags);
+          nOutputBytes, mInputTimeUs.peekll(), outHeader->nFlags);
 
     hexdump(outHeader->pBuffer + outHeader->nOffset, outHeader->nFilledLen);
 #endif

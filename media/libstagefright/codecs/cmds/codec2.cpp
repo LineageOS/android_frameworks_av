@@ -247,7 +247,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
             }
             int slot;
             sp<Fence> fence;
-            ALOGV("Render: Frame #%" PRId64, work->worklets.front()->output.ordinal.frame_index);
+            ALOGV("Render: Frame #%lld", work->worklets.front()->output.ordinal.frameIndex.peekll());
             const std::shared_ptr<C2Buffer> &output = work->worklets.front()->output.buffers[0];
             if (output) {
                 const C2ConstGraphicBlock &block = output->data().graphicBlocks().front();
@@ -266,7 +266,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
                 status_t err = igbp->attachBuffer(&slot, buffer);
 
                 IGraphicBufferProducer::QueueBufferInput qbi(
-                        work->worklets.front()->output.ordinal.timestamp * 1000ll,
+                        (work->worklets.front()->output.ordinal.timestamp * 1000ll).peekll(),
                         false,
                         HAL_DATASPACE_UNKNOWN,
                         Rect(block.width(), block.height()),
@@ -338,9 +338,9 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
                 mQueueCondition.wait_for(l, 100ms);
             }
         }
-        work->input.flags = (C2BufferPack::flags_t)0;
+        work->input.flags = (C2FrameData::flags_t)0;
         work->input.ordinal.timestamp = timestamp;
-        work->input.ordinal.frame_index = numFrames;
+        work->input.ordinal.frameIndex = numFrames;
 
         std::shared_ptr<C2LinearBlock> block;
         mLinearPool->fetchLinearBlock(
