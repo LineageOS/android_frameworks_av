@@ -707,14 +707,18 @@ public:
         return reply.readInt64();
     }
 
-    virtual status_t setLowRamDevice(bool isLowRamDevice)
+    virtual status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) override
     {
         Parcel data, reply;
-        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
-        data.writeInt32((int) isLowRamDevice);
-        remote()->transact(SET_LOW_RAM_DEVICE, data, &reply);
-        return reply.readInt32();
+
+        static_assert(NO_ERROR == 0, "NO_ERROR must be 0");
+        return data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor())
+                ?: data.writeInt32((int) isLowRamDevice)
+                ?: data.writeInt64(totalMemory)
+                ?: remote()->transact(SET_LOW_RAM_DEVICE, data, &reply)
+                ?: reply.readInt32();
     }
+
     virtual status_t listAudioPorts(unsigned int *num_ports,
                                     struct audio_port *ports)
     {
@@ -1281,8 +1285,13 @@ status_t BnAudioFlinger::onTransact(
         } break;
         case SET_LOW_RAM_DEVICE: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
-            bool isLowRamDevice = data.readInt32() != 0;
-            reply->writeInt32(setLowRamDevice(isLowRamDevice));
+            int32_t isLowRamDevice;
+            int64_t totalMemory;
+            const status_t status =
+                    data.readInt32(&isLowRamDevice) ?:
+                    data.readInt64(&totalMemory) ?:
+                    setLowRamDevice(isLowRamDevice != 0, totalMemory);
+            (void)reply->writeInt32(status);
             return NO_ERROR;
         } break;
         case LIST_AUDIO_PORTS: {
