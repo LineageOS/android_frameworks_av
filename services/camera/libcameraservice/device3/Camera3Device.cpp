@@ -1668,10 +1668,16 @@ void Camera3Device::internalUpdateStatusLocked(Status status) {
     mStatusChanged.broadcast();
 }
 
+void Camera3Device::pauseStateNotify(bool enable) {
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+
+    mPauseStateNotify = enable;
+}
+
 // Pause to reconfigure
 status_t Camera3Device::internalPauseAndWaitLocked(nsecs_t maxExpectedDuration) {
     mRequestThread->setPaused(true);
-    mPauseStateNotify = true;
 
     ALOGV("%s: Camera %s: Internal wait until idle (% " PRIi64 " ns)", __FUNCTION__, mId.string(),
           maxExpectedDuration);
@@ -1690,6 +1696,8 @@ status_t Camera3Device::internalResumeLocked() {
 
     mRequestThread->setPaused(false);
 
+    ALOGV("%s: Camera %s: Internal wait until active (% " PRIi64 " ns)", __FUNCTION__, mId.string(),
+            kActiveTimeout);
     res = waitUntilStateThenRelock(/*active*/ true, kActiveTimeout);
     if (res != OK) {
         SET_ERR_L("Can't transition to active in %f seconds!",
@@ -1970,8 +1978,8 @@ void Camera3Device::notifyStatus(bool idle) {
         if (mStatus != STATUS_ACTIVE && mStatus != STATUS_CONFIGURED) {
             return;
         }
-        ALOGV("%s: Camera %s: Now %s", __FUNCTION__, mId.string(),
-                idle ? "idle" : "active");
+        ALOGV("%s: Camera %s: Now %s, pauseState: %s", __FUNCTION__, mId.string(),
+                idle ? "idle" : "active", mPauseStateNotify ? "true" : "false");
         internalUpdateStatusLocked(idle ? STATUS_CONFIGURED : STATUS_ACTIVE);
 
         // Skip notifying listener if we're doing some user-transparent
@@ -4433,9 +4441,13 @@ bool Camera3Device::RequestThread::threadLoop() {
         if (res == OK) {
             sp<StatusTracker> statusTracker = mStatusTracker.promote();
             if (statusTracker != 0) {
+                sp<Camera3Device> parent = mParent.promote();
+                if (parent != nullptr) {
+                    parent->pauseStateNotify(true);
+                }
+
                 statusTracker->markComponentIdle(mStatusId, Fence::NO_FENCE);
 
-                sp<Camera3Device> parent = mParent.promote();
                 if (parent != nullptr) {
                     mReconfigured |= parent->reconfigureCamera(mLatestSessionParams);
                 }
