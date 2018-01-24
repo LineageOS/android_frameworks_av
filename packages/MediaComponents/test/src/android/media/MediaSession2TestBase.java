@@ -97,7 +97,7 @@ abstract class MediaSession2TestBase {
     @CallSuper
     public void cleanUp() throws Exception {
         for (int i = 0; i < mControllers.size(); i++) {
-            mControllers.get(i).release();
+            mControllers.get(i).close();
         }
     }
 

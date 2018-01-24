@@ -75,7 +75,7 @@ public class MediaController2Test extends MediaSession2TestBase {
         super.cleanUp();
         sHandler.postAndSync(() -> {
             if (mSession != null) {
-                mSession.setPlayer(null);
+                mSession.close();
             }
         });
         TestServiceRegistry.getInstance().cleanUp();
@@ -210,7 +210,7 @@ public class MediaController2Test extends MediaSession2TestBase {
             }
         };
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
             mSession = new MediaSession2.Builder(mContext, mPlayer)
                     .setSessionCallback(sessionCallback).build();
         });
@@ -224,14 +224,14 @@ public class MediaController2Test extends MediaSession2TestBase {
     @Test
     public void testControllerCallback_releaseSession() throws InterruptedException {
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
         });
         waitForDisconnect(mController, true);
     }
 
     @Test
     public void testControllerCallback_release() throws InterruptedException {
-        mController.release();
+        mController.close();
         waitForDisconnect(mController, true);
     }
 
@@ -239,7 +239,7 @@ public class MediaController2Test extends MediaSession2TestBase {
     public void testIsConnected() throws InterruptedException {
         assertTrue(mController.isConnected());
         sHandler.postAndSync(()->{
-            mSession.setPlayer(null);
+            mSession.close();
         });
         // postAndSync() to wait until the disconnection is propagated.
         sHandler.postAndSync(()->{
@@ -253,7 +253,7 @@ public class MediaController2Test extends MediaSession2TestBase {
     @Test
     public void testDeadlock() throws InterruptedException {
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
             mSession = null;
         });
 
@@ -301,7 +301,7 @@ public class MediaController2Test extends MediaSession2TestBase {
             if (mSession != null) {
                 sessionHandler.postAndSync(() -> {
                     // Clean up here because sessionHandler will be removed afterwards.
-                    mSession.setPlayer(null);
+                    mSession.close();
                     mSession = null;
                 });
             }
@@ -384,26 +384,26 @@ public class MediaController2Test extends MediaSession2TestBase {
     }
 
     @Test
-    public void testRelease_beforeConnected() throws InterruptedException {
+    public void testClose_beforeConnected() throws InterruptedException {
         MediaController2 controller =
                 createController(mSession.getToken(), false, null);
-        controller.release();
+        controller.close();
     }
 
     @Test
-    public void testRelease_twice() throws InterruptedException {
-        mController.release();
-        mController.release();
+    public void testClose_twice() throws InterruptedException {
+        mController.close();
+        mController.close();
     }
 
     @Test
-    public void testRelease_session() throws InterruptedException {
+    public void testClose_session() throws InterruptedException {
         final String id = mSession.getToken().getId();
-        mController.release();
-        // Release is done immediately for session.
+        mController.close();
+        // close is done immediately for session.
         testNoInteraction();
 
-        // Test whether the controller is notified about later release of the session or
+        // Test whether the controller is notified about later close of the session or
         // re-creation.
         testControllerAfterSessionIsGone(id);
     }
@@ -411,20 +411,20 @@ public class MediaController2Test extends MediaSession2TestBase {
     // TODO(jaewan): Reenable when session manager detects app installs
     @Ignore
     @Test
-    public void testRelease_sessionService() throws InterruptedException {
+    public void testClose_sessionService() throws InterruptedException {
         connectToService(TestUtils.getServiceToken(mContext, MockMediaSessionService2.ID));
-        testReleaseFromService();
+        testCloseFromService();
     }
 
     // TODO(jaewan): Reenable when session manager detects app installs
     @Ignore
     @Test
-    public void testRelease_libraryService() throws InterruptedException {
+    public void testClose_libraryService() throws InterruptedException {
         connectToService(TestUtils.getServiceToken(mContext, MockMediaSessionService2.ID));
-        testReleaseFromService();
+        testCloseFromService();
     }
 
-    private void testReleaseFromService() throws InterruptedException {
+    private void testCloseFromService() throws InterruptedException {
         final String id = mController.getSessionToken().getId();
         final CountDownLatch latch = new CountDownLatch(1);
         TestServiceRegistry.getInstance().setServiceInstanceChangedCallback((service) -> {
@@ -433,21 +433,21 @@ public class MediaController2Test extends MediaSession2TestBase {
                 latch.countDown();
             }
         });
-        mController.release();
-        // Wait until release triggers onDestroy() of the session service.
+        mController.close();
+        // Wait until close triggers onDestroy() of the session service.
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
         assertNull(TestServiceRegistry.getInstance().getServiceInstance());
         testNoInteraction();
 
-        // Test whether the controller is notified about later release of the session or
+        // Test whether the controller is notified about later close of the session or
         // re-creation.
         testControllerAfterSessionIsGone(id);
     }
 
     private void testControllerAfterSessionIsGone(final String id) throws InterruptedException {
         sHandler.postAndSync(() -> {
-            // TODO(jaewan): Use Session.release later when we add the API.
-            mSession.setPlayer(null);
+            // TODO(jaewan): Use Session.close later when we add the API.
+            mSession.close();
         });
         waitForDisconnect(mController, true);
         testNoInteraction();
@@ -464,7 +464,7 @@ public class MediaController2Test extends MediaSession2TestBase {
     private void testNoInteraction() throws InterruptedException {
         final CountDownLatch latch = new CountDownLatch(1);
         final PlaybackListener playbackListener = (state) -> {
-            fail("Controller shouldn't be notified about change in session after the release.");
+            fail("Controller shouldn't be notified about change in session after the close.");
             latch.countDown();
         };
         mController.addPlaybackListener(playbackListener, sHandler);

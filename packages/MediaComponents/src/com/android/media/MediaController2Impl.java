@@ -106,7 +106,7 @@ public class MediaController2Impl implements MediaController2Provider {
         mCallback = callback;
         mCallbackExecutor = executor;
         mDeathRecipient = () -> {
-            mInstance.release();
+            mInstance.close();
         };
 
         mSessionBinder = null;
@@ -159,9 +159,9 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public void release_impl() {
+    public void close_impl() {
         if (DEBUG) {
-            Log.d(TAG, "release from " + mToken);
+            Log.d(TAG, "relese from " + mToken);
         }
         final IMediaSession2 binder;
         synchronized (mLock) {
@@ -397,7 +397,7 @@ public class MediaController2Impl implements MediaController2Provider {
             if (release) {
                 // Trick to call release() without holding the lock, to prevent potential deadlock
                 // with the developer's custom lock within the ControllerCallback.onDisconnected().
-                mInstance.release();
+                mInstance.close();
             }
         }
     }
@@ -530,7 +530,7 @@ public class MediaController2Impl implements MediaController2Provider {
             // Permanent lose of the binding because of the service package update or removed.
             // This SessionServiceRecord will be removed accordingly, but forget session binder here
             // for sure.
-            mInstance.release();
+            mInstance.close();
         }
     }
 }
