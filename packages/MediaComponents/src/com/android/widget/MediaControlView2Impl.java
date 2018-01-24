@@ -161,13 +161,6 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     }
 
     @Override
-    public void showCCButton_impl() {
-        if (mCCButton != null) {
-            mCCButton.setVisibility(View.VISIBLE);
-        }
-    }
-
-    @Override
     public boolean isPlaying_impl() {
         if (mPlaybackState != null) {
             return mPlaybackState.getState() == PlaybackState.STATE_PLAYING;
