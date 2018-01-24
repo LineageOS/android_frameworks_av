@@ -26,8 +26,6 @@
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MetaData.h>
 
-#include <ui/GraphicBuffer.h>
-
 namespace android {
 
 /* static */
