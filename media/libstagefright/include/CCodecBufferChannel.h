@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef A_BUFFER_CHANNEL_H_
+#ifndef CCODEC_BUFFER_CHANNEL_H_
 
-#define A_BUFFER_CHANNEL_H_
+#define CCODEC_BUFFER_CHANNEL_H_
 
 #include <map>
 #include <memory>
@@ -26,12 +26,16 @@
 #include <C2Buffer.h>
 #include <C2Component.h>
 
-#include <media/stagefright/foundation/Mutexed.h>
 #include <media/stagefright/bqhelper/GraphicBufferSource.h>
+#include <media/stagefright/codec2/1.0/InputSurface.h>
+#include <media/stagefright/foundation/Mutexed.h>
 #include <media/stagefright/CodecBase.h>
 #include <media/ICrypto.h>
 
 namespace android {
+
+using ::android::hardware::media::c2::V1_0::implementation::InputSurface;
+using ::android::hardware::media::c2::V1_0::implementation::InputSurfaceConnection;
 
 /**
  * BufferChannelBase implementation for CCodec.
@@ -76,7 +80,7 @@ public:
      * Set GraphicBufferSource object from which the component extracts input
      * buffers.
      */
-    status_t setGraphicBufferSource(const sp<GraphicBufferSource> &source);
+    status_t setInputSurface(const sp<InputSurface> &source);
 
     /**
      * Start queueing buffers to the component. This object should never queue
@@ -156,8 +160,6 @@ private:
         bool mRunning;
     };
 
-    class C2ComponentWrapper;
-
     void feedInputBufferIfAvailable();
 
     QueueSync mSync;
@@ -180,6 +182,9 @@ private:
     sp<MemoryDealer> makeMemoryDealer(size_t heapSize);
     Mutexed<sp<Surface>> mSurface;
 
+    sp<InputSurface> mInputSurface;
+    sp<InputSurfaceConnection> mInputSurfaceConnection;
+
     inline bool hasCryptoOrDescrambler() {
         return mCrypto != NULL || mDescrambler != NULL;
     }
@@ -187,4 +192,4 @@ private:
 
 }  // namespace android
 
-#endif  // A_BUFFER_CHANNEL_H_
+#endif  // CCODEC_BUFFER_CHANNEL_H_

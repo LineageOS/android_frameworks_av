@@ -101,15 +101,6 @@ public:
      * Release the buffer obtained from requestNewBuffer() and get the
      * associated C2Buffer object back. Returns empty shared_ptr if the
      * buffer is not on file.
-     *
-     * XXX: this is a quick hack to be removed
-     */
-    virtual std::shared_ptr<C2Buffer> releaseBufferIndex(size_t /* index */) { return nullptr; }
-
-    /**
-     * Release the buffer obtained from requestNewBuffer() and get the
-     * associated C2Buffer object back. Returns empty shared_ptr if the
-     * buffer is not on file.
      */
     virtual std::shared_ptr<C2Buffer> releaseBuffer(const sp<MediaCodecBuffer> &buffer) = 0;
 
@@ -132,47 +123,6 @@ protected:
 
 private:
     DISALLOW_EVIL_CONSTRUCTORS(InputBuffers);
-};
-
-class CCodecBufferChannel::InputBufferClient {
-public:
-    explicit InputBufferClient(
-            const std::shared_ptr<CCodecBufferChannel> &channel) : mChannel(channel) {}
-    virtual ~InputBufferClient() = default;
-
-    virtual void onInputBufferAdded(size_t index, const sp<MediaCodecBuffer> &buffer) {
-        std::shared_ptr<CCodecBufferChannel> channel = mChannel.lock();
-        if (!channel) {
-            return;
-        }
-        channel->mCallback->onInputBufferAvailable(index, buffer);
-    }
-
-    virtual void onStart() {
-        // no-op
-    }
-
-    virtual void onStop() {
-        // no-op
-    }
-
-    virtual void onRelease() {
-        // no-op
-    }
-
-    virtual void onInputBufferAvailable(size_t index, const sp<MediaCodecBuffer> &buffer) {
-        std::shared_ptr<CCodecBufferChannel> channel = mChannel.lock();
-        if (!channel) {
-            return;
-        }
-        channel->mCallback->onInputBufferAvailable(index, buffer);
-    }
-
-protected:
-    InputBufferClient() = default;
-    std::weak_ptr<CCodecBufferChannel> mChannel;
-
-    DISALLOW_EVIL_CONSTRUCTORS(InputBufferClient);
 };
 
 class CCodecBufferChannel::OutputBuffers : public CCodecBufferChannel::Buffers {
@@ -226,8 +176,6 @@ private:
 };
 
 namespace {
-
-constexpr int32_t kMaskI32 = ~0;
 
 // TODO: get this info from component
 const static size_t kMinBufferArraySize = 16;
@@ -422,23 +370,8 @@ class GraphicInputBuffers : public CCodecBufferChannel::InputBuffers {
 public:
     GraphicInputBuffers() = default;
 
-    bool requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) override {
-        *buffer = nullptr;
-        for (size_t i = 0; i < mAvailable.size(); ++i) {
-            if (mAvailable[i]) {
-                *index = i;
-                mAvailable[i] = false;
-                return true;
-            }
-        }
-        *index = mAvailable.size();
-        mAvailable.push_back(false);
-        return true;
-    }
-
-    std::shared_ptr<C2Buffer> releaseBufferIndex(size_t index) override {
-        mAvailable[index] = true;
-        return nullptr;
+    bool requestNewBuffer(size_t *, sp<MediaCodecBuffer> *) override {
+        return false;
     }
 
     std::shared_ptr<C2Buffer> releaseBuffer(const sp<MediaCodecBuffer> &) override {
@@ -452,8 +385,11 @@ public:
         return nullptr;
     }
 
-private:
-    std::vector<bool> mAvailable;
+    bool isArrayMode() const final { return true; }
+
+    void getArray(Vector<sp<MediaCodecBuffer>> *array) const final {
+        array->clear();
+    }
 };
 
 class OutputBuffersArray : public CCodecBufferChannel::OutputBuffers {
@@ -753,163 +689,7 @@ public:
     }
 };
 
-class BufferQueueClient : public CCodecBufferChannel::InputBufferClient {
-public:
-    explicit BufferQueueClient(const sp<GraphicBufferSource> &source) : mSource(source) {}
-    virtual ~BufferQueueClient() = default;
-
-    void onInputBufferAdded(size_t index, const sp<MediaCodecBuffer> &buffer) override {
-        (void)buffer;
-        mSource->onInputBufferAdded(index & kMaskI32);
-    }
-
-    void onStart() override {
-        mSource->start();
-    }
-
-    void onStop() override {
-        mSource->stop();
-    }
-
-    void onRelease() override {
-        mSource->release();
-    }
-
-    void onInputBufferAvailable(size_t index, const sp<MediaCodecBuffer> &buffer) override {
-        ALOGV("onInputBufferEmptied index = %zu", index);
-        (void)buffer;
-        // TODO: can we really ignore fence here?
-        mSource->onInputBufferEmptied(index & kMaskI32, -1 /* fenceFd */);
-    }
-
-private:
-    sp<GraphicBufferSource> mSource;
-};
-
-class GraphicBlock : public C2GraphicBlock {
-    using C2GraphicBlock::C2GraphicBlock;
-    friend class ::android::CCodecBufferChannel;
-};
-
 }  // namespace
-
-class CCodecBufferChannel::C2ComponentWrapper : public ComponentWrapper {
-public:
-    explicit C2ComponentWrapper(
-            const std::shared_ptr<CCodecBufferChannel> &channel)
-        : mChannel(channel), mLastTimestamp(0) {}
-
-    virtual ~C2ComponentWrapper() {
-        for (const std::pair<int32_t, C2Handle *> &entry : mHandles) {
-            native_handle_delete(entry.second);
-        }
-    }
-
-    status_t submitBuffer(
-            int32_t bufferId, const sp<GraphicBuffer> &buffer,
-            int64_t timestamp, int fenceFd) override {
-        ALOGV("submitBuffer bufferId = %d", bufferId);
-        // TODO: Use fd to construct fence
-        (void)fenceFd;
-
-        std::shared_ptr<CCodecBufferChannel> channel = mChannel.lock();
-        if (!channel) {
-            return NO_INIT;
-        }
-
-        std::shared_ptr<C2Allocator> allocator = mAllocator.lock();
-        if (!allocator) {
-            c2_status_t err = GetCodec2PlatformAllocatorStore()->fetchAllocator(
-                    C2PlatformAllocatorStore::GRALLOC,
-                    &allocator);
-            if (err != OK) {
-                return UNKNOWN_ERROR;
-            }
-            mAllocator = allocator;
-        }
-
-        std::shared_ptr<C2GraphicAllocation> alloc;
-        C2Handle *handle = WrapNativeCodec2GrallocHandle(
-                buffer->handle, buffer->width, buffer->height,
-                buffer->format, buffer->usage, buffer->stride);
-        c2_status_t err = allocator->priorGraphicAllocation(handle, &alloc);
-        if (err != OK) {
-            return UNKNOWN_ERROR;
-        }
-
-        std::shared_ptr<C2GraphicBlock> block = _C2BlockFactory::CreateGraphicBlock(alloc);
-
-        std::unique_ptr<C2Work> work(new C2Work);
-        work->input.flags = (C2FrameData::flags_t)0;
-        work->input.ordinal.timestamp = timestamp;
-        work->input.ordinal.frameIndex = channel->mFrameIndex++;
-        work->input.buffers.clear();
-        work->input.buffers.emplace_back(new Buffer2D(
-                // TODO: fence
-                block->share(C2Rect(block->width(), block->height()), ::android::C2Fence())));
-        work->worklets.clear();
-        work->worklets.emplace_back(new C2Worklet);
-        std::list<std::unique_ptr<C2Work>> items;
-        items.push_back(std::move(work));
-
-        err = channel->mComponent->queue_nb(&items);
-        if (err != OK) {
-            native_handle_delete(handle);
-            return UNKNOWN_ERROR;
-        }
-
-        mLastTimestamp = timestamp;
-        if (mHandles.count(bufferId) > 0) {
-            native_handle_delete(mHandles[bufferId]);
-        }
-        mHandles[bufferId] = handle;
-
-        Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(channel->mInputBuffers);
-        ALOGV("releaseBufferIndex index = %d", bufferId);
-        (*buffers)->releaseBufferIndex(bufferId);
-
-        return OK;
-    }
-
-    status_t submitEos(int32_t bufferId) override {
-        std::shared_ptr<CCodecBufferChannel> channel = mChannel.lock();
-        if (!channel) {
-            return NO_INIT;
-        }
-
-        std::unique_ptr<C2Work> work(new C2Work);
-        work->input.flags = C2FrameData::FLAG_END_OF_STREAM;
-        work->input.ordinal.timestamp = mLastTimestamp;
-        work->input.ordinal.frameIndex = channel->mFrameIndex++;
-        work->input.buffers.clear();
-        work->input.buffers.push_back(nullptr);
-        work->worklets.clear();
-        work->worklets.emplace_back(new C2Worklet);
-        std::list<std::unique_ptr<C2Work>> items;
-        items.push_back(std::move(work));
-
-        c2_status_t err = channel->mComponent->queue_nb(&items);
-
-        Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(channel->mInputBuffers);
-        (*buffers)->releaseBufferIndex(bufferId);
-
-        return (err == C2_OK) ? OK : UNKNOWN_ERROR;
-    }
-
-    void dispatchDataSpaceChanged(
-            int32_t dataSpace, int32_t aspects, int32_t pixelFormat) override {
-        // TODO
-        (void)dataSpace;
-        (void)aspects;
-        (void)pixelFormat;
-    }
-
-private:
-    std::weak_ptr<CCodecBufferChannel> mChannel;
-    std::map<int32_t, C2Handle *> mHandles;
-    int64_t mLastTimestamp;
-    std::weak_ptr<C2Allocator> mAllocator;
-};
 
 CCodecBufferChannel::QueueGuard::QueueGuard(
         CCodecBufferChannel::QueueSync &sync) : mSync(sync) {
@@ -967,13 +747,10 @@ CCodecBufferChannel::~CCodecBufferChannel() {
     if (mCrypto != nullptr && mDealer != nullptr && mHeapSeqNum >= 0) {
         mCrypto->unsetHeap(mHeapSeqNum);
     }
-    // TODO: is this the right place?
-    mInputClient->onRelease();
 }
 
 void CCodecBufferChannel::setComponent(const std::shared_ptr<C2Component> &component) {
     mComponent = component;
-    mInputClient.reset(new InputBufferClient(shared_from_this()));
 
     C2StreamFormatConfig::input inputFormat(0u);
     C2StreamFormatConfig::output outputFormat(0u);
@@ -1026,16 +803,10 @@ void CCodecBufferChannel::setComponent(const std::shared_ptr<C2Component> &compo
     }
 }
 
-status_t CCodecBufferChannel::setGraphicBufferSource(
-        const sp<GraphicBufferSource> &source) {
-    ALOGV("setGraphicBufferSource");
-    mInputClient.reset(new BufferQueueClient(source));
-
-    // TODO: proper color aspect & dataspace
-    android_dataspace dataSpace = HAL_DATASPACE_BT709;
-    // TODO: read settings properly from the interface
-    return source->configure(new C2ComponentWrapper(
-            shared_from_this()), dataSpace, 16, 1080, 1920, GRALLOC_USAGE_SW_READ_OFTEN);
+status_t CCodecBufferChannel::setInputSurface(const sp<InputSurface> &surface) {
+    ALOGV("setInputSurface");
+    mInputSurface = surface;
+    return OK;
 }
 
 status_t CCodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffer) {
@@ -1100,12 +871,13 @@ void CCodecBufferChannel::feedInputBufferIfAvailable() {
     {
         Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(mInputBuffers);
         if (!(*buffers)->requestNewBuffer(&index, &inBuffer)) {
-            ALOGW("no new buffer available");
+            ALOGV("no new buffer available");
             inBuffer = nullptr;
+            return;
         }
     }
     ALOGV("new input index = %zu", index);
-    mInputClient->onInputBufferAvailable(index, inBuffer);
+    mCallback->onInputBufferAvailable(index, inBuffer);
 }
 
 status_t CCodecBufferChannel::renderOutputBuffer(
@@ -1182,7 +954,9 @@ status_t CCodecBufferChannel::discardBuffer(const sp<MediaCodecBuffer> &buffer) 
     {
         Mutexed<std::unique_ptr<OutputBuffers>>::Locked buffers(mOutputBuffers);
         if((*buffers)->releaseBuffer(buffer)) {
+            buffers.unlock();
             feedInputBufferIfAvailable();
+            buffers.lock();
         }
     }
     return OK;
@@ -1221,29 +995,39 @@ void CCodecBufferChannel::start(const sp<AMessage> &inputFormat, const sp<AMessa
     }
 
     mSync.start();
-    // TODO: use proper buffer depth instead of this random value
-    for (size_t i = 0; i < kMinBufferArraySize; ++i) {
-        size_t index;
-        sp<MediaCodecBuffer> buffer;
-        {
-            Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(mInputBuffers);
-            if (!(*buffers)->requestNewBuffer(&index, &buffer)) {
-                buffers.unlock();
-                ALOGE("start: cannot allocate memory");
-                mOnError(NO_MEMORY, ACTION_CODE_FATAL);
-                buffers.lock();
-                return;
+    if (mInputSurface == nullptr) {
+        // TODO: use proper buffer depth instead of this random value
+        for (size_t i = 0; i < kMinBufferArraySize; ++i) {
+            size_t index;
+            sp<MediaCodecBuffer> buffer;
+            {
+                Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(mInputBuffers);
+                if (!(*buffers)->requestNewBuffer(&index, &buffer)) {
+                    if (i == 0) {
+                        ALOGE("start: cannot allocate memory at all");
+                        buffers.unlock();
+                        mOnError(NO_MEMORY, ACTION_CODE_FATAL);
+                        buffers.lock();
+                    } else {
+                        ALOGV("start: cannot allocate memory, only %zu buffers allocated", i);
+                    }
+                    break;
+                }
             }
+            mCallback->onInputBufferAvailable(index, buffer);
         }
-        mInputClient->onInputBufferAdded(index, buffer);
+    } else {
+        mInputSurfaceConnection = mInputSurface->connectToComponent(mComponent);
     }
-    mInputClient->onStart();
 }
 
 void CCodecBufferChannel::stop() {
     mSync.stop();
     mFirstValidFrameIndex = mFrameIndex.load();
-    mInputClient->onStop();
+    if (mInputSurfaceConnection != nullptr) {
+        mInputSurfaceConnection->disconnect();
+        mInputSurfaceConnection.clear();
+    }
 }
 
 void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushedWork) {

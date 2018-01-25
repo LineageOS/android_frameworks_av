@@ -24,16 +24,19 @@
 #include <C2PlatformSupport.h>
 #include <C2V4l2Support.h>
 
+#include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
 #include <gui/Surface.h>
+#include <media/stagefright/codec2/1.0/InputSurface.h>
 #include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/CCodec.h>
 #include <media/stagefright/PersistentSurface.h>
 
 #include "include/CCodecBufferChannel.h"
 
-using namespace std::chrono_literals;
-
 namespace android {
+
+using namespace std::chrono_literals;
+using ::android::hardware::graphics::bufferqueue::V1_0::utils::H2BGraphicBufferProducer;
 
 namespace {
 
@@ -300,18 +303,18 @@ void CCodec::initiateCreateInputSurface() {
 }
 
 void CCodec::createInputSurface() {
-    sp<IGraphicBufferProducer> producer;
-    sp<GraphicBufferSource> source(new GraphicBufferSource);
+    // TODO: get this from codec process
+    sp<InputSurface> surface(InputSurface::Create());
 
-    status_t err = source->initCheck();
+    // TODO: get proper error code.
+    status_t err = (surface == nullptr) ? UNKNOWN_ERROR : OK;
     if (err != OK) {
-        ALOGE("Failed to initialize graphic buffer source: %d", err);
+        ALOGE("Failed to initialize input surface: %d", err);
         mCallback->onInputSurfaceCreationFailed(err);
         return;
     }
-    producer = source->getIGraphicBufferProducer();
 
-    err = setupInputSurface(source);
+    err = setupInputSurface(surface);
     if (err != OK) {
         ALOGE("Failed to set up input surface: %d", err);
         mCallback->onInputSurfaceCreationFailed(err);
@@ -328,16 +331,16 @@ void CCodec::createInputSurface() {
     mCallback->onInputSurfaceCreated(
             inputFormat,
             outputFormat,
-            new BufferProducerWrapper(producer));
+            new BufferProducerWrapper(new H2BGraphicBufferProducer(surface)));
 }
 
-status_t CCodec::setupInputSurface(const sp<GraphicBufferSource> &source) {
-    status_t err = mChannel->setGraphicBufferSource(source);
+status_t CCodec::setupInputSurface(const sp<InputSurface> &surface) {
+    status_t err = mChannel->setInputSurface(surface);
     if (err != OK) {
         return err;
     }
 
-    // TODO: configure |source| with other settings.
+    // TODO: configure |surface| with other settings.
     return OK;
 }
 

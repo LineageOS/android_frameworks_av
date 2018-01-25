@@ -24,7 +24,6 @@
 #include <android/native_window.h>
 #include <media/hardware/MetadataBufferType.h>
 #include <media/stagefright/foundation/Mutexed.h>
-#include <media/stagefright/bqhelper/GraphicBufferSource.h>
 #include <media/stagefright/CodecBase.h>
 #include <media/stagefright/FrameRenderTracker.h>
 #include <media/stagefright/MediaDefs.h>
@@ -34,6 +33,17 @@
 #include <nativebase/nativebase.h>
 
 namespace android {
+namespace hardware {
+namespace media {
+namespace c2 {
+namespace V1_0 {
+namespace implementation {
+class InputSurface;
+}  // implementation
+}  // V1_0
+}  // c2
+}  // media
+}  // hardware
 
 class CCodecBufferChannel;
 
@@ -81,7 +91,8 @@ private:
 
     void createInputSurface();
     void setInputSurface(const sp<PersistentSurface> &surface);
-    status_t setupInputSurface(const sp<GraphicBufferSource> &source);
+    status_t setupInputSurface(
+            const sp<::android::hardware::media::c2::V1_0::implementation::InputSurface> &surface);
 
     void setDeadline(const TimePoint &deadline);
 
