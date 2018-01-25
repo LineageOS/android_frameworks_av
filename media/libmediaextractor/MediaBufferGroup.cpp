@@ -17,9 +17,13 @@
 #define LOG_TAG "MediaBufferGroup"
 #include <utils/Log.h>
 
+#include <list>
+
+#include <binder/MemoryDealer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaBufferGroup.h>
+#include <utils/threads.h>
 
 namespace android {
 
@@ -32,17 +36,26 @@ constexpr T MIN(const T &a, const T &b) { return a <= b ? a : b; }
 static const size_t kSharedMemoryThreshold = MIN(
         (size_t)MediaBuffer::kSharedMemThreshold, (size_t)(4 * 1024));
 
-MediaBufferGroup::MediaBufferGroup(size_t growthLimit) :
-    mGrowthLimit(growthLimit) {
+struct MediaBufferGroup::InternalData {
+    Mutex mLock;
+    Condition mCondition;
+    size_t mGrowthLimit;  // Do not automatically grow group larger than this.
+    std::list<MediaBuffer *> mBuffers;
+};
+
+MediaBufferGroup::MediaBufferGroup(size_t growthLimit)
+    : mInternal(new InternalData()) {
+    mInternal->mGrowthLimit = growthLimit;
 }
 
 MediaBufferGroup::MediaBufferGroup(size_t buffers, size_t buffer_size, size_t growthLimit)
-    : mGrowthLimit(growthLimit) {
+    : mInternal(new InternalData()) {
+    mInternal->mGrowthLimit = growthLimit;
 
-    if (mGrowthLimit > 0 && buffers > mGrowthLimit) {
+    if (mInternal->mGrowthLimit > 0 && buffers > mInternal->mGrowthLimit) {
         ALOGW("Preallocated buffers %zu > growthLimit %zu, increasing growthLimit",
-                buffers, mGrowthLimit);
-        mGrowthLimit = buffers;
+                buffers, mInternal->mGrowthLimit);
+        mInternal->mGrowthLimit = buffers;
     }
 
     if (buffer_size >= kSharedMemoryThreshold) {
@@ -81,7 +94,7 @@ MediaBufferGroup::MediaBufferGroup(size_t buffers, size_t buffer_size, size_t gr
 }
 
 MediaBufferGroup::~MediaBufferGroup() {
-    for (MediaBuffer *buffer : mBuffers) {
+    for (MediaBuffer *buffer : mInternal->mBuffers) {
         if (buffer->refcount() != 0) {
             const int localRefcount = buffer->localRefcount();
             const int remoteRefcount = buffer->remoteRefcount();
@@ -103,34 +116,35 @@ MediaBufferGroup::~MediaBufferGroup() {
         buffer->setObserver(nullptr);
         buffer->release();
     }
+    delete mInternal;
 }
 
 void MediaBufferGroup::add_buffer(MediaBuffer *buffer) {
-    Mutex::Autolock autoLock(mLock);
+    Mutex::Autolock autoLock(mInternal->mLock);
 
     // if we're above our growth limit, release buffers if we can
-    for (auto it = mBuffers.begin();
-            mGrowthLimit > 0
-            && mBuffers.size() >= mGrowthLimit
-            && it != mBuffers.end();) {
+    for (auto it = mInternal->mBuffers.begin();
+            mInternal->mGrowthLimit > 0
+            && mInternal->mBuffers.size() >= mInternal->mGrowthLimit
+            && it != mInternal->mBuffers.end();) {
         if ((*it)->refcount() == 0) {
             (*it)->setObserver(nullptr);
             (*it)->release();
-            it = mBuffers.erase(it);
+            it = mInternal->mBuffers.erase(it);
         } else {
             ++it;
         }
     }
 
     buffer->setObserver(this);
-    mBuffers.emplace_back(buffer);
+    mInternal->mBuffers.emplace_back(buffer);
 }
 
 bool MediaBufferGroup::has_buffers() {
-    if (mBuffers.size() < mGrowthLimit) {
+    if (mInternal->mBuffers.size() < mInternal->mGrowthLimit) {
         return true; // We can add more buffers internally.
     }
-    for (MediaBuffer *buffer : mBuffers) {
+    for (MediaBuffer *buffer : mInternal->mBuffers) {
         if (buffer->refcount() == 0) {
             return true;
         }
@@ -140,12 +154,12 @@ bool MediaBufferGroup::has_buffers() {
 
 status_t MediaBufferGroup::acquire_buffer(
         MediaBuffer **out, bool nonBlocking, size_t requestedSize) {
-    Mutex::Autolock autoLock(mLock);
+    Mutex::Autolock autoLock(mInternal->mLock);
     for (;;) {
         size_t smallest = requestedSize;
         MediaBuffer *buffer = nullptr;
-        auto free = mBuffers.end();
-        for (auto it = mBuffers.begin(); it != mBuffers.end(); ++it) {
+        auto free = mInternal->mBuffers.end();
+        for (auto it = mInternal->mBuffers.begin(); it != mInternal->mBuffers.end(); ++it) {
             if ((*it)->refcount() == 0) {
                 const size_t size = (*it)->size();
                 if (size >= requestedSize) {
@@ -159,7 +173,8 @@ status_t MediaBufferGroup::acquire_buffer(
             }
         }
         if (buffer == nullptr
-                && (free != mBuffers.end() || mBuffers.size() < mGrowthLimit)) {
+                && (free != mInternal->mBuffers.end()
+                    || mInternal->mBuffers.size() < mInternal->mGrowthLimit)) {
             // We alloc before we free so failure leaves group unchanged.
             const size_t allocateSize = requestedSize < SIZE_MAX / 3 * 2 /* NB: ordering */ ?
                     requestedSize * 3 / 2 : requestedSize;
@@ -170,7 +185,7 @@ status_t MediaBufferGroup::acquire_buffer(
                 buffer = nullptr;
             } else {
                 buffer->setObserver(this);
-                if (free != mBuffers.end()) {
+                if (free != mInternal->mBuffers.end()) {
                     ALOGV("reallocate buffer, requested size %zu vs available %zu",
                             requestedSize, (*free)->size());
                     (*free)->setObserver(nullptr);
@@ -178,7 +193,7 @@ status_t MediaBufferGroup::acquire_buffer(
                     *free = buffer; // in-place replace
                 } else {
                     ALOGV("allocate buffer, requested size %zu", requestedSize);
-                    mBuffers.emplace_back(buffer);
+                    mInternal->mBuffers.emplace_back(buffer);
                 }
             }
         }
@@ -193,14 +208,18 @@ status_t MediaBufferGroup::acquire_buffer(
             return WOULD_BLOCK;
         }
         // All buffers are in use, block until one of them is returned.
-        mCondition.wait(mLock);
+        mInternal->mCondition.wait(mInternal->mLock);
     }
     // Never gets here.
 }
 
+size_t MediaBufferGroup::buffers() const {
+    return mInternal->mBuffers.size();
+}
+
 void MediaBufferGroup::signalBufferReturned(MediaBuffer *) {
-    Mutex::Autolock autoLock(mLock);
-    mCondition.signal();
+    Mutex::Autolock autoLock(mInternal->mLock);
+    mInternal->mCondition.signal();
 }
 
 }  // namespace android
