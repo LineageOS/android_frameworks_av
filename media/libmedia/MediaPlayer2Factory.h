@@ -50,9 +50,6 @@ class MediaPlayer2Factory {
         virtual sp<MediaPlayer2Base> createPlayer(pid_t pid) = 0;
     };
 
-    static status_t registerFactory(IFactory* factory,
-                                    player2_type type);
-    static void unregisterFactory(player2_type type);
     static player2_type getPlayerType(const sp<MediaPlayer2Engine>& client,
                                       const char* url);
     static player2_type getPlayerType(const sp<MediaPlayer2Engine>& client,
@@ -76,11 +73,13 @@ class MediaPlayer2Factory {
 
     MediaPlayer2Factory() { }
 
+    static bool ensureInit_l();
+
     static status_t registerFactory_l(IFactory* factory,
                                       player2_type type);
 
     static Mutex       sLock;
-    static tFactoryMap sFactoryMap;
+    static tFactoryMap *sFactoryMap;
     static bool        sInitComplete;
 
     DISALLOW_EVIL_CONSTRUCTORS(MediaPlayer2Factory);
