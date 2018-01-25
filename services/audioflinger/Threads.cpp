@@ -6936,8 +6936,7 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
         if (recordTrack->isExternalTrack()) {
             mLock.unlock();
             bool silenced;
-            status = AudioSystem::startInput(mId, recordTrack->sessionId(),
-                    mInDevice, recordTrack->uid(), &silenced);
+            status = AudioSystem::startInput(recordTrack->portId(), &silenced);
             mLock.lock();
             // FIXME should verify that recordTrack is still in mActiveTracks
             if (status != NO_ERROR) {
@@ -6969,7 +6968,7 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
 
 startError:
     if (recordTrack->isExternalTrack()) {
-        AudioSystem::stopInput(mId, recordTrack->sessionId());
+        AudioSystem::stopInput(recordTrack->portId());
     }
     recordTrack->clearSyncStartEvent();
     // FIXME I wonder why we do not reset the state here?
@@ -7742,7 +7741,7 @@ void AudioFlinger::MmapThread::disconnect()
     if (isOutput()) {
         AudioSystem::releaseOutput(mId, streamType(), mSessionId);
     } else {
-        AudioSystem::releaseInput(mId, mSessionId);
+        AudioSystem::releaseInput(mPortId);
     }
 }
 
@@ -7837,6 +7836,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
                                               mSessionId,
                                               client.clientPid,
                                               client.clientUid,
+                                              client.packageName,
                                               &config,
                                               AUDIO_INPUT_FLAG_MMAP_NOIRQ,
                                               &deviceId,
@@ -7855,7 +7855,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
     } else {
         // TODO: Block recording for idle UIDs (b/72134552)
         bool silenced;
-        ret = AudioSystem::startInput(mId, mSessionId, mInDevice, client.clientUid, &silenced);
+        ret = AudioSystem::startInput(portId, &silenced);
     }
 
     // abort if start is rejected by audio policy manager
@@ -7865,7 +7865,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
             if (isOutput()) {
                 AudioSystem::releaseOutput(mId, streamType(), mSessionId);
             } else {
-                AudioSystem::releaseInput(mId, mSessionId);
+                AudioSystem::releaseInput(portId);
             }
         } else {
             mHalStream->stop();
@@ -7922,8 +7922,8 @@ status_t AudioFlinger::MmapThread::stop(audio_port_handle_t handle)
         AudioSystem::stopOutput(mId, streamType(), track->sessionId());
         AudioSystem::releaseOutput(mId, streamType(), track->sessionId());
     } else {
-        AudioSystem::stopInput(mId, track->sessionId());
-        AudioSystem::releaseInput(mId, track->sessionId());
+        AudioSystem::stopInput(track->portId());
+        AudioSystem::releaseInput(track->portId());
     }
 
     sp<EffectChain> chain = getEffectChain_l(track->sessionId());

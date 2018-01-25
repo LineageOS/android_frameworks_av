@@ -98,19 +98,15 @@ public:
                                      audio_session_t session,
                                      pid_t pid,
                                      uid_t uid,
+                                     const String16& opPackageName,
                                      const audio_config_base_t *config,
                                      audio_input_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId = NULL,
                                      audio_port_handle_t *portId = NULL);
-    virtual status_t startInput(audio_io_handle_t input,
-                                audio_session_t session,
-                                audio_devices_t device,
-                                uid_t uid,
+    virtual status_t startInput(audio_port_handle_t portId,
                                 bool *silenced);
-    virtual status_t stopInput(audio_io_handle_t input,
-                               audio_session_t session);
-    virtual void releaseInput(audio_io_handle_t input,
-                              audio_session_t session);
+    virtual status_t stopInput(audio_port_handle_t portId);
+    virtual void releaseInput(audio_port_handle_t portId);
     virtual status_t initStreamVolume(audio_stream_type_t stream,
                                       int indexMin,
                                       int indexMax);
@@ -611,6 +607,31 @@ private:
               bool                          mAudioPortCallbacksEnabled;
     };
 
+    // --- AudioRecordClient ---
+    // Information about each registered AudioRecord client
+    // (between calls to getInputForAttr() and releaseInput())
+    class AudioRecordClient : public RefBase {
+    public:
+                AudioRecordClient(const audio_attributes_t attributes,
+                                  const audio_io_handle_t input, uid_t uid, pid_t pid,
+                                  const String16& opPackageName, const audio_session_t session) :
+                                      attributes(attributes),
+                                      input(input), uid(uid), pid(pid),
+                                      opPackageName(opPackageName), session(session),
+                                      active(false), isConcurrent(false), isVirtualDevice(false) {}
+        virtual ~AudioRecordClient() {}
+
+        const audio_attributes_t attributes; // source, flags ...
+        const audio_io_handle_t input;       // audio HAL input IO handle
+        const uid_t uid;                     // client UID
+        const pid_t pid;                     // client PID
+        const String16 opPackageName;        // client package name
+        const audio_session_t session;       // audio session ID
+        bool active;                   // Capture is active or inactive
+        bool isConcurrent;             // is allowed to concurrent capture
+        bool isVirtualDevice;          // uses vitual device: updated by APM::getInputForAttr()
+    };
+
     // Internal dump utilities.
     status_t dumpPermissionDenial(int fd);
 
@@ -636,6 +657,7 @@ private:
     audio_mode_t mPhoneState;
 
     sp<UidPolicy> mUidPolicy;
+    DefaultKeyedVector< audio_port_handle_t, sp<AudioRecordClient> >   mAudioRecordClients;
 };
 
 } // namespace android
