@@ -198,7 +198,7 @@ abstract class MediaSession2TestBase {
 
         public TestMediaController(@NonNull Context context, @NonNull SessionToken2 token,
                 @NonNull ControllerCallback callback) {
-            super(context, token, callback, sHandlerExecutor);
+            super(context, token, sHandlerExecutor, callback);
             mCallback = callback;
         }
 

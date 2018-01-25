@@ -129,7 +129,7 @@ public class MediaBrowser2Test extends MediaController2Test {
 
         public TestMediaBrowser(@NonNull Context context, @NonNull SessionToken2 token,
                 @NonNull ControllerCallback callback) {
-            super(context, token, (BrowserCallback) callback, sHandlerExecutor);
+            super(context, token, sHandlerExecutor, (BrowserCallback) callback);
             mCallback = (BrowserCallback) callback;
         }
 

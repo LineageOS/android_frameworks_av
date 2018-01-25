@@ -23,6 +23,7 @@ import android.content.res.Resources.Theme;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaController2;
+import android.media.MediaController2.ControllerCallback;
 import android.media.MediaLibraryService2;
 import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
@@ -43,6 +44,7 @@ import android.media.update.MediaSessionService2Provider;
 import android.media.update.VideoView2Provider;
 import android.media.update.StaticProvider;
 import android.media.update.ViewProvider;
+import android.os.IInterface;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.widget.MediaControlView2;
@@ -68,32 +70,32 @@ public class ApiFactory implements StaticProvider {
 
     @Override
     public MediaController2Provider createMediaController2(
-            MediaController2 instance, Context context, SessionToken2 token,
-            MediaController2.ControllerCallback callback, Executor executor) {
-        return new MediaController2Impl(instance, context, token, callback, executor);
+            Context context, MediaController2 instance, SessionToken2 token,
+            Executor executor, ControllerCallback callback) {
+        return new MediaController2Impl(context, instance, token, executor, callback);
     }
 
     @Override
-    public MediaBrowser2Provider createMediaBrowser2(MediaBrowser2 instance, Context context,
-            SessionToken2 token, BrowserCallback callback, Executor executor) {
-        return new MediaBrowser2Impl(instance, context, token, callback, executor);
+    public MediaBrowser2Provider createMediaBrowser2(Context context, MediaBrowser2 instance,
+            SessionToken2 token, Executor executor, BrowserCallback callback) {
+        return new MediaBrowser2Impl(context, instance, token, executor, callback);
     }
 
     @Override
-    public MediaSession2Provider createMediaSession2(MediaSession2 instance, Context context,
-            MediaPlayerBase player, String id, Executor callbackExecutor, SessionCallback callback,
-            VolumeProvider volumeProvider, int ratingType,
-            PendingIntent sessionActivity) {
-        return new MediaSession2Impl(instance, context, player, id, callbackExecutor, callback,
-                volumeProvider, ratingType, sessionActivity);
+    public MediaSession2Provider createMediaSession2(Context context, MediaSession2 instance,
+            MediaPlayerBase player, String id, VolumeProvider volumeProvider,
+            int ratingType, PendingIntent sessionActivity, Executor callbackExecutor,
+            SessionCallback callback) {
+        return new MediaSession2Impl(context, instance, player, id, volumeProvider, ratingType,
+                sessionActivity, callbackExecutor, callback);
     }
 
     @Override
     public MediaSession2Provider.ControllerInfoProvider createMediaSession2ControllerInfoProvider(
-            ControllerInfo instance, Context context, int uid, int pid, String packageName,
-            IMediaSession2Callback callback) {
-        return new MediaSession2Impl.ControllerInfoImpl(
-                instance, context, uid, pid, packageName, callback);
+            Context context, ControllerInfo instance, int uid, int pid, String packageName,
+            IInterface callback) {
+        return new MediaSession2Impl.ControllerInfoImpl(context,
+                instance, uid, pid, packageName, (IMediaSession2Callback) callback);
     }
 
     @Override
@@ -110,11 +112,11 @@ public class ApiFactory implements StaticProvider {
 
     @Override
     public MediaLibrarySessionProvider createMediaLibraryService2MediaLibrarySession(
-            MediaLibrarySession instance, Context context, MediaPlayerBase player, String id,
-            Executor callbackExecutor, MediaLibrarySessionCallback callback,
-            VolumeProvider volumeProvider, int ratingType, PendingIntent sessionActivity) {
-        return new MediaLibrarySessionImpl(instance, context, player, id, callbackExecutor,
-                callback, volumeProvider, ratingType, sessionActivity);
+            Context context, MediaLibrarySession instance, MediaPlayerBase player,
+            String id, VolumeProvider volumeProvider, int ratingType, PendingIntent sessionActivity,
+            Executor callbackExecutor, MediaLibrarySessionCallback callback) {
+        return new MediaLibrarySessionImpl(context, instance, player, id, volumeProvider,
+                ratingType, sessionActivity, callbackExecutor, callback);
     }
 
     @Override

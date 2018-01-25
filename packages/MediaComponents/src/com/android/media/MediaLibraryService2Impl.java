@@ -67,12 +67,12 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
         private final MediaLibrarySession mInstance;
         private final MediaLibrarySessionCallback mCallback;
 
-        public MediaLibrarySessionImpl(MediaLibrarySession instance, Context context,
-                MediaPlayerBase player, String id, Executor callbackExecutor,
-                MediaLibrarySessionCallback callback, VolumeProvider volumeProvider, int ratingType,
-                PendingIntent sessionActivity) {
-            super(instance, context, player, id, callbackExecutor, callback, volumeProvider,
-                    ratingType, sessionActivity);
+        public MediaLibrarySessionImpl(Context context, MediaLibrarySession instance,
+                MediaPlayerBase player, String id, VolumeProvider volumeProvider, int ratingType,
+                PendingIntent sessionActivity, Executor callbackExecutor,
+                MediaLibrarySessionCallback callback)  {
+            super(context, instance, player, id, volumeProvider, ratingType, sessionActivity,
+                    callbackExecutor, callback);
             mInstance = instance;
             mCallback = callback;
         }
