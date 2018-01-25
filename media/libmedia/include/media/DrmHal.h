@@ -181,7 +181,8 @@ private:
     sp<IDrmPlugin> mPlugin;
     sp<drm::V1_1::IDrmPlugin> mPluginV1_1;
 
-    MediaDrmMetrics mMetrics;
+    // Mutable to allow modification within GetPropertyByteArray.
+    mutable MediaDrmMetrics mMetrics;
 
     Vector<Vector<uint8_t>> mOpenSessions;
     void closeOpenSessions();

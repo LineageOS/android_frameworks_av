@@ -12,6 +12,23 @@ cc_test {
 }
 
 cc_test {
+    name: "DrmMetrics_test",
+    srcs: ["DrmMetrics_test.cpp"],
+    shared_libs: [
+      "android.hardware.drm@1.0",
+      "liblog",
+      "libmediadrm",
+      "libmediametrics",
+      "libutils",
+    ],
+    include_dirs: ["frameworks/av/include/media"],
+    cflags: [
+      "-Werror",
+      "-Wall",
+    ],
+}
+
+cc_test {
     name: "EventMetric_test",
     srcs: ["EventMetric_test.cpp"],
     shared_libs: [
