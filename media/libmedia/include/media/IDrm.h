@@ -74,10 +74,12 @@ struct IDrm : public IInterface {
                                               Vector<uint8_t> &wrappedKey) = 0;
 
     virtual status_t getSecureStops(List<Vector<uint8_t> > &secureStops) = 0;
+    virtual status_t getSecureStopIds(List<Vector<uint8_t> > &secureStopIds) = 0;
     virtual status_t getSecureStop(Vector<uint8_t> const &ssid, Vector<uint8_t> &secureStop) = 0;
 
     virtual status_t releaseSecureStops(Vector<uint8_t> const &ssRelease) = 0;
-    virtual status_t releaseAllSecureStops() = 0;
+    virtual status_t removeSecureStop(Vector<uint8_t> const &ssid) = 0;
+    virtual status_t removeAllSecureStops() = 0;
 
     virtual status_t getHdcpLevels(DrmPlugin::HdcpLevel *connectedLevel,
             DrmPlugin::HdcpLevel *maxLevel)

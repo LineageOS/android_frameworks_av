@@ -44,6 +44,8 @@ using drm::V1_0::KeyType;
 using drm::V1_0::KeyValue;
 using drm::V1_1::HdcpLevel;;
 using drm::V1_0::SecureStop;
+using drm::V1_1::SecureStopRelease;
+using drm::V1_0::SecureStopId;
 using drm::V1_1::SecurityLevel;
 using drm::V1_0::Status;
 using ::android::hardware::hidl_array;
@@ -163,6 +165,15 @@ static List<Vector<uint8_t>> toSecureStops(const hidl_vec<SecureStop>&
         secureStops.push_back(toVector(hSecureStops[i].opaqueData));
     }
     return secureStops;
+}
+
+static List<Vector<uint8_t>> toSecureStopIds(const hidl_vec<SecureStopId>&
+        hSecureStopIds) {
+    List<Vector<uint8_t>> secureStopIds;
+    for (size_t i = 0; i < hSecureStopIds.size(); i++) {
+        secureStopIds.push_back(toVector(hSecureStopIds[i]));
+    }
+    return secureStopIds;
 }
 
 static status_t toStatusT(Status status) {
@@ -797,6 +808,32 @@ status_t DrmHal::getSecureStops(List<Vector<uint8_t>> &secureStops) {
 }
 
 
+status_t DrmHal::getSecureStopIds(List<Vector<uint8_t>> &secureStopIds) {
+    Mutex::Autolock autoLock(mLock);
+
+    if (mInitCheck != OK) {
+        return mInitCheck;
+    }
+
+    if (mPluginV1_1 == NULL) {
+        return ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    status_t err = UNKNOWN_ERROR;
+
+    Return<void> hResult = mPluginV1_1->getSecureStopIds(
+            [&](Status status, const hidl_vec<SecureStopId>& hSecureStopIds) {
+                if (status == Status::OK) {
+                    secureStopIds = toSecureStopIds(hSecureStopIds);
+                }
+                err = toStatusT(status);
+            }
+    );
+
+    return hResult.isOk() ? err : DEAD_OBJECT;
+}
+
+
 status_t DrmHal::getSecureStop(Vector<uint8_t> const &ssid, Vector<uint8_t> &secureStop) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
@@ -819,13 +856,36 @@ status_t DrmHal::releaseSecureStops(Vector<uint8_t> const &ssRelease) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
+    if (mPluginV1_1 != NULL) {
+        SecureStopRelease secureStopRelease;
+        secureStopRelease.opaqueData = toHidlVec(ssRelease);
+        return toStatusT(mPluginV1_1->releaseSecureStops(secureStopRelease));
+    }
+
     return toStatusT(mPlugin->releaseSecureStop(toHidlVec(ssRelease)));
 }
 
-status_t DrmHal::releaseAllSecureStops() {
+status_t DrmHal::removeSecureStop(Vector<uint8_t> const &ssid) {
+    Mutex::Autolock autoLock(mLock);
+
+    if (mInitCheck != OK) {
+        return mInitCheck;
+    }
+
+    if (mPluginV1_1 == NULL) {
+        return ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    return toStatusT(mPluginV1_1->removeSecureStop(toHidlVec(ssid)));
+}
+
+status_t DrmHal::removeAllSecureStops() {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
+    if (mPluginV1_1 != NULL) {
+        return toStatusT(mPluginV1_1->removeAllSecureStops());
+    }
     return toStatusT(mPlugin->releaseAllSecureStops());
 }
 

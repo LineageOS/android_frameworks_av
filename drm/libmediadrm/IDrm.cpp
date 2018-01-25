@@ -56,11 +56,13 @@ enum {
     VERIFY,
     SET_LISTENER,
     GET_SECURE_STOP,
-    RELEASE_ALL_SECURE_STOPS,
+    REMOVE_ALL_SECURE_STOPS,
     GET_HDCP_LEVELS,
     GET_NUMBER_OF_SESSIONS,
     GET_SECURITY_LEVEL,
     SET_SECURITY_LEVEL,
+    REMOVE_SECURE_STOP,
+    GET_SECURE_STOP_IDS
 };
 
 struct BpDrm : public BpInterface<IDrm> {
@@ -302,6 +304,25 @@ struct BpDrm : public BpInterface<IDrm> {
         return reply.readInt32();
     }
 
+    virtual status_t getSecureStopIds(List<Vector<uint8_t> > &secureStopIds) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(GET_SECURE_STOP_IDS, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
+        secureStopIds.clear();
+        uint32_t count = reply.readInt32();
+        for (size_t i = 0; i < count; i++) {
+            Vector<uint8_t> secureStopId;
+            readVector(reply, secureStopId);
+            secureStopIds.push_back(secureStopId);
+        }
+        return reply.readInt32();
+    }
+
     virtual status_t getSecureStop(Vector<uint8_t> const &ssid, Vector<uint8_t> &secureStop) {
         Parcel data, reply;
         data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
@@ -329,11 +350,24 @@ struct BpDrm : public BpInterface<IDrm> {
         return reply.readInt32();
     }
 
-    virtual status_t releaseAllSecureStops() {
+    virtual status_t removeSecureStop(Vector<uint8_t> const &ssid) {
         Parcel data, reply;
         data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
 
-        status_t status = remote()->transact(RELEASE_ALL_SECURE_STOPS, data, &reply);
+        writeVector(data, ssid);
+        status_t status = remote()->transact(REMOVE_SECURE_STOP, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
+        return reply.readInt32();
+    }
+
+    virtual status_t removeAllSecureStops() {
+        Parcel data, reply;
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(REMOVE_ALL_SECURE_STOPS, data, &reply);
         if (status != OK) {
             return status;
         }
@@ -854,6 +888,24 @@ status_t BnDrm::onTransact(
             return OK;
         }
 
+        case GET_SECURE_STOP_IDS:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            List<Vector<uint8_t> > secureStopIds;
+            status_t result = getSecureStopIds(secureStopIds);
+            size_t count = secureStopIds.size();
+            reply->writeInt32(count);
+            List<Vector<uint8_t> >::iterator iter = secureStopIds.begin();
+            while(iter != secureStopIds.end()) {
+                size_t size = iter->size();
+                reply->writeInt32(size);
+                reply->write(iter->array(), iter->size());
+                iter++;
+            }
+            reply->writeInt32(result);
+            return OK;
+        }
+
         case GET_SECURE_STOP:
         {
             CHECK_INTERFACE(IDrm, data, reply);
@@ -874,10 +926,19 @@ status_t BnDrm::onTransact(
             return OK;
         }
 
-        case RELEASE_ALL_SECURE_STOPS:
+        case REMOVE_SECURE_STOP:
         {
             CHECK_INTERFACE(IDrm, data, reply);
-            reply->writeInt32(releaseAllSecureStops());
+            Vector<uint8_t> ssid;
+            readVector(data, ssid);
+            reply->writeInt32(removeSecureStop(ssid));
+            return OK;
+        }
+
+        case REMOVE_ALL_SECURE_STOPS:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            reply->writeInt32(removeAllSecureStops());
             return OK;
         }
 
