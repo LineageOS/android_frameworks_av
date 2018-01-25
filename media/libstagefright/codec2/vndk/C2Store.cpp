@@ -404,6 +404,7 @@ std::shared_ptr<const C2Component::Traits> C2PlatformComponentStore::ComponentMo
 C2PlatformComponentStore::C2PlatformComponentStore() {
     // TODO: move this also into a .so so it can be updated
     mComponents.emplace("c2.google.avc.decoder", "libstagefright_soft_c2avcdec.so");
+    mComponents.emplace("c2.google.avc.encoder", "libstagefright_soft_c2avcenc.so");
     mComponents.emplace("c2.google.aac.decoder", "libstagefright_soft_c2aacdec.so");
     mComponents.emplace("c2.google.aac.encoder", "libstagefright_soft_c2aacenc.so");
 }

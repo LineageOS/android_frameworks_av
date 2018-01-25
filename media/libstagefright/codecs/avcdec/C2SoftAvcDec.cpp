@@ -211,7 +211,6 @@ void fillEmptyWork(const std::unique_ptr<C2Work> &work) {
     }
     work->worklets.front()->output.flags = (C2FrameData::flags_t)flags;
     work->worklets.front()->output.buffers.clear();
-    work->worklets.front()->output.buffers.emplace_back(nullptr);
     work->worklets.front()->output.ordinal = work->input.ordinal;
     work->workletsProcessed = 1u;
 }

@@ -24,6 +24,7 @@
 #include <android/native_window.h>
 #include <media/hardware/MetadataBufferType.h>
 #include <media/stagefright/foundation/Mutexed.h>
+#include <media/stagefright/gbs/GraphicBufferSource.h>
 #include <media/stagefright/CodecBase.h>
 #include <media/stagefright/FrameRenderTracker.h>
 #include <media/stagefright/MediaDefs.h>
@@ -58,6 +59,7 @@ public:
     virtual void signalRequestIDRFrame() override;
 
     void initiateReleaseIfStuck();
+    void onWorkDone(std::vector<std::unique_ptr<C2Work>> &workItems);
 
 protected:
     virtual ~CCodec();
@@ -77,6 +79,10 @@ private:
     void flush();
     void release(bool sendCallback);
 
+    void createInputSurface();
+    void setInputSurface(const sp<PersistentSurface> &surface);
+    status_t setupInputSurface(const sp<GraphicBufferSource> &source);
+
     void setDeadline(const TimePoint &deadline);
 
     enum {
@@ -86,6 +92,9 @@ private:
         kWhatFlush,
         kWhatStop,
         kWhatRelease,
+        kWhatCreateInputSurface,
+        kWhatSetInputSurface,
+        kWhatWorkDone,
     };
 
     enum {
@@ -104,14 +113,17 @@ private:
 
     struct State {
         inline State() : mState(RELEASED) {}
+        inline int get() const { return mState; }
+        inline void set(int newState) { mState = newState; }
 
+        std::shared_ptr<C2Component> comp;
+    private:
         int mState;
-        std::shared_ptr<C2Component> mComp;
     };
 
     struct Formats {
-        sp<AMessage> mInputFormat;
-        sp<AMessage> mOutputFormat;
+        sp<AMessage> inputFormat;
+        sp<AMessage> outputFormat;
     };
 
     Mutexed<State> mState;
@@ -119,6 +131,7 @@ private:
     std::shared_ptr<C2Component::Listener> mListener;
     Mutexed<TimePoint> mDeadline;
     Mutexed<Formats> mFormats;
+    Mutexed<std::list<std::unique_ptr<C2Work>>> mWorkDoneQueue;
 
     DISALLOW_EVIL_CONSTRUCTORS(CCodec);
 };

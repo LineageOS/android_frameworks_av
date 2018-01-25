@@ -375,7 +375,6 @@ void C2SoftAac::process(
 
         work->worklets.front()->output.ordinal = work->input.ordinal;
         work->worklets.front()->output.buffers.clear();
-        work->worklets.front()->output.buffers.push_back(nullptr);
 
         return;
     }
@@ -602,7 +601,6 @@ c2_status_t C2SoftAac::drainInternal(
         auto fillEmptyWork = [](const std::unique_ptr<C2Work> &work) {
             work->worklets.front()->output.flags = work->input.flags;
             work->worklets.front()->output.buffers.clear();
-            work->worklets.front()->output.buffers.emplace_back(nullptr);
             work->worklets.front()->output.ordinal = work->input.ordinal;
             work->workletsProcessed = 1u;
         };

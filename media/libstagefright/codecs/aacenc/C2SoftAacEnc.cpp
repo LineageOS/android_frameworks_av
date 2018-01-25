@@ -344,8 +344,6 @@ void C2SoftAacEnc::process(
     if (nOutputBytes) {
         work->worklets.front()->output.buffers.push_back(
                 createLinearBuffer(block, 0, nOutputBytes));
-    } else {
-        work->worklets.front()->output.buffers.emplace_back(nullptr);
     }
 
 #if 0

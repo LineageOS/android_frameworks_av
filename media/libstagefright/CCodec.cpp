@@ -23,7 +23,9 @@
 #include <C2PlatformSupport.h>
 
 #include <gui/Surface.h>
+#include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/CCodec.h>
+#include <media/stagefright/PersistentSurface.h>
 
 #include "include/CCodecBufferChannel.h"
 
@@ -111,33 +113,35 @@ Mutexed<sp<CCodecWatchdog>> CCodecWatchdog::sInstance;
 
 class CCodecListener : public C2Component::Listener {
 public:
-    CCodecListener(const std::shared_ptr<CCodecBufferChannel> &channel)
-        : mChannel(channel) {
-    }
+    explicit CCodecListener(const wp<CCodec> &codec) : mCodec(codec) {}
 
     virtual void onWorkDone_nb(
             std::weak_ptr<C2Component> component,
             std::vector<std::unique_ptr<C2Work>> workItems) override {
-        (void) component;
-        mChannel->onWorkDone(std::move(workItems));
+        (void)component;
+        sp<CCodec> codec(mCodec.promote());
+        if (!codec) {
+            return;
+        }
+        codec->onWorkDone(workItems);
     }
 
     virtual void onTripped_nb(
             std::weak_ptr<C2Component> component,
             std::vector<std::shared_ptr<C2SettingResult>> settingResult) override {
         // TODO
-        (void) component;
-        (void) settingResult;
+        (void)component;
+        (void)settingResult;
     }
 
     virtual void onError_nb(std::weak_ptr<C2Component> component, uint32_t errorCode) override {
         // TODO
-        (void) component;
-        (void) errorCode;
+        (void)component;
+        (void)errorCode;
     }
 
 private:
-    std::shared_ptr<CCodecBufferChannel> mChannel;
+    wp<CCodec> mCodec;
 };
 
 }  // namespace
@@ -159,11 +163,11 @@ std::shared_ptr<BufferChannelBase> CCodec::getBufferChannel() {
 void CCodec::initiateAllocateComponent(const sp<AMessage> &msg) {
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState != RELEASED) {
+        if (state->get() != RELEASED) {
             mCallback->onError(INVALID_OPERATION, ACTION_CODE_FATAL);
             return;
         }
-        state->mState = ALLOCATING;
+        state->set(ALLOCATING);
     }
 
     AString componentName;
@@ -178,14 +182,14 @@ void CCodec::initiateAllocateComponent(const sp<AMessage> &msg) {
 
 void CCodec::allocate(const AString &componentName) {
     // TODO: use C2ComponentStore to create component
-    mListener.reset(new CCodecListener(mChannel));
+    mListener.reset(new CCodecListener(this));
 
     std::shared_ptr<C2Component> comp;
     c2_status_t err = GetCodec2PlatformComponentStore()->createComponent(
             componentName.c_str(), &comp);
     if (err != C2_OK) {
         Mutexed<State>::Locked state(mState);
-        state->mState = RELEASED;
+        state->set(RELEASED);
         state.unlock();
         mCallback->onError(err, ACTION_CODE_FATAL);
         state.lock();
@@ -194,15 +198,15 @@ void CCodec::allocate(const AString &componentName) {
     comp->setListener_vb(mListener, C2_MAY_BLOCK);
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState != ALLOCATING) {
-            state->mState = RELEASED;
+        if (state->get() != ALLOCATING) {
+            state->set(RELEASED);
             state.unlock();
             mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
             state.lock();
             return;
         }
-        state->mState = ALLOCATED;
-        state->mComp = comp;
+        state->set(ALLOCATED);
+        state->comp = comp;
     }
     mChannel->setComponent(comp);
     mCallback->onComponentAllocated(comp->intf()->getName().c_str());
@@ -211,7 +215,7 @@ void CCodec::allocate(const AString &componentName) {
 void CCodec::initiateConfigureComponent(const sp<AMessage> &format) {
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState != ALLOCATED) {
+        if (state->get() != ALLOCATED) {
             mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
             return;
         }
@@ -252,6 +256,9 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 inputFormat->setInt32("sample-rate", 44100);
                 outputFormat->setInt32("channel-count", 1);
                 outputFormat->setInt32("sample-rate", 44100);
+            } else {
+                outputFormat->setInt32("width", 1080);
+                outputFormat->setInt32("height", 1920);
             }
         } else {
             inputFormat->setString("mime", mime);
@@ -272,32 +279,81 @@ void CCodec::configure(const sp<AMessage> &msg) {
 
     {
         Mutexed<Formats>::Locked formats(mFormats);
-        formats->mInputFormat = inputFormat;
-        formats->mOutputFormat = outputFormat;
+        formats->inputFormat = inputFormat;
+        formats->outputFormat = outputFormat;
     }
     mCallback->onComponentConfigured(inputFormat, outputFormat);
 }
 
-
 void CCodec::initiateCreateInputSurface() {
-    // TODO
+    (new AMessage(kWhatCreateInputSurface, this))->post();
+}
+
+void CCodec::createInputSurface() {
+    sp<IGraphicBufferProducer> producer;
+    sp<GraphicBufferSource> source(new GraphicBufferSource);
+
+    status_t err = source->initCheck();
+    if (err != OK) {
+        ALOGE("Failed to initialize graphic buffer source: %d", err);
+        mCallback->onInputSurfaceCreationFailed(err);
+        return;
+    }
+    producer = source->getIGraphicBufferProducer();
+
+    err = setupInputSurface(source);
+    if (err != OK) {
+        ALOGE("Failed to set up input surface: %d", err);
+        mCallback->onInputSurfaceCreationFailed(err);
+        return;
+    }
+
+    sp<AMessage> inputFormat;
+    sp<AMessage> outputFormat;
+    {
+        Mutexed<Formats>::Locked formats(mFormats);
+        inputFormat = formats->inputFormat;
+        outputFormat = formats->outputFormat;
+    }
+    mCallback->onInputSurfaceCreated(
+            inputFormat,
+            outputFormat,
+            new BufferProducerWrapper(producer));
+}
+
+status_t CCodec::setupInputSurface(const sp<GraphicBufferSource> &source) {
+    status_t err = mChannel->setGraphicBufferSource(source);
+    if (err != OK) {
+        return err;
+    }
+
+    // TODO: configure |source| with other settings.
+    return OK;
 }
 
 void CCodec::initiateSetInputSurface(const sp<PersistentSurface> &surface) {
+    sp<AMessage> msg = new AMessage(kWhatSetInputSurface, this);
+    msg->setObject("surface", surface);
+    msg->post();
+}
+
+void CCodec::setInputSurface(const sp<PersistentSurface> &surface) {
     // TODO
-    (void) surface;
+    (void)surface;
+
+    mCallback->onInputSurfaceDeclined(ERROR_UNSUPPORTED);
 }
 
 void CCodec::initiateStart() {
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState != ALLOCATED) {
+        if (state->get() != ALLOCATED) {
             state.unlock();
             mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
             state.lock();
             return;
         }
-        state->mState = STARTING;
+        state->set(STARTING);
     }
 
     (new AMessage(kWhatStart, this))->post();
@@ -307,13 +363,13 @@ void CCodec::start() {
     std::shared_ptr<C2Component> comp;
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState != STARTING) {
+        if (state->get() != STARTING) {
             state.unlock();
             mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
             state.lock();
             return;
         }
-        comp = state->mComp;
+        comp = state->comp;
     }
     c2_status_t err = comp->start();
     if (err != C2_OK) {
@@ -325,20 +381,20 @@ void CCodec::start() {
     sp<AMessage> outputFormat;
     {
         Mutexed<Formats>::Locked formats(mFormats);
-        inputFormat = formats->mInputFormat;
-        outputFormat = formats->mOutputFormat;
+        inputFormat = formats->inputFormat;
+        outputFormat = formats->outputFormat;
     }
     mChannel->start(inputFormat, outputFormat);
 
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState != STARTING) {
+        if (state->get() != STARTING) {
             state.unlock();
             mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
             state.lock();
             return;
         }
-        state->mState = RUNNING;
+        state->set(RUNNING);
     }
     mCallback->onStartCompleted();
 }
@@ -354,17 +410,17 @@ void CCodec::initiateShutdown(bool keepComponentAllocated) {
 void CCodec::initiateStop() {
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState == ALLOCATED
-                || state->mState  == RELEASED
-                || state->mState == STOPPING
-                || state->mState == RELEASING) {
+        if (state->get() == ALLOCATED
+                || state->get()  == RELEASED
+                || state->get() == STOPPING
+                || state->get() == RELEASING) {
             // We're already stopped, released, or doing it right now.
             state.unlock();
             mCallback->onStopCompleted();
             state.lock();
             return;
         }
-        state->mState = STOPPING;
+        state->set(STOPPING);
     }
 
     (new AMessage(kWhatStop, this))->post();
@@ -374,19 +430,19 @@ void CCodec::stop() {
     std::shared_ptr<C2Component> comp;
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState == RELEASING) {
+        if (state->get() == RELEASING) {
             state.unlock();
             // We're already stopped or release is in progress.
             mCallback->onStopCompleted();
             state.lock();
             return;
-        } else if (state->mState != STOPPING) {
+        } else if (state->get() != STOPPING) {
             state.unlock();
             mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
             state.lock();
             return;
         }
-        comp = state->mComp;
+        comp = state->comp;
     }
     mChannel->stop();
     status_t err = comp->stop();
@@ -397,8 +453,8 @@ void CCodec::stop() {
 
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState == STOPPING) {
-            state->mState = ALLOCATED;
+        if (state->get() == STOPPING) {
+            state->set(ALLOCATED);
         }
     }
     mCallback->onStopCompleted();
@@ -407,7 +463,7 @@ void CCodec::stop() {
 void CCodec::initiateRelease(bool sendCallback /* = true */) {
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState == RELEASED || state->mState == RELEASING) {
+        if (state->get() == RELEASED || state->get() == RELEASING) {
             // We're already released or doing it right now.
             if (sendCallback) {
                 state.unlock();
@@ -416,8 +472,8 @@ void CCodec::initiateRelease(bool sendCallback /* = true */) {
             }
             return;
         }
-        if (state->mState == ALLOCATING) {
-            state->mState = RELEASING;
+        if (state->get() == ALLOCATING) {
+            state->set(RELEASING);
             // With the altered state allocate() would fail and clean up.
             if (sendCallback) {
                 state.unlock();
@@ -426,7 +482,7 @@ void CCodec::initiateRelease(bool sendCallback /* = true */) {
             }
             return;
         }
-        state->mState = RELEASING;
+        state->set(RELEASING);
     }
 
     std::thread([this, sendCallback] { release(sendCallback); }).detach();
@@ -436,7 +492,7 @@ void CCodec::release(bool sendCallback) {
     std::shared_ptr<C2Component> comp;
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState == RELEASED) {
+        if (state->get() == RELEASED) {
             if (sendCallback) {
                 state.unlock();
                 mCallback->onReleaseCompleted();
@@ -444,15 +500,15 @@ void CCodec::release(bool sendCallback) {
             }
             return;
         }
-        comp = state->mComp;
+        comp = state->comp;
     }
     mChannel->stop();
     comp->release();
 
     {
         Mutexed<State>::Locked state(mState);
-        state->mState = RELEASED;
-        state->mComp.reset();
+        state->set(RELEASED);
+        state->comp.reset();
     }
     if (sendCallback) {
         mCallback->onReleaseCompleted();
@@ -466,11 +522,11 @@ status_t CCodec::setSurface(const sp<Surface> &surface) {
 void CCodec::signalFlush() {
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState != RUNNING) {
+        if (state->get() != RUNNING) {
             mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
             return;
         }
-        state->mState = FLUSHING;
+        state->set(FLUSHING);
     }
 
     (new AMessage(kWhatFlush, this))->post();
@@ -480,13 +536,13 @@ void CCodec::flush() {
     std::shared_ptr<C2Component> comp;
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState != FLUSHING) {
+        if (state->get() != FLUSHING) {
             state.unlock();
             mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
             state.lock();
             return;
         }
-        comp = state->mComp;
+        comp = state->comp;
     }
 
     mChannel->stop();
@@ -502,7 +558,7 @@ void CCodec::flush() {
 
     {
         Mutexed<State>::Locked state(mState);
-        state->mState = FLUSHED;
+        state->set(FLUSHED);
     }
     mCallback->onFlushCompleted();
 }
@@ -510,26 +566,26 @@ void CCodec::flush() {
 void CCodec::signalResume() {
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState != FLUSHED) {
+        if (state->get() != FLUSHED) {
             state.unlock();
             mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
             state.lock();
             return;
         }
-        state->mState = RESUMING;
+        state->set(RESUMING);
     }
 
     mChannel->start(nullptr, nullptr);
 
     {
         Mutexed<State>::Locked state(mState);
-        if (state->mState != RESUMING) {
+        if (state->get() != RESUMING) {
             state.unlock();
             mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
             state.lock();
             return;
         }
-        state->mState = RUNNING;
+        state->set(RUNNING);
     }
 }
 
@@ -543,6 +599,14 @@ void CCodec::signalEndOfInputStream() {
 
 void CCodec::signalRequestIDRFrame() {
     // TODO
+}
+
+void CCodec::onWorkDone(std::vector<std::unique_ptr<C2Work>> &workItems) {
+    Mutexed<std::list<std::unique_ptr<C2Work>>>::Locked queue(mWorkDoneQueue);
+    for (std::unique_ptr<C2Work> &item : workItems) {
+        queue->push_back(std::move(item));
+    }
+    (new AMessage(kWhatWorkDone, this))->post();
 }
 
 void CCodec::onMessageReceived(const sp<AMessage> &msg) {
@@ -580,6 +644,37 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
             // C2Component::flush_sm() should return within 5ms.
             setDeadline(now + 50ms);
             flush();
+            break;
+        }
+        case kWhatCreateInputSurface: {
+            // Surface operations may be briefly blocking.
+            setDeadline(now + 100ms);
+            createInputSurface();
+            break;
+        }
+        case kWhatSetInputSurface: {
+            // Surface operations may be briefly blocking.
+            setDeadline(now + 100ms);
+            sp<RefBase> obj;
+            CHECK(msg->findObject("surface", &obj));
+            sp<PersistentSurface> surface(static_cast<PersistentSurface *>(obj.get()));
+            setInputSurface(surface);
+            break;
+        }
+        case kWhatWorkDone: {
+            std::unique_ptr<C2Work> work;
+            {
+                Mutexed<std::list<std::unique_ptr<C2Work>>>::Locked queue(mWorkDoneQueue);
+                if (queue->empty()) {
+                    break;
+                }
+                work.swap(queue->front());
+                queue->pop_front();
+                if (!queue->empty()) {
+                    (new AMessage(kWhatWorkDone, this))->post();
+                }
+            }
+            mChannel->onWorkDone(work);
             break;
         }
         default: {
