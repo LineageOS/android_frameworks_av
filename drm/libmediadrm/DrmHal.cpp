@@ -30,6 +30,7 @@
 #include <media/DrmHal.h>
 #include <media/DrmSessionClientInterface.h>
 #include <media/DrmSessionManager.h>
+#include <media/EventMetric.h>
 #include <media/PluginMetricsReporting.h>
 #include <media/drm/DrmAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -227,7 +228,6 @@ private:
 DrmHal::DrmHal()
    : mDrmSessionClient(new DrmSessionClient(this)),
      mFactories(makeDrmFactories()),
-     mOpenSessionCounter("/drm/mediadrm/open_session", "status"),
      mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT) {
 }
 
@@ -519,7 +519,7 @@ status_t DrmHal::openSession(Vector<uint8_t> &sessionId) {
         mOpenSessions.push(sessionId);
     }
 
-    mOpenSessionCounter.Increment(err);
+    mMetrics.mOpenSessionCounter.Increment(err);
     return err;
 }
 
@@ -551,6 +551,7 @@ status_t DrmHal::getKeyRequest(Vector<uint8_t> const &sessionId,
         String8 &defaultUrl, DrmPlugin::KeyRequestType *keyRequestType) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
+    EventTimer<status_t> keyRequestTimer(&mMetrics.mGetKeyRequestTiming);
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -562,6 +563,7 @@ status_t DrmHal::getKeyRequest(Vector<uint8_t> const &sessionId,
     } else if (keyType == DrmPlugin::kKeyType_Release) {
         hKeyType = KeyType::RELEASE;
     } else {
+        keyRequestTimer.SetAttribute(BAD_VALUE);
         return BAD_VALUE;
     }
 
@@ -636,7 +638,9 @@ status_t DrmHal::getKeyRequest(Vector<uint8_t> const &sessionId,
                 }
             });
 
-    return hResult.isOk() ? err : DEAD_OBJECT;
+    err = hResult.isOk() ? err : DEAD_OBJECT;
+    keyRequestTimer.SetAttribute(err);
+    return err;
 }
 
 status_t DrmHal::provideKeyResponse(Vector<uint8_t> const &sessionId,
@@ -987,26 +991,12 @@ status_t DrmHal::setPropertyByteArray(String8 const &name,
     return toStatusT(status);
 }
 
-status_t DrmHal::getMetrics(MediaAnalyticsItem* metrics) {
-    // TODO: Move mOpenSessionCounter and suffixes to a separate class
-    // that manages the collection of metrics and exporting them.
-    std::string success_count_name =
-        mOpenSessionCounter.metric_name() + "/ok/count";
-    std::string error_count_name =
-        mOpenSessionCounter.metric_name() + "/error/count";
-    mOpenSessionCounter.ExportValues(
-        [&] (status_t status, int64_t value) {
-            if (status == OK) {
-                metrics->setInt64(success_count_name.c_str(), value);
-            } else {
-                int64_t total_errors(0);
-                metrics->getInt64(error_count_name.c_str(), &total_errors);
-                metrics->setInt64(error_count_name.c_str(),
-                                  total_errors + value);
-                // TODO: Add support for exporting the list of error values.
-                // This probably needs to be added to MediaAnalyticsItem.
-            }
-        });
+status_t DrmHal::getMetrics(MediaAnalyticsItem* item) {
+    if (item == nullptr) {
+      return UNEXPECTED_NULL;
+    }
+
+    mMetrics.Export(item);
     return OK;
 }
 

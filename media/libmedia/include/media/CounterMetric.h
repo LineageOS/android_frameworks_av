@@ -16,6 +16,10 @@
 #ifndef ANDROID_COUNTER_METRIC_H_
 #define ANDROID_COUNTER_METRIC_H_
 
+#include <functional>
+#include <map>
+#include <string>
+
 #include <media/MediaAnalyticsItem.h>
 #include <utils/Log.h>
 
@@ -71,13 +75,13 @@ class CounterMetric {
   // of Attribute.
   void ExportValues(
       std::function<void (const AttributeType&,
-                          const int64_t count)> function) {
+                          const int64_t count)> function) const {
     for (auto it = values_.begin(); it != values_.end(); it++) {
       function(it->first, it->second);
     }
   }
 
-  const std::string& metric_name() { return metric_name_; };
+  const std::string& metric_name() const { return metric_name_; };
 
  private:
   const std::string metric_name_;

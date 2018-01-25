@@ -10,3 +10,18 @@ cc_test {
       "-Wall",
     ],
 }
+
+cc_test {
+    name: "EventMetric_test",
+    srcs: ["EventMetric_test.cpp"],
+    shared_libs: [
+      "liblog",
+      "libmediadrm",
+      "libutils",
+    ],
+    include_dirs: ["frameworks/av/include/media"],
+    cflags: [
+      "-Werror",
+      "-Wall",
+    ],
+}

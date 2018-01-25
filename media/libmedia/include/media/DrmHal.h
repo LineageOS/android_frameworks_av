@@ -23,7 +23,7 @@
 #include <android/hardware/drm/1.0/IDrmPluginListener.h>
 #include <android/hardware/drm/1.0/IDrmFactory.h>
 
-#include <media/CounterMetric.h>
+#include <media/DrmMetrics.h>
 #include <media/IDrm.h>
 #include <media/IDrmClient.h>
 #include <media/MediaAnalyticsItem.h>
@@ -181,7 +181,7 @@ private:
     sp<IDrmPlugin> mPlugin;
     sp<drm::V1_1::IDrmPlugin> mPluginV1_1;
 
-    CounterMetric<status_t> mOpenSessionCounter;
+    MediaDrmMetrics mMetrics;
 
     Vector<Vector<uint8_t>> mOpenSessions;
     void closeOpenSessions();
