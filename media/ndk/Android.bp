@@ -37,6 +37,7 @@ cc_library_shared {
     srcs: [
         "NdkMediaCodec.cpp",
         "NdkMediaCrypto.cpp",
+        "NdkMediaDataSource.cpp",
         "NdkMediaExtractor.cpp",
         "NdkMediaFormat.cpp",
         "NdkMediaMuxer.cpp",
