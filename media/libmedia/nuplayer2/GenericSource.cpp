@@ -24,7 +24,6 @@
 #include <binder/IServiceManager.h>
 #include <cutils/properties.h>
 #include <media/DataSource.h>
-#include <media/MediaBufferHolder.h>
 #include <media/IMediaExtractorService.h>
 #include <media/MediaHTTPService.h>
 #include <media/MediaExtractor.h>
@@ -1168,7 +1167,8 @@ sp<ABuffer> NuPlayer2::GenericSource::mediaBufferToABuffer(
 
         // data is already provided in the buffer
         ab = new ABuffer(NULL, mb->range_length());
-        ab->meta()->setObject("mediaBufferHolder", new MediaBufferHolder(mb));
+        mb->add_ref();
+        ab->setMediaBufferBase(mb);
 
         // Modular DRM: Required b/c of the above add_ref.
         // If ref>0, there must be an observer, or it'll crash at release().
