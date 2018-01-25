@@ -122,8 +122,7 @@ private:
 };
 
 struct MatroskaSource : public MediaSource {
-    MatroskaSource(
-            const sp<MatroskaExtractor> &extractor, size_t index);
+    MatroskaSource(MatroskaExtractor *extractor, size_t index);
 
     virtual status_t start(MetaData *params);
     virtual status_t stop();
@@ -144,7 +143,7 @@ private:
         OTHER
     };
 
-    sp<MatroskaExtractor> mExtractor;
+    MatroskaExtractor *mExtractor;
     size_t mTrackIndex;
     Type mType;
     bool mIsAudio;
@@ -211,12 +210,12 @@ const mkvparser::CuePoint::TrackPosition *MatroskaExtractor::TrackInfo::find(
 }
 
 MatroskaSource::MatroskaSource(
-        const sp<MatroskaExtractor> &extractor, size_t index)
+        MatroskaExtractor *extractor, size_t index)
     : mExtractor(extractor),
       mTrackIndex(index),
       mType(OTHER),
       mIsAudio(false),
-      mBlockIter(mExtractor.get(),
+      mBlockIter(mExtractor,
                  mExtractor->mTracks.itemAt(index).mTrackNum,
                  index),
       mNALSizeLen(-1) {

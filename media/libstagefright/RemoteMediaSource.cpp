@@ -14,14 +14,19 @@
  * limitations under the License.
  */
 
+#include <media/stagefright/RemoteMediaExtractor.h>
 #include <media/stagefright/RemoteMediaSource.h>
 #include <media/IMediaSource.h>
 
 namespace android {
 
-RemoteMediaSource::RemoteMediaSource(const sp<MediaSource> &source, const sp<RefBase> &plugin)
-    :mSource(source),
-    mExtractorPlugin(plugin) {}
+RemoteMediaSource::RemoteMediaSource(
+        const sp<RemoteMediaExtractor> &extractor,
+        const sp<MediaSource> &source,
+        const sp<RefBase> &plugin)
+    : mExtractor(extractor),
+      mSource(source),
+      mExtractorPlugin(plugin) {}
 
 RemoteMediaSource::~RemoteMediaSource() {
     mSource = nullptr;
@@ -55,11 +60,13 @@ status_t RemoteMediaSource::setStopTimeUs(int64_t stopTimeUs) {
 ////////////////////////////////////////////////////////////////////////////////
 
 // static
-sp<IMediaSource> RemoteMediaSource::wrap(const sp<MediaSource> &source, const sp<RefBase> &plugin) {
+sp<IMediaSource> RemoteMediaSource::wrap(
+        const sp<RemoteMediaExtractor> &extractor,
+        const sp<MediaSource> &source, const sp<RefBase> &plugin) {
     if (source.get() == nullptr) {
         return nullptr;
     }
-    return new RemoteMediaSource(source, plugin);
+    return new RemoteMediaSource(extractor, source, plugin);
 }
 
 }  // namespace android

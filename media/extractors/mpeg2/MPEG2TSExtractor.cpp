@@ -51,9 +51,10 @@ static const int kMaxDurationRetry = 6;
 
 struct MPEG2TSSource : public MediaSource {
     MPEG2TSSource(
-            const sp<MPEG2TSExtractor> &extractor,
+            MPEG2TSExtractor *extractor,
             const sp<AnotherPacketSource> &impl,
             bool doesSeek);
+    virtual ~MPEG2TSSource();
 
     virtual status_t start(MetaData *params = NULL);
     virtual status_t stop();
@@ -63,7 +64,7 @@ struct MPEG2TSSource : public MediaSource {
             MediaBuffer **buffer, const ReadOptions *options = NULL);
 
 private:
-    sp<MPEG2TSExtractor> mExtractor;
+    MPEG2TSExtractor *mExtractor;
     sp<AnotherPacketSource> mImpl;
 
     // If there are both audio and video streams, only the video stream
@@ -74,12 +75,15 @@ private:
 };
 
 MPEG2TSSource::MPEG2TSSource(
-        const sp<MPEG2TSExtractor> &extractor,
+        MPEG2TSExtractor *extractor,
         const sp<AnotherPacketSource> &impl,
         bool doesSeek)
     : mExtractor(extractor),
       mImpl(impl),
       mDoesSeek(doesSeek) {
+}
+
+MPEG2TSSource::~MPEG2TSSource() {
 }
 
 status_t MPEG2TSSource::start(MetaData *params) {

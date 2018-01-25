@@ -73,7 +73,7 @@ private:
 };
 
 struct MPEG2PSExtractor::WrappedTrack : public MediaSource {
-    WrappedTrack(const sp<MPEG2PSExtractor> &extractor, const sp<Track> &track);
+    WrappedTrack(MPEG2PSExtractor *extractor, const sp<Track> &track);
 
     virtual status_t start(MetaData *params);
     virtual status_t stop();
@@ -86,7 +86,7 @@ protected:
     virtual ~WrappedTrack();
 
 private:
-    sp<MPEG2PSExtractor> mExtractor;
+    MPEG2PSExtractor *mExtractor;
     sp<MPEG2PSExtractor::Track> mTrack;
 
     DISALLOW_EVIL_CONSTRUCTORS(WrappedTrack);
@@ -723,7 +723,7 @@ status_t MPEG2PSExtractor::Track::appendPESData(
 ////////////////////////////////////////////////////////////////////////////////
 
 MPEG2PSExtractor::WrappedTrack::WrappedTrack(
-        const sp<MPEG2PSExtractor> &extractor, const sp<Track> &track)
+        MPEG2PSExtractor *extractor, const sp<Track> &track)
     : mExtractor(extractor),
       mTrack(track) {
 }

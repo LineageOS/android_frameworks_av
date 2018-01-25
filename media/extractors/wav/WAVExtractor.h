@@ -39,7 +39,6 @@ public:
     virtual sp<MetaData> getMetaData();
     virtual const char * name() { return "WAVExtractor"; }
 
-protected:
     virtual ~WAVExtractor();
 
 private:

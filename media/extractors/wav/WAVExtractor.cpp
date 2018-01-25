@@ -564,8 +564,10 @@ static MediaExtractor::CreatorFunc Sniff(
         return NULL;
     }
 
-    sp<MediaExtractor> extractor = new WAVExtractor(source);
-    if (extractor->countTracks() == 0) {
+    MediaExtractor *extractor = new WAVExtractor(source);
+    int numTracks = extractor->countTracks();
+    delete extractor;
+    if (numTracks == 0) {
         return NULL;
     }
 
