@@ -143,6 +143,10 @@ android_dataspace Camera3Stream::getOriginalDataSpace() const {
     return mOriginalDataSpace;
 }
 
+const String8& Camera3Stream::physicalCameraId() const {
+    return mPhysicalCameraId;
+}
+
 status_t Camera3Stream::forceToIdle() {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);

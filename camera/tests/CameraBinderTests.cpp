@@ -198,9 +198,11 @@ public:
 
 
     virtual binder::Status onResultReceived(const CameraMetadata& metadata,
-            const CaptureResultExtras& resultExtras) {
+            const CaptureResultExtras& resultExtras,
+            const std::vector<PhysicalCaptureResultInfo>& physicalResultInfos) {
         (void) metadata;
         (void) resultExtras;
+        (void) physicalResultInfos;
         Mutex::Autolock l(mLock);
         mLastStatus = SENT_RESULT;
         mStatusesHit.push_back(mLastStatus);

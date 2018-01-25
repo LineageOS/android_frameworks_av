@@ -174,6 +174,11 @@ class Camera3OutputStream :
     virtual status_t dropBuffers(bool dropping) override;
 
     /**
+     * Query the physical camera id for the output stream.
+     */
+    virtual const String8& getPhysicalCameraId() const override;
+
+    /**
      * Set the graphic buffer manager to get/return the stream buffers.
      *
      * It is only legal to call this method when stream is in STATE_CONSTRUCTED state.
