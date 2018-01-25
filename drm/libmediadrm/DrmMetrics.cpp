@@ -54,8 +54,8 @@ void ExportCounterMetric(const android::CounterMetric<T>& counter,
     ALOGE("item was unexpectedly null.");
     return;
   }
-  std::string success_count_name = counter.metric_name() + "/ok/count";
-  std::string error_count_name = counter.metric_name() + "/error/count";
+  std::string success_count_name = counter.metric_name() + ".ok.count";
+  std::string error_count_name = counter.metric_name() + ".error.count";
   counter.ExportValues(
       [&] (const android::status_t status, const int64_t value) {
           if (status == android::OK) {
@@ -81,7 +81,7 @@ void ExportCounterMetricWithAttributeNames(
   counter.ExportValues(
       [&] (const T& attribute, const int64_t value) {
           std::string name = counter.metric_name()
-              + "/" + GetAttributeName(attribute) + "/count";
+              + "." + GetAttributeName(attribute) + ".count";
           item->setInt64(name.c_str(), value);
       });
 }
@@ -93,9 +93,9 @@ void ExportEventMetric(const android::EventMetric<T>& event,
     ALOGE("item was unexpectedly null.");
     return;
   }
-  std::string success_count_name = event.metric_name() + "/ok/count";
-  std::string error_count_name = event.metric_name() + "/error/count";
-  std::string timing_name = event.metric_name() + "/ok/average_time_micros";
+  std::string success_count_name = event.metric_name() + ".ok.count";
+  std::string error_count_name = event.metric_name() + ".error.count";
+  std::string timing_name = event.metric_name() + ".ok.average_time_micros";
   event.ExportValues(
       [&] (const android::status_t& status,
            const android::EventStatistics& value) {
@@ -118,19 +118,19 @@ void ExportEventMetric(const android::EventMetric<T>& event,
 namespace android {
 
 MediaDrmMetrics::MediaDrmMetrics()
-    : mOpenSessionCounter("/drm/mediadrm/open_session", "status"),
-      mCloseSessionCounter("/drm/mediadrm/close_session", "status"),
-      mGetKeyRequestTiming("/drm/mediadrm/get_key_request", "status"),
-      mProvideKeyResponseTiming("/drm/mediadrm/provide_key_response", "status"),
+    : mOpenSessionCounter("drm.mediadrm.open_session", "status"),
+      mCloseSessionCounter("drm.mediadrm.close_session", "status"),
+      mGetKeyRequestTiming("drm.mediadrm.get_key_request", "status"),
+      mProvideKeyResponseTiming("drm.mediadrm.provide_key_response", "status"),
       mGetProvisionRequestCounter(
-          "/drm/mediadrm/get_provision_request", "status"),
+          "drm.mediadrm.get_provision_request", "status"),
       mProvideProvisionResponseCounter(
-          "/drm/mediadrm/provide_provision_response", "status"),
+          "drm.mediadrm.provide_provision_response", "status"),
       mKeyStatusChangeCounter(
-          "/drm/mediadrm/key_status_change", "key_status_type"),
-      mEventCounter("/drm/mediadrm/event", "event_type"),
+          "drm.mediadrm.key_status_change", "key_status_type"),
+      mEventCounter("drm.mediadrm.event", "event_type"),
       mGetDeviceUniqueIdCounter(
-          "/drm/mediadrm/get_device_unique_id", "status") {
+          "drm.mediadrm.get_device_unique_id", "status") {
 }
 
 void MediaDrmMetrics::Export(MediaAnalyticsItem* item) {
