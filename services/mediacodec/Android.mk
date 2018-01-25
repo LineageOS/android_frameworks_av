@@ -27,6 +27,7 @@ _software_codecs := \
 include $(CLEAR_VARS)
 # seccomp is not required for coverage build.
 ifneq ($(NATIVE_COVERAGE),true)
+LOCAL_REQUIRED_MODULES := crash_dump.policy
 LOCAL_REQUIRED_MODULES_arm := mediacodec.policy
 LOCAL_REQUIRED_MODULES_x86 := mediacodec.policy
 endif
@@ -53,7 +54,7 @@ LOCAL_32_BIT_ONLY := true
 # Since this is 32-bit-only module, only 32-bit version of the codecs are installed.
 # TODO(b/72343507): eliminate the need for manually adding .vendor suffix. This should be done
 # by the build system.
-LOCAL_REQUIRED_MODULES := \
+LOCAL_REQUIRED_MODULES += \
 $(foreach codec,$(_software_codecs),\
   $(eval _vendor_suffix := $(if $(BOARD_VNDK_VERSION),.vendor))\
   $(codec)$(_vendor_suffix)\
