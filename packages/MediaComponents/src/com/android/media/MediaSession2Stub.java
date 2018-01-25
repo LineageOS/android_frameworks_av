@@ -21,12 +21,15 @@ import static com.android.media.MediaController2Impl.CALLBACK_FLAG_PLAYBACK;
 import android.content.Context;
 import android.media.IMediaSession2;
 import android.media.IMediaSession2Callback;
+import android.media.MediaLibraryService2.BrowserRoot;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
+import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
+import android.media.PlaybackState2;
 import android.media.session.PlaybackState;
 import android.os.Binder;
 import android.os.Bundle;
@@ -35,7 +38,6 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.RemoteException;
-import android.service.media.MediaBrowserService.BrowserRoot;
 import android.support.annotation.GuardedBy;
 import android.util.ArrayMap;
 import android.util.Log;
@@ -151,10 +153,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Deprecated
     @Override
-    public PlaybackState getPlaybackState() throws RemoteException {
+    public Bundle getPlaybackState() throws RemoteException {
         MediaSession2Impl session = getSession();
         // TODO(jaewan): Check if mPlayer.getPlaybackState() is safe here.
-        return session.getInstance().getPlayer().getPlaybackState();
+        return session.getInstance().getPlayer().getPlaybackState().toBundle();
     }
 
     @Deprecated
@@ -215,17 +217,37 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     // Should be used without a lock to prevent potential deadlock.
-    public void notifyPlaybackStateChangedNotLocked(PlaybackState state) {
+    public void notifyPlaybackStateChangedNotLocked(PlaybackState2 state) {
         final List<ControllerInfo> list = getControllersWithFlag(CALLBACK_FLAG_PLAYBACK);
         for (int i = 0; i < list.size(); i++) {
             IMediaSession2Callback callbackBinder =
                     ControllerInfoImpl.from(list.get(i)).getControllerBinder();
             try {
-                callbackBinder.onPlaybackStateChanged(state);
+                callbackBinder.onPlaybackStateChanged(state.toBundle());
             } catch (RemoteException e) {
                 Log.w(TAG, "Controller is gone", e);
                 // TODO(jaewan): What to do when the controller is gone?
             }
+        }
+    }
+
+    public void notifyCustomLayoutNotLocked(ControllerInfo controller, List<CommandButton> layout) {
+        // TODO(jaewan): It's OK to be called while it's connecting, but not OK if the connection
+        //               is rejected. Handle the case.
+        IMediaSession2Callback callbackBinder =
+                ControllerInfoImpl.from(controller).getControllerBinder();
+        try {
+            List<Bundle> layoutBundles = new ArrayList<>();
+            for (int i = 0; i < layout.size(); i++) {
+                Bundle bundle = layout.get(i).toBundle();
+                if (bundle != null) {
+                    layoutBundles.add(bundle);
+                }
+            }
+            callbackBinder.onCustomLayoutChanged(layoutBundles);
+        } catch (RemoteException e) {
+            Log.w(TAG, "Controller is gone", e);
+            // TODO(jaewan): What to do when the controller is gone?
         }
     }
 

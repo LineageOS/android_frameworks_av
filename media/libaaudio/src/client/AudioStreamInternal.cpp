@@ -340,8 +340,13 @@ aaudio_result_t AudioStreamInternal::stopCallback()
     }
 }
 
-aaudio_result_t AudioStreamInternal::requestStopInternal()
+aaudio_result_t AudioStreamInternal::requestStop()
 {
+    aaudio_result_t result = stopCallback();
+    if (result != AAUDIO_OK) {
+        return result;
+    }
+
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
         ALOGE("requestStopInternal() mServiceStreamHandle invalid = 0x%08X",
               mServiceStreamHandle);
@@ -353,16 +358,6 @@ aaudio_result_t AudioStreamInternal::requestStopInternal()
     mAtomicTimestamp.clear();
 
     return mServiceInterface.stopStream(mServiceStreamHandle);
-}
-
-aaudio_result_t AudioStreamInternal::requestStop()
-{
-    aaudio_result_t result = stopCallback();
-    if (result != AAUDIO_OK) {
-        return result;
-    }
-    result = requestStopInternal();
-    return result;
 }
 
 aaudio_result_t AudioStreamInternal::registerThread() {
@@ -482,10 +477,6 @@ aaudio_result_t AudioStreamInternal::onEventFromServer(AAudioServiceMessage *mes
                 setState(AAUDIO_STREAM_STATE_FLUSHED);
                 onFlushFromServer();
             }
-            break;
-        case AAUDIO_SERVICE_EVENT_CLOSED:
-            ALOGD("%s - got AAUDIO_SERVICE_EVENT_CLOSED", __func__);
-            setState(AAUDIO_STREAM_STATE_CLOSED);
             break;
         case AAUDIO_SERVICE_EVENT_DISCONNECTED:
             // Prevent hardware from looping on old data and making buzzing sounds.

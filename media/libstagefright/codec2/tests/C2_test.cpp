@@ -75,4 +75,88 @@ static_assert(c2_const_checker<max_u32_u32>::num() == 2, "should be 2");
 static_assert(c2_const_checker<max_u32_u64>::num() == 3, "should be 3");
 static_assert(c2_const_checker<max_u32_u8>::num() == 0x7fffffff, "should be 0x7fffffff");
 
+/* ======================================= COUNTER TESTS ======================================= */
+
+void c2_cntr_static_test() {
+    // sanity checks for construction/assignment
+    constexpr c2_cntr32_t c32_a(123);
+    constexpr c2_cntr64_t c64_a(-456);
+    c2_cntr32_t c32_b __unused = c64_a;
+    // c32_b = 64.; // DISALLOWED
+    // c2_cntr64_t c64_b = c32_a; // DISALLOWED
+
+    // sanity checks for some constexpr operators
+    static_assert(std::is_same<decltype(c32_a + c64_a), decltype(c64_a + c32_a)>::value, "+ should result same type");
+    static_assert(c32_a + c64_a == c2_cntr32_t(-333), "123 + -456 = -333");
+    static_assert(c32_a + c32_a == c2_cntr32_t(246), "123 + 123 = 246");
+    static_assert(c64_a + c32_a == c2_cntr32_t(-333), "-456 + 123 = 579");
+    static_assert(std::is_same<decltype(c32_a + 1), decltype(1 + c32_a)>::value, "+ should result same type");
+    static_assert(c32_a + 456 == c2_cntr32_t(579), "123 + 456 = 579");
+    static_assert(456 + c64_a == c2_cntr64_t(0), "456 + -456 = 0");
+    static_assert(std::is_same<decltype(c32_a - c64_a), decltype(c64_a - c32_a)>::value, "- should result same type");
+    static_assert(c32_a - c64_a == c2_cntr32_t(579), "123 - -456 = 579");
+    static_assert(c32_a - c32_a == c2_cntr32_t(0), "123 - 123 = 0");
+    static_assert(c64_a - c32_a == c2_cntr32_t(-579), "-456 - 123 = -579");
+    static_assert(std::is_same<decltype(c32_a - 1), decltype(1 - c32_a)>::value, "- should result same type");
+    static_assert(c32_a - 456 == c2_cntr32_t(-333), "123 - 456 = -333");
+    static_assert(456 - c64_a == c2_cntr64_t(912), "456 - -456 = 912");
+    static_assert(std::is_same<decltype(c32_a * c64_a), decltype(c64_a * c32_a)>::value, "* should result same type");
+    static_assert(c32_a * c64_a == c2_cntr32_t(-56088), "123 * -456 = -56088");
+    static_assert(c32_a * c32_a == c2_cntr32_t(15129), "123 * 123 = 15129");
+    static_assert(c64_a * c32_a == c2_cntr32_t(-56088), "-456 * 123 = -56088");
+    static_assert(std::is_same<decltype(c32_a * 1), decltype(1 * c32_a)>::value, "* should result same type");
+    static_assert(c32_a * 456 == c2_cntr32_t(56088), "123 * 456 = 56088");
+    static_assert(456 * c64_a == c2_cntr64_t(-207936), "456 * -456 = -207936");
+
+    static_assert((c32_a << 26u) == c2_cntr32_t(0xEC000000), "123 << 26 = 0xEC000000");
+
+    // sanity checks for unary operators
+    static_assert(c2_cntr32_t(1) == +c2_cntr32_t(1), "1 == +1");
+    static_assert(c2_cntr32_t(1) == -c2_cntr32_t(-1), "1 == --1");
+
+    // sanity checks for comparison
+    using c8_t = c2_cntr_t<uint8_t>;
+    static_assert(c8_t(-0x80) > c8_t(0x7f), "80 > 7F");
+    static_assert(c8_t(-0x80) >= c8_t(0x7f), "80 >= 7F");
+    static_assert(c8_t(0x7f) > c8_t(0x7e), "7F > 7E");
+    static_assert(c8_t(0x7f) >= c8_t(0x7e), "7F >= 7E");
+    static_assert(!(c8_t(-0x80) > c8_t(0)), "80 !> 00");
+    static_assert(!(c8_t(-0x80) >= c8_t(0)), "80 !>= 00");
+    static_assert(!(c8_t(-0x80) > c8_t(-0x80)), "80 !> 80");
+    static_assert(c8_t(-0x80) >= c8_t(-0x80), "80 >= 80");
+
+    static_assert(c8_t(-0x80) == c8_t(0x80), "80 == 80");
+    static_assert(!(c8_t(-0x80) == c8_t(0)), "80 != 0");
+    static_assert(c8_t(-0x80) != c8_t(0x7f), "80 != 7F");
+    static_assert(!(c8_t(0x7f) != c8_t(0x7f)), "80 != 7F");
+
+    static_assert(c8_t(0x7f) < c8_t(-0x80), "7F < 80");
+    static_assert(c8_t(0x7f) <= c8_t(-0x80), "7F < 80");
+    static_assert(c8_t(0x7e) < c8_t(0x7f), "7E < 7F");
+    static_assert(c8_t(0x7e) <= c8_t(0x7f), "7E < 7F");
+    static_assert(!(c8_t(-0x40) < c8_t(0x40)), "-40 !< 40");
+    static_assert(!(c8_t(-0x40) <= c8_t(0x40)), "-40 !<= 40");
+    static_assert(!(c8_t(-0x40) < c8_t(-0x40)), "-40 !< -40");
+    static_assert(c8_t(-0x40) <= c8_t(-0x40), "-40 <= -40");
+
+    static_assert(c2_cntr32_t(-0x7fffffff - 1) > c2_cntr32_t(0x7fffffff), "80 > 7F");
+    static_assert(!(c2_cntr32_t(-0x7fffffff - 1) > c2_cntr32_t(0)), "80 !> 00");
+    static_assert(c2_cntr32_t(1) == c2_cntr32_t(c2_cntr64_t(0x100000001ul)), "1 == 1");
+}
+
+class C2Test : public ::testing::Test {
+};
+
+TEST_F(C2Test, CounterTest) {
+    c2_cntr32_t c32_a(123);
+    c2_cntr64_t c64_a(-456);
+    EXPECT_EQ(c32_a += 3, c2_cntr32_t(126));
+    EXPECT_EQ(c32_a += c64_a, c2_cntr32_t(-330));
+    EXPECT_EQ(c32_a <<= 2u, c2_cntr32_t(-1320));
+    EXPECT_EQ(c64_a *= 3, c2_cntr64_t(-1368));
+    EXPECT_EQ(c32_a -= c64_a, c2_cntr32_t(48));
+    EXPECT_EQ(c32_a -= 40, c2_cntr32_t(8));
+    EXPECT_EQ(c32_a *= c32_a, c2_cntr32_t(64));
+}
+
 } // namespace android

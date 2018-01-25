@@ -23,6 +23,7 @@
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/Surface.h>
 #include <media/ICrypto.h>
+#include <media/MediaBufferHolder.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -739,7 +740,8 @@ status_t MediaCodecSource::feedEncoderInputBuffers() {
             if (mIsVideo) {
                 // video encoder will release MediaBuffer when done
                 // with underlying data.
-                inbuf->setMediaBufferBase(mbuf);
+                inbuf->meta()->setObject("mediaBufferHolder", new MediaBufferHolder(mbuf));
+                mbuf->release();
             } else {
                 mbuf->release();
             }

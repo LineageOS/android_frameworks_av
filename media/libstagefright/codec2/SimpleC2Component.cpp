@@ -342,7 +342,7 @@ void SimpleC2Component::processQueue() {
             return;
         }
     }
-    if (work->worklets_processed != 0u) {
+    if (work->workletsProcessed != 0u) {
         Mutexed<ExecState>::Locked state(mExecState);
         ALOGV("returning this work");
         state->mListener->onWorkDone_nb(shared_from_this(), vec(work));
@@ -351,7 +351,7 @@ void SimpleC2Component::processQueue() {
         std::unique_ptr<C2Work> unexpected;
         {
             Mutexed<PendingWork>::Locked pending(mPendingWork);
-            uint64_t frameIndex = work->input.ordinal.frame_index;
+            uint64_t frameIndex = work->input.ordinal.frameIndex.peeku();
             if (pending->count(frameIndex) != 0) {
                 unexpected = std::move(pending->at(frameIndex));
                 pending->erase(frameIndex);

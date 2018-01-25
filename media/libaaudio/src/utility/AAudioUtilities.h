@@ -268,6 +268,14 @@ int32_t AAudioProperty_getMinimumSleepMicros();
  */
 int32_t AAudioProperty_getHardwareBurstMinMicros();
 
+
+/**
+ * Is flush allowed for the given state?
+ * @param state
+ * @return AAUDIO_OK if allowed or an error
+ */
+aaudio_result_t AAudio_isFlushAllowed(aaudio_stream_state_t state);
+
 /**
  * Try a function f until it returns true.
  *

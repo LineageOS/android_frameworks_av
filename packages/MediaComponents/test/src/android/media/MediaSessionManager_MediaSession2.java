@@ -71,7 +71,7 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
         super.cleanUp();
         sHandler.removeCallbacksAndMessages(null);
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
         });
     }
 
@@ -82,10 +82,10 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
         player.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_STOPPED));
 
         MediaController2 controller = null;
-        List<SessionToken> tokens = mManager.getActiveSessionTokens();
+        List<SessionToken2> tokens = mManager.getActiveSessionTokens();
         assertNotNull(tokens);
         for (int i = 0; i < tokens.size(); i++) {
-            SessionToken token = tokens.get(i);
+            SessionToken2 token = tokens.get(i);
             if (mContext.getPackageName().equals(token.getPackageName())
                     && TAG.equals(token.getId())) {
                 assertNotNull(token.getSessionBinder());
@@ -111,9 +111,9 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
     @Test
     public void testGetSessionTokens_sessionRejected() throws InterruptedException {
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
             mSession = new MediaSession2.Builder(mContext, new MockPlayer(0)).setId(TAG)
-                    .setSessionCallback(new SessionCallback() {
+                    .setSessionCallback(sHandlerExecutor, new SessionCallback() {
                         @Override
                         public MediaSession2.CommandGroup onConnect(ControllerInfo controller) {
                             // Reject all connection request.
@@ -124,10 +124,10 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
         ensureChangeInSession();
 
         boolean foundSession = false;
-        List<SessionToken> tokens = mManager.getActiveSessionTokens();
+        List<SessionToken2> tokens = mManager.getActiveSessionTokens();
         assertNotNull(tokens);
         for (int i = 0; i < tokens.size(); i++) {
-            SessionToken token = tokens.get(i);
+            SessionToken2 token = tokens.get(i);
             if (mContext.getPackageName().equals(token.getPackageName())
                     && TAG.equals(token.getId())) {
                 assertFalse(foundSession);
@@ -141,15 +141,15 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
     public void testGetMediaSession2Tokens_playerRemoved() throws InterruptedException {
         // Release
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
         });
         ensureChangeInSession();
 
         // When the mSession's player becomes null, it should lose binder connection between server.
         // So server will forget the session.
-        List<SessionToken> tokens = mManager.getActiveSessionTokens();
+        List<SessionToken2> tokens = mManager.getActiveSessionTokens();
         for (int i = 0; i < tokens.size(); i++) {
-            SessionToken token = tokens.get(i);
+            SessionToken2 token = tokens.get(i);
             assertFalse(mContext.getPackageName().equals(token.getPackageName())
                     && TAG.equals(token.getId()));
         }
@@ -159,19 +159,19 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
     public void testGetMediaSessionService2Token() throws InterruptedException {
         boolean foundTestSessionService = false;
         boolean foundTestLibraryService = false;
-        List<SessionToken> tokens = mManager.getSessionServiceTokens();
+        List<SessionToken2> tokens = mManager.getSessionServiceTokens();
         for (int i = 0; i < tokens.size(); i++) {
-            SessionToken token = tokens.get(i);
+            SessionToken2 token = tokens.get(i);
             if (mContext.getPackageName().equals(token.getPackageName())
                     && MockMediaSessionService2.ID.equals(token.getId())) {
                 assertFalse(foundTestSessionService);
-                assertEquals(SessionToken.TYPE_SESSION_SERVICE, token.getType());
+                assertEquals(SessionToken2.TYPE_SESSION_SERVICE, token.getType());
                 assertNull(token.getSessionBinder());
                 foundTestSessionService = true;
             } else if (mContext.getPackageName().equals(token.getPackageName())
                     && MockMediaLibraryService2.ID.equals(token.getId())) {
                 assertFalse(foundTestLibraryService);
-                assertEquals(SessionToken.TYPE_LIBRARY_SERVICE, token.getType());
+                assertEquals(SessionToken2.TYPE_LIBRARY_SERVICE, token.getType());
                 assertNull(token.getSessionBinder());
                 foundTestLibraryService = true;
             }
@@ -185,9 +185,9 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
         boolean foundTestSession = false;
         boolean foundTestSessionService = false;
         boolean foundTestLibraryService = false;
-        List<SessionToken> tokens = mManager.getAllSessionTokens();
+        List<SessionToken2> tokens = mManager.getAllSessionTokens();
         for (int i = 0; i < tokens.size(); i++) {
-            SessionToken token = tokens.get(i);
+            SessionToken2 token = tokens.get(i);
             if (!mContext.getPackageName().equals(token.getPackageName())) {
                 continue;
             }
@@ -199,11 +199,11 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
                 case MockMediaSessionService2.ID:
                     assertFalse(foundTestSessionService);
                     foundTestSessionService = true;
-                    assertEquals(SessionToken.TYPE_SESSION_SERVICE, token.getType());
+                    assertEquals(SessionToken2.TYPE_SESSION_SERVICE, token.getType());
                     break;
                 case MockMediaLibraryService2.ID:
                     assertFalse(foundTestLibraryService);
-                    assertEquals(SessionToken.TYPE_LIBRARY_SERVICE, token.getType());
+                    assertEquals(SessionToken2.TYPE_LIBRARY_SERVICE, token.getType());
                     foundTestLibraryService = true;
                     break;
                 default:

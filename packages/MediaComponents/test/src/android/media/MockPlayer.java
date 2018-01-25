@@ -16,6 +16,7 @@
 
 package android.media;
 
+import android.media.MediaSession2.PlaylistParam;
 import android.media.session.PlaybackState;
 import android.os.Handler;
 import android.support.annotation.NonNull;
@@ -24,6 +25,7 @@ import android.support.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 
 /**
  * A mock implementation of {@link MediaPlayerBase} for testing.
@@ -37,7 +39,7 @@ public class MockPlayer extends MediaPlayerBase {
     public boolean mSkipToPreviousCalled;
     public boolean mSkipToNextCalled;
     public List<PlaybackListenerHolder> mListeners = new ArrayList<>();
-    private PlaybackState mLastPlaybackState;
+    private PlaybackState2 mLastPlaybackState;
 
     public MockPlayer(int count) {
         mCountDownLatch = (count > 0) ? new CountDownLatch(count) : null;
@@ -83,16 +85,18 @@ public class MockPlayer extends MediaPlayerBase {
         }
     }
 
+
+
     @Nullable
     @Override
-    public PlaybackState getPlaybackState() {
+    public PlaybackState2 getPlaybackState() {
         return mLastPlaybackState;
     }
 
     @Override
-    public void addPlaybackListener(
-            @NonNull PlaybackListener listener, @NonNull Handler handler) {
-        mListeners.add(new PlaybackListenerHolder(listener, handler));
+    public void addPlaybackListener(@NonNull Executor executor,
+            @NonNull PlaybackListener listener) {
+        mListeners.add(new PlaybackListenerHolder(executor, listener));
     }
 
     @Override
@@ -103,10 +107,40 @@ public class MockPlayer extends MediaPlayerBase {
         }
     }
 
-    public void notifyPlaybackState(final PlaybackState state) {
+    public void notifyPlaybackState(final PlaybackState2 state) {
         mLastPlaybackState = state;
         for (int i = 0; i < mListeners.size(); i++) {
             mListeners.get(i).postPlaybackChange(state);
         }
+    }
+
+    // No-op. Should be added for test later.
+    @Override
+    public void prepare() {
+    }
+
+    @Override
+    public void seekTo(long pos) {
+    }
+
+    @Override
+    public void fastFoward() {
+    }
+
+    @Override
+    public void rewind() {
+    }
+
+    @Override
+    public AudioAttributes getAudioAttributes() {
+        return null;
+    }
+
+    @Override
+    public void setPlaylist(List<MediaItem2> item, PlaylistParam param) {
+    }
+
+    @Override
+    public void setCurrentPlaylistItem(int index) {
     }
 }

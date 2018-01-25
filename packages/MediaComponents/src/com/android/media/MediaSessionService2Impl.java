@@ -26,6 +26,7 @@ import android.media.MediaPlayerBase.PlaybackListener;
 import android.media.MediaSession2;
 import android.media.MediaSessionService2;
 import android.media.MediaSessionService2.MediaNotification;
+import android.media.PlaybackState2;
 import android.media.session.PlaybackState;
 import android.media.update.MediaSessionService2Provider;
 import android.os.IBinder;
@@ -70,7 +71,7 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
     }
 
     @Override
-    public MediaNotification onUpdateNotification_impl(PlaybackState state) {
+    public MediaNotification onUpdateNotification_impl(PlaybackState2 state) {
         // Provide default notification UI later.
         return null;
     }
@@ -118,7 +119,7 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
         return null;
     }
 
-    private void updateNotification(PlaybackState state) {
+    private void updateNotification(PlaybackState2 state) {
         MediaNotification mediaNotification = mInstance.onUpdateNotification(state);
         if (mediaNotification == null) {
             return;
@@ -145,7 +146,7 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
 
     private class SessionServicePlaybackListener implements PlaybackListener {
         @Override
-        public void onPlaybackChanged(PlaybackState state) {
+        public void onPlaybackChanged(PlaybackState2 state) {
             if (state == null) {
                 Log.w(TAG, "Ignoring null playback state");
                 return;

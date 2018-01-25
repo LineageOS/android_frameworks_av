@@ -37,6 +37,16 @@ public:
 
     aaudio_result_t requestFlush() override;
 
+    bool isFlushSupported() const override {
+        // Only implement FLUSH for OUTPUT streams.
+        return true;
+    }
+
+    bool isPauseSupported() const override {
+        // Only implement PAUSE for OUTPUT streams.
+        return true;
+    }
+
     aaudio_result_t write(const void *buffer,
                           int32_t numFrames,
                           int64_t timeoutNanoseconds) override;
@@ -51,8 +61,6 @@ public:
     }
 
 protected:
-
-    aaudio_result_t requestPauseInternal();
 
     void advanceClientToMatchServerPosition() override;
 

@@ -155,6 +155,8 @@ AudioFlinger::AudioFlinger()
       mBtNrecIsOff(false),
       mIsLowRamDevice(true),
       mIsDeviceTypeKnown(false),
+      mTotalMemory(0),
+      mClientSharedHeapSize(kMinimumClientSharedHeapSizeBytes),
       mGlobalEffectEnableTime(0),
       mSystemReady(false)
 {
@@ -1512,17 +1514,9 @@ AudioFlinger::Client::Client(const sp<AudioFlinger>& audioFlinger, pid_t pid)
         mAudioFlinger(audioFlinger),
         mPid(pid)
 {
-    size_t heapSize = property_get_int32("ro.af.client_heap_size_kbyte", 0);
-    heapSize *= 1024;
-    if (!heapSize) {
-        heapSize = kClientSharedHeapSizeBytes;
-        // Increase heap size on non low ram devices to limit risk of reconnection failure for
-        // invalidated tracks
-        if (!audioFlinger->isLowRamDevice()) {
-            heapSize *= kClientSharedHeapSizeMultiplier;
-        }
-    }
-    mMemoryDealer = new MemoryDealer(heapSize, "AudioFlinger::Client");
+    mMemoryDealer = new MemoryDealer(
+            audioFlinger->getClientSharedHeapSize(),
+            (std::string("AudioFlinger::Client(") + std::to_string(pid) + ")").c_str());
 }
 
 // Client destructor must be called with AudioFlinger::mClientLock held
@@ -1860,7 +1854,7 @@ size_t AudioFlinger::getPrimaryOutputFrameCount()
 
 // ----------------------------------------------------------------------------
 
-status_t AudioFlinger::setLowRamDevice(bool isLowRamDevice)
+status_t AudioFlinger::setLowRamDevice(bool isLowRamDevice, int64_t totalMemory)
 {
     uid_t uid = IPCThreadState::self()->getCallingUid();
     if (uid != AID_SYSTEM) {
@@ -1871,8 +1865,41 @@ status_t AudioFlinger::setLowRamDevice(bool isLowRamDevice)
         return INVALID_OPERATION;
     }
     mIsLowRamDevice = isLowRamDevice;
+    mTotalMemory = totalMemory;
+    // mIsLowRamDevice and mTotalMemory are obtained through ActivityManager;
+    // see ActivityManager.isLowRamDevice() and ActivityManager.getMemoryInfo().
+    // mIsLowRamDevice generally represent devices with less than 1GB of memory,
+    // though actual setting is determined through device configuration.
+    constexpr int64_t GB = 1024 * 1024 * 1024;
+    mClientSharedHeapSize =
+            isLowRamDevice ? kMinimumClientSharedHeapSizeBytes
+                    : mTotalMemory < 2 * GB ? 4 * kMinimumClientSharedHeapSizeBytes
+                    : mTotalMemory < 3 * GB ? 8 * kMinimumClientSharedHeapSizeBytes
+                    : mTotalMemory < 4 * GB ? 16 * kMinimumClientSharedHeapSizeBytes
+                    : 32 * kMinimumClientSharedHeapSizeBytes;
     mIsDeviceTypeKnown = true;
+
+    // TODO: Cache the client shared heap size in a persistent property.
+    // It's possible that a native process or Java service or app accesses audioserver
+    // after it is registered by system server, but before AudioService updates
+    // the memory info.  This would occur immediately after boot or an audioserver
+    // crash and restore. Before update from AudioService, the client would get the
+    // minimum heap size.
+
+    ALOGD("isLowRamDevice:%s totalMemory:%lld mClientSharedHeapSize:%zu",
+            (isLowRamDevice ? "true" : "false"),
+            (long long)mTotalMemory,
+            mClientSharedHeapSize.load());
     return NO_ERROR;
+}
+
+size_t AudioFlinger::getClientSharedHeapSize() const
+{
+    size_t heapSizeInBytes = property_get_int32("ro.af.client_heap_size_kbyte", 0) * 1024;
+    if (heapSizeInBytes != 0) { // read-only property overrides all.
+        return heapSizeInBytes;
+    }
+    return mClientSharedHeapSize;
 }
 
 audio_hw_sync_t AudioFlinger::getAudioHwSyncForSession(audio_session_t sessionId)

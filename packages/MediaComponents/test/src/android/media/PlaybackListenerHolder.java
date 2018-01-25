@@ -23,32 +23,22 @@ import android.os.Message;
 import android.support.annotation.NonNull;
 
 import java.util.List;
+import java.util.concurrent.Executor;
 
 /**
  * Holds {@link PlaybackListener} with the {@link Handler}.
  */
-public class PlaybackListenerHolder extends Handler {
-    private static final int ON_PLAYBACK_CHANGED = 1;
-
+public class PlaybackListenerHolder {
+    public final Executor executor;
     public final PlaybackListener listener;
 
-    public PlaybackListenerHolder(
-            @NonNull PlaybackListener listener, @NonNull Handler handler) {
-        super(handler.getLooper());
+    public PlaybackListenerHolder(Executor executor, @NonNull PlaybackListener listener) {
+        this.executor = executor;
         this.listener = listener;
     }
 
-    @Override
-    public void handleMessage(Message msg) {
-        switch (msg.what) {
-            case ON_PLAYBACK_CHANGED:
-                listener.onPlaybackChanged((PlaybackState) msg.obj);
-                break;
-        }
-    }
-
-    public void postPlaybackChange(PlaybackState state) {
-        obtainMessage(ON_PLAYBACK_CHANGED, state).sendToTarget();
+    public void postPlaybackChange(final PlaybackState2 state) {
+        executor.execute(() -> listener.onPlaybackChanged(state));
     }
 
     /**

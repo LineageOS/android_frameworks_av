@@ -65,7 +65,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
     public void cleanUp() throws Exception {
         super.cleanUp();
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
         });
     }
 
@@ -93,7 +93,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
             // Test if setPlayer doesn't crash with various situations.
             mSession.setPlayer(mPlayer);
             mSession.setPlayer(player);
-            mSession.setPlayer(null);
+            mSession.close();
         });
     }
 
@@ -139,6 +139,8 @@ public class MediaSession2Test extends MediaSession2TestBase {
 
     @Test
     public void testPlaybackStateChangedListener() throws InterruptedException {
+        // TODO(jaewan): Add equivalent tests again
+        /*
         final CountDownLatch latch = new CountDownLatch(2);
         final MockPlayer player = new MockPlayer(0);
         final PlaybackListener listener = (state) -> {
@@ -164,10 +166,13 @@ public class MediaSession2Test extends MediaSession2TestBase {
         });
         player.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_PAUSED));
         assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        */
     }
 
     @Test
     public void testBadPlayer() throws InterruptedException {
+        // TODO(jaewan): Add equivalent tests again
+        /*
         final CountDownLatch latch = new CountDownLatch(3); // expected call + 1
         final BadPlayer player = new BadPlayer(0);
         sHandler.postAndSync(() -> {
@@ -181,6 +186,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
         });
         player.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_PAUSED));
         assertFalse(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+        */
     }
 
     private static class BadPlayer extends MockPlayer {
@@ -199,10 +205,10 @@ public class MediaSession2Test extends MediaSession2TestBase {
     public void testOnCommandCallback() throws InterruptedException {
         final MockOnCommandCallback callback = new MockOnCommandCallback();
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
             mPlayer = new MockPlayer(1);
             mSession = new MediaSession2.Builder(mContext, mPlayer)
-                    .setSessionCallback(callback).build();
+                    .setSessionCallback(sHandlerExecutor, callback).build();
         });
         MediaController2 controller = createController(mSession.getToken());
         controller.pause();
@@ -224,9 +230,9 @@ public class MediaSession2Test extends MediaSession2TestBase {
     public void testOnConnectCallback() throws InterruptedException {
         final MockOnConnectCallback sessionCallback = new MockOnConnectCallback();
         sHandler.postAndSync(() -> {
-            mSession.setPlayer(null);
+            mSession.close();
             mSession = new MediaSession2.Builder(mContext, mPlayer)
-                    .setSessionCallback(sessionCallback).build();
+                    .setSessionCallback(sHandlerExecutor, sessionCallback).build();
         });
         MediaController2 controller =
                 createController(mSession.getToken(), false, null);

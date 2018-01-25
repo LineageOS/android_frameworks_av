@@ -46,7 +46,6 @@
             android:paddingStart="4dp"
             android:paddingEnd="4dp"
             android:textSize="20sp"
-            android:text="North by Northwest"
             android:textColor="#FFFFFFFF" />
 
         <view class="com.android.support.mediarouter.app.MediaRouteButton" android:id="@+id/cast"
@@ -84,7 +83,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingLeft="15dp"
-        android:paddingRight="15dp"
         android:orientation="horizontal">
 
         <TextView
@@ -111,25 +109,50 @@
             android:textStyle="bold"
             android:textColor="#BBBBBB" />
 
-        <ImageButton
-            android:id="@+id/overflow"
-            android:layout_alignParentEnd="true"
+        <LinearLayout
+            android:id="@+id/basic_controls"
+            android:layout_alignParentRight="true"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_centerVertical="true"
-            style="@style/BottomBarButton.Overflow"/>
+            android:orientation="horizontal" >
 
-        <ImageButton
-            android:id="@+id/fullscreen"
-            android:layout_toLeftOf="@id/overflow"
-            android:layout_centerVertical="true"
-            style="@style/BottomBarButton.FullScreen"/>
+            <ImageButton
+                android:id="@+id/subtitle"
+                android:scaleType="fitCenter"
+                style="@style/BottomBarButton.CC" />
+            <ImageButton
+                android:id="@+id/fullscreen"
+                style="@style/BottomBarButton.FullScreen"/>
+            <ImageButton
+                android:id="@+id/overflow_right"
+                style="@style/BottomBarButton.OverflowRight"/>
+        </LinearLayout>
 
-        <ImageButton
-            android:id="@+id/cc"
-            android:scaleType="fitCenter"
-            android:layout_toLeftOf="@id/fullscreen"
+        <LinearLayout
+            android:id="@+id/extra_controls"
+            android:layout_alignParentRight="true"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_centerVertical="true"
-            style="@style/BottomBarButton.CC" />
+            android:visibility="gone"
+            android:orientation="horizontal" >
+
+            <ImageButton
+                android:id="@+id/mute"
+                style="@style/BottomBarButton.Mute" />
+            <ImageButton
+                android:id="@+id/aspect_ratio"
+                style="@style/BottomBarButton.AspectRatio" />
+            <ImageButton
+                android:id="@+id/settings"
+                style="@style/BottomBarButton.Settings" />
+            <ImageButton
+                android:id="@+id/overflow_left"
+                style="@style/BottomBarButton.OverflowLeft"/>
+        </LinearLayout>
 
     </RelativeLayout>
 
 </LinearLayout>
+

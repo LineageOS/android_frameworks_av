@@ -602,44 +602,44 @@ c2_status_t C2BasicGraphicBlockPool::fetchGraphicBlock(
 
 class C2BufferData::Impl {
 public:
-    explicit Impl(const std::list<C2ConstLinearBlock> &blocks)
+    explicit Impl(const std::vector<C2ConstLinearBlock> &blocks)
         : mType(blocks.size() == 1 ? LINEAR : LINEAR_CHUNKS),
           mLinearBlocks(blocks) {
     }
 
-    explicit Impl(const std::list<C2ConstGraphicBlock> &blocks)
+    explicit Impl(const std::vector<C2ConstGraphicBlock> &blocks)
         : mType(blocks.size() == 1 ? GRAPHIC : GRAPHIC_CHUNKS),
           mGraphicBlocks(blocks) {
     }
 
     Type type() const { return mType; }
-    const std::list<C2ConstLinearBlock> &linearBlocks() const { return mLinearBlocks; }
-    const std::list<C2ConstGraphicBlock> &graphicBlocks() const { return mGraphicBlocks; }
+    const std::vector<C2ConstLinearBlock> &linearBlocks() const { return mLinearBlocks; }
+    const std::vector<C2ConstGraphicBlock> &graphicBlocks() const { return mGraphicBlocks; }
 
 private:
     Type mType;
-    std::list<C2ConstLinearBlock> mLinearBlocks;
-    std::list<C2ConstGraphicBlock> mGraphicBlocks;
+    std::vector<C2ConstLinearBlock> mLinearBlocks;
+    std::vector<C2ConstGraphicBlock> mGraphicBlocks;
 };
 
-C2BufferData::C2BufferData(const std::list<C2ConstLinearBlock> &blocks) : mImpl(new Impl(blocks)) {}
-C2BufferData::C2BufferData(const std::list<C2ConstGraphicBlock> &blocks) : mImpl(new Impl(blocks)) {}
+C2BufferData::C2BufferData(const std::vector<C2ConstLinearBlock> &blocks) : mImpl(new Impl(blocks)) {}
+C2BufferData::C2BufferData(const std::vector<C2ConstGraphicBlock> &blocks) : mImpl(new Impl(blocks)) {}
 
 C2BufferData::Type C2BufferData::type() const { return mImpl->type(); }
 
-const std::list<C2ConstLinearBlock> C2BufferData::linearBlocks() const {
+const std::vector<C2ConstLinearBlock> C2BufferData::linearBlocks() const {
     return mImpl->linearBlocks();
 }
 
-const std::list<C2ConstGraphicBlock> C2BufferData::graphicBlocks() const {
+const std::vector<C2ConstGraphicBlock> C2BufferData::graphicBlocks() const {
     return mImpl->graphicBlocks();
 }
 
 class C2Buffer::Impl {
 public:
-    Impl(C2Buffer *thiz, const std::list<C2ConstLinearBlock> &blocks)
+    Impl(C2Buffer *thiz, const std::vector<C2ConstLinearBlock> &blocks)
         : mThis(thiz), mData(blocks) {}
-    Impl(C2Buffer *thiz, const std::list<C2ConstGraphicBlock> &blocks)
+    Impl(C2Buffer *thiz, const std::vector<C2ConstGraphicBlock> &blocks)
         : mThis(thiz), mData(blocks) {}
 
     ~Impl() {
@@ -676,8 +676,8 @@ public:
         return C2_OK;
     }
 
-    std::list<std::shared_ptr<const C2Info>> infos() const {
-        std::list<std::shared_ptr<const C2Info>> result(mInfos.size());
+    std::vector<std::shared_ptr<const C2Info>> info() const {
+        std::vector<std::shared_ptr<const C2Info>> result(mInfos.size());
         std::transform(
                 mInfos.begin(), mInfos.end(), result.begin(),
                 [] (const auto &elem) { return elem.second; });
@@ -712,10 +712,10 @@ private:
     std::list<std::pair<OnDestroyNotify, void *>> mNotify;
 };
 
-C2Buffer::C2Buffer(const std::list<C2ConstLinearBlock> &blocks)
+C2Buffer::C2Buffer(const std::vector<C2ConstLinearBlock> &blocks)
     : mImpl(new Impl(this, blocks)) {}
 
-C2Buffer::C2Buffer(const std::list<C2ConstGraphicBlock> &blocks)
+C2Buffer::C2Buffer(const std::vector<C2ConstGraphicBlock> &blocks)
     : mImpl(new Impl(this, blocks)) {}
 
 const C2BufferData C2Buffer::data() const { return mImpl->data(); }
@@ -728,8 +728,8 @@ c2_status_t C2Buffer::unregisterOnDestroyNotify(OnDestroyNotify onDestroyNotify,
     return mImpl->unregisterOnDestroyNotify(onDestroyNotify, arg);
 }
 
-const std::list<std::shared_ptr<const C2Info>> C2Buffer::infos() const {
-    return mImpl->infos();
+const std::vector<std::shared_ptr<const C2Info>> C2Buffer::info() const {
+    return mImpl->info();
 }
 
 c2_status_t C2Buffer::setInfo(const std::shared_ptr<C2Info> &info) {

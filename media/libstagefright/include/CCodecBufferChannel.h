@@ -27,6 +27,7 @@
 #include <C2Component.h>
 
 #include <media/stagefright/foundation/Mutexed.h>
+#include <media/stagefright/gbs/GraphicBufferSource.h>
 #include <media/stagefright/CodecBase.h>
 #include <media/ICrypto.h>
 
@@ -35,134 +36,9 @@ namespace android {
 /**
  * BufferChannelBase implementation for CCodec.
  */
-class CCodecBufferChannel : public BufferChannelBase {
+class CCodecBufferChannel
+    : public BufferChannelBase, public std::enable_shared_from_this<CCodecBufferChannel> {
 public:
-    /**
-     * Base class for representation of buffers at one port.
-     */
-    class Buffers {
-    public:
-        Buffers() = default;
-        virtual ~Buffers() = default;
-
-        /**
-         * Set format for MediaCodec-facing buffers.
-         */
-        inline void setFormat(const sp<AMessage> &format) { mFormat = format; }
-
-        /**
-         * Returns true if the buffers are operating under array mode.
-         */
-        virtual bool isArrayMode() { return false; }
-
-        /**
-         * Fills the vector with MediaCodecBuffer's if in array mode; otherwise,
-         * no-op.
-         */
-        virtual void getArray(Vector<sp<MediaCodecBuffer>> *) {}
-
-    protected:
-        // Format to be used for creating MediaCodec-facing buffers.
-        sp<AMessage> mFormat;
-
-    private:
-        DISALLOW_EVIL_CONSTRUCTORS(Buffers);
-    };
-
-    class InputBuffers : public Buffers {
-    public:
-        using Buffers::Buffers;
-        virtual ~InputBuffers() = default;
-
-        /**
-         * Set a block pool to obtain input memory blocks.
-         */
-        inline void setPool(const std::shared_ptr<C2BlockPool> &pool) { mPool = pool; }
-
-        /**
-         * Get a new MediaCodecBuffer for input and its corresponding index.
-         * Returns false if no new buffer can be obtained at the moment.
-         */
-        virtual bool requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) = 0;
-
-        /**
-         * Release the buffer obtained from requestNewBuffer() and get the
-         * associated C2Buffer object back. Returns empty shared_ptr if the
-         * buffer is not on file.
-         */
-        virtual std::shared_ptr<C2Buffer> releaseBuffer(const sp<MediaCodecBuffer> &buffer) = 0;
-
-        /**
-         * Flush internal state. After this call, no index or buffer previously
-         * returned from requestNewBuffer() is valid.
-         */
-        virtual void flush() = 0;
-
-        /**
-         * Return array-backed version of input buffers. The returned object
-         * shall retain the internal state so that it will honor index and
-         * buffer from previous calls of requestNewBuffer().
-         */
-        virtual std::unique_ptr<InputBuffers> toArrayMode() = 0;
-
-    protected:
-        // Pool to obtain blocks for input buffers.
-        std::shared_ptr<C2BlockPool> mPool;
-
-    private:
-        DISALLOW_EVIL_CONSTRUCTORS(InputBuffers);
-    };
-
-    class OutputBuffers : public Buffers {
-    public:
-        using Buffers::Buffers;
-        virtual ~OutputBuffers() = default;
-
-        /**
-         * Register output C2Buffer from the component and obtain corresponding
-         * index and MediaCodecBuffer object. Returns false if registration
-         * fails.
-         */
-        virtual bool registerBuffer(
-                const std::shared_ptr<C2Buffer> &buffer,
-                size_t *index,
-                sp<MediaCodecBuffer> *codecBuffer) = 0;
-
-        /**
-         * Register codec specific data as a buffer to be consistent with
-         * MediaCodec behavior.
-         */
-        virtual bool registerCsd(
-                const C2StreamCsdInfo::output * /* csd */,
-                size_t * /* index */,
-                sp<MediaCodecBuffer> * /* codecBuffer */) {
-            return false;
-        }
-
-        /**
-         * Release the buffer obtained from registerBuffer() and get the
-         * associated C2Buffer object back. Returns empty shared_ptr if the
-         * buffer is not on file.
-         */
-        virtual std::shared_ptr<C2Buffer> releaseBuffer(const sp<MediaCodecBuffer> &buffer) = 0;
-
-        /**
-         * Flush internal state. After this call, no index or buffer previously
-         * returned from registerBuffer() is valid.
-         */
-        virtual void flush(const std::list<std::unique_ptr<C2Work>> &flushedWork) = 0;
-
-        /**
-         * Return array-backed version of output buffers. The returned object
-         * shall retain the internal state so that it will honor index and
-         * buffer from previous calls of registerBuffer().
-         */
-        virtual std::unique_ptr<OutputBuffers> toArrayMode() = 0;
-
-    private:
-        DISALLOW_EVIL_CONSTRUCTORS(OutputBuffers);
-    };
-
     CCodecBufferChannel(const std::function<void(status_t, enum ActionCode)> &onError);
     virtual ~CCodecBufferChannel();
 
@@ -186,23 +62,21 @@ public:
 
     // Methods below are interface for CCodec to use.
 
+    /**
+     * Set the component object for buffer processing.
+     */
     void setComponent(const std::shared_ptr<C2Component> &component);
+
+    /**
+     * Set output graphic surface for rendering.
+     */
     status_t setSurface(const sp<Surface> &surface);
 
     /**
-     * Set C2BlockPool for input buffers.
-     *
-     * TODO: start timestamp?
+     * Set GraphicBufferSource object from which the component extracts input
+     * buffers.
      */
-    void setInputBufferAllocator(const sp<C2BlockPool> &inAlloc);
-
-    /**
-     * Set C2BlockPool for output buffers. This object shall never use the
-     * allocator itself; it's just passed
-     *
-     * TODO: start timestamp?
-     */
-    void setOutputBufferAllocator(const sp<C2BlockPool> &outAlloc);
+    status_t setGraphicBufferSource(const sp<GraphicBufferSource> &source);
 
     /**
      * Start queueing buffers to the component. This object should never queue
@@ -219,11 +93,17 @@ public:
     void flush(const std::list<std::unique_ptr<C2Work>> &flushedWork);
 
     /**
-     * Notify MediaCodec about work done.
+     * Notify input client about work done.
      *
-     * @param workItems   finished work items.
+     * @param workItems   finished work item.
      */
-    void onWorkDone(std::vector<std::unique_ptr<C2Work>> workItems);
+    void onWorkDone(const std::unique_ptr<C2Work> &work);
+
+    // Internal classes
+    class Buffers;
+    class InputBuffers;
+    class OutputBuffers;
+    class InputBufferClient;
 
 private:
     class QueueGuard;
@@ -276,12 +156,17 @@ private:
         bool mRunning;
     };
 
+    class C2ComponentWrapper;
+
+    void feedInputBufferIfAvailable();
+
     QueueSync mSync;
     sp<MemoryDealer> mDealer;
     sp<IMemory> mDecryptDestination;
     int32_t mHeapSeqNum;
 
     std::shared_ptr<C2Component> mComponent;
+    std::shared_ptr<InputBufferClient> mInputClient;
     std::function<void(status_t, enum ActionCode)> mOnError;
     std::shared_ptr<C2BlockPool> mInputAllocator;
     QueueSync mQueueSync;

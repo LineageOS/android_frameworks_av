@@ -20,12 +20,14 @@ import android.content.Context;
 import android.media.IMediaSession2;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
-import android.media.SessionToken;
+import android.media.MediaSession2.CommandButton;
+import android.media.SessionToken2;
 import android.media.update.MediaBrowser2Provider;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.util.Log;
 
+import java.util.List;
 import java.util.concurrent.Executor;
 
 public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrowser2Provider {
@@ -35,7 +37,7 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
     private final MediaBrowser2 mInstance;
     private final MediaBrowser2.BrowserCallback mCallback;
 
-    public MediaBrowser2Impl(MediaBrowser2 instance, Context context, SessionToken token,
+    public MediaBrowser2Impl(MediaBrowser2 instance, Context context, SessionToken2 token,
             BrowserCallback callback, Executor executor) {
         super(instance, context, token, callback, executor);
         mInstance = instance;
@@ -59,10 +61,41 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
         }
     }
 
+    @Override
+    public void subscribe_impl(String parentId, Bundle options) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void unsubscribe_impl(String parentId, Bundle options) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void getItem_impl(String mediaId) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void getChildren_impl(String parentId, int page, int pageSize, Bundle options) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void search_impl(String query, int page, int pageSize, Bundle extras) {
+        // TODO(jaewan): Implement
+    }
+
     public void onGetRootResult(
             final Bundle rootHints, final String rootMediaId, final Bundle rootExtra) {
         getCallbackExecutor().execute(() -> {
             mCallback.onGetRootResult(rootHints, rootMediaId, rootExtra);
+        });
+    }
+
+    public void onCustomLayoutChanged(final List<CommandButton> layout) {
+        getCallbackExecutor().execute(() -> {
+            mCallback.onCustomLayoutChanged(layout);
         });
     }
 }

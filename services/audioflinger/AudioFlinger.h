@@ -94,12 +94,6 @@ class ServerProxy;
 
 static const nsecs_t kDefaultStandbyTimeInNsecs = seconds(3);
 
-
-// Max shared memory size for audio tracks and audio records per client process
-static const size_t kClientSharedHeapSizeBytes = 1024*1024;
-// Shared memory size multiplier for non low ram devices
-static const size_t kClientSharedHeapSizeMultiplier = 4;
-
 #define INCLUDING_FROM_AUDIOFLINGER_H
 
 class AudioFlinger :
@@ -227,7 +221,7 @@ public:
     virtual uint32_t getPrimaryOutputSamplingRate();
     virtual size_t getPrimaryOutputFrameCount();
 
-    virtual status_t setLowRamDevice(bool isLowRamDevice);
+    virtual status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) override;
 
     /* List available audio ports and their attributes */
     virtual status_t listAudioPorts(unsigned int *num_ports,
@@ -829,15 +823,18 @@ public:
     static const size_t kTeeSinkTrackFramesDefault = 0x200000;
 #endif
 
-    // This method reads from a variable without mLock, but the variable is updated under mLock.  So
-    // we might read a stale value, or a value that's inconsistent with respect to other variables.
-    // In this case, it's safe because the return value isn't used for making an important decision.
-    // The reason we don't want to take mLock is because it could block the caller for a long time.
+    // These methods read variables atomically without mLock,
+    // though the variables are updated with mLock.
     bool    isLowRamDevice() const { return mIsLowRamDevice; }
+    size_t getClientSharedHeapSize() const;
 
 private:
-    bool    mIsLowRamDevice;
+    std::atomic<bool> mIsLowRamDevice;
     bool    mIsDeviceTypeKnown;
+    int64_t mTotalMemory;
+    std::atomic<size_t> mClientSharedHeapSize;
+    static constexpr size_t kMinimumClientSharedHeapSizeBytes = 1024 * 1024; // 1MB
+
     nsecs_t mGlobalEffectEnableTime;  // when a global effect was last enabled
 
     sp<PatchPanel> mPatchPanel;

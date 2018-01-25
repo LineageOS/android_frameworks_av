@@ -25,6 +25,7 @@
 #include <string>
 
 #include <android-base/logging.h>
+#include <android-base/properties.h>
 #include <utils/misc.h>
 
 // from LOCAL_C_INCLUDES
@@ -65,14 +66,10 @@ int main(int argc __unused, char** argv)
     sp<IServiceManager> sm = defaultServiceManager();
     MediaExtractorService::instantiate();
 
-    // TODO: Uncomment below once sepolicy change is landed.
-    /*
-    char value[PROPERTY_VALUE_MAX];
-    property_get("ro.build.type", value, "unknown");
-    if (strcmp(value, "userdebug") == 0 || strcmp(value, "eng") == 0) {
+    std::string value = base::GetProperty("ro.build.type", "unknown");
+    if (value == "userdebug" || value == "eng") {
         media::MediaExtractorUpdateService::instantiate();
     }
-    */
 
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();

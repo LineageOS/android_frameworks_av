@@ -204,7 +204,7 @@ static void usage() {
     AAudioArgsParser::usage();
     printf("      -l{count} loopCount start/stop, every other one is silent\n");
     printf("      -t{msec}  play a high pitched tone at the beginning\n");
-    printf("      -u        force periodic Underruns by sleeping in callback\n");
+    printf("      -f        force periodic underruns by sleeping in callback\n");
 }
 
 int main(int argc, const char **argv)
@@ -234,7 +234,7 @@ int main(int argc, const char **argv)
                     case 't':
                         prefixToneMsec = atoi(&arg[2]);
                         break;
-                    case 'u':
+                    case 'f':
                         forceUnderruns = true;
                         break;
                     default:

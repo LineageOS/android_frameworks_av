@@ -682,7 +682,7 @@ public:
      */
     virtual c2_status_t reset() { return C2_OK; }
 
-    virtual c2_status_t parseFrame(C2BufferPack &frame);
+    virtual c2_status_t parseFrame(C2FrameData &frame);
 
     virtual ~C2FrameInfoParser() = default;
 };

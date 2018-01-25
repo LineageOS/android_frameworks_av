@@ -287,13 +287,8 @@ aaudio_result_t AudioStreamTrack::requestPause() {
     if (mAudioTrack.get() == nullptr) {
         ALOGE("requestPause() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
-    } else if (getState() != AAUDIO_STREAM_STATE_STARTING
-            && getState() != AAUDIO_STREAM_STATE_STARTED) {
-            // TODO What about DISCONNECTED?
-        ALOGE("requestPause(), called when state is %s",
-              AAudio_convertStreamStateToText(getState()));
-        return AAUDIO_ERROR_INVALID_STATE;
     }
+
     setState(AAUDIO_STREAM_STATE_PAUSING);
     mAudioTrack->pause();
     mCallbackEnabled.store(false);
@@ -308,10 +303,8 @@ aaudio_result_t AudioStreamTrack::requestFlush() {
     if (mAudioTrack.get() == nullptr) {
         ALOGE("requestFlush() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
-    } else if (getState() != AAUDIO_STREAM_STATE_PAUSED) {
-        ALOGE("requestFlush() not paused");
-        return AAUDIO_ERROR_INVALID_STATE;
     }
+
     setState(AAUDIO_STREAM_STATE_FLUSHING);
     incrementFramesRead(getFramesWritten() - getFramesRead());
     mAudioTrack->flush();
@@ -325,6 +318,7 @@ aaudio_result_t AudioStreamTrack::requestStop() {
         ALOGE("requestStop() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     }
+
     setState(AAUDIO_STREAM_STATE_STOPPING);
     incrementFramesRead(getFramesWritten() - getFramesRead()); // TODO review
     mTimestampPosition.set(getFramesWritten());

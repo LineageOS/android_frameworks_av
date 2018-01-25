@@ -285,7 +285,7 @@ public:
     static uint32_t getPrimaryOutputSamplingRate();
     static size_t getPrimaryOutputFrameCount();
 
-    static status_t setLowRamDevice(bool isLowRamDevice);
+    static status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory);
 
     // Check if hw offload is possible for given format, stream type, sample rate,
     // bit rate, duration, video and streaming or offload property is enabled

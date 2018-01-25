@@ -38,9 +38,12 @@ AudioStreamInternalPlay::AudioStreamInternalPlay(AAudioServiceInterface  &servic
 
 AudioStreamInternalPlay::~AudioStreamInternalPlay() {}
 
-
-aaudio_result_t AudioStreamInternalPlay::requestPauseInternal()
+aaudio_result_t AudioStreamInternalPlay::requestPause()
 {
+    aaudio_result_t result = stopCallback();
+    if (result != AAUDIO_OK) {
+        return result;
+    }
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
         ALOGE("AudioStreamInternal::requestPauseInternal() mServiceStreamHandle invalid = 0x%08X",
               mServiceStreamHandle);
@@ -51,16 +54,6 @@ aaudio_result_t AudioStreamInternalPlay::requestPauseInternal()
     setState(AAUDIO_STREAM_STATE_PAUSING);
     mAtomicTimestamp.clear();
     return mServiceInterface.pauseStream(mServiceStreamHandle);
-}
-
-aaudio_result_t AudioStreamInternalPlay::requestPause()
-{
-    aaudio_result_t result = stopCallback();
-    if (result != AAUDIO_OK) {
-        return result;
-    }
-    result = requestPauseInternal();
-    return result;
 }
 
 aaudio_result_t AudioStreamInternalPlay::requestFlush() {

@@ -45,11 +45,12 @@ public class MockMediaSessionService2 extends MediaSessionService2 {
     @Override
     public MediaSession2 onCreateSession(String sessionId) {
         final MockPlayer player = new MockPlayer(1);
-        SyncHandler handler = (SyncHandler) TestServiceRegistry.getInstance().getHandler();
+        final SyncHandler handler = (SyncHandler) TestServiceRegistry.getInstance().getHandler();
         try {
             handler.postAndSync(() -> {
                 mSession = new MediaSession2.Builder(MockMediaSessionService2.this, player)
-                        .setId(sessionId).setSessionCallback(new MySessionCallback()).build();
+                        .setId(sessionId).setSessionCallback((runnable)->handler.post(runnable),
+                                new MySessionCallback()).build();
             });
         } catch (InterruptedException e) {
             fail(e.toString());
@@ -70,7 +71,7 @@ public class MockMediaSessionService2 extends MediaSessionService2 {
     }
 
     @Override
-    public MediaNotification onUpdateNotification(PlaybackState state) {
+    public MediaNotification onUpdateNotification(PlaybackState2 state) {
         if (mDefaultNotificationChannel == null) {
             mDefaultNotificationChannel = new NotificationChannel(
                     DEFAULT_MEDIA_NOTIFICATION_CHANNEL_ID,

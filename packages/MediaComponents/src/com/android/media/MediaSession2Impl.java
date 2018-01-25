@@ -17,27 +17,38 @@
 package com.android.media;
 
 import android.Manifest.permission;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.media.AudioAttributes;
 import android.media.IMediaSession2Callback;
-import android.media.MediaController2;
+import android.media.MediaItem2;
 import android.media.MediaPlayerBase;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Builder;
+import android.media.MediaSession2.Command;
+import android.media.MediaSession2.CommandButton;
+import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
+import android.media.MediaSession2.PlaylistParam;
 import android.media.MediaSession2.SessionCallback;
-import android.media.SessionToken;
+import android.media.PlaybackState2;
+import android.media.SessionToken2;
+import android.media.VolumeProvider;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
 import android.media.update.MediaSession2Provider;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.ResultReceiver;
 import android.util.Log;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
 
 public class MediaSession2Impl implements MediaSession2Provider {
     private static final String TAG = "MediaSession2";
@@ -48,8 +59,9 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private final Context mContext;
     private final String mId;
     private final Handler mHandler;
+    private final Executor mCallbackExecutor;
     private final MediaSession2Stub mSessionStub;
-    private final SessionToken mSessionToken;
+    private final SessionToken2 mSessionToken;
 
     private MediaPlayerBase mPlayer;
 
@@ -59,22 +71,28 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     /**
      * Can be only called by the {@link Builder#build()}.
-     *
+     * 
      * @param instance
      * @param context
      * @param player
      * @param id
      * @param callback
+     * @param volumeProvider
+     * @param ratingType
+     * @param sessionActivity
      */
     public MediaSession2Impl(MediaSession2 instance, Context context, MediaPlayerBase player,
-            String id, SessionCallback callback) {
+            String id, Executor callbackExecutor, SessionCallback callback,
+            VolumeProvider volumeProvider, int ratingType, PendingIntent sessionActivity) {
         mInstance = instance;
+        // TODO(jaewan): Keep other params.
 
         // Argument checks are done by builder already.
         // Initialize finals first.
         mContext = context;
         mId = id;
         mHandler = new Handler(Looper.myLooper());
+        mCallbackExecutor = callbackExecutor;
         mSessionStub = new MediaSession2Stub(this, callback);
         // Ask server to create session token for following reasons.
         //   1. Make session ID unique per package.
@@ -101,45 +119,42 @@ public class MediaSession2Impl implements MediaSession2Provider {
     //               setPlayer(null). Token can be available when player is null, and
     //               controller can also attach to session.
     @Override
-    public void setPlayer_impl(MediaPlayerBase player) throws IllegalArgumentException {
+    public void setPlayer_impl(MediaPlayerBase player, VolumeProvider volumeProvider) throws IllegalArgumentException {
         ensureCallingThread();
-        // TODO(jaewan): Remove this when we don't inherits MediaPlayerBase.
-        if (player instanceof MediaSession2 || player instanceof MediaController2) {
-            throw new IllegalArgumentException("player doesn't accept MediaSession2 nor"
-                    + " MediaController2");
-        }
-        if (player != null && mPlayer == player) {
-            // Player didn't changed. No-op.
-            return;
+        if (player == null) {
+            throw new IllegalArgumentException("player shouldn't be null");
         }
         setPlayerInternal(player);
     }
 
     private void setPlayerInternal(MediaPlayerBase player) {
-        mHandler.removeCallbacksAndMessages(null);
-        if (mPlayer == null && player != null) {
-            if (DEBUG) {
-                Log.d(TAG, "session is ready to use, id=" + mId);
-            }
-        } else if (mPlayer != null && player == null) {
-            if (DEBUG) {
-                Log.d(TAG, "session is now unavailable, id=" + mId);
-            }
-            if (mSessionStub != null) {
-                // Invalidate previously published session stub.
-                mSessionStub.destroyNotLocked();
-            }
+        if (mPlayer == player) {
+            // Player didn't changed. No-op.
+            return;
         }
+        // TODO(jaewan): Find equivalent for the executor
+        //mHandler.removeCallbacksAndMessages(null);
         if (mPlayer != null && mListener != null) {
             // This might not work for a poorly implemented player.
             mPlayer.removePlaybackListener(mListener);
         }
-        if (player != null) {
-            mListener = new MyPlaybackListener(this, player);
-            player.addPlaybackListener(mListener, mHandler);
-            notifyPlaybackStateChanged(player.getPlaybackState());
-        }
+        mListener = new MyPlaybackListener(this, player);
+        player.addPlaybackListener(mCallbackExecutor, mListener);
+        notifyPlaybackStateChanged(player.getPlaybackState());
         mPlayer = player;
+    }
+
+    @Override
+    public void close_impl() {
+        // Flush any pending messages.
+        mHandler.removeCallbacksAndMessages(null);
+        if (mSessionStub != null) {
+            if (DEBUG) {
+                Log.d(TAG, "session is now unavailable, id=" + mId);
+            }
+            // Invalidate previously published session stub.
+            mSessionStub.destroyNotLocked();
+        }
     }
 
     @Override
@@ -149,13 +164,23 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     // TODO(jaewan): Change this to @NonNull
     @Override
-    public SessionToken getToken_impl() {
+    public SessionToken2 getToken_impl() {
         return mSessionToken;
     }
 
     @Override
     public List<ControllerInfo> getConnectedControllers_impl() {
         return mSessionStub.getControllers();
+    }
+
+    @Override
+    public void setAudioAttributes_impl(AudioAttributes attributes) {
+        // implement
+    }
+
+    @Override
+    public void setAudioFocusRequest_impl(int focusGain) {
+        // implement
     }
 
     @Override
@@ -194,40 +219,74 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public PlaybackState getPlaybackState_impl() {
+    public void setCustomLayout_impl(ControllerInfo controller, List<CommandButton> layout) {
         ensureCallingThread();
-        ensurePlayer();
-        return mPlayer.getPlaybackState();
+        if (controller == null) {
+            throw new IllegalArgumentException("controller shouldn't be null");
+        }
+        if (layout == null) {
+            throw new IllegalArgumentException("layout shouldn't be null");
+        }
+        mSessionStub.notifyCustomLayoutNotLocked(controller, layout);
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////
+    // TODO(jaewan): Implement follows
+    //////////////////////////////////////////////////////////////////////////////////////
+    @Override
+    public void setPlayer_impl(MediaPlayerBase player) {
+        // TODO(jaewan): Implement
     }
 
     @Override
-    public void addPlaybackListener_impl(
-            MediaPlayerBase.PlaybackListener listener, Handler handler) {
-        if (listener == null) {
-            throw new IllegalArgumentException("listener shouldn't be null");
-        }
-        if (handler == null) {
-            throw new IllegalArgumentException("handler shouldn't be null");
-        }
-        ensureCallingThread();
-        if (PlaybackListenerHolder.contains(mListeners, listener)) {
-            Log.w(TAG, "listener is already added. Ignoring.");
-            return;
-        }
-        mListeners.add(new PlaybackListenerHolder(listener, handler));
+    public void setAllowedCommands_impl(ControllerInfo controller, CommandGroup commands) {
+        // TODO(jaewan): Implement
     }
 
     @Override
-    public void removePlaybackListener_impl(MediaPlayerBase.PlaybackListener listener) {
-        if (listener == null) {
-            throw new IllegalArgumentException("listener shouldn't be null");
-        }
-        ensureCallingThread();
-        int idx = PlaybackListenerHolder.indexOf(mListeners, listener);
-        if (idx >= 0) {
-            mListeners.get(idx).removeCallbacksAndMessages(null);
-            mListeners.remove(idx);
-        }
+    public void notifyMetadataChanged_impl() {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void sendCustomCommand_impl(ControllerInfo controller, Command command, Bundle args,
+            ResultReceiver receiver) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void sendCustomCommand_impl(Command command, Bundle args) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void setPlaylist_impl(List<MediaItem2> playlist, PlaylistParam param) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void prepare_impl() {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void fastForward_impl() {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void rewind_impl() {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void seekTo_impl(long pos) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
+    public void setCurrentPlaylistItem_impl(int index) {
+        // TODO(jaewan): Implement
     }
 
     ///////////////////////////////////////////////////
@@ -246,12 +305,14 @@ public class MediaSession2Impl implements MediaSession2Provider {
     //               1. Allow calls from random threads for all methods.
     //               2. Allow calls from random threads for all methods, except for the
     //                  {@link #setPlayer()}.
-    // TODO(jaewan): Should we pend command instead of exception?
     private void ensureCallingThread() {
+        // TODO(jaewan): Uncomment or remove
+        /*
         if (mHandler.getLooper() != Looper.myLooper()) {
             throw new IllegalStateException("Run this on the given thread");
-        }
+        }*/
     }
+
 
     private void ensurePlayer() {
         // TODO(jaewan): Should we pend command instead? Follow the decision from MP2.
@@ -265,7 +326,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         return mHandler;
     }
 
-    private void notifyPlaybackStateChanged(PlaybackState state) {
+    private void notifyPlaybackStateChanged(PlaybackState2 state) {
         // Notify to listeners added directly to this session
         for (int i = 0; i < mListeners.size(); i++) {
             mListeners.get(i).postPlaybackChange(state);
@@ -296,10 +357,9 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public void onPlaybackChanged(PlaybackState state) {
+        public void onPlaybackChanged(PlaybackState2 state) {
             MediaSession2Impl session = mSession.get();
-            if (session == null || session.getHandler().getLooper() != Looper.myLooper()
-                    || mPlayer != session.mInstance.getPlayer()) {
+            if (mPlayer != session.mInstance.getPlayer()) {
                 Log.w(TAG, "Unexpected playback state change notifications. Ignoring.",
                         new IllegalStateException());
                 return;

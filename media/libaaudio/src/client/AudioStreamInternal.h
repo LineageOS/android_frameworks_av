@@ -121,8 +121,6 @@ protected:
 
     aaudio_result_t processCommands();
 
-    aaudio_result_t requestStopInternal();
-
     aaudio_result_t stopCallback();
 
     virtual void advanceClientToMatchServerPosition() = 0;

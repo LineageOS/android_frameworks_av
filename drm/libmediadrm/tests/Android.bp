@@ -1,0 +1,12 @@
+// Build definitions for unit tests.
+
+cc_test {
+    name: "CounterMetric_test",
+    srcs: ["CounterMetric_test.cpp"],
+    shared_libs: ["libmediadrm"],
+    include_dirs: ["frameworks/av/include/media"],
+    cflags: [
+      "-Werror",
+      "-Wall",
+    ],
+}

@@ -441,3 +441,31 @@ int32_t AAudioProperty_getHardwareBurstMinMicros() {
     }
     return prop;
 }
+
+aaudio_result_t AAudio_isFlushAllowed(aaudio_stream_state_t state) {
+    aaudio_result_t result = AAUDIO_OK;
+    switch (state) {
+// Proceed with flushing.
+        case AAUDIO_STREAM_STATE_OPEN:
+        case AAUDIO_STREAM_STATE_PAUSED:
+        case AAUDIO_STREAM_STATE_STOPPED:
+        case AAUDIO_STREAM_STATE_FLUSHED:
+            break;
+
+// Transition from one inactive state to another.
+        case AAUDIO_STREAM_STATE_STARTING:
+        case AAUDIO_STREAM_STATE_STARTED:
+        case AAUDIO_STREAM_STATE_STOPPING:
+        case AAUDIO_STREAM_STATE_PAUSING:
+        case AAUDIO_STREAM_STATE_FLUSHING:
+        case AAUDIO_STREAM_STATE_CLOSING:
+        case AAUDIO_STREAM_STATE_CLOSED:
+        case AAUDIO_STREAM_STATE_DISCONNECTED:
+        default:
+            ALOGE("can only flush stream when PAUSED, OPEN or STOPPED, state = %s",
+                  AAudio_convertStreamStateToText(state));
+            result =  AAUDIO_ERROR_INVALID_STATE;
+            break;
+    }
+    return result;
+}

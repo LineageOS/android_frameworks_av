@@ -16,12 +16,22 @@
 
 package com.android.media;
 
+import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.media.MediaLibraryService2;
 import android.media.MediaLibraryService2.MediaLibrarySession;
+import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
+import android.media.MediaPlayerBase;
 import android.media.MediaSession2;
+import android.media.MediaSession2.ControllerInfo;
+import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
+import android.media.VolumeProvider;
 import android.media.update.MediaLibraryService2Provider;
+import android.os.Bundle;
+
+import java.util.concurrent.Executor;
 
 public class MediaLibraryService2Impl extends MediaSessionService2Impl implements
         MediaLibraryService2Provider {
@@ -50,5 +60,32 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
         Intent serviceIntent = new Intent(mInstance, mInstance.getClass());
         serviceIntent.setAction(MediaLibraryService2.SERVICE_INTERFACE);
         return serviceIntent;
+    }
+
+    public static class MediaLibrarySessionImpl extends MediaSession2Impl
+            implements MediaLibrarySessionProvider {
+        private final MediaLibrarySession mInstance;
+        private final MediaLibrarySessionCallback mCallback;
+
+        public MediaLibrarySessionImpl(MediaLibrarySession instance, Context context,
+                MediaPlayerBase player, String id, Executor callbackExecutor,
+                MediaLibrarySessionCallback callback, VolumeProvider volumeProvider, int ratingType,
+                PendingIntent sessionActivity) {
+            super(instance, context, player, id, callbackExecutor, callback, volumeProvider,
+                    ratingType, sessionActivity);
+            mInstance = instance;
+            mCallback = callback;
+        }
+
+        @Override
+        public void notifyChildrenChanged_impl(ControllerInfo controller, String parentId,
+                Bundle options) {
+            // TODO(jaewan): Implements
+        }
+
+        @Override
+        public void notifyChildrenChanged_impl(String parentId, Bundle options) {
+            // TODO(jaewan): Implements
+        }
     }
 }

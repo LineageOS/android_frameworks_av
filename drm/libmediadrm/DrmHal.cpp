@@ -38,7 +38,6 @@
 #include <media/stagefright/MediaErrors.h>
 
 using drm::V1_0::KeyedVector;
-using drm::V1_0::KeyRequestType;
 using drm::V1_0::KeyStatusType;
 using drm::V1_0::KeyType;
 using drm::V1_0::KeyValue;
@@ -228,14 +227,15 @@ private:
 DrmHal::DrmHal()
    : mDrmSessionClient(new DrmSessionClient(this)),
      mFactories(makeDrmFactories()),
+     mOpenSessionCounter("/drm/mediadrm/open_session", "status"),
      mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT) {
 }
 
 void DrmHal::closeOpenSessions() {
     if (mPlugin != NULL) {
-        for (size_t i = 0; i < mOpenSessions.size(); i++) {
-            mPlugin->closeSession(toHidlVec(mOpenSessions[i]));
-            DrmSessionManager::Instance()->removeSession(mOpenSessions[i]);
+        auto openSessions = mOpenSessions;
+        for (size_t i = 0; i < openSessions.size(); i++) {
+            closeSession(openSessions[i]);
         }
     }
     mOpenSessions.clear();
@@ -518,6 +518,8 @@ status_t DrmHal::openSession(Vector<uint8_t> &sessionId) {
                 mDrmSessionClient, sessionId);
         mOpenSessions.push(sessionId);
     }
+
+    mOpenSessionCounter.Increment(err);
     return err;
 }
 
@@ -567,23 +569,63 @@ status_t DrmHal::getKeyRequest(Vector<uint8_t> const &sessionId,
 
     status_t err = UNKNOWN_ERROR;
 
+    if (mPluginV1_1 != NULL) {
+        Return<void> hResult =
+            mPluginV1_1->getKeyRequest_1_1(
+                toHidlVec(sessionId), toHidlVec(initData),
+                toHidlString(mimeType), hKeyType, hOptionalParameters,
+                [&](Status status, const hidl_vec<uint8_t>& hRequest,
+                    drm::V1_1::KeyRequestType hKeyRequestType,
+                    const hidl_string& hDefaultUrl) {
+
+            if (status == Status::OK) {
+                request = toVector(hRequest);
+                defaultUrl = toString8(hDefaultUrl);
+
+                switch (hKeyRequestType) {
+                    case drm::V1_1::KeyRequestType::INITIAL:
+                        *keyRequestType = DrmPlugin::kKeyRequestType_Initial;
+                        break;
+                    case drm::V1_1::KeyRequestType::RENEWAL:
+                        *keyRequestType = DrmPlugin::kKeyRequestType_Renewal;
+                        break;
+                    case drm::V1_1::KeyRequestType::RELEASE:
+                        *keyRequestType = DrmPlugin::kKeyRequestType_Release;
+                        break;
+                    case drm::V1_1::KeyRequestType::NONE:
+                        *keyRequestType = DrmPlugin::kKeyRequestType_None;
+                        break;
+                    case drm::V1_1::KeyRequestType::UPDATE:
+                        *keyRequestType = DrmPlugin::kKeyRequestType_Update;
+                        break;
+                    default:
+                        *keyRequestType = DrmPlugin::kKeyRequestType_Unknown;
+                        break;
+                }
+                err = toStatusT(status);
+            }
+        });
+        return hResult.isOk() ? err : DEAD_OBJECT;
+    }
+
     Return<void> hResult = mPlugin->getKeyRequest(toHidlVec(sessionId),
             toHidlVec(initData), toHidlString(mimeType), hKeyType, hOptionalParameters,
             [&](Status status, const hidl_vec<uint8_t>& hRequest,
-                    KeyRequestType hKeyRequestType, const hidl_string& hDefaultUrl) {
+                    drm::V1_0::KeyRequestType hKeyRequestType,
+                    const hidl_string& hDefaultUrl) {
 
                 if (status == Status::OK) {
                     request = toVector(hRequest);
                     defaultUrl = toString8(hDefaultUrl);
 
                     switch (hKeyRequestType) {
-                    case KeyRequestType::INITIAL:
+                    case drm::V1_0::KeyRequestType::INITIAL:
                         *keyRequestType = DrmPlugin::kKeyRequestType_Initial;
                         break;
-                    case KeyRequestType::RENEWAL:
+                    case drm::V1_0::KeyRequestType::RENEWAL:
                         *keyRequestType = DrmPlugin::kKeyRequestType_Renewal;
                         break;
-                    case KeyRequestType::RELEASE:
+                    case drm::V1_0::KeyRequestType::RELEASE:
                         *keyRequestType = DrmPlugin::kKeyRequestType_Release;
                         break;
                     default:
@@ -946,8 +988,25 @@ status_t DrmHal::setPropertyByteArray(String8 const &name,
 }
 
 status_t DrmHal::getMetrics(MediaAnalyticsItem* metrics) {
-    // TODO: Replace this with real metrics.
-    metrics->setCString("/drm/mediadrm/dummymetric", "dummy");
+    // TODO: Move mOpenSessionCounter and suffixes to a separate class
+    // that manages the collection of metrics and exporting them.
+    std::string success_count_name =
+        mOpenSessionCounter.metric_name() + "/ok/count";
+    std::string error_count_name =
+        mOpenSessionCounter.metric_name() + "/error/count";
+    mOpenSessionCounter.ExportValues(
+        [&] (status_t status, int64_t value) {
+            if (status == OK) {
+                metrics->setInt64(success_count_name.c_str(), value);
+            } else {
+                int64_t total_errors(0);
+                metrics->getInt64(error_count_name.c_str(), &total_errors);
+                metrics->setInt64(error_count_name.c_str(),
+                                  total_errors + value);
+                // TODO: Add support for exporting the list of error values.
+                // This probably needs to be added to MediaAnalyticsItem.
+            }
+        });
     return OK;
 }
 

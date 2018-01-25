@@ -28,6 +28,7 @@
 #include "NuPlayer2Source.h"
 
 #include <cutils/properties.h>
+#include <media/MediaBufferHolder.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/NdkMediaCodec.h>
 #include <media/NdkWrapper.h>
@@ -1081,16 +1082,17 @@ bool NuPlayer2::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
                 memcpy(codecBuffer->data(), buffer->data(), buffer->size());
             } else { // No buffer->data()
                 //Modular DRM
-                mediaBuf = (MediaBuffer*)buffer->getMediaBufferBase();
+                sp<RefBase> holder;
+                if (buffer->meta()->findObject("mediaBufferHolder", &holder)) {
+                    mediaBuf = (holder != nullptr) ?
+                        static_cast<MediaBufferHolder*>(holder.get())->mediaBuffer() : nullptr;
+                }
                 if (mediaBuf != NULL) {
                     codecBuffer->setRange(0, mediaBuf->size());
                     memcpy(codecBuffer->data(), mediaBuf->data(), mediaBuf->size());
 
                     sp<MetaData> meta_data = mediaBuf->meta_data();
                     cryptInfo = AMediaCodecCryptoInfoWrapper::Create(meta_data);
-
-                    // since getMediaBuffer() has incremented the refCount
-                    mediaBuf->release();
                 } else { // No mediaBuf
                     ALOGE("onInputBufferFetched: buffer->data()/mediaBuf are NULL for %p",
                             buffer.get());

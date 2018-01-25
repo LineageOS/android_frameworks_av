@@ -722,7 +722,7 @@ int32_t MediaAnalyticsItem::writeToParcel(Parcel *data) {
 
 
 std::string MediaAnalyticsItem::toString() {
-   return toString(-1);
+   return toString(PROTO_LAST);
 }
 
 std::string MediaAnalyticsItem::toString(int version) {
