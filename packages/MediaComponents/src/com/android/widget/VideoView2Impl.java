@@ -16,6 +16,7 @@
 
 package com.android.widget;
 
+import android.annotation.NonNull;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -53,6 +54,11 @@ import android.widget.VideoView2;
 
 import com.android.media.update.ApiHelper;
 import com.android.media.update.R;
+import com.android.support.mediarouter.media.MediaRouter;
+import com.android.support.mediarouter.media.MediaRouteSelector;
+import com.android.support.mediarouter.media.RemotePlaybackClient;
+import com.android.support.mediarouter.media.MediaItemStatus;
+import com.android.support.mediarouter.media.MediaSessionStatus;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -94,6 +100,9 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     private MediaControlView2 mMediaControlView;
     private MediaSession mMediaSession;
     private MediaController mMediaController;
+    private MediaSession.Callback mRouteSessionCallback = new RouteSessionCallback();
+    private MediaRouter mMediaRouter;
+    private MediaRouteSelector mMediaRouteSelector;
     private Metadata mMetadata;
     private String mTitle;
 
@@ -266,6 +275,21 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     }
 
     @Override
+    public void setRouteAttributes_impl(@NonNull List<String> routeCategories,
+            MediaSession.Callback sessionPlayer) {
+        MediaRouteSelector.Builder builder = new MediaRouteSelector.Builder();
+        for (String category : routeCategories) {
+            builder.addControlCategory(category);
+        }
+        mMediaRouteSelector = builder.build();
+        mMediaRouter = MediaRouter.getInstance(mInstance.getContext());
+        mRouteSessionCallback = sessionPlayer;
+        if (mMediaSession != null) {
+            mMediaRouter.setMediaSession(mMediaSession);
+        }
+    }
+
+    @Override
     public void setVideoPath_impl(String path) {
         mInstance.setVideoUri(Uri.parse(path));
     }
@@ -355,6 +379,9 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
         mMediaSession = new MediaSession(mInstance.getContext(), "VideoView2MediaSession");
         mMediaSession.setCallback(new MediaSessionCallback());
         mMediaController = mMediaSession.getController();
+        if (mMediaRouter != null) {
+            mMediaRouter.setMediaSession(mMediaSession);
+        }
 
         attachMediaControlView();
     }
@@ -867,17 +894,22 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     private class MediaSessionCallback extends MediaSession.Callback {
         @Override
         public void onCommand(String command, Bundle args, ResultReceiver receiver) {
-            switch (command) {
-                case MediaControlView2Impl.COMMAND_SHOW_SUBTITLE:
-                    mInstance.showSubtitle();
-                    break;
-                case MediaControlView2Impl.COMMAND_HIDE_SUBTITLE:
-                    mInstance.hideSubtitle();
-                    break;
-                case MediaControlView2Impl.COMMAND_SET_FULLSCREEN:
-                    mInstance.setFullScreen(
-                            args.getBoolean(MediaControlView2Impl.ARGUMENT_KEY_FULLSCREEN));
-                    break;
+            if (mMediaController.getPlaybackInfo().getPlaybackType()
+                    == MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE) {
+                mRouteSessionCallback.onCommand(command, args, receiver);
+            } else {
+                switch (command) {
+                    case MediaControlView2Impl.COMMAND_SHOW_SUBTITLE:
+                        mInstance.showSubtitle();
+                        break;
+                    case MediaControlView2Impl.COMMAND_HIDE_SUBTITLE:
+                        mInstance.hideSubtitle();
+                        break;
+                    case MediaControlView2Impl.COMMAND_SET_FULLSCREEN:
+                        mInstance.setFullScreen(
+                                args.getBoolean(MediaControlView2Impl.ARGUMENT_KEY_FULLSCREEN));
+                        break;
+                }
             }
         }
 
@@ -888,49 +920,132 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
         @Override
         public void onPlay() {
-            if (isInPlaybackState() && mCurrentView.hasAvailableSurface()) {
-                applySpeed();
-                mMediaPlayer.start();
-                mCurrentState = STATE_PLAYING;
-                updatePlaybackState();
-            }
-            mTargetState = STATE_PLAYING;
-            if (DEBUG) {
-                Log.d(TAG, "onPlay(). mCurrentState=" + mCurrentState
-                        + ", mTargetState=" + mTargetState);
+            if (mMediaController.getPlaybackInfo().getPlaybackType()
+                    == MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE) {
+                mRouteSessionCallback.onPlay();
+            } else {
+                if (isInPlaybackState() && mCurrentView.hasAvailableSurface()) {
+                    applySpeed();
+                    mMediaPlayer.start();
+                    mCurrentState = STATE_PLAYING;
+                    updatePlaybackState();
+                }
+                mTargetState = STATE_PLAYING;
+                if (DEBUG) {
+                    Log.d(TAG, "onPlay(). mCurrentState=" + mCurrentState
+                            + ", mTargetState=" + mTargetState);
+                }
             }
         }
 
         @Override
         public void onPause() {
-            if (isInPlaybackState()) {
-                if (mMediaPlayer.isPlaying()) {
-                    mMediaPlayer.pause();
-                    mCurrentState = STATE_PAUSED;
-                    updatePlaybackState();
+            if (mMediaController.getPlaybackInfo().getPlaybackType()
+                    == MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE) {
+                mRouteSessionCallback.onPause();
+            } else {
+                if (isInPlaybackState()) {
+                    if (mMediaPlayer.isPlaying()) {
+                        mMediaPlayer.pause();
+                        mCurrentState = STATE_PAUSED;
+                        updatePlaybackState();
+                    }
                 }
-            }
-            mTargetState = STATE_PAUSED;
-            if (DEBUG) {
-                Log.d(TAG, "onPause(). mCurrentState=" + mCurrentState
-                        + ", mTargetState=" + mTargetState);
+                mTargetState = STATE_PAUSED;
+                if (DEBUG) {
+                    Log.d(TAG, "onPause(). mCurrentState=" + mCurrentState
+                            + ", mTargetState=" + mTargetState);
+                }
             }
         }
 
         @Override
         public void onSeekTo(long pos) {
-            if (isInPlaybackState()) {
-                mMediaPlayer.seekTo(pos, MediaPlayer.SEEK_PREVIOUS_SYNC);
-                mSeekWhenPrepared = 0;
-                updatePlaybackState();
+            if (mMediaController.getPlaybackInfo().getPlaybackType()
+                    == MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE) {
+                mRouteSessionCallback.onSeekTo(pos);
             } else {
-                mSeekWhenPrepared = pos;
+                if (isInPlaybackState()) {
+                    mMediaPlayer.seekTo(pos, MediaPlayer.SEEK_PREVIOUS_SYNC);
+                    mSeekWhenPrepared = 0;
+                    updatePlaybackState();
+                } else {
+                    mSeekWhenPrepared = pos;
+                }
             }
         }
 
         @Override
         public void onStop() {
-            resetPlayer();
+            if (mMediaController.getPlaybackInfo().getPlaybackType()
+                    == MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE) {
+                mRouteSessionCallback.onStop();
+            } else {
+                resetPlayer();
+            }
+        }
+    }
+
+    private class RouteSessionCallback extends MediaSession.Callback {
+        RemotePlaybackClient mClient;
+
+        RemotePlaybackClient.StatusCallback mStatusCallback =
+                new RemotePlaybackClient.StatusCallback() {
+            @Override
+            public void onItemStatusChanged(Bundle data,
+                    String sessionId, MediaSessionStatus sessionStatus,
+                    String itemId, MediaItemStatus itemStatus) {
+                // TODO: implement this
+            }
+
+            @Override
+            public void onSessionStatusChanged(Bundle data,
+                    String sessionId, MediaSessionStatus sessionStatus) {
+                // TODO: implement this
+            }
+
+            @Override
+            public void onSessionChanged(String sessionId) {
+                // TODO: implement this
+            }
+        };
+
+        @Override
+        public void onCommand(String command, Bundle args, ResultReceiver receiver) {
+            ensureClient();
+            // TODO: implement this
+        }
+
+        @Override
+        public void onPlay() {
+            ensureClient();
+            // TODO: implement this
+        }
+
+        @Override
+        public void onPause() {
+            ensureClient();
+            // TODO: implement this
+        }
+
+        @Override
+        public void onSeekTo(long pos) {
+            ensureClient();
+            // TODO: implement this
+        }
+
+        @Override
+        public void onStop() {
+            ensureClient();
+            // TODO: implement this
+        }
+
+        private void ensureClient() {
+            if (mClient == null) {
+                mClient = new RemotePlaybackClient(
+                        mInstance.getContext(), mMediaRouter.getSelectedRoute());
+                mClient.setStatusCallback(mStatusCallback);
+            }
         }
     }
 }
