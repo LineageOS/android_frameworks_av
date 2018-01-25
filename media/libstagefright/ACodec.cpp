@@ -126,6 +126,32 @@ static inline status_t makeNoSideEffectStatus(status_t err) {
     }
 }
 
+static OMX_VIDEO_CONTROLRATETYPE getVideoBitrateMode(const sp<AMessage> &msg) {
+    int32_t tmp;
+    if (msg->findInt32("bitrate-mode", &tmp)) {
+        // explicitly translate from MediaCodecInfo.EncoderCapabilities.
+        // BITRATE_MODE_* into OMX bitrate mode.
+        switch (tmp) {
+            //BITRATE_MODE_CQ
+            case 0: return OMX_Video_ControlRateConstantQuality;
+            //BITRATE_MODE_VBR
+            case 1: return OMX_Video_ControlRateVariable;
+            //BITRATE_MODE_CBR
+            case 2: return OMX_Video_ControlRateConstant;
+            default: break;
+        }
+    }
+    return OMX_Video_ControlRateVariable;
+}
+
+static bool findVideoBitrateControlInfo(const sp<AMessage> &msg,
+        OMX_VIDEO_CONTROLRATETYPE *mode, int32_t *bitrate, int32_t *quality) {
+    *mode = getVideoBitrateMode(msg);
+    bool isCQ = (*mode == OMX_Video_ControlRateConstantQuality);
+    return (!isCQ && msg->findInt32("bitrate", bitrate))
+         || (isCQ && msg->findInt32("quality", quality));
+}
+
 struct MessageList : public RefBase {
     MessageList() {
     }
@@ -1686,6 +1712,7 @@ status_t ACodec::configureCodec(
     mConfigFormat = msg;
 
     mIsEncoder = encoder;
+    mIsVideo = !strncasecmp(mime, "video/", 6);
 
     mPortMode[kPortIndexInput] = IOMX::kPortModePresetByteBuffer;
     mPortMode[kPortIndexOutput] = IOMX::kPortModePresetByteBuffer;
@@ -1696,19 +1723,26 @@ status_t ACodec::configureCodec(
         return err;
     }
 
-    int32_t bitRate = 0;
-    // FLAC encoder doesn't need a bitrate, other encoders do
-    if (encoder && strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_FLAC)
-            && !msg->findInt32("bitrate", &bitRate)) {
-        return INVALID_OPERATION;
+    OMX_VIDEO_CONTROLRATETYPE bitrateMode;
+    int32_t bitrate = 0, quality;
+    // FLAC encoder or video encoder in constant quality mode doesn't need a
+    // bitrate, other encoders do.
+    if (encoder) {
+        if (mIsVideo && !findVideoBitrateControlInfo(
+                msg, &bitrateMode, &bitrate, &quality)) {
+            return INVALID_OPERATION;
+        } else if (!mIsVideo && strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_FLAC)
+            && !msg->findInt32("bitrate", &bitrate)) {
+            return INVALID_OPERATION;
+        }
     }
 
     // propagate bitrate to the output so that the muxer has it
-    if (encoder && msg->findInt32("bitrate", &bitRate)) {
+    if (encoder && msg->findInt32("bitrate", &bitrate)) {
         // Technically ISO spec says that 'bitrate' should be 0 for VBR even though it is the
         // average bitrate. We've been setting both bitrate and max-bitrate to this same value.
-        outputFormat->setInt32("bitrate", bitRate);
-        outputFormat->setInt32("max-bitrate", bitRate);
+        outputFormat->setInt32("bitrate", bitrate);
+        outputFormat->setInt32("max-bitrate", bitrate);
     }
 
     int32_t storeMeta;
@@ -1765,9 +1799,7 @@ status_t ACodec::configureCodec(
     // Only enable metadata mode on encoder output if encoder can prepend
     // sps/pps to idr frames, since in metadata mode the bitstream is in an
     // opaque handle, to which we don't have access.
-    int32_t video = !strncasecmp(mime, "video/", 6);
-    mIsVideo = video;
-    if (encoder && video) {
+    if (encoder && mIsVideo) {
         OMX_BOOL enable = (OMX_BOOL) (prependSPSPPS
             && msg->findInt32("android._store-metadata-in-buffers-output", &storeMeta)
             && storeMeta != 0);
@@ -1813,9 +1845,9 @@ status_t ACodec::configureCodec(
     // NOTE: we only use native window for video decoders
     sp<RefBase> obj;
     bool haveNativeWindow = msg->findObject("native-window", &obj)
-            && obj != NULL && video && !encoder;
+            && obj != NULL && mIsVideo && !encoder;
     mUsingNativeWindow = haveNativeWindow;
-    if (video && !encoder) {
+    if (mIsVideo && !encoder) {
         inputFormat->setInt32("adaptive-playback", false);
 
         int32_t usageProtected;
@@ -1978,7 +2010,7 @@ status_t ACodec::configureCodec(
     (void)msg->findInt32("pcm-encoding", (int32_t*)&pcmEncoding);
     // invalid encodings will default to PCM-16bit in setupRawAudioFormat.
 
-    if (video) {
+    if (mIsVideo) {
         // determine need for software renderer
         bool usingSwRenderer = false;
         if (haveNativeWindow && mComponentName.startsWith("OMX.google.")) {
@@ -2112,14 +2144,14 @@ status_t ACodec::configureCodec(
             }
 
             err = setupAACCodec(
-                    encoder, numChannels, sampleRate, bitRate, aacProfile,
+                    encoder, numChannels, sampleRate, bitrate, aacProfile,
                     isADTS != 0, sbrMode, maxOutputChannelCount, drc,
                     pcmLimiterEnable);
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AMR_NB)) {
-        err = setupAMRCodec(encoder, false /* isWAMR */, bitRate);
+        err = setupAMRCodec(encoder, false /* isWAMR */, bitrate);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AMR_WB)) {
-        err = setupAMRCodec(encoder, true /* isWAMR */, bitRate);
+        err = setupAMRCodec(encoder, true /* isWAMR */, bitrate);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_G711_ALAW)
             || !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_G711_MLAW)) {
         // These are PCM-like formats with a fixed sample rate but
@@ -2233,7 +2265,7 @@ status_t ACodec::configureCodec(
         rateFloat = (float)rateInt;  // 16MHz (FLINTMAX) is OK for upper bound.
     }
     if (rateFloat > 0) {
-        err = setOperatingRate(rateFloat, video);
+        err = setOperatingRate(rateFloat, mIsVideo);
         err = OK; // ignore errors
     }
 
@@ -2258,7 +2290,7 @@ status_t ACodec::configureCodec(
     }
 
     // create data converters if needed
-    if (!video && err == OK) {
+    if (!mIsVideo && err == OK) {
         AudioEncoding codecPcmEncoding = kAudioEncodingPcm16bit;
         if (encoder) {
             (void)mInputFormat->findInt32("pcm-encoding", (int32_t*)&codecPcmEncoding);
@@ -3709,10 +3741,12 @@ status_t ACodec::setupVideoEncoder(
         return err;
     }
 
-    int32_t width, height, bitrate;
+    OMX_VIDEO_CONTROLRATETYPE bitrateMode;
+    int32_t width, height, bitrate = 0, quality;
     if (!msg->findInt32("width", &width)
             || !msg->findInt32("height", &height)
-            || !msg->findInt32("bitrate", &bitrate)) {
+            || !findVideoBitrateControlInfo(
+                    msg, &bitrateMode, &bitrate, &quality)) {
         return INVALID_OPERATION;
     }
 
@@ -3965,15 +3999,6 @@ static OMX_U32 setPFramesSpacing(
     return ret > 0 ? ret - 1 : 0;
 }
 
-static OMX_VIDEO_CONTROLRATETYPE getBitrateMode(const sp<AMessage> &msg) {
-    int32_t tmp;
-    if (!msg->findInt32("bitrate-mode", &tmp)) {
-        return OMX_Video_ControlRateVariable;
-    }
-
-    return static_cast<OMX_VIDEO_CONTROLRATETYPE>(tmp);
-}
-
 status_t ACodec::setupMPEG4EncoderParameters(const sp<AMessage> &msg) {
     int32_t bitrate;
     float iFrameInterval;
@@ -3982,7 +4007,7 @@ status_t ACodec::setupMPEG4EncoderParameters(const sp<AMessage> &msg) {
         return INVALID_OPERATION;
     }
 
-    OMX_VIDEO_CONTROLRATETYPE bitrateMode = getBitrateMode(msg);
+    OMX_VIDEO_CONTROLRATETYPE bitrateMode = getVideoBitrateMode(msg);
 
     float frameRate;
     if (!msg->findFloat("frame-rate", &frameRate)) {
@@ -4047,7 +4072,7 @@ status_t ACodec::setupMPEG4EncoderParameters(const sp<AMessage> &msg) {
         return err;
     }
 
-    err = configureBitrate(bitrate, bitrateMode);
+    err = configureBitrate(bitrateMode, bitrate);
 
     if (err != OK) {
         return err;
@@ -4064,7 +4089,7 @@ status_t ACodec::setupH263EncoderParameters(const sp<AMessage> &msg) {
         return INVALID_OPERATION;
     }
 
-    OMX_VIDEO_CONTROLRATETYPE bitrateMode = getBitrateMode(msg);
+    OMX_VIDEO_CONTROLRATETYPE bitrateMode = getVideoBitrateMode(msg);
 
     float frameRate;
     if (!msg->findFloat("frame-rate", &frameRate)) {
@@ -4124,7 +4149,7 @@ status_t ACodec::setupH263EncoderParameters(const sp<AMessage> &msg) {
         return err;
     }
 
-    err = configureBitrate(bitrate, bitrateMode);
+    err = configureBitrate(bitrateMode, bitrate);
 
     if (err != OK) {
         return err;
@@ -4194,7 +4219,7 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
         return INVALID_OPERATION;
     }
 
-    OMX_VIDEO_CONTROLRATETYPE bitrateMode = getBitrateMode(msg);
+    OMX_VIDEO_CONTROLRATETYPE bitrateMode = getVideoBitrateMode(msg);
 
     float frameRate;
     if (!msg->findFloat("frame-rate", &frameRate)) {
@@ -4350,18 +4375,20 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
         }
     }
 
-    return configureBitrate(bitrate, bitrateMode);
+    return configureBitrate(bitrateMode, bitrate);
 }
 
 status_t ACodec::setupHEVCEncoderParameters(const sp<AMessage> &msg) {
-    int32_t bitrate;
     float iFrameInterval;
-    if (!msg->findInt32("bitrate", &bitrate)
-            || !msg->findAsFloat("i-frame-interval", &iFrameInterval)) {
+    if (!msg->findAsFloat("i-frame-interval", &iFrameInterval)) {
         return INVALID_OPERATION;
     }
 
-    OMX_VIDEO_CONTROLRATETYPE bitrateMode = getBitrateMode(msg);
+    OMX_VIDEO_CONTROLRATETYPE bitrateMode;
+    int32_t bitrate, quality;
+    if (!findVideoBitrateControlInfo(msg, &bitrateMode, &bitrate, &quality)) {
+        return INVALID_OPERATION;
+    }
 
     float frameRate;
     if (!msg->findFloat("frame-rate", &frameRate)) {
@@ -4407,7 +4434,7 @@ status_t ACodec::setupHEVCEncoderParameters(const sp<AMessage> &msg) {
         return err;
     }
 
-    return configureBitrate(bitrate, bitrateMode);
+    return configureBitrate(bitrateMode, bitrate, quality);
 }
 
 status_t ACodec::setupVPXEncoderParameters(const sp<AMessage> &msg, sp<AMessage> &outputFormat) {
@@ -4428,7 +4455,7 @@ status_t ACodec::setupVPXEncoderParameters(const sp<AMessage> &msg, sp<AMessage>
     }
     msg->findAsFloat("i-frame-interval", &iFrameInterval);
 
-    OMX_VIDEO_CONTROLRATETYPE bitrateMode = getBitrateMode(msg);
+    OMX_VIDEO_CONTROLRATETYPE bitrateMode = getVideoBitrateMode(msg);
 
     float frameRate;
     if (!msg->findFloat("frame-rate", &frameRate)) {
@@ -4505,7 +4532,7 @@ status_t ACodec::setupVPXEncoderParameters(const sp<AMessage> &msg, sp<AMessage>
         }
     }
 
-    return configureBitrate(bitrate, bitrateMode);
+    return configureBitrate(bitrateMode, bitrate);
 }
 
 status_t ACodec::verifySupportForProfileAndLevel(
@@ -4541,7 +4568,7 @@ status_t ACodec::verifySupportForProfileAndLevel(
 }
 
 status_t ACodec::configureBitrate(
-        int32_t bitrate, OMX_VIDEO_CONTROLRATETYPE bitrateMode) {
+        OMX_VIDEO_CONTROLRATETYPE bitrateMode, int32_t bitrate, int32_t quality) {
     OMX_VIDEO_PARAM_BITRATETYPE bitrateType;
     InitOMXParams(&bitrateType);
     bitrateType.nPortIndex = kPortIndexOutput;
@@ -4554,7 +4581,13 @@ status_t ACodec::configureBitrate(
     }
 
     bitrateType.eControlRate = bitrateMode;
-    bitrateType.nTargetBitrate = bitrate;
+
+    // write it out explicitly even if it's a union
+    if (bitrateMode == OMX_Video_ControlRateConstantQuality) {
+        bitrateType.nQualityFactor = quality;
+    } else {
+        bitrateType.nTargetBitrate = bitrate;
+    }
 
     return mOMXNode->setParameter(
             OMX_IndexParamVideoBitrate, &bitrateType, sizeof(bitrateType));
