@@ -29,7 +29,6 @@
 
 #include <cutils/properties.h>
 #include <media/ICrypto.h>
-#include <media/MediaBufferHolder.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -1062,17 +1061,16 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
                 memcpy(codecBuffer->data(), buffer->data(), buffer->size());
             } else { // No buffer->data()
                 //Modular DRM
-                sp<RefBase> holder;
-                if (buffer->meta()->findObject("mediaBufferHolder", &holder)) {
-                    mediaBuf = (holder != nullptr) ?
-                        static_cast<MediaBufferHolder*>(holder.get())->mediaBuffer() : nullptr;
-                }
+                mediaBuf = (MediaBuffer*)buffer->getMediaBufferBase();
                 if (mediaBuf != NULL) {
                     codecBuffer->setRange(0, mediaBuf->size());
                     memcpy(codecBuffer->data(), mediaBuf->data(), mediaBuf->size());
 
                     sp<MetaData> meta_data = mediaBuf->meta_data();
                     cryptInfo = NuPlayerDrm::getSampleCryptoInfo(meta_data);
+
+                    // since getMediaBuffer() has incremented the refCount
+                    mediaBuf->release();
                 } else { // No mediaBuf
                     ALOGE("onInputBufferFetched: buffer->data()/mediaBuf are NULL for %p",
                             buffer.get());
