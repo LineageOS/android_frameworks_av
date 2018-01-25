@@ -2315,6 +2315,8 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
 
     Vector<camera3_stream_t*> streams;
     streams.setCapacity(config.num_streams);
+    std::vector<uint32_t> outBufSizes(mOutputStreams.size(), 0);
+
 
     if (mInputStream != NULL) {
         camera3_stream_t *inputStream;
@@ -2345,6 +2347,12 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
             return INVALID_OPERATION;
         }
         streams.add(outputStream);
+
+        if (outputStream->format == HAL_PIXEL_FORMAT_BLOB &&
+                outputStream->data_space == HAL_DATASPACE_V0_JFIF) {
+            outBufSizes[i] = static_cast<uint32_t>(
+                    getJpegBufferSize(outputStream->width, outputStream->height));
+        }
     }
 
     config.streams = streams.editArray();
@@ -2353,7 +2361,7 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
     // max_buffers, usage, priv fields.
 
     const camera_metadata_t *sessionBuffer = sessionParams.getAndLock();
-    res = mInterface->configureStreams(sessionBuffer, &config);
+    res = mInterface->configureStreams(sessionBuffer, &config, outBufSizes);
     sessionParams.unlock(sessionBuffer);
 
     if (res == BAD_VALUE) {
@@ -3323,7 +3331,7 @@ status_t Camera3Device::HalInterface::constructDefaultRequestSettings(
 }
 
 status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *sessionParams,
-        camera3_stream_configuration *config) {
+        camera3_stream_configuration *config, const std::vector<uint32_t>& outputBufferSizes) {
     ATRACE_NAME("CameraHal::configureStreams");
     if (!valid()) return INVALID_OPERATION;
     status_t res = OK;
@@ -3364,6 +3372,7 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
         dst3_2.dataSpace = mapToHidlDataspace(src->data_space);
         dst3_2.rotation = mapToStreamRotation((camera3_stream_rotation_t) src->rotation);
         dst3_4.v3_2 = dst3_2;
+        dst3_4.bufferSize = outputBufferSizes[i];
         if (src->physical_camera_id != nullptr) {
             dst3_4.physicalCameraId = src->physical_camera_id;
         }

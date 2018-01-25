@@ -279,7 +279,8 @@ class Camera3Device :
         status_t constructDefaultRequestSettings(camera3_request_template_t templateId,
                 /*out*/ camera_metadata_t **requestTemplate);
         status_t configureStreams(const camera_metadata_t *sessionParams,
-                /*inout*/ camera3_stream_configuration *config);
+                /*inout*/ camera3_stream_configuration *config,
+                const std::vector<uint32_t>& outputBufferSizes);
         status_t processCaptureRequest(camera3_capture_request_t *request);
         status_t processBatchCaptureRequests(
                 std::vector<camera3_capture_request_t*>& requests,
