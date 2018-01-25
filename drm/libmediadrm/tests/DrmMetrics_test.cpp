@@ -65,15 +65,15 @@ TEST_F(MediaDrmMetricsTest, AllValuesSuccessCounts) {
 
   // Verify the list of pairs of int64 metrics.
   std::vector<std::pair<std::string, int64_t>> expected_values = {
-      { "/drm/mediadrm/open_session/ok/count", 1 },
-      { "/drm/mediadrm/close_session/ok/count", 1 },
-      { "/drm/mediadrm/get_key_request/ok/count", 1 },
-      { "/drm/mediadrm/provide_key_response/ok/count", 1 },
-      { "/drm/mediadrm/get_provision_request/ok/count", 1 },
-      { "/drm/mediadrm/provide_provision_response/ok/count", 1 },
-      { "/drm/mediadrm/key_status_change/USABLE/count", 1 },
-      { "/drm/mediadrm/event/PROVISION_REQUIRED/count", 1 },
-      { "/drm/mediadrm/get_device_unique_id/ok/count", 1 }};
+      { "drm.mediadrm.open_session.ok.count", 1 },
+      { "drm.mediadrm.close_session.ok.count", 1 },
+      { "drm.mediadrm.get_key_request.ok.count", 1 },
+      { "drm.mediadrm.provide_key_response.ok.count", 1 },
+      { "drm.mediadrm.get_provision_request.ok.count", 1 },
+      { "drm.mediadrm.provide_provision_response.ok.count", 1 },
+      { "drm.mediadrm.key_status_change.USABLE.count", 1 },
+      { "drm.mediadrm.event.PROVISION_REQUIRED.count", 1 },
+      { "drm.mediadrm.get_device_unique_id.ok.count", 1 }};
   for (const auto& expected_pair : expected_values) {
     int64_t value = -1;
     EXPECT_TRUE(item.getInt64(expected_pair.first.c_str(), &value))
@@ -85,13 +85,13 @@ TEST_F(MediaDrmMetricsTest, AllValuesSuccessCounts) {
   // Validate timing values exist.
   int64_t value = -1;
   EXPECT_TRUE(
-      item.getInt64("/drm/mediadrm/get_key_request/ok/average_time_micros",
+      item.getInt64("drm.mediadrm.get_key_request.ok.average_time_micros",
                     &value));
   EXPECT_GE(value, 0);
 
   value = -1;
   EXPECT_TRUE(
-      item.getInt64("/drm/mediadrm/provide_key_response/ok/average_time_micros",
+      item.getInt64("drm.mediadrm.provide_key_response.ok.average_time_micros",
                     &value));
   EXPECT_GE(value, 0);
 }
@@ -140,30 +140,30 @@ TEST_F(MediaDrmMetricsTest, AllValuesFull) {
 
   // Verify the list of pairs of int64 metrics.
   std::vector<std::pair<std::string, int64_t>> expected_values = {
-      { "/drm/mediadrm/open_session/ok/count", 1 },
-      { "/drm/mediadrm/close_session/ok/count", 1 },
-      { "/drm/mediadrm/get_key_request/ok/count", 1 },
-      { "/drm/mediadrm/provide_key_response/ok/count", 1 },
-      { "/drm/mediadrm/get_provision_request/ok/count", 1 },
-      { "/drm/mediadrm/provide_provision_response/ok/count", 1 },
-      { "/drm/mediadrm/get_device_unique_id/ok/count", 1 },
-      { "/drm/mediadrm/open_session/error/count", 1 },
-      { "/drm/mediadrm/close_session/error/count", 1 },
-      { "/drm/mediadrm/get_key_request/error/count", 1 },
-      { "/drm/mediadrm/provide_key_response/error/count", 1 },
-      { "/drm/mediadrm/get_provision_request/error/count", 1 },
-      { "/drm/mediadrm/provide_provision_response/error/count", 1 },
-      { "/drm/mediadrm/get_device_unique_id/error/count", 1 },
-      { "/drm/mediadrm/key_status_change/USABLE/count", 1 },
-      { "/drm/mediadrm/key_status_change/EXPIRED/count", 1 },
-      { "/drm/mediadrm/key_status_change/OUTPUT_NOT_ALLOWED/count", 1 },
-      { "/drm/mediadrm/key_status_change/STATUS_PENDING/count", 1 },
-      { "/drm/mediadrm/key_status_change/INTERNAL_ERROR/count", 1 },
-      { "/drm/mediadrm/event/PROVISION_REQUIRED/count", 1 },
-      { "/drm/mediadrm/event/KEY_NEEDED/count", 1 },
-      { "/drm/mediadrm/event/KEY_EXPIRED/count", 1 },
-      { "/drm/mediadrm/event/VENDOR_DEFINED/count", 1 },
-      { "/drm/mediadrm/event/SESSION_RECLAIMED/count", 1 }};
+      { "drm.mediadrm.open_session.ok.count", 1 },
+      { "drm.mediadrm.close_session.ok.count", 1 },
+      { "drm.mediadrm.get_key_request.ok.count", 1 },
+      { "drm.mediadrm.provide_key_response.ok.count", 1 },
+      { "drm.mediadrm.get_provision_request.ok.count", 1 },
+      { "drm.mediadrm.provide_provision_response.ok.count", 1 },
+      { "drm.mediadrm.get_device_unique_id.ok.count", 1 },
+      { "drm.mediadrm.open_session.error.count", 1 },
+      { "drm.mediadrm.close_session.error.count", 1 },
+      { "drm.mediadrm.get_key_request.error.count", 1 },
+      { "drm.mediadrm.provide_key_response.error.count", 1 },
+      { "drm.mediadrm.get_provision_request.error.count", 1 },
+      { "drm.mediadrm.provide_provision_response.error.count", 1 },
+      { "drm.mediadrm.get_device_unique_id.error.count", 1 },
+      { "drm.mediadrm.key_status_change.USABLE.count", 1 },
+      { "drm.mediadrm.key_status_change.EXPIRED.count", 1 },
+      { "drm.mediadrm.key_status_change.OUTPUT_NOT_ALLOWED.count", 1 },
+      { "drm.mediadrm.key_status_change.STATUS_PENDING.count", 1 },
+      { "drm.mediadrm.key_status_change.INTERNAL_ERROR.count", 1 },
+      { "drm.mediadrm.event.PROVISION_REQUIRED.count", 1 },
+      { "drm.mediadrm.event.KEY_NEEDED.count", 1 },
+      { "drm.mediadrm.event.KEY_EXPIRED.count", 1 },
+      { "drm.mediadrm.event.VENDOR_DEFINED.count", 1 },
+      { "drm.mediadrm.event.SESSION_RECLAIMED.count", 1 }};
   for (const auto& expected_pair : expected_values) {
     int64_t value = -1;
     EXPECT_TRUE(item.getInt64(expected_pair.first.c_str(), &value))
@@ -174,18 +174,16 @@ TEST_F(MediaDrmMetricsTest, AllValuesFull) {
 
   // Validate timing values exist.
   int64_t value = -1;
-  std::string name = metrics.mGetKeyRequestTiming.metric_name()
-      + "/ok/average_time_micros";
-  EXPECT_TRUE(item.getInt64(name.c_str(), &value));
+  EXPECT_TRUE(
+      item.getInt64("drm.mediadrm.get_key_request.ok.average_time_micros",
+                    &value));
   EXPECT_GE(value, 0);
 
   value = -1;
-  name = metrics.mProvideKeyResponseTiming.metric_name()
-      + "/ok/average_time_micros";
-  EXPECT_TRUE(item.getInt64(name.c_str(), &value));
+  EXPECT_TRUE(
+      item.getInt64("drm.mediadrm.provide_key_response.ok.average_time_micros",
+                    &value));
   EXPECT_GE(value, 0);
 }
-
-
 
 }  // namespace android
