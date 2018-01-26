@@ -341,6 +341,12 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
+    public List<MediaItem2> getPlaylist_impl() {
+        // TODO(jaewan): Implement this
+        return null;
+    }
+
+    @Override
     public void prepare_impl() {
         ensureCallingThread();
         ensurePlayer();
