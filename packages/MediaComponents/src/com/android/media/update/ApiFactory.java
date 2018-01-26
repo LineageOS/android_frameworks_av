@@ -20,6 +20,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
+import android.media.IMediaSession2;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaController2;
@@ -41,9 +42,11 @@ import android.media.update.MediaController2Provider;
 import android.media.update.MediaLibraryService2Provider.MediaLibrarySessionProvider;
 import android.media.update.MediaSession2Provider;
 import android.media.update.MediaSessionService2Provider;
+import android.media.update.SessionToken2Provider;
 import android.media.update.VideoView2Provider;
 import android.media.update.StaticProvider;
 import android.media.update.ViewProvider;
+import android.os.Bundle;
 import android.os.IInterface;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
@@ -56,6 +59,7 @@ import com.android.media.MediaLibraryService2Impl;
 import com.android.media.MediaLibraryService2Impl.MediaLibrarySessionImpl;
 import com.android.media.MediaSession2Impl;
 import com.android.media.MediaSessionService2Impl;
+import com.android.media.SessionToken2Impl;
 import com.android.widget.MediaControlView2Impl;
 import com.android.widget.VideoView2Impl;
 
@@ -130,5 +134,18 @@ public class ApiFactory implements StaticProvider {
             VideoView2 instance, ViewProvider superProvider,
             @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         return new VideoView2Impl(instance, superProvider, attrs, defStyleAttr, defStyleRes);
+    }
+
+    @Override
+    public SessionToken2Provider createSessionToken2(Context context, SessionToken2 instance,
+            int uid, int type, String packageName, String serviceName, String id,
+            IInterface sessionBinderInterface) {
+        return new SessionToken2Impl(context, instance, uid, type, packageName,
+                serviceName, id, (IMediaSession2) sessionBinderInterface);
+    }
+
+    @Override
+    public SessionToken2 SessionToken2_fromBundle(Context context, Bundle bundle) {
+        return SessionToken2Impl.fromBundle(context, bundle);
     }
 }

@@ -92,7 +92,6 @@ public class MediaController2Impl implements MediaController2Provider {
     public MediaController2Impl(Context context, MediaController2 instance, SessionToken2 token,
             Executor executor, ControllerCallback callback) {
         mInstance = instance;
-
         if (context == null) {
             throw new IllegalArgumentException("context shouldn't be null");
         }
@@ -115,21 +114,28 @@ public class MediaController2Impl implements MediaController2Provider {
         };
 
         mSessionBinder = null;
+    }
 
-        if (token.getSessionBinder() == null) {
+    @Override
+    public void initialize() {
+        SessionToken2Impl impl = SessionToken2Impl.from(mToken);
+        // TODO(jaewan): More sanity checks.
+        if (impl.getSessionBinder() == null) {
+            // Session service
             mServiceConnection = new SessionServiceConnection();
             connectToService();
         } else {
+            // Session
             mServiceConnection = null;
-            connectToSession(token.getSessionBinder());
+            connectToSession(impl.getSessionBinder());
         }
     }
 
-    // Should be only called by constructor.
     private void connectToService() {
         // Service. Needs to get fresh binder whenever connection is needed.
+        SessionToken2Impl impl = SessionToken2Impl.from(mToken);
         final Intent intent = new Intent(MediaSessionService2.SERVICE_INTERFACE);
-        intent.setClassName(mToken.getPackageName(), mToken.getServiceName());
+        intent.setClassName(mToken.getPackageName(), impl.getServiceName());
 
         // Use bindService() instead of startForegroundService() to start session service for three
         // reasons.
@@ -166,7 +172,7 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void close_impl() {
         if (DEBUG) {
-            Log.d(TAG, "relese from " + mToken);
+            Log.d(TAG, "release from " + mToken);
         }
         final IMediaSession2 binder;
         synchronized (mLock) {

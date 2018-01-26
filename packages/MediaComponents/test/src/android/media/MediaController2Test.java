@@ -381,7 +381,6 @@ public class MediaController2Test extends MediaSession2TestBase {
         assertNotNull(token);
         assertEquals(mContext.getPackageName(), token.getPackageName());
         assertEquals(MockMediaSessionService2.ID, token.getId());
-        assertNull(token.getSessionBinder());
         assertEquals(SessionToken2.TYPE_SESSION_SERVICE, token.getType());
     }
 

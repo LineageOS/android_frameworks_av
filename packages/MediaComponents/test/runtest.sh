@@ -129,6 +129,7 @@ function runtest-MediaComponents() {
       ${adb} root
       ${adb} remount
       ${adb} shell stop
+      ${adb} shell setprop log.tag.MediaSessionService DEBUG
       ${adb} sync
       ${adb} shell start
       ${adb} wait-for-device || break

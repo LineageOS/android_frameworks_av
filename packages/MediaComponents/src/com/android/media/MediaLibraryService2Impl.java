@@ -26,6 +26,7 @@ import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSessionService2;
+import android.media.SessionToken2;
 import android.media.VolumeProvider;
 import android.media.update.MediaLibraryService2Provider;
 import android.os.Bundle;
@@ -55,10 +56,8 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
     }
 
     @Override
-    Intent createServiceIntent() {
-        Intent serviceIntent = new Intent(mInstance, mInstance.getClass());
-        serviceIntent.setAction(MediaLibraryService2.SERVICE_INTERFACE);
-        return serviceIntent;
+    int getSessionType() {
+        return SessionToken2.TYPE_LIBRARY_SERVICE;
     }
 
     public static class MediaLibrarySessionImpl extends MediaSession2Impl

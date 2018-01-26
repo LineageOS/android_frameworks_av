@@ -18,7 +18,6 @@ package com.android.media;
 
 import static com.android.media.MediaController2Impl.CALLBACK_FLAG_PLAYBACK;
 
-import android.content.Context;
 import android.media.IMediaSession2;
 import android.media.IMediaSession2Callback;
 import android.media.MediaLibraryService2.BrowserRoot;
@@ -28,15 +27,10 @@ import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
-import android.media.MediaSession2.SessionCallback;
 import android.media.PlaybackState2;
-import android.media.session.PlaybackState;
 import android.os.Binder;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
-import android.os.Message;
 import android.os.RemoteException;
 import android.support.annotation.GuardedBy;
 import android.util.ArrayMap;
