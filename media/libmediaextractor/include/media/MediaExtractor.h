@@ -30,7 +30,7 @@ class DataSource;
 class MetaData;
 class String8;
 struct AMessage;
-struct MediaSource;
+struct MediaSourceBase;
 typedef std::vector<uint8_t> HInterfaceToken;
 
 
@@ -51,7 +51,7 @@ class MediaExtractor
 public:
     virtual ~MediaExtractor();
     virtual size_t countTracks() = 0;
-    virtual sp<MediaSource> getTrack(size_t index) = 0;
+    virtual MediaSourceBase *getTrack(size_t index) = 0;
 
     enum GetTrackMetaDataFlags {
         kIncludeExtensiveMetaData = 1

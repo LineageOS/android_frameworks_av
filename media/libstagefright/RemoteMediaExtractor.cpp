@@ -89,9 +89,9 @@ size_t RemoteMediaExtractor::countTracks() {
 }
 
 sp<IMediaSource> RemoteMediaExtractor::getTrack(size_t index) {
-    sp<MediaSource> source = mExtractor->getTrack(index);
-    return (source.get() == nullptr)
-            ? nullptr : CreateIMediaSourceFromMediaSource(this, source, mExtractorPlugin);
+    MediaSourceBase *source = mExtractor->getTrack(index);
+    return (source == nullptr)
+            ? nullptr : CreateIMediaSourceFromMediaSourceBase(this, source, mExtractorPlugin);
 }
 
 sp<MetaData> RemoteMediaExtractor::getTrackMetaData(size_t index, uint32_t flags) {

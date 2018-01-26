@@ -22,7 +22,7 @@
 
 #include <cutils/properties.h>
 #include <media/DataSource.h>
-#include <media/MediaSource.h>
+#include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/base64.h>
@@ -45,7 +45,7 @@ extern "C" {
 
 namespace android {
 
-struct OggSource : public MediaSource {
+struct OggSource : public MediaSourceBase {
     explicit OggSource(OggExtractor *extractor);
 
     virtual sp<MetaData> getFormat();
@@ -1348,7 +1348,7 @@ size_t OggExtractor::countTracks() {
     return mInitCheck != OK ? 0 : 1;
 }
 
-sp<MediaSource> OggExtractor::getTrack(size_t index) {
+MediaSourceBase *OggExtractor::getTrack(size_t index) {
     if (index >= 1) {
         return NULL;
     }

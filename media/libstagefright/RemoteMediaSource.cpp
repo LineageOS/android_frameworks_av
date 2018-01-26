@@ -22,14 +22,14 @@ namespace android {
 
 RemoteMediaSource::RemoteMediaSource(
         const sp<RemoteMediaExtractor> &extractor,
-        const sp<MediaSource> &source,
+        MediaSourceBase *source,
         const sp<RefBase> &plugin)
     : mExtractor(extractor),
       mSource(source),
       mExtractorPlugin(plugin) {}
 
 RemoteMediaSource::~RemoteMediaSource() {
-    mSource = nullptr;
+    delete mSource;
     mExtractorPlugin = nullptr;
 }
 
@@ -62,8 +62,8 @@ status_t RemoteMediaSource::setStopTimeUs(int64_t stopTimeUs) {
 // static
 sp<IMediaSource> RemoteMediaSource::wrap(
         const sp<RemoteMediaExtractor> &extractor,
-        const sp<MediaSource> &source, const sp<RefBase> &plugin) {
-    if (source.get() == nullptr) {
+        MediaSourceBase *source, const sp<RefBase> &plugin) {
+    if (source == nullptr) {
         return nullptr;
     }
     return new RemoteMediaSource(extractor, source, plugin);

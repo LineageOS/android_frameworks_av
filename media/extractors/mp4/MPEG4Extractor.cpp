@@ -31,7 +31,7 @@
 #include "ItemTable.h"
 #include "include/ESDS.h"
 
-#include <media/MediaSource.h>
+#include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -65,7 +65,7 @@ enum {
     kMaxAtomSize = 64 * 1024 * 1024,
 };
 
-class MPEG4Source : public MediaSource {
+class MPEG4Source : public MediaSourceBase {
 public:
     // Caller retains ownership of both "dataSource" and "sampleTable".
     MPEG4Source(const sp<MetaData> &format,
@@ -87,7 +87,6 @@ public:
     virtual bool supportNonblockingRead() { return true; }
     virtual status_t fragmentedRead(MediaBuffer **buffer, const ReadOptions *options = NULL);
 
-protected:
     virtual ~MPEG4Source();
 
 private:
@@ -3409,7 +3408,7 @@ void MPEG4Extractor::parseID3v2MetaData(off64_t offset) {
     }
 }
 
-sp<MediaSource> MPEG4Extractor::getTrack(size_t index) {
+MediaSourceBase *MPEG4Extractor::getTrack(size_t index) {
     status_t err;
     if ((err = readMetaData()) != OK) {
         return NULL;
@@ -3485,10 +3484,11 @@ sp<MediaSource> MPEG4Extractor::getTrack(size_t index) {
         }
     }
 
-    sp<MPEG4Source> source =  new MPEG4Source(
+    MPEG4Source *source =  new MPEG4Source(
             track->meta, mDataSource, track->timescale, track->sampleTable,
             mSidxEntries, trex, mMoofOffset, itemTable);
     if (source->init() != OK) {
+        delete source;
         return NULL;
     }
     return source;

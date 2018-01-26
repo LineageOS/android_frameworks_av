@@ -52,9 +52,9 @@ sp<MediaSource> CreateMediaSourceFromIMediaSource(const sp<IMediaSource> &source
     return new CallbackMediaSource(source);
 }
 
-sp<IMediaSource> CreateIMediaSourceFromMediaSource(
+sp<IMediaSource> CreateIMediaSourceFromMediaSourceBase(
         const sp<RemoteMediaExtractor> &extractor,
-        const sp<MediaSource> &source, const sp<RefBase> &plugin) {
+        MediaSourceBase *source, const sp<RefBase> &plugin) {
     if (source == nullptr) {
         return nullptr;
     }
