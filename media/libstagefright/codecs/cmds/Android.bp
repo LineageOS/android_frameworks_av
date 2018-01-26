@@ -13,6 +13,7 @@ cc_binary {
         "libcutils",
         "libgui",
         "liblog",
+        "libmediaextractor",
         "libstagefright",
         "libstagefright_codec2",
         "libstagefright_codec2_vndk",

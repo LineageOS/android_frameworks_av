@@ -50,9 +50,6 @@ public:
     size_t offset() const;
     // Default implementation calls ABuffer::setRange() and returns OK.
     virtual status_t setRange(size_t offset, size_t size);
-    // TODO: These can be removed if we finish replacing all MediaBuffer's.
-    MediaBufferBase *getMediaBufferBase();
-    void setMediaBufferBase(MediaBufferBase *mediaBuffer);
 
     // TODO: Specify each field for meta/format.
     sp<AMessage> meta();
@@ -66,7 +63,6 @@ private:
     const sp<AMessage> mMeta;
     sp<AMessage> mFormat;
     const sp<ABuffer> mBuffer;
-    MediaBufferBase *mMediaBufferBase;
 };
 
 }  // namespace android
