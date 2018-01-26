@@ -16,9 +16,14 @@
 
 package android.media;
 
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertTrue;
+
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.ControllerInfo;
+import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
+import android.os.Bundle;
 import android.os.Process;
 import android.support.annotation.NonNull;
 import android.support.test.filters.SmallTest;
@@ -30,6 +35,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.*;
@@ -127,6 +133,30 @@ public class MediaSession2Test extends MediaSession2TestBase {
             mSession.skipToPrevious();
             assertTrue(mPlayer.mSkipToPreviousCalled);
         });
+    }
+
+    @Test
+    public void testSetPlaylistParams() throws Exception {
+        final PlaylistParams params = new PlaylistParams(
+                PlaylistParams.REPEAT_MODE_ALL,
+                PlaylistParams.SHUFFLE_MODE_ALL,
+                null /* PlaylistMetadata */);
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
+            @Override
+            public void onPlaylistParamsChanged(PlaylistParams givenParams) {
+                TestUtils.equals(params.toBundle(), givenParams.toBundle());
+                latch.countDown();
+            }
+        };
+
+        final MediaController2 controller = createController(mSession.getToken(), true, callback);
+        mSession.setPlaylistParams(params);
+        assertTrue(mPlayer.mSetPlaylistParamsCalled);
+        TestUtils.equals(params.toBundle(), mPlayer.mPlaylistParams.toBundle());
+        TestUtils.equals(params.toBundle(), mSession.getPlaylistParams().toBundle());
+        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
     }
 
     @Test

@@ -44,8 +44,10 @@ public class MockPlayer implements MediaPlayerInterface {
     public long mSeekPosition;
     public boolean mSetCurrentPlaylistItemCalled;
     public int mItemIndex;
+    public boolean mSetPlaylistParamsCalled;
 
     public List<PlaybackListenerHolder> mListeners = new ArrayList<>();
+    public PlaylistParams mPlaylistParams;
     private PlaybackState2 mLastPlaybackState;
 
     public MockPlayer(int count) {
@@ -159,6 +161,17 @@ public class MockPlayer implements MediaPlayerInterface {
         for (int i = 0; i < mListeners.size(); i++) {
             mListeners.get(i).postPlaybackChange(state);
         }
+    }
+
+    @Override
+    public void setPlaylistParams(PlaylistParams params) {
+        mSetPlaylistParamsCalled = true;
+        mPlaylistParams = params;
+    }
+
+    @Override
+    public PlaylistParams getPlaylistParams() {
+        return mPlaylistParams;
     }
 
     @Override
