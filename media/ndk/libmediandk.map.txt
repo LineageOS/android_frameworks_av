@@ -153,9 +153,12 @@ LIBMEDIANDK {
     AMediaDrm_verify;
     AMediaExtractor_advance;
     AMediaExtractor_delete;
+    AMediaExtractor_getCachedDuration; # introduced=28
+    AMediaExtractor_getFileFormat;     # introduced=28
     AMediaExtractor_getPsshInfo;
     AMediaExtractor_getSampleCryptoInfo;
     AMediaExtractor_getSampleFlags;
+    AMediaExtractor_getSampleSize;     # introduced=28
     AMediaExtractor_getSampleTime;
     AMediaExtractor_getSampleTrackIndex;
     AMediaExtractor_getTrackCount;
