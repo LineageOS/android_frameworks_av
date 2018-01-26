@@ -387,6 +387,11 @@ public class MediaController2Impl implements MediaController2Provider {
         return null;
     }
 
+    @Override
+    public void setPlaylistParams_impl(PlaylistParams params) {
+        // TODO(hdmoon): Implement
+    }
+
     ///////////////////////////////////////////////////
     // Protected or private methods
     ///////////////////////////////////////////////////
@@ -501,6 +506,24 @@ public class MediaController2Impl implements MediaController2Provider {
         public void onPlaybackStateChanged(Bundle state) throws RuntimeException {
             final MediaController2Impl controller = getController();
             controller.pushPlaybackStateChanges(PlaybackState2.fromBundle(state));
+        }
+
+        @Override
+        public void onPlaylistParamsChanged(Bundle params) throws RuntimeException {
+            final MediaController2Impl controller;
+            try {
+                controller = getController();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+                return;
+            }
+            controller.getCallbackExecutor().execute(() -> {
+                final MediaController2Impl impl = mController.get();
+                if (impl == null) {
+                    return;
+                }
+                impl.mCallback.onPlaylistParamsChanged(PlaylistParams.fromBundle(params));
+            });
         }
 
         @Override
