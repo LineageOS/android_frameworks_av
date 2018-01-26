@@ -16,10 +16,8 @@
 
 package android.media;
 
-import android.media.MediaPlayerBase.PlaybackListener;
-import android.media.session.PlaybackState;
+import android.media.MediaPlayerInterface.PlaybackListener;
 import android.os.Handler;
-import android.os.Message;
 import android.support.annotation.NonNull;
 
 import java.util.List;

@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.MediaPlayerBase.PlaybackListener;
+import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
 import android.media.TestUtils.SyncHandler;
@@ -145,7 +145,7 @@ public class MediaController2Test extends MediaSession2TestBase {
         // TODO(jaewan): add equivalent test later
         /*
         final CountDownLatch latch = new CountDownLatch(1);
-        final MediaPlayerBase.PlaybackListener listener = (state) -> {
+        final MediaPlayerInterface.PlaybackListener listener = (state) -> {
             assertEquals(PlaybackState.STATE_BUFFERING, state.getState());
             latch.countDown();
         };
@@ -163,7 +163,7 @@ public class MediaController2Test extends MediaSession2TestBase {
     @Test
     public void testAddPlaybackListener() throws InterruptedException {
         final CountDownLatch latch = new CountDownLatch(2);
-        final MediaPlayerBase.PlaybackListener listener = (state) -> {
+        final MediaPlayerInterface.PlaybackListener listener = (state) -> {
             switch ((int) latch.getCount()) {
                 case 2:
                     assertEquals(PlaybackState.STATE_PLAYING, state.getState());
@@ -186,7 +186,7 @@ public class MediaController2Test extends MediaSession2TestBase {
     @Test
     public void testRemovePlaybackListener() throws InterruptedException {
         final CountDownLatch latch = new CountDownLatch(1);
-        final MediaPlayerBase.PlaybackListener listener = (state) -> {
+        final MediaPlayerInterface.PlaybackListener listener = (state) -> {
             fail();
             latch.countDown();
         };

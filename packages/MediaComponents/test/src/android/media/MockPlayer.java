@@ -16,6 +16,7 @@
 
 package android.media;
 
+import android.media.MediaPlayerInterface;
 import android.media.MediaSession2.PlaylistParams;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -26,9 +27,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 
 /**
- * A mock implementation of {@link MediaPlayerBase} for testing.
+ * A mock implementation of {@link MediaPlayerInterface} for testing.
  */
-public class MockPlayer extends MediaPlayerBase {
+public class MockPlayer implements MediaPlayerInterface {
     public final CountDownLatch mCountDownLatch;
 
     public boolean mPlayCalled;

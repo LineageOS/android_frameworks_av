@@ -16,13 +16,10 @@
 
 package android.media;
 
-import android.media.MediaPlayerBase.PlaybackListener;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
-import android.media.session.PlaybackState;
 import android.os.Process;
-import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
@@ -33,10 +30,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static android.media.TestUtils.createPlaybackState;
 import static org.junit.Assert.*;
 
 /**

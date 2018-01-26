@@ -22,7 +22,7 @@ import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.media.MediaPlayerBase.PlaybackListener;
+import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2;
 import android.media.MediaSessionService2;
 import android.media.MediaSessionService2.MediaNotification;
@@ -30,7 +30,6 @@ import android.media.PlaybackState2;
 import android.media.session.PlaybackState;
 import android.media.update.MediaSessionService2Provider;
 import android.os.IBinder;
-import android.os.Looper;
 import android.support.annotation.GuardedBy;
 import android.util.Log;
 

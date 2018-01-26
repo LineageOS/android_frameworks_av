@@ -24,8 +24,7 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.media.AudioAttributes;
 import android.media.IMediaSession2Callback;
 import android.media.MediaItem2;
-import android.media.MediaPlayerBase;
-import android.media.MediaPlayerBase.PlaybackListener;
+import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.Command;
@@ -66,7 +65,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private final List<PlaybackListenerHolder> mListeners = new ArrayList<>();
 
     @GuardedBy("mLock")
-    private MediaPlayerBase mPlayer;
+    private MediaPlayerInterface mPlayer;
     @GuardedBy("mLock")
     private MyPlaybackListener mListener;
 
@@ -82,7 +81,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
      * @param ratingType
      * @param sessionActivity
      */
-    public MediaSession2Impl(Context context, MediaSession2 instance, MediaPlayerBase player,
+    public MediaSession2Impl(Context context, MediaSession2 instance, MediaPlayerInterface player,
             String id, VolumeProvider volumeProvider, int ratingType, PendingIntent sessionActivity,
             Executor callbackExecutor, SessionCallback callback) {
         mInstance = instance;
@@ -120,7 +119,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     //               setPlayer(null). Token can be available when player is null, and
     //               controller can also attach to session.
     @Override
-    public void setPlayer_impl(MediaPlayerBase player, VolumeProvider volumeProvider)
+    public void setPlayer_impl(MediaPlayerInterface player, VolumeProvider volumeProvider)
             throws IllegalArgumentException {
         ensureCallingThread();
         if (player == null) {
@@ -129,7 +128,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         setPlayerInternal(player);
     }
 
-    private void setPlayerInternal(MediaPlayerBase player) {
+    private void setPlayerInternal(MediaPlayerInterface player) {
         synchronized (mLock) {
             if (mPlayer == player) {
                 // Player didn't changed. No-op.
@@ -166,7 +165,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public MediaPlayerBase getPlayer_impl() {
+    public MediaPlayerInterface getPlayer_impl() {
         return getPlayer();
     }
 
@@ -242,7 +241,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     // TODO(jaewan): Implement follows
     //////////////////////////////////////////////////////////////////////////////////////
     @Override
-    public void setPlayer_impl(MediaPlayerBase player) {
+    public void setPlayer_impl(MediaPlayerInterface player) {
         // TODO(jaewan): Implement
     }
 
@@ -351,7 +350,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         return mInstance;
     }
 
-    MediaPlayerBase getPlayer() {
+    MediaPlayerInterface getPlayer() {
         return mPlayer;
     }
 
@@ -363,11 +362,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
         return mCallback;
     }
 
-    private static class MyPlaybackListener implements MediaPlayerBase.PlaybackListener {
+    private static class MyPlaybackListener implements MediaPlayerInterface.PlaybackListener {
         private final WeakReference<MediaSession2Impl> mSession;
-        private final MediaPlayerBase mPlayer;
+        private final MediaPlayerInterface mPlayer;
 
-        private MyPlaybackListener(MediaSession2Impl session, MediaPlayerBase player) {
+        private MyPlaybackListener(MediaSession2Impl session, MediaPlayerInterface player) {
             mSession = new WeakReference<>(session);
             mPlayer = player;
         }

@@ -27,7 +27,7 @@ import android.media.MediaController2.ControllerCallback;
 import android.media.MediaLibraryService2;
 import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
-import android.media.MediaPlayerBase;
+import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
@@ -83,7 +83,7 @@ public class ApiFactory implements StaticProvider {
 
     @Override
     public MediaSession2Provider createMediaSession2(Context context, MediaSession2 instance,
-            MediaPlayerBase player, String id, VolumeProvider volumeProvider,
+            MediaPlayerInterface player, String id, VolumeProvider volumeProvider,
             int ratingType, PendingIntent sessionActivity, Executor callbackExecutor,
             SessionCallback callback) {
         return new MediaSession2Impl(context, instance, player, id, volumeProvider, ratingType,
@@ -112,7 +112,7 @@ public class ApiFactory implements StaticProvider {
 
     @Override
     public MediaLibrarySessionProvider createMediaLibraryService2MediaLibrarySession(
-            Context context, MediaLibrarySession instance, MediaPlayerBase player,
+            Context context, MediaLibrarySession instance, MediaPlayerInterface player,
             String id, VolumeProvider volumeProvider, int ratingType, PendingIntent sessionActivity,
             Executor callbackExecutor, MediaLibrarySessionCallback callback) {
         return new MediaLibrarySessionImpl(context, instance, player, id, volumeProvider,
