@@ -34,8 +34,16 @@
 namespace android {
 
 Mutex MediaPlayer2Factory::sLock;
-MediaPlayer2Factory::tFactoryMap MediaPlayer2Factory::sFactoryMap;
+MediaPlayer2Factory::tFactoryMap *MediaPlayer2Factory::sFactoryMap;
 bool MediaPlayer2Factory::sInitComplete = false;
+
+// static
+bool MediaPlayer2Factory::ensureInit_l() {
+    if (sFactoryMap == NULL) {
+        sFactoryMap = new (std::nothrow) tFactoryMap();
+    }
+    return (sFactoryMap != NULL);
+}
 
 status_t MediaPlayer2Factory::registerFactory_l(IFactory* factory,
                                                 player2_type type) {
@@ -45,13 +53,17 @@ status_t MediaPlayer2Factory::registerFactory_l(IFactory* factory,
         return BAD_VALUE;
     }
 
-    if (sFactoryMap.indexOfKey(type) >= 0) {
+    if (!ensureInit_l()) {
+        return NO_INIT;
+    }
+
+    if (sFactoryMap->indexOfKey(type) >= 0) {
         ALOGE("Failed to register MediaPlayer2Factory of type %d, type is"
               " already registered.", type);
         return ALREADY_EXISTS;
     }
 
-    if (sFactoryMap.add(type, factory) < 0) {
+    if (sFactoryMap->add(type, factory) < 0) {
         ALOGE("Failed to register MediaPlayer2Factory of type %d, failed to add"
               " to map.", type);
         return UNKNOWN_ERROR;
@@ -64,31 +76,24 @@ static player2_type getDefaultPlayerType() {
     return PLAYER2_NU_PLAYER2;
 }
 
-status_t MediaPlayer2Factory::registerFactory(IFactory* factory,
-                                              player2_type type) {
-    Mutex::Autolock lock_(&sLock);
-    return registerFactory_l(factory, type);
-}
-
-void MediaPlayer2Factory::unregisterFactory(player2_type type) {
-    Mutex::Autolock lock_(&sLock);
-    sFactoryMap.removeItem(type);
-}
-
 #define GET_PLAYER_TYPE_IMPL(a...)                      \
     Mutex::Autolock lock_(&sLock);                      \
                                                         \
     player2_type ret = PLAYER2_STAGEFRIGHT_PLAYER;      \
     float bestScore = 0.0;                              \
                                                         \
-    for (size_t i = 0; i < sFactoryMap.size(); ++i) {   \
+    if (!ensureInit_l()) {                              \
+        return ret;                                     \
+    }                                                   \
                                                         \
-        IFactory* v = sFactoryMap.valueAt(i);           \
+    for (size_t i = 0; i < sFactoryMap->size(); ++i) {  \
+                                                        \
+        IFactory* v = sFactoryMap->valueAt(i);          \
         float thisScore;                                \
         CHECK(v != NULL);                               \
         thisScore = v->scoreFactory(a, bestScore);      \
         if (thisScore > bestScore) {                    \
-            ret = sFactoryMap.keyAt(i);                 \
+            ret = sFactoryMap->keyAt(i);                \
             bestScore = thisScore;                      \
         }                                               \
     }                                                   \
@@ -133,13 +138,17 @@ sp<MediaPlayer2Base> MediaPlayer2Factory::createPlayer(
     status_t init_result;
     Mutex::Autolock lock_(&sLock);
 
-    if (sFactoryMap.indexOfKey(playerType) < 0) {
+    if (!ensureInit_l()) {
+        return NULL;
+    }
+
+    if (sFactoryMap->indexOfKey(playerType) < 0) {
         ALOGE("Failed to create player object of type %d, no registered"
               " factory", playerType);
         return p;
     }
 
-    factory = sFactoryMap.valueFor(playerType);
+    factory = sFactoryMap->valueFor(playerType);
     CHECK(NULL != factory);
     p = factory->createPlayer(pid);
 
