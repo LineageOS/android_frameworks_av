@@ -202,9 +202,7 @@ void MPEG2TSExtractor::init() {
             break;
         }
         if (!haveVideo) {
-            sp<AnotherPacketSource> impl =
-                (AnotherPacketSource *)mParser->getSource(
-                        ATSParser::VIDEO).get();
+            sp<AnotherPacketSource> impl = mParser->getSource(ATSParser::VIDEO);
 
             if (impl != NULL) {
                 sp<MetaData> format = impl->getFormat();
@@ -220,9 +218,7 @@ void MPEG2TSExtractor::init() {
         }
 
         if (!haveAudio) {
-            sp<AnotherPacketSource> impl =
-                (AnotherPacketSource *)mParser->getSource(
-                        ATSParser::AUDIO).get();
+            sp<AnotherPacketSource> impl = mParser->getSource(ATSParser::AUDIO);
 
             if (impl != NULL) {
                 sp<MetaData> format = impl->getFormat();
@@ -261,10 +257,8 @@ void MPEG2TSExtractor::init() {
     off64_t size;
     if (mDataSource->getSize(&size) == OK && (haveAudio || haveVideo)) {
         sp<AnotherPacketSource> impl = haveVideo
-                ? (AnotherPacketSource *)mParser->getSource(
-                        ATSParser::VIDEO).get()
-                : (AnotherPacketSource *)mParser->getSource(
-                        ATSParser::AUDIO).get();
+                ? mParser->getSource(ATSParser::VIDEO)
+                : mParser->getSource(ATSParser::AUDIO);
         size_t prevSyncSize = 1;
         int64_t durationUs = -1;
         List<int64_t> durations;
@@ -420,8 +414,7 @@ status_t MPEG2TSExtractor::estimateDurationsFromTimesUsAtEnd()  {
                 ev.reset();
 
                 int64_t firstTimeUs;
-                sp<AnotherPacketSource> src =
-                    (AnotherPacketSource *)mParser->getSource(type).get();
+                sp<AnotherPacketSource> src = mParser->getSource(type);
                 if (src == NULL || src->nextBufferTime(&firstTimeUs) != OK) {
                     continue;
                 }
@@ -449,7 +442,7 @@ status_t MPEG2TSExtractor::estimateDurationsFromTimesUsAtEnd()  {
         if (!allDurationsFound) {
             allDurationsFound = true;
             for (auto t: {ATSParser::VIDEO, ATSParser::AUDIO}) {
-                sp<AnotherPacketSource> src = (AnotherPacketSource *)mParser->getSource(t).get();
+                sp<AnotherPacketSource> src = mParser->getSource(t);
                 if (src == NULL) {
                     continue;
                 }
