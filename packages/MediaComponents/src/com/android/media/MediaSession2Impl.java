@@ -273,27 +273,37 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     @Override
     public void prepare_impl() {
-        // TODO(jaewan): Implement
+        ensureCallingThread();
+        ensurePlayer();
+        mPlayer.prepare();
     }
 
     @Override
     public void fastForward_impl() {
-        // TODO(jaewan): Implement
+        ensureCallingThread();
+        ensurePlayer();
+        mPlayer.fastForward();
     }
 
     @Override
     public void rewind_impl() {
-        // TODO(jaewan): Implement
+        ensureCallingThread();
+        ensurePlayer();
+        mPlayer.rewind();
     }
 
     @Override
     public void seekTo_impl(long pos) {
-        // TODO(jaewan): Implement
+        ensureCallingThread();
+        ensurePlayer();
+        mPlayer.seekTo(pos);
     }
 
     @Override
     public void setCurrentPlaylistItem_impl(int index) {
-        // TODO(jaewan): Implement
+        ensureCallingThread();
+        ensurePlayer();
+        mPlayer.setCurrentPlaylistItem(index);
     }
 
     ///////////////////////////////////////////////////

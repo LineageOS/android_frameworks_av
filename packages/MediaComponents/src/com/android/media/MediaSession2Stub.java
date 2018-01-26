@@ -187,6 +187,21 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM:
                     session.getInstance().skipToNext();
                     break;
+                case MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE:
+                    session.getInstance().prepare();
+                    break;
+                case MediaSession2.COMMAND_CODE_PLAYBACK_FAST_FORWARD:
+                    session.getInstance().fastForward();
+                    break;
+                case MediaSession2.COMMAND_CODE_PLAYBACK_REWIND:
+                    session.getInstance().rewind();
+                    break;
+                case MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO:
+                    session.getInstance().seekTo(arg);
+                    break;
+                case MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM:
+                    session.getInstance().setCurrentPlaylistItem((int) arg);
+                    break;
                 default:
                     // TODO(jaewan): Resend unknown (new) commands through the custom command.
             }
