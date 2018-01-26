@@ -24,7 +24,6 @@
 #include <binder/IServiceManager.h>
 #include <cutils/properties.h>
 #include <media/DataSource.h>
-#include <media/MediaBufferHolder.h>
 #include <media/MediaExtractor.h>
 #include <media/MediaSource.h>
 #include <media/IMediaHTTPService.h>
@@ -1161,12 +1160,14 @@ sp<ABuffer> NuPlayer::GenericSource::mediaBufferToABuffer(
 
         // data is already provided in the buffer
         ab = new ABuffer(NULL, mb->range_length());
-        ab->meta()->setObject("mediaBufferHolder", new MediaBufferHolder(mb));
+        mb->add_ref();
+        ab->setMediaBufferBase(mb);
 
         // Modular DRM: Required b/c of the above add_ref.
         // If ref>0, there must be an observer, or it'll crash at release().
         // TODO: MediaBuffer might need to be revised to ease such need.
         mb->setObserver(this);
+        // setMediaBufferBase() interestingly doesn't increment the ref count on its own.
         // Extra increment (since we want to keep mb alive and attached to ab beyond this function
         // call. This is to counter the effect of mb->release() towards the end.
         mb->add_ref();
