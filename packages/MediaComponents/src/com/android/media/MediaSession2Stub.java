@@ -51,30 +51,19 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     private static final boolean DEBUG = true; // TODO(jaewan): Rename.
 
     private final Object mLock = new Object();
-    private final CommandHandler mCommandHandler;
     private final WeakReference<MediaSession2Impl> mSession;
-    private final Context mContext;
-    private final SessionCallback mSessionCallback;
-    private final MediaLibrarySessionCallback mLibraryCallback;
 
     @GuardedBy("mLock")
     private final ArrayMap<IBinder, ControllerInfo> mControllers = new ArrayMap<>();
 
-    public MediaSession2Stub(MediaSession2Impl session, SessionCallback callback) {
+    public MediaSession2Stub(MediaSession2Impl session) {
         mSession = new WeakReference<>(session);
-        mContext = session.getContext();
-        // TODO(jaewan): Should be executor from the session builder
-        mCommandHandler = new CommandHandler(session.getHandler().getLooper());
-        mSessionCallback = callback;
-        mLibraryCallback = (callback instanceof MediaLibrarySessionCallback)
-                ? (MediaLibrarySessionCallback) callback : null;
     }
 
     public void destroyNotLocked() {
         final List<ControllerInfo> list;
         synchronized (mLock) {
             mSession.clear();
-            mCommandHandler.removeCallbacksAndMessages(null);
             list = getControllers();
             mControllers.clear();
         }
@@ -99,14 +88,43 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void connect(String callingPackage, IMediaSession2Callback callback) {
-        if (callback == null) {
-            // Requesting connect without callback to receive result.
-            return;
-        }
-        ControllerInfo request = new ControllerInfo(mContext,
+    public void connect(String callingPackage, IMediaSession2Callback callback)
+            throws RuntimeException {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo request = new ControllerInfo(sessionImpl.getContext(),
                 Binder.getCallingUid(), Binder.getCallingPid(), callingPackage, callback);
-        mCommandHandler.postConnect(request);
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            CommandGroup allowedCommands = session.getCallback().onConnect(request);
+            // Don't reject connection for the request from trusted app.
+            // Otherwise server will fail to retrieve session's information to dispatch
+            // media keys to.
+            boolean accept = allowedCommands != null || request.isTrusted();
+            ControllerInfoImpl impl = ControllerInfoImpl.from(request);
+            if (accept) {
+                synchronized (mLock) {
+                    mControllers.put(impl.getId(), request);
+                }
+                if (allowedCommands == null) {
+                    // For trusted apps, send non-null allowed commands to keep connection.
+                    allowedCommands = new CommandGroup();
+                }
+            }
+            if (DEBUG) {
+                Log.d(TAG, "onConnectResult, request=" + request
+                        + " accept=" + accept);
+            }
+            try {
+                impl.getControllerBinder().onConnectionChanged(
+                        accept ? MediaSession2Stub.this : null,
+                        allowedCommands == null ? null : allowedCommands.toBundle());
+            } catch (RemoteException e) {
+                // Controller may be died prematurely.
+            }
+        });
     }
 
     @Override
@@ -122,20 +140,64 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void sendCommand(IMediaSession2Callback caller, Bundle command, Bundle args)
             throws RuntimeException {
-        ControllerInfo controller = getController(caller);
+        // TODO(jaewan): Generic command
+    }
+
+    @Override
+    public void sendTransportControlCommand(IMediaSession2Callback caller,
+            int commandCode, long arg) throws RuntimeException {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo controller = getController(caller);
         if (controller == null) {
             if (DEBUG) {
                 Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
             }
             return;
         }
-        mCommandHandler.postCommand(controller, Command.fromBundle(command), args);
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            // TODO(jaewan): Sanity check.
+            Command command = new Command(commandCode);
+            boolean accepted = session.getCallback().onCommandRequest(controller, command);
+            if (!accepted) {
+                // Don't run rejected command.
+                if (DEBUG) {
+                    Log.d(TAG, "Command " + commandCode + " from "
+                            + controller + " was rejected by " + session);
+                }
+                return;
+            }
+
+            switch (commandCode) {
+                case MediaSession2.COMMAND_CODE_PLAYBACK_START:
+                    session.getInstance().play();
+                    break;
+                case MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE:
+                    session.getInstance().pause();
+                    break;
+                case MediaSession2.COMMAND_CODE_PLAYBACK_STOP:
+                    session.getInstance().stop();
+                    break;
+                case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM:
+                    session.getInstance().skipToPrevious();
+                    break;
+                case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM:
+                    session.getInstance().skipToNext();
+                    break;
+                default:
+                    // TODO(jaewan): Resend unknown (new) commands through the custom command.
+            }
+        });
     }
 
     @Override
     public void getBrowserRoot(IMediaSession2Callback caller, Bundle rootHints)
             throws RuntimeException {
-        if (mLibraryCallback == null) {
+        final MediaSession2Impl sessionImpl = getSession();
+        if (!(sessionImpl.getCallback() instanceof MediaLibrarySessionCallback)) {
             if (DEBUG) {
                 Log.d(TAG, "Session cannot hand getBrowserRoot()");
             }
@@ -148,7 +210,24 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             }
             return;
         }
-        mCommandHandler.postOnGetRoot(controller, rootHints);
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            final MediaLibrarySessionCallback libraryCallback =
+                    (MediaLibrarySessionCallback) session.getCallback();
+            final ControllerInfoImpl controllerImpl = ControllerInfoImpl.from(controller);
+            BrowserRoot root = libraryCallback.onGetRoot(controller, rootHints);
+            try {
+                controllerImpl.getControllerBinder().onGetRootResult(rootHints,
+                        root == null ? null : root.getRootId(),
+                        root == null ? null : root.getExtras());
+            } catch (RemoteException e) {
+                // Controller may be died prematurely.
+                // TODO(jaewan): Handle this.
+            }
+        });
     }
 
     @Deprecated
@@ -248,133 +327,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         } catch (RemoteException e) {
             Log.w(TAG, "Controller is gone", e);
             // TODO(jaewan): What to do when the controller is gone?
-        }
-    }
-
-    // TODO(jaewan): Remove this. We should use Executor given by the session builder.
-    private class CommandHandler extends Handler {
-        public static final int MSG_CONNECT = 1000;
-        public static final int MSG_COMMAND = 1001;
-        public static final int MSG_ON_GET_ROOT = 2000;
-
-        public CommandHandler(Looper looper) {
-            super(looper);
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            final MediaSession2Impl session = MediaSession2Stub.this.mSession.get();
-            if (session == null || session.getPlayer() == null) {
-                return;
-            }
-
-            switch (msg.what) {
-                case MSG_CONNECT: {
-                    ControllerInfo request = (ControllerInfo) msg.obj;
-                    CommandGroup allowedCommands = mSessionCallback.onConnect(request);
-                    // Don't reject connection for the request from trusted app.
-                    // Otherwise server will fail to retrieve session's information to dispatch
-                    // media keys to.
-                    boolean accept = allowedCommands != null || request.isTrusted();
-                    ControllerInfoImpl impl = ControllerInfoImpl.from(request);
-                    if (accept) {
-                        synchronized (mLock) {
-                            mControllers.put(impl.getId(), request);
-                        }
-                        if (allowedCommands == null) {
-                            // For trusted apps, send non-null allowed commands to keep connection.
-                            allowedCommands = new CommandGroup();
-                        }
-                    }
-                    if (DEBUG) {
-                        Log.d(TAG, "onConnectResult, request=" + request
-                                + " accept=" + accept);
-                    }
-                    try {
-                        impl.getControllerBinder().onConnectionChanged(
-                                accept ? MediaSession2Stub.this : null,
-                                allowedCommands == null ? null : allowedCommands.toBundle());
-                    } catch (RemoteException e) {
-                        // Controller may be died prematurely.
-                    }
-                    break;
-                }
-                case MSG_COMMAND: {
-                    CommandParam param = (CommandParam) msg.obj;
-                    Command command = param.command;
-                    boolean accepted = mSessionCallback.onCommandRequest(
-                            param.controller, command);
-                    if (!accepted) {
-                        // Don't run rejected command.
-                        if (DEBUG) {
-                            Log.d(TAG, "Command " + command + " from "
-                                    + param.controller + " was rejected by " + session);
-                        }
-                        return;
-                    }
-
-                    switch (param.command.getCommandCode()) {
-                        case MediaSession2.COMMAND_CODE_PLAYBACK_START:
-                            session.getInstance().play();
-                            break;
-                        case MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE:
-                            session.getInstance().pause();
-                            break;
-                        case MediaSession2.COMMAND_CODE_PLAYBACK_STOP:
-                            session.getInstance().stop();
-                            break;
-                        case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM:
-                            session.getInstance().skipToPrevious();
-                            break;
-                        case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM:
-                            session.getInstance().skipToNext();
-                            break;
-                        default:
-                            // TODO(jaewan): Handle custom command.
-                    }
-                    break;
-                }
-                case MSG_ON_GET_ROOT: {
-                    final CommandParam param = (CommandParam) msg.obj;
-                    final ControllerInfoImpl controller = ControllerInfoImpl.from(param.controller);
-                    BrowserRoot root = mLibraryCallback.onGetRoot(param.controller, param.args);
-                    try {
-                        controller.getControllerBinder().onGetRootResult(param.args,
-                                root == null ? null : root.getRootId(),
-                                root == null ? null : root.getExtras());
-                    } catch (RemoteException e) {
-                        // Controller may be died prematurely.
-                        // TODO(jaewan): Handle this.
-                    }
-                    break;
-                }
-            }
-        }
-
-        public void postConnect(ControllerInfo request) {
-            obtainMessage(MSG_CONNECT, request).sendToTarget();
-        }
-
-        public void postCommand(ControllerInfo controller, Command command, Bundle args) {
-            CommandParam param = new CommandParam(controller, command, args);
-            obtainMessage(MSG_COMMAND, param).sendToTarget();
-        }
-
-        public void postOnGetRoot(ControllerInfo controller, Bundle rootHints) {
-            CommandParam param = new CommandParam(controller, null, rootHints);
-            obtainMessage(MSG_ON_GET_ROOT, param).sendToTarget();
-        }
-    }
-
-    private static class CommandParam {
-        public final ControllerInfo controller;
-        public final Command command;
-        public final Bundle args;
-
-        private CommandParam(ControllerInfo controller, Command command, Bundle args) {
-            this.controller = controller;
-            this.command = command;
-            this.args = args;
         }
     }
 }

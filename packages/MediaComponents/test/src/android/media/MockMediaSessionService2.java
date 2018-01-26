@@ -28,6 +28,8 @@ import android.media.TestUtils.SyncHandler;
 import android.media.session.PlaybackState;
 import android.os.Process;
 
+import java.util.concurrent.Executor;
+
 /**
  * Mock implementation of {@link android.media.MediaSessionService2} for testing.
  */
@@ -46,11 +48,12 @@ public class MockMediaSessionService2 extends MediaSessionService2 {
     public MediaSession2 onCreateSession(String sessionId) {
         final MockPlayer player = new MockPlayer(1);
         final SyncHandler handler = (SyncHandler) TestServiceRegistry.getInstance().getHandler();
+        final Executor executor = (runnable) -> handler.post(runnable);
         try {
             handler.postAndSync(() -> {
                 mSession = new MediaSession2.Builder(MockMediaSessionService2.this, player)
-                        .setId(sessionId).setSessionCallback((runnable)->handler.post(runnable),
-                                new MySessionCallback()).build();
+                        .setSessionCallback(executor, new MySessionCallback())
+                        .setId(sessionId).build();
             });
         } catch (InterruptedException e) {
             fail(e.toString());

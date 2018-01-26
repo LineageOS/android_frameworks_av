@@ -54,19 +54,16 @@ public class MediaSession2Test extends MediaSession2TestBase {
     @Override
     public void setUp() throws Exception {
         super.setUp();
-        sHandler.postAndSync(() -> {
-            mPlayer = new MockPlayer(0);
-            mSession = new MediaSession2.Builder(mContext, mPlayer).build();
-        });
+        mPlayer = new MockPlayer(0);
+        mSession = new MediaSession2.Builder(mContext, mPlayer)
+                .setSessionCallback(sHandlerExecutor, new SessionCallback()).build();
     }
 
     @After
     @Override
     public void cleanUp() throws Exception {
         super.cleanUp();
-        sHandler.postAndSync(() -> {
-            mSession.close();
-        });
+        mSession.close();
     }
 
     @Test

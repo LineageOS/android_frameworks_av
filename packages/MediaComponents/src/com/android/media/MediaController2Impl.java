@@ -222,38 +222,38 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void play_impl() {
-        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_START);
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_START);
     }
 
     @Override
     public void pause_impl() {
-        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE);
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE);
     }
 
     @Override
     public void stop_impl() {
-        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_STOP);
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_STOP);
     }
 
     @Override
     public void skipToPrevious_impl() {
-        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM);
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM);
     }
 
     @Override
     public void skipToNext_impl() {
-        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM);
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM);
     }
 
-    private void sendCommand(int code) {
-        // TODO(jaewan): optimization) Cache Command objects?
-        Command command = new Command(code);
-        // TODO(jaewan): Check if the command is in the allowed group.
+    private void sendTransportControlCommand(int commandCode) {
+        sendTransportControlCommand(commandCode, 0);
+    }
 
+    private void sendTransportControlCommand(int commandCode, long arg) {
         final IMediaSession2 binder = mSessionBinder;
         if (binder != null) {
             try {
-                binder.sendCommand(mSessionCallbackStub, command.toBundle(), null);
+                binder.sendTransportControlCommand(mSessionCallbackStub, commandCode, arg);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }

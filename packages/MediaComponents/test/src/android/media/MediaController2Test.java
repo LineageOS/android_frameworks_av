@@ -45,6 +45,7 @@ import static org.junit.Assert.*;
  */
 // TODO(jaewan): Implement host-side test so controller and session can run in different processes.
 // TODO(jaewan): Fix flaky failure -- see MediaController2Impl.getController()
+// TODO(jaeawn): Revisit create/close session in the sHandler. It's no longer necessary.
 @RunWith(AndroidJUnit4.class)
 @SmallTest
 @FlakyTest
@@ -60,11 +61,10 @@ public class MediaController2Test extends MediaSession2TestBase {
     public void setUp() throws Exception {
         super.setUp();
         // Create this test specific MediaSession2 to use our own Handler.
-        sHandler.postAndSync(()->{
-            mPlayer = new MockPlayer(1);
-            mSession = new MediaSession2.Builder(mContext, mPlayer).setId(TAG).build();
-        });
-
+        mPlayer = new MockPlayer(1);
+        mSession = new MediaSession2.Builder(mContext, mPlayer)
+                .setSessionCallback(sHandlerExecutor, new SessionCallback())
+                .setId(TAG).build();
         mController = createController(mSession.getToken());
         TestServiceRegistry.getInstance().setHandler(sHandler);
     }
@@ -73,11 +73,9 @@ public class MediaController2Test extends MediaSession2TestBase {
     @Override
     public void cleanUp() throws Exception {
         super.cleanUp();
-        sHandler.postAndSync(() -> {
-            if (mSession != null) {
-                mSession.close();
-            }
-        });
+        if (mSession != null) {
+            mSession.close();
+        }
         TestServiceRegistry.getInstance().cleanUp();
     }
 
@@ -275,6 +273,7 @@ public class MediaController2Test extends MediaSession2TestBase {
             final MockPlayer player = new MockPlayer(0);
             sessionHandler.postAndSync(() -> {
                 mSession = new MediaSession2.Builder(mContext, mPlayer)
+                        .setSessionCallback(sHandlerExecutor, new SessionCallback())
                         .setId("testDeadlock").build();
             });
             final MediaController2 controller = createController(mSession.getToken());
@@ -462,7 +461,9 @@ public class MediaController2Test extends MediaSession2TestBase {
         sHandler.postAndSync(() -> {
             // Recreated session has different session stub, so previously created controller
             // shouldn't be available.
-            mSession = new MediaSession2.Builder(mContext, mPlayer).setId(id).build();
+            mSession = new MediaSession2.Builder(mContext, mPlayer)
+                    .setSessionCallback(sHandlerExecutor, new SessionCallback())
+                    .setId(id).build();
         });
         testNoInteraction();
     }

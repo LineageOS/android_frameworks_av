@@ -59,9 +59,8 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
         // Specify TAG here so {@link MediaSession2.getInstance()} doesn't complaint about
         // per test thread differs across the {@link MediaSession2} with the same TAG.
         final MockPlayer player = new MockPlayer(1);
-        sHandler.postAndSync(() -> {
-            mSession = new MediaSession2.Builder(mContext, player).setId(TAG).build();
-        });
+        mSession = new MediaSession2.Builder(mContext, player)
+                .setSessionCallback(sHandlerExecutor, new SessionCallback()).setId(TAG).build();
         ensureChangeInSession();
     }
 
@@ -70,9 +69,7 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
     public void cleanUp() throws Exception {
         super.cleanUp();
         sHandler.removeCallbacksAndMessages(null);
-        sHandler.postAndSync(() -> {
-            mSession.close();
-        });
+        mSession.close();
     }
 
     // TODO(jaewan): Make this host-side test to see per-user behavior.

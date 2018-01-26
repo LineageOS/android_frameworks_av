@@ -25,6 +25,7 @@ import android.media.AudioAttributes;
 import android.media.IMediaSession2Callback;
 import android.media.MediaItem2;
 import android.media.MediaPlayerBase;
+import android.media.MediaPlayerBase.PlaybackListener;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.Command;
@@ -39,11 +40,11 @@ import android.media.VolumeProvider;
 import android.media.session.MediaSessionManager;
 import android.media.update.MediaSession2Provider;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
 import android.os.ResultReceiver;
+import android.support.annotation.GuardedBy;
 import android.util.Log;
+
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,20 +54,21 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private static final String TAG = "MediaSession2";
     private static final boolean DEBUG = true;//Log.isLoggable(TAG, Log.DEBUG);
 
-    private final MediaSession2 mInstance;
+    private final Object mLock = new Object();
 
+    private final MediaSession2 mInstance;
     private final Context mContext;
     private final String mId;
-    private final Handler mHandler;
     private final Executor mCallbackExecutor;
+    private final SessionCallback mCallback;
     private final MediaSession2Stub mSessionStub;
     private final SessionToken2 mSessionToken;
-
-    private MediaPlayerBase mPlayer;
-
     private final List<PlaybackListenerHolder> mListeners = new ArrayList<>();
+
+    @GuardedBy("mLock")
+    private MediaPlayerBase mPlayer;
+    @GuardedBy("mLock")
     private MyPlaybackListener mListener;
-    private MediaSession2 instance;
 
     /**
      * Can be only called by the {@link Builder#build()}.
@@ -90,9 +92,9 @@ public class MediaSession2Impl implements MediaSession2Provider {
         // Initialize finals first.
         mContext = context;
         mId = id;
-        mHandler = new Handler(Looper.myLooper());
+        mCallback = callback;
         mCallbackExecutor = callbackExecutor;
-        mSessionStub = new MediaSession2Stub(this, callback);
+        mSessionStub = new MediaSession2Stub(this);
         // Ask server to create session token for following reasons.
         //   1. Make session ID unique per package.
         //      Server can only know if the package has another process and has another session
@@ -118,7 +120,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
     //               setPlayer(null). Token can be available when player is null, and
     //               controller can also attach to session.
     @Override
-    public void setPlayer_impl(MediaPlayerBase player, VolumeProvider volumeProvider) throws IllegalArgumentException {
+    public void setPlayer_impl(MediaPlayerBase player, VolumeProvider volumeProvider)
+            throws IllegalArgumentException {
         ensureCallingThread();
         if (player == null) {
             throw new IllegalArgumentException("player shouldn't be null");
@@ -127,32 +130,38 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     private void setPlayerInternal(MediaPlayerBase player) {
-        if (mPlayer == player) {
-            // Player didn't changed. No-op.
-            return;
+        synchronized (mLock) {
+            if (mPlayer == player) {
+                // Player didn't changed. No-op.
+                return;
+            }
+            if (mPlayer != null && mListener != null) {
+                // This might not work for a poorly implemented player.
+                mPlayer.removePlaybackListener(mListener);
+            }
+            mListener = new MyPlaybackListener(this, player);
+            player.addPlaybackListener(mCallbackExecutor, mListener);
+            mPlayer = player;
         }
-        // TODO(jaewan): Find equivalent for the executor
-        //mHandler.removeCallbacksAndMessages(null);
-        if (mPlayer != null && mListener != null) {
-            // This might not work for a poorly implemented player.
-            mPlayer.removePlaybackListener(mListener);
-        }
-        mListener = new MyPlaybackListener(this, player);
-        player.addPlaybackListener(mCallbackExecutor, mListener);
-        notifyPlaybackStateChanged(player.getPlaybackState());
-        mPlayer = player;
+        notifyPlaybackStateChangedNotLocked(player.getPlaybackState());
     }
 
     @Override
     public void close_impl() {
-        // Flush any pending messages.
-        mHandler.removeCallbacksAndMessages(null);
         if (mSessionStub != null) {
             if (DEBUG) {
                 Log.d(TAG, "session is now unavailable, id=" + mId);
             }
             // Invalidate previously published session stub.
             mSessionStub.destroyNotLocked();
+        }
+        synchronized (mLock) {
+            if (mPlayer != null) {
+                // close can be called multiple times
+                mPlayer.removePlaybackListener(mListener);
+                mPlayer = null;
+                return;
+            }
         }
     }
 
@@ -321,14 +330,14 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
     }
 
-    Handler getHandler() {
-        return mHandler;
-    }
-
-    private void notifyPlaybackStateChanged(PlaybackState2 state) {
+    private void notifyPlaybackStateChangedNotLocked(PlaybackState2 state) {
+        List<PlaybackListenerHolder> listeners = new ArrayList<>();
+        synchronized (mLock) {
+            listeners.addAll(mListeners);
+        }
         // Notify to listeners added directly to this session
-        for (int i = 0; i < mListeners.size(); i++) {
-            mListeners.get(i).postPlaybackChange(state);
+        for (int i = 0; i < listeners.size(); i++) {
+            listeners.get(i).postPlaybackChange(state);
         }
         // Notify to controllers as well.
         mSessionStub.notifyPlaybackStateChangedNotLocked(state);
@@ -344,6 +353,14 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     MediaPlayerBase getPlayer() {
         return mPlayer;
+    }
+
+    Executor getCallbackExecutor() {
+        return mCallbackExecutor;
+    }
+
+    SessionCallback getCallback() {
+        return mCallback;
     }
 
     private static class MyPlaybackListener implements MediaPlayerBase.PlaybackListener {
@@ -363,7 +380,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
                         new IllegalStateException());
                 return;
             }
-            session.notifyPlaybackStateChanged(state);
+            session.notifyPlaybackStateChangedNotLocked(state);
         }
     }
 

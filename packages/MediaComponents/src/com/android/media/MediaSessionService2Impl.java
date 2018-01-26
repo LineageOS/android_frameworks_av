@@ -152,11 +152,6 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
                 return;
             }
             MediaSession2Impl impl = (MediaSession2Impl) mSession.getProvider();
-            if (impl.getHandler().getLooper() != Looper.myLooper()) {
-                Log.w(TAG, "Ignoring " + state + ". Expected " + impl.getHandler().getLooper()
-                        + " but " + Looper.myLooper());
-                return;
-            }
             updateNotification(state);
         }
     }
