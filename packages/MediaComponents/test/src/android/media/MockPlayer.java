@@ -49,6 +49,7 @@ public class MockPlayer implements MediaPlayerInterface {
     public List<PlaybackListenerHolder> mListeners = new ArrayList<>();
     public PlaylistParams mPlaylistParams;
     private PlaybackState2 mLastPlaybackState;
+    private AudioAttributes mAudioAttributes;
 
     public MockPlayer(int count) {
         mCountDownLatch = (count > 0) ? new CountDownLatch(count) : null;
@@ -175,8 +176,13 @@ public class MockPlayer implements MediaPlayerInterface {
     }
 
     @Override
+    public void setAudioAttributes(AudioAttributes attributes) {
+        mAudioAttributes = attributes;
+    }
+
+    @Override
     public AudioAttributes getAudioAttributes() {
-        return null;
+        return mAudioAttributes;
     }
 
     @Override

@@ -239,11 +239,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void setAudioAttributes_impl(AudioAttributes attributes) {
-        // implement
-    }
-
-    @Override
     public void setAudioFocusRequest_impl(int focusGain) {
         // implement
     }
