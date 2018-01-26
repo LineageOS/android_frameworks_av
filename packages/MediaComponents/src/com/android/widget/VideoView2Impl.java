@@ -64,6 +64,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.SurfaceListener {
     private static final String TAG = "VideoView2";
@@ -90,7 +91,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     private VideoView2.OnErrorListener mOnErrorListener;
     private VideoView2.OnInfoListener mOnInfoListener;
     private VideoView2.OnViewTypeChangedListener mOnViewTypeChangedListener;
-    private VideoView2.OnFullScreenChangedListener mOnFullScreenChangedListener;
+    private VideoView2.OnFullScreenRequestListener mOnFullScreenRequestListener;
 
     private VideoViewInterface mCurrentView;
     private VideoTextureView mTextureView;
@@ -228,13 +229,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
         }
     }
 
-    @Override
-    public void setFullScreen_impl(boolean fullScreen) {
-        if (mOnFullScreenChangedListener != null) {
-            mOnFullScreenChangedListener.onFullScreenChanged(mInstance, fullScreen);
-        }
-    }
-
     // TODO: remove setSpeed_impl once MediaController2 is ready.
     @Override
     public void setSpeed_impl(float speed) {
@@ -330,9 +324,11 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
         return mCurrentView.getViewType();
     }
 
+    // TODO: Handle executor properly for all the set listener methods.
     @Override
-    public void setCustomActions_impl(List<PlaybackState.CustomAction> actionList,
-            VideoView2.OnCustomActionListener listener) {
+    public void setCustomActions_impl(
+            List<PlaybackState.CustomAction> actionList,
+            Executor executor, VideoView2.OnCustomActionListener listener) {
         mCustomActionList = actionList;
         mOnCustomActionListener = listener;
 
@@ -342,33 +338,35 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     }
 
     @Override
-    public void setOnPreparedListener_impl(VideoView2.OnPreparedListener l) {
+    public void setOnPreparedListener_impl(Executor executor, VideoView2.OnPreparedListener l) {
         mOnPreparedListener = l;
     }
 
     @Override
-    public void setOnCompletionListener_impl(VideoView2.OnCompletionListener l) {
+    public void setOnCompletionListener_impl(Executor executor, VideoView2.OnCompletionListener l) {
         mOnCompletionListener = l;
     }
 
     @Override
-    public void setOnErrorListener_impl(VideoView2.OnErrorListener l) {
+    public void setOnErrorListener_impl(Executor executor, VideoView2.OnErrorListener l) {
         mOnErrorListener = l;
     }
 
     @Override
-    public void setOnInfoListener_impl(VideoView2.OnInfoListener l) {
+    public void setOnInfoListener_impl(Executor executor, VideoView2.OnInfoListener l) {
         mOnInfoListener = l;
     }
 
     @Override
-    public void setOnViewTypeChangedListener_impl(VideoView2.OnViewTypeChangedListener l) {
+    public void setOnViewTypeChangedListener_impl(Executor executor,
+            VideoView2.OnViewTypeChangedListener l) {
         mOnViewTypeChangedListener = l;
     }
 
     @Override
-    public void setFullScreenChangedListener_impl(VideoView2.OnFullScreenChangedListener l) {
-        mOnFullScreenChangedListener = l;
+    public void setFullScreenRequestListener_impl(Executor executor,
+            VideoView2.OnFullScreenRequestListener l) {
+        mOnFullScreenRequestListener = l;
     }
 
     @Override
@@ -906,8 +904,11 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                         mInstance.hideSubtitle();
                         break;
                     case MediaControlView2Impl.COMMAND_SET_FULLSCREEN:
-                        mInstance.setFullScreen(
-                                args.getBoolean(MediaControlView2Impl.ARGUMENT_KEY_FULLSCREEN));
+                        if (mOnFullScreenRequestListener != null) {
+                            mOnFullScreenRequestListener.onFullScreenRequest(
+                                    mInstance,
+                                    args.getBoolean(MediaControlView2Impl.ARGUMENT_KEY_FULLSCREEN));
+                        }
                         break;
                 }
             }
