@@ -28,7 +28,6 @@ import android.support.annotation.CallSuper;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.test.InstrumentationRegistry;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -58,8 +57,7 @@ abstract class MediaSession2TestBase {
     }
 
     interface TestControllerCallbackInterface {
-        // Add methods in ControllerCallback/BrowserCallback that you want to test.
-        default void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {}
+        // Currently empty. Add methods in ControllerCallback/BrowserCallback that you want to test.
 
         // Browser specific callbacks
         default void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {}
@@ -192,11 +190,6 @@ abstract class MediaSession2TestBase {
             } else {
                 assertFalse(disconnectLatch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
             }
-        }
-
-        @Override
-        public void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {
-            mCallbackProxy.onPlaylistParamsChanged(params);
         }
     }
 
