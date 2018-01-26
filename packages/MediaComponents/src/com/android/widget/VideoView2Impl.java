@@ -45,7 +45,6 @@ import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Gravity;
-import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout.LayoutParams;
@@ -396,55 +395,8 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     }
 
     @Override
-    public boolean onKeyDown_impl(int keyCode, KeyEvent event) {
-        Log.v(TAG, "onKeyDown_impl: " + keyCode);
-        boolean isKeyCodeSupported = keyCode != KeyEvent.KEYCODE_BACK
-                && keyCode != KeyEvent.KEYCODE_VOLUME_UP
-                && keyCode != KeyEvent.KEYCODE_VOLUME_DOWN
-                && keyCode != KeyEvent.KEYCODE_VOLUME_MUTE
-                && keyCode != KeyEvent.KEYCODE_MENU
-                && keyCode != KeyEvent.KEYCODE_CALL
-                && keyCode != KeyEvent.KEYCODE_ENDCALL;
-        if (isInPlaybackState() && isKeyCodeSupported && mMediaControlView != null) {
-            if (keyCode == KeyEvent.KEYCODE_HEADSETHOOK
-                    || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
-                if (mMediaPlayer.isPlaying()) {
-                    mMediaController.getTransportControls().pause();
-                    mMediaControlView.show();
-                } else {
-                    mMediaController.getTransportControls().play();
-                    mMediaControlView.hide();
-                }
-                return true;
-            } else if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY) {
-                if (!mMediaPlayer.isPlaying()) {
-                    mMediaController.getTransportControls().play();
-                    mMediaControlView.hide();
-                }
-                return true;
-            } else if (keyCode == KeyEvent.KEYCODE_MEDIA_STOP
-                    || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE) {
-                if (mMediaPlayer.isPlaying()) {
-                    mMediaController.getTransportControls().pause();
-                    mMediaControlView.show();
-                }
-                return true;
-            } else {
-                toggleMediaControlViewVisibility();
-            }
-        }
-
-        return mSuperProvider.onKeyDown_impl(keyCode, event);
-    }
-
-    @Override
     public void onFinishInflate_impl() {
         mSuperProvider.onFinishInflate_impl();
-    }
-
-    @Override
-    public boolean dispatchKeyEvent_impl(KeyEvent event) {
-        return mSuperProvider.dispatchKeyEvent_impl(event);
     }
 
     @Override
