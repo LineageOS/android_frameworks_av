@@ -358,12 +358,16 @@ status_t MediaExtractorFactory::dump(int fd, const Vector<String16>&) {
     Mutex::Autolock autoLock(gPluginMutex);
     String8 out;
     out.append("Available extractors:\n");
-    for (auto it = gPlugins->begin(); it != gPlugins->end(); ++it) {
-        out.appendFormat("  %25s: uuid(%s), version(%u), path(%s)\n",
-                (*it)->def.extractor_name,
-                (*it)->uuidString.c_str(),
-                (*it)->def.extractor_version,
-                (*it)->libPath.c_str());
+    if (gPluginsRegistered) {
+        for (auto it = gPlugins->begin(); it != gPlugins->end(); ++it) {
+            out.appendFormat("  %25s: uuid(%s), version(%u), path(%s)\n",
+                    (*it)->def.extractor_name,
+                    (*it)->uuidString.c_str(),
+                    (*it)->def.extractor_version,
+                    (*it)->libPath.c_str());
+        }
+    } else {
+        out.append("  (no plugins registered)\n");
     }
     write(fd, out.string(), out.size());
     return OK;
