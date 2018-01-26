@@ -16,8 +16,6 @@
 
 package com.android.media;
 
-import static com.android.media.MediaController2Impl.CALLBACK_FLAG_PLAYBACK;
-
 import android.media.IMediaSession2;
 import android.media.IMediaSession2Callback;
 import android.media.MediaLibraryService2.BrowserRoot;
@@ -82,7 +80,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void connect(String callingPackage, IMediaSession2Callback callback)
+    public void connect(String callingPackage, final IMediaSession2Callback callback)
             throws RuntimeException {
         final MediaSession2Impl sessionImpl = getSession();
         final ControllerInfo request = new ControllerInfo(sessionImpl.getContext(),
@@ -112,11 +110,28 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                         + " accept=" + accept);
             }
             try {
-                impl.getControllerBinder().onConnectionChanged(
+                callback.onConnectionChanged(
                         accept ? MediaSession2Stub.this : null,
                         allowedCommands == null ? null : allowedCommands.toBundle());
             } catch (RemoteException e) {
                 // Controller may be died prematurely.
+            }
+            if (accept) {
+                // If connection is accepted, notify the current state to the controller.
+                // It's needed because we cannot call synchronous calls between session/controller.
+                // Note: We're doing this after the onConnectionChanged(), but there's no guarantee
+                //       that events here are notified after the onConnected() because
+                //       IMediaSession2Callback is oneway (i.e. async call) and CallbackStub will
+                //       use thread poll for incoming calls.
+                // TODO(jaewan): Should we protect getting playback state?
+                final PlaybackState2 state = session.getInstance().getPlaybackState();
+                final Bundle bundle = state != null ? state.toBundle() : null;
+                try {
+                    callback.onPlaybackStateChanged(bundle);
+                } catch (RemoteException e) {
+                    // TODO(jaewan): Handle this.
+                    // Controller may be died prematurely.
+                }
             }
         });
     }
@@ -239,48 +254,13 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
-    @Deprecated
-    @Override
-    public Bundle getPlaybackState() throws RemoteException {
-        MediaSession2Impl session = getSession();
-        // TODO(jaewan): Check if mPlayer.getPlaybackState() is safe here.
-        return session.getInstance().getPlayer().getPlaybackState().toBundle();
-    }
-
-    @Deprecated
-    @Override
-    public void registerCallback(final IMediaSession2Callback callbackBinder,
-            final int callbackFlag, final int requestCode) throws RemoteException {
-        // TODO(jaewan): Call onCommand() here. To do so, you should pend message.
-        synchronized (mLock) {
-            ControllerInfo controllerInfo = getController(callbackBinder);
-            if (controllerInfo == null) {
-                return;
-            }
-            ControllerInfoImpl.from(controllerInfo).addFlag(callbackFlag);
-        }
-    }
-
-    @Deprecated
-    @Override
-    public void unregisterCallback(IMediaSession2Callback callbackBinder, int callbackFlag)
-            throws RemoteException {
-        // TODO(jaewan): Call onCommand() here. To do so, you should pend message.
-        synchronized (mLock) {
-            ControllerInfo controllerInfo = getController(callbackBinder);
-            if (controllerInfo == null) {
-                return;
-            }
-            ControllerInfoImpl.from(controllerInfo).removeFlag(callbackFlag);
-        }
-    }
-
     private ControllerInfo getController(IMediaSession2Callback caller) {
         synchronized (mLock) {
             return mControllers.get(caller.asBinder());
         }
     }
 
+    // TODO(jaewan): Need a way to get controller with permissions
     public List<ControllerInfo> getControllers() {
         ArrayList<ControllerInfo> controllers = new ArrayList<>();
         synchronized (mLock) {
@@ -291,27 +271,15 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         return controllers;
     }
 
-    public List<ControllerInfo> getControllersWithFlag(int flag) {
-        ArrayList<ControllerInfo> controllers = new ArrayList<>();
-        synchronized (mLock) {
-            for (int i = 0; i < mControllers.size(); i++) {
-                ControllerInfo controllerInfo = mControllers.valueAt(i);
-                if (ControllerInfoImpl.from(controllerInfo).containsFlag(flag)) {
-                    controllers.add(controllerInfo);
-                }
-            }
-        }
-        return controllers;
-    }
-
     // Should be used without a lock to prevent potential deadlock.
     public void notifyPlaybackStateChangedNotLocked(PlaybackState2 state) {
-        final List<ControllerInfo> list = getControllersWithFlag(CALLBACK_FLAG_PLAYBACK);
+        final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
             IMediaSession2Callback callbackBinder =
                     ControllerInfoImpl.from(list.get(i)).getControllerBinder();
             try {
-                callbackBinder.onPlaybackStateChanged(state.toBundle());
+                final Bundle bundle = state != null ? state.toBundle() : null;
+                callbackBinder.onPlaybackStateChanged(bundle);
             } catch (RemoteException e) {
                 Log.w(TAG, "Controller is gone", e);
                 // TODO(jaewan): What to do when the controller is gone?

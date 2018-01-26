@@ -23,6 +23,7 @@ import static junit.framework.Assert.assertTrue;
 import android.content.Context;
 import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaSession2.CommandGroup;
+import android.media.MediaSession2.PlaylistParams;
 import android.os.Bundle;
 import android.support.annotation.CallSuper;
 import android.support.annotation.NonNull;
@@ -101,8 +102,26 @@ public class MediaBrowser2Test extends MediaController2Test {
         }
 
         @Override
+        public void onPlaybackStateChanged(PlaybackState2 state) {
+            super.onPlaybackStateChanged(state);
+            if (mCallbackProxy != null) {
+                mCallbackProxy.onPlaybackStateChanged(state);
+            }
+        }
+
+        @Override
+        public void onPlaylistParamsChanged(PlaylistParams params) {
+            super.onPlaylistParamsChanged(params);
+            if (mCallbackProxy != null) {
+                mCallbackProxy.onPlaylistParamsChanged(params);
+            }
+        }
+
+        @Override
         public void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {
-            mCallbackProxy.onGetRootResult(rootHints, rootMediaId, rootExtra);
+            if (mCallbackProxy != null) {
+                mCallbackProxy.onGetRootResult(rootHints, rootMediaId, rootExtra);
+            }
         }
 
         @Override

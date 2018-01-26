@@ -61,6 +61,9 @@ abstract class MediaSession2TestBase {
         // Add methods in ControllerCallback/BrowserCallback that you want to test.
         default void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {}
 
+        // Currently empty. Add methods in ControllerCallback/BrowserCallback that you want to test.
+        default void onPlaybackStateChanged(PlaybackState2 state) { }
+
         // Browser specific callbacks
         default void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {}
     }
@@ -174,6 +177,14 @@ abstract class MediaSession2TestBase {
         public void onDisconnected() {
             super.onDisconnected();
             disconnectLatch.countDown();
+        }
+
+        @Override
+        public void onPlaybackStateChanged(PlaybackState2 state) {
+            super.onPlaybackStateChanged(state);
+            if (mCallbackProxy != null) {
+                mCallbackProxy.onPlaybackStateChanged(state);
+            }
         }
 
         @Override

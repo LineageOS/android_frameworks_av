@@ -32,6 +32,7 @@ import android.media.IMediaSession2Callback;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2;
 import android.media.MediaPlayerInterface;
+import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.Command;
@@ -379,6 +380,44 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mPlayer.setCurrentPlaylistItem(index);
     }
 
+    @Override
+    public void addPlaybackListener_impl(Executor executor, PlaybackListener listener) {
+        if (executor == null) {
+            throw new IllegalArgumentException("executor shouldn't be null");
+        }
+        if (listener == null) {
+            throw new IllegalArgumentException("listener shouldn't be null");
+        }
+        ensureCallingThread();
+        if (PlaybackListenerHolder.contains(mListeners, listener)) {
+            Log.w(TAG, "listener is already added. Ignoring.");
+            return;
+        }
+        mListeners.add(new PlaybackListenerHolder(executor, listener));
+        executor.execute(() -> listener.onPlaybackChanged(getInstance().getPlaybackState()));
+    }
+
+    @Override
+    public void removePlaybackListener_impl(PlaybackListener listener) {
+        if (listener == null) {
+            throw new IllegalArgumentException("listener shouldn't be null");
+        }
+        ensureCallingThread();
+        int idx = PlaybackListenerHolder.indexOf(mListeners, listener);
+        if (idx >= 0) {
+            mListeners.remove(idx);
+        }
+    }
+
+    @Override
+    public PlaybackState2 getPlaybackState_impl() {
+        ensureCallingThread();
+        ensurePlayer();
+        // TODO(jaewan): Is it safe to be called on any thread?
+        //               Otherwise we should cache the result from listener.
+        return mPlayer.getPlaybackState();
+    }
+
     ///////////////////////////////////////////////////
     // Protected or private methods
     ///////////////////////////////////////////////////
@@ -402,7 +441,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
             throw new IllegalStateException("Run this on the given thread");
         }*/
     }
-
 
     private void ensurePlayer() {
         // TODO(jaewan): Should we pend command instead? Follow the decision from MP2.
@@ -472,11 +510,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         private final String mPackageName;
         private final boolean mIsTrusted;
         private final IMediaSession2Callback mControllerBinder;
-
-        // Flag to indicate which callbacks should be returned for the controller binder.
-        // Either 0 or combination of {@link #CALLBACK_FLAG_PLAYBACK},
-        // {@link #CALLBACK_FLAG_SESSION_ACTIVENESS}
-        private int mFlag;
 
         public ControllerInfoImpl(Context context, ControllerInfo instance, int uid,
                 int pid, String packageName, IMediaSession2Callback callback) {
@@ -559,18 +592,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         public IMediaSession2Callback getControllerBinder() {
             return mControllerBinder;
-        }
-
-        public boolean containsFlag(int flag) {
-            return (mFlag & flag) != 0;
-        }
-
-        public void addFlag(int flag) {
-            mFlag |= flag;
-        }
-
-        public void removeFlag(int flag) {
-            mFlag &= ~flag;
         }
 
         public static ControllerInfoImpl from(ControllerInfo controller) {

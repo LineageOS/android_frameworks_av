@@ -56,13 +56,6 @@ public class MediaController2Impl implements MediaController2Provider {
 
     private final MediaController2 mInstance;
 
-    /**
-     * Flag used by MediaController2Record to filter playback callback.
-     */
-    static final int CALLBACK_FLAG_PLAYBACK = 0x1;
-
-    static final int REQUEST_CODE_ALL = 0;
-
     private final Object mLock = new Object();
 
     private final Context mContext;
@@ -73,11 +66,11 @@ public class MediaController2Impl implements MediaController2Provider {
     private final IBinder.DeathRecipient mDeathRecipient;
 
     @GuardedBy("mLock")
-    private final List<PlaybackListenerHolder> mPlaybackListeners = new ArrayList<>();
-    @GuardedBy("mLock")
     private SessionServiceConnection mServiceConnection;
     @GuardedBy("mLock")
     private boolean mIsReleased;
+    @GuardedBy("mLock")
+    private PlaybackState2 mPlaybackState;
 
     // Assignment should be used with the lock hold, but should be used without a lock to prevent
     // potential deadlock.
@@ -185,7 +178,6 @@ public class MediaController2Impl implements MediaController2Provider {
                 mContext.unbindService(mServiceConnection);
                 mServiceConnection = null;
             }
-            mPlaybackListeners.clear();
             binder = mSessionBinder;
             mSessionBinder = null;
             mSessionCallbackStub.destroy();
@@ -373,8 +365,9 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public PlaybackState2 getPlaybackState_impl() {
-        // TODO(jaewan): Implement
-        return null;
+        synchronized (mLock) {
+            return mPlaybackState;
+        }
     }
 
     @Override
@@ -401,24 +394,15 @@ public class MediaController2Impl implements MediaController2Provider {
     ///////////////////////////////////////////////////
     // Protected or private methods
     ///////////////////////////////////////////////////
-    // Should be used without a lock to prevent potential deadlock.
-    private void registerCallbackForPlaybackNotLocked() {
-        final IMediaSession2 binder = mSessionBinder;
-        if (binder != null) {
-            try {
-                binder.registerCallback(mSessionCallbackStub,
-                        CALLBACK_FLAG_PLAYBACK, REQUEST_CODE_ALL);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Cannot connect to the service or the session is gone", e);
-            }
-        }
-    }
-
     private void pushPlaybackStateChanges(final PlaybackState2 state) {
         synchronized (mLock) {
-            for (int i = 0; i < mPlaybackListeners.size(); i++) {
-                mPlaybackListeners.get(i).postPlaybackChange(state);
-            }
+            mPlaybackState = state;
+            mCallbackExecutor.execute(() -> {
+                if (!mInstance.isConnected()) {
+                    return;
+                }
+                mCallback.onPlaybackStateChanged(state);
+            });
         }
     }
 
@@ -437,7 +421,6 @@ public class MediaController2Impl implements MediaController2Provider {
                 release = true;
                 return;
             }
-            boolean registerCallbackForPlaybackNeeded;
             synchronized (mLock) {
                 if (mIsReleased) {
                     return;
@@ -460,15 +443,11 @@ public class MediaController2Impl implements MediaController2Provider {
                     release = true;
                     return;
                 }
-                registerCallbackForPlaybackNeeded = !mPlaybackListeners.isEmpty();
             }
             // TODO(jaewan): Keep commands to prevents illegal API calls.
             mCallbackExecutor.execute(() -> {
                 mCallback.onConnected(commandGroup);
             });
-            if (registerCallbackForPlaybackNeeded) {
-                registerCallbackForPlaybackNotLocked();
-            }
         } finally {
             if (release) {
                 // Trick to call release() without holding the lock, to prevent potential deadlock
@@ -510,7 +489,13 @@ public class MediaController2Impl implements MediaController2Provider {
 
         @Override
         public void onPlaybackStateChanged(Bundle state) throws RuntimeException {
-            final MediaController2Impl controller = getController();
+            final MediaController2Impl controller;
+            try {
+                controller = getController();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+                return;
+            }
             controller.pushPlaybackStateChanges(PlaybackState2.fromBundle(state));
         }
 
