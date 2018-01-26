@@ -21,6 +21,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.media.AudioAttributes;
 import android.media.IMediaSession2Callback;
 import android.media.MediaItem2;
 import android.media.MediaPlayerInterface;
@@ -180,17 +181,19 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
+    public void setAudioAttributes_impl(AudioAttributes attributes) {
+        // implement
+    }
+
+    @Override
     public void setAudioFocusRequest_impl(int focusGain) {
-        mAudioFocusType = focusGain;
+        // implement
     }
 
     @Override
     public void play_impl() {
         ensureCallingThread();
         ensurePlayer();
-        if (!gainAudioFocus()) {
-           // TODO: implement
-        }
         mPlayer.play();
     }
 
@@ -347,13 +350,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
         // Notify to controllers as well.
         mSessionStub.notifyPlaybackStateChangedNotLocked(state);
-    }
-
-    private boolean gainAudioFocus() {
-        // implement
-        // int res = mAudioManager.requestAudioFocus(mFocusRequest.build());
-        // return res == AUDIOFOCUS_REQUEST_GRANTED;
-        return false;
     }
 
     Context getContext() {
