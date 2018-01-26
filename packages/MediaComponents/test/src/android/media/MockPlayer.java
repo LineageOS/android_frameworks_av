@@ -37,6 +37,14 @@ public class MockPlayer implements MediaPlayerInterface {
     public boolean mStopCalled;
     public boolean mSkipToPreviousCalled;
     public boolean mSkipToNextCalled;
+    public boolean mPrepareCalled;
+    public boolean mFastForwardCalled;
+    public boolean mRewindCalled;
+    public boolean mSeekToCalled;
+    public long mSeekPosition;
+    public boolean mSetCurrentPlaylistItemCalled;
+    public int mItemIndex;
+
     public List<PlaybackListenerHolder> mListeners = new ArrayList<>();
     private PlaybackState2 mLastPlaybackState;
 
@@ -84,7 +92,47 @@ public class MockPlayer implements MediaPlayerInterface {
         }
     }
 
+    @Override
+    public void prepare() {
+        mPrepareCalled = true;
+        if (mCountDownLatch != null) {
+            mCountDownLatch.countDown();
+        }
+    }
 
+    @Override
+    public void fastForward() {
+        mFastForwardCalled = true;
+        if (mCountDownLatch != null) {
+            mCountDownLatch.countDown();
+        }
+    }
+
+    @Override
+    public void rewind() {
+        mRewindCalled = true;
+        if (mCountDownLatch != null) {
+            mCountDownLatch.countDown();
+        }
+    }
+
+    @Override
+    public void seekTo(long pos) {
+        mSeekToCalled = true;
+        mSeekPosition = pos;
+        if (mCountDownLatch != null) {
+            mCountDownLatch.countDown();
+        }
+    }
+
+    @Override
+    public void setCurrentPlaylistItem(int index) {
+        mSetCurrentPlaylistItemCalled = true;
+        mItemIndex = index;
+        if (mCountDownLatch != null) {
+            mCountDownLatch.countDown();
+        }
+    }
 
     @Nullable
     @Override
@@ -113,23 +161,6 @@ public class MockPlayer implements MediaPlayerInterface {
         }
     }
 
-    // No-op. Should be added for test later.
-    @Override
-    public void prepare() {
-    }
-
-    @Override
-    public void seekTo(long pos) {
-    }
-
-    @Override
-    public void fastFoward() {
-    }
-
-    @Override
-    public void rewind() {
-    }
-
     @Override
     public AudioAttributes getAudioAttributes() {
         return null;
@@ -137,9 +168,5 @@ public class MockPlayer implements MediaPlayerInterface {
 
     @Override
     public void setPlaylist(List<MediaItem2> item, PlaylistParams param) {
-    }
-
-    @Override
-    public void setCurrentPlaylistItem(int index) {
     }
 }

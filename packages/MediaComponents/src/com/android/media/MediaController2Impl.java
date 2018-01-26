@@ -341,27 +341,28 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void prepare_impl() {
-        // TODO(jaewan): Implement
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE);
     }
 
     @Override
     public void fastForward_impl() {
-        // TODO(jaewan): Implement
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_FAST_FORWARD);
     }
 
     @Override
     public void rewind_impl() {
-        // TODO(jaewan): Implement
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_REWIND);
     }
 
     @Override
     public void seekTo_impl(long pos) {
-        // TODO(jaewan): Implement
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO, pos);
     }
 
     @Override
     public void setCurrentPlaylistItem_impl(int index) {
-        // TODO(jaewan): Implement
+        sendTransportControlCommand(
+                MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM, index);
     }
 
     @Override

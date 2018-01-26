@@ -101,7 +101,6 @@ public class MediaController2Test extends MediaSession2TestBase {
         assertTrue(mPlayer.mPauseCalled);
     }
 
-
     @Test
     public void testSkipToPrevious() throws InterruptedException {
         mController.skipToPrevious();
@@ -133,6 +132,65 @@ public class MediaController2Test extends MediaSession2TestBase {
             fail(e.getMessage());
         }
         assertTrue(mPlayer.mStopCalled);
+    }
+
+    @Test
+    public void testPrepare() throws InterruptedException {
+        mController.prepare();
+        try {
+            assertTrue(mPlayer.mCountDownLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+        } catch (InterruptedException e) {
+            fail(e.getMessage());
+        }
+        assertTrue(mPlayer.mPrepareCalled);
+    }
+
+    @Test
+    public void testFastForward() throws InterruptedException {
+        mController.fastForward();
+        try {
+            assertTrue(mPlayer.mCountDownLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+        } catch (InterruptedException e) {
+            fail(e.getMessage());
+        }
+        assertTrue(mPlayer.mFastForwardCalled);
+    }
+
+    @Test
+    public void testRewind() throws InterruptedException {
+        mController.rewind();
+        try {
+            assertTrue(mPlayer.mCountDownLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+        } catch (InterruptedException e) {
+            fail(e.getMessage());
+        }
+        assertTrue(mPlayer.mRewindCalled);
+    }
+
+    @Test
+    public void testSeekTo() throws InterruptedException {
+        final long seekPosition = 12125L;
+        mController.seekTo(seekPosition);
+        try {
+            assertTrue(mPlayer.mCountDownLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+        } catch (InterruptedException e) {
+            fail(e.getMessage());
+        }
+        assertTrue(mPlayer.mSeekToCalled);
+        assertEquals(seekPosition, mPlayer.mSeekPosition);
+    }
+
+    @Test
+    public void testSetCurrentPlaylistItem() throws InterruptedException {
+        final int itemIndex = 9;
+        mController.setCurrentPlaylistItem(itemIndex);
+        try {
+            assertTrue(mPlayer.mCountDownLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+        } catch (InterruptedException e) {
+            fail(e.getMessage());
+        }
+        assertTrue(mPlayer.mSetCurrentPlaylistItemCalled);
+        assertEquals(itemIndex, mPlayer.mItemIndex);
     }
 
     @Test
