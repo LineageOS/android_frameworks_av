@@ -22,11 +22,12 @@
 
 #include <stdint.h>
 
-#include <binder/Parcel.h>
 #include <utils/RefBase.h>
 #include <utils/String8.h>
 
 namespace android {
+
+class Parcel;
 
 // The following keys map to int32_t data unless indicated otherwise.
 enum {
