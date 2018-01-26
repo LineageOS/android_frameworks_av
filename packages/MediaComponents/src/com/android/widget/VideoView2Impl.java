@@ -79,6 +79,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     private AudioAttributes mAudioAttributes;
     private int mAudioFocusType = AudioManager.AUDIOFOCUS_GAIN; // legacy focus gain
 
+    private VideoView2.OnCustomActionListener mOnCustomActionListener;
     private VideoView2.OnPreparedListener mOnPreparedListener;
     private VideoView2.OnCompletionListener mOnCompletionListener;
     private VideoView2.OnErrorListener mOnErrorListener;
@@ -98,6 +99,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     private String mTitle;
 
     private PlaybackState.Builder mStateBuilder;
+    private List<PlaybackState.CustomAction> mCustomActionList;
     private int mTargetState = STATE_IDLE;
     private int mCurrentState = STATE_IDLE;
     private int mCurrentBufferPercentage;
@@ -303,6 +305,17 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     @Override
     public int getViewType_impl() {
         return mCurrentView.getViewType();
+    }
+
+    @Override
+    public void setCustomActions_impl(List<PlaybackState.CustomAction> actionList,
+            VideoView2.OnCustomActionListener listener) {
+        mCustomActionList = actionList;
+        mOnCustomActionListener = listener;
+
+        // Create a new playback builder in order to clear existing the custom actions.
+        mStateBuilder = null;
+        updatePlaybackState();
     }
 
     @Override
@@ -642,8 +655,12 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
             }
             mStateBuilder = new PlaybackState.Builder();
             mStateBuilder.setActions(playbackActions);
-            mStateBuilder.addCustomAction(MediaControlView2Impl.COMMAND_SHOW_SUBTITLE, null, -1);
-            mStateBuilder.addCustomAction(MediaControlView2Impl.COMMAND_HIDE_SUBTITLE, null, -1);
+
+            if (mCustomActionList != null) {
+                for (PlaybackState.CustomAction action : mCustomActionList) {
+                    mStateBuilder.addCustomAction(action);
+                }
+            }
         }
         mStateBuilder.setState(getCorrespondingPlaybackState(),
                 mMediaPlayer.getCurrentPosition(), mSpeed);
@@ -910,6 +927,11 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                             args.getBoolean(MediaControlView2Impl.ARGUMENT_KEY_FULLSCREEN));
                     break;
             }
+        }
+
+        @Override
+        public void onCustomAction(String action, Bundle extras) {
+            mOnCustomActionListener.onCustomAction(action, extras);
         }
 
         @Override

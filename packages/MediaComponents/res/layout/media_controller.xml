@@ -136,7 +136,13 @@
             android:layout_height="wrap_content"
             android:layout_centerVertical="true"
             android:visibility="gone"
-            android:orientation="horizontal" >
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <LinearLayout
+                android:id="@+id/custom_buttons"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
 
             <ImageButton
                 android:id="@+id/mute"

@@ -29,6 +29,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityManager;
+import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.MediaControlView2;
 import android.widget.ProgressBar;
@@ -40,6 +41,7 @@ import com.android.media.update.ApiHelper;
 import com.android.media.update.R;
 
 import java.util.Formatter;
+import java.util.List;
 import java.util.Locale;
 
 public class MediaControlView2Impl implements MediaControlView2Provider {
@@ -97,6 +99,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     private ImageButton mOverflowButtonRight;
 
     private ViewGroup mExtraControls;
+    private ViewGroup mCustomButtons;
     private ImageButton mOverflowButtonLeft;
     private ImageButton mMuteButton;
     private ImageButton mAspectRationButton;
@@ -501,6 +504,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
 
         // TODO: should these buttons be shown as default?
         mExtraControls = v.findViewById(R.id.extra_controls);
+        mCustomButtons = v.findViewById(R.id.custom_buttons);
         mOverflowButtonLeft = v.findViewById(R.id.overflow_left);
         if (mOverflowButtonLeft != null) {
             mOverflowButtonLeft.setOnClickListener(mOverflowLeftListener);
@@ -874,6 +878,31 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
                     mSeekAvailable = false;
                 }
                 mPlaybackActions = newActions;
+            }
+
+            // Add buttons if custom actions are present.
+            List<PlaybackState.CustomAction> customActions = mPlaybackState.getCustomActions();
+            mCustomButtons.removeAllViews();
+            if (customActions.size() > 0) {
+                for (PlaybackState.CustomAction action : customActions) {
+                    ImageButton button = new ImageButton(mInstance.getContext(),
+                            null /* AttributeSet */, 0 /* Style */);
+                    // TODO: Apply R.style.BottomBarButton to this button using library context.
+                    // Refer Constructor with argument (int defStyleRes) of View.java
+                    button.setImageResource(action.getIcon());
+                    button.setTooltipText(action.getName());
+                    final String actionString = action.getAction().toString();
+                    button.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            // TODO: Currently, we are just sending extras that came from session.
+                            // Is it the right behavior?
+                            mControls.sendCustomAction(actionString, action.getExtras());
+                            mInstance.show(DEFAULT_TIMEOUT_MS);
+                        }
+                    });
+                    mCustomButtons.addView(button);
+                }
             }
         }
 
