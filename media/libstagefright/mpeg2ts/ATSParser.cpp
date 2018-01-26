@@ -23,6 +23,8 @@
 #include "ESQueue.h"
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
+#include <binder/IMemory.h>
+#include <binder/MemoryDealer.h>
 #include <cutils/native_handle.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>

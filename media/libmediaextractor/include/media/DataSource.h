@@ -19,23 +19,15 @@
 #define DATA_SOURCE_H_
 
 #include <sys/types.h>
-#include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaErrors.h>
 #include <utils/Errors.h>
-#include <utils/KeyedVector.h>
-#include <utils/List.h>
 #include <utils/RefBase.h>
 #include <utils/threads.h>
 #include <drm/DrmManagerClient.h>
 
 namespace android {
 
-struct AMessage;
-struct AString;
-class  IDataSource;
-struct IMediaHTTPService;
 class String8;
-struct HTTPBase;
 
 class DataSource : public RefBase {
 public:

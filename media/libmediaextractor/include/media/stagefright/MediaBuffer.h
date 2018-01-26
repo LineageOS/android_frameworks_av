@@ -30,7 +30,6 @@
 namespace android {
 
 struct ABuffer;
-class GraphicBuffer;
 class MediaBuffer;
 class MediaBufferObserver;
 class MetaData;

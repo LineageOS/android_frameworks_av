@@ -22,6 +22,7 @@
 #include <stdio.h>
 
 #include <binder/IMemory.h>
+#include <binder/MemoryDealer.h>
 #include <drm/drm_framework_common.h>
 #include <media/IDataSource.h>
 #include <media/mediametadataretriever.h>

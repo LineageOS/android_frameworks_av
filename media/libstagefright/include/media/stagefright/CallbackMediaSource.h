@@ -22,6 +22,8 @@
 
 namespace android {
 
+class IMediaSource;
+
 // A stagefright MediaSource that wraps a binder IMediaSource.
 class CallbackMediaSource : public MediaSource {
 public:

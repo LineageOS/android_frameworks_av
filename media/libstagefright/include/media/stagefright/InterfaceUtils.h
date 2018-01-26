@@ -17,12 +17,16 @@
 #ifndef INTERFACE_UTILS_H_
 #define INTERFACE_UTILS_H_
 
-#include <media/MediaExtractor.h>
-#include <media/MediaSource.h>
-#include <media/IMediaExtractor.h>
-#include <media/IMediaSource.h>
+#include <utils/RefBase.h>
 
 namespace android {
+
+class DataSource;
+class MediaExtractor;
+struct MediaSource;
+class IDataSource;
+class IMediaExtractor;
+class IMediaSource;
 
 // Creates a DataSource which wraps the given IDataSource object.
 sp<DataSource> CreateDataSourceFromIDataSource(const sp<IDataSource> &source);
