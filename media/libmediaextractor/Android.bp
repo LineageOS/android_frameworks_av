@@ -15,6 +15,7 @@ cc_library {
     ],
 
     shared_libs: [
+        "libbinder",
         "libstagefright_foundation",
         "libutils",
         "libcutils",
@@ -23,6 +24,8 @@ cc_library {
 
     srcs: [
         "DataSource.cpp",
+        "MediaBuffer.cpp",
+        "MediaBufferGroup.cpp",
         "MediaSource.cpp",
         "MediaExtractor.cpp",
     ],
