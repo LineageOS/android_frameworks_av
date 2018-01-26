@@ -182,6 +182,9 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
     @Override
     public MediaController getMediaController_impl() {
+        if (mMediaSession == null) {
+            throw new IllegalStateException("MediaSession instance is not available.");
+        }
         return mMediaController;
     }
 
