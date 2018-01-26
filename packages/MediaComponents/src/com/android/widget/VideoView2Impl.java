@@ -78,7 +78,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     private final AudioManager mAudioManager;
     private AudioAttributes mAudioAttributes;
     private int mAudioFocusType = AudioManager.AUDIOFOCUS_GAIN; // legacy focus gain
-    private int mAudioSession;
 
     private VideoView2.OnPreparedListener mOnPreparedListener;
     private VideoView2.OnCompletionListener mOnCompletionListener;
@@ -192,16 +191,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     }
 
     @Override
-    public int getAudioSessionId_impl() {
-        if (mAudioSession == 0) {
-            MediaPlayer foo = new MediaPlayer();
-            mAudioSession = foo.getAudioSessionId();
-            foo.release();
-        }
-        return mAudioSession;
-    }
-
-    @Override
     public void showSubtitle_impl() {
         // Retrieve all tracks that belong to the current video.
         MediaPlayer.TrackInfo[] trackInfos = mMediaPlayer.getTrackInfo();
@@ -232,7 +221,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     @Override
     public void setFullScreen_impl(boolean fullScreen) {
         if (mOnFullScreenChangedListener != null) {
-            mOnFullScreenChangedListener.onFullScreenChanged(fullScreen);
+            mOnFullScreenChangedListener.onFullScreenChanged(mInstance, fullScreen);
         }
     }
 
@@ -277,16 +266,16 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
     @Override
     public void setVideoPath_impl(String path) {
-        mInstance.setVideoURI(Uri.parse(path));
+        mInstance.setVideoUri(Uri.parse(path));
     }
 
     @Override
-    public void setVideoURI_impl(Uri uri) {
-        mInstance.setVideoURI(uri, null);
+    public void setVideoUri_impl(Uri uri) {
+        mInstance.setVideoUri(uri, null);
     }
 
     @Override
-    public void setVideoURI_impl(Uri uri, Map<String, String> headers) {
+    public void setVideoUri_impl(Uri uri, Map<String, String> headers) {
         mSeekWhenPrepared = 0;
         openVideo(uri, headers);
     }
@@ -363,6 +352,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
         mSuperProvider.onDetachedFromWindow_impl();
         mMediaSession.release();
         mMediaSession = null;
+        mMediaController = null;
     }
 
     @Override
@@ -492,7 +482,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
         }
         mCurrentView = view;
         if (mOnViewTypeChangedListener != null) {
-            mOnViewTypeChangedListener.onViewTypeChanged(view.getViewType());
+            mOnViewTypeChangedListener.onViewTypeChanged(mInstance, view.getViewType());
         }
         if (needToStart()) {
             mMediaController.getTransportControls().play();
@@ -554,12 +544,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
             controller.registerRenderer(new Cea708CaptionRenderer(context));
             controller.registerRenderer(new ClosedCaptionRenderer(context));
             mMediaPlayer.setSubtitleAnchor(controller, (SubtitleController.Anchor) mSubtitleView);
-
-            if (mAudioSession != 0) {
-                mMediaPlayer.setAudioSessionId(mAudioSession);
-            } else {
-                mAudioSession = mMediaPlayer.getAudioSessionId();
-            }
             mMediaPlayer.setOnPreparedListener(mPreparedListener);
             mMediaPlayer.setOnVideoSizeChangedListener(mSizeChangedListener);
             mMediaPlayer.setOnCompletionListener(mCompletionListener);
@@ -752,7 +736,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
             }
             mCurrentState = STATE_PREPARED;
             if (mOnPreparedListener != null) {
-                mOnPreparedListener.onPrepared();
+                mOnPreparedListener.onPrepared(mInstance);
             }
             if (mMediaControlView != null) {
                 mMediaControlView.setEnabled(true);
@@ -827,7 +811,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                     updatePlaybackState();
 
                     if (mOnCompletionListener != null) {
-                        mOnCompletionListener.onCompletion();
+                        mOnCompletionListener.onCompletion(mInstance);
                     }
                     if (mAudioFocusType != AudioManager.AUDIOFOCUS_NONE) {
                         mAudioManager.abandonAudioFocus(null);
@@ -839,7 +823,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
             new MediaPlayer.OnInfoListener() {
                 public boolean onInfo(MediaPlayer mp, int what, int extra) {
                     if (mOnInfoListener != null) {
-                        mOnInfoListener.onInfo(what, extra);
+                        mOnInfoListener.onInfo(mInstance, what, extra);
                     }
                     return true;
                 }
@@ -861,7 +845,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
                     /* If an error handler has been supplied, use it and finish. */
                     if (mOnErrorListener != null) {
-                        if (mOnErrorListener.onError(frameworkErr, implErr)) {
+                        if (mOnErrorListener.onError(mInstance, frameworkErr, implErr)) {
                             return true;
                         }
                     }
@@ -892,7 +876,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                                                 * at least inform them that the video is over.
                                                 */
                                                 if (mOnCompletionListener != null) {
-                                                    mOnCompletionListener.onCompletion();
+                                                    mOnCompletionListener.onCompletion(mInstance);
                                                 }
                                             }
                                         })
