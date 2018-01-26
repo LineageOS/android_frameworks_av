@@ -344,18 +344,4 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             // TODO(jaewan): What to do when the controller is gone?
         }
     }
-
-    public void notifyPlaylistParamsChanged(MediaSession2.PlaylistParams params) {
-        final List<ControllerInfo> list = getControllers();
-        for (int i = 0; i < list.size(); i++) {
-            IMediaSession2Callback callbackBinder =
-                    ControllerInfoImpl.from(list.get(i)).getControllerBinder();
-            try {
-                callbackBinder.onPlaylistParamsChanged(params.toBundle());
-            } catch (RemoteException e) {
-                Log.w(TAG, "Controller is gone", e);
-                // TODO(jaewan): What to do when the controller is gone?
-            }
-        }
-    }
 }

@@ -67,7 +67,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private MediaPlayerInterface mPlayer;
     @GuardedBy("mLock")
     private MyPlaybackListener mListener;
-    private PlaylistParams mPlaylistParams;
 
     /**
      * Can be only called by the {@link Builder#build()}.
@@ -233,22 +232,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
             throw new IllegalArgumentException("layout shouldn't be null");
         }
         mSessionStub.notifyCustomLayoutNotLocked(controller, layout);
-    }
-
-    @Override
-    public void setPlaylistParams_impl(PlaylistParams params) {
-        if (params == null) {
-            throw new IllegalArgumentException("PlaylistParams should not be null!");
-        }
-        mPlaylistParams = params;
-        mPlayer.setPlaylistParams(params);
-        mSessionStub.notifyPlaylistParamsChanged(params);
-    }
-
-    @Override
-    public PlaylistParams getPlaylistParams_impl() {
-        // TODO: Do we need to synchronize here for preparing Controller2.setPlaybackParams?
-        return mPlaylistParams;
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
