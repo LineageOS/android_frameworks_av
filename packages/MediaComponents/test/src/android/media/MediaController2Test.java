@@ -16,6 +16,7 @@
 
 package android.media;
 
+import android.media.MediaController2.ControllerCallback;
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
@@ -198,62 +199,31 @@ public class MediaController2Test extends MediaSession2TestBase {
         assertEquals(mContext.getPackageName(), mController.getSessionToken().getPackageName());
     }
 
+    // This also tests testGetPlaybackState().
     @Test
-    public void testGetPlaybackState() throws InterruptedException {
-        // TODO(jaewan): add equivalent test later
-        /*
-        final CountDownLatch latch = new CountDownLatch(1);
-        final MediaPlayerInterface.PlaybackListener listener = (state) -> {
-            assertEquals(PlaybackState.STATE_BUFFERING, state.getState());
-            latch.countDown();
-        };
-        assertNull(mController.getPlaybackState());
-        mController.addPlaybackListener(listener, sHandler);
-
-        mPlayer.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_BUFFERING));
-        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
-        assertEquals(PlaybackState.STATE_BUFFERING, mController.getPlaybackState().getState());
-        */
-    }
-
-    // TODO(jaewan): add equivalent test later
-    /*
-    @Test
-    public void testAddPlaybackListener() throws InterruptedException {
+    public void testControllerCallback_onPlaybackStateChanged() throws InterruptedException {
         final CountDownLatch latch = new CountDownLatch(2);
-        final MediaPlayerInterface.PlaybackListener listener = (state) -> {
-            switch ((int) latch.getCount()) {
-                case 2:
-                    assertEquals(PlaybackState.STATE_PLAYING, state.getState());
-                    break;
-                case 1:
-                    assertEquals(PlaybackState.STATE_PAUSED, state.getState());
-                    break;
+        final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
+            @Override
+            public void onPlaybackStateChanged(PlaybackState2 state) {
+                switch ((int) latch.getCount()) {
+                    case 2:
+                        assertEquals(PlaybackState.STATE_PLAYING, state.getState());
+                        break;
+                    case 1:
+                        assertEquals(PlaybackState.STATE_PAUSED, state.getState());
+                        break;
+                }
+                latch.countDown();
             }
-            latch.countDown();
         };
 
-        mController.addPlaybackListener(listener, sHandler);
-        sHandler.postAndSync(()->{
-            mPlayer.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_PLAYING));
-            mPlayer.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_PAUSED));
-        });
-        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
-    }
-
-    @Test
-    public void testRemovePlaybackListener() throws InterruptedException {
-        final CountDownLatch latch = new CountDownLatch(1);
-        final MediaPlayerInterface.PlaybackListener listener = (state) -> {
-            fail();
-            latch.countDown();
-        };
-        mController.addPlaybackListener(listener, sHandler);
-        mController.removePlaybackListener(listener);
         mPlayer.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_PLAYING));
-        assertFalse(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        mController = createController(mSession.getToken(), true, callback);
+        mPlayer.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_PAUSED));
+        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+        assertEquals(PlaybackState.STATE_PAUSED, mController.getPlaybackState().getState());
     }
-    */
 
     @Test
     public void testControllerCallback_onConnected() throws InterruptedException {
@@ -381,7 +351,6 @@ public class MediaController2Test extends MediaSession2TestBase {
         assertNotNull(token);
         assertEquals(mContext.getPackageName(), token.getPackageName());
         assertEquals(MockMediaSessionService2.ID, token.getId());
-        assertNull(token.getSessionBinder());
         assertEquals(SessionToken2.TYPE_SESSION_SERVICE, token.getType());
     }
 

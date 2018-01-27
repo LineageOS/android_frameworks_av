@@ -16,15 +16,23 @@
 
 package com.android.media;
 
+import static android.media.SessionToken2.TYPE_LIBRARY_SERVICE;
+import static android.media.SessionToken2.TYPE_SESSION;
+import static android.media.SessionToken2.TYPE_SESSION_SERVICE;
+
 import android.Manifest.permission;
 import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.pm.ResolveInfo;
 import android.media.AudioAttributes;
 import android.media.IMediaSession2Callback;
 import android.media.MediaItem2;
+import android.media.MediaLibraryService2;
 import android.media.MediaPlayerInterface;
+import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.Command;
@@ -33,15 +41,18 @@ import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
+import android.media.MediaSessionService2;
 import android.media.PlaybackState2;
 import android.media.SessionToken2;
 import android.media.VolumeProvider;
 import android.media.session.MediaSessionManager;
 import android.media.update.MediaSession2Provider;
 import android.os.Bundle;
+import android.os.Process;
 import android.os.IBinder;
 import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
+import android.text.TextUtils;
 import android.util.Log;
 
 import java.lang.ref.WeakReference;
@@ -95,25 +106,69 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mCallback = callback;
         mCallbackExecutor = callbackExecutor;
         mSessionStub = new MediaSession2Stub(this);
-        // Ask server to create session token for following reasons.
-        //   1. Make session ID unique per package.
-        //      Server can only know if the package has another process and has another session
-        //      with the same id. Let server check this.
-        //      Note that 'ID is unique per package' is important for controller to distinguish
-        //      a session in another package.
-        //   2. Easier to know the type of session.
-        //      Session created here can be the session service token. In order distinguish,
-        //      we need to iterate AndroidManifest.xml but it's already done by the server.
-        //      Let server to create token with the type.
+
+        // Infer type from the id and package name.
+        String sessionService = getServiceName(context, MediaSessionService2.SERVICE_INTERFACE, id);
+        String libraryService = getServiceName(context, MediaLibraryService2.SERVICE_INTERFACE, id);
+        if (sessionService != null && libraryService != null) {
+            throw new IllegalArgumentException("Ambiguous session type. Multiple"
+                    + " session services define the same id=" + id);
+        } else if (sessionService != null) {
+            mSessionToken = new SessionToken2(context, Process.myUid(), TYPE_SESSION_SERVICE,
+                    mContext.getPackageName(), sessionService, id, mSessionStub);
+        } else if (libraryService != null) {
+            mSessionToken = new SessionToken2(context, Process.myUid(), TYPE_LIBRARY_SERVICE,
+                    mContext.getPackageName(), libraryService, id, mSessionStub);
+        } else {
+            mSessionToken = new SessionToken2(context, Process.myUid(), TYPE_SESSION,
+                    mContext.getPackageName(), null, id, mSessionStub);
+        }
+
+        // Only remember player. Actual settings will be done in the initialize().
+        mPlayer = player;
+    }
+
+    private static String getServiceName(Context context, String serviceAction, String id) {
+        PackageManager manager = context.getPackageManager();
+        Intent serviceIntent = new Intent(serviceAction);
+        serviceIntent.setPackage(context.getPackageName());
+        List<ResolveInfo> services = manager.queryIntentServices(serviceIntent,
+                PackageManager.GET_META_DATA);
+        String serviceName = null;
+        if (services != null) {
+            for (int i = 0; i < services.size(); i++) {
+                String serviceId = SessionToken2Impl.getSessionId(services.get(i));
+                if (serviceId != null && TextUtils.equals(id, serviceId)) {
+                    if (services.get(i).serviceInfo == null) {
+                        continue;
+                    }
+                    if (serviceName != null) {
+                        throw new IllegalArgumentException("Ambiguous session type. Multiple"
+                                + " session services define the same id=" + id);
+                    }
+                    serviceName = services.get(i).serviceInfo.name;
+                }
+            }
+        }
+        return serviceName;
+    }
+
+    @Override
+    public void initialize() {
+        synchronized (mLock) {
+            setPlayerLocked(mPlayer);
+        }
+        // Ask server for the sanity check, and starts
+        // Sanity check for making session ID unique 'per package' cannot be done in here.
+        // Server can only know if the package has another process and has another session with the
+        // same id. Note that 'ID is unique per package' is important for controller to distinguish
+        // a session in another package.
         MediaSessionManager manager =
                 (MediaSessionManager) mContext.getSystemService(Context.MEDIA_SESSION_SERVICE);
-        mSessionToken = manager.createSessionToken(mContext.getPackageName(), mId, mSessionStub);
-        if (mSessionToken == null) {
+        if (!manager.onSessionCreated(mSessionToken)) {
             throw new IllegalStateException("Session with the same id is already used by"
                     + " another process. Use MediaController2 instead.");
         }
-
-        setPlayerInternal(player);
     }
 
     // TODO(jaewan): Add explicit release() and do not remove session object with the
@@ -126,28 +181,31 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (player == null) {
             throw new IllegalArgumentException("player shouldn't be null");
         }
-        setPlayerInternal(player);
+        if (player == mPlayer) {
+            return;
+        }
+        synchronized (mLock) {
+            setPlayerLocked(player);
+        }
     }
 
-    private void setPlayerInternal(MediaPlayerInterface player) {
-        synchronized (mLock) {
-            if (mPlayer == player) {
-                // Player didn't changed. No-op.
-                return;
-            }
-            if (mPlayer != null && mListener != null) {
-                // This might not work for a poorly implemented player.
-                mPlayer.removePlaybackListener(mListener);
-            }
-            mListener = new MyPlaybackListener(this, player);
-            player.addPlaybackListener(mCallbackExecutor, mListener);
-            mPlayer = player;
+    private void setPlayerLocked(MediaPlayerInterface player) {
+        if (mPlayer != null && mListener != null) {
+            // This might not work for a poorly implemented player.
+            mPlayer.removePlaybackListener(mListener);
         }
-        notifyPlaybackStateChangedNotLocked(player.getPlaybackState());
+        mPlayer = player;
+        mListener = new MyPlaybackListener(this, player);
+        player.addPlaybackListener(mCallbackExecutor, mListener);
     }
 
     @Override
     public void close_impl() {
+        // Stop system service from listening this session first.
+        MediaSessionManager manager =
+                (MediaSessionManager) mContext.getSystemService(Context.MEDIA_SESSION_SERVICE);
+        manager.onSessionDestroyed(mSessionToken);
+
         if (mSessionStub != null) {
             if (DEBUG) {
                 Log.d(TAG, "session is now unavailable, id=" + mId);
@@ -160,7 +218,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 // close can be called multiple times
                 mPlayer.removePlaybackListener(mListener);
                 mPlayer = null;
-                return;
             }
         }
     }
@@ -179,11 +236,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public List<ControllerInfo> getConnectedControllers_impl() {
         return mSessionStub.getControllers();
-    }
-
-    @Override
-    public void setAudioAttributes_impl(AudioAttributes attributes) {
-        // implement
     }
 
     @Override
@@ -289,6 +341,12 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
+    public List<MediaItem2> getPlaylist_impl() {
+        // TODO(jaewan): Implement this
+        return null;
+    }
+
+    @Override
     public void prepare_impl() {
         ensureCallingThread();
         ensurePlayer();
@@ -323,6 +381,44 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mPlayer.setCurrentPlaylistItem(index);
     }
 
+    @Override
+    public void addPlaybackListener_impl(Executor executor, PlaybackListener listener) {
+        if (executor == null) {
+            throw new IllegalArgumentException("executor shouldn't be null");
+        }
+        if (listener == null) {
+            throw new IllegalArgumentException("listener shouldn't be null");
+        }
+        ensureCallingThread();
+        if (PlaybackListenerHolder.contains(mListeners, listener)) {
+            Log.w(TAG, "listener is already added. Ignoring.");
+            return;
+        }
+        mListeners.add(new PlaybackListenerHolder(executor, listener));
+        executor.execute(() -> listener.onPlaybackChanged(getInstance().getPlaybackState()));
+    }
+
+    @Override
+    public void removePlaybackListener_impl(PlaybackListener listener) {
+        if (listener == null) {
+            throw new IllegalArgumentException("listener shouldn't be null");
+        }
+        ensureCallingThread();
+        int idx = PlaybackListenerHolder.indexOf(mListeners, listener);
+        if (idx >= 0) {
+            mListeners.remove(idx);
+        }
+    }
+
+    @Override
+    public PlaybackState2 getPlaybackState_impl() {
+        ensureCallingThread();
+        ensurePlayer();
+        // TODO(jaewan): Is it safe to be called on any thread?
+        //               Otherwise we should cache the result from listener.
+        return mPlayer.getPlaybackState();
+    }
+
     ///////////////////////////////////////////////////
     // Protected or private methods
     ///////////////////////////////////////////////////
@@ -346,7 +442,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
             throw new IllegalStateException("Run this on the given thread");
         }*/
     }
-
 
     private void ensurePlayer() {
         // TODO(jaewan): Should we pend command instead? Follow the decision from MP2.
@@ -416,11 +511,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         private final String mPackageName;
         private final boolean mIsTrusted;
         private final IMediaSession2Callback mControllerBinder;
-
-        // Flag to indicate which callbacks should be returned for the controller binder.
-        // Either 0 or combination of {@link #CALLBACK_FLAG_PLAYBACK},
-        // {@link #CALLBACK_FLAG_SESSION_ACTIVENESS}
-        private int mFlag;
 
         public ControllerInfoImpl(Context context, ControllerInfo instance, int uid,
                 int pid, String packageName, IMediaSession2Callback callback) {
@@ -503,18 +593,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         public IMediaSession2Callback getControllerBinder() {
             return mControllerBinder;
-        }
-
-        public boolean containsFlag(int flag) {
-            return (mFlag & flag) != 0;
-        }
-
-        public void addFlag(int flag) {
-            mFlag |= flag;
-        }
-
-        public void removeFlag(int flag) {
-            mFlag &= ~flag;
         }
 
         public static ControllerInfoImpl from(ControllerInfo controller) {

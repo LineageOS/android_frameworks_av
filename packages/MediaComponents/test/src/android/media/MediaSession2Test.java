@@ -19,11 +19,15 @@ package android.media;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
 
+import static android.media.TestUtils.createPlaybackState;
+
+import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.os.Bundle;
+import android.os.Looper;
 import android.os.Process;
 import android.support.annotation.NonNull;
 import android.support.test.filters.SmallTest;
@@ -32,6 +36,7 @@ import android.support.test.runner.AndroidJUnit4;
 import java.util.ArrayList;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -159,10 +164,10 @@ public class MediaSession2Test extends MediaSession2TestBase {
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
     }
 
+    // TODO(jaewan): Re-enable test..
+    @Ignore
     @Test
     public void testPlaybackStateChangedListener() throws InterruptedException {
-        // TODO(jaewan): Add equivalent tests again
-        /*
         final CountDownLatch latch = new CountDownLatch(2);
         final MockPlayer player = new MockPlayer(0);
         final PlaybackListener listener = (state) -> {
@@ -170,45 +175,42 @@ public class MediaSession2Test extends MediaSession2TestBase {
             assertNotNull(state);
             switch ((int) latch.getCount()) {
                 case 2:
-                    assertEquals(PlaybackState.STATE_PLAYING, state.getState());
+                    assertEquals(PlaybackState2.STATE_PLAYING, state.getState());
                     break;
                 case 1:
-                    assertEquals(PlaybackState.STATE_PAUSED, state.getState());
+                    assertEquals(PlaybackState2.STATE_PAUSED, state.getState());
                     break;
                 case 0:
                     fail();
             }
             latch.countDown();
         };
-        player.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_PLAYING));
+        player.notifyPlaybackState(createPlaybackState(PlaybackState2.STATE_PLAYING));
         sHandler.postAndSync(() -> {
-            mSession.addPlaybackListener(listener, sHandler);
+            mSession.addPlaybackListener(sHandlerExecutor, listener);
             // When the player is set, listeners will be notified about the player's current state.
             mSession.setPlayer(player);
         });
-        player.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_PAUSED));
+        player.notifyPlaybackState(createPlaybackState(PlaybackState2.STATE_PAUSED));
         assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
-        */
     }
 
     @Test
     public void testBadPlayer() throws InterruptedException {
         // TODO(jaewan): Add equivalent tests again
-        /*
         final CountDownLatch latch = new CountDownLatch(3); // expected call + 1
         final BadPlayer player = new BadPlayer(0);
         sHandler.postAndSync(() -> {
-            mSession.addPlaybackListener((state) -> {
+            mSession.addPlaybackListener(sHandlerExecutor, (state) -> {
                 // This will be called for every setPlayer() calls, but no more.
                 assertNull(state);
                 latch.countDown();
-            }, sHandler);
+            });
             mSession.setPlayer(player);
             mSession.setPlayer(mPlayer);
         });
-        player.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_PAUSED));
+        player.notifyPlaybackState(createPlaybackState(PlaybackState2.STATE_PAUSED));
         assertFalse(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
-        */
     }
 
     private static class BadPlayer extends MockPlayer {

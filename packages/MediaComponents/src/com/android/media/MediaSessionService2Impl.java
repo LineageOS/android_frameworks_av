@@ -27,6 +27,8 @@ import android.media.MediaSession2;
 import android.media.MediaSessionService2;
 import android.media.MediaSessionService2.MediaNotification;
 import android.media.PlaybackState2;
+import android.media.SessionToken2;
+import android.media.SessionToken2.TokenType;
 import android.media.session.PlaybackState;
 import android.media.update.MediaSessionService2Provider;
 import android.os.IBinder;
@@ -81,39 +83,24 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
                 NOTIFICATION_SERVICE);
         mStartSelfIntent = new Intent(mInstance, mInstance.getClass());
 
-        Intent serviceIntent = createServiceIntent();
-        ResolveInfo resolveInfo = mInstance.getPackageManager()
-                .resolveService(serviceIntent, PackageManager.GET_META_DATA);
-        String id;
-        if (resolveInfo == null || resolveInfo.serviceInfo == null) {
-            throw new IllegalArgumentException("service " + mInstance + " doesn't implement"
-                    + serviceIntent.getAction());
-        } else if (resolveInfo.serviceInfo.metaData == null) {
-            if (DEBUG) {
-                Log.d(TAG, "Failed to resolve ID for " + mInstance + ". Using empty id");
-            }
-            id = "";
-        } else {
-            id = resolveInfo.serviceInfo.metaData.getString(
-                    MediaSessionService2.SERVICE_META_DATA, "");
-        }
-        mSession = mInstance.onCreateSession(id);
-        if (mSession == null || !id.equals(mSession.getToken().getId())) {
-            throw new RuntimeException("Expected session with id " + id + ", but got " + mSession);
+        SessionToken2 token = new SessionToken2(mInstance, getSessionType(),
+                mInstance.getPackageName(), mInstance.getClass().getName());
+        mSession = mInstance.onCreateSession(token.getId());
+        if (mSession == null || !token.getId().equals(mSession.getToken().getId())) {
+            throw new RuntimeException("Expected session with id " + token.getId()
+                    + ", but got " + mSession);
         }
         // TODO(jaewan): Uncomment here.
         // mSession.addPlaybackListener(mListener, mSession.getExecutor());
     }
 
-    Intent createServiceIntent() {
-        Intent serviceIntent = new Intent(mInstance, mInstance.getClass());
-        serviceIntent.setAction(MediaSessionService2.SERVICE_INTERFACE);
-        return serviceIntent;
+    @TokenType int getSessionType() {
+        return SessionToken2.TYPE_SESSION_SERVICE;
     }
 
     public IBinder onBind_impl(Intent intent) {
         if (MediaSessionService2.SERVICE_INTERFACE.equals(intent.getAction())) {
-            return mSession.getToken().getSessionBinder().asBinder();
+            return SessionToken2Impl.from(mSession.getToken()).getSessionBinder().asBinder();
         }
         return null;
     }

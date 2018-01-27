@@ -85,7 +85,6 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
             SessionToken2 token = tokens.get(i);
             if (mContext.getPackageName().equals(token.getPackageName())
                     && TAG.equals(token.getId())) {
-                assertNotNull(token.getSessionBinder());
                 assertNull(controller);
                 controller = createController(token);
             }
@@ -163,13 +162,11 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
                     && MockMediaSessionService2.ID.equals(token.getId())) {
                 assertFalse(foundTestSessionService);
                 assertEquals(SessionToken2.TYPE_SESSION_SERVICE, token.getType());
-                assertNull(token.getSessionBinder());
                 foundTestSessionService = true;
             } else if (mContext.getPackageName().equals(token.getPackageName())
                     && MockMediaLibraryService2.ID.equals(token.getId())) {
                 assertFalse(foundTestLibraryService);
                 assertEquals(SessionToken2.TYPE_LIBRARY_SERVICE, token.getType());
-                assertNull(token.getSessionBinder());
                 foundTestLibraryService = true;
             }
         }
