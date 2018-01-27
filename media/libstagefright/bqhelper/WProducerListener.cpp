@@ -14,14 +14,9 @@
  * limitations under the License.
  */
 
-#include <media/stagefright/omx/1.0/WProducerListener.h>
+#include <media/stagefright/bqhelper/WProducerListener.h>
 
 namespace android {
-namespace hardware {
-namespace media {
-namespace omx {
-namespace V1_0 {
-namespace implementation {
 
 // TWProducerListener
 TWProducerListener::TWProducerListener(
@@ -52,9 +47,4 @@ bool LWProducerListener::needsReleaseNotify() {
     return static_cast<bool>(mBase->needsReleaseNotify());
 }
 
-}  // namespace implementation
-}  // namespace V1_0
-}  // namespace omx
-}  // namespace media
-}  // namespace hardware
 }  // namespace android

@@ -20,8 +20,8 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
-#include <media/stagefright/gbs/ComponentWrapper.h>
-#include <media/stagefright/gbs/GraphicBufferSource.h>
+#include <media/stagefright/bqhelper/ComponentWrapper.h>
+#include <media/stagefright/bqhelper/GraphicBufferSource.h>
 #include <media/stagefright/omx/OmxGraphicBufferSource.h>
 
 namespace android {

@@ -22,8 +22,8 @@
 
 #define STRINGIFY_ENUMS // for asString in HardwareAPI.h/VideoAPI.h
 
-#include <media/stagefright/gbs/GraphicBufferSource.h>
-#include <media/stagefright/gbs/FrameDropper.h>
+#include <media/stagefright/bqhelper/GraphicBufferSource.h>
+#include <media/stagefright/bqhelper/FrameDropper.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ColorUtils.h>

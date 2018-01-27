@@ -24,7 +24,7 @@
 #include <android/native_window.h>
 #include <media/hardware/MetadataBufferType.h>
 #include <media/stagefright/foundation/Mutexed.h>
-#include <media/stagefright/gbs/GraphicBufferSource.h>
+#include <media/stagefright/bqhelper/GraphicBufferSource.h>
 #include <media/stagefright/CodecBase.h>
 #include <media/stagefright/FrameRenderTracker.h>
 #include <media/stagefright/MediaDefs.h>

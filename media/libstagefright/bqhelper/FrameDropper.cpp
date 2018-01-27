@@ -18,7 +18,7 @@
 #define LOG_TAG "FrameDropper"
 #include <utils/Log.h>
 
-#include <media/stagefright/gbs/FrameDropper.h>
+#include <media/stagefright/bqhelper/FrameDropper.h>
 #include <media/stagefright/foundation/ADebug.h>
 
 namespace android {

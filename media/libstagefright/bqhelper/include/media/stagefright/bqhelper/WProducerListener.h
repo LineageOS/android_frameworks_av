@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0_WOMXPRODUCERLISTENER_H
-#define ANDROID_HARDWARE_MEDIA_OMX_V1_0_WOMXPRODUCERLISTENER_H
+#ifndef MEDIA_STAGEFRIGHT_WPRODUCERLISTENER_H_
+#define MEDIA_STAGEFRIGHT_WPRODUCERLISTENER_H_
 
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
@@ -26,11 +26,6 @@
 #include <android/hardware/graphics/bufferqueue/1.0/IProducerListener.h>
 
 namespace android {
-namespace hardware {
-namespace media {
-namespace omx {
-namespace V1_0 {
-namespace implementation {
 
 using ::android::hidl::base::V1_0::IBase;
 using ::android::hardware::hidl_array;
@@ -62,11 +57,6 @@ public:
     bool needsReleaseNotify() override;
 };
 
-}  // namespace implementation
-}  // namespace V1_0
-}  // namespace omx
-}  // namespace media
-}  // namespace hardware
 }  // namespace android
 
-#endif  // ANDROID_HARDWARE_MEDIA_OMX_V1_0_WOMXPRODUCERLISTENER_H
+#endif  // MEDIA_STAGEFRIGHT_WPRODUCERLISTENER_H_

@@ -27,7 +27,7 @@
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AHandlerReflector.h>
 #include <media/stagefright/foundation/ALooper.h>
-#include <media/stagefright/gbs/ComponentWrapper.h>
+#include <media/stagefright/bqhelper/ComponentWrapper.h>
 
 namespace android {
 
