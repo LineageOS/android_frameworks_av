@@ -27,7 +27,7 @@
 
 #include <media/AudioEffect.h>
 #include <media/IAudioPolicyService.h>
-
+#include <private/android_filesystem_config.h>
 #include <system/audio.h>
 
 namespace android {
@@ -857,6 +857,27 @@ status_t BnAudioPolicyService::onTransact(
             ALOGW("%s: transaction %d received from PID %d",
                   __func__, code, IPCThreadState::self()->getCallingPid());
             return INVALID_OPERATION;
+        default:
+            break;
+    }
+
+    // make sure the following transactions come from system components
+    switch (code) {
+        case SET_DEVICE_CONNECTION_STATE:
+        case HANDLE_DEVICE_CONFIG_CHANGE:
+        case SET_PHONE_STATE:
+        case SET_RINGER_MODE:
+        case SET_FORCE_USE:
+        case INIT_STREAM_VOLUME:
+        case SET_STREAM_VOLUME:
+        case REGISTER_POLICY_MIXES:
+        case SET_MASTER_MONO:
+            if (IPCThreadState::self()->getCallingUid() >= AID_APP_START) {
+                ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
+                      __func__, code, IPCThreadState::self()->getCallingPid(),
+                      IPCThreadState::self()->getCallingUid());
+                return INVALID_OPERATION;
+            }
         default:
             break;
     }

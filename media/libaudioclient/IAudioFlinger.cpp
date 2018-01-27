@@ -24,6 +24,7 @@
 
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
+#include <private/android_filesystem_config.h>
 
 #include "IAudioFlinger.h"
 
@@ -877,6 +878,24 @@ status_t BnAudioFlinger::onTransact(
             ALOGW("%s: transaction %d received from PID %d",
                   __func__, code, IPCThreadState::self()->getCallingPid());
             return INVALID_OPERATION;
+        default:
+            break;
+    }
+
+    // make sure the following transactions come from system components
+    switch (code) {
+        case SET_MASTER_VOLUME:
+        case SET_MASTER_MUTE:
+        case SET_MODE:
+        case SET_MIC_MUTE:
+        case SET_LOW_RAM_DEVICE:
+        case SYSTEM_READY:
+            if (IPCThreadState::self()->getCallingUid() >= AID_APP_START) {
+                ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
+                      __func__, code, IPCThreadState::self()->getCallingPid(),
+                      IPCThreadState::self()->getCallingUid());
+                return INVALID_OPERATION;
+            }
         default:
             break;
     }
