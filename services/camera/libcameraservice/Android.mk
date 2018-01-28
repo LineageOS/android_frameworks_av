@@ -79,10 +79,15 @@ LOCAL_SHARED_LIBRARIES:= \
     android.hardware.camera.common@1.0 \
     android.hardware.camera.provider@2.4 \
     android.hardware.camera.device@1.0 \
-    vendor.qti.hardware.camera.device@1.0 \
     android.hardware.camera.device@3.2 \
     android.hardware.camera.device@3.3 \
     android.hardware.camera.device@3.4
+
+ifeq ($(TARGET_USES_QTI_CAMERA_DEVICE), true)
+LOCAL_CFLAGS += -DQTI_CAMERA_DEVICE
+LOCAL_SHARED_LIBRARIES += \
+    vendor.qti.hardware.camera.device@1.0
+endif
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder libcamera_client libfmq
 
