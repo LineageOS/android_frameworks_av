@@ -19,6 +19,7 @@
 
 #include <utility>
 #include <unordered_map>
+#include <set>
 
 #include <utils/Condition.h>
 #include <utils/Errors.h>
@@ -33,6 +34,7 @@
 #include <android/hardware/camera/device/3.3/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
+#include <android/hardware/camera/device/3.4/ICameraDeviceCallback.h>
 #include <fmq/MessageQueue.h>
 #include <hardware/camera3.h>
 
@@ -77,7 +79,7 @@ class Camera3StreamInterface;
  */
 class Camera3Device :
             public CameraDeviceBase,
-            virtual public hardware::camera::device::V3_2::ICameraDeviceCallback,
+            virtual public hardware::camera::device::V3_4::ICameraDeviceCallback,
             private camera3_callback_ops {
   public:
 
@@ -472,9 +474,11 @@ class Camera3Device :
 
 
     /**
-     * Implementation of android::hardware::camera::device::V3_2::ICameraDeviceCallback
+     * Implementation of android::hardware::camera::device::V3_4::ICameraDeviceCallback
      */
-
+    hardware::Return<void> processCaptureResult_3_4(
+            const hardware::hidl_vec<
+                    hardware::camera::device::V3_4::CaptureResult>& results) override;
     hardware::Return<void> processCaptureResult(
             const hardware::hidl_vec<
                     hardware::camera::device::V3_2::CaptureResult>& results) override;
@@ -484,7 +488,13 @@ class Camera3Device :
 
     // Handle one capture result. Assume that mProcessCaptureResultLock is held.
     void processOneCaptureResultLocked(
-            const hardware::camera::device::V3_2::CaptureResult& results);
+            const hardware::camera::device::V3_2::CaptureResult& result,
+            const hardware::hidl_vec<
+            hardware::camera::device::V3_4::PhysicalCameraMetadata> physicalCameraMetadatas);
+    status_t readOneCameraMetadataLocked(uint64_t fmqResultSize,
+            hardware::camera::device::V3_2::CameraMetadata& resultMetadata,
+            const hardware::camera::device::V3_2::CameraMetadata& result);
+
     // Handle one notify message
     void notify(const hardware::camera::device::V3_2::NotifyMsg& msg);
 
@@ -965,6 +975,12 @@ class Camera3Device :
         // REQUEST/RESULT error.
         bool skipResultMetadata;
 
+        // The physical camera ids being requested.
+        std::set<String8> physicalCameraIds;
+
+        // Map of physicalCameraId <-> Metadata
+        std::vector<PhysicalCaptureResultInfo> physicalMetadatas;
+
         // Default constructor needed by KeyedVector
         InFlightRequest() :
                 shutterTimestamp(0),
@@ -979,7 +995,8 @@ class Camera3Device :
         }
 
         InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
-                bool hasAppCallback, nsecs_t maxDuration) :
+                bool hasAppCallback, nsecs_t maxDuration,
+                const std::set<String8>& physicalCameraIdSet) :
                 shutterTimestamp(0),
                 sensorTimestamp(0),
                 requestStatus(OK),
@@ -989,7 +1006,8 @@ class Camera3Device :
                 hasInputBuffer(hasInput),
                 hasCallback(hasAppCallback),
                 maxExpectedDuration(maxDuration),
-                skipResultMetadata(false) {
+                skipResultMetadata(false),
+                physicalCameraIds(physicalCameraIdSet) {
         }
     };
 
@@ -1006,7 +1024,7 @@ class Camera3Device :
 
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
-            bool callback, nsecs_t maxExpectedDuration);
+            bool callback, nsecs_t maxExpectedDuration, std::set<String8>& physicalCameraIds);
 
     /**
      * Returns the maximum expected time it'll take for all currently in-flight
@@ -1127,7 +1145,9 @@ class Camera3Device :
     void sendCaptureResult(CameraMetadata &pendingMetadata,
             CaptureResultExtras &resultExtras,
             CameraMetadata &collectedPartialResult, uint32_t frameNumber,
-            bool reprocess);
+            bool reprocess, const std::vector<PhysicalCaptureResultInfo>& physicalMetadatas);
+
+    bool isLastFullResult(const InFlightRequest& inFlightRequest);
 
     // Insert the result to the result queue after updating frame number and overriding AE
     // trigger cancel.

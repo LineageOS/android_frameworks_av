@@ -1,4 +1,5 @@
-cc_library_shared {
+cc_defaults {
+    name: "libmp4extractor_defaults",
 
     srcs: [
         "ItemTable.cpp",
@@ -23,17 +24,21 @@ cc_library_shared {
         "libstagefright_id3",
     ],
 
-    name: "libmp4extractor",
-    relative_install_path: "extractors",
-
-    compile_multilib: "first",
-
     cflags: [
         "-Werror",
         "-Wall",
         "-fvisibility=hidden",
     ],
     version_script: "exports.lds",
+    relative_install_path: "extractors",
+    compile_multilib: "first",
+}
+
+cc_library_shared {
+
+
+    name: "libmp4extractor",
+    defaults: ["libmp4extractor_defaults"],
 
     sanitize: {
         cfi: true,
@@ -46,4 +51,10 @@ cc_library_shared {
         },
     },
 
+}
+
+cc_library_static {
+    name: "libmp4extractor_fuzzing",
+
+    defaults: ["libmp4extractor_defaults"],
 }

@@ -22,11 +22,11 @@ import android.content.Intent;
 import android.media.MediaLibraryService2;
 import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
-import android.media.MediaPlayerBase;
+import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
 import android.media.MediaSession2.ControllerInfo;
-import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
+import android.media.SessionToken2;
 import android.media.VolumeProvider;
 import android.media.update.MediaLibraryService2Provider;
 import android.os.Bundle;
@@ -56,10 +56,8 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
     }
 
     @Override
-    Intent createServiceIntent() {
-        Intent serviceIntent = new Intent(mInstance, mInstance.getClass());
-        serviceIntent.setAction(MediaLibraryService2.SERVICE_INTERFACE);
-        return serviceIntent;
+    int getSessionType() {
+        return SessionToken2.TYPE_LIBRARY_SERVICE;
     }
 
     public static class MediaLibrarySessionImpl extends MediaSession2Impl
@@ -67,12 +65,12 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
         private final MediaLibrarySession mInstance;
         private final MediaLibrarySessionCallback mCallback;
 
-        public MediaLibrarySessionImpl(MediaLibrarySession instance, Context context,
-                MediaPlayerBase player, String id, Executor callbackExecutor,
-                MediaLibrarySessionCallback callback, VolumeProvider volumeProvider, int ratingType,
-                PendingIntent sessionActivity) {
-            super(instance, context, player, id, callbackExecutor, callback, volumeProvider,
-                    ratingType, sessionActivity);
+        public MediaLibrarySessionImpl(Context context, MediaLibrarySession instance,
+                MediaPlayerInterface player, String id, VolumeProvider volumeProvider,
+                int ratingType, PendingIntent sessionActivity, Executor callbackExecutor,
+                MediaLibrarySessionCallback callback)  {
+            super(context, instance, player, id, volumeProvider, ratingType, sessionActivity,
+                    callbackExecutor, callback);
             mInstance = instance;
             mCallback = callback;
         }

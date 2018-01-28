@@ -23,11 +23,13 @@
 #include <media/AudioIoDescriptor.h>
 #include <media/IAudioFlingerClient.h>
 #include <media/IAudioPolicyServiceClient.h>
+#include <media/MicrophoneInfo.h>
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
 #include <utils/Errors.h>
 #include <utils/Mutex.h>
+#include <vector>
 
 namespace android {
 
@@ -239,20 +241,16 @@ public:
                                     audio_session_t session,
                                     pid_t pid,
                                     uid_t uid,
+                                    const String16& opPackageName,
                                     const audio_config_base_t *config,
                                     audio_input_flags_t flags,
                                     audio_port_handle_t *selectedDeviceId,
                                     audio_port_handle_t *portId);
 
-    static status_t startInput(audio_io_handle_t input,
-                               audio_session_t session,
-                               audio_devices_t device,
-                               uid_t uid,
+    static status_t startInput(audio_port_handle_t portId,
                                bool *silenced);
-    static status_t stopInput(audio_io_handle_t input,
-                              audio_session_t session);
-    static void releaseInput(audio_io_handle_t input,
-                             audio_session_t session);
+    static status_t stopInput(audio_port_handle_t portId);
+    static void releaseInput(audio_port_handle_t portId);
     static status_t initStreamVolume(audio_stream_type_t stream,
                                       int indexMin,
                                       int indexMax);
@@ -339,6 +337,8 @@ public:
 
     static float    getStreamVolumeDB(
             audio_stream_type_t stream, int index, audio_devices_t device);
+
+    static status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones);
 
     // ----------------------------------------------------------------------------
 

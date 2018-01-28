@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,27 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef MEDIA_BUFFER_BASE_H_
+package android.hardware.camera2.impl;
 
-#define MEDIA_BUFFER_BASE_H_
-
-namespace android {
-
-class MediaBufferBase {
-public:
-    MediaBufferBase() {}
-
-    virtual void release() = 0;
-    virtual void add_ref() = 0;
-
-protected:
-    virtual ~MediaBufferBase() {}
-
-private:
-    MediaBufferBase(const MediaBufferBase &);
-    MediaBufferBase &operator=(const MediaBufferBase &);
-};
-
-}  // namespace android
-
-#endif  // MEDIA_BUFFER_BASE_H_
+/** @hide */
+parcelable PhysicalCaptureResultInfo cpp_header "camera/CaptureResult.h";

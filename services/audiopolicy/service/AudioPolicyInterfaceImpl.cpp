@@ -287,6 +287,7 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
                                              audio_session_t session,
                                              pid_t pid,
                                              uid_t uid,
+                                             const String16& opPackageName,
                                              const audio_config_base_t *config,
                                              audio_input_flags_t flags,
                                              audio_port_handle_t *selectedDeviceId,
@@ -295,6 +296,7 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
+
     // already checked by client, but double-check in case the client wrapper is bypassed
     if (attr->source < AUDIO_SOURCE_DEFAULT && attr->source >= AUDIO_SOURCE_CNT &&
             attr->source != AUDIO_SOURCE_HOTWORD && attr->source != AUDIO_SOURCE_FM_TUNER) {
@@ -316,6 +318,13 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
                  "%s uid %d pid %d tried to pass itself off as pid %d",
                  __func__, callingUid, callingPid, pid);
         pid = callingPid;
+    }
+
+    // check calling permissions
+    if (!recordingAllowed(opPackageName, pid, uid)) {
+        ALOGE("%s permission denied: recording not allowed for uid %d pid %d",
+                __func__, uid, pid);
+        return PERMISSION_DENIED;
     }
 
     if ((attr->source == AUDIO_SOURCE_HOTWORD) && !captureHotwordAllowed(pid, uid)) {
@@ -367,6 +376,13 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
             }
             return status;
         }
+
+        sp<AudioRecordClient> client =
+                new AudioRecordClient(*attr, *input, uid, pid, opPackageName, session);
+        client->active = false;
+        client->isConcurrent = false;
+        client->isVirtualDevice = false; //TODO : update from APM->getInputForAttr()
+        mAudioRecordClients.add(*portId, client);
     }
 
     if (audioPolicyEffects != 0) {
@@ -379,23 +395,38 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
     return NO_ERROR;
 }
 
-status_t AudioPolicyService::startInput(audio_io_handle_t input,
-                                        audio_session_t session,
-                                        audio_devices_t device,
-                                        uid_t uid,
-                                        bool *silenced)
+status_t AudioPolicyService::startInput(audio_port_handle_t portId, bool *silenced)
 {
-    // If UID inactive it records silence until becoming active
-    *silenced = !mUidPolicy->isUidActive(uid) && !is_virtual_input_device(device);
-
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
+    sp<AudioRecordClient> client;
+    {
+        Mutex::Autolock _l(mLock);
+
+        ssize_t index = mAudioRecordClients.indexOfKey(portId);
+        if (index < 0) {
+            return INVALID_OPERATION;
+        }
+        client = mAudioRecordClients.valueAt(index);
+    }
+
+    // check calling permissions
+    if (!recordingAllowed(client->opPackageName, client->pid, client->uid)) {
+        ALOGE("%s permission denied: recording not allowed for uid %d pid %d",
+                __func__, client->uid, client->pid);
+        return PERMISSION_DENIED;
+    }
+
+    // If UID inactive it records silence until becoming active
+    *silenced = !mUidPolicy->isUidActive(client->uid) && !client->isVirtualDevice;
 
     Mutex::Autolock _l(mLock);
     AudioPolicyInterface::concurrency_type__mask_t concurrency =
             AudioPolicyInterface::API_INPUT_CONCURRENCY_NONE;
-    status_t status = mAudioPolicyManager->startInput(input, session, *silenced, &concurrency);
+
+    status_t status = mAudioPolicyManager->startInput(
+            client->input, client->session, *silenced, &concurrency);
 
     if (status == NO_ERROR) {
         LOG_ALWAYS_FATAL_IF(concurrency & ~AudioPolicyInterface::API_INPUT_CONCURRENCY_ALL,
@@ -413,38 +444,52 @@ status_t AudioPolicyService::startInput(audio_io_handle_t input,
     return status;
 }
 
-status_t AudioPolicyService::stopInput(audio_io_handle_t input,
-                                       audio_session_t session)
+status_t AudioPolicyService::stopInput(audio_port_handle_t portId)
 {
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
     Mutex::Autolock _l(mLock);
 
-    return mAudioPolicyManager->stopInput(input, session);
+    ssize_t index = mAudioRecordClients.indexOfKey(portId);
+    if (index < 0) {
+        return INVALID_OPERATION;
+    }
+    sp<AudioRecordClient> client = mAudioRecordClients.valueAt(index);
+
+    return mAudioPolicyManager->stopInput(client->input, client->session);
 }
 
-void AudioPolicyService::releaseInput(audio_io_handle_t input,
-                                      audio_session_t session)
+void AudioPolicyService::releaseInput(audio_port_handle_t portId)
 {
     if (mAudioPolicyManager == NULL) {
         return;
     }
     sp<AudioPolicyEffects>audioPolicyEffects;
+    sp<AudioRecordClient> client;
     {
         Mutex::Autolock _l(mLock);
         audioPolicyEffects = mAudioPolicyEffects;
+        ssize_t index = mAudioRecordClients.indexOfKey(portId);
+        if (index < 0) {
+            return;
+        }
+        client = mAudioRecordClients.valueAt(index);
+        mAudioRecordClients.removeItem(portId);
+    }
+    if (client == 0) {
+        return;
     }
     if (audioPolicyEffects != 0) {
         // release audio processors from the input
-        status_t status = audioPolicyEffects->releaseInputEffects(input, session);
+        status_t status = audioPolicyEffects->releaseInputEffects(client->input, client->session);
         if(status != NO_ERROR) {
-            ALOGW("Failed to release effects on input %d", input);
+            ALOGW("Failed to release effects on input %d", client->input);
         }
     }
     {
         Mutex::Autolock _l(mLock);
-        mAudioPolicyManager->releaseInput(input, session);
+        mAudioPolicyManager->releaseInput(client->input, client->session);
     }
 }
 

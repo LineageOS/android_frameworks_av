@@ -16,9 +16,8 @@
 
 package android.media;
 
-import android.media.MediaSession2.PlaylistParam;
-import android.media.session.PlaybackState;
-import android.os.Handler;
+import android.media.MediaPlayerInterface;
+import android.media.MediaSession2.PlaylistParams;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
@@ -28,9 +27,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 
 /**
- * A mock implementation of {@link MediaPlayerBase} for testing.
+ * A mock implementation of {@link MediaPlayerInterface} for testing.
  */
-public class MockPlayer extends MediaPlayerBase {
+public class MockPlayer implements MediaPlayerInterface {
     public final CountDownLatch mCountDownLatch;
 
     public boolean mPlayCalled;
@@ -38,8 +37,19 @@ public class MockPlayer extends MediaPlayerBase {
     public boolean mStopCalled;
     public boolean mSkipToPreviousCalled;
     public boolean mSkipToNextCalled;
+    public boolean mPrepareCalled;
+    public boolean mFastForwardCalled;
+    public boolean mRewindCalled;
+    public boolean mSeekToCalled;
+    public long mSeekPosition;
+    public boolean mSetCurrentPlaylistItemCalled;
+    public int mItemIndex;
+    public boolean mSetPlaylistParamsCalled;
+
     public List<PlaybackListenerHolder> mListeners = new ArrayList<>();
+    public PlaylistParams mPlaylistParams;
     private PlaybackState2 mLastPlaybackState;
+    private AudioAttributes mAudioAttributes;
 
     public MockPlayer(int count) {
         mCountDownLatch = (count > 0) ? new CountDownLatch(count) : null;
@@ -85,7 +95,47 @@ public class MockPlayer extends MediaPlayerBase {
         }
     }
 
+    @Override
+    public void prepare() {
+        mPrepareCalled = true;
+        if (mCountDownLatch != null) {
+            mCountDownLatch.countDown();
+        }
+    }
 
+    @Override
+    public void fastForward() {
+        mFastForwardCalled = true;
+        if (mCountDownLatch != null) {
+            mCountDownLatch.countDown();
+        }
+    }
+
+    @Override
+    public void rewind() {
+        mRewindCalled = true;
+        if (mCountDownLatch != null) {
+            mCountDownLatch.countDown();
+        }
+    }
+
+    @Override
+    public void seekTo(long pos) {
+        mSeekToCalled = true;
+        mSeekPosition = pos;
+        if (mCountDownLatch != null) {
+            mCountDownLatch.countDown();
+        }
+    }
+
+    @Override
+    public void setCurrentPlaylistItem(int index) {
+        mSetCurrentPlaylistItemCalled = true;
+        mItemIndex = index;
+        if (mCountDownLatch != null) {
+            mCountDownLatch.countDown();
+        }
+    }
 
     @Nullable
     @Override
@@ -114,33 +164,33 @@ public class MockPlayer extends MediaPlayerBase {
         }
     }
 
-    // No-op. Should be added for test later.
     @Override
-    public void prepare() {
+    public void setPlaylistParams(PlaylistParams params) {
+        mSetPlaylistParamsCalled = true;
+        mPlaylistParams = params;
     }
 
     @Override
-    public void seekTo(long pos) {
+    public PlaylistParams getPlaylistParams() {
+        return mPlaylistParams;
     }
 
     @Override
-    public void fastFoward() {
-    }
-
-    @Override
-    public void rewind() {
+    public void setAudioAttributes(AudioAttributes attributes) {
+        mAudioAttributes = attributes;
     }
 
     @Override
     public AudioAttributes getAudioAttributes() {
+        return mAudioAttributes;
+    }
+
+    @Override
+    public void setPlaylist(List<MediaItem2> item, PlaylistParams param) {
+    }
+
+    @Override
+    public List<MediaItem2> getPlaylist() {
         return null;
-    }
-
-    @Override
-    public void setPlaylist(List<MediaItem2> item, PlaylistParam param) {
-    }
-
-    @Override
-    public void setCurrentPlaylistItem(int index) {
     }
 }

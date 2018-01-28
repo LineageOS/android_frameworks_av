@@ -33,6 +33,7 @@ struct AnotherPacketSource;
 struct ARTSPController;
 class DataSource;
 class IDataSource;
+class IMediaSource;
 struct MediaHTTPService;
 struct MediaSource;
 class MediaBuffer;

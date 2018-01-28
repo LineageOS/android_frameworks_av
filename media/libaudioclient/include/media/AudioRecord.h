@@ -256,6 +256,11 @@ public:
      */
             uint32_t    getNotificationPeriodInFrames() const { return mNotificationFramesAct; }
 
+    /*
+     * return metrics information for the current instance.
+     */
+            status_t getMetrics(MediaAnalyticsItem * &item);
+
     /* After it's created the track is not active. Call start() to
      * make it active. If set, the callback will start being called.
      * If event is not AudioSystem::SYNC_EVENT_NONE, the capture start will be delayed until
@@ -703,6 +708,7 @@ private:
             }
         }
         void gather(const AudioRecord *record);
+        MediaAnalyticsItem *dup() { return mAnalyticsItem->dup(); }
       private:
         std::unique_ptr<MediaAnalyticsItem> mAnalyticsItem;
     };

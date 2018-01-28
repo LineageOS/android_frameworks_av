@@ -31,12 +31,11 @@ import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaController2;
 import android.media.MediaController2.ControllerCallback;
-import android.media.MediaSession2.PlaylistParam;
+import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSessionService2;
 import android.media.PlaybackState2;
 import android.media.Rating2;
 import android.media.SessionToken2;
-import android.media.session.PlaybackState;
 import android.media.update.MediaController2Provider;
 import android.net.Uri;
 import android.os.Bundle;
@@ -57,13 +56,6 @@ public class MediaController2Impl implements MediaController2Provider {
 
     private final MediaController2 mInstance;
 
-    /**
-     * Flag used by MediaController2Record to filter playback callback.
-     */
-    static final int CALLBACK_FLAG_PLAYBACK = 0x1;
-
-    static final int REQUEST_CODE_ALL = 0;
-
     private final Object mLock = new Object();
 
     private final Context mContext;
@@ -74,11 +66,11 @@ public class MediaController2Impl implements MediaController2Provider {
     private final IBinder.DeathRecipient mDeathRecipient;
 
     @GuardedBy("mLock")
-    private final List<PlaybackListenerHolder> mPlaybackListeners = new ArrayList<>();
-    @GuardedBy("mLock")
     private SessionServiceConnection mServiceConnection;
     @GuardedBy("mLock")
     private boolean mIsReleased;
+    @GuardedBy("mLock")
+    private PlaybackState2 mPlaybackState;
 
     // Assignment should be used with the lock hold, but should be used without a lock to prevent
     // potential deadlock.
@@ -90,10 +82,9 @@ public class MediaController2Impl implements MediaController2Provider {
 
     // TODO(jaewan): Require session activeness changed listener, because controller can be
     //               available when the session's player is null.
-    public MediaController2Impl(MediaController2 instance, Context context, SessionToken2 token,
-            ControllerCallback callback, Executor executor) {
+    public MediaController2Impl(Context context, MediaController2 instance, SessionToken2 token,
+            Executor executor, ControllerCallback callback) {
         mInstance = instance;
-
         if (context == null) {
             throw new IllegalArgumentException("context shouldn't be null");
         }
@@ -116,21 +107,28 @@ public class MediaController2Impl implements MediaController2Provider {
         };
 
         mSessionBinder = null;
+    }
 
-        if (token.getSessionBinder() == null) {
+    @Override
+    public void initialize() {
+        SessionToken2Impl impl = SessionToken2Impl.from(mToken);
+        // TODO(jaewan): More sanity checks.
+        if (impl.getSessionBinder() == null) {
+            // Session service
             mServiceConnection = new SessionServiceConnection();
             connectToService();
         } else {
+            // Session
             mServiceConnection = null;
-            connectToSession(token.getSessionBinder());
+            connectToSession(impl.getSessionBinder());
         }
     }
 
-    // Should be only called by constructor.
     private void connectToService() {
         // Service. Needs to get fresh binder whenever connection is needed.
+        SessionToken2Impl impl = SessionToken2Impl.from(mToken);
         final Intent intent = new Intent(MediaSessionService2.SERVICE_INTERFACE);
-        intent.setClassName(mToken.getPackageName(), mToken.getServiceName());
+        intent.setClassName(mToken.getPackageName(), impl.getServiceName());
 
         // Use bindService() instead of startForegroundService() to start session service for three
         // reasons.
@@ -167,7 +165,7 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void close_impl() {
         if (DEBUG) {
-            Log.d(TAG, "relese from " + mToken);
+            Log.d(TAG, "release from " + mToken);
         }
         final IMediaSession2 binder;
         synchronized (mLock) {
@@ -180,7 +178,6 @@ public class MediaController2Impl implements MediaController2Provider {
                 mContext.unbindService(mServiceConnection);
                 mServiceConnection = null;
             }
-            mPlaybackListeners.clear();
             binder = mSessionBinder;
             mSessionBinder = null;
             mSessionCallbackStub.destroy();
@@ -223,38 +220,38 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void play_impl() {
-        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_START);
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_START);
     }
 
     @Override
     public void pause_impl() {
-        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE);
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE);
     }
 
     @Override
     public void stop_impl() {
-        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_STOP);
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_STOP);
     }
 
     @Override
     public void skipToPrevious_impl() {
-        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM);
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM);
     }
 
     @Override
     public void skipToNext_impl() {
-        sendCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM);
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM);
     }
 
-    private void sendCommand(int code) {
-        // TODO(jaewan): optimization) Cache Command objects?
-        Command command = new Command(code);
-        // TODO(jaewan): Check if the command is in the allowed group.
+    private void sendTransportControlCommand(int commandCode) {
+        sendTransportControlCommand(commandCode, 0);
+    }
 
+    private void sendTransportControlCommand(int commandCode, long arg) {
         final IMediaSession2 binder = mSessionBinder;
         if (binder != null) {
             try {
-                binder.sendCommand(mSessionCallbackStub, command.toBundle(), null);
+                binder.sendTransportControlCommand(mSessionCallbackStub, commandCode, arg);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -342,33 +339,35 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void prepare_impl() {
-        // TODO(jaewan): Implement
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE);
     }
 
     @Override
     public void fastForward_impl() {
-        // TODO(jaewan): Implement
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_FAST_FORWARD);
     }
 
     @Override
     public void rewind_impl() {
-        // TODO(jaewan): Implement
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_REWIND);
     }
 
     @Override
     public void seekTo_impl(long pos) {
-        // TODO(jaewan): Implement
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO, pos);
     }
 
     @Override
     public void setCurrentPlaylistItem_impl(int index) {
-        // TODO(jaewan): Implement
+        sendTransportControlCommand(
+                MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM, index);
     }
 
     @Override
     public PlaybackState2 getPlaybackState_impl() {
-        // TODO(jaewan): Implement
-        return null;
+        synchronized (mLock) {
+            return mPlaybackState;
+        }
     }
 
     @Override
@@ -382,32 +381,28 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public PlaylistParam getPlaylistParam_impl() {
+    public PlaylistParams getPlaylistParam_impl() {
         // TODO(jaewan): Implement
         return null;
+    }
+
+    @Override
+    public void setPlaylistParams_impl(PlaylistParams params) {
+        // TODO(hdmoon): Implement
     }
 
     ///////////////////////////////////////////////////
     // Protected or private methods
     ///////////////////////////////////////////////////
-    // Should be used without a lock to prevent potential deadlock.
-    private void registerCallbackForPlaybackNotLocked() {
-        final IMediaSession2 binder = mSessionBinder;
-        if (binder != null) {
-            try {
-                binder.registerCallback(mSessionCallbackStub,
-                        CALLBACK_FLAG_PLAYBACK, REQUEST_CODE_ALL);
-            } catch (RemoteException e) {
-                Log.e(TAG, "Cannot connect to the service or the session is gone", e);
-            }
-        }
-    }
-
     private void pushPlaybackStateChanges(final PlaybackState2 state) {
         synchronized (mLock) {
-            for (int i = 0; i < mPlaybackListeners.size(); i++) {
-                mPlaybackListeners.get(i).postPlaybackChange(state);
-            }
+            mPlaybackState = state;
+            mCallbackExecutor.execute(() -> {
+                if (!mInstance.isConnected()) {
+                    return;
+                }
+                mCallback.onPlaybackStateChanged(state);
+            });
         }
     }
 
@@ -426,7 +421,6 @@ public class MediaController2Impl implements MediaController2Provider {
                 release = true;
                 return;
             }
-            boolean registerCallbackForPlaybackNeeded;
             synchronized (mLock) {
                 if (mIsReleased) {
                     return;
@@ -449,15 +443,11 @@ public class MediaController2Impl implements MediaController2Provider {
                     release = true;
                     return;
                 }
-                registerCallbackForPlaybackNeeded = !mPlaybackListeners.isEmpty();
             }
             // TODO(jaewan): Keep commands to prevents illegal API calls.
             mCallbackExecutor.execute(() -> {
                 mCallback.onConnected(commandGroup);
             });
-            if (registerCallbackForPlaybackNeeded) {
-                registerCallbackForPlaybackNotLocked();
-            }
         } finally {
             if (release) {
                 // Trick to call release() without holding the lock, to prevent potential deadlock
@@ -499,8 +489,32 @@ public class MediaController2Impl implements MediaController2Provider {
 
         @Override
         public void onPlaybackStateChanged(Bundle state) throws RuntimeException {
-            final MediaController2Impl controller = getController();
+            final MediaController2Impl controller;
+            try {
+                controller = getController();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+                return;
+            }
             controller.pushPlaybackStateChanges(PlaybackState2.fromBundle(state));
+        }
+
+        @Override
+        public void onPlaylistParamsChanged(Bundle params) throws RuntimeException {
+            final MediaController2Impl controller;
+            try {
+                controller = getController();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+                return;
+            }
+            controller.getCallbackExecutor().execute(() -> {
+                final MediaController2Impl impl = mController.get();
+                if (impl == null) {
+                    return;
+                }
+                impl.mCallback.onPlaylistParamsChanged(PlaylistParams.fromBundle(params));
+            });
         }
 
         @Override

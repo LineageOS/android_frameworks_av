@@ -22,6 +22,7 @@
 
 #include <media/DataSource.h>
 #include <media/MediaExtractor.h>
+#include <media/stagefright/foundation/AString.h>
 #include <utils/List.h>
 #include <utils/Vector.h>
 #include <utils/String8.h>

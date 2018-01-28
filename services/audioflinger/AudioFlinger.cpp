@@ -321,6 +321,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
                                               actualSessionId,
                                               client.clientPid,
                                               client.clientUid,
+                                              client.packageName,
                                               config,
                                               AUDIO_INPUT_FLAG_MMAP_NOIRQ, deviceId, &portId);
     }
@@ -340,7 +341,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         if (direction == MmapStreamInterface::DIRECTION_OUTPUT) {
             AudioSystem::releaseOutput(io, streamType, actualSessionId);
         } else {
-            AudioSystem::releaseInput(io, actualSessionId);
+            AudioSystem::releaseInput(portId);
         }
         ret = NO_INIT;
     }
@@ -1621,12 +1622,6 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
         clientPid = callingPid;
     }
 
-    // check calling permissions
-    if (!recordingAllowed(input.opPackageName, input.clientInfo.clientTid, clientUid)) {
-        ALOGE("createRecord() permission denied: recording not allowed");
-        lStatus = PERMISSION_DENIED;
-        goto Exit;
-    }
     // we don't yet support anything other than linear PCM
     if (!audio_is_valid_format(input.config.format) || !audio_is_linear_pcm(input.config.format)) {
         ALOGE("createRecord() invalid format %#x", input.config.format);
@@ -1663,7 +1658,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
     // release previously opened input if retrying.
     if (output.inputId != AUDIO_IO_HANDLE_NONE) {
         recordTrack.clear();
-        AudioSystem::releaseInput(output.inputId, sessionId);
+        AudioSystem::releaseInput(portId);
         output.inputId = AUDIO_IO_HANDLE_NONE;
     }
     lStatus = AudioSystem::getInputForAttr(&input.attr, &output.inputId,
@@ -1671,6 +1666,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
                                     // FIXME compare to AudioTrack
                                       clientPid,
                                       clientUid,
+                                      input.opPackageName,
                                       &input.config,
                                       output.flags, &output.selectedDeviceId, &portId);
 
@@ -1739,7 +1735,7 @@ Exit:
         }
         recordTrack.clear();
         if (output.inputId != AUDIO_IO_HANDLE_NONE) {
-            AudioSystem::releaseInput(output.inputId, sessionId);
+            AudioSystem::releaseInput(portId);
         }
     }
 
@@ -1972,6 +1968,43 @@ status_t AudioFlinger::systemReady()
     for (size_t i = 0; i < mRecordThreads.size(); i++) {
         ThreadBase *thread = (ThreadBase *)mRecordThreads.valueAt(i).get();
         thread->systemReady();
+    }
+    return NO_ERROR;
+}
+
+status_t AudioFlinger::getMicrophones(std::vector<media::MicrophoneInfo> *microphones)
+{
+    // Fake data
+    size_t fakeNum = 2;
+    audio_devices_t fakeTypes[] = { AUDIO_DEVICE_IN_BUILTIN_MIC, AUDIO_DEVICE_IN_BACK_MIC };
+    for (size_t i = 0; i < fakeNum; i++) {
+        struct audio_microphone_characteristic_t characteristics;
+        sprintf(characteristics.device_id, "microphone:%zu", i);
+        characteristics.type = fakeTypes[i];
+        sprintf(characteristics.address, "");
+        characteristics.location = AUDIO_MICROPHONE_LOCATION_MAINBODY;
+        characteristics.group = 0;
+        characteristics.index_in_the_group = i;
+        characteristics.sensitivity = 1.0f;
+        characteristics.max_spl = 100.0f;
+        characteristics.min_spl = 0.0f;
+        characteristics.directionality = AUDIO_MICROPHONE_DIRECTIONALITY_OMNI;
+        characteristics.num_frequency_responses = 5 - i;
+        for (size_t j = 0; j < characteristics.num_frequency_responses; j++) {
+            characteristics.frequency_responses[0][j] = 100.0f - j;
+            characteristics.frequency_responses[1][j] = 100.0f + j;
+        }
+        for (size_t j = 0; j < AUDIO_CHANNEL_COUNT_MAX; j++) {
+            characteristics.channel_mapping[j] = AUDIO_MICROPHONE_CHANNEL_MAPPING_UNUSED;
+        }
+        characteristics.geometric_location.x = 0.1f;
+        characteristics.geometric_location.y = 0.2f;
+        characteristics.geometric_location.z = 0.3f;
+        characteristics.orientation.x = 0.0f;
+        characteristics.orientation.y = 1.0f;
+        characteristics.orientation.z = 0.0f;
+        media::MicrophoneInfo microphoneInfo = media::MicrophoneInfo(characteristics);
+        microphones->push_back(microphoneInfo);
     }
     return NO_ERROR;
 }

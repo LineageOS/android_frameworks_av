@@ -23,6 +23,8 @@
 #include "ESQueue.h"
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
+#include <binder/IMemory.h>
+#include <binder/MemoryDealer.h>
 #include <cutils/native_handle.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -77,7 +79,7 @@ struct ATSParser::Program : public RefBase {
 
     void signalEOS(status_t finalResult);
 
-    sp<MediaSource> getSource(SourceType type);
+    sp<AnotherPacketSource> getSource(SourceType type);
     bool hasSource(SourceType type) const;
 
     int64_t convertPTSToTimestamp(uint64_t PTS);
@@ -170,7 +172,7 @@ struct ATSParser::Stream : public RefBase {
     void signalEOS(status_t finalResult);
 
     SourceType getSourceType();
-    sp<MediaSource> getSource(SourceType type);
+    sp<AnotherPacketSource> getSource(SourceType type);
 
     bool isAudio() const;
     bool isVideo() const;
@@ -274,7 +276,7 @@ private:
 ATSParser::SyncEvent::SyncEvent(off64_t offset)
     : mHasReturnedData(false), mOffset(offset), mTimeUs(0) {}
 
-void ATSParser::SyncEvent::init(off64_t offset, const sp<MediaSource> &source,
+void ATSParser::SyncEvent::init(off64_t offset, const sp<AnotherPacketSource> &source,
         int64_t timeUs, SourceType type) {
     mHasReturnedData = true;
     mOffset = offset;
@@ -641,9 +643,9 @@ int64_t ATSParser::Program::recoverPTS(uint64_t PTS_33bit) {
     return mLastRecoveredPTS;
 }
 
-sp<MediaSource> ATSParser::Program::getSource(SourceType type) {
+sp<AnotherPacketSource> ATSParser::Program::getSource(SourceType type) {
     for (size_t i = 0; i < mStreams.size(); ++i) {
-        sp<MediaSource> source = mStreams.editValueAt(i)->getSource(type);
+        sp<AnotherPacketSource> source = mStreams.editValueAt(i)->getSource(type);
         if (source != NULL) {
             return source;
         }
@@ -1607,7 +1609,7 @@ ATSParser::SourceType ATSParser::Stream::getSourceType() {
     return NUM_SOURCE_TYPES;
 }
 
-sp<MediaSource> ATSParser::Stream::getSource(SourceType type) {
+sp<AnotherPacketSource> ATSParser::Stream::getSource(SourceType type) {
     switch (type) {
         case VIDEO:
         {
@@ -2042,11 +2044,11 @@ status_t ATSParser::parseTS(ABitReader *br, SyncEvent *event) {
     return err;
 }
 
-sp<MediaSource> ATSParser::getSource(SourceType type) {
-    sp<MediaSource> firstSourceFound;
+sp<AnotherPacketSource> ATSParser::getSource(SourceType type) {
+    sp<AnotherPacketSource> firstSourceFound;
     for (size_t i = 0; i < mPrograms.size(); ++i) {
         const sp<Program> &program = mPrograms.editItemAt(i);
-        sp<MediaSource> source = program->getSource(type);
+        sp<AnotherPacketSource> source = program->getSource(type);
         if (source == NULL) {
             continue;
         }

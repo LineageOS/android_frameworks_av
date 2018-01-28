@@ -35,6 +35,8 @@
 #include <media/IEffect.h>
 #include <media/IEffectClient.h>
 #include <utils/String8.h>
+#include <media/MicrophoneInfo.h>
+#include <vector>
 
 #include "android/media/IAudioRecord.h"
 
@@ -486,6 +488,9 @@ public:
 
     // Returns the number of frames per audio HAL buffer.
     virtual size_t frameCountHAL(audio_io_handle_t ioHandle) const = 0;
+
+    /* List available microphones and their characteristics */
+    virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones) = 0;
 };
 
 

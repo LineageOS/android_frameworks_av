@@ -28,6 +28,7 @@ import android.support.annotation.CallSuper;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.test.InstrumentationRegistry;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -57,7 +58,11 @@ abstract class MediaSession2TestBase {
     }
 
     interface TestControllerCallbackInterface {
+        // Add methods in ControllerCallback/BrowserCallback that you want to test.
+        default void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {}
+
         // Currently empty. Add methods in ControllerCallback/BrowserCallback that you want to test.
+        default void onPlaybackStateChanged(PlaybackState2 state) { }
 
         // Browser specific callbacks
         default void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {}
@@ -175,6 +180,14 @@ abstract class MediaSession2TestBase {
         }
 
         @Override
+        public void onPlaybackStateChanged(PlaybackState2 state) {
+            super.onPlaybackStateChanged(state);
+            if (mCallbackProxy != null) {
+                mCallbackProxy.onPlaybackStateChanged(state);
+            }
+        }
+
+        @Override
         public void waitForConnect(boolean expect) throws InterruptedException {
             if (expect) {
                 assertTrue(connectLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
@@ -191,6 +204,11 @@ abstract class MediaSession2TestBase {
                 assertFalse(disconnectLatch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
             }
         }
+
+        @Override
+        public void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {
+            mCallbackProxy.onPlaylistParamsChanged(params);
+        }
     }
 
     public class TestMediaController extends MediaController2 implements TestControllerInterface {
@@ -198,7 +216,7 @@ abstract class MediaSession2TestBase {
 
         public TestMediaController(@NonNull Context context, @NonNull SessionToken2 token,
                 @NonNull ControllerCallback callback) {
-            super(context, token, callback, sHandlerExecutor);
+            super(context, token, sHandlerExecutor, callback);
             mCallback = callback;
         }
 

@@ -165,6 +165,7 @@ class Camera3Stream :
     void              setDataSpaceOverride(bool dataSpaceOverriden);
     bool              isDataSpaceOverridden() const;
     android_dataspace getOriginalDataSpace() const;
+    const String8&    physicalCameraId() const;
 
     camera3_stream*   asHalStream() override {
         return this;

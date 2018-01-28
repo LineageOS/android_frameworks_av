@@ -64,7 +64,7 @@ bool ColorConverter::isValid() const {
                     || mDstFormat == OMX_COLOR_Format32bitBGRA8888;
 
         case OMX_COLOR_FormatYUV420Planar16:
-            return mDstFormat == OMX_COLOR_Format32BitRGBA1010102;
+            return mDstFormat == OMX_COLOR_FormatYUV444Y410;
 
         case OMX_COLOR_FormatCbYCrY:
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
@@ -75,6 +75,12 @@ bool ColorConverter::isValid() const {
         default:
             return false;
     }
+}
+
+bool ColorConverter::isDstRGB() const {
+    return mDstFormat == OMX_COLOR_Format16bitRGB565
+            || mDstFormat == OMX_COLOR_Format32BitRGBA8888
+            || mDstFormat == OMX_COLOR_Format32bitBGRA8888;
 }
 
 ColorConverter::BitmapParams::BitmapParams(
@@ -99,7 +105,7 @@ ColorConverter::BitmapParams::BitmapParams(
 
     case OMX_COLOR_Format32bitBGRA8888:
     case OMX_COLOR_Format32BitRGBA8888:
-    case OMX_COLOR_Format32BitRGBA1010102:
+    case OMX_COLOR_FormatYUV444Y410:
         mBpp = 4;
         mStride = 4 * mWidth;
         break;

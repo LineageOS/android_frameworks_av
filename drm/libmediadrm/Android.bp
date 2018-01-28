@@ -18,6 +18,7 @@ cc_library {
         "PluginMetricsReporting.cpp",
         "SharedLibrary.cpp",
         "DrmHal.cpp",
+	"DrmMetrics.cpp",
         "CryptoHal.cpp",
         "protos/plugin_metrics.proto",
     ],

@@ -129,11 +129,12 @@ function runtest-MediaComponents() {
       ${adb} root
       ${adb} remount
       ${adb} shell stop
+      ${adb} shell setprop log.tag.MediaSessionService DEBUG
       ${adb} sync
       ${adb} shell start
       ${adb} wait-for-device || break
       # Ensure package manager is loaded.
-      sleep 5
+      sleep 15
 
       # Install apks
       local install_failed="false"

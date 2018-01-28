@@ -59,9 +59,8 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
         // Specify TAG here so {@link MediaSession2.getInstance()} doesn't complaint about
         // per test thread differs across the {@link MediaSession2} with the same TAG.
         final MockPlayer player = new MockPlayer(1);
-        sHandler.postAndSync(() -> {
-            mSession = new MediaSession2.Builder(mContext, player).setId(TAG).build();
-        });
+        mSession = new MediaSession2.Builder(mContext, player)
+                .setSessionCallback(sHandlerExecutor, new SessionCallback()).setId(TAG).build();
         ensureChangeInSession();
     }
 
@@ -70,9 +69,7 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
     public void cleanUp() throws Exception {
         super.cleanUp();
         sHandler.removeCallbacksAndMessages(null);
-        sHandler.postAndSync(() -> {
-            mSession.close();
-        });
+        mSession.close();
     }
 
     // TODO(jaewan): Make this host-side test to see per-user behavior.
@@ -88,7 +85,6 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
             SessionToken2 token = tokens.get(i);
             if (mContext.getPackageName().equals(token.getPackageName())
                     && TAG.equals(token.getId())) {
-                assertNotNull(token.getSessionBinder());
                 assertNull(controller);
                 controller = createController(token);
             }
@@ -166,13 +162,11 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
                     && MockMediaSessionService2.ID.equals(token.getId())) {
                 assertFalse(foundTestSessionService);
                 assertEquals(SessionToken2.TYPE_SESSION_SERVICE, token.getType());
-                assertNull(token.getSessionBinder());
                 foundTestSessionService = true;
             } else if (mContext.getPackageName().equals(token.getPackageName())
                     && MockMediaLibraryService2.ID.equals(token.getId())) {
                 assertFalse(foundTestLibraryService);
                 assertEquals(SessionToken2.TYPE_LIBRARY_SERVICE, token.getType());
-                assertNull(token.getSessionBinder());
                 foundTestLibraryService = true;
             }
         }

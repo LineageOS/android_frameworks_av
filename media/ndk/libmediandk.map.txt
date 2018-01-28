@@ -123,6 +123,11 @@ LIBMEDIANDK {
     AMediaCrypto_isCryptoSchemeSupported;
     AMediaCrypto_new;
     AMediaCrypto_requiresSecureDecoderComponent;
+    AMediaDataSource_delete;      # introduced=28
+    AMediaDataSource_new;         # introduced=28
+    AMediaDataSource_setGetSize;  # introduced=28
+    AMediaDataSource_setReadAt;   # introduced=28
+    AMediaDataSource_setUserdata; # introduced=28
     AMediaDrm_closeSession;
     AMediaDrm_createByUUID;
     AMediaDrm_decrypt;
@@ -148,9 +153,12 @@ LIBMEDIANDK {
     AMediaDrm_verify;
     AMediaExtractor_advance;
     AMediaExtractor_delete;
+    AMediaExtractor_getCachedDuration; # introduced=28
+    AMediaExtractor_getFileFormat;     # introduced=28
     AMediaExtractor_getPsshInfo;
     AMediaExtractor_getSampleCryptoInfo;
     AMediaExtractor_getSampleFlags;
+    AMediaExtractor_getSampleSize;     # introduced=28
     AMediaExtractor_getSampleTime;
     AMediaExtractor_getSampleTrackIndex;
     AMediaExtractor_getTrackCount;
@@ -160,6 +168,7 @@ LIBMEDIANDK {
     AMediaExtractor_seekTo;
     AMediaExtractor_selectTrack;
     AMediaExtractor_setDataSource;
+    AMediaExtractor_setDataSourceCustom; # introduced=28
     AMediaExtractor_setDataSourceFd;
     AMediaExtractor_unselectTrack;
     AMediaFormat_delete;

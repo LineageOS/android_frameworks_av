@@ -43,6 +43,7 @@
 #include <media/stagefright/PersistentSurface.h>
 #include <media/stagefright/SurfaceUtils.h>
 #include <media/hardware/HardwareAPI.h>
+#include <media/MediaBufferHolder.h>
 #include <media/OMXBuffer.h>
 #include <media/omx/1.0/WOmxNode.h>
 
@@ -5639,7 +5640,7 @@ bool ACodec::BaseState::onOMXEmptyBufferDone(IOMX::buffer_id bufferID, int fence
     // by this "MediaBuffer" object. Now that the OMX component has
     // told us that it's done with the input buffer, we can decrement
     // the mediaBuffer's reference count.
-    info->mData->setMediaBufferBase(NULL);
+    info->mData->meta()->setObject("mediaBufferHolder", sp<MediaBufferHolder>(nullptr));
 
     PortMode mode = getPortMode(kPortIndexInput);
 

@@ -33,6 +33,8 @@ struct ColorConverter {
 
     bool isValid() const;
 
+    bool isDstRGB() const;
+
     status_t convert(
             const void *srcBits,
             size_t srcWidth, size_t srcHeight,

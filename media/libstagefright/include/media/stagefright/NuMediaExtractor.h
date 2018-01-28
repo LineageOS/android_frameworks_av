@@ -85,6 +85,7 @@ struct NuMediaExtractor : public RefBase {
     // readSampleData() reads the sample with the lowest timestamp.
     status_t readSampleData(const sp<ABuffer> &buffer);
 
+    status_t getSampleSize(size_t *sampleSize);
     status_t getSampleTrackIndex(size_t *trackIndex);
     status_t getSampleTime(int64_t *sampleTimeUs);
     status_t getSampleMeta(sp<MetaData> *sampleMeta);
