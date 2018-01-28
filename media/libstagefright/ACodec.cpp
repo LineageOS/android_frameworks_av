@@ -1113,10 +1113,20 @@ status_t ACodec::setupNativeWindowSizeFormatAndUsage(
     mLastNativeWindowDataSpace = HAL_DATASPACE_UNKNOWN;
 
     ALOGV("gralloc usage: %#x(OMX) => %#x(ACodec)", omxUsage, usage);
+
+    int32_t width = 0, height = 0;
+#if defined(MTK_HARDWARE)
+    width = def.format.video.nStride;
+    height = def.format.video.nSliceHeight;
+#else
+    width = def.format.video.nFrameWidth;
+    height = def.format.video.nFrameHeight;
+#endif
+
     return setNativeWindowSizeFormatAndUsage(
             nativeWindow,
-            def.format.video.nFrameWidth,
-            def.format.video.nFrameHeight,
+            width,
+            height,
             def.format.video.eColorFormat,
             mRotationDegrees,
             usage,

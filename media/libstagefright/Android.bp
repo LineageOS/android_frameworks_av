@@ -146,6 +146,11 @@ cc_library_shared {
             // enable experiments only in userdebug and eng builds
             cflags: ["-DENABLE_STAGEFRIGHT_EXPERIMENTS"],
         },
+        lineage: {
+            mtk_hardware: {
+                cppflags: ["-DMTK_HARDWARE"],
+            },
+        },
     },
 
     sanitize: {
