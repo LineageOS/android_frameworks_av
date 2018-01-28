@@ -136,6 +136,7 @@ hardware::Return<void> CameraHardwareInterface::dataCallback(
     return hardware::Void();
 }
 
+#ifdef QTI_CAMERA_DEVICE
 hardware::Return<void> CameraHardwareInterface::QDataCallback(
         DataCallbackMsg msgType, uint32_t data, uint32_t bufferIndex,
         const vendor::qti::hardware::camera::device::V1_0::QCameraFrameMetadata& metadata) {
@@ -149,6 +150,7 @@ hardware::Return<void> CameraHardwareInterface::QDataCallback(
     sDataCb((int32_t) msgType, mHidlMemPoolMap.at(data), bufferIndex, &md, this);
     return hardware::Void();
 }
+#endif
 
 hardware::Return<void> CameraHardwareInterface::dataCallbackTimestamp(
         DataCallbackMsg msgType, uint32_t data,
