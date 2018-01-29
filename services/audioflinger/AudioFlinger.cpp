@@ -321,7 +321,6 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
                                               actualSessionId,
                                               client.clientPid,
                                               client.clientUid,
-                                              client.packageName,
                                               config,
                                               AUDIO_INPUT_FLAG_MMAP_NOIRQ, deviceId, &portId);
     }
@@ -341,7 +340,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         if (direction == MmapStreamInterface::DIRECTION_OUTPUT) {
             AudioSystem::releaseOutput(io, streamType, actualSessionId);
         } else {
-            AudioSystem::releaseInput(portId);
+            AudioSystem::releaseInput(io, actualSessionId);
         }
         ret = NO_INIT;
     }
@@ -1664,7 +1663,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
     // release previously opened input if retrying.
     if (output.inputId != AUDIO_IO_HANDLE_NONE) {
         recordTrack.clear();
-        AudioSystem::releaseInput(portId);
+        AudioSystem::releaseInput(output.inputId, sessionId);
         output.inputId = AUDIO_IO_HANDLE_NONE;
     }
     lStatus = AudioSystem::getInputForAttr(&input.attr, &output.inputId,
@@ -1672,7 +1671,6 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
                                     // FIXME compare to AudioTrack
                                       clientPid,
                                       clientUid,
-                                      input.opPackageName,
                                       &input.config,
                                       output.flags, &output.selectedDeviceId, &portId);
 
@@ -1741,7 +1739,7 @@ Exit:
         }
         recordTrack.clear();
         if (output.inputId != AUDIO_IO_HANDLE_NONE) {
-            AudioSystem::releaseInput(portId);
+            AudioSystem::releaseInput(output.inputId, sessionId);
         }
     }
 
