@@ -296,7 +296,6 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
-
     // already checked by client, but double-check in case the client wrapper is bypassed
     if (attr->source < AUDIO_SOURCE_DEFAULT && attr->source >= AUDIO_SOURCE_CNT &&
             attr->source != AUDIO_SOURCE_HOTWORD && attr->source != AUDIO_SOURCE_FM_TUNER) {
@@ -318,13 +317,6 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
                  "%s uid %d pid %d tried to pass itself off as pid %d",
                  __func__, callingUid, callingPid, pid);
         pid = callingPid;
-    }
-
-    // check calling permissions
-    if (!recordingAllowed(opPackageName, pid, uid)) {
-        ALOGE("%s permission denied: recording not allowed for uid %d pid %d",
-                __func__, uid, pid);
-        return PERMISSION_DENIED;
     }
 
     if ((attr->source == AUDIO_SOURCE_HOTWORD) && !captureHotwordAllowed(pid, uid)) {
@@ -400,28 +392,18 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId, bool *silenc
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
-    sp<AudioRecordClient> client;
-    {
-        Mutex::Autolock _l(mLock);
 
-        ssize_t index = mAudioRecordClients.indexOfKey(portId);
-        if (index < 0) {
-            return INVALID_OPERATION;
-        }
-        client = mAudioRecordClients.valueAt(index);
-    }
+    Mutex::Autolock _l(mLock);
 
-    // check calling permissions
-    if (!recordingAllowed(client->opPackageName, client->pid, client->uid)) {
-        ALOGE("%s permission denied: recording not allowed for uid %d pid %d",
-                __func__, client->uid, client->pid);
-        return PERMISSION_DENIED;
+    ssize_t index = mAudioRecordClients.indexOfKey(portId);
+    if (index < 0) {
+        return INVALID_OPERATION;
     }
+    sp<AudioRecordClient> client = mAudioRecordClients.valueAt(index);
 
     // If UID inactive it records silence until becoming active
     *silenced = !mUidPolicy->isUidActive(client->uid) && !client->isVirtualDevice;
 
-    Mutex::Autolock _l(mLock);
     AudioPolicyInterface::concurrency_type__mask_t concurrency =
             AudioPolicyInterface::API_INPUT_CONCURRENCY_NONE;
 

@@ -7801,6 +7801,10 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         return NO_ERROR;
     }
 
+    if (!isOutput() && !recordingAllowed(client.packageName, client.clientPid, client.clientUid)) {
+        return PERMISSION_DENIED;
+    }
+
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
 
     audio_io_handle_t io = mId;
