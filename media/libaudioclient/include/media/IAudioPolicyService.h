@@ -80,15 +80,19 @@ public:
                               audio_session_t session,
                               pid_t pid,
                               uid_t uid,
-                              const String16& opPackageName,
                               const audio_config_base_t *config,
                               audio_input_flags_t flags,
                               audio_port_handle_t *selectedDeviceId,
                               audio_port_handle_t *portId) = 0;
-    virtual status_t startInput(audio_port_handle_t portId,
+    virtual status_t startInput(audio_io_handle_t input,
+                                audio_session_t session,
+                                audio_devices_t device,
+                                uid_t uid,
                                 bool *silenced) = 0;
-    virtual status_t stopInput(audio_port_handle_t portId) = 0;
-    virtual void releaseInput(audio_port_handle_t portId) = 0;
+    virtual status_t stopInput(audio_io_handle_t input,
+                               audio_session_t session) = 0;
+    virtual void releaseInput(audio_io_handle_t input,
+                              audio_session_t session) = 0;
     virtual status_t initStreamVolume(audio_stream_type_t stream,
                                       int indexMin,
                                       int indexMax) = 0;
