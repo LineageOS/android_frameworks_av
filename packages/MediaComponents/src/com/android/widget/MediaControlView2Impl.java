@@ -56,7 +56,6 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
 
     private static final int MAX_PROGRESS = 1000;
     private static final int DEFAULT_PROGRESS_UPDATE_TIME_MS = 1000;
-    private static final int DEFAULT_TIMEOUT_MS = 2000;
 
     private static final int REWIND_TIME_MS = 10000;
     private static final int FORWARD_TIME_MS = 30000;
@@ -72,6 +71,8 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     private TextView mTitleView;
     private int mDuration;
     private int mPrevState;
+    private int mCurrentVisibility;
+    private long mTimeout;
     private long mPlaybackActions;
     private boolean mShowing;
     private boolean mDragging;
@@ -115,6 +116,9 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
         // Inflate MediaControlView2 from XML
         View root = makeControllerView();
         mInstance.addView(root);
+
+        // Set default timeout
+        mTimeout = 2000;
     }
 
     @Override
@@ -134,50 +138,8 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     }
 
     @Override
-    public void show_impl() {
-        mInstance.show(DEFAULT_TIMEOUT_MS);
-    }
-
-    @Override
-    public void show_impl(long timeout) {
-        if (!mShowing) {
-            setProgress();
-            if (mPlayPauseButton != null) {
-                mPlayPauseButton.requestFocus();
-            }
-            disableUnsupportedButtons();
-            mInstance.setVisibility(View.VISIBLE);
-            mShowing = true;
-        }
-        // cause the progress bar to be updated even if mShowing
-        // was already true.  This happens, for example, if we're
-        // paused with the progress bar showing the user hits play.
-        mInstance.post(mShowProgress);
-
-        if (timeout != 0 && !mAccessibilityManager.isTouchExplorationEnabled()) {
-            mInstance.removeCallbacks(mFadeOut);
-            mInstance.postDelayed(mFadeOut, timeout);
-        }
-    }
-
-    @Override
     public boolean isShowing_impl() {
-        return mShowing;
-    }
-
-    @Override
-    public void hide_impl() {
-        if (mShowing) {
-            try {
-                mInstance.removeCallbacks(mShowProgress);
-                // Remove existing call to mFadeOut to avoid from being called later.
-                mInstance.removeCallbacks(mFadeOut);
-                mInstance.setVisibility(View.GONE);
-            } catch (IllegalArgumentException ex) {
-                Log.w(TAG, "already removed");
-            }
-            mShowing = false;
-        }
+        return (mInstance.getVisibility() == View.VISIBLE) ? true : false;
     }
 
     @Override
@@ -248,6 +210,46 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     }
 
     @Override
+    public void requestPlayButtonFocus_impl() {
+        if (mPlayPauseButton != null) {
+            mPlayPauseButton.requestFocus();
+        }
+    }
+
+    @Override
+    public void setTimeout_impl(long timeout) {
+        mTimeout = timeout;
+    }
+
+    @Override
+    public long getTimeout_impl() {
+        return mTimeout;
+    }
+
+    @Override
+    public void onVisibilityAggregated_impl(boolean invisible) {
+        int visibility = mInstance.getVisibility();
+        if (mCurrentVisibility != visibility) {
+            mInstance.setVisibility(visibility);
+            mCurrentVisibility = visibility;
+
+            if (visibility == View.VISIBLE) {
+                setProgress();
+                disableUnsupportedButtons();
+                // cause the progress bar to be updated even if mShowing
+                // was already true.  This happens, for example, if we're
+                // paused with the progress bar showing the user hits play.
+                mInstance.post(mShowProgress);
+                resetFadeOutRunnable();
+            } else if (visibility == View.GONE) {
+                mInstance.removeCallbacks(mShowProgress);
+                // Remove existing call to mFadeOut to avoid from being called later.
+                mInstance.removeCallbacks(mFadeOut);
+            }
+        }
+    }
+
+    @Override
     public void onAttachedToWindow_impl() {
         mSuperProvider.onAttachedToWindow_impl();
     }
@@ -270,7 +272,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     // TODO: Should this function be removed?
     @Override
     public boolean onTrackballEvent_impl(MotionEvent ev) {
-        mInstance.show(DEFAULT_TIMEOUT_MS);
+        resetFadeOutRunnable();
         return false;
     }
 
@@ -483,7 +485,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
         @Override
         public void run() {
             if (isPlaying()) {
-                mInstance.hide();
+                mInstance.setVisibility(View.GONE);
             }
         }
     };
@@ -498,6 +500,13 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
             }
         }
     };
+
+    private void resetFadeOutRunnable() {
+        if (mTimeout != 0 && !mAccessibilityManager.isTouchExplorationEnabled()) {
+            mInstance.removeCallbacks(mFadeOut);
+            mInstance.postDelayed(mFadeOut, mTimeout);
+        }
+    }
 
     private String stringForTime(int timeMs) {
         int totalSeconds = timeMs / 1000;
@@ -572,9 +581,9 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
             if (!mSeekAvailable) {
                 return;
             }
-            mInstance.show(3600000);
 
             mDragging = true;
+            mInstance.removeCallbacks(mFadeOut);
 
             // By removing these pending progress messages we make sure
             // that a) we won't update the progress while the user adjusts
@@ -622,7 +631,8 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
             mDragging = false;
 
             setProgress();
-            mInstance.show(DEFAULT_TIMEOUT_MS);
+
+            resetFadeOutRunnable();
 
             // Ensure that progress is properly updated in the future,
             // the call to show() does not guarantee this because it is a
@@ -635,7 +645,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
         @Override
         public void onClick(View v) {
             togglePausePlayState();
-            mInstance.show(DEFAULT_TIMEOUT_MS);
+            resetFadeOutRunnable();
         }
     };
 
@@ -646,7 +656,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
             mControls.seekTo(pos);
             setProgress();
 
-            mInstance.show(DEFAULT_TIMEOUT_MS);
+            resetFadeOutRunnable();
         }
     };
 
@@ -657,7 +667,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
             mControls.seekTo(pos);
             setProgress();
 
-            mInstance.show(DEFAULT_TIMEOUT_MS);
+            resetFadeOutRunnable();
         }
     };
 
@@ -665,7 +675,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
         @Override
         public void onClick(View v) {
             mControls.skipToNext();
-            mInstance.show(DEFAULT_TIMEOUT_MS);
+            resetFadeOutRunnable();
         }
     };
 
@@ -673,7 +683,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
         @Override
         public void onClick(View v) {
             mControls.skipToPrevious();
-            mInstance.show(DEFAULT_TIMEOUT_MS);
+            resetFadeOutRunnable();
         }
     };
 
@@ -693,7 +703,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
                 mController.sendCommand(MediaControlView2.COMMAND_HIDE_SUBTITLE, null, null);
                 mSubtitleIsEnabled = false;
             }
-            mInstance.show(DEFAULT_TIMEOUT_MS);
+            resetFadeOutRunnable();
         }
     };
 
@@ -715,7 +725,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
             mController.sendCommand(MediaControlView2.COMMAND_SET_FULLSCREEN, args, null);
 
             mIsFullScreen = isEnteringFullScreen;
-            mInstance.show(DEFAULT_TIMEOUT_MS);
+            resetFadeOutRunnable();
         }
     };
 
@@ -724,7 +734,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
         public void onClick(View v) {
             mBasicControls.setVisibility(View.GONE);
             mExtraControls.setVisibility(View.VISIBLE);
-            mInstance.show(DEFAULT_TIMEOUT_MS);
+            resetFadeOutRunnable();
         }
     };
 
@@ -733,6 +743,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
         public void onClick(View v) {
             mBasicControls.setVisibility(View.VISIBLE);
             mExtraControls.setVisibility(View.GONE);
+            resetFadeOutRunnable();
         }
     };
 
@@ -830,7 +841,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
                             // TODO: Currently, we are just sending extras that came from session.
                             // Is it the right behavior?
                             mControls.sendCustomAction(actionString, action.getExtras());
-                            mInstance.show(DEFAULT_TIMEOUT_MS);
+                            mInstance.setVisibility(View.VISIBLE);
                         }
                     });
                     mCustomButtons.addView(button);
