@@ -20,14 +20,17 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
+import android.media.DataSourceDesc;
 import android.media.IMediaSession2;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaController2;
 import android.media.MediaController2.ControllerCallback;
+import android.media.MediaItem2;
 import android.media.MediaLibraryService2;
 import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
+import android.media.MediaMetadata2;
 import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
 import android.media.MediaSession2.ControllerInfo;
@@ -40,6 +43,7 @@ import android.media.VolumeProvider;
 import android.media.update.MediaBrowser2Provider;
 import android.media.update.MediaControlView2Provider;
 import android.media.update.MediaController2Provider;
+import android.media.update.MediaItem2Provider;
 import android.media.update.MediaLibraryService2Provider.MediaLibrarySessionProvider;
 import android.media.update.MediaSession2Provider;
 import android.media.update.MediaSessionService2Provider;
@@ -57,6 +61,7 @@ import android.widget.VideoView2;
 
 import com.android.media.MediaBrowser2Impl;
 import com.android.media.MediaController2Impl;
+import com.android.media.MediaItem2Impl;
 import com.android.media.MediaLibraryService2Impl;
 import com.android.media.MediaLibraryService2Impl.MediaLibrarySessionImpl;
 import com.android.media.MediaSession2Impl;
@@ -155,5 +160,16 @@ public class ApiFactory implements StaticProvider {
     public SessionPlayer2Provider createSessionPlayer2(Context context, SessionPlayer2 instance) {
         // TODO(jaewan): Implement this
         return null;
+    }
+
+    @Override
+    public MediaItem2Provider createMediaItem2Provider(Context context, MediaItem2 instance,
+            String mediaId, DataSourceDesc dsd, MediaMetadata2 metadata, int flags) {
+        return new MediaItem2Impl(context, instance, mediaId, dsd, metadata, flags);
+    }
+
+    @Override
+    public MediaItem2 fromBundle_MediaItem2(Context context, Bundle bundle) {
+        return MediaItem2Impl.fromBundle(context, bundle);
     }
 }
