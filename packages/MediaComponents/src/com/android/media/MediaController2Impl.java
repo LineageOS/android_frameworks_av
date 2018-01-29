@@ -330,7 +330,20 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void sendCustomCommand_impl(Command command, Bundle args, ResultReceiver cb) {
-        // TODO(jaewan): Implement
+        if (command == null) {
+            throw new IllegalArgumentException("command shouldn't be null");
+        }
+        // TODO(jaewan): Also check if the command is allowed.
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.sendCustomCommand(mSessionCallbackStub, command.toBundle(), args, cb);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     @Override
@@ -481,6 +494,17 @@ public class MediaController2Impl implements MediaController2Provider {
         }
     }
 
+    private void onCustomCommand(final Command command, final Bundle args,
+            final ResultReceiver receiver) {
+        if (DEBUG) {
+            Log.d(TAG, "onCustomCommand cmd=" + command);
+        }
+        mCallbackExecutor.execute(() -> {
+            // TODO(jaewan): Double check if the controller exists.
+            mCallback.onCustomCommand(command, args, receiver);
+        });
+    }
+
     // TODO(jaewan): Pull out this from the controller2, and rename it to the MediaController2Stub
     //               or MediaBrowser2Stub.
     static class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
@@ -591,6 +615,22 @@ public class MediaController2Impl implements MediaController2Provider {
                 }
             }
             browser.onCustomLayoutChanged(layout);
+        }
+
+        @Override
+        public void sendCustomCommand(Bundle commandBundle, Bundle args, ResultReceiver receiver) {
+            final MediaController2Impl controller;
+            try {
+                controller = getController();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+                return;
+            }
+            Command command = Command.fromBundle(commandBundle);
+            if (command == null) {
+                return;
+            }
+            controller.onCustomCommand(command, args, receiver);
         }
     }
 

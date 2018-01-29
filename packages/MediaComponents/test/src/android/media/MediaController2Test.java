@@ -18,14 +18,17 @@ package android.media;
 
 import android.media.MediaController2.ControllerCallback;
 import android.media.MediaPlayerInterface.PlaybackListener;
+import android.media.MediaSession2.Command;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.media.TestUtils.SyncHandler;
 import android.media.session.PlaybackState;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Process;
+import android.os.ResultReceiver;
 import android.support.test.filters.FlakyTest;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
@@ -248,6 +251,34 @@ public class MediaController2Test extends MediaSession2TestBase {
         mPlayer.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_PAUSED));
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
         assertEquals(PlaybackState.STATE_PAUSED, mController.getPlaybackState().getState());
+    }
+
+    @Test
+    public void testSendCustomCommand() throws InterruptedException {
+        // TODO(jaewan): Need to revisit with the permission.
+        final Command testCommand = new Command(MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE);
+        final Bundle testArgs = new Bundle();
+        testArgs.putString("args", "testSendCustomAction");
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final SessionCallback callback = new SessionCallback() {
+            @Override
+            public void onCustomCommand(ControllerInfo controller, Command customCommand,
+                    Bundle args, ResultReceiver cb) {
+                super.onCustomCommand(controller, customCommand, args, cb);
+                assertEquals(mContext.getPackageName(), controller.getPackageName());
+                assertEquals(testCommand, customCommand);
+                assertTrue(TestUtils.equals(testArgs, args));
+                assertNull(cb);
+                latch.countDown();
+            }
+        };
+        mSession.close();
+        mSession = new MediaSession2.Builder(mContext, mPlayer)
+                .setSessionCallback(sHandlerExecutor, callback).setId(TAG).build();
+        final MediaController2 controller = createController(mSession.getToken());
+        controller.sendCustomCommand(testCommand, testArgs, null);
+        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
     }
 
     @Test

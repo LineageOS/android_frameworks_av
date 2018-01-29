@@ -327,12 +327,12 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public void sendCustomCommand_impl(ControllerInfo controller, Command command, Bundle args,
             ResultReceiver receiver) {
-        // TODO(jaewan): Implement
+        mSessionStub.sendCustomCommand(controller, command, args, receiver);
     }
 
     @Override
     public void sendCustomCommand_impl(Command command, Bundle args) {
-        // TODO(jaewan): Implement
+        mSessionStub.sendCustomCommand(command, args);
     }
 
     @Override

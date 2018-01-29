@@ -23,15 +23,18 @@ import static android.media.TestUtils.createPlaybackState;
 
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2.Builder;
+import android.media.MediaSession2.Command;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.os.Bundle;
 import android.os.Looper;
 import android.os.Process;
+import android.os.ResultReceiver;
 import android.support.annotation.NonNull;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
+import android.text.TextUtils;
 
 import java.util.ArrayList;
 import org.junit.After;
@@ -40,6 +43,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -263,6 +267,47 @@ public class MediaSession2Test extends MediaSession2TestBase {
         assertNotNull(controller);
         waitForConnect(controller, false);
         waitForDisconnect(controller, true);
+    }
+
+    @Test
+    public void testSendCustomAction() throws InterruptedException {
+        final Command testCommand = new Command(MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE);
+        final Bundle testArgs = new Bundle();
+        testArgs.putString("args", "testSendCustomAction");
+
+        final CountDownLatch latch = new CountDownLatch(2);
+        final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
+            @Override
+            public void onCustomCommand(Command command, Bundle args, ResultReceiver receiver) {
+                assertEquals(testCommand, command);
+                assertTrue(TestUtils.equals(testArgs, args));
+                assertNull(receiver);
+                latch.countDown();
+            }
+        };
+        final MediaController2 controller =
+                createController(mSession.getToken(), true, callback);
+        // TODO(jaewan): Test with multiple controllers
+        mSession.sendCustomCommand(testCommand, testArgs);
+
+        ControllerInfo controllerInfo = getTestControllerInfo();
+        assertNotNull(controllerInfo);
+        // TODO(jaewan): Test receivers as well.
+        mSession.sendCustomCommand(controllerInfo, testCommand, testArgs, null);
+        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+    }
+
+    private ControllerInfo getTestControllerInfo() {
+        List<ControllerInfo> controllers = mSession.getConnectedControllers();
+        assertNotNull(controllers);
+        final String packageName = mContext.getPackageName();
+        for (int i = 0; i < controllers.size(); i++) {
+            if (TextUtils.equals(packageName, controllers.get(i).getPackageName())) {
+                return controllers.get(i);
+            }
+        }
+        fail("Fails to get custom command");
+        return null;
     }
 
     public class MockOnConnectCallback extends SessionCallback {

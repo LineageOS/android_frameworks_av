@@ -20,11 +20,14 @@ import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
 
+import android.annotation.Nullable;
 import android.content.Context;
 import android.media.MediaBrowser2.BrowserCallback;
+import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.PlaylistParams;
 import android.os.Bundle;
+import android.os.ResultReceiver;
 import android.support.annotation.CallSuper;
 import android.support.annotation.NonNull;
 import android.support.test.filters.SmallTest;
@@ -50,8 +53,16 @@ public class MediaBrowser2Test extends MediaController2Test {
 
     @Override
     TestControllerInterface onCreateController(@NonNull SessionToken2 token,
-            @NonNull TestControllerCallbackInterface callback) {
+            @Nullable TestControllerCallbackInterface callback) {
+        if (callback == null) {
+            callback = new TestBrowserCallbackInterface() {};
+        }
         return new TestMediaBrowser(mContext, token, new TestBrowserCallback(callback));
+    }
+
+    interface TestBrowserCallbackInterface extends TestControllerCallbackInterface {
+        // Browser specific callbacks
+        default void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {}
     }
 
     @Test
@@ -60,7 +71,7 @@ public class MediaBrowser2Test extends MediaController2Test {
         param.putString(TAG, TAG);
 
         final CountDownLatch latch = new CountDownLatch(1);
-        final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
+        final TestControllerCallbackInterface callback = new TestBrowserCallbackInterface() {
             @Override
             public void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {
                 assertTrue(TestUtils.equals(param, rootHints));
@@ -84,6 +95,9 @@ public class MediaBrowser2Test extends MediaController2Test {
         public final CountDownLatch disconnectLatch = new CountDownLatch(1);
 
         TestBrowserCallback(TestControllerCallbackInterface callbackProxy) {
+            if (callbackProxy == null) {
+                throw new IllegalArgumentException("Callback proxy shouldn't be null. Test bug");
+            }
             mCallbackProxy = callbackProxy;
         }
 
@@ -104,23 +118,27 @@ public class MediaBrowser2Test extends MediaController2Test {
         @Override
         public void onPlaybackStateChanged(PlaybackState2 state) {
             super.onPlaybackStateChanged(state);
-            if (mCallbackProxy != null) {
-                mCallbackProxy.onPlaybackStateChanged(state);
-            }
+            mCallbackProxy.onPlaybackStateChanged(state);
         }
 
         @Override
         public void onPlaylistParamsChanged(PlaylistParams params) {
             super.onPlaylistParamsChanged(params);
-            if (mCallbackProxy != null) {
-                mCallbackProxy.onPlaylistParamsChanged(params);
-            }
+            mCallbackProxy.onPlaylistParamsChanged(params);
+        }
+
+        @Override
+        public void onCustomCommand(Command command, Bundle args, ResultReceiver receiver) {
+            super.onCustomCommand(command, args, receiver);
+            mCallbackProxy.onCustomCommand(command, args, receiver);
         }
 
         @Override
         public void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {
-            if (mCallbackProxy != null) {
-                mCallbackProxy.onGetRootResult(rootHints, rootMediaId, rootExtra);
+            super.onGetRootResult(rootHints, rootMediaId, rootExtra);
+            if (mCallbackProxy instanceof TestBrowserCallbackInterface) {
+                ((TestBrowserCallbackInterface) mCallbackProxy)
+                        .onGetRootResult(rootHints, rootMediaId, rootExtra);
             }
         }
 
