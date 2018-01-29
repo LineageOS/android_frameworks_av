@@ -66,7 +66,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
         super.setUp();
         mPlayer = new MockPlayer(0);
         mSession = new MediaSession2.Builder(mContext, mPlayer)
-                .setSessionCallback(sHandlerExecutor, new SessionCallback()).build();
+                .setSessionCallback(sHandlerExecutor, new SessionCallback(mContext)).build();
     }
 
     @After
@@ -295,7 +295,8 @@ public class MediaSession2Test extends MediaSession2TestBase {
 
     @Test
     public void testSendCustomAction() throws InterruptedException {
-        final Command testCommand = new Command(MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE);
+        final Command testCommand =
+                new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE);
         final Bundle testArgs = new Bundle();
         testArgs.putString("args", "testSendCustomAction");
 
@@ -335,6 +336,10 @@ public class MediaSession2Test extends MediaSession2TestBase {
     }
 
     public class MockOnConnectCallback extends SessionCallback {
+        public MockOnConnectCallback() {
+            super(mContext);
+        }
+
         @Override
         public MediaSession2.CommandGroup onConnect(ControllerInfo controllerInfo) {
             if (Process.myUid() != controllerInfo.getUid()) {
@@ -350,6 +355,10 @@ public class MediaSession2Test extends MediaSession2TestBase {
 
     public class MockOnCommandCallback extends SessionCallback {
         public final ArrayList<MediaSession2.Command> commands = new ArrayList<>();
+
+        public MockOnCommandCallback() {
+            super(mContext);
+        }
 
         @Override
         public boolean onCommandRequest(ControllerInfo controllerInfo, MediaSession2.Command command) {

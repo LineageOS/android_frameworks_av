@@ -53,10 +53,9 @@ public class MediaController2Impl implements MediaController2Provider {
     private static final boolean DEBUG = true; // TODO(jaewan): Change
 
     private final MediaController2 mInstance;
-
+    private final Context mContext;
     private final Object mLock = new Object();
 
-    private final Context mContext;
     private final MediaSession2CallbackStub mSessionCallbackStub;
     private final SessionToken2 mToken;
     private final ControllerCallback mCallback;
@@ -207,6 +206,10 @@ public class MediaController2Impl implements MediaController2Provider {
 
     Executor getCallbackExecutor() {
         return mCallbackExecutor;
+    }
+
+    Context getContext() {
+      return mContext;
     }
 
     @Override
@@ -606,7 +609,7 @@ public class MediaController2Impl implements MediaController2Provider {
                 return;
             }
             controller.onConnectionChangedNotLocked(
-                    sessionBinder, CommandGroup.fromBundle(commandGroup));
+                    sessionBinder, CommandGroup.fromBundle(controller.getContext(), commandGroup));
         }
 
         @Override
@@ -645,7 +648,8 @@ public class MediaController2Impl implements MediaController2Provider {
             }
             List<CommandButton> layout = new ArrayList<>();
             for (int i = 0; i < commandButtonlist.size(); i++) {
-                CommandButton button = CommandButton.fromBundle(commandButtonlist.get(i));
+                CommandButton button = CommandButton.fromBundle(
+                        browser.getContext(), commandButtonlist.get(i));
                 if (button != null) {
                     layout.add(button);
                 }
@@ -662,7 +666,7 @@ public class MediaController2Impl implements MediaController2Provider {
                 Log.w(TAG, "Don't fail silently here. Highly likely a bug");
                 return;
             }
-            Command command = Command.fromBundle(commandBundle);
+            Command command = Command.fromBundle(controller.getContext(), commandBundle);
             if (command == null) {
                 return;
             }

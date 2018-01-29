@@ -81,6 +81,10 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
     }
 
     private class TestLibrarySessionCallback extends MediaLibrarySessionCallback {
+        public TestLibrarySessionCallback() {
+            super(MockMediaLibraryService2.this);
+        }
+
         @Override
         public CommandGroup onConnect(ControllerInfo controller) {
             if (Process.myUid() != controller.getUid()) {
