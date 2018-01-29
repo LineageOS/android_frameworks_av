@@ -171,6 +171,14 @@ public class MockPlayer implements MediaPlayerInterface {
     }
 
     @Override
+    public void addPlaylistItem(int index, MediaItem2 item) {
+    }
+
+    @Override
+    public void removePlaylistItem(MediaItem2 item) {
+    }
+
+    @Override
     public PlaylistParams getPlaylistParams() {
         return mPlaylistParams;
     }
