@@ -19,6 +19,7 @@ package android.media;
 import android.media.MediaController2.ControllerCallback;
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2.ControllerInfo;
+import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.media.TestUtils.SyncHandler;
 import android.media.session.PlaybackState;
@@ -192,6 +193,30 @@ public class MediaController2Test extends MediaSession2TestBase {
         }
         assertTrue(mPlayer.mSetCurrentPlaylistItemCalled);
         assertEquals(itemIndex, mPlayer.mItemIndex);
+    }
+
+    @Test
+    public void testGetSetPlaylistParams() throws Exception {
+        final PlaylistParams params = new PlaylistParams(
+                PlaylistParams.REPEAT_MODE_ALL,
+                PlaylistParams.SHUFFLE_MODE_ALL,
+                null /* PlaylistMetadata */);
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
+            @Override
+            public void onPlaylistParamsChanged(PlaylistParams givenParams) {
+                TestUtils.equals(params.toBundle(), givenParams.toBundle());
+                latch.countDown();
+            }
+        };
+
+        final MediaController2 controller = createController(mSession.getToken(), true, callback);
+        controller.setPlaylistParams(params);
+
+        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+        TestUtils.equals(params.toBundle(), mSession.getPlaylistParams().toBundle());
+        TestUtils.equals(params.toBundle(), controller.getPlaylistParams().toBundle());
     }
 
     @Test

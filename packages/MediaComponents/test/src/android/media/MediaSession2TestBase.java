@@ -207,7 +207,9 @@ abstract class MediaSession2TestBase {
 
         @Override
         public void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {
-            mCallbackProxy.onPlaylistParamsChanged(params);
+            if (mCallbackProxy != null) {
+                mCallbackProxy.onPlaylistParamsChanged(params);
+            }
         }
     }
 

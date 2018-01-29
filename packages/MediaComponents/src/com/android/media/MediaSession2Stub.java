@@ -25,6 +25,7 @@ import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
+import android.media.MediaSession2.PlaylistParams;
 import android.media.PlaybackState2;
 import android.os.Binder;
 import android.os.Bundle;
@@ -39,6 +40,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MediaSession2Stub extends IMediaSession2.Stub {
+
+    static final String ARGUMENT_KEY_POSITION = "android.media.media_session2.key_position";
+    static final String ARGUMENT_KEY_ITEM_INDEX = "android.media.media_session2.key_item_index";
+    static final String ARGUMENT_KEY_PLAYLIST_PARAMS =
+            "android.media.media_session2.key_playlist_params";
+
     private static final String TAG = "MediaSession2Stub";
     private static final boolean DEBUG = true; // TODO(jaewan): Rename.
 
@@ -154,7 +161,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void sendTransportControlCommand(IMediaSession2Callback caller,
-            int commandCode, long arg) throws RuntimeException {
+            int commandCode, Bundle args) throws RuntimeException {
         final MediaSession2Impl sessionImpl = getSession();
         final ControllerInfo controller = getController(caller);
         if (controller == null) {
@@ -206,10 +213,16 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     session.getInstance().rewind();
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO:
-                    session.getInstance().seekTo(arg);
+                    session.getInstance().seekTo(args.getLong(ARGUMENT_KEY_POSITION));
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM:
-                    session.getInstance().setCurrentPlaylistItem((int) arg);
+                    session.getInstance().setCurrentPlaylistItem(
+                            args.getInt(ARGUMENT_KEY_ITEM_INDEX));
+                    break;
+                case MediaSession2.COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS:
+                    session.getInstance().setPlaylistParams(
+                            PlaylistParams.fromBundle(
+                                    args.getBundle(ARGUMENT_KEY_PLAYLIST_PARAMS)));
                     break;
                 default:
                     // TODO(jaewan): Resend unknown (new) commands through the custom command.
