@@ -16,7 +16,6 @@
 
 package android.media;
 
-import android.media.MediaPlayerInterface;
 import android.media.MediaSession2.PlaylistParams;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -44,10 +43,13 @@ public class MockPlayer implements MediaPlayerInterface {
     public long mSeekPosition;
     public boolean mSetCurrentPlaylistItemCalled;
     public int mItemIndex;
+    public boolean mSetPlaylistCalled;
     public boolean mSetPlaylistParamsCalled;
 
     public List<PlaybackListenerHolder> mListeners = new ArrayList<>();
+    public List<MediaItem2> mPlaylist;
     public PlaylistParams mPlaylistParams;
+
     private PlaybackState2 mLastPlaybackState;
     private AudioAttributes mAudioAttributes;
 
@@ -194,11 +196,13 @@ public class MockPlayer implements MediaPlayerInterface {
     }
 
     @Override
-    public void setPlaylist(List<MediaItem2> item, PlaylistParams param) {
+    public void setPlaylist(List<MediaItem2> playlist) {
+        mSetPlaylistCalled = true;
+        mPlaylist = playlist;
     }
 
     @Override
     public List<MediaItem2> getPlaylist() {
-        return null;
+        return mPlaylist;
     }
 }

@@ -61,6 +61,7 @@ abstract class MediaSession2TestBase {
 
     interface TestControllerCallbackInterface {
         // Add methods in ControllerCallback/BrowserCallback that you want to test.
+        default void onPlaylistChanged(List<MediaItem2> playlist) {}
         default void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {}
 
         // Currently empty. Add methods in ControllerCallback/BrowserCallback that you want to test.
@@ -213,6 +214,13 @@ abstract class MediaSession2TestBase {
                 assertTrue(disconnectLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
             } else {
                 assertFalse(disconnectLatch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+            }
+        }
+
+        @Override
+        public void onPlaylistChanged(List<MediaItem2> params) {
+            if (mCallbackProxy != null) {
+                mCallbackProxy.onPlaylistChanged(params);
             }
         }
 

@@ -16,6 +16,7 @@
 
 package com.android.media;
 
+import android.media.MediaItem2;
 import android.media.MediaLibraryService2.BrowserRoot;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
 import android.media.MediaSession2;
@@ -342,6 +343,32 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         } catch (RemoteException e) {
             Log.w(TAG, "Controller is gone", e);
             // TODO(jaewan): What to do when the controller is gone?
+        }
+    }
+
+    public void notifyPlaylistChanged(List<MediaItem2> playlist) {
+        if (playlist == null) {
+            return;
+        }
+        final List<Bundle> bundleList = new ArrayList<>();
+        for (int i = 0; i < playlist.size(); i++) {
+            if (playlist.get(i) != null) {
+                Bundle bundle = playlist.get(i).toBundle();
+                if (bundle != null) {
+                    bundleList.add(bundle);
+                }
+            }
+        }
+        final List<ControllerInfo> list = getControllers();
+        for (int i = 0; i < list.size(); i++) {
+            IMediaSession2Callback callbackBinder =
+                    ControllerInfoImpl.from(list.get(i)).getControllerBinder();
+            try {
+                callbackBinder.onPlaylistChanged(bundleList);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Controller is gone", e);
+                // TODO(jaewan): What to do when the controller is gone?
+            }
         }
     }
 

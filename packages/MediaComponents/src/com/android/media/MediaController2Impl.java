@@ -70,6 +70,8 @@ public class MediaController2Impl implements MediaController2Provider {
     @GuardedBy("mLock")
     private PlaybackState2 mPlaybackState;
     @GuardedBy("mLock")
+    private List<MediaItem2> mPlaylist;
+    @GuardedBy("mLock")
     private PlaylistParams mPlaylistParams;
 
     // Assignment should be used with the lock hold, but should be used without a lock to prevent
@@ -346,8 +348,9 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public List<MediaItem2> getPlaylist_impl() {
-        // TODO(jaewan): Implement
-        return null;
+        synchronized (mLock) {
+            return mPlaylist;
+        }
     }
 
     @Override
@@ -439,6 +442,26 @@ public class MediaController2Impl implements MediaController2Provider {
             }
             mCallback.onPlaylistParamsChanged(params);
         });
+    }
+
+    private void pushPlaylistChanges(final List<Bundle> list) {
+        final List<MediaItem2> playlist = new ArrayList<>();
+        for (int i = 0; i < list.size(); i++) {
+            MediaItem2 item = MediaItem2.fromBundle(mContext, list.get(i));
+            if (item != null) {
+                playlist.add(item);
+            }
+        }
+
+        synchronized (mLock) {
+            mPlaylist = playlist;
+            mCallbackExecutor.execute(() -> {
+                if (!mInstance.isConnected()) {
+                    return;
+                }
+                mCallback.onPlaylistChanged(playlist);
+            });
+        }
     }
 
     // Called when the result for connecting to the session was delivered.
@@ -543,6 +566,21 @@ public class MediaController2Impl implements MediaController2Provider {
                 return;
             }
             controller.pushPlaybackStateChanges(PlaybackState2.fromBundle(state));
+        }
+
+        @Override
+        public void onPlaylistChanged(List<Bundle> playlist) throws RuntimeException {
+            final MediaController2Impl controller;
+            try {
+                controller = getController();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+                return;
+            }
+            if (playlist == null) {
+                return;
+            }
+            controller.pushPlaylistChanges(playlist);
         }
 
         @Override

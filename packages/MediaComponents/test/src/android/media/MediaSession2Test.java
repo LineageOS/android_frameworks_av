@@ -145,6 +145,30 @@ public class MediaSession2Test extends MediaSession2TestBase {
     }
 
     @Test
+    public void testSetPlaylist() throws Exception {
+        final List<MediaItem2> playlist = new ArrayList<>();
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
+            @Override
+            public void onPlaylistChanged(List<MediaItem2> givenList) {
+                assertMediaItemListEquals(playlist, givenList);
+                latch.countDown();
+            }
+        };
+
+        final MediaController2 controller = createController(mSession.getToken(), true, callback);
+        mSession.setPlaylist(playlist);
+
+        assertTrue(mPlayer.mSetPlaylistCalled);
+        assertMediaItemListEquals(playlist, mPlayer.mPlaylist);
+        assertMediaItemListEquals(playlist, mSession.getPlaylist());
+
+        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+        assertMediaItemListEquals(playlist, controller.getPlaylist());
+    }
+
+    @Test
     public void testSetPlaylistParams() throws Exception {
         final PlaylistParams params = new PlaylistParams(
                 PlaylistParams.REPEAT_MODE_ALL,
@@ -337,6 +361,30 @@ public class MediaSession2Test extends MediaSession2TestBase {
                 return false;
             }
             return true;
+        }
+    }
+
+    private static void assertMediaItemListEquals(List<MediaItem2> a, List<MediaItem2> b) {
+        if (a == null || b == null) {
+            assertEquals(a, b);
+        }
+        assertEquals(a.size(), b.size());
+
+        for (int i = 0; i < a.size(); i++) {
+            MediaItem2 aItem = a.get(i);
+            MediaItem2 bItem = b.get(i);
+
+            if (aItem == null || bItem == null) {
+                assertEquals(aItem, bItem);
+                continue;
+            }
+
+            assertEquals(aItem.getMediaId(), bItem.getMediaId());
+            assertEquals(aItem.getFlags(), bItem.getFlags());
+            TestUtils.equals(aItem.getMetadata().getBundle(), bItem.getMetadata().getBundle());
+
+            // Note: Here it does not check whether DataSourceDesc are equal,
+            // since there DataSourceDec is not comparable.
         }
     }
 }

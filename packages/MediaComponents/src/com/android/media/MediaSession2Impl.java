@@ -77,11 +77,14 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private MediaPlayerInterface mPlayer;
     @GuardedBy("mLock")
     private MyPlaybackListener mListener;
+    @GuardedBy("mLock")
     private PlaylistParams mPlaylistParams;
+    @GuardedBy("mLock")
+    private List<MediaItem2> mPlaylist;
 
     /**
      * Can be only called by the {@link Builder#build()}.
-     * 
+     *
      * @param instance
      * @param context
      * @param player
@@ -293,7 +296,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (params == null) {
             throw new IllegalArgumentException("PlaylistParams should not be null!");
         }
-        mPlaylistParams = params;
+        ensureCallingThread();
+        ensurePlayer();
+        synchronized (mLock) {
+            mPlaylistParams = params;
+        }
         mPlayer.setPlaylistParams(params);
         mSessionStub.notifyPlaylistParamsChanged(params);
     }
@@ -334,14 +341,24 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void setPlaylist_impl(List<MediaItem2> playlist, PlaylistParams param) {
-        // TODO(jaewan): Implement
+    public void setPlaylist_impl(List<MediaItem2> playlist) {
+        if (playlist == null) {
+            throw new IllegalArgumentException("Playlist should not be null!");
+        }
+        ensureCallingThread();
+        ensurePlayer();
+        synchronized (mLock) {
+            mPlaylist = playlist;
+        }
+        mPlayer.setPlaylist(playlist);
+        mSessionStub.notifyPlaylistChanged(playlist);
     }
 
     @Override
     public List<MediaItem2> getPlaylist_impl() {
-        // TODO(jaewan): Implement this
-        return null;
+        synchronized (mLock) {
+            return mPlaylist;
+        }
     }
 
     @Override
