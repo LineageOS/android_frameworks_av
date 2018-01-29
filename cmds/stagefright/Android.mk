@@ -111,7 +111,7 @@ LOCAL_SRC_FILES:=         \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright liblog libutils libbinder libui libgui \
-        libstagefright_foundation libmedia libcutils
+        libstagefright_foundation libmedia libcutils libmediaextractor
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
@@ -204,7 +204,7 @@ LOCAL_SRC_FILES:=               \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright liblog libutils libbinder libstagefright_foundation \
-        libcutils libc
+        libcutils libc libmediaextractor
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \

@@ -21,7 +21,6 @@
 #include "AACExtractor.h"
 #include <media/DataSource.h>
 #include <media/MediaSourceBase.h>
-#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -29,6 +28,7 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/MetaDataUtils.h>
 #include <utils/String8.h>
 
 namespace android {

@@ -383,7 +383,9 @@ const char *AVCProfileToString(uint8_t profile) {
     }
 }
 
-sp<MetaData> MakeAVCCodecSpecificData(const sp<ABuffer> &accessUnit) {
+sp<ABuffer> MakeAVCCodecSpecificData(
+        const sp<ABuffer> &accessUnit, int32_t *width, int32_t *height,
+        int32_t *sarWidth, int32_t *sarHeight) {
     const uint8_t *data = accessUnit->data();
     size_t size = accessUnit->size();
 
@@ -392,10 +394,8 @@ sp<MetaData> MakeAVCCodecSpecificData(const sp<ABuffer> &accessUnit) {
         return NULL;
     }
 
-    int32_t width, height;
-    int32_t sarWidth, sarHeight;
     FindAVCDimensions(
-            seqParamSet, &width, &height, &sarWidth, &sarHeight);
+            seqParamSet, width, height, sarWidth, sarHeight);
 
     sp<ABuffer> picParamSet = FindNAL(data, size, 8);
     CHECK(picParamSet != NULL);
@@ -434,38 +434,32 @@ sp<MetaData> MakeAVCCodecSpecificData(const sp<ABuffer> &accessUnit) {
     hexdump(seqParamSet->data(), seqParamSet->size());
 #endif
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
 
-    meta->setData(kKeyAVCC, kTypeAVCC, csd->data(), csd->size());
-    meta->setInt32(kKeyWidth, width);
-    meta->setInt32(kKeyHeight, height);
-
-    if ((sarWidth > 0 && sarHeight > 0) && (sarWidth != 1 || sarHeight != 1)) {
-        // We treat *:0 and 0:* (unspecified) as 1:1.
-
-        meta->setInt32(kKeySARWidth, sarWidth);
-        meta->setInt32(kKeySARHeight, sarHeight);
-
-        ALOGI("found AVC codec config (%d x %d, %s-profile level %d.%d) "
-              "SAR %d : %d",
-             width,
-             height,
-             AVCProfileToString(profile),
-             level / 10,
-             level % 10,
-             sarWidth,
-             sarHeight);
-    } else {
-        ALOGI("found AVC codec config (%d x %d, %s-profile level %d.%d)",
-             width,
-             height,
-             AVCProfileToString(profile),
-             level / 10,
-             level % 10);
+    if (sarWidth != nullptr && sarHeight != nullptr) {
+        if ((*sarWidth > 0 && *sarHeight > 0) && (*sarWidth != 1 || *sarHeight != 1)) {
+            ALOGI("found AVC codec config (%d x %d, %s-profile level %d.%d) "
+                    "SAR %d : %d",
+                    *width,
+                    *height,
+                    AVCProfileToString(profile),
+                    level / 10,
+                    level % 10,
+                    *sarWidth,
+                    *sarHeight);
+        } else {
+            // We treat *:0 and 0:* (unspecified) as 1:1.
+            *sarWidth = 0;
+            *sarHeight = 0;
+            ALOGI("found AVC codec config (%d x %d, %s-profile level %d.%d)",
+                    *width,
+                    *height,
+                    AVCProfileToString(profile),
+                    level / 10,
+                    level % 10);
+        }
     }
 
-    return meta;
+    return csd;
 }
 
 bool IsIDR(const uint8_t *data, size_t size) {
@@ -543,19 +537,17 @@ uint32_t FindAVCLayerId(const uint8_t *data, size_t size) {
     return layerId;
 }
 
-sp<MetaData> MakeAACCodecSpecificData(
+sp<ABuffer> MakeAACCodecSpecificData(
         unsigned profile, unsigned sampling_freq_index,
-        unsigned channel_configuration) {
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC);
-
+        unsigned channel_configuration, int32_t *sampleRate,
+        int32_t *channelCount) {
     CHECK_LE(sampling_freq_index, 11u);
     static const int32_t kSamplingFreq[] = {
         96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050,
         16000, 12000, 11025, 8000
     };
-    meta->setInt32(kKeySampleRate, kSamplingFreq[sampling_freq_index]);
-    meta->setInt32(kKeyChannelCount, channel_configuration);
+    *sampleRate = kSamplingFreq[sampling_freq_index];
+    *channelCount = channel_configuration;
 
     static const uint8_t kStaticESDS[] = {
         0x03, 22,
@@ -585,9 +577,7 @@ sp<MetaData> MakeAACCodecSpecificData(
     csd->data()[sizeof(kStaticESDS) + 1] =
         ((sampling_freq_index << 7) & 0x80) | (channel_configuration << 3);
 
-    meta->setData(kKeyESDS, 0, csd->data(), csd->size());
-
-    return meta;
+    return csd;
 }
 
 bool ExtractDimensionsFromVOLHeader(
