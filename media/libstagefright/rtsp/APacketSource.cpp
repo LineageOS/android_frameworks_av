@@ -454,6 +454,17 @@ APacketSource::APacketSource(
 
         mFormat->setInt32(kKeyWidth, width);
         mFormat->setInt32(kKeyHeight, height);
+    } else if (!strncmp(desc.c_str(), "H265/", 5)) {
+        mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
+
+        int32_t width, height;
+        if (!sessionDesc->getDimensions(index, PT, &width, &height)) {
+            width = -1;
+            height = -1;
+        }
+
+        mFormat->setInt32(kKeyWidth, width);
+        mFormat->setInt32(kKeyHeight, height);
     } else if (!strncmp(desc.c_str(), "H263-2000/", 10)
             || !strncmp(desc.c_str(), "H263-1998/", 10)) {
         mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_H263);

@@ -4,6 +4,7 @@ cc_defaults {
     srcs: [
         "AAMRAssembler.cpp",
         "AAVCAssembler.cpp",
+        "AHEVCAssembler.cpp",
         "AH263Assembler.cpp",
         "AMPEG2TSAssembler.cpp",
         "AMPEG4AudioAssembler.cpp",
