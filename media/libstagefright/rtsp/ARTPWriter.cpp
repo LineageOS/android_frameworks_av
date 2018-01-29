@@ -40,6 +40,12 @@
 #define H264_NALU_PPS 0x8
 #define H264_NALU_IFRAME 0x5
 #define H264_NALU_PFRAME 0x1
+
+#define H265_NALU_MASK 0x3F
+#define H265_NALU_VPS 0x40
+#define H265_NALU_SPS 0x42
+#define H265_NALU_PPS 0x44
+
 #define UDP_HEADER_SIZE 8
 #define RTP_HEADER_SIZE 12
 #define RTP_HEADER_EXT_SIZE 1
@@ -198,6 +204,8 @@ status_t ARTPWriter::start(MetaData * /* params */) {
     mMode = INVALID;
     if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
         mMode = H264;
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
+        mMode = H265;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_H263)) {
         mMode = H263;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AMR_NB)) {
@@ -401,6 +409,9 @@ void ARTPWriter::onRead(const sp<AMessage> &msg) {
             } else {
                 sendAVCData(mediaBuf);
             }
+        } else if (mMode == H265) {
+            StripStartcode(mediaBuf);
+            sendHEVCData(mediaBuf);
         } else if (mMode == H263) {
             sendH263Data(mediaBuf);
         } else if (mMode == AMR_NB || mMode == AMR_WB) {
@@ -721,6 +732,131 @@ void ARTPWriter::sendSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs) {
         mPPSBuf->meta_data().setInt32(kKeyPps, 1);
         sendAVCData(mPPSBuf);
     }
+}
+
+void ARTPWriter::sendHEVCData(MediaBufferBase *mediaBuf) {
+    // 12 bytes RTP header + 2 bytes for the FU-indicator and FU-header.
+    CHECK_GE(kMaxPacketSize, 12u + 2u);
+
+    int64_t timeUs;
+    CHECK(mediaBuf->meta_data().findInt64(kKeyTime, &timeUs));
+
+    sendSPSPPSIfIFrame(mediaBuf, timeUs);
+
+    uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100ll);
+
+    const uint8_t *mediaData =
+        (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
+
+    sp<ABuffer> buffer = new ABuffer(kMaxPacketSize);
+
+    if (mediaBuf->range_length() + UDP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_PAYLOAD_ROOM_SIZE
+            <= buffer->capacity()) {
+        // The data fits into a single packet
+        uint8_t *data = buffer->data();
+        data[0] = 0x80;
+        data[1] = (1 << 7) | PT;  // M-bit
+        data[2] = (mSeqNo >> 8) & 0xff;
+        data[3] = mSeqNo & 0xff;
+        data[4] = rtpTime >> 24;
+        data[5] = (rtpTime >> 16) & 0xff;
+        data[6] = (rtpTime >> 8) & 0xff;
+        data[7] = rtpTime & 0xff;
+        data[8] = mSourceID >> 24;
+        data[9] = (mSourceID >> 16) & 0xff;
+        data[10] = (mSourceID >> 8) & 0xff;
+        data[11] = mSourceID & 0xff;
+
+        memcpy(&data[12],
+               mediaData, mediaBuf->range_length());
+
+        buffer->setRange(0, mediaBuf->range_length() + 12);
+
+        send(buffer, false /* isRTCP */);
+
+        ++mSeqNo;
+        ++mNumRTPSent;
+        mNumRTPOctetsSent += buffer->size() - 12;
+    } else {
+        // FU-A
+
+        unsigned nalType = (mediaData[0] >> 1) & H265_NALU_MASK;
+        ALOGV("H265 nalType 0x%x, data[0]=0x%x", nalType, mediaData[0]);
+        size_t offset = 2; //H265 payload header is 16 bit.
+
+        bool firstPacket = true;
+        while (offset < mediaBuf->range_length()) {
+            size_t size = mediaBuf->range_length() - offset;
+            bool lastPacket = true;
+            if (size + UDP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_FU_HEADER_SIZE +
+                    RTP_PAYLOAD_ROOM_SIZE > buffer->capacity()) {
+                lastPacket = false;
+                size = buffer->capacity() - UDP_HEADER_SIZE - RTP_HEADER_SIZE -
+                    RTP_FU_HEADER_SIZE - RTP_PAYLOAD_ROOM_SIZE;
+            }
+
+            uint8_t *data = buffer->data();
+            data[0] = 0x80;
+            data[1] = (lastPacket ? (1 << 7) : 0x00) | PT;  // M-bit
+            data[2] = (mSeqNo >> 8) & 0xff;
+            data[3] = mSeqNo & 0xff;
+            data[4] = rtpTime >> 24;
+            data[5] = (rtpTime >> 16) & 0xff;
+            data[6] = (rtpTime >> 8) & 0xff;
+            data[7] = rtpTime & 0xff;
+            data[8] = mSourceID >> 24;
+            data[9] = (mSourceID >> 16) & 0xff;
+            data[10] = (mSourceID >> 8) & 0xff;
+            data[11] = mSourceID & 0xff;
+
+            /*  H265 payload header is 16 bit
+                 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
+                +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                |F|     Type  |  Layer ID | TID |
+                +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            */
+            ALOGV("H265 payload header 0x%x %x", mediaData[0], mediaData[1]);
+            // excludes Type from 1st byte of H265 payload header.
+            data[12] = mediaData[0] & 0x81;
+            // fills Type as FU (49 == 0x31)
+            data[12] = data[12] | (0x31 << 1);
+            data[13] = mediaData[1];
+
+            ALOGV("H265 FU header 0x%x %x", data[12], data[13]);
+
+            CHECK(!firstPacket || !lastPacket);
+            /*
+                FU INDICATOR HDR
+                0 1 2 3 4 5 6 7
+                +-+-+-+-+-+-+-+
+                |S|E|   Type  |
+                +-+-+-+-+-+-+-+
+            */
+
+            data[14] =
+                (firstPacket ? 0x80 : 0x00)
+                | (lastPacket ? 0x40 : 0x00)
+                | (nalType & H265_NALU_MASK);
+            ALOGV("H265 FU indicator 0x%x", data[14]);
+
+            memcpy(&data[15], &mediaData[offset], size);
+
+            buffer->setRange(0, 15 + size);
+
+            send(buffer, false /* isRTCP */);
+
+            ++mSeqNo;
+            ++mNumRTPSent;
+            mNumRTPOctetsSent += buffer->size() - 12;
+
+            firstPacket = false;
+            offset += size;
+        }
+    }
+
+    mLastRTPTime = rtpTime;
+    mLastNTPTime = GetNowNTP();
+
 }
 
 void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
