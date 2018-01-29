@@ -20,8 +20,6 @@ import static android.content.Context.NOTIFICATION_SERVICE;
 
 import android.app.NotificationManager;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2;
 import android.media.MediaSessionService2;

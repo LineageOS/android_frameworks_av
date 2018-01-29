@@ -16,8 +16,6 @@
 
 package com.android.media;
 
-import android.media.IMediaSession2;
-import android.media.IMediaSession2Callback;
 import android.media.MediaLibraryService2.BrowserRoot;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
 import android.media.MediaSession2;
@@ -35,7 +33,9 @@ import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
 import android.util.ArrayMap;
 import android.util.Log;
+
 import com.android.media.MediaSession2Impl.ControllerInfoImpl;
+
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;

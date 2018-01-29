@@ -21,8 +21,6 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.media.IMediaSession2;
-import android.media.IMediaSession2Callback;
 import android.media.MediaController2.PlaybackInfo;
 import android.media.MediaItem2;
 import android.media.MediaSession2;

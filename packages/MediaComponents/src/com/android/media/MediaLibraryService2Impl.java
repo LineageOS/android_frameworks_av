@@ -18,7 +18,6 @@ package com.android.media;
 
 import android.app.PendingIntent;
 import android.content.Context;
-import android.content.Intent;
 import android.media.MediaLibraryService2;
 import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;

@@ -25,7 +25,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
-import android.media.IMediaSession2;
 import android.media.MediaLibraryService2;
 import android.media.MediaSessionService2;
 import android.media.SessionToken2;

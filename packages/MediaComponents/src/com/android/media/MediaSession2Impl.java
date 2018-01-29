@@ -27,8 +27,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
-import android.media.AudioAttributes;
-import android.media.IMediaSession2Callback;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2;
 import android.media.MediaPlayerInterface;
@@ -108,17 +106,17 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mSessionStub = new MediaSession2Stub(this);
 
         // Infer type from the id and package name.
-        String sessionService = getServiceName(context, MediaSessionService2.SERVICE_INTERFACE, id);
         String libraryService = getServiceName(context, MediaLibraryService2.SERVICE_INTERFACE, id);
+        String sessionService = getServiceName(context, MediaSessionService2.SERVICE_INTERFACE, id);
         if (sessionService != null && libraryService != null) {
             throw new IllegalArgumentException("Ambiguous session type. Multiple"
                     + " session services define the same id=" + id);
-        } else if (sessionService != null) {
-            mSessionToken = new SessionToken2(context, Process.myUid(), TYPE_SESSION_SERVICE,
-                    mContext.getPackageName(), sessionService, id, mSessionStub);
         } else if (libraryService != null) {
             mSessionToken = new SessionToken2(context, Process.myUid(), TYPE_LIBRARY_SERVICE,
                     mContext.getPackageName(), libraryService, id, mSessionStub);
+        } else if (sessionService != null) {
+            mSessionToken = new SessionToken2(context, Process.myUid(), TYPE_SESSION_SERVICE,
+                    mContext.getPackageName(), sessionService, id, mSessionStub);
         } else {
             mSessionToken = new SessionToken2(context, Process.myUid(), TYPE_SESSION,
                     mContext.getPackageName(), null, id, mSessionStub);
