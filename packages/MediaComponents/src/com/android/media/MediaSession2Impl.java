@@ -112,14 +112,14 @@ public class MediaSession2Impl implements MediaSession2Provider {
             throw new IllegalArgumentException("Ambiguous session type. Multiple"
                     + " session services define the same id=" + id);
         } else if (libraryService != null) {
-            mSessionToken = new SessionToken2(context, Process.myUid(), TYPE_LIBRARY_SERVICE,
-                    mContext.getPackageName(), libraryService, id, mSessionStub);
+            mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_LIBRARY_SERVICE,
+                    mContext.getPackageName(), libraryService, id, mSessionStub).getInstance();
         } else if (sessionService != null) {
-            mSessionToken = new SessionToken2(context, Process.myUid(), TYPE_SESSION_SERVICE,
-                    mContext.getPackageName(), sessionService, id, mSessionStub);
+            mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_SESSION_SERVICE,
+                    mContext.getPackageName(), sessionService, id, mSessionStub).getInstance();
         } else {
-            mSessionToken = new SessionToken2(context, Process.myUid(), TYPE_SESSION,
-                    mContext.getPackageName(), null, id, mSessionStub);
+            mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_SESSION,
+                    mContext.getPackageName(), null, id, mSessionStub).getInstance();
         }
 
         // Only remember player. Actual settings will be done in the initialize().

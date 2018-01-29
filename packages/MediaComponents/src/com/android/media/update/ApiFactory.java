@@ -145,10 +145,8 @@ public class ApiFactory implements StaticProvider {
 
     @Override
     public SessionToken2Provider createSessionToken2(Context context, SessionToken2 instance,
-            int uid, int type, String packageName, String serviceName, String id,
-            IInterface sessionBinderInterface) {
-        return new SessionToken2Impl(context, instance, uid, type, packageName,
-                serviceName, id, (IMediaSession2) sessionBinderInterface);
+            String packageName, String serviceName, int uid) {
+        return new SessionToken2Impl(context, instance, packageName, serviceName, uid);
     }
 
     @Override

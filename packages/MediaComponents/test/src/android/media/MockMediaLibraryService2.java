@@ -18,6 +18,8 @@ package android.media;
 
 import static junit.framework.Assert.fail;
 
+import static org.junit.Assert.assertEquals;
+
 import android.content.Context;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
@@ -70,8 +72,9 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
     public static SessionToken2 getToken(Context context) {
         synchronized (MockMediaLibraryService2.class) {
             if (sToken == null) {
-                sToken = new SessionToken2(context, SessionToken2.TYPE_LIBRARY_SERVICE,
-                        context.getPackageName(), MockMediaLibraryService2.class.getName());
+                sToken = new SessionToken2(context, context.getPackageName(),
+                        MockMediaLibraryService2.class.getName());
+                assertEquals(SessionToken2.TYPE_LIBRARY_SERVICE, sToken.getType());
             }
             return sToken;
         }

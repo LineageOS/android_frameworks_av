@@ -50,49 +50,63 @@ public class SessionToken2Impl implements SessionToken2Provider {
     private final String mId;
     private final IMediaSession2 mSessionBinder;
 
-    public SessionToken2Impl(Context context, SessionToken2 instance, int uid, int type,
-            String packageName, String serviceName, String id, IMediaSession2 sessionBinder) {
-        // TODO(jaewan): Add sanity check
+    /**
+     * Public constructor for the legacy support (i.e. browser can try connecting to any browser service
+     * if it knows the service name)
+     */
+    public SessionToken2Impl(Context context, SessionToken2 instance,
+            String packageName, String serviceName, int uid) {
+        if (TextUtils.isEmpty(packageName)) {
+            throw new IllegalArgumentException("package name shouldn't be null");
+        }
+        if (TextUtils.isEmpty(serviceName)) {
+            throw new IllegalArgumentException("service name shouldn't be null");
+        }
         mInstance = instance;
+        // Calculate uid if it's not specified.
+        final PackageManager manager = context.getPackageManager();
         if (uid < 0) {
-            PackageManager manager = context.getPackageManager();
             try {
                 uid = manager.getPackageUid(packageName, 0);
             } catch (NameNotFoundException e) {
-                throw new IllegalArgumentException("Invalid uid=" + uid);
+                throw new IllegalArgumentException("Cannot find package " + packageName);
             }
         }
+        mUid = uid;
+        // calculate id and type
+        Intent serviceIntent = new Intent(MediaLibraryService2.SERVICE_INTERFACE);
+        serviceIntent.setClassName(packageName, serviceName);
+        String id = getSessionId(manager.resolveService(serviceIntent,
+                PackageManager.GET_META_DATA));
+        int type = TYPE_LIBRARY_SERVICE;
+        if (id == null) {
+            // retry with session service
+            serviceIntent.setClassName(packageName, serviceName);
+            id = getSessionId(manager.resolveService(serviceIntent,
+                    PackageManager.GET_META_DATA));
+            type = TYPE_SESSION_SERVICE;
+        }
+        if (id == null) {
+            throw new IllegalArgumentException("service " + serviceName + " doesn't implement"
+                    + " session service nor library service");
+        }
+        mId = id;
+        mType = type;
+        mPackageName = packageName;
+        mServiceName = serviceName;
+        mSessionBinder = null;
+    }
+
+    public SessionToken2Impl(Context context, int uid, int type,
+            String packageName, String serviceName, String id, IMediaSession2 sessionBinder) {
+        // TODO(jaewan): Add sanity check
         mUid = uid;
         mType = type;
         mPackageName = packageName;
         mServiceName = serviceName;
-        if (id == null && !TextUtils.isEmpty(mServiceName)) {
-            // Will be called for an app with no
-            PackageManager manager = context.getPackageManager();
-            String action;
-            switch (type) {
-                case TYPE_SESSION_SERVICE:
-                    action = MediaSessionService2.SERVICE_INTERFACE;
-                    break;
-                case TYPE_LIBRARY_SERVICE:
-                    action = MediaLibraryService2.SERVICE_INTERFACE;
-                    break;
-                default:
-                    throw new IllegalArgumentException("Invalid type");
-            }
-            Intent serviceIntent = new Intent(action);
-            serviceIntent.setClassName(packageName, serviceName);
-            id = getSessionId(manager.resolveService(serviceIntent,
-                    PackageManager.GET_META_DATA));
-            if (id == null) {
-                throw new IllegalArgumentException("service " + serviceName + " doesn't implement"
-                        + serviceIntent.getAction());
-            }
-        } else if (id == null) {
-            throw new IllegalArgumentException("ID shouldn't be null");
-        }
         mId = id;
         mSessionBinder = sessionBinder;
+        mInstance = new SessionToken2(this);
     }
 
     public static String getSessionId(ResolveInfo resolveInfo) {
@@ -104,6 +118,10 @@ public class SessionToken2Impl implements SessionToken2Provider {
             return resolveInfo.serviceInfo.metaData.getString(
                     MediaSessionService2.SERVICE_META_DATA, "");
         }
+    }
+
+    public SessionToken2 getInstance() {
+        return mInstance;
     }
 
     @Override
@@ -168,8 +186,9 @@ public class SessionToken2Impl implements SessionToken2Provider {
         // TODO(jaewan): Revisit here when we add connection callback to the session for individual
         //               controller's permission check. With it, sessionBinder should be available
         //               if and only if for session, not session service.
-        return new SessionToken2(context, uid, type, packageName, serviceName, id,
-                sessionBinder != null ? IMediaSession2.Stub.asInterface(sessionBinder) : null);
+        return new SessionToken2Impl(context, uid, type, packageName, serviceName, id,
+                sessionBinder != null ? IMediaSession2.Stub.asInterface(sessionBinder) : null)
+                .getInstance();
     }
 
     @Override
