@@ -71,6 +71,8 @@ public class MediaController2Impl implements MediaController2Provider {
     private boolean mIsReleased;
     @GuardedBy("mLock")
     private PlaybackState2 mPlaybackState;
+    @GuardedBy("mLock")
+    private PlaylistParams mPlaylistParams;
 
     // Assignment should be used with the lock hold, but should be used without a lock to prevent
     // potential deadlock.
@@ -244,14 +246,14 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     private void sendTransportControlCommand(int commandCode) {
-        sendTransportControlCommand(commandCode, 0);
+        sendTransportControlCommand(commandCode, null);
     }
 
-    private void sendTransportControlCommand(int commandCode, long arg) {
+    private void sendTransportControlCommand(int commandCode, Bundle args) {
         final IMediaSession2 binder = mSessionBinder;
         if (binder != null) {
             try {
-                binder.sendTransportControlCommand(mSessionCallbackStub, commandCode, arg);
+                binder.sendTransportControlCommand(mSessionCallbackStub, commandCode, args);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -354,13 +356,17 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void seekTo_impl(long pos) {
-        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO, pos);
+        Bundle args = new Bundle();
+        args.putLong(MediaSession2Stub.ARGUMENT_KEY_POSITION, pos);
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO, args);
     }
 
     @Override
     public void setCurrentPlaylistItem_impl(int index) {
+        Bundle args = new Bundle();
+        args.putInt(MediaSession2Stub.ARGUMENT_KEY_ITEM_INDEX, index);
         sendTransportControlCommand(
-                MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM, index);
+                MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM, args);
     }
 
     @Override
@@ -381,14 +387,20 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public PlaylistParams getPlaylistParam_impl() {
-        // TODO(jaewan): Implement
-        return null;
+    public PlaylistParams getPlaylistParams_impl() {
+        synchronized (mLock) {
+            return mPlaylistParams;
+        }
     }
 
     @Override
     public void setPlaylistParams_impl(PlaylistParams params) {
-        // TODO(hdmoon): Implement
+        if (params == null) {
+            throw new IllegalArgumentException("PlaylistParams should not be null!");
+        }
+        Bundle args = new Bundle();
+        args.putBundle(MediaSession2Stub.ARGUMENT_KEY_PLAYLIST_PARAMS, params.toBundle());
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS, args);
     }
 
     ///////////////////////////////////////////////////
@@ -397,13 +409,25 @@ public class MediaController2Impl implements MediaController2Provider {
     private void pushPlaybackStateChanges(final PlaybackState2 state) {
         synchronized (mLock) {
             mPlaybackState = state;
-            mCallbackExecutor.execute(() -> {
-                if (!mInstance.isConnected()) {
-                    return;
-                }
-                mCallback.onPlaybackStateChanged(state);
-            });
         }
+        mCallbackExecutor.execute(() -> {
+            if (!mInstance.isConnected()) {
+                return;
+            }
+            mCallback.onPlaybackStateChanged(state);
+        });
+    }
+
+    private void pushPlaylistParamsChanges(final PlaylistParams params) {
+        synchronized (mLock) {
+            mPlaylistParams = params;
+        }
+        mCallbackExecutor.execute(() -> {
+            if (!mInstance.isConnected()) {
+                return;
+            }
+            mCallback.onPlaylistParamsChanged(params);
+        });
     }
 
     // Called when the result for connecting to the session was delivered.
@@ -508,13 +532,7 @@ public class MediaController2Impl implements MediaController2Provider {
                 Log.w(TAG, "Don't fail silently here. Highly likely a bug");
                 return;
             }
-            controller.getCallbackExecutor().execute(() -> {
-                final MediaController2Impl impl = mController.get();
-                if (impl == null) {
-                    return;
-                }
-                impl.mCallback.onPlaylistParamsChanged(PlaylistParams.fromBundle(params));
-            });
+            controller.pushPlaylistParamsChanges(PlaylistParams.fromBundle(params));
         }
 
         @Override
