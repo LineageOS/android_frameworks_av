@@ -60,7 +60,7 @@ MediaAnalyticsItem::MediaAnalyticsItem()
       mPkgVersionCode(0),
       mSessionID(MediaAnalyticsItem::SessionIDNone),
       mTimestamp(0),
-      mFinalized(0),
+      mFinalized(1),
       mPropCount(0), mPropSize(0), mProps(NULL)
 {
     mKey = MediaAnalyticsItem::kKeyNone;
@@ -72,7 +72,7 @@ MediaAnalyticsItem::MediaAnalyticsItem(MediaAnalyticsItem::Key key)
       mPkgVersionCode(0),
       mSessionID(MediaAnalyticsItem::SessionIDNone),
       mTimestamp(0),
-      mFinalized(0),
+      mFinalized(1),
       mPropCount(0), mPropSize(0), mProps(NULL)
 {
     if (DEBUG_ALLOCATIONS) {
@@ -135,16 +135,6 @@ MediaAnalyticsItem *MediaAnalyticsItem::dup() {
     }
 
     return dst;
-}
-
-// so clients can send intermediate values to be overlaid later
-MediaAnalyticsItem &MediaAnalyticsItem::setFinalized(bool value) {
-    mFinalized = value;
-    return *this;
-}
-
-bool MediaAnalyticsItem::getFinalized() const {
-    return mFinalized;
 }
 
 MediaAnalyticsItem &MediaAnalyticsItem::setSessionID(MediaAnalyticsItem::SessionID_t id) {
@@ -636,7 +626,10 @@ int32_t MediaAnalyticsItem::readFromParcel(const Parcel& data) {
     mPkgName = data.readCString();
     mPkgVersionCode = data.readInt64();
     mSessionID = data.readInt64();
+    // We no longer pay attention to user setting of finalized, BUT it's
+    // still part of the wire packet -- so read & discard.
     mFinalized = data.readInt32();
+    mFinalized = 1;
     mTimestamp = data.readInt64();
 
     int count = data.readInt32();
@@ -977,9 +970,6 @@ bool MediaAnalyticsItem::merge(MediaAnalyticsItem *incoming) {
     } else if (mSessionID == 0) {
         mSessionID = incoming->mSessionID;
     }
-
-    // we always take the more recent 'finalized' value
-    setFinalized(incoming->getFinalized());
 
     // for each attribute from 'incoming', resolve appropriately
     int nattr = incoming->mPropCount;
