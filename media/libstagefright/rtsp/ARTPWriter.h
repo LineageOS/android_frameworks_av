@@ -106,6 +106,7 @@ private:
 
     enum {
         INVALID,
+        H265,
         H264,
         H263,
         AMR_NB,
@@ -125,6 +126,7 @@ private:
 
     void sendBye();
     void sendSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs);
+    void sendHEVCData(MediaBufferBase *mediaBuf);
     void sendAVCData(MediaBufferBase *mediaBuf);
     void sendH263Data(MediaBufferBase *mediaBuf);
     void sendAMRData(MediaBufferBase *mediaBuf);
