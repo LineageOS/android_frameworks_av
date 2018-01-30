@@ -452,7 +452,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                     + ", mTargetState=" + mTargetState + ", " + view.toString());
         }
         if (mMediaControlView != null) {
-            mMediaControlView.hide();
+            mMediaControlView.setVisibility(View.GONE);
         }
     }
 
@@ -674,9 +674,9 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
     private void toggleMediaControlViewVisibility() {
         if (mMediaControlView.isShowing()) {
-            mMediaControlView.hide();
+            mMediaControlView.setVisibility(View.GONE);
         } else {
-            mMediaControlView.show();
+            mMediaControlView.setVisibility(View.VISIBLE);
         }
     }
 
@@ -763,14 +763,17 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                 if (needToStart()) {
                     mMediaController.getTransportControls().play();
                     if (mMediaControlView != null) {
-                        mMediaControlView.show();
+                        mMediaControlView.setVisibility(View.VISIBLE);
                     }
                 } else if (!(isInPlaybackState() && mMediaPlayer.isPlaying())
                         && (seekToPosition != 0 || mMediaPlayer.getCurrentPosition() > 0)) {
                     if (mMediaControlView != null) {
                         // Show the media controls when we're paused into a video and
                         // make them stick.
-                        mMediaControlView.show(0);
+                        long currTimeout = mMediaControlView.getTimeout();
+                        mMediaControlView.setTimeout(0L);
+                        mMediaControlView.setVisibility(View.VISIBLE);
+                        mMediaControlView.setTimeout(currTimeout);
                     }
                 }
             } else {
@@ -834,7 +837,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                     updatePlaybackState();
 
                     if (mMediaControlView != null) {
-                        mMediaControlView.hide();
+                        mMediaControlView.setVisibility(View.GONE);
                     }
 
                     /* If an error handler has been supplied, use it and finish. */
