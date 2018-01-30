@@ -127,7 +127,7 @@ void RemoteMediaExtractor::setUID(uid_t uid) {
 }
 
 status_t RemoteMediaExtractor::setMediaCas(const HInterfaceToken &casToken) {
-    return mExtractor->setMediaCas(casToken);
+    return mExtractor->setMediaCas((uint8_t*)casToken.data(), casToken.size());
 }
 
 const char * RemoteMediaExtractor::name() {
