@@ -58,7 +58,7 @@ template<typename T> class SortedVector;
 #define AUDIO_SINK_MIN_DEEP_BUFFER_DURATION_US 5000000
 
 // abstract base class - use MediaPlayer2Interface
-class MediaPlayer2Base : public AHandler
+class MediaPlayer2Interface : public AHandler
 {
 public:
     // callback mechanism for passing messages to MediaPlayer2 object
@@ -148,14 +148,15 @@ public:
         virtual status_t    enableAudioDeviceCallback(bool enabled);
     };
 
-                        MediaPlayer2Base() : mClient(0), mNotify(0) {}
-    virtual             ~MediaPlayer2Base() {}
+                        MediaPlayer2Interface() : mClient(0), mNotify(0) { }
+    virtual             ~MediaPlayer2Interface() { }
     virtual status_t    initCheck() = 0;
-    virtual bool        hardwareOutput() = 0;
 
     virtual status_t    setUID(uid_t /* uid */) {
         return INVALID_OPERATION;
     }
+
+    virtual void        setAudioSink(const sp<AudioSink>& audioSink) { mAudioSink = audioSink; }
 
     virtual status_t    setDataSource(
             const sp<MediaHTTPService> &httpService,
@@ -234,7 +235,7 @@ public:
     virtual status_t getRetransmitEndpoint(struct sockaddr_in* /* endpoint */) {
         return INVALID_OPERATION;
     }
-    virtual status_t setNextPlayer(const sp<MediaPlayer2Base>& /* next */) {
+    virtual status_t setNextPlayer(const sp<MediaPlayer2Interface>& /* next */) {
         return OK;
     }
 
@@ -292,33 +293,15 @@ public:
         return INVALID_OPERATION;
     }
 
+protected:
+    sp<AudioSink>       mAudioSink;
+
 private:
     friend class MediaPlayer2Manager;
 
     Mutex                  mNotifyLock;
     wp<MediaPlayer2Engine> mClient;
     NotifyCallback         mNotify;
-};
-
-// Implement this class for media players that use the AudioFlinger software mixer
-class MediaPlayer2Interface : public MediaPlayer2Base
-{
-public:
-    virtual             ~MediaPlayer2Interface() { }
-    virtual bool        hardwareOutput() { return false; }
-    virtual void        setAudioSink(const sp<AudioSink>& audioSink) { mAudioSink = audioSink; }
-protected:
-    sp<AudioSink>       mAudioSink;
-};
-
-// Implement this class for media players that output audio directly to hardware
-class MediaPlayer2HWInterface : public MediaPlayer2Base
-{
-public:
-    virtual             ~MediaPlayer2HWInterface() {}
-    virtual bool        hardwareOutput() { return true; }
-    virtual status_t    setVolume(float leftVolume, float rightVolume) = 0;
-    virtual status_t    setAudioStreamType(audio_stream_type_t streamType) = 0;
 };
 
 }; // namespace android

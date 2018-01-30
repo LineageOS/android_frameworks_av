@@ -35,15 +35,15 @@ struct NuPlayer2::Renderer : public AHandler {
         FLAG_REAL_TIME = 1,
         FLAG_OFFLOAD_AUDIO = 2,
     };
-    Renderer(const sp<MediaPlayer2Base::AudioSink> &sink,
+    Renderer(const sp<MediaPlayer2Interface::AudioSink> &sink,
              const sp<MediaClock> &mediaClock,
              const sp<AMessage> &notify,
              uint32_t flags = 0);
 
     static size_t AudioSinkCallback(
-            MediaPlayer2Base::AudioSink *audioSink,
+            MediaPlayer2Interface::AudioSink *audioSink,
             void *data, size_t size, void *me,
-            MediaPlayer2Base::AudioSink::cb_event_t event);
+            MediaPlayer2Interface::AudioSink::cb_event_t event);
 
     void queueBuffer(
             bool audio,
@@ -148,7 +148,7 @@ private:
 
     static const int64_t kMinPositionUpdateDelayUs;
 
-    sp<MediaPlayer2Base::AudioSink> mAudioSink;
+    sp<MediaPlayer2Interface::AudioSink> mAudioSink;
     bool mUseVirtualAudioSink;
     sp<AMessage> mNotify;
     Mutex mLock;
