@@ -21,7 +21,7 @@
 #include "AMRExtractor.h"
 
 #include <media/DataSource.h>
-#include <media/MediaSource.h>
+#include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
@@ -31,7 +31,7 @@
 
 namespace android {
 
-class AMRSource : public MediaSource {
+class AMRSource : public MediaSourceBase {
 public:
     AMRSource(const sp<DataSource> &source,
               const sp<MetaData> &meta,
@@ -186,7 +186,7 @@ size_t AMRExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-sp<MediaSource> AMRExtractor::getTrack(size_t index) {
+MediaSourceBase *AMRExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }

@@ -897,13 +897,13 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                 mRouteSessionCallback.onCommand(command, args, receiver);
             } else {
                 switch (command) {
-                    case MediaControlView2Impl.COMMAND_SHOW_SUBTITLE:
+                    case MediaControlView2.COMMAND_SHOW_SUBTITLE:
                         mInstance.showSubtitle();
                         break;
-                    case MediaControlView2Impl.COMMAND_HIDE_SUBTITLE:
+                    case MediaControlView2.COMMAND_HIDE_SUBTITLE:
                         mInstance.hideSubtitle();
                         break;
-                    case MediaControlView2Impl.COMMAND_SET_FULLSCREEN:
+                    case MediaControlView2.COMMAND_SET_FULLSCREEN:
                         if (mOnFullScreenRequestListener != null) {
                             mOnFullScreenRequestListener.onFullScreenRequest(
                                     mInstance,

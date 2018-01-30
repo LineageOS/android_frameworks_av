@@ -60,7 +60,9 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
         // per test thread differs across the {@link MediaSession2} with the same TAG.
         final MockPlayer player = new MockPlayer(1);
         mSession = new MediaSession2.Builder(mContext, player)
-                .setSessionCallback(sHandlerExecutor, new SessionCallback()).setId(TAG).build();
+                .setSessionCallback(sHandlerExecutor, new SessionCallback(mContext))
+                .setId(TAG)
+                .build();
         ensureChangeInSession();
     }
 
@@ -109,7 +111,7 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
         sHandler.postAndSync(() -> {
             mSession.close();
             mSession = new MediaSession2.Builder(mContext, new MockPlayer(0)).setId(TAG)
-                    .setSessionCallback(sHandlerExecutor, new SessionCallback() {
+                    .setSessionCallback(sHandlerExecutor, new SessionCallback(mContext) {
                         @Override
                         public MediaSession2.CommandGroup onConnect(ControllerInfo controller) {
                             // Reject all connection request.

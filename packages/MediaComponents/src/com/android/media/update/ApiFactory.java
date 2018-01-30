@@ -20,26 +20,29 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
-import android.media.IMediaSession2;
+import android.media.DataSourceDesc;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaController2;
 import android.media.MediaController2.ControllerCallback;
+import android.media.MediaItem2;
 import android.media.MediaLibraryService2;
 import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
+import android.media.MediaMetadata2;
 import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
+import android.media.MediaSession2.Command;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
-import android.media.IMediaSession2Callback;
 import android.media.SessionPlayer2;
 import android.media.SessionToken2;
 import android.media.VolumeProvider;
 import android.media.update.MediaBrowser2Provider;
 import android.media.update.MediaControlView2Provider;
 import android.media.update.MediaController2Provider;
+import android.media.update.MediaItem2Provider;
 import android.media.update.MediaLibraryService2Provider.MediaLibrarySessionProvider;
 import android.media.update.MediaSession2Provider;
 import android.media.update.MediaSessionService2Provider;
@@ -55,8 +58,11 @@ import android.util.AttributeSet;
 import android.widget.MediaControlView2;
 import android.widget.VideoView2;
 
+import com.android.media.IMediaSession2;
+import com.android.media.IMediaSession2Callback;
 import com.android.media.MediaBrowser2Impl;
 import com.android.media.MediaController2Impl;
+import com.android.media.MediaItem2Impl;
 import com.android.media.MediaLibraryService2Impl;
 import com.android.media.MediaLibraryService2Impl.MediaLibrarySessionImpl;
 import com.android.media.MediaSession2Impl;
@@ -105,6 +111,20 @@ public class ApiFactory implements StaticProvider {
     }
 
     @Override
+    public MediaSession2Provider.CommandProvider createMediaSession2Command(Command instance,
+            int commandCode, String action, Bundle extra) {
+        if (action == null && extra == null) {
+            return new MediaSession2Impl.CommandImpl(instance, commandCode);
+        }
+        return new MediaSession2Impl.CommandImpl(instance, action, extra);
+    }
+
+    @Override
+    public Command fromBundle_MediaSession2Command(Context context, Bundle command) {
+        return MediaSession2Impl.CommandImpl.fromBundle_impl(context, command);
+    }
+
+    @Override
     public MediaSessionService2Provider createMediaSessionService2(
             MediaSessionService2 instance) {
         return new MediaSessionService2Impl(instance);
@@ -140,20 +160,29 @@ public class ApiFactory implements StaticProvider {
 
     @Override
     public SessionToken2Provider createSessionToken2(Context context, SessionToken2 instance,
-            int uid, int type, String packageName, String serviceName, String id,
-            IInterface sessionBinderInterface) {
-        return new SessionToken2Impl(context, instance, uid, type, packageName,
-                serviceName, id, (IMediaSession2) sessionBinderInterface);
+            String packageName, String serviceName, int uid) {
+        return new SessionToken2Impl(context, instance, packageName, serviceName, uid);
     }
 
     @Override
     public SessionToken2 SessionToken2_fromBundle(Context context, Bundle bundle) {
-        return SessionToken2Impl.fromBundle(context, bundle);
+        return SessionToken2Impl.fromBundle_impl(context, bundle);
     }
 
     @Override
     public SessionPlayer2Provider createSessionPlayer2(Context context, SessionPlayer2 instance) {
         // TODO(jaewan): Implement this
         return null;
+    }
+
+    @Override
+    public MediaItem2Provider createMediaItem2Provider(Context context, MediaItem2 instance,
+            String mediaId, DataSourceDesc dsd, MediaMetadata2 metadata, int flags) {
+        return new MediaItem2Impl(context, instance, mediaId, dsd, metadata, flags);
+    }
+
+    @Override
+    public MediaItem2 fromBundle_MediaItem2(Context context, Bundle bundle) {
+        return MediaItem2Impl.fromBundle(context, bundle);
     }
 }

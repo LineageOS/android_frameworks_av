@@ -17,7 +17,6 @@
 package com.android.media;
 
 import android.content.Context;
-import android.media.IMediaSession2;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaSession2.CommandButton;

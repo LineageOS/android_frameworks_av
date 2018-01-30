@@ -25,7 +25,7 @@
 #include "XINGSeeker.h"
 
 #include <media/DataSource.h>
-#include <media/MediaSource.h>
+#include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/avc_utils.h>
@@ -209,7 +209,7 @@ static bool Resync(
     return valid;
 }
 
-class MP3Source : public MediaSource {
+class MP3Source : public MediaSourceBase {
 public:
     MP3Source(
             const sp<MetaData> &meta, const sp<DataSource> &source,
@@ -407,7 +407,7 @@ size_t MP3Extractor::countTracks() {
     return mInitCheck != OK ? 0 : 1;
 }
 
-sp<MediaSource> MP3Extractor::getTrack(size_t index) {
+MediaSourceBase *MP3Extractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }

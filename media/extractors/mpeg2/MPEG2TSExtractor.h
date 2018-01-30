@@ -20,7 +20,7 @@
 
 #include <media/stagefright/foundation/ABase.h>
 #include <media/MediaExtractor.h>
-#include <media/MediaSource.h>
+#include <media/MediaSourceBase.h>
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
@@ -40,7 +40,7 @@ struct MPEG2TSExtractor : public MediaExtractor {
     explicit MPEG2TSExtractor(const sp<DataSource> &source);
 
     virtual size_t countTracks();
-    virtual sp<MediaSource> getTrack(size_t index);
+    virtual MediaSourceBase *getTrack(size_t index);
     virtual sp<MetaData> getTrackMetaData(size_t index, uint32_t flags);
 
     virtual sp<MetaData> getMetaData();

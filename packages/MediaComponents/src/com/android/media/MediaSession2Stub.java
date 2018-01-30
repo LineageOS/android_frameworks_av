@@ -16,8 +16,8 @@
 
 package com.android.media;
 
-import android.media.IMediaSession2;
-import android.media.IMediaSession2Callback;
+import android.content.Context;
+import android.media.MediaItem2;
 import android.media.MediaLibraryService2.BrowserRoot;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
 import android.media.MediaSession2;
@@ -25,20 +25,30 @@ import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
+import android.media.MediaSession2.PlaylistParams;
 import android.media.PlaybackState2;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
 import android.util.ArrayMap;
 import android.util.Log;
+
 import com.android.media.MediaSession2Impl.ControllerInfoImpl;
+
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
 public class MediaSession2Stub extends IMediaSession2.Stub {
+
+    static final String ARGUMENT_KEY_POSITION = "android.media.media_session2.key_position";
+    static final String ARGUMENT_KEY_ITEM_INDEX = "android.media.media_session2.key_item_index";
+    static final String ARGUMENT_KEY_PLAYLIST_PARAMS =
+            "android.media.media_session2.key_playlist_params";
+
     private static final String TAG = "MediaSession2Stub";
     private static final boolean DEBUG = true; // TODO(jaewan): Rename.
 
@@ -83,7 +93,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     public void connect(String callingPackage, final IMediaSession2Callback callback)
             throws RuntimeException {
         final MediaSession2Impl sessionImpl = getSession();
-        final ControllerInfo request = new ControllerInfo(sessionImpl.getContext(),
+        final Context context = sessionImpl.getContext();
+        final ControllerInfo request = new ControllerInfo(context,
                 Binder.getCallingUid(), Binder.getCallingPid(), callingPackage, callback);
         sessionImpl.getCallbackExecutor().execute(() -> {
             final MediaSession2Impl session = mSession.get();
@@ -102,7 +113,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 }
                 if (allowedCommands == null) {
                     // For trusted apps, send non-null allowed commands to keep connection.
-                    allowedCommands = new CommandGroup();
+                    allowedCommands = new CommandGroup(context);
                 }
             }
             if (DEBUG) {
@@ -154,7 +165,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void sendTransportControlCommand(IMediaSession2Callback caller,
-            int commandCode, long arg) throws RuntimeException {
+            int commandCode, Bundle args) throws RuntimeException {
         final MediaSession2Impl sessionImpl = getSession();
         final ControllerInfo controller = getController(caller);
         if (controller == null) {
@@ -169,7 +180,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 return;
             }
             // TODO(jaewan): Sanity check.
-            Command command = new Command(commandCode);
+            Command command = new Command(session.getContext(), commandCode);
             boolean accepted = session.getCallback().onCommandRequest(controller, command);
             if (!accepted) {
                 // Don't run rejected command.
@@ -206,14 +217,41 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     session.getInstance().rewind();
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO:
-                    session.getInstance().seekTo(arg);
+                    session.getInstance().seekTo(args.getLong(ARGUMENT_KEY_POSITION));
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM:
-                    session.getInstance().setCurrentPlaylistItem((int) arg);
+                    session.getInstance().setCurrentPlaylistItem(
+                            args.getInt(ARGUMENT_KEY_ITEM_INDEX));
+                    break;
+                case MediaSession2.COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS:
+                    session.getInstance().setPlaylistParams(
+                            PlaylistParams.fromBundle(
+                                    args.getBundle(ARGUMENT_KEY_PLAYLIST_PARAMS)));
                     break;
                 default:
                     // TODO(jaewan): Resend unknown (new) commands through the custom command.
             }
+        });
+    }
+
+    @Override
+    public void sendCustomCommand(final IMediaSession2Callback caller, final Bundle commandBundle,
+            final Bundle args, final ResultReceiver receiver) {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            final Command command = Command.fromBundle(session.getContext(), commandBundle);
+            session.getCallback().onCustomCommand(controller, command, args, receiver);
         });
     }
 
@@ -255,6 +293,9 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     private ControllerInfo getController(IMediaSession2Callback caller) {
+        // TODO(jaewan): Device a way to return connection-in-progress-controller
+        //               to be included here, because session owner may want to send some datas
+        //               while onConnected() hasn't returned.
         synchronized (mLock) {
             return mControllers.get(caller.asBinder());
         }
@@ -307,6 +348,32 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         }
     }
 
+    public void notifyPlaylistChanged(List<MediaItem2> playlist) {
+        if (playlist == null) {
+            return;
+        }
+        final List<Bundle> bundleList = new ArrayList<>();
+        for (int i = 0; i < playlist.size(); i++) {
+            if (playlist.get(i) != null) {
+                Bundle bundle = playlist.get(i).toBundle();
+                if (bundle != null) {
+                    bundleList.add(bundle);
+                }
+            }
+        }
+        final List<ControllerInfo> list = getControllers();
+        for (int i = 0; i < list.size(); i++) {
+            IMediaSession2Callback callbackBinder =
+                    ControllerInfoImpl.from(list.get(i)).getControllerBinder();
+            try {
+                callbackBinder.onPlaylistChanged(bundleList);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Controller is gone", e);
+                // TODO(jaewan): What to do when the controller is gone?
+            }
+        }
+    }
+
     public void notifyPlaylistParamsChanged(MediaSession2.PlaylistParams params) {
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
@@ -318,6 +385,46 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 Log.w(TAG, "Controller is gone", e);
                 // TODO(jaewan): What to do when the controller is gone?
             }
+        }
+    }
+
+    public void sendCustomCommand(ControllerInfo controller, Command command, Bundle args,
+            ResultReceiver receiver) {
+        if (receiver != null && controller == null) {
+            throw new IllegalArgumentException("Controller shouldn't be null if result receiver is"
+                    + " specified");
+        }
+        if (command == null) {
+            throw new IllegalArgumentException("command shouldn't be null");
+        }
+        final IMediaSession2Callback callbackBinder =
+                ControllerInfoImpl.from(controller).getControllerBinder();
+        if (getController(callbackBinder) == null) {
+            throw new IllegalArgumentException("Controller is gone");
+        }
+        sendCustomCommandInternal(controller, command, args, receiver);
+    }
+
+    public void sendCustomCommand(Command command, Bundle args) {
+        if (command == null) {
+            throw new IllegalArgumentException("command shouldn't be null");
+        }
+        final List<ControllerInfo> controllers = getControllers();
+        for (int i = 0; i < controllers.size(); i++) {
+            sendCustomCommand(controllers.get(i), command, args, null);
+        }
+    }
+
+    private void sendCustomCommandInternal(ControllerInfo controller, Command command, Bundle args,
+            ResultReceiver receiver) {
+        final IMediaSession2Callback callbackBinder =
+                ControllerInfoImpl.from(controller).getControllerBinder();
+        try {
+            Bundle commandBundle = command.toBundle();
+            callbackBinder.sendCustomCommand(commandBundle, args, receiver);
+        } catch (RemoteException e) {
+            Log.w(TAG, "Controller is gone", e);
+            // TODO(jaewan): What to do when the controller is gone?
         }
     }
 }

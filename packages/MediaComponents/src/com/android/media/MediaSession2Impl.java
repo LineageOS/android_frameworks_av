@@ -20,6 +20,8 @@ import static android.media.SessionToken2.TYPE_LIBRARY_SERVICE;
 import static android.media.SessionToken2.TYPE_SESSION;
 import static android.media.SessionToken2.TYPE_SESSION_SERVICE;
 
+import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.Manifest.permission;
 import android.app.PendingIntent;
 import android.content.Context;
@@ -27,8 +29,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
-import android.media.AudioAttributes;
-import android.media.IMediaSession2Callback;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2;
 import android.media.MediaPlayerInterface;
@@ -79,11 +79,14 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private MediaPlayerInterface mPlayer;
     @GuardedBy("mLock")
     private MyPlaybackListener mListener;
+    @GuardedBy("mLock")
     private PlaylistParams mPlaylistParams;
+    @GuardedBy("mLock")
+    private List<MediaItem2> mPlaylist;
 
     /**
      * Can be only called by the {@link Builder#build()}.
-     * 
+     *
      * @param instance
      * @param context
      * @param player
@@ -108,20 +111,20 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mSessionStub = new MediaSession2Stub(this);
 
         // Infer type from the id and package name.
-        String sessionService = getServiceName(context, MediaSessionService2.SERVICE_INTERFACE, id);
         String libraryService = getServiceName(context, MediaLibraryService2.SERVICE_INTERFACE, id);
+        String sessionService = getServiceName(context, MediaSessionService2.SERVICE_INTERFACE, id);
         if (sessionService != null && libraryService != null) {
             throw new IllegalArgumentException("Ambiguous session type. Multiple"
                     + " session services define the same id=" + id);
-        } else if (sessionService != null) {
-            mSessionToken = new SessionToken2(context, Process.myUid(), TYPE_SESSION_SERVICE,
-                    mContext.getPackageName(), sessionService, id, mSessionStub);
         } else if (libraryService != null) {
-            mSessionToken = new SessionToken2(context, Process.myUid(), TYPE_LIBRARY_SERVICE,
-                    mContext.getPackageName(), libraryService, id, mSessionStub);
+            mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_LIBRARY_SERVICE,
+                    mContext.getPackageName(), libraryService, id, mSessionStub).getInstance();
+        } else if (sessionService != null) {
+            mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_SESSION_SERVICE,
+                    mContext.getPackageName(), sessionService, id, mSessionStub).getInstance();
         } else {
-            mSessionToken = new SessionToken2(context, Process.myUid(), TYPE_SESSION,
-                    mContext.getPackageName(), null, id, mSessionStub);
+            mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_SESSION,
+                    mContext.getPackageName(), null, id, mSessionStub).getInstance();
         }
 
         // Only remember player. Actual settings will be done in the initialize().
@@ -295,7 +298,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (params == null) {
             throw new IllegalArgumentException("PlaylistParams should not be null!");
         }
-        mPlaylistParams = params;
+        ensureCallingThread();
+        ensurePlayer();
+        synchronized (mLock) {
+            mPlaylistParams = params;
+        }
         mPlayer.setPlaylistParams(params);
         mSessionStub.notifyPlaylistParamsChanged(params);
     }
@@ -327,23 +334,33 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public void sendCustomCommand_impl(ControllerInfo controller, Command command, Bundle args,
             ResultReceiver receiver) {
-        // TODO(jaewan): Implement
+        mSessionStub.sendCustomCommand(controller, command, args, receiver);
     }
 
     @Override
     public void sendCustomCommand_impl(Command command, Bundle args) {
-        // TODO(jaewan): Implement
+        mSessionStub.sendCustomCommand(command, args);
     }
 
     @Override
-    public void setPlaylist_impl(List<MediaItem2> playlist, PlaylistParams param) {
-        // TODO(jaewan): Implement
+    public void setPlaylist_impl(List<MediaItem2> playlist) {
+        if (playlist == null) {
+            throw new IllegalArgumentException("Playlist should not be null!");
+        }
+        ensureCallingThread();
+        ensurePlayer();
+        synchronized (mLock) {
+            mPlaylist = playlist;
+        }
+        mPlayer.setPlaylist(playlist);
+        mSessionStub.notifyPlaylistChanged(playlist);
     }
 
     @Override
     public List<MediaItem2> getPlaylist_impl() {
-        // TODO(jaewan): Implement this
-        return null;
+        synchronized (mLock) {
+            return mPlaylist;
+        }
     }
 
     @Override
@@ -502,6 +519,96 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 return;
             }
             session.notifyPlaybackStateChangedNotLocked(state);
+        }
+    }
+
+    public static final class CommandImpl implements CommandProvider {
+        private static final String KEY_COMMAND_CODE
+                = "android.media.media_session2.command.command_code";
+        private static final String KEY_COMMAND_CUSTOM_COMMAND
+                = "android.media.media_session2.command.custom_command";
+        private static final String KEY_COMMAND_EXTRA
+                = "android.media.media_session2.command.extra";
+
+        private final Command mInstance;
+        private final int mCommandCode;
+        // Nonnull if it's custom command
+        private final String mCustomCommand;
+        private final Bundle mExtra;
+
+        public CommandImpl(Command instance, int commandCode) {
+            mInstance = instance;
+            mCommandCode = commandCode;
+            mCustomCommand = null;
+            mExtra = null;
+        }
+
+        public CommandImpl(Command instance, @NonNull String action, @Nullable Bundle extra) {
+            if (action == null) {
+                throw new IllegalArgumentException("action shouldn't be null");
+            }
+            mInstance = instance;
+            mCommandCode = MediaSession2.COMMAND_CODE_CUSTOM;
+            mCustomCommand = action;
+            mExtra = extra;
+        }
+
+        public int getCommandCode_impl() {
+            return mCommandCode;
+        }
+
+        public @Nullable String getCustomCommand_impl() {
+            return mCustomCommand;
+        }
+
+        public @Nullable Bundle getExtra_impl() {
+            return mExtra;
+        }
+
+        /**
+         * @ 7return a new Bundle instance from the Command
+         */
+        public Bundle toBundle_impl() {
+            Bundle bundle = new Bundle();
+            bundle.putInt(KEY_COMMAND_CODE, mCommandCode);
+            bundle.putString(KEY_COMMAND_CUSTOM_COMMAND, mCustomCommand);
+            bundle.putBundle(KEY_COMMAND_EXTRA, mExtra);
+            return bundle;
+        }
+
+        /**
+         * @return a new Command instance from the Bundle
+         */
+        public static Command fromBundle_impl(Context context, Bundle command) {
+            int code = command.getInt(KEY_COMMAND_CODE);
+            if (code != MediaSession2.COMMAND_CODE_CUSTOM) {
+                return new Command(context, code);
+            } else {
+                String customCommand = command.getString(KEY_COMMAND_CUSTOM_COMMAND);
+                if (customCommand == null) {
+                    return null;
+                }
+                return new Command(context, customCommand, command.getBundle(KEY_COMMAND_EXTRA));
+            }
+        }
+
+        @Override
+        public boolean equals_impl(Object obj) {
+            if (!(obj instanceof CommandImpl)) {
+                return false;
+            }
+            CommandImpl other = (CommandImpl) obj;
+            // TODO(jaewan): Should we also compare contents in bundle?
+            //               It may not be possible if the bundle contains private class.
+            return mCommandCode == other.mCommandCode
+                    && TextUtils.equals(mCustomCommand, other.mCustomCommand);
+        }
+
+        @Override
+        public int hashCode_impl() {
+            final int prime = 31;
+            return ((mCustomCommand != null)
+                    ? mCustomCommand.hashCode() : 0) * prime + mCommandCode;
         }
     }
 

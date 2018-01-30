@@ -21,9 +21,11 @@ import static junit.framework.Assert.assertTrue;
 
 import android.content.Context;
 import android.media.MediaController2.ControllerCallback;
+import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandGroup;
 import android.os.Bundle;
 import android.os.HandlerThread;
+import android.os.ResultReceiver;
 import android.support.annotation.CallSuper;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -59,13 +61,13 @@ abstract class MediaSession2TestBase {
 
     interface TestControllerCallbackInterface {
         // Add methods in ControllerCallback/BrowserCallback that you want to test.
+        default void onPlaylistChanged(List<MediaItem2> playlist) {}
         default void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {}
 
         // Currently empty. Add methods in ControllerCallback/BrowserCallback that you want to test.
         default void onPlaybackStateChanged(PlaybackState2 state) { }
 
-        // Browser specific callbacks
-        default void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {}
+        default void onCustomCommand(Command command, Bundle args, ResultReceiver receiver) {}
     }
 
     interface WaitForConnectionInterface {
@@ -151,7 +153,10 @@ abstract class MediaSession2TestBase {
     }
 
     TestControllerInterface onCreateController(@NonNull SessionToken2 token,
-            @NonNull TestControllerCallbackInterface callback) {
+            @Nullable TestControllerCallbackInterface callback) {
+        if (callback == null) {
+            callback = new TestControllerCallbackInterface() {};
+        }
         return new TestMediaController(mContext, token, new TestControllerCallback(callback));
     }
 
@@ -161,7 +166,10 @@ abstract class MediaSession2TestBase {
         public final CountDownLatch connectLatch = new CountDownLatch(1);
         public final CountDownLatch disconnectLatch = new CountDownLatch(1);
 
-        TestControllerCallback(TestControllerCallbackInterface callbackProxy) {
+        TestControllerCallback(@NonNull TestControllerCallbackInterface callbackProxy) {
+            if (callbackProxy == null) {
+                throw new IllegalArgumentException("Callback proxy shouldn't be null. Test bug");
+            }
             mCallbackProxy = callbackProxy;
         }
 
@@ -182,9 +190,13 @@ abstract class MediaSession2TestBase {
         @Override
         public void onPlaybackStateChanged(PlaybackState2 state) {
             super.onPlaybackStateChanged(state);
-            if (mCallbackProxy != null) {
-                mCallbackProxy.onPlaybackStateChanged(state);
-            }
+            mCallbackProxy.onPlaybackStateChanged(state);
+        }
+
+        @Override
+        public void onCustomCommand(Command command, Bundle args, ResultReceiver receiver) {
+            super.onCustomCommand(command, args, receiver);
+            mCallbackProxy.onCustomCommand(command, args, receiver);
         }
 
         @Override
@@ -206,8 +218,17 @@ abstract class MediaSession2TestBase {
         }
 
         @Override
+        public void onPlaylistChanged(List<MediaItem2> params) {
+            if (mCallbackProxy != null) {
+                mCallbackProxy.onPlaylistChanged(params);
+            }
+        }
+
+        @Override
         public void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {
-            mCallbackProxy.onPlaylistParamsChanged(params);
+            if (mCallbackProxy != null) {
+                mCallbackProxy.onPlaylistParamsChanged(params);
+            }
         }
     }
 

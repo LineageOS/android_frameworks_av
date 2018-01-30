@@ -20,8 +20,6 @@ import static android.content.Context.NOTIFICATION_SERVICE;
 
 import android.app.NotificationManager;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2;
 import android.media.MediaSessionService2;
@@ -83,8 +81,11 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
                 NOTIFICATION_SERVICE);
         mStartSelfIntent = new Intent(mInstance, mInstance.getClass());
 
-        SessionToken2 token = new SessionToken2(mInstance, getSessionType(),
-                mInstance.getPackageName(), mInstance.getClass().getName());
+        SessionToken2 token = new SessionToken2(mInstance, mInstance.getPackageName(),
+                mInstance.getClass().getName());
+        if (token.getType() != getSessionType()) {
+            throw new RuntimeException("Expected session service, but was " + token.getType());
+        }
         mSession = mInstance.onCreateSession(token.getId());
         if (mSession == null || !token.getId().equals(mSession.getToken().getId())) {
             throw new RuntimeException("Expected session with id " + token.getId()

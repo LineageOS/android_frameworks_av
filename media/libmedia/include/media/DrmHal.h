@@ -97,10 +97,12 @@ struct DrmHal : public BnDrm,
                                               Vector<uint8_t> &wrappedKey);
 
     virtual status_t getSecureStops(List<Vector<uint8_t>> &secureStops);
+    virtual status_t getSecureStopIds(List<Vector<uint8_t>> &secureStopIds);
     virtual status_t getSecureStop(Vector<uint8_t> const &ssid, Vector<uint8_t> &secureStop);
 
     virtual status_t releaseSecureStops(Vector<uint8_t> const &ssRelease);
-    virtual status_t releaseAllSecureStops();
+    virtual status_t removeSecureStop(Vector<uint8_t> const &ssid);
+    virtual status_t removeAllSecureStops();
 
     virtual status_t getHdcpLevels(DrmPlugin::HdcpLevel *connectedLevel,
             DrmPlugin::HdcpLevel *maxLevel) const;

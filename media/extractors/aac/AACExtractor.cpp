@@ -20,7 +20,7 @@
 
 #include "AACExtractor.h"
 #include <media/DataSource.h>
-#include <media/MediaSource.h>
+#include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -33,7 +33,7 @@
 
 namespace android {
 
-class AACSource : public MediaSource {
+class AACSource : public MediaSourceBase {
 public:
     AACSource(const sp<DataSource> &source,
               const sp<MetaData> &meta,
@@ -207,7 +207,7 @@ size_t AACExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-sp<MediaSource> AACExtractor::getTrack(size_t index) {
+MediaSourceBase *AACExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }

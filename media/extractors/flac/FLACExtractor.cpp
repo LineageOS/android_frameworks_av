@@ -23,7 +23,7 @@
 #include "FLAC/stream_decoder.h"
 
 #include <media/DataSource.h>
-#include <media/MediaSource.h>
+#include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/base64.h>
@@ -161,7 +161,7 @@ static void parseVorbisComment(
 
 class FLACParser;
 
-class FLACSource : public MediaSource {
+class FLACSource : public MediaSourceBase {
 
 public:
     FLACSource(
@@ -936,7 +936,7 @@ size_t FLACExtractor::countTracks()
     return mInitCheck == OK ? 1 : 0;
 }
 
-sp<MediaSource> FLACExtractor::getTrack(size_t index)
+MediaSourceBase *FLACExtractor::getTrack(size_t index)
 {
     if (mInitCheck != OK || index > 0) {
         return NULL;

@@ -23,15 +23,18 @@ import static android.media.TestUtils.createPlaybackState;
 
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2.Builder;
+import android.media.MediaSession2.Command;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.os.Bundle;
 import android.os.Looper;
 import android.os.Process;
+import android.os.ResultReceiver;
 import android.support.annotation.NonNull;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
+import android.text.TextUtils;
 
 import java.util.ArrayList;
 import org.junit.After;
@@ -40,6 +43,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -62,7 +66,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
         super.setUp();
         mPlayer = new MockPlayer(0);
         mSession = new MediaSession2.Builder(mContext, mPlayer)
-                .setSessionCallback(sHandlerExecutor, new SessionCallback()).build();
+                .setSessionCallback(sHandlerExecutor, new SessionCallback(mContext)).build();
     }
 
     @After
@@ -138,6 +142,30 @@ public class MediaSession2Test extends MediaSession2TestBase {
             mSession.skipToPrevious();
             assertTrue(mPlayer.mSkipToPreviousCalled);
         });
+    }
+
+    @Test
+    public void testSetPlaylist() throws Exception {
+        final List<MediaItem2> playlist = new ArrayList<>();
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
+            @Override
+            public void onPlaylistChanged(List<MediaItem2> givenList) {
+                assertMediaItemListEquals(playlist, givenList);
+                latch.countDown();
+            }
+        };
+
+        final MediaController2 controller = createController(mSession.getToken(), true, callback);
+        mSession.setPlaylist(playlist);
+
+        assertTrue(mPlayer.mSetPlaylistCalled);
+        assertMediaItemListEquals(playlist, mPlayer.mPlaylist);
+        assertMediaItemListEquals(playlist, mSession.getPlaylist());
+
+        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+        assertMediaItemListEquals(playlist, controller.getPlaylist());
     }
 
     @Test
@@ -265,7 +293,53 @@ public class MediaSession2Test extends MediaSession2TestBase {
         waitForDisconnect(controller, true);
     }
 
+    @Test
+    public void testSendCustomAction() throws InterruptedException {
+        final Command testCommand =
+                new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE);
+        final Bundle testArgs = new Bundle();
+        testArgs.putString("args", "testSendCustomAction");
+
+        final CountDownLatch latch = new CountDownLatch(2);
+        final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
+            @Override
+            public void onCustomCommand(Command command, Bundle args, ResultReceiver receiver) {
+                assertEquals(testCommand, command);
+                assertTrue(TestUtils.equals(testArgs, args));
+                assertNull(receiver);
+                latch.countDown();
+            }
+        };
+        final MediaController2 controller =
+                createController(mSession.getToken(), true, callback);
+        // TODO(jaewan): Test with multiple controllers
+        mSession.sendCustomCommand(testCommand, testArgs);
+
+        ControllerInfo controllerInfo = getTestControllerInfo();
+        assertNotNull(controllerInfo);
+        // TODO(jaewan): Test receivers as well.
+        mSession.sendCustomCommand(controllerInfo, testCommand, testArgs, null);
+        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+    }
+
+    private ControllerInfo getTestControllerInfo() {
+        List<ControllerInfo> controllers = mSession.getConnectedControllers();
+        assertNotNull(controllers);
+        final String packageName = mContext.getPackageName();
+        for (int i = 0; i < controllers.size(); i++) {
+            if (TextUtils.equals(packageName, controllers.get(i).getPackageName())) {
+                return controllers.get(i);
+            }
+        }
+        fail("Fails to get custom command");
+        return null;
+    }
+
     public class MockOnConnectCallback extends SessionCallback {
+        public MockOnConnectCallback() {
+            super(mContext);
+        }
+
         @Override
         public MediaSession2.CommandGroup onConnect(ControllerInfo controllerInfo) {
             if (Process.myUid() != controllerInfo.getUid()) {
@@ -282,6 +356,10 @@ public class MediaSession2Test extends MediaSession2TestBase {
     public class MockOnCommandCallback extends SessionCallback {
         public final ArrayList<MediaSession2.Command> commands = new ArrayList<>();
 
+        public MockOnCommandCallback() {
+            super(mContext);
+        }
+
         @Override
         public boolean onCommandRequest(ControllerInfo controllerInfo, MediaSession2.Command command) {
             assertEquals(mContext.getPackageName(), controllerInfo.getPackageName());
@@ -292,6 +370,30 @@ public class MediaSession2Test extends MediaSession2TestBase {
                 return false;
             }
             return true;
+        }
+    }
+
+    private static void assertMediaItemListEquals(List<MediaItem2> a, List<MediaItem2> b) {
+        if (a == null || b == null) {
+            assertEquals(a, b);
+        }
+        assertEquals(a.size(), b.size());
+
+        for (int i = 0; i < a.size(); i++) {
+            MediaItem2 aItem = a.get(i);
+            MediaItem2 bItem = b.get(i);
+
+            if (aItem == null || bItem == null) {
+                assertEquals(aItem, bItem);
+                continue;
+            }
+
+            assertEquals(aItem.getMediaId(), bItem.getMediaId());
+            assertEquals(aItem.getFlags(), bItem.getFlags());
+            TestUtils.equals(aItem.getMetadata().getBundle(), bItem.getMetadata().getBundle());
+
+            // Note: Here it does not check whether DataSourceDesc are equal,
+            // since there DataSourceDec is not comparable.
         }
     }
 }
