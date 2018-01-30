@@ -1427,7 +1427,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
     // Explicit routing?
     sp<DeviceDescriptor> deviceDesc;
     if (*selectedDeviceId != AUDIO_PORT_HANDLE_NONE) {
-        deviceDesc = mAvailableOutputDevices.getDeviceFromId(*selectedDeviceId);
+        deviceDesc = mAvailableInputDevices.getDeviceFromId(*selectedDeviceId);
     }
     mInputRoutes.addRoute(session, SessionRoute::STREAM_TYPE_NA, inputSource, deviceDesc, uid);
 
