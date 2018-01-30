@@ -87,7 +87,7 @@ const NuPlayer2::Renderer::PcmInfo NuPlayer2::Renderer::AUDIO_PCMINFO_INITIALIZE
 const int64_t NuPlayer2::Renderer::kMinPositionUpdateDelayUs = 100000ll;
 
 NuPlayer2::Renderer::Renderer(
-        const sp<MediaPlayer2Base::AudioSink> &sink,
+        const sp<MediaPlayer2Interface::AudioSink> &sink,
         const sp<MediaClock> &mediaClock,
         const sp<AMessage> &notify,
         uint32_t flags)
@@ -805,28 +805,28 @@ void NuPlayer2::Renderer::notifyIfMediaRenderingStarted_l() {
 
 // static
 size_t NuPlayer2::Renderer::AudioSinkCallback(
-        MediaPlayer2Base::AudioSink * /* audioSink */,
+        MediaPlayer2Interface::AudioSink * /* audioSink */,
         void *buffer,
         size_t size,
         void *cookie,
-        MediaPlayer2Base::AudioSink::cb_event_t event) {
+        MediaPlayer2Interface::AudioSink::cb_event_t event) {
     NuPlayer2::Renderer *me = (NuPlayer2::Renderer *)cookie;
 
     switch (event) {
-        case MediaPlayer2Base::AudioSink::CB_EVENT_FILL_BUFFER:
+        case MediaPlayer2Interface::AudioSink::CB_EVENT_FILL_BUFFER:
         {
             return me->fillAudioBuffer(buffer, size);
             break;
         }
 
-        case MediaPlayer2Base::AudioSink::CB_EVENT_STREAM_END:
+        case MediaPlayer2Interface::AudioSink::CB_EVENT_STREAM_END:
         {
             ALOGV("AudioSink::CB_EVENT_STREAM_END");
             me->notifyEOSCallback();
             break;
         }
 
-        case MediaPlayer2Base::AudioSink::CB_EVENT_TEAR_DOWN:
+        case MediaPlayer2Interface::AudioSink::CB_EVENT_TEAR_DOWN:
         {
             ALOGV("AudioSink::CB_EVENT_TEAR_DOWN");
             me->notifyAudioTearDown(kDueToError);
