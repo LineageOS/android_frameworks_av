@@ -16,6 +16,7 @@
 
 package com.android.media;
 
+import android.content.Context;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2.BrowserRoot;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
@@ -92,7 +93,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     public void connect(String callingPackage, final IMediaSession2Callback callback)
             throws RuntimeException {
         final MediaSession2Impl sessionImpl = getSession();
-        final ControllerInfo request = new ControllerInfo(sessionImpl.getContext(),
+        final Context context = sessionImpl.getContext();
+        final ControllerInfo request = new ControllerInfo(context,
                 Binder.getCallingUid(), Binder.getCallingPid(), callingPackage, callback);
         sessionImpl.getCallbackExecutor().execute(() -> {
             final MediaSession2Impl session = mSession.get();
@@ -111,7 +113,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 }
                 if (allowedCommands == null) {
                     // For trusted apps, send non-null allowed commands to keep connection.
-                    allowedCommands = new CommandGroup();
+                    allowedCommands = new CommandGroup(context);
                 }
             }
             if (DEBUG) {
@@ -178,7 +180,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 return;
             }
             // TODO(jaewan): Sanity check.
-            Command command = new Command(commandCode);
+            Command command = new Command(session.getContext(), commandCode);
             boolean accepted = session.getCallback().onCommandRequest(controller, command);
             if (!accepted) {
                 // Don't run rejected command.
@@ -248,7 +250,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (session == null) {
                 return;
             }
-            final Command command = Command.fromBundle(commandBundle);
+            final Command command = Command.fromBundle(session.getContext(), commandBundle);
             session.getCallback().onCustomCommand(controller, command, args, receiver);
         });
     }

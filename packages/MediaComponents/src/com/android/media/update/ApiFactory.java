@@ -32,6 +32,7 @@ import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
 import android.media.MediaMetadata2;
 import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
+import android.media.MediaSession2.Command;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
@@ -110,6 +111,20 @@ public class ApiFactory implements StaticProvider {
     }
 
     @Override
+    public MediaSession2Provider.CommandProvider createMediaSession2Command(Command instance,
+            int commandCode, String action, Bundle extra) {
+        if (action == null && extra == null) {
+            return new MediaSession2Impl.CommandImpl(instance, commandCode);
+        }
+        return new MediaSession2Impl.CommandImpl(instance, action, extra);
+    }
+
+    @Override
+    public Command fromBundle_MediaSession2Command(Context context, Bundle command) {
+        return MediaSession2Impl.CommandImpl.fromBundle_impl(context, command);
+    }
+
+    @Override
     public MediaSessionService2Provider createMediaSessionService2(
             MediaSessionService2 instance) {
         return new MediaSessionService2Impl(instance);
@@ -151,7 +166,7 @@ public class ApiFactory implements StaticProvider {
 
     @Override
     public SessionToken2 SessionToken2_fromBundle(Context context, Bundle bundle) {
-        return SessionToken2Impl.fromBundle(context, bundle);
+        return SessionToken2Impl.fromBundle_impl(context, bundle);
     }
 
     @Override

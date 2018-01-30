@@ -91,6 +91,10 @@ public class MockMediaSessionService2 extends MediaSessionService2 {
     }
 
     private class MySessionCallback extends SessionCallback {
+        public MySessionCallback() {
+            super(MockMediaSessionService2.this);
+        }
+
         @Override
         public MediaSession2.CommandGroup onConnect(ControllerInfo controller) {
             if (Process.myUid() != controller.getUid()) {

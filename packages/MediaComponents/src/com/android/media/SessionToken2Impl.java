@@ -152,7 +152,7 @@ public class SessionToken2Impl implements SessionToken2Provider {
         return mSessionBinder;
     }
 
-    public static SessionToken2 fromBundle(Context context, Bundle bundle) {
+    public static SessionToken2 fromBundle_impl(Context context, Bundle bundle) {
         if (bundle == null) {
             return null;
         }
