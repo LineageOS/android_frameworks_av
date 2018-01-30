@@ -28,9 +28,9 @@ import android.media.MediaController2.ControllerCallback;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2;
 import android.media.MediaLibraryService2.MediaLibrarySession;
+import android.media.MediaLibraryService2.MediaLibrarySessionBuilder;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
 import android.media.MediaMetadata2;
-import android.media.MediaMetadata2.Builder;
 import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
@@ -50,6 +50,7 @@ import android.media.update.MediaItem2Provider;
 import android.media.update.MediaLibraryService2Provider.MediaLibrarySessionProvider;
 import android.media.update.MediaMetadata2Provider;
 import android.media.update.MediaSession2Provider;
+import android.media.update.MediaSession2Provider.BuilderBaseProvider;
 import android.media.update.MediaSession2Provider.PlaylistParamsProvider;
 import android.media.update.MediaSessionService2Provider;
 import android.media.update.SessionPlayer2Provider;
@@ -103,15 +104,6 @@ public class ApiFactory implements StaticProvider {
     }
 
     @Override
-    public MediaSession2Provider createMediaSession2(Context context, MediaSession2 instance,
-            MediaPlayerInterface player, String id, VolumeProvider volumeProvider,
-            int ratingType, PendingIntent sessionActivity, Executor callbackExecutor,
-            SessionCallback callback) {
-        return new MediaSession2Impl(context, instance, player, id, volumeProvider, ratingType,
-                sessionActivity, callbackExecutor, callback);
-    }
-
-    @Override
     public MediaSession2Provider.CommandProvider createMediaSession2Command(
             Command instance, int commandCode, String action, Bundle extra) {
         if (action == null && extra == null) {
@@ -158,6 +150,11 @@ public class ApiFactory implements StaticProvider {
         return PlaylistParamsImpl.fromBundle(context, bundle);
     }
 
+    public BuilderBaseProvider<MediaSession2, SessionCallback> createMediaSession2Builder(
+            Context context, MediaSession2.Builder instance, MediaPlayerInterface player) {
+        return new MediaSession2Impl.BuilderImpl(context, instance, player);
+    }
+
     @Override
     public MediaSessionService2Provider createMediaSessionService2(
             MediaSessionService2 instance) {
@@ -171,12 +168,12 @@ public class ApiFactory implements StaticProvider {
     }
 
     @Override
-    public MediaLibrarySessionProvider createMediaLibraryService2MediaLibrarySession(
-            Context context, MediaLibrarySession instance, MediaPlayerInterface player,
-            String id, VolumeProvider volumeProvider, int ratingType, PendingIntent sessionActivity,
+    public BuilderBaseProvider<MediaLibrarySession, MediaLibrarySessionCallback>
+        createMediaLibraryService2Builder(
+            Context context, MediaLibrarySessionBuilder instance, MediaPlayerInterface player,
             Executor callbackExecutor, MediaLibrarySessionCallback callback) {
-        return new MediaLibrarySessionImpl(context, instance, player, id, volumeProvider,
-                ratingType, sessionActivity, callbackExecutor, callback);
+        return new MediaLibraryService2Impl.BuilderImpl(context, instance, player, callbackExecutor,
+                callback);
     }
 
     @Override

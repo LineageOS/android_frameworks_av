@@ -101,11 +101,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
      * @param ratingType
      * @param sessionActivity
      */
-    public MediaSession2Impl(Context context, MediaSession2 instance, MediaPlayerInterface player,
+    public MediaSession2Impl(Context context, MediaPlayerInterface player,
             String id, VolumeProvider volumeProvider, int ratingType, PendingIntent sessionActivity,
             Executor callbackExecutor, SessionCallback callback) {
-        mInstance = instance;
         // TODO(jaewan): Keep other params.
+        mInstance = createInstance();
 
         // Argument checks are done by builder already.
         // Initialize finals first.
@@ -113,8 +113,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mId = id;
         mCallback = callback;
         mCallbackExecutor = callbackExecutor;
-        // Only remember player. Actual settings will be done in the initialize().
-        mPlayer = player;
         mSessionStub = new MediaSession2Stub(this);
 
         // Infer type from the id and package name.
@@ -133,6 +131,24 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_SESSION,
                     mContext.getPackageName(), null, id, mSessionStub).getInstance();
         }
+
+        setPlayerLocked(player);
+
+        // Ask server for the sanity check, and starts
+        // Sanity check for making session ID unique 'per package' cannot be done in here.
+        // Server can only know if the package has another process and has another session with the
+        // same id. Note that 'ID is unique per package' is important for controller to distinguish
+        // a session in another package.
+        MediaSessionManager manager =
+                (MediaSessionManager) mContext.getSystemService(Context.MEDIA_SESSION_SERVICE);
+        if (!manager.onSessionCreated(mSessionToken)) {
+            throw new IllegalStateException("Session with the same id is already used by"
+                    + " another process. Use MediaController2 instead.");
+        }
+    }
+
+    MediaSession2 createInstance() {
+        return new MediaSession2(this);
     }
 
     private static String getServiceName(Context context, String serviceAction, String id) {
@@ -158,24 +174,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
             }
         }
         return serviceName;
-    }
-
-    @Override
-    public void initialize() {
-        synchronized (mLock) {
-            setPlayerLocked(mPlayer);
-        }
-        // Ask server for the sanity check, and starts
-        // Sanity check for making session ID unique 'per package' cannot be done in here.
-        // Server can only know if the package has another process and has another session with the
-        // same id. Note that 'ID is unique per package' is important for controller to distinguish
-        // a session in another package.
-        MediaSessionManager manager =
-                (MediaSessionManager) mContext.getSystemService(Context.MEDIA_SESSION_SERVICE);
-        if (!manager.onSessionCreated(mSessionToken)) {
-            throw new IllegalStateException("Session with the same id is already used by"
-                    + " another process. Use MediaController2 instead.");
-        }
     }
 
     // TODO(jaewan): Add explicit release() and do not remove session object with the
@@ -885,6 +883,91 @@ public class MediaSession2Impl implements MediaSession2Provider {
                     bundle.getInt(KEY_REPEAT_MODE),
                     bundle.getInt(KEY_SHUFFLE_MODE),
                     metadata);
+        }
+    }
+
+    public static abstract class BuilderBaseImpl<T extends MediaSession2, C extends SessionCallback>
+            implements BuilderBaseProvider<T, C> {
+        final Context mContext;
+        final MediaPlayerInterface mPlayer;
+        String mId;
+        Executor mCallbackExecutor;
+        C mCallback;
+        VolumeProvider mVolumeProvider;
+        int mRatingType;
+        PendingIntent mSessionActivity;
+
+        /**
+         * Constructor.
+         *
+         * @param context a context
+         * @param player a player to handle incoming command from any controller.
+         * @throws IllegalArgumentException if any parameter is null, or the player is a
+         *      {@link MediaSession2} or {@link MediaController2}.
+         */
+        // TODO(jaewan): Also need executor
+        public BuilderBaseImpl(Context context, MediaPlayerInterface player) {
+            if (context == null) {
+                throw new IllegalArgumentException("context shouldn't be null");
+            }
+            if (player == null) {
+                throw new IllegalArgumentException("player shouldn't be null");
+            }
+            mContext = context;
+            mPlayer = player;
+            // Ensure non-null
+            mId = "";
+        }
+
+        public void setVolumeProvider_impl(VolumeProvider volumeProvider) {
+            mVolumeProvider = volumeProvider;
+        }
+
+        public void setRatingType_impl(int type) {
+            mRatingType = type;
+        }
+
+        public void setSessionActivity_impl(PendingIntent pi) {
+            mSessionActivity = pi;
+        }
+
+        public void setId_impl(String id) {
+            if (id == null) {
+                throw new IllegalArgumentException("id shouldn't be null");
+            }
+            mId = id;
+        }
+
+        public void setSessionCallback_impl(Executor executor, C callback) {
+            if (executor == null) {
+                throw new IllegalArgumentException("executor shouldn't be null");
+            }
+            if (callback == null) {
+                throw new IllegalArgumentException("callback shouldn't be null");
+            }
+            mCallbackExecutor = executor;
+            mCallback = callback;
+        }
+
+        public abstract T build_impl();
+    }
+
+    public static class BuilderImpl extends BuilderBaseImpl<MediaSession2, SessionCallback> {
+        public BuilderImpl(Context context, Builder instance, MediaPlayerInterface player) {
+            super(context, player);
+        }
+
+        @Override
+        public MediaSession2 build_impl() {
+            if (mCallbackExecutor == null) {
+                mCallbackExecutor = mContext.getMainExecutor();
+            }
+            if (mCallback == null) {
+                mCallback = new SessionCallback(mContext);
+            }
+
+            return new MediaSession2Impl(mContext, mPlayer, mId, mVolumeProvider, mRatingType,
+                    mSessionActivity, mCallbackExecutor, mCallback).getInstance();
         }
     }
 }

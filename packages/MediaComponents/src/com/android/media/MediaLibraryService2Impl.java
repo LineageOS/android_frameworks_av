@@ -20,6 +20,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.media.MediaLibraryService2;
 import android.media.MediaLibraryService2.MediaLibrarySession;
+import android.media.MediaLibraryService2.MediaLibrarySessionBuilder;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
 import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
@@ -29,6 +30,8 @@ import android.media.SessionToken2;
 import android.media.VolumeProvider;
 import android.media.update.MediaLibraryService2Provider;
 import android.os.Bundle;
+
+import com.android.media.MediaSession2Impl.BuilderBaseImpl;
 
 import java.util.concurrent.Executor;
 
@@ -61,17 +64,25 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
 
     public static class MediaLibrarySessionImpl extends MediaSession2Impl
             implements MediaLibrarySessionProvider {
-        private final MediaLibrarySession mInstance;
         private final MediaLibrarySessionCallback mCallback;
 
-        public MediaLibrarySessionImpl(Context context, MediaLibrarySession instance,
+        public MediaLibrarySessionImpl(Context context,
                 MediaPlayerInterface player, String id, VolumeProvider volumeProvider,
                 int ratingType, PendingIntent sessionActivity, Executor callbackExecutor,
                 MediaLibrarySessionCallback callback)  {
-            super(context, instance, player, id, volumeProvider, ratingType, sessionActivity,
+            super(context, player, id, volumeProvider, ratingType, sessionActivity,
                     callbackExecutor, callback);
-            mInstance = instance;
             mCallback = callback;
+        }
+
+        @Override
+        MediaLibrarySession createInstance() {
+            return new MediaLibrarySession(this);
+        }
+
+        @Override
+        MediaLibrarySession getInstance() {
+            return (MediaLibrarySession) super.getInstance();
         }
 
         @Override
@@ -83,6 +94,22 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
         @Override
         public void notifyChildrenChanged_impl(String parentId, Bundle options) {
             // TODO(jaewan): Implements
+        }
+    }
+
+    public static class BuilderImpl
+            extends BuilderBaseImpl<MediaLibrarySession, MediaLibrarySessionCallback> {
+        public BuilderImpl(Context context, MediaLibrarySessionBuilder instance,
+            MediaPlayerInterface player, Executor callbackExecutor,
+            MediaLibrarySessionCallback callback) {
+            super(context, player);
+            setSessionCallback_impl(callbackExecutor, callback);
+        }
+
+        @Override
+        public MediaLibrarySession build_impl() {
+            return new MediaLibrarySessionImpl(mContext, mPlayer, mId, mVolumeProvider, mRatingType,
+                    mSessionActivity, mCallbackExecutor, mCallback).getInstance();
         }
     }
 }
