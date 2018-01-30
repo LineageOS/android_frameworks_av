@@ -74,6 +74,8 @@ public class MediaController2Impl implements MediaController2Provider {
     private List<MediaItem2> mPlaylist;
     @GuardedBy("mLock")
     private PlaylistParams mPlaylistParams;
+    @GuardedBy("mLock")
+    private PlaybackInfo mPlaybackInfo;
 
     // Assignment should be used with the lock hold, but should be used without a lock to prevent
     // potential deadlock.
@@ -293,12 +295,6 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public PlaybackInfo getPlaybackInfo_impl() {
-        // TODO(jaewan): Implement
-        return null;
-    }
-
-    @Override
     public void prepareFromUri_impl(Uri uri, Bundle extras) {
         // TODO(jaewan): Implement
     }
@@ -413,6 +409,13 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
+    public PlaybackInfo getPlaybackInfo_impl() {
+        synchronized (mLock) {
+            return mPlaybackInfo;
+        }
+    }
+
+    @Override
     public void setPlaylistParams_impl(PlaylistParams params) {
         if (params == null) {
             throw new IllegalArgumentException("PlaylistParams should not be null!");
@@ -446,6 +449,18 @@ public class MediaController2Impl implements MediaController2Provider {
                 return;
             }
             mCallback.onPlaylistParamsChanged(params);
+        });
+    }
+
+    private void pushPlaybackInfoChanges(final PlaybackInfo info) {
+        synchronized (mLock) {
+            mPlaybackInfo = info;
+        }
+        mCallbackExecutor.execute(() -> {
+            if (!mInstance.isConnected()) {
+                return;
+            }
+            mCallback.onPlaybackInfoChanged(info);
         });
     }
 
@@ -600,6 +615,19 @@ public class MediaController2Impl implements MediaController2Provider {
             }
             controller.pushPlaylistParamsChanges(
                     PlaylistParams.fromBundle(controller.getContext(), params));
+        }
+
+        @Override
+        public void onPlaybackInfoChanged(Bundle playbackInfo) throws RuntimeException {
+            final MediaController2Impl controller;
+            try {
+                controller = getController();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+                return;
+            }
+            controller.pushPlaybackInfoChanges(
+                    PlaybackInfoImpl.fromBundle(controller.getContext(), playbackInfo));
         }
 
         @Override

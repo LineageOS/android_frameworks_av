@@ -28,7 +28,7 @@ import android.media.MediaSession2;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSessionService2;
 import android.media.SessionToken2;
-import android.media.VolumeProvider;
+import android.media.VolumeProvider2;
 import android.media.update.MediaLibraryService2Provider;
 import android.os.Bundle;
 
@@ -68,7 +68,7 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
         private final MediaLibrarySessionCallback mCallback;
 
         public MediaLibrarySessionImpl(Context context,
-                MediaPlayerInterface player, String id, VolumeProvider volumeProvider,
+                MediaPlayerInterface player, String id, VolumeProvider2 volumeProvider,
                 int ratingType, PendingIntent sessionActivity, Executor callbackExecutor,
                 MediaLibrarySessionCallback callback) {
             super(context, player, id, volumeProvider, ratingType, sessionActivity,

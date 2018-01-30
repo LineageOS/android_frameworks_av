@@ -128,6 +128,13 @@ public class MediaBrowser2Test extends MediaController2Test {
         }
 
         @Override
+        public void onPlaybackInfoChanged(MediaController2.PlaybackInfo info) {
+            if (mCallbackProxy != null) {
+                mCallbackProxy.onPlaybackInfoChanged(info);
+            }
+        }
+
+        @Override
         public void onCustomCommand(Command command, Bundle args, ResultReceiver receiver) {
             super.onCustomCommand(command, args, receiver);
             mCallbackProxy.onCustomCommand(command, args, receiver);

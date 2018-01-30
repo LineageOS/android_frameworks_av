@@ -21,15 +21,19 @@ import static android.media.SessionToken2.TYPE_LIBRARY_SERVICE;
 import static android.media.SessionToken2.TYPE_SESSION;
 import static android.media.SessionToken2.TYPE_SESSION_SERVICE;
 
+import android.Manifest.permission;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.Manifest.permission;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
+import android.media.AudioAttributes;
+import android.media.AudioManager;
+import android.media.MediaController2;
+import android.media.MediaController2.PlaybackInfo;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2;
 import android.media.MediaMetadata2;
@@ -48,14 +52,13 @@ import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
 import android.media.PlaybackState2;
 import android.media.SessionToken2;
-import android.media.VolumeProvider;
+import android.media.VolumeProvider2;
 import android.media.session.MediaSessionManager;
 import android.media.update.MediaSession2Provider;
-import android.media.update.MediaSession2Provider.CommandButtonProvider;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.os.Parcelable;
 import android.os.Process;
-import android.os.IBinder;
 import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
 import android.text.TextUtils;
@@ -80,10 +83,15 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private final SessionCallback mCallback;
     private final MediaSession2Stub mSessionStub;
     private final SessionToken2 mSessionToken;
+    private final AudioManager mAudioManager;
     private final List<PlaybackListenerHolder> mListeners = new ArrayList<>();
 
     @GuardedBy("mLock")
     private MediaPlayerInterface mPlayer;
+    @GuardedBy("mLock")
+    private VolumeProvider2 mVolumeProvider;
+    @GuardedBy("mLock")
+    private PlaybackInfo mPlaybackInfo;
     @GuardedBy("mLock")
     private MyPlaybackListener mListener;
     @GuardedBy("mLock")
@@ -103,8 +111,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
      * @param ratingType
      * @param sessionActivity
      */
-    public MediaSession2Impl(Context context, MediaPlayerInterface player,
-            String id, VolumeProvider volumeProvider, int ratingType, PendingIntent sessionActivity,
+    public MediaSession2Impl(Context context, MediaPlayerInterface player, String id,
+            VolumeProvider2 volumeProvider, int ratingType, PendingIntent sessionActivity,
             Executor callbackExecutor, SessionCallback callback) {
         // TODO(jaewan): Keep other params.
         mInstance = createInstance();
@@ -116,6 +124,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mCallback = callback;
         mCallbackExecutor = callbackExecutor;
         mSessionStub = new MediaSession2Stub(this);
+        mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
 
         // Infer type from the id and package name.
         String libraryService = getServiceName(context, MediaLibraryService2.SERVICE_INTERFACE, id);
@@ -135,6 +144,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         setPlayerLocked(player);
+        mVolumeProvider = volumeProvider;
+        mPlaybackInfo = createPlaybackInfo(volumeProvider, player.getAudioAttributes());
 
         // Ask server for the sanity check, and starts
         // Sanity check for making session ID unique 'per package' cannot be done in here.
@@ -178,12 +189,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
         return serviceName;
     }
 
-    // TODO(jaewan): Add explicit release() and do not remove session object with the
-    //               setPlayer(null). Token can be available when player is null, and
-    //               controller can also attach to session.
     @Override
-    public void setPlayer_impl(MediaPlayerInterface player, VolumeProvider volumeProvider)
-            throws IllegalArgumentException {
+    public void setPlayer_impl(MediaPlayerInterface player) {
         ensureCallingThread();
         if (player == null) {
             throw new IllegalArgumentException("player shouldn't be null");
@@ -191,9 +198,37 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (player == mPlayer) {
             return;
         }
+        PlaybackInfo info =
+                createPlaybackInfo(null /* VolumeProvider */, player.getAudioAttributes());
         synchronized (mLock) {
             setPlayerLocked(player);
+            mVolumeProvider = null;
+            mPlaybackInfo = info;
         }
+        mSessionStub.notifyPlaybackInfoChanged(info);
+    }
+
+    @Override
+    public void setPlayer_impl(MediaPlayerInterface player, VolumeProvider2 volumeProvider)
+            throws IllegalArgumentException {
+        ensureCallingThread();
+        if (player == null) {
+            throw new IllegalArgumentException("player shouldn't be null");
+        }
+        if (volumeProvider == null) {
+            throw new IllegalArgumentException("volumeProvider shouldn't be null");
+        }
+        if (player == mPlayer) {
+            return;
+        }
+
+        PlaybackInfo info = createPlaybackInfo(volumeProvider, player.getAudioAttributes());
+        synchronized (mLock) {
+            setPlayerLocked(player);
+            mVolumeProvider = volumeProvider;
+            mPlaybackInfo = info;
+        }
+        mSessionStub.notifyPlaybackInfoChanged(info);
     }
 
     private void setPlayerLocked(MediaPlayerInterface player) {
@@ -204,6 +239,29 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mPlayer = player;
         mListener = new MyPlaybackListener(this, player);
         player.addPlaybackListener(mCallbackExecutor, mListener);
+    }
+
+    private PlaybackInfo createPlaybackInfo(VolumeProvider2 volumeProvider, AudioAttributes attrs) {
+        PlaybackInfo info;
+        if (volumeProvider == null) {
+            int stream = attrs == null ? AudioManager.STREAM_MUSIC : attrs.getVolumeControlStream();
+            info = PlaybackInfoImpl.createPlaybackInfo(
+                    mContext,
+                    PlaybackInfo.PLAYBACK_TYPE_LOCAL,
+                    attrs,
+                    VolumeProvider2.VOLUME_CONTROL_ABSOLUTE,
+                    mAudioManager.getStreamMaxVolume(stream),
+                    mAudioManager.getStreamVolume(stream));
+        } else {
+            info = PlaybackInfoImpl.createPlaybackInfo(
+                    mContext,
+                    PlaybackInfo.PLAYBACK_TYPE_REMOTE /* ControlType */,
+                    attrs,
+                    volumeProvider.getControlType(),
+                    volumeProvider.getMaxVolume(),
+                    volumeProvider.getCurrentVolume());
+        }
+        return info;
     }
 
     @Override
@@ -320,10 +378,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
     //////////////////////////////////////////////////////////////////////////////////////
     // TODO(jaewan): Implement follows
     //////////////////////////////////////////////////////////////////////////////////////
-    @Override
-    public void setPlayer_impl(MediaPlayerInterface player) {
-        // TODO(jaewan): Implement
-    }
 
     @Override
     public void setAllowedCommands_impl(ControllerInfo controller, CommandGroup commands) {
@@ -1032,7 +1086,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         String mId;
         Executor mCallbackExecutor;
         C mCallback;
-        VolumeProvider mVolumeProvider;
+        VolumeProvider2 mVolumeProvider;
         int mRatingType;
         PendingIntent mSessionActivity;
 
@@ -1058,7 +1112,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mId = "";
         }
 
-        public void setVolumeProvider_impl(VolumeProvider volumeProvider) {
+        public void setVolumeProvider_impl(VolumeProvider2 volumeProvider) {
             mVolumeProvider = volumeProvider;
         }
 

@@ -16,10 +16,16 @@
 
 package android.media;
 
+import static android.media.AudioAttributes.CONTENT_TYPE_MUSIC;
+import static android.media.TestUtils.ensurePlaylistParamsModeEquals;
+
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
 
-import static android.media.TestUtils.ensurePlaylistParamsModeEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
 
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2.Builder;
@@ -36,18 +42,16 @@ import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
 import android.text.TextUtils;
 
-import java.util.ArrayList;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
-import static org.junit.Assert.*;
 
 /**
  * Tests {@link MediaSession2}.
@@ -102,6 +106,48 @@ public class MediaSession2Test extends MediaSession2TestBase {
             mSession.setPlayer(player);
             mSession.close();
         });
+    }
+
+    @Test
+    public void testSetPlayerWithVolumeProvider() throws Exception {
+        MockPlayer player = new MockPlayer(0);
+        AudioAttributes attrs = new AudioAttributes.Builder()
+                .setContentType(CONTENT_TYPE_MUSIC)
+                .build();
+        player.setAudioAttributes(attrs);
+
+        final int maxVolume = 100;
+        final int currentVolume = 23;
+        final int volumeControlType = VolumeProvider2.VOLUME_CONTROL_ABSOLUTE;
+        VolumeProvider2 volumeProvider =
+                new VolumeProvider2(mContext, volumeControlType, maxVolume, currentVolume) { };
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
+            @Override
+            public void onPlaybackInfoChanged(MediaController2.PlaybackInfo info) {
+                assertEquals(MediaController2.PlaybackInfo.PLAYBACK_TYPE_REMOTE,
+                        info.getPlaybackType());
+                assertEquals(attrs, info.getAudioAttributes());
+                assertEquals(volumeControlType, info.getPlaybackType());
+                assertEquals(maxVolume, info.getMaxVolume());
+                assertEquals(currentVolume, info.getCurrentVolume());
+                latch.countDown();
+            }
+        };
+
+        final MediaController2 controller = createController(mSession.getToken(), true, callback);
+        assertNull(controller.getPlaybackInfo());
+
+        mSession.setPlayer(player, volumeProvider);
+        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+
+        MediaController2.PlaybackInfo infoOut = controller.getPlaybackInfo();
+        assertEquals(MediaController2.PlaybackInfo.PLAYBACK_TYPE_REMOTE, infoOut.getPlaybackType());
+        assertEquals(attrs, infoOut.getAudioAttributes());
+        assertEquals(volumeControlType, infoOut.getPlaybackType());
+        assertEquals(maxVolume, infoOut.getMaxVolume());
+        assertEquals(currentVolume, infoOut.getCurrentVolume());
     }
 
     @Test
