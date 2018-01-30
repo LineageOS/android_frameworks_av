@@ -3393,6 +3393,8 @@ bool Camera3Device::HalInterface::valid() {
 }
 
 void Camera3Device::HalInterface::clear() {
+    mHidlSession_3_4.clear();
+    mHidlSession_3_3.clear();
     mHidlSession.clear();
 }
 
