@@ -158,7 +158,7 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
         // TODO(jaewan): Add backward compatibility
         Rating2 rating = null;
         try {
-            rating = Rating2.fromBundle(mBundle.getBundle(key));
+            rating = Rating2.fromBundle(mContext, mBundle.getBundle(key));
         } catch (Exception e) {
             // ignore, value was not a rating
             Log.w(TAG, "Failed to retrieve a key as Rating.", e);

@@ -39,6 +39,7 @@ import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
+import android.media.Rating2;
 import android.media.SessionPlayer2;
 import android.media.SessionToken2;
 import android.media.VolumeProvider;
@@ -74,6 +75,7 @@ import com.android.media.MediaMetadata2Impl;
 import com.android.media.MediaSession2Impl;
 import com.android.media.MediaSession2Impl.PlaylistParamsImpl;
 import com.android.media.MediaSessionService2Impl;
+import com.android.media.Rating2Impl;
 import com.android.media.SessionToken2Impl;
 import com.android.widget.MediaControlView2Impl;
 import com.android.widget.VideoView2Impl;
@@ -233,5 +235,35 @@ public class ApiFactory implements StaticProvider {
     public MediaMetadata2Provider.BuilderProvider createMediaMetadata2Builder(
             Context context, MediaMetadata2.Builder builder, MediaMetadata2 source) {
         return new MediaMetadata2Impl.BuilderImpl(context, builder, source);
+    }
+
+    @Override
+    public Rating2 fromBundle_Rating2(Context context, Bundle bundle) {
+        return Rating2Impl.fromBundle(context, bundle);
+    }
+
+    @Override
+    public Rating2 newUnratedRating_Rating2(Context context, int ratingStyle) {
+        return Rating2Impl.newUnratedRating(context, ratingStyle);
+    }
+
+    @Override
+    public Rating2 newHeartRating_Rating2(Context context, boolean hasHeart) {
+        return Rating2Impl.newHeartRating(context, hasHeart);
+    }
+
+    @Override
+    public Rating2 newThumbRating_Rating2(Context context, boolean thumbIsUp) {
+        return Rating2Impl.newThumbRating(context, thumbIsUp);
+    }
+
+    @Override
+    public Rating2 newStarRating_Rating2(Context context, int starRatingStyle, float starRating) {
+        return Rating2Impl.newStarRating(context, starRatingStyle, starRating);
+    }
+
+    @Override
+    public Rating2 newPercentageRating_Rating2(Context context, float percent) {
+        return Rating2Impl.newPercentageRating(context, percent);
     }
 }

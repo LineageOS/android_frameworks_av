@@ -46,7 +46,7 @@ public class MediaMetadata2Test {
         extra.putString("MediaMetadata2Test", "testBuilder");
         final String title = "title";
         final long discNumber = 10;
-        final Rating2 rating = Rating2.newThumbRating(true);
+        final Rating2 rating = Rating2.newThumbRating(mContext, true);
 
         MediaMetadata2.Builder builder = new Builder(mContext);
         builder.setExtra(extra);
@@ -58,8 +58,6 @@ public class MediaMetadata2Test {
         assertTrue(TestUtils.equals(extra, metadata.getExtra()));
         assertEquals(title, metadata.getString(MediaMetadata2.METADATA_KEY_DISPLAY_TITLE));
         assertEquals(discNumber, metadata.getLong(MediaMetadata2.METADATA_KEY_DISC_NUMBER));
-
-        // TODO(jaewan): Uncomment here when Rating2.equals are there.
-        //assertEquals(rating, metadata.getRating(MediaMetadata2.METADATA_KEY_USER_RATING));
+        assertEquals(rating, metadata.getRating(MediaMetadata2.METADATA_KEY_USER_RATING));
     }
 }
