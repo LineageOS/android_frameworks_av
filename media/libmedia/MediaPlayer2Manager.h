@@ -287,7 +287,7 @@ private:
                                         const sp<media::VolumeShaper::Operation>& operation) override;
         virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) override;
 
-        sp<MediaPlayer2Base>    createPlayer(player2_type playerType);
+        sp<MediaPlayer2Base>    createPlayer();
 
         virtual status_t        setDataSource(
                         const sp<MediaHTTPService> &httpService,
@@ -300,7 +300,7 @@ private:
         virtual status_t        setDataSource(const sp<DataSource> &source);
 
 
-        sp<MediaPlayer2Base>    setDataSource_pre(player2_type playerType);
+        sp<MediaPlayer2Base>    setDataSource_pre();
         status_t                setDataSource_post(const sp<MediaPlayer2Base>& p,
                                                    status_t status);
 
