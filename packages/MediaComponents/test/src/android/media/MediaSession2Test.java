@@ -20,6 +20,7 @@ import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
 
 import static android.media.TestUtils.createPlaybackState;
+import static android.media.TestUtils.ensurePlaylistParamsModeEquals;
 
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2.Builder;
@@ -170,7 +171,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
 
     @Test
     public void testSetPlaylistParams() throws Exception {
-        final PlaylistParams params = new PlaylistParams(
+        final PlaylistParams params = new PlaylistParams(mContext,
                 PlaylistParams.REPEAT_MODE_ALL,
                 PlaylistParams.SHUFFLE_MODE_ALL,
                 null /* PlaylistMetadata */);
@@ -179,7 +180,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
         final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
             @Override
             public void onPlaylistParamsChanged(PlaylistParams givenParams) {
-                TestUtils.equals(params.toBundle(), givenParams.toBundle());
+                ensurePlaylistParamsModeEquals(params, givenParams);
                 latch.countDown();
             }
         };
@@ -187,8 +188,8 @@ public class MediaSession2Test extends MediaSession2TestBase {
         final MediaController2 controller = createController(mSession.getToken(), true, callback);
         mSession.setPlaylistParams(params);
         assertTrue(mPlayer.mSetPlaylistParamsCalled);
-        TestUtils.equals(params.toBundle(), mPlayer.mPlaylistParams.toBundle());
-        TestUtils.equals(params.toBundle(), mSession.getPlaylistParams().toBundle());
+        ensurePlaylistParamsModeEquals(params, mPlayer.mPlaylistParams);
+        ensurePlaylistParamsModeEquals(params, mSession.getPlaylistParams());
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
     }
 

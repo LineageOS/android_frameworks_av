@@ -36,6 +36,7 @@ import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
+import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
 import android.media.SessionPlayer2;
@@ -48,6 +49,7 @@ import android.media.update.MediaItem2Provider;
 import android.media.update.MediaLibraryService2Provider.MediaLibrarySessionProvider;
 import android.media.update.MediaMetadata2Provider;
 import android.media.update.MediaSession2Provider;
+import android.media.update.MediaSession2Provider.PlaylistParamsProvider;
 import android.media.update.MediaSessionService2Provider;
 import android.media.update.SessionPlayer2Provider;
 import android.media.update.SessionToken2Provider;
@@ -70,6 +72,7 @@ import com.android.media.MediaLibraryService2Impl;
 import com.android.media.MediaLibraryService2Impl.MediaLibrarySessionImpl;
 import com.android.media.MediaMetadata2Impl;
 import com.android.media.MediaSession2Impl;
+import com.android.media.MediaSession2Impl.PlaylistParamsImpl;
 import com.android.media.MediaSessionService2Impl;
 import com.android.media.SessionToken2Impl;
 import com.android.widget.MediaControlView2Impl;
@@ -132,11 +135,25 @@ public class ApiFactory implements StaticProvider {
         return MediaSession2Impl.CommandGroupImpl.fromBundle_impl(context, commands);
     }
 
+    @Override
     public MediaSession2Provider.ControllerInfoProvider createMediaSession2ControllerInfo(
             Context context, ControllerInfo instance, int uid, int pid, String packageName,
             IInterface callback) {
         return new MediaSession2Impl.ControllerInfoImpl(context,
                 instance, uid, pid, packageName, (IMediaSession2Callback) callback);
+    }
+
+    @Override
+    public PlaylistParamsProvider createMediaSession2PlaylistParams(Context context,
+            PlaylistParams playlistParams, int repeatMode, int shuffleMode,
+            MediaMetadata2 playlistMetadata) {
+        return new PlaylistParamsImpl(context, playlistParams, repeatMode, shuffleMode,
+                playlistMetadata);
+    }
+
+    @Override
+    public PlaylistParams fromBundle_PlaylistParams(Context context, Bundle bundle) {
+        return PlaylistParamsImpl.fromBundle(context, bundle);
     }
 
     @Override
