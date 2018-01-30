@@ -49,10 +49,6 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     private final MediaControlView2 mInstance;
     private final ViewProvider mSuperProvider;
 
-    static final String COMMAND_SHOW_SUBTITLE = "showSubtitle";
-    static final String COMMAND_HIDE_SUBTITLE = "hideSubtitle";
-    static final String COMMAND_SET_FULLSCREEN = "setFullscreen";
-
     static final String ARGUMENT_KEY_FULLSCREEN = "fullScreen";
 
     static final String KEY_STATE_CONTAINS_SUBTITLE = "StateContainsSubtitle";
@@ -85,7 +81,6 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     private boolean mSubtitleIsEnabled;
     private boolean mContainsSubtitle;
     private boolean mSeekAvailable;
-    private View.OnClickListener mNextListener, mPrevListener;
     private ImageButton mPlayPauseButton;
     private ImageButton mFfwdButton;
     private ImageButton mRewButton;
@@ -144,7 +139,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     }
 
     @Override
-    public void show_impl(int timeout) {
+    public void show_impl(long timeout) {
         if (!mShowing) {
             setProgress();
             if (mPlayPauseButton != null) {
@@ -186,92 +181,65 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     }
 
     @Override
-    public void showSubtitle_impl() {
-        mController.sendCommand(COMMAND_SHOW_SUBTITLE, null, null);
-    }
-
-    @Override
-    public void hideSubtitle_impl() {
-        mController.sendCommand(COMMAND_HIDE_SUBTITLE, null, null);
-    }
-
-    @Override
-    public void setPrevNextListeners_impl(View.OnClickListener next, View.OnClickListener prev) {
-        mNextListener = next;
-        mPrevListener = prev;
-
-        if (mNextButton != null) {
-            mNextButton.setOnClickListener(mNextListener);
-            mNextButton.setEnabled(mNextListener != null);
-            mNextButton.setVisibility(View.VISIBLE);
-        }
-        if (mPrevButton != null) {
-            mPrevButton.setOnClickListener(mPrevListener);
-            mPrevButton.setEnabled(mPrevListener != null);
-            mPrevButton.setVisibility(View.VISIBLE);
-        }
-    }
-
-    @Override
-    public void setButtonVisibility_impl(int button, boolean visible) {
+    public void setButtonVisibility_impl(int button, int visibility) {
         switch (button) {
             case MediaControlView2.BUTTON_PLAY_PAUSE:
                 if (mPlayPauseButton != null && canPause()) {
-                    mPlayPauseButton.setVisibility((visible) ? View.VISIBLE : View.GONE);
+                    mPlayPauseButton.setVisibility(visibility);
                 }
                 break;
             case MediaControlView2.BUTTON_FFWD:
                 if (mFfwdButton != null && canSeekForward()) {
-                    mFfwdButton.setVisibility((visible) ? View.VISIBLE : View.GONE);
+                    mFfwdButton.setVisibility(visibility);
                 }
                 break;
             case MediaControlView2.BUTTON_REW:
                 if (mRewButton != null && canSeekBackward()) {
-                    mRewButton.setVisibility((visible) ? View.VISIBLE : View.GONE);
+                    mRewButton.setVisibility(visibility);
                 }
                 break;
             case MediaControlView2.BUTTON_NEXT:
                 // TODO: this button is not visible unless its listener is manually set. Should this
                 // function still be provided?
                 if (mNextButton != null) {
-                    mNextButton.setVisibility((visible) ? View.VISIBLE : View.GONE);
+                    mNextButton.setVisibility(visibility);
                 }
                 break;
             case MediaControlView2.BUTTON_PREV:
                 // TODO: this button is not visible unless its listener is manually set. Should this
                 // function still be provided?
                 if (mPrevButton != null) {
-                    mPrevButton.setVisibility((visible) ? View.VISIBLE : View.GONE);
+                    mPrevButton.setVisibility(visibility);
                 }
                 break;
             case MediaControlView2.BUTTON_SUBTITLE:
                 if (mSubtitleButton != null && mContainsSubtitle) {
-                    mSubtitleButton.setVisibility((visible) ? View.VISIBLE : View.GONE);
+                    mSubtitleButton.setVisibility(visibility);
                 }
                 break;
             case MediaControlView2.BUTTON_FULL_SCREEN:
                 if (mFullScreenButton != null) {
-                    mFullScreenButton.setVisibility((visible) ? View.VISIBLE : View.GONE);
+                    mFullScreenButton.setVisibility(visibility);
                 }
                 break;
             case MediaControlView2.BUTTON_OVERFLOW:
                 if (mOverflowButtonRight != null) {
-                    mOverflowButtonRight.setVisibility((visible) ? View.VISIBLE : View.GONE);
+                    mOverflowButtonRight.setVisibility(visibility);
                 }
                 break;
             case MediaControlView2.BUTTON_MUTE:
                 if (mMuteButton != null) {
-                    mMuteButton.setVisibility((visible) ? View.VISIBLE : View.GONE);
+                    mMuteButton.setVisibility(visibility);
                 }
                 break;
             case MediaControlView2.BUTTON_ASPECT_RATIO:
                 if (mAspectRationButton != null) {
-                    mAspectRationButton.setVisibility((visible) ? View.VISIBLE : View.GONE);
+                    mAspectRationButton.setVisibility(visibility);
                 }
                 break;
             case MediaControlView2.BUTTON_SETTINGS:
                 if (mSettingsButton != null) {
-                    mSettingsButton.setVisibility((visible) ? View.VISIBLE : View.GONE);
+                    mSettingsButton.setVisibility(visibility);
                 }
                 break;
             default:
@@ -426,11 +394,11 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
         }
         mNextButton = v.findViewById(R.id.next);
         if (mNextButton != null) {
-            mNextButton.setVisibility(View.GONE);
+            mNextButton.setOnClickListener(mNextListener);
         }
         mPrevButton = v.findViewById(R.id.prev);
         if (mPrevButton != null) {
-            mPrevButton.setVisibility(View.GONE);
+            mPrevButton.setOnClickListener(mPrevListener);
         }
 
         mBasicControls = v.findViewById(R.id.basic_controls);
@@ -693,6 +661,22 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
         }
     };
 
+    private final View.OnClickListener mNextListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            mControls.skipToNext();
+            mInstance.show(DEFAULT_TIMEOUT_MS);
+        }
+    };
+
+    private final View.OnClickListener mPrevListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            mControls.skipToPrevious();
+            mInstance.show(DEFAULT_TIMEOUT_MS);
+        }
+    };
+
     private final View.OnClickListener mSubtitleListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
@@ -700,13 +684,13 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
                 mSubtitleButton.setImageDrawable(
                         ApiHelper.getLibResources().getDrawable(
                                 R.drawable.ic_media_subtitle_enabled, null));
-                mInstance.showSubtitle();
+                mController.sendCommand(MediaControlView2.COMMAND_SHOW_SUBTITLE, null, null);
                 mSubtitleIsEnabled = true;
             } else {
                 mSubtitleButton.setImageDrawable(
                         ApiHelper.getLibResources().getDrawable(
                                 R.drawable.ic_media_subtitle_disabled, null));
-                mInstance.hideSubtitle();
+                mController.sendCommand(MediaControlView2.COMMAND_HIDE_SUBTITLE, null, null);
                 mSubtitleIsEnabled = false;
             }
             mInstance.show(DEFAULT_TIMEOUT_MS);
@@ -728,7 +712,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
             }
             Bundle args = new Bundle();
             args.putBoolean(ARGUMENT_KEY_FULLSCREEN, isEnteringFullScreen);
-            mController.sendCommand(COMMAND_SET_FULLSCREEN, args, null);
+            mController.sendCommand(MediaControlView2.COMMAND_SET_FULLSCREEN, args, null);
 
             mIsFullScreen = isEnteringFullScreen;
             mInstance.show(DEFAULT_TIMEOUT_MS);
