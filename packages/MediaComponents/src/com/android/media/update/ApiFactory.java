@@ -33,6 +33,7 @@ import android.media.MediaMetadata2;
 import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
+import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
@@ -103,16 +104,8 @@ public class ApiFactory implements StaticProvider {
     }
 
     @Override
-    public MediaSession2Provider.ControllerInfoProvider createMediaSession2ControllerInfoProvider(
-            Context context, ControllerInfo instance, int uid, int pid, String packageName,
-            IInterface callback) {
-        return new MediaSession2Impl.ControllerInfoImpl(context,
-                instance, uid, pid, packageName, (IMediaSession2Callback) callback);
-    }
-
-    @Override
-    public MediaSession2Provider.CommandProvider createMediaSession2Command(Command instance,
-            int commandCode, String action, Bundle extra) {
+    public MediaSession2Provider.CommandProvider createMediaSession2Command(
+            Command instance, int commandCode, String action, Bundle extra) {
         if (action == null && extra == null) {
             return new MediaSession2Impl.CommandImpl(instance, commandCode);
         }
@@ -122,6 +115,26 @@ public class ApiFactory implements StaticProvider {
     @Override
     public Command fromBundle_MediaSession2Command(Context context, Bundle command) {
         return MediaSession2Impl.CommandImpl.fromBundle_impl(context, command);
+    }
+
+    @Override
+    public MediaSession2Provider.CommandGroupProvider createMediaSession2CommandGroup(
+            Context context, CommandGroup instance, CommandGroup other) {
+        return new MediaSession2Impl.CommandGroupImpl(context, instance,
+                (other == null) ? null : other.getProvider());
+    }
+
+    @Override
+    public CommandGroup fromBundle_MediaSession2CommandGroup(Context context, Bundle commands) {
+        return MediaSession2Impl.CommandGroupImpl.fromBundle_impl(context, commands);
+    }
+
+    @Override
+    public MediaSession2Provider.ControllerInfoProvider createMediaSession2ControllerInfoProvider(
+            Context context, ControllerInfo instance, int uid, int pid, String packageName,
+            IInterface callback) {
+        return new MediaSession2Impl.ControllerInfoImpl(context,
+                instance, uid, pid, packageName, (IMediaSession2Callback) callback);
     }
 
     @Override

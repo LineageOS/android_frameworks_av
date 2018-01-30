@@ -48,11 +48,13 @@ import android.media.VolumeProvider;
 import android.media.session.MediaSessionManager;
 import android.media.update.MediaSession2Provider;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.os.Process;
 import android.os.IBinder;
 import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
 import android.text.TextUtils;
+import android.util.ArraySet;
 import android.util.Log;
 
 import java.lang.ref.WeakReference;
@@ -108,6 +110,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mId = id;
         mCallback = callback;
         mCallbackExecutor = callbackExecutor;
+        // Only remember player. Actual settings will be done in the initialize().
+        mPlayer = player;
         mSessionStub = new MediaSession2Stub(this);
 
         // Infer type from the id and package name.
@@ -126,9 +130,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_SESSION,
                     mContext.getPackageName(), null, id, mSessionStub).getInstance();
         }
-
-        // Only remember player. Actual settings will be done in the initialize().
-        mPlayer = player;
     }
 
     private static String getServiceName(Context context, String serviceAction, String id) {
@@ -609,6 +610,113 @@ public class MediaSession2Impl implements MediaSession2Provider {
             final int prime = 31;
             return ((mCustomCommand != null)
                     ? mCustomCommand.hashCode() : 0) * prime + mCommandCode;
+        }
+    }
+
+    /**
+     * Represent set of {@link Command}.
+     */
+    public static class CommandGroupImpl implements CommandGroupProvider {
+        private static final String KEY_COMMANDS =
+                "android.media.mediasession2.commandgroup.commands";
+        private ArraySet<Command> mCommands = new ArraySet<>();
+        private final Context mContext;
+        private final CommandGroup mInstance;
+
+        public CommandGroupImpl(Context context, CommandGroup instance, Object other) {
+            mContext = context;
+            mInstance = instance;
+            if (other != null && other instanceof CommandGroupImpl) {
+                mCommands.addAll(((CommandGroupImpl) other).mCommands);
+            }
+        }
+
+        @Override
+        public void addCommand_impl(Command command) {
+            mCommands.add(command);
+        }
+
+        @Override
+        public void addAllPredefinedCommands_impl() {
+            // TODO(jaewan): Is there any better way than this?
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_START));
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE));
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_STOP));
+            mCommands.add(new Command(mContext,
+                    MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM));
+            mCommands.add(new Command(mContext,
+                    MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM));
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE));
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_FAST_FORWARD));
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_REWIND));
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO));
+            mCommands.add(new Command(mContext,
+                    MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM));
+        }
+
+        @Override
+        public void removeCommand_impl(Command command) {
+            mCommands.remove(command);
+        }
+
+        @Override
+        public boolean hasCommand_impl(Command command) {
+            return mCommands.contains(command);
+        }
+
+        @Override
+        public boolean hasCommand_impl(int code) {
+            if (code == MediaSession2.COMMAND_CODE_CUSTOM) {
+                throw new IllegalArgumentException("Use hasCommand(Command) for custom command");
+            }
+            for (int i = 0; i < mCommands.size(); i++) {
+                if (mCommands.valueAt(i).getCommandCode() == code) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * @return new bundle from the CommandGroup
+         * @hide
+         */
+        @Override
+        public Bundle toBundle_impl() {
+            ArrayList<Bundle> list = new ArrayList<>();
+            for (int i = 0; i < mCommands.size(); i++) {
+                list.add(mCommands.valueAt(i).toBundle());
+            }
+            Bundle bundle = new Bundle();
+            bundle.putParcelableArrayList(KEY_COMMANDS, list);
+            return bundle;
+        }
+
+        /**
+         * @return new instance of CommandGroup from the bundle
+         * @hide
+         */
+        public static @Nullable CommandGroup fromBundle_impl(Context context, Bundle commands) {
+            if (commands == null) {
+                return null;
+            }
+            List<Parcelable> list = commands.getParcelableArrayList(KEY_COMMANDS);
+            if (list == null) {
+                return null;
+            }
+            CommandGroup commandGroup = new CommandGroup(context);
+            for (int i = 0; i < list.size(); i++) {
+                Parcelable parcelable = list.get(i);
+                if (!(parcelable instanceof Bundle)) {
+                    continue;
+                }
+                Bundle commandBundle = (Bundle) parcelable;
+                Command command = Command.fromBundle(context, commandBundle);
+                if (command != null) {
+                    commandGroup.addCommand(command);
+                }
+            }
+            return commandGroup;
         }
     }
 
