@@ -24,6 +24,7 @@
 #include <binder/MemoryDealer.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
+#include <utils/Log.h>
 #include <utils/RefBase.h>
 #include <utils/Vector.h>
 
