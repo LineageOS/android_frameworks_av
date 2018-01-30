@@ -285,7 +285,6 @@ public:
                                      audio_session_t session,
                                      pid_t pid,
                                      uid_t uid,
-                                     const String16& opPackageName,
                                      const audio_config_base_t *config,
                                      audio_input_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId,
@@ -314,7 +313,6 @@ public:
         data.writeInt32(session);
         data.writeInt32(pid);
         data.writeInt32(uid);
-        data.writeString16(opPackageName);
         data.write(config, sizeof(audio_config_base_t));
         data.writeInt32(flags);
         data.writeInt32(*selectedDeviceId);
@@ -333,12 +331,18 @@ public:
         return NO_ERROR;
     }
 
-    virtual status_t startInput(audio_port_handle_t portId,
+    virtual status_t startInput(audio_io_handle_t input,
+                                audio_session_t session,
+                                audio_devices_t device,
+                                uid_t uid,
                                 bool *silenced)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
-        data.writeInt32(portId);
+        data.writeInt32(input);
+        data.writeInt32(session);
+        data.writeInt32(device);
+        data.writeInt32(uid);
         data.writeInt32(*silenced ? 1 : 0);
         remote()->transact(START_INPUT, data, &reply);
         status_t status = static_cast <status_t> (reply.readInt32());
@@ -346,20 +350,24 @@ public:
         return status;
     }
 
-    virtual status_t stopInput(audio_port_handle_t portId)
+    virtual status_t stopInput(audio_io_handle_t input,
+                               audio_session_t session)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
-        data.writeInt32(portId);
+        data.writeInt32(input);
+        data.writeInt32(session);
         remote()->transact(STOP_INPUT, data, &reply);
         return static_cast <status_t> (reply.readInt32());
     }
 
-    virtual void releaseInput(audio_port_handle_t portId)
+    virtual void releaseInput(audio_io_handle_t input,
+                              audio_session_t session)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
-        data.writeInt32(portId);
+        data.writeInt32(input);
+        data.writeInt32(session);
         remote()->transact(RELEASE_INPUT, data, &reply);
     }
 
@@ -1026,7 +1034,6 @@ status_t BnAudioPolicyService::onTransact(
             audio_session_t session = (audio_session_t)data.readInt32();
             pid_t pid = (pid_t)data.readInt32();
             uid_t uid = (uid_t)data.readInt32();
-            const String16 opPackageName = data.readString16();
             audio_config_base_t config;
             memset(&config, 0, sizeof(audio_config_base_t));
             data.read(&config, sizeof(audio_config_base_t));
@@ -1034,7 +1041,7 @@ status_t BnAudioPolicyService::onTransact(
             audio_port_handle_t selectedDeviceId = (audio_port_handle_t) data.readInt32();
             audio_port_handle_t portId = (audio_port_handle_t)data.readInt32();
             status_t status = getInputForAttr(&attr, &input, session, pid, uid,
-                                              opPackageName, &config,
+                                              &config,
                                               flags, &selectedDeviceId, &portId);
             reply->writeInt32(status);
             if (status == NO_ERROR) {
@@ -1047,9 +1054,12 @@ status_t BnAudioPolicyService::onTransact(
 
         case START_INPUT: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            audio_port_handle_t portId = static_cast <audio_port_handle_t>(data.readInt32());
+            audio_io_handle_t input = static_cast <audio_io_handle_t>(data.readInt32());
+            audio_session_t session = static_cast <audio_session_t>(data.readInt32());
+            audio_devices_t device = static_cast <audio_devices_t>(data.readInt32());
+            uid_t uid = static_cast <uid_t>(data.readInt32());
             bool silenced = data.readInt32() == 1;
-            status_t status = startInput(portId, &silenced);
+            status_t status = startInput(input, session, device, uid, &silenced);
             reply->writeInt32(static_cast <uint32_t>(status));
             reply->writeInt32(silenced ? 1 : 0);
             return NO_ERROR;
@@ -1057,15 +1067,17 @@ status_t BnAudioPolicyService::onTransact(
 
         case STOP_INPUT: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            audio_port_handle_t portId = static_cast <audio_port_handle_t>(data.readInt32());
-            reply->writeInt32(static_cast <uint32_t>(stopInput(portId)));
+            audio_io_handle_t input = static_cast <audio_io_handle_t>(data.readInt32());
+            audio_session_t session = static_cast <audio_session_t>(data.readInt32());
+            reply->writeInt32(static_cast <uint32_t>(stopInput(input, session)));
             return NO_ERROR;
         } break;
 
         case RELEASE_INPUT: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            audio_port_handle_t portId = static_cast <audio_port_handle_t>(data.readInt32());
-            releaseInput(portId);
+            audio_io_handle_t input = static_cast <audio_io_handle_t>(data.readInt32());
+            audio_session_t session = static_cast <audio_session_t>(data.readInt32());
+            releaseInput(input, session);
             return NO_ERROR;
         } break;
 
