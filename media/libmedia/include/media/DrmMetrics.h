@@ -20,6 +20,7 @@
 #include <map>
 
 #include <android/hardware/drm/1.0/types.h>
+#include <binder/PersistableBundle.h>
 #include <media/CounterMetric.h>
 #include <media/EventMetric.h>
 
@@ -58,7 +59,7 @@ class MediaDrmMetrics {
   // TODO: Add session start and end time support. These are a special case.
 
   // Export the metrics to a MediaAnalyticsItem.
-  void Export(MediaAnalyticsItem* item);
+  void Export(os::PersistableBundle* metricsBundle);
 };
 
 }  // namespace android

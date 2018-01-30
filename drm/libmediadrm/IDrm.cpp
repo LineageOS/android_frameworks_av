@@ -508,7 +508,7 @@ struct BpDrm : public BpInterface<IDrm> {
         return reply.readInt32();
     }
 
-    virtual status_t getMetrics(MediaAnalyticsItem *item) {
+    virtual status_t getMetrics(os::PersistableBundle *metrics) {
         Parcel data, reply;
         data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
 
@@ -517,7 +517,7 @@ struct BpDrm : public BpInterface<IDrm> {
             return status;
         }
 
-        item->readFromParcel(reply);
+        metrics->readFromParcel(&reply);
         return reply.readInt32();
     }
 
@@ -1034,9 +1034,9 @@ status_t BnDrm::onTransact(
         {
             CHECK_INTERFACE(IDrm, data, reply);
 
-            MediaAnalyticsItem item;
-            status_t result = getMetrics(&item);
-            item.writeToParcel(reply);
+            os::PersistableBundle metrics;
+            status_t result = getMetrics(&metrics);
+            metrics.writeToParcel(reply);
             reply->writeInt32(result);
             return OK;
         }

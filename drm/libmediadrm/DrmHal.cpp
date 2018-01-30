@@ -54,6 +54,7 @@ using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::hidl::manager::V1_0::IServiceManager;
+using ::android::os::PersistableBundle;
 using ::android::sp;
 
 namespace {
@@ -1086,7 +1087,7 @@ status_t DrmHal::setPropertyByteArray(String8 const &name,
     return toStatusT(status);
 }
 
-status_t DrmHal::getMetrics(MediaAnalyticsItem* item) {
+status_t DrmHal::getMetrics(PersistableBundle* item) {
     if (item == nullptr) {
       return UNEXPECTED_NULL;
     }

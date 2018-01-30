@@ -19,6 +19,7 @@
 
 using ::android::hardware::drm::V1_0::EventType;
 using ::android::hardware::drm::V1_0::KeyStatusType;
+using ::android::os::PersistableBundle;
 
 namespace {
 
@@ -49,9 +50,9 @@ std::string GetAttributeName<EventType>(EventType type) {
 
 template<typename T>
 void ExportCounterMetric(const android::CounterMetric<T>& counter,
-                         android::MediaAnalyticsItem* item) {
-  if (!item) {
-    ALOGE("item was unexpectedly null.");
+                         PersistableBundle* metrics) {
+  if (!metrics) {
+    ALOGE("metrics was unexpectedly null.");
     return;
   }
   std::string success_count_name = counter.metric_name() + ".ok.count";
@@ -59,13 +60,15 @@ void ExportCounterMetric(const android::CounterMetric<T>& counter,
   counter.ExportValues(
       [&] (const android::status_t status, const int64_t value) {
           if (status == android::OK) {
-              item->setInt64(success_count_name.c_str(), value);
+              metrics->putLong(android::String16(success_count_name.c_str()),
+                               value);
           } else {
               int64_t total_errors(0);
-              item->getInt64(error_count_name.c_str(), &total_errors);
-              item->setInt64(error_count_name.c_str(), total_errors + value);
+              metrics->getLong(android::String16(error_count_name.c_str()),
+                               &total_errors);
+              metrics->putLong(android::String16(error_count_name.c_str()),
+                               total_errors + value);
               // TODO: Add support for exporting the list of error values.
-              // This probably needs to be added to MediaAnalyticsItem.
           }
       });
 }
@@ -73,24 +76,24 @@ void ExportCounterMetric(const android::CounterMetric<T>& counter,
 template<typename T>
 void ExportCounterMetricWithAttributeNames(
     const android::CounterMetric<T>& counter,
-    android::MediaAnalyticsItem* item) {
-  if (!item) {
-    ALOGE("item was unexpectedly null.");
+    PersistableBundle* metrics) {
+  if (!metrics) {
+    ALOGE("metrics was unexpectedly null.");
     return;
   }
   counter.ExportValues(
       [&] (const T& attribute, const int64_t value) {
           std::string name = counter.metric_name()
               + "." + GetAttributeName(attribute) + ".count";
-          item->setInt64(name.c_str(), value);
+          metrics->putLong(android::String16(name.c_str()), value);
       });
 }
 
 template<typename T>
 void ExportEventMetric(const android::EventMetric<T>& event,
-                       android::MediaAnalyticsItem* item) {
-  if (!item) {
-    ALOGE("item was unexpectedly null.");
+                       PersistableBundle* metrics) {
+  if (!metrics) {
+    ALOGE("metrics was unexpectedly null.");
     return;
   }
   std::string success_count_name = event.metric_name() + ".ok.count";
@@ -100,15 +103,17 @@ void ExportEventMetric(const android::EventMetric<T>& event,
       [&] (const android::status_t& status,
            const android::EventStatistics& value) {
           if (status == android::OK) {
-              item->setInt64(success_count_name.c_str(), value.count);
-              item->setInt64(timing_name.c_str(), value.mean);
+              metrics->putLong(android::String16(success_count_name.c_str()),
+                               value.count);
+              metrics->putLong(android::String16(timing_name.c_str()),
+                               value.mean);
           } else {
               int64_t total_errors(0);
-              item->getInt64(error_count_name.c_str(), &total_errors);
-              item->setInt64(error_count_name.c_str(),
-                             total_errors + value.count);
+              metrics->getLong(android::String16(error_count_name.c_str()),
+                               &total_errors);
+              metrics->putLong(android::String16(error_count_name.c_str()),
+                               total_errors + value.count);
               // TODO: Add support for exporting the list of error values.
-              // This probably needs to be added to MediaAnalyticsItem.
           }
       });
 }
@@ -133,20 +138,20 @@ MediaDrmMetrics::MediaDrmMetrics()
           "drm.mediadrm.get_device_unique_id", "status") {
 }
 
-void MediaDrmMetrics::Export(MediaAnalyticsItem* item) {
-  if (!item) {
-    ALOGE("item was unexpectedly null.");
+void MediaDrmMetrics::Export(PersistableBundle* metrics) {
+  if (!metrics) {
+    ALOGE("metrics was unexpectedly null.");
     return;
   }
-  ExportCounterMetric(mOpenSessionCounter, item);
-  ExportCounterMetric(mCloseSessionCounter, item);
-  ExportEventMetric(mGetKeyRequestTiming, item);
-  ExportEventMetric(mProvideKeyResponseTiming, item);
-  ExportCounterMetric(mGetProvisionRequestCounter, item);
-  ExportCounterMetric(mProvideProvisionResponseCounter, item);
-  ExportCounterMetricWithAttributeNames(mKeyStatusChangeCounter, item);
-  ExportCounterMetricWithAttributeNames(mEventCounter, item);
-  ExportCounterMetric(mGetDeviceUniqueIdCounter, item);
+  ExportCounterMetric(mOpenSessionCounter, metrics);
+  ExportCounterMetric(mCloseSessionCounter, metrics);
+  ExportEventMetric(mGetKeyRequestTiming, metrics);
+  ExportEventMetric(mProvideKeyResponseTiming, metrics);
+  ExportCounterMetric(mGetProvisionRequestCounter, metrics);
+  ExportCounterMetric(mProvideProvisionResponseCounter, metrics);
+  ExportCounterMetricWithAttributeNames(mKeyStatusChangeCounter, metrics);
+  ExportCounterMetricWithAttributeNames(mEventCounter, metrics);
+  ExportCounterMetric(mGetDeviceUniqueIdCounter, metrics);
 }
 
 }  // namespace android
