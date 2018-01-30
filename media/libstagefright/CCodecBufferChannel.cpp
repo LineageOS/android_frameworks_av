@@ -312,6 +312,7 @@ public:
                 mBufferArray[i].available = false;
                 *index = i;
                 *buffer = mBufferArray[i].clientBuffer;
+                (*buffer)->meta()->clear();
                 (*buffer)->setRange(0, (*buffer)->capacity());
                 return true;
             }
@@ -487,6 +488,7 @@ public:
                 *index = i;
                 *codecBuffer = mBufferArray[i].clientBuffer;
                 (*codecBuffer)->setFormat(mFormat);
+                (*codecBuffer)->meta()->clear();
                 mBufferArray[i].compBuffer = buffer;
                 mBufferArray[i].available = false;
                 return true;
@@ -512,6 +514,7 @@ public:
                 *index = i;
                 *codecBuffer = mBufferArray[i].clientBuffer;
                 (*codecBuffer)->setFormat(mFormat);
+                (*codecBuffer)->meta()->clear();
                 mBufferArray[i].available = false;
                 return true;
             }
