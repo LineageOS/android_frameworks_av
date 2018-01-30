@@ -225,7 +225,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS:
                     session.getInstance().setPlaylistParams(
-                            PlaylistParams.fromBundle(
+                            PlaylistParams.fromBundle(session.getContext(),
                                     args.getBundle(ARGUMENT_KEY_PLAYLIST_PARAMS)));
                     break;
                 default:

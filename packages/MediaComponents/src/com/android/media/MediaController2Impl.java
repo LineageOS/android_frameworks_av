@@ -595,7 +595,8 @@ public class MediaController2Impl implements MediaController2Provider {
                 Log.w(TAG, "Don't fail silently here. Highly likely a bug");
                 return;
             }
-            controller.pushPlaylistParamsChanges(PlaylistParams.fromBundle(params));
+            controller.pushPlaylistParamsChanges(
+                    PlaylistParams.fromBundle(controller.getContext(), params));
         }
 
         @Override

@@ -31,6 +31,7 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2;
+import android.media.MediaMetadata2;
 import android.media.MediaPlayerInterface;
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2;
@@ -40,6 +41,8 @@ import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
+import android.media.MediaSession2.PlaylistParams.RepeatMode;
+import android.media.MediaSession2.PlaylistParams.ShuffleMode;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
 import android.media.PlaybackState2;
@@ -812,6 +815,76 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         public static ControllerInfoImpl from(ControllerInfo controller) {
             return (ControllerInfoImpl) controller.getProvider();
+        }
+    }
+
+    public static class PlaylistParamsImpl implements PlaylistParamsProvider {
+        /**
+         * Keys used for converting a PlaylistParams object to a bundle object and vice versa.
+         */
+        private static final String KEY_REPEAT_MODE =
+                "android.media.session2.playlistparams2.repeat_mode";
+        private static final String KEY_SHUFFLE_MODE =
+                "android.media.session2.playlistparams2.shuffle_mode";
+        private static final String KEY_MEDIA_METADATA2_BUNDLE =
+                "android.media.session2.playlistparams2.metadata2_bundle";
+
+        private Context mContext;
+        private PlaylistParams mInstance;
+        private @RepeatMode int mRepeatMode;
+        private @ShuffleMode int mShuffleMode;
+        private MediaMetadata2 mPlaylistMetadata;
+
+        public PlaylistParamsImpl(Context context, PlaylistParams instance,
+                @RepeatMode int repeatMode, @ShuffleMode int shuffleMode,
+                MediaMetadata2 playlistMetadata) {
+            // TODO(jaewan): Sanity check
+            mContext = context;
+            mInstance = instance;
+            mRepeatMode = repeatMode;
+            mShuffleMode = shuffleMode;
+            mPlaylistMetadata = playlistMetadata;
+        }
+
+        public @RepeatMode int getRepeatMode_impl() {
+            return mRepeatMode;
+        }
+
+        public @ShuffleMode int getShuffleMode_impl() {
+            return mShuffleMode;
+        }
+
+        public MediaMetadata2 getPlaylistMetadata_impl() {
+            return mPlaylistMetadata;
+        }
+
+        @Override
+        public Bundle toBundle_impl() {
+            Bundle bundle = new Bundle();
+            bundle.putInt(KEY_REPEAT_MODE, mRepeatMode);
+            bundle.putInt(KEY_SHUFFLE_MODE, mShuffleMode);
+            if (mPlaylistMetadata != null) {
+                bundle.putBundle(KEY_MEDIA_METADATA2_BUNDLE, mPlaylistMetadata.toBundle());
+            }
+            return bundle;
+        }
+
+        public static PlaylistParams fromBundle(Context context, Bundle bundle) {
+            if (bundle == null) {
+                return null;
+            }
+            if (!bundle.containsKey(KEY_REPEAT_MODE) || !bundle.containsKey(KEY_SHUFFLE_MODE)) {
+                return null;
+            }
+
+            Bundle metadataBundle = bundle.getBundle(KEY_MEDIA_METADATA2_BUNDLE);
+            MediaMetadata2 metadata = metadataBundle == null
+                    ? null : MediaMetadata2.fromBundle(context, metadataBundle);
+
+            return new PlaylistParams(context,
+                    bundle.getInt(KEY_REPEAT_MODE),
+                    bundle.getInt(KEY_SHUFFLE_MODE),
+                    metadata);
         }
     }
 }
