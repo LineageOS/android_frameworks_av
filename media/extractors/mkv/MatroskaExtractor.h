@@ -30,11 +30,11 @@ struct AMessage;
 class String8;
 
 class MetaData;
-struct DataSourceReader;
+struct DataSourceBaseReader;
 struct MatroskaSource;
 
 struct MatroskaExtractor : public MediaExtractor {
-    explicit MatroskaExtractor(const sp<DataSource> &source);
+    explicit MatroskaExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();
 
@@ -76,8 +76,8 @@ private:
     Mutex mLock;
     Vector<TrackInfo> mTracks;
 
-    sp<DataSource> mDataSource;
-    DataSourceReader *mReader;
+    DataSourceBase *mDataSource;
+    DataSourceBaseReader *mReader;
     mkvparser::Segment *mSegment;
     bool mExtractedThumbnails;
     bool mIsLiveStreaming;
@@ -96,7 +96,7 @@ private:
 };
 
 bool SniffMatroska(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence,
+        DataSourceBase *source, String8 *mimeType, float *confidence,
         sp<AMessage> *);
 
 }  // namespace android

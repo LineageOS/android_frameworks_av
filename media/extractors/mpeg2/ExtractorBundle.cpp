@@ -34,18 +34,18 @@ MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
         1,
         "MPEG2-PS/TS Extractor",
         [](
-                const sp<DataSource> &source,
+                DataSourceBase *source,
                 String8 *mimeType,
                 float *confidence,
                 sp<AMessage> *meta __unused) -> MediaExtractor::CreatorFunc {
             if (SniffMPEG2TS(source, mimeType, confidence, meta)) {
                 return [](
-                        const sp<DataSource> &source,
+                        DataSourceBase *source,
                         const sp<AMessage>& meta __unused) -> MediaExtractor* {
                     return new MPEG2TSExtractor(source);};
             } else if (SniffMPEG2PS(source, mimeType, confidence, meta)) {
                         return [](
-                                const sp<DataSource> &source,
+                                DataSourceBase *source,
                                 const sp<AMessage>& meta __unused) -> MediaExtractor* {
                             return new MPEG2PSExtractor(source);};
             }

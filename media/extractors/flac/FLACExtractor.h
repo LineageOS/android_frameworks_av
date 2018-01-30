@@ -17,7 +17,7 @@
 #ifndef FLAC_EXTRACTOR_H_
 #define FLAC_EXTRACTOR_H_
 
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/MediaExtractor.h>
 #include <utils/String8.h>
 
@@ -28,8 +28,7 @@ class FLACParser;
 class FLACExtractor : public MediaExtractor {
 
 public:
-    // Extractor assumes ownership of source
-    explicit FLACExtractor(const sp<DataSource> &source);
+    explicit FLACExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();
     virtual MediaSourceBase *getTrack(size_t index);
@@ -42,7 +41,7 @@ protected:
     virtual ~FLACExtractor();
 
 private:
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
     sp<FLACParser> mParser;
     status_t mInitCheck;
     sp<MetaData> mFileMetadata;
@@ -57,7 +56,7 @@ private:
 
 };
 
-bool SniffFLAC(const sp<DataSource> &source, String8 *mimeType,
+bool SniffFLAC(DataSourceBase *source, String8 *mimeType,
         float *confidence, sp<AMessage> *);
 
 }  // namespace android

@@ -22,7 +22,7 @@
 
 #include <arpa/inet.h>
 
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ByteUtils.h>
 

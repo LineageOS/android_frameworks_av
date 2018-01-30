@@ -19,7 +19,7 @@
 #include <utils/Log.h>
 
 #include "AACExtractor.h"
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -35,7 +35,7 @@ namespace android {
 
 class AACSource : public MediaSourceBase {
 public:
-    AACSource(const sp<DataSource> &source,
+    AACSource(DataSourceBase *source,
               const sp<MetaData> &meta,
               const Vector<uint64_t> &offset_vector,
               int64_t frame_duration_us);
@@ -53,7 +53,7 @@ protected:
 
 private:
     static const size_t kMaxFrameSize;
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
     sp<MetaData> mMeta;
 
     off64_t mOffset;
@@ -91,7 +91,7 @@ uint32_t get_sample_rate(const uint8_t sf_index)
 // The returned value is the AAC frame size with the ADTS header length (regardless of
 //     the presence of the CRC).
 // If headerSize is non-NULL, it will be used to return the size of the header of this ADTS frame.
-static size_t getAdtsFrameLength(const sp<DataSource> &source, off64_t offset, size_t* headerSize) {
+static size_t getAdtsFrameLength(DataSourceBase *source, off64_t offset, size_t* headerSize) {
 
     const size_t kAdtsHeaderLengthNoCrc = 7;
     const size_t kAdtsHeaderLengthWithCrc = 9;
@@ -132,7 +132,7 @@ static size_t getAdtsFrameLength(const sp<DataSource> &source, off64_t offset, s
 }
 
 AACExtractor::AACExtractor(
-        const sp<DataSource> &source, const sp<AMessage> &_meta)
+        DataSourceBase *source, const sp<AMessage> &_meta)
     : mDataSource(source),
       mInitCheck(NO_INIT),
       mFrameDurationUs(0) {
@@ -229,7 +229,7 @@ sp<MetaData> AACExtractor::getTrackMetaData(size_t index, uint32_t /* flags */) 
 const size_t AACSource::kMaxFrameSize = 8192;
 
 AACSource::AACSource(
-        const sp<DataSource> &source, const sp<MetaData> &meta,
+        DataSourceBase *source, const sp<MetaData> &meta,
         const Vector<uint64_t> &offset_vector,
         int64_t frame_duration_us)
     : mDataSource(source),
@@ -332,13 +332,13 @@ status_t AACSource::read(
 ////////////////////////////////////////////////////////////////////////////////
 
 static MediaExtractor* CreateExtractor(
-        const sp<DataSource> &source,
+        DataSourceBase *source,
         const sp<AMessage>& meta) {
     return new AACExtractor(source, meta);
 }
 
 static MediaExtractor::CreatorFunc Sniff(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence,
+        DataSourceBase *source, String8 *mimeType, float *confidence,
         sp<AMessage> *meta) {
     off64_t pos = 0;
 

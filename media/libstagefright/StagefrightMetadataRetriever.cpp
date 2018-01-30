@@ -47,12 +47,6 @@ StagefrightMetadataRetriever::StagefrightMetadataRetriever()
 StagefrightMetadataRetriever::~StagefrightMetadataRetriever() {
     ALOGV("~StagefrightMetadataRetriever()");
     clearMetadata();
-    // Explicitly release extractor before continuing with the destructor,
-    // some extractors might need to callback to close off the DataSource
-    // and we need to make sure it's still there.
-    if (mExtractor != NULL) {
-        mExtractor->release();
-    }
     if (mSource != NULL) {
         mSource->close();
     }

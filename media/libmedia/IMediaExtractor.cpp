@@ -39,8 +39,7 @@ enum {
     SETMEDIACAS,
     SETUID,
     NAME,
-    GETMETRICS,
-    RELEASE,
+    GETMETRICS
 };
 
 class BpMediaExtractor : public BpInterface<IMediaExtractor> {
@@ -140,13 +139,6 @@ public:
         ALOGV("name NOT IMPLEMENTED");
         return NULL;
     }
-
-    virtual void release() {
-        ALOGV("release");
-        Parcel data, reply;
-        data.writeInterfaceToken(BpMediaExtractor::getInterfaceDescriptor());
-        remote()->transact(RELEASE, data, &reply);
-    }
 };
 
 IMPLEMENT_META_INTERFACE(MediaExtractor, "android.media.IMediaExtractor");
@@ -222,12 +214,6 @@ status_t BnMediaExtractor::onTransact(
             }
 
             reply->writeInt32(setMediaCas(casToken));
-            return OK;
-        }
-        case RELEASE: {
-            ALOGV("release");
-            CHECK_INTERFACE(IMediaExtractor, data, reply);
-            release();
             return OK;
         }
         default:

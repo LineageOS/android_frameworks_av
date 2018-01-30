@@ -31,7 +31,7 @@ struct Track;
 class String8;
 
 struct MPEG2PSExtractor : public MediaExtractor {
-    explicit MPEG2PSExtractor(const sp<DataSource> &source);
+    explicit MPEG2PSExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();
     virtual MediaSourceBase *getTrack(size_t index);
@@ -50,7 +50,7 @@ private:
     struct WrappedTrack;
 
     mutable Mutex mLock;
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
 
     off64_t mOffset;
     status_t mFinalResult;
@@ -72,7 +72,7 @@ private:
 };
 
 bool SniffMPEG2PS(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence,
+        DataSourceBase *source, String8 *mimeType, float *confidence,
         sp<AMessage> *);
 
 }  // namespace android

@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 //#define LOG_NDEBUG 0
-#define LOG_TAG "DataSource"
+#define LOG_TAG "DataSourceBase"
 
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/MediaErrors.h>
 #include <utils/String8.h>
 
 namespace android {
 
-bool DataSource::getUInt16(off64_t offset, uint16_t *x) {
+bool DataSourceBase::getUInt16(off64_t offset, uint16_t *x) {
     *x = 0;
 
     uint8_t byte[2];
@@ -36,7 +36,7 @@ bool DataSource::getUInt16(off64_t offset, uint16_t *x) {
     return true;
 }
 
-bool DataSource::getUInt24(off64_t offset, uint32_t *x) {
+bool DataSourceBase::getUInt24(off64_t offset, uint32_t *x) {
     *x = 0;
 
     uint8_t byte[3];
@@ -49,7 +49,7 @@ bool DataSource::getUInt24(off64_t offset, uint32_t *x) {
     return true;
 }
 
-bool DataSource::getUInt32(off64_t offset, uint32_t *x) {
+bool DataSourceBase::getUInt32(off64_t offset, uint32_t *x) {
     *x = 0;
 
     uint32_t tmp;
@@ -62,7 +62,7 @@ bool DataSource::getUInt32(off64_t offset, uint32_t *x) {
     return true;
 }
 
-bool DataSource::getUInt64(off64_t offset, uint64_t *x) {
+bool DataSourceBase::getUInt64(off64_t offset, uint64_t *x) {
     *x = 0;
 
     uint64_t tmp;
@@ -75,7 +75,7 @@ bool DataSource::getUInt64(off64_t offset, uint64_t *x) {
     return true;
 }
 
-bool DataSource::getUInt16Var(off64_t offset, uint16_t *x, size_t size) {
+bool DataSourceBase::getUInt16Var(off64_t offset, uint16_t *x, size_t size) {
     if (size == 2) {
         return getUInt16(offset, x);
     }
@@ -89,7 +89,7 @@ bool DataSource::getUInt16Var(off64_t offset, uint16_t *x, size_t size) {
     return false;
 }
 
-bool DataSource::getUInt32Var(off64_t offset, uint32_t *x, size_t size) {
+bool DataSourceBase::getUInt32Var(off64_t offset, uint32_t *x, size_t size) {
     if (size == 4) {
         return getUInt32(offset, x);
     }
@@ -103,7 +103,7 @@ bool DataSource::getUInt32Var(off64_t offset, uint32_t *x, size_t size) {
     return false;
 }
 
-bool DataSource::getUInt64Var(off64_t offset, uint64_t *x, size_t size) {
+bool DataSourceBase::getUInt64Var(off64_t offset, uint64_t *x, size_t size) {
     if (size == 8) {
         return getUInt64(offset, x);
     }
@@ -117,13 +117,13 @@ bool DataSource::getUInt64Var(off64_t offset, uint64_t *x, size_t size) {
     return false;
 }
 
-status_t DataSource::getSize(off64_t *size) {
+status_t DataSourceBase::getSize(off64_t *size) {
     *size = 0;
 
     return ERROR_UNSUPPORTED;
 }
 
-String8 DataSource::getMIMEType() const {
+String8 DataSourceBase::getMIMEType() const {
     return String8("application/octet-stream");
 }
 

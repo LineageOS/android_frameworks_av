@@ -41,7 +41,9 @@ sp<IDataSource> CreateIDataSourceFromDataSource(const sp<DataSource> &source);
 
 // Creates an IMediaExtractor wrapper to the given MediaExtractor.
 sp<IMediaExtractor> CreateIMediaExtractorFromMediaExtractor(
-        MediaExtractor *extractor, const sp<RefBase> &plugin);
+        MediaExtractor *extractor,
+        const sp<DataSource> &source,
+        const sp<RefBase> &plugin);
 
 // Creates a MediaSource which wraps the given IMediaSource object.
 sp<MediaSource> CreateMediaSourceFromIMediaSource(const sp<IMediaSource> &source);
