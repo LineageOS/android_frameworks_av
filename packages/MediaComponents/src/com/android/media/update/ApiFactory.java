@@ -30,6 +30,7 @@ import android.media.MediaLibraryService2;
 import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
 import android.media.MediaMetadata2;
+import android.media.MediaMetadata2.Builder;
 import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
@@ -45,6 +46,7 @@ import android.media.update.MediaControlView2Provider;
 import android.media.update.MediaController2Provider;
 import android.media.update.MediaItem2Provider;
 import android.media.update.MediaLibraryService2Provider.MediaLibrarySessionProvider;
+import android.media.update.MediaMetadata2Provider;
 import android.media.update.MediaSession2Provider;
 import android.media.update.MediaSessionService2Provider;
 import android.media.update.SessionPlayer2Provider;
@@ -66,6 +68,7 @@ import com.android.media.MediaController2Impl;
 import com.android.media.MediaItem2Impl;
 import com.android.media.MediaLibraryService2Impl;
 import com.android.media.MediaLibraryService2Impl.MediaLibrarySessionImpl;
+import com.android.media.MediaMetadata2Impl;
 import com.android.media.MediaSession2Impl;
 import com.android.media.MediaSessionService2Impl;
 import com.android.media.SessionToken2Impl;
@@ -129,8 +132,7 @@ public class ApiFactory implements StaticProvider {
         return MediaSession2Impl.CommandGroupImpl.fromBundle_impl(context, commands);
     }
 
-    @Override
-    public MediaSession2Provider.ControllerInfoProvider createMediaSession2ControllerInfoProvider(
+    public MediaSession2Provider.ControllerInfoProvider createMediaSession2ControllerInfo(
             Context context, ControllerInfo instance, int uid, int pid, String packageName,
             IInterface callback) {
         return new MediaSession2Impl.ControllerInfoImpl(context,
@@ -189,7 +191,7 @@ public class ApiFactory implements StaticProvider {
     }
 
     @Override
-    public MediaItem2Provider createMediaItem2Provider(Context context, MediaItem2 instance,
+    public MediaItem2Provider createMediaItem2(Context context, MediaItem2 instance,
             String mediaId, DataSourceDesc dsd, MediaMetadata2 metadata, int flags) {
         return new MediaItem2Impl(context, instance, mediaId, dsd, metadata, flags);
     }
@@ -197,5 +199,22 @@ public class ApiFactory implements StaticProvider {
     @Override
     public MediaItem2 fromBundle_MediaItem2(Context context, Bundle bundle) {
         return MediaItem2Impl.fromBundle(context, bundle);
+    }
+
+    @Override
+    public MediaMetadata2 fromBundle_MediaMetadata2(Context context, Bundle bundle) {
+        return MediaMetadata2Impl.fromBundle(context, bundle);
+    }
+
+    @Override
+    public MediaMetadata2Provider.BuilderProvider createMediaMetadata2Builder(
+            Context context, MediaMetadata2.Builder builder) {
+        return new MediaMetadata2Impl.BuilderImpl(context, builder);
+    }
+
+    @Override
+    public MediaMetadata2Provider.BuilderProvider createMediaMetadata2Builder(
+            Context context, MediaMetadata2.Builder builder, MediaMetadata2 source) {
+        return new MediaMetadata2Impl.BuilderImpl(context, builder, source);
     }
 }
