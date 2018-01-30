@@ -307,13 +307,10 @@ sp<MetaData> MidiExtractor::getMetaData()
 
 // Sniffer
 
-bool SniffMidi(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *)
+bool SniffMidi(DataSourceBase *source, float *confidence)
 {
     sp<MidiEngine> p = new MidiEngine(source, NULL, NULL);
     if (p->initCheck() == OK) {
-        *mimeType = MEDIA_MIMETYPE_AUDIO_MIDI;
         *confidence = 0.8;
         ALOGV("SniffMidi: yes");
         return true;
@@ -334,13 +331,13 @@ MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
         "MIDI Extractor",
         [](
                 DataSourceBase *source,
-                String8 *mimeType,
                 float *confidence,
-                sp<AMessage> *meta __unused) -> MediaExtractor::CreatorFunc {
-            if (SniffMidi(source, mimeType, confidence, meta)) {
+                void **,
+                MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
+            if (SniffMidi(source, confidence)) {
                 return [](
                         DataSourceBase *source,
-                        const sp<AMessage>& meta __unused) -> MediaExtractor* {
+                        void *) -> MediaExtractor* {
                     return new MidiExtractor(source);};
             }
             return NULL;

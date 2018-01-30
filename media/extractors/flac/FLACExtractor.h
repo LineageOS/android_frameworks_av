@@ -56,8 +56,7 @@ private:
 
 };
 
-bool SniffFLAC(DataSourceBase *source, String8 *mimeType,
-        float *confidence, sp<AMessage> *);
+bool SniffFLAC(DataSourceBase *source, float *confidence);
 
 }  // namespace android
 

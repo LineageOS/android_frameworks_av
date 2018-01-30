@@ -751,8 +751,7 @@ status_t MPEG2PSExtractor::WrappedTrack::read(
 ////////////////////////////////////////////////////////////////////////////////
 
 bool SniffMPEG2PS(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *) {
+        DataSourceBase *source, float *confidence) {
     uint8_t header[5];
     if (source->readAt(0, header, sizeof(header)) < (ssize_t)sizeof(header)) {
         return false;
@@ -763,8 +762,6 @@ bool SniffMPEG2PS(
     }
 
     *confidence = 0.25f;  // Slightly larger than .mp3 extractor's confidence
-
-    mimeType->setTo(MEDIA_MIMETYPE_CONTAINER_MPEG2PS);
 
     return true;
 }
