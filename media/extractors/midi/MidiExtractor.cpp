@@ -25,7 +25,7 @@
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
-#include <media/MediaSource.h>
+#include <media/MediaSourceBase.h>
 #include <libsonivox/eas_reverb.h>
 
 namespace android {
@@ -33,7 +33,7 @@ namespace android {
 // how many Sonivox output buffers to aggregate into one MediaBuffer
 static const int NUM_COMBINE_BUFFERS = 4;
 
-class MidiSource : public MediaSource {
+class MidiSource : public MediaSourceBase {
 
 public:
     MidiSource(
@@ -282,7 +282,7 @@ size_t MidiExtractor::countTracks()
     return mInitCheck == OK ? 1 : 0;
 }
 
-sp<MediaSource> MidiExtractor::getTrack(size_t index)
+MediaSourceBase *MidiExtractor::getTrack(size_t index)
 {
     if (mInitCheck != OK || index > 0) {
         return NULL;

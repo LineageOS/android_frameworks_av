@@ -22,7 +22,7 @@
 #include "MatroskaExtractor.h"
 
 #include <media/DataSource.h>
-#include <media/MediaSource.h>
+#include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -121,9 +121,8 @@ private:
     BlockIterator &operator=(const BlockIterator &);
 };
 
-struct MatroskaSource : public MediaSource {
-    MatroskaSource(
-            const sp<MatroskaExtractor> &extractor, size_t index);
+struct MatroskaSource : public MediaSourceBase {
+    MatroskaSource(MatroskaExtractor *extractor, size_t index);
 
     virtual status_t start(MetaData *params);
     virtual status_t stop();
@@ -144,7 +143,7 @@ private:
         OTHER
     };
 
-    sp<MatroskaExtractor> mExtractor;
+    MatroskaExtractor *mExtractor;
     size_t mTrackIndex;
     Type mType;
     bool mIsAudio;
@@ -211,12 +210,12 @@ const mkvparser::CuePoint::TrackPosition *MatroskaExtractor::TrackInfo::find(
 }
 
 MatroskaSource::MatroskaSource(
-        const sp<MatroskaExtractor> &extractor, size_t index)
+        MatroskaExtractor *extractor, size_t index)
     : mExtractor(extractor),
       mTrackIndex(index),
       mType(OTHER),
       mIsAudio(false),
-      mBlockIter(mExtractor.get(),
+      mBlockIter(mExtractor,
                  mExtractor->mTracks.itemAt(index).mTrackNum,
                  index),
       mNALSizeLen(-1) {
@@ -928,7 +927,7 @@ size_t MatroskaExtractor::countTracks() {
     return mTracks.size();
 }
 
-sp<MediaSource> MatroskaExtractor::getTrack(size_t index) {
+MediaSourceBase *MatroskaExtractor::getTrack(size_t index) {
     if (index >= mTracks.size()) {
         return NULL;
     }

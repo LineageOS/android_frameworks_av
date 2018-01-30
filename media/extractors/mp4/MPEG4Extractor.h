@@ -56,7 +56,7 @@ public:
     explicit MPEG4Extractor(const sp<DataSource> &source, const char *mime = NULL);
 
     virtual size_t countTracks();
-    virtual sp<MediaSource> getTrack(size_t index);
+    virtual MediaSourceBase *getTrack(size_t index);
     virtual sp<MetaData> getTrackMetaData(size_t index, uint32_t flags);
 
     virtual sp<MetaData> getMetaData();

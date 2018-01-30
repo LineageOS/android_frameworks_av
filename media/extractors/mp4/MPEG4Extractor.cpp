@@ -31,7 +31,7 @@
 #include "ItemTable.h"
 #include "include/ESDS.h"
 
-#include <media/MediaSource.h>
+#include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -65,11 +65,10 @@ enum {
     kMaxAtomSize = 64 * 1024 * 1024,
 };
 
-class MPEG4Source : public MediaSource {
+class MPEG4Source : public MediaSourceBase {
 public:
     // Caller retains ownership of both "dataSource" and "sampleTable".
-    MPEG4Source(const sp<MPEG4Extractor> &owner,
-                const sp<MetaData> &format,
+    MPEG4Source(const sp<MetaData> &format,
                 const sp<DataSource> &dataSource,
                 int32_t timeScale,
                 const sp<SampleTable> &sampleTable,
@@ -88,14 +87,11 @@ public:
     virtual bool supportNonblockingRead() { return true; }
     virtual status_t fragmentedRead(MediaBuffer **buffer, const ReadOptions *options = NULL);
 
-protected:
     virtual ~MPEG4Source();
 
 private:
     Mutex mLock;
 
-    // keep the MPEG4Extractor around, since we're referencing its data
-    sp<MPEG4Extractor> mOwner;
     sp<MetaData> mFormat;
     sp<DataSource> mDataSource;
     int32_t mTimescale;
@@ -3412,7 +3408,7 @@ void MPEG4Extractor::parseID3v2MetaData(off64_t offset) {
     }
 }
 
-sp<MediaSource> MPEG4Extractor::getTrack(size_t index) {
+MediaSourceBase *MPEG4Extractor::getTrack(size_t index) {
     status_t err;
     if ((err = readMetaData()) != OK) {
         return NULL;
@@ -3488,10 +3484,11 @@ sp<MediaSource> MPEG4Extractor::getTrack(size_t index) {
         }
     }
 
-    sp<MPEG4Source> source =  new MPEG4Source(this,
+    MPEG4Source *source =  new MPEG4Source(
             track->meta, mDataSource, track->timescale, track->sampleTable,
             mSidxEntries, trex, mMoofOffset, itemTable);
     if (source->init() != OK) {
+        delete source;
         return NULL;
     }
     return source;
@@ -3884,7 +3881,6 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
 ////////////////////////////////////////////////////////////////////////////////
 
 MPEG4Source::MPEG4Source(
-        const sp<MPEG4Extractor> &owner,
         const sp<MetaData> &format,
         const sp<DataSource> &dataSource,
         int32_t timeScale,
@@ -3893,8 +3889,7 @@ MPEG4Source::MPEG4Source(
         const Trex *trex,
         off64_t firstMoofOffset,
         const sp<ItemTable> &itemTable)
-    : mOwner(owner),
-      mFormat(format),
+    : mFormat(format),
       mDataSource(dataSource),
       mTimescale(timeScale),
       mSampleTable(sampleTable),

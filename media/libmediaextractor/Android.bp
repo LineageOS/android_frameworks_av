@@ -26,6 +26,7 @@ cc_library {
         "DataSource.cpp",
         "MediaBuffer.cpp",
         "MediaBufferGroup.cpp",
+        "MediaSourceBase.cpp",
         "MediaSource.cpp",
         "MediaExtractor.cpp",
     ],

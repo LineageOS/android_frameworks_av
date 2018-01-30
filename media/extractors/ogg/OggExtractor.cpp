@@ -22,7 +22,7 @@
 
 #include <cutils/properties.h>
 #include <media/DataSource.h>
-#include <media/MediaSource.h>
+#include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/base64.h>
@@ -45,8 +45,8 @@ extern "C" {
 
 namespace android {
 
-struct OggSource : public MediaSource {
-    explicit OggSource(const sp<OggExtractor> &extractor);
+struct OggSource : public MediaSourceBase {
+    explicit OggSource(OggExtractor *extractor);
 
     virtual sp<MetaData> getFormat();
 
@@ -60,7 +60,7 @@ protected:
     virtual ~OggSource();
 
 private:
-    sp<OggExtractor> mExtractor;
+    OggExtractor *mExtractor;
     bool mStarted;
 
     OggSource(const OggSource &);
@@ -224,7 +224,7 @@ static void extractAlbumArt(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-OggSource::OggSource(const sp<OggExtractor> &extractor)
+OggSource::OggSource(OggExtractor *extractor)
     : mExtractor(extractor),
       mStarted(false) {
 }
@@ -1348,7 +1348,7 @@ size_t OggExtractor::countTracks() {
     return mInitCheck != OK ? 0 : 1;
 }
 
-sp<MediaSource> OggExtractor::getTrack(size_t index) {
+MediaSourceBase *OggExtractor::getTrack(size_t index) {
     if (index >= 1) {
         return NULL;
     }

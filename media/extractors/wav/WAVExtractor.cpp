@@ -22,7 +22,7 @@
 
 #include <audio_utils/primitives.h>
 #include <media/DataSource.h>
-#include <media/MediaSource.h>
+#include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
@@ -55,7 +55,7 @@ static uint16_t U16_LE_AT(const uint8_t *ptr) {
     return ptr[1] << 8 | ptr[0];
 }
 
-struct WAVSource : public MediaSource {
+struct WAVSource : public MediaSourceBase {
     WAVSource(
             const sp<DataSource> &dataSource,
             const sp<MetaData> &meta,
@@ -120,7 +120,7 @@ size_t WAVExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-sp<MediaSource> WAVExtractor::getTrack(size_t index) {
+MediaSourceBase *WAVExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index > 0) {
         return NULL;
     }
@@ -564,8 +564,10 @@ static MediaExtractor::CreatorFunc Sniff(
         return NULL;
     }
 
-    sp<MediaExtractor> extractor = new WAVExtractor(source);
-    if (extractor->countTracks() == 0) {
+    MediaExtractor *extractor = new WAVExtractor(source);
+    int numTracks = extractor->countTracks();
+    delete extractor;
+    if (numTracks == 0) {
         return NULL;
     }
 
