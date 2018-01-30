@@ -47,16 +47,6 @@ struct ANativeWindowWrapper;
 
 template<typename T> class SortedVector;
 
-enum player2_type {
-    PLAYER2_STAGEFRIGHT_PLAYER = 3,
-    PLAYER2_NU_PLAYER2 = 4,
-    // Test players are available only in the 'test' and 'eng' builds.
-    // The shared library with the test player is passed passed as an
-    // argument to the 'test:' url in the setDataSource call.
-    PLAYER2_TEST_PLAYER = 5,
-};
-
-
 #define DEFAULT_AUDIOSINK_BUFFERCOUNT 4
 #define DEFAULT_AUDIOSINK_BUFFERSIZE 1200
 #define DEFAULT_AUDIOSINK_SAMPLERATE 44100
@@ -234,7 +224,6 @@ public:
         return INVALID_OPERATION;
     }
     virtual status_t    setLooping(int loop) = 0;
-    virtual player2_type playerType() = 0;
     virtual status_t    setParameter(int key, const Parcel &request) = 0;
     virtual status_t    getParameter(int key, Parcel *reply) = 0;
 

@@ -68,8 +68,8 @@
 
 #include <private/android_filesystem_config.h>
 
+#include <nuplayer2/NuPlayer2Driver.h>
 #include "MediaPlayer2Manager.h"
-#include "MediaPlayer2Factory.h"
 
 static const int kDumpLockRetries = 50;
 static const int kDumpLockSleepUs = 20000;
@@ -269,8 +269,6 @@ MediaPlayer2Manager::MediaPlayer2Manager() {
     mPid = IPCThreadState::self()->getCallingPid();
     mUid = IPCThreadState::self()->getCallingUid();
     mNextConnId = 1;
-
-    MediaPlayer2Factory::registerBuiltinFactories();
 }
 
 MediaPlayer2Manager::~MediaPlayer2Manager() {
@@ -562,16 +560,17 @@ void MediaPlayer2Manager::Client::disconnect()
     IPCThreadState::self()->flushCommands();
 }
 
-sp<MediaPlayer2Base> MediaPlayer2Manager::Client::createPlayer(player2_type playerType)
-{
-    // determine if we have the right player type
+sp<MediaPlayer2Base> MediaPlayer2Manager::Client::createPlayer() {
     sp<MediaPlayer2Base> p = getPlayer();
-    if ((p != NULL) && (p->playerType() != playerType)) {
-        ALOGV("delete player");
-        p.clear();
-    }
     if (p == NULL) {
-        p = MediaPlayer2Factory::createPlayer(playerType, this, notify, mPid);
+        p = new NuPlayer2Driver(mPid);
+        status_t init_result = p->initCheck();
+        if (init_result == NO_ERROR) {
+            p->setNotifyCallback(this, notify);
+        } else {
+            ALOGE("Failed to create player, initCheck failed(res = %d)", init_result);
+            p.clear();
+        }
     }
 
     if (p != NULL) {
@@ -592,13 +591,8 @@ void MediaPlayer2Manager::Client::AudioDeviceUpdatedNotifier::onAudioDeviceUpdat
     }
 }
 
-sp<MediaPlayer2Base> MediaPlayer2Manager::Client::setDataSource_pre(
-        player2_type playerType)
-{
-    ALOGV("player type = %d", playerType);
-
-    // create the right type of player
-    sp<MediaPlayer2Base> p = createPlayer(playerType);
+sp<MediaPlayer2Base> MediaPlayer2Manager::Client::setDataSource_pre() {
+    sp<MediaPlayer2Base> p = createPlayer();
     if (p == NULL) {
         return p;
     }
@@ -663,8 +657,7 @@ status_t MediaPlayer2Manager::Client::setDataSource(
         mStatus = UNKNOWN_ERROR;
         return mStatus;
     } else {
-        player2_type playerType = MediaPlayer2Factory::getPlayerType(this, url);
-        sp<MediaPlayer2Base> p = setDataSource_pre(playerType);
+        sp<MediaPlayer2Base> p = setDataSource_pre();
         if (p == NULL) {
             return NO_INIT;
         }
@@ -701,11 +694,7 @@ status_t MediaPlayer2Manager::Client::setDataSource(int fd, int64_t offset, int6
         ALOGV("calculated length = %lld", (long long)length);
     }
 
-    player2_type playerType = MediaPlayer2Factory::getPlayerType(this,
-                                                               fd,
-                                                               offset,
-                                                               length);
-    sp<MediaPlayer2Base> p = setDataSource_pre(playerType);
+    sp<MediaPlayer2Base> p = setDataSource_pre();
     if (p == NULL) {
         return NO_INIT;
     }
@@ -716,9 +705,7 @@ status_t MediaPlayer2Manager::Client::setDataSource(int fd, int64_t offset, int6
 
 status_t MediaPlayer2Manager::Client::setDataSource(
         const sp<IStreamSource> &source) {
-    // create the right type of player
-    player2_type playerType = MediaPlayer2Factory::getPlayerType(this, source);
-    sp<MediaPlayer2Base> p = setDataSource_pre(playerType);
+    sp<MediaPlayer2Base> p = setDataSource_pre();
     if (p == NULL) {
         return NO_INIT;
     }
@@ -729,8 +716,7 @@ status_t MediaPlayer2Manager::Client::setDataSource(
 
 status_t MediaPlayer2Manager::Client::setDataSource(
         const sp<DataSource> &source) {
-    player2_type playerType = MediaPlayer2Factory::getPlayerType(this, source);
-    sp<MediaPlayer2Base> p = setDataSource_pre(playerType);
+    sp<MediaPlayer2Base> p = setDataSource_pre();
     if (p == NULL) {
         return NO_INIT;
     }

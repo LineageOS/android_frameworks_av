@@ -736,10 +736,6 @@ status_t NuPlayer2Driver::setLooping(int loop) {
     return OK;
 }
 
-player2_type NuPlayer2Driver::playerType() {
-    return PLAYER2_NU_PLAYER2;
-}
-
 status_t NuPlayer2Driver::invoke(const Parcel &request, Parcel *reply) {
     if (reply == NULL) {
         ALOGE("reply is a NULL pointer");
