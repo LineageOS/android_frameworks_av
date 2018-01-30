@@ -22,6 +22,7 @@
 #include <vector>
 
 #include <utils/Errors.h>
+#include <utils/Log.h>
 #include <utils/RefBase.h>
 
 namespace android {
