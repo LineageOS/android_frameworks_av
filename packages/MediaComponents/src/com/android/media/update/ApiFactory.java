@@ -39,6 +39,7 @@ import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
+import android.media.PlaybackState2;
 import android.media.Rating2;
 import android.media.SessionPlayer2;
 import android.media.SessionToken2;
@@ -52,6 +53,7 @@ import android.media.update.MediaMetadata2Provider;
 import android.media.update.MediaSession2Provider;
 import android.media.update.MediaSession2Provider.PlaylistParamsProvider;
 import android.media.update.MediaSessionService2Provider;
+import android.media.update.PlaybackState2Provider;
 import android.media.update.SessionPlayer2Provider;
 import android.media.update.SessionToken2Provider;
 import android.media.update.VideoView2Provider;
@@ -75,6 +77,7 @@ import com.android.media.MediaMetadata2Impl;
 import com.android.media.MediaSession2Impl;
 import com.android.media.MediaSession2Impl.PlaylistParamsImpl;
 import com.android.media.MediaSessionService2Impl;
+import com.android.media.PlaybackState2Impl;
 import com.android.media.Rating2Impl;
 import com.android.media.SessionToken2Impl;
 import com.android.widget.MediaControlView2Impl;
@@ -265,5 +268,18 @@ public class ApiFactory implements StaticProvider {
     @Override
     public Rating2 newPercentageRating_Rating2(Context context, float percent) {
         return Rating2Impl.newPercentageRating(context, percent);
+    }
+
+    @Override
+    public PlaybackState2Provider createPlaybackState2(Context context, PlaybackState2 instance,
+            int state, long position, long updateTime, float speed, long bufferedPosition,
+            long activeItemId, CharSequence error) {
+        return new PlaybackState2Impl(context, instance, state, position, updateTime, speed,
+                bufferedPosition, activeItemId, error);
+    }
+
+    @Override
+    public PlaybackState2 fromBundle_PlaybackState2(Context context, Bundle bundle) {
+        return PlaybackState2Impl.fromBundle(context, bundle);
     }
 }

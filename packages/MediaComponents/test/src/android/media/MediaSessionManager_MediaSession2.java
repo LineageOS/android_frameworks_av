@@ -33,7 +33,6 @@ import org.junit.runner.RunWith;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import static android.media.TestUtils.createPlaybackState;
 import static org.junit.Assert.*;
 
 /**

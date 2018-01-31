@@ -108,6 +108,17 @@ abstract class MediaSession2TestBase {
         }
     }
 
+    /**
+     * Creates a {@link android.media.session.PlaybackState} with the given state.
+     *
+     * @param state one of the PlaybackState.STATE_xxx.
+     * @return a PlaybackState
+     */
+    public PlaybackState2 createPlaybackState(int state) {
+        return new PlaybackState2(mContext, state, 0, 0, 1.0f,
+                0, 0, null);
+    }
+
     final MediaController2 createController(SessionToken2 token) throws InterruptedException {
         return createController(token, true, null);
     }

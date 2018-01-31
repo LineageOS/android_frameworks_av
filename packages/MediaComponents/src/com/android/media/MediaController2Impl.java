@@ -568,7 +568,8 @@ public class MediaController2Impl implements MediaController2Provider {
                 Log.w(TAG, "Don't fail silently here. Highly likely a bug");
                 return;
             }
-            controller.pushPlaybackStateChanges(PlaybackState2.fromBundle(state));
+            controller.pushPlaybackStateChanges(
+                    PlaybackState2.fromBundle(controller.getContext(), state));
         }
 
         @Override
