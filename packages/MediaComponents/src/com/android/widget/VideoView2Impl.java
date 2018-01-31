@@ -39,17 +39,16 @@ import android.media.session.MediaController.PlaybackInfo;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
 import android.media.update.VideoView2Provider;
-import android.media.update.ViewProvider;
+import android.media.update.ViewGroupProvider;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.ResultReceiver;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
-import android.widget.FrameLayout.LayoutParams;
+import android.view.ViewGroup.LayoutParams;
 import android.widget.MediaControlView2;
 import android.widget.VideoView2;
 
@@ -67,12 +66,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 
-public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.SurfaceListener {
+public class VideoView2Impl extends BaseLayout
+        implements VideoView2Provider, VideoViewInterface.SurfaceListener {
     private static final String TAG = "VideoView2";
     private static final boolean DEBUG = true; // STOPSHIP: Log.isLoggable(TAG, Log.DEBUG);
 
     private final VideoView2 mInstance;
-    private final ViewProvider mSuperProvider;
 
     private static final int STATE_ERROR = -1;
     private static final int STATE_IDLE = 0;
@@ -82,7 +81,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     private static final int STATE_PAUSED = 4;
     private static final int STATE_PLAYBACK_COMPLETED = 5;
 
-    private final AudioManager mAudioManager;
+    private AudioManager mAudioManager;
     private AudioAttributes mAudioAttributes;
     private int mAudioFocusType = AudioManager.AUDIOFOCUS_GAIN; // legacy focus gain
 
@@ -127,11 +126,14 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     // Refer: https://docs.google.com/document/d/1nzAfns6i2hJ3RkaUre3QMT6wsDedJ5ONLiA_OOBFFX8/edit
     private float mFallbackSpeed;  // keep the original speed before 'pause' is called.
 
-    public VideoView2Impl(VideoView2 instance, ViewProvider superProvider,
-            @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+    public VideoView2Impl(VideoView2 instance,
+            ViewGroupProvider superProvider, ViewGroupProvider privateProvider) {
+        super(instance, superProvider, privateProvider);
         mInstance = instance;
-        mSuperProvider = superProvider;
+    }
 
+    @Override
+    public void initialize(@Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         mVideoWidth = 0;
         mVideoHeight = 0;
         mSpeed = 1.0f;
@@ -150,7 +152,6 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
         mSurfaceView = new VideoSurfaceView(mInstance.getContext());
         LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT,
                 LayoutParams.MATCH_PARENT);
-        params.gravity = Gravity.CENTER;
         mTextureView.setLayoutParams(params);
         mSurfaceView.setLayoutParams(params);
         mTextureView.setSurfaceListener(this);
@@ -397,7 +398,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
     @Override
     public void onAttachedToWindow_impl() {
-        mSuperProvider.onAttachedToWindow_impl();
+        super.onAttachedToWindow_impl();
 
         // Create MediaSession
         mMediaSession = new MediaSession(mInstance.getContext(), "VideoView2MediaSession");
@@ -412,8 +413,8 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
     @Override
     public void onDetachedFromWindow_impl() {
-        Log.e(TAG, ".... Debugging. onDetachedFromWindow_impl()");
-        mSuperProvider.onDetachedFromWindow_impl();
+        super.onDetachedFromWindow_impl();
+
         mMediaSession.release();
         mMediaSession = null;
         mMediaController = null;
@@ -434,7 +435,8 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                 && isInPlaybackState() && mMediaControlView != null) {
             toggleMediaControlViewVisibility();
         }
-        return mSuperProvider.onTouchEvent_impl(ev);
+
+        return super.onTouchEvent_impl(ev);
     }
 
     @Override
@@ -443,17 +445,8 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                 && isInPlaybackState() && mMediaControlView != null) {
             toggleMediaControlViewVisibility();
         }
-        return mSuperProvider.onTrackballEvent_impl(ev);
-    }
 
-    @Override
-    public void onFinishInflate_impl() {
-        mSuperProvider.onFinishInflate_impl();
-    }
-
-    @Override
-    public void setEnabled_impl(boolean enabled) {
-        mSuperProvider.setEnabled_impl(enabled);
+        return super.onTrackballEvent_impl(ev);
     }
 
     ///////////////////////////////////////////////////
