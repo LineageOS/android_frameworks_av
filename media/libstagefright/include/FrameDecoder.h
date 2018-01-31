@@ -17,6 +17,9 @@
 #ifndef FRAME_DECODER_H_
 #define FRAME_DECODER_H_
 
+#include <memory>
+#include <vector>
+
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/MediaSource.h>

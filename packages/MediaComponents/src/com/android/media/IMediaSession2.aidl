@@ -27,6 +27,7 @@ import com.android.media.IMediaSession2Callback;
  * Keep this interface oneway. Otherwise a malicious app may implement fake version of this,
  * and holds calls from session to make session owner(s) frozen.
  */
+// TODO: Consider to make some methods oneway
 interface IMediaSession2 {
     // TODO(jaewan): add onCommand() to send private command
     // TODO(jaewan): Due to the nature of oneway calls, APIs can be called in out of order

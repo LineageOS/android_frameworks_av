@@ -35,6 +35,7 @@
 #include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/MetaDataUtils.h>
 #include <media/stagefright/Utils.h>
 
 #include <ctype.h>

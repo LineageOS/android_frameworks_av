@@ -29,6 +29,7 @@ cc_library {
         "MediaSourceBase.cpp",
         "MediaSource.cpp",
         "MediaExtractor.cpp",
+        "MetaData.cpp",
     ],
 
     clang: true,

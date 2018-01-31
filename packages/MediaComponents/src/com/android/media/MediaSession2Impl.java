@@ -31,6 +31,7 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2;
+import android.media.MediaMetadata2;
 import android.media.MediaPlayerInterface;
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2;
@@ -40,6 +41,8 @@ import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
+import android.media.MediaSession2.PlaylistParams.RepeatMode;
+import android.media.MediaSession2.PlaylistParams.ShuffleMode;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
 import android.media.PlaybackState2;
@@ -48,11 +51,13 @@ import android.media.VolumeProvider;
 import android.media.session.MediaSessionManager;
 import android.media.update.MediaSession2Provider;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.os.Process;
 import android.os.IBinder;
 import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
 import android.text.TextUtils;
+import android.util.ArraySet;
 import android.util.Log;
 
 import java.lang.ref.WeakReference;
@@ -96,11 +101,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
      * @param ratingType
      * @param sessionActivity
      */
-    public MediaSession2Impl(Context context, MediaSession2 instance, MediaPlayerInterface player,
+    public MediaSession2Impl(Context context, MediaPlayerInterface player,
             String id, VolumeProvider volumeProvider, int ratingType, PendingIntent sessionActivity,
             Executor callbackExecutor, SessionCallback callback) {
-        mInstance = instance;
         // TODO(jaewan): Keep other params.
+        mInstance = createInstance();
 
         // Argument checks are done by builder already.
         // Initialize finals first.
@@ -127,8 +132,23 @@ public class MediaSession2Impl implements MediaSession2Provider {
                     mContext.getPackageName(), null, id, mSessionStub).getInstance();
         }
 
-        // Only remember player. Actual settings will be done in the initialize().
-        mPlayer = player;
+        setPlayerLocked(player);
+
+        // Ask server for the sanity check, and starts
+        // Sanity check for making session ID unique 'per package' cannot be done in here.
+        // Server can only know if the package has another process and has another session with the
+        // same id. Note that 'ID is unique per package' is important for controller to distinguish
+        // a session in another package.
+        MediaSessionManager manager =
+                (MediaSessionManager) mContext.getSystemService(Context.MEDIA_SESSION_SERVICE);
+        if (!manager.onSessionCreated(mSessionToken)) {
+            throw new IllegalStateException("Session with the same id is already used by"
+                    + " another process. Use MediaController2 instead.");
+        }
+    }
+
+    MediaSession2 createInstance() {
+        return new MediaSession2(this);
     }
 
     private static String getServiceName(Context context, String serviceAction, String id) {
@@ -154,24 +174,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
             }
         }
         return serviceName;
-    }
-
-    @Override
-    public void initialize() {
-        synchronized (mLock) {
-            setPlayerLocked(mPlayer);
-        }
-        // Ask server for the sanity check, and starts
-        // Sanity check for making session ID unique 'per package' cannot be done in here.
-        // Server can only know if the package has another process and has another session with the
-        // same id. Note that 'ID is unique per package' is important for controller to distinguish
-        // a session in another package.
-        MediaSessionManager manager =
-                (MediaSessionManager) mContext.getSystemService(Context.MEDIA_SESSION_SERVICE);
-        if (!manager.onSessionCreated(mSessionToken)) {
-            throw new IllegalStateException("Session with the same id is already used by"
-                    + " another process. Use MediaController2 instead.");
-        }
     }
 
     // TODO(jaewan): Add explicit release() and do not remove session object with the
@@ -612,6 +614,113 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
     }
 
+    /**
+     * Represent set of {@link Command}.
+     */
+    public static class CommandGroupImpl implements CommandGroupProvider {
+        private static final String KEY_COMMANDS =
+                "android.media.mediasession2.commandgroup.commands";
+        private ArraySet<Command> mCommands = new ArraySet<>();
+        private final Context mContext;
+        private final CommandGroup mInstance;
+
+        public CommandGroupImpl(Context context, CommandGroup instance, Object other) {
+            mContext = context;
+            mInstance = instance;
+            if (other != null && other instanceof CommandGroupImpl) {
+                mCommands.addAll(((CommandGroupImpl) other).mCommands);
+            }
+        }
+
+        @Override
+        public void addCommand_impl(Command command) {
+            mCommands.add(command);
+        }
+
+        @Override
+        public void addAllPredefinedCommands_impl() {
+            // TODO(jaewan): Is there any better way than this?
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_START));
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE));
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_STOP));
+            mCommands.add(new Command(mContext,
+                    MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM));
+            mCommands.add(new Command(mContext,
+                    MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM));
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE));
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_FAST_FORWARD));
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_REWIND));
+            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO));
+            mCommands.add(new Command(mContext,
+                    MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM));
+        }
+
+        @Override
+        public void removeCommand_impl(Command command) {
+            mCommands.remove(command);
+        }
+
+        @Override
+        public boolean hasCommand_impl(Command command) {
+            return mCommands.contains(command);
+        }
+
+        @Override
+        public boolean hasCommand_impl(int code) {
+            if (code == MediaSession2.COMMAND_CODE_CUSTOM) {
+                throw new IllegalArgumentException("Use hasCommand(Command) for custom command");
+            }
+            for (int i = 0; i < mCommands.size(); i++) {
+                if (mCommands.valueAt(i).getCommandCode() == code) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * @return new bundle from the CommandGroup
+         * @hide
+         */
+        @Override
+        public Bundle toBundle_impl() {
+            ArrayList<Bundle> list = new ArrayList<>();
+            for (int i = 0; i < mCommands.size(); i++) {
+                list.add(mCommands.valueAt(i).toBundle());
+            }
+            Bundle bundle = new Bundle();
+            bundle.putParcelableArrayList(KEY_COMMANDS, list);
+            return bundle;
+        }
+
+        /**
+         * @return new instance of CommandGroup from the bundle
+         * @hide
+         */
+        public static @Nullable CommandGroup fromBundle_impl(Context context, Bundle commands) {
+            if (commands == null) {
+                return null;
+            }
+            List<Parcelable> list = commands.getParcelableArrayList(KEY_COMMANDS);
+            if (list == null) {
+                return null;
+            }
+            CommandGroup commandGroup = new CommandGroup(context);
+            for (int i = 0; i < list.size(); i++) {
+                Parcelable parcelable = list.get(i);
+                if (!(parcelable instanceof Bundle)) {
+                    continue;
+                }
+                Bundle commandBundle = (Bundle) parcelable;
+                Command command = Command.fromBundle(context, commandBundle);
+                if (command != null) {
+                    commandGroup.addCommand(command);
+                }
+            }
+            return commandGroup;
+        }
+    }
+
     public static class ControllerInfoImpl implements ControllerInfoProvider {
         private final ControllerInfo mInstance;
         private final int mUid;
@@ -704,6 +813,161 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         public static ControllerInfoImpl from(ControllerInfo controller) {
             return (ControllerInfoImpl) controller.getProvider();
+        }
+    }
+
+    public static class PlaylistParamsImpl implements PlaylistParamsProvider {
+        /**
+         * Keys used for converting a PlaylistParams object to a bundle object and vice versa.
+         */
+        private static final String KEY_REPEAT_MODE =
+                "android.media.session2.playlistparams2.repeat_mode";
+        private static final String KEY_SHUFFLE_MODE =
+                "android.media.session2.playlistparams2.shuffle_mode";
+        private static final String KEY_MEDIA_METADATA2_BUNDLE =
+                "android.media.session2.playlistparams2.metadata2_bundle";
+
+        private Context mContext;
+        private PlaylistParams mInstance;
+        private @RepeatMode int mRepeatMode;
+        private @ShuffleMode int mShuffleMode;
+        private MediaMetadata2 mPlaylistMetadata;
+
+        public PlaylistParamsImpl(Context context, PlaylistParams instance,
+                @RepeatMode int repeatMode, @ShuffleMode int shuffleMode,
+                MediaMetadata2 playlistMetadata) {
+            // TODO(jaewan): Sanity check
+            mContext = context;
+            mInstance = instance;
+            mRepeatMode = repeatMode;
+            mShuffleMode = shuffleMode;
+            mPlaylistMetadata = playlistMetadata;
+        }
+
+        public @RepeatMode int getRepeatMode_impl() {
+            return mRepeatMode;
+        }
+
+        public @ShuffleMode int getShuffleMode_impl() {
+            return mShuffleMode;
+        }
+
+        public MediaMetadata2 getPlaylistMetadata_impl() {
+            return mPlaylistMetadata;
+        }
+
+        @Override
+        public Bundle toBundle_impl() {
+            Bundle bundle = new Bundle();
+            bundle.putInt(KEY_REPEAT_MODE, mRepeatMode);
+            bundle.putInt(KEY_SHUFFLE_MODE, mShuffleMode);
+            if (mPlaylistMetadata != null) {
+                bundle.putBundle(KEY_MEDIA_METADATA2_BUNDLE, mPlaylistMetadata.toBundle());
+            }
+            return bundle;
+        }
+
+        public static PlaylistParams fromBundle(Context context, Bundle bundle) {
+            if (bundle == null) {
+                return null;
+            }
+            if (!bundle.containsKey(KEY_REPEAT_MODE) || !bundle.containsKey(KEY_SHUFFLE_MODE)) {
+                return null;
+            }
+
+            Bundle metadataBundle = bundle.getBundle(KEY_MEDIA_METADATA2_BUNDLE);
+            MediaMetadata2 metadata = metadataBundle == null
+                    ? null : MediaMetadata2.fromBundle(context, metadataBundle);
+
+            return new PlaylistParams(context,
+                    bundle.getInt(KEY_REPEAT_MODE),
+                    bundle.getInt(KEY_SHUFFLE_MODE),
+                    metadata);
+        }
+    }
+
+    public static abstract class BuilderBaseImpl<T extends MediaSession2, C extends SessionCallback>
+            implements BuilderBaseProvider<T, C> {
+        final Context mContext;
+        final MediaPlayerInterface mPlayer;
+        String mId;
+        Executor mCallbackExecutor;
+        C mCallback;
+        VolumeProvider mVolumeProvider;
+        int mRatingType;
+        PendingIntent mSessionActivity;
+
+        /**
+         * Constructor.
+         *
+         * @param context a context
+         * @param player a player to handle incoming command from any controller.
+         * @throws IllegalArgumentException if any parameter is null, or the player is a
+         *      {@link MediaSession2} or {@link MediaController2}.
+         */
+        // TODO(jaewan): Also need executor
+        public BuilderBaseImpl(Context context, MediaPlayerInterface player) {
+            if (context == null) {
+                throw new IllegalArgumentException("context shouldn't be null");
+            }
+            if (player == null) {
+                throw new IllegalArgumentException("player shouldn't be null");
+            }
+            mContext = context;
+            mPlayer = player;
+            // Ensure non-null
+            mId = "";
+        }
+
+        public void setVolumeProvider_impl(VolumeProvider volumeProvider) {
+            mVolumeProvider = volumeProvider;
+        }
+
+        public void setRatingType_impl(int type) {
+            mRatingType = type;
+        }
+
+        public void setSessionActivity_impl(PendingIntent pi) {
+            mSessionActivity = pi;
+        }
+
+        public void setId_impl(String id) {
+            if (id == null) {
+                throw new IllegalArgumentException("id shouldn't be null");
+            }
+            mId = id;
+        }
+
+        public void setSessionCallback_impl(Executor executor, C callback) {
+            if (executor == null) {
+                throw new IllegalArgumentException("executor shouldn't be null");
+            }
+            if (callback == null) {
+                throw new IllegalArgumentException("callback shouldn't be null");
+            }
+            mCallbackExecutor = executor;
+            mCallback = callback;
+        }
+
+        public abstract T build_impl();
+    }
+
+    public static class BuilderImpl extends BuilderBaseImpl<MediaSession2, SessionCallback> {
+        public BuilderImpl(Context context, Builder instance, MediaPlayerInterface player) {
+            super(context, player);
+        }
+
+        @Override
+        public MediaSession2 build_impl() {
+            if (mCallbackExecutor == null) {
+                mCallbackExecutor = mContext.getMainExecutor();
+            }
+            if (mCallback == null) {
+                mCallback = new SessionCallback(mContext);
+            }
+
+            return new MediaSession2Impl(mContext, mPlayer, mId, mVolumeProvider, mRatingType,
+                    mSessionActivity, mCallbackExecutor, mCallback).getInstance();
         }
     }
 }

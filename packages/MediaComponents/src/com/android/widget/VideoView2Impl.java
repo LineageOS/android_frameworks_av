@@ -172,10 +172,28 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
         // TODO: Need a common namespace for attributes those are defined in updatable library.
         boolean enableControlView = (attrs == null) || attrs.getAttributeBooleanValue(
-                "http://schemas.android.com/apk/com.android.media.update",
+                "http://schemas.android.com/apk/res/android",
                 "enableControlView", true);
         if (enableControlView) {
             mMediaControlView = new MediaControlView2(mInstance.getContext());
+        }
+        boolean showSubtitle = (attrs == null) || attrs.getAttributeBooleanValue(
+                "http://schemas.android.com/apk/res/android",
+                "showSubtitle", true);
+        if (showSubtitle) {
+            Log.d(TAG, "showSubtitle attribute is true.");
+            // TODO: implement
+        }
+        int viewType = (attrs == null) ? VideoView2.VIEW_TYPE_SURFACEVIEW
+                : attrs.getAttributeIntValue(
+                "http://schemas.android.com/apk/res/android",
+                "viewType", 0);
+        if (viewType == 0) {
+            Log.d(TAG, "viewType attribute is surfaceView.");
+            // TODO: implement
+        } else if (viewType == 1) {
+            Log.d(TAG, "viewType attribute is textureView.");
+            // TODO: implement
         }
     }
 
@@ -202,30 +220,29 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     }
 
     @Override
-    public void showSubtitle_impl() {
-        // Retrieve all tracks that belong to the current video.
-        MediaPlayer.TrackInfo[] trackInfos = mMediaPlayer.getTrackInfo();
+    public void showSubtitle_impl(boolean show) {
+        if (show) {
+            // Retrieve all tracks that belong to the current video.
+            MediaPlayer.TrackInfo[] trackInfos = mMediaPlayer.getTrackInfo();
 
-        List<Integer> subtitleTrackIndices = new ArrayList<>();
-        for (int i = 0; i < trackInfos.length; ++i) {
-            int trackType = trackInfos[i].getTrackType();
-            if (trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE) {
-                subtitleTrackIndices.add(i);
+            List<Integer> subtitleTrackIndices = new ArrayList<>();
+            for (int i = 0; i < trackInfos.length; ++i) {
+                int trackType = trackInfos[i].getTrackType();
+                if (trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE) {
+                    subtitleTrackIndices.add(i);
+                }
             }
-        }
-        if (subtitleTrackIndices.size() > 0) {
-            // Select first subtitle track
-            mCCEnabled = true;
-            mSelectedTrackIndex = subtitleTrackIndices.get(0);
-            mMediaPlayer.selectTrack(mSelectedTrackIndex);
-        }
-    }
-
-    @Override
-    public void hideSubtitle_impl() {
-        if (mCCEnabled) {
-            mMediaPlayer.deselectTrack(mSelectedTrackIndex);
-            mCCEnabled = false;
+            if (subtitleTrackIndices.size() > 0) {
+                // Select first subtitle track
+                mCCEnabled = true;
+                mSelectedTrackIndex = subtitleTrackIndices.get(0);
+                mMediaPlayer.selectTrack(mSelectedTrackIndex);
+            }
+        } else {
+            if (mCCEnabled) {
+                mMediaPlayer.deselectTrack(mSelectedTrackIndex);
+                mCCEnabled = false;
+            }
         }
     }
 
@@ -452,7 +469,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                     + ", mTargetState=" + mTargetState + ", " + view.toString());
         }
         if (mMediaControlView != null) {
-            mMediaControlView.hide();
+            mMediaControlView.setVisibility(View.GONE);
         }
     }
 
@@ -674,9 +691,9 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
     private void toggleMediaControlViewVisibility() {
         if (mMediaControlView.isShowing()) {
-            mMediaControlView.hide();
+            mMediaControlView.setVisibility(View.GONE);
         } else {
-            mMediaControlView.show();
+            mMediaControlView.setVisibility(View.VISIBLE);
         }
     }
 
@@ -763,14 +780,17 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                 if (needToStart()) {
                     mMediaController.getTransportControls().play();
                     if (mMediaControlView != null) {
-                        mMediaControlView.show();
+                        mMediaControlView.setVisibility(View.VISIBLE);
                     }
                 } else if (!(isInPlaybackState() && mMediaPlayer.isPlaying())
                         && (seekToPosition != 0 || mMediaPlayer.getCurrentPosition() > 0)) {
                     if (mMediaControlView != null) {
                         // Show the media controls when we're paused into a video and
                         // make them stick.
-                        mMediaControlView.show(0);
+                        long currTimeout = mMediaControlView.getTimeout();
+                        mMediaControlView.setTimeout(0L);
+                        mMediaControlView.setVisibility(View.VISIBLE);
+                        mMediaControlView.setTimeout(currTimeout);
                     }
                 }
             } else {
@@ -834,7 +854,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
                     updatePlaybackState();
 
                     if (mMediaControlView != null) {
-                        mMediaControlView.hide();
+                        mMediaControlView.setVisibility(View.GONE);
                     }
 
                     /* If an error handler has been supplied, use it and finish. */
@@ -898,10 +918,10 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
             } else {
                 switch (command) {
                     case MediaControlView2.COMMAND_SHOW_SUBTITLE:
-                        mInstance.showSubtitle();
+                        mInstance.showSubtitle(true);
                         break;
                     case MediaControlView2.COMMAND_HIDE_SUBTITLE:
-                        mInstance.hideSubtitle();
+                        mInstance.showSubtitle(false);
                         break;
                     case MediaControlView2.COMMAND_SET_FULLSCREEN:
                         if (mOnFullScreenRequestListener != null) {

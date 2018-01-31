@@ -41,5 +41,4 @@
     <attr name="mediaRouteControlPanelThemeOverlay" format="reference" />
 
     <attr name="mediaRouteTheme" format="reference" />
-    <attr name="enableControlView" format="boolean" />
 </resources>

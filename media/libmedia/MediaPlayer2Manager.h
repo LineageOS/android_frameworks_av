@@ -48,7 +48,7 @@ class MediaPlayer2EngineClient;
 class Antagonizer {
 public:
     Antagonizer(
-            MediaPlayer2Base::NotifyCallback cb,
+            MediaPlayer2Interface::NotifyCallback cb,
             const wp<MediaPlayer2Engine> &client);
     void start() { mActive = true; }
     void stop() { mActive = false; }
@@ -62,14 +62,14 @@ private:
     bool                             mExit;
     bool                             mActive;
     wp<MediaPlayer2Engine>           mClient;
-    MediaPlayer2Base::NotifyCallback mCb;
+    MediaPlayer2Interface::NotifyCallback mCb;
 };
 #endif
 
 class MediaPlayer2Manager {
     class Client;
 
-    class AudioOutput : public MediaPlayer2Base::AudioSink
+    class AudioOutput : public MediaPlayer2Interface::AudioSink
     {
         class CallbackData;
 
@@ -287,7 +287,7 @@ private:
                                         const sp<media::VolumeShaper::Operation>& operation) override;
         virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) override;
 
-        sp<MediaPlayer2Base>    createPlayer(player2_type playerType);
+        sp<MediaPlayer2Interface>    createPlayer();
 
         virtual status_t        setDataSource(
                         const sp<MediaHTTPService> &httpService,
@@ -300,8 +300,8 @@ private:
         virtual status_t        setDataSource(const sp<DataSource> &source);
 
 
-        sp<MediaPlayer2Base>    setDataSource_pre(player2_type playerType);
-        status_t                setDataSource_post(const sp<MediaPlayer2Base>& p,
+        sp<MediaPlayer2Interface>    setDataSource_pre();
+        status_t                setDataSource_post(const sp<MediaPlayer2Interface>& p,
                                                    status_t status);
 
         static  void            notify(const wp<MediaPlayer2Engine> &listener, int msg,
@@ -323,7 +323,7 @@ private:
         class AudioDeviceUpdatedNotifier: public AudioSystem::AudioDeviceCallback
         {
         public:
-            AudioDeviceUpdatedNotifier(const sp<MediaPlayer2Base>& listener) {
+            AudioDeviceUpdatedNotifier(const sp<MediaPlayer2Interface>& listener) {
                 mListener = listener;
             }
             ~AudioDeviceUpdatedNotifier() {}
@@ -332,7 +332,7 @@ private:
                                              audio_port_handle_t deviceId);
 
         private:
-            wp<MediaPlayer2Base> mListener;
+            wp<MediaPlayer2Interface> mListener;
         };
 
         friend class MediaPlayer2Manager;
@@ -346,7 +346,7 @@ private:
 
                 void            deletePlayer();
 
-        sp<MediaPlayer2Base>     getPlayer() const { Mutex::Autolock lock(mLock); return mPlayer; }
+        sp<MediaPlayer2Interface> getPlayer() const { Mutex::Autolock lock(mLock); return mPlayer; }
 
 
 
@@ -366,7 +366,7 @@ private:
         status_t setAudioAttributes_l(const Parcel &request);
 
         mutable     Mutex                        mLock;
-                    sp<MediaPlayer2Base>         mPlayer;
+                    sp<MediaPlayer2Interface>    mPlayer;
                     sp<MediaPlayer2EngineClient> mClient;
                     sp<AudioOutput>              mAudioOutput;
                     pid_t                        mPid;

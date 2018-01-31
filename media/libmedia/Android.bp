@@ -318,9 +318,7 @@ cc_library {
 
     srcs: [
         "JAudioTrack.cpp",
-        "MediaPlayer2Factory.cpp",
         "MediaPlayer2Manager.cpp",
-        "TestPlayerStub.cpp",
         "mediaplayer2.cpp",
     ],
 

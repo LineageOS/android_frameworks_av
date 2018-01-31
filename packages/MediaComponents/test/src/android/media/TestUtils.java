@@ -17,6 +17,7 @@
 package android.media;
 
 import android.content.Context;
+import android.media.MediaSession2.PlaylistParams;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
 import android.os.Bundle;
@@ -29,6 +30,7 @@ import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -98,6 +100,11 @@ public final class TestUtils {
             }
         }
         return true;
+    }
+
+    public static void ensurePlaylistParamsModeEquals(PlaylistParams a, PlaylistParams b) {
+        assertEquals(a.getRepeatMode(), b.getRepeatMode());
+        assertEquals(a.getShuffleMode(), b.getShuffleMode());
     }
 
     /**

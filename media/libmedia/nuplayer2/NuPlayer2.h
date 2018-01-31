@@ -61,7 +61,7 @@ struct NuPlayer2 : public AHandler {
 
     void setVideoSurfaceTextureAsync(const sp<ANativeWindowWrapper> &nww);
 
-    void setAudioSink(const sp<MediaPlayer2Base::AudioSink> &sink);
+    void setAudioSink(const sp<MediaPlayer2Interface::AudioSink> &sink);
     status_t setPlaybackSettings(const AudioPlaybackRate &rate);
     status_t getPlaybackSettings(AudioPlaybackRate *rate /* nonnull */);
     status_t setSyncSettings(const AVSyncSettings &sync, float videoFpsHint);
@@ -168,7 +168,7 @@ private:
     sp<Source> mSource;
     uint32_t mSourceFlags;
     sp<ANativeWindowWrapper> mNativeWindow;
-    sp<MediaPlayer2Base::AudioSink> mAudioSink;
+    sp<MediaPlayer2Interface::AudioSink> mAudioSink;
     sp<DecoderBase> mVideoDecoder;
     bool mOffloadAudio;
     sp<DecoderBase> mAudioDecoder;

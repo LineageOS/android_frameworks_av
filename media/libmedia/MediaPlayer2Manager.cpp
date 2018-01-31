@@ -68,8 +68,8 @@
 
 #include <private/android_filesystem_config.h>
 
+#include <nuplayer2/NuPlayer2Driver.h>
 #include "MediaPlayer2Manager.h"
-#include "MediaPlayer2Factory.h"
 
 static const int kDumpLockRetries = 50;
 static const int kDumpLockSleepUs = 20000;
@@ -269,8 +269,6 @@ MediaPlayer2Manager::MediaPlayer2Manager() {
     mPid = IPCThreadState::self()->getCallingPid();
     mUid = IPCThreadState::self()->getCallingUid();
     mNextConnId = 1;
-
-    MediaPlayer2Factory::registerBuiltinFactories();
 }
 
 MediaPlayer2Manager::~MediaPlayer2Manager() {
@@ -330,7 +328,7 @@ status_t MediaPlayer2Manager::Client::dump(int fd, const Vector<String16>& args)
             mPid, mConnId, mStatus, mLoop?"true": "false");
     result.append(buffer);
 
-    sp<MediaPlayer2Base> p;
+    sp<MediaPlayer2Interface> p;
     sp<AudioOutput> audioOutput;
     bool locked = false;
     for (int i = 0; i < kDumpLockRetries; ++i) {
@@ -534,7 +532,7 @@ void MediaPlayer2Manager::Client::disconnect()
     ALOGV("disconnect(%d) from pid %d", mConnId, mPid);
     // grab local reference and clear main reference to prevent future
     // access to object
-    sp<MediaPlayer2Base> p;
+    sp<MediaPlayer2Interface> p;
     {
         Mutex::Autolock l(mLock);
         p = mPlayer;
@@ -562,16 +560,17 @@ void MediaPlayer2Manager::Client::disconnect()
     IPCThreadState::self()->flushCommands();
 }
 
-sp<MediaPlayer2Base> MediaPlayer2Manager::Client::createPlayer(player2_type playerType)
-{
-    // determine if we have the right player type
-    sp<MediaPlayer2Base> p = getPlayer();
-    if ((p != NULL) && (p->playerType() != playerType)) {
-        ALOGV("delete player");
-        p.clear();
-    }
+sp<MediaPlayer2Interface> MediaPlayer2Manager::Client::createPlayer() {
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == NULL) {
-        p = MediaPlayer2Factory::createPlayer(playerType, this, notify, mPid);
+        p = new NuPlayer2Driver(mPid);
+        status_t init_result = p->initCheck();
+        if (init_result == NO_ERROR) {
+            p->setNotifyCallback(this, notify);
+        } else {
+            ALOGE("Failed to create player, initCheck failed(res = %d)", init_result);
+            p.clear();
+        }
     }
 
     if (p != NULL) {
@@ -584,7 +583,7 @@ sp<MediaPlayer2Base> MediaPlayer2Manager::Client::createPlayer(player2_type play
 void MediaPlayer2Manager::Client::AudioDeviceUpdatedNotifier::onAudioDeviceUpdate(
         audio_io_handle_t audioIo,
         audio_port_handle_t deviceId) {
-    sp<MediaPlayer2Base> listener = mListener.promote();
+    sp<MediaPlayer2Interface> listener = mListener.promote();
     if (listener != NULL) {
         listener->sendEvent(MEDIA2_AUDIO_ROUTING_CHANGED, audioIo, deviceId);
     } else {
@@ -592,13 +591,8 @@ void MediaPlayer2Manager::Client::AudioDeviceUpdatedNotifier::onAudioDeviceUpdat
     }
 }
 
-sp<MediaPlayer2Base> MediaPlayer2Manager::Client::setDataSource_pre(
-        player2_type playerType)
-{
-    ALOGV("player type = %d", playerType);
-
-    // create the right type of player
-    sp<MediaPlayer2Base> p = createPlayer(playerType);
+sp<MediaPlayer2Interface> MediaPlayer2Manager::Client::setDataSource_pre() {
+    sp<MediaPlayer2Interface> p = createPlayer();
     if (p == NULL) {
         return p;
     }
@@ -607,17 +601,15 @@ sp<MediaPlayer2Base> MediaPlayer2Manager::Client::setDataSource_pre(
 
     mAudioDeviceUpdatedListener = new AudioDeviceUpdatedNotifier(p);
 
-    if (!p->hardwareOutput()) {
-        mAudioOutput = new AudioOutput(mAudioSessionId, mUid,
-                mPid, mAudioAttributes, mAudioDeviceUpdatedListener);
-        static_cast<MediaPlayer2Interface*>(p.get())->setAudioSink(mAudioOutput);
-    }
+    mAudioOutput = new AudioOutput(mAudioSessionId, mUid,
+            mPid, mAudioAttributes, mAudioDeviceUpdatedListener);
+    p->setAudioSink(mAudioOutput);
 
     return p;
 }
 
 status_t MediaPlayer2Manager::Client::setDataSource_post(
-        const sp<MediaPlayer2Base>& p,
+        const sp<MediaPlayer2Interface>& p,
         status_t status)
 {
     ALOGV(" setDataSource");
@@ -663,8 +655,7 @@ status_t MediaPlayer2Manager::Client::setDataSource(
         mStatus = UNKNOWN_ERROR;
         return mStatus;
     } else {
-        player2_type playerType = MediaPlayer2Factory::getPlayerType(this, url);
-        sp<MediaPlayer2Base> p = setDataSource_pre(playerType);
+        sp<MediaPlayer2Interface> p = setDataSource_pre();
         if (p == NULL) {
             return NO_INIT;
         }
@@ -701,11 +692,7 @@ status_t MediaPlayer2Manager::Client::setDataSource(int fd, int64_t offset, int6
         ALOGV("calculated length = %lld", (long long)length);
     }
 
-    player2_type playerType = MediaPlayer2Factory::getPlayerType(this,
-                                                               fd,
-                                                               offset,
-                                                               length);
-    sp<MediaPlayer2Base> p = setDataSource_pre(playerType);
+    sp<MediaPlayer2Interface> p = setDataSource_pre();
     if (p == NULL) {
         return NO_INIT;
     }
@@ -716,9 +703,7 @@ status_t MediaPlayer2Manager::Client::setDataSource(int fd, int64_t offset, int6
 
 status_t MediaPlayer2Manager::Client::setDataSource(
         const sp<IStreamSource> &source) {
-    // create the right type of player
-    player2_type playerType = MediaPlayer2Factory::getPlayerType(this, source);
-    sp<MediaPlayer2Base> p = setDataSource_pre(playerType);
+    sp<MediaPlayer2Interface> p = setDataSource_pre();
     if (p == NULL) {
         return NO_INIT;
     }
@@ -729,8 +714,7 @@ status_t MediaPlayer2Manager::Client::setDataSource(
 
 status_t MediaPlayer2Manager::Client::setDataSource(
         const sp<DataSource> &source) {
-    player2_type playerType = MediaPlayer2Factory::getPlayerType(this, source);
-    sp<MediaPlayer2Base> p = setDataSource_pre(playerType);
+    sp<MediaPlayer2Interface> p = setDataSource_pre();
     if (p == NULL) {
         return NO_INIT;
     }
@@ -757,7 +741,7 @@ status_t MediaPlayer2Manager::Client::setVideoSurfaceTexture(
     ALOGV("[%d] setVideoSurfaceTexture(%p)",
           mConnId,
           (nww == NULL ? NULL : nww->getANativeWindow()));
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
 
     if (nww != NULL && nww->getANativeWindow() != NULL) {
@@ -810,7 +794,7 @@ status_t MediaPlayer2Manager::Client::setVideoSurfaceTexture(
 status_t MediaPlayer2Manager::Client::invoke(const Parcel& request,
                                             Parcel *reply)
 {
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == NULL) return UNKNOWN_ERROR;
     return p->invoke(request, reply);
 }
@@ -834,7 +818,7 @@ status_t MediaPlayer2Manager::Client::setMetadataFilter(const Parcel& filter)
 status_t MediaPlayer2Manager::Client::getMetadata(
         bool update_only, bool /*apply_filter*/, Parcel *reply)
 {
-    sp<MediaPlayer2Base> player = getPlayer();
+    sp<MediaPlayer2Interface> player = getPlayer();
     if (player == 0) return UNKNOWN_ERROR;
 
     status_t status;
@@ -879,7 +863,7 @@ status_t MediaPlayer2Manager::Client::setBufferingSettings(
 {
     ALOGV("[%d] setBufferingSettings{%s}",
             mConnId, buffering.toString().string());
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->setBufferingSettings(buffering);
 }
@@ -887,7 +871,7 @@ status_t MediaPlayer2Manager::Client::setBufferingSettings(
 status_t MediaPlayer2Manager::Client::getBufferingSettings(
         BufferingSettings* buffering /* nonnull */)
 {
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     // TODO: create mPlayer on demand.
     if (p == 0) return UNKNOWN_ERROR;
     status_t ret = p->getBufferingSettings(buffering);
@@ -903,7 +887,7 @@ status_t MediaPlayer2Manager::Client::getBufferingSettings(
 status_t MediaPlayer2Manager::Client::prepareAsync()
 {
     ALOGV("[%d] prepareAsync", mConnId);
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     status_t ret = p->prepareAsync();
 #if CALLBACK_ANTAGONIZER
@@ -916,7 +900,7 @@ status_t MediaPlayer2Manager::Client::prepareAsync()
 status_t MediaPlayer2Manager::Client::start()
 {
     ALOGV("[%d] start", mConnId);
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     p->setLooping(mLoop);
     return p->start();
@@ -925,7 +909,7 @@ status_t MediaPlayer2Manager::Client::start()
 status_t MediaPlayer2Manager::Client::stop()
 {
     ALOGV("[%d] stop", mConnId);
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->stop();
 }
@@ -933,7 +917,7 @@ status_t MediaPlayer2Manager::Client::stop()
 status_t MediaPlayer2Manager::Client::pause()
 {
     ALOGV("[%d] pause", mConnId);
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->pause();
 }
@@ -941,7 +925,7 @@ status_t MediaPlayer2Manager::Client::pause()
 status_t MediaPlayer2Manager::Client::isPlaying(bool* state)
 {
     *state = false;
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     *state = p->isPlaying();
     ALOGV("[%d] isPlaying: %d", mConnId, *state);
@@ -952,14 +936,14 @@ status_t MediaPlayer2Manager::Client::setPlaybackSettings(const AudioPlaybackRat
 {
     ALOGV("[%d] setPlaybackSettings(%f, %f, %d, %d)",
             mConnId, rate.mSpeed, rate.mPitch, rate.mFallbackMode, rate.mStretchMode);
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->setPlaybackSettings(rate);
 }
 
 status_t MediaPlayer2Manager::Client::getPlaybackSettings(AudioPlaybackRate* rate /* nonnull */)
 {
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     status_t ret = p->getPlaybackSettings(rate);
     if (ret == NO_ERROR) {
@@ -976,7 +960,7 @@ status_t MediaPlayer2Manager::Client::setSyncSettings(
 {
     ALOGV("[%d] setSyncSettings(%u, %u, %f, %f)",
             mConnId, sync.mSource, sync.mAudioAdjustMode, sync.mTolerance, videoFpsHint);
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->setSyncSettings(sync, videoFpsHint);
 }
@@ -984,7 +968,7 @@ status_t MediaPlayer2Manager::Client::setSyncSettings(
 status_t MediaPlayer2Manager::Client::getSyncSettings(
         AVSyncSettings* sync /* nonnull */, float* videoFps /* nonnull */)
 {
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     status_t ret = p->getSyncSettings(sync, videoFps);
     if (ret == NO_ERROR) {
@@ -999,7 +983,7 @@ status_t MediaPlayer2Manager::Client::getSyncSettings(
 status_t MediaPlayer2Manager::Client::getCurrentPosition(int *msec)
 {
     ALOGV("getCurrentPosition");
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     status_t ret = p->getCurrentPosition(msec);
     if (ret == NO_ERROR) {
@@ -1013,7 +997,7 @@ status_t MediaPlayer2Manager::Client::getCurrentPosition(int *msec)
 status_t MediaPlayer2Manager::Client::getDuration(int *msec)
 {
     ALOGV("getDuration");
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     status_t ret = p->getDuration(msec);
     if (ret == NO_ERROR) {
@@ -1037,7 +1021,7 @@ status_t MediaPlayer2Manager::Client::setNextPlayer(const sp<MediaPlayer2Engine>
     if (c != NULL) {
         if (mAudioOutput != NULL) {
             mAudioOutput->setNextOutput(c->mAudioOutput);
-        } else if ((mPlayer != NULL) && !mPlayer->hardwareOutput()) {
+        } else {
             ALOGE("no current audio output");
         }
 
@@ -1054,13 +1038,9 @@ VolumeShaper::Status MediaPlayer2Manager::Client::applyVolumeShaper(
         const sp<VolumeShaper::Operation>& operation) {
     // for hardware output, call player instead
     ALOGV("Client::applyVolumeShaper(%p)", this);
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     {
         Mutex::Autolock l(mLock);
-        if (p != 0 && p->hardwareOutput()) {
-            // TODO: investigate internal implementation
-            return VolumeShaper::Status(INVALID_OPERATION);
-        }
         if (mAudioOutput.get() != nullptr) {
             return mAudioOutput->applyVolumeShaper(configuration, operation);
         }
@@ -1071,13 +1051,9 @@ VolumeShaper::Status MediaPlayer2Manager::Client::applyVolumeShaper(
 sp<VolumeShaper::State> MediaPlayer2Manager::Client::getVolumeShaperState(int id) {
     // for hardware output, call player instead
     ALOGV("Client::getVolumeShaperState(%p)", this);
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     {
         Mutex::Autolock l(mLock);
-        if (p != 0 && p->hardwareOutput()) {
-            // TODO: investigate internal implementation.
-            return nullptr;
-        }
         if (mAudioOutput.get() != nullptr) {
             return mAudioOutput->getVolumeShaperState(id);
         }
@@ -1088,7 +1064,7 @@ sp<VolumeShaper::State> MediaPlayer2Manager::Client::getVolumeShaperState(int id
 status_t MediaPlayer2Manager::Client::seekTo(int msec, MediaPlayer2SeekMode mode)
 {
     ALOGV("[%d] seekTo(%d, %d)", mConnId, msec, mode);
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->seekTo(msec, mode);
 }
@@ -1097,7 +1073,7 @@ status_t MediaPlayer2Manager::Client::reset()
 {
     ALOGV("[%d] reset", mConnId);
     mRetransmitEndpointValid = false;
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->reset();
 }
@@ -1105,7 +1081,7 @@ status_t MediaPlayer2Manager::Client::reset()
 status_t MediaPlayer2Manager::Client::notifyAt(int64_t mediaTimeUs)
 {
     ALOGV("[%d] notifyAt(%lld)", mConnId, (long long)mediaTimeUs);
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->notifyAt(mediaTimeUs);
 }
@@ -1142,7 +1118,7 @@ status_t MediaPlayer2Manager::Client::setLooping(int loop)
 {
     ALOGV("[%d] setLooping(%d)", mConnId, loop);
     mLoop = loop;
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p != 0) return p->setLooping(loop);
     return NO_ERROR;
 }
@@ -1152,17 +1128,10 @@ status_t MediaPlayer2Manager::Client::setVolume(float leftVolume, float rightVol
     ALOGV("[%d] setVolume(%f, %f)", mConnId, leftVolume, rightVolume);
 
     // for hardware output, call player instead
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     {
       Mutex::Autolock l(mLock);
-      if (p != 0 && p->hardwareOutput()) {
-          MediaPlayerHWInterface* hwp =
-                  reinterpret_cast<MediaPlayerHWInterface*>(p.get());
-          return hwp->setVolume(leftVolume, rightVolume);
-      } else {
-          if (mAudioOutput != 0) mAudioOutput->setVolume(leftVolume, rightVolume);
-          return NO_ERROR;
-      }
+      if (mAudioOutput != 0) mAudioOutput->setVolume(leftVolume, rightVolume);
     }
 
     return NO_ERROR;
@@ -1193,7 +1162,7 @@ status_t MediaPlayer2Manager::Client::setParameter(int key, const Parcel &reques
         return setAudioAttributes_l(request);
     }
     default:
-        sp<MediaPlayer2Base> p = getPlayer();
+        sp<MediaPlayer2Interface> p = getPlayer();
         if (p == 0) { return UNKNOWN_ERROR; }
         return p->setParameter(key, request);
     }
@@ -1201,7 +1170,7 @@ status_t MediaPlayer2Manager::Client::setParameter(int key, const Parcel &reques
 
 status_t MediaPlayer2Manager::Client::getParameter(int key, Parcel *reply) {
     ALOGV("[%d] getParameter(%d)", mConnId, key);
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->getParameter(key, reply);
 }
@@ -1218,7 +1187,7 @@ status_t MediaPlayer2Manager::Client::setRetransmitEndpoint(
         ALOGV("[%d] setRetransmitEndpoint = <none>", mConnId);
     }
 
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
 
     // Right now, the only valid time to set a retransmit endpoint is before
     // player selection has been made (since the presence or absence of a
@@ -1244,7 +1213,7 @@ status_t MediaPlayer2Manager::Client::getRetransmitEndpoint(
     if (NULL == endpoint)
         return BAD_VALUE;
 
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
 
     if (p != NULL)
         return p->getRetransmitEndpoint(endpoint);
@@ -1347,7 +1316,7 @@ status_t MediaPlayer2Manager::Client::prepareDrm(const uint8_t uuid[16],
         const Vector<uint8_t>& drmSessionId)
 {
     ALOGV("[%d] prepareDrm", mConnId);
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
 
     status_t ret = p->prepareDrm(uuid, drmSessionId);
@@ -1359,7 +1328,7 @@ status_t MediaPlayer2Manager::Client::prepareDrm(const uint8_t uuid[16],
 status_t MediaPlayer2Manager::Client::releaseDrm()
 {
     ALOGV("[%d] releaseDrm", mConnId);
-    sp<MediaPlayer2Base> p = getPlayer();
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
 
     status_t ret = p->releaseDrm();

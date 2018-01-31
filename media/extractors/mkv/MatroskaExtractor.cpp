@@ -28,12 +28,12 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/foundation/ColorUtils.h>
-#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/MetaDataUtils.h>
 #include <utils/String8.h>
 
 #include <inttypes.h>

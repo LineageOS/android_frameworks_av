@@ -80,8 +80,9 @@ status_t getNextNALUnit(
         const uint8_t **nalStart, size_t *nalSize,
         bool startCodeFollows = false);
 
-class MetaData;
-sp<MetaData> MakeAVCCodecSpecificData(const sp<ABuffer> &accessUnit);
+sp<ABuffer> MakeAVCCodecSpecificData(
+        const sp<ABuffer> &accessUnit, int32_t *width, int32_t *height,
+        int32_t *sarWidth = nullptr, int32_t *sarHeight = nullptr);
 
 bool IsIDR(const uint8_t *data, size_t size);
 bool IsAVCReferenceFrame(const sp<ABuffer> &accessUnit);
@@ -89,9 +90,10 @@ uint32_t FindAVCLayerId(const uint8_t *data, size_t size);
 
 const char *AVCProfileToString(uint8_t profile);
 
-sp<MetaData> MakeAACCodecSpecificData(
+sp<ABuffer> MakeAACCodecSpecificData(
         unsigned profile, unsigned sampling_freq_index,
-        unsigned channel_configuration);
+        unsigned channel_configuration, int32_t *sampleRate,
+        int32_t *channelCount);
 
 // Given an MPEG4 video VOL-header chunk (starting with 0x00 0x00 0x01 0x2?)
 // parse it and fill in dimensions, returns true iff successful.

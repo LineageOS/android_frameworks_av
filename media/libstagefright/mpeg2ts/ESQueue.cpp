@@ -29,6 +29,7 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/MetaDataUtils.h>
 #include <media/cas/DescramblerAPI.h>
 #include <media/hardware/CryptoAPI.h>
 

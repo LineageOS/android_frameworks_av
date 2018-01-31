@@ -13,6 +13,10 @@ cc_library_shared {
         "libutils",
     ],
 
+    static_libs: [
+        "libstagefright_metadatautils",
+    ],
+
     name: "libaacextractor",
     relative_install_path: "extractors",
 

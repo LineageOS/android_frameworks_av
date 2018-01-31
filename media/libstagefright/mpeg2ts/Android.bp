@@ -37,4 +37,8 @@ cc_library_static {
         "android.hardware.cas.native@1.0",
         "android.hidl.memory@1.0",
     ],
+
+    whole_static_libs: [
+        "libstagefright_metadatautils",
+    ],
 }

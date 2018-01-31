@@ -90,7 +90,7 @@ public class MediaItem2Impl implements MediaItem2Provider {
         bundle.putString(KEY_ID, mId);
         bundle.putInt(KEY_FLAGS, mFlags);
         if (mMetadata != null) {
-            bundle.putBundle(KEY_METADATA, mMetadata.getBundle());
+            bundle.putBundle(KEY_METADATA, mMetadata.toBundle());
         }
         return bundle;
     }
@@ -102,7 +102,7 @@ public class MediaItem2Impl implements MediaItem2Provider {
         final String id = bundle.getString(KEY_ID);
         final Bundle metadataBundle = bundle.getBundle(KEY_METADATA);
         final MediaMetadata2 metadata = metadataBundle != null
-                ? new MediaMetadata2(metadataBundle) : null;
+                ? MediaMetadata2.fromBundle(context, metadataBundle) : null;
         final int flags = bundle.getInt(KEY_FLAGS);
         return new MediaItem2Impl(context, id, metadata, flags).getInstance();
     }

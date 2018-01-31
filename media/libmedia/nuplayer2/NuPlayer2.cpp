@@ -64,7 +64,7 @@
 
 namespace android {
 
-static status_t sendMetaDataToHal(sp<MediaPlayer2Base::AudioSink>& sink,
+static status_t sendMetaDataToHal(sp<MediaPlayer2Interface::AudioSink>& sink,
                                   const sp<MetaData>& meta) {
     int32_t sampleRate = 0;
     int32_t bitRate = 0;
@@ -417,7 +417,7 @@ void NuPlayer2::setVideoSurfaceTextureAsync(const sp<ANativeWindowWrapper> &nww)
     msg->post();
 }
 
-void NuPlayer2::setAudioSink(const sp<MediaPlayer2Base::AudioSink> &sink) {
+void NuPlayer2::setAudioSink(const sp<MediaPlayer2Interface::AudioSink> &sink) {
     sp<AMessage> msg = new AMessage(kWhatSetAudioSink, this);
     msg->setObject("sink", sink);
     msg->post();
@@ -850,7 +850,7 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
             sp<RefBase> obj;
             CHECK(msg->findObject("sink", &obj));
 
-            mAudioSink = static_cast<MediaPlayer2Base::AudioSink *>(obj.get());
+            mAudioSink = static_cast<MediaPlayer2Interface::AudioSink *>(obj.get());
             break;
         }
 
