@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MetaData"
 #include <inttypes.h>
+#include <binder/Parcel.h>
 #include <utils/KeyedVector.h>
 #include <utils/Log.h>
 

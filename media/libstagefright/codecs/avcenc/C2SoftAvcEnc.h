@@ -17,6 +17,8 @@
 #ifndef C2_SOFT_AVC_ENC_H__
 #define C2_SOFT_AVC_ENC_H__
 
+#include <map>
+
 #include <media/stagefright/foundation/ABase.h>
 #include <utils/Vector.h>
 
