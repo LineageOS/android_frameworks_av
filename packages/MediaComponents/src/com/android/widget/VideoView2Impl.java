@@ -35,6 +35,7 @@ import android.media.SubtitleController;
 import android.media.TtmlRenderer;
 import android.media.WebVttRenderer;
 import android.media.session.MediaController;
+import android.media.session.MediaController.PlaybackInfo;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
 import android.media.update.VideoView2Provider;
@@ -403,6 +404,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
     @Override
     public void onDetachedFromWindow_impl() {
+        Log.e(TAG, ".... Debugging. onDetachedFromWindow_impl()");
         mSuperProvider.onDetachedFromWindow_impl();
         mMediaSession.release();
         mMediaSession = null;
@@ -720,6 +722,14 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
         }
     }
 
+    private boolean isRemotePlayback() {
+        if (mMediaController == null) {
+            return false;
+        }
+        PlaybackInfo playbackInfo = mMediaController.getPlaybackInfo();
+        return (playbackInfo != null) && (playbackInfo.getPlaybackType() == PlaybackInfo.PLAYBACK_TYPE_REMOTE);
+    }
+
     MediaPlayer.OnVideoSizeChangedListener mSizeChangedListener =
             new MediaPlayer.OnVideoSizeChangedListener() {
                 public void onVideoSizeChanged(MediaPlayer mp, int width, int height) {
@@ -912,8 +922,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     private class MediaSessionCallback extends MediaSession.Callback {
         @Override
         public void onCommand(String command, Bundle args, ResultReceiver receiver) {
-            if (mMediaController.getPlaybackInfo().getPlaybackType()
-                    == MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE) {
+            if (isRemotePlayback()) {
                 mRouteSessionCallback.onCommand(command, args, receiver);
             } else {
                 switch (command) {
@@ -941,8 +950,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
         @Override
         public void onPlay() {
-            if (mMediaController.getPlaybackInfo().getPlaybackType()
-                    == MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE) {
+            if (isRemotePlayback()) {
                 mRouteSessionCallback.onPlay();
             } else {
                 if (isInPlaybackState() && mCurrentView.hasAvailableSurface()) {
@@ -961,8 +969,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
         @Override
         public void onPause() {
-            if (mMediaController.getPlaybackInfo().getPlaybackType()
-                    == MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE) {
+            if (isRemotePlayback()) {
                 mRouteSessionCallback.onPause();
             } else {
                 if (isInPlaybackState()) {
@@ -982,8 +989,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
         @Override
         public void onSeekTo(long pos) {
-            if (mMediaController.getPlaybackInfo().getPlaybackType()
-                    == MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE) {
+            if (isRemotePlayback()) {
                 mRouteSessionCallback.onSeekTo(pos);
             } else {
                 if (isInPlaybackState()) {
@@ -998,8 +1004,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
 
         @Override
         public void onStop() {
-            if (mMediaController.getPlaybackInfo().getPlaybackType()
-                    == MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE) {
+            if (isRemotePlayback()) {
                 mRouteSessionCallback.onStop();
             } else {
                 resetPlayer();
