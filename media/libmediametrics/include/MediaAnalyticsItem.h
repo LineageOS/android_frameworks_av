@@ -89,10 +89,6 @@ class MediaAnalyticsItem {
         MediaAnalyticsItem(Key);
         ~MediaAnalyticsItem();
 
-        // so clients can send intermediate values to be overlaid later
-        MediaAnalyticsItem &setFinalized(bool);
-        bool getFinalized() const;
-
         // SessionID ties multiple submissions for same key together
         // so that if video "height" and "width" are known at one point
         // and "framerate" is only known later, they can be be brought

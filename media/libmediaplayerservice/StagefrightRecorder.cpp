@@ -125,7 +125,6 @@ StagefrightRecorder::~StagefrightRecorder() {
     if (mAnalyticsDirty && mAnalyticsItem != NULL) {
         updateMetrics();
         if (mAnalyticsItem->count() > 0) {
-            mAnalyticsItem->setFinalized(true);
             mAnalyticsItem->selfrecord();
         }
         delete mAnalyticsItem;
@@ -185,14 +184,12 @@ void StagefrightRecorder::resetMetrics() {
     if (mAnalyticsDirty && mAnalyticsItem != NULL) {
         updateMetrics();
         if (mAnalyticsItem->count() > 0) {
-            mAnalyticsItem->setFinalized(true);
             mAnalyticsItem->selfrecord();
         }
         delete mAnalyticsItem;
         mAnalyticsItem = NULL;
     }
     mAnalyticsItem = new MediaAnalyticsItem(kKeyRecorder);
-    (void) mAnalyticsItem->generateSessionID();
     mAnalyticsDirty = false;
 }
 

@@ -53,7 +53,6 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
     int64_t mItemsDiscarded;
     int64_t mItemsDiscardedExpire;
     int64_t mItemsDiscardedCount;
-    int64_t mSetsDiscarded;
     MediaAnalyticsItem::SessionID_t mLastSessionID;
 
     // partitioned a bit so we don't over serialize
@@ -76,25 +75,15 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
     bool contentValid(MediaAnalyticsItem *item, bool isTrusted);
     bool rateLimited(MediaAnalyticsItem *);
 
-    // the ones that are still open
-    // (newest at front) since we keep looking for them
-    List<MediaAnalyticsItem *> *mOpen;
-    // the ones we've finalized
     // (oldest at front) so it prints nicely for dumpsys
-    List<MediaAnalyticsItem *> *mFinalized;
-    // searching within these queues: queue, key
-    MediaAnalyticsItem *findItem(List<MediaAnalyticsItem *> *,
-                                     MediaAnalyticsItem *, bool removeit);
-
-    void saveItem(MediaAnalyticsItem);
-    void saveItem(List<MediaAnalyticsItem *> *, MediaAnalyticsItem *, int);
-    void deleteItem(List<MediaAnalyticsItem *> *, MediaAnalyticsItem *);
+    List<MediaAnalyticsItem *> mItems;
+    void saveItem(MediaAnalyticsItem *);
 
     // support for generating output
     int mDumpProto;
     int mDumpProtoDefault;
-    String8 dumpQueue(List<MediaAnalyticsItem*> *);
-    String8 dumpQueue(List<MediaAnalyticsItem*> *, nsecs_t, const char *only);
+    String8 dumpQueue();
+    String8 dumpQueue(nsecs_t, const char *only);
 
     void dumpHeaders(String8 &result, nsecs_t ts_since);
     void dumpSummaries(String8 &result, nsecs_t ts_since, const char * only);

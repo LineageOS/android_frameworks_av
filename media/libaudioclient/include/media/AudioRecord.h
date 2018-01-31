@@ -703,7 +703,6 @@ private:
             // mAnalyticsItem alloc failure will be flagged in the constructor
             // don't log empty records
             if (mAnalyticsItem->count() > 0) {
-                mAnalyticsItem->setFinalized(true);
                 mAnalyticsItem->selfrecord();
             }
         }
