@@ -602,6 +602,14 @@ status_t MPEG4Extractor::readMetaData() {
                 ALOGE("heif image %u has no meta!", imageIndex);
                 continue;
             }
+            // Some heif files advertise image sequence brands (eg. 'hevc') in
+            // ftyp box, but don't have any valid tracks in them. Instead of
+            // reporting the entire file as malformed, we override the error
+            // to allow still images to be extracted.
+            if (err != OK) {
+                ALOGW("Extracting still images only");
+                err = OK;
+            }
 
             ALOGV("adding HEIF image track %u", imageIndex);
             Track *track = new Track;
