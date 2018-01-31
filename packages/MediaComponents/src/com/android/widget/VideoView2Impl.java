@@ -104,7 +104,7 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     private MediaController mMediaController;
     private MediaSession.Callback mRouteSessionCallback = new RouteSessionCallback();
     private MediaRouter mMediaRouter;
-    private MediaRouteSelector mMediaRouteSelector;
+    private MediaRouteSelector mRouteSelector;
     private Metadata mMetadata;
     private String mTitle;
 
@@ -201,6 +201,10 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
     @Override
     public void setMediaControlView2_impl(MediaControlView2 mediaControlView) {
         mMediaControlView = mediaControlView;
+        if (mRouteSelector != null) {
+            ((MediaControlView2Impl) mMediaControlView.getProvider())
+                    .setRouteSelector(mRouteSelector);
+        }
 
         if (mInstance.isAttachedToWindow()) {
             attachMediaControlView();
@@ -293,7 +297,11 @@ public class VideoView2Impl implements VideoView2Provider, VideoViewInterface.Su
         for (String category : routeCategories) {
             builder.addControlCategory(category);
         }
-        mMediaRouteSelector = builder.build();
+        mRouteSelector = builder.build();
+        if (mMediaControlView != null) {
+            ((MediaControlView2Impl) mMediaControlView.getProvider())
+                    .setRouteSelector(mRouteSelector);
+        }
         mMediaRouter = MediaRouter.getInstance(mInstance.getContext());
         mRouteSessionCallback = sessionPlayer;
         if (mMediaSession != null) {

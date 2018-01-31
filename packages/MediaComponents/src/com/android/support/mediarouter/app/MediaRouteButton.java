@@ -90,6 +90,7 @@ public class MediaRouteButton extends View {
     private final MediaRouterCallback mCallback;
 
     private MediaRouteSelector mSelector = MediaRouteSelector.EMPTY;
+    private int mRouteCallbackFlags;
     private MediaRouteDialogFactory mDialogFactory = MediaRouteDialogFactory.getDefault();
 
     private boolean mAttachedToWindow;
@@ -174,23 +175,38 @@ public class MediaRouteButton extends View {
      * Sets the media route selector for filtering the routes that the user can
      * select using the media route chooser dialog.
      *
-     * @param selector The selector, must not be null.
+     * @param selector The selector.
      */
     public void setRouteSelector(MediaRouteSelector selector) {
-        if (selector == null) {
-            throw new IllegalArgumentException("selector must not be null");
+        setRouteSelector(selector, 0);
+    }
+
+    /**
+     * Sets the media route selector for filtering the routes that the user can
+     * select using the media route chooser dialog.
+     *
+     * @param selector The selector.
+     * @param flags Flags to control the behavior of the callback. May be zero or a combination of
+     *              {@link #MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN} and
+     *              {@link #MediaRouter.CALLBACK_FLAG_UNFILTERED_EVENTS}.
+     */
+    public void setRouteSelector(MediaRouteSelector selector, int flags) {
+        if (mSelector.equals(selector) && mRouteCallbackFlags == flags) {
+            return;
+        }
+        if (!mSelector.isEmpty()) {
+            mRouter.removeCallback(mCallback);
+        }
+        if (selector == null || selector.isEmpty()) {
+            mSelector = MediaRouteSelector.EMPTY;
+            return;
         }
 
-        if (!mSelector.equals(selector)) {
-            if (mAttachedToWindow) {
-                if (!mSelector.isEmpty()) {
-                    mRouter.removeCallback(mCallback);
-                }
-                if (!selector.isEmpty()) {
-                    mRouter.addCallback(selector, mCallback);
-                }
-            }
-            mSelector = selector;
+        mSelector = selector;
+        mRouteCallbackFlags = flags;
+
+        if (mAttachedToWindow) {
+            mRouter.addCallback(selector, mCallback, flags);
             refreshRoute();
         }
     }
@@ -411,7 +427,7 @@ public class MediaRouteButton extends View {
 
         mAttachedToWindow = true;
         if (!mSelector.isEmpty()) {
-            mRouter.addCallback(mSelector, mCallback);
+            mRouter.addCallback(mSelector, mCallback, mRouteCallbackFlags);
         }
         refreshRoute();
     }
