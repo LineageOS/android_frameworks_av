@@ -19,7 +19,6 @@ package android.media;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
 
-import static android.media.TestUtils.createPlaybackState;
 import static android.media.TestUtils.ensurePlaylistParamsModeEquals;
 
 import android.media.MediaPlayerInterface.PlaybackListener;
