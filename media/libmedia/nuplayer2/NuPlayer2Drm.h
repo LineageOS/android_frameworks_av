@@ -17,8 +17,11 @@
 #ifndef NUPLAYER2_DRM_H_
 #define NUPLAYER2_DRM_H_
 
-#include <binder/Parcel.h>
+#include <media/NdkMediaExtractor.h>
+#include <media/stagefright/foundation/ABuffer.h>
 
+#include <utils/String8.h>
+#include <utils/Vector.h>
 
 namespace android {
 
@@ -76,8 +79,8 @@ namespace android {
         // static helpers - public
 
     public:
-        // Parcel has only private copy constructor so passing it in rather than returning
-        static void retrieveDrmInfo(const void *pssh, size_t psshsize, Parcel *parcel);
+        static sp<ABuffer> retrieveDrmInfo(const void *pssh, uint32_t psshsize);
+        static sp<ABuffer> retrieveDrmInfo(PsshInfo *);
 
     };  // NuPlayer2Drm
 
