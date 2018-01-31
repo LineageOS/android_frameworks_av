@@ -32,6 +32,8 @@
 #include <media/stagefright/CodecBase.h>
 #include <media/ICrypto.h>
 
+#include "InputSurfaceWrapper.h"
+
 namespace android {
 
 using ::android::hardware::media::c2::V1_0::implementation::InputSurface;
@@ -80,7 +82,7 @@ public:
      * Set GraphicBufferSource object from which the component extracts input
      * buffers.
      */
-    status_t setInputSurface(const sp<InputSurface> &source);
+    status_t setInputSurface(const std::shared_ptr<InputSurfaceWrapper> &surface);
 
     /**
      * Start queueing buffers to the component. This object should never queue
@@ -107,7 +109,6 @@ public:
     class Buffers;
     class InputBuffers;
     class OutputBuffers;
-    class InputBufferClient;
 
 private:
     class QueueGuard;
@@ -168,7 +169,6 @@ private:
     int32_t mHeapSeqNum;
 
     std::shared_ptr<C2Component> mComponent;
-    std::shared_ptr<InputBufferClient> mInputClient;
     std::function<void(status_t, enum ActionCode)> mOnError;
     std::shared_ptr<C2BlockPool> mInputAllocator;
     QueueSync mQueueSync;
@@ -182,8 +182,7 @@ private:
     sp<MemoryDealer> makeMemoryDealer(size_t heapSize);
     Mutexed<sp<Surface>> mSurface;
 
-    sp<InputSurface> mInputSurface;
-    sp<InputSurfaceConnection> mInputSurfaceConnection;
+    std::shared_ptr<InputSurfaceWrapper> mInputSurface;
 
     inline bool hasCryptoOrDescrambler() {
         return mCrypto != NULL || mDescrambler != NULL;

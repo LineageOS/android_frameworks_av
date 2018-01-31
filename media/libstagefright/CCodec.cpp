@@ -24,6 +24,7 @@
 #include <C2PlatformSupport.h>
 #include <C2V4l2Support.h>
 
+#include <android/IOMXBufferSource.h>
 #include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
 #include <gui/Surface.h>
 #include <media/stagefright/codec2/1.0/InputSurface.h>
@@ -31,7 +32,9 @@
 #include <media/stagefright/CCodec.h>
 #include <media/stagefright/PersistentSurface.h>
 
+#include "include/C2OMXNode.h"
 #include "include/CCodecBufferChannel.h"
+#include "include/InputSurfaceWrapper.h"
 
 namespace android {
 
@@ -147,6 +150,76 @@ public:
 
 private:
     wp<CCodec> mCodec;
+};
+
+class C2InputSurfaceWrapper : public InputSurfaceWrapper {
+public:
+    explicit C2InputSurfaceWrapper(const sp<InputSurface> &surface) : mSurface(surface) {}
+    ~C2InputSurfaceWrapper() override = default;
+
+    status_t connect(const std::shared_ptr<C2Component> &comp) override {
+        if (mConnection != nullptr) {
+            return ALREADY_EXISTS;
+        }
+        mConnection = mSurface->connectToComponent(comp);
+        return OK;
+    }
+
+    void disconnect() override {
+        if (mConnection != nullptr) {
+            mConnection->disconnect();
+            mConnection.clear();
+        }
+    }
+
+private:
+    sp<InputSurface> mSurface;
+    sp<InputSurfaceConnection> mConnection;
+};
+
+class GraphicBufferSourceWrapper : public InputSurfaceWrapper {
+public:
+    explicit GraphicBufferSourceWrapper(const sp<IGraphicBufferSource> &source) : mSource(source) {}
+    ~GraphicBufferSourceWrapper() override = default;
+
+    status_t connect(const std::shared_ptr<C2Component> &comp) override {
+        // TODO: proper color aspect & dataspace
+        android_dataspace dataSpace = HAL_DATASPACE_BT709;
+
+        mNode = new C2OMXNode(comp);
+        mSource->configure(mNode, dataSpace);
+
+        // TODO: configure according to intf().
+
+        sp<IOMXBufferSource> source = mNode->getSource();
+        if (source == nullptr) {
+            return NO_INIT;
+        }
+        constexpr size_t kNumSlots = 16;
+        for (size_t i = 0; i < kNumSlots; ++i) {
+            source->onInputBufferAdded(i);
+        }
+        source->onOmxExecuting();
+        return OK;
+    }
+
+    void disconnect() override {
+        if (mNode == nullptr) {
+            return;
+        }
+        sp<IOMXBufferSource> source = mNode->getSource();
+        if (source == nullptr) {
+            ALOGD("GBSWrapper::disconnect: node is not configured with OMXBufferSource.");
+            return;
+        }
+        source->onOmxIdle();
+        source->onOmxLoaded();
+        mNode.clear();
+    }
+
+private:
+    sp<IGraphicBufferSource> mSource;
+    sp<C2OMXNode> mNode;
 };
 
 }  // namespace
@@ -314,7 +387,7 @@ void CCodec::createInputSurface() {
         return;
     }
 
-    err = setupInputSurface(surface);
+    err = setupInputSurface(std::make_shared<C2InputSurfaceWrapper>(surface));
     if (err != OK) {
         ALOGE("Failed to set up input surface: %d", err);
         mCallback->onInputSurfaceCreationFailed(err);
@@ -334,7 +407,7 @@ void CCodec::createInputSurface() {
             new BufferProducerWrapper(new H2BGraphicBufferProducer(surface)));
 }
 
-status_t CCodec::setupInputSurface(const sp<InputSurface> &surface) {
+status_t CCodec::setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &surface) {
     status_t err = mChannel->setInputSurface(surface);
     if (err != OK) {
         return err;
@@ -351,10 +424,22 @@ void CCodec::initiateSetInputSurface(const sp<PersistentSurface> &surface) {
 }
 
 void CCodec::setInputSurface(const sp<PersistentSurface> &surface) {
-    // TODO
-    (void)surface;
+    status_t err = setupInputSurface(std::make_shared<GraphicBufferSourceWrapper>(
+            surface->getBufferSource()));
+    if (err != OK) {
+        ALOGE("Failed to set up input surface: %d", err);
+        mCallback->onInputSurfaceDeclined(err);
+        return;
+    }
 
-    mCallback->onInputSurfaceDeclined(ERROR_UNSUPPORTED);
+    sp<AMessage> inputFormat;
+    sp<AMessage> outputFormat;
+    {
+        Mutexed<Formats>::Locked formats(mFormats);
+        inputFormat = formats->inputFormat;
+        outputFormat = formats->outputFormat;
+    }
+    mCallback->onInputSurfaceAccepted(inputFormat, outputFormat);
 }
 
 void CCodec::initiateStart() {

@@ -33,19 +33,9 @@
 #include <nativebase/nativebase.h>
 
 namespace android {
-namespace hardware {
-namespace media {
-namespace c2 {
-namespace V1_0 {
-namespace implementation {
-class InputSurface;
-}  // implementation
-}  // V1_0
-}  // c2
-}  // media
-}  // hardware
 
 class CCodecBufferChannel;
+class InputSurfaceWrapper;
 
 class CCodec : public CodecBase {
 public:
@@ -91,8 +81,7 @@ private:
 
     void createInputSurface();
     void setInputSurface(const sp<PersistentSurface> &surface);
-    status_t setupInputSurface(
-            const sp<::android::hardware::media::c2::V1_0::implementation::InputSurface> &surface);
+    status_t setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &surface);
 
     void setDeadline(const TimePoint &deadline);
 

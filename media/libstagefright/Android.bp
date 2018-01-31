@@ -60,6 +60,7 @@ cc_library_shared {
         "AudioPresentationInfo.cpp",
         "AudioSource.cpp",
         "BufferImpl.cpp",
+        "C2OMXNode.cpp",
         "CCodec.cpp",
         "CCodecBufferChannel.cpp",
         "CodecBase.cpp",

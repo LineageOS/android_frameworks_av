@@ -803,7 +803,8 @@ void CCodecBufferChannel::setComponent(const std::shared_ptr<C2Component> &compo
     }
 }
 
-status_t CCodecBufferChannel::setInputSurface(const sp<InputSurface> &surface) {
+status_t CCodecBufferChannel::setInputSurface(
+        const std::shared_ptr<InputSurfaceWrapper> &surface) {
     ALOGV("setInputSurface");
     mInputSurface = surface;
     return OK;
@@ -1017,16 +1018,15 @@ void CCodecBufferChannel::start(const sp<AMessage> &inputFormat, const sp<AMessa
             mCallback->onInputBufferAvailable(index, buffer);
         }
     } else {
-        mInputSurfaceConnection = mInputSurface->connectToComponent(mComponent);
+        (void)mInputSurface->connect(mComponent);
     }
 }
 
 void CCodecBufferChannel::stop() {
     mSync.stop();
     mFirstValidFrameIndex = mFrameIndex.load();
-    if (mInputSurfaceConnection != nullptr) {
-        mInputSurfaceConnection->disconnect();
-        mInputSurfaceConnection.clear();
+    if (mInputSurface != nullptr) {
+        mInputSurface->disconnect();
     }
 }
 
