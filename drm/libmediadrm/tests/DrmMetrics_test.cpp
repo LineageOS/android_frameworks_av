@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
+#include <binder/PersistableBundle.h>
 #include <gtest/gtest.h>
 
 #include "DrmMetrics.h"
 
 using ::android::hardware::drm::V1_0::EventType;
 using ::android::hardware::drm::V1_0::KeyStatusType;
+using ::android::os::PersistableBundle;
 
 namespace android {
 
@@ -31,10 +33,10 @@ class MediaDrmMetricsTest : public ::testing::Test {
 
 TEST_F(MediaDrmMetricsTest, EmptySuccess) {
   MediaDrmMetrics metrics;
-  MediaAnalyticsItem item;
+  PersistableBundle bundle;
 
-  metrics.Export(&item);
-  EXPECT_EQ(0, item.count());
+  metrics.Export(&bundle);
+  EXPECT_TRUE(bundle.empty());
 }
 
 TEST_F(MediaDrmMetricsTest, AllValuesSuccessCounts) {
@@ -58,10 +60,10 @@ TEST_F(MediaDrmMetricsTest, AllValuesSuccessCounts) {
   metrics.mKeyStatusChangeCounter.Increment(KeyStatusType::USABLE);
   metrics.mEventCounter.Increment(EventType::PROVISION_REQUIRED);
 
-  MediaAnalyticsItem item;
+  PersistableBundle bundle;
 
-  metrics.Export(&item);
-  EXPECT_EQ(11, item.count());
+  metrics.Export(&bundle);
+  EXPECT_EQ(11U, bundle.size());
 
   // Verify the list of pairs of int64 metrics.
   std::vector<std::pair<std::string, int64_t>> expected_values = {
@@ -75,24 +77,24 @@ TEST_F(MediaDrmMetricsTest, AllValuesSuccessCounts) {
       { "drm.mediadrm.event.PROVISION_REQUIRED.count", 1 },
       { "drm.mediadrm.get_device_unique_id.ok.count", 1 }};
   for (const auto& expected_pair : expected_values) {
+    String16 key(expected_pair.first.c_str());
     int64_t value = -1;
-    EXPECT_TRUE(item.getInt64(expected_pair.first.c_str(), &value))
-        << "Failed to get " << expected_pair.first;
+    EXPECT_TRUE(bundle.getLong(key, &value))
+        << "Unexpected error retrieviing key: " << key;
     EXPECT_EQ(expected_pair.second, value)
-        << "Unexpected value for " << expected_pair.first;
+        << "Unexpected value for " << expected_pair.first << ". " << value;
   }
 
   // Validate timing values exist.
+  String16 get_key_request_key(
+      "drm.mediadrm.get_key_request.ok.average_time_micros");
+  String16 provide_key_response_key(
+      "drm.mediadrm.provide_key_response.ok.average_time_micros");
   int64_t value = -1;
-  EXPECT_TRUE(
-      item.getInt64("drm.mediadrm.get_key_request.ok.average_time_micros",
-                    &value));
+  EXPECT_TRUE(bundle.getLong(get_key_request_key, &value));
   EXPECT_GE(value, 0);
-
   value = -1;
-  EXPECT_TRUE(
-      item.getInt64("drm.mediadrm.provide_key_response.ok.average_time_micros",
-                    &value));
+  EXPECT_TRUE(bundle.getLong(provide_key_response_key, &value));
   EXPECT_GE(value, 0);
 }
 
@@ -133,10 +135,9 @@ TEST_F(MediaDrmMetricsTest, AllValuesFull) {
   metrics.mEventCounter.Increment(EventType::VENDOR_DEFINED);
   metrics.mEventCounter.Increment(EventType::SESSION_RECLAIMED);
 
-  MediaAnalyticsItem item;
-
-  metrics.Export(&item);
-  EXPECT_EQ(26, item.count());
+  PersistableBundle bundle;
+  metrics.Export(&bundle);
+  EXPECT_EQ(33U, bundle.size());
 
   // Verify the list of pairs of int64 metrics.
   std::vector<std::pair<std::string, int64_t>> expected_values = {
@@ -165,24 +166,44 @@ TEST_F(MediaDrmMetricsTest, AllValuesFull) {
       { "drm.mediadrm.event.VENDOR_DEFINED.count", 1 },
       { "drm.mediadrm.event.SESSION_RECLAIMED.count", 1 }};
   for (const auto& expected_pair : expected_values) {
+    String16 key(expected_pair.first.c_str());
     int64_t value = -1;
-    EXPECT_TRUE(item.getInt64(expected_pair.first.c_str(), &value))
-        << "Failed to get " << expected_pair.first;
+    EXPECT_TRUE(bundle.getLong(key, &value))
+        << "Unexpected error retrieviing key: " << key;
     EXPECT_EQ(expected_pair.second, value)
-        << "Unexpected value for " << expected_pair.first;
+        << "Unexpected value for " << expected_pair.first << ". " << value;
+  }
+
+  // Verify the error lists
+  std::vector<std::pair<std::string, std::vector<int64_t>>> expected_vector_values = {
+      { "drm.mediadrm.close_session.error.list", { UNEXPECTED_NULL } },
+      { "drm.mediadrm.get_device_unique_id.error.list", { UNEXPECTED_NULL } },
+      { "drm.mediadrm.get_key_request.error.list", { UNEXPECTED_NULL } },
+      { "drm.mediadrm.get_provision_request.error.list", { UNEXPECTED_NULL } },
+      { "drm.mediadrm.open_session.error.list", { UNEXPECTED_NULL } },
+      { "drm.mediadrm.provide_key_response.error.list", { UNEXPECTED_NULL } },
+      { "drm.mediadrm.provide_provision_response.error.list", { UNEXPECTED_NULL } }};
+  for (const auto& expected_pair : expected_vector_values) {
+    String16 key(expected_pair.first.c_str());
+    std::vector<int64_t> values;
+    EXPECT_TRUE(bundle.getLongVector(key, &values))
+        << "Unexpected error retrieviing key: " << key;
+    for (auto expected : expected_pair.second) {
+      EXPECT_TRUE(std::find(values.begin(), values.end(), expected) != values.end())
+          << "Could not find " << expected << " for key " << expected_pair.first;
+    }
   }
 
   // Validate timing values exist.
+  String16 get_key_request_key(
+      "drm.mediadrm.get_key_request.ok.average_time_micros");
+  String16 provide_key_response_key(
+      "drm.mediadrm.provide_key_response.ok.average_time_micros");
   int64_t value = -1;
-  EXPECT_TRUE(
-      item.getInt64("drm.mediadrm.get_key_request.ok.average_time_micros",
-                    &value));
+  EXPECT_TRUE(bundle.getLong(get_key_request_key, &value));
   EXPECT_GE(value, 0);
-
   value = -1;
-  EXPECT_TRUE(
-      item.getInt64("drm.mediadrm.provide_key_response.ok.average_time_micros",
-                    &value));
+  EXPECT_TRUE(bundle.getLong(provide_key_response_key, &value));
   EXPECT_GE(value, 0);
 }
 

@@ -550,6 +550,7 @@ status_t DrmHal::openSession(Vector<uint8_t> &sessionId) {
         DrmSessionManager::Instance()->addSession(getCallingPid(),
                 mDrmSessionClient, sessionId);
         mOpenSessions.push(sessionId);
+        mMetrics.SetSessionStart(sessionId);
     }
 
     mMetrics.mOpenSessionCounter.Increment(err);
@@ -571,9 +572,10 @@ status_t DrmHal::closeSession(Vector<uint8_t> const &sessionId) {
                 }
             }
         }
-        reportMetrics();
         status_t response = toStatusT(status);
+        mMetrics.SetSessionEnd(sessionId);
         mMetrics.mCloseSessionCounter.Increment(response);
+        reportMetrics();
         return response;
     }
     mMetrics.mCloseSessionCounter.Increment(DEAD_OBJECT);
