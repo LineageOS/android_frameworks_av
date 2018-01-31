@@ -641,20 +641,10 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         @Override
         public void addAllPredefinedCommands_impl() {
-            // TODO(jaewan): Is there any better way than this?
-            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_START));
-            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE));
-            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_STOP));
-            mCommands.add(new Command(mContext,
-                    MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM));
-            mCommands.add(new Command(mContext,
-                    MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM));
-            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE));
-            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_FAST_FORWARD));
-            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_REWIND));
-            mCommands.add(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO));
-            mCommands.add(new Command(mContext,
-                    MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM));
+            final int COMMAND_CODE_MAX = 22;
+            for (int i = 1; i <= COMMAND_CODE_MAX; i++) {
+                mCommands.add(new Command(mContext, i));
+            }
         }
 
         @Override
