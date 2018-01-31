@@ -54,3 +54,7 @@ cc_library_shared {
         "-std=c++14",
     ],
 }
+
+subdirs = [
+    "bufferpool",
+]
