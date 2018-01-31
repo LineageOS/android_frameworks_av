@@ -55,8 +55,6 @@ static inline const T &max(const T &x, const T &y) {
     return x > y ? x : y;
 }
 
-static const int32_t NANOS_PER_SECOND = 1000000000;
-
 static inline nsecs_t framesToNanoseconds(ssize_t frames, uint32_t sampleRate, float speed)
 {
     return ((double)frames * 1000000000) / ((double)sampleRate * speed);
