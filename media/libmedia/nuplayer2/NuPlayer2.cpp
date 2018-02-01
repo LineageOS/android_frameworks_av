@@ -43,6 +43,7 @@
 #include <media/AudioParameter.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AVSyncSettings.h>
+#include <media/DataSourceDesc.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/NdkWrapper.h>
 
@@ -258,16 +259,6 @@ void NuPlayer2::setDriver(const wp<NuPlayer2Driver> &driver) {
     mDriver = driver;
 }
 
-void NuPlayer2::setDataSourceAsync(const sp<IStreamSource> &source) {
-    sp<AMessage> msg = new AMessage(kWhatSetDataSource, this);
-
-    sp<AMessage> notify = new AMessage(kWhatSourceNotify, this);
-
-    msg->setObject("source", new StreamingSource(notify, source));
-    msg->post();
-    mDataSourceType = DATA_SOURCE_TYPE_STREAM;
-}
-
 static bool IsHTTPLiveURL(const char *url) {
     if (!strncasecmp("http://", url, 7)
             || !strncasecmp("https://", url, 8)
@@ -285,93 +276,102 @@ static bool IsHTTPLiveURL(const char *url) {
     return false;
 }
 
-void NuPlayer2::setDataSourceAsync(
-        const sp<MediaHTTPService> &httpService,
-        const char *url,
-        const KeyedVector<String8, String8> *headers) {
-
+void NuPlayer2::setDataSourceAsync(const sp<DataSourceDesc> &dsd) {
     sp<AMessage> msg = new AMessage(kWhatSetDataSource, this);
-    size_t len = strlen(url);
-
     sp<AMessage> notify = new AMessage(kWhatSourceNotify, this);
-
     sp<Source> source;
-    if (IsHTTPLiveURL(url)) {
-        source = new HTTPLiveSource(notify, httpService, url, headers);
-        ALOGV("setDataSourceAsync HTTPLiveSource %s", url);
-        mDataSourceType = DATA_SOURCE_TYPE_HTTP_LIVE;
-    } else if (!strncasecmp(url, "rtsp://", 7)) {
-        source = new RTSPSource(
-                notify, httpService, url, headers, mUIDValid, mUID);
-        ALOGV("setDataSourceAsync RTSPSource %s", url);
-        mDataSourceType = DATA_SOURCE_TYPE_RTSP;
-    } else if ((!strncasecmp(url, "http://", 7)
-                || !strncasecmp(url, "https://", 8))
-                    && ((len >= 4 && !strcasecmp(".sdp", &url[len - 4]))
-                    || strstr(url, ".sdp?"))) {
-        source = new RTSPSource(
-                notify, httpService, url, headers, mUIDValid, mUID, true);
-        ALOGV("setDataSourceAsync RTSPSource http/https/.sdp %s", url);
-        mDataSourceType = DATA_SOURCE_TYPE_RTSP;
-    } else {
-        ALOGV("setDataSourceAsync GenericSource %s", url);
 
-        sp<GenericSource> genericSource =
-                new GenericSource(notify, mUIDValid, mUID, mMediaClock);
+    switch (dsd->mType) {
+        case DataSourceDesc::TYPE_URL:
+        {
+            const char *url = dsd->mUrl.c_str();
+            size_t len = strlen(url);
 
-        status_t err = genericSource->setDataSource(httpService, url, headers);
+            const sp<MediaHTTPService> &httpService = dsd->mHttpService;
+            KeyedVector<String8, String8> *headers = &(dsd->mHeaders);
 
-        if (err == OK) {
-            source = genericSource;
-        } else {
-            ALOGE("Failed to set data source!");
+            if (IsHTTPLiveURL(url)) {
+                source = new HTTPLiveSource(notify, httpService, url, headers);
+                ALOGV("setDataSourceAsync HTTPLiveSource %s", url);
+                mDataSourceType = DATA_SOURCE_TYPE_HTTP_LIVE;
+            } else if (!strncasecmp(url, "rtsp://", 7)) {
+                source = new RTSPSource(
+                        notify, httpService, url, headers, mUIDValid, mUID);
+                ALOGV("setDataSourceAsync RTSPSource %s", url);
+                mDataSourceType = DATA_SOURCE_TYPE_RTSP;
+            } else if ((!strncasecmp(url, "http://", 7)
+                        || !strncasecmp(url, "https://", 8))
+                            && ((len >= 4 && !strcasecmp(".sdp", &url[len - 4]))
+                            || strstr(url, ".sdp?"))) {
+                source = new RTSPSource(
+                        notify, httpService, url, headers, mUIDValid, mUID, true);
+                ALOGV("setDataSourceAsync RTSPSource http/https/.sdp %s", url);
+                mDataSourceType = DATA_SOURCE_TYPE_RTSP;
+            } else {
+                ALOGV("setDataSourceAsync GenericSource %s", url);
+
+                sp<GenericSource> genericSource =
+                        new GenericSource(notify, mUIDValid, mUID, mMediaClock);
+
+                status_t err = genericSource->setDataSource(httpService, url, headers);
+
+                if (err == OK) {
+                    source = genericSource;
+                } else {
+                    ALOGE("Failed to set data source!");
+                }
+
+                // regardless of success/failure
+                mDataSourceType = DATA_SOURCE_TYPE_GENERIC_URL;
+            }
+            break;
         }
 
-        // regardless of success/failure
-        mDataSourceType = DATA_SOURCE_TYPE_GENERIC_URL;
+        case DataSourceDesc::TYPE_FD:
+        {
+            sp<GenericSource> genericSource =
+                    new GenericSource(notify, mUIDValid, mUID, mMediaClock);
+
+            ALOGV("setDataSourceAsync fd %d/%lld/%lld source: %p",
+                  dsd->mFD, (long long)dsd->mFDOffset, (long long)dsd->mFDLength, source.get());
+
+            status_t err = genericSource->setDataSource(dsd->mFD, dsd->mFDOffset, dsd->mFDLength);
+
+            if (err != OK) {
+                ALOGE("Failed to set data source!");
+                source = NULL;
+            } else {
+                source = genericSource;
+            }
+
+            mDataSourceType = DATA_SOURCE_TYPE_GENERIC_FD;
+            break;
+        }
+
+        case DataSourceDesc::TYPE_CALLBACK:
+        {
+            sp<GenericSource> genericSource =
+                    new GenericSource(notify, mUIDValid, mUID, mMediaClock);
+            status_t err = genericSource->setDataSource(dsd->mCallbackSource);
+
+            if (err != OK) {
+                ALOGE("Failed to set data source!");
+                source = NULL;
+            } else {
+                source = genericSource;
+            }
+
+            mDataSourceType = DATA_SOURCE_TYPE_MEDIA;
+            break;
+        }
+
+        default:
+            ALOGE("invalid data source type!");
+            break;
     }
+
     msg->setObject("source", source);
     msg->post();
-}
-
-void NuPlayer2::setDataSourceAsync(int fd, int64_t offset, int64_t length) {
-    sp<AMessage> msg = new AMessage(kWhatSetDataSource, this);
-
-    sp<AMessage> notify = new AMessage(kWhatSourceNotify, this);
-
-    sp<GenericSource> source =
-            new GenericSource(notify, mUIDValid, mUID, mMediaClock);
-
-    ALOGV("setDataSourceAsync fd %d/%lld/%lld source: %p",
-            fd, (long long)offset, (long long)length, source.get());
-
-    status_t err = source->setDataSource(fd, offset, length);
-
-    if (err != OK) {
-        ALOGE("Failed to set data source!");
-        source = NULL;
-    }
-
-    msg->setObject("source", source);
-    msg->post();
-    mDataSourceType = DATA_SOURCE_TYPE_GENERIC_FD;
-}
-
-void NuPlayer2::setDataSourceAsync(const sp<DataSource> &dataSource) {
-    sp<AMessage> msg = new AMessage(kWhatSetDataSource, this);
-    sp<AMessage> notify = new AMessage(kWhatSourceNotify, this);
-
-    sp<GenericSource> source = new GenericSource(notify, mUIDValid, mUID, mMediaClock);
-    status_t err = source->setDataSource(dataSource);
-
-    if (err != OK) {
-        ALOGE("Failed to set data source!");
-        source = NULL;
-    }
-
-    msg->setObject("source", source);
-    msg->post();
-    mDataSourceType = DATA_SOURCE_TYPE_MEDIA;
 }
 
 status_t NuPlayer2::getBufferingSettings(

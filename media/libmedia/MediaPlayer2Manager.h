@@ -287,22 +287,7 @@ private:
                                         const sp<media::VolumeShaper::Operation>& operation) override;
         virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) override;
 
-        sp<MediaPlayer2Interface>    createPlayer();
-
-        virtual status_t        setDataSource(
-                        const sp<MediaHTTPService> &httpService,
-                        const char *url,
-                        const KeyedVector<String8, String8> *headers);
-
-        virtual status_t        setDataSource(int fd, int64_t offset, int64_t length);
-
-        virtual status_t        setDataSource(const sp<IStreamSource> &source);
-        virtual status_t        setDataSource(const sp<DataSource> &source);
-
-
-        sp<MediaPlayer2Interface>    setDataSource_pre();
-        status_t                setDataSource_post(const sp<MediaPlayer2Interface>& p,
-                                                   status_t status);
+        virtual status_t        setDataSource(const sp<DataSourceDesc> &dsd);
 
         static  void            notify(const wp<MediaPlayer2Engine> &listener, int msg,
                                        int ext1, int ext2, const Parcel *obj);
@@ -343,6 +328,7 @@ private:
                                        uid_t uid);
                                 Client();
         virtual                 ~Client();
+        bool init();
 
                 void            deletePlayer();
 

@@ -32,16 +32,7 @@ struct NuPlayer2Driver : public MediaPlayer2Interface {
 
     virtual status_t setUID(uid_t uid);
 
-    virtual status_t setDataSource(
-            const sp<MediaHTTPService> &httpService,
-            const char *url,
-            const KeyedVector<String8, String8> *headers);
-
-    virtual status_t setDataSource(int fd, int64_t offset, int64_t length);
-
-    virtual status_t setDataSource(const sp<IStreamSource> &source);
-
-    virtual status_t setDataSource(const sp<DataSource>& dataSource);
+    virtual status_t setDataSource(const sp<DataSourceDesc> &dsd) override;
 
     virtual status_t setVideoSurfaceTexture(const sp<ANativeWindowWrapper> &nww);
 

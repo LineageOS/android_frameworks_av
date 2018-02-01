@@ -254,6 +254,7 @@ cc_library {
 
     srcs: [
         "BufferingSettings.cpp",
+        "DataSourceDesc.cpp",
         "IDataSource.cpp",
         "IMediaExtractor.cpp",
         "IMediaExtractorService.cpp",

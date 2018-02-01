@@ -45,6 +45,7 @@
 #include <utils/Vector.h>
 
 #include <media/AudioPolicyHelper.h>
+#include <media/DataSourceDesc.h>
 #include <media/MediaHTTPService.h>
 #include <media/MediaPlayer2EngineClient.h>
 #include <media/MediaPlayer2Interface.h>
@@ -247,13 +248,6 @@ extern ALooperRoster gLooperRoster;
 
 MediaPlayer2Manager gMediaPlayer2Manager;
 
-static bool checkPermission(const char* permissionString) {
-    if (getpid() == IPCThreadState::self()->getCallingPid()) return true;
-    bool ok = checkCallingPermission(String16(permissionString));
-    if (!ok) ALOGE("Request requires %s", permissionString);
-    return ok;
-}
-
 // TODO: Find real cause of Audio/Video delay in PV framework and remove this workaround
 /* static */ int MediaPlayer2Manager::AudioOutput::mMinBufferCount = 4;
 /* static */ bool MediaPlayer2Manager::AudioOutput::mIsOnEmulator = false;
@@ -283,6 +277,10 @@ sp<MediaPlayer2Engine> MediaPlayer2Manager::create(
 
     sp<Client> c = new Client(
             mPid, connId, client, audioSessionId, mUid);
+
+    if (!c->init()) {
+        return NULL;
+    }
 
     ALOGV("Create new client(%d) from pid %d, uid %d, ", connId, mPid, mUid);
 
@@ -514,6 +512,25 @@ MediaPlayer2Manager::Client::Client(
 #endif
 }
 
+bool MediaPlayer2Manager::Client::init() {
+    sp<MediaPlayer2Interface> p = new NuPlayer2Driver(mPid);
+    status_t init_result = p->initCheck();
+    if (init_result != NO_ERROR) {
+        ALOGE("Failed to create player object, initCheck failed(%d)", init_result);
+        return false;
+    }
+
+    p->setNotifyCallback(this, notify);
+    p->setUID(mUid);
+    mAudioDeviceUpdatedListener = new AudioDeviceUpdatedNotifier(p);
+    mAudioOutput = new AudioOutput(mAudioSessionId, mUid,
+            mPid, mAudioAttributes, mAudioDeviceUpdatedListener);
+    p->setAudioSink(mAudioOutput);
+
+    mPlayer = p;
+    return true;
+}
+
 MediaPlayer2Manager::Client::~Client()
 {
     ALOGV("Client(%d) destructor pid = %d", mConnId, mPid);
@@ -560,26 +577,6 @@ void MediaPlayer2Manager::Client::disconnect()
     IPCThreadState::self()->flushCommands();
 }
 
-sp<MediaPlayer2Interface> MediaPlayer2Manager::Client::createPlayer() {
-    sp<MediaPlayer2Interface> p = getPlayer();
-    if (p == NULL) {
-        p = new NuPlayer2Driver(mPid);
-        status_t init_result = p->initCheck();
-        if (init_result == NO_ERROR) {
-            p->setNotifyCallback(this, notify);
-        } else {
-            ALOGE("Failed to create player, initCheck failed(res = %d)", init_result);
-            p.clear();
-        }
-    }
-
-    if (p != NULL) {
-        p->setUID(mUid);
-    }
-
-    return p;
-}
-
 void MediaPlayer2Manager::Client::AudioDeviceUpdatedNotifier::onAudioDeviceUpdate(
         audio_io_handle_t audioIo,
         audio_port_handle_t deviceId) {
@@ -591,30 +588,20 @@ void MediaPlayer2Manager::Client::AudioDeviceUpdatedNotifier::onAudioDeviceUpdat
     }
 }
 
-sp<MediaPlayer2Interface> MediaPlayer2Manager::Client::setDataSource_pre() {
-    sp<MediaPlayer2Interface> p = createPlayer();
+status_t MediaPlayer2Manager::Client::setDataSource(
+        const sp<DataSourceDesc> &dsd) {
+    sp<MediaPlayer2Interface> p = getPlayer();
     if (p == NULL) {
-        return p;
+        return NO_INIT;
     }
 
-    Mutex::Autolock lock(mLock);
+    if (dsd == NULL) {
+        return BAD_VALUE;
+    }
 
-    mAudioDeviceUpdatedListener = new AudioDeviceUpdatedNotifier(p);
-
-    mAudioOutput = new AudioOutput(mAudioSessionId, mUid,
-            mPid, mAudioAttributes, mAudioDeviceUpdatedListener);
-    p->setAudioSink(mAudioOutput);
-
-    return p;
-}
-
-status_t MediaPlayer2Manager::Client::setDataSource_post(
-        const sp<MediaPlayer2Interface>& p,
-        status_t status)
-{
-    ALOGV(" setDataSource");
+    status_t status = p->setDataSource(dsd);
     if (status != OK) {
-        ALOGE("  error: %d", status);
+        ALOGE("setDataSource error: %d", status);
         return status;
     }
 
@@ -626,100 +613,7 @@ status_t MediaPlayer2Manager::Client::setDataSource_post(
         }
     }
 
-    if (status == OK) {
-        Mutex::Autolock lock(mLock);
-        mPlayer = p;
-    }
     return status;
-}
-
-status_t MediaPlayer2Manager::Client::setDataSource(
-        const sp<MediaHTTPService> &httpService,
-        const char *url,
-        const KeyedVector<String8, String8> *headers)
-{
-    ALOGV("setDataSource(%s)", url);
-    if (url == NULL)
-        return UNKNOWN_ERROR;
-
-    if ((strncmp(url, "http://", 7) == 0) ||
-        (strncmp(url, "https://", 8) == 0) ||
-        (strncmp(url, "rtsp://", 7) == 0)) {
-        if (!checkPermission("android.permission.INTERNET")) {
-            return PERMISSION_DENIED;
-        }
-    }
-
-    if (strncmp(url, "content://", 10) == 0) {
-        ALOGE("setDataSource: content scheme is not supported here");
-        mStatus = UNKNOWN_ERROR;
-        return mStatus;
-    } else {
-        sp<MediaPlayer2Interface> p = setDataSource_pre();
-        if (p == NULL) {
-            return NO_INIT;
-        }
-
-        return mStatus =
-                setDataSource_post(
-                p, p->setDataSource(httpService, url, headers));
-    }
-}
-
-status_t MediaPlayer2Manager::Client::setDataSource(int fd, int64_t offset, int64_t length)
-{
-    ALOGV("setDataSource fd=%d (%s), offset=%lld, length=%lld",
-            fd, nameForFd(fd).c_str(), (long long) offset, (long long) length);
-    struct stat sb;
-    int ret = fstat(fd, &sb);
-    if (ret != 0) {
-        ALOGE("fstat(%d) failed: %d, %s", fd, ret, strerror(errno));
-        return UNKNOWN_ERROR;
-    }
-
-    ALOGV("st_dev  = %llu", static_cast<unsigned long long>(sb.st_dev));
-    ALOGV("st_mode = %u", sb.st_mode);
-    ALOGV("st_uid  = %lu", static_cast<unsigned long>(sb.st_uid));
-    ALOGV("st_gid  = %lu", static_cast<unsigned long>(sb.st_gid));
-    ALOGV("st_size = %llu", static_cast<unsigned long long>(sb.st_size));
-
-    if (offset >= sb.st_size) {
-        ALOGE("offset error");
-        return UNKNOWN_ERROR;
-    }
-    if (offset + length > sb.st_size) {
-        length = sb.st_size - offset;
-        ALOGV("calculated length = %lld", (long long)length);
-    }
-
-    sp<MediaPlayer2Interface> p = setDataSource_pre();
-    if (p == NULL) {
-        return NO_INIT;
-    }
-
-    // now set data source
-    return mStatus = setDataSource_post(p, p->setDataSource(fd, offset, length));
-}
-
-status_t MediaPlayer2Manager::Client::setDataSource(
-        const sp<IStreamSource> &source) {
-    sp<MediaPlayer2Interface> p = setDataSource_pre();
-    if (p == NULL) {
-        return NO_INIT;
-    }
-
-    // now set data source
-    return mStatus = setDataSource_post(p, p->setDataSource(source));
-}
-
-status_t MediaPlayer2Manager::Client::setDataSource(
-        const sp<DataSource> &source) {
-    sp<MediaPlayer2Interface> p = setDataSource_pre();
-    if (p == NULL) {
-        return NO_INIT;
-    }
-    // now set data source
-    return mStatus = setDataSource_post(p, p->setDataSource(source));
 }
 
 void MediaPlayer2Manager::Client::disconnectNativeWindow_l() {
@@ -1187,13 +1081,8 @@ status_t MediaPlayer2Manager::Client::setRetransmitEndpoint(
         ALOGV("[%d] setRetransmitEndpoint = <none>", mConnId);
     }
 
-    sp<MediaPlayer2Interface> p = getPlayer();
-
     // Right now, the only valid time to set a retransmit endpoint is before
-    // player selection has been made (since the presence or absence of a
-    // retransmit endpoint is going to determine which player is selected during
-    // setDataSource).
-    if (p != 0) return INVALID_OPERATION;
+    // setDataSource.
 
     if (NULL != endpoint) {
         Mutex::Autolock lock(mLock);
