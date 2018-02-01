@@ -2622,8 +2622,8 @@ void dumpFSV(const C2FieldSupportedValues &sv, T*t) {
         if (get(sv.range.step, t) != std::is_integral<T>::value) {
             cout << ":" << get(sv.range.step, t);
         }
-        if (get(sv.range.nom, t) != 1 || get(sv.range.denom, t) != 1) {
-            cout << ":" << get(sv.range.nom, t) << "/" << get(sv.range.denom, t);
+        if (get(sv.range.num, t) != 1 || get(sv.range.denom, t) != 1) {
+            cout << ":" << get(sv.range.num, t) << "/" << get(sv.range.denom, t);
         }
         cout << get(sv.range.max, t) << ")";
     }
@@ -2736,7 +2736,7 @@ void dumpDesc(const C2ParamDescriptor &pd) {
         cout << "persistent ";
     }
     cout << "struct ";
-    dumpType(pd.type());
+    dumpType(C2Param::Type(pd.index().type()));
     cout << " " << pd.name() << ";" << endl;
 }
 
@@ -2769,7 +2769,7 @@ TEST_F(C2ParamTest, FieldSupportedValuesTest) {
     Uint32TestInfo t;
     std::vector<C2FieldSupportedValues> values;
     values.push_back(C2FieldSupportedValues(0, 10, 1));  // min, max, step
-    values.push_back(C2FieldSupportedValues(1, 64, 2, 1));  // min, max, nom, den
+    values.push_back(C2FieldSupportedValues(1, 64, 2, 1));  // min, max, num, den
     values.push_back(C2FieldSupportedValues(false, {1, 2, 3}));  // flags, std::initializer_list
     uint32_t val[] = {1, 3, 5, 7};
     std::vector<uint32_t> v(std::begin(val), std::end(val));

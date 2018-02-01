@@ -237,8 +237,8 @@ std::shared_ptr<C2ComponentInterface> SimpleC2Component::intf() {
 
 namespace {
 
-std::vector<std::unique_ptr<C2Work>> vec(std::unique_ptr<C2Work> &work) {
-    std::vector<std::unique_ptr<C2Work>> ret;
+std::list<std::unique_ptr<C2Work>> vec(std::unique_ptr<C2Work> &work) {
+    std::list<std::unique_ptr<C2Work>> ret;
     ret.push_back(std::move(work));
     return ret;
 }

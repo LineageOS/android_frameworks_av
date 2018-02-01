@@ -22,7 +22,7 @@
 namespace android {
 
 struct C2_HIDE _C2ParamInspector {
-   inline static uint32_t getIndex(const C2ParamField &pf) {
+    inline static uint32_t getIndex(const C2ParamField &pf) {
         return pf._mIndex;
     }
 
@@ -32,6 +32,10 @@ struct C2_HIDE _C2ParamInspector {
 
     inline static uint32_t getSize(const C2ParamField &pf) {
         return pf._mFieldId._mSize;
+    }
+
+    inline static uint32_t getAttrib(const C2ParamDescriptor &pd) {
+        return pd._mAttrib;
     }
 
     inline static

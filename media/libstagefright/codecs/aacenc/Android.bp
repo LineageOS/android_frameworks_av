@@ -22,7 +22,6 @@ cc_library_shared {
 
     static_libs: [
         "libFraunhoferAAC",
-        "libstagefright_codec2_vndk"
     ],
 
     shared_libs: [
@@ -30,6 +29,7 @@ cc_library_shared {
         "libion",
         "liblog",
         "libstagefright_codec2",
+        "libstagefright_codec2_vndk",
         "libstagefright_foundation",
         "libstagefright_simple_c2component",
         "libutils",
