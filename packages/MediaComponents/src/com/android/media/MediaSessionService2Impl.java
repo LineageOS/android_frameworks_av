@@ -18,7 +18,9 @@ package com.android.media;
 
 import static android.content.Context.NOTIFICATION_SERVICE;
 
+import android.app.Notification;
 import android.app.NotificationManager;
+import android.content.Context;
 import android.content.Intent;
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2;
@@ -116,7 +118,8 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
                 if (!mIsRunningForeground) {
                     mIsRunningForeground = true;
                     mInstance.startForegroundService(mStartSelfIntent);
-                    mInstance.startForeground(mediaNotification.id, mediaNotification.notification);
+                    mInstance.startForeground(mediaNotification.getNotificationId(),
+                            mediaNotification.getNotification());
                     return;
                 }
                 break;
@@ -128,7 +131,8 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
                 }
                 break;
         }
-        mNotificationManager.notify(mediaNotification.id, mediaNotification.notification);
+        mNotificationManager.notify(mediaNotification.getNotificationId(),
+                mediaNotification.getNotification());
     }
 
     private class SessionServicePlaybackListener implements PlaybackListener {
@@ -140,6 +144,30 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
             }
             MediaSession2Impl impl = (MediaSession2Impl) mSession.getProvider();
             updateNotification(state);
+        }
+    }
+
+    public static class MediaNotificationImpl implements MediaNotificationProvider {
+        private int mNotificationId;
+        private Notification mNotification;
+
+        public MediaNotificationImpl(Context context, MediaNotification instance,
+                int notificationId, Notification notification) {
+            if (notification == null) {
+                throw new IllegalArgumentException("notification shouldn't be null");
+            }
+            mNotificationId = notificationId;
+            mNotification = notification;
+        }
+
+        @Override
+        public int getNotificationId_impl() {
+            return mNotificationId;
+        }
+
+        @Override
+        public Notification getNotification_impl() {
+            return mNotification;
         }
     }
 }

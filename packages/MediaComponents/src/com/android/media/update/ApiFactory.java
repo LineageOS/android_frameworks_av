@@ -16,6 +16,7 @@
 
 package com.android.media.update;
 
+import android.app.Notification;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
@@ -38,6 +39,7 @@ import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
+import android.media.MediaSessionService2.MediaNotification;
 import android.media.PlaybackState2;
 import android.media.Rating2;
 import android.media.SessionPlayer2;
@@ -52,6 +54,7 @@ import android.media.update.MediaSession2Provider;
 import android.media.update.MediaSession2Provider.BuilderBaseProvider;
 import android.media.update.MediaSession2Provider.PlaylistParamsProvider;
 import android.media.update.MediaSessionService2Provider;
+import android.media.update.MediaSessionService2Provider.MediaNotificationProvider;
 import android.media.update.PlaybackState2Provider;
 import android.media.update.SessionPlayer2Provider;
 import android.media.update.SessionToken2Provider;
@@ -160,6 +163,13 @@ public class ApiFactory implements StaticProvider {
     public MediaSessionService2Provider createMediaSessionService2(
             MediaSessionService2 instance) {
         return new MediaSessionService2Impl(instance);
+    }
+
+    @Override
+    public MediaNotificationProvider createMediaSessionService2MediaNotification(Context context,
+            MediaNotification instance, int notificationId, Notification notification) {
+        return new MediaSessionService2Impl.MediaNotificationImpl(
+                context, instance, notificationId, notification);
     }
 
     @Override
