@@ -31,6 +31,34 @@ namespace android {
 std::shared_ptr<C2AllocatorStore> GetCodec2PlatformAllocatorStore();
 
 /**
+ * Platform allocator store IDs
+ */
+class C2PlatformAllocatorStore : public C2AllocatorStore {
+public:
+    enum : id_t {
+        /**
+         * ID of the ion backed platform allocator.
+         *
+         * C2Handle consists of:
+         *   fd  shared ion buffer handle
+         *   int size (lo 32 bits)
+         *   int size (hi 32 bits)
+         *   int magic '\xc2io\x00'
+         */
+        ION = PLATFORM_START,
+
+        /**
+         * ID of the gralloc backed platform allocator.
+         *
+         * C2Handle layout is not public. Use C2AllocatorGralloc::UnwrapNativeCodec2GrallocHandle
+         * to get the underlying gralloc handle from a C2Handle, and WrapNativeCodec2GrallocHandle
+         * to create a C2Handle from a gralloc handle - for C2Allocator::priorAllocation.
+         */
+        GRALLOC,
+    };
+};
+
+/**
  * Retrieves a block pool for a component.
  *
  * \param id        the local ID of the block pool

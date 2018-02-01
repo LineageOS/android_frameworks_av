@@ -61,7 +61,7 @@ public:
             const C2Handle *handle,
             std::shared_ptr<C2GraphicAllocation> *allocation) override;
 
-    C2AllocatorGralloc();
+    C2AllocatorGralloc(id_t id = 0);
 
     c2_status_t status() const;
 

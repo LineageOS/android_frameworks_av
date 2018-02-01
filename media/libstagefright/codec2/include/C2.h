@@ -189,6 +189,7 @@ enum c2_blocking_t : int32_t {
 #define C2_CONST __attribute__((const))
 #define C2_HIDE __attribute__((visibility("hidden")))
 #define C2_INTERNAL __attribute__((internal_linkage))
+#define C2_ALLOW_OVERFLOW __attribute__((no_sanitize("integer")))
 
 #define DEFINE_OTHER_COMPARISON_OPERATORS(type) \
     inline bool operator!=(const type &other) const { return !(*this == other); } \
@@ -221,13 +222,13 @@ class C2_HIDE c2_cntr_t;
 template<typename T>
 struct C2_HIDE _c2_cntr_compat_helper {
     template<typename U, typename E=typename std::enable_if<std::is_integral<U>::value>::type>
-    __attribute__((no_sanitize("integer")))
+    C2_ALLOW_OVERFLOW
     inline static constexpr T get(const U &value) {
         return T(value);
     }
 
     template<typename U, typename E=typename std::enable_if<(sizeof(U) >= sizeof(T))>::type>
-    __attribute__((no_sanitize("integer")))
+    C2_ALLOW_OVERFLOW
     inline static constexpr T get(const c2_cntr_t<U, void> &value) {
         return T(value.mValue);
     }
@@ -281,7 +282,7 @@ public:
     /**
      * Peek as underlying signed type.
      */
-    __attribute__((no_sanitize("integer")))
+    C2_ALLOW_OVERFLOW
     inline constexpr typename std::make_signed<T>::type peek() const {
         return static_cast<typename std::make_signed<T>::type>(mValue);
     }
@@ -296,7 +297,7 @@ public:
     /**
      * Peek as long long - e.g. for printing.
      */
-    __attribute__((no_sanitize("integer")))
+    C2_ALLOW_OVERFLOW
     inline constexpr long long peekll() const {
         return (long long)mValue;
     }
@@ -304,7 +305,7 @@ public:
     /**
      * Peek as unsigned long long - e.g. for printing.
      */
-    __attribute__((no_sanitize("integer")))
+    C2_ALLOW_OVERFLOW
     inline constexpr unsigned long long peekull() const {
         return (unsigned long long)mValue;
     }
@@ -352,24 +353,24 @@ public:
         return c2_cntr_t<T, void>(mValue op); \
     }
 
-    DEFINE_C2_CNTR_BINARY_OP(__attribute__((no_sanitize("integer"))), +, +=)
-    DEFINE_C2_CNTR_BINARY_OP(__attribute__((no_sanitize("integer"))), -, -=)
-    DEFINE_C2_CNTR_BINARY_OP(__attribute__((no_sanitize("integer"))), *, *=)
+    DEFINE_C2_CNTR_BINARY_OP(C2_ALLOW_OVERFLOW, +, +=)
+    DEFINE_C2_CNTR_BINARY_OP(C2_ALLOW_OVERFLOW, -, -=)
+    DEFINE_C2_CNTR_BINARY_OP(C2_ALLOW_OVERFLOW, *, *=)
 
-    DEFINE_C2_CNTR_UNARY_OP(__attribute__((no_sanitize("integer"))), -)
-    DEFINE_C2_CNTR_UNARY_OP(__attribute__((no_sanitize("integer"))), +)
+    DEFINE_C2_CNTR_UNARY_OP(C2_ALLOW_OVERFLOW, -)
+    DEFINE_C2_CNTR_UNARY_OP(C2_ALLOW_OVERFLOW, +)
 
-    DEFINE_C2_CNTR_CREMENT_OP(__attribute__((no_sanitize("integer"))), ++)
-    DEFINE_C2_CNTR_CREMENT_OP(__attribute__((no_sanitize("integer"))), --)
+    DEFINE_C2_CNTR_CREMENT_OP(C2_ALLOW_OVERFLOW, ++)
+    DEFINE_C2_CNTR_CREMENT_OP(C2_ALLOW_OVERFLOW, --)
 
     template<typename U, typename E=typename std::enable_if<std::is_unsigned<U>::value>::type>
-    __attribute__((no_sanitize("integer")))
+    C2_ALLOW_OVERFLOW
     inline constexpr c2_cntr_t<T> operator<<(const U &value) const {
         return c2_cntr_t<T>(mValue << value);
     }
 
     template<typename U, typename E=typename std::enable_if<std::is_unsigned<U>::value>::type>
-    __attribute__((no_sanitize("integer")))
+    C2_ALLOW_OVERFLOW
     inline c2_cntr_t<T> &operator<<=(const U &value) {
         mValue <<= value;
         return *this;
@@ -378,12 +379,12 @@ public:
     /**
      * Comparison operators
      */
-    __attribute__((no_sanitize("integer")))
+    C2_ALLOW_OVERFLOW
     inline constexpr bool operator<=(const c2_cntr_t<T> &other) const {
         return T(other.mValue - mValue) < HALF_RANGE;
     }
 
-    __attribute__((no_sanitize("integer")))
+    C2_ALLOW_OVERFLOW
     inline constexpr bool operator>=(const c2_cntr_t<T> &other) const {
         return T(mValue - other.mValue) < HALF_RANGE;
     }
