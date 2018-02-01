@@ -64,6 +64,7 @@ enum {
     SET_INPUT_DEVICE,
     GET_ROUTED_DEVICE_ID,
     ENABLE_AUDIO_DEVICE_CALLBACK,
+    GET_ACTIVE_MICROPHONES,
 
 };
 
@@ -391,6 +392,21 @@ public:
         }
         return reply.readInt32();
     }
+
+    status_t getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones)
+    {
+        ALOGV("getActiveMicrophones");
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
+        status_t status = remote()->transact(GET_ACTIVE_MICROPHONES, data, &reply);
+        if (status != OK
+                || (status = (status_t)reply.readInt32()) != NO_ERROR) {
+            return status;
+        }
+        status = reply.readParcelableVector(activeMicrophones);
+        return status;
+    }
+
 };
 
 IMPLEMENT_META_INTERFACE(MediaRecorder, "android.media.IMediaRecorder");
@@ -631,6 +647,19 @@ status_t BnMediaRecorder::onTransact(
                 reply->writeInt32(BAD_VALUE);
             }
             return NO_ERROR;
+        } break;
+        case GET_ACTIVE_MICROPHONES: {
+            ALOGV("GET_ACTIVE_MICROPHONES");
+            CHECK_INTERFACE(IMediaRecorder, data, reply);
+            std::vector<media::MicrophoneInfo> activeMicrophones;
+            status_t status = getActiveMicrophones(&activeMicrophones);
+            reply->writeInt32(status);
+            if (status != NO_ERROR) {
+                return NO_ERROR;
+            }
+            reply->writeParcelableVector(activeMicrophones);
+            return NO_ERROR;
+
         }
         default:
             return BBinder::onTransact(code, data, reply, flags);

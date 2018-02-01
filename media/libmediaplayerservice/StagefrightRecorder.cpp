@@ -2160,6 +2160,15 @@ status_t StagefrightRecorder::enableAudioDeviceCallback(bool enabled) {
     return NO_ERROR;
 }
 
+status_t StagefrightRecorder::getActiveMicrophones(
+        std::vector<media::MicrophoneInfo>* activeMicrophones) {
+    if (mAudioSourceNode != 0) {
+        return mAudioSourceNode->getActiveMicrophones(activeMicrophones);
+    }
+    return NO_INIT;
+}
+
+
 status_t StagefrightRecorder::dump(
         int fd, const Vector<String16>& args) const {
     ALOGV("dump");

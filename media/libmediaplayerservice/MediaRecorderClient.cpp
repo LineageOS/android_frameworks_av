@@ -527,4 +527,14 @@ status_t MediaRecorderClient::enableAudioDeviceCallback(bool enabled) {
     }
     return NO_INIT;
 }
+
+status_t MediaRecorderClient::getActiveMicrophones(
+        std::vector<media::MicrophoneInfo>* activeMicrophones) {
+    ALOGV("getActiveMicrophones");
+    Mutex::Autolock lock(mLock);
+    if (mRecorder != NULL) {
+        return mRecorder->getActiveMicrophones(activeMicrophones);
+    }
+    return NO_INIT;
+}
 }; // namespace android
