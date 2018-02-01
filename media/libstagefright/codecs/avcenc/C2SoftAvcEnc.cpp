@@ -654,7 +654,6 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
         ALOGE("Unable to allocate memory for hold memory records: Size %zu",
                 mNumMemRecords * sizeof(iv_mem_rec_t));
         mSignalledError = true;
-        // TODO: notify(error, C2_CORRUPTED, 0, 0);
         return C2_CORRUPTED;
     }
 
@@ -697,8 +696,6 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
         if (status != IV_SUCCESS) {
             ALOGE("Fill memory records failed = 0x%x\n",
                     s_fill_mem_rec_op.u4_error_code);
-            mSignalledError = true;
-            // TODO: notify(error, C2_CORRUPTED, 0, 0);
             return C2_CORRUPTED;
         }
     }
@@ -716,8 +713,6 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
             if (ps_mem_rec->pv_base == NULL) {
                 ALOGE("Allocation failure for mem record id %zu size %u\n", i,
                         ps_mem_rec->u4_mem_size);
-                mSignalledError = true;
-                // TODO: notify(error, C2_CORRUPTED, 0, 0);
                 return C2_CORRUPTED;
 
             }
@@ -771,8 +766,6 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
 
         if (status != IV_SUCCESS) {
             ALOGE("Init encoder failed = 0x%x\n", s_init_op.u4_error_code);
-            mSignalledError = true;
-            // TODO: notify(error, C2_CORRUPTED, 0 /* arg2 */, NULL /* data */);
             return C2_CORRUPTED;
         }
     }
@@ -1001,6 +994,7 @@ c2_status_t C2SoftAvcEnc::setEncodeArgs(
 void C2SoftAvcEnc::process(
         const std::unique_ptr<C2Work> &work,
         const std::shared_ptr<C2BlockPool> &pool) {
+    work->result = C2_OK;
     work->workletsProcessed = 0u;
 
     IV_STATUS_T status;
@@ -1011,7 +1005,8 @@ void C2SoftAvcEnc::process(
     if (mCodecCtx == NULL) {
         if (C2_OK != initEncoder()) {
             ALOGE("Failed to initialize encoder");
-            // TODO: notify(error, C2_CORRUPTED, 0 /* arg2 */, NULL /* data */);
+            work->workletsProcessed = 1u;
+            work->result = C2_CORRUPTED;
             return;
         }
     }
@@ -1031,7 +1026,8 @@ void C2SoftAvcEnc::process(
                 &s_encode_ip, &s_encode_op, NULL, header, kHeaderLength, timestamp);
         if (error != C2_OK) {
             mSignalledError = true;
-            // TODO: notify(error, C2_CORRUPTED, 0, 0);
+            work->workletsProcessed = 1u;
+            work->result = C2_CORRUPTED;
             return;
         }
         status = ive_api_function(mCodecCtx, &s_encode_ip, &s_encode_op);
@@ -1100,11 +1096,15 @@ void C2SoftAvcEnc::process(
         c2_status_t err = pool->fetchLinearBlock(mOutBufferSize, usage, &block);
         if (err != C2_OK) {
             ALOGE("fetch linear block err = %d", err);
+            work->workletsProcessed = 1u;
+            work->result = err;
             return;
         }
         C2WriteView wView = block->map().get();
         if (wView.error() != C2_OK) {
             ALOGE("write view map err = %d", wView.error());
+            work->workletsProcessed = 1u;
+            work->result = wView.error();
             return;
         }
 
@@ -1113,7 +1113,8 @@ void C2SoftAvcEnc::process(
         if (error != C2_OK) {
             mSignalledError = true;
             ALOGE("setEncodeArgs failed : %d", error);
-            // TODO: notify(error, C2_CORRUPTED, 0, 0);
+            work->workletsProcessed = 1u;
+            work->result = error;
             return;
         }
 
@@ -1136,7 +1137,8 @@ void C2SoftAvcEnc::process(
             ALOGE("Encode Frame failed = 0x%x\n",
                     s_encode_op.u4_error_code);
             mSignalledError = true;
-            // TODO: notify(error, C2_CORRUPTED, 0, 0);
+            work->workletsProcessed = 1u;
+            work->result = C2_CORRUPTED;
             return;
         }
     } while (IV_SUCCESS != status);
@@ -1155,7 +1157,8 @@ void C2SoftAvcEnc::process(
     /* If encoder frees up an input buffer, mark it as free */
     if (freed != NULL) {
         if (mBuffers.count(freed) == 0u) {
-            // TODO: error
+            work->workletsProcessed = 1u;
+            work->result = C2_CORRUPTED;
             return;
         }
         // Release input buffer reference
