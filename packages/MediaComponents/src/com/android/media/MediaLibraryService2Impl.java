@@ -19,6 +19,7 @@ package com.android.media;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.media.MediaLibraryService2;
+import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySessionBuilder;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
@@ -69,7 +70,7 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
         public MediaLibrarySessionImpl(Context context,
                 MediaPlayerInterface player, String id, VolumeProvider volumeProvider,
                 int ratingType, PendingIntent sessionActivity, Executor callbackExecutor,
-                MediaLibrarySessionCallback callback)  {
+                MediaLibrarySessionCallback callback) {
             super(context, player, id, volumeProvider, ratingType, sessionActivity,
                     callbackExecutor, callback);
             mCallback = callback;
@@ -100,8 +101,8 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
     public static class BuilderImpl
             extends BuilderBaseImpl<MediaLibrarySession, MediaLibrarySessionCallback> {
         public BuilderImpl(Context context, MediaLibrarySessionBuilder instance,
-            MediaPlayerInterface player, Executor callbackExecutor,
-            MediaLibrarySessionCallback callback) {
+                MediaPlayerInterface player, Executor callbackExecutor,
+                MediaLibrarySessionCallback callback) {
             super(context, player);
             setSessionCallback_impl(callbackExecutor, callback);
         }
@@ -110,6 +111,33 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
         public MediaLibrarySession build_impl() {
             return new MediaLibrarySessionImpl(mContext, mPlayer, mId, mVolumeProvider, mRatingType,
                     mSessionActivity, mCallbackExecutor, mCallback).getInstance();
+        }
+    }
+
+    public static final class LibraryRootImpl implements LibraryRootProvider {
+        private final LibraryRoot mInstance;
+        private final String mRootId;
+        private final Bundle mExtras;
+
+        public LibraryRootImpl(Context context, LibraryRoot instance, String rootId,
+                Bundle extras) {
+            if (rootId == null) {
+                throw new IllegalArgumentException("The root id in BrowserRoot cannot be null. " +
+                        "Use null for BrowserRoot instead.");
+            }
+            mInstance = instance;
+            mRootId = rootId;
+            mExtras = extras;
+        }
+
+        @Override
+        public String getRootId_impl() {
+            return mRootId;
+        }
+
+        @Override
+        public Bundle getExtras_impl() {
+            return mExtras;
         }
     }
 }

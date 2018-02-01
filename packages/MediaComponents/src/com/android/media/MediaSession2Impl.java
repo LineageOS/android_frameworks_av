@@ -16,6 +16,7 @@
 
 package com.android.media;
 
+import static android.media.MediaSession2.COMMAND_CODE_CUSTOM;
 import static android.media.SessionToken2.TYPE_LIBRARY_SERVICE;
 import static android.media.SessionToken2.TYPE_SESSION;
 import static android.media.SessionToken2.TYPE_SESSION_SERVICE;
@@ -50,6 +51,7 @@ import android.media.SessionToken2;
 import android.media.VolumeProvider;
 import android.media.session.MediaSessionManager;
 import android.media.update.MediaSession2Provider;
+import android.media.update.MediaSession2Provider.CommandButtonProvider;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.os.Process;
@@ -550,7 +552,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 throw new IllegalArgumentException("action shouldn't be null");
             }
             mInstance = instance;
-            mCommandCode = MediaSession2.COMMAND_CODE_CUSTOM;
+            mCommandCode = COMMAND_CODE_CUSTOM;
             mCustomCommand = action;
             mExtra = extra;
         }
@@ -583,7 +585,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
          */
         public static Command fromBundle_impl(Context context, Bundle command) {
             int code = command.getInt(KEY_COMMAND_CODE);
-            if (code != MediaSession2.COMMAND_CODE_CUSTOM) {
+            if (code != COMMAND_CODE_CUSTOM) {
                 return new Command(context, code);
             } else {
                 String customCommand = command.getString(KEY_COMMAND_CUSTOM_COMMAND);
@@ -657,7 +659,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         @Override
         public boolean hasCommand_impl(int code) {
-            if (code == MediaSession2.COMMAND_CODE_CUSTOM) {
+            if (code == COMMAND_CODE_CUSTOM) {
                 throw new IllegalArgumentException("Use hasCommand(Command) for custom command");
             }
             for (int i = 0; i < mCommands.size(); i++) {
@@ -873,6 +875,153 @@ public class MediaSession2Impl implements MediaSession2Provider {
                     bundle.getInt(KEY_REPEAT_MODE),
                     bundle.getInt(KEY_SHUFFLE_MODE),
                     metadata);
+        }
+    }
+
+    public static class CommandButtonImpl implements CommandButtonProvider {
+        private static final String KEY_COMMAND
+                = "android.media.media_session2.command_button.command";
+        private static final String KEY_ICON_RES_ID
+                = "android.media.media_session2.command_button.icon_res_id";
+        private static final String KEY_DISPLAY_NAME
+                = "android.media.media_session2.command_button.display_name";
+        private static final String KEY_EXTRA
+                = "android.media.media_session2.command_button.extra";
+        private static final String KEY_ENABLED
+                = "android.media.media_session2.command_button.enabled";
+
+        private final CommandButton mInstance;
+        private Command mCommand;
+        private int mIconResId;
+        private String mDisplayName;
+        private Bundle mExtra;
+        private boolean mEnabled;
+
+        public CommandButtonImpl(Context context, @Nullable Command command, int iconResId,
+                @Nullable String displayName, Bundle extra, boolean enabled) {
+            mCommand = command;
+            mIconResId = iconResId;
+            mDisplayName = displayName;
+            mExtra = extra;
+            mEnabled = enabled;
+            mInstance = new CommandButton(this);
+        }
+
+        @Override
+        public @Nullable Command getCommand_impl() {
+            return mCommand;
+        }
+
+        @Override
+        public int getIconResId_impl() {
+            return mIconResId;
+        }
+
+        @Override
+        public @Nullable String getDisplayName_impl() {
+            return mDisplayName;
+        }
+
+        @Override
+        public @Nullable Bundle getExtra_impl() {
+            return mExtra;
+        }
+
+        @Override
+        public boolean isEnabled_impl() {
+            return mEnabled;
+        }
+
+        public @NonNull Bundle toBundle() {
+            Bundle bundle = new Bundle();
+            bundle.putBundle(KEY_COMMAND, mCommand.toBundle());
+            bundle.putInt(KEY_ICON_RES_ID, mIconResId);
+            bundle.putString(KEY_DISPLAY_NAME, mDisplayName);
+            bundle.putBundle(KEY_EXTRA, mExtra);
+            bundle.putBoolean(KEY_ENABLED, mEnabled);
+            return bundle;
+        }
+
+        public static @Nullable CommandButton fromBundle(Context context, Bundle bundle) {
+            if (bundle == null) {
+                return null;
+            }
+            CommandButton.Builder builder = new CommandButton.Builder(context);
+            builder.setCommand(Command.fromBundle(context, bundle.getBundle(KEY_COMMAND)));
+            builder.setIconResId(bundle.getInt(KEY_ICON_RES_ID, 0));
+            builder.setDisplayName(bundle.getString(KEY_DISPLAY_NAME));
+            builder.setExtra(bundle.getBundle(KEY_EXTRA));
+            builder.setEnabled(bundle.getBoolean(KEY_ENABLED));
+            try {
+                return builder.build();
+            } catch (IllegalStateException e) {
+                // Malformed or version mismatch. Return null for now.
+                return null;
+            }
+        }
+
+        /**
+         * Builder for {@link CommandButton}.
+         */
+        public static class BuilderImpl implements CommandButtonProvider.BuilderProvider {
+            private final Context mContext;
+            private final CommandButton.Builder mInstance;
+            private Command mCommand;
+            private int mIconResId;
+            private String mDisplayName;
+            private Bundle mExtra;
+            private boolean mEnabled;
+
+            public BuilderImpl(Context context, CommandButton.Builder instance) {
+                mContext = context;
+                mInstance = instance;
+                mEnabled = true;
+            }
+
+            @Override
+            public CommandButton.Builder setCommand_impl(Command command) {
+                mCommand = command;
+                return mInstance;
+            }
+
+            @Override
+            public CommandButton.Builder setIconResId_impl(int resId) {
+                mIconResId = resId;
+                return mInstance;
+            }
+
+            @Override
+            public CommandButton.Builder setDisplayName_impl(String displayName) {
+                mDisplayName = displayName;
+                return mInstance;
+            }
+
+            @Override
+            public CommandButton.Builder setEnabled_impl(boolean enabled) {
+                mEnabled = enabled;
+                return mInstance;
+            }
+
+            @Override
+            public CommandButton.Builder setExtra_impl(Bundle extra) {
+                mExtra = extra;
+                return mInstance;
+            }
+
+            @Override
+            public CommandButton build_impl() {
+                if (mEnabled && mCommand == null) {
+                    throw new IllegalStateException("Enabled button needs Command"
+                            + " for controller to invoke the command");
+                }
+                if (mCommand != null && mCommand.getCommandCode() == COMMAND_CODE_CUSTOM
+                        && (mIconResId == 0 || TextUtils.isEmpty(mDisplayName))) {
+                    throw new IllegalStateException("Custom commands needs icon and"
+                            + " and name to display");
+                }
+                return new CommandButtonImpl(
+                        mContext, mCommand, mIconResId, mDisplayName, mExtra, mEnabled).mInstance;
+            }
         }
     }
 
