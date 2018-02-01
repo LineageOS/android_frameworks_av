@@ -7051,7 +7051,7 @@ status_t AudioFlinger::RecordThread::getActiveMicrophones(
     // Fake data
     struct audio_microphone_characteristic_t characteristic;
     sprintf(characteristic.device_id, "builtin_mic");
-    characteristic.type = AUDIO_DEVICE_IN_BUILTIN_MIC;
+    characteristic.device = AUDIO_DEVICE_IN_BUILTIN_MIC;
     sprintf(characteristic.address, "");
     characteristic.location = AUDIO_MICROPHONE_LOCATION_MAINBODY;
     characteristic.group = 0;
