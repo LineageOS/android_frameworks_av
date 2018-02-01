@@ -2736,7 +2736,7 @@ void dumpDesc(const C2ParamDescriptor &pd) {
         cout << "persistent ";
     }
     cout << "struct ";
-    dumpType(pd.type());
+    dumpType(C2Param::Type(pd.index().type()));
     cout << " " << pd.name() << ";" << endl;
 }
 

@@ -529,7 +529,7 @@ bool isSupportedParam(
         const C2Param &param,
         const std::vector<std::shared_ptr<C2ParamDescriptor>> &sParams) {
     for (const auto &pd : sParams) {
-        if (param.type() == pd->type().type()) {
+        if (param.type() == pd->index().type()) {
             return true;
         }
     }

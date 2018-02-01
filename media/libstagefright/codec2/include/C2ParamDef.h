@@ -225,7 +225,7 @@ C2FlexStructCheck<S, ParamIndex, TypeFlags>::FIELD_LIST = S::FIELD_LIST;
 #define DEFINE_CAST_OPERATORS(_Type) \
     inline static _Type* From(C2Param *other) { \
         return (_Type*)C2Param::ifSuitable( \
-                other, sizeof(_Type),_Type::PARAM_TYPE, _Type::FLEX_SIZE, \
+                other, sizeof(_Type), _Type::PARAM_TYPE, _Type::FLEX_SIZE, \
                 (_Type::PARAM_TYPE & T::Index::DIR_UNDEFINED) != T::Index::DIR_UNDEFINED); \
     } \
     inline static const _Type* From(const C2Param *other) { \
