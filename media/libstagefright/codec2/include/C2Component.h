@@ -696,6 +696,7 @@ public:
         DEFAULT_GRAPHIC,    ///< basic graphic allocator type
         PLATFORM_START = 0x10,
         VENDOR_START   = 0x100,
+        BAD_ID         = C2Allocator::BAD_ID, ///< DO NOT USE
     };
 
     /**

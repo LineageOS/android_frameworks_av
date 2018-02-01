@@ -540,7 +540,7 @@ c2_status_t C2AllocatorGralloc::Impl::priorGraphicAllocation(
     return C2_OK;
 }
 
-C2AllocatorGralloc::C2AllocatorGralloc() : mImpl(new Impl) {}
+C2AllocatorGralloc::C2AllocatorGralloc(id_t) : mImpl(new Impl) {}
 
 C2AllocatorGralloc::~C2AllocatorGralloc() { delete mImpl; }
 

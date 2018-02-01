@@ -21,47 +21,44 @@
 #include <map>
 
 #include <C2BufferPriv.h>
+#include <C2BlockInternal.h>
 
 namespace android {
 
 namespace {
 
+// This anonymous namespace contains the helper classes that allow our implementation to create
+// block/buffer objects.
+//
 // Inherit from the parent, share with the friend.
-
-class DummyCapacityAspect : public _C2LinearCapacityAspect {
-    using _C2LinearCapacityAspect::_C2LinearCapacityAspect;
-    friend class ::android::C2ReadView;
-    friend class ::android::C2ConstLinearBlock;
-};
-
-class C2DefaultReadView : public C2ReadView {
+class ReadViewBuddy : public C2ReadView {
     using C2ReadView::C2ReadView;
     friend class ::android::C2ConstLinearBlock;
 };
 
-class C2DefaultWriteView : public C2WriteView {
+class WriteViewBuddy : public C2WriteView {
     using C2WriteView::C2WriteView;
     friend class ::android::C2LinearBlock;
 };
 
-class C2AcquirableReadView : public C2Acquirable<C2ReadView> {
-    using C2Acquirable::C2Acquirable;
-    friend class ::android::C2ConstLinearBlock;
-};
-
-class C2AcquirableWriteView : public C2Acquirable<C2WriteView> {
-    using C2Acquirable::C2Acquirable;
-    friend class ::android::C2LinearBlock;
-};
-
-class C2DefaultConstLinearBlock : public C2ConstLinearBlock {
+class ConstLinearBlockBuddy : public C2ConstLinearBlock {
     using C2ConstLinearBlock::C2ConstLinearBlock;
     friend class ::android::C2LinearBlock;
 };
 
-class C2DefaultLinearBlock : public C2LinearBlock {
+class LinearBlockBuddy : public C2LinearBlock {
     using C2LinearBlock::C2LinearBlock;
     friend class ::android::C2BasicLinearBlockPool;
+};
+
+class AcquirableReadViewBuddy : public C2Acquirable<C2ReadView> {
+    using C2Acquirable::C2Acquirable;
+    friend class ::android::C2ConstLinearBlock;
+};
+
+class AcquirableWriteViewBuddy : public C2Acquirable<C2WriteView> {
+    using C2Acquirable::C2Acquirable;
+    friend class ::android::C2LinearBlock;
 };
 
 class C2DefaultGraphicView : public C2GraphicView {
@@ -99,40 +96,75 @@ class C2DefaultBufferData : public C2BufferData {
 
 /* ========================================== 1D BLOCK ========================================= */
 
-class C2Block1D::Impl {
+struct C2_HIDE _C2BlockPoolData;
+
+/**
+ * This class is the base class for all 1D block and view implementations.
+ *
+ * This is basically just a placeholder for the underlying 1D allocation and the range of the
+ * alloted portion to this block. There is also a placeholder for a blockpool data.
+ */
+class C2_HIDE _C2Block1DImpl : public _C2LinearRangeAspect {
 public:
-    const C2Handle *handle() const {
-        return mAllocation->handle();
+    _C2Block1DImpl(const std::shared_ptr<C2LinearAllocation> &alloc,
+            const std::shared_ptr<_C2BlockPoolData> &poolData = nullptr,
+            size_t offset = 0, size_t size = ~(size_t)0)
+        : _C2LinearRangeAspect(alloc.get(), offset, size),
+          mAllocation(alloc),
+          mPoolData(poolData) { }
+
+    _C2Block1DImpl(const _C2Block1DImpl &other, size_t offset = 0, size_t size = ~(size_t)0)
+        : _C2LinearRangeAspect(&other, offset, size),
+          mAllocation(other.mAllocation),
+          mPoolData(other.mPoolData) { }
+
+    /** returns const pool data  */
+    std::shared_ptr<const _C2BlockPoolData> poolData() const {
+        return mPoolData;
     }
 
-    Impl(std::shared_ptr<C2LinearAllocation> alloc)
-        : mAllocation(alloc) {}
+    /** returns native handle */
+    const C2Handle *handle() const {
+        return mAllocation ? mAllocation->handle() : nullptr;
+    }
+
+    /** returns the allocator's ID */
+    C2Allocator::id_t getAllocatorId() const {
+        // BAD_ID can only happen if this Impl class is initialized for a view - never for a block.
+        return mAllocation ? mAllocation->getAllocatorId() : C2Allocator::BAD_ID;
+    }
+
+    std::shared_ptr<C2LinearAllocation> getAllocation() const {
+        return mAllocation;
+    }
 
 private:
     std::shared_ptr<C2LinearAllocation> mAllocation;
+    std::shared_ptr<_C2BlockPoolData> mPoolData;
 };
 
-const C2Handle *C2Block1D::handle() const {
-    return mImpl->handle();
-};
-
-C2Block1D::C2Block1D(std::shared_ptr<C2LinearAllocation> alloc)
-    : _C2LinearRangeAspect(alloc.get()), mImpl(new Impl(alloc)) {
-}
-
-C2Block1D::C2Block1D(std::shared_ptr<C2LinearAllocation> alloc, size_t offset, size_t size)
-    : _C2LinearRangeAspect(alloc.get(), offset, size), mImpl(new Impl(alloc)) {
-}
-
-class C2ReadView::Impl {
+/**
+ * This class contains the mapped data pointer, and the potential error.
+ *
+ * range is the mapped range of the underlying allocation (which is part of the allotted
+ * range).
+ */
+class C2_HIDE _C2MappedBlock1DImpl : public _C2Block1DImpl {
 public:
-    explicit Impl(const uint8_t *data)
-        : mData(data), mError(C2_OK) {}
+    _C2MappedBlock1DImpl(const _C2Block1DImpl &block, uint8_t *data,
+                         size_t offset = 0, size_t size = ~(size_t)0)
+        : _C2Block1DImpl(block, offset, size), mData(data), mError(C2_OK) { }
 
-    explicit Impl(c2_status_t error)
-        : mData(nullptr), mError(error) {}
+    _C2MappedBlock1DImpl(c2_status_t error)
+        : _C2Block1DImpl(nullptr), mData(nullptr), mError(error) {
+        // CHECK(error != C2_OK);
+    }
 
     const uint8_t *data() const {
+        return mData;
+    }
+
+    uint8_t *data() {
         return mData;
     }
 
@@ -141,213 +173,153 @@ public:
     }
 
 private:
-    const uint8_t *mData;
+    uint8_t *mData;
     c2_status_t mError;
 };
 
-C2ReadView::C2ReadView(const _C2LinearCapacityAspect *parent, const uint8_t *data)
-    : _C2LinearCapacityAspect(parent), mImpl(std::make_shared<Impl>(data)) {}
+/**
+ * Block implementation.
+ */
+class C2Block1D::Impl : public _C2Block1DImpl {
+    using _C2Block1DImpl::_C2Block1DImpl;
+};
 
-C2ReadView::C2ReadView(c2_status_t error)
-    : _C2LinearCapacityAspect(0u), mImpl(std::make_shared<Impl>(error)) {}
+const C2Handle *C2Block1D::handle() const {
+    return mImpl->handle();
+};
 
-const uint8_t *C2ReadView::data() const {
-    return mImpl->data();
+C2Allocator::id_t C2Block1D::getAllocatorId() const {
+    return mImpl->getAllocatorId();
+};
+
+C2Block1D::C2Block1D(std::shared_ptr<Impl> impl, const _C2LinearRangeAspect &range)
+    // always clamp subrange to parent (impl) range for safety
+    : _C2LinearRangeAspect(impl.get(), range.offset(), range.size()), mImpl(impl) {
 }
 
-C2ReadView C2ReadView::subView(size_t offset, size_t size) const {
-    if (offset > capacity()) {
-        offset = capacity();
-    }
-    if (size > capacity() - offset) {
-        size = capacity() - offset;
-    }
-    // TRICKY: newCapacity will just be used to grab the size.
-    DummyCapacityAspect newCapacity((uint32_t)size);
-    return C2ReadView(&newCapacity, data() + offset);
+/**
+ * Read view implementation.
+ *
+ * range of Impl is the mapped range of the underlying allocation (which is part of the allotted
+ * range). range of View is 0 to capacity() (not represented as an actual range). This maps to a
+ * subrange of Impl range starting at mImpl->offset() + _mOffset.
+ */
+class C2ReadView::Impl : public _C2MappedBlock1DImpl {
+    using _C2MappedBlock1DImpl::_C2MappedBlock1DImpl;
+};
+
+C2ReadView::C2ReadView(std::shared_ptr<Impl> impl, uint32_t offset, uint32_t size)
+    : _C2LinearCapacityAspect(C2LinearCapacity(impl->size()).range(offset, size).size()),
+      mImpl(impl),
+      mOffset(C2LinearCapacity(impl->size()).range(offset, size).offset()) { }
+
+C2ReadView::C2ReadView(c2_status_t error)
+    : _C2LinearCapacityAspect(0u), mImpl(std::make_shared<Impl>(error)), mOffset(0u) {
+    // CHECK(error != C2_OK);
+}
+
+const uint8_t *C2ReadView::data() const {
+    return mImpl->error() ? nullptr : mImpl->data() + mOffset;
 }
 
 c2_status_t C2ReadView::error() const {
     return mImpl->error();
 }
 
-class C2WriteView::Impl {
-public:
-    explicit Impl(uint8_t *base)
-        : mBase(base), mError(C2_OK) {}
+C2ReadView C2ReadView::subView(size_t offset, size_t size) const {
+    C2LinearRange subRange(*this, offset, size);
+    return C2ReadView(mImpl, mOffset + subRange.offset(), subRange.size());
+}
 
-    explicit Impl(c2_status_t error)
-        : mBase(nullptr), mError(error) {}
-
-    uint8_t *base() const {
-        return mBase;
-    }
-
-    c2_status_t error() const {
-        return mError;
-    }
-
-private:
-    uint8_t *mBase;
-    c2_status_t mError;
+/**
+ * Write view implementation.
+ */
+class C2WriteView::Impl : public _C2MappedBlock1DImpl {
+    using _C2MappedBlock1DImpl::_C2MappedBlock1DImpl;
 };
 
-C2WriteView::C2WriteView(const _C2LinearRangeAspect *parent, uint8_t *base)
-    : _C2EditableLinearRange(parent), mImpl(std::make_shared<Impl>(base)) {}
+C2WriteView::C2WriteView(std::shared_ptr<Impl> impl)
+// UGLY: _C2LinearRangeAspect requires a bona-fide object for capacity to prevent spoofing, so
+// this is what we have to do.
+    : _C2EditableLinearRange(std::make_unique<C2LinearCapacity>(impl->size()).get()), mImpl(impl) { }
 
 C2WriteView::C2WriteView(c2_status_t error)
     : _C2EditableLinearRange(nullptr), mImpl(std::make_shared<Impl>(error)) {}
 
-uint8_t *C2WriteView::base() { return mImpl->base(); }
+uint8_t *C2WriteView::base() { return mImpl->data(); }
 
-uint8_t *C2WriteView::data() { return mImpl->base() + offset(); }
+uint8_t *C2WriteView::data() { return mImpl->data() + offset(); }
 
 c2_status_t C2WriteView::error() const { return mImpl->error(); }
 
-class C2ConstLinearBlock::Impl {
-public:
-    explicit Impl(std::shared_ptr<C2LinearAllocation> alloc)
-        : mAllocation(alloc), mBase(nullptr), mSize(0u), mError(C2_CORRUPTED) {}
-
-    ~Impl() {
-        if (mBase != nullptr) {
-            // TODO: fence
-            c2_status_t err = mAllocation->unmap(mBase, mSize, nullptr);
-            if (err != C2_OK) {
-                // TODO: Log?
-            }
-        }
-    }
-
-    C2ConstLinearBlock subBlock(size_t offset, size_t size) const {
-        return C2ConstLinearBlock(mAllocation, offset, size);
-    }
-
-    void map(size_t offset, size_t size) {
-        if (mBase == nullptr) {
-            void *base = nullptr;
-            mError = mAllocation->map(
-                    offset, size, { C2MemoryUsage::CPU_READ, 0 }, nullptr, &base);
-            // TODO: fence
-            if (mError == C2_OK) {
-                mBase = (uint8_t *)base;
-                mSize = size;
-            }
-        }
-    }
-
-    const uint8_t *base() const { return mBase; }
-
-    c2_status_t error() const { return mError; }
-
-private:
-    std::shared_ptr<C2LinearAllocation> mAllocation;
-    uint8_t *mBase;
-    size_t mSize;
-    c2_status_t mError;
-};
-
-C2ConstLinearBlock::C2ConstLinearBlock(std::shared_ptr<C2LinearAllocation> alloc)
-    : C2Block1D(alloc), mImpl(std::make_shared<Impl>(alloc)) {}
-
-C2ConstLinearBlock::C2ConstLinearBlock(
-        std::shared_ptr<C2LinearAllocation> alloc, size_t offset, size_t size)
-    : C2Block1D(alloc, offset, size), mImpl(std::make_shared<Impl>(alloc)) {}
+/**
+ * Const linear block implementation.
+ */
+C2ConstLinearBlock::C2ConstLinearBlock(std::shared_ptr<Impl> impl, const _C2LinearRangeAspect &range, C2Fence fence)
+    : C2Block1D(impl, range), mFence(fence) { }
 
 C2Acquirable<C2ReadView> C2ConstLinearBlock::map() const {
-    mImpl->map(offset(), size());
-    if (mImpl->base() == nullptr) {
-        C2DefaultReadView view(mImpl->error());
-        return C2AcquirableReadView(mImpl->error(), mFence, view);
+    void *base = nullptr;
+    uint32_t len = size();
+    c2_status_t error = mImpl->getAllocation()->map(
+            offset(), len, { C2MemoryUsage::CPU_READ, 0 }, nullptr, &base);
+    // TODO: wait on fence
+    if (error == C2_OK) {
+        std::shared_ptr<ReadViewBuddy::Impl> rvi = std::shared_ptr<ReadViewBuddy::Impl>(
+                new ReadViewBuddy::Impl(*mImpl, (uint8_t *)base, offset(), len),
+                [base, len](ReadViewBuddy::Impl *i) {
+                    (void)i->getAllocation()->unmap(base, len, nullptr);
+        });
+        return AcquirableReadViewBuddy(error, C2Fence(), ReadViewBuddy(rvi, 0, len));
+    } else {
+        return AcquirableReadViewBuddy(error, C2Fence(), ReadViewBuddy(error));
     }
-    DummyCapacityAspect newCapacity(size());
-    C2DefaultReadView view(&newCapacity, mImpl->base());
-    return C2AcquirableReadView(mImpl->error(), mFence, view);
 }
 
-C2ConstLinearBlock C2ConstLinearBlock::subBlock(size_t offset, size_t size) const {
-    return mImpl->subBlock(offset, size);
+C2ConstLinearBlock C2ConstLinearBlock::subBlock(size_t offset_, size_t size_) const {
+    C2LinearRange subRange(*mImpl, offset_, size_);
+    return C2ConstLinearBlock(mImpl, subRange, mFence);
 }
 
-class C2LinearBlock::Impl {
-public:
-    Impl(std::shared_ptr<C2LinearAllocation> alloc)
-        : mAllocation(alloc), mBase(nullptr), mSize(0u), mError(C2_CORRUPTED) {}
-
-    ~Impl() {
-        if (mBase != nullptr) {
-            // TODO: fence
-            c2_status_t err = mAllocation->unmap(mBase, mSize, nullptr);
-            if (err != C2_OK) {
-                // TODO: Log?
-            }
-        }
-    }
-
-    void map(size_t capacity) {
-        if (mBase == nullptr) {
-            void *base = nullptr;
-            // TODO: fence
-            mError = mAllocation->map(
-                    0u,
-                    capacity,
-                    { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
-                    nullptr,
-                    &base);
-            if (mError == C2_OK) {
-                mBase = (uint8_t *)base;
-                mSize = capacity;
-            }
-        }
-    }
-
-    C2ConstLinearBlock share(size_t offset, size_t size, C2Fence &fence) {
-        // TODO
-        (void) fence;
-        return C2DefaultConstLinearBlock(mAllocation, offset, size);
-    }
-
-    uint8_t *base() const { return mBase; }
-
-    c2_status_t error() const { return mError; }
-
-    C2Fence fence() const { return mFence; }
-
-private:
-    std::shared_ptr<C2LinearAllocation> mAllocation;
-    uint8_t *mBase;
-    size_t mSize;
-    c2_status_t mError;
-    C2Fence mFence;
-};
-
-C2LinearBlock::C2LinearBlock(std::shared_ptr<C2LinearAllocation> alloc)
-    : C2Block1D(alloc),
-      mImpl(new Impl(alloc)) {}
-
-C2LinearBlock::C2LinearBlock(std::shared_ptr<C2LinearAllocation> alloc, size_t offset, size_t size)
-    : C2Block1D(alloc, offset, size),
-      mImpl(new Impl(alloc)) {}
+/**
+ * Linear block implementation.
+ */
+C2LinearBlock::C2LinearBlock(std::shared_ptr<Impl> impl, const _C2LinearRangeAspect &range)
+    : C2Block1D(impl, range) { }
 
 C2Acquirable<C2WriteView> C2LinearBlock::map() {
-    mImpl->map(capacity());
-    if (mImpl->base() == nullptr) {
-        C2DefaultWriteView view(mImpl->error());
-        return C2AcquirableWriteView(mImpl->error(), mImpl->fence(), view);
+    void *base = nullptr;
+    uint32_t len = size();
+    c2_status_t error = mImpl->getAllocation()->map(
+            offset(), len, { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE }, nullptr, &base);
+    // TODO: wait on fence
+    if (error == C2_OK) {
+        std::shared_ptr<WriteViewBuddy::Impl> rvi = std::shared_ptr<WriteViewBuddy::Impl>(
+                new WriteViewBuddy::Impl(*mImpl, (uint8_t *)base, 0, len),
+                [base, len](WriteViewBuddy::Impl *i) {
+                    (void)i->getAllocation()->unmap(base, len, nullptr);
+        });
+        return AcquirableWriteViewBuddy(error, C2Fence(), WriteViewBuddy(rvi));
+    } else {
+        return AcquirableWriteViewBuddy(error, C2Fence(), WriteViewBuddy(error));
     }
-    C2DefaultWriteView view(this, mImpl->base());
-    view.setOffset_be(offset());
-    view.setSize_be(size());
-    return C2AcquirableWriteView(mImpl->error(), mImpl->fence(), view);
 }
 
-C2ConstLinearBlock C2LinearBlock::share(size_t offset, size_t size, C2Fence fence) {
-    return mImpl->share(offset, size, fence);
+C2ConstLinearBlock C2LinearBlock::share(size_t offset_, size_t size_, C2Fence fence) {
+    return ConstLinearBlockBuddy(mImpl, C2LinearRange(*this, offset_, size_), fence);
+}
+
+std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
+        const std::shared_ptr<C2LinearAllocation> &alloc,
+        const std::shared_ptr<_C2BlockPoolData> &data, size_t offset, size_t size) {
+    std::shared_ptr<C2Block1D::Impl> impl =
+        std::make_shared<C2Block1D::Impl>(alloc, data, offset, size);
+    return std::shared_ptr<C2LinearBlock>(new C2LinearBlock(impl, *impl));
 }
 
 C2BasicLinearBlockPool::C2BasicLinearBlockPool(
         const std::shared_ptr<C2Allocator> &allocator)
-  : mAllocator(allocator) {}
+  : mAllocator(allocator) { }
 
 c2_status_t C2BasicLinearBlockPool::fetchLinearBlock(
         uint32_t capacity,
@@ -361,7 +333,7 @@ c2_status_t C2BasicLinearBlockPool::fetchLinearBlock(
         return err;
     }
 
-    block->reset(new C2DefaultLinearBlock(alloc));
+    *block = _C2BlockFactory::CreateLinearBlock(alloc);
 
     return C2_OK;
 }
