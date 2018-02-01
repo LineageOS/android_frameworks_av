@@ -1398,6 +1398,8 @@ public:
             // Sets the UID records silence
             void        setRecordSilenced(uid_t uid, bool silenced);
 
+            status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+
 private:
             // Enter standby if not already in standby, and set mStandby flag
             void    standbyIfNotAlreadyInStandby();

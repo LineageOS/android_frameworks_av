@@ -1316,6 +1316,14 @@ void AudioRecord::onAudioDeviceUpdate(audio_io_handle_t audioIo,
     }
 }
 
+// -------------------------------------------------------------------------
+
+status_t AudioRecord::getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones)
+{
+    AutoMutex lock(mLock);
+    return mAudioRecord->getActiveMicrophones(activeMicrophones).transactionError();
+}
+
 // =========================================================================
 
 void AudioRecord::DeathNotifier::binderDied(const wp<IBinder>& who __unused)

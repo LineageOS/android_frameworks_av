@@ -1580,6 +1580,13 @@ void AudioFlinger::RecordHandle::stop_nonvirtual() {
     mRecordTrack->stop();
 }
 
+binder::Status AudioFlinger::RecordHandle::getActiveMicrophones(
+        std::vector<media::MicrophoneInfo>* activeMicrophones) {
+    ALOGV("RecordHandle::getActiveMicrophones()");
+    return binder::Status::fromStatusT(
+            mRecordTrack->getActiveMicrophones(activeMicrophones));
+}
+
 // ----------------------------------------------------------------------------
 
 // RecordTrack constructor must be called with AudioFlinger::mLock and ThreadBase::mLock held
@@ -1790,6 +1797,18 @@ void AudioFlinger::RecordThread::RecordTrack::updateTrackFrameInfo(
         }
     }
     mServerProxy->setTimestamp(local);
+}
+
+status_t AudioFlinger::RecordThread::RecordTrack::getActiveMicrophones(
+        std::vector<media::MicrophoneInfo>* activeMicrophones)
+{
+    sp<ThreadBase> thread = mThread.promote();
+    if (thread != 0) {
+        RecordThread *recordThread = (RecordThread *)thread.get();
+        return recordThread->getActiveMicrophones(activeMicrophones);
+    } else {
+        return BAD_VALUE;
+    }
 }
 
 AudioFlinger::RecordThread::PatchRecord::PatchRecord(RecordThread *recordThread,
