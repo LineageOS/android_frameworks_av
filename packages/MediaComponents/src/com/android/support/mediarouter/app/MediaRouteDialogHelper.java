@@ -28,6 +28,7 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
+import com.android.media.update.ApiHelper;
 import com.android.media.update.R;
 
 import java.util.HashMap;
@@ -40,12 +41,12 @@ final class MediaRouteDialogHelper {
      * The framework should set the dialog width properly, but somehow it doesn't work, hence
      * duplicating a similar logic here to determine the appropriate dialog width.
      */
-    public static int getDialogWidth(Context context) {
-        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+    public static int getDialogWidth() {
+        DisplayMetrics metrics = ApiHelper.getLibResources().getDisplayMetrics();
         boolean isPortrait = metrics.widthPixels < metrics.heightPixels;
 
         TypedValue value = new TypedValue();
-        context.getResources().getValue(isPortrait ? R.dimen.mr_dialog_fixed_width_minor
+        ApiHelper.getLibResources().getValue(isPortrait ? R.dimen.mr_dialog_fixed_width_minor
                 : R.dimen.mr_dialog_fixed_width_major, value, true);
         if (value.type == TypedValue.TYPE_DIMENSION) {
             return (int) value.getDimension(metrics);

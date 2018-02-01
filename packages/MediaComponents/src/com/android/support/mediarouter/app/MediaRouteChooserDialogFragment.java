@@ -17,10 +17,10 @@
 package com.android.support.mediarouter.app;
 
 import android.app.Dialog;
+import android.app.DialogFragment;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.os.Bundle;
-import android.support.v4.app.DialogFragment;
 
 import com.android.support.mediarouter.media.MediaRouteSelector;
 
