@@ -18,7 +18,7 @@ package com.android.media;
 
 import android.content.Context;
 import android.media.MediaItem2;
-import android.media.MediaLibraryService2.BrowserRoot;
+import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
@@ -263,7 +263,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         final MediaSession2Impl sessionImpl = getSession();
         if (!(sessionImpl.getCallback() instanceof MediaLibrarySessionCallback)) {
             if (DEBUG) {
-                Log.d(TAG, "Session cannot hand getBrowserRoot()");
+                Log.d(TAG, "Session cannot hand getLibraryRoot()");
             }
             return;
         }
@@ -282,7 +282,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             final MediaLibrarySessionCallback libraryCallback =
                     (MediaLibrarySessionCallback) session.getCallback();
             final ControllerInfoImpl controllerImpl = ControllerInfoImpl.from(controller);
-            BrowserRoot root = libraryCallback.onGetRoot(controller, rootHints);
+            LibraryRoot root = libraryCallback.onGetRoot(controller, rootHints);
             try {
                 controllerImpl.getControllerBinder().onGetRootResult(rootHints,
                         root == null ? null : root.getRootId(),

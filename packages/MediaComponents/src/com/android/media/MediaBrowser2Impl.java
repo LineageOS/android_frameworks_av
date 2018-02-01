@@ -44,7 +44,7 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
     }
 
     @Override
-    public void getBrowserRoot_impl(Bundle rootHints) {
+    public void getLibraryRoot_impl(Bundle rootHints) {
         final IMediaSession2 binder = getSessionBinder();
         if (binder != null) {
             try {

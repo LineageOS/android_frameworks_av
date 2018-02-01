@@ -27,6 +27,7 @@ import android.media.MediaController2;
 import android.media.MediaController2.ControllerCallback;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2;
+import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySessionBuilder;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
@@ -50,6 +51,7 @@ import android.media.update.MediaBrowser2Provider;
 import android.media.update.MediaControlView2Provider;
 import android.media.update.MediaController2Provider;
 import android.media.update.MediaItem2Provider;
+import android.media.update.MediaLibraryService2Provider.LibraryRootProvider;
 import android.media.update.MediaMetadata2Provider;
 import android.media.update.MediaSession2Provider;
 import android.media.update.MediaSession2Provider.BuilderBaseProvider;
@@ -76,6 +78,7 @@ import com.android.media.MediaBrowser2Impl;
 import com.android.media.MediaController2Impl;
 import com.android.media.MediaItem2Impl;
 import com.android.media.MediaLibraryService2Impl;
+import com.android.media.MediaLibraryService2Impl.LibraryRootImpl;
 import com.android.media.MediaMetadata2Impl;
 import com.android.media.MediaSession2Impl;
 import com.android.media.MediaSession2Impl.PlaylistParamsImpl;
@@ -193,6 +196,12 @@ public class ApiFactory implements StaticProvider {
             Executor callbackExecutor, MediaLibrarySessionCallback callback) {
         return new MediaLibraryService2Impl.BuilderImpl(context, instance, player, callbackExecutor,
                 callback);
+    }
+
+    @Override
+    public LibraryRootProvider createMediaLibraryService2LibraryRoot(Context context,
+            LibraryRoot instance, String rootId, Bundle extras) {
+        return new LibraryRootImpl(context, instance, rootId, extras);
     }
 
     @Override
