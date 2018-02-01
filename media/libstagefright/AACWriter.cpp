@@ -294,7 +294,7 @@ status_t AACWriter::threadFunc() {
     prctl(PR_SET_NAME, (unsigned long)"AACWriterThread", 0, 0, 0);
 
     while (!mDone && err == OK) {
-        MediaBuffer *buffer;
+        MediaBufferBase *buffer;
         err = mSource->read(&buffer);
 
         if (err != OK) {

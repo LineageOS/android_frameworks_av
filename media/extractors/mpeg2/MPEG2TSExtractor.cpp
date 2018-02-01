@@ -61,7 +61,7 @@ struct MPEG2TSSource : public MediaSourceBase {
     virtual sp<MetaData> getFormat();
 
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
 private:
     MPEG2TSExtractor *mExtractor;
@@ -99,7 +99,7 @@ sp<MetaData> MPEG2TSSource::getFormat() {
 }
 
 status_t MPEG2TSSource::read(
-        MediaBuffer **out, const ReadOptions *options) {
+        MediaBufferBase **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;

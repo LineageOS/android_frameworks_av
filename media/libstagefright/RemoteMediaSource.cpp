@@ -45,7 +45,8 @@ sp<MetaData> RemoteMediaSource::getFormat() {
     return mSource->getFormat();
 }
 
-status_t RemoteMediaSource::read(MediaBuffer **buffer, const MediaSource::ReadOptions *options) {
+status_t RemoteMediaSource::read(
+        MediaBufferBase **buffer, const MediaSource::ReadOptions *options) {
     return mSource->read(buffer, reinterpret_cast<const MediaSource::ReadOptions*>(options));
 }
 

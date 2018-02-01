@@ -33,7 +33,7 @@ public:
     virtual status_t stop();
     virtual sp<MetaData> getFormat();
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
     virtual status_t pause();
 
 private:

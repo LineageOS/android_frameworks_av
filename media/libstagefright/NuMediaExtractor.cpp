@@ -45,7 +45,7 @@ NuMediaExtractor::Sample::Sample()
       mSampleTimeUs(-1ll) {
 }
 
-NuMediaExtractor::Sample::Sample(MediaBuffer *buffer, int64_t timeUs)
+NuMediaExtractor::Sample::Sample(MediaBufferBase *buffer, int64_t timeUs)
     : mBuffer(buffer),
       mSampleTimeUs(timeUs) {
 }
@@ -488,12 +488,12 @@ void NuMediaExtractor::fetchTrackSamples(TrackInfo *info,
     }
 
     status_t err = OK;
-    Vector<MediaBuffer *> mediaBuffers;
+    Vector<MediaBufferBase *> mediaBuffers;
     if (info->mSource->supportReadMultiple()) {
         options.setNonBlocking();
         err = info->mSource->readMultiple(&mediaBuffers, info->mMaxFetchCount, &options);
     } else {
-        MediaBuffer *mbuf = NULL;
+        MediaBufferBase *mbuf = NULL;
         err = info->mSource->read(&mbuf, &options);
         if (err == OK && mbuf != NULL) {
             mediaBuffers.push_back(mbuf);
@@ -505,7 +505,7 @@ void NuMediaExtractor::fetchTrackSamples(TrackInfo *info,
         ALOGW("read on track %zu failed with error %d", info->mTrackIndex, err);
         size_t count = mediaBuffers.size();
         for (size_t id = 0; id < count; ++id) {
-            MediaBuffer *mbuf = mediaBuffers[id];
+            MediaBufferBase *mbuf = mediaBuffers[id];
             if (mbuf != NULL) {
                 mbuf->release();
             }
@@ -517,7 +517,7 @@ void NuMediaExtractor::fetchTrackSamples(TrackInfo *info,
     bool releaseRemaining = false;
     for (size_t id = 0; id < count; ++id) {
         int64_t timeUs;
-        MediaBuffer *mbuf = mediaBuffers[id];
+        MediaBufferBase *mbuf = mediaBuffers[id];
         if (mbuf == NULL) {
             continue;
         }
@@ -565,7 +565,8 @@ status_t NuMediaExtractor::advance() {
     return OK;
 }
 
-status_t NuMediaExtractor::appendVorbisNumPageSamples(MediaBuffer *mbuf, const sp<ABuffer> &buffer) {
+status_t NuMediaExtractor::appendVorbisNumPageSamples(
+        MediaBufferBase *mbuf, const sp<ABuffer> &buffer) {
     int32_t numPageSamples;
     if (!mbuf->meta_data()->findInt32(
             kKeyValidSamples, &numPageSamples)) {

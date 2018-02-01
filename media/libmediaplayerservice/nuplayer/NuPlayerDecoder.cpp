@@ -1046,7 +1046,7 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
         }
 
         // Modular DRM
-        MediaBuffer *mediaBuf = NULL;
+        MediaBufferBase *mediaBuf = NULL;
         NuPlayerDrm::CryptoInfo *cryptInfo = NULL;
 
         // copy into codec buffer

@@ -1149,7 +1149,7 @@ status_t NuPlayer2::GenericSource2::doSeek(int64_t seekTimeUs, MediaPlayer2SeekM
 }
 
 sp<ABuffer> NuPlayer2::GenericSource2::mediaBufferToABuffer(
-        MediaBuffer* mb,
+        MediaBufferBase* mb,
         media_track_type trackType) {
     bool audio = trackType == MEDIA_TRACK_TYPE_AUDIO;
     size_t outLength = mb->range_length();
@@ -1333,7 +1333,7 @@ void NuPlayer2::GenericSource2::readBuffer(
 
     int32_t generation = getDataGeneration(trackType);
     for (size_t numBuffers = 0; numBuffers < maxBuffers; ) {
-        Vector<MediaBuffer *> mediaBuffers;
+        Vector<MediaBufferBase *> mediaBuffers;
         status_t err = NO_ERROR;
 
         sp<IMediaSource> source = track->mSource;
@@ -1342,7 +1342,7 @@ void NuPlayer2::GenericSource2::readBuffer(
             err = source->readMultiple(
                     &mediaBuffers, maxBuffers - numBuffers, &options);
         } else {
-            MediaBuffer *mbuf = NULL;
+            MediaBufferBase *mbuf = NULL;
             err = source->read(&mbuf, &options);
             if (err == OK && mbuf != NULL) {
                 mediaBuffers.push_back(mbuf);
@@ -1365,7 +1365,7 @@ void NuPlayer2::GenericSource2::readBuffer(
 
         for (; id < count; ++id) {
             int64_t timeUs;
-            MediaBuffer *mbuf = mediaBuffers[id];
+            MediaBufferBase *mbuf = mediaBuffers[id];
             if (!mbuf->meta_data()->findInt64(kKeyTime, &timeUs)) {
                 mbuf->meta_data()->dumpToLog();
                 track->mPackets->signalEOS(ERROR_MALFORMED);
@@ -1659,7 +1659,7 @@ status_t NuPlayer2::GenericSource2::checkDrmInfo()
     return OK;
 }
 
-void NuPlayer2::GenericSource2::signalBufferReturned(MediaBuffer *buffer)
+void NuPlayer2::GenericSource2::signalBufferReturned(MediaBufferBase *buffer)
 {
     //ALOGV("signalBufferReturned %p  refCount: %d", buffer, buffer->localRefcount());
 

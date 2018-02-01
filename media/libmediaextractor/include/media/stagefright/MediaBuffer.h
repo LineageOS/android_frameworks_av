@@ -26,6 +26,7 @@
 #include <binder/MemoryDealer.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
+#include <media/stagefright/MediaBufferBase.h>
 
 namespace android {
 
@@ -34,19 +35,7 @@ class MediaBuffer;
 class MediaBufferObserver;
 class MetaData;
 
-class MediaBufferObserver {
-public:
-    MediaBufferObserver() {}
-    virtual ~MediaBufferObserver() {}
-
-    virtual void signalBufferReturned(MediaBuffer *buffer) = 0;
-
-private:
-    MediaBufferObserver(const MediaBufferObserver &);
-    MediaBufferObserver &operator=(const MediaBufferObserver &);
-};
-
-class MediaBuffer {
+class MediaBuffer : public MediaBufferBase {
 public:
     // allocations larger than or equal to this will use shared memory.
     static const size_t kSharedMemThreshold = 64 * 1024;
@@ -70,42 +59,42 @@ public:
     //
     // If no MediaBufferGroup is set, the local reference count must be zero
     // when called, whereupon the MediaBuffer is deleted.
-    void release();
+    virtual void release();
 
     // Increments the local reference count.
     // Use only when MediaBufferGroup is set.
-    void add_ref();
+    virtual void add_ref();
 
-    void *data() const;
-    size_t size() const;
+    virtual void *data() const;
+    virtual size_t size() const;
 
-    size_t range_offset() const;
-    size_t range_length() const;
+    virtual size_t range_offset() const;
+    virtual size_t range_length() const;
 
-    void set_range(size_t offset, size_t length);
+    virtual void set_range(size_t offset, size_t length);
 
-    sp<MetaData> meta_data();
+    virtual sp<MetaData> meta_data();
 
     // Clears meta data and resets the range to the full extent.
-    void reset();
+    virtual void reset();
 
-    void setObserver(MediaBufferObserver *group);
+    virtual void setObserver(MediaBufferObserver *group);
 
     // Returns a clone of this MediaBuffer increasing its reference count.
     // The clone references the same data but has its own range and
     // MetaData.
-    MediaBuffer *clone();
+    virtual MediaBufferBase *clone();
 
     // sum of localRefcount() and remoteRefcount()
-    int refcount() const {
+    virtual int refcount() const {
         return localRefcount() + remoteRefcount();
     }
 
-    int localRefcount() const {
+    virtual int localRefcount() const {
         return mRefCount;
     }
 
-    int remoteRefcount() const {
+    virtual int remoteRefcount() const {
         if (mMemory.get() == nullptr || mMemory->pointer() == nullptr) return 0;
         int32_t remoteRefcount =
                 reinterpret_cast<SharedControl *>(mMemory->pointer())->getRemoteRefcount();

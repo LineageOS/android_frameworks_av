@@ -31,7 +31,7 @@
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
-#include <media/stagefright/MediaBuffer.h>
+#include <media/stagefright/MediaBufferBase.h>
 
 namespace android {
 
@@ -173,7 +173,7 @@ public:
     virtual sp<MetaData> getFormat();
 
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~FLACSource();
@@ -232,10 +232,10 @@ public:
     // media buffers
     void allocateBuffers();
     void releaseBuffers();
-    MediaBuffer *readBuffer() {
+    MediaBufferBase *readBuffer() {
         return readBuffer(false, 0LL);
     }
-    MediaBuffer *readBuffer(FLAC__uint64 sample) {
+    MediaBufferBase *readBuffer(FLAC__uint64 sample) {
         return readBuffer(true, sample);
     }
 
@@ -274,7 +274,7 @@ private:
     FLAC__StreamDecoderErrorStatus mErrorStatus;
 
     status_t init();
-    MediaBuffer *readBuffer(bool doSeek, FLAC__uint64 sample);
+    MediaBufferBase *readBuffer(bool doSeek, FLAC__uint64 sample);
 
     // no copy constructor or assignment
     FLACParser(const FLACParser &);
@@ -763,7 +763,7 @@ void FLACParser::allocateBuffers()
     CHECK(mGroup == NULL);
     mGroup = new MediaBufferGroup;
     mMaxBufferSize = getMaxBlockSize() * getChannels() * sizeof(short);
-    mGroup->add_buffer(new MediaBuffer(mMaxBufferSize));
+    mGroup->add_buffer(MediaBufferBase::Create(mMaxBufferSize));
 }
 
 void FLACParser::releaseBuffers()
@@ -773,7 +773,7 @@ void FLACParser::releaseBuffers()
     mGroup = NULL;
 }
 
-MediaBuffer *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
+MediaBufferBase *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
 {
     mWriteRequested = true;
     mWriteCompleted = false;
@@ -810,7 +810,7 @@ MediaBuffer *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
     }
     // acquire a media buffer
     CHECK(mGroup != NULL);
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     status_t err = mGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return NULL;
@@ -881,9 +881,9 @@ sp<MetaData> FLACSource::getFormat()
 }
 
 status_t FLACSource::read(
-        MediaBuffer **outBuffer, const ReadOptions *options)
+        MediaBufferBase **outBuffer, const ReadOptions *options)
 {
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     // process an optional seek request
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;

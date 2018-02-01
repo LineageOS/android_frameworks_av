@@ -35,7 +35,7 @@ public:
     virtual status_t stop();
     virtual sp<MetaData> getFormat();
     virtual status_t read(
-            MediaBuffer **buffer,
+            MediaBufferBase **buffer,
             const MediaSource::ReadOptions *options = NULL);
     virtual status_t pause();
     virtual status_t setStopTimeUs(int64_t stopTimeUs);

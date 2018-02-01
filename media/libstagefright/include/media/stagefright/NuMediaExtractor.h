@@ -107,8 +107,8 @@ private:
 
     struct Sample {
         Sample();
-        Sample(MediaBuffer *buffer, int64_t timeUs);
-        MediaBuffer *mBuffer;
+        Sample(MediaBufferBase *buffer, int64_t timeUs);
+        MediaBufferBase *mBuffer;
         int64_t mSampleTimeUs;
     };
 
@@ -150,7 +150,7 @@ private:
 
     bool getTotalBitrate(int64_t *bitRate) const;
     status_t updateDurationAndBitrate();
-    status_t appendVorbisNumPageSamples(MediaBuffer *mbuf, const sp<ABuffer> &buffer);
+    status_t appendVorbisNumPageSamples(MediaBufferBase *mbuf, const sp<ABuffer> &buffer);
 
     DISALLOW_EVIL_CONSTRUCTORS(NuMediaExtractor);
 };

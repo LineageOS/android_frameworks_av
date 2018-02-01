@@ -59,7 +59,7 @@ struct MediaCodecSource::Puller : public AHandler {
     void pause();
     void resume();
     status_t setStopTimeUs(int64_t stopTimeUs);
-    bool readBuffer(MediaBuffer **buffer);
+    bool readBuffer(MediaBufferBase **buffer);
 
 protected:
     virtual void onMessageReceived(const sp<AMessage> &msg);
@@ -86,14 +86,14 @@ private:
         int64_t mReadPendingSince;
         bool mPaused;
         bool mPulling;
-        Vector<MediaBuffer *> mReadBuffers;
+        Vector<MediaBufferBase *> mReadBuffers;
 
         void flush();
         // if queue is empty, return false and set *|buffer| to NULL . Otherwise, pop
         // buffer from front of the queue, place it into *|buffer| and return true.
-        bool readBuffer(MediaBuffer **buffer);
+        bool readBuffer(MediaBufferBase **buffer);
         // add a buffer to the back of the queue
-        void pushBuffer(MediaBuffer *mbuf);
+        void pushBuffer(MediaBufferBase *mbuf);
     };
     Mutexed<Queue> mQueue;
 
@@ -123,11 +123,11 @@ MediaCodecSource::Puller::~Puller() {
     mLooper->stop();
 }
 
-void MediaCodecSource::Puller::Queue::pushBuffer(MediaBuffer *mbuf) {
+void MediaCodecSource::Puller::Queue::pushBuffer(MediaBufferBase *mbuf) {
     mReadBuffers.push_back(mbuf);
 }
 
-bool MediaCodecSource::Puller::Queue::readBuffer(MediaBuffer **mbuf) {
+bool MediaCodecSource::Puller::Queue::readBuffer(MediaBufferBase **mbuf) {
     if (mReadBuffers.empty()) {
         *mbuf = NULL;
         return false;
@@ -138,14 +138,14 @@ bool MediaCodecSource::Puller::Queue::readBuffer(MediaBuffer **mbuf) {
 }
 
 void MediaCodecSource::Puller::Queue::flush() {
-    MediaBuffer *mbuf;
+    MediaBufferBase *mbuf;
     while (readBuffer(&mbuf)) {
         // there are no null buffers in the queue
         mbuf->release();
     }
 }
 
-bool MediaCodecSource::Puller::readBuffer(MediaBuffer **mbuf) {
+bool MediaCodecSource::Puller::readBuffer(MediaBufferBase **mbuf) {
     Mutexed<Queue>::Locked queue(mQueue);
     return queue->readBuffer(mbuf);
 }
@@ -298,7 +298,7 @@ void MediaCodecSource::Puller::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             queue.unlock();
-            MediaBuffer *mbuf = NULL;
+            MediaBufferBase *mbuf = NULL;
             status_t err = mSource->read(&mbuf);
             queue.lock();
 
@@ -413,7 +413,7 @@ sp<IGraphicBufferProducer> MediaCodecSource::getGraphicBufferProducer() {
 }
 
 status_t MediaCodecSource::read(
-        MediaBuffer** buffer, const ReadOptions* /* options */) {
+        MediaBufferBase** buffer, const ReadOptions* /* options */) {
     Mutexed<Output>::Locked output(mOutput);
 
     *buffer = NULL;
@@ -428,7 +428,7 @@ status_t MediaCodecSource::read(
     return output->mErrorCode;
 }
 
-void MediaCodecSource::signalBufferReturned(MediaBuffer *buffer) {
+void MediaCodecSource::signalBufferReturned(MediaBufferBase *buffer) {
     buffer->setObserver(0);
     buffer->release();
 }
@@ -636,7 +636,7 @@ void MediaCodecSource::signalEOS(status_t err) {
         if (!reachedEOS) {
             ALOGV("encoder (%s) reached EOS", mIsVideo ? "video" : "audio");
             // release all unread media buffers
-            for (List<MediaBuffer*>::iterator it = output->mBufferQueue.begin();
+            for (List<MediaBufferBase*>::iterator it = output->mBufferQueue.begin();
                     it != output->mBufferQueue.end(); it++) {
                 (*it)->release();
             }
@@ -682,7 +682,7 @@ void MediaCodecSource::resume(int64_t resumeStartTimeUs) {
 }
 
 status_t MediaCodecSource::feedEncoderInputBuffers() {
-    MediaBuffer* mbuf = NULL;
+    MediaBufferBase* mbuf = NULL;
     while (!mAvailEncoderInputIndices.empty() && mPuller->readBuffer(&mbuf)) {
         size_t bufferIndex = *mAvailEncoderInputIndices.begin();
         mAvailEncoderInputIndices.erase(mAvailEncoderInputIndices.begin());
@@ -906,7 +906,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
                 break;
             }
 
-            MediaBuffer *mbuf = new MediaBuffer(outbuf->size());
+            MediaBufferBase *mbuf = new MediaBuffer(outbuf->size());
             mbuf->setObserver(this);
             mbuf->add_ref();
 

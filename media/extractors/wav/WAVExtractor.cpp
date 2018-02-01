@@ -68,7 +68,7 @@ struct WAVSource : public MediaSourceBase {
     virtual sp<MetaData> getFormat();
 
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
     virtual bool supportNonblockingRead() { return true; }
 
@@ -385,7 +385,7 @@ status_t WAVSource::start(MetaData * /* params */) {
 
     if (mBitsPerSample == 8) {
         // As a temporary buffer for 8->16 bit conversion.
-        mGroup->add_buffer(new MediaBuffer(kMaxFrameSize));
+        mGroup->add_buffer(MediaBufferBase::Create(kMaxFrameSize));
     }
 
     mCurrentPos = mOffset;
@@ -415,7 +415,7 @@ sp<MetaData> WAVSource::getFormat() {
 }
 
 status_t WAVSource::read(
-        MediaBuffer **out, const ReadOptions *options) {
+        MediaBufferBase **out, const ReadOptions *options) {
     *out = NULL;
 
     if (options != nullptr && options->getNonBlocking() && !mGroup->has_buffers()) {
@@ -441,7 +441,7 @@ status_t WAVSource::read(
         mCurrentPos = pos + mOffset;
     }
 
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     status_t err = mGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return err;
@@ -492,7 +492,7 @@ status_t WAVSource::read(
             // Convert 8-bit unsigned samples to 16-bit signed.
 
             // Create new buffer with 2 byte wide samples
-            MediaBuffer *tmp;
+            MediaBufferBase *tmp;
             CHECK_EQ(mGroup->acquire_buffer(&tmp), (status_t)OK);
             tmp->set_range(0, 2 * n);
 

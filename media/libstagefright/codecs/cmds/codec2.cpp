@@ -295,7 +295,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
         size_t size = 0u;
         void *data = nullptr;
         int64_t timestamp = 0u;
-        MediaBuffer *buffer = nullptr;
+        MediaBufferBase *buffer = nullptr;
         sp<ABuffer> csd;
         if (csd0 != nullptr) {
             csd = csd0;

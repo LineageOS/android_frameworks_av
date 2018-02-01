@@ -27,7 +27,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/base64.h>
 #include <media/stagefright/foundation/ByteUtils.h>
-#include <media/stagefright/MediaBuffer.h>
+#include <media/stagefright/MediaBufferBase.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
@@ -54,7 +54,7 @@ struct OggSource : public MediaSourceBase {
     virtual status_t stop();
 
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~OggSource();
@@ -82,7 +82,7 @@ struct MyOggExtractor {
 
     status_t seekToTime(int64_t timeUs);
     status_t seekToOffset(off64_t offset);
-    virtual status_t readNextPacket(MediaBuffer **buffer) = 0;
+    virtual status_t readNextPacket(MediaBufferBase **buffer) = 0;
 
     status_t init();
 
@@ -141,7 +141,7 @@ protected:
     // 1 - bitstream identification header
     // 3 - comment header
     // 5 - codec setup header (Vorbis only)
-    virtual status_t verifyHeader(MediaBuffer *buffer, uint8_t type) = 0;
+    virtual status_t verifyHeader(MediaBufferBase *buffer, uint8_t type) = 0;
 
     // Read the next ogg packet from the underlying data source; optionally
     // calculate the timestamp for the output packet whilst pretending
@@ -149,9 +149,9 @@ protected:
     //
     // *buffer is NULL'ed out immediately upon entry, and if successful a new buffer is allocated;
     // clients are responsible for releasing the original buffer.
-    status_t _readNextPacket(MediaBuffer **buffer, bool calcVorbisTimestamp);
+    status_t _readNextPacket(MediaBufferBase **buffer, bool calcVorbisTimestamp);
 
-    int32_t getPacketBlockSize(MediaBuffer *buffer);
+    int32_t getPacketBlockSize(MediaBufferBase *buffer);
 
     void parseFileMetaData();
 
@@ -173,7 +173,7 @@ struct MyVorbisExtractor : public MyOggExtractor {
 
     virtual uint64_t approxBitrate() const;
 
-    virtual status_t readNextPacket(MediaBuffer **buffer) {
+    virtual status_t readNextPacket(MediaBufferBase **buffer) {
         return _readNextPacket(buffer, /* calcVorbisTimestamp = */ true);
     }
 
@@ -185,7 +185,7 @@ protected:
         return granulePos * 1000000ll / mVi.rate;
     }
 
-    virtual status_t verifyHeader(MediaBuffer *buffer, uint8_t type);
+    virtual status_t verifyHeader(MediaBufferBase *buffer, uint8_t type);
 };
 
 struct MyOpusExtractor : public MyOggExtractor {
@@ -203,16 +203,16 @@ struct MyOpusExtractor : public MyOggExtractor {
         return 0;
     }
 
-    virtual status_t readNextPacket(MediaBuffer **buffer);
+    virtual status_t readNextPacket(MediaBufferBase **buffer);
 
 protected:
     virtual int64_t getTimeUsOfGranule(uint64_t granulePos) const;
-    virtual status_t verifyHeader(MediaBuffer *buffer, uint8_t type);
+    virtual status_t verifyHeader(MediaBufferBase *buffer, uint8_t type);
 
 private:
-    status_t verifyOpusHeader(MediaBuffer *buffer);
-    status_t verifyOpusComments(MediaBuffer *buffer);
-    uint32_t getNumSamplesInPacket(MediaBuffer *buffer) const;
+    status_t verifyOpusHeader(MediaBufferBase *buffer);
+    status_t verifyOpusComments(MediaBufferBase *buffer);
+    uint32_t getNumSamplesInPacket(MediaBufferBase *buffer) const;
 
     uint8_t mChannelCount;
     uint16_t mCodecDelay;
@@ -256,7 +256,7 @@ status_t OggSource::stop() {
 }
 
 status_t OggSource::read(
-        MediaBuffer **out, const ReadOptions *options) {
+        MediaBufferBase **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -268,7 +268,7 @@ status_t OggSource::read(
         }
     }
 
-    MediaBuffer *packet;
+    MediaBufferBase *packet;
     status_t err = mExtractor->mImpl->readNextPacket(&packet);
 
     if (err != OK) {
@@ -562,13 +562,13 @@ ssize_t MyOggExtractor::readPage(off64_t offset, Page *page) {
     return sizeof(header) + page->mNumSegments + totalSize;
 }
 
-status_t MyOpusExtractor::readNextPacket(MediaBuffer **out) {
+status_t MyOpusExtractor::readNextPacket(MediaBufferBase **out) {
     if (mOffset <= mFirstDataOffset && mStartGranulePosition < 0) {
         // The first sample might not start at time 0; find out where by subtracting
         // the number of samples on the first page from the granule position
         // (position of last complete sample) of the first page. This happens
         // the first time before we attempt to read a packet from the first page.
-        MediaBuffer *mBuf;
+        MediaBufferBase *mBuf;
         uint32_t numSamples = 0;
         uint64_t curGranulePosition = 0;
         while (true) {
@@ -623,7 +623,7 @@ status_t MyOpusExtractor::readNextPacket(MediaBuffer **out) {
     return OK;
 }
 
-uint32_t MyOpusExtractor::getNumSamplesInPacket(MediaBuffer *buffer) const {
+uint32_t MyOpusExtractor::getNumSamplesInPacket(MediaBufferBase *buffer) const {
     if (buffer == NULL || buffer->range_length() < 1) {
         return 0;
     }
@@ -669,10 +669,10 @@ uint32_t MyOpusExtractor::getNumSamplesInPacket(MediaBuffer *buffer) const {
     return numSamples;
 }
 
-status_t MyOggExtractor::_readNextPacket(MediaBuffer **out, bool calcVorbisTimestamp) {
+status_t MyOggExtractor::_readNextPacket(MediaBufferBase **out, bool calcVorbisTimestamp) {
     *out = NULL;
 
-    MediaBuffer *buffer = NULL;
+    MediaBufferBase *buffer = NULL;
     int64_t timeUs = -1;
 
     for (;;) {
@@ -708,7 +708,7 @@ status_t MyOggExtractor::_readNextPacket(MediaBuffer **out, bool calcVorbisTimes
                 ALOGE("b/36592202");
                 return ERROR_MALFORMED;
             }
-            MediaBuffer *tmp = new (std::nothrow) MediaBuffer(fullSize);
+            MediaBufferBase *tmp = MediaBufferBase::Create(fullSize);
             if (tmp == NULL) {
                 if (buffer != NULL) {
                     buffer->release();
@@ -833,7 +833,7 @@ status_t MyOggExtractor::init() {
     mMeta->setCString(kKeyMIMEType, mMimeType);
 
     status_t err;
-    MediaBuffer *packet;
+    MediaBufferBase *packet;
     for (size_t i = 0; i < mNumHeaders; ++i) {
         // ignore timestamp for configuration packets
         if ((err = _readNextPacket(&packet, /* calcVorbisTimestamp = */ false)) != OK) {
@@ -910,7 +910,7 @@ void MyOggExtractor::buildTableOfContents() {
     }
 }
 
-int32_t MyOggExtractor::getPacketBlockSize(MediaBuffer *buffer) {
+int32_t MyOggExtractor::getPacketBlockSize(MediaBufferBase *buffer) {
     const uint8_t *data =
         (const uint8_t *)buffer->data() + buffer->range_offset();
 
@@ -950,7 +950,7 @@ int64_t MyOpusExtractor::getTimeUsOfGranule(uint64_t granulePos) const {
     return pcmSamplePosition * 1000000ll / kOpusSampleRate;
 }
 
-status_t MyOpusExtractor::verifyHeader(MediaBuffer *buffer, uint8_t type) {
+status_t MyOpusExtractor::verifyHeader(MediaBufferBase *buffer, uint8_t type) {
     switch (type) {
         // there are actually no header types defined in the Opus spec; we choose 1 and 3 to mean
         // header and comments such that we can share code with MyVorbisExtractor.
@@ -963,7 +963,7 @@ status_t MyOpusExtractor::verifyHeader(MediaBuffer *buffer, uint8_t type) {
     }
 }
 
-status_t MyOpusExtractor::verifyOpusHeader(MediaBuffer *buffer) {
+status_t MyOpusExtractor::verifyOpusHeader(MediaBufferBase *buffer) {
     const size_t kOpusHeaderSize = 19;
     const uint8_t *data =
         (const uint8_t *)buffer->data() + buffer->range_offset();
@@ -989,7 +989,7 @@ status_t MyOpusExtractor::verifyOpusHeader(MediaBuffer *buffer) {
     return OK;
 }
 
-status_t MyOpusExtractor::verifyOpusComments(MediaBuffer *buffer) {
+status_t MyOpusExtractor::verifyOpusComments(MediaBufferBase *buffer) {
     // add artificial framing bit so we can reuse _vorbis_unpack_comment
     int32_t commentSize = buffer->range_length() + 1;
     sp<ABuffer> aBuf = new ABuffer(commentSize);
@@ -1081,7 +1081,7 @@ status_t MyOpusExtractor::verifyOpusComments(MediaBuffer *buffer) {
 }
 
 status_t MyVorbisExtractor::verifyHeader(
-        MediaBuffer *buffer, uint8_t type) {
+        MediaBufferBase *buffer, uint8_t type) {
     const uint8_t *data =
         (const uint8_t *)buffer->data() + buffer->range_offset();
 

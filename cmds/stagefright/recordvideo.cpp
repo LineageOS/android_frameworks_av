@@ -90,7 +90,7 @@ public:
     }
 
     virtual status_t read(
-            MediaBuffer **buffer, const MediaSource::ReadOptions *options __unused) {
+            MediaBufferBase **buffer, const MediaSource::ReadOptions *options __unused) {
 
         if (mNumFramesOutput % 10 == 0) {
             fprintf(stderr, ".");

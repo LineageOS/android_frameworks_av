@@ -97,7 +97,7 @@ public:
     virtual status_t start(MetaData *params = NULL);
     virtual status_t stop() { return reset(); }
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
     virtual status_t setStopTimeUs(int64_t stopTimeUs);
 
     /**
@@ -127,7 +127,7 @@ public:
      */
     MetadataBufferType metaDataStoredInVideoBuffers() const;
 
-    virtual void signalBufferReturned(MediaBuffer* buffer);
+    virtual void signalBufferReturned(MediaBufferBase* buffer);
 
 protected:
 

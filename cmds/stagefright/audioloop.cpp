@@ -169,7 +169,7 @@ ALOGI("Line: %d", __LINE__);
 ALOGI("Line: %d", __LINE__);
         } else {
             CHECK_EQ(decoder->start(), (status_t)OK);
-            MediaBuffer* buffer;
+            MediaBufferBase* buffer;
             while (decoder->read(&buffer) == OK) {
                 // do something with buffer (save it eventually?)
                 // need to stop after some count though...

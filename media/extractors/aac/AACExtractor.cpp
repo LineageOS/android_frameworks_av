@@ -46,7 +46,7 @@ public:
     virtual sp<MetaData> getFormat();
 
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~AACSource();
@@ -259,7 +259,7 @@ status_t AACSource::start(MetaData * /* params */) {
 
     mCurrentTimeUs = 0;
     mGroup = new MediaBufferGroup;
-    mGroup->add_buffer(new MediaBuffer(kMaxFrameSize));
+    mGroup->add_buffer(MediaBufferBase::Create(kMaxFrameSize));
     mStarted = true;
 
     return OK;
@@ -280,7 +280,7 @@ sp<MetaData> AACSource::getFormat() {
 }
 
 status_t AACSource::read(
-        MediaBuffer **out, const ReadOptions *options) {
+        MediaBufferBase **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -303,7 +303,7 @@ status_t AACSource::read(
         return ERROR_END_OF_STREAM;
     }
 
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     status_t err = mGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return err;

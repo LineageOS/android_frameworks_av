@@ -110,13 +110,13 @@ private:
     void addSR(const sp<ABuffer> &buffer);
     void addSDES(const sp<ABuffer> &buffer);
 
-    void makeH264SPropParamSets(MediaBuffer *buffer);
+    void makeH264SPropParamSets(MediaBufferBase *buffer);
     void dumpSessionDesc();
 
     void sendBye();
-    void sendAVCData(MediaBuffer *mediaBuf);
-    void sendH263Data(MediaBuffer *mediaBuf);
-    void sendAMRData(MediaBuffer *mediaBuf);
+    void sendAVCData(MediaBufferBase *mediaBuf);
+    void sendH263Data(MediaBufferBase *mediaBuf);
+    void sendAMRData(MediaBufferBase *mediaBuf);
 
     void send(const sp<ABuffer> &buffer, bool isRTCP);
 

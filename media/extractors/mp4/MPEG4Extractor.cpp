@@ -41,7 +41,7 @@
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
-#include <media/stagefright/MediaBuffer.h>
+#include <media/stagefright/MediaBufferBase.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
@@ -83,9 +83,9 @@ public:
 
     virtual sp<MetaData> getFormat();
 
-    virtual status_t read(MediaBuffer **buffer, const ReadOptions *options = NULL);
+    virtual status_t read(MediaBufferBase **buffer, const ReadOptions *options = NULL);
     virtual bool supportNonblockingRead() { return true; }
-    virtual status_t fragmentedRead(MediaBuffer **buffer, const ReadOptions *options = NULL);
+    virtual status_t fragmentedRead(MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
     virtual ~MPEG4Source();
 
@@ -128,7 +128,7 @@ private:
 
     MediaBufferGroup *mGroup;
 
-    MediaBuffer *mBuffer;
+    MediaBufferBase *mBuffer;
 
     bool mWantsNALFragments;
 
@@ -4681,7 +4681,7 @@ size_t MPEG4Source::parseNALSize(const uint8_t *data) const {
 }
 
 status_t MPEG4Source::read(
-        MediaBuffer **out, const ReadOptions *options) {
+        MediaBufferBase **out, const ReadOptions *options) {
     Mutex::Autolock autoLock(mLock);
 
     CHECK(mStarted);
@@ -4906,7 +4906,7 @@ status_t MPEG4Source::read(
             return ERROR_MALFORMED;
         }
 
-        MediaBuffer *clone = mBuffer->clone();
+        MediaBufferBase *clone = mBuffer->clone();
         CHECK(clone != NULL);
         clone->set_range(mBuffer->range_offset() + mNALLengthSize, nal_size);
 
@@ -5026,7 +5026,7 @@ status_t MPEG4Source::read(
 }
 
 status_t MPEG4Source::fragmentedRead(
-        MediaBuffer **out, const ReadOptions *options) {
+        MediaBufferBase **out, const ReadOptions *options) {
 
     ALOGV("MPEG4Source::fragmentedRead");
 
@@ -5230,7 +5230,7 @@ status_t MPEG4Source::fragmentedRead(
             return ERROR_MALFORMED;
         }
 
-        MediaBuffer *clone = mBuffer->clone();
+        MediaBufferBase *clone = mBuffer->clone();
         CHECK(clone != NULL);
         clone->set_range(mBuffer->range_offset() + mNALLengthSize, nal_size);
 

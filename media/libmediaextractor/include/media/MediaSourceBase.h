@@ -30,7 +30,7 @@
 
 namespace android {
 
-class MediaBuffer;
+class MediaBufferBase;
 
 class SourceBaseAllocTracker {
 public:
@@ -111,7 +111,7 @@ struct MediaSourceBase
     // MediaSource has changed mid-stream, the client can continue reading
     // but should be prepared for buffers of the new configuration.
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL) = 0;
+            MediaBufferBase **buffer, const ReadOptions *options = NULL) = 0;
 
     // Causes this source to suspend pulling data from its upstream source
     // until a subsequent read-with-seek. This is currently not supported
