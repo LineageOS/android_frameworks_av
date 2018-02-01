@@ -126,6 +126,7 @@ cc_library_shared {
         "libutils",
         "libmedia_helper",
         "libstagefright_codec2",
+        "libstagefright_codec2_vndk",
         "libstagefright_foundation",
         "libstagefright_gbs",
         "libstagefright_omx",
@@ -154,8 +155,6 @@ cc_library_shared {
         "libstagefright_esds",
         "libstagefright_id3",
         "libFLAC",
-
-        "libstagefright_codec2_vndk",
     ],
 
     export_shared_lib_headers: [
