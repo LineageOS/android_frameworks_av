@@ -83,7 +83,7 @@ public:
     ~SimplePlayer();
 
     void onWorkDone(std::weak_ptr<C2Component> component,
-                    std::vector<std::unique_ptr<C2Work>> workItems);
+                    std::list<std::unique_ptr<C2Work>> workItems);
     void onTripped(std::weak_ptr<C2Component> component,
                    std::vector<std::shared_ptr<C2SettingResult>> settingResult);
     void onError(std::weak_ptr<C2Component> component, uint32_t errorCode);
@@ -120,7 +120,7 @@ public:
     virtual ~Listener() = default;
 
     virtual void onWorkDone_nb(std::weak_ptr<C2Component> component,
-                            std::vector<std::unique_ptr<C2Work>> workItems) override {
+                            std::list<std::unique_ptr<C2Work>> workItems) override {
         mThis->onWorkDone(component, std::move(workItems));
     }
 
@@ -174,7 +174,7 @@ SimplePlayer::~SimplePlayer() {
 }
 
 void SimplePlayer::onWorkDone(
-        std::weak_ptr<C2Component> component, std::vector<std::unique_ptr<C2Work>> workItems) {
+        std::weak_ptr<C2Component> component, std::list<std::unique_ptr<C2Work>> workItems) {
     ALOGV("SimplePlayer::onWorkDone");
     (void) component;
     ULock l(mProcessedLock);

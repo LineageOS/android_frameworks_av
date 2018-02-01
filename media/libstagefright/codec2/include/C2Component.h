@@ -332,7 +332,7 @@ public:
     class Listener {
     public:
         virtual void onWorkDone_nb(std::weak_ptr<C2Component> component,
-                                std::vector<std::unique_ptr<C2Work>> workItems) = 0;
+                                std::list<std::unique_ptr<C2Work>> workItems) = 0;
 
         virtual void onTripped_nb(std::weak_ptr<C2Component> component,
                                std::vector<std::shared_ptr<C2SettingResult>> settingResult) = 0;

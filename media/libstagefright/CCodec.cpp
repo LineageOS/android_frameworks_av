@@ -117,7 +117,7 @@ public:
 
     virtual void onWorkDone_nb(
             std::weak_ptr<C2Component> component,
-            std::vector<std::unique_ptr<C2Work>> workItems) override {
+            std::list<std::unique_ptr<C2Work>> workItems) override {
         (void)component;
         sp<CCodec> codec(mCodec.promote());
         if (!codec) {
@@ -601,7 +601,7 @@ void CCodec::signalRequestIDRFrame() {
     // TODO
 }
 
-void CCodec::onWorkDone(std::vector<std::unique_ptr<C2Work>> &workItems) {
+void CCodec::onWorkDone(std::list<std::unique_ptr<C2Work>> &workItems) {
     Mutexed<std::list<std::unique_ptr<C2Work>>>::Locked queue(mWorkDoneQueue);
     for (std::unique_ptr<C2Work> &item : workItems) {
         queue->push_back(std::move(item));
