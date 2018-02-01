@@ -307,7 +307,7 @@ status_t NuPlayer2::createNuPlayer2Source(const sp<DataSourceDesc> &dsd,
                 sp<GenericSource2> genericSource =
                         new GenericSource2(notify, mUID, mMediaClock);
 
-                err = genericSource->setDataSource(httpService, url, headers);
+                err = genericSource->setDataSource(url, headers);
 
                 if (err == OK) {
                     *source = genericSource;

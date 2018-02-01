@@ -1244,43 +1244,25 @@ sp<AMediaCodecCryptoInfoWrapper> AMediaExtractorWrapper::getSampleCryptoInfo() {
     return new AMediaCodecCryptoInfoWrapper(AMediaExtractor_getSampleCryptoInfo(mAMediaExtractor));
 }
 
-ssize_t AMediaDataSourceWrapper::AMediaDataSourceWrapper_getSize(void *userdata) {
-    DataSource *source = static_cast<DataSource *>(userdata);
-    off64_t size = -1;
-    source->getSize(&size);
-    return size;
-}
-
-ssize_t AMediaDataSourceWrapper::AMediaDataSourceWrapper_readAt(void *userdata, off64_t offset, void * buf, size_t size) {
-    DataSource *source = static_cast<DataSource *>(userdata);
-    return source->readAt(offset, buf, size);
-}
-
-void AMediaDataSourceWrapper::AMediaDataSourceWrapper_close(void *userdata) {
-    DataSource *source = static_cast<DataSource *>(userdata);
-    source->close();
-}
-
-AMediaDataSourceWrapper::AMediaDataSourceWrapper(const sp<DataSource> &dataSource)
-    : mDataSource(dataSource),
-      mAMediaDataSource(AMediaDataSource_new()) {
-    ALOGV("setDataSource (source: %p)", dataSource.get());
-    AMediaDataSource_setUserdata(mAMediaDataSource, dataSource.get());
-    AMediaDataSource_setReadAt(mAMediaDataSource, AMediaDataSourceWrapper_readAt);
-    AMediaDataSource_setGetSize(mAMediaDataSource, AMediaDataSourceWrapper_getSize);
-    AMediaDataSource_setClose(mAMediaDataSource, AMediaDataSourceWrapper_close);
+AMediaDataSourceWrapper::AMediaDataSourceWrapper(AMediaDataSource *aDataSource)
+    : mAMediaDataSource(aDataSource) {
 }
 
 AMediaDataSourceWrapper::~AMediaDataSourceWrapper() {
     if (mAMediaDataSource == NULL) {
         return;
     }
+    AMediaDataSource_close(mAMediaDataSource);
     AMediaDataSource_delete(mAMediaDataSource);
     mAMediaDataSource = NULL;
 }
 
 AMediaDataSource* AMediaDataSourceWrapper::getAMediaDataSource() {
     return mAMediaDataSource;
+}
+
+void AMediaDataSourceWrapper::close() {
+    AMediaDataSource_close(mAMediaDataSource);
 }
 
 }  // namespace android
