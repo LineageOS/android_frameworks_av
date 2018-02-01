@@ -97,7 +97,10 @@ static void checkSessionIdAllocate(aaudio_performance_mode_t perfMode,
 
     // Get the allocated ID from the stream.
     sessionId1 = AAudioStream_getSessionId(aaudioStream1);
-    ASSERT_LT(0, sessionId1); // Must be positive.
+
+    // Check for invalid session IDs.
+    ASSERT_NE(AAUDIO_SESSION_ID_NONE, sessionId1);
+    ASSERT_NE(AAUDIO_SESSION_ID_ALLOCATE, sessionId1);
 
     ASSERT_EQ(AAUDIO_OK, AAudioStream_requestStart(aaudioStream1));
 

@@ -251,8 +251,8 @@ aaudio_result_t AAudioConvert_androidToAAudioResult(status_t status) {
 }
 
 audio_session_t AAudioConvert_aaudioToAndroidSessionId(aaudio_session_id_t sessionId) {
-    // If not a valid sessionId then convert to a safe value of AUDIO_SESSION_ALLOCATE.
-    return (sessionId < AAUDIO_SESSION_ID_MIN)
+    // If not a regular sessionId then convert to a safe value of AUDIO_SESSION_ALLOCATE.
+    return (sessionId == AAUDIO_SESSION_ID_ALLOCATE || sessionId == AAUDIO_SESSION_ID_NONE)
            ? AUDIO_SESSION_ALLOCATE
            : (audio_session_t) sessionId;
 }
