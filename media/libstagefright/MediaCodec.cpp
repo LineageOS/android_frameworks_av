@@ -502,7 +502,6 @@ void MediaCodec::initAnalyticsItem() {
     // set up our new record, get a sessionID, put it into the in-progress list
     mAnalyticsItem = new MediaAnalyticsItem(kCodecKeyName);
     if (mAnalyticsItem != NULL) {
-        (void) mAnalyticsItem->generateSessionID();
         // don't record it yet; only at the end, when we have decided that we have
         // data worth writing (e.g. .count() > 0)
     }
@@ -512,7 +511,6 @@ void MediaCodec::flushAnalyticsItem() {
     if (mAnalyticsItem != NULL) {
         // don't log empty records
         if (mAnalyticsItem->count() > 0) {
-            mAnalyticsItem->setFinalized(true);
             mAnalyticsItem->selfrecord();
         }
         delete mAnalyticsItem;

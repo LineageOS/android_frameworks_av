@@ -559,6 +559,8 @@ using effect_buffer_t = int16_t;
         virtual binder::Status    start(int /*AudioSystem::sync_event_t*/ event,
                 int /*audio_session_t*/ triggerSession);
         virtual binder::Status   stop();
+        virtual binder::Status   getActiveMicrophones(
+                std::vector<media::MicrophoneInfo>* activeMicrophones);
     private:
         const sp<RecordThread::RecordTrack> mRecordTrack;
 

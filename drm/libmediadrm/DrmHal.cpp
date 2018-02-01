@@ -472,7 +472,9 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
     for (size_t i = 0; i < mFactories.size(); i++) {
         if (mFactories[i]->isCryptoSchemeSupported(uuid)) {
             mPlugin = makeDrmPlugin(mFactories[i], uuid, appPackageName);
-            mPluginV1_1 = drm::V1_1::IDrmPlugin::castFrom(mPlugin);
+            if (mPlugin != NULL) {
+                mPluginV1_1 = drm::V1_1::IDrmPlugin::castFrom(mPlugin);
+            }
         }
     }
 
@@ -504,6 +506,7 @@ status_t DrmHal::destroyPlugin() {
         }
     }
     mPlugin.clear();
+    mPluginV1_1.clear();
     return OK;
 }
 

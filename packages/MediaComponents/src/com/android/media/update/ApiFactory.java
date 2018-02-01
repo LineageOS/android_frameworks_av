@@ -16,7 +16,6 @@
 
 package com.android.media.update;
 
-import android.app.PendingIntent;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
@@ -39,25 +38,27 @@ import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
+import android.media.PlaybackState2;
 import android.media.Rating2;
 import android.media.SessionPlayer2;
 import android.media.SessionToken2;
-import android.media.VolumeProvider;
+import android.media.VolumeProvider2;
 import android.media.update.MediaBrowser2Provider;
 import android.media.update.MediaControlView2Provider;
 import android.media.update.MediaController2Provider;
 import android.media.update.MediaItem2Provider;
-import android.media.update.MediaLibraryService2Provider.MediaLibrarySessionProvider;
 import android.media.update.MediaMetadata2Provider;
 import android.media.update.MediaSession2Provider;
 import android.media.update.MediaSession2Provider.BuilderBaseProvider;
 import android.media.update.MediaSession2Provider.PlaylistParamsProvider;
 import android.media.update.MediaSessionService2Provider;
+import android.media.update.PlaybackState2Provider;
 import android.media.update.SessionPlayer2Provider;
 import android.media.update.SessionToken2Provider;
-import android.media.update.VideoView2Provider;
 import android.media.update.StaticProvider;
+import android.media.update.VideoView2Provider;
 import android.media.update.ViewProvider;
+import android.media.update.VolumeProvider2Provider;
 import android.os.Bundle;
 import android.os.IInterface;
 import android.support.annotation.Nullable;
@@ -65,19 +66,19 @@ import android.util.AttributeSet;
 import android.widget.MediaControlView2;
 import android.widget.VideoView2;
 
-import com.android.media.IMediaSession2;
 import com.android.media.IMediaSession2Callback;
 import com.android.media.MediaBrowser2Impl;
 import com.android.media.MediaController2Impl;
 import com.android.media.MediaItem2Impl;
 import com.android.media.MediaLibraryService2Impl;
-import com.android.media.MediaLibraryService2Impl.MediaLibrarySessionImpl;
 import com.android.media.MediaMetadata2Impl;
 import com.android.media.MediaSession2Impl;
 import com.android.media.MediaSession2Impl.PlaylistParamsImpl;
 import com.android.media.MediaSessionService2Impl;
+import com.android.media.PlaybackState2Impl;
 import com.android.media.Rating2Impl;
 import com.android.media.SessionToken2Impl;
+import com.android.media.VolumeProvider2Impl;
 import com.android.widget.MediaControlView2Impl;
 import com.android.widget.VideoView2Impl;
 
@@ -218,6 +219,12 @@ public class ApiFactory implements StaticProvider {
     }
 
     @Override
+    public VolumeProvider2Provider createVolumeProvider2(Context context, VolumeProvider2 instance,
+            int controlType, int maxVolume, int currentVolume) {
+        return new VolumeProvider2Impl(context, instance, controlType, maxVolume, currentVolume);
+    }
+
+    @Override
     public MediaMetadata2 fromBundle_MediaMetadata2(Context context, Bundle bundle) {
         return MediaMetadata2Impl.fromBundle(context, bundle);
     }
@@ -262,5 +269,18 @@ public class ApiFactory implements StaticProvider {
     @Override
     public Rating2 newPercentageRating_Rating2(Context context, float percent) {
         return Rating2Impl.newPercentageRating(context, percent);
+    }
+
+    @Override
+    public PlaybackState2Provider createPlaybackState2(Context context, PlaybackState2 instance,
+            int state, long position, long updateTime, float speed, long bufferedPosition,
+            long activeItemId, CharSequence error) {
+        return new PlaybackState2Impl(context, instance, state, position, updateTime, speed,
+                bufferedPosition, activeItemId, error);
+    }
+
+    @Override
+    public PlaybackState2 fromBundle_PlaybackState2(Context context, Bundle bundle) {
+        return PlaybackState2Impl.fromBundle(context, bundle);
     }
 }

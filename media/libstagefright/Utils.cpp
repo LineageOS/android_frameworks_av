@@ -667,7 +667,7 @@ status_t convertMetaDataToMessage(
         if (!strncasecmp("image/", mime, 6)) {
             int32_t gridWidth, gridHeight, gridRows, gridCols;
             if (meta->findInt32(kKeyGridWidth, &gridWidth)
-                    && meta->findInt32(kKeyHeight, &gridHeight)
+                    && meta->findInt32(kKeyGridHeight, &gridHeight)
                     && meta->findInt32(kKeyGridRows, &gridRows)
                     && meta->findInt32(kKeyGridCols, &gridCols)) {
                 msg->setInt32("grid-width", gridWidth);

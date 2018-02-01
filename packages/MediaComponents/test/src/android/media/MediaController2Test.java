@@ -42,7 +42,6 @@ import org.junit.runner.RunWith;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static android.media.TestUtils.createPlaybackState;
 import static android.media.TestUtils.ensurePlaylistParamsModeEquals;
 
 import static org.junit.Assert.*;

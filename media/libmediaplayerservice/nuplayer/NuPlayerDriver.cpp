@@ -91,7 +91,6 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
 
     // set up an analytics record
     mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
-    mAnalyticsItem->generateSessionID();
 
     mLooper->start(
             false, /* runOnCallingThread */
@@ -617,14 +616,12 @@ void NuPlayerDriver::logMetrics(const char *where) {
     // So the canonical "empty" record has 3 elements in it.
     if (mAnalyticsItem->count() > 3) {
 
-        mAnalyticsItem->setFinalized(true);
         mAnalyticsItem->selfrecord();
 
         // re-init in case we prepare() and start() again.
         delete mAnalyticsItem ;
         mAnalyticsItem = new MediaAnalyticsItem("nuplayer");
         if (mAnalyticsItem) {
-            mAnalyticsItem->generateSessionID();
             mAnalyticsItem->setUid(mClientUid);
         }
     } else {

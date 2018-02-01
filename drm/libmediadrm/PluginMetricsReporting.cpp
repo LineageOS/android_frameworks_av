@@ -80,7 +80,6 @@ status_t reportMetricsGroup(const MetricsGroup& metricsGroup,
         }
     }
 
-    analyticsItem.setFinalized(true);
     if (!analyticsItem.selfrecord()) {
       ALOGE("selfrecord() returned false. sessioId %" PRId64, sessionId);
     }

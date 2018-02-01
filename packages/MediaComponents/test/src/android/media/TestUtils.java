@@ -42,17 +42,6 @@ public final class TestUtils {
     private static final int WAIT_SERVICE_TIME_MS = 5000;
 
     /**
-     * Creates a {@link android.media.session.PlaybackState} with the given state.
-     *
-     * @param state one of the PlaybackState.STATE_xxx.
-     * @return a PlaybackState
-     */
-    public static PlaybackState2 createPlaybackState(int state) {
-        return new PlaybackState2(state, 0, 0, 1.0f,
-                0, 0, null);
-    }
-
-    /**
      * Finds the session with id in this test package.
      *
      * @param context

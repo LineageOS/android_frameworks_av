@@ -225,7 +225,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void play_impl() {
-        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_START);
+        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_PLAY);
     }
 
     @Override
@@ -568,7 +568,8 @@ public class MediaController2Impl implements MediaController2Provider {
                 Log.w(TAG, "Don't fail silently here. Highly likely a bug");
                 return;
             }
-            controller.pushPlaybackStateChanges(PlaybackState2.fromBundle(state));
+            controller.pushPlaybackStateChanges(
+                    PlaybackState2.fromBundle(controller.getContext(), state));
         }
 
         @Override

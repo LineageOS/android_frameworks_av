@@ -38,6 +38,9 @@ import android.widget.TextView;
 
 import com.android.media.update.ApiHelper;
 import com.android.media.update.R;
+import com.android.support.mediarouter.app.MediaRouteButton;
+import com.android.support.mediarouter.media.MediaRouter;
+import com.android.support.mediarouter.media.MediaRouteSelector;
 
 import java.util.Formatter;
 import java.util.List;
@@ -106,6 +109,9 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
 
     private StringBuilder mFormatBuilder;
     private Formatter mFormatter;
+
+    private MediaRouteButton mRouteButton;
+    private MediaRouteSelector mRouteSelector;
 
     public MediaControlView2Impl(
             MediaControlView2 instance, ViewProvider superProvider) {
@@ -305,6 +311,17 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
         mSuperProvider.setEnabled_impl(enabled);
     }
 
+    public void setRouteSelector(MediaRouteSelector selector) {
+        mRouteSelector = selector;
+        if (mRouteSelector != null && !mRouteSelector.isEmpty()) {
+            mRouteButton.setRouteSelector(selector, MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN);
+            mRouteButton.setVisibility(View.VISIBLE);
+        } else {
+            mRouteButton.setRouteSelector(MediaRouteSelector.EMPTY);
+            mRouteButton.setVisibility(View.GONE);
+        }
+    }
+
     ///////////////////////////////////////////////////
     // Protected or private methods
     ///////////////////////////////////////////////////
@@ -374,6 +391,8 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
         mPlayDescription = res.getText(R.string.lockscreen_play_button_content_description);
         mPauseDescription = res.getText(R.string.lockscreen_pause_button_content_description);
         mReplayDescription = res.getText(R.string.lockscreen_replay_button_content_description);
+
+        mRouteButton = v.findViewById(R.id.cast);
 
         mPlayPauseButton = v.findViewById(R.id.pause);
         if (mPlayPauseButton != null) {

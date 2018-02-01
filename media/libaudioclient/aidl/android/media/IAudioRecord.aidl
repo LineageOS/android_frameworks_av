@@ -16,6 +16,8 @@
 
 package android.media;
 
+import android.media.MicrophoneInfo;
+
 /* Native code must specify namespace media (media::IAudioRecord) when referring to this class */
 interface IAudioRecord {
 
@@ -30,4 +32,8 @@ interface IAudioRecord {
    * will be processed, unless flush() is called.
    */
   void stop();
+
+  /* Get a list of current active microphones.
+   */
+  void getActiveMicrophones(out MicrophoneInfo[] activeMicrophones);
 }

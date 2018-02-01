@@ -23,8 +23,10 @@
 #include <media/AudioTimestamp.h>
 #include <media/MediaAnalyticsItem.h>
 #include <media/Modulo.h>
+#include <media/MicrophoneInfo.h>
 #include <utils/RefBase.h>
 #include <utils/threads.h>
+#include <vector>
 
 #include "android/media/IAudioRecord.h"
 
@@ -527,6 +529,11 @@ public:
     /* Get the flags */
             audio_input_flags_t getFlags() const { AutoMutex _l(mLock); return mFlags; }
 
+    /* Get active microphones. A empty vector of MicrophoneInfo will be passed as a parameter,
+     * the data will be filled when querying the hal.
+     */
+            status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+
     /*
      * Dumps the state of an audio record.
      */
@@ -703,7 +710,6 @@ private:
             // mAnalyticsItem alloc failure will be flagged in the constructor
             // don't log empty records
             if (mAnalyticsItem->count() > 0) {
-                mAnalyticsItem->setFinalized(true);
                 mAnalyticsItem->selfrecord();
             }
         }

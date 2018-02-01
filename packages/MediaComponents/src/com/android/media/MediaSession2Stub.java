@@ -192,7 +192,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             }
 
             switch (commandCode) {
-                case MediaSession2.COMMAND_CODE_PLAYBACK_START:
+                case MediaSession2.COMMAND_CODE_PLAYBACK_PLAY:
                     session.getInstance().play();
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE:

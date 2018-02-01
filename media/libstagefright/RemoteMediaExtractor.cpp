@@ -44,7 +44,6 @@ RemoteMediaExtractor::RemoteMediaExtractor(
     mAnalyticsItem = nullptr;
     if (MEDIA_LOG) {
         mAnalyticsItem = new MediaAnalyticsItem(kKeyExtractor);
-        (void) mAnalyticsItem->generateSessionID();
 
         // track the container format (mpeg, aac, wvm, etc)
         size_t ntracks = extractor->countTracks();
@@ -73,7 +72,6 @@ RemoteMediaExtractor::~RemoteMediaExtractor() {
     if (MEDIA_LOG) {
         if (mAnalyticsItem != nullptr) {
             if (mAnalyticsItem->count() > 0) {
-                mAnalyticsItem->setFinalized(true);
                 mAnalyticsItem->selfrecord();
             }
         }
