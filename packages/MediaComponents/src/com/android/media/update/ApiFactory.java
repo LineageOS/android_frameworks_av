@@ -34,6 +34,7 @@ import android.media.MediaMetadata2;
 import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
+import android.media.MediaSession2.CommandButton.Builder;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
@@ -52,6 +53,7 @@ import android.media.update.MediaItem2Provider;
 import android.media.update.MediaMetadata2Provider;
 import android.media.update.MediaSession2Provider;
 import android.media.update.MediaSession2Provider.BuilderBaseProvider;
+import android.media.update.MediaSession2Provider.CommandButtonProvider.BuilderProvider;
 import android.media.update.MediaSession2Provider.PlaylistParamsProvider;
 import android.media.update.MediaSessionService2Provider;
 import android.media.update.MediaSessionService2Provider.MediaNotificationProvider;
@@ -152,6 +154,12 @@ public class ApiFactory implements StaticProvider {
     @Override
     public PlaylistParams fromBundle_PlaylistParams(Context context, Bundle bundle) {
         return PlaylistParamsImpl.fromBundle(context, bundle);
+    }
+
+    @Override
+    public BuilderProvider createMediaSession2CommandButtonBuilder(Context context,
+            Builder instance) {
+        return new MediaSession2Impl.CommandButtonImpl.BuilderImpl(context, instance);
     }
 
     public BuilderBaseProvider<MediaSession2, SessionCallback> createMediaSession2Builder(

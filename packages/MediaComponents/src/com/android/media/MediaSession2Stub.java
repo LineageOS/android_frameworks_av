@@ -27,6 +27,7 @@ import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.PlaybackState2;
+import android.media.update.MediaSession2Provider.CommandButtonProvider;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -36,6 +37,7 @@ import android.support.annotation.GuardedBy;
 import android.util.ArrayMap;
 import android.util.Log;
 
+import com.android.media.MediaSession2Impl.CommandButtonImpl;
 import com.android.media.MediaSession2Impl.ControllerInfoImpl;
 
 import java.lang.ref.WeakReference;
@@ -336,7 +338,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         try {
             List<Bundle> layoutBundles = new ArrayList<>();
             for (int i = 0; i < layout.size(); i++) {
-                Bundle bundle = layout.get(i).toBundle();
+                Bundle bundle = ((CommandButtonImpl) layout.get(i).getProvider()).toBundle();
                 if (bundle != null) {
                     layoutBundles.add(bundle);
                 }

@@ -43,6 +43,8 @@ import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
 import android.util.Log;
 
+import com.android.media.MediaSession2Impl.CommandButtonImpl;
+
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
@@ -650,7 +652,7 @@ public class MediaController2Impl implements MediaController2Provider {
             }
             List<CommandButton> layout = new ArrayList<>();
             for (int i = 0; i < commandButtonlist.size(); i++) {
-                CommandButton button = CommandButton.fromBundle(
+                CommandButton button = CommandButtonImpl.fromBundle(
                         browser.getContext(), commandButtonlist.get(i));
                 if (button != null) {
                     layout.add(button);
