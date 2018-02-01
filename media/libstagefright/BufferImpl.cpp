@@ -64,28 +64,51 @@ ICrypto::DestinationType SecureBuffer::getDestinationType() {
     return ICrypto::kDestinationTypeNativeHandle;
 }
 
-// Codec2Buffer
+// LinearBlockBuffer
 
 // static
-sp<Codec2Buffer> Codec2Buffer::allocate(
+sp<LinearBlockBuffer> LinearBlockBuffer::allocate(
         const sp<AMessage> &format, const std::shared_ptr<C2LinearBlock> &block) {
     C2WriteView writeView(block->map().get());
     if (writeView.error() != C2_OK) {
         return nullptr;
     }
-    return new Codec2Buffer(format, new ABuffer(writeView.base(), writeView.capacity()), block);
+    return new LinearBlockBuffer(format, std::move(writeView), block);
 }
 
-C2ConstLinearBlock Codec2Buffer::share() {
+C2ConstLinearBlock LinearBlockBuffer::share() {
     return mBlock->share(offset(), size(), C2Fence());
 }
 
-Codec2Buffer::Codec2Buffer(
+LinearBlockBuffer::LinearBlockBuffer(
         const sp<AMessage> &format,
-        const sp<ABuffer> &buffer,
+        C2WriteView&& writeView,
         const std::shared_ptr<C2LinearBlock> &block)
-    : MediaCodecBuffer(format, buffer),
+    : MediaCodecBuffer(format, new ABuffer(writeView.data(), writeView.size())),
+      mWriteView(writeView),
       mBlock(block) {
+}
+
+// ConstLinearBlockBuffer
+
+// static
+sp<ConstLinearBlockBuffer> ConstLinearBlockBuffer::allocate(
+        const sp<AMessage> &format, const C2ConstLinearBlock &block) {
+    C2ReadView readView(block.map().get());
+    if (readView.error() != C2_OK) {
+        return nullptr;
+    }
+    return new ConstLinearBlockBuffer(format, std::move(readView));
+}
+
+ConstLinearBlockBuffer::ConstLinearBlockBuffer(
+        const sp<AMessage> &format,
+        C2ReadView&& readView)
+    : MediaCodecBuffer(format, new ABuffer(
+            // NOTE: ABuffer only takes non-const pointer but this data is
+            //       supposed to be read-only.
+            const_cast<uint8_t *>(readView.data()), readView.capacity())),
+      mReadView(readView) {
 }
 
 }  // namespace android
