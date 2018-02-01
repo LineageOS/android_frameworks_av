@@ -45,10 +45,12 @@ namespace V1_1 {
 namespace clearkey {
 
 DrmPlugin::DrmPlugin(SessionLibrary* sessionLibrary)
-        : mSessionLibrary(sessionLibrary) {
+        : mSessionLibrary(sessionLibrary),
+          mOpenSessionOkCount(0),
+          mCloseSessionOkCount(0),
+          mCloseSessionNotOpenedCount(0) {
     mPlayPolicy.clear();
     initProperties();
-
 }
 
 void DrmPlugin::initProperties() {
@@ -77,6 +79,7 @@ Return<void> DrmPlugin::openSession(openSession_cb _hidl_cb) {
 
     setSecurityLevel(sessionId, SecurityLevel::SW_SECURE_CRYPTO);
     _hidl_cb(Status::OK, toHidlVec(sessionId));
+    mOpenSessionOkCount++;
     return Void();
 }
 
@@ -87,9 +90,11 @@ Return<Status> DrmPlugin::closeSession(const hidl_vec<uint8_t>& sessionId) {
 
     sp<Session> session = mSessionLibrary->findSession(toVector(sessionId));
     if (session.get()) {
+        mCloseSessionOkCount++;
         mSessionLibrary->destroySession(session);
         return Status::OK;
     }
+    mCloseSessionNotOpenedCount++;
     return Status::ERROR_DRM_SESSION_NOT_OPENED;
 }
 
@@ -363,6 +368,50 @@ Return<Status> DrmPlugin::setSecurityLevel(const hidl_vec<uint8_t>& sessionId,
     }
     return Status::OK;
 }
+
+Return<void> DrmPlugin::getMetrics(getMetrics_cb _hidl_cb) {
+    // Set the open session count metric.
+    DrmMetricGroup::Attribute openSessionOkAttribute = {
+      "status", DrmMetricGroup::ValueType::INT64_TYPE, (int64_t) Status::OK, 0.0, ""
+    };
+    DrmMetricGroup::Value openSessionMetricValue = {
+      "count", DrmMetricGroup::ValueType::INT64_TYPE, mOpenSessionOkCount, 0.0, ""
+    };
+    DrmMetricGroup::Metric openSessionMetric = {
+      "open_session", { openSessionOkAttribute }, { openSessionMetricValue }
+    };
+
+    // Set the close session count metric.
+    DrmMetricGroup::Attribute closeSessionOkAttribute = {
+      "status", DrmMetricGroup::ValueType::INT64_TYPE, (int64_t) Status::OK, 0.0, ""
+    };
+    DrmMetricGroup::Value closeSessionMetricValue = {
+      "count", DrmMetricGroup::ValueType::INT64_TYPE, mCloseSessionOkCount, 0.0, ""
+    };
+    DrmMetricGroup::Metric closeSessionMetric = {
+      "close_session", { closeSessionOkAttribute }, { closeSessionMetricValue }
+    };
+
+    // Set the close session, not opened metric.
+    DrmMetricGroup::Attribute closeSessionNotOpenedAttribute = {
+      "status", DrmMetricGroup::ValueType::INT64_TYPE,
+      (int64_t) Status::ERROR_DRM_SESSION_NOT_OPENED, 0.0, ""
+    };
+    DrmMetricGroup::Value closeSessionNotOpenedMetricValue = {
+      "count", DrmMetricGroup::ValueType::INT64_TYPE, mCloseSessionNotOpenedCount, 0.0, ""
+    };
+    DrmMetricGroup::Metric closeSessionNotOpenedMetric = {
+      "close_session", { closeSessionNotOpenedAttribute }, { closeSessionNotOpenedMetricValue }
+    };
+
+    DrmMetricGroup metrics = { { openSessionMetric, closeSessionMetric,
+                                closeSessionNotOpenedMetric } };
+
+    _hidl_cb(Status::OK, hidl_vec<DrmMetricGroup>({metrics}));
+    return Void();
+}
+
+
 
 }  // namespace clearkey
 }  // namespace V1_1
