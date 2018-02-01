@@ -1308,7 +1308,7 @@ struct C2FieldSupportedValues {
         Primitive min;
         Primitive max;
         Primitive step;
-        Primitive nom;
+        Primitive num;
         Primitive denom;
     } range;
     std::vector<Primitive> values;
@@ -1323,9 +1323,9 @@ struct C2FieldSupportedValues {
           range{min, max, step, (T)1, (T)1} { }
 
     template<typename T>
-    C2FieldSupportedValues(T min, T max, T nom, T den) :
+    C2FieldSupportedValues(T min, T max, T num, T den) :
         type(RANGE),
-        range{min, max, (T)0, nom, den} { }
+        range{min, max, (T)0, num, den} { }
 
     template<typename T>
     C2FieldSupportedValues(bool flags, std::initializer_list<T> list)

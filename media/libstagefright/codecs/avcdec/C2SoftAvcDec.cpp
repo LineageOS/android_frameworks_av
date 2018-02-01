@@ -99,7 +99,7 @@ struct ValidateParam {
             }
         case C2FieldSupportedValues::RANGE:
             {
-                // TODO: handle step, nom, denom
+                // TODO: handle step, num, denom
                 return Getter<T>::get(supportedValues.range.min) <= value
                         && value <= Getter<T>::get(supportedValues.range.max);
             }
