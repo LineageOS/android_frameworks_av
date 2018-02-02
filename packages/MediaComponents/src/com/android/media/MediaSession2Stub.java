@@ -28,6 +28,7 @@ import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.PlaybackState2;
+import android.media.VolumeProvider2;
 import android.media.update.MediaSession2Provider.CommandButtonProvider;
 import android.os.Binder;
 import android.os.Bundle;
@@ -159,6 +160,82 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 Log.d(TAG, "releasing " + controllerInfo);
             }
         }
+    }
+
+    @Override
+    public void setVolumeTo(IMediaSession2Callback caller, int value, int flags)
+            throws RuntimeException {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            // TODO(jaewan): Sanity check.
+            Command command = new Command(
+                    session.getContext(), MediaSession2.COMMAND_CODE_SET_VOLUME);
+            boolean accepted = session.getCallback().onCommandRequest(controller, command);
+            if (!accepted) {
+                // Don't run rejected command.
+                if (DEBUG) {
+                    Log.d(TAG, "Command " + MediaSession2.COMMAND_CODE_SET_VOLUME + " from "
+                            + controller + " was rejected by " + session);
+                }
+                return;
+            }
+
+            VolumeProvider2 volumeProvider = session.getVolumeProvider();
+            if (volumeProvider == null) {
+                // TODO(jaewan): Set local stream volume
+            } else {
+                volumeProvider.onSetVolumeTo(value);
+            }
+        });
+    }
+
+    @Override
+    public void adjustVolume(IMediaSession2Callback caller, int direction, int flags)
+            throws RuntimeException {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            // TODO(jaewan): Sanity check.
+            Command command = new Command(
+                    session.getContext(), MediaSession2.COMMAND_CODE_SET_VOLUME);
+            boolean accepted = session.getCallback().onCommandRequest(controller, command);
+            if (!accepted) {
+                // Don't run rejected command.
+                if (DEBUG) {
+                    Log.d(TAG, "Command " + MediaSession2.COMMAND_CODE_SET_VOLUME + " from "
+                            + controller + " was rejected by " + session);
+                }
+                return;
+            }
+
+            VolumeProvider2 volumeProvider = session.getVolumeProvider();
+            if (volumeProvider == null) {
+                // TODO(jaewan): Adjust local stream volume
+            } else {
+                volumeProvider.onAdjustVolume(direction);
+            }
+        });
     }
 
     @Override

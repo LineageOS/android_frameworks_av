@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.MediaController2.ControllerCallback;
+import android.content.Context;
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.ControllerInfo;
@@ -221,6 +221,42 @@ public class MediaController2Test extends MediaSession2TestBase {
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
         ensurePlaylistParamsModeEquals(params, mSession.getPlaylistParams());
         ensurePlaylistParamsModeEquals(params, controller.getPlaylistParams());
+    }
+
+    @Test
+    public void testSetVolumeTo() throws Exception {
+        final int maxVolume = 100;
+        final int currentVolume = 23;
+        final int volumeControlType = VolumeProvider2.VOLUME_CONTROL_ABSOLUTE;
+        TestVolumeProvider volumeProvider =
+                new TestVolumeProvider(mContext, volumeControlType, maxVolume, currentVolume);
+
+        mSession.setPlayer(new MockPlayer(0), volumeProvider);
+        final MediaController2 controller = createController(mSession.getToken(), true, null);
+
+        final int targetVolume = 50;
+        controller.setVolumeTo(targetVolume, 0 /* flags */);
+        assertTrue(volumeProvider.mLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+        assertTrue(volumeProvider.mSetVolumeToCalled);
+        assertEquals(targetVolume, volumeProvider.mVolume);
+    }
+
+    @Test
+    public void testAdjustVolume() throws Exception {
+        final int maxVolume = 100;
+        final int currentVolume = 23;
+        final int volumeControlType = VolumeProvider2.VOLUME_CONTROL_ABSOLUTE;
+        TestVolumeProvider volumeProvider =
+                new TestVolumeProvider(mContext, volumeControlType, maxVolume, currentVolume);
+
+        mSession.setPlayer(new MockPlayer(0), volumeProvider);
+        final MediaController2 controller = createController(mSession.getToken(), true, null);
+
+        final int direction = AudioManager.ADJUST_RAISE;
+        controller.adjustVolume(direction, 0 /* flags */);
+        assertTrue(volumeProvider.mLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+        assertTrue(volumeProvider.mAdjustVolumeCalled);
+        assertEquals(direction, volumeProvider.mDirection);
     }
 
     @Test
@@ -570,4 +606,31 @@ public class MediaController2Test extends MediaSession2TestBase {
 
     // TODO(jaewan): Add  test for service connect rejection, when we differentiate session
     //               active/inactive and connection accept/refuse
+
+    class TestVolumeProvider extends VolumeProvider2 {
+        final CountDownLatch mLatch = new CountDownLatch(1);
+        boolean mSetVolumeToCalled;
+        boolean mAdjustVolumeCalled;
+        int mVolume;
+        int mDirection;
+
+        public TestVolumeProvider(Context context, int controlType, int maxVolume,
+                int currentVolume) {
+            super(context, controlType, maxVolume, currentVolume);
+        }
+
+        @Override
+        public void onSetVolumeTo(int volume) {
+            mSetVolumeToCalled = true;
+            mVolume = volume;
+            mLatch.countDown();
+        }
+
+        @Override
+        public void onAdjustVolume(int direction) {
+            mAdjustVolumeCalled = true;
+            mDirection = direction;
+            mLatch.countDown();
+        }
+    }
 }
