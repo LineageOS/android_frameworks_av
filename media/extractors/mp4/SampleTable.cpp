@@ -25,7 +25,7 @@
 
 #include <arpa/inet.h>
 
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ByteUtils.h>
 
@@ -114,7 +114,7 @@ int32_t SampleTable::CompositionDeltaLookup::getCompositionTimeOffset(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-SampleTable::SampleTable(const sp<DataSource> &source)
+SampleTable::SampleTable(DataSourceBase *source)
     : mDataSource(source),
       mChunkOffsetOffset(-1),
       mChunkOffsetType(0),

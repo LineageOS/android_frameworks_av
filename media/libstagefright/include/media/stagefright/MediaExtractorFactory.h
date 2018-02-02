@@ -56,7 +56,7 @@ private:
     static void RegisterExtractor(
             const sp<ExtractorPlugin> &plugin, List<sp<ExtractorPlugin>> &pluginList);
 
-    static MediaExtractor::CreatorFunc sniff(const sp<DataSource> &source,
+    static MediaExtractor::CreatorFunc sniff(DataSourceBase *source,
             String8 *mimeType, float *confidence, sp<AMessage> *meta,
             sp<ExtractorPlugin> &plugin);
 

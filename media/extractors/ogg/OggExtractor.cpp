@@ -21,7 +21,7 @@
 #include "OggExtractor.h"
 
 #include <cutils/properties.h>
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -69,7 +69,7 @@ private:
 
 struct MyOggExtractor {
     MyOggExtractor(
-            const sp<DataSource> &source,
+            DataSourceBase *source,
             const char *mimeType,
             size_t numHeaders,
             int64_t seekPreRollUs);
@@ -105,7 +105,7 @@ protected:
         int64_t mTimeUs;
     };
 
-    sp<DataSource> mSource;
+    DataSourceBase *mSource;
     off64_t mOffset;
     Page mCurrentPage;
     uint64_t mCurGranulePosition;
@@ -164,7 +164,7 @@ protected:
 };
 
 struct MyVorbisExtractor : public MyOggExtractor {
-    explicit MyVorbisExtractor(const sp<DataSource> &source)
+    explicit MyVorbisExtractor(DataSourceBase *source)
         : MyOggExtractor(source,
                 MEDIA_MIMETYPE_AUDIO_VORBIS,
                 /* numHeaders */ 3,
@@ -192,7 +192,7 @@ struct MyOpusExtractor : public MyOggExtractor {
     static const int32_t kOpusSampleRate = 48000;
     static const int64_t kOpusSeekPreRollUs = 80000; // 80 ms
 
-    explicit MyOpusExtractor(const sp<DataSource> &source)
+    explicit MyOpusExtractor(DataSourceBase *source)
         : MyOggExtractor(source, MEDIA_MIMETYPE_AUDIO_OPUS, /*numHeaders*/ 2, kOpusSeekPreRollUs),
           mChannelCount(0),
           mCodecDelay(0),
@@ -294,7 +294,7 @@ status_t OggSource::read(
 ////////////////////////////////////////////////////////////////////////////////
 
 MyOggExtractor::MyOggExtractor(
-        const sp<DataSource> &source,
+        DataSourceBase *source,
         const char *mimeType,
         size_t numHeaders,
         int64_t seekPreRollUs)
@@ -852,7 +852,7 @@ status_t MyOggExtractor::init() {
 
     off64_t size;
     uint64_t lastGranulePosition;
-    if (!(mSource->flags() & DataSource::kIsCachingDataSource)
+    if (!(mSource->flags() & DataSourceBase::kIsCachingDataSource)
             && mSource->getSize(&size) == OK
             && findPrevGranulePosition(size, &lastGranulePosition) == OK) {
         // Let's assume it's cheap to seek to the end.
@@ -1315,7 +1315,7 @@ void MyOggExtractor::parseFileMetaData() {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-OggExtractor::OggExtractor(const sp<DataSource> &source)
+OggExtractor::OggExtractor(DataSourceBase *source)
     : mDataSource(source),
       mInitCheck(NO_INIT),
       mImpl(NULL) {
@@ -1370,13 +1370,13 @@ sp<MetaData> OggExtractor::getMetaData() {
 }
 
 static MediaExtractor* CreateExtractor(
-        const sp<DataSource> &source,
+        DataSourceBase *source,
         const sp<AMessage>& meta __unused) {
     return new OggExtractor(source);
 }
 
 static MediaExtractor::CreatorFunc Sniff(
-        const sp<DataSource> &source,
+        DataSourceBase *source,
         String8 *mimeType,
         float *confidence,
         sp<AMessage> *) {

@@ -37,9 +37,12 @@ static const char *kExtractorTracks = "android.media.mediaextractor.ntrk";
 static const char *kExtractorFormat = "android.media.mediaextractor.fmt";
 
 RemoteMediaExtractor::RemoteMediaExtractor(
-        MediaExtractor *extractor, const sp<RefBase> &plugin)
+        MediaExtractor *extractor,
+        const sp<DataSource> &source,
+        const sp<RefBase> &plugin)
     :mExtractor(extractor),
-    mExtractorPlugin(plugin) {
+     mSource(source),
+     mExtractorPlugin(plugin) {
 
     mAnalyticsItem = nullptr;
     if (MEDIA_LOG) {
@@ -67,6 +70,8 @@ RemoteMediaExtractor::RemoteMediaExtractor(
 
 RemoteMediaExtractor::~RemoteMediaExtractor() {
     delete mExtractor;
+    mSource->close();
+    mSource.clear();
     mExtractorPlugin = nullptr;
     // log the current record, provided it has some information worth recording
     if (MEDIA_LOG) {
@@ -129,19 +134,17 @@ const char * RemoteMediaExtractor::name() {
     return mExtractor->name();
 }
 
-void RemoteMediaExtractor::release() {
-    return mExtractor->release();
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
 // static
 sp<IMediaExtractor> RemoteMediaExtractor::wrap(
-        MediaExtractor *extractor, const sp<RefBase> &plugin) {
+        MediaExtractor *extractor,
+        const sp<DataSource> &source,
+        const sp<RefBase> &plugin) {
     if (extractor == nullptr) {
         return nullptr;
     }
-    return new RemoteMediaExtractor(extractor, plugin);
+    return new RemoteMediaExtractor(extractor, source, plugin);
 }
 
 }  // namespace android

@@ -47,7 +47,7 @@ MidiIoWrapper::MidiIoWrapper(int fd, off64_t offset, int64_t size) {
     mLength = size;
 }
 
-MidiIoWrapper::MidiIoWrapper(const sp<DataSource> &source) {
+MidiIoWrapper::MidiIoWrapper(DataSourceBase *source) {
     ALOGV("MidiIoWrapper(DataSource)");
     mFd = -1;
     mDataSource = source;

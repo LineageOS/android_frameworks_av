@@ -38,11 +38,13 @@ sp<IDataSource> CreateIDataSourceFromDataSource(const sp<DataSource> &source) {
 }
 
 sp<IMediaExtractor> CreateIMediaExtractorFromMediaExtractor(
-        MediaExtractor *extractor, const sp<RefBase> &plugin) {
+        MediaExtractor *extractor,
+        const sp<DataSource> &source,
+        const sp<RefBase> &plugin) {
     if (extractor == nullptr) {
         return nullptr;
     }
-    return RemoteMediaExtractor::wrap(extractor, plugin);
+    return RemoteMediaExtractor::wrap(extractor, source, plugin);
 }
 
 sp<MediaSource> CreateMediaSourceFromIMediaSource(const sp<IMediaSource> &source) {

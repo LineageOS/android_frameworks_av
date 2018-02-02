@@ -20,7 +20,7 @@
 
 #include <arpa/inet.h>
 
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/MediaExtractor.h>
 #include <media/stagefright/foundation/AString.h>
 #include <utils/List.h>
@@ -29,7 +29,8 @@
 
 namespace android {
 struct AMessage;
-class DataSource;
+class DataSourceBase;
+struct CachedRangedDataSource;
 class SampleTable;
 class String8;
 namespace heif {
@@ -52,8 +53,7 @@ struct Trex {
 
 class MPEG4Extractor : public MediaExtractor {
 public:
-    // Extractor assumes ownership of "source".
-    explicit MPEG4Extractor(const sp<DataSource> &source, const char *mime = NULL);
+    explicit MPEG4Extractor(DataSourceBase *source, const char *mime = NULL);
 
     virtual size_t countTracks();
     virtual MediaSourceBase *getTrack(size_t index);
@@ -62,7 +62,6 @@ public:
     virtual sp<MetaData> getMetaData();
     virtual uint32_t flags() const;
     virtual const char * name() { return "MPEG4Extractor"; }
-    virtual void release();
 
     // for DRM
     virtual char* getDrmTrackInfo(size_t trackID, int *len);
@@ -98,7 +97,8 @@ private:
 
     Vector<Trex> mTrex;
 
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
+    CachedRangedDataSource *mCachedSource;
     status_t mInitCheck;
     uint32_t mHeaderTimescale;
     bool mIsQT;
@@ -160,7 +160,7 @@ private:
 };
 
 bool SniffMPEG4(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence,
+        DataSourceBase *source, String8 *mimeType, float *confidence,
         sp<AMessage> *);
 
 }  // namespace android

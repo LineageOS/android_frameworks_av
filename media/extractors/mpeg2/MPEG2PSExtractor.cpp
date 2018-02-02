@@ -23,7 +23,7 @@
 #include "mpeg2ts/AnotherPacketSource.h"
 #include "mpeg2ts/ESQueue.h"
 
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -94,7 +94,7 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-MPEG2PSExtractor::MPEG2PSExtractor(const sp<DataSource> &source)
+MPEG2PSExtractor::MPEG2PSExtractor(DataSourceBase *source)
     : mDataSource(source),
       mOffset(0),
       mFinalResult(OK),
@@ -751,7 +751,7 @@ status_t MPEG2PSExtractor::WrappedTrack::read(
 ////////////////////////////////////////////////////////////////////////////////
 
 bool SniffMPEG2PS(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence,
+        DataSourceBase *source, String8 *mimeType, float *confidence,
         sp<AMessage> *) {
     uint8_t header[5];
     if (source->readAt(0, header, sizeof(header)) < (ssize_t)sizeof(header)) {

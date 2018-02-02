@@ -21,7 +21,7 @@
 #include "WAVExtractor.h"
 
 #include <audio_utils/primitives.h>
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaBufferGroup.h>
@@ -57,7 +57,7 @@ static uint16_t U16_LE_AT(const uint8_t *ptr) {
 
 struct WAVSource : public MediaSourceBase {
     WAVSource(
-            const sp<DataSource> &dataSource,
+            DataSourceBase *dataSource,
             const sp<MetaData> &meta,
             uint16_t waveFormat,
             int32_t bitsPerSample,
@@ -78,7 +78,7 @@ protected:
 private:
     static const size_t kMaxFrameSize;
 
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
     sp<MetaData> mMeta;
     uint16_t mWaveFormat;
     int32_t mSampleRate;
@@ -94,7 +94,7 @@ private:
     WAVSource &operator=(const WAVSource &);
 };
 
-WAVExtractor::WAVExtractor(const sp<DataSource> &source)
+WAVExtractor::WAVExtractor(DataSourceBase *source)
     : mDataSource(source),
       mValidFormat(false),
       mChannelMask(CHANNEL_MASK_USE_CHANNEL_ORDER) {
@@ -348,7 +348,7 @@ status_t WAVExtractor::init() {
 const size_t WAVSource::kMaxFrameSize = 32768;
 
 WAVSource::WAVSource(
-        const sp<DataSource> &dataSource,
+        DataSourceBase *dataSource,
         const sp<MetaData> &meta,
         uint16_t waveFormat,
         int32_t bitsPerSample,
@@ -545,13 +545,13 @@ status_t WAVSource::read(
 ////////////////////////////////////////////////////////////////////////////////
 
 static MediaExtractor* CreateExtractor(
-        const sp<DataSource> &source,
+        DataSourceBase *source,
         const sp<AMessage>& meta __unused) {
     return new WAVExtractor(source);
 }
 
 static MediaExtractor::CreatorFunc Sniff(
-        const sp<DataSource> &source,
+        DataSourceBase *source,
         String8 *mimeType,
         float *confidence,
         sp<AMessage> *) {

@@ -20,7 +20,7 @@
 
 #include "AMRExtractor.h"
 
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaBufferGroup.h>
@@ -33,7 +33,7 @@ namespace android {
 
 class AMRSource : public MediaSourceBase {
 public:
-    AMRSource(const sp<DataSource> &source,
+    AMRSource(DataSourceBase *source,
               const sp<MetaData> &meta,
               bool isWide,
               const off64_t *offset_table,
@@ -51,7 +51,7 @@ protected:
     virtual ~AMRSource();
 
 private:
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
     sp<MetaData> mMeta;
     bool mIsWide;
 
@@ -97,7 +97,7 @@ static size_t getFrameSize(bool isWide, unsigned FT) {
     return frameSize;
 }
 
-static status_t getFrameSizeByOffset(const sp<DataSource> &source,
+static status_t getFrameSizeByOffset(DataSourceBase *source,
         off64_t offset, bool isWide, size_t *frameSize) {
     uint8_t header;
     ssize_t count = source->readAt(offset, &header, 1);
@@ -116,7 +116,7 @@ static status_t getFrameSizeByOffset(const sp<DataSource> &source,
     return OK;
 }
 
-AMRExtractor::AMRExtractor(const sp<DataSource> &source)
+AMRExtractor::AMRExtractor(DataSourceBase *source)
     : mDataSource(source),
       mInitCheck(NO_INIT),
       mOffsetTableLength(0) {
@@ -206,7 +206,7 @@ sp<MetaData> AMRExtractor::getTrackMetaData(size_t index, uint32_t /* flags */) 
 ////////////////////////////////////////////////////////////////////////////////
 
 AMRSource::AMRSource(
-        const sp<DataSource> &source, const sp<MetaData> &meta,
+        DataSourceBase *source, const sp<MetaData> &meta,
         bool isWide, const off64_t *offset_table, size_t offset_table_length)
     : mDataSource(source),
       mMeta(meta),
@@ -339,7 +339,7 @@ status_t AMRSource::read(
 ////////////////////////////////////////////////////////////////////////////////
 
 bool SniffAMR(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence,
+        DataSourceBase *source, String8 *mimeType, float *confidence,
         sp<AMessage> *) {
     char header[9];
 
@@ -372,13 +372,13 @@ MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
         1,
         "AMR Extractor",
         [](
-                const sp<DataSource> &source,
+                DataSourceBase *source,
                 String8 *mimeType,
                 float *confidence,
                 sp<AMessage> *meta __unused) -> MediaExtractor::CreatorFunc {
             if (SniffAMR(source, mimeType, confidence, meta)) {
                 return [](
-                        const sp<DataSource> &source,
+                        DataSourceBase *source,
                         const sp<AMessage>& meta __unused) -> MediaExtractor* {
                     return new AMRExtractor(source);};
             }

@@ -27,12 +27,12 @@
 
 namespace android {
 
-class DataSource;
+class DataSourceBase;
 struct SampleIterator;
 
 class SampleTable : public RefBase {
 public:
-    explicit SampleTable(const sp<DataSource> &source);
+    explicit SampleTable(DataSourceBase *source);
 
     bool isValid() const;
 
@@ -99,7 +99,7 @@ private:
     // Limit the total size of all internal tables to 200MiB.
     static const size_t kMaxTotalSize = 200 * (1 << 20);
 
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
     Mutex mLock;
 
     off64_t mChunkOffsetOffset;

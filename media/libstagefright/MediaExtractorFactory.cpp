@@ -118,7 +118,7 @@ sp<IMediaExtractor> MediaExtractorFactory::CreateFromService(
     String8 tmp;
     float confidence;
     sp<ExtractorPlugin> plugin;
-    creator = sniff(source, &tmp, &confidence, &meta, plugin);
+    creator = sniff(source.get(), &tmp, &confidence, &meta, plugin);
     if (!creator) {
         ALOGV("FAILED to autodetect media content.");
         return NULL;
@@ -128,8 +128,8 @@ sp<IMediaExtractor> MediaExtractorFactory::CreateFromService(
     ALOGV("Autodetected media content as '%s' with confidence %.2f",
          mime, confidence);
 
-    MediaExtractor *ret = creator(source, meta);
-    return CreateIMediaExtractorFromMediaExtractor(ret, plugin);
+    MediaExtractor *ret = creator(source.get(), meta);
+    return CreateIMediaExtractorFromMediaExtractor(ret, source, plugin);
 }
 
 //static
@@ -165,7 +165,7 @@ bool MediaExtractorFactory::gPluginsRegistered = false;
 
 // static
 MediaExtractor::CreatorFunc MediaExtractorFactory::sniff(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence, sp<AMessage> *meta,
+        DataSourceBase *source, String8 *mimeType, float *confidence, sp<AMessage> *meta,
         sp<ExtractorPlugin> &plugin) {
     *mimeType = "";
     *confidence = 0.0f;

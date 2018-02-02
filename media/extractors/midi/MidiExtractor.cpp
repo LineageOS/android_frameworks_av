@@ -141,7 +141,7 @@ status_t MidiSource::init()
 
 // MidiEngine
 
-MidiEngine::MidiEngine(const sp<DataSource> &dataSource,
+MidiEngine::MidiEngine(DataSourceBase *dataSource,
         const sp<MetaData> &fileMetadata,
         const sp<MetaData> &trackMetadata) :
             mGroup(NULL),
@@ -261,7 +261,7 @@ MediaBuffer* MidiEngine::readBuffer() {
 // MidiExtractor
 
 MidiExtractor::MidiExtractor(
-        const sp<DataSource> &dataSource)
+        DataSourceBase *dataSource)
     : mDataSource(dataSource),
       mInitCheck(false)
 {
@@ -308,7 +308,7 @@ sp<MetaData> MidiExtractor::getMetaData()
 // Sniffer
 
 bool SniffMidi(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence,
+        DataSourceBase *source, String8 *mimeType, float *confidence,
         sp<AMessage> *)
 {
     sp<MidiEngine> p = new MidiEngine(source, NULL, NULL);
@@ -333,13 +333,13 @@ MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
         1,
         "MIDI Extractor",
         [](
-                const sp<DataSource> &source,
+                DataSourceBase *source,
                 String8 *mimeType,
                 float *confidence,
                 sp<AMessage> *meta __unused) -> MediaExtractor::CreatorFunc {
             if (SniffMidi(source, mimeType, confidence, meta)) {
                 return [](
-                        const sp<DataSource> &source,
+                        DataSourceBase *source,
                         const sp<AMessage>& meta __unused) -> MediaExtractor* {
                     return new MidiExtractor(source);};
             }
