@@ -34,6 +34,7 @@
 #include <media/AudioSystem.h>
 #include <media/AVSyncSettings.h>
 #include <media/DataSource.h>
+#include <media/DataSourceDesc.h>
 #include <media/MediaAnalyticsItem.h>
 #include <media/NdkWrapper.h>
 
@@ -153,43 +154,16 @@ status_t MediaPlayer2::attachNewPlayer(const sp<MediaPlayer2Engine>& player)
     return err;
 }
 
-status_t MediaPlayer2::setDataSource(
-        const sp<MediaHTTPService> &httpService,
-        const char *url, const KeyedVector<String8, String8> *headers)
+status_t MediaPlayer2::setDataSource(const sp<DataSourceDesc> &dsd)
 {
-    ALOGV("setDataSource(%s)", url);
-    status_t err = BAD_VALUE;
-    if (url != NULL) {
-        sp<MediaPlayer2Engine> player(MediaPlayer2Manager::get().create(this, mAudioSessionId));
-        if ((NO_ERROR != doSetRetransmitEndpoint(player)) ||
-            (NO_ERROR != player->setDataSource(httpService, url, headers))) {
-            player.clear();
-        }
-        err = attachNewPlayer(player);
+    if (dsd == NULL) {
+        return BAD_VALUE;
     }
-    return err;
-}
-
-status_t MediaPlayer2::setDataSource(int fd, int64_t offset, int64_t length)
-{
-    ALOGV("setDataSource(%d, %" PRId64 ", %" PRId64 ")", fd, offset, length);
+    ALOGV("setDataSource type(%d)", dsd->mType);
     status_t err = UNKNOWN_ERROR;
     sp<MediaPlayer2Engine> player(MediaPlayer2Manager::get().create(this, mAudioSessionId));
     if ((NO_ERROR != doSetRetransmitEndpoint(player)) ||
-        (NO_ERROR != player->setDataSource(fd, offset, length))) {
-        player.clear();
-    }
-    err = attachNewPlayer(player);
-    return err;
-}
-
-status_t MediaPlayer2::setDataSource(const sp<DataSource> &source)
-{
-    ALOGV("setDataSource(DataSource)");
-    status_t err = UNKNOWN_ERROR;
-    sp<MediaPlayer2Engine> player(MediaPlayer2Manager::get().create(this, mAudioSessionId));
-    if ((NO_ERROR != doSetRetransmitEndpoint(player)) ||
-        (NO_ERROR != player->setDataSource(source))) {
+        (NO_ERROR != player->setDataSource(dsd))) {
         player.clear();
     }
     err = attachNewPlayer(player);

@@ -41,6 +41,7 @@ struct sockaddr_in;
 namespace android {
 
 class DataSource;
+struct DataSourceDesc;
 struct MediaHTTPService;
 class Parcel;
 struct ANativeWindowWrapper;
@@ -158,18 +159,7 @@ public:
 
     virtual void        setAudioSink(const sp<AudioSink>& audioSink) { mAudioSink = audioSink; }
 
-    virtual status_t    setDataSource(
-            const sp<MediaHTTPService> &httpService,
-            const char *url,
-            const KeyedVector<String8, String8> *headers = NULL) = 0;
-
-    virtual status_t    setDataSource(int fd, int64_t offset, int64_t length) = 0;
-
-    virtual status_t    setDataSource(const sp<IStreamSource>& /* source */) {
-        return INVALID_OPERATION;
-    }
-
-    virtual status_t    setDataSource(const sp<DataSource>& /* source */) {
+    virtual status_t    setDataSource(const sp<DataSourceDesc>& /* dsd */) {
         return INVALID_OPERATION;
     }
 
