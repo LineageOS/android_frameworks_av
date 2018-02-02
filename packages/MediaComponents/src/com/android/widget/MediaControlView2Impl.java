@@ -21,8 +21,10 @@ import android.media.MediaMetadata;
 import android.media.session.MediaController;
 import android.media.session.PlaybackState;
 import android.media.update.MediaControlView2Provider;
-import android.media.update.ViewProvider;
+import android.media.update.ViewGroupProvider;
 import android.os.Bundle;
+import android.support.annotation.Nullable;
+import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
@@ -46,11 +48,10 @@ import java.util.Formatter;
 import java.util.List;
 import java.util.Locale;
 
-public class MediaControlView2Impl implements MediaControlView2Provider {
+public class MediaControlView2Impl extends BaseLayout implements MediaControlView2Provider {
     private static final String TAG = "MediaControlView2";
 
     private final MediaControlView2 mInstance;
-    private final ViewProvider mSuperProvider;
 
     static final String ARGUMENT_KEY_FULLSCREEN = "fullScreen";
 
@@ -63,7 +64,7 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     private static final int REWIND_TIME_MS = 10000;
     private static final int FORWARD_TIME_MS = 30000;
 
-    private final AccessibilityManager mAccessibilityManager;
+    private AccessibilityManager mAccessibilityManager;
 
     private MediaController mController;
     private MediaController.TransportControls mControls;
@@ -113,10 +114,14 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     private MediaRouteButton mRouteButton;
     private MediaRouteSelector mRouteSelector;
 
-    public MediaControlView2Impl(
-            MediaControlView2 instance, ViewProvider superProvider) {
+    public MediaControlView2Impl(MediaControlView2 instance,
+            ViewGroupProvider superProvider, ViewGroupProvider privateProvider) {
+        super(instance, superProvider, privateProvider);
         mInstance = instance;
-        mSuperProvider = superProvider;
+    }
+
+    @Override
+    public void initialize(@Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         mAccessibilityManager = AccessibilityManager.getInstance(mInstance.getContext());
 
         // Inflate MediaControlView2 from XML
@@ -233,39 +238,6 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     }
 
     @Override
-    public void onVisibilityAggregated_impl(boolean invisible) {
-        int visibility = mInstance.getVisibility();
-        if (mCurrentVisibility != visibility) {
-            mInstance.setVisibility(visibility);
-            mCurrentVisibility = visibility;
-
-            if (visibility == View.VISIBLE) {
-                setProgress();
-                disableUnsupportedButtons();
-                // cause the progress bar to be updated even if mShowing
-                // was already true.  This happens, for example, if we're
-                // paused with the progress bar showing the user hits play.
-                mInstance.post(mShowProgress);
-                resetFadeOutRunnable();
-            } else if (visibility == View.GONE) {
-                mInstance.removeCallbacks(mShowProgress);
-                // Remove existing call to mFadeOut to avoid from being called later.
-                mInstance.removeCallbacks(mFadeOut);
-            }
-        }
-    }
-
-    @Override
-    public void onAttachedToWindow_impl() {
-        mSuperProvider.onAttachedToWindow_impl();
-    }
-
-    @Override
-    public void onDetachedFromWindow_impl() {
-        mSuperProvider.onDetachedFromWindow_impl();
-    }
-
-    @Override
     public CharSequence getAccessibilityClassName_impl() {
         return MediaControlView2.class.getName();
     }
@@ -283,12 +255,9 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
     }
 
     @Override
-    public void onFinishInflate_impl() {
-        mSuperProvider.onFinishInflate_impl();
-    }
-
-    @Override
     public void setEnabled_impl(boolean enabled) {
+        super.setEnabled_impl(enabled);
+
         if (mPlayPauseButton != null) {
             mPlayPauseButton.setEnabled(enabled);
         }
@@ -308,7 +277,31 @@ public class MediaControlView2Impl implements MediaControlView2Provider {
             mProgress.setEnabled(enabled);
         }
         disableUnsupportedButtons();
-        mSuperProvider.setEnabled_impl(enabled);
+    }
+
+    @Override
+    public void onVisibilityAggregated_impl(boolean invisible) {
+        super.onVisibilityAggregated_impl(invisible);
+
+        int visibility = mInstance.getVisibility();
+        if (mCurrentVisibility != visibility) {
+            mInstance.setVisibility(visibility);
+            mCurrentVisibility = visibility;
+
+            if (visibility == View.VISIBLE) {
+                setProgress();
+                disableUnsupportedButtons();
+                // cause the progress bar to be updated even if mShowing
+                // was already true.  This happens, for example, if we're
+                // paused with the progress bar showing the user hits play.
+                mInstance.post(mShowProgress);
+                resetFadeOutRunnable();
+            } else if (visibility == View.GONE) {
+                mInstance.removeCallbacks(mShowProgress);
+                // Remove existing call to mFadeOut to avoid from being called later.
+                mInstance.removeCallbacks(mFadeOut);
+            }
+        }
     }
 
     public void setRouteSelector(MediaRouteSelector selector) {

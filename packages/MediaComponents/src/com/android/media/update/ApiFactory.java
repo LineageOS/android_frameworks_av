@@ -64,7 +64,7 @@ import android.media.update.SessionPlayer2Provider;
 import android.media.update.SessionToken2Provider;
 import android.media.update.StaticProvider;
 import android.media.update.VideoView2Provider;
-import android.media.update.ViewProvider;
+import android.media.update.ViewGroupProvider;
 import android.media.update.VolumeProvider2Provider;
 import android.os.Bundle;
 import android.os.IInterface;
@@ -205,16 +205,17 @@ public class ApiFactory implements StaticProvider {
     }
 
     @Override
-    public MediaControlView2Provider createMediaControlView2(
-            MediaControlView2 instance, ViewProvider superProvider) {
-        return new MediaControlView2Impl(instance, superProvider);
+    public MediaControlView2Provider createMediaControlView2(MediaControlView2 instance,
+            ViewGroupProvider superProvider, ViewGroupProvider privateProvider,
+            @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+        return new MediaControlView2Impl(instance, superProvider, privateProvider);
     }
 
     @Override
     public VideoView2Provider createVideoView2(
-            VideoView2 instance, ViewProvider superProvider,
+            VideoView2 instance, ViewGroupProvider superProvider, ViewGroupProvider privateProvider,
             @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-        return new VideoView2Impl(instance, superProvider, attrs, defStyleAttr, defStyleRes);
+        return new VideoView2Impl(instance, superProvider, privateProvider);
     }
 
     @Override
