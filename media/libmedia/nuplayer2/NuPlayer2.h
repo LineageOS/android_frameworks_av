@@ -106,11 +106,10 @@ private:
     struct DecoderBase;
     struct DecoderPassThrough;
     struct CCDecoder;
-    struct GenericSource;
-    struct HTTPLiveSource;
+    struct GenericSource2;
+    struct HTTPLiveSource2;
     struct Renderer;
-    struct RTSPSource;
-    struct StreamingSource;
+    struct RTSPSource2;
     struct Action;
     struct SeekAction;
     struct SetSurfaceAction;

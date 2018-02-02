@@ -15,9 +15,9 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "GenericSource"
+#define LOG_TAG "GenericSource2"
 
-#include "GenericSource.h"
+#include "GenericSource2.h"
 #include "NuPlayer2Drm.h"
 
 #include "AnotherPacketSource.h"
@@ -52,7 +52,7 @@ static const int kInitialMarkMs        = 5000;  // 5secs
 //static const int kPausePlaybackMarkMs  = 2000;  // 2secs
 static const int kResumePlaybackMarkMs = 15000;  // 15secs
 
-NuPlayer2::GenericSource::GenericSource(
+NuPlayer2::GenericSource2::GenericSource2(
         const sp<AMessage> &notify,
         bool uidValid,
         uid_t uid,
@@ -79,7 +79,7 @@ NuPlayer2::GenericSource::GenericSource(
       mFd(-1),
       mBitrate(-1ll),
       mPendingReadBufferTypes(0) {
-    ALOGV("GenericSource");
+    ALOGV("GenericSource2");
     CHECK(mediaClock != NULL);
 
     mBufferingSettings.mInitialMarkMs = kInitialMarkMs;
@@ -87,7 +87,7 @@ NuPlayer2::GenericSource::GenericSource(
     resetDataSource();
 }
 
-void NuPlayer2::GenericSource::resetDataSource() {
+void NuPlayer2::GenericSource2::resetDataSource() {
     ALOGV("resetDataSource");
 
     mHTTPService.clear();
@@ -110,7 +110,7 @@ void NuPlayer2::GenericSource::resetDataSource() {
     mMimes.clear();
 }
 
-status_t NuPlayer2::GenericSource::setDataSource(
+status_t NuPlayer2::GenericSource2::setDataSource(
         const sp<MediaHTTPService> &httpService,
         const char *url,
         const KeyedVector<String8, String8> *headers) {
@@ -131,7 +131,7 @@ status_t NuPlayer2::GenericSource::setDataSource(
     return OK;
 }
 
-status_t NuPlayer2::GenericSource::setDataSource(
+status_t NuPlayer2::GenericSource2::setDataSource(
         int fd, int64_t offset, int64_t length) {
     Mutex::Autolock _l(mLock);
     ALOGV("setDataSource %d/%lld/%lld", fd, (long long)offset, (long long)length);
@@ -147,7 +147,7 @@ status_t NuPlayer2::GenericSource::setDataSource(
     return OK;
 }
 
-status_t NuPlayer2::GenericSource::setDataSource(const sp<DataSource>& source) {
+status_t NuPlayer2::GenericSource2::setDataSource(const sp<DataSource>& source) {
     Mutex::Autolock _l(mLock);
     ALOGV("setDataSource (source: %p)", source.get());
 
@@ -156,12 +156,12 @@ status_t NuPlayer2::GenericSource::setDataSource(const sp<DataSource>& source) {
     return OK;
 }
 
-sp<MetaData> NuPlayer2::GenericSource::getFileFormatMeta() const {
+sp<MetaData> NuPlayer2::GenericSource2::getFileFormatMeta() const {
     Mutex::Autolock _l(mLock);
     return mFileMeta;
 }
 
-status_t NuPlayer2::GenericSource::initFromDataSource() {
+status_t NuPlayer2::GenericSource2::initFromDataSource() {
     sp<IMediaExtractor> extractor;
     CHECK(mDataSource != NULL || mFd != -1);
     sp<DataSource> dataSource = mDataSource;
@@ -294,7 +294,7 @@ status_t NuPlayer2::GenericSource::initFromDataSource() {
     return OK;
 }
 
-status_t NuPlayer2::GenericSource::getBufferingSettings(
+status_t NuPlayer2::GenericSource2::getBufferingSettings(
         BufferingSettings* buffering /* nonnull */) {
     {
         Mutex::Autolock _l(mLock);
@@ -305,7 +305,7 @@ status_t NuPlayer2::GenericSource::getBufferingSettings(
     return OK;
 }
 
-status_t NuPlayer2::GenericSource::setBufferingSettings(const BufferingSettings& buffering) {
+status_t NuPlayer2::GenericSource2::setBufferingSettings(const BufferingSettings& buffering) {
     ALOGV("setBufferingSettings{%s}", buffering.toString().string());
 
     Mutex::Autolock _l(mLock);
@@ -313,7 +313,7 @@ status_t NuPlayer2::GenericSource::setBufferingSettings(const BufferingSettings&
     return OK;
 }
 
-status_t NuPlayer2::GenericSource::startSources() {
+status_t NuPlayer2::GenericSource2::startSources() {
     // Start the selected A/V tracks now before we start buffering.
     // Widevine sources might re-initialize crypto when starting, if we delay
     // this to start(), all data buffered during prepare would be wasted.
@@ -334,7 +334,7 @@ status_t NuPlayer2::GenericSource::startSources() {
     return OK;
 }
 
-int64_t NuPlayer2::GenericSource::getLastReadPosition() {
+int64_t NuPlayer2::GenericSource2::getLastReadPosition() {
     if (mAudioTrack.mSource != NULL) {
         return mAudioTimeUs;
     } else if (mVideoTrack.mSource != NULL) {
@@ -344,13 +344,13 @@ int64_t NuPlayer2::GenericSource::getLastReadPosition() {
     }
 }
 
-bool NuPlayer2::GenericSource::isStreaming() const {
+bool NuPlayer2::GenericSource2::isStreaming() const {
     Mutex::Autolock _l(mLock);
     return mIsStreaming;
 }
 
-NuPlayer2::GenericSource::~GenericSource() {
-    ALOGV("~GenericSource");
+NuPlayer2::GenericSource2::~GenericSource2() {
+    ALOGV("~GenericSource2");
     if (mLooper != NULL) {
         mLooper->unregisterHandler(id());
         mLooper->stop();
@@ -361,7 +361,7 @@ NuPlayer2::GenericSource::~GenericSource() {
     resetDataSource();
 }
 
-void NuPlayer2::GenericSource::prepareAsync() {
+void NuPlayer2::GenericSource2::prepareAsync() {
     Mutex::Autolock _l(mLock);
     ALOGV("prepareAsync: (looper: %d)", (mLooper != NULL));
 
@@ -379,7 +379,7 @@ void NuPlayer2::GenericSource::prepareAsync() {
     msg->post();
 }
 
-void NuPlayer2::GenericSource::onPrepareAsync() {
+void NuPlayer2::GenericSource2::onPrepareAsync() {
     ALOGV("onPrepareAsync: mDataSource: %d", (mDataSource != NULL));
 
     // delayed data source creation
@@ -460,7 +460,7 @@ void NuPlayer2::GenericSource::onPrepareAsync() {
     ALOGV("onPrepareAsync: Done");
 }
 
-void NuPlayer2::GenericSource::finishPrepareAsync() {
+void NuPlayer2::GenericSource2::finishPrepareAsync() {
     ALOGV("finishPrepareAsync");
 
     status_t err = startSources();
@@ -487,7 +487,7 @@ void NuPlayer2::GenericSource::finishPrepareAsync() {
     }
 }
 
-void NuPlayer2::GenericSource::notifyPreparedAndCleanup(status_t err) {
+void NuPlayer2::GenericSource2::notifyPreparedAndCleanup(status_t err) {
     if (err != OK) {
         mDataSource.clear();
         mCachedSource.clear();
@@ -500,7 +500,7 @@ void NuPlayer2::GenericSource::notifyPreparedAndCleanup(status_t err) {
     notifyPrepared(err);
 }
 
-void NuPlayer2::GenericSource::start() {
+void NuPlayer2::GenericSource2::start() {
     Mutex::Autolock _l(mLock);
     ALOGI("start");
 
@@ -515,22 +515,22 @@ void NuPlayer2::GenericSource::start() {
     mStarted = true;
 }
 
-void NuPlayer2::GenericSource::stop() {
+void NuPlayer2::GenericSource2::stop() {
     Mutex::Autolock _l(mLock);
     mStarted = false;
 }
 
-void NuPlayer2::GenericSource::pause() {
+void NuPlayer2::GenericSource2::pause() {
     Mutex::Autolock _l(mLock);
     mStarted = false;
 }
 
-void NuPlayer2::GenericSource::resume() {
+void NuPlayer2::GenericSource2::resume() {
     Mutex::Autolock _l(mLock);
     mStarted = true;
 }
 
-void NuPlayer2::GenericSource::disconnect() {
+void NuPlayer2::GenericSource2::disconnect() {
     sp<DataSource> dataSource, httpSource;
     {
         Mutex::Autolock _l(mLock);
@@ -549,11 +549,11 @@ void NuPlayer2::GenericSource::disconnect() {
     }
 }
 
-status_t NuPlayer2::GenericSource::feedMoreTSData() {
+status_t NuPlayer2::GenericSource2::feedMoreTSData() {
     return OK;
 }
 
-void NuPlayer2::GenericSource::sendCacheStats() {
+void NuPlayer2::GenericSource2::sendCacheStats() {
     int32_t kbps = 0;
     status_t err = UNKNOWN_ERROR;
 
@@ -569,7 +569,7 @@ void NuPlayer2::GenericSource::sendCacheStats() {
     }
 }
 
-void NuPlayer2::GenericSource::onMessageReceived(const sp<AMessage> &msg) {
+void NuPlayer2::GenericSource2::onMessageReceived(const sp<AMessage> &msg) {
     Mutex::Autolock _l(mLock);
     switch (msg->what()) {
       case kWhatPrepareAsync:
@@ -686,7 +686,7 @@ void NuPlayer2::GenericSource::onMessageReceived(const sp<AMessage> &msg) {
     }
 }
 
-void NuPlayer2::GenericSource::fetchTextData(
+void NuPlayer2::GenericSource2::fetchTextData(
         uint32_t sendWhat,
         media_track_type type,
         int32_t curGen,
@@ -723,7 +723,7 @@ void NuPlayer2::GenericSource::fetchTextData(
     mMediaClock->addTimer(msg2, subTimeUs);
 }
 
-void NuPlayer2::GenericSource::sendTextData(
+void NuPlayer2::GenericSource2::sendTextData(
         uint32_t what,
         media_track_type type,
         int32_t curGen,
@@ -759,7 +759,7 @@ void NuPlayer2::GenericSource::sendTextData(
     }
 }
 
-void NuPlayer2::GenericSource::sendGlobalTextData(
+void NuPlayer2::GenericSource2::sendGlobalTextData(
         uint32_t what,
         int32_t curGen,
         sp<AMessage> msg) {
@@ -790,12 +790,12 @@ void NuPlayer2::GenericSource::sendGlobalTextData(
     }
 }
 
-sp<MetaData> NuPlayer2::GenericSource::getFormatMeta(bool audio) {
+sp<MetaData> NuPlayer2::GenericSource2::getFormatMeta(bool audio) {
     Mutex::Autolock _l(mLock);
     return getFormatMeta_l(audio);
 }
 
-sp<MetaData> NuPlayer2::GenericSource::getFormatMeta_l(bool audio) {
+sp<MetaData> NuPlayer2::GenericSource2::getFormatMeta_l(bool audio) {
     sp<IMediaSource> source = audio ? mAudioTrack.mSource : mVideoTrack.mSource;
 
     if (source == NULL) {
@@ -805,7 +805,7 @@ sp<MetaData> NuPlayer2::GenericSource::getFormatMeta_l(bool audio) {
     return source->getFormat();
 }
 
-status_t NuPlayer2::GenericSource::dequeueAccessUnit(
+status_t NuPlayer2::GenericSource2::dequeueAccessUnit(
         bool audio, sp<ABuffer> *accessUnit) {
     Mutex::Autolock _l(mLock);
     // If has gone through stop/releaseDrm sequence, we no longer send down any buffer b/c
@@ -901,18 +901,18 @@ status_t NuPlayer2::GenericSource::dequeueAccessUnit(
     return result;
 }
 
-status_t NuPlayer2::GenericSource::getDuration(int64_t *durationUs) {
+status_t NuPlayer2::GenericSource2::getDuration(int64_t *durationUs) {
     Mutex::Autolock _l(mLock);
     *durationUs = mDurationUs;
     return OK;
 }
 
-size_t NuPlayer2::GenericSource::getTrackCount() const {
+size_t NuPlayer2::GenericSource2::getTrackCount() const {
     Mutex::Autolock _l(mLock);
     return mSources.size();
 }
 
-sp<AMessage> NuPlayer2::GenericSource::getTrackInfo(size_t trackIndex) const {
+sp<AMessage> NuPlayer2::GenericSource2::getTrackInfo(size_t trackIndex) const {
     Mutex::Autolock _l(mLock);
     size_t trackCount = mSources.size();
     if (trackIndex >= trackCount) {
@@ -962,7 +962,7 @@ sp<AMessage> NuPlayer2::GenericSource::getTrackInfo(size_t trackIndex) const {
     return format;
 }
 
-ssize_t NuPlayer2::GenericSource::getSelectedTrack(media_track_type type) const {
+ssize_t NuPlayer2::GenericSource2::getSelectedTrack(media_track_type type) const {
     Mutex::Autolock _l(mLock);
     const Track *track = NULL;
     switch (type) {
@@ -989,7 +989,7 @@ ssize_t NuPlayer2::GenericSource::getSelectedTrack(media_track_type type) const 
     return -1;
 }
 
-status_t NuPlayer2::GenericSource::selectTrack(size_t trackIndex, bool select, int64_t timeUs) {
+status_t NuPlayer2::GenericSource2::selectTrack(size_t trackIndex, bool select, int64_t timeUs) {
     Mutex::Autolock _l(mLock);
     ALOGV("%s track: %zu", select ? "select" : "deselect", trackIndex);
 
@@ -1083,7 +1083,7 @@ status_t NuPlayer2::GenericSource::selectTrack(size_t trackIndex, bool select, i
     return INVALID_OPERATION;
 }
 
-status_t NuPlayer2::GenericSource::seekTo(int64_t seekTimeUs, MediaPlayer2SeekMode mode) {
+status_t NuPlayer2::GenericSource2::seekTo(int64_t seekTimeUs, MediaPlayer2SeekMode mode) {
     ALOGV("seekTo: %lld, %d", (long long)seekTimeUs, mode);
     sp<AMessage> msg = new AMessage(kWhatSeek, this);
     msg->setInt64("seekTimeUs", seekTimeUs);
@@ -1101,7 +1101,7 @@ status_t NuPlayer2::GenericSource::seekTo(int64_t seekTimeUs, MediaPlayer2SeekMo
     return err;
 }
 
-void NuPlayer2::GenericSource::onSeek(const sp<AMessage>& msg) {
+void NuPlayer2::GenericSource2::onSeek(const sp<AMessage>& msg) {
     int64_t seekTimeUs;
     int32_t mode;
     CHECK(msg->findInt64("seekTimeUs", &seekTimeUs));
@@ -1116,7 +1116,7 @@ void NuPlayer2::GenericSource::onSeek(const sp<AMessage>& msg) {
     response->postReply(replyID);
 }
 
-status_t NuPlayer2::GenericSource::doSeek(int64_t seekTimeUs, MediaPlayer2SeekMode mode) {
+status_t NuPlayer2::GenericSource2::doSeek(int64_t seekTimeUs, MediaPlayer2SeekMode mode) {
     if (mVideoTrack.mSource != NULL) {
         ++mVideoDataGeneration;
 
@@ -1150,7 +1150,7 @@ status_t NuPlayer2::GenericSource::doSeek(int64_t seekTimeUs, MediaPlayer2SeekMo
     return OK;
 }
 
-sp<ABuffer> NuPlayer2::GenericSource::mediaBufferToABuffer(
+sp<ABuffer> NuPlayer2::GenericSource2::mediaBufferToABuffer(
         MediaBuffer* mb,
         media_track_type trackType) {
     bool audio = trackType == MEDIA_TRACK_TYPE_AUDIO;
@@ -1248,7 +1248,7 @@ sp<ABuffer> NuPlayer2::GenericSource::mediaBufferToABuffer(
     return ab;
 }
 
-int32_t NuPlayer2::GenericSource::getDataGeneration(media_track_type type) const {
+int32_t NuPlayer2::GenericSource2::getDataGeneration(media_track_type type) const {
     int32_t generation = -1;
     switch (type) {
     case MEDIA_TRACK_TYPE_VIDEO:
@@ -1270,7 +1270,7 @@ int32_t NuPlayer2::GenericSource::getDataGeneration(media_track_type type) const
     return generation;
 }
 
-void NuPlayer2::GenericSource::postReadBuffer(media_track_type trackType) {
+void NuPlayer2::GenericSource2::postReadBuffer(media_track_type trackType) {
     if ((mPendingReadBufferTypes & (1 << trackType)) == 0) {
         mPendingReadBufferTypes |= (1 << trackType);
         sp<AMessage> msg = new AMessage(kWhatReadBuffer, this);
@@ -1279,7 +1279,7 @@ void NuPlayer2::GenericSource::postReadBuffer(media_track_type trackType) {
     }
 }
 
-void NuPlayer2::GenericSource::onReadBuffer(const sp<AMessage>& msg) {
+void NuPlayer2::GenericSource2::onReadBuffer(const sp<AMessage>& msg) {
     int32_t tmpType;
     CHECK(msg->findInt32("trackType", &tmpType));
     media_track_type trackType = (media_track_type)tmpType;
@@ -1287,7 +1287,7 @@ void NuPlayer2::GenericSource::onReadBuffer(const sp<AMessage>& msg) {
     readBuffer(trackType);
 }
 
-void NuPlayer2::GenericSource::readBuffer(
+void NuPlayer2::GenericSource2::readBuffer(
         media_track_type trackType, int64_t seekTimeUs, MediaPlayer2SeekMode mode,
         int64_t *actualTimeUs, bool formatChange) {
     Track *track;
@@ -1460,7 +1460,7 @@ void NuPlayer2::GenericSource::readBuffer(
     }
 }
 
-void NuPlayer2::GenericSource::queueDiscontinuityIfNeeded(
+void NuPlayer2::GenericSource2::queueDiscontinuityIfNeeded(
         bool seeking, bool formatChange, media_track_type trackType, Track *track) {
     // formatChange && seeking: track whose source is changed during selection
     // formatChange && !seeking: track whose source is not changed during selection
@@ -1475,7 +1475,7 @@ void NuPlayer2::GenericSource::queueDiscontinuityIfNeeded(
     }
 }
 
-void NuPlayer2::GenericSource::notifyBufferingUpdate(int32_t percentage) {
+void NuPlayer2::GenericSource2::notifyBufferingUpdate(int32_t percentage) {
     // Buffering percent could go backward as it's estimated from remaining
     // data and last access time. This could cause the buffering position
     // drawn on media control to jitter slightly. Remember previously reported
@@ -1496,14 +1496,14 @@ void NuPlayer2::GenericSource::notifyBufferingUpdate(int32_t percentage) {
     notify->post();
 }
 
-void NuPlayer2::GenericSource::schedulePollBuffering() {
+void NuPlayer2::GenericSource2::schedulePollBuffering() {
     sp<AMessage> msg = new AMessage(kWhatPollBuffering, this);
     msg->setInt32("generation", mPollBufferingGeneration);
     // Enquires buffering status every second.
     msg->post(1000000ll);
 }
 
-void NuPlayer2::GenericSource::onPollBuffering() {
+void NuPlayer2::GenericSource2::onPollBuffering() {
     status_t finalStatus = UNKNOWN_ERROR;
     int64_t cachedDurationUs = -1ll;
     ssize_t cachedDataRemaining = -1;
@@ -1554,7 +1554,7 @@ void NuPlayer2::GenericSource::onPollBuffering() {
 }
 
 // Modular DRM
-status_t NuPlayer2::GenericSource::prepareDrm(
+status_t NuPlayer2::GenericSource2::prepareDrm(
         const uint8_t uuid[16],
         const Vector<uint8_t> &drmSessionId,
         sp<AMediaCryptoWrapper> *outCrypto) {
@@ -1611,7 +1611,7 @@ status_t NuPlayer2::GenericSource::prepareDrm(
     return status;
 }
 
-status_t NuPlayer2::GenericSource::releaseDrm() {
+status_t NuPlayer2::GenericSource2::releaseDrm() {
     Mutex::Autolock _l(mLock);
     ALOGV("releaseDrm");
 
@@ -1627,7 +1627,7 @@ status_t NuPlayer2::GenericSource::releaseDrm() {
     return OK;
 }
 
-status_t NuPlayer2::GenericSource::checkDrmInfo()
+status_t NuPlayer2::GenericSource2::checkDrmInfo()
 {
     // clearing the flag at prepare in case the player is reused after stop/releaseDrm with the
     // same source without being reset (called by prepareAsync/initFromDataSource)
@@ -1661,7 +1661,7 @@ status_t NuPlayer2::GenericSource::checkDrmInfo()
     return OK;
 }
 
-void NuPlayer2::GenericSource::signalBufferReturned(MediaBuffer *buffer)
+void NuPlayer2::GenericSource2::signalBufferReturned(MediaBuffer *buffer)
 {
     //ALOGV("signalBufferReturned %p  refCount: %d", buffer, buffer->localRefcount());
 

@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef GENERIC_SOURCE_H_
+#ifndef GENERIC_SOURCE2_H_
 
-#define GENERIC_SOURCE_H_
+#define GENERIC_SOURCE2_H_
 
 #include "NuPlayer2.h"
 #include "NuPlayer2Source.h"
@@ -40,11 +40,11 @@ class MediaBuffer;
 struct MediaClock;
 struct NuCachedSource2;
 
-struct NuPlayer2::GenericSource : public NuPlayer2::Source,
-                                 public MediaBufferObserver // Modular DRM
+struct NuPlayer2::GenericSource2 : public NuPlayer2::Source,
+                                   public MediaBufferObserver // Modular DRM
 {
-    GenericSource(const sp<AMessage> &notify, bool uidValid, uid_t uid,
-                  const sp<MediaClock> &mediaClock);
+    GenericSource2(const sp<AMessage> &notify, bool uidValid, uid_t uid,
+                   const sp<MediaClock> &mediaClock);
 
     status_t setDataSource(
             const sp<MediaHTTPService> &httpService,
@@ -97,7 +97,7 @@ struct NuPlayer2::GenericSource : public NuPlayer2::Source,
 
 
 protected:
-    virtual ~GenericSource();
+    virtual ~GenericSource2();
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
 
@@ -240,9 +240,9 @@ private:
 
     status_t checkDrmInfo();
 
-    DISALLOW_EVIL_CONSTRUCTORS(GenericSource);
+    DISALLOW_EVIL_CONSTRUCTORS(GenericSource2);
 };
 
 }  // namespace android
 
-#endif  // GENERIC_SOURCE_H_
+#endif  // GENERIC_SOURCE2_H_

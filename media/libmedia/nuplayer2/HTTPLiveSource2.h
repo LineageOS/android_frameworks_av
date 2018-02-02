@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef HTTP_LIVE_SOURCE_H_
+#ifndef HTTP_LIVE_SOURCE2_H_
 
-#define HTTP_LIVE_SOURCE_H_
+#define HTTP_LIVE_SOURCE2_H_
 
 #include "NuPlayer2.h"
 #include "NuPlayer2Source.h"
@@ -27,8 +27,8 @@ namespace android {
 
 struct LiveSession;
 
-struct NuPlayer2::HTTPLiveSource : public NuPlayer2::Source {
-    HTTPLiveSource(
+struct NuPlayer2::HTTPLiveSource2 : public NuPlayer2::Source {
+    HTTPLiveSource2(
             const sp<AMessage> &notify,
             const sp<MediaHTTPService> &httpService,
             const char *url,
@@ -56,7 +56,7 @@ struct NuPlayer2::HTTPLiveSource : public NuPlayer2::Source {
             MediaPlayer2SeekMode mode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC) override;
 
 protected:
-    virtual ~HTTPLiveSource();
+    virtual ~HTTPLiveSource2();
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
 
@@ -91,9 +91,9 @@ private:
             const sp<AMessage> &msg, int32_t currentGeneration,
             LiveSession::StreamType fetchType, int32_t pushWhat);
 
-    DISALLOW_EVIL_CONSTRUCTORS(HTTPLiveSource);
+    DISALLOW_EVIL_CONSTRUCTORS(HTTPLiveSource2);
 };
 
 }  // namespace android
 
-#endif  // HTTP_LIVE_SOURCE_H_
+#endif  // HTTP_LIVE_SOURCE2_H_

@@ -23,7 +23,7 @@
 
 #include "NuPlayer2.h"
 
-#include "HTTPLiveSource.h"
+#include "HTTPLiveSource2.h"
 #include "NuPlayer2CCDecoder.h"
 #include "NuPlayer2Decoder.h"
 #include "NuPlayer2DecoderBase.h"
@@ -31,9 +31,8 @@
 #include "NuPlayer2Driver.h"
 #include "NuPlayer2Renderer.h"
 #include "NuPlayer2Source.h"
-#include "RTSPSource.h"
-#include "StreamingSource.h"
-#include "GenericSource.h"
+#include "RTSPSource2.h"
+#include "GenericSource2.h"
 #include "TextDescriptions.h"
 
 #include "ATSParser.h"
@@ -291,27 +290,27 @@ void NuPlayer2::setDataSourceAsync(const sp<DataSourceDesc> &dsd) {
             KeyedVector<String8, String8> *headers = &(dsd->mHeaders);
 
             if (IsHTTPLiveURL(url)) {
-                source = new HTTPLiveSource(notify, httpService, url, headers);
-                ALOGV("setDataSourceAsync HTTPLiveSource %s", url);
+                source = new HTTPLiveSource2(notify, httpService, url, headers);
+                ALOGV("setDataSourceAsync HTTPLiveSource2 %s", url);
                 mDataSourceType = DATA_SOURCE_TYPE_HTTP_LIVE;
             } else if (!strncasecmp(url, "rtsp://", 7)) {
-                source = new RTSPSource(
+                source = new RTSPSource2(
                         notify, httpService, url, headers, mUIDValid, mUID);
-                ALOGV("setDataSourceAsync RTSPSource %s", url);
+                ALOGV("setDataSourceAsync RTSPSource2 %s", url);
                 mDataSourceType = DATA_SOURCE_TYPE_RTSP;
             } else if ((!strncasecmp(url, "http://", 7)
                         || !strncasecmp(url, "https://", 8))
                             && ((len >= 4 && !strcasecmp(".sdp", &url[len - 4]))
                             || strstr(url, ".sdp?"))) {
-                source = new RTSPSource(
+                source = new RTSPSource2(
                         notify, httpService, url, headers, mUIDValid, mUID, true);
-                ALOGV("setDataSourceAsync RTSPSource http/https/.sdp %s", url);
+                ALOGV("setDataSourceAsync RTSPSource2 http/https/.sdp %s", url);
                 mDataSourceType = DATA_SOURCE_TYPE_RTSP;
             } else {
-                ALOGV("setDataSourceAsync GenericSource %s", url);
+                ALOGV("setDataSourceAsync GenericSource2 %s", url);
 
-                sp<GenericSource> genericSource =
-                        new GenericSource(notify, mUIDValid, mUID, mMediaClock);
+                sp<GenericSource2> genericSource =
+                        new GenericSource2(notify, mUIDValid, mUID, mMediaClock);
 
                 status_t err = genericSource->setDataSource(httpService, url, headers);
 
@@ -329,8 +328,8 @@ void NuPlayer2::setDataSourceAsync(const sp<DataSourceDesc> &dsd) {
 
         case DataSourceDesc::TYPE_FD:
         {
-            sp<GenericSource> genericSource =
-                    new GenericSource(notify, mUIDValid, mUID, mMediaClock);
+            sp<GenericSource2> genericSource =
+                    new GenericSource2(notify, mUIDValid, mUID, mMediaClock);
 
             ALOGV("setDataSourceAsync fd %d/%lld/%lld source: %p",
                   dsd->mFD, (long long)dsd->mFDOffset, (long long)dsd->mFDLength, source.get());
@@ -350,8 +349,8 @@ void NuPlayer2::setDataSourceAsync(const sp<DataSourceDesc> &dsd) {
 
         case DataSourceDesc::TYPE_CALLBACK:
         {
-            sp<GenericSource> genericSource =
-                    new GenericSource(notify, mUIDValid, mUID, mMediaClock);
+            sp<GenericSource2> genericSource =
+                    new GenericSource2(notify, mUIDValid, mUID, mMediaClock);
             status_t err = genericSource->setDataSource(dsd->mCallbackSource);
 
             if (err != OK) {
