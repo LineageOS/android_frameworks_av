@@ -1984,7 +1984,7 @@ status_t AudioFlinger::getMicrophones(std::vector<media::MicrophoneInfo> *microp
     for (size_t i = 0; i < fakeNum; i++) {
         struct audio_microphone_characteristic_t characteristics;
         sprintf(characteristics.device_id, "microphone:%zu", i);
-        characteristics.type = fakeTypes[i];
+        characteristics.device = fakeTypes[i];
         sprintf(characteristics.address, "");
         characteristics.location = AUDIO_MICROPHONE_LOCATION_MAINBODY;
         characteristics.group = 0;
