@@ -15,7 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "ClearKeyCryptoPlugin"
+#define LOG_TAG "ClearKeyDrmPlugin"
 #include <utils/Log.h>
 
 #include <media/stagefright/MediaErrors.h>

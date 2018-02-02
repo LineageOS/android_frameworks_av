@@ -15,7 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "ClearKeyCryptoPlugin"
+#define LOG_TAG "ClearKeySessionLibrary"
 #include <utils/Log.h>
 
 #include <utils/String8.h>

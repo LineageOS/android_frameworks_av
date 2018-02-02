@@ -15,7 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "ClearKeyCryptoPlugin"
+#define LOG_TAG "ClearKeyDrmFactory"
 #include <utils/Log.h>
 
 #include <utils/Errors.h>
