@@ -24,28 +24,46 @@
 
 namespace android {
 
-class C2Buffer;
-
 /**
  * MediaCodecBuffer implementation wraps around C2LinearBlock.
  */
-class Codec2Buffer : public MediaCodecBuffer {
+class LinearBlockBuffer : public MediaCodecBuffer {
 public:
-    static sp<Codec2Buffer> allocate(
+    static sp<LinearBlockBuffer> allocate(
             const sp<AMessage> &format, const std::shared_ptr<C2LinearBlock> &block);
 
-    virtual ~Codec2Buffer() = default;
+    virtual ~LinearBlockBuffer() = default;
 
     C2ConstLinearBlock share();
 
 private:
-    Codec2Buffer(
+    LinearBlockBuffer(
             const sp<AMessage> &format,
-            const sp<ABuffer> &buffer,
+            C2WriteView &&writeView,
             const std::shared_ptr<C2LinearBlock> &block);
-    Codec2Buffer() = delete;
+    LinearBlockBuffer() = delete;
 
+    C2WriteView mWriteView;
     std::shared_ptr<C2LinearBlock> mBlock;
+};
+
+/**
+ * MediaCodecBuffer implementation wraps around C2ConstLinearBlock.
+ */
+class ConstLinearBlockBuffer : public MediaCodecBuffer {
+public:
+    static sp<ConstLinearBlockBuffer> allocate(
+            const sp<AMessage> &format, const C2ConstLinearBlock &block);
+
+    virtual ~ConstLinearBlockBuffer() = default;
+
+private:
+    ConstLinearBlockBuffer(
+            const sp<AMessage> &format,
+            C2ReadView &&readView);
+    ConstLinearBlockBuffer() = delete;
+
+    C2ReadView mReadView;
 };
 
 }  // namespace android
