@@ -25,6 +25,7 @@
 
 #include <C2AllocatorGralloc.h>
 #include <C2Buffer.h>
+#include <C2PlatformSupport.h>
 
 namespace android {
 
@@ -185,7 +186,7 @@ public:
             C2Rect rect, C2MemoryUsage usage, int *fenceFd,
             C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) override;
     virtual c2_status_t unmap(C2Fence *fenceFd /* nullable */) override;
-    virtual bool isValid() const override { return true; }
+    virtual C2Allocator::id_t getAllocatorId() const override { return mAllocatorId; }
     virtual const C2Handle *handle() const override { return mLockedHandle ? : mHandle; }
     virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const override;
 
@@ -195,7 +196,8 @@ public:
               const BufferDescriptorInfo &info,
               const sp<IMapper> &mapper,
               hidl_handle &hidlHandle,
-              const C2HandleGralloc *const handle);
+              const C2HandleGralloc *const handle,
+              C2Allocator::id_t allocatorId);
     int dup() const;
     c2_status_t status() const;
 
@@ -207,20 +209,24 @@ private:
     buffer_handle_t mBuffer;
     const C2HandleGralloc *mLockedHandle;
     bool mLocked;
+    C2Allocator::id_t mAllocatorId;
 };
 
 C2AllocationGralloc::C2AllocationGralloc(
           const BufferDescriptorInfo &info,
           const sp<IMapper> &mapper,
           hidl_handle &hidlHandle,
-          const C2HandleGralloc *const handle)
+          const C2HandleGralloc *const handle,
+          C2Allocator::id_t allocatorId)
     : C2GraphicAllocation(info.mapperInfo.width, info.mapperInfo.height),
       mInfo(info),
       mMapper(mapper),
       mHidlHandle(std::move(hidlHandle)),
       mHandle(handle),
       mBuffer(nullptr),
-      mLocked(false) {}
+      mLocked(false),
+      mAllocatorId(allocatorId) {
+}
 
 C2AllocationGralloc::~C2AllocationGralloc() {
     if (!mBuffer) {
@@ -422,11 +428,19 @@ bool C2AllocationGralloc::equals(const std::shared_ptr<const C2GraphicAllocation
 /* ===================================== GRALLOC ALLOCATOR ==================================== */
 class C2AllocatorGralloc::Impl {
 public:
-    Impl();
+    Impl(id_t id);
 
-    id_t getId() const;
+    id_t getId() const {
+        return mTraits->id;
+    }
 
-    C2String getName() const;
+    C2String getName() const {
+        return mTraits->name;
+    }
+
+    std::shared_ptr<const C2Allocator::Traits> getTraits() const {
+        return mTraits;
+    }
 
     c2_status_t newGraphicAllocation(
             uint32_t width, uint32_t height, uint32_t format, const C2MemoryUsage &usage,
@@ -439,26 +453,24 @@ public:
     c2_status_t status() const { return mInit; }
 
 private:
+    std::shared_ptr<C2Allocator::Traits> mTraits;
     c2_status_t mInit;
     sp<IAllocator> mAllocator;
     sp<IMapper> mMapper;
 };
 
-C2AllocatorGralloc::Impl::Impl() : mInit(C2_OK) {
-    // TODO: share a global service
+C2AllocatorGralloc::Impl::Impl(id_t id) : mInit(C2_OK) {
+    // TODO: get this from allocator
+    C2MemoryUsage minUsage = { 0, 0 }, maxUsage = { ~(uint64_t)0, ~(uint64_t)0 };
+    Traits traits = { "android.allocator.gralloc", id, C2Allocator::GRAPHIC, minUsage, maxUsage };
+    mTraits = std::make_shared<C2Allocator::Traits>(traits);
+
+    // gralloc allocator is a singleton, so all objects share a global service
     mAllocator = IAllocator::getService();
     mMapper = IMapper::getService();
     if (mAllocator == nullptr || mMapper == nullptr) {
         mInit = C2_CORRUPTED;
     }
-}
-
-C2Allocator::id_t C2AllocatorGralloc::Impl::getId() const {
-    return 1; /// \todo implement ID
-}
-
-C2String C2AllocatorGralloc::Impl::getName() const {
-    return "android.allocator.gralloc";
 }
 
 c2_status_t C2AllocatorGralloc::Impl::newGraphicAllocation(
@@ -517,7 +529,8 @@ c2_status_t C2AllocatorGralloc::Impl::newGraphicAllocation(
             C2HandleGralloc::WrapNativeHandle(
                     buffer.getNativeHandle(),
                     info.mapperInfo.width, info.mapperInfo.height,
-                    (uint32_t)info.mapperInfo.format, info.mapperInfo.usage, info.stride)));
+                    (uint32_t)info.mapperInfo.format, info.mapperInfo.usage, info.stride),
+            mTraits->id));
     return C2_OK;
 }
 
@@ -536,11 +549,11 @@ c2_status_t C2AllocatorGralloc::Impl::priorGraphicAllocation(
 
     hidl_handle hidlHandle = C2HandleGralloc::UnwrapNativeHandle(grallocHandle);
 
-    allocation->reset(new C2AllocationGralloc(info, mMapper, hidlHandle, grallocHandle));
+    allocation->reset(new C2AllocationGralloc(info, mMapper, hidlHandle, grallocHandle, mTraits->id));
     return C2_OK;
 }
 
-C2AllocatorGralloc::C2AllocatorGralloc(id_t) : mImpl(new Impl) {}
+C2AllocatorGralloc::C2AllocatorGralloc(id_t id) : mImpl(new Impl(id)) {}
 
 C2AllocatorGralloc::~C2AllocatorGralloc() { delete mImpl; }
 
@@ -550,6 +563,10 @@ C2Allocator::id_t C2AllocatorGralloc::getId() const {
 
 C2String C2AllocatorGralloc::getName() const {
     return mImpl->getName();
+}
+
+std::shared_ptr<const C2Allocator::Traits> C2AllocatorGralloc::getTraits() const {
+    return mImpl->getTraits();
 }
 
 c2_status_t C2AllocatorGralloc::newGraphicAllocation(

@@ -23,6 +23,7 @@
 
 #include <C2AllocatorGralloc.h>
 #include <C2PlatformSupport.h>
+#include <C2BlockInternal.h>
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <binder/MemoryDealer.h>
@@ -819,7 +820,7 @@ public:
         std::shared_ptr<C2Allocator> allocator = mAllocator.lock();
         if (!allocator) {
             c2_status_t err = GetCodec2PlatformAllocatorStore()->fetchAllocator(
-                    C2AllocatorStore::PLATFORM_START + 1,  // GRALLOC
+                    C2PlatformAllocatorStore::GRALLOC,
                     &allocator);
             if (err != OK) {
                 return UNKNOWN_ERROR;
@@ -835,7 +836,8 @@ public:
         if (err != OK) {
             return UNKNOWN_ERROR;
         }
-        std::shared_ptr<C2GraphicBlock> block(new GraphicBlock(alloc));
+
+        std::shared_ptr<C2GraphicBlock> block = _C2BlockFactory::CreateGraphicBlock(alloc);
 
         std::unique_ptr<C2Work> work(new C2Work);
         work->input.flags = (C2FrameData::flags_t)0;

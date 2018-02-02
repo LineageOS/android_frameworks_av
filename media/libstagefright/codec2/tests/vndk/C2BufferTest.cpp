@@ -26,6 +26,209 @@
 
 namespace android {
 
+class C2BufferUtilsTest : public ::testing::Test {
+    static void StaticSegmentTest() {
+        // constructor
+        static_assert(C2Segment(123u, 456u).offset == 123, "");
+        static_assert(C2Segment(123u, 456u).size == 456, "");
+
+        // empty
+        static_assert(!C2Segment(123u, 456u).isEmpty(), "");
+        static_assert(C2Segment(123u, 0u).isEmpty(), "");
+
+        // valid
+        static_assert(C2Segment(123u, 456u).isValid(), "");
+        static_assert(C2Segment(123u, ~123u).isValid(), "");
+        static_assert(!C2Segment(123u, 1 + ~123u).isValid(), "");
+
+        // bool()
+        static_assert(C2Segment(123u, 456u), "");
+        static_assert((bool)C2Segment(123u, ~123u), "");
+        static_assert(!bool(C2Segment(123u, 1 + ~123u)), "");
+        static_assert(!bool(C2Segment(123u, 0)), "");
+
+        // !
+        static_assert(!!C2Segment(123u, 456u), "");
+        static_assert(!!C2Segment(123u, ~123u), "");
+        static_assert(!C2Segment(123u, 1 + ~123u), "");
+        static_assert(!C2Segment(123u, 0), "");
+
+        // contains
+        static_assert(C2Segment(123u, ~123u).contains(C2Segment(123u, 0)), "");
+        static_assert(!C2Segment(123u, 1 + ~123u).contains(C2Segment(123u, 0)), "");
+        static_assert(C2Segment(123u, ~123u).contains(C2Segment(123u, ~123u)), "");
+        static_assert(!C2Segment(123u, ~123u).contains(C2Segment(123u, 1 + ~123u)), "");
+        static_assert(!C2Segment(123u, 1 + ~123u).contains(C2Segment(123u, 1 + ~123u)), "");
+        static_assert(!C2Segment(123u, ~123u).contains(C2Segment(122u, 2u)), "");
+        static_assert(C2Segment(123u, ~123u).contains(C2Segment(123u, 2u)), "");
+        static_assert(C2Segment(123u, 3u).contains(C2Segment(124u, 2u)), "");
+        static_assert(!C2Segment(123u, 3u).contains(C2Segment(125u, 2u)), "");
+
+        // ==
+        static_assert(C2Segment(123u, 456u) == C2Segment(123u, 456u), "");
+        static_assert(!(C2Segment(123u, 456u) == C2Segment(123u, 457u)), "");
+        static_assert(!(C2Segment(123u, 456u) == C2Segment(123u, 455u)), "");
+        static_assert(!(C2Segment(123u, 456u) == C2Segment(122u, 456u)), "");
+        static_assert(!(C2Segment(123u, 456u) == C2Segment(124u, 456u)), "");
+        static_assert(!(C2Segment(123u, 0u) == C2Segment(124u, 0u)), "");
+        static_assert(C2Segment(123u, 0u) == C2Segment(123u, 0u), "");
+        static_assert(C2Segment(123u, 1 + ~123u) == C2Segment(124u, 1 + ~124u), "");
+
+        // !=
+        static_assert(!(C2Segment(123u, 456u) != C2Segment(123u, 456u)), "");
+        static_assert(C2Segment(123u, 456u) != C2Segment(123u, 457u), "");
+        static_assert(C2Segment(123u, 456u) != C2Segment(123u, 455u), "");
+        static_assert(C2Segment(123u, 456u) != C2Segment(122u, 456u), "");
+        static_assert(C2Segment(123u, 456u) != C2Segment(124u, 456u), "");
+        static_assert(C2Segment(123u, 0u) != C2Segment(124u, 0u), "");
+        static_assert(!(C2Segment(123u, 0u) != C2Segment(123u, 0u)), "");
+        static_assert(!(C2Segment(123u, 1 + ~123u) != C2Segment(124u, 1 + ~124u)), "");
+
+        // <=
+        static_assert(C2Segment(123u, 456u) <= C2Segment(123u, 456u), "");
+        static_assert(C2Segment(123u, 456u) <= C2Segment(123u, 457u), "");
+        static_assert(C2Segment(123u, 456u) <= C2Segment(122u, 457u), "");
+        static_assert(!(C2Segment(123u, 457u) <= C2Segment(123u, 456u)), "");
+        static_assert(!(C2Segment(122u, 457u) <= C2Segment(123u, 456u)), "");
+        static_assert(!(C2Segment(123u, 457u) <= C2Segment(124u, 457u)), "");
+        static_assert(!(C2Segment(122u, 457u) <= C2Segment(123u, 457u)), "");
+        static_assert(!(C2Segment(122u, 0u) <= C2Segment(123u, 0u)), "");
+        static_assert(C2Segment(123u, 0u) <= C2Segment(122u, 1u), "");
+        static_assert(C2Segment(122u, 0u) <= C2Segment(122u, 1u), "");
+        static_assert(!(C2Segment(122u, ~122u) <= C2Segment(122u, 1 + ~122u)), "");
+        static_assert(!(C2Segment(122u, 1 + ~122u) <= C2Segment(122u, ~122u)), "");
+        static_assert(!(C2Segment(122u, 1 + ~122u) <= C2Segment(122u, 1 + ~122u)), "");
+
+        // <
+        static_assert(!(C2Segment(123u, 456u) < C2Segment(123u, 456u)), "");
+        static_assert(C2Segment(123u, 456u) < C2Segment(123u, 457u), "");
+        static_assert(C2Segment(123u, 456u) < C2Segment(122u, 457u), "");
+        static_assert(!(C2Segment(123u, 457u) < C2Segment(123u, 456u)), "");
+        static_assert(!(C2Segment(122u, 457u) < C2Segment(123u, 456u)), "");
+        static_assert(!(C2Segment(123u, 457u) < C2Segment(124u, 457u)), "");
+        static_assert(!(C2Segment(122u, 457u) < C2Segment(123u, 457u)), "");
+        static_assert(!(C2Segment(122u, 0u) < C2Segment(123u, 0u)), "");
+        static_assert(C2Segment(123u, 0u) < C2Segment(122u, 1u), "");
+        static_assert(C2Segment(122u, 0u) < C2Segment(122u, 1u), "");
+        static_assert(!(C2Segment(122u, ~122u) < C2Segment(122u, 1 + ~122u)), "");
+        static_assert(!(C2Segment(122u, 1 + ~122u) < C2Segment(122u, ~122u)), "");
+        static_assert(!(C2Segment(122u, 1 + ~122u) < C2Segment(122u, 1 + ~122u)), "");
+
+        // <=
+        static_assert(C2Segment(123u, 456u) >= C2Segment(123u, 456u), "");
+        static_assert(C2Segment(123u, 457u) >= C2Segment(123u, 456u), "");
+        static_assert(C2Segment(122u, 457u) >= C2Segment(123u, 456u), "");
+        static_assert(!(C2Segment(123u, 456u) >= C2Segment(123u, 457u)), "");
+        static_assert(!(C2Segment(123u, 456u) >= C2Segment(122u, 457u)), "");
+        static_assert(!(C2Segment(124u, 457u) >= C2Segment(123u, 457u)), "");
+        static_assert(!(C2Segment(123u, 457u) >= C2Segment(122u, 457u)), "");
+        static_assert(!(C2Segment(123u, 0u) >= C2Segment(122u, 0u)), "");
+        static_assert(C2Segment(122u, 1u) >= C2Segment(123u, 0u), "");
+        static_assert(C2Segment(122u, 1u) >= C2Segment(122u, 0u), "");
+        static_assert(!(C2Segment(122u, 1 + ~122u) >= C2Segment(122u, ~122u)), "");
+        static_assert(!(C2Segment(122u, ~122u) >= C2Segment(122u, 1 + ~122u)), "");
+        static_assert(!(C2Segment(122u, 1 + ~122u) >= C2Segment(122u, 1 + ~122u)), "");
+
+        // <
+        static_assert(!(C2Segment(123u, 456u) > C2Segment(123u, 456u)), "");
+        static_assert(C2Segment(123u, 457u) > C2Segment(123u, 456u), "");
+        static_assert(C2Segment(122u, 457u) > C2Segment(123u, 456u), "");
+        static_assert(!(C2Segment(123u, 456u) > C2Segment(123u, 457u)), "");
+        static_assert(!(C2Segment(123u, 456u) > C2Segment(122u, 457u)), "");
+        static_assert(!(C2Segment(124u, 457u) > C2Segment(123u, 457u)), "");
+        static_assert(!(C2Segment(123u, 457u) > C2Segment(122u, 457u)), "");
+        static_assert(!(C2Segment(123u, 0u) > C2Segment(122u, 0u)), "");
+        static_assert(C2Segment(122u, 1u) > C2Segment(123u, 0u), "");
+        static_assert(C2Segment(122u, 1u) > C2Segment(122u, 0u), "");
+        static_assert(!(C2Segment(122u, 1 + ~122u) > C2Segment(122u, ~122u)), "");
+        static_assert(!(C2Segment(122u, ~122u) > C2Segment(122u, 1 + ~122u)), "");
+        static_assert(!(C2Segment(122u, 1 + ~122u) > C2Segment(122u, 1 + ~122u)), "");
+
+        // end
+        static_assert(C2Segment(123u, 456u).end() == 579u, "");
+        static_assert(C2Segment(123u, 0u).end() == 123u, "");
+        static_assert(C2Segment(123u, ~123u).end() == 0xffffffffu, "");
+        static_assert(C2Segment(123u, 1 + ~123u).end() == 0u, "");
+
+        // intersect
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(123u, 456u)) == C2Segment(123u, 456u), "");
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(123u, 460u)) == C2Segment(123u, 456u), "");
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(124u, 460u)) == C2Segment(124u, 455u), "");
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(579u, 460u)) == C2Segment(579u, 0u), "");
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(589u, 460u)) == C2Segment(589u, ~9u /* -10 */), "");
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(123u, 455u)) == C2Segment(123u, 455u), "");
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(122u, 456u)) == C2Segment(123u, 455u), "");
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(0u, 123u)) == C2Segment(123u, 0u), "");
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(0u, 0u)) == C2Segment(123u, ~122u /* -123 */), "");
+
+        // normalize (change invalid segments to empty segments)
+        static_assert(C2Segment(123u, 456u).normalize() == C2Segment(123u, 456u), "");
+        static_assert(C2Segment(123u, ~123u).normalize() == C2Segment(123u, ~123u), "");
+        static_assert(C2Segment(123u, 1 + ~123u).normalize() == C2Segment(123u, 0u), "");
+
+        // note: normalize cannot be used to make this work
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(150u, ~150u)).normalize() == C2Segment(150u, 429u), "");
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(150u, 1 + ~150u)).normalize() != C2Segment(150u, 429u), "");
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(150u, 1 + ~150u)).normalize() == C2Segment(150u, 0u), "");
+
+        // saturate (change invalid segments to full segments up to max)
+        static_assert(C2Segment(123u, 456u).saturate() == C2Segment(123u, 456u), "");
+        static_assert(C2Segment(123u, ~123u).saturate() == C2Segment(123u, ~123u), "");
+        static_assert(C2Segment(123u, 1 + ~123u).saturate() == C2Segment(123u, ~123u), "");
+
+        // note: saturate can be used to make this work but only partially
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(150u, 1 + ~150u).saturate()).normalize() == C2Segment(150u, 429u), "");
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(0u, 100u).saturate()).normalize() == C2Segment(123u, 0u), "");
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(1000u, 100u).saturate()).normalize() != C2Segment(579u, 0u), "");
+        static_assert(C2Segment(123u, 456u).intersect(C2Segment(1000u, 100u).saturate()).normalize() == C2Segment(1000u, 0u), "");
+
+    }
+
+    static void StaticLinearRangeAndCapacityTest() {
+        class TestCapacity : public _C2LinearCapacityAspect {
+            using _C2LinearCapacityAspect::_C2LinearCapacityAspect;
+            friend class C2BufferUtilsTest;
+        };
+
+        class TestRange : public _C2LinearRangeAspect {
+            using _C2LinearRangeAspect::_C2LinearRangeAspect;
+            friend class C2BufferUtilsTest;
+        };
+
+        // _C2LinearCapacityAspect
+        static_assert(TestCapacity(0u).capacity() == 0u, "");
+        constexpr TestCapacity cap(123u);
+        static_assert(TestCapacity(&cap).capacity() == 123u, "");
+        static_assert(TestCapacity(nullptr).capacity() == 0u, "");
+
+        // _C2LinearCapacityRange
+        static_assert(TestRange(&cap).capacity() == 123u, "");
+        static_assert(TestRange(&cap).offset() == 0u, "");
+        static_assert(TestRange(&cap).size() == 123u, "");
+        static_assert(TestRange(&cap).endOffset() == 123u, "");
+
+        constexpr TestRange range(&cap, 50u, 100u);
+
+        static_assert(range.capacity() == 123u, "");
+        static_assert(range.offset() == 50u, "");
+        static_assert(range.size() == 73u, "");
+        static_assert(range.endOffset() == 123u, "");
+
+        static_assert(TestRange(&cap, 20u, 30u).capacity() == 123u, "");
+        static_assert(TestRange(&cap, 20u, 30u).offset() == 20u, "");
+        static_assert(TestRange(&cap, 20u, 30u).size() == 30u, "");
+        static_assert(TestRange(&cap, 20u, 30u).endOffset() == 50u, "");
+
+        static_assert(TestRange(&cap, 200u, 30u).capacity() == 123u, "");
+        static_assert(TestRange(&cap, 200u, 30u).offset() == 123u, "");
+        static_assert(TestRange(&cap, 200u, 30u).size() == 0u, "");
+        static_assert(TestRange(&cap, 200u, 30u).endOffset() == 123u, "");
+
+    }
+
+};
+
+
 class C2BufferTest : public ::testing::Test {
 public:
     C2BufferTest()
@@ -178,6 +381,14 @@ TEST_F(C2BufferTest, BlockPoolTest) {
     ASSERT_NE(nullptr, data);
     for (size_t i = 0; i < writeView.size(); ++i) {
         data[i] = i % 100u;
+    }
+
+    writeView.setOffset(kCapacity / 3);
+    data = writeView.data();
+    ASSERT_NE(nullptr, data);
+    for (size_t i = 0; i < writeView.size(); ++i) {
+        ASSERT_EQ((i + kCapacity / 3) % 100u, data[i]) << " at i = " << i
+            << "; data = " << static_cast<void *>(data);
     }
 
     C2Fence fence;
