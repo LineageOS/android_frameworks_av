@@ -17,6 +17,7 @@
 package com.android.media;
 
 import android.content.Context;
+import android.media.MediaController2;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
@@ -130,6 +131,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 // Controller may be died prematurely.
             }
             if (accept) {
+                // TODO(jaewan): We need to send current PlaybackInfo.
                 // If connection is accepted, notify the current state to the controller.
                 // It's needed because we cannot call synchronous calls between session/controller.
                 // Note: We're doing this after the onConnectionChanged(), but there's no guarantee
@@ -383,6 +385,21 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     ControllerInfoImpl.from(list.get(i)).getControllerBinder();
             try {
                 callbackBinder.onPlaylistParamsChanged(params.toBundle());
+            } catch (RemoteException e) {
+                Log.w(TAG, "Controller is gone", e);
+                // TODO(jaewan): What to do when the controller is gone?
+            }
+        }
+    }
+
+    public void notifyPlaybackInfoChanged(MediaController2.PlaybackInfo playbackInfo) {
+        final List<ControllerInfo> list = getControllers();
+        for (int i = 0; i < list.size(); i++) {
+            IMediaSession2Callback callbackBinder =
+                    ControllerInfoImpl.from(list.get(i)).getControllerBinder();
+            try {
+                callbackBinder.onPlaybackInfoChanged(
+                        ((PlaybackInfoImpl) playbackInfo.getProvider()).toBundle());
             } catch (RemoteException e) {
                 Log.w(TAG, "Controller is gone", e);
                 // TODO(jaewan): What to do when the controller is gone?

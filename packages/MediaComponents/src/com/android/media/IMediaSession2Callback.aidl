@@ -31,6 +31,7 @@ oneway interface IMediaSession2Callback {
     void onPlaybackStateChanged(in Bundle state);
     void onPlaylistChanged(in List<Bundle> playlist);
     void onPlaylistParamsChanged(in Bundle params);
+    void onPlaybackInfoChanged(in Bundle playbackInfo);
 
     /**
      * Called only when the controller is created with service's token.
