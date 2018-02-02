@@ -693,7 +693,7 @@ public class VideoView2Impl extends BaseLayout
     }
 
     private void toggleMediaControlViewVisibility() {
-        if (mMediaControlView.isShowing()) {
+        if (mMediaControlView.getVisibility() == View.VISIBLE) {
             mMediaControlView.setVisibility(View.GONE);
         } else {
             mMediaControlView.setVisibility(View.VISIBLE);
