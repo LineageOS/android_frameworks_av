@@ -149,11 +149,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     }
 
     @Override
-    public boolean isShowing_impl() {
-        return (mInstance.getVisibility() == View.VISIBLE) ? true : false;
-    }
-
-    @Override
     public void setButtonVisibility_impl(int button, int visibility) {
         switch (button) {
             case MediaControlView2.BUTTON_PLAY_PAUSE:
