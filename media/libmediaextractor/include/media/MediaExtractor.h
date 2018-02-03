@@ -32,7 +32,6 @@ class MetaData;
 class String8;
 struct AMessage;
 struct MediaSourceBase;
-typedef std::vector<uint8_t> HInterfaceToken;
 
 
 class ExtractorAllocTracker {
@@ -81,7 +80,7 @@ public:
     }
     virtual void setUID(uid_t /*uid*/) {
     }
-    virtual status_t setMediaCas(const HInterfaceToken &/*casToken*/) {
+    virtual status_t setMediaCas(const uint8_t* /*casToken*/, size_t /*size*/) {
         return INVALID_OPERATION;
     }
 

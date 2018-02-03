@@ -165,9 +165,9 @@ bool MPEG2TSExtractor::isScrambledFormat(const sp<MetaData> &format) {
                     || !strcasecmp(MEDIA_MIMETYPE_AUDIO_SCRAMBLED, mime));
 }
 
-status_t MPEG2TSExtractor::setMediaCas(const HInterfaceToken &casToken) {
+status_t MPEG2TSExtractor::setMediaCas(const uint8_t* casToken, size_t size) {
     HalToken halToken;
-    halToken.setToExternal((uint8_t*)casToken.data(), casToken.size());
+    halToken.setToExternal((uint8_t*)casToken, size);
     sp<ICas> cas = ICas::castFrom(retrieveHalInterface(halToken));
     ALOGD("setMediaCas: %p", cas.get());
 

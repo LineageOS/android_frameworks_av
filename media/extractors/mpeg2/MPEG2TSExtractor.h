@@ -45,7 +45,7 @@ struct MPEG2TSExtractor : public MediaExtractor {
 
     virtual sp<MetaData> getMetaData();
 
-    virtual status_t setMediaCas(const HInterfaceToken &casToken) override;
+    virtual status_t setMediaCas(const uint8_t* /*casToken*/, size_t /*size*/) override;
 
     virtual uint32_t flags() const;
     virtual const char * name() { return "MPEG2TSExtractor"; }
