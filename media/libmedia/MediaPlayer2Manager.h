@@ -132,11 +132,6 @@ class MediaPlayer2Manager {
         virtual status_t        setParameters(const String8& keyValuePairs);
         virtual String8         getParameters(const String8& keys);
 
-        virtual media::VolumeShaper::Status applyVolumeShaper(
-                                        const sp<media::VolumeShaper::Configuration>& configuration,
-                                        const sp<media::VolumeShaper::Operation>& operation) override;
-        virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) override;
-
         // AudioRouting
         virtual status_t        setOutputDevice(audio_port_handle_t deviceId);
         virtual status_t        getRoutedDeviceId(audio_port_handle_t* deviceId);
@@ -170,7 +165,6 @@ class MediaPlayer2Manager {
         float                   mSendLevel;
         int                     mAuxEffectId;
         audio_output_flags_t    mFlags;
-        sp<media::VolumeHandler>       mVolumeHandler;
         audio_port_handle_t     mSelectedDeviceId;
         audio_port_handle_t     mRoutedDeviceId;
         bool                    mDeviceCallbackEnabled;
@@ -278,14 +272,7 @@ private:
         virtual status_t        attachAuxEffect(int effectId);
         virtual status_t        setParameter(int key, const Parcel &request);
         virtual status_t        getParameter(int key, Parcel *reply);
-        virtual status_t        setRetransmitEndpoint(const struct sockaddr_in* endpoint);
-        virtual status_t        getRetransmitEndpoint(struct sockaddr_in* endpoint);
         virtual status_t        setNextPlayer(const sp<MediaPlayer2Engine>& player);
-
-        virtual media::VolumeShaper::Status applyVolumeShaper(
-                                        const sp<media::VolumeShaper::Configuration>& configuration,
-                                        const sp<media::VolumeShaper::Operation>& operation) override;
-        virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) override;
 
         virtual status_t        setDataSource(const sp<DataSourceDesc> &dsd);
 
@@ -363,8 +350,6 @@ private:
                     audio_attributes_t *         mAudioAttributes;
                     uid_t                        mUid;
                     sp<ANativeWindowWrapper>     mConnectedWindow;
-                    struct sockaddr_in           mRetransmitEndpoint;
-                    bool                         mRetransmitEndpointValid;
                     sp<Client>                   mNextClient;
 
         // Metadata filters.

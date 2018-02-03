@@ -138,11 +138,6 @@ public:
         virtual status_t    setParameters(const String8& /* keyValuePairs */) { return NO_ERROR; }
         virtual String8     getParameters(const String8& /* keys */) { return String8::empty(); }
 
-        virtual media::VolumeShaper::Status applyVolumeShaper(
-                                    const sp<media::VolumeShaper::Configuration>& configuration,
-                                    const sp<media::VolumeShaper::Operation>& operation);
-        virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id);
-
         // AudioRouting
         virtual status_t    setOutputDevice(audio_port_handle_t deviceId);
         virtual status_t    getRoutedDeviceId(audio_port_handle_t* deviceId);
@@ -218,13 +213,6 @@ public:
     virtual status_t    setParameter(int key, const Parcel &request) = 0;
     virtual status_t    getParameter(int key, Parcel *reply) = 0;
 
-    // default no-op implementation of optional extensions
-    virtual status_t setRetransmitEndpoint(const struct sockaddr_in* /* endpoint */) {
-        return INVALID_OPERATION;
-    }
-    virtual status_t getRetransmitEndpoint(struct sockaddr_in* /* endpoint */) {
-        return INVALID_OPERATION;
-    }
     virtual status_t setNextPlayer(const sp<MediaPlayer2Interface>& /* next */) {
         return OK;
     }

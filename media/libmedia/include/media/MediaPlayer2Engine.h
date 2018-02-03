@@ -23,7 +23,6 @@
 #include <system/audio.h>
 
 #include <media/MediaSource.h>
-#include <media/VolumeShaper.h>
 
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
 // global, and not in android::
@@ -77,14 +76,7 @@ public:
     virtual status_t        attachAuxEffect(int effectId) = 0;
     virtual status_t        setParameter(int key, const Parcel& request) = 0;
     virtual status_t        getParameter(int key, Parcel* reply) = 0;
-    virtual status_t        setRetransmitEndpoint(const struct sockaddr_in* endpoint) = 0;
-    virtual status_t        getRetransmitEndpoint(struct sockaddr_in* endpoint) = 0;
     virtual status_t        setNextPlayer(const sp<MediaPlayer2Engine>& next) = 0;
-
-    virtual media::VolumeShaper::Status applyVolumeShaper(
-                                    const sp<media::VolumeShaper::Configuration>& configuration,
-                                    const sp<media::VolumeShaper::Operation>& operation) = 0;
-    virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) = 0;
 
     // Modular DRM
     virtual status_t        prepareDrm(const uint8_t uuid[16],

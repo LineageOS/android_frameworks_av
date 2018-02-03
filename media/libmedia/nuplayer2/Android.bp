@@ -12,7 +12,6 @@ cc_library_static {
         "NuPlayer2Driver.cpp",
         "NuPlayer2Drm.cpp",
         "NuPlayer2Renderer.cpp",
-        "NuPlayer2StreamListener.cpp",
         "RTSPSource2.cpp",
     ],
 

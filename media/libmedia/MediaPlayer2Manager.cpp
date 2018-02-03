@@ -82,7 +82,6 @@ using android::OK;
 using android::BAD_VALUE;
 using android::NOT_ENOUGH_DATA;
 using android::Parcel;
-using android::media::VolumeShaper;
 
 // Max number of entries in the filter.
 const int kMaxFilterSize = 64;  // I pulled that out of thin air.
@@ -503,7 +502,6 @@ MediaPlayer2Manager::Client::Client(
     mStatus = NO_INIT;
     mAudioSessionId = audioSessionId;
     mUid = uid;
-    mRetransmitEndpointValid = false;
     mAudioAttributes = NULL;
 
 #if CALLBACK_ANTAGONIZER
@@ -603,14 +601,6 @@ status_t MediaPlayer2Manager::Client::setDataSource(
     if (status != OK) {
         ALOGE("setDataSource error: %d", status);
         return status;
-    }
-
-    // Set the re-transmission endpoint if one was chosen.
-    if (mRetransmitEndpointValid) {
-        status = p->setRetransmitEndpoint(&mRetransmitEndpoint);
-        if (status != NO_ERROR) {
-            ALOGE("setRetransmitEndpoint error: %d", status);
-        }
     }
 
     return status;
@@ -927,34 +917,6 @@ status_t MediaPlayer2Manager::Client::setNextPlayer(const sp<MediaPlayer2Engine>
     return OK;
 }
 
-VolumeShaper::Status MediaPlayer2Manager::Client::applyVolumeShaper(
-        const sp<VolumeShaper::Configuration>& configuration,
-        const sp<VolumeShaper::Operation>& operation) {
-    // for hardware output, call player instead
-    ALOGV("Client::applyVolumeShaper(%p)", this);
-    sp<MediaPlayer2Interface> p = getPlayer();
-    {
-        Mutex::Autolock l(mLock);
-        if (mAudioOutput.get() != nullptr) {
-            return mAudioOutput->applyVolumeShaper(configuration, operation);
-        }
-    }
-    return VolumeShaper::Status(INVALID_OPERATION);
-}
-
-sp<VolumeShaper::State> MediaPlayer2Manager::Client::getVolumeShaperState(int id) {
-    // for hardware output, call player instead
-    ALOGV("Client::getVolumeShaperState(%p)", this);
-    sp<MediaPlayer2Interface> p = getPlayer();
-    {
-        Mutex::Autolock l(mLock);
-        if (mAudioOutput.get() != nullptr) {
-            return mAudioOutput->getVolumeShaperState(id);
-        }
-    }
-    return nullptr;
-}
-
 status_t MediaPlayer2Manager::Client::seekTo(int msec, MediaPlayer2SeekMode mode)
 {
     ALOGV("[%d] seekTo(%d, %d)", mConnId, msec, mode);
@@ -966,7 +928,6 @@ status_t MediaPlayer2Manager::Client::seekTo(int msec, MediaPlayer2SeekMode mode
 status_t MediaPlayer2Manager::Client::reset()
 {
     ALOGV("[%d] reset", mConnId);
-    mRetransmitEndpointValid = false;
     sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->reset();
@@ -1067,53 +1028,6 @@ status_t MediaPlayer2Manager::Client::getParameter(int key, Parcel *reply) {
     sp<MediaPlayer2Interface> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->getParameter(key, reply);
-}
-
-status_t MediaPlayer2Manager::Client::setRetransmitEndpoint(
-        const struct sockaddr_in* endpoint) {
-
-    if (NULL != endpoint) {
-        uint32_t a = ntohl(endpoint->sin_addr.s_addr);
-        uint16_t p = ntohs(endpoint->sin_port);
-        ALOGV("[%d] setRetransmitEndpoint(%u.%u.%u.%u:%hu)", mConnId,
-                (a >> 24), (a >> 16) & 0xFF, (a >> 8) & 0xFF, (a & 0xFF), p);
-    } else {
-        ALOGV("[%d] setRetransmitEndpoint = <none>", mConnId);
-    }
-
-    // Right now, the only valid time to set a retransmit endpoint is before
-    // setDataSource.
-
-    if (NULL != endpoint) {
-        Mutex::Autolock lock(mLock);
-        mRetransmitEndpoint = *endpoint;
-        mRetransmitEndpointValid = true;
-    } else {
-        Mutex::Autolock lock(mLock);
-        mRetransmitEndpointValid = false;
-    }
-
-    return NO_ERROR;
-}
-
-status_t MediaPlayer2Manager::Client::getRetransmitEndpoint(
-        struct sockaddr_in* endpoint)
-{
-    if (NULL == endpoint)
-        return BAD_VALUE;
-
-    sp<MediaPlayer2Interface> p = getPlayer();
-
-    if (p != NULL)
-        return p->getRetransmitEndpoint(endpoint);
-
-    Mutex::Autolock lock(mLock);
-    if (!mRetransmitEndpointValid)
-        return NO_INIT;
-
-    *endpoint = mRetransmitEndpoint;
-
-    return NO_ERROR;
 }
 
 void MediaPlayer2Manager::Client::notify(
@@ -1319,7 +1233,6 @@ MediaPlayer2Manager::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t u
       mSendLevel(0.0),
       mAuxEffectId(0),
       mFlags(AUDIO_OUTPUT_FLAG_NONE),
-      mVolumeHandler(new media::VolumeHandler()),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mDeviceCallbackEnabled(false),
@@ -1790,24 +1703,6 @@ status_t MediaPlayer2Manager::AudioOutput::open(
     ALOGV("setVolume");
     t->setVolume(mLeftVolume, mRightVolume);
 
-    // Restore VolumeShapers for the MediaPlayer2 in case the track was recreated
-    // due to an output sink error (e.g. offload to non-offload switch).
-    mVolumeHandler->forall([&t](const VolumeShaper &shaper) -> VolumeShaper::Status {
-        sp<VolumeShaper::Operation> operationToEnd =
-                new VolumeShaper::Operation(shaper.mOperation);
-        // TODO: Ideally we would restore to the exact xOffset position
-        // as returned by getVolumeShaperState(), but we don't have that
-        // information when restoring at the client unless we periodically poll
-        // the server or create shared memory state.
-        //
-        // For now, we simply advance to the end of the VolumeShaper effect
-        // if it has been started.
-        if (shaper.isStarted()) {
-            operationToEnd->setNormalizedTime(1.f);
-        }
-        return t->applyVolumeShaper(shaper.mConfiguration, operationToEnd);
-    });
-
     mSampleRateHz = sampleRate;
     mFlags = flags;
     mMsecsPerFrame = 1E3f / (mPlaybackRate.mSpeed * sampleRate);
@@ -1852,9 +1747,6 @@ status_t MediaPlayer2Manager::AudioOutput::start()
         mTrack->setVolume(mLeftVolume, mRightVolume);
         mTrack->setAuxEffectSendLevel(mSendLevel);
         status_t status = mTrack->start();
-        if (status == NO_ERROR) {
-            mVolumeHandler->setStarted();
-        }
         return status;
     }
     return NO_INIT;
@@ -2089,67 +1981,6 @@ status_t MediaPlayer2Manager::AudioOutput::enableAudioDeviceCallback(bool enable
         return status;
     }
     return NO_ERROR;
-}
-
-VolumeShaper::Status MediaPlayer2Manager::AudioOutput::applyVolumeShaper(
-                const sp<VolumeShaper::Configuration>& configuration,
-                const sp<VolumeShaper::Operation>& operation)
-{
-    Mutex::Autolock lock(mLock);
-    ALOGV("AudioOutput::applyVolumeShaper");
-
-    mVolumeHandler->setIdIfNecessary(configuration);
-
-    VolumeShaper::Status status;
-    if (mTrack != 0) {
-        status = mTrack->applyVolumeShaper(configuration, operation);
-        if (status >= 0) {
-            (void)mVolumeHandler->applyVolumeShaper(configuration, operation);
-            if (mTrack->isPlaying()) { // match local AudioTrack to properly restore.
-                mVolumeHandler->setStarted();
-            }
-        }
-    } else {
-        // VolumeShapers are not affected when a track moves between players for
-        // gapless playback (setNextMediaPlayer).
-        // We forward VolumeShaper operations that do not change configuration
-        // to the new player so that unducking may occur as expected.
-        // Unducking is an idempotent operation, same if applied back-to-back.
-        if (configuration->getType() == VolumeShaper::Configuration::TYPE_ID
-                && mNextOutput != nullptr) {
-            ALOGV("applyVolumeShaper: Attempting to forward missed operation: %s %s",
-                    configuration->toString().c_str(), operation->toString().c_str());
-            Mutex::Autolock nextLock(mNextOutput->mLock);
-
-            // recycled track should be forwarded from this AudioSink by switchToNextOutput
-            sp<AudioTrack> track = mNextOutput->mRecycledTrack;
-            if (track != nullptr) {
-                ALOGD("Forward VolumeShaper operation to recycled track %p", track.get());
-                (void)track->applyVolumeShaper(configuration, operation);
-            } else {
-                // There is a small chance that the unduck occurs after the next
-                // player has already started, but before it is registered to receive
-                // the unduck command.
-                track = mNextOutput->mTrack;
-                if (track != nullptr) {
-                    ALOGD("Forward VolumeShaper operation to track %p", track.get());
-                    (void)track->applyVolumeShaper(configuration, operation);
-                }
-            }
-        }
-        status = mVolumeHandler->applyVolumeShaper(configuration, operation);
-    }
-    return status;
-}
-
-sp<VolumeShaper::State> MediaPlayer2Manager::AudioOutput::getVolumeShaperState(int id)
-{
-    Mutex::Autolock lock(mLock);
-    if (mTrack != 0) {
-        return mTrack->getVolumeShaperState(id);
-    } else {
-        return mVolumeHandler->getVolumeShaperState(id);
-    }
 }
 
 // static

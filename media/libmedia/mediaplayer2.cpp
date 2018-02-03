@@ -50,8 +50,6 @@
 
 namespace android {
 
-using media::VolumeShaper;
-
 MediaPlayer2::MediaPlayer2()
 {
     ALOGV("constructor");
@@ -73,7 +71,6 @@ MediaPlayer2::MediaPlayer2()
     mAudioSessionId = (audio_session_t) AudioSystem::newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
     AudioSystem::acquireAudioSessionId(mAudioSessionId, -1);
     mSendLevel = 0;
-    mRetransmitEndpointValid = false;
 }
 
 MediaPlayer2::~MediaPlayer2()
@@ -111,7 +108,6 @@ void MediaPlayer2::clear_l()
     mSeekPosition = -1;
     mSeekMode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC;
     mVideoWidth = mVideoHeight = 0;
-    mRetransmitEndpointValid = false;
 }
 
 status_t MediaPlayer2::setListener(const sp<MediaPlayer2Listener>& listener)
@@ -162,8 +158,7 @@ status_t MediaPlayer2::setDataSource(const sp<DataSourceDesc> &dsd)
     ALOGV("setDataSource type(%d)", dsd->mType);
     status_t err = UNKNOWN_ERROR;
     sp<MediaPlayer2Engine> player(MediaPlayer2Manager::get().create(this, mAudioSessionId));
-    if ((NO_ERROR != doSetRetransmitEndpoint(player)) ||
-        (NO_ERROR != player->setDataSource(dsd))) {
+    if (NO_ERROR != player->setDataSource(dsd)) {
         player.clear();
     }
     err = attachNewPlayer(player);
@@ -589,20 +584,6 @@ status_t MediaPlayer2::reset_l()
     return NO_ERROR;
 }
 
-status_t MediaPlayer2::doSetRetransmitEndpoint(const sp<MediaPlayer2Engine>& player) {
-    Mutex::Autolock _l(mLock);
-
-    if (player == NULL) {
-        return UNKNOWN_ERROR;
-    }
-
-    if (mRetransmitEndpointValid) {
-        return player->setRetransmitEndpoint(&mRetransmitEndpoint);
-    }
-
-    return OK;
-}
-
 status_t MediaPlayer2::reset()
 {
     ALOGV("reset");
@@ -782,34 +763,6 @@ status_t MediaPlayer2::getParameter(int key, Parcel *reply)
     return INVALID_OPERATION;
 }
 
-status_t MediaPlayer2::setRetransmitEndpoint(const char* addrString,
-                                            uint16_t port) {
-    ALOGV("MediaPlayer2::setRetransmitEndpoint(%s:%hu)",
-            addrString ? addrString : "(null)", port);
-
-    Mutex::Autolock _l(mLock);
-    if ((mPlayer != NULL) || (mCurrentState != MEDIA_PLAYER2_IDLE))
-        return INVALID_OPERATION;
-
-    if (NULL == addrString) {
-        mRetransmitEndpointValid = false;
-        return OK;
-    }
-
-    struct in_addr saddr;
-    if(!inet_aton(addrString, &saddr)) {
-        return BAD_VALUE;
-    }
-
-    memset(&mRetransmitEndpoint, 0, sizeof(mRetransmitEndpoint));
-    mRetransmitEndpoint.sin_family = AF_INET;
-    mRetransmitEndpoint.sin_addr   = saddr;
-    mRetransmitEndpoint.sin_port   = htons(port);
-    mRetransmitEndpointValid       = true;
-
-    return OK;
-}
-
 void MediaPlayer2::notify(int msg, int ext1, int ext2, const Parcel *obj)
 {
     ALOGV("message received msg=%d, ext1=%d, ext2=%d", msg, ext1, ext2);
@@ -947,27 +900,6 @@ status_t MediaPlayer2::setNextMediaPlayer(const sp<MediaPlayer2>& next) {
     }
 
     return mPlayer->setNextPlayer(next == NULL ? NULL : next->mPlayer);
-}
-
-VolumeShaper::Status MediaPlayer2::applyVolumeShaper(
-        const sp<VolumeShaper::Configuration>& configuration,
-        const sp<VolumeShaper::Operation>& operation)
-{
-    Mutex::Autolock _l(mLock);
-    if (mPlayer == nullptr) {
-        return VolumeShaper::Status(NO_INIT);
-    }
-    VolumeShaper::Status status = mPlayer->applyVolumeShaper(configuration, operation);
-    return status;
-}
-
-sp<VolumeShaper::State> MediaPlayer2::getVolumeShaperState(int id)
-{
-    Mutex::Autolock _l(mLock);
-    if (mPlayer == nullptr) {
-        return nullptr;
-    }
-    return mPlayer->getVolumeShaperState(id);
 }
 
 // Modular DRM
