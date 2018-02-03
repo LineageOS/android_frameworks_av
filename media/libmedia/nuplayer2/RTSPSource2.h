@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef RTSP_SOURCE_H_
+#ifndef RTSP_SOURCE2_H_
 
-#define RTSP_SOURCE_H_
+#define RTSP_SOURCE2_H_
 
 #include "NuPlayer2Source.h"
 
@@ -30,8 +30,8 @@ struct AnotherPacketSource;
 struct MyHandler;
 struct SDPLoader;
 
-struct NuPlayer2::RTSPSource : public NuPlayer2::Source {
-    RTSPSource(
+struct NuPlayer2::RTSPSource2 : public NuPlayer2::Source {
+    RTSPSource2(
             const sp<AMessage> &notify,
             const sp<MediaHTTPService> &httpService,
             const char *url,
@@ -60,7 +60,7 @@ struct NuPlayer2::RTSPSource : public NuPlayer2::Source {
     void onMessageReceived(const sp<AMessage> &msg);
 
 protected:
-    virtual ~RTSPSource();
+    virtual ~RTSPSource2();
 
     virtual sp<MetaData> getFormatMeta(bool audio);
 
@@ -161,9 +161,9 @@ private:
     bool sourceNearEOS(bool audio);
     bool sourceReachedEOS(bool audio);
 
-    DISALLOW_EVIL_CONSTRUCTORS(RTSPSource);
+    DISALLOW_EVIL_CONSTRUCTORS(RTSPSource2);
 };
 
 }  // namespace android
 
-#endif  // RTSP_SOURCE_H_
+#endif  // RTSP_SOURCE2_H_

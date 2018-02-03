@@ -15,10 +15,10 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "HTTPLiveSource"
+#define LOG_TAG "HTTPLiveSource2"
 #include <utils/Log.h>
 
-#include "HTTPLiveSource.h"
+#include "HTTPLiveSource2.h"
 
 #include "AnotherPacketSource.h"
 #include "LiveDataSource.h"
@@ -38,7 +38,7 @@ static const int kPrepareMarkMs   = 1500;  // 1.5 seconds
 
 namespace android {
 
-NuPlayer2::HTTPLiveSource::HTTPLiveSource(
+NuPlayer2::HTTPLiveSource2::HTTPLiveSource2(
         const sp<AMessage> &notify,
         const sp<MediaHTTPService> &httpService,
         const char *url,
@@ -69,7 +69,7 @@ NuPlayer2::HTTPLiveSource::HTTPLiveSource(
     }
 }
 
-NuPlayer2::HTTPLiveSource::~HTTPLiveSource() {
+NuPlayer2::HTTPLiveSource2::~HTTPLiveSource2() {
     if (mLiveSession != NULL) {
         mLiveSession->disconnect();
 
@@ -82,14 +82,14 @@ NuPlayer2::HTTPLiveSource::~HTTPLiveSource() {
     }
 }
 
-status_t NuPlayer2::HTTPLiveSource::getBufferingSettings(
+status_t NuPlayer2::HTTPLiveSource2::getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) {
     *buffering = mBufferingSettings;
 
     return OK;
 }
 
-status_t NuPlayer2::HTTPLiveSource::setBufferingSettings(const BufferingSettings& buffering) {
+status_t NuPlayer2::HTTPLiveSource2::setBufferingSettings(const BufferingSettings& buffering) {
     mBufferingSettings = buffering;
 
     if (mLiveSession != NULL) {
@@ -99,7 +99,7 @@ status_t NuPlayer2::HTTPLiveSource::setBufferingSettings(const BufferingSettings
     return OK;
 }
 
-void NuPlayer2::HTTPLiveSource::prepareAsync() {
+void NuPlayer2::HTTPLiveSource2::prepareAsync() {
     if (mLiveLooper == NULL) {
         mLiveLooper = new ALooper;
         mLiveLooper->setName("http live");
@@ -123,10 +123,10 @@ void NuPlayer2::HTTPLiveSource::prepareAsync() {
             mURL.c_str(), mExtraHeaders.isEmpty() ? NULL : &mExtraHeaders);
 }
 
-void NuPlayer2::HTTPLiveSource::start() {
+void NuPlayer2::HTTPLiveSource2::start() {
 }
 
-sp<MetaData> NuPlayer2::HTTPLiveSource::getFormatMeta(bool audio) {
+sp<MetaData> NuPlayer2::HTTPLiveSource2::getFormatMeta(bool audio) {
     sp<MetaData> meta;
     if (mLiveSession != NULL) {
         mLiveSession->getStreamFormatMeta(
@@ -138,7 +138,7 @@ sp<MetaData> NuPlayer2::HTTPLiveSource::getFormatMeta(bool audio) {
     return meta;
 }
 
-sp<AMessage> NuPlayer2::HTTPLiveSource::getFormat(bool audio) {
+sp<AMessage> NuPlayer2::HTTPLiveSource2::getFormat(bool audio) {
     sp<MetaData> meta;
     status_t err = -EWOULDBLOCK;
     if (mLiveSession != NULL) {
@@ -161,11 +161,11 @@ sp<AMessage> NuPlayer2::HTTPLiveSource::getFormat(bool audio) {
     return format;
 }
 
-status_t NuPlayer2::HTTPLiveSource::feedMoreTSData() {
+status_t NuPlayer2::HTTPLiveSource2::feedMoreTSData() {
     return OK;
 }
 
-status_t NuPlayer2::HTTPLiveSource::dequeueAccessUnit(
+status_t NuPlayer2::HTTPLiveSource2::dequeueAccessUnit(
         bool audio, sp<ABuffer> *accessUnit) {
     return mLiveSession->dequeueAccessUnit(
             audio ? LiveSession::STREAMTYPE_AUDIO
@@ -173,19 +173,19 @@ status_t NuPlayer2::HTTPLiveSource::dequeueAccessUnit(
             accessUnit);
 }
 
-status_t NuPlayer2::HTTPLiveSource::getDuration(int64_t *durationUs) {
+status_t NuPlayer2::HTTPLiveSource2::getDuration(int64_t *durationUs) {
     return mLiveSession->getDuration(durationUs);
 }
 
-size_t NuPlayer2::HTTPLiveSource::getTrackCount() const {
+size_t NuPlayer2::HTTPLiveSource2::getTrackCount() const {
     return mLiveSession->getTrackCount();
 }
 
-sp<AMessage> NuPlayer2::HTTPLiveSource::getTrackInfo(size_t trackIndex) const {
+sp<AMessage> NuPlayer2::HTTPLiveSource2::getTrackInfo(size_t trackIndex) const {
     return mLiveSession->getTrackInfo(trackIndex);
 }
 
-ssize_t NuPlayer2::HTTPLiveSource::getSelectedTrack(media_track_type type) const {
+ssize_t NuPlayer2::HTTPLiveSource2::getSelectedTrack(media_track_type type) const {
     if (mLiveSession == NULL) {
         return -1;
     } else if (type == MEDIA_TRACK_TYPE_METADATA) {
@@ -197,7 +197,7 @@ ssize_t NuPlayer2::HTTPLiveSource::getSelectedTrack(media_track_type type) const
     }
 }
 
-status_t NuPlayer2::HTTPLiveSource::selectTrack(size_t trackIndex, bool select, int64_t /*timeUs*/) {
+status_t NuPlayer2::HTTPLiveSource2::selectTrack(size_t trackIndex, bool select, int64_t /*timeUs*/) {
     if (mLiveSession == NULL) {
         return INVALID_OPERATION;
     }
@@ -239,7 +239,7 @@ status_t NuPlayer2::HTTPLiveSource::selectTrack(size_t trackIndex, bool select, 
     return (err == OK || err == BAD_VALUE) ? (status_t)OK : err;
 }
 
-status_t NuPlayer2::HTTPLiveSource::seekTo(int64_t seekTimeUs, MediaPlayer2SeekMode mode) {
+status_t NuPlayer2::HTTPLiveSource2::seekTo(int64_t seekTimeUs, MediaPlayer2SeekMode mode) {
     if (mLiveSession->isSeekable()) {
         return mLiveSession->seekTo(seekTimeUs, mode);
     } else {
@@ -247,7 +247,7 @@ status_t NuPlayer2::HTTPLiveSource::seekTo(int64_t seekTimeUs, MediaPlayer2SeekM
     }
 }
 
-void NuPlayer2::HTTPLiveSource::pollForRawData(
+void NuPlayer2::HTTPLiveSource2::pollForRawData(
         const sp<AMessage> &msg, int32_t currentGeneration,
         LiveSession::StreamType fetchType, int32_t pushWhat) {
 
@@ -290,7 +290,7 @@ void NuPlayer2::HTTPLiveSource::pollForRawData(
     msg->post(1000000ll);
 }
 
-void NuPlayer2::HTTPLiveSource::onMessageReceived(const sp<AMessage> &msg) {
+void NuPlayer2::HTTPLiveSource2::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatSessionNotify:
         {
@@ -328,7 +328,7 @@ void NuPlayer2::HTTPLiveSource::onMessageReceived(const sp<AMessage> &msg) {
     }
 }
 
-void NuPlayer2::HTTPLiveSource::onSessionNotify(const sp<AMessage> &msg) {
+void NuPlayer2::HTTPLiveSource2::onSessionNotify(const sp<AMessage> &msg) {
     int32_t what;
     CHECK(msg->findInt32("what", &what));
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 The Android Open Source Project
+ * Copyright 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,10 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "RTSPSource"
+#define LOG_TAG "RTSPSource2"
 #include <utils/Log.h>
 
-#include "RTSPSource.h"
+#include "RTSPSource2.h"
 
 #include "AnotherPacketSource.h"
 #include "MyHandler.h"
@@ -38,7 +38,7 @@ static const int kPrepareMarkMs     =  3000;  // 3 seconds
 //static const int kStartServerMarkMs =  5000;
 static const int kOverflowMarkMs    = 10000;  // 10 seconds
 
-NuPlayer2::RTSPSource::RTSPSource(
+NuPlayer2::RTSPSource2::RTSPSource2(
         const sp<AMessage> &notify,
         const sp<MediaHTTPService> &httpService,
         const char *url,
@@ -78,27 +78,27 @@ NuPlayer2::RTSPSource::RTSPSource(
     }
 }
 
-NuPlayer2::RTSPSource::~RTSPSource() {
+NuPlayer2::RTSPSource2::~RTSPSource2() {
     if (mLooper != NULL) {
         mLooper->unregisterHandler(id());
         mLooper->stop();
     }
 }
 
-status_t NuPlayer2::RTSPSource::getBufferingSettings(
+status_t NuPlayer2::RTSPSource2::getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) {
     Mutex::Autolock _l(mBufferingSettingsLock);
     *buffering = mBufferingSettings;
     return OK;
 }
 
-status_t NuPlayer2::RTSPSource::setBufferingSettings(const BufferingSettings& buffering) {
+status_t NuPlayer2::RTSPSource2::setBufferingSettings(const BufferingSettings& buffering) {
     Mutex::Autolock _l(mBufferingSettingsLock);
     mBufferingSettings = buffering;
     return OK;
 }
 
-void NuPlayer2::RTSPSource::prepareAsync() {
+void NuPlayer2::RTSPSource2::prepareAsync() {
     if (mIsSDP && mHTTPService == NULL) {
         notifyPrepared(BAD_VALUE);
         return;
@@ -137,10 +137,10 @@ void NuPlayer2::RTSPSource::prepareAsync() {
     startBufferingIfNecessary();
 }
 
-void NuPlayer2::RTSPSource::start() {
+void NuPlayer2::RTSPSource2::start() {
 }
 
-void NuPlayer2::RTSPSource::stop() {
+void NuPlayer2::RTSPSource2::stop() {
     if (mLooper == NULL) {
         return;
     }
@@ -150,12 +150,12 @@ void NuPlayer2::RTSPSource::stop() {
     msg->postAndAwaitResponse(&dummy);
 }
 
-status_t NuPlayer2::RTSPSource::feedMoreTSData() {
+status_t NuPlayer2::RTSPSource2::feedMoreTSData() {
     Mutex::Autolock _l(mBufferingLock);
     return mFinalResult;
 }
 
-sp<MetaData> NuPlayer2::RTSPSource::getFormatMeta(bool audio) {
+sp<MetaData> NuPlayer2::RTSPSource2::getFormatMeta(bool audio) {
     sp<AnotherPacketSource> source = getSource(audio);
 
     if (source == NULL) {
@@ -165,7 +165,7 @@ sp<MetaData> NuPlayer2::RTSPSource::getFormatMeta(bool audio) {
     return source->getFormat();
 }
 
-bool NuPlayer2::RTSPSource::haveSufficientDataOnAllTracks() {
+bool NuPlayer2::RTSPSource2::haveSufficientDataOnAllTracks() {
     // We're going to buffer at least 2 secs worth data on all tracks before
     // starting playback (both at startup and after a seek).
 
@@ -201,7 +201,7 @@ bool NuPlayer2::RTSPSource::haveSufficientDataOnAllTracks() {
     return true;
 }
 
-status_t NuPlayer2::RTSPSource::dequeueAccessUnit(
+status_t NuPlayer2::RTSPSource2::dequeueAccessUnit(
         bool audio, sp<ABuffer> *accessUnit) {
     if (!stopBufferingIfNecessary()) {
         return -EWOULDBLOCK;
@@ -253,7 +253,7 @@ status_t NuPlayer2::RTSPSource::dequeueAccessUnit(
     return source->dequeueAccessUnit(accessUnit);
 }
 
-sp<AnotherPacketSource> NuPlayer2::RTSPSource::getSource(bool audio) {
+sp<AnotherPacketSource> NuPlayer2::RTSPSource2::getSource(bool audio) {
     if (mTSParser != NULL) {
         sp<MediaSource> source = mTSParser->getSource(
                 audio ? ATSParser::AUDIO : ATSParser::VIDEO);
@@ -264,7 +264,7 @@ sp<AnotherPacketSource> NuPlayer2::RTSPSource::getSource(bool audio) {
     return audio ? mAudioTrack : mVideoTrack;
 }
 
-void NuPlayer2::RTSPSource::setEOSTimeout(bool audio, int64_t timeout) {
+void NuPlayer2::RTSPSource2::setEOSTimeout(bool audio, int64_t timeout) {
     if (audio) {
         mEOSTimeoutAudio = timeout;
     } else {
@@ -272,7 +272,7 @@ void NuPlayer2::RTSPSource::setEOSTimeout(bool audio, int64_t timeout) {
     }
 }
 
-status_t NuPlayer2::RTSPSource::getDuration(int64_t *durationUs) {
+status_t NuPlayer2::RTSPSource2::getDuration(int64_t *durationUs) {
     *durationUs = -1ll;
 
     int64_t audioDurationUs;
@@ -294,7 +294,7 @@ status_t NuPlayer2::RTSPSource::getDuration(int64_t *durationUs) {
     return OK;
 }
 
-status_t NuPlayer2::RTSPSource::seekTo(int64_t seekTimeUs, MediaPlayer2SeekMode mode) {
+status_t NuPlayer2::RTSPSource2::seekTo(int64_t seekTimeUs, MediaPlayer2SeekMode mode) {
     sp<AMessage> msg = new AMessage(kWhatPerformSeek, this);
     msg->setInt32("generation", ++mSeekGeneration);
     msg->setInt64("timeUs", seekTimeUs);
@@ -309,7 +309,7 @@ status_t NuPlayer2::RTSPSource::seekTo(int64_t seekTimeUs, MediaPlayer2SeekMode 
     return err;
 }
 
-void NuPlayer2::RTSPSource::performSeek(int64_t seekTimeUs) {
+void NuPlayer2::RTSPSource2::performSeek(int64_t seekTimeUs) {
     if (mState != CONNECTED) {
         finishSeek(INVALID_OPERATION);
         return;
@@ -320,12 +320,12 @@ void NuPlayer2::RTSPSource::performSeek(int64_t seekTimeUs) {
     mEOSPending = false;
 }
 
-void NuPlayer2::RTSPSource::schedulePollBuffering() {
+void NuPlayer2::RTSPSource2::schedulePollBuffering() {
     sp<AMessage> msg = new AMessage(kWhatPollBuffering, this);
     msg->post(1000000ll); // 1 second intervals
 }
 
-void NuPlayer2::RTSPSource::checkBuffering(
+void NuPlayer2::RTSPSource2::checkBuffering(
         bool *prepared, bool *underflow, bool *overflow, bool *startServer, bool *finished) {
     size_t numTracks = mTracks.size();
     size_t preparedCount, underflowCount, overflowCount, startCount, finishedCount;
@@ -383,7 +383,7 @@ void NuPlayer2::RTSPSource::checkBuffering(
     *finished    = (finishedCount > 0);
 }
 
-void NuPlayer2::RTSPSource::onPollBuffering() {
+void NuPlayer2::RTSPSource2::onPollBuffering() {
     bool prepared, underflow, overflow, startServer, finished;
     checkBuffering(&prepared, &underflow, &overflow, &startServer, &finished);
 
@@ -415,7 +415,7 @@ void NuPlayer2::RTSPSource::onPollBuffering() {
     schedulePollBuffering();
 }
 
-void NuPlayer2::RTSPSource::signalSourceEOS(status_t result) {
+void NuPlayer2::RTSPSource2::signalSourceEOS(status_t result) {
     const bool audio = true;
     const bool video = false;
 
@@ -430,7 +430,7 @@ void NuPlayer2::RTSPSource::signalSourceEOS(status_t result) {
     }
 }
 
-bool NuPlayer2::RTSPSource::sourceReachedEOS(bool audio) {
+bool NuPlayer2::RTSPSource2::sourceReachedEOS(bool audio) {
     sp<AnotherPacketSource> source = getSource(audio);
     status_t finalResult;
     return (source != NULL &&
@@ -438,14 +438,14 @@ bool NuPlayer2::RTSPSource::sourceReachedEOS(bool audio) {
             finalResult == ERROR_END_OF_STREAM);
 }
 
-bool NuPlayer2::RTSPSource::sourceNearEOS(bool audio) {
+bool NuPlayer2::RTSPSource2::sourceNearEOS(bool audio) {
     sp<AnotherPacketSource> source = getSource(audio);
     int64_t mediaDurationUs = 0;
     getDuration(&mediaDurationUs);
     return (source != NULL && source->isFinished(mediaDurationUs));
 }
 
-void NuPlayer2::RTSPSource::onSignalEOS(const sp<AMessage> &msg) {
+void NuPlayer2::RTSPSource2::onSignalEOS(const sp<AMessage> &msg) {
     int32_t generation;
     CHECK(msg->findInt32("generation", &generation));
 
@@ -459,7 +459,7 @@ void NuPlayer2::RTSPSource::onSignalEOS(const sp<AMessage> &msg) {
     }
 }
 
-void NuPlayer2::RTSPSource::postSourceEOSIfNecessary() {
+void NuPlayer2::RTSPSource2::postSourceEOSIfNecessary() {
     const bool audio = true;
     const bool video = false;
     // If a source has detected near end, give it some time to retrieve more
@@ -474,7 +474,7 @@ void NuPlayer2::RTSPSource::postSourceEOSIfNecessary() {
     }
 }
 
-void NuPlayer2::RTSPSource::onMessageReceived(const sp<AMessage> &msg) {
+void NuPlayer2::RTSPSource2::onMessageReceived(const sp<AMessage> &msg) {
     if (msg->what() == kWhatDisconnect) {
         sp<AReplyToken> replyID;
         CHECK(msg->senderAwaitsResponse(&replyID));
@@ -722,7 +722,7 @@ void NuPlayer2::RTSPSource::onMessageReceived(const sp<AMessage> &msg) {
     }
 }
 
-void NuPlayer2::RTSPSource::onConnected() {
+void NuPlayer2::RTSPSource2::onConnected() {
     CHECK(mAudioTrack == NULL);
     CHECK(mVideoTrack == NULL);
 
@@ -770,7 +770,7 @@ void NuPlayer2::RTSPSource::onConnected() {
     mState = CONNECTED;
 }
 
-void NuPlayer2::RTSPSource::onSDPLoaded(const sp<AMessage> &msg) {
+void NuPlayer2::RTSPSource2::onSDPLoaded(const sp<AMessage> &msg) {
     status_t err;
     CHECK(msg->findInt32("result", &err));
 
@@ -816,7 +816,7 @@ void NuPlayer2::RTSPSource::onSDPLoaded(const sp<AMessage> &msg) {
     }
 }
 
-void NuPlayer2::RTSPSource::onDisconnected(const sp<AMessage> &msg) {
+void NuPlayer2::RTSPSource2::onDisconnected(const sp<AMessage> &msg) {
     if (mState == DISCONNECTED) {
         return;
     }
@@ -842,7 +842,7 @@ void NuPlayer2::RTSPSource::onDisconnected(const sp<AMessage> &msg) {
     }
 }
 
-void NuPlayer2::RTSPSource::finishDisconnectIfPossible() {
+void NuPlayer2::RTSPSource2::finishDisconnectIfPossible() {
     if (mState != DISCONNECTED) {
         if (mHandler != NULL) {
             mHandler->disconnect();
@@ -856,12 +856,12 @@ void NuPlayer2::RTSPSource::finishDisconnectIfPossible() {
     mDisconnectReplyID = 0;
 }
 
-void NuPlayer2::RTSPSource::setError(status_t err) {
+void NuPlayer2::RTSPSource2::setError(status_t err) {
     Mutex::Autolock _l(mBufferingLock);
     mFinalResult = err;
 }
 
-void NuPlayer2::RTSPSource::startBufferingIfNecessary() {
+void NuPlayer2::RTSPSource2::startBufferingIfNecessary() {
     Mutex::Autolock _l(mBufferingLock);
 
     if (!mBuffering) {
@@ -873,7 +873,7 @@ void NuPlayer2::RTSPSource::startBufferingIfNecessary() {
     }
 }
 
-bool NuPlayer2::RTSPSource::stopBufferingIfNecessary() {
+bool NuPlayer2::RTSPSource2::stopBufferingIfNecessary() {
     Mutex::Autolock _l(mBufferingLock);
 
     if (mBuffering) {
@@ -891,7 +891,7 @@ bool NuPlayer2::RTSPSource::stopBufferingIfNecessary() {
     return true;
 }
 
-void NuPlayer2::RTSPSource::finishSeek(status_t err) {
+void NuPlayer2::RTSPSource2::finishSeek(status_t err) {
     if (mSeekReplyID == NULL) {
         return;
     }
