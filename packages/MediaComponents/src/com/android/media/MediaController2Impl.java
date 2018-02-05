@@ -76,6 +76,8 @@ public class MediaController2Impl implements MediaController2Provider {
     private PlaylistParams mPlaylistParams;
     @GuardedBy("mLock")
     private PlaybackInfo mPlaybackInfo;
+    @GuardedBy("mLock")
+    private CommandGroup mCommandGroup;
 
     // Assignment should be used with the lock hold, but should be used without a lock to prevent
     // potential deadlock.
@@ -504,19 +506,18 @@ public class MediaController2Impl implements MediaController2Provider {
         }
     }
 
-    // Called when the result for connecting to the session was delivered.
     // Should be used without a lock to prevent potential deadlock.
-    private void onConnectionChangedNotLocked(IMediaSession2 sessionBinder,
-            CommandGroup commandGroup) {
+    private void onConnectedNotLocked(IMediaSession2 sessionBinder,
+            final CommandGroup commandGroup, final PlaybackState2 state) {
         if (DEBUG) {
-            Log.d(TAG, "onConnectionChangedNotLocked sessionBinder=" + sessionBinder
+            Log.d(TAG, "onConnectedNotLocked sessionBinder=" + sessionBinder
                     + ", commands=" + commandGroup);
         }
-        boolean release = false;
+        boolean close = false;
         try {
             if (sessionBinder == null || commandGroup == null) {
                 // Connection rejected.
-                release = true;
+                close = true;
                 return;
             }
             synchronized (mLock) {
@@ -526,9 +527,11 @@ public class MediaController2Impl implements MediaController2Provider {
                 if (mSessionBinder != null) {
                     Log.e(TAG, "Cannot be notified about the connection result many times."
                             + " Probably a bug or malicious app.");
-                    release = true;
+                    close = true;
                     return;
                 }
+                mCommandGroup = commandGroup;
+                mPlaybackState = state;
                 mSessionBinder = sessionBinder;
                 try {
                     // Implementation for the local binder is no-op,
@@ -538,16 +541,19 @@ public class MediaController2Impl implements MediaController2Provider {
                     if (DEBUG) {
                         Log.d(TAG, "Session died too early.", e);
                     }
-                    release = true;
+                    close = true;
                     return;
                 }
             }
             // TODO(jaewan): Keep commands to prevents illegal API calls.
             mCallbackExecutor.execute(() -> {
+                // Note: We may trigger ControllerCallbacks with the initial values
+                // But it's hard to define the order of the controller callbacks
+                // Only notify about the
                 mCallback.onConnected(commandGroup);
             });
         } finally {
-            if (release) {
+            if (close) {
                 // Trick to call release() without holding the lock, to prevent potential deadlock
                 // with the developer's custom lock within the ControllerCallback.onDisconnected().
                 mInstance.close();
@@ -651,17 +657,30 @@ public class MediaController2Impl implements MediaController2Provider {
         }
 
         @Override
-        public void onConnectionChanged(IMediaSession2 sessionBinder, Bundle commandGroup)
-                throws RuntimeException {
-            final MediaController2Impl controller;
-            try {
-                controller = getController();
-            } catch (IllegalStateException e) {
-                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+        public void onConnected(IMediaSession2 sessionBinder, Bundle commandGroup,
+                Bundle playbackState) {
+            final MediaController2Impl controller = mController.get();
+            if (controller == null) {
+                if (DEBUG) {
+                    Log.d(TAG, "onConnected after MediaController2.close()");
+                }
                 return;
             }
-            controller.onConnectionChangedNotLocked(
-                    sessionBinder, CommandGroup.fromBundle(controller.getContext(), commandGroup));
+            controller.onConnectedNotLocked(sessionBinder,
+                    CommandGroup.fromBundle(controller.getContext(), commandGroup),
+                    PlaybackState2.fromBundle(controller.getContext(), playbackState));
+        }
+
+        @Override
+        public void onDisconnected() {
+            final MediaController2Impl controller = mController.get();
+            if (controller == null) {
+                if (DEBUG) {
+                    Log.d(TAG, "onDisconnected after MediaController2.close()");
+                }
+                return;
+            }
+            controller.mInstance.close();
         }
 
         @Override

@@ -18,6 +18,7 @@ package com.android.media;
 
 import android.content.Context;
 import android.media.MediaController2;
+import android.media.MediaController2.PlaybackInfo;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
@@ -78,7 +79,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     ((ControllerInfoImpl) list.get(i).getProvider()).getControllerBinder();
             try {
                 // Should be used without a lock hold to prevent potential deadlock.
-                callbackBinder.onConnectionChanged(null, null);
+                callbackBinder.onDisconnected();
             } catch (RemoteException e) {
                 // Controller is gone. Should be fine because we're destroying.
             }
@@ -111,7 +112,11 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             // media keys to.
             boolean accept = allowedCommands != null || request.isTrusted();
             ControllerInfoImpl impl = ControllerInfoImpl.from(request);
-            if (accept) {
+            if (accept && allowedCommands != null) {
+                if (DEBUG) {
+                    Log.d(TAG, "Accepting connection, request=" + request
+                            + " allowedCommands=" + allowedCommands);
+                }
                 synchronized (mLock) {
                     mControllers.put(impl.getId(), request);
                 }
@@ -119,20 +124,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     // For trusted apps, send non-null allowed commands to keep connection.
                     allowedCommands = new CommandGroup(context);
                 }
-            }
-            if (DEBUG) {
-                Log.d(TAG, "onConnectResult, request=" + request
-                        + " accept=" + accept);
-            }
-            try {
-                callback.onConnectionChanged(
-                        accept ? MediaSession2Stub.this : null,
-                        allowedCommands == null ? null : allowedCommands.toBundle());
-            } catch (RemoteException e) {
-                // Controller may be died prematurely.
-            }
-            if (accept) {
-                // TODO(jaewan): We need to send current PlaybackInfo.
                 // If connection is accepted, notify the current state to the controller.
                 // It's needed because we cannot call synchronous calls between session/controller.
                 // Note: We're doing this after the onConnectionChanged(), but there's no guarantee
@@ -141,12 +132,24 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 //       use thread poll for incoming calls.
                 // TODO(jaewan): Should we protect getting playback state?
                 final PlaybackState2 state = session.getInstance().getPlaybackState();
-                final Bundle bundle = state != null ? state.toBundle() : null;
+                final Bundle playbackStateBundle = (state != null) ? state.toBundle() : null;
+
                 try {
-                    callback.onPlaybackStateChanged(bundle);
+                    callback.onConnected(MediaSession2Stub.this,
+                            allowedCommands.toBundle(), playbackStateBundle);
                 } catch (RemoteException e) {
-                    // TODO(jaewan): Handle this.
                     // Controller may be died prematurely.
+                    // TODO(jaewan): Handle here.
+                }
+            } else {
+                if (DEBUG) {
+                    Log.d(TAG, "Rejecting connection, request=" + request);
+                }
+                try {
+                    callback.onDisconnected();
+                } catch (RemoteException e) {
+                    // Controller may be died prematurely.
+                    // Not an issue because we'll ignore it anyway.
                 }
             }
         });
