@@ -320,34 +320,87 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void prepareFromUri_impl(Uri uri, Bundle extras) {
-        // TODO(jaewan): Implement
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.prepareFromUri(mSessionCallbackStub, uri, extras);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            // TODO(jaewan): Handle.
+        }
     }
 
     @Override
     public void prepareFromSearch_impl(String query, Bundle extras) {
-        // TODO(jaewan): Implement
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.prepareFromSearch(mSessionCallbackStub, query, extras);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            // TODO(jaewan): Handle.
+        }
     }
 
     @Override
     public void prepareMediaId_impl(String mediaId, Bundle extras) {
-        // TODO(jaewan): Implement
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.prepareFromMediaId(mSessionCallbackStub, mediaId, extras);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            // TODO(jaewan): Handle.
+        }
+    }
+
+    @Override
+    public void playFromUri_impl(Uri uri, Bundle extras) {
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.playFromUri(mSessionCallbackStub, uri, extras);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            // TODO(jaewan): Handle.
+        }
     }
 
     @Override
     public void playFromSearch_impl(String query, Bundle extras) {
-        // TODO(jaewan): Implement
-    }
-
-    @Override
-    public void playFromUri_impl(String uri, Bundle extras) {
-        // TODO(jaewan): Implement
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.playFromSearch(mSessionCallbackStub, query, extras);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            // TODO(jaewan): Handle.
+        }
     }
 
     @Override
     public void playFromMediaId_impl(String mediaId, Bundle extras) {
-        // TODO(jaewan): Implement
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.playFromMediaId(mSessionCallbackStub, mediaId, extras);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            // TODO(jaewan): Handle.
+        }
     }
-
     @Override
     public void setRating_impl(Rating2 rating) {
         // TODO(jaewan): Implement

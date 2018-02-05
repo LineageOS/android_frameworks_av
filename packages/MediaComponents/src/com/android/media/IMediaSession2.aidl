@@ -18,6 +18,7 @@ package com.android.media;
 
 import android.os.Bundle;
 import android.os.ResultReceiver;
+import android.net.Uri;
 
 import com.android.media.IMediaSession2Callback;
 
@@ -27,8 +28,7 @@ import com.android.media.IMediaSession2Callback;
  * Keep this interface oneway. Otherwise a malicious app may implement fake version of this,
  * and holds calls from session to make session owner(s) frozen.
  */
-// TODO: Consider to make some methods oneway
-interface IMediaSession2 {
+oneway interface IMediaSession2 {
     // TODO(jaewan): add onCommand() to send private command
     // TODO(jaewan): Due to the nature of oneway calls, APIs can be called in out of order
     //               Add id for individual calls to address this.
@@ -52,7 +52,14 @@ interface IMediaSession2 {
     void sendCustomCommand(IMediaSession2Callback caller, in Bundle command, in Bundle args,
             in ResultReceiver receiver);
 
-    //////////////////////////////////////////////////////////////////////////////////////////////
+    void prepareFromUri(IMediaSession2Callback caller, in Uri uri, in Bundle extra);
+    void prepareFromSearch(IMediaSession2Callback caller, String query, in Bundle extra);
+    void prepareFromMediaId(IMediaSession2Callback caller, String mediaId, in Bundle extra);
+    void playFromUri(IMediaSession2Callback caller, in Uri uri, in Bundle extra);
+    void playFromSearch(IMediaSession2Callback caller, String query, in Bundle extra);
+    void playFromMediaId(IMediaSession2Callback caller, String mediaId, in Bundle extra);
+
+   //////////////////////////////////////////////////////////////////////////////////////////////
     // Get library service specific
     //////////////////////////////////////////////////////////////////////////////////////////////
     void getBrowserRoot(IMediaSession2Callback callback, in Bundle rootHints);
