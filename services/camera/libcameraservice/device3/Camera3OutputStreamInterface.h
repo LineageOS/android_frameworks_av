@@ -59,6 +59,11 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
      *
      */
     virtual status_t detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd) = 0;
+
+    /**
+     * Drop buffers if dropping is true. If dropping is false, do not drop buffers.
+     */
+    virtual status_t dropBuffers(bool /*dropping*/) = 0;
 };
 
 } // namespace camera3

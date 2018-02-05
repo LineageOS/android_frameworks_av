@@ -166,6 +166,11 @@ class Camera3OutputStream :
     virtual status_t notifyBufferReleased(ANativeWindowBuffer *anwBuffer);
 
     /**
+     * Drop buffers if dropping is true. If dropping is false, do not drop buffers.
+     */
+    virtual status_t dropBuffers(bool dropping) override;
+
+    /**
      * Set the graphic buffer manager to get/return the stream buffers.
      *
      * It is only legal to call this method when stream is in STATE_CONSTRUCTED state.
@@ -246,6 +251,9 @@ class Camera3OutputStream :
      * consumer case.
      */
     uint64_t    mConsumerUsage;
+
+    // Whether to drop valid buffers.
+    bool mDropBuffers;
 
     /**
      * Internal Camera3Stream interface
