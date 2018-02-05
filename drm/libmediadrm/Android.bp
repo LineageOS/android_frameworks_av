@@ -7,7 +7,6 @@
 cc_library {
     name: "libmediadrm",
 
-
     srcs: [
         "DrmPluginPath.cpp",
         "DrmSessionManager.cpp",
@@ -62,6 +61,7 @@ cc_library_shared {
         "android.hardware.drm@1.1",
         "libbase",
         "libbinder",
+	"libhidlbase",
         "liblog",
         "libmediametrics",
         "libprotobuf-cpp-lite",
@@ -93,6 +93,7 @@ cc_library_shared {
         "android.hardware.drm@1.1",
         "libbase",
         "libbinder",
+	"libhidlbase",
         "liblog",
         "libmediametrics",
         "libprotobuf-cpp-full",

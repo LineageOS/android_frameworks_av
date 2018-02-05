@@ -16,7 +16,9 @@ cc_test {
     srcs: ["DrmMetrics_test.cpp"],
     shared_libs: [
       "android.hardware.drm@1.0",
+      "android.hardware.drm@1.1",
       "libbinder",
+      "libhidlbase",
       "liblog",
       "libmediadrmmetrics_full",
       "libmediametrics",
