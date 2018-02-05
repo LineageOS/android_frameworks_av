@@ -32,6 +32,7 @@ import android.media.MediaSession2.PlaylistParams;
 import android.media.PlaybackState2;
 import android.media.VolumeProvider2;
 import android.media.update.MediaSession2Provider.CommandButtonProvider;
+import android.net.Uri;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -363,6 +364,126 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             }
             final Command command = Command.fromBundle(session.getContext(), commandBundle);
             session.getCallback().onCustomCommand(controller, command, args, receiver);
+        });
+    }
+
+    @Override
+    public void prepareFromUri(final IMediaSession2Callback caller, final Uri uri,
+            final Bundle extra) {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            session.getCallback().onPrepareFromUri(controller, uri, extra);
+        });
+    }
+
+    @Override
+    public void prepareFromSearch(final IMediaSession2Callback caller, final String query,
+            final Bundle extra) {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            session.getCallback().onPrepareFromSearch(controller, query, extra);
+        });
+    }
+
+    @Override
+    public void prepareFromMediaId(final IMediaSession2Callback caller, final String mediaId,
+            final Bundle extra) {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            session.getCallback().onPrepareFromMediaId(controller, mediaId, extra);
+        });
+    }
+
+    @Override
+    public void playFromUri(final IMediaSession2Callback caller, final Uri uri,
+            final Bundle extra) {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            session.getCallback().onPlayFromUri(controller, uri, extra);
+        });
+    }
+
+    @Override
+    public void playFromSearch(final IMediaSession2Callback caller, final String query,
+            final Bundle extra) {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            session.getCallback().onPlayFromSearch(controller, query, extra);
+        });
+    }
+
+    @Override
+    public void playFromMediaId(final IMediaSession2Callback caller, final String mediaId,
+            final Bundle extra) {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            session.getCallback().onPlayFromMediaId(controller, mediaId, extra);
         });
     }
 

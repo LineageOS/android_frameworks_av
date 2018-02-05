@@ -25,6 +25,7 @@ import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.media.TestUtils.SyncHandler;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -376,6 +377,151 @@ public class MediaController2Test extends MediaSession2TestBase {
     }
 
     @Test
+    public void testPlayFromSearch() throws InterruptedException {
+        final String request = "random query";
+        final Bundle bundle = new Bundle();
+        bundle.putString("key", "value");
+        final CountDownLatch latch = new CountDownLatch(1);
+        final SessionCallback callback = new SessionCallback(mContext) {
+            @Override
+            public void onPlayFromSearch(ControllerInfo controller, String query, Bundle extras) {
+                assertEquals(mContext.getPackageName(), controller.getPackageName());
+                assertEquals(request, query);
+                assertTrue(TestUtils.equals(bundle, extras));
+                latch.countDown();;
+            }
+        };
+        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+                .setSessionCallback(sHandlerExecutor, callback)
+                .setId("testPlayFromSearch").build()) {
+            MediaController2 controller = createController(session.getToken());
+            controller.playFromSearch(request, bundle);
+            assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        }
+    }
+
+    @Test
+    public void testPlayFromUri() throws InterruptedException {
+        final Uri request = Uri.parse("foo://boo");
+        final Bundle bundle = new Bundle();
+        bundle.putString("key", "value");
+        final CountDownLatch latch = new CountDownLatch(1);
+        final SessionCallback callback = new SessionCallback(mContext) {
+            @Override
+            public void onPlayFromUri(ControllerInfo controller, Uri uri, Bundle extras) {
+                assertEquals(mContext.getPackageName(), controller.getPackageName());
+                assertEquals(request, uri);
+                assertTrue(TestUtils.equals(bundle, extras));
+                latch.countDown();;
+            }
+        };
+        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+                .setSessionCallback(sHandlerExecutor, callback)
+                .setId("testPlayFromUri").build()) {
+            MediaController2 controller = createController(session.getToken());
+            controller.playFromUri(request, bundle);
+            assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        }
+    }
+
+    @Test
+    public void testPlayFromMediaId() throws InterruptedException {
+        final String request = "media_id";
+        final Bundle bundle = new Bundle();
+        bundle.putString("key", "value");
+        final CountDownLatch latch = new CountDownLatch(1);
+        final SessionCallback callback = new SessionCallback(mContext) {
+            @Override
+            public void onPlayFromMediaId(ControllerInfo controller, String id, Bundle extras) {
+                assertEquals(mContext.getPackageName(), controller.getPackageName());
+                assertEquals(request, id);
+                assertTrue(TestUtils.equals(bundle, extras));
+                latch.countDown();;
+            }
+        };
+        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+                .setSessionCallback(sHandlerExecutor, callback)
+                .setId("testPlayFromMediaId").build()) {
+            MediaController2 controller = createController(session.getToken());
+            controller.playFromMediaId(request, bundle);
+            assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        }
+    }
+
+
+    @Test
+    public void testPrepareFromSearch() throws InterruptedException {
+        final String request = "random query";
+        final Bundle bundle = new Bundle();
+        bundle.putString("key", "value");
+        final CountDownLatch latch = new CountDownLatch(1);
+        final SessionCallback callback = new SessionCallback(mContext) {
+            @Override
+            public void onPrepareFromSearch(ControllerInfo controller, String query, Bundle extras) {
+                assertEquals(mContext.getPackageName(), controller.getPackageName());
+                assertEquals(request, query);
+                assertTrue(TestUtils.equals(bundle, extras));
+                latch.countDown();;
+            }
+        };
+        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+                .setSessionCallback(sHandlerExecutor, callback)
+                .setId("testPrepareFromSearch").build()) {
+            MediaController2 controller = createController(session.getToken());
+            controller.prepareFromSearch(request, bundle);
+            assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        }
+    }
+
+    @Test
+    public void testPrepareFromUri() throws InterruptedException {
+        final Uri request = Uri.parse("foo://boo");
+        final Bundle bundle = new Bundle();
+        bundle.putString("key", "value");
+        final CountDownLatch latch = new CountDownLatch(1);
+        final SessionCallback callback = new SessionCallback(mContext) {
+            @Override
+            public void onPrepareFromUri(ControllerInfo controller, Uri uri, Bundle extras) {
+                assertEquals(mContext.getPackageName(), controller.getPackageName());
+                assertEquals(request, uri);
+                assertTrue(TestUtils.equals(bundle, extras));
+                latch.countDown();;
+            }
+        };
+        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+                .setSessionCallback(sHandlerExecutor, callback)
+                .setId("testPrepareFromUri").build()) {
+            MediaController2 controller = createController(session.getToken());
+            controller.prepareFromUri(request, bundle);
+            assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        }
+    }
+
+    @Test
+    public void testPrepareFromMediaId() throws InterruptedException {
+        final String request = "media_id";
+        final Bundle bundle = new Bundle();
+        bundle.putString("key", "value");
+        final CountDownLatch latch = new CountDownLatch(1);
+        final SessionCallback callback = new SessionCallback(mContext) {
+            @Override
+            public void onPrepareFromMediaId(ControllerInfo controller, String id, Bundle extras) {
+                assertEquals(mContext.getPackageName(), controller.getPackageName());
+                assertEquals(request, id);
+                assertTrue(TestUtils.equals(bundle, extras));
+                latch.countDown();;
+            }
+        };
+        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+                .setSessionCallback(sHandlerExecutor, callback)
+                .setId("testPrepareFromMediaId").build()) {
+            MediaController2 controller = createController(session.getToken());
+            controller.prepareFromMediaId(request, bundle);
+            assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        }
+    }
+
+    @Test
     public void testIsConnected() throws InterruptedException {
         assertTrue(mController.isConnected());
         sHandler.postAndSync(()->{
@@ -511,11 +657,14 @@ public class MediaController2Test extends MediaSession2TestBase {
         */
     }
 
+    // TODO(jaewan): Re-enable after b/72792686 is fixed
+    @Ignore
     @Test
     public void testControllerAfterSessionIsGone_session() throws InterruptedException {
         testControllerAfterSessionIsGone(mSession.getToken().getId());
     }
 
+    // TODO(jaewan): Re-enable after b/72792686 is fixed
     @Ignore
     @Test
     public void testControllerAfterSessionIsGone_sessionService() throws InterruptedException {
