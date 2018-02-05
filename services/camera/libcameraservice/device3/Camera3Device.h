@@ -93,6 +93,8 @@ class Camera3Device :
 
     const String8& getId() const override;
 
+    metadata_vendor_id_t getVendorTagId() const override { return mVendorTagId; }
+
     // Transitions to idle state on success.
     status_t initialize(sp<CameraProviderManager> manager) override;
     status_t disconnect() override;
