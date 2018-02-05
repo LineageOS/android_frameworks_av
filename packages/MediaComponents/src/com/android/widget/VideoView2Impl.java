@@ -81,6 +81,8 @@ public class VideoView2Impl extends BaseLayout
     private static final int STATE_PAUSED = 4;
     private static final int STATE_PLAYBACK_COMPLETED = 5;
 
+    private static final int INVALID_TRACK_INDEX = -1;
+
     private AudioManager mAudioManager;
     private AudioAttributes mAudioAttributes;
     private int mAudioFocusType = AudioManager.AUDIOFOCUS_GAIN; // legacy focus gain
@@ -117,7 +119,7 @@ public class VideoView2Impl extends BaseLayout
     private int mVideoWidth;
     private int mVideoHeight;
 
-    private boolean mCCEnabled;
+    private boolean mSubtitleEnabled;
     private int mSelectedTrackIndex;
 
     private SubtitleView mSubtitleView;
@@ -138,6 +140,7 @@ public class VideoView2Impl extends BaseLayout
         mVideoHeight = 0;
         mSpeed = 1.0f;
         mFallbackSpeed = mSpeed;
+        mSelectedTrackIndex = INVALID_TRACK_INDEX;
 
         mAudioManager = (AudioManager) mInstance.getContext()
                 .getSystemService(Context.AUDIO_SERVICE);
@@ -179,11 +182,11 @@ public class VideoView2Impl extends BaseLayout
         if (enableControlView) {
             mMediaControlView = new MediaControlView2(mInstance.getContext());
         }
-        boolean showSubtitle = (attrs == null) || attrs.getAttributeBooleanValue(
+        boolean enableSubtitle = (attrs == null) || attrs.getAttributeBooleanValue(
                 "http://schemas.android.com/apk/res/android",
-                "showSubtitle", true);
-        if (showSubtitle) {
-            Log.d(TAG, "showSubtitle attribute is true.");
+                "enableSubtitle", true);
+        if (enableSubtitle) {
+            Log.d(TAG, "enableSubtitle attribute is true.");
             // TODO: implement
         }
         int viewType = (attrs == null) ? VideoView2.VIEW_TYPE_SURFACEVIEW
@@ -226,8 +229,8 @@ public class VideoView2Impl extends BaseLayout
     }
 
     @Override
-    public void showSubtitle_impl(boolean show) {
-        if (show) {
+    public void setSubtitleEnabled_impl(boolean enable) {
+        if (enable) {
             // Retrieve all tracks that belong to the current video.
             MediaPlayer.TrackInfo[] trackInfos = mMediaPlayer.getTrackInfo();
 
@@ -240,16 +243,21 @@ public class VideoView2Impl extends BaseLayout
             }
             if (subtitleTrackIndices.size() > 0) {
                 // Select first subtitle track
-                mCCEnabled = true;
                 mSelectedTrackIndex = subtitleTrackIndices.get(0);
                 mMediaPlayer.selectTrack(mSelectedTrackIndex);
             }
         } else {
-            if (mCCEnabled) {
+            if (mSelectedTrackIndex != INVALID_TRACK_INDEX) {
                 mMediaPlayer.deselectTrack(mSelectedTrackIndex);
-                mCCEnabled = false;
+                mSelectedTrackIndex = INVALID_TRACK_INDEX;
             }
         }
+        mSubtitleEnabled = enable;
+    }
+
+    @Override
+    public boolean isSubtitleEnabled_impl() {
+        return mSubtitleEnabled;
     }
 
     // TODO: remove setSpeed_impl once MediaController2 is ready.
@@ -661,8 +669,12 @@ public class VideoView2Impl extends BaseLayout
         }
         mStateBuilder.setState(getCorrespondingPlaybackState(),
                 mMediaPlayer.getCurrentPosition(), mSpeed);
-        mStateBuilder.setBufferedPosition(
-                (long) (mCurrentBufferPercentage / 100.0) * mMediaPlayer.getDuration());
+        if (mCurrentState != STATE_ERROR
+            && mCurrentState != STATE_IDLE
+            && mCurrentState != STATE_PREPARING) {
+            mStateBuilder.setBufferedPosition(
+                    (long) (mCurrentBufferPercentage / 100.0) * mMediaPlayer.getDuration());
+        }
 
         // Set PlaybackState for MediaSession
         if (mMediaSession != null) {
@@ -928,10 +940,10 @@ public class VideoView2Impl extends BaseLayout
             } else {
                 switch (command) {
                     case MediaControlView2.COMMAND_SHOW_SUBTITLE:
-                        mInstance.showSubtitle(true);
+                        mInstance.setSubtitleEnabled(true);
                         break;
                     case MediaControlView2.COMMAND_HIDE_SUBTITLE:
-                        mInstance.showSubtitle(false);
+                        mInstance.setSubtitleEnabled(false);
                         break;
                     case MediaControlView2.COMMAND_SET_FULLSCREEN:
                         if (mOnFullScreenRequestListener != null) {
