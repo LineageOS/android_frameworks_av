@@ -134,7 +134,7 @@ public:
 private:
     class Impl;
     std::shared_ptr<Impl> mImpl;
-    C2Fence(const std::shared_ptr<Impl> &impl);
+    C2Fence(std::shared_ptr<Impl> impl);
     friend struct _C2FenceFactory;
 };
 
@@ -324,15 +324,20 @@ struct C2Segment {
 
     C2_ALLOW_OVERFLOW
     inline constexpr C2Segment intersect(const C2Segment &other) const {
-        if (!isValid()) {
-            return *this;
-        } else if (!other.isValid()) {
-            return other;
-        } else {
-            return C2Segment(c2_max(offset, other.offset),
-                             c2_min(end(), other.end()) - c2_max(offset, other.offset));
-        }
+        return C2Segment(c2_max(offset, other.offset),
+                         c2_min(end(), other.end()) - c2_max(offset, other.offset));
     }
+
+    /** clamps end to offset if it overflows */
+    inline constexpr C2Segment normalize() const {
+        return C2Segment(offset, c2_max(offset, end()) - offset);
+    }
+
+    /** clamps end to max if it overflows */
+    inline constexpr C2Segment saturate() const {
+        return C2Segment(offset, c2_min(size, ~offset));
+    }
+
 };
 
 /**
@@ -370,7 +375,7 @@ private:
 };
 
 /**
- * Aspect for objects that have a linear range.
+ * Aspect for objects that have a linear range inside a linear capacity.
  *
  * This class is copiable.
  */
@@ -386,33 +391,52 @@ public:
         return C2Segment(mOffset, mSize);
     }
 
-protected:
-    // capacity range [0, capacity]
-    inline constexpr explicit _C2LinearRangeAspect(const _C2LinearCapacityAspect *parent)
-        : _C2LinearCapacityAspect(parent),
-          mOffset(0),
-          mSize(capacity()) { }
+private:
+    // subrange of capacity [0, capacity] & [size, size + offset]
+    inline constexpr _C2LinearRangeAspect(uint32_t capacity_, size_t offset, size_t size)
+        : _C2LinearCapacityAspect(capacity_),
+          mOffset(c2_min(offset, capacity())),
+          mSize(c2_min(size, capacity() - mOffset)) {
+    }
 
+protected:
     // copy constructor (no error check)
     inline constexpr _C2LinearRangeAspect(const _C2LinearRangeAspect &other)
         : _C2LinearCapacityAspect(other.capacity()),
           mOffset(other.offset()),
-          mSize(other.size()) { }
+          mSize(other.size()) {
+    }
 
-    // subrange of capacity [0, capacity] & [size, size + offset]
+    // parent capacity range [0, capacity]
+    inline constexpr explicit _C2LinearRangeAspect(const _C2LinearCapacityAspect *parent)
+        : _C2LinearCapacityAspect(parent),
+          mOffset(0),
+          mSize(capacity()) {
+    }
+
+    // subrange of parent capacity [0, capacity] & [size, size + offset]
     inline constexpr _C2LinearRangeAspect(const _C2LinearCapacityAspect *parent, size_t offset, size_t size)
         : _C2LinearCapacityAspect(parent),
           mOffset(c2_min(offset, capacity())),
-          mSize(c2_min(size, capacity() - mOffset)) { }
+          mSize(c2_min(size, capacity() - mOffset)) {
+    }
 
-    // subsection of the two [offset, offset + size] ranges
+    // subsection of the parent's and [offset, offset + size] ranges
     inline constexpr _C2LinearRangeAspect(const _C2LinearRangeAspect *parent, size_t offset, size_t size)
-        : _C2LinearCapacityAspect(parent == nullptr ? 0 : parent->capacity()),
+        : _C2LinearCapacityAspect(parent),
           mOffset(c2_min(c2_max(offset, parent == nullptr ? 0 : parent->offset()), capacity())),
-          mSize(c2_min(c2_min(size, parent == nullptr ? 0 : parent->size()), capacity() - mOffset)) { }
+          mSize(std::min(c2_min(size, parent == nullptr ? 0 : parent->size()), capacity() - mOffset)) {
+    }
 
-private:
-    friend class _C2EditableLinearRange;
+public:
+    inline constexpr _C2LinearRangeAspect childRange(size_t offset, size_t size) const {
+        return _C2LinearRangeAspect(
+            mSize,
+            c2_min(c2_max(offset, mOffset), capacity()) - mOffset,
+            c2_min(c2_min(size, mSize), capacity() - c2_min(c2_max(offset, mOffset), capacity())));
+    }
+
+    friend class _C2EditableLinearRangeAspect;
     // invariants 0 <= mOffset <= mOffset + mSize <= capacity()
     uint32_t mOffset;
     uint32_t mSize;
@@ -420,7 +444,7 @@ private:
 };
 
 /**
- * Utility class for safe range calculations.
+ * Utility class for safe range calculations using size_t-s.
  */
 class C2LinearRange : public _C2LinearRangeAspect {
 public:
@@ -436,7 +460,7 @@ public:
 };
 
 /**
- * Utility class for simple capacity and range construction.
+ * Utility class for simple and safe capacity and range construction.
  */
 class C2LinearCapacity : public _C2LinearCapacityAspect {
 public:
@@ -453,21 +477,10 @@ public:
  *
  * This class is copiable.
  */
-class _C2EditableLinearRange : public _C2LinearRangeAspect {
-protected:
-    inline explicit _C2EditableLinearRange(const _C2LinearCapacityAspect *parent)
-        : _C2LinearRangeAspect(parent) { }
+class _C2EditableLinearRangeAspect : public _C2LinearRangeAspect {
+    using _C2LinearRangeAspect::_C2LinearRangeAspect;
 
-    inline _C2EditableLinearRange(const _C2LinearRangeAspect &other)
-        : _C2LinearRangeAspect(other) { }
-
-    inline _C2EditableLinearRange(const _C2LinearCapacityAspect *parent, size_t offset, size_t size)
-        : _C2LinearRangeAspect(parent, offset, size) { }
-
-    // subsection of the two [offset, offset + size] ranges
-    inline _C2EditableLinearRange(const _C2LinearRangeAspect *parent, size_t offset, size_t size)
-        : _C2LinearRangeAspect(parent, offset, size) { }
-
+public:
 /// \name Editable linear range interface
 /// @{
 
@@ -1086,7 +1099,7 @@ private:
  *
  * This class is copiable. \todo movable only?
  */
-class C2WriteView : public _C2EditableLinearRange {
+class C2WriteView : public _C2EditableLinearRangeAspect {
 public:
     /**
      * Start of the block.
@@ -1354,30 +1367,6 @@ public:
 /// @{
 
 /**
- * Interface for objects that have a width and height (planar capacity).
- */
-class _C2PlanarCapacityAspect {
-/// \name Planar capacity interface
-/// @{
-public:
-    inline uint32_t width() const { return _mWidth; }
-    inline uint32_t height() const { return _mHeight; }
-
-protected:
-    inline _C2PlanarCapacityAspect(uint32_t width, uint32_t height)
-      : _mWidth(width), _mHeight(height) { }
-
-    inline _C2PlanarCapacityAspect(const _C2PlanarCapacityAspect *parent)
-        : _mWidth(parent == nullptr ? 0 : parent->width()),
-          _mHeight(parent == nullptr ? 0 : parent->height()) { }
-
-private:
-    const uint32_t _mWidth;
-    const uint32_t _mHeight;
-/// @}
-};
-
-/**
  * C2Rect: rectangle type with non-negative coordinates.
  *
  * \note This struct has public fields without getters/setters. All methods are inline.
@@ -1465,17 +1454,44 @@ struct C2Rect {
 
     C2_ALLOW_OVERFLOW
     inline constexpr C2Rect intersect(const C2Rect &other) const {
-        if (!isValid()) {
-            return *this;
-        } else if (!other.isValid()) {
-            return other;
-        } else {
-            return C2Rect(c2_min(right(), other.right()) - c2_max(left, other.left),
-                          c2_min(bottom(), other.bottom()) - c2_max(top, other.top),
-                          c2_max(left, other.left),
-                          c2_max(top, other.top));
-        }
+        return C2Rect(c2_min(right(), other.right()) - c2_max(left, other.left),
+                      c2_min(bottom(), other.bottom()) - c2_max(top, other.top),
+                      c2_max(left, other.left),
+                      c2_max(top, other.top));
     }
+
+    /** clamps right and bottom to top, left if they overflow */
+    inline constexpr C2Rect normalize() const {
+        return C2Rect(c2_max(left, right()) - left, c2_max(top, bottom()) - top, left, top);
+    }
+};
+
+/**
+ * Interface for objects that have a width and height (planar capacity).
+ */
+class _C2PlanarCapacityAspect {
+/// \name Planar capacity interface
+/// @{
+public:
+    inline constexpr uint32_t width() const { return _mWidth; }
+    inline constexpr uint32_t height() const { return _mHeight; }
+
+    inline constexpr operator C2Rect() const {
+        return C2Rect(_mWidth, _mHeight);
+    }
+
+protected:
+    inline constexpr _C2PlanarCapacityAspect(uint32_t width, uint32_t height)
+      : _mWidth(width), _mHeight(height) { }
+
+    inline explicit constexpr _C2PlanarCapacityAspect(const _C2PlanarCapacityAspect *parent)
+        : _mWidth(parent == nullptr ? 0 : parent->width()),
+          _mHeight(parent == nullptr ? 0 : parent->height()) { }
+
+private:
+    uint32_t _mWidth;
+    uint32_t _mHeight;
+/// @}
 };
 
 /**
@@ -1497,6 +1513,7 @@ struct C2PlaneInfo {
 
     int32_t colInc;       ///< column increment in bytes. may be negative
     int32_t rowInc;       ///< row increment in bytes. may be negative
+
     uint32_t colSampling; ///< subsampling compared to width (must be a power of 2)
     uint32_t rowSampling; ///< subsampling compared to height (must be a power of 2)
 
@@ -1529,7 +1546,7 @@ struct C2PlaneInfo {
         BIG_END,    // BIG_ENDIAN is a reserved macro
     } endianness; ///< endianness of the samples
 
-    inline ssize_t minOffset(uint32_t width, uint32_t height) {
+    inline constexpr ssize_t minOffset(uint32_t width, uint32_t height) const {
         ssize_t offs = 0;
         if (width > 0 && colInc < 0) {
             offs += colInc * (ssize_t)(width - 1);
@@ -1540,7 +1557,7 @@ struct C2PlaneInfo {
         return offs;
     }
 
-    inline ssize_t maxOffset(uint32_t width, uint32_t height, uint32_t allocatedDepth) {
+    inline constexpr ssize_t maxOffset(uint32_t width, uint32_t height) const {
         ssize_t offs = (allocatedDepth + 7) >> 3;
         if (width > 0 && colInc > 0) {
             offs += colInc * (ssize_t)(width - 1);
@@ -1550,20 +1567,20 @@ struct C2PlaneInfo {
         }
         return offs;
     }
-};
+} C2_PACK;
 
 struct C2PlanarLayout {
 //public:
     enum type_t : uint32_t {
         TYPE_UNKNOWN = 0,
-        TYPE_YUV = 0x100,
-        TYPE_YUVA,
-        TYPE_RGB,
-        TYPE_RGBA,
+        TYPE_YUV = 0x100,   ///< YUV image with 3 planes
+        TYPE_YUVA,          ///< YUVA image with 4 planes
+        TYPE_RGB,           ///< RGB image with 3 planes
+        TYPE_RGBA,          ///< RBGA image with 4 planes
     };
 
-    type_t type;
-    uint32_t numPlanes;               // number of planes
+    type_t type;                    // image type
+    uint32_t numPlanes;             // number of planes
 
     enum plane_index_t : uint32_t {
         PLANE_Y = 0,
@@ -1584,13 +1601,68 @@ struct C2PlanarLayout {
  *
  * This class is copiable.
  */
-class _C2PlanarSection : public _C2PlanarCapacityAspect {
+class _C2PlanarSectionAspect : public _C2PlanarCapacityAspect {
 /// \name Planar section interface
 /// @{
+private:
+    inline constexpr _C2PlanarSectionAspect(uint32_t width, uint32_t height, const C2Rect &crop)
+        : _C2PlanarCapacityAspect(width, height),
+          mCrop(std::min(width - std::min(crop.left, width), crop.width),
+                std::min(height - std::min(crop.top, height), crop.height),
+                std::min(crop.left, width),
+                std::min(crop.height, height)) {
+    }
+
 public:
     // crop can be an empty rect, does not have to line up with subsampling
     // NOTE: we do not support floating-point crop
-    inline const C2Rect crop() const { return mCrop; }
+    inline constexpr C2Rect crop() const { return mCrop; }
+
+    /**
+     * Returns a child planar section for |crop|, where the capacity represents this section.
+     */
+    inline constexpr _C2PlanarSectionAspect childSection(const C2Rect &crop) const {
+        return _C2PlanarSectionAspect(
+                mCrop.width, mCrop.height,
+                // crop and translate |crop| rect
+                C2Rect(c2_min(mCrop.right() - c2_clamp(mCrop.left, crop.left, mCrop.right()), crop.width),
+                       c2_min(mCrop.bottom() - c2_clamp(mCrop.top, crop.top, mCrop.bottom()), crop.height),
+                       c2_clamp(mCrop.left, crop.left, mCrop.right()) - mCrop.left,
+                       c2_clamp(mCrop.top, crop.top, mCrop.bottom()) - mCrop.top));
+    }
+
+protected:
+    inline constexpr _C2PlanarSectionAspect(const _C2PlanarCapacityAspect *parent)
+        : _C2PlanarCapacityAspect(parent), mCrop(width(), height()) {}
+
+    inline constexpr _C2PlanarSectionAspect(const _C2PlanarCapacityAspect *parent, const C2Rect &crop)
+        : _C2PlanarCapacityAspect(parent),
+          mCrop(parent == nullptr ? C2Rect(0, 0) : ((C2Rect)*parent).intersect(crop).normalize()) { }
+
+    inline constexpr _C2PlanarSectionAspect(const _C2PlanarSectionAspect *parent, const C2Rect &crop)
+        : _C2PlanarCapacityAspect(parent),
+          mCrop(parent == nullptr ? C2Rect(0, 0) : parent->crop().intersect(crop).normalize()) { }
+
+private:
+    friend class _C2EditablePlanarSectionAspect;
+    C2Rect mCrop;
+/// @}
+};
+
+/**
+ * Aspect for objects that have an editable planar section (crop rectangle).
+ *
+ * This class is copiable.
+ */
+class _C2EditablePlanarSectionAspect : public _C2PlanarSectionAspect {
+/// \name Planar section interface
+/// @{
+    using _C2PlanarSectionAspect::_C2PlanarSectionAspect;
+
+public:
+    // crop can be an empty rect, does not have to line up with subsampling
+    // NOTE: we do not support floating-point crop
+    inline constexpr C2Rect crop() const { return mCrop; }
 
     /**
      *  Sets crop to crop intersected with [(0,0) .. (width, height)]
@@ -1616,15 +1688,39 @@ public:
         mCrop = crop;
         return true;
     }
-
-protected:
-    inline _C2PlanarSection(const _C2PlanarCapacityAspect *parent)
-        : _C2PlanarCapacityAspect(parent), mCrop(width(), height()) {}
-
-private:
-    C2Rect mCrop;
 /// @}
 };
+
+/**
+ * Utility class for safe range calculations using size_t-s.
+ */
+class C2PlanarSection : public _C2PlanarSectionAspect {
+public:
+    inline constexpr C2PlanarSection(const _C2PlanarCapacityAspect &parent, const C2Rect &crop)
+        : _C2PlanarSectionAspect(&parent, crop) { }
+
+    inline constexpr C2PlanarSection(const _C2PlanarSectionAspect &parent, const C2Rect &crop)
+        : _C2PlanarSectionAspect(&parent, crop) { }
+
+    inline constexpr C2PlanarSection intersect(const C2Rect &crop) const {
+        return C2PlanarSection(*this, crop);
+    }
+};
+
+/**
+ * Utility class for simple and safe planar capacity and section construction.
+ */
+class C2PlanarCapacity : public _C2PlanarCapacityAspect {
+public:
+    inline constexpr explicit C2PlanarCapacity(size_t width, size_t height)
+        : _C2PlanarCapacityAspect(c2_min(width, std::numeric_limits<uint32_t>::max()),
+                                  c2_min(height, std::numeric_limits<uint32_t>::max())) { }
+
+    inline constexpr C2PlanarSection section(const C2Rect &crop) const {
+        return C2PlanarSection(*this, crop);
+    }
+};
+
 
 /**
  * \ingroup graphic allocator
@@ -1640,19 +1736,22 @@ public:
      * descriptor referring to an acquire sync fence object. If it is already safe to access the
      * buffer contents, then -1.
      *
+     * Safe regions for the pointer addresses returned can be gotten via C2LayoutInfo.minOffse()/
+     * maxOffset().
+     *
      * \note Only one portion of the graphic allocation can be mapped at the same time. (This is
      * from gralloc1 limitation.)
      *
-     * \param rect            section to be mapped (this does not have to be aligned)
-     * \param usage           the desired usage. \todo this must be kSoftwareRead and/or
+     * \param rect          section to be mapped (this does not have to be aligned)
+     * \param usage         the desired usage. \todo this must be kSoftwareRead and/or
      *                      kSoftwareWrite.
-     * \param fenceFd         a pointer to a file descriptor if an async mapping is requested. If
+     * \param fenceFd       a pointer to a file descriptor if an async mapping is requested. If
      *                      not-null, and acquire fence FD will be stored here on success, or -1
      *                      on failure. If null, the mapping will be synchronous.
-     * \param layout          a pointer to where the mapped planes' descriptors will be
+     * \param layout        a pointer to where the mapped planes' descriptors will be
      *                      stored. On failure, nullptr will be stored here.
-     *
-     * \todo Do we need to support sync operation as we could just wait for the fence?
+     * \param addr          pointer to an array with at least C2PlanarLayout::MAX_NUM_PLANES
+     *                      elements. Only layout.numPlanes elements will be modified on success.
      *
      * \retval C2_OK        the operation was successful
      * \retval C2_REFUSED   no permission to map the section
@@ -1666,7 +1765,6 @@ public:
      */
     virtual c2_status_t map(
             C2Rect rect, C2MemoryUsage usage, int *fenceFd,
-            // TODO: return <addr, size> buffers with plane sizes
             C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) = 0;
 
     /**
@@ -1687,11 +1785,9 @@ public:
     virtual c2_status_t unmap(C2Fence *fenceFd /* nullable */) = 0;
 
     /**
-     * Returns true if this is a valid allocation.
-     *
-     * \todo remove?
+     * Returns the allocator ID for this allocation. This is useful to put the handle into context.
      */
-    virtual bool isValid() const = 0;
+    virtual C2Allocator::id_t getAllocatorId() const = 0;
 
     /**
      * Returns a pointer to the allocation handle.
@@ -1710,15 +1806,36 @@ protected:
 
 class C2GraphicAllocation;
 
-class C2Block2D : public _C2PlanarSection {
+/**
+ * A 2D block.
+ *
+ * \note width()/height() is not meaningful for users of blocks; instead, crop().width() and
+ * crop().height() is the capacity of the usable portion. Use and crop() if accessing the block
+ * directly through its handle to represent the allotted region of the underlying allocation to this
+ * block.
+ */
+class C2Block2D : public _C2PlanarSectionAspect {
 public:
+    /**
+     * Returns the underlying handle for this allocation.
+     *
+     * \note that the block and its block pool has shared ownership of the handle
+     *       and if all references to the block are released, the underlying block
+     *       allocation may get reused even if a client keeps a clone of this handle.
+     */
     const C2Handle *handle() const;
 
-protected:
-    C2Block2D(const std::shared_ptr<C2GraphicAllocation> &alloc);
+    /**
+     * Returns the allocator's ID that created the underlying allocation for this block. This
+     * provides the context for understanding the handle.
+     */
+    C2Allocator::id_t getAllocatorId() const;
 
-private:
+protected:
     class Impl;
+    C2Block2D(std::shared_ptr<Impl> impl, const _C2PlanarSectionAspect &section);
+
+    friend struct _C2BlockFactory;
     std::shared_ptr<Impl> mImpl;
 };
 
@@ -1731,21 +1848,19 @@ private:
  * to ensure subsampling is followed. This results in nearly identical interface between read and
  * write views, so C2GraphicView can encompass both of them.
  */
-class C2GraphicView : public _C2PlanarSection {
+class C2GraphicView : public _C2EditablePlanarSectionAspect {
 public:
     /**
-     * \return array of pointers to the start of the planes or nullptr on error.
-     * Regardless of crop rect, they always point to the top-left corner of
-     * each plane.  Access outside of the crop rect results in an undefined
-     * behavior.
+     * \return array of pointers (of layout().numPlanes elements) to the start of the planes or
+     * nullptr on error. Regardless of crop rect, they always point to the top-left corner of each
+     * plane. Access outside of the crop rect results in an undefined behavior.
      */
     const uint8_t *const *data() const;
 
     /**
-     * \return array of pointers to the start of the planes or nullptr on error.
-     * Regardless of crop rect, they always point to the top-left corner of
-     * each plane.  Access outside of the crop rect results in an undefined
-     * behavior.
+     * \return array of pointers (of layout().numPlanes elements) to the start of the planes or
+     * nullptr on error. Regardless of crop rect, they always point to the top-left corner of each
+     * plane. Access outside of the crop rect results in an undefined behavior.
      */
     uint8_t *const *data();
 
@@ -1770,14 +1885,12 @@ public:
     c2_status_t error() const;
 
 protected:
-    C2GraphicView(
-            const _C2PlanarCapacityAspect *parent,
-            uint8_t *const *data,
-            const C2PlanarLayout& layout);
+    class Impl;
+    C2GraphicView(std::shared_ptr<Impl> impl, const _C2PlanarSectionAspect &section);
     explicit C2GraphicView(c2_status_t error);
 
 private:
-    class Impl;
+    friend struct _C2BlockFactory;
     std::shared_ptr<Impl> mImpl;
 };
 
@@ -1814,11 +1927,11 @@ public:
     C2Fence fence() const { return mFence; }
 
 protected:
-    C2ConstGraphicBlock(const std::shared_ptr<C2GraphicAllocation> &alloc, C2Fence fence);
+    C2ConstGraphicBlock(
+            std::shared_ptr<Impl> impl, const _C2PlanarSectionAspect &section, C2Fence fence);
 
 private:
-    class Impl;
-    std::shared_ptr<Impl> mImpl;
+    friend struct _C2BlockFactory;
     C2Fence mFence;
 };
 
@@ -1848,11 +1961,9 @@ public:
     C2ConstGraphicBlock share(const C2Rect &crop, C2Fence fence);
 
 protected:
-    explicit C2GraphicBlock(const std::shared_ptr<C2GraphicAllocation> &alloc);
+    C2GraphicBlock(std::shared_ptr<Impl> impl, const _C2PlanarSectionAspect &section);
 
-private:
-    class Impl;
-    std::shared_ptr<Impl> mImpl;
+    friend struct _C2BlockFactory;
 };
 
 /// @}

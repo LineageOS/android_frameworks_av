@@ -24,15 +24,44 @@ namespace android {
 struct _C2BlockPoolData;
 
 /**
- * Interface for creating blocks by block pool/buffer passing implementations.
+ * Internal only interface for creating blocks by block pool/buffer passing implementations.
+ *
+ * \todo this must be hidden
  */
-struct C2_HIDE _C2BlockFactory {
+struct _C2BlockFactory {
+    /**
+     * Create a linear block from an allocation for an allotted range.
+     *
+     * @param alloc parent allocation
+     * @param data  blockpool data
+     * @param offset allotted range offset
+     * @param size  allotted size
+     *
+     * @return shared pointer to the linear block. nullptr if there was not enough memory to
+     *         create this block.
+     */
     static
     std::shared_ptr<C2LinearBlock> C2_HIDE CreateLinearBlock(
             const std::shared_ptr<C2LinearAllocation> &alloc,
             const std::shared_ptr<_C2BlockPoolData> &data = nullptr,
             size_t offset = 0,
             size_t size = ~(size_t)0);
+
+    /**
+     * Create a graphic block from an allocation for an allotted section.
+     *
+     * @param alloc parent allocation
+     * @param data  blockpool data
+     * @param crop  allotted crop region
+     *
+     * @return shared pointer to the graphic block. nullptr if there was not enough memory to
+     *         create this block.
+     */
+    static
+    std::shared_ptr<C2GraphicBlock> CreateGraphicBlock(
+            const std::shared_ptr<C2GraphicAllocation> &alloc,
+            const std::shared_ptr<_C2BlockPoolData> &data = nullptr,
+            const C2Rect &allottedCrop = C2Rect(~0u, ~0u));
 };
 
 }
