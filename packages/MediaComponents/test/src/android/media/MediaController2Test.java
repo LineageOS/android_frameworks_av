@@ -23,7 +23,6 @@ import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.media.TestUtils.SyncHandler;
-import android.media.session.PlaybackState;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -228,30 +227,24 @@ public class MediaController2Test extends MediaSession2TestBase {
         assertEquals(mContext.getPackageName(), mController.getSessionToken().getPackageName());
     }
 
-    // This also tests testGetPlaybackState().
+    // This also tests getPlaybackState().
     @Test
     public void testControllerCallback_onPlaybackStateChanged() throws InterruptedException {
-        final CountDownLatch latch = new CountDownLatch(2);
+        final CountDownLatch latch = new CountDownLatch(1);
         final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
             @Override
             public void onPlaybackStateChanged(PlaybackState2 state) {
-                switch ((int) latch.getCount()) {
-                    case 2:
-                        assertEquals(PlaybackState.STATE_PLAYING, state.getState());
-                        break;
-                    case 1:
-                        assertEquals(PlaybackState.STATE_PAUSED, state.getState());
-                        break;
-                }
+                // Called only once when the player's playback state is changed after this.
+                assertEquals(PlaybackState2.STATE_PAUSED, state.getState());
                 latch.countDown();
             }
         };
-
-        mPlayer.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_PLAYING));
+        mPlayer.notifyPlaybackState(createPlaybackState(PlaybackState2.STATE_PLAYING));
         mController = createController(mSession.getToken(), true, callback);
-        mPlayer.notifyPlaybackState(createPlaybackState(PlaybackState.STATE_PAUSED));
+        assertEquals(PlaybackState2.STATE_PLAYING, mController.getPlaybackState().getState());
+        mPlayer.notifyPlaybackState(createPlaybackState(PlaybackState2.STATE_PAUSED));
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
-        assertEquals(PlaybackState.STATE_PAUSED, mController.getPlaybackState().getState());
+        assertEquals(PlaybackState2.STATE_PAUSED, mController.getPlaybackState().getState());
     }
 
     @Test
@@ -364,7 +357,7 @@ public class MediaController2Test extends MediaSession2TestBase {
             });
             final MediaController2 controller = createController(mSession.getToken());
             testHandler.post(() -> {
-                final PlaybackState2 state = createPlaybackState(PlaybackState.STATE_ERROR);
+                final PlaybackState2 state = createPlaybackState(PlaybackState2.STATE_ERROR);
                 for (int i = 0; i < 100; i++) {
                     // triggers call from session to controller.
                     player.notifyPlaybackState(state);
