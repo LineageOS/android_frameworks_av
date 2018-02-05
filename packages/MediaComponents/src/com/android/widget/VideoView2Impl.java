@@ -49,6 +49,7 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup.LayoutParams;
+import android.view.accessibility.AccessibilityManager;
 import android.widget.MediaControlView2;
 import android.widget.VideoView2;
 
@@ -70,6 +71,7 @@ public class VideoView2Impl extends BaseLayout
         implements VideoView2Provider, VideoViewInterface.SurfaceListener {
     private static final String TAG = "VideoView2";
     private static final boolean DEBUG = true; // STOPSHIP: Log.isLoggable(TAG, Log.DEBUG);
+    private static final long DEFAULT_SHOW_CONTROLLER_INTERVAL_MS = 2000;
 
     private final VideoView2 mInstance;
 
@@ -83,6 +85,7 @@ public class VideoView2Impl extends BaseLayout
 
     private static final int INVALID_TRACK_INDEX = -1;
 
+    private AccessibilityManager mAccessibilityManager;
     private AudioManager mAudioManager;
     private AudioAttributes mAudioAttributes;
     private int mAudioFocusType = AudioManager.AUDIOFOCUS_GAIN; // legacy focus gain
@@ -119,14 +122,16 @@ public class VideoView2Impl extends BaseLayout
     private int mVideoWidth;
     private int mVideoHeight;
 
-    private boolean mSubtitleEnabled;
-    private int mSelectedTrackIndex;
-
     private SubtitleView mSubtitleView;
+    private boolean mSubtitleEnabled;
+    private int mSelectedTrackIndex;  // selected subtitle track index as MediaPlayer2 returns
+
     private float mSpeed;
     // TODO: Remove mFallbackSpeed when integration with MediaPlayer2's new setPlaybackParams().
     // Refer: https://docs.google.com/document/d/1nzAfns6i2hJ3RkaUre3QMT6wsDedJ5ONLiA_OOBFFX8/edit
     private float mFallbackSpeed;  // keep the original speed before 'pause' is called.
+
+    private long mShowControllerIntervalMs;
 
     public VideoView2Impl(VideoView2 instance,
             ViewGroupProvider superProvider, ViewGroupProvider privateProvider) {
@@ -141,6 +146,10 @@ public class VideoView2Impl extends BaseLayout
         mSpeed = 1.0f;
         mFallbackSpeed = mSpeed;
         mSelectedTrackIndex = INVALID_TRACK_INDEX;
+        // TODO: add attributes to get this value.
+        mShowControllerIntervalMs = DEFAULT_SHOW_CONTROLLER_INTERVAL_MS;
+
+        mAccessibilityManager = AccessibilityManager.getInstance(mInstance.getContext());
 
         mAudioManager = (AudioManager) mInstance.getContext()
                 .getSystemService(Context.AUDIO_SERVICE);
@@ -203,8 +212,9 @@ public class VideoView2Impl extends BaseLayout
     }
 
     @Override
-    public void setMediaControlView2_impl(MediaControlView2 mediaControlView) {
+    public void setMediaControlView2_impl(MediaControlView2 mediaControlView, long intervalMs) {
         mMediaControlView = mediaControlView;
+        mShowControllerIntervalMs = intervalMs;
         if (mRouteSelector != null) {
             ((MediaControlView2Impl) mMediaControlView.getProvider())
                     .setRouteSelector(mRouteSelector);
@@ -439,8 +449,7 @@ public class VideoView2Impl extends BaseLayout
             Log.d(TAG, "onTouchEvent(). mCurrentState=" + mCurrentState
                     + ", mTargetState=" + mTargetState);
         }
-        if (ev.getAction() == MotionEvent.ACTION_UP
-                && isInPlaybackState() && mMediaControlView != null) {
+        if (ev.getAction() == MotionEvent.ACTION_UP && mMediaControlView != null) {
             toggleMediaControlViewVisibility();
         }
 
@@ -449,12 +458,17 @@ public class VideoView2Impl extends BaseLayout
 
     @Override
     public boolean onTrackballEvent_impl(MotionEvent ev) {
-        if (ev.getAction() == MotionEvent.ACTION_UP
-                && isInPlaybackState() && mMediaControlView != null) {
+        if (ev.getAction() == MotionEvent.ACTION_UP && mMediaControlView != null) {
             toggleMediaControlViewVisibility();
         }
 
         return super.onTrackballEvent_impl(ev);
+    }
+
+    @Override
+    public boolean dispatchTouchEvent_impl(MotionEvent ev) {
+        // TODO: Test touch event handling logic thoroughly and simplify the logic.
+        return super.dispatchTouchEvent_impl(ev);
     }
 
     ///////////////////////////////////////////////////
@@ -478,9 +492,6 @@ public class VideoView2Impl extends BaseLayout
         if (DEBUG) {
             Log.d(TAG, "onSurfaceDestroyed(). mCurrentState=" + mCurrentState
                     + ", mTargetState=" + mTargetState + ", " + view.toString());
-        }
-        if (mMediaControlView != null) {
-            mMediaControlView.setVisibility(View.GONE);
         }
     }
 
@@ -704,11 +715,34 @@ public class VideoView2Impl extends BaseLayout
         }
     }
 
+    private final Runnable mFadeOut = new Runnable() {
+        @Override
+        public void run() {
+            if (mCurrentState == STATE_PLAYING) {
+                mMediaControlView.setVisibility(View.GONE);
+            }
+        }
+    };
+
+    private void showController() {
+        // TODO: Decide what to show when the state is not in playback state
+        if (mMediaControlView == null || !isInPlaybackState()) {
+            return;
+        }
+        mMediaControlView.removeCallbacks(mFadeOut);
+        mMediaControlView.setVisibility(View.VISIBLE);
+        if (mShowControllerIntervalMs != 0
+            && !mAccessibilityManager.isTouchExplorationEnabled()) {
+            mMediaControlView.postDelayed(mFadeOut, mShowControllerIntervalMs);
+        }
+    }
+
     private void toggleMediaControlViewVisibility() {
         if (mMediaControlView.getVisibility() == View.VISIBLE) {
+            mMediaControlView.removeCallbacks(mFadeOut);
             mMediaControlView.setVisibility(View.GONE);
         } else {
-            mMediaControlView.setVisibility(View.VISIBLE);
+            showController();
         }
     }
 
@@ -769,6 +803,9 @@ public class VideoView2Impl extends BaseLayout
                         + ", mTargetState=" + mTargetState);
             }
             mCurrentState = STATE_PREPARED;
+            // Create and set playback state for MediaControlView2
+            updatePlaybackState();
+
             if (mOnPreparedListener != null) {
                 mOnPreparedListener.onPrepared(mInstance);
             }
@@ -802,19 +839,6 @@ public class VideoView2Impl extends BaseLayout
 
                 if (needToStart()) {
                     mMediaController.getTransportControls().play();
-                    if (mMediaControlView != null) {
-                        mMediaControlView.setVisibility(View.VISIBLE);
-                    }
-                } else if (!(isInPlaybackState() && mMediaPlayer.isPlaying())
-                        && (seekToPosition != 0 || mMediaPlayer.getCurrentPosition() > 0)) {
-                    if (mMediaControlView != null) {
-                        // Show the media controls when we're paused into a video and
-                        // make them stick.
-                        long currTimeout = mMediaControlView.getTimeout();
-                        mMediaControlView.setTimeout(0L);
-                        mMediaControlView.setVisibility(View.VISIBLE);
-                        mMediaControlView.setTimeout(currTimeout);
-                    }
                 }
             } else {
                 // We don't know the video size yet, but should start anyway.
@@ -823,8 +847,6 @@ public class VideoView2Impl extends BaseLayout
                     mMediaController.getTransportControls().play();
                 }
             }
-            // Create and set playback state for MediaControlView2
-            updatePlaybackState();
 
             // Get and set duration and title values as MediaMetadata for MediaControlView2
             MediaMetadata.Builder builder = new MediaMetadata.Builder();
@@ -954,11 +976,13 @@ public class VideoView2Impl extends BaseLayout
                         break;
                 }
             }
+            showController();
         }
 
         @Override
         public void onCustomAction(String action, Bundle extras) {
             mOnCustomActionListener.onCustomAction(action, extras);
+            showController();
         }
 
         @Override
@@ -978,6 +1002,7 @@ public class VideoView2Impl extends BaseLayout
                             + ", mTargetState=" + mTargetState);
                 }
             }
+            showController();
         }
 
         @Override
@@ -998,6 +1023,7 @@ public class VideoView2Impl extends BaseLayout
                             + ", mTargetState=" + mTargetState);
                 }
             }
+            showController();
         }
 
         @Override
@@ -1013,6 +1039,7 @@ public class VideoView2Impl extends BaseLayout
                     mSeekWhenPrepared = pos;
                 }
             }
+            showController();
         }
 
         @Override
@@ -1022,6 +1049,7 @@ public class VideoView2Impl extends BaseLayout
             } else {
                 resetPlayer();
             }
+            showController();
         }
     }
 
