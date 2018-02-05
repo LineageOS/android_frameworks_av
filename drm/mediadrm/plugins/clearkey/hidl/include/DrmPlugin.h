@@ -38,12 +38,14 @@ using ::android::hardware::drm::V1_0::KeyValue;
 using ::android::hardware::drm::V1_0::SecureStop;
 using ::android::hardware::drm::V1_0::SecureStopId;
 using ::android::hardware::drm::V1_0::Status;
+using ::android::hardware::drm::V1_1::DrmMetricGroup;
 
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::sp;
+
 
 struct DrmPlugin : public IDrmPlugin {
     explicit DrmPlugin(SessionLibrary* sessionLibrary);
@@ -162,6 +164,8 @@ struct DrmPlugin : public IDrmPlugin {
 
     Return<Status> setSecurityLevel(const hidl_vec<uint8_t>& sessionId,
             SecurityLevel level) override;
+
+    Return<void> getMetrics(getMetrics_cb _hidl_cb) override;
 
     Return<void> getPropertyString(
         const hidl_string& name,
@@ -302,11 +306,6 @@ struct DrmPlugin : public IDrmPlugin {
         return Void();
     }
 
-    Return<void> getMetrics(getMetrics_cb _hidl_cb) {
-        _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, hidl_vec<DrmMetricGroup>());
-        return Void();
-    }
-
     Return<void> getSecureStopIds(getSecureStopIds_cb _hidl_cb) {
         _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, hidl_vec<SecureStopId>());
         return Void();
@@ -340,6 +339,9 @@ private:
     std::map<std::vector<uint8_t>, SecurityLevel> mSecurityLevel;
     sp<IDrmPluginListener> mListener;
     SessionLibrary *mSessionLibrary;
+    int64_t mOpenSessionOkCount;
+    int64_t mCloseSessionOkCount;
+    int64_t mCloseSessionNotOpenedCount;
 
     CLEARKEY_DISALLOW_COPY_AND_ASSIGN_AND_NEW(DrmPlugin);
 };
