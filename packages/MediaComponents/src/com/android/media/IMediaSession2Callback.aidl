@@ -16,6 +16,7 @@
 
 package com.android.media;
 
+import android.app.PendingIntent;
 import android.os.Bundle;
 import android.os.ResultReceiver;
 
@@ -33,8 +34,10 @@ oneway interface IMediaSession2Callback {
     void onPlaylistParamsChanged(in Bundle params);
     void onPlaybackInfoChanged(in Bundle playbackInfo);
 
-
-    void onConnected(IMediaSession2 sessionBinder, in Bundle commandGroup, in Bundle playbackState);
+    // TODO(jaewan): Handle when the playlist becomes too huge.
+    void onConnected(IMediaSession2 sessionBinder, in Bundle commandGroup, in Bundle playbackState,
+            in Bundle playbackInfo, in Bundle params, in List<Bundle> playlist, int ratingType,
+            in PendingIntent sessionActivity);
     void onDisconnected();
 
     void onCustomLayoutChanged(in List<Bundle> commandButtonlist);

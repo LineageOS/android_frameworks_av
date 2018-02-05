@@ -16,7 +16,9 @@
 
 package android.media;
 
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.ControllerInfo;
@@ -56,7 +58,9 @@ import static org.junit.Assert.*;
 @FlakyTest
 public class MediaController2Test extends MediaSession2TestBase {
     private static final String TAG = "MediaController2Test";
+    private static final int DEFAULT_RATING_TYPE = Rating2.RATING_5_STARS;
 
+    PendingIntent mIntent;
     MediaSession2 mSession;
     MediaController2 mController;
     MockPlayer mPlayer;
@@ -65,10 +69,15 @@ public class MediaController2Test extends MediaSession2TestBase {
     @Override
     public void setUp() throws Exception {
         super.setUp();
+        final Intent sessionActivity = new Intent(mContext, MockActivity.class);
         // Create this test specific MediaSession2 to use our own Handler.
+        mIntent = PendingIntent.getActivity(mContext, 0, sessionActivity, 0);
+
         mPlayer = new MockPlayer(1);
         mSession = new MediaSession2.Builder(mContext, mPlayer)
                 .setSessionCallback(sHandlerExecutor, new SessionCallback(mContext))
+                .setRatingType(DEFAULT_RATING_TYPE)
+                .setSessionActivity(mIntent)
                 .setId(TAG).build();
         mController = createController(mSession.getToken());
         TestServiceRegistry.getInstance().setHandler(sHandler);
@@ -196,6 +205,18 @@ public class MediaController2Test extends MediaSession2TestBase {
         }
         assertTrue(mPlayer.mSetCurrentPlaylistItemCalled);
         assertEquals(itemIndex, mPlayer.mItemIndex);
+    }
+
+    @Test
+    public void testGetRatingType() throws InterruptedException {
+        assertEquals(DEFAULT_RATING_TYPE, mController.getRatingType());
+    }
+
+    @Test
+    public void testGetSessionActivity() throws InterruptedException {
+        PendingIntent sessionActivity = mController.getSessionActivity();
+        assertEquals(mContext.getPackageName(), sessionActivity.getCreatorPackage());
+        assertEquals(Process.myUid(), sessionActivity.getCreatorUid());
     }
 
     @Test
