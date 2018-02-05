@@ -96,6 +96,11 @@ public abstract class ViewGroupImpl implements ViewGroupProvider {
     }
 
     @Override
+    public boolean dispatchTouchEvent_impl(MotionEvent ev) {
+        return mSuperProvider.dispatchTouchEvent_impl(ev);
+    }
+
+    @Override
     public boolean checkLayoutParams_impl(ViewGroup.LayoutParams p) {
         return mSuperProvider.checkLayoutParams_impl(p);
     }
