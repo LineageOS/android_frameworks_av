@@ -859,6 +859,12 @@ status_t Camera2Client::startPreviewL(Parameters &params, bool restart) {
 
     outputStreams.push(getPreviewStreamId());
 
+    if (params.isDeviceZslSupported) {
+        // If device ZSL is supported, resume preview buffers that may be paused
+        // during last takePicture().
+        mDevice->dropStreamBuffers(false, getPreviewStreamId());
+    }
+
     if (!params.recordingHint) {
         if (!restart) {
             res = mStreamingProcessor->updatePreviewRequest(params);
