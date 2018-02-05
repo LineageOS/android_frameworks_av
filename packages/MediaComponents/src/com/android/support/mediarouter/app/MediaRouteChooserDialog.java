@@ -20,7 +20,9 @@ import static com.android.support.mediarouter.media.MediaRouter.RouteInfo.CONNEC
 import static com.android.support.mediarouter.media.MediaRouter.RouteInfo.CONNECTION_STATE_CONNECTING;
 
 import android.annotation.NonNull;
+import android.app.Dialog;
 import android.content.Context;
+import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
@@ -31,6 +33,7 @@ import android.os.SystemClock;
 import android.support.v7.app.AppCompatDialog;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -41,6 +44,7 @@ import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import com.android.media.update.ApiHelper;
 import com.android.media.update.R;
 import com.android.support.mediarouter.media.MediaRouteSelector;
 import com.android.support.mediarouter.media.MediaRouter;
@@ -61,7 +65,7 @@ import java.util.List;
  * @see MediaRouteButton
  * @see MediaRouteActionProvider
  */
-public class MediaRouteChooserDialog extends AppCompatDialog {
+public class MediaRouteChooserDialog extends Dialog {
     static final String TAG = "MediaRouteChooserDialog";
 
     // Do not update the route list immediately to avoid unnatural dialog change.
@@ -94,8 +98,9 @@ public class MediaRouteChooserDialog extends AppCompatDialog {
     }
 
     public MediaRouteChooserDialog(Context context, int theme) {
-        super(context = MediaRouterThemeHelper.createThemedDialogContext(context, theme, false),
-                MediaRouterThemeHelper.createThemedDialogStyle(context));
+        super(new ContextThemeWrapper(context,
+                ApiHelper.getLibTheme(MediaRouterThemeHelper.getRouterThemeId(context))),
+                theme == 0 ? android.R.style.Animation : theme);
         context = getContext();
 
         mRouter = MediaRouter.getInstance(context);
@@ -182,7 +187,9 @@ public class MediaRouteChooserDialog extends AppCompatDialog {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        setContentView(R.layout.mr_chooser_dialog);
+        setContentView(ApiHelper.inflateLibLayout(getContext(),
+                ApiHelper.getLibTheme(MediaRouterThemeHelper.getRouterThemeId(getContext())),
+                R.layout.mr_chooser_dialog));
 
         mRoutes = new ArrayList<>();
         mAdapter = new RouteAdapter(getContext(), mRoutes);
@@ -199,7 +206,7 @@ public class MediaRouteChooserDialog extends AppCompatDialog {
      * Sets the width of the dialog. Also called when configuration changes.
      */
     void updateLayout() {
-        getWindow().setLayout(MediaRouteDialogHelper.getDialogWidth(getContext()),
+        getWindow().setLayout(MediaRouteDialogHelper.getDialogWidth(),
                 ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
@@ -248,7 +255,6 @@ public class MediaRouteChooserDialog extends AppCompatDialog {
 
     private final class RouteAdapter extends ArrayAdapter<MediaRouter.RouteInfo>
             implements ListView.OnItemClickListener {
-        private final LayoutInflater mInflater;
         private final Drawable mDefaultIcon;
         private final Drawable mTvIcon;
         private final Drawable mSpeakerIcon;
@@ -256,12 +262,16 @@ public class MediaRouteChooserDialog extends AppCompatDialog {
 
         public RouteAdapter(Context context, List<MediaRouter.RouteInfo> routes) {
             super(context, 0, routes);
-            mInflater = LayoutInflater.from(context);
-            TypedArray styledAttributes = getContext().obtainStyledAttributes(new int[] {
-                    R.attr.mediaRouteDefaultIconDrawable,
-                    R.attr.mediaRouteTvIconDrawable,
-                    R.attr.mediaRouteSpeakerIconDrawable,
-                    R.attr.mediaRouteSpeakerGroupIconDrawable});
+
+            TypedArray styledAttributes = ApiHelper.getLibTheme(
+                    MediaRouterThemeHelper.getRouterThemeId(context)).obtainStyledAttributes(
+                            new int[] {
+                                R.attr.mediaRouteDefaultIconDrawable,
+                                R.attr.mediaRouteTvIconDrawable,
+                                R.attr.mediaRouteSpeakerIconDrawable,
+                                R.attr.mediaRouteSpeakerGroupIconDrawable
+                            });
+
             mDefaultIcon = styledAttributes.getDrawable(0);
             mTvIcon = styledAttributes.getDrawable(1);
             mSpeakerIcon = styledAttributes.getDrawable(2);
@@ -283,7 +293,10 @@ public class MediaRouteChooserDialog extends AppCompatDialog {
         public View getView(int position, View convertView, ViewGroup parent) {
             View view = convertView;
             if (view == null) {
-                view = mInflater.inflate(R.layout.mr_chooser_list_item, parent, false);
+                view = ApiHelper.inflateLibLayout(getContext(),
+                        ApiHelper.getLibTheme(
+                                MediaRouterThemeHelper.getRouterThemeId(getContext())),
+                        R.layout.mr_chooser_list_item, parent, false);
             }
 
             MediaRouter.RouteInfo route = getItem(position);

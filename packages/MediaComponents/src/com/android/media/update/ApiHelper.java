@@ -16,6 +16,7 @@
 
 package com.android.media.update;
 
+import android.annotation.Nullable;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
@@ -24,6 +25,7 @@ import android.util.AttributeSet;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 
 import com.android.support.mediarouter.app.MediaRouteButton;
 
@@ -51,13 +53,23 @@ public class ApiHelper {
         return sInstance.mLibResources;
     }
 
-    public static Resources.Theme getLibTheme() {
+    public static Theme getLibTheme() {
         return sInstance.mLibTheme;
     }
 
+    public static Theme getLibTheme(int themeId) {
+        Theme theme = sInstance.mLibResources.newTheme();
+        theme.applyStyle(themeId, true);
+        return theme;
+    }
+
     public static LayoutInflater getLayoutInflater(Context context) {
+        return getLayoutInflater(context, getLibTheme());
+    }
+
+    public static LayoutInflater getLayoutInflater(Context context, Theme theme) {
         LayoutInflater layoutInflater = LayoutInflater.from(context).cloneInContext(
-                new ContextThemeWrapper(context, getLibTheme()));
+                new ContextThemeWrapper(context, theme));
         layoutInflater.setFactory2(new LayoutInflater.Factory2() {
             @Override
             public View onCreateView(
@@ -77,8 +89,17 @@ public class ApiHelper {
     }
 
     public static View inflateLibLayout(Context context, int libResId) {
+        return inflateLibLayout(context, getLibTheme(), libResId, null, false);
+    }
+
+    public static View inflateLibLayout(Context context, Theme theme, int libResId) {
+        return inflateLibLayout(context, theme, libResId, null, false);
+    }
+
+    public static View inflateLibLayout(Context context, Theme theme, int libResId,
+            @Nullable ViewGroup root, boolean attachToRoot) {
         try (XmlResourceParser parser = getLibResources().getLayout(libResId)) {
-            return getLayoutInflater(context).inflate(parser, null);
+            return getLayoutInflater(context, theme).inflate(parser, root, attachToRoot);
         }
     }
 }
