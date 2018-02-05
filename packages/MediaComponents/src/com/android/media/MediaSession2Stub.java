@@ -16,6 +16,7 @@
 
 package com.android.media;
 
+import android.app.PendingIntent;
 import android.content.Context;
 import android.media.MediaController2;
 import android.media.MediaController2.PlaybackInfo;
@@ -133,10 +134,36 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 // TODO(jaewan): Should we protect getting playback state?
                 final PlaybackState2 state = session.getInstance().getPlaybackState();
                 final Bundle playbackStateBundle = (state != null) ? state.toBundle() : null;
+                final Bundle playbackInfoBundle =
+                        ((PlaybackInfoImpl) session.getPlaybackInfo().getProvider()).toBundle();
+                final PlaylistParams params = session.getInstance().getPlaylistParams();
+                final Bundle paramsBundle = (params != null) ? params.toBundle() : null;
+                final int ratingType = session.getRatingType();
+                final PendingIntent sessionActivity = session.getSessionActivity();
+                final List<MediaItem2> playlist = session.getInstance().getPlaylist();
+                final List<Bundle> playlistBundle = new ArrayList<>();
+                if (playlist != null) {
+                    // TODO(jaewan): Find a way to avoid concurrent modification exception.
+                    for (int i = 0; i < playlist.size(); i++) {
+                        final MediaItem2 item = playlist.get(i);
+                        if (item != null) {
+                            final Bundle itemBundle = item.toBundle();
+                            if (itemBundle != null) {
+                                playlistBundle.add(itemBundle);
+                            }
+                        }
+                    }
+                }
 
+                // Double check if session is still there, because close() can be called in another
+                // thread.
+                if (mSession.get() == null) {
+                    return;
+                }
                 try {
                     callback.onConnected(MediaSession2Stub.this,
-                            allowedCommands.toBundle(), playbackStateBundle);
+                            allowedCommands.toBundle(), playbackStateBundle, playbackInfoBundle,
+                            paramsBundle, playlistBundle, ratingType, sessionActivity);
                 } catch (RemoteException e) {
                     // Controller may be died prematurely.
                     // TODO(jaewan): Handle here.

@@ -77,6 +77,10 @@ public class MediaController2Impl implements MediaController2Provider {
     @GuardedBy("mLock")
     private PlaybackInfo mPlaybackInfo;
     @GuardedBy("mLock")
+    private int mRatingType;
+    @GuardedBy("mLock")
+    private PendingIntent mSessionActivity;
+    @GuardedBy("mLock")
     private CommandGroup mCommandGroup;
 
     // Assignment should be used with the lock hold, but should be used without a lock to prevent
@@ -276,14 +280,12 @@ public class MediaController2Impl implements MediaController2Provider {
     //////////////////////////////////////////////////////////////////////////////////////
     @Override
     public PendingIntent getSessionActivity_impl() {
-        // TODO(jaewan): Implement
-        return null;
+        return mSessionActivity;
     }
 
     @Override
     public int getRatingType_impl() {
-        // TODO(jaewan): Implement
-        return 0;
+        return mRatingType;
     }
 
     @Override
@@ -508,7 +510,9 @@ public class MediaController2Impl implements MediaController2Provider {
 
     // Should be used without a lock to prevent potential deadlock.
     private void onConnectedNotLocked(IMediaSession2 sessionBinder,
-            final CommandGroup commandGroup, final PlaybackState2 state) {
+            final CommandGroup commandGroup, final PlaybackState2 state, final PlaybackInfo info,
+            final PlaylistParams params, final List<MediaItem2> playlist, final int ratingType,
+            final PendingIntent sessionActivity) {
         if (DEBUG) {
             Log.d(TAG, "onConnectedNotLocked sessionBinder=" + sessionBinder
                     + ", commands=" + commandGroup);
@@ -532,6 +536,11 @@ public class MediaController2Impl implements MediaController2Provider {
                 }
                 mCommandGroup = commandGroup;
                 mPlaybackState = state;
+                mPlaybackInfo = info;
+                mPlaylistParams = params;
+                mPlaylist = playlist;
+                mRatingType = ratingType;
+                mSessionActivity = sessionActivity;
                 mSessionBinder = sessionBinder;
                 try {
                     // Implementation for the local binder is no-op,
@@ -645,6 +654,9 @@ public class MediaController2Impl implements MediaController2Provider {
 
         @Override
         public void onPlaybackInfoChanged(Bundle playbackInfo) throws RuntimeException {
+            if (DEBUG) {
+                Log.d(TAG, "onPlaybackInfoChanged");
+            }
             final MediaController2Impl controller;
             try {
                 controller = getController();
@@ -658,7 +670,8 @@ public class MediaController2Impl implements MediaController2Provider {
 
         @Override
         public void onConnected(IMediaSession2 sessionBinder, Bundle commandGroup,
-                Bundle playbackState) {
+                Bundle playbackState, Bundle playbackInfo, Bundle playlistParams, List<Bundle>
+                playlist, int ratingType, PendingIntent sessionActivity) {
             final MediaController2Impl controller = mController.get();
             if (controller == null) {
                 if (DEBUG) {
@@ -666,9 +679,20 @@ public class MediaController2Impl implements MediaController2Provider {
                 }
                 return;
             }
+            final Context context = controller.getContext();
+            List<MediaItem2> list = new ArrayList<>();
+            for (int i = 0; i < playlist.size(); i++) {
+                MediaItem2 item = MediaItem2.fromBundle(context, playlist.get(i));
+                if (item != null) {
+                    list.add(item);
+                }
+            }
             controller.onConnectedNotLocked(sessionBinder,
-                    CommandGroup.fromBundle(controller.getContext(), commandGroup),
-                    PlaybackState2.fromBundle(controller.getContext(), playbackState));
+                    CommandGroup.fromBundle(context, commandGroup),
+                    PlaybackState2.fromBundle(context, playbackState),
+                    PlaybackInfoImpl.fromBundle(context, playbackInfo),
+                    PlaylistParams.fromBundle(context, playlistParams),
+                    list, ratingType, sessionActivity);
         }
 
         @Override
@@ -706,6 +730,7 @@ public class MediaController2Impl implements MediaController2Provider {
                 // Illegal call. Ignore
                 return;
             }
+            // TODO(jaewan): Fix here. It's controller feature so shouldn't use browser
             final MediaBrowser2Impl browser;
             try {
                 browser = getBrowser();

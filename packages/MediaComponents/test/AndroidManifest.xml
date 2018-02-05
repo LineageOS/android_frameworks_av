@@ -20,14 +20,7 @@
     <application android:label="Media API Test">
         <uses-library android:name="android.test.runner" />
 
-        <activity android:name="android.widget2.VideoView2TestActivity"
-                  android:configChanges="keyboardHidden|orientation|screenSize"
-                  android:label="VideoView2TestActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.FRAMEWORK_INSTRUMENTATION_TEST" />
-            </intent-filter>
-          </activity>
+        <activity android:name="android.media.MockActivity" />
 
         <!-- Keep the test services synced together with the TestUtils.java -->
         <service android:name="android.media.MockMediaSessionService2">
