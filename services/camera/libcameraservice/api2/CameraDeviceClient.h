@@ -259,8 +259,8 @@ private:
 
     // Utility method to insert the surface into SurfaceMap
     binder::Status insertGbpLocked(const sp<IGraphicBufferProducer>& gbp,
-            /*out*/SurfaceMap* surfaceMap,
-            /*out*/Vector<int32_t>* streamIds);
+            /*out*/SurfaceMap* surfaceMap, /*out*/Vector<int32_t>* streamIds,
+            /*out*/int32_t*  currentStreamId);
 
     // Check that the physicalCameraId passed in is spported by the camera
     // device.

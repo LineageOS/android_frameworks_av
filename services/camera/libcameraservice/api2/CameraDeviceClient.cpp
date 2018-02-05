@@ -122,8 +122,7 @@ binder::Status CameraDeviceClient::submitRequest(
 }
 
 binder::Status CameraDeviceClient::insertGbpLocked(const sp<IGraphicBufferProducer>& gbp,
-        SurfaceMap* outSurfaceMap,
-        Vector<int32_t>* outputStreamIds) {
+        SurfaceMap* outSurfaceMap, Vector<int32_t>* outputStreamIds, int32_t *currentStreamId) {
     int idx = mStreamMap.indexOfKey(IInterface::asBinder(gbp));
 
     // Trying to submit request with surface that wasn't created
@@ -145,6 +144,10 @@ binder::Status CameraDeviceClient::insertGbpLocked(const sp<IGraphicBufferProduc
     ALOGV("%s: Camera %s: Appending output stream %d surface %d to request",
             __FUNCTION__, mCameraIdStr.string(), streamSurfaceId.streamId(),
             streamSurfaceId.surfaceId());
+
+    if (currentStreamId != nullptr) {
+        *currentStreamId = streamSurfaceId.streamId();
+    }
 
     return binder::Status::ok();
 }
@@ -218,40 +221,6 @@ binder::Status CameraDeviceClient::submitRequestList(
                     "Invalid camera request settings");
         }
 
-        CameraDeviceBase::PhysicalCameraSettingsList physicalSettingsList;
-        for (const auto& it : request.mPhysicalCameraSettings) {
-            String8 physicalId(it.id.c_str());
-            if ((physicalId != mDevice->getId()) && !checkPhysicalCameraId(physicalId)) {
-                ALOGE("%s: Camera %s: Physical camera id: %s is invalid.", __FUNCTION__,
-                        mCameraIdStr.string(), physicalId.string());
-                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                        "Invalid physical camera id");
-            }
-
-            CameraMetadata metadata(it.settings);
-            if (metadata.isEmpty()) {
-                ALOGE("%s: Camera %s: Sent empty metadata packet. Rejecting request.",
-                        __FUNCTION__, mCameraIdStr.string());
-                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                        "Request settings are empty");
-            }
-
-            if (!enforceRequestPermissions(metadata)) {
-                // Callee logs
-                return STATUS_ERROR(CameraService::ERROR_PERMISSION_DENIED,
-                        "Caller does not have permission to change restricted controls");
-            }
-
-            physicalSettingsList.push_back({it.id, metadata});
-        }
-
-        if (streaming && (physicalSettingsList.size() > 1)) {
-            ALOGE("%s: Camera %s: Individual physical camera settings are not supported in "
-                    "streaming requests. Rejecting request.", __FUNCTION__, mCameraIdStr.string());
-            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                    "Streaming request contains individual physical requests");
-        }
-
         if (request.mSurfaceList.isEmpty() && request.mStreamIdxList.size() == 0) {
             ALOGE("%s: Camera %s: Requests must have at least one surface target. "
                     "Rejecting request.", __FUNCTION__, mCameraIdStr.string());
@@ -265,14 +234,25 @@ binder::Status CameraDeviceClient::submitRequestList(
          */
         SurfaceMap surfaceMap;
         Vector<int32_t> outputStreamIds;
+        std::vector<std::string> requestedPhysicalIds;
         if (request.mSurfaceList.size() > 0) {
             for (sp<Surface> surface : request.mSurfaceList) {
                 if (surface == 0) continue;
 
+                int32_t streamId;
                 sp<IGraphicBufferProducer> gbp = surface->getIGraphicBufferProducer();
-                res = insertGbpLocked(gbp, &surfaceMap, &outputStreamIds);
+                res = insertGbpLocked(gbp, &surfaceMap, &outputStreamIds, &streamId);
                 if (!res.isOk()) {
                     return res;
+                }
+
+                ssize_t index = mConfiguredOutputs.indexOfKey(streamId);
+                if (index >= 0) {
+                    String8 requestedPhysicalId(
+                            mConfiguredOutputs.valueAt(index).getPhysicalCameraId());
+                    requestedPhysicalIds.push_back(requestedPhysicalId.string());
+                } else {
+                    ALOGW("%s: Output stream Id not found among configured outputs!", __FUNCTION__);
                 }
             }
         } else {
@@ -298,11 +278,53 @@ binder::Status CameraDeviceClient::submitRequestList(
                             "Request targets Surface has invalid surface index");
                 }
 
-                res = insertGbpLocked(gbps[surfaceIdx], &surfaceMap, &outputStreamIds);
+                res = insertGbpLocked(gbps[surfaceIdx], &surfaceMap, &outputStreamIds, nullptr);
                 if (!res.isOk()) {
                     return res;
                 }
+
+                String8 requestedPhysicalId(
+                        mConfiguredOutputs.valueAt(index).getPhysicalCameraId());
+                requestedPhysicalIds.push_back(requestedPhysicalId.string());
             }
+        }
+
+        CameraDeviceBase::PhysicalCameraSettingsList physicalSettingsList;
+        for (const auto& it : request.mPhysicalCameraSettings) {
+            String8 physicalId(it.id.c_str());
+            if (physicalId != mDevice->getId()) {
+                auto found = std::find(requestedPhysicalIds.begin(), requestedPhysicalIds.end(),
+                        it.id);
+                if (found == requestedPhysicalIds.end()) {
+                    ALOGE("%s: Camera %s: Physical camera id: %s not part of attached outputs.",
+                            __FUNCTION__, mCameraIdStr.string(), physicalId.string());
+                    return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                            "Invalid physical camera id");
+                }
+            }
+
+            CameraMetadata metadata(it.settings);
+            if (metadata.isEmpty()) {
+                ALOGE("%s: Camera %s: Sent empty metadata packet. Rejecting request.",
+                        __FUNCTION__, mCameraIdStr.string());
+                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                        "Request settings are empty");
+            }
+
+            physicalSettingsList.push_back({it.id, metadata});
+        }
+
+        if (streaming && (physicalSettingsList.size() > 1)) {
+            ALOGE("%s: Camera %s: Individual physical camera settings are not supported in "
+                    "streaming requests. Rejecting request.", __FUNCTION__, mCameraIdStr.string());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                    "Streaming request contains individual physical requests");
+        }
+
+        if (!enforceRequestPermissions(physicalSettingsList.begin()->metadata)) {
+            // Callee logs
+            return STATUS_ERROR(CameraService::ERROR_PERMISSION_DENIED,
+                    "Caller does not have permission to change restricted controls");
         }
 
         physicalSettingsList.begin()->metadata.update(ANDROID_REQUEST_OUTPUT_STREAMS,
