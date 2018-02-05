@@ -175,67 +175,7 @@ status_t NuPlayer2Driver::setUID(uid_t uid) {
     return OK;
 }
 
-status_t NuPlayer2Driver::setDataSource(
-        const sp<MediaHTTPService> &httpService,
-        const char *url,
-        const KeyedVector<String8, String8> *headers) {
-    ALOGV("setDataSource(%p) url(%s)", this, uriDebugString(url, false).c_str());
-    Mutex::Autolock autoLock(mLock);
-
-    if (mState != STATE_IDLE) {
-        return INVALID_OPERATION;
-    }
-
-    mState = STATE_SET_DATASOURCE_PENDING;
-
-    mPlayer->setDataSourceAsync(httpService, url, headers);
-
-    while (mState == STATE_SET_DATASOURCE_PENDING) {
-        mCondition.wait(mLock);
-    }
-
-    return mAsyncResult;
-}
-
-status_t NuPlayer2Driver::setDataSource(int fd, int64_t offset, int64_t length) {
-    ALOGV("setDataSource(%p) file(%d)", this, fd);
-    Mutex::Autolock autoLock(mLock);
-
-    if (mState != STATE_IDLE) {
-        return INVALID_OPERATION;
-    }
-
-    mState = STATE_SET_DATASOURCE_PENDING;
-
-    mPlayer->setDataSourceAsync(fd, offset, length);
-
-    while (mState == STATE_SET_DATASOURCE_PENDING) {
-        mCondition.wait(mLock);
-    }
-
-    return mAsyncResult;
-}
-
-status_t NuPlayer2Driver::setDataSource(const sp<IStreamSource> &source) {
-    ALOGV("setDataSource(%p) stream source", this);
-    Mutex::Autolock autoLock(mLock);
-
-    if (mState != STATE_IDLE) {
-        return INVALID_OPERATION;
-    }
-
-    mState = STATE_SET_DATASOURCE_PENDING;
-
-    mPlayer->setDataSourceAsync(source);
-
-    while (mState == STATE_SET_DATASOURCE_PENDING) {
-        mCondition.wait(mLock);
-    }
-
-    return mAsyncResult;
-}
-
-status_t NuPlayer2Driver::setDataSource(const sp<DataSource> &source) {
+status_t NuPlayer2Driver::setDataSource(const sp<DataSourceDesc> &dsd) {
     ALOGV("setDataSource(%p) callback source", this);
     Mutex::Autolock autoLock(mLock);
 
@@ -245,7 +185,7 @@ status_t NuPlayer2Driver::setDataSource(const sp<DataSource> &source) {
 
     mState = STATE_SET_DATASOURCE_PENDING;
 
-    mPlayer->setDataSourceAsync(source);
+    mPlayer->setDataSourceAsync(dsd);
 
     while (mState == STATE_SET_DATASOURCE_PENDING) {
         mCondition.wait(mLock);

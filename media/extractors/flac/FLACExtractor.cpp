@@ -22,7 +22,7 @@
 // libFLAC parser
 #include "FLAC/stream_decoder.h"
 
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -165,7 +165,7 @@ class FLACSource : public MediaSourceBase {
 
 public:
     FLACSource(
-            const sp<DataSource> &dataSource,
+            DataSourceBase *dataSource,
             const sp<MetaData> &trackMetadata);
 
     virtual status_t start(MetaData *params);
@@ -179,7 +179,7 @@ protected:
     virtual ~FLACSource();
 
 private:
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
     sp<MetaData> mTrackMetadata;
     sp<FLACParser> mParser;
     bool mInitCheck;
@@ -203,7 +203,7 @@ public:
     };
 
     explicit FLACParser(
-        const sp<DataSource> &dataSource,
+        DataSourceBase *dataSource,
         // If metadata pointers aren't provided, we don't fill them
         const sp<MetaData> &fileMetadata = 0,
         const sp<MetaData> &trackMetadata = 0);
@@ -243,7 +243,7 @@ protected:
     virtual ~FLACParser();
 
 private:
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
     sp<MetaData> mFileMetadata;
     sp<MetaData> mTrackMetadata;
     bool mInitCheck;
@@ -612,7 +612,7 @@ static void copyTrespass(
 // FLACParser
 
 FLACParser::FLACParser(
-        const sp<DataSource> &dataSource,
+        DataSourceBase *dataSource,
         const sp<MetaData> &fileMetadata,
         const sp<MetaData> &trackMetadata)
     : mDataSource(dataSource),
@@ -833,7 +833,7 @@ MediaBuffer *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
 // FLACsource
 
 FLACSource::FLACSource(
-        const sp<DataSource> &dataSource,
+        DataSourceBase *dataSource,
         const sp<MetaData> &trackMetadata)
     : mDataSource(dataSource),
       mTrackMetadata(trackMetadata),
@@ -918,7 +918,7 @@ status_t FLACSource::init()
 // FLACExtractor
 
 FLACExtractor::FLACExtractor(
-        const sp<DataSource> &dataSource)
+        DataSourceBase *dataSource)
     : mDataSource(dataSource),
       mInitCheck(false)
 {
@@ -969,7 +969,7 @@ sp<MetaData> FLACExtractor::getMetaData()
 // Sniffer
 
 bool SniffFLAC(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence,
+        DataSourceBase *source, String8 *mimeType, float *confidence,
         sp<AMessage> *)
 {
     // first 4 is the signature word
@@ -1000,13 +1000,13 @@ MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
             1,
             "FLAC Extractor",
             [](
-                    const sp<DataSource> &source,
+                    DataSourceBase *source,
                     String8 *mimeType,
                     float *confidence,
                     sp<AMessage> *meta __unused) -> MediaExtractor::CreatorFunc {
                 if (SniffFLAC(source, mimeType, confidence, meta)) {
                     return [](
-                            const sp<DataSource> &source,
+                            DataSourceBase *source,
                             const sp<AMessage>& meta __unused) -> MediaExtractor* {
                         return new FLACExtractor(source);};
                 }

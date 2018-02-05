@@ -29,6 +29,7 @@
 #include <utils/Log.h>
 #include <private/media/AudioTrackShared.h>
 #include <media/IAudioFlinger.h>
+#include <media/AudioParameter.h>
 #include <media/AudioPolicyHelper.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/MediaAnalyticsItem.h>
@@ -2352,6 +2353,17 @@ status_t AudioTrack::setParameters(const String8& keyValuePairs)
 {
     AutoMutex lock(mLock);
     return mAudioTrack->setParameters(keyValuePairs);
+}
+
+status_t AudioTrack::selectPresentation(int presentationId, int programId)
+{
+    AutoMutex lock(mLock);
+    AudioParameter param = AudioParameter();
+    param.addInt(String8(AudioParameter::keyPresentationId), presentationId);
+    param.addInt(String8(AudioParameter::keyProgramId), programId);
+    ALOGV("PresentationId/ProgramId[%s]",param.toString().string());
+
+    return mAudioTrack->setParameters(param.toString());
 }
 
 VolumeShaper::Status AudioTrack::applyVolumeShaper(

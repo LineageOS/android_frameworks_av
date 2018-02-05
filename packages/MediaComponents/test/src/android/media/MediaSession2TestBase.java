@@ -63,6 +63,7 @@ abstract class MediaSession2TestBase {
         // Add methods in ControllerCallback/BrowserCallback that you want to test.
         default void onPlaylistChanged(List<MediaItem2> playlist) {}
         default void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {}
+        default void onPlaybackInfoChanged(MediaController2.PlaybackInfo info) {}
 
         // Currently empty. Add methods in ControllerCallback/BrowserCallback that you want to test.
         default void onPlaybackStateChanged(PlaybackState2 state) { }
@@ -239,6 +240,13 @@ abstract class MediaSession2TestBase {
         public void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {
             if (mCallbackProxy != null) {
                 mCallbackProxy.onPlaylistParamsChanged(params);
+            }
+        }
+
+        @Override
+        public void onPlaybackInfoChanged(MediaController2.PlaybackInfo info) {
+            if (mCallbackProxy != null) {
+                mCallbackProxy.onPlaybackInfoChanged(info);
             }
         }
     }

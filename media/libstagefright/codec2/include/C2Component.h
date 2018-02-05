@@ -332,7 +332,7 @@ public:
     class Listener {
     public:
         virtual void onWorkDone_nb(std::weak_ptr<C2Component> component,
-                                std::vector<std::unique_ptr<C2Work>> workItems) = 0;
+                                std::list<std::unique_ptr<C2Work>> workItems) = 0;
 
         virtual void onTripped_nb(std::weak_ptr<C2Component> component,
                                std::vector<std::shared_ptr<C2SettingResult>> settingResult) = 0;
@@ -696,6 +696,7 @@ public:
         DEFAULT_GRAPHIC,    ///< basic graphic allocator type
         PLATFORM_START = 0x10,
         VENDOR_START   = 0x100,
+        BAD_ID         = C2Allocator::BAD_ID, ///< DO NOT USE
     };
 
     /**

@@ -40,14 +40,9 @@ namespace android {
  * \todo Move ion allocation into its HIDL or provide some mapping from memory usage to ion flags
  * \todo Make this allocator store extendable
  */
-class C2PlatformAllocatorStore : public C2AllocatorStore {
+class C2PlatformAllocatorStoreImpl : public C2PlatformAllocatorStore {
 public:
-    enum : id_t {
-        ION = PLATFORM_START,
-        GRALLOC,
-    };
-
-    C2PlatformAllocatorStore(
+    C2PlatformAllocatorStoreImpl(
         /* ionmapper */
     );
 
@@ -71,10 +66,10 @@ private:
     std::shared_ptr<C2Allocator> fetchGrallocAllocator();
 };
 
-C2PlatformAllocatorStore::C2PlatformAllocatorStore() {
+C2PlatformAllocatorStoreImpl::C2PlatformAllocatorStoreImpl() {
 }
 
-c2_status_t C2PlatformAllocatorStore::fetchAllocator(
+c2_status_t C2PlatformAllocatorStoreImpl::fetchAllocator(
         id_t id, std::shared_ptr<C2Allocator> *const allocator) {
     allocator->reset();
     switch (id) {
@@ -98,32 +93,32 @@ c2_status_t C2PlatformAllocatorStore::fetchAllocator(
     return C2_OK;
 }
 
-std::shared_ptr<C2Allocator> C2PlatformAllocatorStore::fetchIonAllocator() {
+std::shared_ptr<C2Allocator> C2PlatformAllocatorStoreImpl::fetchIonAllocator() {
     static std::mutex mutex;
     static std::weak_ptr<C2Allocator> ionAllocator;
     std::lock_guard<std::mutex> lock(mutex);
     std::shared_ptr<C2Allocator> allocator = ionAllocator.lock();
     if (allocator == nullptr) {
-        allocator = std::make_shared<C2AllocatorIon>();
+        allocator = std::make_shared<C2AllocatorIon>(C2PlatformAllocatorStore::ION);
         ionAllocator = allocator;
     }
     return allocator;
 }
 
-std::shared_ptr<C2Allocator> C2PlatformAllocatorStore::fetchGrallocAllocator() {
+std::shared_ptr<C2Allocator> C2PlatformAllocatorStoreImpl::fetchGrallocAllocator() {
     static std::mutex mutex;
     static std::weak_ptr<C2Allocator> grallocAllocator;
     std::lock_guard<std::mutex> lock(mutex);
     std::shared_ptr<C2Allocator> allocator = grallocAllocator.lock();
     if (allocator == nullptr) {
-        allocator = std::make_shared<C2AllocatorGralloc>();
+        allocator = std::make_shared<C2AllocatorGralloc>(C2PlatformAllocatorStore::GRALLOC);
         grallocAllocator = allocator;
     }
     return allocator;
 }
 
 std::shared_ptr<C2AllocatorStore> GetCodec2PlatformAllocatorStore() {
-    return std::make_shared<C2PlatformAllocatorStore>();
+    return std::make_shared<C2PlatformAllocatorStoreImpl>();
 }
 
 c2_status_t GetCodec2BlockPool(
@@ -408,6 +403,8 @@ C2PlatformComponentStore::C2PlatformComponentStore() {
     mComponents.emplace("c2.google.aac.decoder", "libstagefright_soft_c2aacdec.so");
     mComponents.emplace("c2.google.aac.encoder", "libstagefright_soft_c2aacenc.so");
     mComponents.emplace("c2.google.mp3.decoder", "libstagefright_soft_c2mp3dec.so");
+    mComponents.emplace("c2.google.g711.alaw.decoder", "libstagefright_soft_c2g711alawdec.so");
+    mComponents.emplace("c2.google.g711.mlaw.decoder", "libstagefright_soft_c2g711mlawdec.so");
 }
 
 c2_status_t C2PlatformComponentStore::copyBuffer(

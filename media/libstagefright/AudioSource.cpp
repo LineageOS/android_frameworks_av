@@ -498,4 +498,12 @@ status_t AudioSource::removeAudioDeviceCallback(
     return NO_INIT;
 }
 
+status_t AudioSource::getActiveMicrophones(
+        std::vector<media::MicrophoneInfo>* activeMicrophones) {
+    if (mRecord != 0) {
+        return mRecord->getActiveMicrophones(activeMicrophones);
+    }
+    return NO_INIT;
+}
+
 }  // namespace android

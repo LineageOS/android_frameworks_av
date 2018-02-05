@@ -16,11 +16,13 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "CCodec"
+#include <cutils/properties.h>
 #include <utils/Log.h>
 
 #include <thread>
 
 #include <C2PlatformSupport.h>
+#include <C2V4l2Support.h>
 
 #include <gui/Surface.h>
 #include <media/stagefright/BufferProducerWrapper.h>
@@ -117,7 +119,7 @@ public:
 
     virtual void onWorkDone_nb(
             std::weak_ptr<C2Component> component,
-            std::vector<std::unique_ptr<C2Work>> workItems) override {
+            std::list<std::unique_ptr<C2Work>> workItems) override {
         (void)component;
         sp<CCodec> codec(mCodec.promote());
         if (!codec) {
@@ -187,7 +189,14 @@ void CCodec::allocate(const AString &componentName) {
     std::shared_ptr<C2Component> comp;
     c2_status_t err = GetCodec2PlatformComponentStore()->createComponent(
             componentName.c_str(), &comp);
+    static bool v4l2Enabled =
+            property_get_bool("debug.stagefright.ccodec_v4l2", false);
+    if (err != C2_OK && v4l2Enabled) {
+        err = GetCodec2VDAComponentStore()->createComponent(
+                componentName.c_str(), &comp);
+    }
     if (err != C2_OK) {
+        ALOGE("Failed Create component: %s", componentName.c_str());
         Mutexed<State>::Locked state(mState);
         state->set(RELEASED);
         state.unlock();
@@ -195,6 +204,7 @@ void CCodec::allocate(const AString &componentName) {
         state.lock();
         return;
     }
+    ALOGV("Success Create component: %s", componentName.c_str());
     comp->setListener_vb(mListener, C2_MAY_BLOCK);
     {
         Mutexed<State>::Locked state(mState);
@@ -601,7 +611,7 @@ void CCodec::signalRequestIDRFrame() {
     // TODO
 }
 
-void CCodec::onWorkDone(std::vector<std::unique_ptr<C2Work>> &workItems) {
+void CCodec::onWorkDone(std::list<std::unique_ptr<C2Work>> &workItems) {
     Mutexed<std::list<std::unique_ptr<C2Work>>>::Locked queue(mWorkDoneQueue);
     for (std::unique_ptr<C2Work> &item : workItems) {
         queue->push_back(std::move(item));

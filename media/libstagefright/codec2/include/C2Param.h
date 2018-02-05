@@ -1020,7 +1020,7 @@ public:
      * For vendor-defined components, it can be true even for vendor-defined params,
      * but it is not recommended, in case the component becomes platform-defined.
      */
-    inline bool isRequired() const { return _mIsRequired; }
+    inline bool isRequired() const { return _mAttrib & IS_REQUIRED; }
 
     /**
      * Returns whether this parameter is persistent. This is always true for C2Tuning and C2Setting,
@@ -1029,35 +1029,43 @@ public:
      * current frame and is not assumed to have the same value (or even be present) on subsequent
      * frames, unless it is specified for those frames.
      */
-    inline bool isPersistent() const { return _mIsPersistent; }
+    inline bool isPersistent() const { return _mAttrib & IS_PERSISTENT; }
 
     /// Returns the name of this param.
     /// This defaults to the underlying C2Struct's name, but could be altered for a component.
     inline C2String name() const { return _mName; }
 
-    /// Returns the parameter type
-    /// \todo fix this
-    inline C2Param::Type type() const { return _mType; }
+    /// Returns the parameter index
+    inline C2Param::Index index() const { return _mIndex; }
+
+    /// Returns the indices of parameters that this parameter has a dependency on
+    inline const std::vector<C2Param::Index> &dependencies() const { return mDependencies; }
+
+    // TODO: add more constructors that allow setting dependencies and attributes
 
     template<typename T>
     inline C2ParamDescriptor(bool isRequired, C2StringLiteral name, const T*)
-        : _mIsRequired(isRequired),
-          _mIsPersistent(true),
-          _mName(name),
-          _mType(T::PARAM_TYPE) { }
+        : _mIndex(T::PARAM_TYPE),
+          _mAttrib(IS_PERSISTENT | (isRequired ? IS_REQUIRED : 0)),
+          _mName(name) { }
 
     inline C2ParamDescriptor(
-            bool isRequired, C2StringLiteral name, C2Param::Type type)
-        : _mIsRequired(isRequired),
-          _mIsPersistent(true),
-          _mName(name),
-          _mType(type) { }
+            bool isRequired, C2StringLiteral name, C2Param::Index index)
+        : _mIndex(index),
+          _mAttrib(IS_PERSISTENT | (isRequired ? IS_REQUIRED : 0)),
+          _mName(name) { }
 
 private:
-    const bool _mIsRequired;
-    const bool _mIsPersistent;
+    enum attrib_t : uint32_t {
+        IS_REQUIRED   = 1u << 0,
+        IS_PERSISTENT = 1u << 1,
+    };
+    const C2Param::Index _mIndex;
+    const uint32_t _mAttrib;
     const C2String _mName;
-    const C2Param::Type _mType;
+    std::vector<C2Param::Index> mDependencies;
+
+    friend struct _C2ParamInspector;
 };
 
 /// \ingroup internal
@@ -1300,7 +1308,7 @@ struct C2FieldSupportedValues {
         Primitive min;
         Primitive max;
         Primitive step;
-        Primitive nom;
+        Primitive num;
         Primitive denom;
     } range;
     std::vector<Primitive> values;
@@ -1315,9 +1323,9 @@ struct C2FieldSupportedValues {
           range{min, max, step, (T)1, (T)1} { }
 
     template<typename T>
-    C2FieldSupportedValues(T min, T max, T nom, T den) :
+    C2FieldSupportedValues(T min, T max, T num, T den) :
         type(RANGE),
-        range{min, max, (T)0, nom, den} { }
+        range{min, max, (T)0, num, den} { }
 
     template<typename T>
     C2FieldSupportedValues(bool flags, std::initializer_list<T> list)

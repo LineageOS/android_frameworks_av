@@ -30,7 +30,7 @@ namespace android {
 
 static const size_t kMaxMetadataSize = 3 * 1024 * 1024;
 
-struct MemorySource : public DataSource {
+struct MemorySource : public DataSourceBase {
     MemorySource(const uint8_t *data, size_t size)
         : mData(data),
           mSize(size) {
@@ -56,7 +56,7 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(MemorySource);
 };
 
-ID3::ID3(const sp<DataSource> &source, bool ignoreV1, off64_t offset)
+ID3::ID3(DataSourceBase *source, bool ignoreV1, off64_t offset)
     : mIsValid(false),
       mData(NULL),
       mSize(0),
@@ -77,7 +77,7 @@ ID3::ID3(const uint8_t *data, size_t size, bool ignoreV1)
       mFirstFrameOffset(0),
       mVersion(ID3_UNKNOWN),
       mRawSize(0) {
-    sp<MemorySource> source = new (std::nothrow) MemorySource(data, size);
+    MemorySource *source = new (std::nothrow) MemorySource(data, size);
 
     if (source == NULL)
         return;
@@ -87,6 +87,7 @@ ID3::ID3(const uint8_t *data, size_t size, bool ignoreV1)
     if (!mIsValid && !ignoreV1) {
         mIsValid = parseV1(source);
     }
+    delete source;
 }
 
 ID3::~ID3() {
@@ -118,7 +119,7 @@ bool ID3::ParseSyncsafeInteger(const uint8_t encoded[4], size_t *x) {
     return true;
 }
 
-bool ID3::parseV2(const sp<DataSource> &source, off64_t offset) {
+bool ID3::parseV2(DataSourceBase *source, off64_t offset) {
 struct id3_header {
     char id[3];
     uint8_t version_major;
@@ -960,7 +961,7 @@ ID3::getAlbumArt(size_t *length, String8 *mime) const {
     return NULL;
 }
 
-bool ID3::parseV1(const sp<DataSource> &source) {
+bool ID3::parseV1(DataSourceBase *source) {
     const size_t V1_TAG_SIZE = 128;
 
     off64_t size;

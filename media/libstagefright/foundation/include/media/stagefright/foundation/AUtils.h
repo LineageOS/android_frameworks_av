@@ -22,28 +22,28 @@
 
 /* T must be integer type, den must not be 0 */
 template<class T>
-inline static const T divRound(const T &nom, const T &den) {
-    if ((nom >= 0) ^ (den >= 0)) {
-        return (nom - den / 2) / den;
+inline static const T divRound(const T &num, const T &den) {
+    if ((num >= 0) ^ (den >= 0)) {
+        return (num - den / 2) / den;
     } else {
-        return (nom + den / 2) / den;
+        return (num + den / 2) / den;
     }
 }
 
-/* == ceil(nom / den). T must be integer type, den must not be 0 */
+/* == ceil(num / den). T must be integer type, den must not be 0 */
 template<class T>
-inline static const T divUp(const T &nom, const T &den) {
+inline static const T divUp(const T &num, const T &den) {
     if (den < 0) {
-        return (nom < 0 ? nom + den + 1 : nom) / den;
+        return (num < 0 ? num + den + 1 : num) / den;
     } else {
-        return (nom < 0 ? nom : nom + den - 1) / den;
+        return (num < 0 ? num : num + den - 1) / den;
     }
 }
 
-/* == ceil(nom / den) * den. T must be integer type, alignment must be positive power of 2 */
+/* == ceil(num / den) * den. T must be integer type, alignment must be positive power of 2 */
 template<class T, class U>
-inline static const T align(const T &nom, const U &den) {
-    return (nom + (T)(den - 1)) & (T)~(den - 1);
+inline static const T align(const T &num, const U &den) {
+    return (num + (T)(den - 1)) & (T)~(den - 1);
 }
 
 template<class T>

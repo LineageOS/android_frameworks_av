@@ -24,11 +24,11 @@
 
 namespace android {
 
-class DataSource;
+class DataSourceBase;
 
 struct VBRISeeker : public MP3Seeker {
     static sp<VBRISeeker> CreateFromSource(
-            const sp<DataSource> &source, off64_t post_id3_pos);
+            DataSourceBase *source, off64_t post_id3_pos);
 
     virtual bool getDuration(int64_t *durationUs);
     virtual bool getOffsetForTime(int64_t *timeUs, off64_t *pos);

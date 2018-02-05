@@ -1,4 +1,14 @@
-cc_library {
+cc_library_headers {
+    name: "libstagefright_codec2_internal",
+
+    export_include_dirs: [
+        "internal",
+    ],
+
+    vendor_available: false,
+}
+
+cc_library_shared {
     name: "libstagefright_codec2_vndk",
 
     srcs: [
@@ -11,6 +21,10 @@ cc_library {
 
     export_include_dirs: [
         "include",
+    ],
+
+    header_libs:[
+        "libstagefright_codec2_internal",
     ],
 
     include_dirs: [

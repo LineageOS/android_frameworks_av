@@ -2,8 +2,8 @@ cc_library_static {
 
     srcs: [
         "JWakeLock.cpp",
-        "GenericSource.cpp",
-        "HTTPLiveSource.cpp",
+        "GenericSource2.cpp",
+        "HTTPLiveSource2.cpp",
         "NuPlayer2.cpp",
         "NuPlayer2CCDecoder.cpp",
         "NuPlayer2Decoder.cpp",
@@ -12,9 +12,7 @@ cc_library_static {
         "NuPlayer2Driver.cpp",
         "NuPlayer2Drm.cpp",
         "NuPlayer2Renderer.cpp",
-        "NuPlayer2StreamListener.cpp",
-        "RTSPSource.cpp",
-        "StreamingSource.cpp",
+        "RTSPSource2.cpp",
     ],
 
     header_libs: [

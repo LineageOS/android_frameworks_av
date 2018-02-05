@@ -42,7 +42,7 @@ public:
     MicrophoneInfo(audio_microphone_characteristic_t& characteristic) {
         mDeviceId = String16(&characteristic.device_id[0]);
         mPortId = characteristic.id;
-        mType = characteristic.type;
+        mType = characteristic.device;
         mAddress = String16(&characteristic.address[0]);
         mDeviceLocation = characteristic.location;
         mDeviceGroup = characteristic.group;

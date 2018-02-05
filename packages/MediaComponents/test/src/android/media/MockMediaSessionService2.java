@@ -87,7 +87,7 @@ public class MockMediaSessionService2 extends MediaSessionService2 {
                 .setContentTitle(getPackageName())
                 .setContentText("Playback state: " + state.getState())
                 .setSmallIcon(android.R.drawable.sym_def_app_icon).build();
-        return MediaNotification.create(DEFAULT_MEDIA_NOTIFICATION_ID, notification);
+        return new MediaNotification(this, DEFAULT_MEDIA_NOTIFICATION_ID, notification);
     }
 
     private class MySessionCallback extends SessionCallback {

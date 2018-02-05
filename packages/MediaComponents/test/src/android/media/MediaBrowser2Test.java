@@ -66,7 +66,7 @@ public class MediaBrowser2Test extends MediaController2Test {
     }
 
     @Test
-    public void testGetBrowserRoot() throws InterruptedException {
+    public void testGetLibraryRoot() throws InterruptedException {
         final Bundle param = new Bundle();
         param.putString(TAG, TAG);
 
@@ -84,7 +84,7 @@ public class MediaBrowser2Test extends MediaController2Test {
         final SessionToken2 token = MockMediaLibraryService2.getToken(mContext);
         MediaBrowser2 browser =
                 (MediaBrowser2) createController(token,true, callback);
-        browser.getBrowserRoot(param);
+        browser.getLibraryRoot(param);
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
     }
 
@@ -125,6 +125,13 @@ public class MediaBrowser2Test extends MediaController2Test {
         public void onPlaylistParamsChanged(PlaylistParams params) {
             super.onPlaylistParamsChanged(params);
             mCallbackProxy.onPlaylistParamsChanged(params);
+        }
+
+        @Override
+        public void onPlaybackInfoChanged(MediaController2.PlaybackInfo info) {
+            if (mCallbackProxy != null) {
+                mCallbackProxy.onPlaybackInfoChanged(info);
+            }
         }
 
         @Override

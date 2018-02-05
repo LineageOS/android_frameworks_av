@@ -21,7 +21,7 @@
 #include <media/stagefright/foundation/avc_utils.h>
 
 #include <media/stagefright/foundation/ByteUtils.h>
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 
 namespace android {
 
@@ -77,7 +77,7 @@ bool XINGSeeker::getOffsetForTime(int64_t *timeUs, off64_t *pos) {
 
 // static
 sp<XINGSeeker> XINGSeeker::CreateFromSource(
-        const sp<DataSource> &source, off64_t first_frame_pos) {
+        DataSourceBase *source, off64_t first_frame_pos) {
     sp<XINGSeeker> seeker = new XINGSeeker;
 
     seeker->mFirstFramePos = first_frame_pos;

@@ -97,8 +97,8 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         }
 
         @Override
-        public BrowserRoot onGetRoot(ControllerInfo controller, Bundle rootHints) {
-            return new BrowserRoot(ROOT_ID, EXTRA);
+        public LibraryRoot onGetRoot(ControllerInfo controller, Bundle rootHints) {
+            return new LibraryRoot(MockMediaLibraryService2.this, ROOT_ID, EXTRA);
         }
     }
 }

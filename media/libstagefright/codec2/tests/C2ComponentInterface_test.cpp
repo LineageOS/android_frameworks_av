@@ -410,17 +410,17 @@ void C2CompIntfTest::getTestValues(
             // 1. integer geometric case
             // 2. float geometric case
 
-            auto nom = prim2Value(range.nom);
+            auto num = prim2Value(range.num);
             auto denom = prim2Value(range.denom);
 
-            // If both range.nom and range.denom are 1 and step is 0, we should use
+            // If both range.num and range.denom are 1 and step is 0, we should use
             // VALUES, shouldn't we?
-            ASSERT_FALSE(nom == 1 && denom == 1);
+            ASSERT_FALSE(num == 1 && denom == 1);
 
-            // (nom / denom) is not less than 1.
+            // (num / denom) is not less than 1.
             ASSERT_FALSE(denom == 0);
-            ASSERT_LE(denom, nom);
-            for (auto v = rmin; v <= rmax; v = v * nom / denom) {
+            ASSERT_LE(denom, num);
+            for (auto v = rmin; v <= rmax; v = v * num / denom) {
                 validValues->emplace_back(v);
             }
 
@@ -529,7 +529,7 @@ bool isSupportedParam(
         const C2Param &param,
         const std::vector<std::shared_ptr<C2ParamDescriptor>> &sParams) {
     for (const auto &pd : sParams) {
-        if (param.type() == pd->type().type()) {
+        if (param.type() == pd->index().type()) {
             return true;
         }
     }

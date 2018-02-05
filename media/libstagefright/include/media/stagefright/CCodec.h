@@ -59,7 +59,7 @@ public:
     virtual void signalRequestIDRFrame() override;
 
     void initiateReleaseIfStuck();
-    void onWorkDone(std::vector<std::unique_ptr<C2Work>> &workItems);
+    void onWorkDone(std::list<std::unique_ptr<C2Work>> &workItems);
 
 protected:
     virtual ~CCodec();

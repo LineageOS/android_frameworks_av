@@ -17,7 +17,7 @@
 #ifndef MIDI_EXTRACTOR_H_
 #define MIDI_EXTRACTOR_H_
 
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/MediaExtractor.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaBufferGroup.h>
@@ -29,7 +29,7 @@ namespace android {
 
 class MidiEngine : public RefBase {
 public:
-    MidiEngine(const sp<DataSource> &dataSource,
+    MidiEngine(DataSourceBase *dataSource,
             const sp<MetaData> &fileMetadata,
             const sp<MetaData> &trackMetadata);
     ~MidiEngine();
@@ -52,8 +52,7 @@ private:
 class MidiExtractor : public MediaExtractor {
 
 public:
-    // Extractor assumes ownership of source
-    explicit MidiExtractor(const sp<DataSource> &source);
+    explicit MidiExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();
     virtual MediaSourceBase *getTrack(size_t index);
@@ -66,7 +65,7 @@ protected:
     virtual ~MidiExtractor();
 
 private:
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
     status_t mInitCheck;
     sp<MetaData> mFileMetadata;
 
@@ -88,7 +87,7 @@ private:
 
 };
 
-bool SniffMidi(const sp<DataSource> &source, String8 *mimeType,
+bool SniffMidi(DataSourceBase *source, String8 *mimeType,
         float *confidence, sp<AMessage> *);
 
 }  // namespace android

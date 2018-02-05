@@ -58,6 +58,12 @@ public:
     static const char * const keyMonoOutput;
     static const char * const keyStreamHwAvSync;
 
+    //  keys for presentation selection
+    //  keyPresentationId: Audio presentation identifier
+    //  keyProgramId: Audio presentation program identifier
+    static const char * const keyPresentationId;
+    static const char * const keyProgramId;
+
     //  keyStreamConnect / Disconnect: value is an int in audio_devices_t
     static const char * const keyStreamConnect;
     static const char * const keyStreamDisconnect;

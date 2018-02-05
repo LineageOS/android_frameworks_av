@@ -39,7 +39,9 @@ NuPlayer2::DecoderBase::DecoderBase(const sp<AMessage> &notify)
     // are blocking, but NuPlayer2 needs asynchronous operations.
     mDecoderLooper = new ALooper;
     mDecoderLooper->setName("NPDecoder");
-    mDecoderLooper->start(false, false, ANDROID_PRIORITY_AUDIO);
+    mDecoderLooper->start(false, /* runOnCallingThread */
+                          true,  /* canCallJava */
+                          ANDROID_PRIORITY_AUDIO);
 }
 
 NuPlayer2::DecoderBase::~DecoderBase() {

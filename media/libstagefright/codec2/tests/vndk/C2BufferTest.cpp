@@ -29,10 +29,10 @@ namespace android {
 class C2BufferTest : public ::testing::Test {
 public:
     C2BufferTest()
-        : mLinearAllocator(std::make_shared<C2AllocatorIon>()),
+        : mLinearAllocator(std::make_shared<C2AllocatorIon>('i')),
           mSize(0u),
           mAddr(nullptr),
-          mGraphicAllocator(std::make_shared<C2AllocatorGralloc>()) {
+          mGraphicAllocator(std::make_shared<C2AllocatorGralloc>('g')) {
     }
 
     ~C2BufferTest() = default;

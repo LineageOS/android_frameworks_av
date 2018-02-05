@@ -24,7 +24,7 @@
 #include "VBRISeeker.h"
 #include "XINGSeeker.h"
 
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -46,7 +46,7 @@ namespace android {
 static const uint32_t kMask = 0xfffe0c00;
 
 static bool Resync(
-        const sp<DataSource> &source, uint32_t match_header,
+        DataSourceBase *source, uint32_t match_header,
         off64_t *inout_pos, off64_t *post_id3_pos, uint32_t *out_header) {
     if (post_id3_pos != NULL) {
         *post_id3_pos = 0;
@@ -212,7 +212,7 @@ static bool Resync(
 class MP3Source : public MediaSourceBase {
 public:
     MP3Source(
-            const sp<MetaData> &meta, const sp<DataSource> &source,
+            const sp<MetaData> &meta, DataSourceBase *source,
             off64_t first_frame_pos, uint32_t fixed_header,
             const sp<MP3Seeker> &seeker);
 
@@ -230,7 +230,7 @@ protected:
 private:
     static const size_t kMaxFrameSize;
     sp<MetaData> mMeta;
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
     off64_t mFirstFramePos;
     uint32_t mFixedHeader;
     off64_t mCurrentPos;
@@ -247,7 +247,7 @@ private:
 };
 
 MP3Extractor::MP3Extractor(
-        const sp<DataSource> &source, const sp<AMessage> &meta)
+        DataSourceBase *source, const sp<AMessage> &meta)
     : mInitCheck(NO_INIT),
       mDataSource(source),
       mFirstFramePos(-1),
@@ -436,7 +436,7 @@ sp<MetaData> MP3Extractor::getTrackMetaData(
 // Set our max frame size to the nearest power of 2 above this size (aka, 4kB)
 const size_t MP3Source::kMaxFrameSize = (1 << 12); /* 4096 bytes */
 MP3Source::MP3Source(
-        const sp<MetaData> &meta, const sp<DataSource> &source,
+        const sp<MetaData> &meta, DataSourceBase *source,
         off64_t first_frame_pos, uint32_t fixed_header,
         const sp<MP3Seeker> &seeker)
     : mMeta(meta),
@@ -667,13 +667,13 @@ sp<MetaData> MP3Extractor::getMetaData() {
 }
 
 static MediaExtractor* CreateExtractor(
-        const sp<DataSource> &source,
+        DataSourceBase *source,
         const sp<AMessage>& meta) {
     return new MP3Extractor(source, meta);
 }
 
 static MediaExtractor::CreatorFunc Sniff(
-        const sp<DataSource> &source, String8 *mimeType,
+        DataSourceBase *source, String8 *mimeType,
         float *confidence, sp<AMessage> *meta) {
     off64_t pos = 0;
     off64_t post_id3_pos;

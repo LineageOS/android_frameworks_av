@@ -126,9 +126,16 @@ public:
      */
     bool isHW() const;
 
+    /**
+     * Null-fence. A fence that has fired.
+     */
+    constexpr C2Fence() : mImpl(nullptr) { }
+
 private:
     class Impl;
     std::shared_ptr<Impl> mImpl;
+    C2Fence(const std::shared_ptr<Impl> &impl);
+    friend struct _C2FenceFactory;
 };
 
 /**
@@ -245,13 +252,101 @@ private:
 **************************************************************************************************/
 
 /**
+ * Basic segment math support.
+ */
+struct C2Segment {
+    uint32_t offset;
+    uint32_t size;
+
+    inline constexpr C2Segment(uint32_t offset_, uint32_t size_)
+        : offset(offset_),
+          size(size_) {
+    }
+
+    inline constexpr bool isEmpty() const {
+        return size == 0;
+    }
+
+    inline constexpr bool isValid() const {
+        return offset <= ~size;
+    }
+
+    inline constexpr operator bool() const {
+        return isValid() && !isEmpty();
+    }
+
+    inline constexpr bool operator!() const {
+        return !bool(*this);
+    }
+
+    C2_ALLOW_OVERFLOW
+    inline constexpr bool contains(const C2Segment &other) const {
+        if (!isValid() || !other.isValid()) {
+            return false;
+        } else {
+            return offset <= other.offset
+                    && offset + size >= other.offset + other.size;
+        }
+    }
+
+    inline constexpr bool operator==(const C2Segment &other) const {
+        if (!isValid()) {
+            return !other.isValid();
+        } else {
+            return offset == other.offset && size == other.size;
+        }
+    }
+
+    inline constexpr bool operator!=(const C2Segment &other) const {
+        return !operator==(other);
+    }
+
+    inline constexpr bool operator>=(const C2Segment &other) const {
+        return contains(other);
+    }
+
+    inline constexpr bool operator>(const C2Segment &other) const {
+        return contains(other) && !operator==(other);
+    }
+
+    inline constexpr bool operator<=(const C2Segment &other) const {
+        return other.contains(*this);
+    }
+
+    inline constexpr bool operator<(const C2Segment &other) const {
+        return other.contains(*this) && !operator==(other);
+    }
+
+    C2_ALLOW_OVERFLOW
+    inline constexpr uint32_t end() const {
+        return offset + size;
+    }
+
+    C2_ALLOW_OVERFLOW
+    inline constexpr C2Segment intersect(const C2Segment &other) const {
+        if (!isValid()) {
+            return *this;
+        } else if (!other.isValid()) {
+            return other;
+        } else {
+            return C2Segment(c2_max(offset, other.offset),
+                             c2_min(end(), other.end()) - c2_max(offset, other.offset));
+        }
+    }
+};
+
+/**
  * Common aspect for all objects that have a linear capacity.
  */
 class _C2LinearCapacityAspect {
 /// \name Linear capacity interface
 /// @{
 public:
-    inline uint32_t capacity() const { return mCapacity; }
+    inline constexpr uint32_t capacity() const { return mCapacity; }
+
+    inline constexpr operator C2Segment() const {
+        return C2Segment(0, mCapacity);
+    }
 
 protected:
 
@@ -263,10 +358,10 @@ protected:
     inline explicit _C2LinearCapacityAspect(size_t capacity) = delete;
 #endif
 
-    inline explicit _C2LinearCapacityAspect(uint32_t capacity)
+    inline explicit constexpr _C2LinearCapacityAspect(uint32_t capacity)
       : mCapacity(capacity) { }
 
-    inline explicit _C2LinearCapacityAspect(const _C2LinearCapacityAspect *parent)
+    inline explicit constexpr _C2LinearCapacityAspect(const _C2LinearCapacityAspect *parent)
         : mCapacity(parent == nullptr ? 0 : parent->capacity()) { }
 
 private:
@@ -283,23 +378,35 @@ class _C2LinearRangeAspect : public _C2LinearCapacityAspect {
 /// \name Linear range interface
 /// @{
 public:
-    inline uint32_t offset() const { return mOffset; }
-    inline uint32_t endOffset() const { return mOffset + mSize; }
-    inline uint32_t size() const { return mSize; }
+    inline constexpr uint32_t offset() const { return mOffset; }
+    inline constexpr uint32_t endOffset() const { return mOffset + mSize; }
+    inline constexpr uint32_t size() const { return mSize; }
+
+    inline constexpr operator C2Segment() const {
+        return C2Segment(mOffset, mSize);
+    }
 
 protected:
-    inline explicit _C2LinearRangeAspect(const _C2LinearCapacityAspect *parent)
+    // capacity range [0, capacity]
+    inline constexpr explicit _C2LinearRangeAspect(const _C2LinearCapacityAspect *parent)
         : _C2LinearCapacityAspect(parent),
           mOffset(0),
           mSize(capacity()) { }
 
-    inline _C2LinearRangeAspect(const _C2LinearCapacityAspect *parent, size_t offset, size_t size)
+    // copy constructor (no error check)
+    inline constexpr _C2LinearRangeAspect(const _C2LinearRangeAspect &other)
+        : _C2LinearCapacityAspect(other.capacity()),
+          mOffset(other.offset()),
+          mSize(other.size()) { }
+
+    // subrange of capacity [0, capacity] & [size, size + offset]
+    inline constexpr _C2LinearRangeAspect(const _C2LinearCapacityAspect *parent, size_t offset, size_t size)
         : _C2LinearCapacityAspect(parent),
           mOffset(c2_min(offset, capacity())),
           mSize(c2_min(size, capacity() - mOffset)) { }
 
     // subsection of the two [offset, offset + size] ranges
-    inline _C2LinearRangeAspect(const _C2LinearRangeAspect *parent, size_t offset, size_t size)
+    inline constexpr _C2LinearRangeAspect(const _C2LinearRangeAspect *parent, size_t offset, size_t size)
         : _C2LinearCapacityAspect(parent == nullptr ? 0 : parent->capacity()),
           mOffset(c2_min(c2_max(offset, parent == nullptr ? 0 : parent->offset()), capacity())),
           mSize(c2_min(c2_min(size, parent == nullptr ? 0 : parent->size()), capacity() - mOffset)) { }
@@ -312,28 +419,31 @@ private:
 /// @}
 };
 
-class C2_HIDE _C2LinearCapacityBase : public _C2LinearCapacityAspect {
-public:
-    inline explicit _C2LinearCapacityBase(size_t capacity)
-        : _C2LinearCapacityAspect(c2_min(capacity, std::numeric_limits<uint32_t>::max())) {}
-};
-
 /**
  * Utility class for safe range calculations.
  */
 class C2LinearRange : public _C2LinearRangeAspect {
 public:
-    inline C2LinearRange(const _C2LinearCapacityBase &parent, size_t offset, size_t size)
-        : _C2LinearRangeAspect(&parent, offset, size) {}
+    inline constexpr C2LinearRange(const _C2LinearCapacityAspect &parent, size_t offset, size_t size)
+        : _C2LinearRangeAspect(&parent, offset, size) { }
+
+    inline constexpr C2LinearRange(const _C2LinearRangeAspect &parent, size_t offset, size_t size)
+        : _C2LinearRangeAspect(&parent, offset, size) { }
+
+    inline constexpr C2LinearRange intersect(size_t offset, size_t size) const {
+        return C2LinearRange(*this, offset, size);
+    }
 };
 
 /**
  * Utility class for simple capacity and range construction.
  */
-class C2LinearCapacity : public _C2LinearCapacityBase {
+class C2LinearCapacity : public _C2LinearCapacityAspect {
 public:
-    using _C2LinearCapacityBase::_C2LinearCapacityBase;
-    inline C2LinearRange range(size_t offset, size_t size) {
+    inline constexpr explicit C2LinearCapacity(size_t capacity)
+        : _C2LinearCapacityAspect(c2_min(capacity, std::numeric_limits<uint32_t>::max())) { }
+
+    inline constexpr C2LinearRange range(size_t offset, size_t size) const {
         return C2LinearRange(*this, offset, size);
     }
 };
@@ -347,6 +457,9 @@ class _C2EditableLinearRange : public _C2LinearRangeAspect {
 protected:
     inline explicit _C2EditableLinearRange(const _C2LinearCapacityAspect *parent)
         : _C2LinearRangeAspect(parent) { }
+
+    inline _C2EditableLinearRange(const _C2LinearRangeAspect &other)
+        : _C2LinearRangeAspect(other) { }
 
     inline _C2EditableLinearRange(const _C2LinearCapacityAspect *parent, size_t offset, size_t size)
         : _C2LinearRangeAspect(parent, offset, size) { }
@@ -379,6 +492,7 @@ protected:
         mOffset = offset;
         return true;
     }
+
     /**
      * Sets the size to |size|. Returns true if successful, which is equivalent to
      * if 0 <= |size| <= capacity() - offset().
@@ -394,6 +508,7 @@ protected:
             return true;
         }
     }
+
     /**
      * Sets the offset to |offset| with best effort. Same as setOffset() except that offset will
      * be clamped to the buffer capacity.
@@ -402,16 +517,9 @@ protected:
      * on the order of the operations. Always set offset first to ensure proper size.
      */
     inline void setOffset_be(uint32_t offset) {
-        if (offset > capacity()) {
-            offset = capacity();
-        }
-        if (offset > mOffset + mSize) {
-            mSize = 0;
-        } else {
-            mSize = mOffset + mSize - offset;
-        }
-        mOffset = offset;
+        (void)setOffset(c2_min(offset, capacity()));
     }
+
     /**
      * Sets the size to |size| with best effort. Same as setSize() except that the selected region
      * will be clamped to the buffer capacity (e.g. size is clamped to [0, capacity() - offset()]).
@@ -420,10 +528,470 @@ protected:
      * on the order of the operations. Always set offset first to ensure proper size.
      */
     inline void setSize_be(uint32_t size) {
-        mSize = std::min(size, capacity() - mOffset);
+        mSize = c2_min(size, capacity() - mOffset);
     }
 /// @}
 };
+
+/**************************************************************************************************
+  ALLOCATIONS
+**************************************************************************************************/
+
+/// \defgroup allocator Allocation and memory placement
+/// @{
+
+/**
+ * Buffer/memory usage bits. These are used by the allocators to select optimal memory type/pool and
+ * buffer layout.
+ *
+ * \note This struct has public fields without getters/setters. All methods are inline.
+ */
+struct C2MemoryUsage {
+// public:
+    // TODO: match these to gralloc1.h
+    enum Consumer : uint64_t {
+        // \todo do we need to distinguish often from rarely?
+        CPU_READ          = GRALLOC_USAGE_SW_READ_OFTEN,
+        RENDERSCRIPT_READ = GRALLOC_USAGE_RENDERSCRIPT,
+        HW_TEXTURE_READ   = GRALLOC_USAGE_HW_TEXTURE,
+        HW_COMPOSER_READ  = GRALLOC_USAGE_HW_COMPOSER,
+        HW_CODEC_READ     = GRALLOC_USAGE_HW_VIDEO_ENCODER,
+        READ_PROTECTED    = GRALLOC_USAGE_PROTECTED,
+    };
+
+    enum Producer : uint64_t {
+        CPU_WRITE          = GRALLOC_USAGE_SW_WRITE_OFTEN,
+        RENDERSCRIPT_WRITE = GRALLOC_USAGE_RENDERSCRIPT,
+        HW_TEXTURE_WRITE   = GRALLOC_USAGE_HW_RENDER,
+        HW_COMPOSER_WRITE  = GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_RENDER,
+        HW_CODEC_WRITE     = GRALLOC_USAGE_HW_VIDEO_ENCODER,
+        WRITE_PROTECTED    = GRALLOC_USAGE_PROTECTED,
+    };
+
+    uint64_t consumer; // e.g. input
+    uint64_t producer; // e.g. output
+};
+
+class C2LinearAllocation;
+class C2GraphicAllocation;
+
+/**
+ *  Allocators are used by the framework to allocate memory (allocations) for buffers. They can
+ *  support either 1D or 2D allocations.
+ *
+ *  \note In theory they could support both, but in practice, we will use only one or the other.
+ *
+ *  Never constructed on stack.
+ *
+ *  Allocators are provided by vendors.
+ */
+class C2Allocator {
+public:
+    /**
+     * Allocator ID type.
+     */
+    typedef uint32_t id_t;
+    enum : id_t {
+        BAD_ID = 0xBADD, // invalid allocator ID
+    };
+
+    /**
+     * Allocation types. This is a bitmask and is used in C2Allocator::Info
+     * to list the supported allocation types of an allocator.
+     */
+    enum type_t : uint32_t {
+        LINEAR  = 1 << 0, //
+        GRAPHIC = 1 << 1,
+    };
+
+    /**
+     * Information about an allocator.
+     *
+     * Allocators don't have a query API so all queriable information is stored here.
+     */
+    struct Traits {
+        C2String name;              ///< allocator name
+        id_t id;                    ///< allocator ID
+        type_t supportedTypes;      ///< supported allocation types
+        C2MemoryUsage minimumUsage; ///< usage that is minimally required for allocations
+        C2MemoryUsage maximumUsage; ///< usage that is maximally allowed for allocations
+    };
+
+    /**
+     * Returns the unique name of this allocator.
+     *
+     * This method MUST be "non-blocking" and return within 1ms.
+     *
+     * \return the name of this allocator.
+     * \retval an empty string if there was not enough memory to allocate the actual name.
+     */
+    virtual C2String getName() const = 0;
+
+    /**
+     * Returns a unique ID for this allocator. This ID is used to get this allocator from the
+     * allocator store, and to identify this allocator across all processes.
+     *
+     * This method MUST be "non-blocking" and return within 1ms.
+     *
+     * \return a unique ID for this allocator.
+     */
+    virtual id_t getId() const = 0;
+
+    /**
+     * Returns the allocator traits.
+     *
+     * This method MUST be "non-blocking" and return within 1ms.
+     *
+     * Allocators don't have a full-fledged query API, only this method.
+     *
+     * \return allocator information
+     */
+    virtual std::shared_ptr<const Traits> getTraits() const = 0;
+
+    /**
+     * Allocates a 1D allocation of given |capacity| and |usage|. If successful, the allocation is
+     * stored in |allocation|. Otherwise, |allocation| is set to 'nullptr'.
+     *
+     * \param capacity      the size of requested allocation (the allocation could be slightly
+     *                      larger, e.g. to account for any system-required alignment)
+     * \param usage         the memory usage info for the requested allocation. \note that the
+     *                      returned allocation may be later used/mapped with different usage.
+     *                      The allocator should layout the buffer to be optimized for this usage,
+     *                      but must support any usage. One exception: protected buffers can
+     *                      only be used in a protected scenario.
+     * \param allocation    pointer to where the allocation shall be stored on success. nullptr
+     *                      will be stored here on failure
+     *
+     * \retval C2_OK        the allocation was successful
+     * \retval C2_NO_MEMORY not enough memory to complete the allocation
+     * \retval C2_TIMED_OUT the allocation timed out
+     * \retval C2_REFUSED   no permission to complete the allocation
+     * \retval C2_BAD_VALUE capacity or usage are not supported (invalid) (caller error)
+     * \retval C2_OMITTED   this allocator does not support 1D allocations
+     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
+     */
+    virtual c2_status_t newLinearAllocation(
+            uint32_t capacity __unused, C2MemoryUsage usage __unused,
+            std::shared_ptr<C2LinearAllocation> *allocation /* nonnull */) {
+        *allocation = nullptr;
+        return C2_OMITTED;
+    }
+
+    /**
+     * (Re)creates a 1D allocation from a native |handle|. If successful, the allocation is stored
+     * in |allocation|. Otherwise, |allocation| is set to 'nullptr'.
+     *
+     * \param handle      the handle for the existing allocation
+     * \param allocation  pointer to where the allocation shall be stored on success. nullptr
+     *                    will be stored here on failure
+     *
+     * \retval C2_OK        the allocation was recreated successfully
+     * \retval C2_NO_MEMORY not enough memory to recreate the allocation
+     * \retval C2_TIMED_OUT the recreation timed out (unexpected)
+     * \retval C2_REFUSED   no permission to recreate the allocation
+     * \retval C2_BAD_VALUE invalid handle (caller error)
+     * \retval C2_OMITTED   this allocator does not support 1D allocations
+     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
+     */
+    virtual c2_status_t priorLinearAllocation(
+            const C2Handle *handle __unused,
+            std::shared_ptr<C2LinearAllocation> *allocation /* nonnull */) {
+        *allocation = nullptr;
+        return C2_OMITTED;
+    }
+
+    /**
+     * Allocates a 2D allocation of given |width|, |height|, |format| and |usage|. If successful,
+     * the allocation is stored in |allocation|. Otherwise, |allocation| is set to 'nullptr'.
+     *
+     * \param width         the width of requested allocation (the allocation could be slightly
+     *                      larger, e.g. to account for any system-required alignment)
+     * \param height        the height of requested allocation (the allocation could be slightly
+     *                      larger, e.g. to account for any system-required alignment)
+     * \param format        the pixel format of requested allocation. This could be a vendor
+     *                      specific format.
+     * \param usage         the memory usage info for the requested allocation. \note that the
+     *                      returned allocation may be later used/mapped with different usage.
+     *                      The allocator should layout the buffer to be optimized for this usage,
+     *                      but must support any usage. One exception: protected buffers can
+     *                      only be used in a protected scenario.
+     * \param allocation    pointer to where the allocation shall be stored on success. nullptr
+     *                      will be stored here on failure
+     *
+     * \retval C2_OK        the allocation was successful
+     * \retval C2_NO_MEMORY not enough memory to complete the allocation
+     * \retval C2_TIMED_OUT the allocation timed out
+     * \retval C2_REFUSED   no permission to complete the allocation
+     * \retval C2_BAD_VALUE width, height, format or usage are not supported (invalid) (caller error)
+     * \retval C2_OMITTED   this allocator does not support 2D allocations
+     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
+     */
+    virtual c2_status_t newGraphicAllocation(
+            uint32_t width __unused, uint32_t height __unused, uint32_t format __unused,
+            C2MemoryUsage usage __unused,
+            std::shared_ptr<C2GraphicAllocation> *allocation /* nonnull */) {
+        *allocation = nullptr;
+        return C2_OMITTED;
+    }
+
+    /**
+     * (Re)creates a 2D allocation from a native handle.  If successful, the allocation is stored
+     * in |allocation|. Otherwise, |allocation| is set to 'nullptr'.
+     *
+     * \param handle      the handle for the existing allocation
+     * \param allocation  pointer to where the allocation shall be stored on success. nullptr
+     *                    will be stored here on failure
+     *
+     * \retval C2_OK        the allocation was recreated successfully
+     * \retval C2_NO_MEMORY not enough memory to recreate the allocation
+     * \retval C2_TIMED_OUT the recreation timed out (unexpected)
+     * \retval C2_REFUSED   no permission to recreate the allocation
+     * \retval C2_BAD_VALUE invalid handle (caller error)
+     * \retval C2_OMITTED   this allocator does not support 2D allocations
+     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during recreation (unexpected)
+     */
+    virtual c2_status_t priorGraphicAllocation(
+            const C2Handle *handle __unused,
+            std::shared_ptr<C2GraphicAllocation> *allocation /* nonnull */) {
+        *allocation = nullptr;
+        return C2_OMITTED;
+    }
+
+protected:
+    C2Allocator() = default;
+
+    virtual ~C2Allocator() = default;
+};
+
+/**
+ * \ingroup linear allocator
+ * 1D allocation interface.
+ */
+class C2LinearAllocation : public _C2LinearCapacityAspect {
+public:
+    /**
+     * Maps a portion of an allocation starting from |offset| with |size| into local process memory.
+     * Stores the starting address into |addr|, or NULL if the operation was unsuccessful.
+     * |fenceFd| is a file descriptor referring to an acquire sync fence object. If it is already
+     * safe to access the buffer contents, then -1.
+     *
+     * \param offset          starting position of the portion to be mapped (this does not have to
+     *                      be page aligned)
+     * \param size            size of the portion to be mapped (this does not have to be page
+     *                      aligned)
+     * \param usage           the desired usage. \todo this must be kSoftwareRead and/or
+     *                      kSoftwareWrite.
+     * \param fenceFd         a pointer to a file descriptor if an async mapping is requested. If
+     *                      not-null, and acquire fence FD will be stored here on success, or -1
+     *                      on failure. If null, the mapping will be synchronous.
+     * \param addr            a pointer to where the starting address of the mapped portion will be
+     *                      stored. On failure, nullptr will be stored here.
+     *
+     * \todo Only one portion can be mapped at the same time - this is true for gralloc, but there
+     *       is no need for this for 1D buffers.
+     * \todo Do we need to support sync operation as we could just wait for the fence?
+     *
+     * \retval C2_OK        the operation was successful
+     * \retval C2_REFUSED   no permission to map the portion
+     * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_DUPLICATE if the allocation is already mapped.
+     * \retval C2_NO_MEMORY not enough memory to complete the operation
+     * \retval C2_BAD_VALUE the parameters (offset/size) are invalid or outside the allocation, or
+     *                      the usage flags are invalid (caller error)
+     * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
+     */
+    virtual c2_status_t map(
+            size_t offset, size_t size, C2MemoryUsage usage, int *fenceFd /* nullable */,
+            void **addr /* nonnull */) = 0;
+
+    /**
+     * Unmaps a portion of an allocation at |addr| with |size|. These must be parameters previously
+     * passed to |map|; otherwise, this operation is a no-op.
+     *
+     * \param addr            starting address of the mapped region
+     * \param size            size of the mapped region
+     * \param fenceFd         a pointer to a file descriptor if an async unmapping is requested. If
+     *                      not-null, a release fence FD will be stored here on success, or -1
+     *                      on failure. This fence signals when the original allocation contains
+     *                      any changes that happened to the mapped region. If null, the unmapping
+     *                      will be synchronous.
+     *
+     * \retval C2_OK        the operation was successful
+     * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_NOT_FOUND if the allocation was not mapped previously.
+     * \retval C2_BAD_VALUE the parameters (addr/size) do not correspond to previously mapped
+     *                      regions (caller error)
+     * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
+     * \retval C2_REFUSED   no permission to unmap the portion (unexpected - system)
+     */
+    virtual c2_status_t unmap(void *addr, size_t size, int *fenceFd /* nullable */) = 0;
+
+    /**
+     * Returns the allocator ID for this allocation. This is useful to put the handle into context.
+     */
+    virtual C2Allocator::id_t getAllocatorId() const = 0;
+
+    /**
+     * Returns a pointer to the allocation handle.
+     */
+    virtual const C2Handle *handle() const = 0;
+
+    /**
+     * Returns true if this is the same allocation as |other|.
+     */
+    virtual bool equals(const std::shared_ptr<C2LinearAllocation> &other) const = 0;
+
+protected:
+    // \todo should we limit allocation directly?
+    C2LinearAllocation(size_t capacity) : _C2LinearCapacityAspect(c2_min(capacity, UINT32_MAX)) {}
+    virtual ~C2LinearAllocation() = default;
+};
+
+class C2CircularBlock;
+class C2LinearBlock;
+class C2GraphicBlock;
+
+/**
+ *  Block pools are used by components to obtain output buffers in an efficient way. They can
+ *  support either linear (1D), circular (1D) or graphic (2D) blocks.
+ *
+ *  Block pools decouple the recycling of memory/allocations from the components. They are meant to
+ *  be an opaque service (there are no public APIs other than obtaining blocks) provided by the
+ *  platform. Block pools are also meant to decouple allocations from memory used by buffers. This
+ *  is accomplished by allowing pools to allot multiple memory 'blocks' on a single allocation. As
+ *  their name suggest, block pools maintain a pool of memory blocks. When a component asks for
+ *  a memory block, pools will try to return a free memory block already in the pool. If no such
+ *  block exists, they will allocate memory using the backing allocator and allot a block on that
+ *  allocation. When blocks are no longer used in the system, they are recycled back to the block
+ *  pool and are available as free blocks.
+ *
+ *  Never constructed on stack.
+ */
+class C2BlockPool {
+public:
+    /**
+     * Block pool ID type.
+     */
+    typedef uint64_t local_id_t;
+
+    enum : local_id_t {
+        BASIC_LINEAR = 0,  ///< ID of basic (unoptimized) block pool for fetching 1D blocks
+        BASIC_GRAPHIC = 1, ///< ID of basic (unoptimized) block pool for fetching 2D blocks
+        PLATFORM_START = 0x10,
+    };
+
+    /**
+     * Returns the ID for this block pool. This ID is used to get this block pool from the platform.
+     * It is only valid in the current process.
+     *
+     * This method MUST be "non-blocking" and return within 1ms.
+     *
+     * \return a local ID for this block pool.
+     */
+    virtual local_id_t getLocalId() const = 0;
+
+    /**
+     * Returns the ID of the backing allocator of this block pool.
+     *
+     * This method MUST be "non-blocking" and return within 1ms.
+     *
+     * \return the ID of the backing allocator of this block pool.
+     */
+    virtual C2Allocator::id_t getAllocatorId() const = 0;
+
+    /**
+     * Obtains a linear writeable block of given |capacity| and |usage|. If successful, the
+     * block is stored in |block|. Otherwise, |block| is set to 'nullptr'.
+     *
+     * \param capacity the size of requested block.
+     * \param usage    the memory usage info for the requested block. Returned blocks will be
+     *                 optimized for this usage, but may be used with any usage. One exception:
+     *                 protected blocks/buffers can only be used in a protected scenario.
+     * \param block    pointer to where the obtained block shall be stored on success. nullptr will
+     *                 be stored here on failure
+     *
+     * \retval C2_OK        the operation was successful
+     * \retval C2_NO_MEMORY not enough memory to complete any required allocation
+     * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_REFUSED   no permission to complete any required allocation
+     * \retval C2_BAD_VALUE capacity or usage are not supported (invalid) (caller error)
+     * \retval C2_OMITTED   this pool does not support linear blocks
+     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during operation (unexpected)
+     */
+    virtual c2_status_t fetchLinearBlock(
+            uint32_t capacity __unused, C2MemoryUsage usage __unused,
+            std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
+        *block = nullptr;
+        return C2_OMITTED;
+    }
+
+    /**
+     * Obtains a circular writeable block of given |capacity| and |usage|. If successful, the
+     * block is stored in |block|. Otherwise, |block| is set to 'nullptr'.
+     *
+     * \param capacity the size of requested circular block. (note: the size of the obtained
+     *                 block could be slightly larger, e.g. to accommodate any system-required
+     *                 alignment)
+     * \param usage    the memory usage info for the requested block. Returned blocks will be
+     *                 optimized for this usage, but may be used with any usage. One exception:
+     *                 protected blocks/buffers can only be used in a protected scenario.
+     * \param block    pointer to where the obtained block shall be stored on success. nullptr
+     *                 will be stored here on failure
+     *
+     * \retval C2_OK        the operation was successful
+     * \retval C2_NO_MEMORY not enough memory to complete any required allocation
+     * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_REFUSED   no permission to complete any required allocation
+     * \retval C2_BAD_VALUE capacity or usage are not supported (invalid) (caller error)
+     * \retval C2_OMITTED   this pool does not support circular blocks
+     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during operation (unexpected)
+     */
+    virtual c2_status_t fetchCircularBlock(
+            uint32_t capacity __unused, C2MemoryUsage usage __unused,
+            std::shared_ptr<C2CircularBlock> *block /* nonnull */) {
+        *block = nullptr;
+        return C2_OMITTED;
+    }
+
+    /**
+     * Obtains a 2D graphic block of given |width|, |height|, |format| and |usage|. If successful,
+     * the block is stored in |block|. Otherwise, |block| is set to 'nullptr'.
+     *
+     * \param width  the width of requested block (the obtained block could be slightly larger, e.g.
+     *               to accommodate any system-required alignment)
+     * \param height the height of requested block (the obtained block could be slightly larger,
+     *               e.g. to accommodate any system-required alignment)
+     * \param format the pixel format of requested block. This could be a vendor specific format.
+     * \param usage  the memory usage info for the requested block. Returned blocks will be
+     *               optimized for this usage, but may be used with any usage. One exception:
+     *               protected blocks/buffers can only be used in a protected scenario.
+     * \param block  pointer to where the obtained block shall be stored on success. nullptr
+     *               will be stored here on failure
+     *
+     * \retval C2_OK        the operation was successful
+     * \retval C2_NO_MEMORY not enough memory to complete any required allocation
+     * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_REFUSED   no permission to complete any required allocation
+     * \retval C2_BAD_VALUE width, height, format or usage are not supported (invalid) (caller
+     *                      error)
+     * \retval C2_OMITTED   this pool does not support 2D blocks
+     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during operation (unexpected)
+     */
+    virtual c2_status_t fetchGraphicBlock(
+            uint32_t width __unused, uint32_t height __unused, uint32_t format __unused,
+            C2MemoryUsage usage __unused,
+            std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {
+        *block = nullptr;
+        return C2_OMITTED;
+    }
+
+protected:
+    C2BlockPool() = default;
+
+    virtual ~C2BlockPool() = default;
+};
+
+/// @}
 
 // ================================================================================================
 //  BLOCKS
@@ -435,16 +1003,36 @@ protected:
 
 class C2LinearAllocation;
 
+/**
+ * A 1D block.
+ *
+ * \note capacity() is not meaningful for users of blocks; instead size() is the capacity of the
+ * usable portion. Use and offset() and size() if accessing the block directly through its handle
+ * to represent the allotted range of the underlying allocation to this block.
+ */
 class C2Block1D : public _C2LinearRangeAspect {
 public:
+    /**
+     * Returns the underlying handle for this allocation.
+     *
+     * \note that the block and its block pool has shared ownership of the handle
+     *       and if all references to the block are released, the underlying block
+     *       allocation may get reused even if a client keeps a clone of this handle.
+     */
     const C2Handle *handle() const;
 
-protected:
-    C2Block1D(std::shared_ptr<C2LinearAllocation> alloc);
-    C2Block1D(std::shared_ptr<C2LinearAllocation> alloc, size_t offset, size_t size);
+    /**
+     * Returns the allocator's ID that created the underlying allocation for this block. This
+     * provides the context for understanding the handle.
+     */
+    C2Allocator::id_t getAllocatorId() const;
 
-private:
+protected:
     class Impl;
+    /** construct a block. */
+    C2Block1D(std::shared_ptr<Impl> impl, const _C2LinearRangeAspect &range);
+
+    friend struct _C2BlockFactory;
     std::shared_ptr<Impl> mImpl;
 };
 
@@ -457,6 +1045,7 @@ class C2ReadView : public _C2LinearCapacityAspect {
 public:
     /**
      * \return pointer to the start of the block or nullptr on error.
+     *         This pointer is only valid during the lifetime of this view or until it is released.
      */
     const uint8_t *data() const;
 
@@ -476,13 +1065,20 @@ public:
      */
     c2_status_t error() const;
 
+    /**
+     * Releases this view. This sets error to C2_NO_INIT.
+     */
+    //void release();
+
 protected:
-    C2ReadView(const _C2LinearCapacityAspect *parent, const uint8_t *data);
+    class Impl;
+    C2ReadView(std::shared_ptr<Impl> impl, uint32_t offset, uint32_t size);
     explicit C2ReadView(c2_status_t error);
 
 private:
-    class Impl;
+    friend struct _C2BlockFactory;
     std::shared_ptr<Impl> mImpl;
+    uint32_t mOffset; /**< offset into the linear block backing this read view */
 };
 
 /**
@@ -496,11 +1092,13 @@ public:
      * Start of the block.
      *
      * \return pointer to the start of the block or nullptr on error.
+     *         This pointer is only valid during the lifetime of this view or until it is released.
      */
     uint8_t *base();
 
     /**
      * \return pointer to the block at the current offset or nullptr on error.
+     *         This pointer is only valid during the lifetime of this view or until it is released.
      */
     uint8_t *data();
 
@@ -509,14 +1107,18 @@ public:
      */
     c2_status_t error() const;
 
+    /**
+     * Releases this view. This sets error to C2_NO_INIT.
+     */
+    //void release();
+
 protected:
-    C2WriteView(const _C2LinearRangeAspect *parent, uint8_t *base);
+    class Impl;
+    C2WriteView(std::shared_ptr<Impl> impl);
     explicit C2WriteView(c2_status_t error);
 
 private:
-    class Impl;
-    /// \todo should this be unique_ptr to make this movable only - to avoid inconsistent regions
-    /// between copies.
+    friend struct _C2BlockFactory;
     std::shared_ptr<Impl> mImpl;
 };
 
@@ -554,12 +1156,10 @@ public:
     C2Fence fence() const { return mFence; }
 
 protected:
-    C2ConstLinearBlock(std::shared_ptr<C2LinearAllocation> alloc);
-    C2ConstLinearBlock(std::shared_ptr<C2LinearAllocation> alloc, size_t offset, size_t size);
+    C2ConstLinearBlock(std::shared_ptr<Impl> impl, const _C2LinearRangeAspect &range, C2Fence mFence);
 
 private:
-    class Impl;
-    std::shared_ptr<Impl> mImpl;
+    friend struct _C2BlockFactory;
     C2Fence mFence;
 };
 
@@ -589,12 +1189,9 @@ public:
     C2ConstLinearBlock share(size_t offset, size_t size, C2Fence fence);
 
 protected:
-    C2LinearBlock(std::shared_ptr<C2LinearAllocation> alloc);
-    C2LinearBlock(std::shared_ptr<C2LinearAllocation> alloc, size_t offset, size_t size);
+    C2LinearBlock(std::shared_ptr<Impl> impl, const _C2LinearRangeAspect &range);
 
-private:
-    class Impl;
-    std::shared_ptr<Impl> mImpl;
+    friend struct _C2BlockFactory;
 };
 
 /// @}
@@ -800,27 +1397,26 @@ struct C2Rect {
 
     // utility methods
 
-    inline bool isEmpty() const {
+    inline constexpr bool isEmpty() const {
         return width == 0 || height == 0;
     }
 
-    inline bool isValid() const {
+    inline constexpr bool isValid() const {
         return left <= ~width && top <= ~height;
     }
 
-    inline operator bool() const {
+    inline constexpr operator bool() const {
         return isValid() && !isEmpty();
     }
 
-    inline bool operator!() const {
+    inline constexpr bool operator!() const {
         return !bool(*this);
     }
 
-    inline bool contains(const C2Rect &other) const {
+    C2_ALLOW_OVERFLOW
+    inline constexpr bool contains(const C2Rect &other) const {
         if (!isValid() || !other.isValid()) {
             return false;
-        } else if (other.isEmpty()) {
-            return true;
         } else {
             return left <= other.left && top <= other.top
                     && left + width >= other.left + other.width
@@ -828,35 +1424,57 @@ struct C2Rect {
         }
     }
 
-    inline bool operator==(const C2Rect &other) const {
+    inline constexpr bool operator==(const C2Rect &other) const {
         if (!isValid()) {
             return !other.isValid();
-        } else if (isEmpty()) {
-            return other.isEmpty();
         } else {
             return left == other.left && top == other.top
                     && width == other.width && height == other.height;
         }
     }
 
-    inline bool operator!=(const C2Rect &other) const {
+    inline constexpr bool operator!=(const C2Rect &other) const {
         return !operator==(other);
     }
 
-    inline bool operator>=(const C2Rect &other) const {
+    inline constexpr bool operator>=(const C2Rect &other) const {
         return contains(other);
     }
 
-    inline bool operator>(const C2Rect &other) const {
+    inline constexpr bool operator>(const C2Rect &other) const {
         return contains(other) && !operator==(other);
     }
 
-    inline bool operator<=(const C2Rect &other) const {
+    inline constexpr bool operator<=(const C2Rect &other) const {
         return other.contains(*this);
     }
 
-    inline bool operator<(const C2Rect &other) const {
+    inline constexpr bool operator<(const C2Rect &other) const {
         return other.contains(*this) && !operator==(other);
+    }
+
+    C2_ALLOW_OVERFLOW
+    inline constexpr uint32_t right() const {
+        return left + width;
+    }
+
+    C2_ALLOW_OVERFLOW
+    inline constexpr uint32_t bottom() const {
+        return top + height;
+    }
+
+    C2_ALLOW_OVERFLOW
+    inline constexpr C2Rect intersect(const C2Rect &other) const {
+        if (!isValid()) {
+            return *this;
+        } else if (!other.isValid()) {
+            return other;
+        } else {
+            return C2Rect(c2_min(right(), other.right()) - c2_max(left, other.left),
+                          c2_min(bottom(), other.bottom()) - c2_max(top, other.top),
+                          c2_max(left, other.left),
+                          c2_max(top, other.top));
+        }
     }
 };
 
@@ -1006,6 +1624,88 @@ protected:
 private:
     C2Rect mCrop;
 /// @}
+};
+
+/**
+ * \ingroup graphic allocator
+ * 2D allocation interface.
+ */
+class C2GraphicAllocation : public _C2PlanarCapacityAspect {
+public:
+    /**
+     * Maps a rectangular section (as defined by |rect|) of a 2D allocation into local process
+     * memory for flexible access. On success, it fills out |layout| with the plane specifications
+     * and fills the |addr| array with pointers to the first byte of the top-left pixel of each
+     * plane used. Otherwise, it leaves |layout| and |addr| untouched. |fenceFd| is a file
+     * descriptor referring to an acquire sync fence object. If it is already safe to access the
+     * buffer contents, then -1.
+     *
+     * \note Only one portion of the graphic allocation can be mapped at the same time. (This is
+     * from gralloc1 limitation.)
+     *
+     * \param rect            section to be mapped (this does not have to be aligned)
+     * \param usage           the desired usage. \todo this must be kSoftwareRead and/or
+     *                      kSoftwareWrite.
+     * \param fenceFd         a pointer to a file descriptor if an async mapping is requested. If
+     *                      not-null, and acquire fence FD will be stored here on success, or -1
+     *                      on failure. If null, the mapping will be synchronous.
+     * \param layout          a pointer to where the mapped planes' descriptors will be
+     *                      stored. On failure, nullptr will be stored here.
+     *
+     * \todo Do we need to support sync operation as we could just wait for the fence?
+     *
+     * \retval C2_OK        the operation was successful
+     * \retval C2_REFUSED   no permission to map the section
+     * \retval C2_DUPLICATE there is already a mapped region (caller error)
+     * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_NO_MEMORY not enough memory to complete the operation
+     * \retval C2_BAD_VALUE the parameters (rect) are invalid or outside the allocation, or the
+     *                      usage flags are invalid (caller error)
+     * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
+
+     */
+    virtual c2_status_t map(
+            C2Rect rect, C2MemoryUsage usage, int *fenceFd,
+            // TODO: return <addr, size> buffers with plane sizes
+            C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) = 0;
+
+    /**
+     * Unmaps the last mapped rectangular section.
+     *
+     * \param fenceFd         a pointer to a file descriptor if an async unmapping is requested. If
+     *                      not-null, a release fence FD will be stored here on success, or -1
+     *                      on failure. This fence signals when the original allocation contains
+     *                      any changes that happened to the mapped section. If null, the unmapping
+     *                      will be synchronous.
+     *
+     * \retval C2_OK        the operation was successful
+     * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_NOT_FOUND there is no mapped region (caller error)
+     * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
+     * \retval C2_REFUSED   no permission to unmap the section (unexpected - system)
+     */
+    virtual c2_status_t unmap(C2Fence *fenceFd /* nullable */) = 0;
+
+    /**
+     * Returns true if this is a valid allocation.
+     *
+     * \todo remove?
+     */
+    virtual bool isValid() const = 0;
+
+    /**
+     * Returns a pointer to the allocation handle.
+     */
+    virtual const C2Handle *handle() const = 0;
+
+    /**
+     * Returns true if this is the same allocation as |other|.
+     */
+    virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const = 0;
+
+protected:
+    using _C2PlanarCapacityAspect::_C2PlanarCapacityAspect;
+    virtual ~C2GraphicAllocation() = default;
 };
 
 class C2GraphicAllocation;
@@ -1323,8 +2023,32 @@ public:
      * \return true iff there is a metadata with the parameter type attached to this buffer.
      */
     bool hasInfo(C2Param::Type index) const;
+
+    /**
+     * Removes a metadata from the buffer.
+     */
     std::shared_ptr<C2Info> removeInfo(C2Param::Type index);
     ///@}
+
+    /**
+     * Creates a buffer containing a single linear block.
+     *
+     * \param block the content of the buffer.
+     *
+     * \return shared pointer to the created buffer.
+     */
+    static std::shared_ptr<C2Buffer> CreateLinearBuffer(const C2ConstLinearBlock &block);
+
+    /**
+     * Creates a buffer containing a single graphic block.
+     *
+     * \param block the content of the buffer.
+     *
+     * \return shared pointer to the created buffer.
+     */
+    static std::shared_ptr<C2Buffer> CreateGraphicBuffer(const C2ConstGraphicBlock &block);
+
+
 
 protected:
     // no public constructor
@@ -1357,540 +2081,6 @@ public:
      * \return the buffer's data.
      */
     const C2BufferData data() const;
-};
-
-/// @}
-
-/**************************************************************************************************
-  ALLOCATIONS
-**************************************************************************************************/
-
-/// \defgroup allocator Allocation and memory placement
-/// @{
-
-/**
- * Buffer/memory usage bits. These are used by the allocators to select optimal memory type/pool and
- * buffer layout.
- *
- * \note This struct has public fields without getters/setters. All methods are inline.
- */
-struct C2MemoryUsage {
-// public:
-    // TODO: match these to gralloc1.h
-    enum Consumer : uint64_t {
-        // \todo do we need to distinguish often from rarely?
-        CPU_READ          = GRALLOC_USAGE_SW_READ_OFTEN,
-        RENDERSCRIPT_READ = GRALLOC_USAGE_RENDERSCRIPT,
-        HW_TEXTURE_READ   = GRALLOC_USAGE_HW_TEXTURE,
-        HW_COMPOSER_READ  = GRALLOC_USAGE_HW_COMPOSER,
-        HW_CODEC_READ     = GRALLOC_USAGE_HW_VIDEO_ENCODER,
-        READ_PROTECTED    = GRALLOC_USAGE_PROTECTED,
-    };
-
-    enum Producer : uint64_t {
-        CPU_WRITE          = GRALLOC_USAGE_SW_WRITE_OFTEN,
-        RENDERSCRIPT_WRITE = GRALLOC_USAGE_RENDERSCRIPT,
-        HW_TEXTURE_WRITE   = GRALLOC_USAGE_HW_RENDER,
-        HW_COMPOSER_WRITE  = GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_RENDER,
-        HW_CODEC_WRITE     = GRALLOC_USAGE_HW_VIDEO_ENCODER,
-        WRITE_PROTECTED    = GRALLOC_USAGE_PROTECTED,
-    };
-
-    uint64_t consumer; // e.g. input
-    uint64_t producer; // e.g. output
-};
-
-/**
- * \ingroup linear allocator
- * 1D allocation interface.
- */
-class C2LinearAllocation : public _C2LinearCapacityAspect {
-public:
-    /**
-     * Maps a portion of an allocation starting from |offset| with |size| into local process memory.
-     * Stores the starting address into |addr|, or NULL if the operation was unsuccessful.
-     * |fenceFd| is a file descriptor referring to an acquire sync fence object. If it is already
-     * safe to access the buffer contents, then -1.
-     *
-     * \param offset          starting position of the portion to be mapped (this does not have to
-     *                      be page aligned)
-     * \param size            size of the portion to be mapped (this does not have to be page
-     *                      aligned)
-     * \param usage           the desired usage. \todo this must be kSoftwareRead and/or
-     *                      kSoftwareWrite.
-     * \param fenceFd         a pointer to a file descriptor if an async mapping is requested. If
-     *                      not-null, and acquire fence FD will be stored here on success, or -1
-     *                      on failure. If null, the mapping will be synchronous.
-     * \param addr            a pointer to where the starting address of the mapped portion will be
-     *                      stored. On failure, nullptr will be stored here.
-     *
-     * \todo Only one portion can be mapped at the same time - this is true for gralloc, but there
-     *       is no need for this for 1D buffers.
-     * \todo Do we need to support sync operation as we could just wait for the fence?
-     *
-     * \retval C2_OK        the operation was successful
-     * \retval C2_REFUSED   no permission to map the portion
-     * \retval C2_TIMED_OUT the operation timed out
-     * \retval C2_DUPLICATE if the allocation is already mapped.
-     * \retval C2_NO_MEMORY not enough memory to complete the operation
-     * \retval C2_BAD_VALUE the parameters (offset/size) are invalid or outside the allocation, or
-     *                      the usage flags are invalid (caller error)
-     * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
-     */
-    virtual c2_status_t map(
-            size_t offset, size_t size, C2MemoryUsage usage, int *fenceFd /* nullable */,
-            void **addr /* nonnull */) = 0;
-
-    /**
-     * Unmaps a portion of an allocation at |addr| with |size|. These must be parameters previously
-     * passed to |map|; otherwise, this operation is a no-op.
-     *
-     * \param addr            starting address of the mapped region
-     * \param size            size of the mapped region
-     * \param fenceFd         a pointer to a file descriptor if an async unmapping is requested. If
-     *                      not-null, a release fence FD will be stored here on success, or -1
-     *                      on failure. This fence signals when the original allocation contains
-     *                      any changes that happened to the mapped region. If null, the unmapping
-     *                      will be synchronous.
-     *
-     * \retval C2_OK        the operation was successful
-     * \retval C2_TIMED_OUT the operation timed out
-     * \retval C2_NOT_FOUND if the allocation was not mapped previously.
-     * \retval C2_BAD_VALUE the parameters (addr/size) do not correspond to previously mapped
-     *                      regions (caller error)
-     * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
-     * \retval C2_REFUSED   no permission to unmap the portion (unexpected - system)
-     */
-    virtual c2_status_t unmap(void *addr, size_t size, int *fenceFd /* nullable */) = 0;
-
-    /**
-     * Returns true if this is a valid allocation.
-     *
-     * \todo remove?
-     */
-    virtual bool isValid() const = 0;
-
-    /**
-     * Returns a pointer to the allocation handle.
-     */
-    virtual const C2Handle *handle() const = 0;
-
-    /**
-     * Returns true if this is the same allocation as |other|.
-     */
-    virtual bool equals(const std::shared_ptr<C2LinearAllocation> &other) const = 0;
-
-protected:
-    // \todo should we limit allocation directly?
-    C2LinearAllocation(size_t capacity) : _C2LinearCapacityAspect(c2_min(capacity, UINT32_MAX)) {}
-    virtual ~C2LinearAllocation() = default;
-};
-
-/**
- * \ingroup graphic allocator
- * 2D allocation interface.
- */
-class C2GraphicAllocation : public _C2PlanarCapacityAspect {
-public:
-    /**
-     * Maps a rectangular section (as defined by |rect|) of a 2D allocation into local process
-     * memory for flexible access. On success, it fills out |layout| with the plane specifications
-     * and fills the |addr| array with pointers to the first byte of the top-left pixel of each
-     * plane used. Otherwise, it leaves |layout| and |addr| untouched. |fenceFd| is a file
-     * descriptor referring to an acquire sync fence object. If it is already safe to access the
-     * buffer contents, then -1.
-     *
-     * \note Only one portion of the graphic allocation can be mapped at the same time. (This is
-     * from gralloc1 limitation.)
-     *
-     * \param rect            section to be mapped (this does not have to be aligned)
-     * \param usage           the desired usage. \todo this must be kSoftwareRead and/or
-     *                      kSoftwareWrite.
-     * \param fenceFd         a pointer to a file descriptor if an async mapping is requested. If
-     *                      not-null, and acquire fence FD will be stored here on success, or -1
-     *                      on failure. If null, the mapping will be synchronous.
-     * \param layout          a pointer to where the mapped planes' descriptors will be
-     *                      stored. On failure, nullptr will be stored here.
-     *
-     * \todo Do we need to support sync operation as we could just wait for the fence?
-     *
-     * \retval C2_OK        the operation was successful
-     * \retval C2_REFUSED   no permission to map the section
-     * \retval C2_DUPLICATE there is already a mapped region (caller error)
-     * \retval C2_TIMED_OUT the operation timed out
-     * \retval C2_NO_MEMORY not enough memory to complete the operation
-     * \retval C2_BAD_VALUE the parameters (rect) are invalid or outside the allocation, or the
-     *                      usage flags are invalid (caller error)
-     * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
-
-     */
-    virtual c2_status_t map(
-            C2Rect rect, C2MemoryUsage usage, int *fenceFd,
-            // TODO: return <addr, size> buffers with plane sizes
-            C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) = 0;
-
-    /**
-     * Unmaps the last mapped rectangular section.
-     *
-     * \param fenceFd         a pointer to a file descriptor if an async unmapping is requested. If
-     *                      not-null, a release fence FD will be stored here on success, or -1
-     *                      on failure. This fence signals when the original allocation contains
-     *                      any changes that happened to the mapped section. If null, the unmapping
-     *                      will be synchronous.
-     *
-     * \retval C2_OK        the operation was successful
-     * \retval C2_TIMED_OUT the operation timed out
-     * \retval C2_NOT_FOUND there is no mapped region (caller error)
-     * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
-     * \retval C2_REFUSED   no permission to unmap the section (unexpected - system)
-     */
-    virtual c2_status_t unmap(C2Fence *fenceFd /* nullable */) = 0;
-
-    /**
-     * Returns true if this is a valid allocation.
-     *
-     * \todo remove?
-     */
-    virtual bool isValid() const = 0;
-
-    /**
-     * Returns a pointer to the allocation handle.
-     */
-    virtual const C2Handle *handle() const = 0;
-
-    /**
-     * Returns true if this is the same allocation as |other|.
-     */
-    virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const = 0;
-
-protected:
-    using _C2PlanarCapacityAspect::_C2PlanarCapacityAspect;
-    virtual ~C2GraphicAllocation() = default;
-};
-
-/**
- *  Allocators are used by the framework to allocate memory (allocations) for buffers. They can
- *  support either 1D or 2D allocations.
- *
- *  \note In theory they could support both, but in practice, we will use only one or the other.
- *
- *  Never constructed on stack.
- *
- *  Allocators are provided by vendors.
- */
-class C2Allocator {
-public:
-    /**
-     * Allocator ID type.
-     */
-    typedef uint32_t id_t;
-
-    /**
-     * Allocation types. This is a bitmask and is used in C2Allocator::Info
-     * to list the supported allocation types of an allocator.
-     */
-    enum type_t : uint32_t {
-        LINEAR  = 1 << 0, //
-        GRAPHIC = 1 << 1,
-    };
-
-    /**
-     * Information about an allocator.
-     *
-     * Allocators don't have a query API so all queriable information is stored here.
-     */
-    struct Traits {
-        C2String name;              ///< allocator name
-        id_t id;                    ///< allocator ID
-        type_t supportedTypes;      ///< supported allocation types
-        C2MemoryUsage minimumUsage; ///< usage that is minimally required for allocations
-        C2MemoryUsage maximumUsage; ///< usage that is maximally allowed for allocations
-    };
-
-    /**
-     * Returns the unique name of this allocator.
-     *
-     * This method MUST be "non-blocking" and return within 1ms.
-     *
-     * \return the name of this allocator.
-     * \retval an empty string if there was not enough memory to allocate the actual name.
-     */
-    virtual C2String getName() const = 0;
-
-    /**
-     * Returns a unique ID for this allocator. This ID is used to get this allocator from the
-     * allocator store, and to identify this allocator across all processes.
-     *
-     * This method MUST be "non-blocking" and return within 1ms.
-     *
-     * \return a unique ID for this allocator.
-     */
-    virtual id_t getId() const = 0;
-
-    /**
-     * Returns the allocator traits.
-     *
-     * This method MUST be "non-blocking" and return within 1ms.
-     *
-     * Allocators don't have a full-fledged query API, only this method.
-     *
-     * \return allocator information
-     */
-    virtual std::shared_ptr<const Traits> getTraits() const = 0;
-
-    /**
-     * Allocates a 1D allocation of given |capacity| and |usage|. If successful, the allocation is
-     * stored in |allocation|. Otherwise, |allocation| is set to 'nullptr'.
-     *
-     * \param capacity      the size of requested allocation (the allocation could be slightly
-     *                      larger, e.g. to account for any system-required alignment)
-     * \param usage         the memory usage info for the requested allocation. \note that the
-     *                      returned allocation may be later used/mapped with different usage.
-     *                      The allocator should layout the buffer to be optimized for this usage,
-     *                      but must support any usage. One exception: protected buffers can
-     *                      only be used in a protected scenario.
-     * \param allocation    pointer to where the allocation shall be stored on success. nullptr
-     *                      will be stored here on failure
-     *
-     * \retval C2_OK        the allocation was successful
-     * \retval C2_NO_MEMORY not enough memory to complete the allocation
-     * \retval C2_TIMED_OUT the allocation timed out
-     * \retval C2_REFUSED   no permission to complete the allocation
-     * \retval C2_BAD_VALUE capacity or usage are not supported (invalid) (caller error)
-     * \retval C2_OMITTED   this allocator does not support 1D allocations
-     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
-     */
-    virtual c2_status_t newLinearAllocation(
-            uint32_t capacity __unused, C2MemoryUsage usage __unused,
-            std::shared_ptr<C2LinearAllocation> *allocation /* nonnull */) {
-        *allocation = nullptr;
-        return C2_OMITTED;
-    }
-
-    /**
-     * (Re)creates a 1D allocation from a native |handle|. If successful, the allocation is stored
-     * in |allocation|. Otherwise, |allocation| is set to 'nullptr'.
-     *
-     * \param handle      the handle for the existing allocation
-     * \param allocation  pointer to where the allocation shall be stored on success. nullptr
-     *                    will be stored here on failure
-     *
-     * \retval C2_OK        the allocation was recreated successfully
-     * \retval C2_NO_MEMORY not enough memory to recreate the allocation
-     * \retval C2_TIMED_OUT the recreation timed out (unexpected)
-     * \retval C2_REFUSED   no permission to recreate the allocation
-     * \retval C2_BAD_VALUE invalid handle (caller error)
-     * \retval C2_OMITTED   this allocator does not support 1D allocations
-     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
-     */
-    virtual c2_status_t priorLinearAllocation(
-            const C2Handle *handle __unused,
-            std::shared_ptr<C2LinearAllocation> *allocation /* nonnull */) {
-        *allocation = nullptr;
-        return C2_OMITTED;
-    }
-
-    /**
-     * Allocates a 2D allocation of given |width|, |height|, |format| and |usage|. If successful,
-     * the allocation is stored in |allocation|. Otherwise, |allocation| is set to 'nullptr'.
-     *
-     * \param width         the width of requested allocation (the allocation could be slightly
-     *                      larger, e.g. to account for any system-required alignment)
-     * \param height        the height of requested allocation (the allocation could be slightly
-     *                      larger, e.g. to account for any system-required alignment)
-     * \param format        the pixel format of requested allocation. This could be a vendor
-     *                      specific format.
-     * \param usage         the memory usage info for the requested allocation. \note that the
-     *                      returned allocation may be later used/mapped with different usage.
-     *                      The allocator should layout the buffer to be optimized for this usage,
-     *                      but must support any usage. One exception: protected buffers can
-     *                      only be used in a protected scenario.
-     * \param allocation    pointer to where the allocation shall be stored on success. nullptr
-     *                      will be stored here on failure
-     *
-     * \retval C2_OK        the allocation was successful
-     * \retval C2_NO_MEMORY not enough memory to complete the allocation
-     * \retval C2_TIMED_OUT the allocation timed out
-     * \retval C2_REFUSED   no permission to complete the allocation
-     * \retval C2_BAD_VALUE width, height, format or usage are not supported (invalid) (caller error)
-     * \retval C2_OMITTED   this allocator does not support 2D allocations
-     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during allocation (unexpected)
-     */
-    virtual c2_status_t newGraphicAllocation(
-            uint32_t width __unused, uint32_t height __unused, uint32_t format __unused,
-            C2MemoryUsage usage __unused,
-            std::shared_ptr<C2GraphicAllocation> *allocation /* nonnull */) {
-        *allocation = nullptr;
-        return C2_OMITTED;
-    }
-
-    /**
-     * (Re)creates a 2D allocation from a native handle.  If successful, the allocation is stored
-     * in |allocation|. Otherwise, |allocation| is set to 'nullptr'.
-     *
-     * \param handle      the handle for the existing allocation
-     * \param allocation  pointer to where the allocation shall be stored on success. nullptr
-     *                    will be stored here on failure
-     *
-     * \retval C2_OK        the allocation was recreated successfully
-     * \retval C2_NO_MEMORY not enough memory to recreate the allocation
-     * \retval C2_TIMED_OUT the recreation timed out (unexpected)
-     * \retval C2_REFUSED   no permission to recreate the allocation
-     * \retval C2_BAD_VALUE invalid handle (caller error)
-     * \retval C2_OMITTED   this allocator does not support 2D allocations
-     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during recreation (unexpected)
-     */
-    virtual c2_status_t priorGraphicAllocation(
-            const C2Handle *handle __unused,
-            std::shared_ptr<C2GraphicAllocation> *allocation /* nonnull */) {
-        *allocation = nullptr;
-        return C2_OMITTED;
-    }
-
-protected:
-    C2Allocator() = default;
-
-    virtual ~C2Allocator() = default;
-};
-
-/**
- *  Block pools are used by components to obtain output buffers in an efficient way. They can
- *  support either linear (1D), circular (1D) or graphic (2D) blocks.
- *
- *  Block pools decouple the recycling of memory/allocations from the components. They are meant to
- *  be an opaque service (there are no public APIs other than obtaining blocks) provided by the
- *  platform. Block pools are also meant to decouple allocations from memory used by buffers. This
- *  is accomplished by allowing pools to allot multiple memory 'blocks' on a single allocation. As
- *  their name suggest, block pools maintain a pool of memory blocks. When a component asks for
- *  a memory block, pools will try to return a free memory block already in the pool. If no such
- *  block exists, they will allocate memory using the backing allocator and allot a block on that
- *  allocation. When blocks are no longer used in the system, they are recycled back to the block
- *  pool and are available as free blocks.
- *
- *  Never constructed on stack.
- */
-class C2BlockPool {
-public:
-    /**
-     * Block pool ID type.
-     */
-    typedef uint64_t local_id_t;
-
-    enum : local_id_t {
-        BASIC_LINEAR = 0,  ///< ID of basic (unoptimized) block pool for fetching 1D blocks
-        BASIC_GRAPHIC = 1, ///< ID of basic (unoptimized) block pool for fetching 2D blocks
-        PLATFORM_START = 0x10,
-    };
-
-    /**
-     * Returns the ID for this block pool. This ID is used to get this block pool from the platform.
-     * It is only valid in the current process.
-     *
-     * This method MUST be "non-blocking" and return within 1ms.
-     *
-     * \return a local ID for this block pool.
-     */
-    virtual local_id_t getLocalId() const = 0;
-
-    /**
-     * Returns the ID of the backing allocator of this block pool.
-     *
-     * This method MUST be "non-blocking" and return within 1ms.
-     *
-     * \return the ID of the backing allocator of this block pool.
-     */
-    virtual C2Allocator::id_t getAllocatorId() const = 0;
-
-    /**
-     * Obtains a linear writeable block of given |capacity| and |usage|. If successful, the
-     * block is stored in |block|. Otherwise, |block| is set to 'nullptr'.
-     *
-     * \param capacity the size of requested block.
-     * \param usage    the memory usage info for the requested block. Returned blocks will be
-     *                 optimized for this usage, but may be used with any usage. One exception:
-     *                 protected blocks/buffers can only be used in a protected scenario.
-     * \param block    pointer to where the obtained block shall be stored on success. nullptr will
-     *                 be stored here on failure
-     *
-     * \retval C2_OK        the operation was successful
-     * \retval C2_NO_MEMORY not enough memory to complete any required allocation
-     * \retval C2_TIMED_OUT the operation timed out
-     * \retval C2_REFUSED   no permission to complete any required allocation
-     * \retval C2_BAD_VALUE capacity or usage are not supported (invalid) (caller error)
-     * \retval C2_OMITTED   this pool does not support linear blocks
-     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during operation (unexpected)
-     */
-    virtual c2_status_t fetchLinearBlock(
-            uint32_t capacity __unused, C2MemoryUsage usage __unused,
-            std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
-        *block = nullptr;
-        return C2_OMITTED;
-    }
-
-    /**
-     * Obtains a circular writeable block of given |capacity| and |usage|. If successful, the
-     * block is stored in |block|. Otherwise, |block| is set to 'nullptr'.
-     *
-     * \param capacity the size of requested circular block. (note: the size of the obtained
-     *                 block could be slightly larger, e.g. to accommodate any system-required
-     *                 alignment)
-     * \param usage    the memory usage info for the requested block. Returned blocks will be
-     *                 optimized for this usage, but may be used with any usage. One exception:
-     *                 protected blocks/buffers can only be used in a protected scenario.
-     * \param block    pointer to where the obtained block shall be stored on success. nullptr
-     *                 will be stored here on failure
-     *
-     * \retval C2_OK        the operation was successful
-     * \retval C2_NO_MEMORY not enough memory to complete any required allocation
-     * \retval C2_TIMED_OUT the operation timed out
-     * \retval C2_REFUSED   no permission to complete any required allocation
-     * \retval C2_BAD_VALUE capacity or usage are not supported (invalid) (caller error)
-     * \retval C2_OMITTED   this pool does not support circular blocks
-     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during operation (unexpected)
-     */
-    virtual c2_status_t fetchCircularBlock(
-            uint32_t capacity __unused, C2MemoryUsage usage __unused,
-            std::shared_ptr<C2CircularBlock> *block /* nonnull */) {
-        *block = nullptr;
-        return C2_OMITTED;
-    }
-
-    /**
-     * Obtains a 2D graphic block of given |width|, |height|, |format| and |usage|. If successful,
-     * the block is stored in |block|. Otherwise, |block| is set to 'nullptr'.
-     *
-     * \param width  the width of requested block (the obtained block could be slightly larger, e.g.
-     *               to accommodate any system-required alignment)
-     * \param height the height of requested block (the obtained block could be slightly larger,
-     *               e.g. to accommodate any system-required alignment)
-     * \param format the pixel format of requested block. This could be a vendor specific format.
-     * \param usage  the memory usage info for the requested block. Returned blocks will be
-     *               optimized for this usage, but may be used with any usage. One exception:
-     *               protected blocks/buffers can only be used in a protected scenario.
-     * \param block  pointer to where the obtained block shall be stored on success. nullptr
-     *               will be stored here on failure
-     *
-     * \retval C2_OK        the operation was successful
-     * \retval C2_NO_MEMORY not enough memory to complete any required allocation
-     * \retval C2_TIMED_OUT the operation timed out
-     * \retval C2_REFUSED   no permission to complete any required allocation
-     * \retval C2_BAD_VALUE width, height, format or usage are not supported (invalid) (caller
-     *                      error)
-     * \retval C2_OMITTED   this pool does not support 2D blocks
-     * \retval C2_CORRUPTED some unknown, unrecoverable error occured during operation (unexpected)
-     */
-    virtual c2_status_t fetchGraphicBlock(
-            uint32_t width __unused, uint32_t height __unused, uint32_t format __unused,
-            C2MemoryUsage usage __unused,
-            std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {
-        *block = nullptr;
-        return C2_OMITTED;
-    }
-
-protected:
-    C2BlockPool() = default;
-
-    virtual ~C2BlockPool() = default;
 };
 
 /// @}

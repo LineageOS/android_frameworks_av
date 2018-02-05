@@ -24,14 +24,14 @@
 namespace android {
 
 struct AMessage;
-class DataSource;
+class DataSourceBase;
 class String8;
 
 struct MyOggExtractor;
 struct OggSource;
 
 struct OggExtractor : public MediaExtractor {
-    explicit OggExtractor(const sp<DataSource> &source);
+    explicit OggExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();
     virtual MediaSourceBase *getTrack(size_t index);
@@ -46,7 +46,7 @@ protected:
 private:
     friend struct OggSource;
 
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
     status_t mInitCheck;
 
     MyOggExtractor *mImpl;
@@ -56,7 +56,7 @@ private:
 };
 
 bool SniffOgg(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence,
+        DataSourceBase *source, String8 *mimeType, float *confidence,
         sp<AMessage> *);
 
 }  // namespace android

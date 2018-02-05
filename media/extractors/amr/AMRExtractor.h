@@ -29,7 +29,7 @@ class String8;
 
 class AMRExtractor : public MediaExtractor {
 public:
-    explicit AMRExtractor(const sp<DataSource> &source);
+    explicit AMRExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();
     virtual MediaSourceBase *getTrack(size_t index);
@@ -42,7 +42,7 @@ protected:
     virtual ~AMRExtractor();
 
 private:
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
     sp<MetaData> mMeta;
     status_t mInitCheck;
     bool mIsWide;
@@ -55,7 +55,7 @@ private:
 };
 
 bool SniffAMR(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence,
+        DataSourceBase *source, String8 *mimeType, float *confidence,
         sp<AMessage> *);
 
 }  // namespace android

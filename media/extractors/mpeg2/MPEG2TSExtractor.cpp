@@ -22,7 +22,7 @@
 
 #include "MPEG2TSExtractor.h"
 
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/IStreamSource.h>
 #include <media/MediaSourceBase.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -121,7 +121,7 @@ status_t MPEG2TSSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-MPEG2TSExtractor::MPEG2TSExtractor(const sp<DataSource> &source)
+MPEG2TSExtractor::MPEG2TSExtractor(DataSourceBase *source)
     : mDataSource(source),
       mParser(new ATSParser),
       mLastSyncEvent(0),
@@ -165,9 +165,9 @@ bool MPEG2TSExtractor::isScrambledFormat(const sp<MetaData> &format) {
                     || !strcasecmp(MEDIA_MIMETYPE_AUDIO_SCRAMBLED, mime));
 }
 
-status_t MPEG2TSExtractor::setMediaCas(const HInterfaceToken &casToken) {
+status_t MPEG2TSExtractor::setMediaCas(const uint8_t* casToken, size_t size) {
     HalToken halToken;
-    halToken.setToExternal((uint8_t*)casToken.data(), casToken.size());
+    halToken.setToExternal((uint8_t*)casToken, size);
     sp<ICas> cas = ICas::castFrom(retrieveHalInterface(halToken));
     ALOGD("setMediaCas: %p", cas.get());
 
@@ -367,7 +367,7 @@ void MPEG2TSExtractor::addSyncPoint_l(const ATSParser::SyncEvent &event) {
 }
 
 status_t MPEG2TSExtractor::estimateDurationsFromTimesUsAtEnd()  {
-    if (!(mDataSource->flags() & DataSource::kIsLocalFileSource)) {
+    if (!(mDataSource->flags() & DataSourceBase::kIsLocalFileSource)) {
         return ERROR_UNSUPPORTED;
     }
 
@@ -646,7 +646,7 @@ status_t MPEG2TSExtractor::feedUntilBufferAvailable(
 ////////////////////////////////////////////////////////////////////////////////
 
 bool SniffMPEG2TS(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence,
+        DataSourceBase *source, String8 *mimeType, float *confidence,
         sp<AMessage> *) {
     for (int i = 0; i < 5; ++i) {
         char header;

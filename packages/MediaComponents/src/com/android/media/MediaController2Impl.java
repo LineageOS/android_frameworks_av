@@ -43,6 +43,8 @@ import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
 import android.util.Log;
 
+import com.android.media.MediaSession2Impl.CommandButtonImpl;
+
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
@@ -72,6 +74,8 @@ public class MediaController2Impl implements MediaController2Provider {
     private List<MediaItem2> mPlaylist;
     @GuardedBy("mLock")
     private PlaylistParams mPlaylistParams;
+    @GuardedBy("mLock")
+    private PlaybackInfo mPlaybackInfo;
 
     // Assignment should be used with the lock hold, but should be used without a lock to prevent
     // potential deadlock.
@@ -282,18 +286,32 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void setVolumeTo_impl(int value, int flags) {
-        // TODO(jaewan): Implement
+        // TODO(hdmoon): sanity check
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.setVolumeTo(mSessionCallbackStub, value, flags);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     @Override
     public void adjustVolume_impl(int direction, int flags) {
-        // TODO(jaewan): Implement
-    }
-
-    @Override
-    public PlaybackInfo getPlaybackInfo_impl() {
-        // TODO(jaewan): Implement
-        return null;
+        // TODO(hdmoon): sanity check
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.adjustVolume(mSessionCallbackStub, direction, flags);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     @Override
@@ -411,6 +429,13 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
+    public PlaybackInfo getPlaybackInfo_impl() {
+        synchronized (mLock) {
+            return mPlaybackInfo;
+        }
+    }
+
+    @Override
     public void setPlaylistParams_impl(PlaylistParams params) {
         if (params == null) {
             throw new IllegalArgumentException("PlaylistParams should not be null!");
@@ -444,6 +469,18 @@ public class MediaController2Impl implements MediaController2Provider {
                 return;
             }
             mCallback.onPlaylistParamsChanged(params);
+        });
+    }
+
+    private void pushPlaybackInfoChanges(final PlaybackInfo info) {
+        synchronized (mLock) {
+            mPlaybackInfo = info;
+        }
+        mCallbackExecutor.execute(() -> {
+            if (!mInstance.isConnected()) {
+                return;
+            }
+            mCallback.onPlaybackInfoChanged(info);
         });
     }
 
@@ -601,6 +638,19 @@ public class MediaController2Impl implements MediaController2Provider {
         }
 
         @Override
+        public void onPlaybackInfoChanged(Bundle playbackInfo) throws RuntimeException {
+            final MediaController2Impl controller;
+            try {
+                controller = getController();
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+                return;
+            }
+            controller.pushPlaybackInfoChanges(
+                    PlaybackInfoImpl.fromBundle(controller.getContext(), playbackInfo));
+        }
+
+        @Override
         public void onConnectionChanged(IMediaSession2 sessionBinder, Bundle commandGroup)
                 throws RuntimeException {
             final MediaController2Impl controller;
@@ -650,7 +700,7 @@ public class MediaController2Impl implements MediaController2Provider {
             }
             List<CommandButton> layout = new ArrayList<>();
             for (int i = 0; i < commandButtonlist.size(); i++) {
-                CommandButton button = CommandButton.fromBundle(
+                CommandButton button = CommandButtonImpl.fromBundle(
                         browser.getContext(), commandButtonlist.get(i));
                 if (button != null) {
                     layout.add(button);

@@ -32,12 +32,12 @@ namespace android {
 struct AMessage;
 struct AnotherPacketSource;
 struct ATSParser;
-class DataSource;
+class DataSourceBase;
 struct MPEG2TSSource;
 class String8;
 
 struct MPEG2TSExtractor : public MediaExtractor {
-    explicit MPEG2TSExtractor(const sp<DataSource> &source);
+    explicit MPEG2TSExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();
     virtual MediaSourceBase *getTrack(size_t index);
@@ -45,7 +45,7 @@ struct MPEG2TSExtractor : public MediaExtractor {
 
     virtual sp<MetaData> getMetaData();
 
-    virtual status_t setMediaCas(const HInterfaceToken &casToken) override;
+    virtual status_t setMediaCas(const uint8_t* /*casToken*/, size_t /*size*/) override;
 
     virtual uint32_t flags() const;
     virtual const char * name() { return "MPEG2TSExtractor"; }
@@ -55,7 +55,7 @@ private:
 
     mutable Mutex mLock;
 
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
 
     sp<ATSParser> mParser;
 
@@ -79,9 +79,9 @@ private:
     // Try to feed more data from source to parser.
     // |isInit| means this function is called inside init(). This is a signal to
     // save SyncEvent so that init() can add SyncPoint after it updates |mSourceImpls|.
-    // This function returns OK if expected amount of data is fed from DataSource to
+    // This function returns OK if expected amount of data is fed from DataSourceBase to
     // parser and is successfully parsed. Otherwise, various error codes could be
-    // returned, e.g., ERROR_END_OF_STREAM, or no data availalbe from DataSource, or
+    // returned, e.g., ERROR_END_OF_STREAM, or no data availalbe from DataSourceBase, or
     // the data has syntax error during parsing, etc.
     status_t feedMore(bool isInit = false);
     status_t seek(int64_t seekTimeUs,
@@ -100,7 +100,7 @@ private:
 };
 
 bool SniffMPEG2TS(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence,
+        DataSourceBase *source, String8 *mimeType, float *confidence,
         sp<AMessage> *);
 
 }  // namespace android

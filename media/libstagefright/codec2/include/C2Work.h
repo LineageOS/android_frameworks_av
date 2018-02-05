@@ -68,7 +68,7 @@ struct C2SettingResult {
 
     /// Conflicting parameters or fields with optional suggestions with (optional) suggested values
     /// for any conflicting fields to avoid the conflict.
-    std::list<C2ParamFieldValues> conflicts;
+    std::vector<C2ParamFieldValues> conflicts;
 };
 
 // ================================================================================================
@@ -206,7 +206,7 @@ struct C2Work {
 struct C2WorkOutline {
 //public:
     C2WorkOrdinalStruct ordinal;
-    std::list<c2_node_id_t> chain;
+    std::vector<c2_node_id_t> chain;
 };
 
 /// @}

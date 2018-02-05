@@ -18,7 +18,7 @@
 #define LOG_TAG "ItemTable"
 
 #include <ItemTable.h>
-#include <media/DataSource.h>
+#include <media/DataSourceBase.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -87,7 +87,7 @@ struct ImageItem {
 
 struct Box {
 protected:
-    Box(const sp<DataSource> source, uint32_t type) :
+    Box(DataSourceBase *source, uint32_t type) :
         mDataSource(source), mType(type) {}
 
     virtual ~Box() {}
@@ -99,14 +99,14 @@ protected:
 
     inline uint32_t type() const { return mType; }
 
-    inline sp<DataSource> source() const { return mDataSource; }
+    inline DataSourceBase *source() const { return mDataSource; }
 
     status_t parseChunk(off64_t *offset);
 
     status_t parseChunks(off64_t offset, size_t size);
 
 private:
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
     uint32_t mType;
 };
 
@@ -181,7 +181,7 @@ status_t Box::parseChunks(off64_t offset, size_t size) {
 
 struct FullBox : public Box {
 protected:
-    FullBox(const sp<DataSource> source, uint32_t type) :
+    FullBox(DataSourceBase *source, uint32_t type) :
         Box(source, type), mVersion(0), mFlags(0) {}
 
     inline uint8_t version() const { return mVersion; }
@@ -216,7 +216,7 @@ status_t FullBox::parseFullBoxHeader(off64_t *offset, size_t *size) {
 //
 
 struct PitmBox : public FullBox {
-    PitmBox(const sp<DataSource> source) :
+    PitmBox(DataSourceBase *source) :
         FullBox(source, FOURCC('p', 'i', 't', 'm')) {}
 
     status_t parse(off64_t offset, size_t size, uint32_t *primaryItemId);
@@ -296,7 +296,7 @@ struct ItemLoc {
 };
 
 struct IlocBox : public FullBox {
-    IlocBox(const sp<DataSource> source, KeyedVector<uint32_t, ItemLoc> *itemLocs) :
+    IlocBox(DataSourceBase *source, KeyedVector<uint32_t, ItemLoc> *itemLocs) :
         FullBox(source, FOURCC('i', 'l', 'o', 'c')),
         mItemLocs(itemLocs), mHasConstructMethod1(false) {}
 
@@ -466,7 +466,7 @@ status_t IlocBox::parse(off64_t offset, size_t size) {
 //
 
 struct ItemReference : public Box, public RefBase {
-    ItemReference(const sp<DataSource> source, uint32_t type, uint32_t itemIdSize) :
+    ItemReference(DataSourceBase *source, uint32_t type, uint32_t itemIdSize) :
         Box(source, type), mItemId(0), mRefIdSize(itemIdSize) {}
 
     status_t parse(off64_t offset, size_t size);
@@ -575,7 +575,7 @@ status_t ItemReference::parse(off64_t offset, size_t size) {
 }
 
 struct IrefBox : public FullBox {
-    IrefBox(const sp<DataSource> source, Vector<sp<ItemReference> > *itemRefs) :
+    IrefBox(DataSourceBase *source, Vector<sp<ItemReference> > *itemRefs) :
         FullBox(source, FOURCC('i', 'r', 'e', 'f')), mRefIdSize(0), mItemRefs(itemRefs) {}
 
     status_t parse(off64_t offset, size_t size);
@@ -637,7 +637,7 @@ private:
 };
 
 struct IspeBox : public FullBox, public ItemProperty {
-    IspeBox(const sp<DataSource> source) :
+    IspeBox(DataSourceBase *source) :
         FullBox(source, FOURCC('i', 's', 'p', 'e')), mWidth(0), mHeight(0) {}
 
     status_t parse(off64_t offset, size_t size) override;
@@ -673,7 +673,7 @@ status_t IspeBox::parse(off64_t offset, size_t size) {
 }
 
 struct HvccBox : public Box, public ItemProperty {
-    HvccBox(const sp<DataSource> source) :
+    HvccBox(DataSourceBase *source) :
         Box(source, FOURCC('h', 'v', 'c', 'C')) {}
 
     status_t parse(off64_t offset, size_t size) override;
@@ -706,7 +706,7 @@ status_t HvccBox::parse(off64_t offset, size_t size) {
 }
 
 struct IrotBox : public Box, public ItemProperty {
-    IrotBox(const sp<DataSource> source) :
+    IrotBox(DataSourceBase *source) :
         Box(source, FOURCC('i', 'r', 'o', 't')), mAngle(0) {}
 
     status_t parse(off64_t offset, size_t size) override;
@@ -735,7 +735,7 @@ status_t IrotBox::parse(off64_t offset, size_t size) {
 }
 
 struct ColrBox : public Box, public ItemProperty {
-    ColrBox(const sp<DataSource> source) :
+    ColrBox(DataSourceBase *source) :
         Box(source, FOURCC('c', 'o', 'l', 'r')) {}
 
     status_t parse(off64_t offset, size_t size) override;
@@ -783,7 +783,7 @@ status_t ColrBox::parse(off64_t offset, size_t size) {
 }
 
 struct IpmaBox : public FullBox {
-    IpmaBox(const sp<DataSource> source, Vector<AssociationEntry> *associations) :
+    IpmaBox(DataSourceBase *source, Vector<AssociationEntry> *associations) :
         FullBox(source, FOURCC('i', 'p', 'm', 'a')), mAssociations(associations) {}
 
     status_t parse(off64_t offset, size_t size);
@@ -857,7 +857,7 @@ status_t IpmaBox::parse(off64_t offset, size_t size) {
 }
 
 struct IpcoBox : public Box {
-    IpcoBox(const sp<DataSource> source, Vector<sp<ItemProperty> > *properties) :
+    IpcoBox(DataSourceBase *source, Vector<sp<ItemProperty> > *properties) :
         Box(source, FOURCC('i', 'p', 'c', 'o')), mItemProperties(properties) {}
 
     status_t parse(off64_t offset, size_t size);
@@ -914,7 +914,7 @@ status_t IpcoBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
 }
 
 struct IprpBox : public Box {
-    IprpBox(const sp<DataSource> source,
+    IprpBox(DataSourceBase *source,
             Vector<sp<ItemProperty> > *properties,
             Vector<AssociationEntry> *associations) :
         Box(source, FOURCC('i', 'p', 'r', 'p')),
@@ -971,7 +971,7 @@ struct ItemInfo {
 };
 
 struct InfeBox : public FullBox {
-    InfeBox(const sp<DataSource> source) :
+    InfeBox(DataSourceBase *source) :
         FullBox(source, FOURCC('i', 'n', 'f', 'e')) {}
 
     status_t parse(off64_t offset, size_t size, ItemInfo *itemInfo);
@@ -1075,7 +1075,7 @@ status_t InfeBox::parse(off64_t offset, size_t size, ItemInfo *itemInfo) {
 }
 
 struct IinfBox : public FullBox {
-    IinfBox(const sp<DataSource> source, Vector<ItemInfo> *itemInfos) :
+    IinfBox(DataSourceBase *source, Vector<ItemInfo> *itemInfos) :
         FullBox(source, FOURCC('i', 'i', 'n', 'f')),
         mItemInfos(itemInfos), mHasGrids(false) {}
 
@@ -1144,7 +1144,7 @@ status_t IinfBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
 
 //////////////////////////////////////////////////////////////////
 
-ItemTable::ItemTable(const sp<DataSource> &source)
+ItemTable::ItemTable(DataSourceBase *source)
     : mDataSource(source),
       mPrimaryItemId(0),
       mIdatOffset(0),

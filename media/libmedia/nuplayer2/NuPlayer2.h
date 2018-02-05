@@ -30,6 +30,7 @@ struct AMessage;
 struct ANativeWindowWrapper;
 struct AudioPlaybackRate;
 struct AVSyncSettings;
+struct DataSourceDesc;
 class IDataSource;
 struct MediaClock;
 struct MediaHTTPService;
@@ -43,16 +44,7 @@ struct NuPlayer2 : public AHandler {
 
     void setDriver(const wp<NuPlayer2Driver> &driver);
 
-    void setDataSourceAsync(const sp<IStreamSource> &source);
-
-    void setDataSourceAsync(
-            const sp<MediaHTTPService> &httpService,
-            const char *url,
-            const KeyedVector<String8, String8> *headers);
-
-    void setDataSourceAsync(int fd, int64_t offset, int64_t length);
-
-    void setDataSourceAsync(const sp<DataSource> &source);
+    void setDataSourceAsync(const sp<DataSourceDesc> &dsd);
 
     status_t getBufferingSettings(BufferingSettings* buffering /* nonnull */);
     status_t setBufferingSettings(const BufferingSettings& buffering);
@@ -114,11 +106,10 @@ private:
     struct DecoderBase;
     struct DecoderPassThrough;
     struct CCDecoder;
-    struct GenericSource;
-    struct HTTPLiveSource;
+    struct GenericSource2;
+    struct HTTPLiveSource2;
     struct Renderer;
-    struct RTSPSource;
-    struct StreamingSource;
+    struct RTSPSource2;
     struct Action;
     struct SeekAction;
     struct SetSurfaceAction;
