@@ -286,12 +286,32 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void setVolumeTo_impl(int value, int flags) {
-        // TODO(jaewan): Implement
+        // TODO(hdmoon): sanity check
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.setVolumeTo(mSessionCallbackStub, value, flags);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     @Override
     public void adjustVolume_impl(int direction, int flags) {
-        // TODO(jaewan): Implement
+        // TODO(hdmoon): sanity check
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.adjustVolume(mSessionCallbackStub, direction, flags);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     @Override

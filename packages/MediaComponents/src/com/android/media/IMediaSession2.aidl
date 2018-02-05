@@ -40,6 +40,9 @@ interface IMediaSession2 {
     void connect(String callingPackage, IMediaSession2Callback callback);
     void release(IMediaSession2Callback caller);
 
+    void setVolumeTo(IMediaSession2Callback caller, int value, int flags);
+    void adjustVolume(IMediaSession2Callback caller, int direction, int flags);
+
     //////////////////////////////////////////////////////////////////////////////////////////////
     // send command
     //////////////////////////////////////////////////////////////////////////////////////////////

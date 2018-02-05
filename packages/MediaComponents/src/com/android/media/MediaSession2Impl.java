@@ -559,6 +559,10 @@ public class MediaSession2Impl implements MediaSession2Provider {
         return mCallback;
     }
 
+    VolumeProvider2 getVolumeProvider() {
+        return mVolumeProvider;
+    }
+
     private static class MyPlaybackListener implements MediaPlayerInterface.PlaybackListener {
         private final WeakReference<MediaSession2Impl> mSession;
         private final MediaPlayerInterface mPlayer;
