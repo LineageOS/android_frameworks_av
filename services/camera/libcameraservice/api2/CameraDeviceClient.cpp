@@ -47,6 +47,7 @@ CameraDeviceClientBase::CameraDeviceClientBase(
         const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
         const String16& clientPackageName,
         const String8& cameraId,
+        int api1CameraId,
         int cameraFacing,
         int clientPid,
         uid_t clientUid,
@@ -60,6 +61,8 @@ CameraDeviceClientBase::CameraDeviceClientBase(
             clientUid,
             servicePid),
     mRemoteCallback(remoteCallback) {
+    // We don't need it for API2 clients, but Camera2ClientBase requires it.
+    (void) api1CameraId;
 }
 
 // Interface used by CameraService
@@ -73,7 +76,8 @@ CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
         uid_t clientUid,
         int servicePid) :
     Camera2ClientBase(cameraService, remoteCallback, clientPackageName,
-                cameraId, cameraFacing, clientPid, clientUid, servicePid),
+                cameraId, /*API1 camera ID*/ -1,
+                cameraFacing, clientPid, clientUid, servicePid),
     mInputStream(),
     mStreamingRequestId(REQUEST_ID_NONE),
     mRequestIdCounter(0) {

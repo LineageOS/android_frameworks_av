@@ -49,16 +49,17 @@ static int getCallingPid() {
 Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
         const sp<hardware::ICameraClient>& cameraClient,
         const String16& clientPackageName,
-        int cameraId,
+        const String8& cameraDeviceId,
+        int api1CameraId,
         int cameraFacing,
         int clientPid,
         uid_t clientUid,
         int servicePid,
         bool legacyMode):
         Camera2ClientBase(cameraService, cameraClient, clientPackageName,
-                String8::format("%d", cameraId), cameraFacing,
+                cameraDeviceId, api1CameraId, cameraFacing,
                 clientPid, clientUid, servicePid),
-        mParameters(cameraId, cameraFacing)
+        mParameters(api1CameraId, cameraFacing)
 {
     ATRACE_CALL();
 

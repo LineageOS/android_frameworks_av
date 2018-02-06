@@ -45,6 +45,7 @@ protected:
             const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
             const String16& clientPackageName,
             const String8& cameraId,
+            int api1CameraId,
             int cameraFacing,
             int clientPid,
             uid_t clientUid,
