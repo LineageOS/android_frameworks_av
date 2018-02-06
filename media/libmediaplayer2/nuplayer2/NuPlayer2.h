@@ -39,9 +39,7 @@ class MetaData;
 struct NuPlayer2Driver;
 
 struct NuPlayer2 : public AHandler {
-    explicit NuPlayer2(pid_t pid, const sp<MediaClock> &mediaClock);
-
-    void setUID(uid_t uid);
+    explicit NuPlayer2(pid_t pid, uid_t uid, const sp<MediaClock> &mediaClock);
 
     void setDriver(const wp<NuPlayer2Driver> &driver);
 
@@ -152,9 +150,8 @@ private:
     };
 
     wp<NuPlayer2Driver> mDriver;
-    bool mUIDValid;
-    uid_t mUID;
     pid_t mPID;
+    uid_t mUID;
     const sp<MediaClock> mMediaClock;
     Mutex mSourceLock;  // guard |mSource|.
     sp<Source> mSource;
