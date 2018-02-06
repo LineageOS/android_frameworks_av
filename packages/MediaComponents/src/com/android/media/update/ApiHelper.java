@@ -18,9 +18,12 @@ package com.android.media.update;
 
 import android.annotation.Nullable;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
 import android.content.res.XmlResourceParser;
+import android.support.v4.widget.Space;
+import android.support.v7.widget.ButtonBarLayout;
 import android.util.AttributeSet;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
@@ -28,6 +31,9 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import com.android.support.mediarouter.app.MediaRouteButton;
+import com.android.support.mediarouter.app.MediaRouteExpandCollapseButton;
+import com.android.support.mediarouter.app.MediaRouteVolumeSlider;
+import com.android.support.mediarouter.app.OverlayListView;
 
 public class ApiHelper {
     private static ApiHelper sInstance;
@@ -68,6 +74,7 @@ public class ApiHelper {
     }
 
     public static LayoutInflater getLayoutInflater(Context context, Theme theme) {
+        // TODO (b/72975976): Avoid to use ContextThemeWrapper with app context and lib theme.
         LayoutInflater layoutInflater = LayoutInflater.from(context).cloneInContext(
                 new ContextThemeWrapper(context, theme));
         layoutInflater.setFactory2(new LayoutInflater.Factory2() {
@@ -76,6 +83,16 @@ public class ApiHelper {
                     View parent, String name, Context context, AttributeSet attrs) {
                 if (MediaRouteButton.class.getCanonicalName().equals(name)) {
                     return new MediaRouteButton(context, attrs);
+                } else if (MediaRouteVolumeSlider.class.getCanonicalName().equals(name)) {
+                    return new MediaRouteVolumeSlider(context, attrs);
+                } else if (MediaRouteExpandCollapseButton.class.getCanonicalName().equals(name)) {
+                    return new MediaRouteExpandCollapseButton(context, attrs);
+                } else if (OverlayListView.class.getCanonicalName().equals(name)) {
+                    return new OverlayListView(context, attrs);
+                } else if (ButtonBarLayout.class.getCanonicalName().equals(name)) {
+                    return new ButtonBarLayout(context, attrs);
+                } else if (Space.class.getCanonicalName().equals(name)) {
+                    return new Space(context, attrs);
                 }
                 return null;
             }
