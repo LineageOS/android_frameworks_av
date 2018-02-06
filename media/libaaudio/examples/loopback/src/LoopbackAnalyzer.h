@@ -410,8 +410,7 @@ private:
 
 
 static void printAudioScope(float sample) {
-    const int maxStars = 80
-    ; // arbitrary, fits on one line
+    const int maxStars = 80; // arbitrary, fits on one line
     char c = '*';
     if (sample < -1.0) {
         sample = -1.0;
@@ -555,7 +554,7 @@ public:
                 break;
 
             case STATE_WAITING_FOR_SILENCE:
-                // Output silence.
+                // Output silence and wait for the echos to die down.
                 numSamples = numFrames * outputChannelCount;
                 for (int i = 0; i < numSamples; i++) {
                     outputData[i] = 0;
