@@ -39,7 +39,7 @@ public:
 
     std::list<FrameRenderTracker::Info> render(
             const void *data, size_t size, int64_t mediaTimeUs, nsecs_t renderTimeNs,
-            void *platformPrivate, const sp<AMessage> &format);
+            size_t numOutputBuffers, const sp<AMessage> &format);
     void clearTracker();
 
 private:
@@ -59,10 +59,11 @@ private:
     HDRStaticInfo mHDRStaticInfo;
     FrameRenderTracker mRenderTracker;
 
+    void resetFormatIfChanged(
+            const sp<AMessage> &format, size_t numOutputBuffers);
+
     SoftwareRenderer(const SoftwareRenderer &);
     SoftwareRenderer &operator=(const SoftwareRenderer &);
-
-    void resetFormatIfChanged(const sp<AMessage> &format);
 };
 
 }  // namespace android

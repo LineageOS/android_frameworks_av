@@ -2951,8 +2951,8 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
 
         if (mSoftRenderer != NULL) {
             std::list<FrameRenderTracker::Info> doneFrames = mSoftRenderer->render(
-                    buffer->data(), buffer->size(),
-                    mediaTimeUs, renderTimeNs, NULL, buffer->format());
+                    buffer->data(), buffer->size(), mediaTimeUs, renderTimeNs,
+                    mPortBuffers[kPortIndexOutput].size(), buffer->format());
 
             // if we are running, notify rendered frames
             if (!doneFrames.empty() && mState == STARTED && mOnFrameRenderedNotification != NULL) {
