@@ -125,6 +125,7 @@ LIBMEDIANDK {
     AMediaCrypto_requiresSecureDecoderComponent;
     AMediaDataSource_delete;      # introduced=28
     AMediaDataSource_new;         # introduced=28
+    AMediaDataSource_setClose;    # introduced=28
     AMediaDataSource_setGetSize;  # introduced=28
     AMediaDataSource_setReadAt;   # introduced=28
     AMediaDataSource_setUserdata; # introduced=28
