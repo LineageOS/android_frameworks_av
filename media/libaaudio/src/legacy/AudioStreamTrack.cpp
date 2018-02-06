@@ -22,6 +22,7 @@
 #include <media/AudioTrack.h>
 
 #include <aaudio/AAudio.h>
+#include <system/audio.h>
 #include "utility/AudioClock.h"
 #include "legacy/AudioStreamLegacy.h"
 #include "legacy/AudioStreamTrack.h"
@@ -130,7 +131,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             .content_type = contentType,
             .usage = usage,
             .source = AUDIO_SOURCE_DEFAULT, // only used for recording
-            .flags = flags, // If attributes are set then the other flags parameter is ignored.
+            .flags = AUDIO_FLAG_NONE, // Different than the AUDIO_OUTPUT_FLAGS
             .tags = ""
     };
 
