@@ -18,7 +18,7 @@
 
 #include "media/JAudioAttributes.h"
 #include "media/JAudioFormat.h"
-#include "media/JAudioTrack.h"
+#include "mediaplayer2/JAudioTrack.h"
 
 #include <android_media_AudioErrors.h>
 #include <android_runtime/AndroidRuntime.h>

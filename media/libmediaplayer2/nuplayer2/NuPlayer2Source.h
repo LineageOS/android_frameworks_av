@@ -20,9 +20,9 @@
 
 #include "NuPlayer2.h"
 
-#include <media/mediaplayer2.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MetaData.h>
+#include <mediaplayer2/mediaplayer2.h>
 #include <utils/Vector.h>
 
 namespace android {

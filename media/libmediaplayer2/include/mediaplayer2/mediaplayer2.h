@@ -23,8 +23,8 @@
 
 #include <media/AudioResamplerPublic.h>
 #include <media/BufferingSettings.h>
-#include <media/MediaPlayer2EngineClient.h>
-#include <media/MediaPlayer2Engine.h>
+#include <mediaplayer2/MediaPlayer2EngineClient.h>
+#include <mediaplayer2/MediaPlayer2Engine.h>
 
 #include <utils/Condition.h>
 #include <utils/KeyedVector.h>
