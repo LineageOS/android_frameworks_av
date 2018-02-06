@@ -224,4 +224,47 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
         }
         browser.onGetRootResult(rootHints, rootMediaId, rootExtra);
     }
+
+
+    @Override
+    public void onItemLoaded(String mediaId, Bundle itemBundle) throws RuntimeException {
+        final MediaBrowser2Impl browser;
+        try {
+            browser = getBrowser();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        if (browser == null) {
+            // TODO(jaewan): Revisit here. Could be a bug
+            return;
+        }
+        browser.onItemLoaded(mediaId,
+                MediaItem2Impl.fromBundle(browser.getContext(), itemBundle));
+    }
+
+    @Override
+    public void onChildrenLoaded(String parentId, int page, int pageSize, Bundle options,
+            List<Bundle> itemBundleList) throws RuntimeException {
+        final MediaBrowser2Impl browser;
+        try {
+            browser = getBrowser();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        if (browser == null) {
+            // TODO(jaewan): Revisit here. Could be a bug
+            return;
+        }
+
+        List<MediaItem2> result = null;
+        if (itemBundleList != null) {
+            result = new ArrayList<>();
+            for (Bundle bundle : itemBundleList) {
+                result.add(MediaItem2.fromBundle(browser.getContext(), bundle));
+            }
+        }
+        browser.onChildrenLoaded(parentId, page, pageSize, options, result);
+    }
 }

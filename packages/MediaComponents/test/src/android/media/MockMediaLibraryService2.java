@@ -26,6 +26,11 @@ import android.media.MediaSession2.ControllerInfo;
 import android.media.TestUtils.SyncHandler;
 import android.os.Bundle;
 import android.os.Process;
+import android.util.Log;
+
+import java.io.FileDescriptor;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.annotation.concurrent.GuardedBy;
 
@@ -38,6 +43,20 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
 
     public static final String ROOT_ID = "rootId";
     public static final Bundle EXTRA = new Bundle();
+
+    public static final String MEDIA_ID_GET_ITEM = "media_id_get_item";
+
+    public static final String PARENT_ID = "parent_id";
+    public static final String PARENT_ID_NO_CHILDREN = "parent_id_no_children";
+    public static final String PARENT_ID_ERROR = "parent_id_error";
+    public static final List<MediaItem2> GET_CHILDREN_RESULT = new ArrayList<>();
+
+    private static final int CHILDREN_COUNT = 100;
+    private static final DataSourceDesc DATA_SOURCE_DESC =
+            new DataSourceDesc.Builder().setDataSource(new FileDescriptor()).build();
+
+    private static final String TAG = "MockMediaLibrarySvc2";
+
     static {
         EXTRA.putString(ROOT_ID, ROOT_ID);
     }
@@ -45,6 +64,15 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
     private static SessionToken2 sToken;
 
     private MediaLibrarySession mSession;
+
+    public MockMediaLibraryService2() {
+        super();
+        GET_CHILDREN_RESULT.clear();
+        String mediaIdPrefix = "media_id_";
+        for (int i = 0; i < CHILDREN_COUNT; i++) {
+            GET_CHILDREN_RESULT.add(createMediaItem(mediaIdPrefix + i));
+        }
+    }
 
     @Override
     public MediaLibrarySession onCreateSession(String sessionId) {
@@ -100,5 +128,60 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         public LibraryRoot onGetRoot(ControllerInfo controller, Bundle rootHints) {
             return new LibraryRoot(MockMediaLibraryService2.this, ROOT_ID, EXTRA);
         }
+
+        @Override
+        public MediaItem2 onLoadItem(ControllerInfo controller, String mediaId) {
+            if (MEDIA_ID_GET_ITEM.equals(mediaId)) {
+                return createMediaItem(mediaId);
+            } else {
+                return null;
+            }
+        }
+
+        @Override
+        public List<MediaItem2> onLoadChildren(ControllerInfo controller, String parentId, int page,
+                int pageSize, Bundle options) {
+            if (PARENT_ID.equals(parentId)) {
+                return getPaginatedResult(GET_CHILDREN_RESULT, page, pageSize);
+            } else if (PARENT_ID_ERROR.equals(parentId)) {
+                return null;
+            }
+            // Includes the case of PARENT_ID_NO_CHILDREN.
+            return new ArrayList<>();
+        }
+    }
+
+    private List<MediaItem2> getPaginatedResult(List<MediaItem2> items, int page, int pageSize) {
+        if (items == null) {
+            return null;
+        } else if (items.size() == 0) {
+            return new ArrayList<>();
+        }
+
+        final int totalItemCount = items.size();
+        int fromIndex = (page - 1) * pageSize;
+        int toIndex = Math.min(page * pageSize, totalItemCount);
+
+        List<MediaItem2> paginatedResult = new ArrayList<>();
+        try {
+            // The case of (fromIndex >= totalItemCount) will throw exception below.
+            paginatedResult = items.subList(fromIndex, toIndex);
+        } catch (IndexOutOfBoundsException | IllegalArgumentException ex) {
+            Log.d(TAG, "Result is empty for given pagination arguments: totalItemCount="
+                    + totalItemCount + ", page=" + page + ", pageSize=" + pageSize, ex);
+        }
+        return paginatedResult;
+    }
+
+    private MediaItem2 createMediaItem(String mediaId) {
+        Context context = MockMediaLibraryService2.this;
+        return new MediaItem2(
+                context,
+                mediaId,
+                DATA_SOURCE_DESC,
+                new MediaMetadata2.Builder(context)
+                        .putString(MediaMetadata2.METADATA_KEY_MEDIA_ID, mediaId)
+                        .build(),
+                0 /* Flags */);
     }
 }
