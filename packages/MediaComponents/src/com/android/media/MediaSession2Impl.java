@@ -85,6 +85,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private final SessionToken2 mSessionToken;
     private final AudioManager mAudioManager;
     private final List<PlaybackListenerHolder> mListeners = new ArrayList<>();
+    private final int mRatingType;
+    private final PendingIntent mSessionActivity;
 
     @GuardedBy("mLock")
     private MediaPlayerInterface mPlayer;
@@ -102,7 +104,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
     /**
      * Can be only called by the {@link Builder#build()}.
      *
-     * @param instance
      * @param context
      * @param player
      * @param id
@@ -123,6 +124,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mId = id;
         mCallback = callback;
         mCallbackExecutor = callbackExecutor;
+        mRatingType = ratingType;
+        mSessionActivity = sessionActivity;
         mSessionStub = new MediaSession2Stub(this);
         mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
 
@@ -195,9 +198,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (player == null) {
             throw new IllegalArgumentException("player shouldn't be null");
         }
-        if (player == mPlayer) {
-            return;
-        }
         PlaybackInfo info =
                 createPlaybackInfo(null /* VolumeProvider */, player.getAudioAttributes());
         synchronized (mLock) {
@@ -218,10 +218,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (volumeProvider == null) {
             throw new IllegalArgumentException("volumeProvider shouldn't be null");
         }
-        if (player == mPlayer) {
-            return;
-        }
-
         PlaybackInfo info = createPlaybackInfo(volumeProvider, player.getAudioAttributes());
         synchronized (mLock) {
             setPlayerLocked(player);
@@ -244,12 +240,25 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private PlaybackInfo createPlaybackInfo(VolumeProvider2 volumeProvider, AudioAttributes attrs) {
         PlaybackInfo info;
         if (volumeProvider == null) {
-            int stream = attrs == null ? AudioManager.STREAM_MUSIC : attrs.getVolumeControlStream();
+            int stream;
+            if (attrs == null) {
+                stream = AudioManager.STREAM_MUSIC;
+            } else {
+                stream = attrs.getVolumeControlStream();
+                if (stream == AudioManager.USE_DEFAULT_STREAM_TYPE) {
+                    // It may happen if the AudioAttributes doesn't have usage.
+                    // Change it to the STREAM_MUSIC because it's not supported by audio manager
+                    // for querying volume level.
+                    stream = AudioManager.STREAM_MUSIC;
+                }
+            }
             info = PlaybackInfoImpl.createPlaybackInfo(
                     mContext,
                     PlaybackInfo.PLAYBACK_TYPE_LOCAL,
                     attrs,
-                    VolumeProvider2.VOLUME_CONTROL_ABSOLUTE,
+                    mAudioManager.isVolumeFixed()
+                            ? VolumeProvider2.VOLUME_CONTROL_FIXED
+                            : VolumeProvider2.VOLUME_CONTROL_ABSOLUTE,
                     mAudioManager.getStreamMaxVolume(stream),
                     mAudioManager.getStreamVolume(stream));
         } else {
@@ -561,6 +570,20 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     VolumeProvider2 getVolumeProvider() {
         return mVolumeProvider;
+    }
+
+    PlaybackInfo getPlaybackInfo() {
+        synchronized (mLock) {
+            return mPlaybackInfo;
+        }
+    }
+
+    int getRatingType() {
+        return mRatingType;
+    }
+
+    PendingIntent getSessionActivity() {
+        return mSessionActivity;
     }
 
     private static class MyPlaybackListener implements MediaPlayerInterface.PlaybackListener {

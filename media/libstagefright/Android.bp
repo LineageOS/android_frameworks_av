@@ -106,6 +106,10 @@ cc_library_shared {
         "VideoFrameScheduler.cpp",
     ],
 
+    header_libs: [
+        "libstagefright_codec2_internal",
+    ],
+
     shared_libs: [
         "libaudioutils",
         "libbinder",

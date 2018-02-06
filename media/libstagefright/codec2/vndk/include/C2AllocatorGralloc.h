@@ -49,9 +49,7 @@ public:
 
     virtual C2String getName() const override;
 
-    virtual std::shared_ptr<const Traits> getTraits() const override {
-        return nullptr; // \todo
-    }
+    virtual std::shared_ptr<const Traits> getTraits() const override;
 
     virtual c2_status_t newGraphicAllocation(
             uint32_t width, uint32_t height, uint32_t format, C2MemoryUsage usage,
@@ -61,7 +59,7 @@ public:
             const C2Handle *handle,
             std::shared_ptr<C2GraphicAllocation> *allocation) override;
 
-    C2AllocatorGralloc(id_t id = 0);
+    C2AllocatorGralloc(id_t id);
 
     c2_status_t status() const;
 

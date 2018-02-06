@@ -16,6 +16,7 @@
 
 package com.android.media;
 
+import android.app.PendingIntent;
 import android.os.Bundle;
 import android.os.ResultReceiver;
 
@@ -33,19 +34,11 @@ oneway interface IMediaSession2Callback {
     void onPlaylistParamsChanged(in Bundle params);
     void onPlaybackInfoChanged(in Bundle playbackInfo);
 
-    /**
-     * Called only when the controller is created with service's token.
-     *
-     * @param sessionBinder {@code null} if the connect is rejected or is disconnected. a session
-     *     binder if the connect is accepted.
-     * @param commands initially allowed commands.
-     */
-    // TODO(jaewan): Also need to pass flags for allowed actions for permission check.
-    //               For example, a media can allow setRating only for whitelisted apps
-    //               it's better for controller to know such information in advance.
-    //               Follow-up TODO: Add similar functions to the session.
-    // TODO(jaewan): Is term 'accepted/rejected' correct? For permission, 'grant' is used.
-    void onConnectionChanged(IMediaSession2 sessionBinder, in Bundle commandGroup);
+    // TODO(jaewan): Handle when the playlist becomes too huge.
+    void onConnected(IMediaSession2 sessionBinder, in Bundle commandGroup, in Bundle playbackState,
+            in Bundle playbackInfo, in Bundle params, in List<Bundle> playlist, int ratingType,
+            in PendingIntent sessionActivity);
+    void onDisconnected();
 
     void onCustomLayoutChanged(in List<Bundle> commandButtonlist);
 

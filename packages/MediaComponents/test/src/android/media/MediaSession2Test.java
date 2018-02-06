@@ -27,6 +27,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
+import android.content.Context;
+import android.media.AudioManager;
+import android.media.MediaController2.PlaybackInfo;
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.Command;
@@ -99,17 +102,15 @@ public class MediaSession2Test extends MediaSession2TestBase {
 
     @Test
     public void testSetPlayer() throws Exception {
-        sHandler.postAndSync(() -> {
-            MockPlayer player = new MockPlayer(0);
-            // Test if setPlayer doesn't crash with various situations.
-            mSession.setPlayer(mPlayer);
-            mSession.setPlayer(player);
-            mSession.close();
-        });
+        MockPlayer player = new MockPlayer(0);
+        // Test if setPlayer doesn't crash with various situations.
+        mSession.setPlayer(mPlayer);
+        mSession.setPlayer(player);
+        mSession.close();
     }
 
     @Test
-    public void testSetPlayerWithVolumeProvider() throws Exception {
+    public void testSetPlayer_playbackInfo() throws Exception {
         MockPlayer player = new MockPlayer(0);
         AudioAttributes attrs = new AudioAttributes.Builder()
                 .setContentType(CONTENT_TYPE_MUSIC)
@@ -125,7 +126,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
         final CountDownLatch latch = new CountDownLatch(1);
         final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
             @Override
-            public void onPlaybackInfoChanged(MediaController2.PlaybackInfo info) {
+            public void onPlaybackInfoChanged(PlaybackInfo info) {
                 assertEquals(MediaController2.PlaybackInfo.PLAYBACK_TYPE_REMOTE,
                         info.getPlaybackType());
                 assertEquals(attrs, info.getAudioAttributes());
@@ -136,18 +137,30 @@ public class MediaSession2Test extends MediaSession2TestBase {
             }
         };
 
+        mSession.setPlayer(player);
+
         final MediaController2 controller = createController(mSession.getToken(), true, callback);
-        assertNull(controller.getPlaybackInfo());
+        PlaybackInfo info = controller.getPlaybackInfo();
+        assertNotNull(info);
+        assertEquals(PlaybackInfo.PLAYBACK_TYPE_LOCAL, info.getPlaybackType());
+        assertEquals(attrs, info.getAudioAttributes());
+        AudioManager manager = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
+        int localVolumeControlType = manager.isVolumeFixed()
+                ? VolumeProvider2.VOLUME_CONTROL_FIXED : VolumeProvider2.VOLUME_CONTROL_ABSOLUTE;
+        assertEquals(localVolumeControlType, info.getControlType());
+        assertEquals(manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC), info.getMaxVolume());
+        assertEquals(manager.getStreamVolume(AudioManager.STREAM_MUSIC), info.getCurrentVolume());
 
         mSession.setPlayer(player, volumeProvider);
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
 
-        MediaController2.PlaybackInfo infoOut = controller.getPlaybackInfo();
-        assertEquals(MediaController2.PlaybackInfo.PLAYBACK_TYPE_REMOTE, infoOut.getPlaybackType());
-        assertEquals(attrs, infoOut.getAudioAttributes());
-        assertEquals(volumeControlType, infoOut.getPlaybackType());
-        assertEquals(maxVolume, infoOut.getMaxVolume());
-        assertEquals(currentVolume, infoOut.getCurrentVolume());
+        info = controller.getPlaybackInfo();
+        assertNotNull(info);
+        assertEquals(PlaybackInfo.PLAYBACK_TYPE_REMOTE, info.getPlaybackType());
+        assertEquals(attrs, info.getAudioAttributes());
+        assertEquals(volumeControlType, info.getControlType());
+        assertEquals(maxVolume, info.getMaxVolume());
+        assertEquals(currentVolume, info.getCurrentVolume());
     }
 
     @Test

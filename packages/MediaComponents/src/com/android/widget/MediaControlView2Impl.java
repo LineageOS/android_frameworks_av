@@ -29,7 +29,6 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.accessibility.AccessibilityManager;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.MediaControlView2;
@@ -64,8 +63,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private static final int REWIND_TIME_MS = 10000;
     private static final int FORWARD_TIME_MS = 30000;
 
-    private AccessibilityManager mAccessibilityManager;
-
     private MediaController mController;
     private MediaController.TransportControls mControls;
     private PlaybackState mPlaybackState;
@@ -76,7 +73,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private int mDuration;
     private int mPrevState;
     private int mCurrentVisibility;
-    private long mTimeout;
     private long mPlaybackActions;
     private boolean mShowing;
     private boolean mDragging;
@@ -122,14 +118,9 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
 
     @Override
     public void initialize(@Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-        mAccessibilityManager = AccessibilityManager.getInstance(mInstance.getContext());
-
         // Inflate MediaControlView2 from XML
         View root = makeControllerView();
         mInstance.addView(root);
-
-        // Set default timeout
-        mTimeout = 2000;
     }
 
     @Override
@@ -223,16 +214,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     }
 
     @Override
-    public void setTimeout_impl(long timeout) {
-        mTimeout = timeout;
-    }
-
-    @Override
-    public long getTimeout_impl() {
-        return mTimeout;
-    }
-
-    @Override
     public CharSequence getAccessibilityClassName_impl() {
         return MediaControlView2.class.getName();
     }
@@ -245,7 +226,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     // TODO: Should this function be removed?
     @Override
     public boolean onTrackballEvent_impl(MotionEvent ev) {
-        resetFadeOutRunnable();
         return false;
     }
 
@@ -290,11 +270,8 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
                 // was already true.  This happens, for example, if we're
                 // paused with the progress bar showing the user hits play.
                 mInstance.post(mShowProgress);
-                resetFadeOutRunnable();
             } else if (visibility == View.GONE) {
                 mInstance.removeCallbacks(mShowProgress);
-                // Remove existing call to mFadeOut to avoid from being called later.
-                mInstance.removeCallbacks(mFadeOut);
             }
         }
     }
@@ -488,15 +465,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         }
     }
 
-    private final Runnable mFadeOut = new Runnable() {
-        @Override
-        public void run() {
-            if (isPlaying()) {
-                mInstance.setVisibility(View.GONE);
-            }
-        }
-    };
-
     private final Runnable mShowProgress = new Runnable() {
         @Override
         public void run() {
@@ -507,13 +475,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             }
         }
     };
-
-    private void resetFadeOutRunnable() {
-        if (mTimeout != 0 && !mAccessibilityManager.isTouchExplorationEnabled()) {
-            mInstance.removeCallbacks(mFadeOut);
-            mInstance.postDelayed(mFadeOut, mTimeout);
-        }
-    }
 
     private String stringForTime(int timeMs) {
         int totalSeconds = timeMs / 1000;
@@ -590,7 +551,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             }
 
             mDragging = true;
-            mInstance.removeCallbacks(mFadeOut);
 
             // By removing these pending progress messages we make sure
             // that a) we won't update the progress while the user adjusts
@@ -639,8 +599,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
 
             setProgress();
 
-            resetFadeOutRunnable();
-
             // Ensure that progress is properly updated in the future,
             // the call to show() does not guarantee this because it is a
             // no-op if we are already showing.
@@ -652,7 +610,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         @Override
         public void onClick(View v) {
             togglePausePlayState();
-            resetFadeOutRunnable();
         }
     };
 
@@ -662,8 +619,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             int pos = getCurrentPosition() - REWIND_TIME_MS;
             mControls.seekTo(pos);
             setProgress();
-
-            resetFadeOutRunnable();
         }
     };
 
@@ -673,8 +628,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             int pos = getCurrentPosition() + FORWARD_TIME_MS;
             mControls.seekTo(pos);
             setProgress();
-
-            resetFadeOutRunnable();
         }
     };
 
@@ -682,7 +635,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         @Override
         public void onClick(View v) {
             mControls.skipToNext();
-            resetFadeOutRunnable();
         }
     };
 
@@ -690,7 +642,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         @Override
         public void onClick(View v) {
             mControls.skipToPrevious();
-            resetFadeOutRunnable();
         }
     };
 
@@ -710,7 +661,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
                 mController.sendCommand(MediaControlView2.COMMAND_HIDE_SUBTITLE, null, null);
                 mSubtitleIsEnabled = false;
             }
-            resetFadeOutRunnable();
         }
     };
 
@@ -732,7 +682,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             mController.sendCommand(MediaControlView2.COMMAND_SET_FULLSCREEN, args, null);
 
             mIsFullScreen = isEnteringFullScreen;
-            resetFadeOutRunnable();
         }
     };
 
@@ -741,7 +690,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         public void onClick(View v) {
             mBasicControls.setVisibility(View.GONE);
             mExtraControls.setVisibility(View.VISIBLE);
-            resetFadeOutRunnable();
         }
     };
 
@@ -750,7 +698,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         public void onClick(View v) {
             mBasicControls.setVisibility(View.VISIBLE);
             mExtraControls.setVisibility(View.GONE);
-            resetFadeOutRunnable();
         }
     };
 

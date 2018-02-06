@@ -76,6 +76,12 @@ public class MediaController2Impl implements MediaController2Provider {
     private PlaylistParams mPlaylistParams;
     @GuardedBy("mLock")
     private PlaybackInfo mPlaybackInfo;
+    @GuardedBy("mLock")
+    private int mRatingType;
+    @GuardedBy("mLock")
+    private PendingIntent mSessionActivity;
+    @GuardedBy("mLock")
+    private CommandGroup mCommandGroup;
 
     // Assignment should be used with the lock hold, but should be used without a lock to prevent
     // potential deadlock.
@@ -274,14 +280,12 @@ public class MediaController2Impl implements MediaController2Provider {
     //////////////////////////////////////////////////////////////////////////////////////
     @Override
     public PendingIntent getSessionActivity_impl() {
-        // TODO(jaewan): Implement
-        return null;
+        return mSessionActivity;
     }
 
     @Override
     public int getRatingType_impl() {
-        // TODO(jaewan): Implement
-        return 0;
+        return mRatingType;
     }
 
     @Override
@@ -316,34 +320,87 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void prepareFromUri_impl(Uri uri, Bundle extras) {
-        // TODO(jaewan): Implement
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.prepareFromUri(mSessionCallbackStub, uri, extras);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            // TODO(jaewan): Handle.
+        }
     }
 
     @Override
     public void prepareFromSearch_impl(String query, Bundle extras) {
-        // TODO(jaewan): Implement
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.prepareFromSearch(mSessionCallbackStub, query, extras);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            // TODO(jaewan): Handle.
+        }
     }
 
     @Override
     public void prepareMediaId_impl(String mediaId, Bundle extras) {
-        // TODO(jaewan): Implement
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.prepareFromMediaId(mSessionCallbackStub, mediaId, extras);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            // TODO(jaewan): Handle.
+        }
+    }
+
+    @Override
+    public void playFromUri_impl(Uri uri, Bundle extras) {
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.playFromUri(mSessionCallbackStub, uri, extras);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            // TODO(jaewan): Handle.
+        }
     }
 
     @Override
     public void playFromSearch_impl(String query, Bundle extras) {
-        // TODO(jaewan): Implement
-    }
-
-    @Override
-    public void playFromUri_impl(String uri, Bundle extras) {
-        // TODO(jaewan): Implement
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.playFromSearch(mSessionCallbackStub, query, extras);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            // TODO(jaewan): Handle.
+        }
     }
 
     @Override
     public void playFromMediaId_impl(String mediaId, Bundle extras) {
-        // TODO(jaewan): Implement
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.playFromMediaId(mSessionCallbackStub, mediaId, extras);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            // TODO(jaewan): Handle.
+        }
     }
-
     @Override
     public void setRating_impl(Rating2 rating) {
         // TODO(jaewan): Implement
@@ -504,19 +561,20 @@ public class MediaController2Impl implements MediaController2Provider {
         }
     }
 
-    // Called when the result for connecting to the session was delivered.
     // Should be used without a lock to prevent potential deadlock.
-    private void onConnectionChangedNotLocked(IMediaSession2 sessionBinder,
-            CommandGroup commandGroup) {
+    private void onConnectedNotLocked(IMediaSession2 sessionBinder,
+            final CommandGroup commandGroup, final PlaybackState2 state, final PlaybackInfo info,
+            final PlaylistParams params, final List<MediaItem2> playlist, final int ratingType,
+            final PendingIntent sessionActivity) {
         if (DEBUG) {
-            Log.d(TAG, "onConnectionChangedNotLocked sessionBinder=" + sessionBinder
+            Log.d(TAG, "onConnectedNotLocked sessionBinder=" + sessionBinder
                     + ", commands=" + commandGroup);
         }
-        boolean release = false;
+        boolean close = false;
         try {
             if (sessionBinder == null || commandGroup == null) {
                 // Connection rejected.
-                release = true;
+                close = true;
                 return;
             }
             synchronized (mLock) {
@@ -526,9 +584,16 @@ public class MediaController2Impl implements MediaController2Provider {
                 if (mSessionBinder != null) {
                     Log.e(TAG, "Cannot be notified about the connection result many times."
                             + " Probably a bug or malicious app.");
-                    release = true;
+                    close = true;
                     return;
                 }
+                mCommandGroup = commandGroup;
+                mPlaybackState = state;
+                mPlaybackInfo = info;
+                mPlaylistParams = params;
+                mPlaylist = playlist;
+                mRatingType = ratingType;
+                mSessionActivity = sessionActivity;
                 mSessionBinder = sessionBinder;
                 try {
                     // Implementation for the local binder is no-op,
@@ -538,16 +603,19 @@ public class MediaController2Impl implements MediaController2Provider {
                     if (DEBUG) {
                         Log.d(TAG, "Session died too early.", e);
                     }
-                    release = true;
+                    close = true;
                     return;
                 }
             }
             // TODO(jaewan): Keep commands to prevents illegal API calls.
             mCallbackExecutor.execute(() -> {
+                // Note: We may trigger ControllerCallbacks with the initial values
+                // But it's hard to define the order of the controller callbacks
+                // Only notify about the
                 mCallback.onConnected(commandGroup);
             });
         } finally {
-            if (release) {
+            if (close) {
                 // Trick to call release() without holding the lock, to prevent potential deadlock
                 // with the developer's custom lock within the ControllerCallback.onDisconnected().
                 mInstance.close();
@@ -639,6 +707,9 @@ public class MediaController2Impl implements MediaController2Provider {
 
         @Override
         public void onPlaybackInfoChanged(Bundle playbackInfo) throws RuntimeException {
+            if (DEBUG) {
+                Log.d(TAG, "onPlaybackInfoChanged");
+            }
             final MediaController2Impl controller;
             try {
                 controller = getController();
@@ -651,17 +722,42 @@ public class MediaController2Impl implements MediaController2Provider {
         }
 
         @Override
-        public void onConnectionChanged(IMediaSession2 sessionBinder, Bundle commandGroup)
-                throws RuntimeException {
-            final MediaController2Impl controller;
-            try {
-                controller = getController();
-            } catch (IllegalStateException e) {
-                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+        public void onConnected(IMediaSession2 sessionBinder, Bundle commandGroup,
+                Bundle playbackState, Bundle playbackInfo, Bundle playlistParams, List<Bundle>
+                playlist, int ratingType, PendingIntent sessionActivity) {
+            final MediaController2Impl controller = mController.get();
+            if (controller == null) {
+                if (DEBUG) {
+                    Log.d(TAG, "onConnected after MediaController2.close()");
+                }
                 return;
             }
-            controller.onConnectionChangedNotLocked(
-                    sessionBinder, CommandGroup.fromBundle(controller.getContext(), commandGroup));
+            final Context context = controller.getContext();
+            List<MediaItem2> list = new ArrayList<>();
+            for (int i = 0; i < playlist.size(); i++) {
+                MediaItem2 item = MediaItem2.fromBundle(context, playlist.get(i));
+                if (item != null) {
+                    list.add(item);
+                }
+            }
+            controller.onConnectedNotLocked(sessionBinder,
+                    CommandGroup.fromBundle(context, commandGroup),
+                    PlaybackState2.fromBundle(context, playbackState),
+                    PlaybackInfoImpl.fromBundle(context, playbackInfo),
+                    PlaylistParams.fromBundle(context, playlistParams),
+                    list, ratingType, sessionActivity);
+        }
+
+        @Override
+        public void onDisconnected() {
+            final MediaController2Impl controller = mController.get();
+            if (controller == null) {
+                if (DEBUG) {
+                    Log.d(TAG, "onDisconnected after MediaController2.close()");
+                }
+                return;
+            }
+            controller.mInstance.close();
         }
 
         @Override
@@ -687,6 +783,7 @@ public class MediaController2Impl implements MediaController2Provider {
                 // Illegal call. Ignore
                 return;
             }
+            // TODO(jaewan): Fix here. It's controller feature so shouldn't use browser
             final MediaBrowser2Impl browser;
             try {
                 browser = getBrowser();
