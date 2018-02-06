@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <media/MediaPlayer2Interface.h>
+#include <mediaplayer2/MediaPlayer2Interface.h>
 
 #include <media/MediaAnalyticsItem.h>
 #include <media/stagefright/foundation/ABase.h>

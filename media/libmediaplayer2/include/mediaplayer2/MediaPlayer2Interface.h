@@ -31,8 +31,8 @@
 #include <media/AVSyncSettings.h>
 #include <media/BufferingSettings.h>
 #include <media/Metadata.h>
-#include <media/mediaplayer2.h>
 #include <media/stagefright/foundation/AHandler.h>
+#include <mediaplayer2/mediaplayer2.h>
 
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
 // global, and not in android::

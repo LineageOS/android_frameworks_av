@@ -29,7 +29,6 @@
 #include <binder/IServiceManager.h>
 #include <binder/IPCThreadState.h>
 
-#include <media/mediaplayer2.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/AVSyncSettings.h>
@@ -37,6 +36,7 @@
 #include <media/DataSourceDesc.h>
 #include <media/MediaAnalyticsItem.h>
 #include <media/NdkWrapper.h>
+#include <mediaplayer2/mediaplayer2.h>
 
 #include <binder/MemoryBase.h>
 

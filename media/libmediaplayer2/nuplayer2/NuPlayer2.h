@@ -19,8 +19,9 @@
 #define NU_PLAYER2_H_
 
 #include <media/AudioResamplerPublic.h>
-#include <media/MediaPlayer2Interface.h>
 #include <media/stagefright/foundation/AHandler.h>
+
+#include <mediaplayer2/MediaPlayer2Interface.h>
 
 namespace android {
 
