@@ -676,8 +676,6 @@ status_t Camera3Device::dump(int fd, const Vector<String16> &args) {
             "TEMPLATE_VIDEO_SNAPSHOT",
             "TEMPLATE_ZERO_SHUTTER_LAG",
             "TEMPLATE_MANUAL",
-            "TEMPLATE_MOTION_TRACKING_PREVIEW",
-            "TEMPALTE_MOTION_TRACKING_BEST"
         };
 
         for (int i = 1; i < CAMERA3_TEMPLATE_COUNT; i++) {
@@ -3435,65 +3433,31 @@ status_t Camera3Device::HalInterface::constructDefaultRequestSettings(
             }
         };
     hardware::Return<void> err;
-    if (mHidlSession_3_4 != nullptr) {
-        device::V3_4::RequestTemplate id;
-        switch (templateId) {
-            case CAMERA3_TEMPLATE_PREVIEW:
-                id = device::V3_4::RequestTemplate::PREVIEW;
-                break;
-            case CAMERA3_TEMPLATE_STILL_CAPTURE:
-                id = device::V3_4::RequestTemplate::STILL_CAPTURE;
-                break;
-            case CAMERA3_TEMPLATE_VIDEO_RECORD:
-                id = device::V3_4::RequestTemplate::VIDEO_RECORD;
-                break;
-            case CAMERA3_TEMPLATE_VIDEO_SNAPSHOT:
-                id = device::V3_4::RequestTemplate::VIDEO_SNAPSHOT;
-                break;
-            case CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG:
-                id = device::V3_4::RequestTemplate::ZERO_SHUTTER_LAG;
-                break;
-            case CAMERA3_TEMPLATE_MANUAL:
-                id = device::V3_4::RequestTemplate::MANUAL;
-                break;
-            case CAMERA3_TEMPLATE_MOTION_TRACKING_PREVIEW:
-                id = device::V3_4::RequestTemplate::MOTION_TRACKING_PREVIEW;
-                break;
-            case CAMERA3_TEMPLATE_MOTION_TRACKING_BEST:
-                id = device::V3_4::RequestTemplate::MOTION_TRACKING_BEST;
-                break;
-            default:
-                // Unknown template ID
-                return BAD_VALUE;
-        }
-        err = mHidlSession_3_4->constructDefaultRequestSettings_3_4(id, requestCallback);
-    } else {
-        RequestTemplate id;
-        switch (templateId) {
-            case CAMERA3_TEMPLATE_PREVIEW:
-                id = RequestTemplate::PREVIEW;
-                break;
-            case CAMERA3_TEMPLATE_STILL_CAPTURE:
-                id = RequestTemplate::STILL_CAPTURE;
-                break;
-            case CAMERA3_TEMPLATE_VIDEO_RECORD:
-                id = RequestTemplate::VIDEO_RECORD;
-                break;
-            case CAMERA3_TEMPLATE_VIDEO_SNAPSHOT:
-                id = RequestTemplate::VIDEO_SNAPSHOT;
-                break;
-            case CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG:
-                id = RequestTemplate::ZERO_SHUTTER_LAG;
-                break;
-            case CAMERA3_TEMPLATE_MANUAL:
-                id = RequestTemplate::MANUAL;
-                break;
-            default:
-                // Unknown template ID, or this HAL is too old to support it
-                return BAD_VALUE;
-        }
-        err = mHidlSession->constructDefaultRequestSettings(id, requestCallback);
+    RequestTemplate id;
+    switch (templateId) {
+        case CAMERA3_TEMPLATE_PREVIEW:
+            id = RequestTemplate::PREVIEW;
+            break;
+        case CAMERA3_TEMPLATE_STILL_CAPTURE:
+            id = RequestTemplate::STILL_CAPTURE;
+            break;
+        case CAMERA3_TEMPLATE_VIDEO_RECORD:
+            id = RequestTemplate::VIDEO_RECORD;
+            break;
+        case CAMERA3_TEMPLATE_VIDEO_SNAPSHOT:
+            id = RequestTemplate::VIDEO_SNAPSHOT;
+            break;
+        case CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG:
+            id = RequestTemplate::ZERO_SHUTTER_LAG;
+            break;
+        case CAMERA3_TEMPLATE_MANUAL:
+            id = RequestTemplate::MANUAL;
+            break;
+        default:
+            // Unknown template ID, or this HAL is too old to support it
+            return BAD_VALUE;
     }
+    err = mHidlSession->constructDefaultRequestSettings(id, requestCallback);
 
     if (!err.isOk()) {
         ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
