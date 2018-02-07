@@ -27,7 +27,7 @@
 #include <C2Component.h>
 
 #include <media/stagefright/foundation/Mutexed.h>
-#include <media/stagefright/gbs/GraphicBufferSource.h>
+#include <media/stagefright/bqhelper/GraphicBufferSource.h>
 #include <media/stagefright/CodecBase.h>
 #include <media/ICrypto.h>
 

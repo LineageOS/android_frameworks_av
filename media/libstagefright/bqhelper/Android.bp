@@ -1,5 +1,5 @@
 cc_library_shared {
-    name: "libstagefright_gbs",
+    name: "libstagefright_bufferqueue_helper",
     vendor_available: true,
     vndk: {
         enabled: true,
@@ -8,6 +8,7 @@ cc_library_shared {
     srcs: [
         "FrameDropper.cpp",
         "GraphicBufferSource.cpp",
+        "WProducerListener.cpp",
     ],
 
     export_include_dirs: [
@@ -25,12 +26,18 @@ cc_library_shared {
     shared_libs: [
         "libbase",
         "libbinder",
-        "libutils",
-        "liblog",
-        "libui",
-        "libgui",
         "libcutils",
+        "libgui",
+        "libhidlbase",
+        "libhidlmemory",
+        "libhidltransport",
+        "liblog",
         "libstagefright_foundation",
+        "libui",
+        "libutils",
+
+        "android.hardware.graphics.bufferqueue@1.0",
+
         "libnativewindow", // TODO(b/62923479): use header library
     ],
 

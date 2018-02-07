@@ -4,7 +4,7 @@ cc_test {
     srcs: ["FrameDropper_test.cpp"],
 
     shared_libs: [
-        "libstagefright_gbs",
+        "libstagefright_bufferqueue_helper",
         "libutils",
     ],
 
