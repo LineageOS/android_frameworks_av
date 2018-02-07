@@ -21,6 +21,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.media.AudioAttributes;
 import android.media.MediaController2.PlaybackInfo;
 import android.media.MediaItem2;
 import android.media.MediaSession2;
@@ -857,6 +858,99 @@ public class MediaController2Impl implements MediaController2Provider {
             // This SessionServiceRecord will be removed accordingly, but forget session binder here
             // for sure.
             mInstance.close();
+        }
+    }
+
+    public static final class PlaybackInfoImpl implements PlaybackInfoProvider {
+
+        private static final String KEY_PLAYBACK_TYPE =
+                "android.media.playbackinfo_impl.playback_type";
+        private static final String KEY_CONTROL_TYPE =
+                "android.media.playbackinfo_impl.control_type";
+        private static final String KEY_MAX_VOLUME =
+                "android.media.playbackinfo_impl.max_volume";
+        private static final String KEY_CURRENT_VOLUME =
+                "android.media.playbackinfo_impl.current_volume";
+        private static final String KEY_AUDIO_ATTRIBUTES =
+                "android.media.playbackinfo_impl.audio_attrs";
+
+        private final Context mContext;
+        private final PlaybackInfo mInstance;
+
+        private final int mPlaybackType;
+        private final int mControlType;
+        private final int mMaxVolume;
+        private final int mCurrentVolume;
+        private final AudioAttributes mAudioAttrs;
+
+        private PlaybackInfoImpl(Context context, int playbackType, AudioAttributes attrs,
+                int controlType, int max, int current) {
+            mContext = context;
+            mPlaybackType = playbackType;
+            mAudioAttrs = attrs;
+            mControlType = controlType;
+            mMaxVolume = max;
+            mCurrentVolume = current;
+            mInstance = new PlaybackInfo(this);
+        }
+
+        @Override
+        public int getPlaybackType_impl() {
+            return mPlaybackType;
+        }
+
+        @Override
+        public AudioAttributes getAudioAttributes_impl() {
+            return mAudioAttrs;
+        }
+
+        @Override
+        public int getControlType_impl() {
+            return mControlType;
+        }
+
+        @Override
+        public int getMaxVolume_impl() {
+            return mMaxVolume;
+        }
+
+        @Override
+        public int getCurrentVolume_impl() {
+            return mCurrentVolume;
+        }
+
+        public PlaybackInfo getInstance() {
+            return mInstance;
+        }
+
+        public Bundle toBundle() {
+            Bundle bundle = new Bundle();
+            bundle.putInt(KEY_PLAYBACK_TYPE, mPlaybackType);
+            bundle.putInt(KEY_CONTROL_TYPE, mControlType);
+            bundle.putInt(KEY_MAX_VOLUME, mMaxVolume);
+            bundle.putInt(KEY_CURRENT_VOLUME, mCurrentVolume);
+            bundle.putParcelable(KEY_AUDIO_ATTRIBUTES, mAudioAttrs);
+            return bundle;
+        }
+
+        public static PlaybackInfo createPlaybackInfo(Context context, int playbackType,
+                AudioAttributes attrs, int controlType, int max, int current) {
+            return new PlaybackInfoImpl(context, playbackType, attrs, controlType, max, current)
+                    .getInstance();
+        }
+
+        public static PlaybackInfo fromBundle(Context context, Bundle bundle) {
+            if (bundle == null) {
+                return null;
+            }
+            final int volumeType = bundle.getInt(KEY_PLAYBACK_TYPE);
+            final int volumeControl = bundle.getInt(KEY_CONTROL_TYPE);
+            final int maxVolume = bundle.getInt(KEY_MAX_VOLUME);
+            final int currentVolume = bundle.getInt(KEY_CURRENT_VOLUME);
+            final AudioAttributes attrs = bundle.getParcelable(KEY_AUDIO_ATTRIBUTES);
+
+            return createPlaybackInfo(
+                    context, volumeType, attrs, volumeControl, maxVolume, currentVolume);
         }
     }
 }
