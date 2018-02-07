@@ -34,14 +34,15 @@ namespace android {
 class MediaDrmMetrics {
  public:
   explicit MediaDrmMetrics();
+  virtual ~MediaDrmMetrics() {};
   // Count of openSession calls.
   CounterMetric<status_t> mOpenSessionCounter;
   // Count of closeSession calls.
   CounterMetric<status_t> mCloseSessionCounter;
   // Count and timing of getKeyRequest calls.
-  EventMetric<status_t> mGetKeyRequestTiming;
+  EventMetric<status_t> mGetKeyRequestTimeUs;
   // Count and timing of provideKeyResponse calls.
-  EventMetric<status_t> mProvideKeyResponseTiming;
+  EventMetric<status_t> mProvideKeyResponseTimeUs;
   // Count of getProvisionRequest calls.
   CounterMetric<status_t> mGetProvisionRequestCounter;
   // Count of provideProvisionResponse calls.
@@ -62,13 +63,31 @@ class MediaDrmMetrics {
   // Adds a session end time record.
   void SetSessionEnd(const Vector<uint8_t>& sessionId);
 
+  // The app package name is the application package name that is using the
+  // instance. The app package name is held here for convenience. It is not
+  // serialized or exported with the metrics.
+  void SetAppPackageName(const String8& appPackageName) { mAppPackageName = appPackageName; }
+  const String8& GetAppPackageName() { return mAppPackageName; }
+
   // Export the metrics to a PersistableBundle.
   void Export(os::PersistableBundle* metricsBundle);
+
+  // Get the serialized metrics. Metrics are formatted as a serialized
+  // DrmFrameworkMetrics proto. If there is a failure serializing the metrics,
+  // this returns an error. The parameter |serlializedMetrics| is owned by the
+  // caller and must not be null.
+  status_t GetSerializedMetrics(std::string* serializedMetrics);
+
+ protected:
+  // This is visible for testing only.
+  virtual int64_t GetCurrentTimeMs();
 
  private:
   // Session lifetimes. A pair of values representing the milliseconds since
   // epoch, UTC. The first value is the start time, the second is the end time.
-  std::map<String16, std::pair<int64_t, int64_t>> mSessionLifespans;
+  std::map<std::string, std::pair<int64_t, int64_t>> mSessionLifespans;
+
+  String8 mAppPackageName;
 };
 
 }  // namespace android

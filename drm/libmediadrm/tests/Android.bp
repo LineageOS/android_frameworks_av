@@ -18,15 +18,21 @@ cc_test {
       "android.hardware.drm@1.0",
       "libbinder",
       "liblog",
-      "libmediadrm",
+      "libmediadrmmetrics_full",
       "libmediametrics",
+      "libprotobuf-cpp-full",
       "libutils",
     ],
-    include_dirs: ["frameworks/av/include/media"],
-    cflags: [
-      "-Werror",
-      "-Wall",
+    static_libs: ["libgmock"],
+    include_dirs: [
+      "frameworks/av/include/media",
     ],
+    cflags: [
+        // Suppress unused parameter and no error options. These cause problems
+        // when using the map type in a proto definition.
+        "-Wno-unused-parameter",
+        "-Wno-error",
+    ]
 }
 
 cc_test {

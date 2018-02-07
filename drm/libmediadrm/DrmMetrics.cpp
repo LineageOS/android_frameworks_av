@@ -13,15 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#define LOG_TAG "DrmMetrics"
+#include <iomanip>
 #include <utility>
 
 #include <android-base/macros.h>
 #include <media/DrmMetrics.h>
 #include <media/stagefright/foundation/base64.h>
 #include <sys/time.h>
+#include <utils/Log.h>
 #include <utils/Timers.h>
 
+#include "protos/metrics.pb.h"
+
+using ::android::String16;
+using ::android::String8;
+using ::android::drm_metrics::DrmFrameworkMetrics;
 using ::android::hardware::drm::V1_0::EventType;
 using ::android::hardware::drm::V1_0::KeyStatusType;
 using ::android::os::PersistableBundle;
@@ -130,8 +137,7 @@ void ExportEventMetric(const android::EventMetric<T> &event,
 }
 
 void ExportSessionLifespans(
-    const std::map<android::String16, std::pair<int64_t, int64_t>>
-        &mSessionLifespans,
+    const std::map<std::string, std::pair<int64_t, int64_t>> &mSessionLifespans,
     PersistableBundle *metrics) {
     if (!metrics) {
         ALOGE("metrics was unexpectedly null.");
@@ -146,9 +152,9 @@ void ExportSessionLifespans(
     PersistableBundle endTimesBundle;
     for (auto it = mSessionLifespans.begin(); it != mSessionLifespans.end();
          it++) {
-        startTimesBundle.putLong(android::String16(it->first),
-                                 it->second.first);
-        endTimesBundle.putLong(android::String16(it->first), it->second.second);
+        String16 key(it->first.c_str(), it->first.size());
+        startTimesBundle.putLong(key, it->second.first);
+        endTimesBundle.putLong(key, it->second.second);
     }
     metrics->putPersistableBundle(
         android::String16("drm.mediadrm.session_start_times_ms"),
@@ -157,18 +163,13 @@ void ExportSessionLifespans(
         android::String16("drm.mediadrm.session_end_times_ms"), endTimesBundle);
 }
 
-android::String8 ToHexString(const android::Vector<uint8_t> &sessionId) {
-    android::String8 result;
+std::string ToHexString(const android::Vector<uint8_t> &sessionId) {
+    std::ostringstream out;
+    out << std::hex << std::setfill('0');
     for (size_t i = 0; i < sessionId.size(); i++) {
-        result.appendFormat("%02x", sessionId[i]);
+        out << std::setw(2) << (int)(sessionId[i]);
     }
-    return result;
-}
-
-int64_t getCurrentTimeMs() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return ((int64_t)tv.tv_sec * 1000) + ((int64_t)tv.tv_usec / 1000);
+    return out.str();
 }
 
 } // namespace
@@ -178,8 +179,8 @@ namespace android {
 MediaDrmMetrics::MediaDrmMetrics()
     : mOpenSessionCounter("drm.mediadrm.open_session", "status"),
       mCloseSessionCounter("drm.mediadrm.close_session", "status"),
-      mGetKeyRequestTiming("drm.mediadrm.get_key_request", "status"),
-      mProvideKeyResponseTiming("drm.mediadrm.provide_key_response", "status"),
+      mGetKeyRequestTimeUs("drm.mediadrm.get_key_request", "status"),
+      mProvideKeyResponseTimeUs("drm.mediadrm.provide_key_response", "status"),
       mGetProvisionRequestCounter("drm.mediadrm.get_provision_request",
                                   "status"),
       mProvideProvisionResponseCounter(
@@ -192,14 +193,14 @@ MediaDrmMetrics::MediaDrmMetrics()
 
 void MediaDrmMetrics::SetSessionStart(
     const android::Vector<uint8_t> &sessionId) {
-    String16 sessionIdHex = String16(ToHexString(sessionId));
+    std::string sessionIdHex = ToHexString(sessionId);
     mSessionLifespans[sessionIdHex] =
-        std::make_pair(getCurrentTimeMs(), (int64_t)0);
+        std::make_pair(GetCurrentTimeMs(), (int64_t)0);
 }
 
 void MediaDrmMetrics::SetSessionEnd(const android::Vector<uint8_t> &sessionId) {
-    String16 sessionIdHex = String16(ToHexString(sessionId));
-    int64_t endTimeMs = getCurrentTimeMs();
+    std::string sessionIdHex = ToHexString(sessionId);
+    int64_t endTimeMs = GetCurrentTimeMs();
     if (mSessionLifespans.find(sessionIdHex) != mSessionLifespans.end()) {
         mSessionLifespans[sessionIdHex] =
             std::make_pair(mSessionLifespans[sessionIdHex].first, endTimeMs);
@@ -215,14 +216,127 @@ void MediaDrmMetrics::Export(PersistableBundle *metrics) {
     }
     ExportCounterMetric(mOpenSessionCounter, metrics);
     ExportCounterMetric(mCloseSessionCounter, metrics);
-    ExportEventMetric(mGetKeyRequestTiming, metrics);
-    ExportEventMetric(mProvideKeyResponseTiming, metrics);
+    ExportEventMetric(mGetKeyRequestTimeUs, metrics);
+    ExportEventMetric(mProvideKeyResponseTimeUs, metrics);
     ExportCounterMetric(mGetProvisionRequestCounter, metrics);
     ExportCounterMetric(mProvideProvisionResponseCounter, metrics);
     ExportCounterMetricWithAttributeNames(mKeyStatusChangeCounter, metrics);
     ExportCounterMetricWithAttributeNames(mEventCounter, metrics);
     ExportCounterMetric(mGetDeviceUniqueIdCounter, metrics);
     ExportSessionLifespans(mSessionLifespans, metrics);
+}
+
+status_t MediaDrmMetrics::GetSerializedMetrics(std::string *serializedMetrics) {
+
+    if (!serializedMetrics) {
+        ALOGE("serializedMetrics was unexpectedly null.");
+        return UNEXPECTED_NULL;
+    }
+
+    DrmFrameworkMetrics metrics;
+
+    mOpenSessionCounter.ExportValues(
+        [&](const android::status_t status, const int64_t value) {
+            DrmFrameworkMetrics::Counter *counter =
+                metrics.add_open_session_counter();
+            counter->set_count(value);
+            counter->mutable_attributes()->set_error_code(status);
+        });
+
+    mCloseSessionCounter.ExportValues(
+        [&](const android::status_t status, const int64_t value) {
+            DrmFrameworkMetrics::Counter *counter =
+                metrics.add_close_session_counter();
+            counter->set_count(value);
+            counter->mutable_attributes()->set_error_code(status);
+        });
+
+    mGetProvisionRequestCounter.ExportValues(
+        [&](const android::status_t status, const int64_t value) {
+            DrmFrameworkMetrics::Counter *counter =
+                metrics.add_get_provisioning_request_counter();
+            counter->set_count(value);
+            counter->mutable_attributes()->set_error_code(status);
+        });
+
+    mProvideProvisionResponseCounter.ExportValues(
+        [&](const android::status_t status, const int64_t value) {
+            DrmFrameworkMetrics::Counter *counter =
+                metrics.add_provide_provisioning_response_counter();
+            counter->set_count(value);
+            counter->mutable_attributes()->set_error_code(status);
+        });
+
+    mKeyStatusChangeCounter.ExportValues(
+        [&](const KeyStatusType key_status_type, const int64_t value) {
+            DrmFrameworkMetrics::Counter *counter =
+                metrics.add_key_status_change_counter();
+            counter->set_count(value);
+            counter->mutable_attributes()->set_key_status_type(
+                (uint32_t)key_status_type);
+        });
+
+    mEventCounter.ExportValues(
+        [&](const EventType event_type, const int64_t value) {
+            DrmFrameworkMetrics::Counter *counter =
+                metrics.add_event_callback_counter();
+            counter->set_count(value);
+            counter->mutable_attributes()->set_event_type((uint32_t)event_type);
+        });
+
+    mGetDeviceUniqueIdCounter.ExportValues(
+        [&](const status_t status, const int64_t value) {
+            DrmFrameworkMetrics::Counter *counter =
+                metrics.add_get_device_unique_id_counter();
+            counter->set_count(value);
+            counter->mutable_attributes()->set_error_code(status);
+        });
+
+    mGetKeyRequestTimeUs.ExportValues(
+        [&](const status_t status, const EventStatistics &stats) {
+            DrmFrameworkMetrics::DistributionMetric *metric =
+                metrics.add_get_key_request_time_us();
+            metric->set_min(stats.min);
+            metric->set_max(stats.max);
+            metric->set_mean(stats.mean);
+            metric->set_operation_count(stats.count);
+            metric->set_variance(stats.sum_squared_deviation / stats.count);
+            metric->mutable_attributes()->set_error_code(status);
+        });
+
+    mProvideKeyResponseTimeUs.ExportValues(
+        [&](const status_t status, const EventStatistics &stats) {
+            DrmFrameworkMetrics::DistributionMetric *metric =
+                metrics.add_provide_key_response_time_us();
+            metric->set_min(stats.min);
+            metric->set_max(stats.max);
+            metric->set_mean(stats.mean);
+            metric->set_operation_count(stats.count);
+            metric->set_variance(stats.sum_squared_deviation / stats.count);
+            metric->mutable_attributes()->set_error_code(status);
+        });
+
+    for (const auto &sessionLifespan : mSessionLifespans) {
+        auto *map = metrics.mutable_session_lifetimes();
+
+        (*map)[sessionLifespan.first].set_start_time_ms(
+            sessionLifespan.second.first);
+        (*map)[sessionLifespan.first].set_end_time_ms(
+            sessionLifespan.second.second);
+    }
+
+    if (!metrics.SerializeToString(serializedMetrics)) {
+        ALOGE("Failed to serialize metrics.");
+        return UNKNOWN_ERROR;
+    }
+
+    return OK;
+}
+
+int64_t MediaDrmMetrics::GetCurrentTimeMs() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return ((int64_t)tv.tv_sec * 1000) + ((int64_t)tv.tv_usec / 1000);
 }
 
 } // namespace android
