@@ -47,8 +47,6 @@
 #include <media/AudioPolicyHelper.h>
 #include <media/DataSourceDesc.h>
 #include <media/MediaHTTPService.h>
-#include <media/MediaPlayer2EngineClient.h>
-#include <media/MediaPlayer2Interface.h>
 #include <media/Metadata.h>
 #include <media/AudioTrack.h>
 #include <media/MemoryLeakTrackUtil.h>
@@ -62,6 +60,9 @@
 #include <media/stagefright/foundation/ALooperRoster.h>
 #include <media/stagefright/SurfaceUtils.h>
 #include <mediautils/BatteryNotifier.h>
+
+#include <mediaplayer2/MediaPlayer2EngineClient.h>
+#include <mediaplayer2/MediaPlayer2Interface.h>
 
 #include <memunreachable/memunreachable.h>
 #include <system/audio.h>

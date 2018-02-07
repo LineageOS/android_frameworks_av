@@ -74,6 +74,13 @@ typedef ssize_t (*AMediaDataSourceReadAt)(
 typedef ssize_t (*AMediaDataSourceGetSize)(void *userdata);
 
 /**
+ * Called to close the data source and release associated resources.
+ * The NDK media framework guarantees that after |close| is called
+ * no future callbacks will be invoked on the data source.
+ */
+typedef void (*AMediaDataSourceClose)(void *userdata);
+
+/**
  * Create new media data source. Returns NULL if memory allocation
  * for the new data source object fails.
  */
@@ -116,6 +123,17 @@ void AMediaDataSource_setReadAt(
 void AMediaDataSource_setGetSize(
         AMediaDataSource*,
         AMediaDataSourceGetSize);
+
+/**
+ * Set a custom callback to receive signal from the NDK media framework
+ * when the data source is closed.
+ *
+ * Please refer to the definition of AMediaDataSourceClose for
+ * additional details.
+ */
+void AMediaDataSource_setClose(
+        AMediaDataSource*,
+        AMediaDataSourceClose);
 
 #endif  /*__ANDROID_API__ >= 28 */
 

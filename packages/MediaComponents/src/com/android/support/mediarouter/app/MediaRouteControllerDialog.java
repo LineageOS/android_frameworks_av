@@ -21,6 +21,7 @@ import static android.support.v4.media.session.PlaybackStateCompat.ACTION_PLAY;
 import static android.support.v4.media.session.PlaybackStateCompat.ACTION_PLAY_PAUSE;
 import static android.support.v4.media.session.PlaybackStateCompat.ACTION_STOP;
 
+import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -41,11 +42,10 @@ import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.support.v4.util.ObjectsCompat;
 import android.support.v4.view.accessibility.AccessibilityEventCompat;
-import android.support.v7.app.AlertDialog;
 import android.support.v7.graphics.Palette;
-
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.ContextThemeWrapper;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -72,6 +72,7 @@ import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
+import com.android.media.update.ApiHelper;
 import com.android.media.update.R;
 import com.android.support.mediarouter.media.MediaRouteSelector;
 import com.android.support.mediarouter.media.MediaRouter;
@@ -204,8 +205,9 @@ public class MediaRouteControllerDialog extends AlertDialog {
     }
 
     public MediaRouteControllerDialog(Context context, int theme) {
-        super(context = MediaRouterThemeHelper.createThemedDialogContext(context, theme, true),
-                MediaRouterThemeHelper.createThemedDialogStyle(context));
+        // TODO (b/72975976): Avoid to use ContextThemeWrapper with app context and lib theme.
+        super(new ContextThemeWrapper(context,
+                ApiHelper.getLibTheme(MediaRouterThemeHelper.getRouterThemeId(context))), theme);
         mContext = getContext();
 
         mControllerCallback = new MediaControllerCallback();
@@ -213,16 +215,14 @@ public class MediaRouteControllerDialog extends AlertDialog {
         mCallback = new MediaRouterCallback();
         mRoute = mRouter.getSelectedRoute();
         setMediaSession(mRouter.getMediaSessionToken());
-        mVolumeGroupListPaddingTop = mContext.getResources().getDimensionPixelSize(
+        mVolumeGroupListPaddingTop = ApiHelper.getLibResources().getDimensionPixelSize(
                 R.dimen.mr_controller_volume_group_list_padding_top);
         mAccessibilityManager =
                 (AccessibilityManager) mContext.getSystemService(Context.ACCESSIBILITY_SERVICE);
-        if (android.os.Build.VERSION.SDK_INT >= 21) {
-            mLinearOutSlowInInterpolator = AnimationUtils.loadInterpolator(context,
-                    R.interpolator.mr_linear_out_slow_in);
-            mFastOutSlowInInterpolator = AnimationUtils.loadInterpolator(context,
-                    R.interpolator.mr_fast_out_slow_in);
-        }
+        mLinearOutSlowInInterpolator = AnimationUtils.loadInterpolator(
+                mContext, android.R.interpolator.linear_out_slow_in);
+        mFastOutSlowInInterpolator = AnimationUtils.loadInterpolator(
+                mContext, android.R.interpolator.fast_out_slow_in);
         mAccelerateDecelerateInterpolator = new AccelerateDecelerateInterpolator();
     }
 
@@ -332,7 +332,10 @@ public class MediaRouteControllerDialog extends AlertDialog {
         super.onCreate(savedInstanceState);
 
         getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-        setContentView(R.layout.mr_controller_material_dialog_b);
+
+        setContentView(ApiHelper.inflateLibLayout(mContext,
+                ApiHelper.getLibTheme(MediaRouterThemeHelper.getRouterThemeId(mContext)),
+                R.layout.mr_controller_material_dialog_b));
 
         // Remove the neutral button.
         findViewById(BUTTON_NEUTRAL_RES_ID).setVisibility(View.GONE);
@@ -355,12 +358,14 @@ public class MediaRouteControllerDialog extends AlertDialog {
         });
         int color = MediaRouterThemeHelper.getButtonTextColor(mContext);
         mDisconnectButton = findViewById(BUTTON_DISCONNECT_RES_ID);
-        mDisconnectButton.setText(R.string.mr_controller_disconnect);
+        mDisconnectButton.setText(
+                ApiHelper.getLibResources().getString(R.string.mr_controller_disconnect));
         mDisconnectButton.setTextColor(color);
         mDisconnectButton.setOnClickListener(listener);
 
         mStopCastingButton = findViewById(BUTTON_STOP_RES_ID);
-        mStopCastingButton.setText(R.string.mr_controller_stop_casting);
+        mStopCastingButton.setText(
+                ApiHelper.getLibResources().getString(R.string.mr_controller_stop_casting));
         mStopCastingButton.setTextColor(color);
         mStopCastingButton.setOnClickListener(listener);
 
@@ -435,11 +440,11 @@ public class MediaRouteControllerDialog extends AlertDialog {
             }
         });
         loadInterpolator();
-        mGroupListAnimationDurationMs = mContext.getResources().getInteger(
+        mGroupListAnimationDurationMs = ApiHelper.getLibResources().getInteger(
                 R.integer.mr_controller_volume_group_list_animation_duration_ms);
-        mGroupListFadeInDurationMs = mContext.getResources().getInteger(
+        mGroupListFadeInDurationMs = ApiHelper.getLibResources().getInteger(
                 R.integer.mr_controller_volume_group_list_fade_in_duration_ms);
-        mGroupListFadeOutDurationMs = mContext.getResources().getInteger(
+        mGroupListFadeOutDurationMs = ApiHelper.getLibResources().getInteger(
                 R.integer.mr_controller_volume_group_list_fade_out_duration_ms);
 
         mCustomControlView = onCreateMediaControlView(savedInstanceState);
@@ -461,7 +466,7 @@ public class MediaRouteControllerDialog extends AlertDialog {
         View decorView = getWindow().getDecorView();
         mDialogContentWidth = width - decorView.getPaddingLeft() - decorView.getPaddingRight();
 
-        Resources res = mContext.getResources();
+        Resources res = ApiHelper.getLibResources();
         mVolumeGroupListItemIconSize = res.getDimensionPixelSize(
                 R.dimen.mr_controller_volume_group_list_item_icon_size);
         mVolumeGroupListItemHeight = res.getDimensionPixelSize(
@@ -726,12 +731,8 @@ public class MediaRouteControllerDialog extends AlertDialog {
     }
 
     void loadInterpolator() {
-        if (android.os.Build.VERSION.SDK_INT >= 21) {
-            mInterpolator = mIsGroupExpanded ? mLinearOutSlowInInterpolator
-                    : mFastOutSlowInInterpolator;
-        } else {
-            mInterpolator = mAccelerateDecelerateInterpolator;
-        }
+        mInterpolator =
+                mIsGroupExpanded ? mLinearOutSlowInInterpolator : mFastOutSlowInInterpolator;
     }
 
     private void updateVolumeControlLayout() {
@@ -990,14 +991,17 @@ public class MediaRouteControllerDialog extends AlertDialog {
             if (mRoute.getPresentationDisplayId()
                     != MediaRouter.RouteInfo.PRESENTATION_DISPLAY_ID_NONE) {
                 // The user is currently casting screen.
-                mTitleView.setText(R.string.mr_controller_casting_screen);
+                mTitleView.setText(ApiHelper.getLibResources().getString(
+                        R.string.mr_controller_casting_screen));
                 showTitle = true;
             } else if (mState == null || mState.getState() == PlaybackStateCompat.STATE_NONE) {
                 // Show "No media selected" as we don't yet know the playback state.
-                mTitleView.setText(R.string.mr_controller_no_media_selected);
+                mTitleView.setText(ApiHelper.getLibResources().getString(
+                        R.string.mr_controller_no_media_selected));
                 showTitle = true;
             } else if (!hasTitle && !hasSubtitle) {
-                mTitleView.setText(R.string.mr_controller_no_info_available);
+                mTitleView.setText(ApiHelper.getLibResources().getString(
+                        R.string.mr_controller_no_info_available));
                 showTitle = true;
             } else {
                 if (hasTitle) {
@@ -1219,7 +1223,7 @@ public class MediaRouteControllerDialog extends AlertDialog {
                                 AccessibilityEventCompat.TYPE_ANNOUNCEMENT);
                         event.setPackageName(mContext.getPackageName());
                         event.setClassName(getClass().getName());
-                        event.getText().add(mContext.getString(actionDescResId));
+                        event.getText().add(ApiHelper.getLibResources().getString(actionDescResId));
                         mAccessibilityManager.sendAccessibilityEvent(event);
                     }
                 }

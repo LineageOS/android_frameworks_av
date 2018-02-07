@@ -113,7 +113,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             .content_type = contentType,
             .usage = AUDIO_USAGE_UNKNOWN, // only used for output
             .source = source,
-            .flags = flags, // If attributes are set then the other flags parameter is ignored.
+            .flags = AUDIO_FLAG_NONE, // Different than the AUDIO_INPUT_FLAGS
             .tags = ""
     };
 

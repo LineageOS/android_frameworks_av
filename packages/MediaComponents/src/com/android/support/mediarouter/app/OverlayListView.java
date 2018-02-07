@@ -32,7 +32,7 @@ import java.util.List;
  * A ListView which has an additional overlay layer. {@link BitmapDrawable}
  * can be added to the layer and can be animated.
  */
-final class OverlayListView extends ListView {
+public final class OverlayListView extends ListView {
     private final List<OverlayObject> mOverlayObjects = new ArrayList<>();
 
     public OverlayListView(Context context) {

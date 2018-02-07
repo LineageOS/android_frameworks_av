@@ -98,9 +98,9 @@ public class MediaRouteChooserDialog extends Dialog {
     }
 
     public MediaRouteChooserDialog(Context context, int theme) {
+        // TODO (b/72975976): Avoid to use ContextThemeWrapper with app context and lib theme.
         super(new ContextThemeWrapper(context,
-                ApiHelper.getLibTheme(MediaRouterThemeHelper.getRouterThemeId(context))),
-                theme == 0 ? android.R.style.Animation : theme);
+                ApiHelper.getLibTheme(MediaRouterThemeHelper.getRouterThemeId(context))), theme);
         context = getContext();
 
         mRouter = MediaRouter.getInstance(context);

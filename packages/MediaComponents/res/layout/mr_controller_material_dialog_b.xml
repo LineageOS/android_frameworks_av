@@ -23,7 +23,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:orientation="vertical"
-        android:background="?attr/colorBackgroundFloating">
+        android:background="?android:attr/colorBackgroundFloating">
         <LinearLayout android:id="@+id/mr_title_bar"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
@@ -44,7 +44,7 @@
                 android:layout_gravity="center_vertical"
                 android:contentDescription="@string/mr_controller_close_description"
                 android:src="?attr/mediaRouteCloseDrawable"
-                android:background="?attr/selectableItemBackgroundBorderless" />
+                android:background="?android:attr/selectableItemBackgroundBorderless" />
         </LinearLayout>
         <FrameLayout android:id="@+id/mr_custom_control"
             android:layout_width="fill_parent"
@@ -58,7 +58,7 @@
                 android:layout_height="wrap_content"
                 android:adjustViewBounds="true"
                 android:scaleType="fitXY"
-                android:background="?attr/colorPrimary"
+                android:background="?android:attr/colorPrimary"
                 android:layout_gravity="top"
                 android:contentDescription="@string/mr_controller_album_art"
                 android:visibility="gone" />
@@ -89,7 +89,7 @@
                             android:layout_alignParentRight="true"
                             android:layout_centerVertical="true"
                             android:contentDescription="@string/mr_controller_play"
-                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:background="?android:attr/selectableItemBackgroundBorderless"
                             android:visibility="gone" />
                         <LinearLayout android:id="@+id/mr_control_title_container"
                             android:orientation="vertical"
@@ -146,7 +146,7 @@
                             android:layout_width="48dp"
                             android:layout_height="48dp"
                             android:padding="12dp"
-                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:background="?android:attr/selectableItemBackgroundBorderless"
                             android:visibility="gone"/>
                     </LinearLayout>
                 </LinearLayout>
@@ -181,7 +181,7 @@
                 android:paddingTop="4dp">
                 <Button
                     android:id="@android:id/button3"
-                    style="?attr/buttonBarNeutralButtonStyle"
+                    style="?android:attr/buttonBarNeutralButtonStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"/>
                 <android.support.v4.widget.Space
@@ -197,7 +197,7 @@
                     android:layout_height="wrap_content"/>
                 <Button
                     android:id="@android:id/button1"
-                    style="?attr/buttonBarPositiveButtonStyle"
+                    style="?android:attr/buttonBarPositiveButtonStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"/>
             </android.support.v7.widget.ButtonBarLayout>

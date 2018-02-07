@@ -20,14 +20,14 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
-import android.support.v7.widget.AppCompatSeekBar;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.widget.SeekBar;
 
 /**
  * Volume slider with showing, hiding, and applying alpha supports to the thumb.
  */
-class MediaRouteVolumeSlider extends AppCompatSeekBar {
+public class MediaRouteVolumeSlider extends SeekBar {
     private static final String TAG = "MediaRouteVolumeSlider";
 
     private final float mDisabledAlpha;
@@ -41,7 +41,8 @@ class MediaRouteVolumeSlider extends AppCompatSeekBar {
     }
 
     public MediaRouteVolumeSlider(Context context, AttributeSet attrs) {
-        this(context, attrs, android.support.v7.appcompat.R.attr.seekBarStyle);
+        super(context, attrs);
+        mDisabledAlpha = MediaRouterThemeHelper.getDisabledAlpha(context);
     }
 
     public MediaRouteVolumeSlider(Context context, AttributeSet attrs, int defStyleAttr) {
@@ -56,8 +57,10 @@ class MediaRouteVolumeSlider extends AppCompatSeekBar {
 
         // The thumb drawable is a collection of drawables and its current drawables are changed per
         // state. Apply the color filter and alpha on every state change.
-        mThumb.setColorFilter(mColor, PorterDuff.Mode.SRC_IN);
-        mThumb.setAlpha(alpha);
+        if (mThumb != null) {
+            mThumb.setColorFilter(mColor, PorterDuff.Mode.SRC_IN);
+            mThumb.setAlpha(alpha);
+        }
 
         getProgressDrawable().setColorFilter(mColor, PorterDuff.Mode.SRC_IN);
         getProgressDrawable().setAlpha(alpha);

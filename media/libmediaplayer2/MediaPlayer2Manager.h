@@ -26,10 +26,10 @@
 #include <utils/String8.h>
 #include <utils/Vector.h>
 
-#include <media/MediaPlayer2Engine.h>
-#include <media/MediaPlayer2Interface.h>
 #include <media/Metadata.h>
 #include <media/stagefright/foundation/ABase.h>
+#include <mediaplayer2/MediaPlayer2Engine.h>
+#include <mediaplayer2/MediaPlayer2Interface.h>
 
 #include <system/audio.h>
 

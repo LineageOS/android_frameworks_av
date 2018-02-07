@@ -18,7 +18,7 @@
 
 #define OMX_GRAPHIC_BUFFER_SOURCE_H_
 
-#include <media/stagefright/gbs/GraphicBufferSource.h>
+#include <media/stagefright/bqhelper/GraphicBufferSource.h>
 #include <media/stagefright/foundation/ABase.h>
 
 #include <android/BnGraphicBufferSource.h>
@@ -34,7 +34,7 @@ using ::android::binder::Status;
  * This class is used to feed OMX codecs from a Surface via BufferQueue or
  * HW producer.
  *
- * See media/stagefright/gbs/GraphicBufferSource.h for documentation.
+ * See media/stagefright/bqhelper/GraphicBufferSource.h for documentation.
  */
 class OmxGraphicBufferSource : public GraphicBufferSource {
 public:

@@ -26,12 +26,13 @@ import android.util.AttributeSet;
 import android.view.View;
 import android.widget.ImageButton;
 
+import com.android.media.update.ApiHelper;
 import com.android.media.update.R;
 
 /**
  * Chevron/Caret button to expand/collapse group volume list with animation.
  */
-class MediaRouteExpandCollapseButton extends ImageButton {
+public class MediaRouteExpandCollapseButton extends ImageButton {
     final AnimationDrawable mExpandAnimationDrawable;
     final AnimationDrawable mCollapseAnimationDrawable;
     final String mExpandGroupDescription;
@@ -49,10 +50,10 @@ class MediaRouteExpandCollapseButton extends ImageButton {
 
     public MediaRouteExpandCollapseButton(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        mExpandAnimationDrawable = (AnimationDrawable) ContextCompat.getDrawable(
-                context, R.drawable.mr_group_expand);
-        mCollapseAnimationDrawable = (AnimationDrawable) ContextCompat.getDrawable(
-                context, R.drawable.mr_group_collapse);
+        mExpandAnimationDrawable = (AnimationDrawable)
+                ApiHelper.getLibResources().getDrawable(R.drawable.mr_group_expand);
+        mCollapseAnimationDrawable = (AnimationDrawable)
+                ApiHelper.getLibResources().getDrawable(R.drawable.mr_group_collapse);
 
         ColorFilter filter = new PorterDuffColorFilter(
                 MediaRouterThemeHelper.getControllerColor(context, defStyleAttr),
@@ -60,8 +61,10 @@ class MediaRouteExpandCollapseButton extends ImageButton {
         mExpandAnimationDrawable.setColorFilter(filter);
         mCollapseAnimationDrawable.setColorFilter(filter);
 
-        mExpandGroupDescription = context.getString(R.string.mr_controller_expand_group);
-        mCollapseGroupDescription = context.getString(R.string.mr_controller_collapse_group);
+        mExpandGroupDescription =
+                ApiHelper.getLibResources().getString(R.string.mr_controller_expand_group);
+        mCollapseGroupDescription =
+                ApiHelper.getLibResources().getString(R.string.mr_controller_collapse_group);
 
         setImageDrawable(mExpandAnimationDrawable.getFrame(0));
         setContentDescription(mExpandGroupDescription);
