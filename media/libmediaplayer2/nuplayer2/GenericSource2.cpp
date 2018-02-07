@@ -54,7 +54,6 @@ static const int kResumePlaybackMarkMs = 15000;  // 15secs
 
 NuPlayer2::GenericSource2::GenericSource2(
         const sp<AMessage> &notify,
-        bool uidValid,
         uid_t uid,
         const sp<MediaClock> &mediaClock)
     : Source(notify),
@@ -73,7 +72,6 @@ NuPlayer2::GenericSource2::GenericSource2(
       mAudioIsVorbis(false),
       mIsSecure(false),
       mIsStreaming(false),
-      mUIDValid(uidValid),
       mUID(uid),
       mMediaClock(mediaClock),
       mFd(-1),

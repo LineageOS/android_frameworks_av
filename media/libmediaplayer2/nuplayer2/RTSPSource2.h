@@ -36,7 +36,6 @@ struct NuPlayer2::RTSPSource2 : public NuPlayer2::Source {
             const sp<MediaHTTPService> &httpService,
             const char *url,
             const KeyedVector<String8, String8> *headers,
-            bool uidValid = false,
             uid_t uid = 0,
             bool isSDP = false);
 
@@ -97,7 +96,6 @@ private:
     sp<MediaHTTPService> mHTTPService;
     AString mURL;
     KeyedVector<String8, String8> mExtraHeaders;
-    bool mUIDValid;
     uid_t mUID;
     uint32_t mFlags;
     bool mIsSDP;

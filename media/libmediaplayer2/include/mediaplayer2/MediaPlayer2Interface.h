@@ -148,10 +148,6 @@ public:
     virtual             ~MediaPlayer2Interface() { }
     virtual status_t    initCheck() = 0;
 
-    virtual status_t    setUID(uid_t /* uid */) {
-        return INVALID_OPERATION;
-    }
-
     virtual void        setAudioSink(const sp<AudioSink>& audioSink) { mAudioSink = audioSink; }
 
     virtual status_t    setDataSource(const sp<DataSourceDesc>& /* dsd */) {

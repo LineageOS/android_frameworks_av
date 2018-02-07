@@ -99,7 +99,7 @@ static const char *kPlayerRebufferingCount = "android.media.mediaplayer.rebuffer
 static const char *kPlayerRebufferingAtExit = "android.media.mediaplayer.rebufferExit";
 
 
-NuPlayer2Driver::NuPlayer2Driver(pid_t pid)
+NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid)
     : mState(STATE_IDLE),
       mIsAsyncPrepare(false),
       mAsyncResult(UNKNOWN_ERROR),
@@ -114,10 +114,10 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid)
       mLooper(new ALooper),
       mNuPlayer2Looper(new ALooper),
       mMediaClock(new MediaClock),
-      mPlayer(new NuPlayer2(pid, mMediaClock)),
+      mPlayer(new NuPlayer2(pid, uid, mMediaClock)),
       mPlayerFlags(0),
       mAnalyticsItem(NULL),
-      mClientUid(-1),
+      mClientUid(uid),
       mAtEOS(false),
       mLooping(false),
       mAutoLoop(false) {
@@ -129,6 +129,7 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid)
 
     // set up an analytics record
     mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
+    mAnalyticsItem->setUid(mClientUid);
 
     mNuPlayer2Looper->start(
             false, /* runOnCallingThread */
@@ -162,16 +163,6 @@ status_t NuPlayer2Driver::initCheck() {
             PRIORITY_AUDIO);
 
     mLooper->registerHandler(this);
-    return OK;
-}
-
-status_t NuPlayer2Driver::setUID(uid_t uid) {
-    mPlayer->setUID(uid);
-    mClientUid = uid;
-    if (mAnalyticsItem) {
-        mAnalyticsItem->setUid(mClientUid);
-    }
-
     return OK;
 }
 

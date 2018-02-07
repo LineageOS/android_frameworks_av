@@ -43,7 +43,7 @@ struct NuCachedSource2;
 struct NuPlayer2::GenericSource2 : public NuPlayer2::Source,
                                    public MediaBufferObserver // Modular DRM
 {
-    GenericSource2(const sp<AMessage> &notify, bool uidValid, uid_t uid,
+    GenericSource2(const sp<AMessage> &notify, uid_t uid,
                    const sp<MediaClock> &mediaClock);
 
     status_t setDataSource(
@@ -150,7 +150,6 @@ private:
     // Secure codec is required.
     bool mIsSecure;
     bool mIsStreaming;
-    bool mUIDValid;
     uid_t mUID;
     const sp<MediaClock> mMediaClock;
     sp<MediaHTTPService> mHTTPService;
