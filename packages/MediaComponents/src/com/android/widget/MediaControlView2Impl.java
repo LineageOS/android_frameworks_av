@@ -54,6 +54,7 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
 
     static final String ARGUMENT_KEY_FULLSCREEN = "fullScreen";
 
+    // TODO: Move these constants to public api to support custom video view.
     static final String KEY_STATE_CONTAINS_SUBTITLE = "StateContainsSubtitle";
     static final String EVENT_UPDATE_SUBTITLE_STATUS = "UpdateSubtitleStatus";
 
