@@ -300,8 +300,7 @@ protected:
                              bool force = false,
                              int delayMs = 0,
                              audio_patch_handle_t *patchHandle = NULL,
-                             const char *address = nullptr,
-                             bool requiresMuteCheck = true);
+                             const char* address = NULL);
         status_t resetOutputDevice(const sp<AudioOutputDescriptor>& outputDesc,
                                    int delayMs = 0,
                                    audio_patch_handle_t *patchHandle = NULL);
