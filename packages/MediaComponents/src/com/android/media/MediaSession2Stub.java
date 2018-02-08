@@ -19,7 +19,6 @@ package com.android.media;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.media.MediaController2;
-import android.media.MediaController2.PlaybackInfo;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
@@ -31,7 +30,6 @@ import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.PlaybackState2;
 import android.media.VolumeProvider2;
-import android.media.update.MediaSession2Provider.CommandButtonProvider;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Bundle;
@@ -136,7 +134,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 final PlaybackState2 state = session.getInstance().getPlaybackState();
                 final Bundle playbackStateBundle = (state != null) ? state.toBundle() : null;
                 final Bundle playbackInfoBundle =
-                        ((PlaybackInfoImpl) session.getPlaybackInfo().getProvider()).toBundle();
+                        ((MediaController2Impl.PlaybackInfoImpl) session.getPlaybackInfo().getProvider()).toBundle();
                 final PlaylistParams params = session.getInstance().getPlaylistParams();
                 final Bundle paramsBundle = (params != null) ? params.toBundle() : null;
                 final int ratingType = session.getRatingType();
@@ -627,7 +625,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     ControllerInfoImpl.from(list.get(i)).getControllerBinder();
             try {
                 callbackBinder.onPlaybackInfoChanged(
-                        ((PlaybackInfoImpl) playbackInfo.getProvider()).toBundle());
+                        ((MediaController2Impl.PlaybackInfoImpl) playbackInfo.getProvider()).toBundle());
             } catch (RemoteException e) {
                 Log.w(TAG, "Controller is gone", e);
                 // TODO(jaewan): What to do when the controller is gone?

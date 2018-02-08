@@ -252,7 +252,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
                     stream = AudioManager.STREAM_MUSIC;
                 }
             }
-            info = PlaybackInfoImpl.createPlaybackInfo(
+            info = MediaController2Impl.PlaybackInfoImpl.createPlaybackInfo(
                     mContext,
                     PlaybackInfo.PLAYBACK_TYPE_LOCAL,
                     attrs,
@@ -262,7 +262,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
                     mAudioManager.getStreamMaxVolume(stream),
                     mAudioManager.getStreamVolume(stream));
         } else {
-            info = PlaybackInfoImpl.createPlaybackInfo(
+            info = MediaController2Impl.PlaybackInfoImpl.createPlaybackInfo(
                     mContext,
                     PlaybackInfo.PLAYBACK_TYPE_REMOTE /* ControlType */,
                     attrs,
