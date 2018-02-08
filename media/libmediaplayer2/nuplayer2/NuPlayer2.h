@@ -32,7 +32,6 @@ struct ANativeWindowWrapper;
 struct AudioPlaybackRate;
 struct AVSyncSettings;
 struct DataSourceDesc;
-class IDataSource;
 struct MediaClock;
 struct MediaHTTPService;
 class MetaData;
@@ -44,6 +43,7 @@ struct NuPlayer2 : public AHandler {
     void setDriver(const wp<NuPlayer2Driver> &driver);
 
     void setDataSourceAsync(const sp<DataSourceDesc> &dsd);
+    void prepareNextDataSourceAsync(const sp<DataSourceDesc> &dsd);
 
     status_t getBufferingSettings(BufferingSettings* buffering /* nonnull */);
     status_t setBufferingSettings(const BufferingSettings& buffering);
@@ -120,6 +120,7 @@ private:
     enum {
         kWhatSetDataSource              = '=DaS',
         kWhatPrepare                    = 'prep',
+        kWhatPrepareNextDataSource      = 'pNDS',
         kWhatSetVideoSurface            = '=VSu',
         kWhatSetAudioSink               = '=AuS',
         kWhatMoreDataQueued             = 'more',
@@ -155,7 +156,11 @@ private:
     const sp<MediaClock> mMediaClock;
     Mutex mSourceLock;  // guard |mSource|.
     sp<Source> mSource;
+    int64_t mSrcId;
     uint32_t mSourceFlags;
+    sp<Source> mNextSource;
+    int64_t mNextSrcId;
+    uint32_t mNextSourceFlags;
     sp<ANativeWindowWrapper> mNativeWindow;
     sp<MediaPlayer2Interface::AudioSink> mAudioSink;
     sp<DecoderBase> mVideoDecoder;
@@ -248,10 +253,10 @@ private:
         DATA_SOURCE_TYPE_GENERIC_URL,
         DATA_SOURCE_TYPE_GENERIC_FD,
         DATA_SOURCE_TYPE_MEDIA,
-        DATA_SOURCE_TYPE_STREAM,
     } DATA_SOURCE_TYPE;
 
     std::atomic<DATA_SOURCE_TYPE> mDataSourceType;
+    std::atomic<DATA_SOURCE_TYPE> mNextDataSourceType;
 
     inline const sp<DecoderBase> &getDecoder(bool audio) {
         return audio ? mAudioDecoder : mVideoDecoder;
@@ -264,6 +269,10 @@ private:
         mFlushComplete[1][1] = false;
     }
 
+    status_t createNuPlayer2Source(const sp<DataSourceDesc> &dsd,
+                                   sp<Source> *source,
+                                   DATA_SOURCE_TYPE *dataSourceType);
+
     void tryOpenAudioSinkForOffload(
             const sp<AMessage> &format, const sp<MetaData> &audioMeta, bool hasVideo);
     void closeAudioSink();
@@ -273,8 +282,6 @@ private:
 
     status_t instantiateDecoder(
             bool audio, sp<DecoderBase> *decoder, bool checkAudioModeChange = true);
-
-    status_t onInstantiateSecureDecoders();
 
     void updateVideoSize(
             const sp<AMessage> &inputFormat,

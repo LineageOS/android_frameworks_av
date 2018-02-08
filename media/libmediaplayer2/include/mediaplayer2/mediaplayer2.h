@@ -83,10 +83,11 @@ enum media2_error_type {
     // 0xx
     MEDIA2_ERROR_UNKNOWN = 1,
     // 1xx
-    MEDIA2_ERROR_SERVER_DIED = 100,
+    // MEDIA2_ERROR_SERVER_DIED = 100,
     // 2xx
     MEDIA2_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK = 200,
     // 3xx
+    MEDIA2_ERROR_FAILED_TO_SET_DATA_SOURCE = 300,
 };
 
 

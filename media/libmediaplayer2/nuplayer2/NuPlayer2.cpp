@@ -270,10 +270,12 @@ static bool IsHTTPLiveURL(const char *url) {
     return false;
 }
 
-void NuPlayer2::setDataSourceAsync(const sp<DataSourceDesc> &dsd) {
-    sp<AMessage> msg = new AMessage(kWhatSetDataSource, this);
+status_t NuPlayer2::createNuPlayer2Source(const sp<DataSourceDesc> &dsd,
+                                          sp<Source> *source,
+                                          DATA_SOURCE_TYPE *dataSourceType) {
+    status_t err = NO_ERROR;
     sp<AMessage> notify = new AMessage(kWhatSourceNotify, this);
-    sp<Source> source;
+    notify->setInt64("srcId", dsd->mId);
 
     switch (dsd->mType) {
         case DataSourceDesc::TYPE_URL:
@@ -285,38 +287,38 @@ void NuPlayer2::setDataSourceAsync(const sp<DataSourceDesc> &dsd) {
             KeyedVector<String8, String8> *headers = &(dsd->mHeaders);
 
             if (IsHTTPLiveURL(url)) {
-                source = new HTTPLiveSource2(notify, httpService, url, headers);
-                ALOGV("setDataSourceAsync HTTPLiveSource2 %s", url);
-                mDataSourceType = DATA_SOURCE_TYPE_HTTP_LIVE;
+                *source = new HTTPLiveSource2(notify, httpService, url, headers);
+                ALOGV("createNuPlayer2Source HTTPLiveSource2 %s", url);
+                *dataSourceType = DATA_SOURCE_TYPE_HTTP_LIVE;
             } else if (!strncasecmp(url, "rtsp://", 7)) {
-                source = new RTSPSource2(
+                *source = new RTSPSource2(
                         notify, httpService, url, headers, mUID);
-                ALOGV("setDataSourceAsync RTSPSource2 %s", url);
-                mDataSourceType = DATA_SOURCE_TYPE_RTSP;
+                ALOGV("createNuPlayer2Source RTSPSource2 %s", url);
+                *dataSourceType = DATA_SOURCE_TYPE_RTSP;
             } else if ((!strncasecmp(url, "http://", 7)
                         || !strncasecmp(url, "https://", 8))
                             && ((len >= 4 && !strcasecmp(".sdp", &url[len - 4]))
                             || strstr(url, ".sdp?"))) {
-                source = new RTSPSource2(
+                *source = new RTSPSource2(
                         notify, httpService, url, headers, mUID, true);
-                ALOGV("setDataSourceAsync RTSPSource2 http/https/.sdp %s", url);
-                mDataSourceType = DATA_SOURCE_TYPE_RTSP;
+                ALOGV("createNuPlayer2Source RTSPSource2 http/https/.sdp %s", url);
+                *dataSourceType = DATA_SOURCE_TYPE_RTSP;
             } else {
-                ALOGV("setDataSourceAsync GenericSource2 %s", url);
+                ALOGV("createNuPlayer2Source GenericSource2 %s", url);
 
                 sp<GenericSource2> genericSource =
                         new GenericSource2(notify, mUID, mMediaClock);
 
-                status_t err = genericSource->setDataSource(httpService, url, headers);
+                err = genericSource->setDataSource(httpService, url, headers);
 
                 if (err == OK) {
-                    source = genericSource;
+                    *source = genericSource;
                 } else {
-                    ALOGE("Failed to set data source!");
+                    ALOGE("Failed to create NuPlayer2Source!");
                 }
 
                 // regardless of success/failure
-                mDataSourceType = DATA_SOURCE_TYPE_GENERIC_URL;
+                *dataSourceType = DATA_SOURCE_TYPE_GENERIC_URL;
             }
             break;
         }
@@ -326,19 +328,20 @@ void NuPlayer2::setDataSourceAsync(const sp<DataSourceDesc> &dsd) {
             sp<GenericSource2> genericSource =
                     new GenericSource2(notify, mUID, mMediaClock);
 
-            ALOGV("setDataSourceAsync fd %d/%lld/%lld source: %p",
-                  dsd->mFD, (long long)dsd->mFDOffset, (long long)dsd->mFDLength, source.get());
+            ALOGV("createNuPlayer2Source fd %d/%lld/%lld source: %p",
+                  dsd->mFD, (long long)dsd->mFDOffset, (long long)dsd->mFDLength,
+                  genericSource.get());
 
-            status_t err = genericSource->setDataSource(dsd->mFD, dsd->mFDOffset, dsd->mFDLength);
+            err = genericSource->setDataSource(dsd->mFD, dsd->mFDOffset, dsd->mFDLength);
 
             if (err != OK) {
-                ALOGE("Failed to set data source!");
-                source = NULL;
+                ALOGE("Failed to create NuPlayer2Source!");
+                *source = NULL;
             } else {
-                source = genericSource;
+                *source = genericSource;
             }
 
-            mDataSourceType = DATA_SOURCE_TYPE_GENERIC_FD;
+            *dataSourceType = DATA_SOURCE_TYPE_GENERIC_FD;
             break;
         }
 
@@ -346,25 +349,63 @@ void NuPlayer2::setDataSourceAsync(const sp<DataSourceDesc> &dsd) {
         {
             sp<GenericSource2> genericSource =
                     new GenericSource2(notify, mUID, mMediaClock);
-            status_t err = genericSource->setDataSource(dsd->mCallbackSource);
+            err = genericSource->setDataSource(dsd->mCallbackSource);
 
             if (err != OK) {
-                ALOGE("Failed to set data source!");
-                source = NULL;
+                ALOGE("Failed to create NuPlayer2Source!");
+                *source = NULL;
             } else {
-                source = genericSource;
+                *source = genericSource;
             }
 
-            mDataSourceType = DATA_SOURCE_TYPE_MEDIA;
+            *dataSourceType = DATA_SOURCE_TYPE_MEDIA;
             break;
         }
 
         default:
+            err = BAD_TYPE;
+            source = NULL;
+            *dataSourceType = DATA_SOURCE_TYPE_NONE;
             ALOGE("invalid data source type!");
             break;
     }
 
+    return err;
+}
+
+void NuPlayer2::setDataSourceAsync(const sp<DataSourceDesc> &dsd) {
+    DATA_SOURCE_TYPE dataSourceType;
+    sp<Source> source;
+    status_t err = createNuPlayer2Source(dsd, &source, &dataSourceType);
+
+    if (err != OK) {
+        notifyListener(MEDIA2_ERROR, MEDIA2_ERROR_FAILED_TO_SET_DATA_SOURCE, err);
+        return;
+    }
+
+    mDataSourceType = dataSourceType;
+
+    sp<AMessage> msg = new AMessage(kWhatSetDataSource, this);
     msg->setObject("source", source);
+    msg->setInt64("srcId", dsd->mId);
+    msg->post();
+}
+
+void NuPlayer2::prepareNextDataSourceAsync(const sp<DataSourceDesc> &dsd) {
+    DATA_SOURCE_TYPE dataSourceType;
+    sp<Source> source;
+    status_t err = createNuPlayer2Source(dsd, &source, &dataSourceType);
+
+    if (err != OK) {
+        notifyListener(MEDIA2_ERROR, MEDIA2_ERROR_FAILED_TO_SET_DATA_SOURCE, err);
+        return;
+    }
+
+    mNextDataSourceType = dataSourceType;
+
+    sp<AMessage> msg = new AMessage(kWhatPrepareNextDataSource, this);
+    msg->setObject("source", source);
+    msg->setInt64("srcId", dsd->mId);
     msg->post();
 }
 
@@ -582,6 +623,7 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
             CHECK(msg->findObject("source", &obj));
             if (obj != NULL) {
                 Mutex::Autolock autoLock(mSourceLock);
+                CHECK(msg->findInt64("srcId", &mSrcId));
                 mSource = static_cast<Source *>(obj.get());
             } else {
                 err = UNKNOWN_ERROR;
@@ -592,6 +634,25 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
             if (driver != NULL) {
                 driver->notifySetDataSourceCompleted(err);
             }
+            break;
+        }
+
+        case kWhatPrepareNextDataSource:
+        {
+            ALOGV("kWhatPrepareNextDataSource");
+
+            status_t err = OK;
+            sp<RefBase> obj;
+            CHECK(msg->findObject("source", &obj));
+            if (obj != NULL) {
+                Mutex::Autolock autoLock(mSourceLock);
+                CHECK(msg->findInt64("srcId", &mNextSrcId));
+                mNextSource = static_cast<Source *>(obj.get());
+                mNextSource->prepareAsync();
+            } else {
+                err = UNKNOWN_ERROR;
+            }
+
             break;
         }
 
@@ -1482,35 +1543,6 @@ void NuPlayer2::onResume() {
     }
 
     startPlaybackTimer("onresume");
-}
-
-status_t NuPlayer2::onInstantiateSecureDecoders() {
-    status_t err;
-    if (!(mSourceFlags & Source::FLAG_SECURE)) {
-        return BAD_TYPE;
-    }
-
-    if (mRenderer != NULL) {
-        ALOGE("renderer should not be set when instantiating secure decoders");
-        return UNKNOWN_ERROR;
-    }
-
-    // TRICKY: We rely on mRenderer being null, so that decoder does not start requesting
-    // data on instantiation.
-    if (mNativeWindow != NULL && mNativeWindow->getANativeWindow() != NULL) {
-        err = instantiateDecoder(false, &mVideoDecoder);
-        if (err != OK) {
-            return err;
-        }
-    }
-
-    if (mAudioSink != NULL) {
-        err = instantiateDecoder(true, &mAudioDecoder);
-        if (err != OK) {
-            return err;
-        }
-    }
-    return OK;
 }
 
 void NuPlayer2::onStart(int64_t startPositionUs, MediaPlayer2SeekMode mode) {
@@ -2428,24 +2460,8 @@ void NuPlayer2::onSourceNotify(const sp<AMessage> &msg) {
     int32_t what;
     CHECK(msg->findInt32("what", &what));
 
+    // TODO: tell this is for mSource or mNextSource.
     switch (what) {
-        case Source::kWhatInstantiateSecureDecoders:
-        {
-            if (mSource == NULL) {
-                // This is a stale notification from a source that was
-                // asynchronously preparing when the client called reset().
-                // We handled the reset, the source is gone.
-                break;
-            }
-
-            sp<AMessage> reply;
-            CHECK(msg->findMessage("reply", &reply));
-            status_t err = onInstantiateSecureDecoders();
-            reply->setInt32("err", err);
-            reply->post();
-            break;
-        }
-
         case Source::kWhatPrepared:
         {
             ALOGV("NuPlayer2::onSourceNotify Source::kWhatPrepared source: %p", mSource.get());
@@ -2789,9 +2805,6 @@ const char *NuPlayer2::getDataSourceType() {
         case DATA_SOURCE_TYPE_MEDIA:
             return "Media";
 
-        case DATA_SOURCE_TYPE_STREAM:
-            return "Stream";
-
         case DATA_SOURCE_TYPE_NONE:
         default:
             return "None";
@@ -2976,13 +2989,6 @@ void NuPlayer2::Source::notifyDrmInfo(const sp<ABuffer> &drmInfoBuffer)
     notify->setInt32("what", kWhatDrmInfo);
     notify->setBuffer("drmInfo", drmInfoBuffer);
 
-    notify->post();
-}
-
-void NuPlayer2::Source::notifyInstantiateSecureDecoders(const sp<AMessage> &reply) {
-    sp<AMessage> notify = dupNotify();
-    notify->setInt32("what", kWhatInstantiateSecureDecoders);
-    notify->setMessage("reply", reply);
     notify->post();
 }
 
