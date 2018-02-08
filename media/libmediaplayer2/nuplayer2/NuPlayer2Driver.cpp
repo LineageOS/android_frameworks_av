@@ -79,6 +79,9 @@ private:
 // key for media statistics
 static const char *kKeyPlayer = "nuplayer";
 // attrs for media statistics
+    // NB: these are matched with public Java API constants defined
+    // in frameworks/base/media/java/android/media/MediaPlayer2.java
+    // These must be kept synchronized with the constants there.
 static const char *kPlayerVMime = "android.media.mediaplayer.video.mime";
 static const char *kPlayerVCodec = "android.media.mediaplayer.video.codec";
 static const char *kPlayerWidth = "android.media.mediaplayer.width";
@@ -91,6 +94,8 @@ static const char *kPlayerDuration = "android.media.mediaplayer.durationMs";
 static const char *kPlayerPlaying = "android.media.mediaplayer.playingMs";
 static const char *kPlayerError = "android.media.mediaplayer.err";
 static const char *kPlayerErrorCode = "android.media.mediaplayer.errcode";
+
+// NB: These are not yet exposed as public Java API constants.
 static const char *kPlayerErrorState = "android.media.mediaplayer.errstate";
 static const char *kPlayerDataSourceType = "android.media.mediaplayer.dataSource";
 //

@@ -91,11 +91,14 @@ void AudioRecord::MediaMetrics::gather(const AudioRecord *record)
 {
     // key for media statistics is defined in the header
     // attrs for media statistics
-    static constexpr char kAudioRecordChannelCount[] = "android.media.audiorecord.channels";
+    // NB: these are matched with public Java API constants defined
+    // in frameworks/base/media/java/android/media/AudioRecord.java
+    // These must be kept synchronized with the constants there.
     static constexpr char kAudioRecordEncoding[] = "android.media.audiorecord.encoding";
+    static constexpr char kAudioRecordSource[] = "android.media.audiorecord.source";
     static constexpr char kAudioRecordLatency[] = "android.media.audiorecord.latency";
     static constexpr char kAudioRecordSampleRate[] = "android.media.audiorecord.samplerate";
-    static constexpr char kAudioRecordSource[] = "android.media.audiotrack.source";
+    static constexpr char kAudioRecordChannelCount[] = "android.media.audiorecord.channels";
 
     // constructor guarantees mAnalyticsItem is valid
 

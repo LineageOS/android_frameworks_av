@@ -32,9 +32,12 @@ namespace android {
 static const char *kKeyExtractor = "extractor";
 
 // attrs for media statistics
+// NB: these are matched with public Java API constants defined
+// in frameworks/base/media/java/android/media/MediaExtractor.java
+// These must be kept synchronized with the constants there.
+static const char *kExtractorFormat = "android.media.mediaextractor.fmt";
 static const char *kExtractorMime = "android.media.mediaextractor.mime";
 static const char *kExtractorTracks = "android.media.mediaextractor.ntrk";
-static const char *kExtractorFormat = "android.media.mediaextractor.fmt";
 
 RemoteMediaExtractor::RemoteMediaExtractor(
         MediaExtractor *extractor,
