@@ -460,7 +460,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
-            // TODO implement, use the SessionPlaylistController itf
+            // TODO implement and use SessionPlaylistAgent
             //player.setPlaylist(playlist);
             mSessionStub.notifyPlaylistChanged(playlist);
         } else if (DEBUG) {
