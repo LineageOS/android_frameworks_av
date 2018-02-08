@@ -25,7 +25,7 @@ namespace android {
 class MediaPlayer2EngineClient: public RefBase
 {
 public:
-    virtual void notify(int msg, int ext1, int ext2, const Parcel *obj) = 0;
+    virtual void notify(int64_t srcId, int msg, int ext1, int ext2, const Parcel *obj) = 0;
 };
 
 }; // namespace android

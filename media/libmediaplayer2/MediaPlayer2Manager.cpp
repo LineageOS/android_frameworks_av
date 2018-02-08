@@ -580,7 +580,7 @@ void MediaPlayer2Manager::Client::AudioDeviceUpdatedNotifier::onAudioDeviceUpdat
         audio_port_handle_t deviceId) {
     sp<MediaPlayer2Interface> listener = mListener.promote();
     if (listener != NULL) {
-        listener->sendEvent(MEDIA2_AUDIO_ROUTING_CHANGED, audioIo, deviceId);
+        listener->sendEvent(0, MEDIA2_AUDIO_ROUTING_CHANGED, audioIo, deviceId);
     } else {
         ALOGW("listener for process %d death is gone", MEDIA2_AUDIO_ROUTING_CHANGED);
     }
@@ -1031,7 +1031,8 @@ status_t MediaPlayer2Manager::Client::getParameter(int key, Parcel *reply) {
 }
 
 void MediaPlayer2Manager::Client::notify(
-        const wp<MediaPlayer2Engine> &listener, int msg, int ext1, int ext2, const Parcel *obj)
+        const wp<MediaPlayer2Engine> &listener, int64_t srcId,
+        int msg, int ext1, int ext2, const Parcel *obj)
 {
     sp<MediaPlayer2Engine> spListener = listener.promote();
     if (spListener == NULL) {
@@ -1063,9 +1064,9 @@ void MediaPlayer2Manager::Client::notify(
         }
         if (nc != NULL) {
             if (errStartNext == NO_ERROR) {
-                nc->notify(MEDIA2_INFO, MEDIA2_INFO_STARTED_AS_NEXT, 0, obj);
+                nc->notify(srcId, MEDIA2_INFO, MEDIA2_INFO_STARTED_AS_NEXT, 0, obj);
             } else {
-                nc->notify(MEDIA2_ERROR, MEDIA2_ERROR_UNKNOWN , 0, obj);
+                nc->notify(srcId, MEDIA2_ERROR, MEDIA2_ERROR_UNKNOWN , 0, obj);
                 ALOGE("gapless:start playback for next track failed, err(%d)", errStartNext);
             }
         }
@@ -1085,8 +1086,9 @@ void MediaPlayer2Manager::Client::notify(
     }
 
     if (c != NULL) {
-        ALOGV("[%d] notify (%p, %d, %d, %d)", client->mConnId, spListener.get(), msg, ext1, ext2);
-        c->notify(msg, ext1, ext2, obj);
+        ALOGV("[%d] notify (%p, %lld, %d, %d, %d)", client->mConnId, spListener.get(),
+              (long long)srcId, msg, ext1, ext2);
+        c->notify(srcId, msg, ext1, ext2, obj);
     }
 }
 

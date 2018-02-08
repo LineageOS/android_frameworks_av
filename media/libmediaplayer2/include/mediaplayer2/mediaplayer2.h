@@ -194,7 +194,7 @@ enum media_player2_invoke_ids {
 class MediaPlayer2Listener: virtual public RefBase
 {
 public:
-    virtual void notify(int msg, int ext1, int ext2, const Parcel *obj) = 0;
+    virtual void notify(int64_t srcId, int msg, int ext1, int ext2, const Parcel *obj) = 0;
 };
 
 class MediaPlayer2 : public MediaPlayer2EngineClient
@@ -204,6 +204,7 @@ public:
     ~MediaPlayer2();
             void            disconnect();
 
+            status_t        getSrcId(int64_t *srcId);
             status_t        setDataSource(const sp<DataSourceDesc> &dsd);
             status_t        setVideoSurfaceTexture(const sp<ANativeWindowWrapper>& nww);
             status_t        setListener(const sp<MediaPlayer2Listener>& listener);
@@ -235,7 +236,8 @@ public:
             status_t        setLooping(int loop);
             bool            isLooping();
             status_t        setVolume(float leftVolume, float rightVolume);
-            void            notify(int msg, int ext1, int ext2, const Parcel *obj = NULL);
+            void            notify(int64_t srcId, int msg, int ext1, int ext2,
+                                   const Parcel *obj = NULL);
             status_t        invoke(const Parcel& request, Parcel *reply);
             status_t        setMetadataFilter(const Parcel& filter);
             status_t        getMetadata(bool update_only, bool apply_filter, Parcel *metadata);
@@ -260,11 +262,12 @@ private:
             status_t        seekTo_l(int msec, MediaPlayer2SeekMode mode);
             status_t        prepareAsync_l();
             status_t        getDuration_l(int *msec);
-            status_t        attachNewPlayer(const sp<MediaPlayer2Engine>& player);
+            status_t        attachNewPlayer(const sp<MediaPlayer2Engine>& player, long srcId);
             status_t        reset_l();
             status_t        checkStateForKeySet_l(int key);
 
     sp<MediaPlayer2Engine>      mPlayer;
+    int64_t                     mSrcId;
     thread_id_t                 mLockThreadId;
     Mutex                       mLock;
     Mutex                       mNotifyLock;
