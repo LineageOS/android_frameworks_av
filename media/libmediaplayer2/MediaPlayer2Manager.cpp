@@ -512,7 +512,7 @@ MediaPlayer2Manager::Client::Client(
 }
 
 bool MediaPlayer2Manager::Client::init() {
-    sp<MediaPlayer2Interface> p = new NuPlayer2Driver(mPid);
+    sp<MediaPlayer2Interface> p = new NuPlayer2Driver(mPid, mUid);
     status_t init_result = p->initCheck();
     if (init_result != NO_ERROR) {
         ALOGE("Failed to create player object, initCheck failed(%d)", init_result);
@@ -520,7 +520,6 @@ bool MediaPlayer2Manager::Client::init() {
     }
 
     p->setNotifyCallback(this, notify);
-    p->setUID(mUid);
     mAudioDeviceUpdatedListener = new AudioDeviceUpdatedNotifier(p);
     mAudioOutput = new AudioOutput(mAudioSessionId, mUid,
             mPid, mAudioAttributes, mAudioDeviceUpdatedListener);

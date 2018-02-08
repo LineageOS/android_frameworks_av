@@ -26,11 +26,9 @@ struct MediaClock;
 struct NuPlayer2;
 
 struct NuPlayer2Driver : public MediaPlayer2Interface {
-    explicit NuPlayer2Driver(pid_t pid);
+    explicit NuPlayer2Driver(pid_t pid, uid_t uid);
 
     virtual status_t initCheck();
-
-    virtual status_t setUID(uid_t uid);
 
     virtual status_t setDataSource(const sp<DataSourceDesc> &dsd) override;
 

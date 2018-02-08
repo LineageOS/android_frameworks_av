@@ -210,16 +210,16 @@ Return<void> DrmPlugin::getPropertyString(
     std::string name(propertyName.c_str());
     std::string value;
 
-    if (name == "vendor") {
-        value = "Google";
-    } else if (name == "version") {
-        value = "1.1";
-    } else if (name == "description") {
-        value = "ClearKey CDM";
-    } else if (name == "algorithms") {
-        value = "";
-    } else if (name == "listenerTestSupport") {
-        value = mStringProperties[name];
+    if (name == kVendorKey) {
+        value = mStringProperties[kVendorKey];
+    } else if (name == kVersionKey) {
+        value = mStringProperties[kVersionKey];
+    } else if (name == kPluginDescriptionKey) {
+        value = mStringProperties[kPluginDescriptionKey];
+    } else if (name == kAlgorithmsKey) {
+        value = mStringProperties[kAlgorithmsKey];
+    } else if (name == kListenerTestSupportKey) {
+        value = mStringProperties[kListenerTestSupportKey];
     } else {
         ALOGE("App requested unknown string property %s", name.c_str());
         _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, "");

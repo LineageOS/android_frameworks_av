@@ -64,16 +64,22 @@ namespace android {
 // key for media statistics
 static const char *kCodecKeyName = "codec";
 // attrs for media statistics
+// NB: these are matched with public Java API constants defined
+// in frameworks/base/media/java/android/media/MediaCodec.java
+// These must be kept synchronized with the constants there.
 static const char *kCodecCodec = "android.media.mediacodec.codec";  /* e.g. OMX.google.aac.decoder */
 static const char *kCodecMime = "android.media.mediacodec.mime";    /* e.g. audio/mime */
 static const char *kCodecMode = "android.media.mediacodec.mode";    /* audio, video */
-static const char *kCodecSecure = "android.media.mediacodec.secure";   /* 0, 1 */
-static const char *kCodecHeight = "android.media.mediacodec.height";   /* 0..n */
-static const char *kCodecWidth = "android.media.mediacodec.width";     /* 0..n */
-static const char *kCodecRotation = "android.media.mediacodec.rotation-degrees";  /* 0/90/180/270 */
-static const char *kCodecCrypto = "android.media.mediacodec.crypto";   /* 0,1 */
+static const char *kCodecModeVideo = "video";            /* values returned for kCodecMode */
+static const char *kCodecModeAudio = "audio";
 static const char *kCodecEncoder = "android.media.mediacodec.encoder"; /* 0,1 */
+static const char *kCodecSecure = "android.media.mediacodec.secure";   /* 0, 1 */
+static const char *kCodecWidth = "android.media.mediacodec.width";     /* 0..n */
+static const char *kCodecHeight = "android.media.mediacodec.height";   /* 0..n */
+static const char *kCodecRotation = "android.media.mediacodec.rotation-degrees";  /* 0/90/180/270 */
 
+// NB: These are not yet exposed as public Java API constants.
+static const char *kCodecCrypto = "android.media.mediacodec.crypto";   /* 0,1 */
 static const char *kCodecBytesIn = "android.media.mediacodec.bytesin";  /* 0..n */
 static const char *kCodecProfile = "android.media.mediacodec.profile";  /* 0..n */
 static const char *kCodecLevel = "android.media.mediacodec.level";  /* 0..n */
@@ -645,7 +651,7 @@ status_t MediaCodec::init(const AString &name, bool nameIsType, bool encoder) {
         } else {
             mAnalyticsItem->setCString(kCodecCodec, name.c_str());
         }
-        mAnalyticsItem->setCString(kCodecMode, mIsVideo ? "video" : "audio");
+        mAnalyticsItem->setCString(kCodecMode, mIsVideo ? kCodecModeVideo : kCodecModeAudio);
         if (nameIsType)
             mAnalyticsItem->setInt32(kCodecEncoder, encoder);
     }

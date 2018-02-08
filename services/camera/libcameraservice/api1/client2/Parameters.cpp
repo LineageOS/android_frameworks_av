@@ -1324,8 +1324,8 @@ status_t Parameters::set(const String8& paramString) {
     {
         const char *fpsRange, *fpsSingle;
 
-        fpsRange = newParams.get(CameraParameters::KEY_PREVIEW_FRAME_RATE);
-        fpsSingle = newParams.get(CameraParameters::KEY_PREVIEW_FPS_RANGE);
+        fpsSingle = newParams.get(CameraParameters::KEY_PREVIEW_FRAME_RATE);
+        fpsRange = newParams.get(CameraParameters::KEY_PREVIEW_FPS_RANGE);
 
         /**
          * Pick either the range or the single key if only one was set.

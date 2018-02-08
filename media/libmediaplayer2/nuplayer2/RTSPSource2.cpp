@@ -43,13 +43,11 @@ NuPlayer2::RTSPSource2::RTSPSource2(
         const sp<MediaHTTPService> &httpService,
         const char *url,
         const KeyedVector<String8, String8> *headers,
-        bool uidValid,
         uid_t uid,
         bool isSDP)
     : Source(notify),
       mHTTPService(httpService),
       mURL(url),
-      mUIDValid(uidValid),
       mUID(uid),
       mFlags(0),
       mIsSDP(isSDP),
@@ -128,7 +126,7 @@ void NuPlayer2::RTSPSource2::prepareAsync() {
         mSDPLoader->load(
                 mURL.c_str(), mExtraHeaders.isEmpty() ? NULL : &mExtraHeaders);
     } else {
-        mHandler = new MyHandler(mURL.c_str(), notify, mUIDValid, mUID);
+        mHandler = new MyHandler(mURL.c_str(), notify, true /* uidValid */, mUID);
         mLooper->registerHandler(mHandler);
 
         mHandler->connect();
@@ -793,7 +791,7 @@ void NuPlayer2::RTSPSource2::onSDPLoaded(const sp<AMessage> &msg) {
         } else {
             sp<AMessage> notify = new AMessage(kWhatNotify, this);
 
-            mHandler = new MyHandler(rtspUri.c_str(), notify, mUIDValid, mUID);
+            mHandler = new MyHandler(rtspUri.c_str(), notify, true /* uidValid */, mUID);
             mLooper->registerHandler(mHandler);
 
             mHandler->loadSDP(desc);

@@ -69,22 +69,26 @@ static const int kMaxNumVideoTemporalLayers = 8;
 // key for media statistics
 static const char *kKeyRecorder = "recorder";
 // attrs for media statistics
-static const char *kRecorderHeight = "android.media.mediarecorder.height";
-static const char *kRecorderWidth = "android.media.mediarecorder.width";
-static const char *kRecorderFrameRate = "android.media.mediarecorder.frame-rate";
-static const char *kRecorderVideoBitrate = "android.media.mediarecorder.video-bitrate";
-static const char *kRecorderAudioSampleRate = "android.media.mediarecorder.audio-samplerate";
-static const char *kRecorderAudioChannels = "android.media.mediarecorder.audio-channels";
+// NB: these are matched with public Java API constants defined
+// in frameworks/base/media/java/android/media/MediaRecorder.java
+// These must be kept synchronized with the constants there.
 static const char *kRecorderAudioBitrate = "android.media.mediarecorder.audio-bitrate";
-static const char *kRecorderVideoIframeInterval = "android.media.mediarecorder.video-iframe-interval";
-static const char *kRecorderMovieTimescale = "android.media.mediarecorder.movie-timescale";
+static const char *kRecorderAudioChannels = "android.media.mediarecorder.audio-channels";
+static const char *kRecorderAudioSampleRate = "android.media.mediarecorder.audio-samplerate";
 static const char *kRecorderAudioTimescale = "android.media.mediarecorder.audio-timescale";
-static const char *kRecorderVideoTimescale = "android.media.mediarecorder.video-timescale";
-static const char *kRecorderVideoProfile = "android.media.mediarecorder.video-encoder-profile";
-static const char *kRecorderVideoLevel = "android.media.mediarecorder.video-encoder-level";
-static const char *kRecorderCaptureFpsEnable = "android.media.mediarecorder.capture-fpsenable";
 static const char *kRecorderCaptureFps = "android.media.mediarecorder.capture-fps";
+static const char *kRecorderCaptureFpsEnable = "android.media.mediarecorder.capture-fpsenable";
+static const char *kRecorderFrameRate = "android.media.mediarecorder.frame-rate";
+static const char *kRecorderHeight = "android.media.mediarecorder.height";
+static const char *kRecorderMovieTimescale = "android.media.mediarecorder.movie-timescale";
 static const char *kRecorderRotation = "android.media.mediarecorder.rotation";
+static const char *kRecorderVideoBitrate = "android.media.mediarecorder.video-bitrate";
+static const char *kRecorderVideoIframeInterval = "android.media.mediarecorder.video-iframe-interval";
+static const char *kRecorderVideoLevel = "android.media.mediarecorder.video-encoder-level";
+static const char *kRecorderVideoProfile = "android.media.mediarecorder.video-encoder-profile";
+static const char *kRecorderVideoTimescale = "android.media.mediarecorder.video-timescale";
+static const char *kRecorderWidth = "android.media.mediarecorder.width";
+
 
 // To collect the encoder usage for the battery app
 static void addBatteryData(uint32_t params) {

@@ -185,11 +185,16 @@ void AudioTrack::MediaMetrics::gather(const AudioTrack *track)
 
     // key for media statistics is defined in the header
     // attrs for media statistics
+    // NB: these are matched with public Java API constants defined
+    // in frameworks/base/media/java/android/media/AudioTrack.java
+    // These must be kept synchronized with the constants there.
     static constexpr char kAudioTrackStreamType[] = "android.media.audiotrack.streamtype";
     static constexpr char kAudioTrackContentType[] = "android.media.audiotrack.type";
     static constexpr char kAudioTrackUsage[] = "android.media.audiotrack.usage";
     static constexpr char kAudioTrackSampleRate[] = "android.media.audiotrack.samplerate";
     static constexpr char kAudioTrackChannelMask[] = "android.media.audiotrack.channelmask";
+
+    // NB: These are not yet exposed as public Java API constants.
     static constexpr char kAudioTrackUnderrunFrames[] = "android.media.audiotrack.underrunframes";
     static constexpr char kAudioTrackStartupGlitch[] = "android.media.audiotrack.glitch.startup";
 

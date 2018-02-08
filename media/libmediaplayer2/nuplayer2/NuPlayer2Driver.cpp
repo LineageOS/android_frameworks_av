@@ -79,6 +79,9 @@ private:
 // key for media statistics
 static const char *kKeyPlayer = "nuplayer";
 // attrs for media statistics
+    // NB: these are matched with public Java API constants defined
+    // in frameworks/base/media/java/android/media/MediaPlayer2.java
+    // These must be kept synchronized with the constants there.
 static const char *kPlayerVMime = "android.media.mediaplayer.video.mime";
 static const char *kPlayerVCodec = "android.media.mediaplayer.video.codec";
 static const char *kPlayerWidth = "android.media.mediaplayer.width";
@@ -91,6 +94,8 @@ static const char *kPlayerDuration = "android.media.mediaplayer.durationMs";
 static const char *kPlayerPlaying = "android.media.mediaplayer.playingMs";
 static const char *kPlayerError = "android.media.mediaplayer.err";
 static const char *kPlayerErrorCode = "android.media.mediaplayer.errcode";
+
+// NB: These are not yet exposed as public Java API constants.
 static const char *kPlayerErrorState = "android.media.mediaplayer.errstate";
 static const char *kPlayerDataSourceType = "android.media.mediaplayer.dataSource";
 //
@@ -99,7 +104,7 @@ static const char *kPlayerRebufferingCount = "android.media.mediaplayer.rebuffer
 static const char *kPlayerRebufferingAtExit = "android.media.mediaplayer.rebufferExit";
 
 
-NuPlayer2Driver::NuPlayer2Driver(pid_t pid)
+NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid)
     : mState(STATE_IDLE),
       mIsAsyncPrepare(false),
       mAsyncResult(UNKNOWN_ERROR),
@@ -114,10 +119,10 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid)
       mLooper(new ALooper),
       mNuPlayer2Looper(new ALooper),
       mMediaClock(new MediaClock),
-      mPlayer(new NuPlayer2(pid, mMediaClock)),
+      mPlayer(new NuPlayer2(pid, uid, mMediaClock)),
       mPlayerFlags(0),
       mAnalyticsItem(NULL),
-      mClientUid(-1),
+      mClientUid(uid),
       mAtEOS(false),
       mLooping(false),
       mAutoLoop(false) {
@@ -129,6 +134,7 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid)
 
     // set up an analytics record
     mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
+    mAnalyticsItem->setUid(mClientUid);
 
     mNuPlayer2Looper->start(
             false, /* runOnCallingThread */
@@ -162,16 +168,6 @@ status_t NuPlayer2Driver::initCheck() {
             PRIORITY_AUDIO);
 
     mLooper->registerHandler(this);
-    return OK;
-}
-
-status_t NuPlayer2Driver::setUID(uid_t uid) {
-    mPlayer->setUID(uid);
-    mClientUid = uid;
-    if (mAnalyticsItem) {
-        mAnalyticsItem->setUid(mClientUid);
-    }
-
     return OK;
 }
 
