@@ -394,7 +394,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     // mRetryCount initialized later when needed
     mSharedBuffer(sharedBuffer),
     mStreamType(streamType),
-    mName(-1),  // see note below
+    mName(TRACK_NAME_FAILURE),  // set to TRACK_NAME_PENDING on constructor success.
     mMainBuffer(thread->sinkBuffer()),
     mAuxBuffer(NULL),
     mAuxEffectId(0), mHasVolumeController(false),
@@ -427,9 +427,8 @@ AudioFlinger::PlaybackThread::Track::Track(
     }
     mServerProxy = mAudioTrackServerProxy;
 
-    mName = thread->getTrackName_l(channelMask, format, sessionId, uid);
-    if (mName < 0) {
-        ALOGE("no more track names available");
+    if (!thread->isTrackAllowed_l(channelMask, format, sessionId, uid)) {
+        ALOGE("no more tracks available");
         return;
     }
     // only allocate a fast track index if we were able to allocate a normal track name
@@ -448,6 +447,7 @@ AudioFlinger::PlaybackThread::Track::Track(
         mFastIndex = i;
         thread->mFastTrackAvailMask &= ~(1 << i);
     }
+    mName = TRACK_NAME_PENDING;
 }
 
 AudioFlinger::PlaybackThread::Track::~Track()
@@ -466,7 +466,7 @@ AudioFlinger::PlaybackThread::Track::~Track()
 status_t AudioFlinger::PlaybackThread::Track::initCheck() const
 {
     status_t status = TrackBase::initCheck();
-    if (status == NO_ERROR && mName < 0) {
+    if (status == NO_ERROR && mName == TRACK_NAME_FAILURE) {
         status = NO_MEMORY;
     }
     return status;
@@ -527,10 +527,12 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
 
     if (isFastTrack()) {
         result.appendFormat("F%c %3d", trackType, mFastIndex);
-    } else if (mName >= AudioMixer::TRACK0) {
-        result.appendFormat("%c %4d", trackType, mName - AudioMixer::TRACK0);
+    } else if (mName == TRACK_NAME_PENDING) {
+        result.appendFormat("%c pend", trackType);
+    } else if (mName == TRACK_NAME_FAILURE) {
+        result.appendFormat("%c fail", trackType);
     } else {
-        result.appendFormat("%c none", trackType);
+        result.appendFormat("%c %4d", trackType, mName);
     }
 
     char nowInUnderrun;

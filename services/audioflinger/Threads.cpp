@@ -1661,6 +1661,7 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         mSuspendedFrames(0),
         mActiveTracks(&this->mLocalLog),
         // mStreamTypes[] initialized in constructor body
+        mTracks(type == MIXER),
         mOutput(output),
         mLastWriteTime(-1), mNumWrites(0), mNumDelayedWrites(0), mInWrite(false),
         mMixerStatus(MIXER_IDLE),
@@ -2157,6 +2158,53 @@ Exit:
     return track;
 }
 
+template<typename T>
+ssize_t AudioFlinger::PlaybackThread::Tracks<T>::add(const sp<T> &track)
+{
+    const ssize_t index = mTracks.add(track);
+    if (index >= 0) {
+        // set name for track when adding.
+        int name;
+        if (mUnusedTrackNames.empty()) {
+            name = mTracks.size() - 1; // new name {0 ... size-1}.
+        } else {
+            // reuse smallest name for deleted track.
+            auto it = mUnusedTrackNames.begin();
+            name = *it;
+            (void)mUnusedTrackNames.erase(it);
+        }
+        track->setName(name);
+    } else {
+        LOG_ALWAYS_FATAL("cannot add track");
+    }
+    return index;
+}
+
+template<typename T>
+ssize_t AudioFlinger::PlaybackThread::Tracks<T>::remove(const sp<T> &track)
+{
+    const int name = track->name();
+    const ssize_t index = mTracks.remove(track);
+    if (index >= 0) {
+        // invalidate name when removing from mTracks.
+        LOG_ALWAYS_FATAL_IF(name < 0, "invalid name %d for track on mTracks", name);
+
+        if (mSaveDeletedTrackNames) {
+            // We can't directly access mAudioMixer since the caller may be outside of threadLoop.
+            // Instead, we add to mDeletedTrackNames which is solely used for mAudioMixer update,
+            // to be handled when MixerThread::prepareTracks_l() next changes mAudioMixer.
+            mDeletedTrackNames.emplace(name);
+        }
+
+        mUnusedTrackNames.emplace(name);
+        track->setName(T::TRACK_NAME_PENDING);
+    } else {
+        LOG_ALWAYS_FATAL_IF(name >= 0,
+                "valid name %d for track not in mTracks (returned %zd)", name, index);
+    }
+    return index;
+}
+
 uint32_t AudioFlinger::PlaybackThread::correctLatency_l(uint32_t latency) const
 {
     return latency;
@@ -2313,9 +2361,6 @@ void AudioFlinger::PlaybackThread::removeTrack_l(const sp<Track>& track)
     mLocalLog.log("removeTrack_l (%p) %s", track.get(), result.string());
 
     mTracks.remove(track);
-    deleteTrackName_l(track->name());
-    // redundant as track is about to be destroyed, for dumpsys only
-    track->mName = -1;
     if (track->isFastTrack()) {
         int index = track->mFastIndex;
         ALOG_ASSERT(0 < index && index < (int)FastMixerState::sMaxFastTracks);
@@ -4111,6 +4156,14 @@ void AudioFlinger::MixerThread::threadLoop_sleepTime()
 AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTracks_l(
         Vector< sp<Track> > *tracksToRemove)
 {
+    // clean up deleted track names in AudioMixer before allocating new tracks
+    (void)mTracks.processDeletedTrackNames([this](int name) {
+        // for each name, destroy it in the AudioMixer
+        if (mAudioMixer->exists(name)) {
+            mAudioMixer->destroy(name);
+        }
+    });
+    mTracks.clearDeletedTrackNames();
 
     mixer_state mixerStatus = MIXER_IDLE;
     // find out which tracks need to be processed
@@ -4332,6 +4385,24 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
         // The first time a track is added we wait
         // for all its buffers to be filled before processing it
         int name = track->name();
+
+        // if an active track doesn't exist in the AudioMixer, create it.
+        if (!mAudioMixer->exists(name)) {
+            status_t status = mAudioMixer->create(
+                    name,
+                    track->mChannelMask,
+                    track->mFormat,
+                    track->mSessionId);
+            if (status != OK) {
+                ALOGW("%s: cannot create track name"
+                        " %d, mask %#x, format %#x, sessionId %d in AudioMixer",
+                        __func__, name, track->mChannelMask, track->mFormat, track->mSessionId);
+                tracksToRemove->add(track);
+                track->invalidate(); // consider it dead.
+                continue;
+            }
+        }
+
         // make sure that we have enough frames to mix one full buffer.
         // enforce this condition only once to enable draining the buffer in case the client
         // app does not call stop() and relies on underrun to stop:
@@ -4357,20 +4428,9 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
         size_t framesReady = track->framesReady();
         if (ATRACE_ENABLED()) {
             // I wish we had formatted trace names
-            char traceName[16];
-            strcpy(traceName, "nRdy");
-            int name = track->name();
-            if (AudioMixer::TRACK0 <= name &&
-                    name < (int) (AudioMixer::TRACK0 + AudioMixer::MAX_NUM_TRACKS)) {
-                name -= AudioMixer::TRACK0;
-                traceName[4] = (name / 10) + '0';
-                traceName[5] = (name % 10) + '0';
-            } else {
-                traceName[4] = '?';
-                traceName[5] = '?';
-            }
-            traceName[6] = '\0';
-            ATRACE_INT(traceName, framesReady);
+            std::string traceName("nRdy");
+            traceName += std::to_string(track->name());
+            ATRACE_INT(traceName.c_str(), framesReady);
         }
         if ((framesReady >= minFrames) && track->isReady() &&
                 !track->isPaused() && !track->isTerminated())
@@ -4736,7 +4796,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
 }
 
 // trackCountForUid_l() must be called with ThreadBase::mLock held
-uint32_t AudioFlinger::PlaybackThread::trackCountForUid_l(uid_t uid)
+uint32_t AudioFlinger::PlaybackThread::trackCountForUid_l(uid_t uid) const
 {
     uint32_t trackCount = 0;
     for (size_t i = 0; i < mTracks.size() ; i++) {
@@ -4747,21 +4807,24 @@ uint32_t AudioFlinger::PlaybackThread::trackCountForUid_l(uid_t uid)
     return trackCount;
 }
 
-// getTrackName_l() must be called with ThreadBase::mLock held
-int AudioFlinger::MixerThread::getTrackName_l(audio_channel_mask_t channelMask,
-        audio_format_t format, audio_session_t sessionId, uid_t uid)
+// isTrackAllowed_l() must be called with ThreadBase::mLock held
+bool AudioFlinger::MixerThread::isTrackAllowed_l(
+        audio_channel_mask_t channelMask, audio_format_t format,
+        audio_session_t sessionId, uid_t uid) const
 {
-    if (trackCountForUid_l(uid) > (PlaybackThread::kMaxTracksPerUid - 1)) {
-        return -1;
+    if (!PlaybackThread::isTrackAllowed_l(channelMask, format, sessionId, uid)) {
+        return false;
     }
-    return mAudioMixer->getTrackName(channelMask, format, sessionId);
-}
-
-// deleteTrackName_l() must be called with ThreadBase::mLock held
-void AudioFlinger::MixerThread::deleteTrackName_l(int name)
-{
-    ALOGV("remove track (%d) and delete from mixer", name);
-    mAudioMixer->deleteTrackName(name);
+    // Check validity as we don't call AudioMixer::create() here.
+    if (!AudioMixer::isValidFormat(format)) {
+        ALOGW("%s: invalid format: %#x", __func__, format);
+        return false;
+    }
+    if (!AudioMixer::isValidChannelMask(channelMask)) {
+        ALOGW("%s: invalid channelMask: %#x", __func__, channelMask);
+        return false;
+    }
+    return true;
 }
 
 // checkForNewParameter_l() must be called with ThreadBase::mLock held
@@ -4854,13 +4917,18 @@ bool AudioFlinger::MixerThread::checkForNewParameter_l(const String8& keyValuePa
             readOutputParameters_l();
             delete mAudioMixer;
             mAudioMixer = new AudioMixer(mNormalFrameCount, mSampleRate);
-            for (size_t i = 0; i < mTracks.size() ; i++) {
-                int name = getTrackName_l(mTracks[i]->mChannelMask,
-                        mTracks[i]->mFormat, mTracks[i]->mSessionId, mTracks[i]->uid());
-                if (name < 0) {
-                    break;
-                }
-                mTracks[i]->mName = name;
+            for (const auto &track : mTracks) {
+                const int name = track->name();
+                status_t status = mAudioMixer->create(
+                        name,
+                        track->mChannelMask,
+                        track->mFormat,
+                        track->mSessionId);
+                ALOGW_IF(status != NO_ERROR,
+                        "%s: cannot create track name"
+                        " %d, mask %#x, format %#x, sessionId %d in AudioMixer",
+                        __func__,
+                        name, track->mChannelMask, track->mFormat, track->mSessionId);
             }
             sendIoConfigEvent_l(AUDIO_OUTPUT_CONFIG_CHANGED);
         }
@@ -5307,21 +5375,6 @@ bool AudioFlinger::DirectOutputThread::shouldStandby_l()
     }
 
     return !mStandby && !(trackPaused || (mHwPaused && !trackStopped));
-}
-
-// getTrackName_l() must be called with ThreadBase::mLock held
-int AudioFlinger::DirectOutputThread::getTrackName_l(audio_channel_mask_t channelMask __unused,
-        audio_format_t format __unused, audio_session_t sessionId __unused, uid_t uid)
-{
-    if (trackCountForUid_l(uid) > (PlaybackThread::kMaxTracksPerUid - 1)) {
-        return -1;
-    }
-    return 0;
-}
-
-// deleteTrackName_l() must be called with ThreadBase::mLock held
-void AudioFlinger::DirectOutputThread::deleteTrackName_l(int name __unused)
-{
 }
 
 // checkForNewParameter_l() must be called with ThreadBase::mLock held
@@ -5939,6 +5992,31 @@ void AudioFlinger::DuplicatingThread::threadLoop_standby()
     for (size_t i = 0; i < outputTracks.size(); i++) {
         outputTracks[i]->stop();
     }
+}
+
+void AudioFlinger::DuplicatingThread::dumpInternals(int fd, const Vector<String16>& args __unused)
+{
+    MixerThread::dumpInternals(fd, args);
+
+    std::stringstream ss;
+    const size_t numTracks = mOutputTracks.size();
+    ss << "  " << numTracks << " OutputTracks";
+    if (numTracks > 0) {
+        ss << ":";
+        for (const auto &track : mOutputTracks) {
+            const sp<ThreadBase> thread = track->thread().promote();
+            ss << " (" << track->name() << " : ";
+            if (thread.get() != nullptr) {
+                ss << thread.get() << ", " << thread->id();
+            } else {
+                ss << "null";
+            }
+            ss << ")";
+        }
+    }
+    ss << "\n";
+    std::string result = ss.str();
+    write(fd, result.c_str(), result.size());
 }
 
 void AudioFlinger::DuplicatingThread::saveOutputTracks()

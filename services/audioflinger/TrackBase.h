@@ -54,6 +54,11 @@ public:
         TYPE_PATCH,
     };
 
+    enum {
+        TRACK_NAME_PENDING = -1,
+        TRACK_NAME_FAILURE = -2,
+    };
+
                         TrackBase(ThreadBase *thread,
                                 const sp<Client>& client,
                                 uint32_t sampleRate,
