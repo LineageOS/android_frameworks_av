@@ -24,6 +24,7 @@ import android.annotation.Nullable;
 import android.content.Context;
 import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaSession2.Command;
+import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.PlaylistParams;
 import android.os.Bundle;
@@ -36,6 +37,7 @@ import android.support.test.runner.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -104,40 +106,39 @@ public class MediaBrowser2Test extends MediaController2Test {
         @CallSuper
         @Override
         public void onConnected(CommandGroup commands) {
-            super.onConnected(commands);
             connectLatch.countDown();
         }
 
         @CallSuper
         @Override
         public void onDisconnected() {
-            super.onDisconnected();
             disconnectLatch.countDown();
         }
 
         @Override
         public void onPlaybackStateChanged(PlaybackState2 state) {
-            super.onPlaybackStateChanged(state);
             mCallbackProxy.onPlaybackStateChanged(state);
         }
 
         @Override
         public void onPlaylistParamsChanged(PlaylistParams params) {
-            super.onPlaylistParamsChanged(params);
             mCallbackProxy.onPlaylistParamsChanged(params);
         }
 
         @Override
         public void onPlaybackInfoChanged(MediaController2.PlaybackInfo info) {
-            if (mCallbackProxy != null) {
-                mCallbackProxy.onPlaybackInfoChanged(info);
-            }
+            mCallbackProxy.onPlaybackInfoChanged(info);
         }
 
         @Override
         public void onCustomCommand(Command command, Bundle args, ResultReceiver receiver) {
-            super.onCustomCommand(command, args, receiver);
             mCallbackProxy.onCustomCommand(command, args, receiver);
+        }
+
+
+        @Override
+        public void onCustomLayoutChanged(List<CommandButton> layout) {
+            mCallbackProxy.onCustomLayoutChanged(layout);
         }
 
         @Override

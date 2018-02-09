@@ -33,6 +33,8 @@ import android.media.MediaController2.PlaybackInfo;
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.Command;
+import android.media.MediaSession2.CommandButton;
+import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
@@ -350,6 +352,45 @@ public class MediaSession2Test extends MediaSession2TestBase {
         assertNotNull(controller);
         waitForConnect(controller, false);
         waitForDisconnect(controller, true);
+    }
+
+    @Test
+    public void testSetCustomLayout() throws InterruptedException {
+        final List<CommandButton> buttons = new ArrayList<>();
+        buttons.add(new CommandButton.Builder(mContext)
+                .setCommand(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_PLAY))
+                .setDisplayName("button").build());
+        final CountDownLatch latch = new CountDownLatch(1);
+        final SessionCallback sessionCallback = new SessionCallback(mContext) {
+            @Override
+            public CommandGroup onConnect(ControllerInfo controller) {
+                if (mContext.getPackageName().equals(controller.getPackageName())) {
+                    mSession.setCustomLayout(controller, buttons);
+                }
+                return super.onConnect(controller);
+            }
+        };
+
+        try (final MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+                .setId("testSetCustomLayout")
+                .setSessionCallback(sHandlerExecutor, sessionCallback)
+                .build()) {
+            final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
+                @Override
+                public void onCustomLayoutChanged(List<CommandButton> layout) {
+                    assertEquals(layout.size(), buttons.size());
+                    for (int i = 0; i < layout.size(); i++) {
+                        assertEquals(layout.get(i).getCommand(), buttons.get(i).getCommand());
+                        assertEquals(layout.get(i).getDisplayName(),
+                                buttons.get(i).getDisplayName());
+                    }
+                    latch.countDown();
+                }
+            };
+            final MediaController2 controller =
+                    createController(session.getToken(), true, callback);
+            assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+        }
     }
 
     @Test
