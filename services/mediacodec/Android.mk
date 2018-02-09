@@ -73,7 +73,11 @@ LOCAL_MODULE_PATH := $(TARGET_OUT)/etc/seccomp_policy
 # mediacodec runs in 32-bit combatibility mode. For 64 bit architectures,
 # use the 32 bit policy
 ifdef TARGET_2ND_ARCH
+  ifneq ($(TARGET_TRANSLATE_2ND_ARCH),true)
     LOCAL_SRC_FILES := seccomp_policy/mediacodec-$(TARGET_2ND_ARCH).policy
+  else
+    LOCAL_SRC_FILES := seccomp_policy/mediacodec-$(TARGET_ARCH).policy
+  endif
 else
     LOCAL_SRC_FILES := seccomp_policy/mediacodec-$(TARGET_ARCH).policy
 endif
