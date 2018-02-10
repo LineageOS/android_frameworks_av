@@ -659,7 +659,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
     sp<Client> client;
     status_t lStatus;
     audio_stream_type_t streamType;
-    audio_port_handle_t portId;
+    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
 
     bool updatePid = (input.clientInfo.clientPid == -1);
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
@@ -1597,7 +1597,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
     sp<Client> client;
     status_t lStatus;
     audio_session_t sessionId = input.sessionId;
-    audio_port_handle_t portId;
+    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
 
     output.cblk.clear();
     output.buffers.clear();
@@ -1660,6 +1660,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
         recordTrack.clear();
         AudioSystem::releaseInput(portId);
         output.inputId = AUDIO_IO_HANDLE_NONE;
+        portId = AUDIO_PORT_HANDLE_NONE;
     }
     lStatus = AudioSystem::getInputForAttr(&input.attr, &output.inputId,
                                       sessionId,
