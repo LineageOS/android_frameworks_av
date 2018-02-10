@@ -53,6 +53,8 @@ struct DrmPlugin : public IDrmPlugin {
     virtual ~DrmPlugin() {}
 
     Return<void> openSession(openSession_cb _hidl_cb) override;
+    Return<void> openSession_1_1(SecurityLevel securityLevel,
+            openSession_cb _hidl_cb) override;
 
     Return<Status> closeSession(const hidl_vec<uint8_t>& sessionId) override;
 
@@ -161,9 +163,6 @@ struct DrmPlugin : public IDrmPlugin {
 
     Return<void> getSecurityLevel(const hidl_vec<uint8_t>& sessionId,
             getSecurityLevel_cb _hidl_cb) override;
-
-    Return<Status> setSecurityLevel(const hidl_vec<uint8_t>& sessionId,
-            SecurityLevel level) override;
 
     Return<void> getMetrics(getMetrics_cb _hidl_cb) override;
 
@@ -332,6 +331,9 @@ struct DrmPlugin : public IDrmPlugin {
 private:
     void initProperties();
     void setPlayPolicy();
+
+    Return<Status> setSecurityLevel(const hidl_vec<uint8_t>& sessionId,
+            SecurityLevel level);
 
     std::vector<KeyValue> mPlayPolicy;
     std::map<std::string, std::string> mStringProperties;
