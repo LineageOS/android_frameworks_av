@@ -189,7 +189,8 @@ public:
             int newState,
             const String8& cameraId,
             int facing,
-            const String16& clientName);
+            const String16& clientName,
+            int apiLevel);
 
     /////////////////////////////////////////////////////////////////////
     // CameraDeviceFactory functionality
