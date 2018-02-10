@@ -64,7 +64,7 @@ class MediaPlayer2Interface : public AHandler
 public:
     // callback mechanism for passing messages to MediaPlayer2 object
     typedef void (*NotifyCallback)(const wp<MediaPlayer2Engine> &listener,
-            int msg, int ext1, int ext2, const Parcel *obj);
+            int64_t srcId, int msg, int ext1, int ext2, const Parcel *obj);
 
     // AudioSink: abstraction layer for audio output
     class AudioSink : public RefBase {
@@ -240,7 +240,7 @@ public:
         mClient = client; mNotify = notifyFunc;
     }
 
-    void        sendEvent(int msg, int ext1=0, int ext2=0,
+    void        sendEvent(int64_t srcId, int msg, int ext1=0, int ext2=0,
                           const Parcel *obj=NULL) {
         NotifyCallback notifyCB;
         wp<MediaPlayer2Engine> client;
@@ -250,7 +250,7 @@ public:
             client = mClient;
         }
 
-        if (notifyCB) notifyCB(client, msg, ext1, ext2, obj);
+        if (notifyCB) notifyCB(client, srcId, msg, ext1, ext2, obj);
     }
 
     virtual status_t dump(int /* fd */, const Vector<String16>& /* args */) const {

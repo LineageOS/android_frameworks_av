@@ -53,6 +53,7 @@ namespace android {
 MediaPlayer2::MediaPlayer2()
 {
     ALOGV("constructor");
+    mSrcId = 0;
     mListener = NULL;
     mCookie = NULL;
     mStreamType = AUDIO_STREAM_MUSIC;
@@ -118,8 +119,17 @@ status_t MediaPlayer2::setListener(const sp<MediaPlayer2Listener>& listener)
     return NO_ERROR;
 }
 
+status_t MediaPlayer2::getSrcId(int64_t *srcId) {
+    if (srcId == NULL) {
+        return BAD_VALUE;
+    }
 
-status_t MediaPlayer2::attachNewPlayer(const sp<MediaPlayer2Engine>& player)
+    Mutex::Autolock _l(mLock);
+    *srcId = mSrcId;
+    return OK;
+}
+
+status_t MediaPlayer2::attachNewPlayer(const sp<MediaPlayer2Engine>& player, long srcId)
 {
     status_t err = UNKNOWN_ERROR;
     sp<MediaPlayer2Engine> p;
@@ -135,6 +145,7 @@ status_t MediaPlayer2::attachNewPlayer(const sp<MediaPlayer2Engine>& player)
         clear_l();
         p = mPlayer;
         mPlayer = player;
+        mSrcId = srcId;
         if (player != 0) {
             mCurrentState = MEDIA_PLAYER2_INITIALIZED;
             err = NO_ERROR;
@@ -161,7 +172,7 @@ status_t MediaPlayer2::setDataSource(const sp<DataSourceDesc> &dsd)
     if (NO_ERROR != player->setDataSource(dsd)) {
         player.clear();
     }
-    err = attachNewPlayer(player);
+    err = attachNewPlayer(player, dsd->mId);
     return err;
 }
 
@@ -763,9 +774,10 @@ status_t MediaPlayer2::getParameter(int key, Parcel *reply)
     return INVALID_OPERATION;
 }
 
-void MediaPlayer2::notify(int msg, int ext1, int ext2, const Parcel *obj)
+void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Parcel *obj)
 {
-    ALOGV("message received msg=%d, ext1=%d, ext2=%d", msg, ext1, ext2);
+    ALOGV("message received srcId=%lld, msg=%d, ext1=%d, ext2=%d",
+          (long long)srcId, msg, ext1, ext2);
     bool send = true;
     bool locked = false;
 
@@ -784,7 +796,8 @@ void MediaPlayer2::notify(int msg, int ext1, int ext2, const Parcel *obj)
 
     // Allows calls from JNI in idle state to notify errors
     if (!(msg == MEDIA2_ERROR && mCurrentState == MEDIA_PLAYER2_IDLE) && mPlayer == 0) {
-        ALOGV("notify(%d, %d, %d) callback on disconnected mediaplayer", msg, ext1, ext2);
+        ALOGV("notify(%lld, %d, %d, %d) callback on disconnected mediaplayer",
+              (long long)srcId, msg, ext1, ext2);
         if (locked) mLock.unlock();   // release the lock when done.
         return;
     }
@@ -803,7 +816,8 @@ void MediaPlayer2::notify(int msg, int ext1, int ext2, const Parcel *obj)
         }
         break;
     case MEDIA2_DRM_INFO:
-        ALOGV("MediaPlayer2::notify() MEDIA2_DRM_INFO(%d, %d, %d, %p)", msg, ext1, ext2, obj);
+        ALOGV("MediaPlayer2::notify() MEDIA2_DRM_INFO(%lld, %d, %d, %d, %p)",
+              (long long)srcId, msg, ext1, ext2, obj);
         break;
     case MEDIA2_PLAYBACK_COMPLETE:
         ALOGV("playback complete");
@@ -882,7 +896,7 @@ void MediaPlayer2::notify(int msg, int ext1, int ext2, const Parcel *obj)
     if ((listener != 0) && send) {
         Mutex::Autolock _l(mNotifyLock);
         ALOGV("callback application");
-        listener->notify(msg, ext1, ext2, obj);
+        listener->notify(srcId, msg, ext1, ext2, obj);
         ALOGV("back from callback");
     }
 }

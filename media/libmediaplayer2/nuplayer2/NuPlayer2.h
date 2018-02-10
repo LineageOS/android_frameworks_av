@@ -284,10 +284,11 @@ private:
             bool audio, sp<DecoderBase> *decoder, bool checkAudioModeChange = true);
 
     void updateVideoSize(
+            int64_t srcId,
             const sp<AMessage> &inputFormat,
             const sp<AMessage> &outputFormat = NULL);
 
-    void notifyListener(int msg, int ext1, int ext2, const Parcel *in = NULL);
+    void notifyListener(int64_t srcId, int msg, int ext1, int ext2, const Parcel *in = NULL);
 
     void handleFlushComplete(bool audio, bool isDecoder);
     void finishFlushIfPossible();
@@ -303,7 +304,7 @@ private:
     void flushDecoder(bool audio, bool needShutdown);
 
     void finishResume();
-    void notifyDriverSeekComplete();
+    void notifyDriverSeekComplete(int64_t srcId);
 
     void postScanSources();
 

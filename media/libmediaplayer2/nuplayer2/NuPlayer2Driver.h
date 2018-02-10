@@ -67,18 +67,19 @@ struct NuPlayer2Driver : public MediaPlayer2Interface {
 
     virtual void onMessageReceived(const sp<AMessage> &msg) override;
 
-    void notifySetDataSourceCompleted(status_t err);
-    void notifyPrepareCompleted(status_t err);
-    void notifyResetComplete();
-    void notifySetSurfaceComplete();
-    void notifyDuration(int64_t durationUs);
-    void notifyMorePlayingTimeUs(int64_t timeUs);
-    void notifyMoreRebufferingTimeUs(int64_t timeUs);
-    void notifyRebufferingWhenExit(bool status);
-    void notifySeekComplete();
-    void notifySeekComplete_l();
-    void notifyListener(int msg, int ext1 = 0, int ext2 = 0, const Parcel *in = NULL);
-    void notifyFlagsChanged(uint32_t flags);
+    void notifySetDataSourceCompleted(int64_t srcId, status_t err);
+    void notifyPrepareCompleted(int64_t srcId, status_t err);
+    void notifyResetComplete(int64_t srcId);
+    void notifySetSurfaceComplete(int64_t srcId);
+    void notifyDuration(int64_t srcId, int64_t durationUs);
+    void notifyMorePlayingTimeUs(int64_t srcId, int64_t timeUs);
+    void notifyMoreRebufferingTimeUs(int64_t srcId, int64_t timeUs);
+    void notifyRebufferingWhenExit(int64_t srcId, bool status);
+    void notifySeekComplete(int64_t srcId);
+    void notifySeekComplete_l(int64_t srcId);
+    void notifyListener(int64_t srcId, int msg, int ext1 = 0, int ext2 = 0,
+                        const Parcel *in = NULL);
+    void notifyFlagsChanged(int64_t srcId, uint32_t flags);
 
     // Modular DRM
     virtual status_t prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId);
@@ -118,6 +119,7 @@ private:
 
     // The following are protected through "mLock"
     // >>>
+    int64_t mSrcId;
     bool mSetSurfaceInProgress;
     int64_t mDurationUs;
     int64_t mPositionUs;
@@ -147,7 +149,8 @@ private:
 
     status_t prepare_l();
     status_t start_l();
-    void notifyListener_l(int msg, int ext1 = 0, int ext2 = 0, const Parcel *in = NULL);
+    void notifyListener_l(int64_t srcId, int msg, int ext1 = 0, int ext2 = 0,
+                          const Parcel *in = NULL);
 
     DISALLOW_EVIL_CONSTRUCTORS(NuPlayer2Driver);
 };
