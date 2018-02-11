@@ -20,16 +20,14 @@
 
 #include <android/hardware/drm/1.0/ICryptoFactory.h>
 #include <android/hardware/drm/1.0/ICryptoPlugin.h>
-#include <android/hardware/drm/1.1/ICryptoFactory.h>
 
 #include <media/ICrypto.h>
 #include <utils/KeyedVector.h>
 #include <utils/threads.h>
 
-namespace drm = ::android::hardware::drm;
-using drm::V1_0::ICryptoFactory;
-using drm::V1_0::ICryptoPlugin;
-using drm::V1_0::SharedBuffer;
+using ::android::hardware::drm::V1_0::ICryptoFactory;
+using ::android::hardware::drm::V1_0::ICryptoPlugin;
+using ::android::hardware::drm::V1_0::SharedBuffer;
 
 class IMemoryHeap;
 

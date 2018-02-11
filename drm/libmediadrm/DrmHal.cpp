@@ -21,6 +21,8 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 
+#include <android/hardware/drm/1.0/IDrmFactory.h>
+#include <android/hardware/drm/1.0/IDrmPlugin.h>
 #include <android/hardware/drm/1.0/types.h>
 #include <android/hidl/manager/1.0/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
@@ -269,24 +271,15 @@ Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
     auto manager = hardware::defaultServiceManager();
 
     if (manager != NULL) {
-        manager->listByInterface(drm::V1_0::IDrmFactory::descriptor,
+        manager->listByInterface(IDrmFactory::descriptor,
                 [&factories](const hidl_vec<hidl_string> &registered) {
                     for (const auto &instance : registered) {
-                        auto factory = drm::V1_0::IDrmFactory::getService(instance);
+                        auto factory = IDrmFactory::getService(instance);
                         if (factory != NULL) {
-                            ALOGD("found drm@1.0 IDrmFactory %s", instance.c_str());
                             factories.push_back(factory);
-                        }
-                    }
-                }
-            );
-        manager->listByInterface(drm::V1_1::IDrmFactory::descriptor,
-                [&factories](const hidl_vec<hidl_string> &registered) {
-                    for (const auto &instance : registered) {
-                        auto factory = drm::V1_1::IDrmFactory::getService(instance);
-                        if (factory != NULL) {
-                            ALOGD("found drm@1.1 IDrmFactory %s", instance.c_str());
-                            factories.push_back(factory);
+                            ALOGI("makeDrmFactories: factory instance %s is %s",
+                                    instance.c_str(),
+                                    factory->isRemote() ? "Remote" : "Not Remote");
                         }
                     }
                 }
@@ -297,7 +290,7 @@ Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
         // must be in passthrough mode, load the default passthrough service
         auto passthrough = IDrmFactory::getService();
         if (passthrough != NULL) {
-            ALOGI("makeDrmFactories: using default passthrough drm instance");
+            ALOGI("makeDrmFactories: using default drm instance");
             factories.push_back(passthrough);
         } else {
             ALOGE("Failed to find any drm factories");
