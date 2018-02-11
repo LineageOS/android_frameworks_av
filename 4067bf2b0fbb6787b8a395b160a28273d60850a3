@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3ae6a849_06b5fdd9",
+        "filename": "media/libstagefright/include/SimpleSoftOMXComponent.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 79,
+      "author": {
+        "id": 17656
+      },
+      "writtenOn": "2018-02-11T17:48:58Z",
+      "side": 1,
+      "message": "trailing space?",
+      "revId": "4067bf2b0fbb6787b8a395b160a28273d60850a3",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "bbda9958_10058dd9",
+        "filename": "media/libstagefright/omx/SimpleSoftOMXComponent.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 674,
+      "author": {
+        "id": 17656
+      },
+      "writtenOn": "2018-02-11T17:48:58Z",
+      "side": 1,
+      "message": "trailing space?",
+      "revId": "4067bf2b0fbb6787b8a395b160a28273d60850a3",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
