@@ -40,8 +40,7 @@ struct IDrm : public IInterface {
 
     virtual status_t destroyPlugin() = 0;
 
-    virtual status_t openSession(DrmPlugin::SecurityLevel securityLevel,
-            Vector<uint8_t> &sessionId) = 0;
+    virtual status_t openSession(Vector<uint8_t> &sessionId) = 0;
 
     virtual status_t closeSession(Vector<uint8_t> const &sessionId) = 0;
 
@@ -89,6 +88,8 @@ struct IDrm : public IInterface {
             uint32_t *maxSessions) const = 0;
     virtual status_t getSecurityLevel(Vector<uint8_t> const &sessionId,
             DrmPlugin::SecurityLevel *level) const = 0;
+    virtual status_t setSecurityLevel(Vector<uint8_t> const &sessionId,
+            const DrmPlugin::SecurityLevel& level) = 0;
 
     virtual status_t getPropertyString(String8 const &name, String8 &value) const = 0;
     virtual status_t getPropertyByteArray(String8 const &name,
