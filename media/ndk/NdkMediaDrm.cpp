@@ -240,7 +240,7 @@ media_status_t AMediaDrm_openSession(AMediaDrm *mObj, AMediaDrmSessionId *sessio
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
     Vector<uint8_t> session;
-    status_t status = mObj->mDrm->openSession(DrmPlugin::kSecurityLevelMax, session);
+    status_t status = mObj->mDrm->openSession(session);
     if (status == OK) {
         mObj->mIds.push_front(session);
         List<idvec_t>::iterator iter = mObj->mIds.begin();
