@@ -118,15 +118,24 @@ Vector<sp<ICryptoFactory>> CryptoHal::makeCryptoFactories() {
 
     auto manager = ::IServiceManager::getService();
     if (manager != NULL) {
-        manager->listByInterface(ICryptoFactory::descriptor,
+        manager->listByInterface(drm::V1_0::ICryptoFactory::descriptor,
                 [&factories](const hidl_vec<hidl_string> &registered) {
                     for (const auto &instance : registered) {
-                        auto factory = ICryptoFactory::getService(instance);
+                        auto factory = drm::V1_0::ICryptoFactory::getService(instance);
                         if (factory != NULL) {
+                            ALOGD("found drm@1.0 ICryptoFactory %s", instance.c_str());
                             factories.push_back(factory);
-                            ALOGI("makeCryptoFactories: factory instance %s is %s",
-                                    instance.c_str(),
-                                    factory->isRemote() ? "Remote" : "Not Remote");
+                        }
+                    }
+                }
+            );
+        manager->listByInterface(drm::V1_1::ICryptoFactory::descriptor,
+                [&factories](const hidl_vec<hidl_string> &registered) {
+                    for (const auto &instance : registered) {
+                        auto factory = drm::V1_1::ICryptoFactory::getService(instance);
+                        if (factory != NULL) {
+                            ALOGD("found drm@1.1 ICryptoFactory %s", instance.c_str());
+                            factories.push_back(factory);
                         }
                     }
                 }
@@ -137,7 +146,7 @@ Vector<sp<ICryptoFactory>> CryptoHal::makeCryptoFactories() {
         // must be in passthrough mode, load the default passthrough service
         auto passthrough = ICryptoFactory::getService();
         if (passthrough != NULL) {
-            ALOGI("makeCryptoFactories: using default crypto instance");
+            ALOGI("makeCryptoFactories: using default passthrough crypto instance");
             factories.push_back(passthrough);
         } else {
             ALOGE("Failed to find any crypto factories");
