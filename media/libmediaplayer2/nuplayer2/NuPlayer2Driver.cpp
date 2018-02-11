@@ -25,6 +25,7 @@
 #include "NuPlayer2.h"
 #include "NuPlayer2Source.h"
 
+#include <media/DataSourceDesc.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AUtils.h>
@@ -108,6 +109,7 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid)
     : mState(STATE_IDLE),
       mIsAsyncPrepare(false),
       mAsyncResult(UNKNOWN_ERROR),
+      mSrcId(0),
       mSetSurfaceInProgress(false),
       mDurationUs(-1),
       mPositionUs(-1),
@@ -179,6 +181,7 @@ status_t NuPlayer2Driver::setDataSource(const sp<DataSourceDesc> &dsd) {
         return INVALID_OPERATION;
     }
 
+    mSrcId = dsd->mId;
     mState = STATE_SET_DATASOURCE_PENDING;
 
     mPlayer->setDataSourceAsync(dsd);
@@ -361,7 +364,7 @@ status_t NuPlayer2Driver::stop() {
 
         case STATE_PAUSED:
             mState = STATE_STOPPED;
-            notifyListener_l(MEDIA2_STOPPED);
+            //notifyListener_l(MEDIA2_STOPPED);
             break;
 
         case STATE_PREPARED:
@@ -396,7 +399,6 @@ status_t NuPlayer2Driver::pause() {
 
         case STATE_RUNNING:
             mState = STATE_PAUSED;
-            notifyListener_l(MEDIA2_PAUSED);
             mPlayer->pause();
             break;
 
@@ -420,7 +422,6 @@ status_t NuPlayer2Driver::setPlaybackSettings(const AudioPlaybackRate &rate) {
         Mutex::Autolock autoLock(mLock);
         if (rate.mSpeed == 0.f && mState == STATE_RUNNING) {
             mState = STATE_PAUSED;
-            notifyListener_l(MEDIA2_PAUSED);
         } else if (rate.mSpeed != 0.f
                 && (mState == STATE_PAUSED
                     || mState == STATE_STOPPED_AND_PREPARED
@@ -457,8 +458,6 @@ status_t NuPlayer2Driver::seekTo(int msec, MediaPlayer2SeekMode mode) {
         {
             mAtEOS = false;
             mSeekInProgress = true;
-            // seeks can take a while, so we essentially paused
-            notifyListener_l(MEDIA2_PAUSED);
             mPlayer->seekToAsync(seekTimeUs, mode, true /* needNotify */);
             break;
         }
@@ -629,7 +628,7 @@ status_t NuPlayer2Driver::reset() {
         {
             CHECK(mIsAsyncPrepare);
 
-            notifyListener_l(MEDIA2_PREPARED);
+            notifyListener_l(mSrcId, MEDIA2_PREPARED);
             break;
         }
 
@@ -638,7 +637,7 @@ status_t NuPlayer2Driver::reset() {
     }
 
     if (mState != STATE_STOPPED) {
-        notifyListener_l(MEDIA2_STOPPED);
+        // notifyListener_l(MEDIA2_STOPPED);
     }
 
     mState = STATE_RESET_IN_PROGRESS;
@@ -772,7 +771,7 @@ status_t NuPlayer2Driver::getMetadata(
     return OK;
 }
 
-void NuPlayer2Driver::notifyResetComplete() {
+void NuPlayer2Driver::notifyResetComplete(int64_t /* srcId */) {
     ALOGD("notifyResetComplete(%p)", this);
     Mutex::Autolock autoLock(mLock);
 
@@ -781,7 +780,7 @@ void NuPlayer2Driver::notifyResetComplete() {
     mCondition.broadcast();
 }
 
-void NuPlayer2Driver::notifySetSurfaceComplete() {
+void NuPlayer2Driver::notifySetSurfaceComplete(int64_t /* srcId */) {
     ALOGV("notifySetSurfaceComplete(%p)", this);
     Mutex::Autolock autoLock(mLock);
 
@@ -791,35 +790,35 @@ void NuPlayer2Driver::notifySetSurfaceComplete() {
     mCondition.broadcast();
 }
 
-void NuPlayer2Driver::notifyDuration(int64_t durationUs) {
+void NuPlayer2Driver::notifyDuration(int64_t /* srcId */, int64_t durationUs) {
     Mutex::Autolock autoLock(mLock);
     mDurationUs = durationUs;
 }
 
-void NuPlayer2Driver::notifyMorePlayingTimeUs(int64_t playingUs) {
+void NuPlayer2Driver::notifyMorePlayingTimeUs(int64_t /* srcId */, int64_t playingUs) {
     Mutex::Autolock autoLock(mLock);
     mPlayingTimeUs += playingUs;
 }
 
-void NuPlayer2Driver::notifyMoreRebufferingTimeUs(int64_t rebufferingUs) {
+void NuPlayer2Driver::notifyMoreRebufferingTimeUs(int64_t /* srcId */, int64_t rebufferingUs) {
     Mutex::Autolock autoLock(mLock);
     mRebufferingTimeUs += rebufferingUs;
     mRebufferingEvents++;
 }
 
-void NuPlayer2Driver::notifyRebufferingWhenExit(bool status) {
+void NuPlayer2Driver::notifyRebufferingWhenExit(int64_t /* srcId */, bool status) {
     Mutex::Autolock autoLock(mLock);
     mRebufferingAtExit = status;
 }
 
-void NuPlayer2Driver::notifySeekComplete() {
+void NuPlayer2Driver::notifySeekComplete(int64_t srcId) {
     ALOGV("notifySeekComplete(%p)", this);
     Mutex::Autolock autoLock(mLock);
     mSeekInProgress = false;
-    notifySeekComplete_l();
+    notifySeekComplete_l(srcId);
 }
 
-void NuPlayer2Driver::notifySeekComplete_l() {
+void NuPlayer2Driver::notifySeekComplete_l(int64_t srcId) {
     bool wasSeeking = true;
     if (mState == STATE_STOPPED_AND_PREPARING) {
         wasSeeking = false;
@@ -833,7 +832,7 @@ void NuPlayer2Driver::notifySeekComplete_l() {
         // no need to notify listener
         return;
     }
-    notifyListener_l(wasSeeking ? MEDIA2_SEEK_COMPLETE : MEDIA2_PREPARED);
+    notifyListener_l(srcId, wasSeeking ? MEDIA2_SEEK_COMPLETE : MEDIA2_PREPARED);
 }
 
 status_t NuPlayer2Driver::dump(
@@ -916,9 +915,11 @@ status_t NuPlayer2Driver::dump(
 void NuPlayer2Driver::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatNotifyListener: {
+            int64_t srcId;
             int32_t msgId;
             int32_t ext1 = 0;
             int32_t ext2 = 0;
+            CHECK(msg->findInt64("srcId", &srcId));
             CHECK(msg->findInt32("messageId", &msgId));
             msg->findInt32("ext1", &ext1);
             msg->findInt32("ext2", &ext2);
@@ -927,7 +928,7 @@ void NuPlayer2Driver::onMessageReceived(const sp<AMessage> &msg) {
             if (msg->findObject("parcel", &obj) && obj != NULL) {
                 in = static_cast<ParcelWrapper *>(obj.get());
             }
-            sendEvent(msgId, ext1, ext2, (in == NULL ? NULL : in->getParcel()));
+            sendEvent(srcId, msgId, ext1, ext2, (in == NULL ? NULL : in->getParcel()));
             break;
         }
         default:
@@ -936,15 +937,16 @@ void NuPlayer2Driver::onMessageReceived(const sp<AMessage> &msg) {
 }
 
 void NuPlayer2Driver::notifyListener(
-        int msg, int ext1, int ext2, const Parcel *in) {
+        int64_t srcId, int msg, int ext1, int ext2, const Parcel *in) {
     Mutex::Autolock autoLock(mLock);
-    notifyListener_l(msg, ext1, ext2, in);
+    notifyListener_l(srcId, msg, ext1, ext2, in);
 }
 
 void NuPlayer2Driver::notifyListener_l(
-        int msg, int ext1, int ext2, const Parcel *in) {
-    ALOGD("notifyListener_l(%p), (%d, %d, %d, %d), loop setting(%d, %d)",
-            this, msg, ext1, ext2, (in == NULL ? -1 : (int)in->dataSize()), mAutoLoop, mLooping);
+        int64_t srcId, int msg, int ext1, int ext2, const Parcel *in) {
+    ALOGD("notifyListener_l(%p), (%lld, %d, %d, %d, %d), loop setting(%d, %d)",
+            this, (long long)srcId, msg, ext1, ext2,
+            (in == NULL ? -1 : (int)in->dataSize()), mAutoLoop, mLooping);
     switch (msg) {
         case MEDIA2_PLAYBACK_COMPLETE:
         {
@@ -1000,6 +1002,7 @@ void NuPlayer2Driver::notifyListener_l(
     }
 
     sp<AMessage> notify = new AMessage(kWhatNotifyListener, this);
+    notify->setInt64("srcId", srcId);
     notify->setInt32("messageId", msg);
     notify->setInt32("ext1", ext1);
     notify->setInt32("ext2", ext2);
@@ -1007,7 +1010,7 @@ void NuPlayer2Driver::notifyListener_l(
     notify->post();
 }
 
-void NuPlayer2Driver::notifySetDataSourceCompleted(status_t err) {
+void NuPlayer2Driver::notifySetDataSourceCompleted(int64_t /* srcId */, status_t err) {
     Mutex::Autolock autoLock(mLock);
 
     CHECK_EQ(mState, STATE_SET_DATASOURCE_PENDING);
@@ -1017,7 +1020,7 @@ void NuPlayer2Driver::notifySetDataSourceCompleted(status_t err) {
     mCondition.broadcast();
 }
 
-void NuPlayer2Driver::notifyPrepareCompleted(status_t err) {
+void NuPlayer2Driver::notifyPrepareCompleted(int64_t srcId, status_t err) {
     ALOGV("notifyPrepareCompleted %d", err);
 
     Mutex::Autolock autoLock(mLock);
@@ -1039,12 +1042,12 @@ void NuPlayer2Driver::notifyPrepareCompleted(status_t err) {
         // in response, NuPlayer2Driver has the right state
         mState = STATE_PREPARED;
         if (mIsAsyncPrepare) {
-            notifyListener_l(MEDIA2_PREPARED);
+            notifyListener_l(srcId, MEDIA2_PREPARED);
         }
     } else {
         mState = STATE_UNPREPARED;
         if (mIsAsyncPrepare) {
-            notifyListener_l(MEDIA2_ERROR, MEDIA2_ERROR_UNKNOWN, err);
+            notifyListener_l(srcId, MEDIA2_ERROR, MEDIA2_ERROR_UNKNOWN, err);
         }
     }
 
@@ -1058,7 +1061,7 @@ void NuPlayer2Driver::notifyPrepareCompleted(status_t err) {
     mCondition.broadcast();
 }
 
-void NuPlayer2Driver::notifyFlagsChanged(uint32_t flags) {
+void NuPlayer2Driver::notifyFlagsChanged(int64_t /* srcId */, uint32_t flags) {
     Mutex::Autolock autoLock(mLock);
 
     mPlayerFlags = flags;

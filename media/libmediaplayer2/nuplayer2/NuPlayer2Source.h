@@ -55,7 +55,6 @@ struct NuPlayer2::Source : public AHandler {
         kWhatTimedMetaData,
         kWhatQueueDecoderShutdown,
         kWhatDrmNoLicense,
-        kWhatInstantiateSecureDecoders,
         // Modular DRM
         kWhatDrmInfo,
     };
@@ -151,7 +150,6 @@ protected:
 
     void notifyFlagsChanged(uint32_t flags);
     void notifyVideoSizeChanged(const sp<AMessage> &format = NULL);
-    void notifyInstantiateSecureDecoders(const sp<AMessage> &reply);
     void notifyPrepared(status_t err = OK);
     // Modular DRM
     void notifyDrmInfo(const sp<ABuffer> &buffer);

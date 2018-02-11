@@ -1694,7 +1694,7 @@ void AudioFlinger::RecordThread::RecordTrack::stop()
     if (thread != 0) {
         RecordThread *recordThread = (RecordThread *)thread.get();
         if (recordThread->stop(this) && isExternalTrack()) {
-            AudioSystem::stopInput(mThreadIoHandle, mSessionId);
+            AudioSystem::stopInput(mPortId);
         }
     }
 }
@@ -1706,9 +1706,9 @@ void AudioFlinger::RecordThread::RecordTrack::destroy()
     {
         if (isExternalTrack()) {
             if (mState == ACTIVE || mState == RESUMING) {
-                AudioSystem::stopInput(mThreadIoHandle, mSessionId);
+                AudioSystem::stopInput(mPortId);
             }
-            AudioSystem::releaseInput(mThreadIoHandle, mSessionId);
+            AudioSystem::releaseInput(mPortId);
         }
         sp<ThreadBase> thread = mThread.promote();
         if (thread != 0) {

@@ -276,8 +276,8 @@ private:
 
         virtual status_t        setDataSource(const sp<DataSourceDesc> &dsd);
 
-        static  void            notify(const wp<MediaPlayer2Engine> &listener, int msg,
-                                       int ext1, int ext2, const Parcel *obj);
+        static  void            notify(const wp<MediaPlayer2Engine> &listener, int64_t srcId,
+                                       int msg, int ext1, int ext2, const Parcel *obj);
 
                 pid_t           pid() const { return mPid; }
         virtual status_t        dump(int fd, const Vector<String16>& args);
