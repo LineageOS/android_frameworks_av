@@ -18,11 +18,10 @@
 
 #define DRM_HAL_H_
 
-#include <android/hardware/drm/1.0/IDrmFactory.h>
 #include <android/hardware/drm/1.0/IDrmPlugin.h>
-#include <android/hardware/drm/1.0/IDrmPluginListener.h>
-#include <android/hardware/drm/1.1/IDrmFactory.h>
 #include <android/hardware/drm/1.1/IDrmPlugin.h>
+#include <android/hardware/drm/1.0/IDrmPluginListener.h>
+#include <android/hardware/drm/1.0/IDrmFactory.h>
 
 #include <media/DrmMetrics.h>
 #include <media/IDrm.h>
