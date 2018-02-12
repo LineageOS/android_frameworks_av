@@ -60,7 +60,8 @@ SoftwareRenderer::~SoftwareRenderer() {
     mConverter = NULL;
 }
 
-void SoftwareRenderer::resetFormatIfChanged(const sp<AMessage> &format) {
+void SoftwareRenderer::resetFormatIfChanged(
+        const sp<AMessage> &format, size_t numOutputBuffers) {
     CHECK(format != NULL);
 
     int32_t colorFormatNew;
@@ -168,7 +169,7 @@ void SoftwareRenderer::resetFormatIfChanged(const sp<AMessage> &format) {
     CHECK_EQ(0,
             native_window_set_usage(
             mNativeWindow.get(),
-            GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_OFTEN
+            GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_RARELY
             | GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_EXTERNAL_DISP));
 
     CHECK_EQ(0,
@@ -184,6 +185,11 @@ void SoftwareRenderer::resetFormatIfChanged(const sp<AMessage> &format) {
     CHECK_EQ(0, native_window_set_buffers_format(
                 mNativeWindow.get(),
                 halFormat));
+    if (OK != native_window_set_buffer_count(
+                mNativeWindow.get(), numOutputBuffers + 4)) {
+        ALOGE("Failed to set native window buffer count to (%zu + 4)",
+                numOutputBuffers);
+    }
 
     // NOTE: native window uses extended right-bottom coordinate
     android_native_rect_t crop;
@@ -219,8 +225,8 @@ void SoftwareRenderer::clearTracker() {
 
 std::list<FrameRenderTracker::Info> SoftwareRenderer::render(
         const void *data, size_t , int64_t mediaTimeUs, nsecs_t renderTimeNs,
-        void* /*platformPrivate*/, const sp<AMessage>& format) {
-    resetFormatIfChanged(format);
+        size_t numOutputBuffers, const sp<AMessage>& format) {
+    resetFormatIfChanged(format, numOutputBuffers);
     FrameRenderTracker::Info *info = NULL;
 
     ANativeWindowBuffer *buf;
@@ -243,8 +249,9 @@ std::list<FrameRenderTracker::Info> SoftwareRenderer::render(
     Rect bounds(mCropWidth, mCropHeight);
 
     void *dst;
-    CHECK_EQ(0, mapper.lock(
-                buf->handle, GRALLOC_USAGE_SW_WRITE_OFTEN, bounds, &dst));
+    CHECK_EQ(0, mapper.lock(buf->handle,
+            GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_RARELY,
+            bounds, &dst));
 
     // TODO move the other conversions also into ColorConverter, and
     // fix cropping issues (when mCropLeft/Top != 0 or mWidth != mCropWidth)
