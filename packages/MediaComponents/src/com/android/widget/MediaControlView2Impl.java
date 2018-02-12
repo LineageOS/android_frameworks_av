@@ -72,9 +72,7 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private TextView mTitleView;
     private int mDuration;
     private int mPrevState;
-    private int mCurrentVisibility;
     private long mPlaybackActions;
-    private boolean mShowing;
     private boolean mDragging;
     private boolean mIsFullScreen;
     private boolean mOverflowExpanded;
@@ -233,6 +231,7 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     public void setEnabled_impl(boolean enabled) {
         super.setEnabled_impl(enabled);
 
+        // TODO: Merge the below code with disableUnsupportedButtons().
         if (mPlayPauseButton != null) {
             mPlayPauseButton.setEnabled(enabled);
         }
@@ -255,24 +254,15 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     }
 
     @Override
-    public void onVisibilityAggregated_impl(boolean invisible) {
-        super.onVisibilityAggregated_impl(invisible);
+    public void onVisibilityAggregated_impl(boolean isVisible) {
+        super.onVisibilityAggregated_impl(isVisible);
 
-        int visibility = mInstance.getVisibility();
-        if (mCurrentVisibility != visibility) {
-            mInstance.setVisibility(visibility);
-            mCurrentVisibility = visibility;
-
-            if (visibility == View.VISIBLE) {
-                setProgress();
-                disableUnsupportedButtons();
-                // cause the progress bar to be updated even if mShowing
-                // was already true.  This happens, for example, if we're
-                // paused with the progress bar showing the user hits play.
-                mInstance.post(mShowProgress);
-            } else if (visibility == View.GONE) {
-                mInstance.removeCallbacks(mShowProgress);
-            }
+        if (isVisible) {
+            disableUnsupportedButtons();
+            mInstance.removeCallbacks(mUpdateProgress);
+            mInstance.post(mUpdateProgress);
+        } else {
+            mInstance.removeCallbacks(mUpdateProgress);
         }
     }
 
@@ -465,12 +455,13 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         }
     }
 
-    private final Runnable mShowProgress = new Runnable() {
+    private final Runnable mUpdateProgress = new Runnable() {
         @Override
         public void run() {
             int pos = setProgress();
-            if (!mDragging && mShowing && isPlaying()) {
-                mInstance.postDelayed(mShowProgress,
+            boolean isShowing = mInstance.getVisibility() == View.VISIBLE;
+            if (!mDragging && isShowing && isPlaying()) {
+                mInstance.postDelayed(mUpdateProgress,
                         DEFAULT_PROGRESS_UPDATE_TIME_MS - (pos % DEFAULT_PROGRESS_UPDATE_TIME_MS));
             }
         }
@@ -557,7 +548,7 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             // the seekbar and b) once the user is done dragging the thumb
             // we will post one of these messages to the queue again and
             // this ensures that there will be exactly one message queued up.
-            mInstance.removeCallbacks(mShowProgress);
+            mInstance.removeCallbacks(mUpdateProgress);
 
             // Check if playback is currently stopped. In this case, update the pause button to
             // show the play image instead of the replay image.
@@ -602,7 +593,7 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             // Ensure that progress is properly updated in the future,
             // the call to show() does not guarantee this because it is a
             // no-op if we are already showing.
-            mInstance.post(mShowProgress);
+            mInstance.post(mUpdateProgress);
         }
     };
 
@@ -735,6 +726,8 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
                                 ApiHelper.getLibResources().getDrawable(
                                         R.drawable.ic_pause_circle_filled, null));
                         mPlayPauseButton.setContentDescription(mPauseDescription);
+                        mInstance.removeCallbacks(mUpdateProgress);
+                        mInstance.post(mUpdateProgress);
                         break;
                     case PlaybackState.STATE_PAUSED:
                         mPlayPauseButton.setImageDrawable(
