@@ -73,24 +73,12 @@ void DrmPlugin::initProperties() {
     mByteArrayProperties[kMetricsKey] = valueVector;
 }
 
-
 Return<void> DrmPlugin::openSession(openSession_cb _hidl_cb) {
     sp<Session> session = mSessionLibrary->createSession();
     std::vector<uint8_t> sessionId = session->sessionId();
 
-    Status status = setSecurityLevel(sessionId, SecurityLevel::SW_SECURE_CRYPTO);
-    _hidl_cb(status, toHidlVec(sessionId));
-    mOpenSessionOkCount++;
-    return Void();
-}
-
-Return<void> DrmPlugin::openSession_1_1(SecurityLevel securityLevel,
-        openSession_1_1_cb _hidl_cb) {
-    sp<Session> session = mSessionLibrary->createSession();
-    std::vector<uint8_t> sessionId = session->sessionId();
-
-    Status status = setSecurityLevel(sessionId, securityLevel);
-    _hidl_cb(status, toHidlVec(sessionId));
+    setSecurityLevel(sessionId, SecurityLevel::SW_SECURE_CRYPTO);
+    _hidl_cb(Status::OK, toHidlVec(sessionId));
     mOpenSessionOkCount++;
     return Void();
 }
@@ -356,8 +344,8 @@ Return<Status> DrmPlugin::setSecurityLevel(const hidl_vec<uint8_t>& sessionId,
         return Status::BAD_VALUE;
     }
 
-    if (level > SecurityLevel::SW_SECURE_CRYPTO) {
-        ALOGE("Cannot set security level > max");
+    if (level > SecurityLevel::HW_SECURE_ALL) {
+        ALOGE("Cannot set invalid security level");
         return Status::BAD_VALUE;
     }
 
