@@ -20,7 +20,7 @@
 
 #include <gtest/gtest.h>
 
-#include <media/Drm.h>
+#include <media/DrmHal.h>
 #include <media/DrmSessionClientInterface.h>
 #include <media/DrmSessionManager.h>
 #include <media/stagefright/foundation/ADebug.h>
