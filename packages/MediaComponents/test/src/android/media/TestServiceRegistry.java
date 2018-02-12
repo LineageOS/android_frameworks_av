@@ -18,10 +18,12 @@ package android.media;
 
 import static org.junit.Assert.fail;
 
+import android.content.Context;
+import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.TestUtils.SyncHandler;
 import android.os.Handler;
-import android.os.Looper;
+import android.os.Process;
 import android.support.annotation.GuardedBy;
 
 /**
@@ -31,8 +33,46 @@ import android.support.annotation.GuardedBy;
  * It only support only one service at a time.
  */
 public class TestServiceRegistry {
-    public interface ServiceInstanceChangedCallback {
-        void OnServiceInstanceChanged(MediaSessionService2 service);
+    /**
+     * Proxy for both {@link MediaSession2.SessionCallback} and
+     * {@link MediaLibraryService2.MediaLibrarySessionCallback}.
+     */
+    public static abstract class SessionCallbackProxy {
+        private final Context mContext;
+
+        /**
+         * Constructor
+         */
+        public SessionCallbackProxy(Context context) {
+            mContext = context;
+        }
+
+        public final Context getContext() {
+            return mContext;
+        }
+
+        /**
+         * @param controller
+         * @return
+         */
+        public CommandGroup onConnect(ControllerInfo controller) {
+            if (Process.myUid() == controller.getUid()) {
+                CommandGroup commands = new CommandGroup(mContext);
+                commands.addAllPredefinedCommands();
+                return commands;
+            }
+            return null;
+        }
+
+        /**
+         * Called when enclosing service is created.
+         */
+        public void onServiceCreated(MediaSessionService2 service) { }
+
+        /**
+         * Called when enclosing service is destroyed.
+         */
+        public void onServiceDestroyed() { }
     }
 
     @GuardedBy("TestServiceRegistry.class")
@@ -42,9 +82,7 @@ public class TestServiceRegistry {
     @GuardedBy("TestServiceRegistry.class")
     private SyncHandler mHandler;
     @GuardedBy("TestServiceRegistry.class")
-    private ControllerInfo mOnConnectControllerInfo;
-    @GuardedBy("TestServiceRegistry.class")
-    private ServiceInstanceChangedCallback mCallback;
+    private SessionCallbackProxy mCallbackProxy;
 
     public static TestServiceRegistry getInstance() {
         synchronized (TestServiceRegistry.class) {
@@ -61,28 +99,33 @@ public class TestServiceRegistry {
         }
     }
 
-    public void setServiceInstanceChangedCallback(ServiceInstanceChangedCallback callback) {
-        synchronized (TestServiceRegistry.class) {
-            mCallback = callback;
-        }
-    }
-
     public Handler getHandler() {
         synchronized (TestServiceRegistry.class) {
             return mHandler;
         }
     }
 
-    public void setServiceInstance(MediaSessionService2 service, ControllerInfo controller) {
+    public void setSessionCallbackProxy(SessionCallbackProxy callbackProxy) {
+        synchronized (TestServiceRegistry.class) {
+            mCallbackProxy = callbackProxy;
+        }
+    }
+
+    public SessionCallbackProxy getSessionCallbackProxy() {
+        synchronized (TestServiceRegistry.class) {
+            return mCallbackProxy;
+        }
+    }
+
+    public void setServiceInstance(MediaSessionService2 service) {
         synchronized (TestServiceRegistry.class) {
             if (mService != null) {
                 fail("Previous service instance is still running. Clean up manually to ensure"
                         + " previoulsy running service doesn't break current test");
             }
             mService = service;
-            mOnConnectControllerInfo = controller;
-            if (mCallback != null) {
-                mCallback.OnServiceInstanceChanged(service);
+            if (mCallbackProxy != null) {
+                mCallbackProxy.onServiceCreated(service);
             }
         }
     }
@@ -93,28 +136,11 @@ public class TestServiceRegistry {
         }
     }
 
-    public ControllerInfo getOnConnectControllerInfo() {
-        synchronized (TestServiceRegistry.class) {
-            return mOnConnectControllerInfo;
-        }
-    }
-
-
     public void cleanUp() {
         synchronized (TestServiceRegistry.class) {
-            final ServiceInstanceChangedCallback callback = mCallback;
+            final SessionCallbackProxy callbackProxy = mCallbackProxy;
             if (mService != null) {
-                try {
-                    if (mHandler.getLooper() == Looper.myLooper()) {
-                        mService.getSession().close();
-                    } else {
-                        mHandler.postAndSync(() -> {
-                            mService.getSession().close();
-                        });
-                    }
-                } catch (InterruptedException e) {
-                    // No-op. Service containing session will die, but shouldn't be a huge issue.
-                }
+                mService.getSession().close();
                 // stopSelf() would not kill service while the binder connection established by
                 // bindService() exists, and close() above will do the job instead.
                 // So stopSelf() isn't really needed, but just for sure.
@@ -124,11 +150,10 @@ public class TestServiceRegistry {
             if (mHandler != null) {
                 mHandler.removeCallbacksAndMessages(null);
             }
-            mCallback = null;
-            mOnConnectControllerInfo = null;
+            mCallbackProxy = null;
 
-            if (callback != null) {
-                callback.OnServiceInstanceChanged(null);
+            if (callbackProxy != null) {
+                callbackProxy.onServiceDestroyed();
             }
         }
     }

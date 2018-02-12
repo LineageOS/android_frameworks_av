@@ -22,11 +22,11 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
+import android.media.TestServiceRegistry.SessionCallbackProxy;
 import android.media.TestUtils.SyncHandler;
-import android.media.session.PlaybackState;
-import android.os.Process;
 
 import java.util.concurrent.Executor;
 
@@ -45,26 +45,29 @@ public class MockMediaSessionService2 extends MediaSessionService2 {
     private NotificationManager mNotificationManager;
 
     @Override
+    public void onCreate() {
+        super.onCreate();
+        TestServiceRegistry.getInstance().setServiceInstance(this);
+        mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+    }
+
+    @Override
     public MediaSession2 onCreateSession(String sessionId) {
         final MockPlayer player = new MockPlayer(1);
         final SyncHandler handler = (SyncHandler) TestServiceRegistry.getInstance().getHandler();
         final Executor executor = (runnable) -> handler.post(runnable);
-        try {
-            handler.postAndSync(() -> {
-                mSession = new MediaSession2.Builder(MockMediaSessionService2.this, player)
-                        .setSessionCallback(executor, new MySessionCallback())
-                        .setId(sessionId).build();
-            });
-        } catch (InterruptedException e) {
-            fail(e.toString());
+        SessionCallbackProxy sessionCallbackProxy = TestServiceRegistry.getInstance()
+                .getSessionCallbackProxy();
+        if (sessionCallbackProxy == null) {
+            // Ensures non-null
+            sessionCallbackProxy = new SessionCallbackProxy(this) {};
         }
+        TestSessionServiceCallback callback =
+                new TestSessionServiceCallback(sessionCallbackProxy);
+        mSession = new MediaSession2.Builder(this, player)
+                .setSessionCallback(executor, callback)
+                .setId(sessionId).build();
         return mSession;
-    }
-
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
     }
 
     @Override
@@ -90,20 +93,17 @@ public class MockMediaSessionService2 extends MediaSessionService2 {
         return new MediaNotification(this, DEFAULT_MEDIA_NOTIFICATION_ID, notification);
     }
 
-    private class MySessionCallback extends SessionCallback {
-        public MySessionCallback() {
+    private class TestSessionServiceCallback extends SessionCallback {
+        private final SessionCallbackProxy mCallbackProxy;
+
+        public TestSessionServiceCallback(SessionCallbackProxy callbackProxy) {
             super(MockMediaSessionService2.this);
+            mCallbackProxy = callbackProxy;
         }
 
         @Override
-        public MediaSession2.CommandGroup onConnect(ControllerInfo controller) {
-            if (Process.myUid() != controller.getUid()) {
-                // It's system app wants to listen changes. Ignore.
-                return super.onConnect(controller);
-            }
-            TestServiceRegistry.getInstance().setServiceInstance(
-                    MockMediaSessionService2.this, controller);
-            return super.onConnect(controller);
+        public CommandGroup onConnect(ControllerInfo controller) {
+            return mCallbackProxy.onConnect(controller);
         }
     }
 }
