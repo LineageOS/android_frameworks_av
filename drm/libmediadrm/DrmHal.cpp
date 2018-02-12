@@ -21,8 +21,6 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 
-#include <android/hardware/drm/1.0/IDrmFactory.h>
-#include <android/hardware/drm/1.0/IDrmPlugin.h>
 #include <android/hardware/drm/1.0/types.h>
 #include <android/hidl/manager/1.0/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
@@ -271,15 +269,24 @@ Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
     auto manager = hardware::defaultServiceManager();
 
     if (manager != NULL) {
-        manager->listByInterface(IDrmFactory::descriptor,
+        manager->listByInterface(drm::V1_0::IDrmFactory::descriptor,
                 [&factories](const hidl_vec<hidl_string> &registered) {
                     for (const auto &instance : registered) {
-                        auto factory = IDrmFactory::getService(instance);
+                        auto factory = drm::V1_0::IDrmFactory::getService(instance);
                         if (factory != NULL) {
+                            ALOGD("found drm@1.0 IDrmFactory %s", instance.c_str());
                             factories.push_back(factory);
-                            ALOGI("makeDrmFactories: factory instance %s is %s",
-                                    instance.c_str(),
-                                    factory->isRemote() ? "Remote" : "Not Remote");
+                        }
+                    }
+                }
+            );
+        manager->listByInterface(drm::V1_1::IDrmFactory::descriptor,
+                [&factories](const hidl_vec<hidl_string> &registered) {
+                    for (const auto &instance : registered) {
+                        auto factory = drm::V1_1::IDrmFactory::getService(instance);
+                        if (factory != NULL) {
+                            ALOGD("found drm@1.1 IDrmFactory %s", instance.c_str());
+                            factories.push_back(factory);
                         }
                     }
                 }
@@ -290,7 +297,7 @@ Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
         // must be in passthrough mode, load the default passthrough service
         auto passthrough = IDrmFactory::getService();
         if (passthrough != NULL) {
-            ALOGI("makeDrmFactories: using default drm instance");
+            ALOGI("makeDrmFactories: using default passthrough drm instance");
             factories.push_back(passthrough);
         } else {
             ALOGE("Failed to find any drm factories");
@@ -510,24 +517,62 @@ status_t DrmHal::destroyPlugin() {
     return OK;
 }
 
-status_t DrmHal::openSession(Vector<uint8_t> &sessionId) {
+status_t DrmHal::openSession(DrmPlugin::SecurityLevel level,
+        Vector<uint8_t> &sessionId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    status_t  err = UNKNOWN_ERROR;
+    SecurityLevel hSecurityLevel;
+    bool setSecurityLevel = true;
 
+    switch(level) {
+    case DrmPlugin::kSecurityLevelSwSecureCrypto:
+        hSecurityLevel = SecurityLevel::SW_SECURE_CRYPTO;
+        break;
+    case DrmPlugin::kSecurityLevelSwSecureDecode:
+        hSecurityLevel = SecurityLevel::SW_SECURE_DECODE;
+        break;
+    case DrmPlugin::kSecurityLevelHwSecureCrypto:
+        hSecurityLevel = SecurityLevel::HW_SECURE_CRYPTO;
+        break;
+    case DrmPlugin::kSecurityLevelHwSecureDecode:
+        hSecurityLevel = SecurityLevel::HW_SECURE_DECODE;
+        break;
+    case DrmPlugin::kSecurityLevelHwSecureAll:
+        hSecurityLevel = SecurityLevel::HW_SECURE_ALL;
+        break;
+    case DrmPlugin::kSecurityLevelMax:
+        setSecurityLevel = false;
+        break;
+    default:
+        return ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    status_t  err = UNKNOWN_ERROR;
     bool retry = true;
     do {
         hidl_vec<uint8_t> hSessionId;
 
-        Return<void> hResult = mPlugin->openSession(
-                [&](Status status, const hidl_vec<uint8_t>& id) {
-                    if (status == Status::OK) {
-                        sessionId = toVector(id);
+        Return<void> hResult;
+        if (mPluginV1_1 == NULL || !setSecurityLevel) {
+            hResult = mPlugin->openSession(
+                    [&](Status status,const hidl_vec<uint8_t>& id) {
+                        if (status == Status::OK) {
+                            sessionId = toVector(id);
+                        }
+                        err = toStatusT(status);
                     }
-                    err = toStatusT(status);
-                }
-            );
+                );
+        } else {
+            hResult = mPluginV1_1->openSession_1_1(hSecurityLevel,
+                    [&](Status status, const hidl_vec<uint8_t>& id) {
+                        if (status == Status::OK) {
+                            sessionId = toVector(id);
+                        }
+                        err = toStatusT(status);
+                    }
+                );
+        }
 
         if (!hResult.isOk()) {
             err = DEAD_OBJECT;
@@ -977,42 +1022,6 @@ status_t DrmHal::getSecurityLevel(Vector<uint8_t> const &sessionId,
     );
 
     return hResult.isOk() ? err : DEAD_OBJECT;
-}
-
-status_t DrmHal::setSecurityLevel(Vector<uint8_t> const &sessionId,
-        const DrmPlugin::SecurityLevel& level) {
-    Mutex::Autolock autoLock(mLock);
-    INIT_CHECK();
-
-    if (mPluginV1_1 == NULL) {
-        return ERROR_DRM_CANNOT_HANDLE;
-    }
-
-    SecurityLevel hSecurityLevel;
-
-    switch(level) {
-    case DrmPlugin::kSecurityLevelSwSecureCrypto:
-        hSecurityLevel = SecurityLevel::SW_SECURE_CRYPTO;
-        break;
-    case DrmPlugin::kSecurityLevelSwSecureDecode:
-        hSecurityLevel = SecurityLevel::SW_SECURE_DECODE;
-        break;
-    case DrmPlugin::kSecurityLevelHwSecureCrypto:
-        hSecurityLevel = SecurityLevel::HW_SECURE_CRYPTO;
-        break;
-    case DrmPlugin::kSecurityLevelHwSecureDecode:
-        hSecurityLevel = SecurityLevel::HW_SECURE_DECODE;
-        break;
-    case DrmPlugin::kSecurityLevelHwSecureAll:
-        hSecurityLevel = SecurityLevel::HW_SECURE_ALL;
-        break;
-    default:
-        return ERROR_DRM_CANNOT_HANDLE;
-    }
-
-    Status status = mPluginV1_1->setSecurityLevel(toHidlVec(sessionId),
-            hSecurityLevel);
-    return toStatusT(status);
 }
 
 status_t DrmHal::getPropertyString(String8 const &name, String8 &value ) const {
