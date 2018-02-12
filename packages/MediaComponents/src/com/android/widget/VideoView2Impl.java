@@ -31,7 +31,9 @@ import android.media.Cea708CaptionRenderer;
 import android.media.ClosedCaptionRenderer;
 import android.media.Metadata;
 import android.media.PlaybackParams;
+import android.media.SRTRenderer;
 import android.media.SubtitleController;
+import android.media.TimedText;
 import android.media.TtmlRenderer;
 import android.media.WebVttRenderer;
 import android.media.session.MediaController;
@@ -122,6 +124,7 @@ public class VideoView2Impl extends BaseLayout
     private int mVideoWidth;
     private int mVideoHeight;
 
+    private ArrayList<Integer> mSubtitleTrackIndices;
     private SubtitleView mSubtitleView;
     private boolean mSubtitleEnabled;
     private int mSelectedTrackIndex;  // selected subtitle track index as MediaPlayer2 returns
@@ -191,13 +194,11 @@ public class VideoView2Impl extends BaseLayout
         if (enableControlView) {
             mMediaControlView = new MediaControlView2(mInstance.getContext());
         }
-        boolean enableSubtitle = (attrs == null) || attrs.getAttributeBooleanValue(
+
+        mSubtitleEnabled = (attrs == null) || attrs.getAttributeBooleanValue(
                 "http://schemas.android.com/apk/res/android",
-                "enableSubtitle", true);
-        if (enableSubtitle) {
-            Log.d(TAG, "enableSubtitle attribute is true.");
-            // TODO: implement
-        }
+                "enableSubtitle", false);
+
         int viewType = (attrs == null) ? VideoView2.VIEW_TYPE_SURFACEVIEW
                 : attrs.getAttributeIntValue(
                 "http://schemas.android.com/apk/res/android",
@@ -240,27 +241,8 @@ public class VideoView2Impl extends BaseLayout
 
     @Override
     public void setSubtitleEnabled_impl(boolean enable) {
-        if (enable) {
-            // Retrieve all tracks that belong to the current video.
-            MediaPlayer.TrackInfo[] trackInfos = mMediaPlayer.getTrackInfo();
-
-            List<Integer> subtitleTrackIndices = new ArrayList<>();
-            for (int i = 0; i < trackInfos.length; ++i) {
-                int trackType = trackInfos[i].getTrackType();
-                if (trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE) {
-                    subtitleTrackIndices.add(i);
-                }
-            }
-            if (subtitleTrackIndices.size() > 0) {
-                // Select first subtitle track
-                mSelectedTrackIndex = subtitleTrackIndices.get(0);
-                mMediaPlayer.selectTrack(mSelectedTrackIndex);
-            }
-        } else {
-            if (mSelectedTrackIndex != INVALID_TRACK_INDEX) {
-                mMediaPlayer.deselectTrack(mSelectedTrackIndex);
-                mSelectedTrackIndex = INVALID_TRACK_INDEX;
-            }
+        if (enable != mSubtitleEnabled) {
+            selectOrDeselectSubtitle(enable);
         }
         mSubtitleEnabled = enable;
     }
@@ -572,7 +554,13 @@ public class VideoView2Impl extends BaseLayout
             controller.registerRenderer(new TtmlRenderer(context));
             controller.registerRenderer(new Cea708CaptionRenderer(context));
             controller.registerRenderer(new ClosedCaptionRenderer(context));
-            mMediaPlayer.setSubtitleAnchor(controller, (SubtitleController.Anchor) mSubtitleView);
+            controller.registerRenderer(new SRTRenderer(context));
+            mMediaPlayer.setSubtitleAnchor(
+                    controller, (SubtitleController.Anchor) mSubtitleView);
+            // TODO: Remove timed text related code later once relevant Renderer is defined.
+            // This is just for debugging purpose.
+            mMediaPlayer.setOnTimedTextListener(mTimedTextListener);
+
             mMediaPlayer.setOnPreparedListener(mPreparedListener);
             mMediaPlayer.setOnVideoSizeChangedListener(mSizeChangedListener);
             mMediaPlayer.setOnCompletionListener(mCompletionListener);
@@ -622,7 +610,6 @@ public class VideoView2Impl extends BaseLayout
     /*
      * Reset the media player in any state
      */
-    // TODO: Figure out if the legacy code's boolean parameter: cleartargetstate is necessary.
     private void resetPlayer() {
         if (mMediaPlayer != null) {
             mMediaPlayer.reset();
@@ -774,7 +761,58 @@ public class VideoView2Impl extends BaseLayout
             return false;
         }
         PlaybackInfo playbackInfo = mMediaController.getPlaybackInfo();
-        return (playbackInfo != null) && (playbackInfo.getPlaybackType() == PlaybackInfo.PLAYBACK_TYPE_REMOTE);
+        return (playbackInfo != null)
+                && (playbackInfo.getPlaybackType() == PlaybackInfo.PLAYBACK_TYPE_REMOTE);
+    }
+
+    private void selectOrDeselectSubtitle(boolean select) {
+        if (!isInPlaybackState()) {
+            return;
+        }
+        if (select) {
+            if (mSubtitleTrackIndices.size() > 0) {
+                // Select first subtitle track
+                mSelectedTrackIndex = mSubtitleTrackIndices.get(0);
+                mMediaPlayer.selectTrack(mSelectedTrackIndex);
+                mSubtitleView.setVisibility(View.VISIBLE);
+            }
+        } else {
+            if (mSelectedTrackIndex != INVALID_TRACK_INDEX) {
+                mMediaPlayer.deselectTrack(mSelectedTrackIndex);
+                mSelectedTrackIndex = INVALID_TRACK_INDEX;
+                mSubtitleView.setVisibility(View.GONE);
+            }
+        }
+    }
+
+    private void extractSubtitleTracks() {
+        MediaPlayer.TrackInfo[] trackInfos = mMediaPlayer.getTrackInfo();
+        boolean previouslyNoTracks = mSubtitleTrackIndices == null
+                || mSubtitleTrackIndices.size() == 0;
+        mSubtitleTrackIndices = new ArrayList<>();
+        for (int i = 0; i < trackInfos.length; ++i) {
+            int trackType = trackInfos[i].getTrackType();
+            if (trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE
+                    || trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT) {
+                  mSubtitleTrackIndices.add(i);
+            }
+        }
+        if (mSubtitleTrackIndices.size() > 0) {
+            if (previouslyNoTracks) {
+                selectOrDeselectSubtitle(mSubtitleEnabled);
+                // Notify MediaControlView that subtitle track exists
+                // TODO: Send the subtitle track list to MediaSession for MCV2.
+                Bundle data = new Bundle();
+                data.putBoolean(MediaControlView2Impl.KEY_STATE_CONTAINS_SUBTITLE, true);
+                mMediaSession.sendSessionEvent(
+                        MediaControlView2Impl.EVENT_UPDATE_SUBTITLE_STATUS, data);
+            }
+        } else {
+            Bundle data = new Bundle();
+            data.putBoolean(MediaControlView2Impl.KEY_STATE_CONTAINS_SUBTITLE, false);
+            mMediaSession.sendSessionEvent(
+                    MediaControlView2Impl.EVENT_UPDATE_SUBTITLE_STATUS, data);
+        }
     }
 
     MediaPlayer.OnVideoSizeChangedListener mSizeChangedListener =
@@ -805,6 +843,7 @@ public class VideoView2Impl extends BaseLayout
             mCurrentState = STATE_PREPARED;
             // Create and set playback state for MediaControlView2
             updatePlaybackState();
+            extractSubtitleTracks();
 
             if (mOnPreparedListener != null) {
                 mOnPreparedListener.onPrepared(mInstance);
@@ -884,6 +923,10 @@ public class VideoView2Impl extends BaseLayout
                     if (mOnInfoListener != null) {
                         mOnInfoListener.onInfo(mInstance, what, extra);
                     }
+
+                    if (what == MediaPlayer.MEDIA_INFO_METADATA_UPDATE) {
+                        extractSubtitleTracks();
+                    }
                     return true;
                 }
             };
@@ -951,6 +994,15 @@ public class VideoView2Impl extends BaseLayout
                 public void onBufferingUpdate(MediaPlayer mp, int percent) {
                     mCurrentBufferPercentage = percent;
                     updatePlaybackState();
+                }
+            };
+
+    // TODO: Remove timed text related code later once relevant Renderer is defined.
+    // This is just for debugging purpose.
+    private MediaPlayer.OnTimedTextListener mTimedTextListener =
+            new MediaPlayer.OnTimedTextListener() {
+                public void onTimedText(MediaPlayer mp, TimedText text) {
+                    Log.d(TAG, "TimedText: " + text.getText());
                 }
             };
 
