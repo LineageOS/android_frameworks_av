@@ -26,7 +26,6 @@ import android.media.MediaController2.PlaybackInfo;
 import android.media.MediaItem2;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
-import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaController2;
 import android.media.MediaController2.ControllerCallback;
@@ -44,9 +43,6 @@ import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
 import android.util.Log;
 
-import com.android.media.MediaSession2Impl.CommandButtonImpl;
-
-import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -220,7 +216,11 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     Context getContext() {
-      return mContext;
+        return mContext;
+    }
+
+    MediaController2 getInstance() {
+        return mInstance;
     }
 
     @Override
@@ -503,10 +503,7 @@ public class MediaController2Impl implements MediaController2Provider {
         sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS, args);
     }
 
-    ///////////////////////////////////////////////////
-    // Protected or private methods
-    ///////////////////////////////////////////////////
-    private void pushPlaybackStateChanges(final PlaybackState2 state) {
+    void pushPlaybackStateChanges(final PlaybackState2 state) {
         synchronized (mLock) {
             mPlaybackState = state;
         }
@@ -518,7 +515,7 @@ public class MediaController2Impl implements MediaController2Provider {
         });
     }
 
-    private void pushPlaylistParamsChanges(final PlaylistParams params) {
+    void pushPlaylistParamsChanges(final PlaylistParams params) {
         synchronized (mLock) {
             mPlaylistParams = params;
         }
@@ -530,7 +527,7 @@ public class MediaController2Impl implements MediaController2Provider {
         });
     }
 
-    private void pushPlaybackInfoChanges(final PlaybackInfo info) {
+    void pushPlaybackInfoChanges(final PlaybackInfo info) {
         synchronized (mLock) {
             mPlaybackInfo = info;
         }
@@ -542,7 +539,7 @@ public class MediaController2Impl implements MediaController2Provider {
         });
     }
 
-    private void pushPlaylistChanges(final List<Bundle> list) {
+    void pushPlaylistChanges(final List<Bundle> list) {
         final List<MediaItem2> playlist = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             MediaItem2 item = MediaItem2.fromBundle(mContext, list.get(i));
@@ -563,7 +560,7 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     // Should be used without a lock to prevent potential deadlock.
-    private void onConnectedNotLocked(IMediaSession2 sessionBinder,
+    void onConnectedNotLocked(IMediaSession2 sessionBinder,
             final CommandGroup commandGroup, final PlaybackState2 state, final PlaybackInfo info,
             final PlaylistParams params, final List<MediaItem2> playlist, final int ratingType,
             final PendingIntent sessionActivity) {
@@ -624,7 +621,7 @@ public class MediaController2Impl implements MediaController2Provider {
         }
     }
 
-    private void onCustomCommand(final Command command, final Bundle args,
+    void onCustomCommand(final Command command, final Bundle args,
             final ResultReceiver receiver) {
         if (DEBUG) {
             Log.d(TAG, "onCustomCommand cmd=" + command);
@@ -633,195 +630,6 @@ public class MediaController2Impl implements MediaController2Provider {
             // TODO(jaewan): Double check if the controller exists.
             mCallback.onCustomCommand(command, args, receiver);
         });
-    }
-
-    // TODO(jaewan): Pull out this from the controller2, and rename it to the MediaController2Stub
-    //               or MediaBrowser2Stub.
-    static class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
-        private final WeakReference<MediaController2Impl> mController;
-
-        private MediaSession2CallbackStub(MediaController2Impl controller) {
-            mController = new WeakReference<>(controller);
-        }
-
-        private MediaController2Impl getController() throws IllegalStateException {
-            final MediaController2Impl controller = mController.get();
-            if (controller == null) {
-                throw new IllegalStateException("Controller is released");
-            }
-            return controller;
-        }
-
-        // TODO(jaewan): Refactor code to get rid of these pattern.
-        private MediaBrowser2Impl getBrowser() throws IllegalStateException {
-            final MediaController2Impl controller = getController();
-            if (controller instanceof MediaBrowser2Impl) {
-                return (MediaBrowser2Impl) controller;
-            }
-            return null;
-        }
-
-        public void destroy() {
-            mController.clear();
-        }
-
-        @Override
-        public void onPlaybackStateChanged(Bundle state) throws RuntimeException {
-            final MediaController2Impl controller;
-            try {
-                controller = getController();
-            } catch (IllegalStateException e) {
-                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
-                return;
-            }
-            controller.pushPlaybackStateChanges(
-                    PlaybackState2.fromBundle(controller.getContext(), state));
-        }
-
-        @Override
-        public void onPlaylistChanged(List<Bundle> playlist) throws RuntimeException {
-            final MediaController2Impl controller;
-            try {
-                controller = getController();
-            } catch (IllegalStateException e) {
-                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
-                return;
-            }
-            if (playlist == null) {
-                return;
-            }
-            controller.pushPlaylistChanges(playlist);
-        }
-
-        @Override
-        public void onPlaylistParamsChanged(Bundle params) throws RuntimeException {
-            final MediaController2Impl controller;
-            try {
-                controller = getController();
-            } catch (IllegalStateException e) {
-                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
-                return;
-            }
-            controller.pushPlaylistParamsChanges(
-                    PlaylistParams.fromBundle(controller.getContext(), params));
-        }
-
-        @Override
-        public void onPlaybackInfoChanged(Bundle playbackInfo) throws RuntimeException {
-            if (DEBUG) {
-                Log.d(TAG, "onPlaybackInfoChanged");
-            }
-            final MediaController2Impl controller;
-            try {
-                controller = getController();
-            } catch (IllegalStateException e) {
-                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
-                return;
-            }
-            controller.pushPlaybackInfoChanges(
-                    PlaybackInfoImpl.fromBundle(controller.getContext(), playbackInfo));
-        }
-
-        @Override
-        public void onConnected(IMediaSession2 sessionBinder, Bundle commandGroup,
-                Bundle playbackState, Bundle playbackInfo, Bundle playlistParams, List<Bundle>
-                playlist, int ratingType, PendingIntent sessionActivity) {
-            final MediaController2Impl controller = mController.get();
-            if (controller == null) {
-                if (DEBUG) {
-                    Log.d(TAG, "onConnected after MediaController2.close()");
-                }
-                return;
-            }
-            final Context context = controller.getContext();
-            List<MediaItem2> list = new ArrayList<>();
-            for (int i = 0; i < playlist.size(); i++) {
-                MediaItem2 item = MediaItem2.fromBundle(context, playlist.get(i));
-                if (item != null) {
-                    list.add(item);
-                }
-            }
-            controller.onConnectedNotLocked(sessionBinder,
-                    CommandGroup.fromBundle(context, commandGroup),
-                    PlaybackState2.fromBundle(context, playbackState),
-                    PlaybackInfoImpl.fromBundle(context, playbackInfo),
-                    PlaylistParams.fromBundle(context, playlistParams),
-                    list, ratingType, sessionActivity);
-        }
-
-        @Override
-        public void onDisconnected() {
-            final MediaController2Impl controller = mController.get();
-            if (controller == null) {
-                if (DEBUG) {
-                    Log.d(TAG, "onDisconnected after MediaController2.close()");
-                }
-                return;
-            }
-            controller.mInstance.close();
-        }
-
-        @Override
-        public void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra)
-                throws RuntimeException {
-            final MediaBrowser2Impl browser;
-            try {
-                browser = getBrowser();
-            } catch (IllegalStateException e) {
-                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
-                return;
-            }
-            if (browser == null) {
-                // TODO(jaewan): Revisit here. Could be a bug
-                return;
-            }
-            browser.onGetRootResult(rootHints, rootMediaId, rootExtra);
-        }
-
-        @Override
-        public void onCustomLayoutChanged(List<Bundle> commandButtonlist) {
-            if (commandButtonlist == null) {
-                // Illegal call. Ignore
-                return;
-            }
-            // TODO(jaewan): Fix here. It's controller feature so shouldn't use browser
-            final MediaBrowser2Impl browser;
-            try {
-                browser = getBrowser();
-            } catch (IllegalStateException e) {
-                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
-                return;
-            }
-            if (browser == null) {
-                // TODO(jaewan): Revisit here. Could be a bug
-                return;
-            }
-            List<CommandButton> layout = new ArrayList<>();
-            for (int i = 0; i < commandButtonlist.size(); i++) {
-                CommandButton button = CommandButtonImpl.fromBundle(
-                        browser.getContext(), commandButtonlist.get(i));
-                if (button != null) {
-                    layout.add(button);
-                }
-            }
-            browser.onCustomLayoutChanged(layout);
-        }
-
-        @Override
-        public void sendCustomCommand(Bundle commandBundle, Bundle args, ResultReceiver receiver) {
-            final MediaController2Impl controller;
-            try {
-                controller = getController();
-            } catch (IllegalStateException e) {
-                Log.w(TAG, "Don't fail silently here. Highly likely a bug");
-                return;
-            }
-            Command command = Command.fromBundle(controller.getContext(), commandBundle);
-            if (command == null) {
-                return;
-            }
-            controller.onCustomCommand(command, args, receiver);
-        }
     }
 
     // This will be called on the main thread.
