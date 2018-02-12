@@ -91,10 +91,4 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
             mCallback.onGetRootResult(rootHints, rootMediaId, rootExtra);
         });
     }
-
-    public void onCustomLayoutChanged(final List<CommandButton> layout) {
-        getCallbackExecutor().execute(() -> {
-            mCallback.onCustomLayoutChanged(layout);
-        });
-    }
 }

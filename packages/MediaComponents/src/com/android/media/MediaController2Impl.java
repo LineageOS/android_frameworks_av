@@ -26,6 +26,7 @@ import android.media.MediaController2.PlaybackInfo;
 import android.media.MediaItem2;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
+import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaController2;
 import android.media.MediaController2.ControllerCallback;
@@ -629,6 +630,12 @@ public class MediaController2Impl implements MediaController2Provider {
         mCallbackExecutor.execute(() -> {
             // TODO(jaewan): Double check if the controller exists.
             mCallback.onCustomCommand(command, args, receiver);
+        });
+    }
+
+    void onCustomLayoutChanged(final List<CommandButton> layout) {
+        mCallbackExecutor.execute(() -> {
+            mCallback.onCustomLayoutChanged(layout);
         });
     }
 
