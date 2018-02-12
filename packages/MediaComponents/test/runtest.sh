@@ -146,9 +146,10 @@ function runtest-MediaComponents() {
         fi
         target_dir=$(dirname ${target_dir})
         local package=$(sed -n 's/^.*\bpackage\b="\([a-z0-9\._]*\)".*$/\1/p' ${target_dir}/AndroidManifest.xml)
-        local apk_path=$(find ${OUT} -name ${target}.apk)
-        if [[ -z "${apk_path}" ]]; then
-          echo "Cannot locate ${target}.apk" && break
+        local apk_path=$(find ${OUT}/system ${OUT}/data -name ${target}.apk)
+        local apk_num=$(find ${OUT}/system ${OUT}/data -name ${target}.apk | wc -l)
+        if [[ "${apk_num}" != "1" ]]; then
+          echo "Cannot locate a ${target}.apk. Found ${apk_num} apks" && break
         fi
         echo "Installing ${target}.apk. path=${apk_path}"
         ${adb} install -r ${apk_path}
