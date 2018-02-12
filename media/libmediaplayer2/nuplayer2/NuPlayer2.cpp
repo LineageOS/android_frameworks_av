@@ -641,6 +641,7 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
                 mSource = static_cast<Source *>(obj.get());
             } else {
                 err = UNKNOWN_ERROR;
+                ALOGE("kWhatSetDataSource, source should not be NULL");
             }
 
             CHECK(mDriver != NULL);
@@ -1453,25 +1454,23 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
             ALOGV("kWhatSeek seekTimeUs=%lld us, mode=%d, needNotify=%d",
                     (long long)seekTimeUs, mode, needNotify);
 
-            // seeks can take a while, so we essentially paused
-            notifyListener(mSrcId, MEDIA2_PAUSED, 0, 0);
-
             if (!mStarted) {
-                // Seek before the player is started. In order to preview video,
-                // need to start the player and pause it. This branch is called
-                // only once if needed. After the player is started, any seek
-                // operation will go through normal path.
-                // Audio-only cases are handled separately.
-                onStart(seekTimeUs, (MediaPlayer2SeekMode)mode);
-                if (mStarted) {
-                    onPause();
-                    mPausedByClient = true;
+                if (!mSourceStarted) {
+                    mSourceStarted = true;
+                    mSource->start();
                 }
+                if (seekTimeUs > 0) {
+                    performSeek(seekTimeUs, (MediaPlayer2SeekMode)mode);
+                }
+
                 if (needNotify) {
                     notifyDriverSeekComplete(mSrcId);
                 }
                 break;
             }
+
+            // seeks can take a while, so we essentially paused
+            notifyListener(mSrcId, MEDIA2_PAUSED, 0, 0);
 
             mDeferredActions.push_back(
                     new FlushDecoderAction(FLUSH_CMD_FLUSH /* audio */,
@@ -1565,18 +1564,12 @@ void NuPlayer2::onResume() {
     startPlaybackTimer("onresume");
 }
 
-void NuPlayer2::onStart(int64_t startPositionUs, MediaPlayer2SeekMode mode) {
+void NuPlayer2::onStart() {
     ALOGV("onStart: mCrypto: %p", mCrypto.get());
 
     if (!mSourceStarted) {
         mSourceStarted = true;
         mSource->start();
-    }
-    if (startPositionUs > 0) {
-        performSeek(startPositionUs, mode);
-        if (mSource->getFormat(false /* audio */) == NULL) {
-            return;
-        }
     }
 
     mOffloadAudio = false;
