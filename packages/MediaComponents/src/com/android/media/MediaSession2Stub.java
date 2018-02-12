@@ -21,7 +21,6 @@ import android.content.Context;
 import android.media.MediaController2;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2.LibraryRoot;
-import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
@@ -40,6 +39,7 @@ import android.support.annotation.GuardedBy;
 import android.util.ArrayMap;
 import android.util.Log;
 
+import com.android.media.MediaLibraryService2Impl.MediaLibrarySessionImpl;
 import com.android.media.MediaSession2Impl.CommandButtonImpl;
 import com.android.media.MediaSession2Impl.ControllerInfoImpl;
 
@@ -93,6 +93,27 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         }
         return session;
     }
+
+    private MediaLibrarySessionImpl getLibrarySession() throws IllegalStateException {
+        final MediaSession2Impl session = getSession();
+        if (!(session instanceof MediaLibrarySessionImpl)) {
+            throw new RuntimeException("Session isn't a library session");
+        }
+        return (MediaLibrarySessionImpl) session;
+    }
+
+    private ControllerInfo getController(IMediaSession2Callback caller) {
+        // TODO(jaewan): Find a way to return connection-in-progress-controller
+        //               to be included here, because session owner may want to send some datas
+        //               while onConnected() hasn't returned.
+        synchronized (mLock) {
+            return mControllers.get(caller.asBinder());
+        }
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////////////
+    // AIDL methods for session overrides
+    //////////////////////////////////////////////////////////////////////////////////////////////
 
     @Override
     public void connect(String callingPackage, final IMediaSession2Callback callback)
@@ -485,32 +506,28 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
+    //////////////////////////////////////////////////////////////////////////////////////////////
+    // AIDL methods for LibrarySession overrides
+    //////////////////////////////////////////////////////////////////////////////////////////////
+
     @Override
     public void getBrowserRoot(IMediaSession2Callback caller, Bundle rootHints)
             throws RuntimeException {
-        final MediaSession2Impl sessionImpl = getSession();
-        if (!(sessionImpl.getCallback() instanceof MediaLibrarySessionCallback)) {
-            if (DEBUG) {
-                Log.d(TAG, "Session cannot hand getLibraryRoot()");
-            }
-            return;
-        }
+        final MediaLibrarySessionImpl sessionImpl = getLibrarySession();
         final ControllerInfo controller = getController(caller);
         if (controller == null) {
             if (DEBUG) {
-                Log.d(TAG, "getBrowerRoot from a controller that hasn't connected. Ignore");
+                Log.d(TAG, "getBrowerRoot() from a controller that hasn't connected. Ignore");
             }
             return;
         }
         sessionImpl.getCallbackExecutor().execute(() -> {
-            final MediaSession2Impl session = mSession.get();
+            final MediaLibrarySessionImpl session = getLibrarySession();
             if (session == null) {
                 return;
             }
-            final MediaLibrarySessionCallback libraryCallback =
-                    (MediaLibrarySessionCallback) session.getCallback();
             final ControllerInfoImpl controllerImpl = ControllerInfoImpl.from(controller);
-            LibraryRoot root = libraryCallback.onGetRoot(controller, rootHints);
+            LibraryRoot root = session.getCallback().onGetRoot(controller, rootHints);
             try {
                 controllerImpl.getControllerBinder().onGetRootResult(rootHints,
                         root == null ? null : root.getRootId(),
@@ -522,15 +539,9 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
-    private ControllerInfo getController(IMediaSession2Callback caller) {
-        // TODO(jaewan): Device a way to return connection-in-progress-controller
-        //               to be included here, because session owner may want to send some datas
-        //               while onConnected() hasn't returned.
-        synchronized (mLock) {
-            return mControllers.get(caller.asBinder());
-        }
-    }
-
+    //////////////////////////////////////////////////////////////////////////////////////////////
+    // APIs for MediaSession2Impl
+    //////////////////////////////////////////////////////////////////////////////////////////////
     // TODO(jaewan): Need a way to get controller with permissions
     public List<ControllerInfo> getControllers() {
         ArrayList<ControllerInfo> controllers = new ArrayList<>();
