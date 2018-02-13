@@ -271,6 +271,7 @@ C2Acquirable<C2ReadView> C2ConstLinearBlock::map() const {
                 new ReadViewBuddy::Impl(*mImpl, (uint8_t *)base, offset(), len),
                 [base, len](ReadViewBuddy::Impl *i) {
                     (void)i->getAllocation()->unmap(base, len, nullptr);
+                    delete i;
         });
         return AcquirableReadViewBuddy(error, C2Fence(), ReadViewBuddy(rvi, 0, len));
     } else {
@@ -300,6 +301,7 @@ C2Acquirable<C2WriteView> C2LinearBlock::map() {
                 new WriteViewBuddy::Impl(*mImpl, (uint8_t *)base, 0, len),
                 [base, len](WriteViewBuddy::Impl *i) {
                     (void)i->getAllocation()->unmap(base, len, nullptr);
+                    delete i;
         });
         return AcquirableWriteViewBuddy(error, C2Fence(), WriteViewBuddy(rvi));
     } else {
@@ -789,6 +791,16 @@ bool C2Buffer::hasInfo(C2Param::Type index) const {
 
 std::shared_ptr<C2Info> C2Buffer::removeInfo(C2Param::Type index) {
     return mImpl->removeInfo(index);
+}
+
+// static
+std::shared_ptr<C2Buffer> C2Buffer::CreateLinearBuffer(const C2ConstLinearBlock &block) {
+    return std::shared_ptr<C2Buffer>(new C2Buffer({ block }));
+}
+
+// static
+std::shared_ptr<C2Buffer> C2Buffer::CreateGraphicBuffer(const C2ConstGraphicBlock &block) {
+    return std::shared_ptr<C2Buffer>(new C2Buffer({ block }));
 }
 
 } // namespace android
