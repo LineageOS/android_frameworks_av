@@ -36,11 +36,9 @@ import android.os.ResultReceiver;
 import android.support.test.filters.FlakyTest;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
-import android.text.TextUtils;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -601,7 +599,6 @@ public class MediaController2Test extends MediaSession2TestBase {
         }
     }
 
-    @Ignore
     @Test
     public void testGetServiceToken() {
         SessionToken2 token = TestUtils.getServiceToken(mContext, MockMediaSessionService2.ID);
@@ -617,15 +614,11 @@ public class MediaController2Test extends MediaSession2TestBase {
         mPlayer = (MockPlayer) mSession.getPlayer();
     }
 
-    // TODO(jaewan): Reenable when session manager detects app installs
-    @Ignore
     @Test
     public void testConnectToService_sessionService() throws InterruptedException {
         testConnectToService(MockMediaSessionService2.ID);
     }
 
-    // TODO(jaewan): Reenable when session manager detects app installs
-    @Ignore
     @Test
     public void testConnectToService_libraryService() throws InterruptedException {
         testConnectToService(MockMediaLibraryService2.ID);
@@ -668,15 +661,11 @@ public class MediaController2Test extends MediaSession2TestBase {
         */
     }
 
-    // TODO(jaewan): Re-enable after b/72792686 is fixed
-    @Ignore
     @Test
     public void testControllerAfterSessionIsGone_session() throws InterruptedException {
         testControllerAfterSessionIsGone(mSession.getToken().getId());
     }
 
-    // TODO(jaewan): Re-enable after b/72792686 is fixed
-    @Ignore
     @Test
     public void testControllerAfterSessionIsGone_sessionService() throws InterruptedException {
         connectToService(TestUtils.getServiceToken(mContext, MockMediaSessionService2.ID));
@@ -708,15 +697,11 @@ public class MediaController2Test extends MediaSession2TestBase {
         testControllerAfterSessionIsGone(id);
     }
 
-    // TODO(jaewan): Reenable when session manager detects app installs
-    @Ignore
     @Test
     public void testClose_sessionService() throws InterruptedException {
         testCloseFromService(MockMediaSessionService2.ID);
     }
 
-    // TODO(jaewan): Reenable when session manager detects app installs
-    @Ignore
     @Test
     public void testClose_libraryService() throws InterruptedException {
         testCloseFromService(MockMediaLibraryService2.ID);
@@ -751,7 +736,7 @@ public class MediaController2Test extends MediaSession2TestBase {
         waitForDisconnect(mController, true);
         testNoInteraction();
 
-        // Test with the newly created session.
+        // Ensure that the controller cannot use newly create session with the same ID.
         sHandler.postAndSync(() -> {
             // Recreated session has different session stub, so previously created controller
             // shouldn't be available.

@@ -26,7 +26,6 @@ import android.support.test.runner.AndroidJUnit4;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -40,9 +39,6 @@ import static org.junit.Assert.*;
  */
 @RunWith(AndroidJUnit4.class)
 @SmallTest
-@Ignore
-// TODO(jaewan): Reenable test when the media session service detects newly installed sesison
-//               service app.
 public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
     private static final String TAG = "MediaSessionManager_MediaSession2";
 
@@ -101,7 +97,7 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
     }
 
     /**
-     * Test if server recognizes session even if session refuses the connection from server.
+     * Test if server recognizes a session even if the session refuses the connection from server.
      *
      * @throws InterruptedException
      */
