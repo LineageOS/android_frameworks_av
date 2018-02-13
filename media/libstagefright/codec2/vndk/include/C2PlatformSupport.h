@@ -82,6 +82,23 @@ c2_status_t GetCodec2BlockPool(
         std::shared_ptr<C2BlockPool> *pool);
 
 /**
+ * Creates a block pool.
+ * \param allocatorId  the allocator ID which is used to allocate blocks
+ * \param component     the component using the block pool (must be non-null)
+ * \param pool          pointer to where the created block pool shall be store on success.
+ *                      nullptr will be stored here on failure
+ *
+ * \retval C2_OK        the operation was successful
+ * \retval C2_BAD_VALUE the component is null
+ * \retval C2_NOT_FOUND if the allocator does not exist
+ * \retval C2_NO_MEMORY not enough memory to create a block pool
+ */
+c2_status_t CreateCodec2BlockPool(
+        C2PlatformAllocatorStore::id_t allocatorId,
+        std::shared_ptr<const C2Component> component,
+        std::shared_ptr<C2BlockPool> *pool);
+
+/**
  * Returns the platform component store.
  * \retval nullptr if the platform component store could not be obtained
  */
