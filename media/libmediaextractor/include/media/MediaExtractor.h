@@ -29,8 +29,6 @@ namespace android {
 
 class DataSourceBase;
 class MetaData;
-class String8;
-struct AMessage;
 struct MediaSourceBase;
 
 
@@ -87,14 +85,16 @@ public:
     virtual const char * name() { return "<unspecified>"; }
 
     typedef MediaExtractor* (*CreatorFunc)(
-            DataSourceBase *source, const sp<AMessage> &meta);
+            DataSourceBase *source, void *meta);
+    typedef void (*FreeMetaFunc)(void *meta);
 
-    // The sniffer can optionally fill in "meta" with an AMessage containing
-    // a dictionary of values that helps the corresponding extractor initialize
-    // its state without duplicating effort already exerted by the sniffer.
+    // The sniffer can optionally fill in an opaque object, "meta", that helps
+    // the corresponding extractor initialize its state without duplicating
+    // effort already exerted by the sniffer. If "freeMeta" is given, it will be
+    // called against the opaque object when it is no longer used.
     typedef CreatorFunc (*SnifferFunc)(
-            DataSourceBase *source, String8 *mimeType,
-            float *confidence, sp<AMessage> *meta);
+            DataSourceBase *source, float *confidence,
+            void **meta, FreeMetaFunc *freeMeta);
 
     typedef struct {
         const uint8_t b[16];

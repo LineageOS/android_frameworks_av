@@ -112,23 +112,25 @@ sp<IMediaExtractor> MediaExtractorFactory::CreateFromService(
     // initialize source decryption if needed
     source->DrmInitialization(nullptr /* mime */);
 
-    sp<AMessage> meta;
-
+    void *meta = nullptr;
     MediaExtractor::CreatorFunc creator = NULL;
-    String8 tmp;
+    MediaExtractor::FreeMetaFunc freeMeta = nullptr;
     float confidence;
     sp<ExtractorPlugin> plugin;
-    creator = sniff(source.get(), &tmp, &confidence, &meta, plugin);
+    creator = sniff(source.get(), &confidence, &meta, &freeMeta, plugin);
     if (!creator) {
         ALOGV("FAILED to autodetect media content.");
         return NULL;
     }
 
-    mime = tmp.string();
-    ALOGV("Autodetected media content as '%s' with confidence %.2f",
-         mime, confidence);
-
     MediaExtractor *ret = creator(source.get(), meta);
+    if (meta != nullptr && freeMeta != nullptr) {
+        freeMeta(meta);
+    }
+
+    ALOGV("Created an extractor '%s' with confidence %.2f",
+         ret != nullptr ? ret->name() : "<null>", confidence);
+
     return CreateIMediaExtractorFromMediaExtractor(ret, source, plugin);
 }
 
@@ -165,11 +167,10 @@ bool MediaExtractorFactory::gPluginsRegistered = false;
 
 // static
 MediaExtractor::CreatorFunc MediaExtractorFactory::sniff(
-        DataSourceBase *source, String8 *mimeType, float *confidence, sp<AMessage> *meta,
-        sp<ExtractorPlugin> &plugin) {
-    *mimeType = "";
+        DataSourceBase *source, float *confidence, void **meta,
+        MediaExtractor::FreeMetaFunc *freeMeta, sp<ExtractorPlugin> &plugin) {
     *confidence = 0.0f;
-    meta->clear();
+    *meta = nullptr;
 
     std::shared_ptr<List<sp<ExtractorPlugin>>> plugins;
     {
@@ -183,16 +184,23 @@ MediaExtractor::CreatorFunc MediaExtractorFactory::sniff(
     MediaExtractor::CreatorFunc curCreator = NULL;
     MediaExtractor::CreatorFunc bestCreator = NULL;
     for (auto it = plugins->begin(); it != plugins->end(); ++it) {
-        String8 newMimeType;
         float newConfidence;
-        sp<AMessage> newMeta;
-        if ((curCreator = (*it)->def.sniff(source, &newMimeType, &newConfidence, &newMeta))) {
+        void *newMeta = nullptr;
+        MediaExtractor::FreeMetaFunc newFreeMeta = nullptr;
+        if ((curCreator = (*it)->def.sniff(source, &newConfidence, &newMeta, &newFreeMeta))) {
             if (newConfidence > *confidence) {
-                *mimeType = newMimeType;
                 *confidence = newConfidence;
+                if (*meta != nullptr && *freeMeta != nullptr) {
+                    (*freeMeta)(*meta);
+                }
                 *meta = newMeta;
+                *freeMeta = newFreeMeta;
                 plugin = *it;
                 bestCreator = curCreator;
+            } else {
+                if (newMeta != nullptr && newFreeMeta != nullptr) {
+                    newFreeMeta(newMeta);
+                }
             }
         }
     }

@@ -87,8 +87,7 @@ private:
 
 };
 
-bool SniffMidi(DataSourceBase *source, String8 *mimeType,
-        float *confidence, sp<AMessage> *);
+bool SniffMidi(DataSourceBase *source, float *confidence);
 
 }  // namespace android
 

@@ -1371,21 +1371,20 @@ sp<MetaData> OggExtractor::getMetaData() {
 
 static MediaExtractor* CreateExtractor(
         DataSourceBase *source,
-        const sp<AMessage>& meta __unused) {
+        void *) {
     return new OggExtractor(source);
 }
 
 static MediaExtractor::CreatorFunc Sniff(
         DataSourceBase *source,
-        String8 *mimeType,
         float *confidence,
-        sp<AMessage> *) {
+        void **,
+        MediaExtractor::FreeMetaFunc *) {
     char tmp[4];
     if (source->readAt(0, tmp, 4) < 4 || memcmp(tmp, "OggS", 4)) {
         return NULL;
     }
 
-    mimeType->setTo(MEDIA_MIMETYPE_CONTAINER_OGG);
     *confidence = 0.2f;
 
     return CreateExtractor;

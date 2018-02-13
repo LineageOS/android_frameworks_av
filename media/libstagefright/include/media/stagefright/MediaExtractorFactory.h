@@ -57,7 +57,7 @@ private:
             const sp<ExtractorPlugin> &plugin, List<sp<ExtractorPlugin>> &pluginList);
 
     static MediaExtractor::CreatorFunc sniff(DataSourceBase *source,
-            String8 *mimeType, float *confidence, sp<AMessage> *meta,
+            float *confidence, void **meta, MediaExtractor::FreeMetaFunc *freeMeta,
             sp<ExtractorPlugin> &plugin);
 
     static void UpdateExtractors(const char *newUpdateApkPath);

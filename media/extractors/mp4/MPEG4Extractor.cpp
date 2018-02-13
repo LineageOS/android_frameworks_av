@@ -5382,8 +5382,7 @@ MPEG4Extractor::Track *MPEG4Extractor::findTrackByMimePrefix(
     return NULL;
 }
 
-static bool LegacySniffMPEG4(
-        DataSourceBase *source, String8 *mimeType, float *confidence) {
+static bool LegacySniffMPEG4(DataSourceBase *source, float *confidence) {
     uint8_t header[8];
 
     ssize_t n = source->readAt(4, header, sizeof(header));
@@ -5399,7 +5398,6 @@ static bool LegacySniffMPEG4(
         || !memcmp(header, "ftypkddi", 8) || !memcmp(header, "ftypM4VP", 8)
         || !memcmp(header, "ftypmif1", 8) || !memcmp(header, "ftypheic", 8)
         || !memcmp(header, "ftypmsf1", 8) || !memcmp(header, "ftyphevc", 8)) {
-        *mimeType = MEDIA_MIMETYPE_CONTAINER_MPEG4;
         *confidence = 0.4;
 
         return true;
@@ -5449,9 +5447,7 @@ static bool isCompatibleBrand(uint32_t fourcc) {
 // Also try to identify where this file's metadata ends
 // (end of the 'moov' atom) and report it to the caller as part of
 // the metadata.
-static bool BetterSniffMPEG4(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *meta) {
+static bool BetterSniffMPEG4(DataSourceBase *source, float *confidence) {
     // We scan up to 128 bytes to identify this file as an MP4.
     static const off64_t kMaxScanOffset = 128ll;
 
@@ -5553,35 +5549,23 @@ static bool BetterSniffMPEG4(
         return false;
     }
 
-    *mimeType = MEDIA_MIMETYPE_CONTAINER_MPEG4;
     *confidence = 0.4f;
-
-    if (moovAtomEndOffset >= 0) {
-        *meta = new AMessage;
-        (*meta)->setInt64("meta-data-size", moovAtomEndOffset);
-
-        ALOGV("found metadata size: %lld", (long long)moovAtomEndOffset);
-    }
 
     return true;
 }
 
-static MediaExtractor* CreateExtractor(
-        DataSourceBase *source,
-        const sp<AMessage>& meta __unused) {
+static MediaExtractor* CreateExtractor(DataSourceBase *source, void *) {
     return new MPEG4Extractor(source);
 }
 
 static MediaExtractor::CreatorFunc Sniff(
-        DataSourceBase *source,
-        String8 *mimeType,
-        float *confidence,
-        sp<AMessage> *meta) {
-    if (BetterSniffMPEG4(source, mimeType, confidence, meta)) {
+        DataSourceBase *source, float *confidence, void **,
+        MediaExtractor::FreeMetaFunc *) {
+    if (BetterSniffMPEG4(source, confidence)) {
         return CreateExtractor;
     }
 
-    if (LegacySniffMPEG4(source, mimeType, confidence)) {
+    if (LegacySniffMPEG4(source, confidence)) {
         ALOGW("Identified supported mpeg4 through LegacySniffMPEG4.");
         return CreateExtractor;
     }

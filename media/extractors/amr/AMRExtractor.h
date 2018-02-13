@@ -55,8 +55,7 @@ private:
 };
 
 bool SniffAMR(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *);
+        DataSourceBase *source, String8 *mimeType, float *confidence);
 
 }  // namespace android
 

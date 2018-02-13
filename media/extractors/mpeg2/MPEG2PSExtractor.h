@@ -71,9 +71,7 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(MPEG2PSExtractor);
 };
 
-bool SniffMPEG2PS(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *);
+bool SniffMPEG2PS(DataSourceBase *source, float *confidence);
 
 }  // namespace android
 
