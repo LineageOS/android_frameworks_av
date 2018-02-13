@@ -110,6 +110,38 @@ Return<Status> DrmPlugin::closeSession(const hidl_vec<uint8_t>& sessionId) {
     return Status::ERROR_DRM_SESSION_NOT_OPENED;
 }
 
+Status DrmPlugin::getKeyRequestCommon(const hidl_vec<uint8_t>& scope,
+        const hidl_vec<uint8_t>& initData,
+        const hidl_string& mimeType,
+        KeyType keyType,
+        const hidl_vec<KeyValue>& optionalParameters,
+        std::vector<uint8_t> *request,
+        KeyRequestType *keyRequestType,
+        std::string *defaultUrl) {
+        UNUSED(optionalParameters);
+
+    *defaultUrl = "";
+    *keyRequestType = KeyRequestType::UNKNOWN;
+    *request = std::vector<uint8_t>();
+
+    if (scope.size() == 0) {
+        return Status::BAD_VALUE;
+    }
+
+    if (keyType != KeyType::STREAMING) {
+        return Status::ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    sp<Session> session = mSessionLibrary->findSession(toVector(scope));
+    if (!session.get()) {
+        return Status::ERROR_DRM_SESSION_NOT_OPENED;
+    }
+
+    Status status = session->getKeyRequest(initData, mimeType, request);
+    *keyRequestType = KeyRequestType::INITIAL;
+    return status;
+}
+
 Return<void> DrmPlugin::getKeyRequest(
         const hidl_vec<uint8_t>& scope,
         const hidl_vec<uint8_t>& initData,
@@ -119,29 +151,16 @@ Return<void> DrmPlugin::getKeyRequest(
         getKeyRequest_cb _hidl_cb) {
     UNUSED(optionalParameters);
 
-    if (scope.size() == 0) {
-        // Returns empty keyRequest, unknown keyType and empty defaultUrl
-        _hidl_cb(Status::BAD_VALUE, hidl_vec<uint8_t>(),
-                KeyRequestType::UNKNOWN, "");
-        return Void();
-    }
-
-    if (keyType != KeyType::STREAMING) {
-        _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, hidl_vec<uint8_t>(),
-                KeyRequestType::UNKNOWN, "");
-        return Void();
-    }
-
-    sp<Session> session = mSessionLibrary->findSession(toVector(scope));
-    if (!session.get()) {
-        _hidl_cb(Status::ERROR_DRM_SESSION_NOT_OPENED, hidl_vec<uint8_t>(),
-                KeyRequestType::UNKNOWN, "");
-        return Void();
-    }
-
+    KeyRequestType keyRequestType = KeyRequestType::UNKNOWN;
+    std::string defaultUrl("");
     std::vector<uint8_t> request;
-    Status status = session->getKeyRequest(initData, mimeType, &request);
-    _hidl_cb(status, toHidlVec(request), KeyRequestType::INITIAL, "");
+    Status status = getKeyRequestCommon(
+            scope, initData, mimeType, keyType, optionalParameters,
+            &request, &keyRequestType, &defaultUrl);
+
+    _hidl_cb(status, toHidlVec(request),
+            static_cast<drm::V1_0::KeyRequestType>(keyRequestType),
+            hidl_string(defaultUrl));
     return Void();
 }
 
@@ -152,23 +171,16 @@ Return<void> DrmPlugin::getKeyRequest_1_1(
         KeyType keyType,
         const hidl_vec<KeyValue>& optionalParameters,
         getKeyRequest_1_1_cb _hidl_cb) {
-    hidl_string defaultUrl;
-    hidl_vec<uint8_t> request;
-    ::android::hardware::drm::V1_1::KeyRequestType requestType =
-            static_cast<::android::hardware::drm::V1_1::KeyRequestType>(KeyRequestType::UNKNOWN);
-    Status status = Status::OK;
+    UNUSED(optionalParameters);
 
-    defaultUrl.clear();
-    getKeyRequest(scope, initData, mimeType, keyType, optionalParameters,
-            [&](Status statusCode, const hidl_vec<uint8_t>& hResult,
-            KeyRequestType hKeyRequestType,
-            const hidl_string& hDefaultUrl) {
-        defaultUrl = hDefaultUrl;
-        request = hResult;
-        requestType = static_cast<::android::hardware::drm::V1_1::KeyRequestType>(hKeyRequestType);
-        status = statusCode;
-    });
-    _hidl_cb(status, request, requestType, defaultUrl);
+    KeyRequestType keyRequestType = KeyRequestType::UNKNOWN;
+    std::string defaultUrl("");
+    std::vector<uint8_t> request;
+    Status status = getKeyRequestCommon(
+            scope, initData, mimeType, keyType, optionalParameters,
+            &request, &keyRequestType, &defaultUrl);
+
+    _hidl_cb(status, toHidlVec(request), keyRequestType, hidl_string(defaultUrl));
     return Void();
 }
 
