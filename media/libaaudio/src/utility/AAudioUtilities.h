@@ -159,6 +159,41 @@ void AAudio_linearRamp(const int16_t *source,
                        float amplitude1,
                        float amplitude2);
 
+class AAudioDataConverter {
+public:
+
+    struct FormattedData {
+
+        FormattedData(void *data, aaudio_format_t format, int32_t channelCount)
+            : data(data)
+            , format(format)
+            , channelCount(channelCount) {}
+
+        const void            *data = nullptr;
+        const aaudio_format_t  format = AAUDIO_FORMAT_UNSPECIFIED;
+        const int32_t          channelCount = 1;
+    };
+
+    static void convert(const FormattedData &source,
+                        const FormattedData &destination,
+                        int32_t numFrames,
+                        float levelFrom,
+                        float levelTo);
+
+private:
+    static void convertMonoToStereo(const FormattedData &source,
+                                    const FormattedData &destination,
+                                    int32_t numFrames,
+                                    float levelFrom,
+                                    float levelTo);
+
+    static void convertChannelsMatch(const FormattedData &source,
+                                     const FormattedData &destination,
+                                     int32_t numFrames,
+                                     float levelFrom,
+                                     float levelTo);
+};
+
 /**
  * Calculate the number of bytes and prevent numeric overflow.
  * @param numFrames frame count

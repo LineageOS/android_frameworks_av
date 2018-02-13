@@ -138,7 +138,14 @@ protected:
     // Calculate timeout for an operation involving framesPerOperation.
     int64_t calculateReasonableTimeout(int32_t framesPerOperation);
 
-    aaudio_format_t          mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    aaudio_format_t getDeviceFormat() const { return mDeviceFormat; }
+
+    int32_t getDeviceChannelCount() const { return mDeviceChannelCount; }
+
+    /**
+     * @return true if running in audio service, versus in app process
+     */
+    bool isInService() const { return mInService; }
 
     IsochronousClockModel    mClockModel;      // timing model for chasing the HAL
 
@@ -187,6 +194,11 @@ private:
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
 
     int64_t                  mServiceLatencyNanos = 0;
+
+    // Sometimes the hardware is operating with a different format or channel count from the app.
+    // Then we require conversion in AAudio.
+    aaudio_format_t          mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    int32_t                  mDeviceChannelCount = 0;
 };
 
 } /* namespace aaudio */
