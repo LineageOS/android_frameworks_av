@@ -539,9 +539,95 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
+    @Override
+    public void getItem(IMediaSession2Callback caller, String mediaId) throws RuntimeException {
+        final MediaLibrarySessionImpl sessionImpl = getLibrarySession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "getItem() from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        if (mediaId == null) {
+            if (DEBUG) {
+                Log.d(TAG, "mediaId shouldn't be null");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaLibrarySessionImpl session = getLibrarySession();
+            if (session == null) {
+                return;
+            }
+            final ControllerInfoImpl controllerImpl = ControllerInfoImpl.from(controller);
+            MediaItem2 result = session.getCallback().onLoadItem(controller, mediaId);
+            try {
+                controllerImpl.getControllerBinder().onItemLoaded(
+                        mediaId, result == null ? null : result.toBundle());
+            } catch (RemoteException e) {
+                // Controller may be died prematurely.
+                // TODO(jaewan): Handle this.
+            }
+        });
+    }
+
+    @Override
+    public void getChildren(IMediaSession2Callback caller, String parentId, int page,
+            int pageSize, Bundle options) throws RuntimeException {
+        final MediaLibrarySessionImpl sessionImpl = getLibrarySession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "getChildren() from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        if (parentId == null) {
+            Log.d(TAG, "parentId shouldn't be null");
+            return;
+        }
+        if (page < 1 || pageSize < 1) {
+            Log.d(TAG, "Neither page nor pageSize should be less than 1");
+            return;
+        }
+
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaLibrarySessionImpl session = getLibrarySession();
+            if (session == null) {
+                return;
+            }
+            final ControllerInfoImpl controllerImpl = ControllerInfoImpl.from(controller);
+            List<MediaItem2> result = session.getCallback().onLoadChildren(
+                    controller, parentId, page, pageSize, options);
+            if (result != null && result.size() > pageSize) {
+                throw new IllegalArgumentException("onLoadChildren() shouldn't return media items "
+                        + "more than pageSize. result.size()=" + result.size() + " pageSize="
+                        + pageSize);
+            }
+
+            List<Bundle> bundleList = null;
+            if (result != null) {
+                bundleList = new ArrayList<>();
+                for (MediaItem2 item : result) {
+                    bundleList.add(item == null ? null : item.toBundle());
+                }
+            }
+
+            try {
+                controllerImpl.getControllerBinder().onChildrenLoaded(
+                        parentId, page, pageSize, options, bundleList);
+            } catch (RemoteException e) {
+                // Controller may be died prematurely.
+                // TODO(jaewan): Handle this.
+            }
+        });
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////////
     // APIs for MediaSession2Impl
     //////////////////////////////////////////////////////////////////////////////////////////////
+
     // TODO(jaewan): Need a way to get controller with permissions
     public List<ControllerInfo> getControllers() {
         ArrayList<ControllerInfo> controllers = new ArrayList<>();

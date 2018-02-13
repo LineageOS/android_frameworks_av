@@ -19,11 +19,13 @@ package com.android.media;
 import android.content.Context;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
+import android.media.MediaItem2;
 import android.media.MediaSession2.CommandButton;
 import android.media.SessionToken2;
 import android.media.update.MediaBrowser2Provider;
 import android.os.Bundle;
 import android.os.RemoteException;
+import android.text.TextUtils;
 import android.util.Log;
 
 import java.util.List;
@@ -72,12 +74,47 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
 
     @Override
     public void getItem_impl(String mediaId) {
-        // TODO(jaewan): Implement
+        if (mediaId == null) {
+            throw new IllegalArgumentException("mediaId shouldn't be null");
+        }
+
+        final IMediaSession2 binder = getSessionBinder();
+        if (binder != null) {
+            try {
+                binder.getItem(getControllerStub(), mediaId);
+            } catch (RemoteException e) {
+                // TODO(jaewan): Handle disconnect.
+                if (DEBUG) {
+                    Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+                }
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     @Override
     public void getChildren_impl(String parentId, int page, int pageSize, Bundle options) {
-        // TODO(jaewan): Implement
+        if (parentId == null) {
+            throw new IllegalArgumentException("parentId shouldn't be null");
+        }
+        if (page < 1 || pageSize < 1) {
+            throw new IllegalArgumentException("Neither page nor pageSize should be less than 1");
+        }
+
+        final IMediaSession2 binder = getSessionBinder();
+        if (binder != null) {
+            try {
+                binder.getChildren(getControllerStub(), parentId, page, pageSize, options);
+            } catch (RemoteException e) {
+                // TODO(jaewan): Handle disconnect.
+                if (DEBUG) {
+                    Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+                }
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     @Override
@@ -89,6 +126,19 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
             final Bundle rootHints, final String rootMediaId, final Bundle rootExtra) {
         getCallbackExecutor().execute(() -> {
             mCallback.onGetRootResult(rootHints, rootMediaId, rootExtra);
+        });
+    }
+
+    public void onItemLoaded(String mediaId, MediaItem2 item) {
+        getCallbackExecutor().execute(() -> {
+            mCallback.onItemLoaded(mediaId, item);
+        });
+    }
+
+    public void onChildrenLoaded(String parentId, int page, int pageSize, Bundle options,
+            List<MediaItem2> result) {
+        getCallbackExecutor().execute(() -> {
+            mCallback.onChildrenLoaded(parentId, page, pageSize, options, result);
         });
     }
 }
