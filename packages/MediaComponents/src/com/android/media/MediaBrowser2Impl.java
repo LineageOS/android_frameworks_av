@@ -63,12 +63,12 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
     }
 
     @Override
-    public void subscribe_impl(String parentId, Bundle options) {
+    public void subscribe_impl(String parentId, Bundle extras) {
         // TODO(jaewan): Implement
     }
 
     @Override
-    public void unsubscribe_impl(String parentId, Bundle options) {
+    public void unsubscribe_impl(String parentId, Bundle extras) {
         // TODO(jaewan): Implement
     }
 
@@ -94,7 +94,7 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
     }
 
     @Override
-    public void getChildren_impl(String parentId, int page, int pageSize, Bundle options) {
+    public void getChildren_impl(String parentId, int page, int pageSize, Bundle extras) {
         if (parentId == null) {
             throw new IllegalArgumentException("parentId shouldn't be null");
         }
@@ -105,7 +105,7 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
         final IMediaSession2 binder = getSessionBinder();
         if (binder != null) {
             try {
-                binder.getChildren(getControllerStub(), parentId, page, pageSize, options);
+                binder.getChildren(getControllerStub(), parentId, page, pageSize, extras);
             } catch (RemoteException e) {
                 // TODO(jaewan): Handle disconnect.
                 if (DEBUG) {
@@ -118,8 +118,43 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
     }
 
     @Override
-    public void search_impl(String query, int page, int pageSize, Bundle extras) {
-        // TODO(jaewan): Implement
+    public void search_impl(String query, Bundle extras) {
+        if (TextUtils.isEmpty(query)) {
+            throw new IllegalArgumentException("query shouldn't be empty");
+        }
+        final IMediaSession2 binder = getSessionBinder();
+        if (binder != null) {
+            try {
+                binder.search(getControllerStub(), query, extras);
+            } catch (RemoteException e) {
+                // TODO(jaewan): Handle disconnect.
+                if (DEBUG) {
+                    Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+                }
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
+    }
+
+    @Override
+    public void getSearchResult_impl(String query, int page, int pageSize, Bundle extras) {
+        if (TextUtils.isEmpty(query)) {
+            throw new IllegalArgumentException("query shouldn't be empty");
+        }
+        final IMediaSession2 binder = getSessionBinder();
+        if (binder != null) {
+            try {
+                binder.getSearchResult(getControllerStub(), query, page, pageSize, extras);
+            } catch (RemoteException e) {
+                // TODO(jaewan): Handle disconnect.
+                if (DEBUG) {
+                    Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+                }
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     public void onGetRootResult(
@@ -135,10 +170,17 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
         });
     }
 
-    public void onChildrenLoaded(String parentId, int page, int pageSize, Bundle options,
+    public void onChildrenLoaded(String parentId, int page, int pageSize, Bundle extras,
             List<MediaItem2> result) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onChildrenLoaded(parentId, page, pageSize, options, result);
+            mCallback.onChildrenLoaded(parentId, page, pageSize, extras, result);
+        });
+    }
+
+    public void onSearchResultLoaded(String query, int page, int pageSize, Bundle extras,
+            List<MediaItem2> result) {
+        getCallbackExecutor().execute(() -> {
+            mCallback.onSearchResultLoaded(query, page, pageSize, extras, result);
         });
     }
 }
