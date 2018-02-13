@@ -31,6 +31,9 @@ public:
         if (source.get() == nullptr) {
             return nullptr;
         }
+        if (source->getIDataSource().get() != nullptr) {
+            return source->getIDataSource();
+        }
         return new RemoteDataSource(source);
     }
 
