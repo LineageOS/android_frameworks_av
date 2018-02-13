@@ -52,6 +52,7 @@ using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::hidl::manager::V1_0::IServiceManager;
+using ::android::os::PersistableBundle;
 using ::android::sp;
 
 namespace {
@@ -594,6 +595,7 @@ status_t DrmHal::openSession(DrmPlugin::SecurityLevel level,
         DrmSessionManager::Instance()->addSession(getCallingPid(),
                 mDrmSessionClient, sessionId);
         mOpenSessions.push(sessionId);
+        mMetrics.SetSessionStart(sessionId);
     }
 
     mMetrics.mOpenSessionCounter.Increment(err);
@@ -615,9 +617,10 @@ status_t DrmHal::closeSession(Vector<uint8_t> const &sessionId) {
                 }
             }
         }
-        reportMetrics();
         status_t response = toStatusT(status);
+        mMetrics.SetSessionEnd(sessionId);
         mMetrics.mCloseSessionCounter.Increment(response);
+        reportMetrics();
         return response;
     }
     mMetrics.mCloseSessionCounter.Increment(DEAD_OBJECT);
@@ -1095,7 +1098,7 @@ status_t DrmHal::setPropertyByteArray(String8 const &name,
     return toStatusT(status);
 }
 
-status_t DrmHal::getMetrics(MediaAnalyticsItem* item) {
+status_t DrmHal::getMetrics(PersistableBundle* item) {
     if (item == nullptr) {
       return UNEXPECTED_NULL;
     }

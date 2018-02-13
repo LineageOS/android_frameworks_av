@@ -15,6 +15,7 @@
  */
 
 #include <binder/IInterface.h>
+#include <binder/PersistableBundle.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/drm/DrmAPI.h>
 #include <media/IDrmClient.h>
@@ -98,7 +99,7 @@ struct IDrm : public IInterface {
     virtual status_t setPropertyByteArray(String8 const &name,
                                           Vector<uint8_t> const &value) const = 0;
 
-    virtual status_t getMetrics(MediaAnalyticsItem *item) = 0;
+    virtual status_t getMetrics(os::PersistableBundle *metrics) = 0;
 
     virtual status_t setCipherAlgorithm(Vector<uint8_t> const &sessionId,
                                         String8 const &algorithm) = 0;

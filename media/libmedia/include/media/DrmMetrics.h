@@ -20,6 +20,7 @@
 #include <map>
 
 #include <android/hardware/drm/1.0/types.h>
+#include <binder/PersistableBundle.h>
 #include <media/CounterMetric.h>
 #include <media/EventMetric.h>
 
@@ -28,7 +29,7 @@ namespace android {
 /**
  * This class contains the definition of metrics captured within MediaDrm.
  * It also contains a method for exporting all of the metrics to a
- * MediaAnalyticsItem instance.
+ * PersistableBundle.
  */
 class MediaDrmMetrics {
  public:
@@ -55,10 +56,19 @@ class MediaDrmMetrics {
   // Count getPropertyByteArray calls to retrieve the device unique id.
   CounterMetric<status_t> mGetDeviceUniqueIdCounter;
 
-  // TODO: Add session start and end time support. These are a special case.
+  // Adds a session start time record.
+  void SetSessionStart(const Vector<uint8_t>& sessionId);
 
-  // Export the metrics to a MediaAnalyticsItem.
-  void Export(MediaAnalyticsItem* item);
+  // Adds a session end time record.
+  void SetSessionEnd(const Vector<uint8_t>& sessionId);
+
+  // Export the metrics to a PersistableBundle.
+  void Export(os::PersistableBundle* metricsBundle);
+
+ private:
+  // Session lifetimes. A pair of values representing the milliseconds since
+  // epoch, UTC. The first value is the start time, the second is the end time.
+  std::map<String16, std::pair<int64_t, int64_t>> mSessionLifespans;
 };
 
 }  // namespace android

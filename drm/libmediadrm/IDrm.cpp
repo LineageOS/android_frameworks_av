@@ -492,7 +492,10 @@ struct BpDrm : public BpInterface<IDrm> {
         return reply.readInt32();
     }
 
-    virtual status_t getMetrics(MediaAnalyticsItem *item) {
+    virtual status_t getMetrics(os::PersistableBundle *metrics) {
+        if (metrics == NULL) {
+            return BAD_VALUE;
+        }
         Parcel data, reply;
         data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
 
@@ -500,9 +503,23 @@ struct BpDrm : public BpInterface<IDrm> {
         if (status != OK) {
             return status;
         }
+        // The reply data is ordered as
+        // 1) 32 bit integer reply followed by
+        // 2) Serialized PersistableBundle containing metrics.
+        status_t reply_status;
+        if (reply.readInt32(&reply_status) != OK
+           || reply_status != OK) {
+          ALOGE("Failed to read getMetrics response code from parcel. %d",
+                reply_status);
+          return reply_status;
+        }
 
-        item->readFromParcel(reply);
-        return reply.readInt32();
+        status = metrics->readFromParcel(&reply);
+        if (status != OK) {
+            ALOGE("Failed to read metrics from parcel. %d", status);
+            return status;
+        }
+        return reply_status;
     }
 
     virtual status_t setCipherAlgorithm(Vector<uint8_t> const &sessionId,
@@ -1008,11 +1025,18 @@ status_t BnDrm::onTransact(
         {
             CHECK_INTERFACE(IDrm, data, reply);
 
-            MediaAnalyticsItem item;
-            status_t result = getMetrics(&item);
-            item.writeToParcel(reply);
-            reply->writeInt32(result);
-            return OK;
+            os::PersistableBundle metrics;
+            status_t result = getMetrics(&metrics);
+            // The reply data is ordered as
+            // 1) 32 bit integer reply followed by
+            // 2) Serialized PersistableBundle containing metrics.
+            // Only write the metrics if the getMetrics result was
+            // OK and we successfully added the status to reply.
+            status_t parcel_result = reply->writeInt32(result);
+            if (result == OK && parcel_result == OK) {
+                parcel_result = metrics.writeToParcel(reply);
+            }
+            return parcel_result;
         }
 
         case SET_CIPHER_ALGORITHM:
