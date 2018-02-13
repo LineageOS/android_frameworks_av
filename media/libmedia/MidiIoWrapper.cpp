@@ -38,6 +38,7 @@ MidiIoWrapper::MidiIoWrapper(const char *path) {
     mFd = open(path, O_RDONLY | O_LARGEFILE);
     mBase = 0;
     mLength = lseek(mFd, 0, SEEK_END);
+    mDataSource = nullptr;
 }
 
 MidiIoWrapper::MidiIoWrapper(int fd, off64_t offset, int64_t size) {
@@ -45,6 +46,7 @@ MidiIoWrapper::MidiIoWrapper(int fd, off64_t offset, int64_t size) {
     mFd = fd < 0 ? -1 : dup(fd);
     mBase = offset;
     mLength = size;
+    mDataSource = nullptr;
 }
 
 MidiIoWrapper::MidiIoWrapper(DataSourceBase *source) {
