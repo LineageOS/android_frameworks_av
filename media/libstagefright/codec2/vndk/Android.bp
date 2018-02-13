@@ -10,6 +10,10 @@ cc_library_headers {
 
 cc_library_shared {
     name: "libstagefright_codec2_vndk",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     srcs: [
         "C2AllocatorIon.cpp",
@@ -23,12 +27,9 @@ cc_library_shared {
         "include",
     ],
 
-    header_libs:[
-        "libstagefright_codec2_internal",
-    ],
-
     include_dirs: [
         "frameworks/av/media/libstagefright/codec2/include",
+        "frameworks/av/media/libstagefright/codec2/vndk/internal",
         "frameworks/native/include/media/hardware",
     ],
 
@@ -42,7 +43,6 @@ cc_library_shared {
         "libhidlbase",
         "libion",
         "liblog",
-        "libmedia",
         "libstagefright_foundation",
         "libui",
         "libutils",
