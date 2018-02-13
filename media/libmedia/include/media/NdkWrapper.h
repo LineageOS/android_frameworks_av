@@ -18,6 +18,9 @@
 
 #define NDK_WRAPPER_H_
 
+#include <media/DataSource.h>
+#include <media/MediaSource.h>
+#include <media/NdkMediaDataSource.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaExtractor.h>
 #include <media/hardware/CryptoAPI.h>
@@ -286,7 +289,11 @@ struct AMediaExtractorWrapper : public RefBase {
 
     status_t setDataSource(const char *location);
 
+    status_t setDataSource(AMediaDataSource *);
+
     size_t getTrackCount();
+
+    sp<AMediaFormatWrapper> getFormat();
 
     sp<AMediaFormatWrapper> getTrackFormat(size_t idx);
 
@@ -294,7 +301,11 @@ struct AMediaExtractorWrapper : public RefBase {
 
     status_t unselectTrack(size_t idx);
 
+    status_t selectSingleTrack(size_t idx);
+
     ssize_t readSampleData(const sp<ABuffer> &buffer);
+
+    ssize_t getSampleSize();
 
     uint32_t getSampleFlags();
 
@@ -302,9 +313,11 @@ struct AMediaExtractorWrapper : public RefBase {
 
     int64_t getSampleTime();
 
+    int64_t getCachedDuration();
+
     bool advance();
 
-    status_t seekTo(int64_t seekPosUs, SeekMode mode);
+    status_t seekTo(int64_t seekPosUs, MediaSource::ReadOptions::SeekMode mode);
 
     // the returned PsshInfo is still owned by this wrapper.
     PsshInfo* getPsshInfo();
@@ -318,6 +331,31 @@ private:
     AMediaExtractor *mAMediaExtractor;
 
     DISALLOW_EVIL_CONSTRUCTORS(AMediaExtractorWrapper);
+};
+
+struct AMediaDataSourceWrapper : public RefBase {
+
+    static status_t translate_error(media_status_t err);
+
+    static ssize_t AMediaDataSourceWrapper_getSize(void *userdata);
+
+    static ssize_t AMediaDataSourceWrapper_readAt(void *userdata, off64_t offset, void * buf, size_t size);
+
+    static void AMediaDataSourceWrapper_close(void *userdata);
+
+    AMediaDataSourceWrapper(const sp<DataSource> &dataSource);
+
+    AMediaDataSource *getAMediaDataSource();
+
+protected:
+    virtual ~AMediaDataSourceWrapper();
+
+private:
+    sp<DataSource> mDataSource;
+
+    AMediaDataSource *mAMediaDataSource;
+
+    DISALLOW_EVIL_CONSTRUCTORS(AMediaDataSourceWrapper);
 };
 
 }  // namespace android
