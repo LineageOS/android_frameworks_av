@@ -34,6 +34,8 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.text.TextUtils;
 
+import java.util.List;
+
 public class SessionToken2Impl implements SessionToken2Provider {
     private static final String KEY_UID = "android.media.token.uid";
     private static final String KEY_TYPE = "android.media.token.type";
@@ -73,25 +75,24 @@ public class SessionToken2Impl implements SessionToken2Provider {
             }
         }
         mUid = uid;
-        // calculate id and type
-        Intent serviceIntent = new Intent(MediaLibraryService2.SERVICE_INTERFACE);
-        serviceIntent.setClassName(packageName, serviceName);
-        String id = getSessionId(manager.resolveService(serviceIntent,
-                PackageManager.GET_META_DATA));
-        int type = TYPE_LIBRARY_SERVICE;
-        if (id == null) {
+
+        // Infer id and type from package name and service name
+        // TODO(jaewan): Handle multi-user.
+        String id = getSessionIdFromService(manager, MediaLibraryService2.SERVICE_INTERFACE,
+                packageName, serviceName);
+        if (id != null) {
+            mId = id;
+            mType = TYPE_LIBRARY_SERVICE;
+        } else {
             // retry with session service
-            serviceIntent.setClassName(packageName, serviceName);
-            id = getSessionId(manager.resolveService(serviceIntent,
-                    PackageManager.GET_META_DATA));
-            type = TYPE_SESSION_SERVICE;
+            mId = getSessionIdFromService(manager, MediaSessionService2.SERVICE_INTERFACE,
+                    packageName, serviceName);
+            mType = TYPE_SESSION_SERVICE;
         }
-        if (id == null) {
+        if (mId == null) {
             throw new IllegalArgumentException("service " + serviceName + " doesn't implement"
-                    + " session service nor library service");
+                    + " session service nor library service. Use service's full name.");
         }
-        mId = id;
-        mType = type;
         mPackageName = packageName;
         mServiceName = serviceName;
         mSessionBinder = null;
@@ -107,6 +108,29 @@ public class SessionToken2Impl implements SessionToken2Provider {
         mId = id;
         mSessionBinder = sessionBinder;
         mInstance = new SessionToken2(this);
+    }
+
+    private static String getSessionIdFromService(PackageManager manager, String serviceInterface,
+            String packageName, String serviceName) {
+        Intent serviceIntent = new Intent(serviceInterface);
+        serviceIntent.setPackage(packageName);
+        // Use queryIntentServices to find services with MediaLibraryService2.SERVICE_INTERFACE.
+        // We cannot use resolveService with intent specified class name, because resolveService
+        // ignores actions if Intent.setClassName() is specified.
+        List<ResolveInfo> list = manager.queryIntentServices(
+                serviceIntent, PackageManager.GET_META_DATA);
+        if (list != null) {
+            for (int i = 0; i < list.size(); i++) {
+                ResolveInfo resolveInfo = list.get(i);
+                if (resolveInfo == null || resolveInfo.serviceInfo == null) {
+                    continue;
+                }
+                if (TextUtils.equals(resolveInfo.serviceInfo.name, serviceName)) {
+                    return getSessionId(resolveInfo);
+                }
+            }
+        }
+        return null;
     }
 
     public static String getSessionId(ResolveInfo resolveInfo) {
