@@ -105,4 +105,11 @@
     </string>
     <!-- Placeholder text indicating that the user can press the button to go to an external website. -->
     <string name="MediaControlView2_ad_text">Visit Advertiser</string>
+    <string name="MediaControlView2_cc_text">Closed caption</string>
+    <string name="MediaControlView2_audio_track_text">Audio track</string>
+    <string name="MediaControlView2_video_quality_text">Video quality</string>
+    <string name="MediaControlView2_video_quality_auto_text">Auto</string>
+    <string name="MediaControlView2_playback_speed_text">Playback speed</string>
+    <string name="MediaControlView2_playback_speed_normal_text">Normal</string>
+    <string name="MediaControlView2_help_text">Help &amp; feedback</string>
 </resources>
