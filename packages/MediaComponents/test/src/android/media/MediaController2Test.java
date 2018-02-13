@@ -21,9 +21,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.media.MediaPlayerInterface.PlaybackListener;
 import android.media.MediaSession2.Command;
+import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
+import android.media.TestServiceRegistry.SessionCallbackProxy;
 import android.media.TestUtils.SyncHandler;
 import android.net.Uri;
 import android.os.Bundle;
@@ -34,6 +36,7 @@ import android.os.ResultReceiver;
 import android.support.test.filters.FlakyTest;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
+import android.text.TextUtils;
 
 import org.junit.After;
 import org.junit.Before;
@@ -618,24 +621,32 @@ public class MediaController2Test extends MediaSession2TestBase {
     @Ignore
     @Test
     public void testConnectToService_sessionService() throws InterruptedException {
-        connectToService(TestUtils.getServiceToken(mContext, MockMediaSessionService2.ID));
-        testConnectToService();
+        testConnectToService(MockMediaSessionService2.ID);
     }
 
     // TODO(jaewan): Reenable when session manager detects app installs
     @Ignore
     @Test
     public void testConnectToService_libraryService() throws InterruptedException {
-        connectToService(TestUtils.getServiceToken(mContext, MockMediaLibraryService2.ID));
-        testConnectToService();
+        testConnectToService(MockMediaLibraryService2.ID);
     }
 
-    public void testConnectToService() throws InterruptedException {
-        TestServiceRegistry serviceInfo = TestServiceRegistry.getInstance();
-        ControllerInfo info = serviceInfo.getOnConnectControllerInfo();
-        assertEquals(mContext.getPackageName(), info.getPackageName());
-        assertEquals(Process.myUid(), info.getUid());
-        assertFalse(info.isTrusted());
+    public void testConnectToService(String id) throws InterruptedException {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final SessionCallbackProxy proxy = new SessionCallbackProxy(mContext) {
+            @Override
+            public CommandGroup onConnect(ControllerInfo controller) {
+                if (Process.myUid() == controller.getUid()) {
+                    assertEquals(mContext.getPackageName(), controller.getPackageName());
+                    assertFalse(controller.isTrusted());
+                    latch.countDown();;
+                }
+                return super.onConnect(controller);
+            }
+        };
+        TestServiceRegistry.getInstance().setSessionCallbackProxy(proxy);
+        mController = createController(TestUtils.getServiceToken(mContext, id));
+        assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
 
         // Test command from controller to session service
         mController.play();
@@ -701,27 +712,26 @@ public class MediaController2Test extends MediaSession2TestBase {
     @Ignore
     @Test
     public void testClose_sessionService() throws InterruptedException {
-        connectToService(TestUtils.getServiceToken(mContext, MockMediaSessionService2.ID));
-        testCloseFromService();
+        testCloseFromService(MockMediaSessionService2.ID);
     }
 
     // TODO(jaewan): Reenable when session manager detects app installs
     @Ignore
     @Test
     public void testClose_libraryService() throws InterruptedException {
-        connectToService(TestUtils.getServiceToken(mContext, MockMediaSessionService2.ID));
-        testCloseFromService();
+        testCloseFromService(MockMediaLibraryService2.ID);
     }
 
-    private void testCloseFromService() throws InterruptedException {
-        final String id = mController.getSessionToken().getId();
+    private void testCloseFromService(String id) throws InterruptedException {
         final CountDownLatch latch = new CountDownLatch(1);
-        TestServiceRegistry.getInstance().setServiceInstanceChangedCallback((service) -> {
-            if (service == null) {
-                // Destroying..
+        final SessionCallbackProxy proxy = new SessionCallbackProxy(mContext) {
+            @Override
+            public void onServiceDestroyed() {
                 latch.countDown();
             }
-        });
+        };
+        TestServiceRegistry.getInstance().setSessionCallbackProxy(proxy);
+        mController = createController(TestUtils.getServiceToken(mContext, id));
         mController.close();
         // Wait until close triggers onDestroy() of the session service.
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
