@@ -15,7 +15,7 @@
  */
 
 #define LOG_NDEBUG 0
-#define LOG_TAG "C2SoftAvcEncEnc"
+#define LOG_TAG "C2SoftAvcEnc"
 #include <utils/Log.h>
 #include <utils/misc.h>
 

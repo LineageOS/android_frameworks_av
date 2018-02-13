@@ -49,6 +49,9 @@ struct NdkDataSource : public DataSource {
     virtual String8 getMIMEType() const;
     virtual void close();
 
+protected:
+    virtual ~NdkDataSource();
+
 private:
 
     Mutex mLock;

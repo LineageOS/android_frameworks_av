@@ -24,7 +24,6 @@
 #include <android/native_window.h>
 #include <media/hardware/MetadataBufferType.h>
 #include <media/stagefright/foundation/Mutexed.h>
-#include <media/stagefright/bqhelper/GraphicBufferSource.h>
 #include <media/stagefright/CodecBase.h>
 #include <media/stagefright/FrameRenderTracker.h>
 #include <media/stagefright/MediaDefs.h>
@@ -36,6 +35,7 @@
 namespace android {
 
 class CCodecBufferChannel;
+class InputSurfaceWrapper;
 
 class CCodec : public CodecBase {
 public:
@@ -81,7 +81,7 @@ private:
 
     void createInputSurface();
     void setInputSurface(const sp<PersistentSurface> &surface);
-    status_t setupInputSurface(const sp<GraphicBufferSource> &source);
+    status_t setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &surface);
 
     void setDeadline(const TimePoint &deadline);
 

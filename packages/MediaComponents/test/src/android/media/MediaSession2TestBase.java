@@ -22,6 +22,7 @@ import static junit.framework.Assert.assertTrue;
 import android.content.Context;
 import android.media.MediaController2.ControllerCallback;
 import android.media.MediaSession2.Command;
+import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.os.Bundle;
 import android.os.HandlerThread;
@@ -59,15 +60,15 @@ abstract class MediaSession2TestBase {
         ControllerCallback getCallback();
     }
 
+    // Any change here should be also reflected to the TestControllerCallback and
+    // TestBrowserCallback
     interface TestControllerCallbackInterface {
-        // Add methods in ControllerCallback/BrowserCallback that you want to test.
+        // Add methods in ControllerCallback that you want to test.
         default void onPlaylistChanged(List<MediaItem2> playlist) {}
         default void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {}
         default void onPlaybackInfoChanged(MediaController2.PlaybackInfo info) {}
-
-        // Currently empty. Add methods in ControllerCallback/BrowserCallback that you want to test.
-        default void onPlaybackStateChanged(PlaybackState2 state) { }
-
+        default void onPlaybackStateChanged(PlaybackState2 state) {}
+        default void onCustomLayoutChanged(List<CommandButton> layout) {}
         default void onCustomCommand(Command command, Bundle args, ResultReceiver receiver) {}
     }
 
@@ -188,26 +189,22 @@ abstract class MediaSession2TestBase {
         @CallSuper
         @Override
         public void onConnected(CommandGroup commands) {
-            super.onConnected(commands);
             connectLatch.countDown();
         }
 
         @CallSuper
         @Override
         public void onDisconnected() {
-            super.onDisconnected();
             disconnectLatch.countDown();
         }
 
         @Override
         public void onPlaybackStateChanged(PlaybackState2 state) {
-            super.onPlaybackStateChanged(state);
             mCallbackProxy.onPlaybackStateChanged(state);
         }
 
         @Override
         public void onCustomCommand(Command command, Bundle args, ResultReceiver receiver) {
-            super.onCustomCommand(command, args, receiver);
             mCallbackProxy.onCustomCommand(command, args, receiver);
         }
 
@@ -231,23 +228,22 @@ abstract class MediaSession2TestBase {
 
         @Override
         public void onPlaylistChanged(List<MediaItem2> params) {
-            if (mCallbackProxy != null) {
-                mCallbackProxy.onPlaylistChanged(params);
-            }
+            mCallbackProxy.onPlaylistChanged(params);
         }
 
         @Override
         public void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {
-            if (mCallbackProxy != null) {
-                mCallbackProxy.onPlaylistParamsChanged(params);
-            }
+            mCallbackProxy.onPlaylistParamsChanged(params);
         }
 
         @Override
         public void onPlaybackInfoChanged(MediaController2.PlaybackInfo info) {
-            if (mCallbackProxy != null) {
-                mCallbackProxy.onPlaybackInfoChanged(info);
-            }
+            mCallbackProxy.onPlaybackInfoChanged(info);
+        }
+
+        @Override
+        public void onCustomLayoutChanged(List<CommandButton> layout) {
+            mCallbackProxy.onCustomLayoutChanged(layout);
         }
     }
 

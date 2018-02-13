@@ -26,6 +26,7 @@ import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
 import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
 import android.media.MediaSession2.ControllerInfo;
+import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
 import android.media.SessionToken2;
 import android.media.VolumeProvider2;
@@ -84,6 +85,12 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
         @Override
         MediaLibrarySession getInstance() {
             return (MediaLibrarySession) super.getInstance();
+        }
+
+        @Override
+        MediaLibrarySessionCallback getCallback() {
+            // Equivalent to the (MediaLibrarySessionCallback) super.getCallback().
+            return mCallback;
         }
 
         @Override

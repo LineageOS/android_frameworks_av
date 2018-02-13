@@ -333,13 +333,20 @@ status_t AACSource::read(
 
 static MediaExtractor* CreateExtractor(
         DataSourceBase *source,
-        const sp<AMessage>& meta) {
-    return new AACExtractor(source, meta);
+        void *meta) {
+    sp<AMessage> metaData = static_cast<AMessage *>(meta);
+    return new AACExtractor(source, metaData);
+}
+
+static void FreeMeta(void *meta) {
+    if (meta != nullptr) {
+        static_cast<AMessage *>(meta)->decStrong(nullptr);
+    }
 }
 
 static MediaExtractor::CreatorFunc Sniff(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *meta) {
+        DataSourceBase *source, float *confidence, void **meta,
+        MediaExtractor::FreeMetaFunc *freeMeta) {
     off64_t pos = 0;
 
     for (;;) {
@@ -377,11 +384,14 @@ static MediaExtractor::CreatorFunc Sniff(
 
     // ADTS syncword
     if ((header[0] == 0xff) && ((header[1] & 0xf6) == 0xf0)) {
-        *mimeType = MEDIA_MIMETYPE_AUDIO_AAC_ADTS;
         *confidence = 0.2;
 
-        *meta = new AMessage;
-        (*meta)->setInt64("offset", pos);
+        AMessage *msg = new AMessage;
+        msg->setInt64("offset", pos);
+        *meta = msg;
+        *freeMeta = &FreeMeta;
+        // ref count will be decreased in FreeMeta.
+        msg->incStrong(nullptr);
 
         return CreateExtractor;
     }

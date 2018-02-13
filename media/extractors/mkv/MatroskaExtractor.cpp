@@ -1548,8 +1548,7 @@ uint32_t MatroskaExtractor::flags() const {
 }
 
 bool SniffMatroska(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *) {
+        DataSourceBase *source, float *confidence) {
     DataSourceBaseReader reader(source);
     mkvparser::EBMLHeader ebmlHeader;
     long long pos;
@@ -1557,7 +1556,6 @@ bool SniffMatroska(
         return false;
     }
 
-    mimeType->setTo(MEDIA_MIMETYPE_CONTAINER_MATROSKA);
     *confidence = 0.6;
 
     return true;
@@ -1575,13 +1573,13 @@ MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
         "Matroska Extractor",
         [](
                 DataSourceBase *source,
-                String8 *mimeType,
                 float *confidence,
-                sp<AMessage> *meta __unused) -> MediaExtractor::CreatorFunc {
-            if (SniffMatroska(source, mimeType, confidence, meta)) {
+                void **,
+                MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
+            if (SniffMatroska(source, confidence)) {
                 return [](
                         DataSourceBase *source,
-                        const sp<AMessage>& meta __unused) -> MediaExtractor* {
+                        void *) -> MediaExtractor* {
                     return new MatroskaExtractor(source);};
             }
             return NULL;

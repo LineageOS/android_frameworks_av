@@ -19,8 +19,6 @@
 #define MEDIA_BUFFER_GROUP_H_
 
 #include <media/stagefright/MediaBuffer.h>
-#include <utils/Errors.h>
-#include <utils/threads.h>
 
 namespace android {
 
@@ -50,7 +48,7 @@ public:
     status_t acquire_buffer(
             MediaBuffer **buffer, bool nonBlocking = false, size_t requestedSize = 0);
 
-    size_t buffers() const { return mBuffers.size(); }
+    size_t buffers() const;
 
     // If buffer is nullptr, have acquire_buffer() check for remote release.
     virtual void signalBufferReturned(MediaBuffer *buffer);
@@ -58,10 +56,8 @@ public:
 private:
     friend class MediaBuffer;
 
-    Mutex mLock;
-    Condition mCondition;
-    size_t mGrowthLimit;  // Do not automatically grow group larger than this.
-    std::list<MediaBuffer *> mBuffers;
+    struct InternalData;
+    InternalData *mInternal;
 
     MediaBufferGroup(const MediaBufferGroup &);
     MediaBufferGroup &operator=(const MediaBufferGroup &);

@@ -99,9 +99,7 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(MPEG2TSExtractor);
 };
 
-bool SniffMPEG2TS(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *);
+bool SniffMPEG2TS(DataSourceBase *source, float *confidence);
 
 }  // namespace android
 

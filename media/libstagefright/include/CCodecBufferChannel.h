@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef A_BUFFER_CHANNEL_H_
+#ifndef CCODEC_BUFFER_CHANNEL_H_
 
-#define A_BUFFER_CHANNEL_H_
+#define CCODEC_BUFFER_CHANNEL_H_
 
 #include <map>
 #include <memory>
@@ -26,12 +26,18 @@
 #include <C2Buffer.h>
 #include <C2Component.h>
 
-#include <media/stagefright/foundation/Mutexed.h>
 #include <media/stagefright/bqhelper/GraphicBufferSource.h>
+#include <media/stagefright/codec2/1.0/InputSurface.h>
+#include <media/stagefright/foundation/Mutexed.h>
 #include <media/stagefright/CodecBase.h>
 #include <media/ICrypto.h>
 
+#include "InputSurfaceWrapper.h"
+
 namespace android {
+
+using ::android::hardware::media::c2::V1_0::implementation::InputSurface;
+using ::android::hardware::media::c2::V1_0::implementation::InputSurfaceConnection;
 
 /**
  * BufferChannelBase implementation for CCodec.
@@ -76,7 +82,7 @@ public:
      * Set GraphicBufferSource object from which the component extracts input
      * buffers.
      */
-    status_t setGraphicBufferSource(const sp<GraphicBufferSource> &source);
+    status_t setInputSurface(const std::shared_ptr<InputSurfaceWrapper> &surface);
 
     /**
      * Start queueing buffers to the component. This object should never queue
@@ -103,7 +109,6 @@ public:
     class Buffers;
     class InputBuffers;
     class OutputBuffers;
-    class InputBufferClient;
 
 private:
     class QueueGuard;
@@ -156,8 +161,6 @@ private:
         bool mRunning;
     };
 
-    class C2ComponentWrapper;
-
     void feedInputBufferIfAvailable();
 
     QueueSync mSync;
@@ -166,7 +169,6 @@ private:
     int32_t mHeapSeqNum;
 
     std::shared_ptr<C2Component> mComponent;
-    std::shared_ptr<InputBufferClient> mInputClient;
     std::function<void(status_t, enum ActionCode)> mOnError;
     std::shared_ptr<C2BlockPool> mInputAllocator;
     QueueSync mQueueSync;
@@ -180,6 +182,8 @@ private:
     sp<MemoryDealer> makeMemoryDealer(size_t heapSize);
     Mutexed<sp<Surface>> mSurface;
 
+    std::shared_ptr<InputSurfaceWrapper> mInputSurface;
+
     inline bool hasCryptoOrDescrambler() {
         return mCrypto != NULL || mDescrambler != NULL;
     }
@@ -187,4 +191,4 @@ private:
 
 }  // namespace android
 
-#endif  // A_BUFFER_CHANNEL_H_
+#endif  // CCODEC_BUFFER_CHANNEL_H_

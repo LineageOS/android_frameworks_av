@@ -60,6 +60,7 @@ cc_library_shared {
         "AudioPresentationInfo.cpp",
         "AudioSource.cpp",
         "BufferImpl.cpp",
+        "C2OMXNode.cpp",
         "CCodec.cpp",
         "CCodecBufferChannel.cpp",
         "CodecBase.cpp",
@@ -130,7 +131,6 @@ cc_library_shared {
         "libui",
         "libutils",
         "libmedia_helper",
-        "libstagefright_bufferqueue_helper",
         "libstagefright_codec2",
         "libstagefright_codec2_vndk",
         "libstagefright_foundation",
@@ -149,6 +149,10 @@ cc_library_shared {
         "android.hardware.media.omx@1.0",
         "android.hardware.graphics.allocator@2.0",
         "android.hardware.graphics.mapper@2.0",
+
+        // TODO: do not link directly with impl
+        "android.hardware.media.c2@1.0-service-impl",
+        "libstagefright_bufferqueue_helper",
     ],
 
     static_libs: [
@@ -215,6 +219,7 @@ cc_library {
         "InterfaceUtils.cpp",
         "MediaClock.cpp",
         "MediaExtractorFactory.cpp",
+        "NdkUtils.cpp",
         "NuCachedSource2.cpp",
         "RemoteMediaExtractor.cpp",
         "RemoteMediaSource.cpp",

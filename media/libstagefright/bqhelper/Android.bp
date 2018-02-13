@@ -43,6 +43,7 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "libstagefright_foundation",
+        "libhidlmemory",
     ],
 
     cflags: [

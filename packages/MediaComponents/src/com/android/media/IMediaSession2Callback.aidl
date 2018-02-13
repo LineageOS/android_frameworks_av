@@ -48,4 +48,7 @@ oneway interface IMediaSession2Callback {
     // Browser sepcific
     //////////////////////////////////////////////////////////////////////////////////////////////
     void onGetRootResult(in Bundle rootHints, String rootMediaId, in Bundle rootExtra);
+    void onItemLoaded(String mediaId, in Bundle result);
+    void onChildrenLoaded(String parentId, int page, int pageSize, in Bundle options,
+            in List<Bundle> result);
 }

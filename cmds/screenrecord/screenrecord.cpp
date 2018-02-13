@@ -50,6 +50,7 @@
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaMuxer.h>
+#include <media/stagefright/PersistentSurface.h>
 #include <media/ICrypto.h>
 #include <media/MediaCodecBuffer.h>
 
@@ -70,6 +71,7 @@ static const char* kMimeTypeAvc = "video/avc";
 static bool gVerbose = false;           // chatty on stdout
 static bool gRotate = false;            // rotate 90 degrees
 static bool gMonotonicTime = false;     // use system monotonic time for timestamps
+static bool gPersistentSurface = false; // use persistent surface
 static enum {
     FORMAT_MP4, FORMAT_H264, FORMAT_FRAMES, FORMAT_RAW_FRAMES
 } gOutputFormat = FORMAT_MP4;           // data format for output
@@ -199,10 +201,18 @@ static status_t prepareEncoder(float displayFps, sp<MediaCodec>* pCodec,
 
     ALOGV("Creating encoder input surface");
     sp<IGraphicBufferProducer> bufferProducer;
-    err = codec->createInputSurface(&bufferProducer);
+    if (gPersistentSurface) {
+        sp<PersistentSurface> surface = MediaCodec::CreatePersistentInputSurface();
+        bufferProducer = surface->getBufferProducer();
+        err = codec->setInputSurface(surface);
+    } else {
+        err = codec->createInputSurface(&bufferProducer);
+    }
     if (err != NO_ERROR) {
         fprintf(stderr,
-            "ERROR: unable to create encoder input surface (err=%d)\n", err);
+            "ERROR: unable to %s encoder input surface (err=%d)\n",
+            gPersistentSurface ? "set" : "create",
+            err);
         codec->release();
         return err;
     }
@@ -920,6 +930,7 @@ int main(int argc, char* const argv[]) {
         { "output-format",      required_argument,  NULL, 'o' },
         { "codec-name",         required_argument,  NULL, 'N' },
         { "monotonic-time",     no_argument,        NULL, 'm' },
+        { "persistent-surface", no_argument,        NULL, 'p' },
         { NULL,                 0,                  NULL, 0 }
     };
 
@@ -1004,6 +1015,9 @@ int main(int argc, char* const argv[]) {
             break;
         case 'm':
             gMonotonicTime = true;
+            break;
+        case 'p':
+            gPersistentSurface = true;
             break;
         default:
             if (ic != '?') {

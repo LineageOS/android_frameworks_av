@@ -668,13 +668,20 @@ sp<MetaData> MP3Extractor::getMetaData() {
 
 static MediaExtractor* CreateExtractor(
         DataSourceBase *source,
-        const sp<AMessage>& meta) {
-    return new MP3Extractor(source, meta);
+        void *meta) {
+    sp<AMessage> metaData = static_cast<AMessage *>(meta);
+    return new MP3Extractor(source, metaData);
+}
+
+static void FreeMeta(void *meta) {
+    if (meta != nullptr) {
+        static_cast<AMessage *>(meta)->decStrong(nullptr);
+    }
 }
 
 static MediaExtractor::CreatorFunc Sniff(
-        DataSourceBase *source, String8 *mimeType,
-        float *confidence, sp<AMessage> *meta) {
+        DataSourceBase *source, float *confidence, void **meta,
+        MediaExtractor::FreeMetaFunc *freeMeta) {
     off64_t pos = 0;
     off64_t post_id3_pos;
     uint32_t header;
@@ -691,12 +698,15 @@ static MediaExtractor::CreatorFunc Sniff(
         return NULL;
     }
 
-    *meta = new AMessage;
-    (*meta)->setInt64("offset", pos);
-    (*meta)->setInt32("header", header);
-    (*meta)->setInt64("post-id3-offset", post_id3_pos);
+    AMessage *msg = new AMessage;
+    msg->setInt64("offset", pos);
+    msg->setInt32("header", header);
+    msg->setInt64("post-id3-offset", post_id3_pos);
+    *meta = msg;
+    *freeMeta = &FreeMeta;
+    // ref count will be decreased in FreeMeta.
+    msg->incStrong(nullptr);
 
-    *mimeType = MEDIA_MIMETYPE_AUDIO_MPEG;
     *confidence = 0.2f;
 
     return CreateExtractor;

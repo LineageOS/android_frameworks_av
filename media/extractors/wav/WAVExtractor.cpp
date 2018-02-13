@@ -546,15 +546,15 @@ status_t WAVSource::read(
 
 static MediaExtractor* CreateExtractor(
         DataSourceBase *source,
-        const sp<AMessage>& meta __unused) {
+        void *) {
     return new WAVExtractor(source);
 }
 
 static MediaExtractor::CreatorFunc Sniff(
         DataSourceBase *source,
-        String8 *mimeType,
         float *confidence,
-        sp<AMessage> *) {
+        void **,
+        MediaExtractor::FreeMetaFunc *) {
     char header[12];
     if (source->readAt(0, header, sizeof(header)) < (ssize_t)sizeof(header)) {
         return NULL;
@@ -571,7 +571,6 @@ static MediaExtractor::CreatorFunc Sniff(
         return NULL;
     }
 
-    *mimeType = MEDIA_MIMETYPE_CONTAINER_WAV;
     *confidence = 0.3f;
 
     return CreateExtractor;

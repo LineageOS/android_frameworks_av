@@ -53,7 +53,6 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
         return controller;
     }
 
-    // TODO(jaewan): Refactor code to get rid of these pattern.
     private MediaBrowser2Impl getBrowser() throws IllegalStateException {
         final MediaController2Impl controller = getController();
         if (controller instanceof MediaBrowser2Impl) {
@@ -163,49 +162,31 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
     }
 
     @Override
-    public void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra)
-            throws RuntimeException {
-        final MediaBrowser2Impl browser;
-        try {
-            browser = getBrowser();
-        } catch (IllegalStateException e) {
-            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
-            return;
-        }
-        if (browser == null) {
-            // TODO(jaewan): Revisit here. Could be a bug
-            return;
-        }
-        browser.onGetRootResult(rootHints, rootMediaId, rootExtra);
-    }
-
-    @Override
     public void onCustomLayoutChanged(List<Bundle> commandButtonlist) {
         if (commandButtonlist == null) {
             // Illegal call. Ignore
             return;
         }
-        // TODO(jaewan): Fix here. It's controller feature so shouldn't use browser
-        final MediaBrowser2Impl browser;
+        final MediaController2Impl controller;
         try {
-            browser = getBrowser();
+            controller = getController();
         } catch (IllegalStateException e) {
             Log.w(TAG, "Don't fail silently here. Highly likely a bug");
             return;
         }
-        if (browser == null) {
+        if (controller == null) {
             // TODO(jaewan): Revisit here. Could be a bug
             return;
         }
         List<CommandButton> layout = new ArrayList<>();
         for (int i = 0; i < commandButtonlist.size(); i++) {
             CommandButton button = CommandButtonImpl.fromBundle(
-                    browser.getContext(), commandButtonlist.get(i));
+                    controller.getContext(), commandButtonlist.get(i));
             if (button != null) {
                 layout.add(button);
             }
         }
-        browser.onCustomLayoutChanged(layout);
+        controller.onCustomLayoutChanged(layout);
     }
 
     @Override
@@ -222,5 +203,68 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
             return;
         }
         controller.onCustomCommand(command, args, receiver);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    // MediaBrowser specific
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    @Override
+    public void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra)
+            throws RuntimeException {
+        final MediaBrowser2Impl browser;
+        try {
+            browser = getBrowser();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        if (browser == null) {
+            // TODO(jaewan): Revisit here. Could be a bug
+            return;
+        }
+        browser.onGetRootResult(rootHints, rootMediaId, rootExtra);
+    }
+
+
+    @Override
+    public void onItemLoaded(String mediaId, Bundle itemBundle) throws RuntimeException {
+        final MediaBrowser2Impl browser;
+        try {
+            browser = getBrowser();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        if (browser == null) {
+            // TODO(jaewan): Revisit here. Could be a bug
+            return;
+        }
+        browser.onItemLoaded(mediaId,
+                MediaItem2Impl.fromBundle(browser.getContext(), itemBundle));
+    }
+
+    @Override
+    public void onChildrenLoaded(String parentId, int page, int pageSize, Bundle options,
+            List<Bundle> itemBundleList) throws RuntimeException {
+        final MediaBrowser2Impl browser;
+        try {
+            browser = getBrowser();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        if (browser == null) {
+            // TODO(jaewan): Revisit here. Could be a bug
+            return;
+        }
+
+        List<MediaItem2> result = null;
+        if (itemBundleList != null) {
+            result = new ArrayList<>();
+            for (Bundle bundle : itemBundleList) {
+                result.add(MediaItem2.fromBundle(browser.getContext(), bundle));
+            }
+        }
+        browser.onChildrenLoaded(parentId, page, pageSize, options, result);
     }
 }

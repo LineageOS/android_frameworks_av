@@ -20,7 +20,6 @@
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
-#include <android-base/logging.h>
 #include <binder/Binder.h>
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/IProducerListener.h>
@@ -51,6 +50,15 @@ typedef ::android::hardware::graphics::bufferqueue::V1_0::
 typedef ::android::IGraphicBufferProducer BGraphicBufferProducer;
 typedef ::android::IProducerListener BProducerListener;
 using ::android::BnGraphicBufferProducer;
+
+#ifndef LOG
+struct LOG_dummy {
+    template <typename T>
+    LOG_dummy& operator<< (const T&) { return *this; }
+};
+
+#define LOG(x)  LOG_dummy()
+#endif
 
 // Instantiate only if HGraphicBufferProducer is base of BASE.
 template <typename BASE,

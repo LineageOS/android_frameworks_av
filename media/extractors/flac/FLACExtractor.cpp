@@ -968,9 +968,7 @@ sp<MetaData> FLACExtractor::getMetaData()
 
 // Sniffer
 
-bool SniffFLAC(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *)
+bool SniffFLAC(DataSourceBase *source, float *confidence)
 {
     // first 4 is the signature word
     // second 4 is the sizeof STREAMINFO
@@ -983,7 +981,6 @@ bool SniffFLAC(
         return false;
     }
 
-    *mimeType = MEDIA_MIMETYPE_AUDIO_FLAC;
     *confidence = 0.5;
 
     return true;
@@ -1001,13 +998,13 @@ MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
             "FLAC Extractor",
             [](
                     DataSourceBase *source,
-                    String8 *mimeType,
                     float *confidence,
-                    sp<AMessage> *meta __unused) -> MediaExtractor::CreatorFunc {
-                if (SniffFLAC(source, mimeType, confidence, meta)) {
+                    void **,
+                    MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
+                if (SniffFLAC(source, confidence)) {
                     return [](
                             DataSourceBase *source,
-                            const sp<AMessage>& meta __unused) -> MediaExtractor* {
+                            void *) -> MediaExtractor* {
                         return new FLACExtractor(source);};
                 }
                 return NULL;

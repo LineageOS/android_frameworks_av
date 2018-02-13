@@ -293,9 +293,7 @@ private:
     void handleFlushComplete(bool audio, bool isDecoder);
     void finishFlushIfPossible();
 
-    void onStart(
-            int64_t startPositionUs = -1,
-            MediaPlayer2SeekMode mode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC);
+    void onStart();
     void onResume();
     void onPause();
 
