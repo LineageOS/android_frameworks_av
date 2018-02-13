@@ -19,6 +19,7 @@
 
 #include <jni.h>
 #include <media/AudioResamplerPublic.h>
+#include <media/AudioSystem.h>
 #include <media/VolumeShaper.h>
 #include <system/audio.h>
 #include <utils/Errors.h>
@@ -30,6 +31,42 @@ namespace android {
 
 class JAudioTrack {
 public:
+
+    /* Events used by AudioTrack callback function (callback_t).
+     * Keep in sync with frameworks/base/media/java/android/media/AudioTrack.java NATIVE_EVENT_*.
+     */
+    enum event_type {
+        EVENT_MORE_DATA = 0,        // Request to write more data to buffer.
+        EVENT_NEW_IAUDIOTRACK = 6,  // IAudioTrack was re-created, either due to re-routing and
+                                    // voluntary invalidation by mediaserver, or mediaserver crash.
+        EVENT_STREAM_END = 7,       // Sent after all the buffers queued in AF and HW are played
+                                    // back (after stop is called) for an offloaded track.
+    };
+
+    class Buffer
+    {
+    public:
+        size_t      mSize;        // input/output in bytes.
+        void*       mData;        // pointer to the audio data.
+    };
+
+    /* As a convenience, if a callback is supplied, a handler thread
+     * is automatically created with the appropriate priority. This thread
+     * invokes the callback when a new buffer becomes available or various conditions occur.
+     *
+     * Parameters:
+     *
+     * event:   type of event notified (see enum AudioTrack::event_type).
+     * user:    Pointer to context for use by the callback receiver.
+     * info:    Pointer to optional parameter according to event type:
+     *          - EVENT_MORE_DATA: pointer to JAudioTrack::Buffer struct. The callback must not
+     *            write more bytes than indicated by 'size' field and update 'size' if fewer bytes
+     *            are written.
+     *          - EVENT_NEW_IAUDIOTRACK: unused.
+     *          - EVENT_STREAM_END: unused.
+     */
+
+    typedef void (*callback_t)(int event, void* user, void *info);
 
     /* Creates an JAudioTrack object for non-offload mode.
      * Once created, the track needs to be started before it can be used.
@@ -49,6 +86,9 @@ public:
      *                     output sink.
      *                     (TODO: How can we check whether a format is supported?)
      * channelMask:        Channel mask, such that audio_is_output_channel(channelMask) is true.
+     * cbf:                Callback function. If not null, this function is called periodically
+     *                     to provide new data and inform of marker, position updates, etc.
+     * user:               Context for use by the callback receiver.
      * frameCount:         Minimum size of track PCM buffer in frames. This defines the
      *                     application's contribution to the latency of the track.
      *                     The actual size selected by the JAudioTrack could be larger if the
@@ -68,35 +108,20 @@ public:
                 uint32_t sampleRate,
                 audio_format_t format,
                 audio_channel_mask_t channelMask,
+                callback_t cbf,
+                void* user,
                 size_t frameCount = 0,
                 audio_session_t sessionId  = AUDIO_SESSION_ALLOCATE,
                 const audio_attributes_t* pAttributes = NULL,
                 float maxRequiredSpeed = 1.0f);
 
     /*
-       Temporarily removed constructor arguments:
-
-       // Q. Values are in audio-base.h, but where can we find explanation for them?
-       audio_output_flags_t flags,
-
        // Q. May be used in AudioTrack.setPreferredDevice(AudioDeviceInfo)?
        audio_port_handle_t selectedDeviceId,
 
-       // Should be deleted, since we don't use Binder anymore.
-       bool doNotReconnect,
-
-       // Do we need UID and PID?
-       uid_t uid,
-       pid_t pid,
-
-       // TODO: Uses these values when Java AudioTrack supports the offload mode.
-       callback_t cbf,
-       void* user,
+       // TODO: No place to use these values.
        int32_t notificationFrames,
        const audio_offload_info_t *offloadInfo,
-
-       // Fixed to false, but what is this?
-       threadCanCallJava
     */
 
     virtual ~JAudioTrack();
@@ -137,6 +162,46 @@ public:
      * The timestamp parameter is undefined on return, if false is returned.
      */
     bool getTimestamp(AudioTimestamp& timestamp);
+
+    // TODO: This doc is just copied from AudioTrack.h. Revise it after implemenation.
+    /* Return the extended timestamp, with additional timebase info and improved drain behavior.
+     *
+     * This is similar to the AudioTrack.java API:
+     * getTimestamp(@NonNull AudioTimestamp timestamp, @AudioTimestamp.Timebase int timebase)
+     *
+     * Some differences between this method and the getTimestamp(AudioTimestamp& timestamp) method
+     *
+     *   1. stop() by itself does not reset the frame position.
+     *      A following start() resets the frame position to 0.
+     *   2. flush() by itself does not reset the frame position.
+     *      The frame position advances by the number of frames flushed,
+     *      when the first frame after flush reaches the audio sink.
+     *   3. BOOTTIME clock offsets are provided to help synchronize with
+     *      non-audio streams, e.g. sensor data.
+     *   4. Position is returned with 64 bits of resolution.
+     *
+     * Parameters:
+     *  timestamp: A pointer to the caller allocated ExtendedTimestamp.
+     *
+     * Returns NO_ERROR    on success; timestamp is filled with valid data.
+     *         BAD_VALUE   if timestamp is NULL.
+     *         WOULD_BLOCK if called immediately after start() when the number
+     *                     of frames consumed is less than the
+     *                     overall hardware latency to physical output. In WOULD_BLOCK cases,
+     *                     one might poll again, or use getPosition(), or use 0 position and
+     *                     current time for the timestamp.
+     *                     If WOULD_BLOCK is returned, the timestamp is still
+     *                     modified with the LOCATION_CLIENT portion filled.
+     *         DEAD_OBJECT if AudioFlinger dies or the output device changes and
+     *                     the track cannot be automatically restored.
+     *                     The application needs to recreate the AudioTrack
+     *                     because the audio device changed or AudioFlinger died.
+     *                     This typically occurs for direct or offloaded tracks
+     *                     or if mDoNotReconnect is true.
+     *         INVALID_OPERATION  if called on a offloaded or direct track.
+     *                     Use getTimestamp(AudioTimestamp& timestamp) instead.
+     */
+    status_t getTimestamp(ExtendedTimestamp *timestamp);
 
     /* Set source playback rate for timestretch
      * 1.0 is normal speed: < 1.0 is slower, > 1.0 is faster
@@ -270,7 +335,65 @@ public:
      */
     audio_port_handle_t getRoutedDeviceId();
 
+    /* Returns the ID of the audio session this AudioTrack belongs to. */
+    audio_session_t getAudioSessionId();
+
+    /* Selects the audio device to use for output of this AudioTrack. A value of
+     * AUDIO_PORT_HANDLE_NONE indicates default routing.
+     *
+     * Parameters:
+     *  The device ID of the selected device (as returned by the AudioDevicesManager API).
+     *
+     * Returned value:
+     *  - NO_ERROR: successful operation
+     *  - BAD_VALUE: failed to find the valid output device with given device Id.
+     */
+    status_t setOutputDevice(audio_port_handle_t deviceId);
+
+    // TODO: Add AUDIO_OUTPUT_FLAG_DIRECT when it is possible to check.
+    // TODO: Add AUDIO_FLAG_HW_AV_SYNC when it is possible to check.
+    /* Returns the flags */
+    audio_output_flags_t getFlags() const { return mFlags; }
+
+    /* Obtain the pending duration in milliseconds for playback of pure PCM data remaining in
+     * AudioTrack.
+     *
+     * Returns NO_ERROR if successful.
+     *         INVALID_OPERATION if the AudioTrack does not contain pure PCM data.
+     *         BAD_VALUE if msec is nullptr.
+     */
+    status_t pendingDuration(int32_t *msec);
+
+    /* Adds an AudioDeviceCallback. The caller will be notified when the audio device to which this
+     * AudioTrack is routed is updated.
+     * Replaces any previously installed callback.
+     *
+     * Parameters:
+     *
+     * callback: The callback interface
+     *
+     * Returns NO_ERROR if successful.
+     *         INVALID_OPERATION if the same callback is already installed.
+     *         NO_INIT or PREMISSION_DENIED if AudioFlinger service is not reachable
+     *         BAD_VALUE if the callback is NULL
+     */
+    status_t addAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
+
+    /* Removes an AudioDeviceCallback.
+     *
+     * Parameters:
+     *
+     * callback: The callback interface
+     *
+     * Returns NO_ERROR if successful.
+     *         INVALID_OPERATION if the callback is not installed
+     *         BAD_VALUE if the callback is NULL
+     */
+    status_t removeAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
+
 private:
+    audio_output_flags_t mFlags;
+
     jclass mAudioTrackCls;
     jobject mAudioTrackObj;
 
@@ -281,6 +404,12 @@ private:
     /* Creates a Java VolumeShaper.Operation object from VolumeShaper::Operation */
     jobject createVolumeShaperOperationObj(
             const sp<media::VolumeShaper::Operation>& operation);
+
+    /* Creates a Java StreamEventCallback object */
+    jobject createStreamEventCallback(callback_t cbf, void* user);
+
+    /* Creates a Java Executor object for running a callback */
+    jobject createCallbackExecutor();
 
     status_t javaToNativeStatus(int javaStatus);
 };
