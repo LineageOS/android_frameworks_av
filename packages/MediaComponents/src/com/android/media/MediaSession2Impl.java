@@ -158,9 +158,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
                     mContext.getPackageName(), null, id, mSessionStub).getInstance();
         }
 
-        setPlayerLocked(player);
-        mVolumeProvider = volumeProvider;
-        mPlaybackInfo = createPlaybackInfo(volumeProvider, player.getAudioAttributes());
+        setPlayer(player, volumeProvider);
 
         // Ask server for the sanity check, and starts
         // Sanity check for making session ID unique 'per package' cannot be done in here.
@@ -210,14 +208,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (player == null) {
             throw new IllegalArgumentException("player shouldn't be null");
         }
-        PlaybackInfo info =
-                createPlaybackInfo(null /* VolumeProvider */, player.getAudioAttributes());
-        synchronized (mLock) {
-            setPlayerLocked(player);
-            mVolumeProvider = null;
-            mPlaybackInfo = info;
-        }
-        mSessionStub.notifyPlaybackInfoChanged(info);
+        setPlayer(player, null);
     }
 
     @Override
@@ -230,23 +221,23 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (volumeProvider == null) {
             throw new IllegalArgumentException("volumeProvider shouldn't be null");
         }
+        setPlayer(player, volumeProvider);
+    }
+
+    private void setPlayer(MediaPlayerInterface player, VolumeProvider2 volumeProvider) {
         PlaybackInfo info = createPlaybackInfo(volumeProvider, player.getAudioAttributes());
         synchronized (mLock) {
-            setPlayerLocked(player);
+            if (mPlayer != null && mListener != null) {
+                // This might not work for a poorly implemented player.
+                mPlayer.removePlaybackListener(mListener);
+            }
+            mPlayer = player;
+            mListener = new MyPlaybackListener(this, player);
+            player.addPlaybackListener(mCallbackExecutor, mListener);
             mVolumeProvider = volumeProvider;
             mPlaybackInfo = info;
         }
         mSessionStub.notifyPlaybackInfoChanged(info);
-    }
-
-    private void setPlayerLocked(MediaPlayerInterface player) {
-        if (mPlayer != null && mListener != null) {
-            // This might not work for a poorly implemented player.
-            mPlayer.removePlaybackListener(mListener);
-        }
-        mPlayer = player;
-        mListener = new MyPlaybackListener(this, player);
-        player.addPlaybackListener(mCallbackExecutor, mListener);
     }
 
     private PlaybackInfo createPlaybackInfo(VolumeProvider2 volumeProvider, AudioAttributes attrs) {
