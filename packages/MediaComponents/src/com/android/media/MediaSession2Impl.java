@@ -88,6 +88,22 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private final int mRatingType;
     private final PendingIntent mSessionActivity;
 
+    // mPlayer is set to null when the session is closed, and we shouldn't throw an exception
+    // nor leave log always for using mPlayer when it's null. Here's the reason.
+    // When a MediaSession2 is closed, there could be a pended operation in the session callback
+    // executor that may want to access the player. Here's the sample code snippet for that.
+    //
+    //   public void onFoo() {
+    //     if (mPlayer == null) return; // first check
+    //     mSessionCallbackExecutor.executor(() -> {
+    //       // Error. Session may be closed and mPlayer can be null here.
+    //       mPlayer.foo();
+    //     });
+    //   }
+    //
+    // By adding protective code, we can also protect APIs from being called after the close()
+    //
+    // TODO(jaewan): Should we put volatile here?
     @GuardedBy("mLock")
     private MediaPlayerInterface mPlayer;
     @GuardedBy("mLock")
@@ -96,10 +112,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private PlaybackInfo mPlaybackInfo;
     @GuardedBy("mLock")
     private MyPlaybackListener mListener;
-    @GuardedBy("mLock")
-    private PlaylistParams mPlaylistParams;
-    @GuardedBy("mLock")
-    private List<MediaItem2> mPlaylist;
 
     /**
      * Can be only called by the {@link Builder#build()}.
@@ -320,36 +332,56 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public void play_impl() {
         ensureCallingThread();
-        ensurePlayer();
-        mPlayer.play();
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            player.play();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
     public void pause_impl() {
         ensureCallingThread();
-        ensurePlayer();
-        mPlayer.pause();
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            player.pause();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
     public void stop_impl() {
         ensureCallingThread();
-        ensurePlayer();
-        mPlayer.stop();
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            player.stop();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
     public void skipToPrevious_impl() {
         ensureCallingThread();
-        ensurePlayer();
-        mPlayer.skipToPrevious();
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            player.skipToPrevious();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
     public void skipToNext_impl() {
         ensureCallingThread();
-        ensurePlayer();
-        mPlayer.skipToNext();
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            player.skipToNext();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
@@ -367,21 +399,27 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public void setPlaylistParams_impl(PlaylistParams params) {
         if (params == null) {
-            throw new IllegalArgumentException("PlaylistParams should not be null!");
+            throw new IllegalArgumentException("params shouldn't be null");
         }
         ensureCallingThread();
-        ensurePlayer();
-        synchronized (mLock) {
-            mPlaylistParams = params;
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            player.setPlaylistParams(params);
+            mSessionStub.notifyPlaylistParamsChanged(params);
         }
-        mPlayer.setPlaylistParams(params);
-        mSessionStub.notifyPlaylistParamsChanged(params);
     }
 
     @Override
     public PlaylistParams getPlaylistParams_impl() {
-        // TODO: Do we need to synchronize here for preparing Controller2.setPlaybackParams?
-        return mPlaylistParams;
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            // TODO(jaewan): Is it safe to be called on any thread?
+            //               Otherwise MediaSession2 should cache parameter of setPlaylistParams.
+            return player.getPlaylistParams();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
+        return null;
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -412,57 +450,84 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public void setPlaylist_impl(List<MediaItem2> playlist) {
         if (playlist == null) {
-            throw new IllegalArgumentException("Playlist should not be null!");
+            throw new IllegalArgumentException("playlist shouldn't be null");
         }
         ensureCallingThread();
-        ensurePlayer();
-        synchronized (mLock) {
-            mPlaylist = playlist;
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            player.setPlaylist(playlist);
+            mSessionStub.notifyPlaylistChanged(playlist);
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
-        mPlayer.setPlaylist(playlist);
-        mSessionStub.notifyPlaylistChanged(playlist);
     }
 
     @Override
     public List<MediaItem2> getPlaylist_impl() {
-        synchronized (mLock) {
-            return mPlaylist;
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            // TODO(jaewan): Is it safe to be called on any thread?
+            //               Otherwise MediaSession2 should cache parameter of setPlaylist.
+            return player.getPlaylist();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
+        return null;
     }
 
     @Override
     public void prepare_impl() {
         ensureCallingThread();
-        ensurePlayer();
-        mPlayer.prepare();
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            player.prepare();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
     public void fastForward_impl() {
         ensureCallingThread();
-        ensurePlayer();
-        mPlayer.fastForward();
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            player.fastForward();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
     public void rewind_impl() {
         ensureCallingThread();
-        ensurePlayer();
-        mPlayer.rewind();
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            player.rewind();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
     public void seekTo_impl(long pos) {
         ensureCallingThread();
-        ensurePlayer();
-        mPlayer.seekTo(pos);
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            player.seekTo(pos);
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
     public void setCurrentPlaylistItem_impl(int index) {
         ensureCallingThread();
-        ensurePlayer();
-        mPlayer.setCurrentPlaylistItem(index);
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            player.setCurrentPlaylistItem(index);
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
@@ -497,10 +562,15 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public PlaybackState2 getPlaybackState_impl() {
         ensureCallingThread();
-        ensurePlayer();
-        // TODO(jaewan): Is it safe to be called on any thread?
-        //               Otherwise we should cache the result from listener.
-        return mPlayer.getPlaybackState();
+        final MediaPlayerInterface player = mPlayer;
+        if (player != null) {
+            // TODO(jaewan): Is it safe to be called on any thread?
+            //               Otherwise MediaSession2 should cache the result from listener.
+            return player.getPlaybackState();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
+        return null;
     }
 
     ///////////////////////////////////////////////////
@@ -525,14 +595,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (mHandler.getLooper() != Looper.myLooper()) {
             throw new IllegalStateException("Run this on the given thread");
         }*/
-    }
-
-    private void ensurePlayer() {
-        // TODO(jaewan): Should we pend command instead? Follow the decision from MP2.
-        //               Alternatively we can add a API like setAcceptsPendingCommands(boolean).
-        if (mPlayer == null) {
-            throw new IllegalStateException("Player isn't set");
-        }
     }
 
     private void notifyPlaybackStateChangedNotLocked(PlaybackState2 state) {
