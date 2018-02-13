@@ -244,7 +244,7 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
     }
 
     @Override
-    public void onChildrenLoaded(String parentId, int page, int pageSize, Bundle options,
+    public void onChildrenLoaded(String parentId, int page, int pageSize, Bundle extras,
             List<Bundle> itemBundleList) throws RuntimeException {
         final MediaBrowser2Impl browser;
         try {
@@ -265,6 +265,31 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
                 result.add(MediaItem2.fromBundle(browser.getContext(), bundle));
             }
         }
-        browser.onChildrenLoaded(parentId, page, pageSize, options, result);
+        browser.onChildrenLoaded(parentId, page, pageSize, extras, result);
+    }
+
+    @Override
+    public void onSearchResultLoaded(String query, int page, int pageSize, Bundle extras,
+            List<Bundle> itemBundleList) throws RuntimeException {
+        final MediaBrowser2Impl browser;
+        try {
+            browser = getBrowser();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        if (browser == null) {
+            // TODO(jaewan): Revisit here. Could be a bug
+            return;
+        }
+
+        List<MediaItem2> result = null;
+        if (itemBundleList != null) {
+            result = new ArrayList<>();
+            for (Bundle bundle : itemBundleList) {
+                result.add(MediaItem2.fromBundle(browser.getContext(), bundle));
+            }
+        }
+        browser.onSearchResultLoaded(query, page, pageSize, extras, result);
     }
 }

@@ -36,6 +36,7 @@ import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
+import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.Log;
 
@@ -574,7 +575,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void getChildren(IMediaSession2Callback caller, String parentId, int page,
-            int pageSize, Bundle options) throws RuntimeException {
+            int pageSize, Bundle extras) throws RuntimeException {
         final MediaLibrarySessionImpl sessionImpl = getLibrarySession();
         final ControllerInfo controller = getController(caller);
         if (controller == null) {
@@ -584,11 +585,15 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             return;
         }
         if (parentId == null) {
-            Log.d(TAG, "parentId shouldn't be null");
+            if (DEBUG) {
+                Log.d(TAG, "parentId shouldn't be null");
+            }
             return;
         }
         if (page < 1 || pageSize < 1) {
-            Log.d(TAG, "Neither page nor pageSize should be less than 1");
+            if (DEBUG) {
+                Log.d(TAG, "Neither page nor pageSize should be less than 1");
+            }
             return;
         }
 
@@ -599,7 +604,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             }
             final ControllerInfoImpl controllerImpl = ControllerInfoImpl.from(controller);
             List<MediaItem2> result = session.getCallback().onLoadChildren(
-                    controller, parentId, page, pageSize, options);
+                    controller, parentId, page, pageSize, extras);
             if (result != null && result.size() > pageSize) {
                 throw new IllegalArgumentException("onLoadChildren() shouldn't return media items "
                         + "more than pageSize. result.size()=" + result.size() + " pageSize="
@@ -616,7 +621,90 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
             try {
                 controllerImpl.getControllerBinder().onChildrenLoaded(
-                        parentId, page, pageSize, options, bundleList);
+                        parentId, page, pageSize, extras, bundleList);
+            } catch (RemoteException e) {
+                // Controller may be died prematurely.
+                // TODO(jaewan): Handle this.
+            }
+        });
+    }
+
+    @Override
+    public void search(IMediaSession2Callback caller, String query, Bundle extras) {
+        final MediaLibrarySessionImpl sessionImpl = getLibrarySession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "search() from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        if (TextUtils.isEmpty(query)) {
+            if (DEBUG) {
+                Log.d(TAG, "query shouldn't be empty");
+            }
+            return;
+        }
+
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaLibrarySessionImpl session = getLibrarySession();
+            if (session == null) {
+                return;
+            }
+            final ControllerInfoImpl controllerImpl = ControllerInfoImpl.from(controller);
+            session.getCallback().onSearch(controller, query, extras);
+        });
+    }
+
+    @Override
+    public void getSearchResult(IMediaSession2Callback caller, String query, int page,
+            int pageSize, Bundle extras) {
+        final MediaLibrarySessionImpl sessionImpl = getLibrarySession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "getSearchResult() from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        if (TextUtils.isEmpty(query)) {
+            if (DEBUG) {
+                Log.d(TAG, "query shouldn't be empty");
+            }
+            return;
+        }
+        if (page < 1 || pageSize < 1) {
+            if (DEBUG) {
+                Log.d(TAG, "Neither page nor pageSize should be less than 1");
+            }
+            return;
+        }
+
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaLibrarySessionImpl session = getLibrarySession();
+            if (session == null) {
+                return;
+            }
+            final ControllerInfoImpl controllerImpl = ControllerInfoImpl.from(controller);
+            List<MediaItem2> result = session.getCallback().onLoadSearchResult(
+                    controller, query, page, pageSize, extras);
+            if (result != null && result.size() > pageSize) {
+                throw new IllegalArgumentException("onLoadSearchResult() shouldn't return media "
+                        + "items more than pageSize. result.size()=" + result.size() + " pageSize="
+                        + pageSize);
+            }
+
+            List<Bundle> bundleList = null;
+            if (result != null) {
+                bundleList = new ArrayList<>();
+                for (MediaItem2 item : result) {
+                    bundleList.add(item == null ? null : item.toBundle());
+                }
+            }
+
+            try {
+                controllerImpl.getControllerBinder().onSearchResultLoaded(
+                        query, page, pageSize, extras, bundleList);
             } catch (RemoteException e) {
                 // Controller may be died prematurely.
                 // TODO(jaewan): Handle this.

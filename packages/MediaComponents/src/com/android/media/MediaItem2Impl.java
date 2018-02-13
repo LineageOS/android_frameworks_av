@@ -52,7 +52,7 @@ public class MediaItem2Impl implements MediaItem2Provider {
             throw new IllegalArgumentException("dsd shouldn't be null");
         }
         if (metadata != null && !TextUtils.equals(mediaId, metadata.getMediaId())) {
-            throw new IllegalArgumentException("metadata's id should be match with the mediaid");
+            throw new IllegalArgumentException("metadata's id should be matched with the mediaid");
         }
 
         mContext = context;
@@ -71,9 +71,9 @@ public class MediaItem2Impl implements MediaItem2Provider {
             throw new IllegalArgumentException("mediaId shouldn't be null");
         }
         if (metadata != null && !TextUtils.equals(mediaId, metadata.getMediaId())) {
-            throw new IllegalArgumentException("metadata's id should be match with the mediaid");
+            throw new IllegalArgumentException("metadata's id should be matched with the mediaid");
         }
-        mContext =context;
+        mContext = context;
         mId = mediaId;
         mMetadata = metadata;
         mFlags = flags;
@@ -136,24 +136,21 @@ public class MediaItem2Impl implements MediaItem2Provider {
     }
 
     @Override
-    public void setMetadata_impl(@NonNull MediaMetadata2 metadata) {
-        if (metadata == null) {
-            throw new IllegalArgumentException("metadata shouldn't be null");
-        }
-        if (TextUtils.isEmpty(metadata.getMediaId())) {
-            throw new IllegalArgumentException("metadata must have a non-empty media id");
+    public void setMetadata_impl(@Nullable MediaMetadata2 metadata) {
+        if (metadata != null && !TextUtils.equals(mId, metadata.getMediaId())) {
+            throw new IllegalArgumentException("metadata's id should be matched with the mediaId");
         }
         mMetadata = metadata;
     }
 
     @Override
-    public MediaMetadata2 getMetadata_impl() {
+    public @Nullable MediaMetadata2 getMetadata_impl() {
         return mMetadata;
     }
 
     @Override
-    public @Nullable String getMediaId_impl() {
-        return mMetadata.getMediaId();
+    public @NonNull String getMediaId_impl() {
+        return mId;
     }
 
     @Override
