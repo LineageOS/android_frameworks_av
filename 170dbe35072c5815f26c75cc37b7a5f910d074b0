@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d9088eb7_66c487e4",
+        "filename": "media/libstagefright/MediaCodecSource.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 169,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-02-13T02:36:05Z",
+      "side": 0,
+      "message": "We should look carefully at what\u0027s receiving the message here, because it looks like we\u0027re changing some messaging behavior here.",
+      "revId": "170dbe35072c5815f26c75cc37b7a5f910d074b0",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
