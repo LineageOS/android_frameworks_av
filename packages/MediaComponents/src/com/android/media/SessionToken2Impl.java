@@ -235,8 +235,7 @@ public class SessionToken2Impl implements SessionToken2Provider {
                 + prime * (mUid
                 + prime * (mPackageName.hashCode()
                 + prime * (mId.hashCode()
-                + prime * ((mServiceName != null ? mServiceName.hashCode() : 0)
-                + prime * (mSessionBinder != null ? mSessionBinder.asBinder().hashCode() : 0)))));
+                + prime * (mServiceName != null ? mServiceName.hashCode() : 0))));
     }
 
     @Override
@@ -245,19 +244,11 @@ public class SessionToken2Impl implements SessionToken2Provider {
             return false;
         }
         SessionToken2Impl other = from((SessionToken2) obj);
-        if (mUid != other.mUid
-                || !TextUtils.equals(mPackageName, other.mPackageName)
-                || !TextUtils.equals(mServiceName, other.mServiceName)
-                || !TextUtils.equals(mId, other.mId)
-                || mType != other.mType) {
-            return false;
-        }
-        if (mSessionBinder == other.mSessionBinder) {
-            return true;
-        } else if (mSessionBinder == null || other.mSessionBinder == null) {
-            return false;
-        }
-        return mSessionBinder.asBinder().equals(other.mSessionBinder.asBinder());
+        return mUid == other.mUid
+                && TextUtils.equals(mPackageName, other.mPackageName)
+                && TextUtils.equals(mServiceName, other.mServiceName)
+                && TextUtils.equals(mId, other.mId)
+                && mType == other.mType;
     }
 
     @Override

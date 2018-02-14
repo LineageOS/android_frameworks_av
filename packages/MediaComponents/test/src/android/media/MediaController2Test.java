@@ -39,6 +39,7 @@ import android.support.test.runner.AndroidJUnit4;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -722,11 +723,13 @@ public class MediaController2Test extends MediaSession2TestBase {
         testControllerAfterSessionIsGone(id);
     }
 
+    @Ignore
     @Test
     public void testClose_sessionService() throws InterruptedException {
         testCloseFromService(MockMediaSessionService2.ID);
     }
 
+    @Ignore
     @Test
     public void testClose_libraryService() throws InterruptedException {
         testCloseFromService(MockMediaLibraryService2.ID);

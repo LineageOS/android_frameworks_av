@@ -148,10 +148,10 @@ public class MediaSession2Impl implements MediaSession2Provider {
                     + " session services define the same id=" + id);
         } else if (libraryService != null) {
             mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_LIBRARY_SERVICE,
-                    mContext.getPackageName(), libraryService, id, mSessionStub).getInstance();
+                    mContext.getPackageName(), libraryService, id, null).getInstance();
         } else if (sessionService != null) {
             mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_SESSION_SERVICE,
-                    mContext.getPackageName(), sessionService, id, mSessionStub).getInstance();
+                    mContext.getPackageName(), sessionService, id, null).getInstance();
         } else {
             mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_SESSION,
                     mContext.getPackageName(), null, id, mSessionStub).getInstance();
@@ -166,7 +166,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         // a session in another package.
         MediaSessionManager manager =
                 (MediaSessionManager) mContext.getSystemService(Context.MEDIA_SESSION_SERVICE);
-        if (!manager.onSessionCreated(mSessionToken)) {
+        if (!manager.createSession2(mSessionToken)) {
             throw new IllegalStateException("Session with the same id is already used by"
                     + " another process. Use MediaController2 instead.");
         }
@@ -281,7 +281,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         // Stop system service from listening this session first.
         MediaSessionManager manager =
                 (MediaSessionManager) mContext.getSystemService(Context.MEDIA_SESSION_SERVICE);
-        manager.onSessionDestroyed(mSessionToken);
+        manager.destroySession2(mSessionToken);
 
         if (mSessionStub != null) {
             if (DEBUG) {
