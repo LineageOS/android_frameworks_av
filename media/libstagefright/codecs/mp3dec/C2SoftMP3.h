@@ -61,6 +61,8 @@ private:
     bool mIsFirst;
     bool mSignalledError;
     bool mSignalledOutputEos;
+    uint64_t mAnchorTimeStamp;
+    uint64_t mProcessedSamples;
 
     status_t initDecoder();
 
