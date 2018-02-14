@@ -26,7 +26,6 @@ import android.media.MediaSession2.ControllerInfo;
 import android.media.TestServiceRegistry.SessionCallbackProxy;
 import android.media.TestUtils.SyncHandler;
 import android.os.Bundle;
-import android.os.Process;
 import android.util.Log;
 
 import java.io.FileDescriptor;
@@ -34,6 +33,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.annotation.concurrent.GuardedBy;
 
@@ -52,9 +53,18 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
     public static final String PARENT_ID = "parent_id";
     public static final String PARENT_ID_NO_CHILDREN = "parent_id_no_children";
     public static final String PARENT_ID_ERROR = "parent_id_error";
-    public static final List<MediaItem2> GET_CHILDREN_RESULT = new ArrayList<>();
 
-    private static final int CHILDREN_COUNT = 100;
+    public static final List<MediaItem2> GET_CHILDREN_RESULT = new ArrayList<>();
+    public static final int CHILDREN_COUNT = 100;
+
+    public static final String SEARCH_QUERY = "search_query";
+    public static final String SEARCH_QUERY_TAKES_TIME = "search_query_takes_time";
+    public static final int SEARCH_TIME_IN_MS = 5000;
+    public static final String SEARCH_QUERY_EMPTY_RESULT = "search_query_empty_result";
+
+    public static final List<MediaItem2> SEARCH_RESULT = new ArrayList<>();
+    public static final int SEARCH_RESULT_COUNT = 50;
+
     private static final DataSourceDesc DATA_SOURCE_DESC =
             new DataSourceDesc.Builder().setDataSource(new FileDescriptor()).build();
 
@@ -71,9 +81,15 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
     public MockMediaLibraryService2() {
         super();
         GET_CHILDREN_RESULT.clear();
-        String mediaIdPrefix = "media_id_";
+        String getChildrenMediaIdPrefix = "get_children_media_id_";
         for (int i = 0; i < CHILDREN_COUNT; i++) {
-            GET_CHILDREN_RESULT.add(createMediaItem(mediaIdPrefix + i));
+            GET_CHILDREN_RESULT.add(createMediaItem(getChildrenMediaIdPrefix + i));
+        }
+
+        SEARCH_RESULT.clear();
+        String getSearchResultMediaIdPrefix = "get_search_result_media_id_";
+        for (int i = 0; i < SEARCH_RESULT_COUNT; i++) {
+            SEARCH_RESULT.add(createMediaItem(getSearchResultMediaIdPrefix + i));
         }
     }
 
@@ -147,7 +163,7 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
 
         @Override
         public List<MediaItem2> onLoadChildren(ControllerInfo controller, String parentId, int page,
-                int pageSize, Bundle options) {
+                int pageSize, Bundle extras) {
             if (PARENT_ID.equals(parentId)) {
                 return getPaginatedResult(GET_CHILDREN_RESULT, page, pageSize);
             } else if (PARENT_ID_ERROR.equals(parentId)) {
@@ -155,6 +171,37 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
             }
             // Includes the case of PARENT_ID_NO_CHILDREN.
             return new ArrayList<>();
+        }
+
+        @Override
+        public void onSearch(ControllerInfo controllerInfo, String query, Bundle extras) {
+            if (SEARCH_QUERY.equals(query)) {
+                mSession.notifySearchResultChanged(controllerInfo, query, extras,
+                        SEARCH_RESULT_COUNT);
+            } else if (SEARCH_QUERY_TAKES_TIME.equals(query)) {
+                // Searching takes some time. Notify after 5 seconds.
+                Executors.newSingleThreadScheduledExecutor().schedule(new Runnable() {
+                    @Override
+                    public void run() {
+                        mSession.notifySearchResultChanged(
+                                controllerInfo, query, extras, SEARCH_RESULT_COUNT);
+                    }
+                }, SEARCH_TIME_IN_MS, TimeUnit.MILLISECONDS);
+            } else if (SEARCH_QUERY_EMPTY_RESULT.equals(query)) {
+                mSession.notifySearchResultChanged(controllerInfo, query, extras, 0);
+            } else {
+                // TODO: For the error case, how should we notify the browser?
+            }
+        }
+
+        @Override
+        public List<MediaItem2> onLoadSearchResult(ControllerInfo controllerInfo,
+                String query, int page, int pageSize, Bundle extras) {
+            if (SEARCH_QUERY.equals(query)) {
+                return getPaginatedResult(SEARCH_RESULT, page, pageSize);
+            } else {
+                return null;
+            }
         }
     }
 

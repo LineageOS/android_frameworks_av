@@ -580,7 +580,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     //               1. Allow calls from random threads for all methods.
     //               2. Allow calls from random threads for all methods, except for the
     //                  {@link #setPlayer()}.
-    private void ensureCallingThread() {
+    void ensureCallingThread() {
         // TODO(jaewan): Uncomment or remove
         /*
         if (mHandler.getLooper() != Looper.myLooper()) {
@@ -619,6 +619,10 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     SessionCallback getCallback() {
         return mCallback;
+    }
+
+    MediaSession2Stub getSessionStub() {
+        return mSessionStub;
     }
 
     VolumeProvider2 getVolumeProvider() {

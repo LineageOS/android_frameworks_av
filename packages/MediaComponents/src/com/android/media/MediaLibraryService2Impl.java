@@ -26,12 +26,12 @@ import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
 import android.media.MediaPlayerInterface;
 import android.media.MediaSession2;
 import android.media.MediaSession2.ControllerInfo;
-import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
 import android.media.SessionToken2;
 import android.media.VolumeProvider2;
 import android.media.update.MediaLibraryService2Provider;
 import android.os.Bundle;
+import android.text.TextUtils;
 
 import com.android.media.MediaSession2Impl.BuilderBaseImpl;
 
@@ -96,13 +96,26 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
 
         @Override
         public void notifyChildrenChanged_impl(ControllerInfo controller, String parentId,
-                Bundle options) {
+                Bundle extras) {
             // TODO(jaewan): Implements
         }
 
         @Override
-        public void notifyChildrenChanged_impl(String parentId, Bundle options) {
+        public void notifyChildrenChanged_impl(String parentId, Bundle extras) {
             // TODO(jaewan): Implements
+        }
+
+        @Override
+        public void notifySearchResultChanged_impl(ControllerInfo controller, String query,
+                Bundle extras, int itemCount) {
+            ensureCallingThread();
+            if (controller == null) {
+                throw new IllegalArgumentException("controller shouldn't be null");
+            }
+            if (TextUtils.isEmpty(query)) {
+                throw new IllegalArgumentException("query shouldn't be empty");
+            }
+            getSessionStub().notifySearchResultChanged(controller, query, extras, itemCount);
         }
     }
 

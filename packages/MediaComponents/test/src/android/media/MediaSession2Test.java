@@ -461,7 +461,8 @@ public class MediaSession2Test extends MediaSession2TestBase {
         }
 
         @Override
-        public boolean onCommandRequest(ControllerInfo controllerInfo, MediaSession2.Command command) {
+        public boolean onCommandRequest(ControllerInfo controllerInfo,
+                MediaSession2.Command command) {
             assertEquals(mContext.getPackageName(), controllerInfo.getPackageName());
             assertEquals(Process.myUid(), controllerInfo.getUid());
             assertFalse(controllerInfo.isTrusted());

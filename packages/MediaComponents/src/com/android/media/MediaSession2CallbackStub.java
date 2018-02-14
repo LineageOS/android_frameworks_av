@@ -269,6 +269,23 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
     }
 
     @Override
+    public void onSearchResultChanged(String query, Bundle extras, int itemCount)
+            throws RuntimeException {
+        final MediaBrowser2Impl browser;
+        try {
+            browser = getBrowser();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        if (browser == null) {
+            // TODO(jaewan): Revisit here. Could be a bug
+            return;
+        }
+        browser.onSearchResultChanged(query, extras, itemCount);
+    }
+
+    @Override
     public void onSearchResultLoaded(String query, int page, int pageSize, Bundle extras,
             List<Bundle> itemBundleList) throws RuntimeException {
         final MediaBrowser2Impl browser;
