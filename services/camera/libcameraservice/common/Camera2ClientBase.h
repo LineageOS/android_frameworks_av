@@ -55,7 +55,7 @@ public:
                       int servicePid);
     virtual ~Camera2ClientBase();
 
-    virtual status_t      initialize(sp<CameraProviderManager> manager);
+    virtual status_t      initialize(sp<CameraProviderManager> manager, const String8& monitorTags);
     virtual status_t      dumpClient(int fd, const Vector<String16>& args);
 
     /**
@@ -142,7 +142,7 @@ protected:
 
 private:
     template<typename TProviderPtr>
-    status_t              initializeImpl(TProviderPtr providerPtr);
+    status_t              initializeImpl(TProviderPtr providerPtr, const String8& monitorTags);
 };
 
 }; // namespace android

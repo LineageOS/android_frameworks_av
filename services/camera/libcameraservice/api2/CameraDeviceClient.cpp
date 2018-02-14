@@ -84,16 +84,17 @@ CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
     ALOGI("CameraDeviceClient %s: Opened", cameraId.string());
 }
 
-status_t CameraDeviceClient::initialize(sp<CameraProviderManager> manager) {
-    return initializeImpl(manager);
+status_t CameraDeviceClient::initialize(sp<CameraProviderManager> manager,
+        const String8& monitorTags) {
+    return initializeImpl(manager, monitorTags);
 }
 
 template<typename TProviderPtr>
-status_t CameraDeviceClient::initializeImpl(TProviderPtr providerPtr) {
+status_t CameraDeviceClient::initializeImpl(TProviderPtr providerPtr, const String8& monitorTags) {
     ATRACE_CALL();
     status_t res;
 
-    res = Camera2ClientBase::initialize(providerPtr);
+    res = Camera2ClientBase::initialize(providerPtr, monitorTags);
     if (res != OK) {
         return res;
     }

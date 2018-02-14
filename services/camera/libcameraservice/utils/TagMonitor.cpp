@@ -33,6 +33,8 @@ TagMonitor::TagMonitor():
         mVendorTagId(CAMERA_METADATA_INVALID_VENDOR_ID)
 {}
 
+const String16 TagMonitor::kMonitorOption = String16("-m");
+
 const char* TagMonitor::k3aTags =
         "android.control.aeMode, android.control.afMode, android.control.awbMode,"
         "android.control.aeState, android.control.afState, android.control.awbState,"

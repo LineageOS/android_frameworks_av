@@ -68,8 +68,8 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
     mLegacyMode = legacyMode;
 }
 
-status_t Camera2Client::initialize(sp<CameraProviderManager> manager) {
-    return initializeImpl(manager);
+status_t Camera2Client::initialize(sp<CameraProviderManager> manager, const String8& monitorTags) {
+    return initializeImpl(manager, monitorTags);
 }
 
 bool Camera2Client::isZslEnabledInStillTemplate() {
@@ -87,13 +87,13 @@ bool Camera2Client::isZslEnabledInStillTemplate() {
 }
 
 template<typename TProviderPtr>
-status_t Camera2Client::initializeImpl(TProviderPtr providerPtr)
+status_t Camera2Client::initializeImpl(TProviderPtr providerPtr, const String8& monitorTags)
 {
     ATRACE_CALL();
     ALOGV("%s: Initializing client for camera %d", __FUNCTION__, mCameraId);
     status_t res;
 
-    res = Camera2ClientBase::initialize(providerPtr);
+    res = Camera2ClientBase::initialize(providerPtr, monitorTags);
     if (res != OK) {
         return res;
     }

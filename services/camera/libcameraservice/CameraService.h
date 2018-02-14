@@ -205,7 +205,8 @@ public:
 
     class BasicClient : public virtual RefBase {
     public:
-        virtual status_t       initialize(sp<CameraProviderManager> manager) = 0;
+        virtual status_t       initialize(sp<CameraProviderManager> manager,
+                const String8& monitorTags) = 0;
         virtual binder::Status disconnect();
 
         // because we can't virtually inherit IInterface, which breaks
@@ -604,6 +605,9 @@ private:
     // Circular buffer for storing event logging for dumps
     RingBuffer<String8> mEventLog;
     Mutex mLogLock;
+
+    // The last monitored tags set by client
+    String8 mMonitorTags;
 
     // Currently allowed user IDs
     std::set<userid_t> mAllowedUsers;

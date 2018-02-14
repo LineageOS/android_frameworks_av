@@ -38,6 +38,10 @@ namespace android {
  * buffer log that can be dumped at will. */
 class TagMonitor {
   public:
+
+    // Monitor argument
+    static const String16 kMonitorOption;
+
     enum eventSource {
         REQUEST,
         RESULT
