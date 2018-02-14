@@ -90,11 +90,6 @@ uint32_t FindAVCLayerId(const uint8_t *data, size_t size);
 
 const char *AVCProfileToString(uint8_t profile);
 
-sp<ABuffer> MakeAACCodecSpecificData(
-        unsigned profile, unsigned sampling_freq_index,
-        unsigned channel_configuration, int32_t *sampleRate,
-        int32_t *channelCount);
-
 // Given an MPEG4 video VOL-header chunk (starting with 0x00 0x00 0x01 0x2?)
 // parse it and fill in dimensions, returns true iff successful.
 bool ExtractDimensionsFromVOLHeader(
