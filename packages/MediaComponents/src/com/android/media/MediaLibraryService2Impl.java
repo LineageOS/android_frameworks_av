@@ -66,15 +66,17 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
 
     public static class MediaLibrarySessionImpl extends MediaSession2Impl
             implements MediaLibrarySessionProvider {
-        private final MediaLibrarySessionCallback mCallback;
-
         public MediaLibrarySessionImpl(Context context,
                 MediaPlayerInterface player, String id, VolumeProvider2 volumeProvider,
                 int ratingType, PendingIntent sessionActivity, Executor callbackExecutor,
                 MediaLibrarySessionCallback callback) {
             super(context, player, id, volumeProvider, ratingType, sessionActivity,
                     callbackExecutor, callback);
-            mCallback = callback;
+            // Don't put any extra initialization here. Here's the reason.
+            // System service will recognize this session inside of the super constructor and would
+            // connect to this session assuming that initialization is finished. However, if any
+            // initialization logic is here, calls from the server would fail.
+            // see: MediaSession2Stub#connect()
         }
 
         @Override
@@ -89,8 +91,7 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
 
         @Override
         MediaLibrarySessionCallback getCallback() {
-            // Equivalent to the (MediaLibrarySessionCallback) super.getCallback().
-            return mCallback;
+            return (MediaLibrarySessionCallback) super.getCallback();
         }
 
         @Override
