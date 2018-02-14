@@ -55,6 +55,11 @@ class CameraDeviceBase : public virtual RefBase {
      */
     virtual const String8& getId() const = 0;
 
+    /**
+     * The device vendor tag ID
+     */
+    virtual metadata_vendor_id_t getVendorTagId() const = 0;
+
     virtual status_t initialize(sp<CameraProviderManager> manager) = 0;
     virtual status_t disconnect() = 0;
 
