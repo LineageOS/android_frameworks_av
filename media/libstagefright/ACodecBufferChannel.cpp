@@ -22,6 +22,7 @@
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <binder/MemoryDealer.h>
+#include <hidlmemory/FrameworkUtils.h>
 #include <media/openmax/OMX_Core.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
@@ -34,6 +35,7 @@
 #include "include/SharedMemoryBuffer.h"
 
 namespace android {
+using hardware::fromHeap;
 using hardware::hidl_handle;
 using hardware::hidl_string;
 using hardware::hidl_vec;
@@ -162,7 +164,7 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
         size_t size;
         it->mSharedEncryptedBuffer->getMemory(&offset, &size);
         hardware::cas::native::V1_0::SharedBuffer srcBuffer = {
-                .heapBase = mHidlMemory,
+                .heapBase = *mHidlMemory,
                 .offset = (uint64_t) offset,
                 .size = size
         };
@@ -308,11 +310,8 @@ sp<MemoryDealer> ACodecBufferChannel::makeMemoryDealer(size_t heapSize) {
         }
     } else if (mDescrambler != nullptr) {
         sp<IMemoryHeap> heap = dealer->getMemoryHeap();
-        native_handle_t* nativeHandle = native_handle_create(1, 0);
-        if (nativeHandle != nullptr) {
-            int fd = heap->getHeapID();
-            nativeHandle->data[0] = fd;
-            mHidlMemory = hidl_memory("ashmem", hidl_handle(nativeHandle), heap->getSize());
+        mHidlMemory = fromHeap(heap);
+        if (mHidlMemory != NULL) {
             ALOGV("created hidl_memory for descrambler");
         } else {
             ALOGE("failed to create hidl_memory for descrambler");
