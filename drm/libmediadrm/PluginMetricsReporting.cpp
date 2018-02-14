@@ -23,7 +23,7 @@
 
 #include <media/MediaAnalyticsItem.h>
 
-#include "protos/plugin_metrics.pb.h"
+#include "protos/metrics.pb.h"
 
 namespace android {
 

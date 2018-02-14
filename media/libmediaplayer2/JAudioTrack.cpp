@@ -32,6 +32,8 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
         uint32_t sampleRate,                          // AudioFormat && bufferSizeInBytes
         audio_format_t format,                        // AudioFormat && bufferSizeInBytes
         audio_channel_mask_t channelMask,             // AudioFormat && bufferSizeInBytes
+        callback_t cbf,                               // Offload
+        void* user,                                   // Offload
         size_t frameCount,                            // bufferSizeInBytes
         audio_session_t sessionId,                    // AudioTrack
         const audio_attributes_t* pAttributes,        // AudioAttributes
@@ -90,8 +92,27 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
         jBuilderObj = env->CallObjectMethod(jBuilderObj, jSetSessionId, sessionId);
     }
 
+    if (cbf != NULL) {
+        jmethodID jSetOffloadedPlayback = env->GetMethodID(jBuilderCls, "setOffloadedPlayback",
+                "(Z)Landroid/media/AudioTrack$Builder;");
+        jBuilderObj = env->CallObjectMethod(jBuilderObj, jSetOffloadedPlayback, true);
+        mFlags = AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD;
+    }
+
     jmethodID jBuild = env->GetMethodID(jBuilderCls, "build", "()Landroid/media/AudioTrack;");
     mAudioTrackObj = env->CallObjectMethod(jBuilderObj, jBuild);
+
+    if (cbf != NULL) {
+        // Set offload mode callback
+        jobject jStreamEventCallbackObj = createStreamEventCallback(cbf, user);
+        jobject jExecutorObj = createCallbackExecutor();
+        jmethodID jSetStreamEventCallback = env->GetMethodID(
+                jAudioTrackCls,
+                "setStreamEventCallback",
+                "(Ljava/util/concurrent/Executor;Landroid/media/AudioTrack$StreamEventCallback;)V");
+        env->CallVoidMethod(
+                mAudioTrackObj, jSetStreamEventCallback, jExecutorObj, jStreamEventCallbackObj);
+    }
 }
 
 JAudioTrack::~JAudioTrack() {
@@ -158,6 +179,11 @@ bool JAudioTrack::getTimestamp(AudioTimestamp& timestamp) {
     timestamp.mPosition = (uint32_t) framePosition;
 
     return true;
+}
+
+status_t JAudioTrack::getTimestamp(ExtendedTimestamp *timestamp __unused) {
+    // TODO: Implement this after appropriate Java AudioTrack method is available.
+    return NO_ERROR;
 }
 
 status_t JAudioTrack::setPlaybackRate(const AudioPlaybackRate &playbackRate) {
@@ -442,6 +468,80 @@ audio_port_handle_t JAudioTrack::getRoutedDeviceId() {
     return routedDeviceId;
 }
 
+audio_session_t JAudioTrack::getAudioSessionId() {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jmethodID jGetAudioSessionId = env->GetMethodID(mAudioTrackCls, "getAudioSessionId", "()I");
+    jint sessionId = env->CallIntMethod(mAudioTrackObj, jGetAudioSessionId);
+    return (audio_session_t) sessionId;
+}
+
+status_t JAudioTrack::setOutputDevice(audio_port_handle_t deviceId) {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jclass jMP2ImplCls = env->FindClass("android/media/MediaPlayer2Impl");
+    jmethodID jSetAudioOutputDeviceById = env->GetMethodID(
+            jMP2ImplCls, "setAudioOutputDeviceById", "(Landroid/media/AudioTrack;I)Z");
+    jboolean result = env->CallStaticBooleanMethod(
+            jMP2ImplCls, jSetAudioOutputDeviceById, mAudioTrackObj, deviceId);
+    return result == true ? NO_ERROR : BAD_VALUE;
+}
+
+status_t JAudioTrack::pendingDuration(int32_t *msec) {
+    if (msec == nullptr) {
+        return BAD_VALUE;
+    }
+
+    bool isPurePcmData = audio_is_linear_pcm(format()) && (getFlags() & AUDIO_FLAG_HW_AV_SYNC) == 0;
+    if (!isPurePcmData) {
+        return INVALID_OPERATION;
+    }
+
+    // TODO: Need to know the difference btw. client and server time.
+    // If getTimestamp(ExtendedTimestamp) is ready, and un-comment below and modify appropriately.
+    // (copied from AudioTrack.cpp)
+
+//    ExtendedTimestamp ets;
+//    ExtendedTimestamp::LOCATION location = ExtendedTimestamp::LOCATION_SERVER;
+//    if (getTimestamp_l(&ets) == OK && ets.mTimeNs[location] > 0) {
+//        int64_t diff = ets.mPosition[ExtendedTimestamp::LOCATION_CLIENT]
+//                - ets.mPosition[location];
+//        if (diff < 0) {
+//            *msec = 0;
+//        } else {
+//            // ms is the playback time by frames
+//            int64_t ms = (int64_t)((double)diff * 1000 /
+//                    ((double)mSampleRate * mPlaybackRate.mSpeed));
+//            // clockdiff is the timestamp age (negative)
+//            int64_t clockdiff = (mState != STATE_ACTIVE) ? 0 :
+//                    ets.mTimeNs[location]
+//                    + ets.mTimebaseOffset[ExtendedTimestamp::TIMEBASE_MONOTONIC]
+//                    - systemTime(SYSTEM_TIME_MONOTONIC);
+//
+//            //ALOGV("ms: %lld  clockdiff: %lld", (long long)ms, (long long)clockdiff);
+//            static const int NANOS_PER_MILLIS = 1000000;
+//            *msec = (int32_t)(ms + clockdiff / NANOS_PER_MILLIS);
+//        }
+//        return NO_ERROR;
+//    }
+
+    return NO_ERROR;
+}
+
+status_t JAudioTrack::addAudioDeviceCallback(
+        const sp<AudioSystem::AudioDeviceCallback>& callback __unused) {
+    // TODO: Implement this after appropriate Java AudioTrack method is available.
+    return NO_ERROR;
+}
+
+status_t JAudioTrack::removeAudioDeviceCallback(
+        const sp<AudioSystem::AudioDeviceCallback>& callback __unused) {
+    // TODO: Implement this after appropriate Java AudioTrack method is available.
+    return NO_ERROR;
+}
+
+/////////////////////////////////////////////////////////////
+///                Private method begins                  ///
+/////////////////////////////////////////////////////////////
+
 jobject JAudioTrack::createVolumeShaperConfigurationObj(
         const sp<media::VolumeShaper::Configuration>& config) {
 
@@ -544,6 +644,24 @@ jobject JAudioTrack::createVolumeShaperOperationObj(
     jmethodID jBuild = env->GetMethodID(jBuilderCls, "build",
             "()Landroid/media/VolumeShaper$Operation;");
     return env->CallObjectMethod(jBuilderObj, jBuild);
+}
+
+jobject JAudioTrack::createStreamEventCallback(callback_t cbf, void* user) {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jclass jCallbackCls = env->FindClass("android/media/MediaPlayer2Impl$StreamEventCallback");
+    jmethodID jCallbackCtor = env->GetMethodID(jCallbackCls, "<init>", "(JJJ)V");
+    jobject jCallbackObj = env->NewObject(jCallbackCls, jCallbackCtor, this, cbf, user);
+    return jCallbackObj;
+}
+
+jobject JAudioTrack::createCallbackExecutor() {
+    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    jclass jExecutorsCls = env->FindClass("java/util/concurrent/Executors");
+    jmethodID jNewSingleThreadExecutor = env->GetStaticMethodID(jExecutorsCls,
+            "newSingleThreadExecutor", "()Ljava/util/concurrent/ExecutorService;");
+    jobject jSingleThreadExecutorObj =
+            env->CallStaticObjectMethod(jExecutorsCls, jNewSingleThreadExecutor);
+    return jSingleThreadExecutorObj;
 }
 
 status_t JAudioTrack::javaToNativeStatus(int javaStatus) {

@@ -16,6 +16,8 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "DrmHal"
+#include <iomanip>
+
 #include <utils/Log.h>
 
 #include <binder/IPCThreadState.h>
@@ -52,6 +54,7 @@ using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::hidl::manager::V1_0::IServiceManager;
+using ::android::os::PersistableBundle;
 using ::android::sp;
 
 namespace {
@@ -95,6 +98,15 @@ static String8 toString8(const hidl_string &string) {
 
 static hidl_string toHidlString(const String8& string) {
     return hidl_string(string.string());
+}
+
+std::string ToHexString(const std::string& str) {
+  std::ostringstream out;
+  out << std::hex << std::setfill('0');
+  for (size_t i = 0; i < str.size(); i++) {
+    out << std::setw(2) << (int)(str[i]);
+  }
+  return out.str();
 }
 
 static DrmPlugin::SecurityLevel toSecurityLevel(SecurityLevel level) {
@@ -308,6 +320,7 @@ Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
 
 sp<IDrmPlugin> DrmHal::makeDrmPlugin(const sp<IDrmFactory>& factory,
         const uint8_t uuid[16], const String8& appPackageName) {
+    mMetrics.SetAppPackageName(appPackageName);
 
     sp<IDrmPlugin> plugin;
     Return<void> hResult = factory->createPlugin(uuid, appPackageName.string(),
@@ -503,7 +516,8 @@ status_t DrmHal::destroyPlugin() {
     INIT_CHECK();
 
     closeOpenSessions();
-    reportMetrics();
+    reportPluginMetrics();
+    reportFrameworkMetrics();
     setListener(NULL);
     mInitCheck = NO_INIT;
 
@@ -594,6 +608,7 @@ status_t DrmHal::openSession(DrmPlugin::SecurityLevel level,
         DrmSessionManager::Instance()->addSession(getCallingPid(),
                 mDrmSessionClient, sessionId);
         mOpenSessions.push(sessionId);
+        mMetrics.SetSessionStart(sessionId);
     }
 
     mMetrics.mOpenSessionCounter.Increment(err);
@@ -615,9 +630,10 @@ status_t DrmHal::closeSession(Vector<uint8_t> const &sessionId) {
                 }
             }
         }
-        reportMetrics();
         status_t response = toStatusT(status);
+        mMetrics.SetSessionEnd(sessionId);
         mMetrics.mCloseSessionCounter.Increment(response);
+        reportPluginMetrics();
         return response;
     }
     mMetrics.mCloseSessionCounter.Increment(DEAD_OBJECT);
@@ -631,7 +647,7 @@ status_t DrmHal::getKeyRequest(Vector<uint8_t> const &sessionId,
         String8 &defaultUrl, DrmPlugin::KeyRequestType *keyRequestType) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
-    EventTimer<status_t> keyRequestTimer(&mMetrics.mGetKeyRequestTiming);
+    EventTimer<status_t> keyRequestTimer(&mMetrics.mGetKeyRequestTimeUs);
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
@@ -726,7 +742,7 @@ status_t DrmHal::getKeyRequest(Vector<uint8_t> const &sessionId,
 status_t DrmHal::provideKeyResponse(Vector<uint8_t> const &sessionId,
         Vector<uint8_t> const &response, Vector<uint8_t> &keySetId) {
     Mutex::Autolock autoLock(mLock);
-    EventTimer<status_t> keyResponseTimer(&mMetrics.mProvideKeyResponseTiming);
+    EventTimer<status_t> keyResponseTimer(&mMetrics.mProvideKeyResponseTimeUs);
 
     INIT_CHECK();
 
@@ -1095,7 +1111,7 @@ status_t DrmHal::setPropertyByteArray(String8 const &name,
     return toStatusT(status);
 }
 
-status_t DrmHal::getMetrics(MediaAnalyticsItem* item) {
+status_t DrmHal::getMetrics(PersistableBundle* item) {
     if (item == nullptr) {
       return UNEXPECTED_NULL;
     }
@@ -1274,8 +1290,41 @@ void DrmHal::writeByteArray(Parcel &obj, hidl_vec<uint8_t> const &vec)
     }
 }
 
+void DrmHal::reportFrameworkMetrics() const
+{
+    MediaAnalyticsItem item("mediadrm");
+    item.generateSessionID();
+    item.setPkgName(mMetrics.GetAppPackageName().c_str());
+    String8 vendor;
+    String8 description;
+    status_t result = getPropertyStringInternal(String8("vendor"), vendor);
+    if (result != OK) {
+        ALOGE("Failed to get vendor from drm plugin. %d", result);
+    } else {
+        item.setCString("vendor", vendor.c_str());
+    }
+    result = getPropertyStringInternal(String8("description"), description);
+    if (result != OK) {
+        ALOGE("Failed to get description from drm plugin. %d", result);
+    } else {
+        item.setCString("description", description.c_str());
+    }
 
-void DrmHal::reportMetrics() const
+    std::string serializedMetrics;
+    result = mMetrics.GetSerializedMetrics(&serializedMetrics);
+    if (result != OK) {
+        ALOGE("Failed to serialize Framework metrics: %d", result);
+    }
+    serializedMetrics = ToHexString(serializedMetrics);
+    if (!serializedMetrics.empty()) {
+        item.setCString("serialized_metrics", serializedMetrics.c_str());
+    }
+    if (!item.selfrecord()) {
+        ALOGE("Failed to self record framework metrics.");
+    }
+}
+
+void DrmHal::reportPluginMetrics() const
 {
     Vector<uint8_t> metrics;
     String8 vendor;

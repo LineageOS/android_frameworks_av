@@ -119,7 +119,7 @@ struct DrmHal : public BnDrm,
     virtual status_t setPropertyString(String8 const &name, String8 const &value ) const;
     virtual status_t setPropertyByteArray(String8 const &name,
                                           Vector<uint8_t> const &value ) const;
-    virtual status_t getMetrics(MediaAnalyticsItem *item);
+    virtual status_t getMetrics(os::PersistableBundle *metrics);
 
     virtual status_t setCipherAlgorithm(Vector<uint8_t> const &sessionId,
                                         String8 const &algorithm);
@@ -203,7 +203,8 @@ private:
 
     void writeByteArray(Parcel &obj, const hidl_vec<uint8_t>& array);
 
-    void reportMetrics() const;
+    void reportPluginMetrics() const;
+    void reportFrameworkMetrics() const;
     status_t getPropertyStringInternal(String8 const &name, String8 &value) const;
     status_t getPropertyByteArrayInternal(String8 const &name,
                                           Vector<uint8_t> &value) const;
