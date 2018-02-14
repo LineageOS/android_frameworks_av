@@ -241,8 +241,12 @@ status_t ZslProcessor::updateStream(const Parameters &params) {
                     client->getCameraId(), strerror(-res), res);
             return res;
         }
-        if (streamInfo.width != (uint32_t)params.fastInfo.arrayWidth ||
-                streamInfo.height != (uint32_t)params.fastInfo.arrayHeight) {
+
+        Size maxImageSize = getMaxStreamResolution(params,
+                                       HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
+                                       ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT);
+        if (streamInfo.width != (uint32_t)maxImageSize.width ||
+                streamInfo.height != (uint32_t)maxImageSize.height) {
             if (mZslStreamId != NO_STREAM) {
                 ALOGV("%s: Camera %d: Deleting stream %d since the buffer "
                       "dimensions changed",
@@ -286,8 +290,11 @@ status_t ZslProcessor::updateStream(const Parameters &params) {
     }
 
     if (mInputStreamId == NO_STREAM) {
-        res = device->createInputStream(params.fastInfo.arrayWidth,
-            params.fastInfo.arrayHeight, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
+        Size maxImageSize = getMaxStreamResolution(params,
+                                       HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
+                                       ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_INPUT);
+        res = device->createInputStream(maxImageSize.width,
+            maxImageSize.height, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
             &mInputStreamId);
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create input stream: "
@@ -308,9 +315,11 @@ status_t ZslProcessor::updateStream(const Parameters &params) {
             mBufferQueueDepth);
         mProducer->setName(String8("Camera2-ZslRingBufferConsumer"));
         sp<Surface> outSurface = new Surface(producer);
-
-        res = device->createStream(outSurface, params.fastInfo.arrayWidth,
-            params.fastInfo.arrayHeight, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
+        Size maxImageSize = getMaxStreamResolution(params,
+                                       HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
+                                       ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT);
+        res = device->createStream(outSurface, maxImageSize.width,
+                maxImageSize.height, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
             HAL_DATASPACE_UNKNOWN, CAMERA3_STREAM_ROTATION_0, &mZslStreamId);
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create ZSL stream: "
@@ -913,6 +922,43 @@ nsecs_t ZslProcessor::getCandidateTimestampLocked(size_t* metadataIdx) const {
     }
 
     return minTimestamp;
+}
+
+Size ZslProcessor::getMaxStreamResolution(const Parameters &params,
+                              int32_t streamFormat,
+                              int32_t streamDirection) const {
+    int32_t maxFormatWidth = 0, maxFormatHeight = 0;
+    const int STREAM_CONFIGURATION_SIZE = 4;
+    const int STREAM_FORMAT_OFFSET = 0;
+    const int STREAM_WIDTH_OFFSET = 1;
+    const int STREAM_HEIGHT_OFFSET = 2;
+    const int STREAM_IS_INPUT_OFFSET = 3;
+    camera_metadata_ro_entry availableStreamConfigs =
+            params.info->find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
+
+    if ((availableStreamConfigs.count == 0) ||
+            (availableStreamConfigs.count % STREAM_CONFIGURATION_SIZE != 0)) {
+        ALOGE("Stream width and height not valid");
+        return Size(0, 0);
+    }
+
+    // Get max format size (area-wise).
+    for (size_t i=0; i < availableStreamConfigs.count; i+= STREAM_CONFIGURATION_SIZE) {
+
+        int32_t format    = availableStreamConfigs.data.i32[i + STREAM_FORMAT_OFFSET];
+        int32_t width     = availableStreamConfigs.data.i32[i + STREAM_WIDTH_OFFSET];
+        int32_t height    = availableStreamConfigs.data.i32[i + STREAM_HEIGHT_OFFSET];
+        int32_t direction = availableStreamConfigs.data.i32[i + STREAM_IS_INPUT_OFFSET];
+
+        if ((direction == streamDirection) &&
+                (format == streamFormat) &&
+                ((width * height) > (maxFormatWidth * maxFormatHeight))) {
+            maxFormatWidth = width;
+            maxFormatHeight = height;
+        }
+    }
+
+    return Size(maxFormatWidth, maxFormatHeight);
 }
 
 }; // namespace camera2
