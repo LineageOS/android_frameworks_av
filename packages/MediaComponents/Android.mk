@@ -16,6 +16,12 @@
 
 LOCAL_PATH := $(call my-dir)
 
+ifneq ($(TARGET_BUILD_PDK),true)
+# Build MediaComponents only if this is not a PDK build.  MediaComponents won't
+# build in PDK builds because frameworks/base/core/java is not available but
+# IMediaSession2.aidl and IMediaSession2Callback.aidl are using classes from
+# frameworks/base/core/java.
+
 include $(CLEAR_VARS)
 
 LOCAL_PACKAGE_NAME := MediaComponents
@@ -59,5 +65,7 @@ LOCAL_STATIC_ANDROID_LIBRARIES += \
 LOCAL_USE_AAPT2 := true
 
 include $(BUILD_PACKAGE)
+
+endif  # ifneq ($(TARGET_BUILD_PDK),true)
 
 include $(call all-makefiles-under,$(LOCAL_PATH))
