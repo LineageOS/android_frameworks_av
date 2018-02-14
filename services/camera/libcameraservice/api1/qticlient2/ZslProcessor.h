@@ -27,7 +27,6 @@
 #include <gui/RingBufferConsumer.h>
 #include <gui/IProducerListener.h>
 #include <camera/CameraMetadata.h>
-
 #include "api1/qticlient2/FrameProcessor.h"
 
 namespace android {
@@ -162,6 +161,10 @@ class ZslProcessor :
     void doNotifyInputReleasedLocked();
 
     bool isFixedFocusMode(uint8_t afMode) const;
+
+    Size getMaxStreamResolution(const Parameters &params,
+                                int32_t streamFormat,
+                                int32_t streamDirection) const ;
 
     // Update the post-processing metadata with the default still capture request template
     status_t updateRequestWithDefaultStillRequest(CameraMetadata &request) const;
