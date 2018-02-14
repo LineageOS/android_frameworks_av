@@ -219,7 +219,7 @@ static sp<ABuffer> MakeAVCCodecSpecificData(
     return csd;
 }
 
-sp<ABuffer> MakeAACCodecSpecificData(const char *params) {
+static sp<ABuffer> MakeAACCodecSpecificData(const char *params) {
     AString val;
     CHECK(GetAttribute(params, "config", &val));
 
@@ -257,7 +257,7 @@ sp<ABuffer> MakeAACCodecSpecificData(const char *params) {
 }
 
 // From mpeg4-generic configuration data.
-sp<ABuffer> MakeAACCodecSpecificData2(const char *params) {
+static sp<ABuffer> MakeAACCodecSpecificData2(const char *params) {
     AString val;
     unsigned long objectType;
     if (GetAttribute(params, "objectType", &val)) {
