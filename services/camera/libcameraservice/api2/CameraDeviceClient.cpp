@@ -28,6 +28,8 @@
 #include "common/CameraDeviceBase.h"
 #include "api2/CameraDeviceClient.h"
 
+#include <camera_metadata_hidden.h>
+
 // Convenience methods for constructing binder::Status objects for error returns
 
 #define STATUS_ERROR(errorCode, errorString) \
@@ -105,6 +107,15 @@ status_t CameraDeviceClient::initializeImpl(TProviderPtr providerPtr) {
                                       FRAME_PROCESSOR_LISTENER_MAX_ID,
                                       /*listener*/this,
                                       /*sendPartials*/true);
+
+    auto deviceInfo = mDevice->info();
+    camera_metadata_entry_t physicalKeysEntry = deviceInfo.find(
+            ANDROID_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS);
+    if (physicalKeysEntry.count > 0) {
+        mSupportedPhysicalRequestKeys.insert(mSupportedPhysicalRequestKeys.begin(),
+                physicalKeysEntry.data.i32,
+                physicalKeysEntry.data.i32 + physicalKeysEntry.count);
+    }
 
     return OK;
 }
@@ -291,6 +302,13 @@ binder::Status CameraDeviceClient::submitRequestList(
 
         CameraDeviceBase::PhysicalCameraSettingsList physicalSettingsList;
         for (const auto& it : request.mPhysicalCameraSettings) {
+            if (it.settings.isEmpty()) {
+                ALOGE("%s: Camera %s: Sent empty metadata packet. Rejecting request.",
+                        __FUNCTION__, mCameraIdStr.string());
+                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                        "Request settings are empty");
+            }
+
             String8 physicalId(it.id.c_str());
             if (physicalId != mDevice->getId()) {
                 auto found = std::find(requestedPhysicalIds.begin(), requestedPhysicalIds.end(),
@@ -301,24 +319,27 @@ binder::Status CameraDeviceClient::submitRequestList(
                     return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                             "Invalid physical camera id");
                 }
+
+                if (!mSupportedPhysicalRequestKeys.empty()) {
+                    // Filter out any unsupported physical request keys.
+                    CameraMetadata filteredParams(mSupportedPhysicalRequestKeys.size());
+                    camera_metadata_t *meta = const_cast<camera_metadata_t *>(
+                            filteredParams.getAndLock());
+                    set_camera_metadata_vendor_id(meta, mDevice->getVendorTagId());
+                    filteredParams.unlock(meta);
+
+                    for (const auto& keyIt : mSupportedPhysicalRequestKeys) {
+                        camera_metadata_ro_entry entry = it.settings.find(keyIt);
+                        if (entry.count > 0) {
+                            filteredParams.update(entry);
+                        }
+                    }
+
+                    physicalSettingsList.push_back({it.id, filteredParams});
+                }
+            } else {
+                physicalSettingsList.push_back({it.id, it.settings});
             }
-
-            CameraMetadata metadata(it.settings);
-            if (metadata.isEmpty()) {
-                ALOGE("%s: Camera %s: Sent empty metadata packet. Rejecting request.",
-                        __FUNCTION__, mCameraIdStr.string());
-                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                        "Request settings are empty");
-            }
-
-            physicalSettingsList.push_back({it.id, metadata});
-        }
-
-        if (streaming && (physicalSettingsList.size() > 1)) {
-            ALOGE("%s: Camera %s: Individual physical camera settings are not supported in "
-                    "streaming requests. Rejecting request.", __FUNCTION__, mCameraIdStr.string());
-            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                    "Streaming request contains individual physical requests");
         }
 
         if (!enforceRequestPermissions(physicalSettingsList.begin()->metadata)) {
