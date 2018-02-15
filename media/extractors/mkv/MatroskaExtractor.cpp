@@ -29,7 +29,7 @@
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/foundation/hexdump.h>
-#include <media/stagefright/MediaBuffer.h>
+#include <media/stagefright/MediaBufferBase.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
@@ -130,7 +130,7 @@ struct MatroskaSource : public MediaSourceBase {
     virtual sp<MetaData> getFormat();
 
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options);
+            MediaBufferBase **buffer, const ReadOptions *options);
 
 protected:
     virtual ~MatroskaSource();
@@ -150,11 +150,11 @@ private:
     BlockIterator mBlockIter;
     ssize_t mNALSizeLen;  // for type AVC or HEVC
 
-    List<MediaBuffer *> mPendingFrames;
+    List<MediaBufferBase *> mPendingFrames;
 
     status_t advance();
 
-    status_t setWebmBlockCryptoInfo(MediaBuffer *mbuf);
+    status_t setWebmBlockCryptoInfo(MediaBufferBase *mbuf);
     status_t readBlock();
     void clearPendingFrames();
 
@@ -568,7 +568,7 @@ static AString uriDebugString(const AString &uri) {
 
 void MatroskaSource::clearPendingFrames() {
     while (!mPendingFrames.empty()) {
-        MediaBuffer *frame = *mPendingFrames.begin();
+        MediaBufferBase *frame = *mPendingFrames.begin();
         mPendingFrames.erase(mPendingFrames.begin());
 
         frame->release();
@@ -576,7 +576,7 @@ void MatroskaSource::clearPendingFrames() {
     }
 }
 
-status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBuffer *mbuf) {
+status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferBase *mbuf) {
     if (mbuf->range_length() < 1 || mbuf->range_length() - 1 > INT32_MAX) {
         // 1-byte signal
         return ERROR_MALFORMED;
@@ -662,7 +662,7 @@ status_t MatroskaSource::readBlock() {
         }
 
         len += trackInfo->mHeaderLen;
-        MediaBuffer *mbuf = new MediaBuffer(len);
+        MediaBufferBase *mbuf = MediaBufferBase::Create(len);
         uint8_t *data = static_cast<uint8_t *>(mbuf->data());
         if (trackInfo->mHeader) {
             memcpy(data, trackInfo->mHeader, trackInfo->mHeaderLen);
@@ -695,7 +695,7 @@ status_t MatroskaSource::readBlock() {
 }
 
 status_t MatroskaSource::read(
-        MediaBuffer **out, const ReadOptions *options) {
+        MediaBufferBase **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t targetSampleTimeUs = -1ll;
@@ -731,7 +731,7 @@ status_t MatroskaSource::read(
         }
     }
 
-    MediaBuffer *frame = *mPendingFrames.begin();
+    MediaBufferBase *frame = *mPendingFrames.begin();
     mPendingFrames.erase(mPendingFrames.begin());
 
     if ((mType != AVC && mType != HEVC) || mNALSizeLen == 0) {
@@ -760,7 +760,7 @@ status_t MatroskaSource::read(
     size_t srcSize = frame->range_length();
 
     size_t dstSize = 0;
-    MediaBuffer *buffer = NULL;
+    MediaBufferBase *buffer = NULL;
     uint8_t *dstPtr = NULL;
 
     for (int32_t pass = 0; pass < 2; ++pass) {
@@ -820,7 +820,7 @@ status_t MatroskaSource::read(
                 // each 4-byte nal size with a 4-byte start code
                 buffer = frame;
             } else {
-                buffer = new MediaBuffer(dstSize);
+                buffer = MediaBufferBase::Create(dstSize);
             }
 
             int64_t timeUs;

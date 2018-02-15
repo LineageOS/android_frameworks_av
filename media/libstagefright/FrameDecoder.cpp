@@ -230,7 +230,7 @@ status_t FrameDecoder::extractInternal(
             }
             codecBuffer = inputBuffers[inputIndex];
 
-            MediaBuffer *mediaBuffer = NULL;
+            MediaBufferBase *mediaBuffer = NULL;
 
             err = mSource->read(&mediaBuffer, &options);
             options.clearSeekTo();

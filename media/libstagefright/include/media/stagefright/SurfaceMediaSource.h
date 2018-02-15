@@ -79,7 +79,7 @@ public:
     // For the MediaSource interface for use by StageFrightRecorder:
     virtual status_t start(MetaData *params = NULL);
     virtual status_t stop();
-    virtual status_t read(MediaBuffer **buffer,
+    virtual status_t read(MediaBufferBase **buffer,
             const ReadOptions *options = NULL);
     virtual sp<MetaData> getFormat();
 
@@ -90,7 +90,7 @@ public:
     // The call for the StageFrightRecorder to tell us that
     // it is done using the MediaBuffer data so that its state
     // can be set to FREE for dequeuing
-    virtual void signalBufferReturned(MediaBuffer* buffer);
+    virtual void signalBufferReturned(MediaBufferBase* buffer);
     // end of MediaSource interface
 
     // getTimestamp retrieves the timestamp associated with the image
@@ -236,7 +236,7 @@ private:
     Condition mMediaBuffersAvailableCondition;
 
     // Allocate and return a new MediaBuffer and pass the ANW buffer as metadata into it.
-    void passMetadataBuffer_l(MediaBuffer **buffer, ANativeWindowBuffer *bufferHandle) const;
+    void passMetadataBuffer_l(MediaBufferBase **buffer, ANativeWindowBuffer *bufferHandle) const;
 
     // Avoid copying and equating and default constructor
     DISALLOW_EVIL_CONSTRUCTORS(SurfaceMediaSource);

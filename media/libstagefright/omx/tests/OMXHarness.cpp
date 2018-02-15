@@ -658,7 +658,7 @@ status_t Harness::testSeek(
                      requestedSeekTimeUs, requestedSeekTimeUs / 1E6);
             }
 
-            MediaBuffer *buffer = NULL;
+            MediaBufferBase *buffer = NULL;
             options.setSeekTo(
                     requestedSeekTimeUs, MediaSource::ReadOptions::SEEK_NEXT_SYNC);
 
@@ -679,7 +679,7 @@ status_t Harness::testSeek(
         }
 
         status_t err;
-        MediaBuffer *buffer;
+        MediaBufferBase *buffer;
         for (;;) {
             err = codec->read(&buffer, &options);
             options.clearSeekTo();

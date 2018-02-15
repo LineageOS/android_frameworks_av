@@ -75,7 +75,7 @@ void DummyRecorder::readFromSource() {
     }
 
     status_t err = OK;
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     ALOGV("A fake writer accessing the frames");
     while (mStarted && (err = mSource->read(&buffer)) == OK){
         // if not getting a valid buffer from source, then exit

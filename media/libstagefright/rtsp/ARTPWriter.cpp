@@ -173,7 +173,7 @@ status_t ARTPWriter::pause() {
     return OK;
 }
 
-static void StripStartcode(MediaBuffer *buffer) {
+static void StripStartcode(MediaBufferBase *buffer) {
     if (buffer->range_length() < 4) {
         return;
     }
@@ -195,7 +195,7 @@ void ARTPWriter::onMessageReceived(const sp<AMessage> &msg) {
 
 #if 0
             if (mMode == H264) {
-                MediaBuffer *buffer;
+                MediaBufferBase *buffer;
                 CHECK_EQ(mSource->read(&buffer), (status_t)OK);
 
                 StripStartcode(buffer);
@@ -265,7 +265,7 @@ void ARTPWriter::onMessageReceived(const sp<AMessage> &msg) {
 }
 
 void ARTPWriter::onRead(const sp<AMessage> &msg) {
-    MediaBuffer *mediaBuf;
+    MediaBufferBase *mediaBuf;
     status_t err = mSource->read(&mediaBuf);
 
     if (err != OK) {
@@ -523,7 +523,7 @@ void ARTPWriter::dumpSessionDesc() {
     ALOGI("%s", sdp.c_str());
 }
 
-void ARTPWriter::makeH264SPropParamSets(MediaBuffer *buffer) {
+void ARTPWriter::makeH264SPropParamSets(MediaBufferBase *buffer) {
     static const char kStartCode[] = "\x00\x00\x00\x01";
 
     const uint8_t *data =
@@ -567,7 +567,7 @@ void ARTPWriter::sendBye() {
     send(buffer, true /* isRTCP */);
 }
 
-void ARTPWriter::sendAVCData(MediaBuffer *mediaBuf) {
+void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
     // 12 bytes RTP header + 2 bytes for the FU-indicator and FU-header.
     CHECK_GE(kMaxPacketSize, 12u + 2u);
 
@@ -663,7 +663,7 @@ void ARTPWriter::sendAVCData(MediaBuffer *mediaBuf) {
     mLastNTPTime = GetNowNTP();
 }
 
-void ARTPWriter::sendH263Data(MediaBuffer *mediaBuf) {
+void ARTPWriter::sendH263Data(MediaBufferBase *mediaBuf) {
     CHECK_GE(kMaxPacketSize, 12u + 2u);
 
     int64_t timeUs;
@@ -741,7 +741,7 @@ static size_t getFrameSize(bool isWide, unsigned FT) {
     return frameSize;
 }
 
-void ARTPWriter::sendAMRData(MediaBuffer *mediaBuf) {
+void ARTPWriter::sendAMRData(MediaBufferBase *mediaBuf) {
     const uint8_t *mediaData =
         (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
 

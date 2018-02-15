@@ -85,8 +85,8 @@ private:
 
     void extractCodecSpecificData();
 
-    void appendAACFrames(MediaBuffer *buffer);
-    void appendAVCFrame(MediaBuffer *buffer);
+    void appendAACFrames(MediaBufferBase *buffer);
+    void appendAVCFrame(MediaBufferBase *buffer);
 
     DISALLOW_EVIL_CONSTRUCTORS(SourceInfo);
 };
@@ -249,7 +249,7 @@ void MPEG2TSWriter::SourceInfo::extractCodecSpecificData() {
     notify->post();
 }
 
-void MPEG2TSWriter::SourceInfo::appendAVCFrame(MediaBuffer *buffer) {
+void MPEG2TSWriter::SourceInfo::appendAVCFrame(MediaBufferBase *buffer) {
     sp<AMessage> notify = mNotify->dup();
     notify->setInt32("what", kNotifyBuffer);
 
@@ -279,7 +279,7 @@ void MPEG2TSWriter::SourceInfo::appendAVCFrame(MediaBuffer *buffer) {
     notify->post();
 }
 
-void MPEG2TSWriter::SourceInfo::appendAACFrames(MediaBuffer *buffer) {
+void MPEG2TSWriter::SourceInfo::appendAACFrames(MediaBufferBase *buffer) {
     sp<AMessage> notify = mNotify->dup();
     notify->setInt32("what", kNotifyBuffer);
 
@@ -368,7 +368,7 @@ void MPEG2TSWriter::SourceInfo::onMessageReceived(const sp<AMessage> &msg) {
 
         case kWhatRead:
         {
-            MediaBuffer *buffer;
+            MediaBufferBase *buffer;
             status_t err = mSource->read(&buffer);
 
             if (err != OK && err != INFO_FORMAT_CHANGED) {

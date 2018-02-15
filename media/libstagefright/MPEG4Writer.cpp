@@ -2809,7 +2809,7 @@ status_t MPEG4Writer::Track::threadEntry() {
     sp<MetaData> meta_data;
 
     status_t err = OK;
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     const char *trackName = getTrackType();
     while (!mDone && (err = mSource->read(&buffer)) == OK) {
         if (buffer->range_length() == 0) {

@@ -57,13 +57,13 @@ struct MediaCodecSource : public MediaSource,
     virtual status_t pause(MetaData *params);
     virtual sp<MetaData> getFormat();
     virtual status_t read(
-            MediaBuffer **buffer,
+            MediaBufferBase **buffer,
             const ReadOptions *options = NULL);
     virtual status_t setStopTimeUs(int64_t stopTimeUs);
 
 
     // MediaBufferObserver
-    virtual void signalBufferReturned(MediaBuffer *buffer);
+    virtual void signalBufferReturned(MediaBufferBase *buffer);
 
     // for AHandlerReflector
     void onMessageReceived(const sp<AMessage> &msg);
@@ -136,7 +136,7 @@ private:
     sp<AMessage> mEncoderActivityNotify;
     sp<IGraphicBufferProducer> mGraphicBufferProducer;
     sp<PersistentSurface> mPersistentSurface;
-    List<MediaBuffer *> mInputBufferQueue;
+    List<MediaBufferBase *> mInputBufferQueue;
     List<size_t> mAvailEncoderInputIndices;
     List<int64_t> mDecodingTimeQueue; // decoding time (us) for video
     int64_t mInputBufferTimeOffsetUs;
@@ -149,7 +149,7 @@ private:
 
     struct Output {
         Output();
-        List<MediaBuffer*> mBufferQueue;
+        List<MediaBufferBase*> mBufferQueue;
         bool mEncoderReachedEOS;
         status_t mErrorCode;
         Condition mCond;

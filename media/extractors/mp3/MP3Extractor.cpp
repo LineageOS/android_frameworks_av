@@ -30,7 +30,7 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/ByteUtils.h>
-#include <media/stagefright/MediaBuffer.h>
+#include <media/stagefright/MediaBufferBase.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
@@ -222,7 +222,7 @@ public:
     virtual sp<MetaData> getFormat();
 
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~MP3Source();
@@ -463,7 +463,7 @@ status_t MP3Source::start(MetaData *) {
 
     mGroup = new MediaBufferGroup;
 
-    mGroup->add_buffer(new MediaBuffer(kMaxFrameSize));
+    mGroup->add_buffer(MediaBufferBase::Create(kMaxFrameSize));
 
     mCurrentPos = mFirstFramePos;
     mCurrentTimeUs = 0;
@@ -492,7 +492,7 @@ sp<MetaData> MP3Source::getFormat() {
 }
 
 status_t MP3Source::read(
-        MediaBuffer **out, const ReadOptions *options) {
+        MediaBufferBase **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -522,7 +522,7 @@ status_t MP3Source::read(
         mSamplesRead = 0;
     }
 
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     status_t err = mGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return err;

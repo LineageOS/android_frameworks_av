@@ -45,7 +45,7 @@ public:
     virtual sp<MetaData> getFormat();
 
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~AMRSource();
@@ -233,7 +233,7 @@ status_t AMRSource::start(MetaData * /* params */) {
     mOffset = mIsWide ? 9 : 6;
     mCurrentTimeUs = 0;
     mGroup = new MediaBufferGroup;
-    mGroup->add_buffer(new MediaBuffer(128));
+    mGroup->add_buffer(MediaBufferBase::Create(128));
     mStarted = true;
 
     return OK;
@@ -254,7 +254,7 @@ sp<MetaData> AMRSource::getFormat() {
 }
 
 status_t AMRSource::read(
-        MediaBuffer **out, const ReadOptions *options) {
+        MediaBufferBase **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -303,7 +303,7 @@ status_t AMRSource::read(
         return ERROR_MALFORMED;
     }
 
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     status_t err = mGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return err;

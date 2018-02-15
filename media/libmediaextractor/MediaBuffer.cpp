@@ -177,7 +177,7 @@ void MediaBuffer::setObserver(MediaBufferObserver *observer) {
     mObserver = observer;
 }
 
-MediaBuffer *MediaBuffer::clone() {
+MediaBufferBase *MediaBuffer::clone() {
     MediaBuffer *buffer = new MediaBuffer(mData, mSize);
     buffer->set_range(mRangeOffset, mRangeLength);
     buffer->mMetaData = new MetaData(*mMetaData.get());

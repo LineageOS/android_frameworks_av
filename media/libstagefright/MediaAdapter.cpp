@@ -72,7 +72,7 @@ sp<MetaData> MediaAdapter::getFormat() {
     return mOutputFormat;
 }
 
-void MediaAdapter::signalBufferReturned(MediaBuffer *buffer) {
+void MediaAdapter::signalBufferReturned(MediaBufferBase *buffer) {
     Mutex::Autolock autoLock(mAdapterLock);
     CHECK(buffer != NULL);
     buffer->setObserver(0);
@@ -82,7 +82,7 @@ void MediaAdapter::signalBufferReturned(MediaBuffer *buffer) {
 }
 
 status_t MediaAdapter::read(
-            MediaBuffer **buffer, const ReadOptions * /* options */) {
+            MediaBufferBase **buffer, const ReadOptions * /* options */) {
     Mutex::Autolock autoLock(mAdapterLock);
     if (!mStarted) {
         ALOGV("Read before even started!");

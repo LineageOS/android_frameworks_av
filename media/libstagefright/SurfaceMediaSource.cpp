@@ -251,7 +251,7 @@ sp<MetaData> SurfaceMediaSource::getFormat()
 
 // Pass the data to the MediaBuffer. Pass in only the metadata
 // Note: Call only when you have the lock
-void SurfaceMediaSource::passMetadataBuffer_l(MediaBuffer **buffer,
+void SurfaceMediaSource::passMetadataBuffer_l(MediaBufferBase **buffer,
         ANativeWindowBuffer *bufferHandle) const {
     *buffer = new MediaBuffer(sizeof(VideoNativeMetadata));
     VideoNativeMetadata *data = (VideoNativeMetadata *)(*buffer)->data();
@@ -267,7 +267,7 @@ void SurfaceMediaSource::passMetadataBuffer_l(MediaBuffer **buffer,
 }
 
 status_t SurfaceMediaSource::read(
-        MediaBuffer **buffer, const ReadOptions * /* options */) {
+        MediaBufferBase **buffer, const ReadOptions * /* options */) {
     ALOGV("read");
     Mutex::Autolock lock(mMutex);
 
@@ -371,7 +371,7 @@ status_t SurfaceMediaSource::read(
     return OK;
 }
 
-static buffer_handle_t getMediaBufferHandle(MediaBuffer *buffer) {
+static buffer_handle_t getMediaBufferHandle(MediaBufferBase *buffer) {
     // need to convert to char* for pointer arithmetic and then
     // copy the byte stream into our handle
     buffer_handle_t bufferHandle;
@@ -379,7 +379,7 @@ static buffer_handle_t getMediaBufferHandle(MediaBuffer *buffer) {
     return bufferHandle;
 }
 
-void SurfaceMediaSource::signalBufferReturned(MediaBuffer *buffer) {
+void SurfaceMediaSource::signalBufferReturned(MediaBufferBase *buffer) {
     ALOGV("signalBufferReturned");
 
     bool foundBuffer = false;

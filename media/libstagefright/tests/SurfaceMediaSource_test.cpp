@@ -601,7 +601,7 @@ struct SimpleDummyRecorder {
 
         // fakes reading from a media source
         status_t readFromSource() {
-            MediaBuffer *buffer;
+            MediaBufferBase *buffer;
             status_t err = mSource->read(&buffer);
             if (err != OK) {
                 return err;

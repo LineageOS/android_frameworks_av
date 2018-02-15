@@ -163,7 +163,7 @@ void AnotherPacketSource::requeueAccessUnit(const sp<ABuffer> &buffer) {
 }
 
 status_t AnotherPacketSource::read(
-        MediaBuffer **out, const ReadOptions *) {
+        MediaBufferBase **out, const ReadOptions *) {
     *out = NULL;
 
     Mutex::Autolock autoLock(mLock);
@@ -202,7 +202,7 @@ status_t AnotherPacketSource::read(
             seg.mMaxDequeTimeUs = timeUs;
         }
 
-        MediaBuffer *mediaBuffer = new MediaBuffer(buffer);
+        MediaBufferBase *mediaBuffer = new MediaBuffer(buffer);
         sp<MetaData> bufmeta = mediaBuffer->meta_data();
 
         bufmeta->setInt64(kKeyTime, timeUs);
