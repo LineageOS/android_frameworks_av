@@ -40,8 +40,6 @@ public:
     virtual sp<MetaData> getMetaData();
     virtual status_t getMetrics(Parcel *reply);
     virtual uint32_t flags() const;
-    virtual char* getDrmTrackInfo(size_t trackID, int * len);
-    virtual void setUID(uid_t uid);
     virtual status_t setMediaCas(const HInterfaceToken &casToken);
     virtual const char * name();
 

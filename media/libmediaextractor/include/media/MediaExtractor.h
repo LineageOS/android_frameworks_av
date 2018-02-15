@@ -72,12 +72,6 @@ public:
     // CAN_SEEK_BACKWARD | CAN_SEEK_FORWARD | CAN_SEEK | CAN_PAUSE
     virtual uint32_t flags() const;
 
-    // for DRM
-    virtual char* getDrmTrackInfo(size_t /*trackID*/, int * /*len*/) {
-        return NULL;
-    }
-    virtual void setUID(uid_t /*uid*/) {
-    }
     virtual status_t setMediaCas(const uint8_t* /*casToken*/, size_t /*size*/) {
         return INVALID_OPERATION;
     }

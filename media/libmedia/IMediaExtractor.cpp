@@ -35,9 +35,7 @@ enum {
     GETTRACKMETADATA,
     GETMETADATA,
     FLAGS,
-    GETDRMTRACKINFO,
     SETMEDIACAS,
-    SETUID,
     NAME,
     GETMETRICS
 };
@@ -112,11 +110,6 @@ public:
         return 0;
     }
 
-    virtual char* getDrmTrackInfo(size_t trackID __unused, int *len __unused) {
-        ALOGV("getDrmTrackInfo NOT IMPLEMENTED");
-        return NULL;
-    }
-
     virtual status_t setMediaCas(const HInterfaceToken &casToken) {
         ALOGV("setMediaCas");
 
@@ -129,10 +122,6 @@ public:
             return err;
         }
         return reply.readInt32();
-    }
-
-    virtual void setUID(uid_t uid __unused) {
-        ALOGV("setUID NOT IMPLEMENTED");
     }
 
     virtual const char * name() {

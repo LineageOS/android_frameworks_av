@@ -354,9 +354,7 @@ MPEG4Extractor::MPEG4Extractor(DataSourceBase *source, const char *mime)
       mPreferHeif(mime != NULL && !strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_HEIF)),
       mFirstTrack(NULL),
       mLastTrack(NULL),
-      mFileMetaData(new MetaData),
-      mFirstSINF(NULL),
-      mIsDrm(false) {
+      mFileMetaData(new MetaData) {
     ALOGV("mime=%s, mPreferHeif=%d", mime, mPreferHeif);
 }
 
@@ -369,15 +367,6 @@ MPEG4Extractor::~MPEG4Extractor() {
         track = next;
     }
     mFirstTrack = mLastTrack = NULL;
-
-    SINF *sinf = mFirstSINF;
-    while (sinf) {
-        SINF *next = sinf->next;
-        delete[] sinf->IPMPData;
-        delete sinf;
-        sinf = next;
-    }
-    mFirstSINF = NULL;
 
     for (size_t i = 0; i < mPssh.size(); i++) {
         delete [] mPssh[i].data;
@@ -670,177 +659,6 @@ status_t MPEG4Extractor::readMetaData() {
     }
 
     return mInitCheck;
-}
-
-char* MPEG4Extractor::getDrmTrackInfo(size_t trackID, int *len) {
-    if (mFirstSINF == NULL) {
-        return NULL;
-    }
-
-    SINF *sinf = mFirstSINF;
-    while (sinf && (trackID != sinf->trackID)) {
-        sinf = sinf->next;
-    }
-
-    if (sinf == NULL) {
-        return NULL;
-    }
-
-    *len = sinf->len;
-    return sinf->IPMPData;
-}
-
-// Reads an encoded integer 7 bits at a time until it encounters the high bit clear.
-static int32_t readSize(off64_t offset,
-        DataSourceBase *DataSourceBase, uint8_t *numOfBytes) {
-    uint32_t size = 0;
-    uint8_t data;
-    bool moreData = true;
-    *numOfBytes = 0;
-
-    while (moreData) {
-        if (DataSourceBase->readAt(offset, &data, 1) < 1) {
-            return -1;
-        }
-        offset ++;
-        moreData = (data >= 128) ? true : false;
-        size = (size << 7) | (data & 0x7f); // Take last 7 bits
-        (*numOfBytes) ++;
-    }
-
-    return size;
-}
-
-status_t MPEG4Extractor::parseDrmSINF(
-        off64_t * /* offset */, off64_t data_offset) {
-    uint8_t updateIdTag;
-    if (mDataSource->readAt(data_offset, &updateIdTag, 1) < 1) {
-        return ERROR_IO;
-    }
-    data_offset ++;
-
-    if (0x01/*OBJECT_DESCRIPTOR_UPDATE_ID_TAG*/ != updateIdTag) {
-        return ERROR_MALFORMED;
-    }
-
-    uint8_t numOfBytes;
-    int32_t size = readSize(data_offset, mDataSource, &numOfBytes);
-    if (size < 0) {
-        return ERROR_IO;
-    }
-    data_offset += numOfBytes;
-
-    while(size >= 11 ) {
-        uint8_t descriptorTag;
-        if (mDataSource->readAt(data_offset, &descriptorTag, 1) < 1) {
-            return ERROR_IO;
-        }
-        data_offset ++;
-
-        if (0x11/*OBJECT_DESCRIPTOR_ID_TAG*/ != descriptorTag) {
-            return ERROR_MALFORMED;
-        }
-
-        uint8_t buffer[8];
-        //ObjectDescriptorID and ObjectDescriptor url flag
-        if (mDataSource->readAt(data_offset, buffer, 2) < 2) {
-            return ERROR_IO;
-        }
-        data_offset += 2;
-
-        if ((buffer[1] >> 5) & 0x0001) { //url flag is set
-            return ERROR_MALFORMED;
-        }
-
-        if (mDataSource->readAt(data_offset, buffer, 8) < 8) {
-            return ERROR_IO;
-        }
-        data_offset += 8;
-
-        if ((0x0F/*ES_ID_REF_TAG*/ != buffer[1])
-                || ( 0x0A/*IPMP_DESCRIPTOR_POINTER_ID_TAG*/ != buffer[5])) {
-            return ERROR_MALFORMED;
-        }
-
-        SINF *sinf = new SINF;
-        sinf->trackID = U16_AT(&buffer[3]);
-        sinf->IPMPDescriptorID = buffer[7];
-        sinf->next = mFirstSINF;
-        mFirstSINF = sinf;
-
-        size -= (8 + 2 + 1);
-    }
-
-    if (size != 0) {
-        return ERROR_MALFORMED;
-    }
-
-    if (mDataSource->readAt(data_offset, &updateIdTag, 1) < 1) {
-        return ERROR_IO;
-    }
-    data_offset ++;
-
-    if(0x05/*IPMP_DESCRIPTOR_UPDATE_ID_TAG*/ != updateIdTag) {
-        return ERROR_MALFORMED;
-    }
-
-    size = readSize(data_offset, mDataSource, &numOfBytes);
-    if (size < 0) {
-        return ERROR_IO;
-    }
-    data_offset += numOfBytes;
-
-    while (size > 0) {
-        uint8_t tag;
-        int32_t dataLen;
-        if (mDataSource->readAt(data_offset, &tag, 1) < 1) {
-            return ERROR_IO;
-        }
-        data_offset ++;
-
-        if (0x0B/*IPMP_DESCRIPTOR_ID_TAG*/ == tag) {
-            uint8_t id;
-            dataLen = readSize(data_offset, mDataSource, &numOfBytes);
-            if (dataLen < 0) {
-                return ERROR_IO;
-            } else if (dataLen < 4) {
-                return ERROR_MALFORMED;
-            }
-            data_offset += numOfBytes;
-
-            if (mDataSource->readAt(data_offset, &id, 1) < 1) {
-                return ERROR_IO;
-            }
-            data_offset ++;
-
-            SINF *sinf = mFirstSINF;
-            while (sinf && (sinf->IPMPDescriptorID != id)) {
-                sinf = sinf->next;
-            }
-            if (sinf == NULL) {
-                return ERROR_MALFORMED;
-            }
-            sinf->len = dataLen - 3;
-            sinf->IPMPData = new (std::nothrow) char[sinf->len];
-            if (sinf->IPMPData == NULL) {
-                return ERROR_MALFORMED;
-            }
-            data_offset += 2;
-
-            if (mDataSource->readAt(data_offset, sinf->IPMPData, sinf->len) < sinf->len) {
-                return ERROR_IO;
-            }
-            data_offset += sinf->len;
-
-            size -= (dataLen + numOfBytes + 1);
-        }
-    }
-
-    if (size != 0) {
-        return ERROR_MALFORMED;
-    }
-
-    return UNKNOWN_ERROR;  // Return a dummy error.
 }
 
 struct PathAdder {
@@ -1144,11 +962,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             } else if (chunk_type == FOURCC('m', 'o', 'o', 'v')) {
                 mInitCheck = OK;
 
-                if (!mIsDrm) {
-                    return UNKNOWN_ERROR;  // Return a dummy error.
-                } else {
-                    return OK;
-                }
+                return UNKNOWN_ERROR;  // Return a dummy error.
             }
             break;
         }
@@ -1596,7 +1410,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             }
 
             if (chunk_type != FOURCC('e', 'n', 'c', 'a')) {
-                // if the chunk type is enca, we'll get the type from the sinf/frma box later
+                // if the chunk type is enca, we'll get the type from the frma box later
                 mLastTrack->meta->setCString(kKeyMIMEType, FourCC2MIME(chunk_type));
                 AdjustChannelsAndRate(chunk_type, &num_channels, &sample_rate);
             }
@@ -1656,7 +1470,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 return ERROR_MALFORMED;
 
             if (chunk_type != FOURCC('e', 'n', 'c', 'v')) {
-                // if the chunk type is encv, we'll get the type from the sinf/frma box later
+                // if the chunk type is encv, we'll get the type from the frma box later
                 mLastTrack->meta->setCString(kKeyMIMEType, FourCC2MIME(chunk_type));
             }
             mLastTrack->meta->setInt32(kKeyWidth, width);
@@ -2278,20 +2092,10 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
         case FOURCC('m', 'd', 'a', 't'):
         {
-            ALOGV("mdat chunk, drm: %d", mIsDrm);
-
             mMdatFound = true;
 
-            if (!mIsDrm) {
-                *offset += chunk_size;
-                break;
-            }
-
-            if (chunk_size < 8) {
-                return ERROR_MALFORMED;
-            }
-
-            return parseDrmSINF(offset, data_offset);
+            *offset += chunk_size;
+            break;
         }
 
         case FOURCC('h', 'd', 'l', 'r'):
