@@ -1158,6 +1158,12 @@ status_t AudioPolicyManager::startSource(const sp<AudioOutputDescriptor>& output
     bool force = !outputDesc->isActive() &&
             (outputDesc->getPatchHandle() == AUDIO_PATCH_HANDLE_NONE);
 
+    // requiresMuteCheck is false when we can bypass mute strategy.
+    // It covers a common case when there is no materially active audio
+    // and muting would result in unnecessary delay and dropped audio.
+    const uint32_t outputLatencyMs = outputDesc->latency();
+    bool requiresMuteCheck = outputDesc->isActive(outputLatencyMs * 2);  // account for drain
+
     // increment usage count for this stream on the requested output:
     // NOTE that the usage count is the same for duplicated output and hardware output which is
     // necessary for a correct control of hardware output routing by startOutput() and stopOutput()
@@ -1181,29 +1187,44 @@ status_t AudioPolicyManager::startSource(const sp<AudioOutputDescriptor>& output
         for (size_t i = 0; i < mOutputs.size(); i++) {
             sp<AudioOutputDescriptor> desc = mOutputs.valueAt(i);
             if (desc != outputDesc) {
+                // An output has a shared device if
+                // - managed by the same hw module
+                // - supports the currently selected device
+                const bool sharedDevice = outputDesc->sharesHwModuleWith(desc)
+                        && (desc->supportedDevices() & device) != AUDIO_DEVICE_NONE;
+
                 // force a device change if any other output is:
                 // - managed by the same hw module
-                // - has a current device selection that differs from selected device.
                 // - supports currently selected device
+                // - has a current device selection that differs from selected device.
                 // - has an active audio patch
                 // In this case, the audio HAL must receive the new device selection so that it can
-                // change the device currently selected by the other active output.
-                if (outputDesc->sharesHwModuleWith(desc) &&
+                // change the device currently selected by the other output.
+                if (sharedDevice &&
                         desc->device() != device &&
-                        desc->supportedDevices() & device &&
                         desc->getPatchHandle() != AUDIO_PATCH_HANDLE_NONE) {
                     force = true;
                 }
                 // wait for audio on other active outputs to be presented when starting
                 // a notification so that audio focus effect can propagate, or that a mute/unmute
                 // event occurred for beacon
-                uint32_t latency = desc->latency();
-                if (shouldWait && desc->isActive(latency * 2) && (waitMs < latency)) {
-                    waitMs = latency;
+                const uint32_t latencyMs = desc->latency();
+                const bool isActive = desc->isActive(latencyMs * 2);  // account for drain
+
+                if (shouldWait && isActive && (waitMs < latencyMs)) {
+                    waitMs = latencyMs;
                 }
+
+                // Require mute check if another output is on a shared device
+                // and currently active to have proper drain and avoid pops.
+                // Note restoring AudioTracks onto this output needs to invoke
+                // a volume ramp if there is no mute.
+                requiresMuteCheck |= sharedDevice && isActive;
             }
         }
-        uint32_t muteWaitMs = setOutputDevice(outputDesc, device, force, 0, NULL, address);
+
+        const uint32_t muteWaitMs =
+                setOutputDevice(outputDesc, device, force, 0, NULL, address, requiresMuteCheck);
 
         // handle special case for sonification while in call
         if (isInCall()) {
@@ -1228,6 +1249,14 @@ status_t AudioPolicyManager::startSource(const sp<AudioOutputDescriptor>& output
         if (waitMs > muteWaitMs) {
             *delayMs = waitMs - muteWaitMs;
         }
+
+        // FIXME: A device change (muteWaitMs > 0) likely introduces a volume change.
+        // A volume change enacted by APM with 0 delay is not synchronous, as it goes
+        // via AudioCommandThread to AudioFlinger.  Hence it is possible that the volume
+        // change occurs after the MixerThread starts and causes a stream volume
+        // glitch.
+        //
+        // We do not introduce additional delay here.
     }
 
     return NO_ERROR;
@@ -4742,21 +4771,24 @@ uint32_t AudioPolicyManager::setOutputDevice(const sp<AudioOutputDescriptor>& ou
                                              bool force,
                                              int delayMs,
                                              audio_patch_handle_t *patchHandle,
-                                             const char* address)
+                                             const char *address,
+                                             bool requiresMuteCheck)
 {
     ALOGV("setOutputDevice() device %04x delayMs %d", device, delayMs);
     AudioParameter param;
     uint32_t muteWaitMs;
 
     if (outputDesc->isDuplicated()) {
-        muteWaitMs = setOutputDevice(outputDesc->subOutput1(), device, force, delayMs);
-        muteWaitMs += setOutputDevice(outputDesc->subOutput2(), device, force, delayMs);
+        muteWaitMs = setOutputDevice(outputDesc->subOutput1(), device, force, delayMs,
+                nullptr /* patchHandle */, nullptr /* address */, requiresMuteCheck);
+        muteWaitMs += setOutputDevice(outputDesc->subOutput2(), device, force, delayMs,
+                nullptr /* patchHandle */, nullptr /* address */, requiresMuteCheck);
         return muteWaitMs;
     }
     // no need to proceed if new device is not AUDIO_DEVICE_NONE and not supported by current
     // output profile
     if ((device != AUDIO_DEVICE_NONE) &&
-            ((device & outputDesc->supportedDevices()) == 0)) {
+            ((device & outputDesc->supportedDevices()) == AUDIO_DEVICE_NONE)) {
         return 0;
     }
 
@@ -4770,7 +4802,14 @@ uint32_t AudioPolicyManager::setOutputDevice(const sp<AudioOutputDescriptor>& ou
     if (device != AUDIO_DEVICE_NONE) {
         outputDesc->mDevice = device;
     }
-    muteWaitMs = checkDeviceMuteStrategies(outputDesc, prevDevice, delayMs);
+
+    // if the outputs are not materially active, there is no need to mute.
+    if (requiresMuteCheck) {
+        muteWaitMs = checkDeviceMuteStrategies(outputDesc, prevDevice, delayMs);
+    } else {
+        ALOGV("%s: suppressing checkDeviceMuteStrategies", __func__);
+        muteWaitMs = 0;
+    }
 
     // Do not change the routing if:
     //      the requested device is AUDIO_DEVICE_NONE
