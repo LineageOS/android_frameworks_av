@@ -100,7 +100,6 @@ cc_library_shared {
         "SkipCutBuffer.cpp",
         "StagefrightMediaScanner.cpp",
         "StagefrightMetadataRetriever.cpp",
-        "SurfaceMediaSource.cpp",
         "SurfaceUtils.cpp",
         "Utils.cpp",
         "ThrottledSource.cpp",
