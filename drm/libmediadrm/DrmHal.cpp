@@ -261,18 +261,37 @@ DrmHal::DrmHal()
 }
 
 void DrmHal::closeOpenSessions() {
-    if (mPlugin != NULL) {
-        for (size_t i = 0; i < mOpenSessions.size(); i++) {
-            mPlugin->closeSession(toHidlVec(mOpenSessions[i]));
-            DrmSessionManager::Instance()->removeSession(mOpenSessions[i]);
-        }
+    Mutex::Autolock autoLock(mLock);
+    auto openSessions = mOpenSessions;
+    for (size_t i = 0; i < openSessions.size(); i++) {
+        mLock.unlock();
+        closeSession(openSessions[i]);
+        mLock.lock();
     }
     mOpenSessions.clear();
 }
 
 DrmHal::~DrmHal() {
-    closeOpenSessions();
     DrmSessionManager::Instance()->removeDrm(mDrmSessionClient);
+}
+
+void DrmHal::cleanup() {
+    closeOpenSessions();
+
+    Mutex::Autolock autoLock(mLock);
+    reportPluginMetrics();
+    reportFrameworkMetrics();
+
+    setListener(NULL);
+    mInitCheck = NO_INIT;
+
+    if (mPlugin != NULL) {
+        if (!mPlugin->setListener(NULL).isOk()) {
+            mInitCheck = DEAD_OBJECT;
+        }
+    }
+    mPlugin.clear();
+    mPluginV1_1.clear();
 }
 
 Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
@@ -512,22 +531,7 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
 }
 
 status_t DrmHal::destroyPlugin() {
-    Mutex::Autolock autoLock(mLock);
-    INIT_CHECK();
-
-    closeOpenSessions();
-    reportPluginMetrics();
-    reportFrameworkMetrics();
-    setListener(NULL);
-    mInitCheck = NO_INIT;
-
-    if (mPlugin != NULL) {
-        if (!mPlugin->setListener(NULL).isOk()) {
-            mInitCheck = DEAD_OBJECT;
-        }
-    }
-    mPlugin.clear();
-    mPluginV1_1.clear();
+    cleanup();
     return OK;
 }
 
@@ -633,7 +637,6 @@ status_t DrmHal::closeSession(Vector<uint8_t> const &sessionId) {
         status_t response = toStatusT(status);
         mMetrics.SetSessionEnd(sessionId);
         mMetrics.mCloseSessionCounter.Increment(response);
-        reportPluginMetrics();
         return response;
     }
     mMetrics.mCloseSessionCounter.Increment(DEAD_OBJECT);
@@ -1267,17 +1270,7 @@ status_t DrmHal::signRSA(Vector<uint8_t> const &sessionId,
 
 void DrmHal::binderDied(const wp<IBinder> &the_late_who __unused)
 {
-    Mutex::Autolock autoLock(mLock);
-    closeOpenSessions();
-    setListener(NULL);
-    mInitCheck = NO_INIT;
-
-    if (mPlugin != NULL) {
-        if (!mPlugin->setListener(NULL).isOk()) {
-            mInitCheck = DEAD_OBJECT;
-        }
-    }
-    mPlugin.clear();
+    cleanup();
 }
 
 void DrmHal::writeByteArray(Parcel &obj, hidl_vec<uint8_t> const &vec)
