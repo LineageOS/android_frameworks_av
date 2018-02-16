@@ -188,6 +188,7 @@ private:
 
     Vector<Vector<uint8_t>> mOpenSessions;
     void closeOpenSessions();
+    void cleanup();
 
     /**
      * mInitCheck is:
