@@ -18,7 +18,7 @@
 #define ANDROID_SERVERS_CAMERA_CAMERAPROVIDER_H
 
 #include <vector>
-#include <set>
+#include <unordered_set>
 #include <string>
 #include <mutex>
 
@@ -125,16 +125,14 @@ public:
      */
     int getCameraCount() const;
 
+    std::vector<std::string> getCameraDeviceIds() const;
+
     /**
      * Retrieve the number of API1 compatible cameras; these are internal and
      * backwards-compatible. This is the set of cameras that will be
-     * accessible via the old camera API, with IDs in range of
-     * [0, getAPI1CompatibleCameraCount()-1]. This value is not expected to change dynamically.
+     * accessible via the old camera API.
+     * The return value may change dynamically due to external camera hotplug.
      */
-    int getAPI1CompatibleCameraCount() const;
-
-    std::vector<std::string> getCameraDeviceIds() const;
-
     std::vector<std::string> getAPI1CompatibleCameraDeviceIds() const;
 
     /**
@@ -314,9 +312,9 @@ private:
             static status_t setTorchMode(InterfaceT& interface, bool enabled);
         };
         std::vector<std::unique_ptr<DeviceInfo>> mDevices;
-        std::set<std::string> mUniqueCameraIds;
+        std::unordered_set<std::string> mUniqueCameraIds;
         int mUniqueDeviceCount;
-        std::set<std::string> mUniqueAPI1CompatibleCameraIds;
+        std::unordered_set<std::string> mUniqueAPI1CompatibleCameraIds;
 
         // HALv1-specific camera fields, including the actual device interface
         struct DeviceInfo1 : public DeviceInfo {
@@ -365,6 +363,8 @@ private:
         std::mutex mLock;
 
         CameraProviderManager *mManager;
+
+        bool mInitialized = false;
 
         // Templated method to instantiate the right kind of DeviceInfo and call the
         // right CameraProvider getCameraDeviceInterface_* method.
