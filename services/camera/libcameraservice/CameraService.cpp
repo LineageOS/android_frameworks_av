@@ -1733,8 +1733,6 @@ void CameraService::removeByClient(const BasicClient* client) {
 }
 
 bool CameraService::evictClientIdByRemote(const wp<IBinder>& remote) {
-    const int callingPid = getCallingPid();
-    const int servicePid = getpid();
     bool ret = false;
     {
         // Acquire mServiceLock and prevent other clients from connecting
@@ -1750,8 +1748,7 @@ bool CameraService::evictClientIdByRemote(const wp<IBinder>& remote) {
                 mActiveClientManager.remove(i);
                 continue;
             }
-            if (remote == clientSp->getRemote() && (callingPid == servicePid ||
-                    callingPid == clientSp->getClientPid())) {
+            if (remote == clientSp->getRemote()) {
                 mActiveClientManager.remove(i);
                 evicted.push_back(clientSp);
 
@@ -2770,7 +2767,7 @@ void CameraService::handleTorchClientBinderDied(const wp<IBinder> &who) {
       * While tempting to promote the wp<IBinder> into a sp, it's actually not supported by the
       * binder driver
       */
-
+    // PID here is approximate and can be wrong.
     logClientDied(getCallingPid(), String8("Binder died unexpectedly"));
 
     // check torch client
