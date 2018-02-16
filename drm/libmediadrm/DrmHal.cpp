@@ -100,7 +100,7 @@ static hidl_string toHidlString(const String8& string) {
     return hidl_string(string.string());
 }
 
-std::string ToHexString(const std::string& str) {
+std::string toHexString(const std::string& str) {
   std::ostringstream out;
   out << std::hex << std::setfill('0');
   for (size_t i = 0; i < str.size(); i++) {
@@ -1299,13 +1299,13 @@ void DrmHal::reportFrameworkMetrics() const
     String8 description;
     status_t result = getPropertyStringInternal(String8("vendor"), vendor);
     if (result != OK) {
-        ALOGE("Failed to get vendor from drm plugin. %d", result);
+        ALOGE("Failed to get vendor from drm plugin: %d", result);
     } else {
         item.setCString("vendor", vendor.c_str());
     }
     result = getPropertyStringInternal(String8("description"), description);
     if (result != OK) {
-        ALOGE("Failed to get description from drm plugin. %d", result);
+        ALOGE("Failed to get description from drm plugin: %d", result);
     } else {
         item.setCString("description", description.c_str());
     }
@@ -1313,14 +1313,14 @@ void DrmHal::reportFrameworkMetrics() const
     std::string serializedMetrics;
     result = mMetrics.GetSerializedMetrics(&serializedMetrics);
     if (result != OK) {
-        ALOGE("Failed to serialize Framework metrics: %d", result);
+        ALOGE("Failed to serialize framework metrics: %d", result);
     }
-    serializedMetrics = ToHexString(serializedMetrics);
+    serializedMetrics = toHexString(serializedMetrics);
     if (!serializedMetrics.empty()) {
         item.setCString("serialized_metrics", serializedMetrics.c_str());
     }
     if (!item.selfrecord()) {
-        ALOGE("Failed to self record framework metrics.");
+        ALOGE("Failed to self record framework metrics");
     }
 }
 
@@ -1335,7 +1335,7 @@ void DrmHal::reportPluginMetrics() const
         status_t res = android::reportDrmPluginMetrics(
                 metrics, vendor, description);
         if (res != OK) {
-            ALOGE("Metrics were retrieved but could not be reported: %i", res);
+            ALOGE("Metrics were retrieved but could not be reported: %d", res);
         }
     }
 }
