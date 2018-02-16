@@ -3791,9 +3791,11 @@ status_t AudioPolicyManager::initCheck()
 
 // ---
 
-void AudioPolicyManager::addOutput(audio_io_handle_t output, const sp<SwAudioOutputDescriptor>& outputDesc)
+void AudioPolicyManager::addOutput(audio_io_handle_t output,
+                                   const sp<SwAudioOutputDescriptor>& outputDesc)
 {
     mOutputs.add(output, outputDesc);
+    applyStreamVolumes(outputDesc, AUDIO_DEVICE_NONE, 0 /* delayMs */, true /* force */);
     updateMono(output); // update mono status when adding to output list
     selectOutputForMusicEffects();
     nextAudioPortGeneration();
@@ -3805,7 +3807,8 @@ void AudioPolicyManager::removeOutput(audio_io_handle_t output)
     selectOutputForMusicEffects();
 }
 
-void AudioPolicyManager::addInput(audio_io_handle_t input, const sp<AudioInputDescriptor>& inputDesc)
+void AudioPolicyManager::addInput(audio_io_handle_t input,
+                                  const sp<AudioInputDescriptor>& inputDesc)
 {
     mInputs.add(input, inputDesc);
     nextAudioPortGeneration();
@@ -3955,9 +3958,6 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                         // outputs used by dynamic policy mixes
                         audio_io_handle_t duplicatedOutput = AUDIO_IO_HANDLE_NONE;
 
-                        // set initial stream volume for device
-                        applyStreamVolumes(desc, device, 0, true);
-
                         //TODO: configure audio effect output stage here
 
                         // open a duplicating output thread for the new output and the primary output
@@ -3968,7 +3968,6 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                         if (status == NO_ERROR) {
                             // add duplicated output descriptor
                             addOutput(duplicatedOutput, dupOutputDesc);
-                            applyStreamVolumes(dupOutputDesc, device, 0, true);
                         } else {
                             ALOGW("checkOutputsForDevice() could not open dup output for %d and %d",
                                     mPrimaryOutput->mIoHandle, output);

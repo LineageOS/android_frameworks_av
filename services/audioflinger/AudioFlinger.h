@@ -616,9 +616,6 @@ using effect_buffer_t = int16_t;
               // no range check, AudioFlinger::mLock held
               bool streamMute_l(audio_stream_type_t stream) const
                                 { return mStreamTypes[stream].mute; }
-              // no range check, doesn't check per-thread stream volume, AudioFlinger::mLock held
-              float streamVolume_l(audio_stream_type_t stream) const
-                                { return mStreamTypes[stream].volume; }
               void ioConfigChanged(audio_io_config_event event,
                                    const sp<AudioIoDescriptor>& ioDesc,
                                    pid_t pid = 0);
