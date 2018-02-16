@@ -67,7 +67,9 @@ status_t AudioPolicyManager::setDeviceConnectionState(audio_devices_t device,
                                                       const char *device_address,
                                                       const char *device_name)
 {
-    return setDeviceConnectionStateInt(device, state, device_address, device_name);
+    status_t status = setDeviceConnectionStateInt(device, state, device_address, device_name);
+    nextAudioPortGeneration();
+    return status;
 }
 
 void AudioPolicyManager::broadcastDeviceConnectionState(audio_devices_t device,
