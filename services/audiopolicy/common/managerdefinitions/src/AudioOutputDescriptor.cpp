@@ -222,7 +222,7 @@ void AudioOutputDescriptor::log(const char* indent)
 SwAudioOutputDescriptor::SwAudioOutputDescriptor(const sp<IOProfile>& profile,
                                                  AudioPolicyClientInterface *clientInterface)
     : AudioOutputDescriptor(profile, clientInterface),
-    mProfile(profile), mIoHandle(0), mLatency(0),
+    mProfile(profile), mIoHandle(AUDIO_IO_HANDLE_NONE), mLatency(0),
     mFlags((audio_output_flags_t)0), mPolicyMix(NULL),
     mOutput1(0), mOutput2(0), mDirectOpenCount(0),
     mDirectClientSession(AUDIO_SESSION_NONE), mGlobalRefCount(0)
@@ -507,6 +507,30 @@ void SwAudioOutputDescriptor::close()
         mProfile->curOpenCount--;
         mIoHandle = AUDIO_IO_HANDLE_NONE;
     }
+}
+
+status_t SwAudioOutputDescriptor::openDuplicating(const sp<SwAudioOutputDescriptor>& output1,
+                                                  const sp<SwAudioOutputDescriptor>& output2,
+                                                  audio_io_handle_t *ioHandle)
+{
+    // open a duplicating output thread for the new output and the primary output
+    // Note: openDuplicateOutput() API expects the output handles in the reverse order from the
+    // numbering in SwAudioOutputDescriptor mOutput1 and mOutput2
+    *ioHandle = mClientInterface->openDuplicateOutput(output2->mIoHandle, output1->mIoHandle);
+    if (*ioHandle == AUDIO_IO_HANDLE_NONE) {
+        return INVALID_OPERATION;
+    }
+
+    mId = AudioPort::getNextUniqueId();
+    mIoHandle = *ioHandle;
+    mOutput1 = output1;
+    mOutput2 = output2;
+    mSamplingRate = output2->mSamplingRate;
+    mFormat = output2->mFormat;
+    mChannelMask = output2->mChannelMask;
+    mLatency = output2->mLatency;
+
+    return NO_ERROR;
 }
 
 // HwAudioOutputDescriptor implementation
