@@ -44,6 +44,7 @@ struct NuPlayer2 : public AHandler {
 
     void setDataSourceAsync(const sp<DataSourceDesc> &dsd);
     void prepareNextDataSourceAsync(const sp<DataSourceDesc> &dsd);
+    void playNextDataSource(int64_t srcId);
 
     status_t getBufferingSettings(BufferingSettings* buffering /* nonnull */);
     status_t setBufferingSettings(const BufferingSettings& buffering);
@@ -121,6 +122,7 @@ private:
         kWhatSetDataSource              = '=DaS',
         kWhatPrepare                    = 'prep',
         kWhatPrepareNextDataSource      = 'pNDS',
+        kWhatPlayNextDataSource         = 'plNS',
         kWhatSetVideoSurface            = '=VSu',
         kWhatSetAudioSink               = '=AuS',
         kWhatMoreDataQueued             = 'more',
@@ -269,6 +271,8 @@ private:
         mFlushComplete[1][1] = false;
     }
 
+    void disconnectSource();
+
     status_t createNuPlayer2Source(const sp<DataSourceDesc> &dsd,
                                    sp<Source> *source,
                                    DATA_SOURCE_TYPE *dataSourceType);
@@ -314,6 +318,7 @@ private:
     void performSeek(int64_t seekTimeUs, MediaPlayer2SeekMode mode);
     void performDecoderFlush(FlushCommand audio, FlushCommand video);
     void performReset();
+    void performPlayNextDataSource();
     void performScanSources();
     void performSetSurface(const sp<ANativeWindowWrapper> &nw);
     void performResumeDecoders(bool needNotify);

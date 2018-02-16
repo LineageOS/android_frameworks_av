@@ -28,17 +28,18 @@ struct NuPlayer2;
 struct NuPlayer2Driver : public MediaPlayer2Interface {
     explicit NuPlayer2Driver(pid_t pid, uid_t uid);
 
-    virtual status_t initCheck();
+    virtual status_t initCheck() override;
 
     virtual status_t setDataSource(const sp<DataSourceDesc> &dsd) override;
+    virtual status_t prepareNextDataSource(const sp<DataSourceDesc> &dsd) override;
+    virtual status_t playNextDataSource(int64_t srcId) override;
 
-    virtual status_t setVideoSurfaceTexture(const sp<ANativeWindowWrapper> &nww);
+    virtual status_t setVideoSurfaceTexture(const sp<ANativeWindowWrapper> &nww) override;
 
     virtual status_t getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) override;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
 
-    virtual status_t prepare();
     virtual status_t prepareAsync();
     virtual status_t start();
     virtual status_t stop();
@@ -114,7 +115,6 @@ private:
 
     State mState;
 
-    bool mIsAsyncPrepare;
     status_t mAsyncResult;
 
     // The following are protected through "mLock"
@@ -147,7 +147,6 @@ private:
     void updateMetrics(const char *where);
     void logMetrics(const char *where);
 
-    status_t prepare_l();
     status_t start_l();
     void notifyListener_l(int64_t srcId, int msg, int ext1 = 0, int ext2 = 0,
                           const Parcel *in = NULL);

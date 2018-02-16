@@ -107,7 +107,6 @@ static const char *kPlayerRebufferingAtExit = "android.media.mediaplayer.rebuffe
 
 NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid)
     : mState(STATE_IDLE),
-      mIsAsyncPrepare(false),
       mAsyncResult(UNKNOWN_ERROR),
       mSrcId(0),
       mSetSurfaceInProgress(false),
@@ -174,7 +173,7 @@ status_t NuPlayer2Driver::initCheck() {
 }
 
 status_t NuPlayer2Driver::setDataSource(const sp<DataSourceDesc> &dsd) {
-    ALOGV("setDataSource(%p) callback source", this);
+    ALOGV("setDataSource(%p)", this);
     Mutex::Autolock autoLock(mLock);
 
     if (mState != STATE_IDLE) {
@@ -191,6 +190,25 @@ status_t NuPlayer2Driver::setDataSource(const sp<DataSourceDesc> &dsd) {
     }
 
     return mAsyncResult;
+}
+
+status_t NuPlayer2Driver::prepareNextDataSource(const sp<DataSourceDesc> &dsd) {
+    ALOGV("prepareNextDataSource(%p)", this);
+    Mutex::Autolock autoLock(mLock);
+
+    mPlayer->prepareNextDataSourceAsync(dsd);
+
+    return OK;
+}
+
+status_t NuPlayer2Driver::playNextDataSource(int64_t srcId) {
+    ALOGV("playNextDataSource(%p)", this);
+    Mutex::Autolock autoLock(mLock);
+
+    mSrcId = srcId;
+    mPlayer->playNextDataSource(srcId);
+
+    return OK;
 }
 
 status_t NuPlayer2Driver::setVideoSurfaceTexture(const sp<ANativeWindowWrapper> &nww) {
@@ -245,42 +263,6 @@ status_t NuPlayer2Driver::setBufferingSettings(const BufferingSettings& bufferin
     return mPlayer->setBufferingSettings(buffering);
 }
 
-status_t NuPlayer2Driver::prepare() {
-    ALOGV("prepare(%p)", this);
-    Mutex::Autolock autoLock(mLock);
-    return prepare_l();
-}
-
-status_t NuPlayer2Driver::prepare_l() {
-    switch (mState) {
-        case STATE_UNPREPARED:
-            mState = STATE_PREPARING;
-
-            // Make sure we're not posting any notifications, success or
-            // failure information is only communicated through our result
-            // code.
-            mIsAsyncPrepare = false;
-            mPlayer->prepareAsync();
-            while (mState == STATE_PREPARING) {
-                mCondition.wait(mLock);
-            }
-            return (mState == STATE_PREPARED) ? OK : UNKNOWN_ERROR;
-        case STATE_STOPPED:
-            // this is really just paused. handle as seek to start
-            mAtEOS = false;
-            mState = STATE_STOPPED_AND_PREPARING;
-            mIsAsyncPrepare = false;
-            mPlayer->seekToAsync(0, MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC /* mode */,
-                    true /* needNotify */);
-            while (mState == STATE_STOPPED_AND_PREPARING) {
-                mCondition.wait(mLock);
-            }
-            return (mState == STATE_STOPPED_AND_PREPARED) ? OK : UNKNOWN_ERROR;
-        default:
-            return INVALID_OPERATION;
-    };
-}
-
 status_t NuPlayer2Driver::prepareAsync() {
     ALOGV("prepareAsync(%p)", this);
     Mutex::Autolock autoLock(mLock);
@@ -288,14 +270,12 @@ status_t NuPlayer2Driver::prepareAsync() {
     switch (mState) {
         case STATE_UNPREPARED:
             mState = STATE_PREPARING;
-            mIsAsyncPrepare = true;
             mPlayer->prepareAsync();
             return OK;
         case STATE_STOPPED:
             // this is really just paused. handle as seek to start
             mAtEOS = false;
             mState = STATE_STOPPED_AND_PREPARING;
-            mIsAsyncPrepare = true;
             mPlayer->seekToAsync(0, MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC /* mode */,
                     true /* needNotify */);
             return OK;
@@ -312,19 +292,6 @@ status_t NuPlayer2Driver::start() {
 
 status_t NuPlayer2Driver::start_l() {
     switch (mState) {
-        case STATE_UNPREPARED:
-        {
-            status_t err = prepare_l();
-
-            if (err != OK) {
-                return err;
-            }
-
-            CHECK_EQ(mState, STATE_PREPARED);
-
-            // fall through
-        }
-
         case STATE_PAUSED:
         case STATE_STOPPED_AND_PREPARED:
         case STATE_PREPARED:
@@ -626,8 +593,6 @@ status_t NuPlayer2Driver::reset() {
 
         case STATE_PREPARING:
         {
-            CHECK(mIsAsyncPrepare);
-
             notifyListener_l(mSrcId, MEDIA2_PREPARED);
             break;
         }
@@ -824,10 +789,6 @@ void NuPlayer2Driver::notifySeekComplete_l(int64_t srcId) {
         wasSeeking = false;
         mState = STATE_STOPPED_AND_PREPARED;
         mCondition.broadcast();
-        if (!mIsAsyncPrepare) {
-            // if we are preparing synchronously, no need to notify listener
-            return;
-        }
     } else if (mState == STATE_STOPPED) {
         // no need to notify listener
         return;
@@ -947,58 +908,60 @@ void NuPlayer2Driver::notifyListener_l(
     ALOGD("notifyListener_l(%p), (%lld, %d, %d, %d, %d), loop setting(%d, %d)",
             this, (long long)srcId, msg, ext1, ext2,
             (in == NULL ? -1 : (int)in->dataSize()), mAutoLoop, mLooping);
-    switch (msg) {
-        case MEDIA2_PLAYBACK_COMPLETE:
-        {
-            if (mState != STATE_RESET_IN_PROGRESS) {
-                if (mAutoLoop) {
-                    audio_stream_type_t streamType = AUDIO_STREAM_MUSIC;
-                    if (mAudioSink != NULL) {
-                        streamType = mAudioSink->getAudioStreamType();
+    if (srcId == mSrcId) {
+        switch (msg) {
+            case MEDIA2_PLAYBACK_COMPLETE:
+            {
+                if (mState != STATE_RESET_IN_PROGRESS) {
+                    if (mAutoLoop) {
+                        audio_stream_type_t streamType = AUDIO_STREAM_MUSIC;
+                        if (mAudioSink != NULL) {
+                            streamType = mAudioSink->getAudioStreamType();
+                        }
+                        if (streamType == AUDIO_STREAM_NOTIFICATION) {
+                            ALOGW("disabling auto-loop for notification");
+                            mAutoLoop = false;
+                        }
                     }
-                    if (streamType == AUDIO_STREAM_NOTIFICATION) {
-                        ALOGW("disabling auto-loop for notification");
-                        mAutoLoop = false;
+                    if (mLooping || mAutoLoop) {
+                        mPlayer->seekToAsync(0);
+                        if (mAudioSink != NULL) {
+                            // The renderer has stopped the sink at the end in order to play out
+                            // the last little bit of audio. In looping mode, we need to restart it.
+                            mAudioSink->start();
+                        }
+                        // don't send completion event when looping
+                        return;
                     }
-                }
-                if (mLooping || mAutoLoop) {
-                    mPlayer->seekToAsync(0);
-                    if (mAudioSink != NULL) {
-                        // The renderer has stopped the sink at the end in order to play out
-                        // the last little bit of audio. If we're looping, we need to restart it.
-                        mAudioSink->start();
+                    if (property_get_bool("persist.debug.sf.stats", false)) {
+                        Vector<String16> args;
+                        dump(-1, args);
                     }
-                    // don't send completion event when looping
-                    return;
+                    mPlayer->pause();
+                    mState = STATE_PAUSED;
                 }
-                if (property_get_bool("persist.debug.sf.stats", false)) {
-                    Vector<String16> args;
-                    dump(-1, args);
-                }
-                mPlayer->pause();
-                mState = STATE_PAUSED;
+                // fall through
             }
-            // fall through
-        }
 
-        case MEDIA2_ERROR:
-        {
-            // when we have an error, add it to the analytics for this playback.
-            // ext1 is our primary 'error type' value. Only add ext2 when non-zero.
-            // [test against msg is due to fall through from previous switch value]
-            if (msg == MEDIA2_ERROR) {
-                mAnalyticsItem->setInt32(kPlayerError, ext1);
-                if (ext2 != 0) {
-                    mAnalyticsItem->setInt32(kPlayerErrorCode, ext2);
+            case MEDIA2_ERROR:
+            {
+                // when we have an error, add it to the analytics for this playback.
+                // ext1 is our primary 'error type' value. Only add ext2 when non-zero.
+                // [test against msg is due to fall through from previous switch value]
+                if (msg == MEDIA2_ERROR) {
+                    mAnalyticsItem->setInt32(kPlayerError, ext1);
+                    if (ext2 != 0) {
+                        mAnalyticsItem->setInt32(kPlayerErrorCode, ext2);
+                    }
+                    mAnalyticsItem->setCString(kPlayerErrorState, stateString(mState).c_str());
                 }
-                mAnalyticsItem->setCString(kPlayerErrorState, stateString(mState).c_str());
+                mAtEOS = true;
+                break;
             }
-            mAtEOS = true;
-            break;
-        }
 
-        default:
-            break;
+            default:
+                break;
+        }
     }
 
     sp<AMessage> notify = new AMessage(kWhatNotifyListener, this);
@@ -1025,6 +988,15 @@ void NuPlayer2Driver::notifyPrepareCompleted(int64_t srcId, status_t err) {
 
     Mutex::Autolock autoLock(mLock);
 
+    if (srcId != mSrcId) {
+        if (err == OK) {
+            notifyListener_l(srcId, MEDIA2_PREPARED);
+        } else {
+            notifyListener_l(srcId, MEDIA2_ERROR, MEDIA2_ERROR_UNKNOWN, err);
+        }
+        return;
+    }
+
     if (mState != STATE_PREPARING) {
         // We were preparing asynchronously when the client called
         // reset(), we sent a premature "prepared" notification and
@@ -1041,14 +1013,10 @@ void NuPlayer2Driver::notifyPrepareCompleted(int64_t srcId, status_t err) {
         // update state before notifying client, so that if client calls back into NuPlayer2Driver
         // in response, NuPlayer2Driver has the right state
         mState = STATE_PREPARED;
-        if (mIsAsyncPrepare) {
-            notifyListener_l(srcId, MEDIA2_PREPARED);
-        }
+        notifyListener_l(srcId, MEDIA2_PREPARED);
     } else {
         mState = STATE_UNPREPARED;
-        if (mIsAsyncPrepare) {
-            notifyListener_l(srcId, MEDIA2_ERROR, MEDIA2_ERROR_UNKNOWN, err);
-        }
+        notifyListener_l(srcId, MEDIA2_ERROR, MEDIA2_ERROR_UNKNOWN, err);
     }
 
     sp<MetaData> meta = mPlayer->getFileMeta();
