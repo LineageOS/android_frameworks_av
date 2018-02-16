@@ -189,7 +189,7 @@ private:
     struct timeval mTimeEnd;     // Time at the end of decode()
 
     // Internal buffer to be used to flush out the buffers from decoder
-    uint8_t *mFlushOutBuffer;
+    uint8_t *mOutBuffer;
 
 #ifdef FILE_DUMP_ENABLE
     char mInFile[200];

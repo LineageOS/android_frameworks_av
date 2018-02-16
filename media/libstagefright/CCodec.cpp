@@ -404,6 +404,14 @@ void CCodec::configure(const sp<AMessage> &msg) {
             if (audio) {
                 outputFormat->setInt32("channel-count", 2);
                 outputFormat->setInt32("sample-rate", 44100);
+            } else {
+                int32_t tmp;
+                if (msg->findInt32("width", &tmp)) {
+                    outputFormat->setInt32("width", tmp);
+                }
+                if (msg->findInt32("height", &tmp)) {
+                    outputFormat->setInt32("height", tmp);
+                }
             }
         }
 
