@@ -41,6 +41,34 @@ public:
         return nullptr;
     }
 
+    virtual String8 toString() {
+        return String8("<unspecified>");
+    }
+
+    virtual status_t reconnectAtOffset(off64_t /*offset*/) {
+        return ERROR_UNSUPPORTED;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    // for DRM
+    virtual sp<DecryptHandle> DrmInitialization(const char * /*mime*/ = NULL) {
+        return NULL;
+    }
+
+    virtual String8 getUri() {
+        return String8();
+    }
+
+    virtual bool getUri(char *uriString, size_t bufferSize) final {
+        int ret = snprintf(uriString, bufferSize, "%s", getUri().c_str());
+        return ret >= 0 && static_cast<size_t>(ret) < bufferSize;
+    }
+
+    virtual String8 getMIMEType() const {
+        return String8("application/octet-stream");
+    }
+
 protected:
     virtual ~DataSource() {}
 

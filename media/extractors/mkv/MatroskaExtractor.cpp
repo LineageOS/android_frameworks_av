@@ -542,12 +542,11 @@ static unsigned U24_AT(const uint8_t *ptr) {
     return ptr[0] << 16 | ptr[1] << 8 | ptr[2];
 }
 
-static AString uriDebugString(const AString &uri) {
+static AString uriDebugString(const char *uri) {
     // find scheme
     AString scheme;
-    const char *chars = uri.c_str();
-    for (size_t i = 0; i < uri.size(); i++) {
-        const char c = chars[i];
+    for (size_t i = 0; i < strlen(uri); i++) {
+        const char c = uri[i];
         if (!isascii(c)) {
             break;
         } else if (isalpha(c)) {
@@ -899,8 +898,12 @@ MatroskaExtractor::MatroskaExtractor(DataSourceBase *source)
     }
 
     if (ret < 0) {
+        char uri[1024];
+        if(!mDataSource->getUri(uri, sizeof(uri))) {
+            uri[0] = '\0';
+        }
         ALOGW("Corrupt %s source: %s", mIsWebm ? "webm" : "matroska",
-                uriDebugString(mDataSource->getUri()).c_str());
+                uriDebugString(uri).c_str());
         delete mSegment;
         mSegment = NULL;
         return;
