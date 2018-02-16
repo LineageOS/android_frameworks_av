@@ -21,6 +21,7 @@
 #include "mkvparser/mkvparser.h"
 
 #include <media/MediaExtractor.h>
+#include <media/stagefright/MetaDataBase.h>
 #include <utils/Vector.h>
 #include <utils/threads.h>
 
@@ -38,12 +39,11 @@ struct MatroskaExtractor : public MediaExtractor {
 
     virtual size_t countTracks();
 
-    virtual MediaSourceBase *getTrack(size_t index);
+    virtual MediaTrack *getTrack(size_t index);
 
-    virtual sp<MetaData> getTrackMetaData(
-            size_t index, uint32_t flags);
+    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
 
-    virtual sp<MetaData> getMetaData();
+    virtual status_t getMetaData(MetaDataBase& meta);
 
     virtual uint32_t flags() const;
 
@@ -59,7 +59,7 @@ private:
     struct TrackInfo {
         unsigned long mTrackNum;
         bool mEncrypted;
-        sp<MetaData> mMeta;
+        MetaDataBase mMeta;
         const MatroskaExtractor *mExtractor;
         Vector<const mkvparser::CuePoint*> mCuePoints;
 
@@ -85,19 +85,20 @@ private:
     int64_t mSeekPreRollNs;
 
     status_t synthesizeAVCC(TrackInfo *trackInfo, size_t index);
-    status_t initTrackInfo(const mkvparser::Track *track, const sp<MetaData> &meta, TrackInfo *trackInfo);
+    status_t initTrackInfo(
+            const mkvparser::Track *track,
+            MetaDataBase &meta,
+            TrackInfo *trackInfo);
     void addTracks();
     void findThumbnails();
-    void getColorInformation(const mkvparser::VideoTrack *vtrack, sp<MetaData> &meta);
+    void getColorInformation(
+            const mkvparser::VideoTrack *vtrack,
+            MetaDataBase &meta);
     bool isLiveStreaming() const;
 
     MatroskaExtractor(const MatroskaExtractor &);
     MatroskaExtractor &operator=(const MatroskaExtractor &);
 };
-
-bool SniffMatroska(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *);
 
 }  // namespace android
 

@@ -1071,7 +1071,7 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
                     codecBuffer->setRange(0, mediaBuf->size());
                     memcpy(codecBuffer->data(), mediaBuf->data(), mediaBuf->size());
 
-                    sp<MetaData> meta_data = mediaBuf->meta_data();
+                    MetaDataBase &meta_data = mediaBuf->meta_data();
                     cryptInfo = NuPlayerDrm::getSampleCryptoInfo(meta_data);
                 } else { // No mediaBuf
                     ALOGE("onInputBufferFetched: buffer->data()/mediaBuf are NULL for %p",

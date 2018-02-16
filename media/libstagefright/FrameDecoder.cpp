@@ -251,7 +251,7 @@ status_t FrameDecoder::extractInternal(
             } else {
                 codecBuffer->setRange(0, mediaBuffer->range_length());
 
-                CHECK(mediaBuffer->meta_data()->findInt64(kKeyTime, &ptsUs));
+                CHECK(mediaBuffer->meta_data().findInt64(kKeyTime, &ptsUs));
                 memcpy(codecBuffer->data(),
                         (const uint8_t*)mediaBuffer->data() + mediaBuffer->range_offset(),
                         mediaBuffer->range_length());
@@ -387,12 +387,12 @@ sp<AMessage> VideoFrameDecoder::onGetFormatAndSeekOptions(
 
 status_t VideoFrameDecoder::onInputReceived(
         const sp<MediaCodecBuffer> &codecBuffer,
-        const sp<MetaData> &sampleMeta, bool firstSample, uint32_t *flags) {
+        MetaDataBase &sampleMeta, bool firstSample, uint32_t *flags) {
     bool isSeekingClosest = (mSeekMode == MediaSource::ReadOptions::SEEK_CLOSEST)
             || (mSeekMode == MediaSource::ReadOptions::SEEK_FRAME_INDEX);
 
     if (firstSample && isSeekingClosest) {
-        sampleMeta->findInt64(kKeyTargetTime, &mTargetTimeUs);
+        sampleMeta.findInt64(kKeyTargetTime, &mTargetTimeUs);
         ALOGV("Seeking closest: targetTimeUs=%lld", (long long)mTargetTimeUs);
     }
 

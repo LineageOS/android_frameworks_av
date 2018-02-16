@@ -692,7 +692,7 @@ status_t MediaCodecSource::feedEncoderInputBuffers() {
         size_t size = 0;
 
         if (mbuf != NULL) {
-            CHECK(mbuf->meta_data()->findInt64(kKeyTime, &timeUs));
+            CHECK(mbuf->meta_data().findInt64(kKeyTime, &timeUs));
             if (mFirstSampleSystemTimeUs < 0ll) {
                 mFirstSampleSystemTimeUs = systemTime() / 1000;
                 if (mPausePending) {
@@ -715,7 +715,7 @@ status_t MediaCodecSource::feedEncoderInputBuffers() {
                     mFirstSampleTimeUs = timeUs;
                 }
                 int64_t driftTimeUs = 0;
-                if (mbuf->meta_data()->findInt64(kKeyDriftTime, &driftTimeUs)
+                if (mbuf->meta_data().findInt64(kKeyDriftTime, &driftTimeUs)
                         && driftTimeUs) {
                     driftTimeUs = timeUs - mFirstSampleTimeUs - driftTimeUs;
                 }
@@ -937,7 +937,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
                         decodingTimeUs = *(mDecodingTimeQueue.begin());
                         mDecodingTimeQueue.erase(mDecodingTimeQueue.begin());
                     }
-                    mbuf->meta_data()->setInt64(kKeyDecodingTime, decodingTimeUs);
+                    mbuf->meta_data().setInt64(kKeyDecodingTime, decodingTimeUs);
 
                     ALOGV("[video] time %" PRId64 " us (%.2f secs), dts/pts diff %" PRId64,
                             timeUs, timeUs / 1E6, decodingTimeUs - timeUs);
@@ -947,18 +947,18 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
                     CHECK(!mDriftTimeQueue.empty());
                     driftTimeUs = *(mDriftTimeQueue.begin());
                     mDriftTimeQueue.erase(mDriftTimeQueue.begin());
-                    mbuf->meta_data()->setInt64(kKeyDriftTime, driftTimeUs);
+                    mbuf->meta_data().setInt64(kKeyDriftTime, driftTimeUs);
 #endif // DEBUG_DRIFT_TIME
                     ALOGV("[audio] time %" PRId64 " us (%.2f secs), drift %" PRId64,
                             timeUs, timeUs / 1E6, driftTimeUs);
                 }
-                mbuf->meta_data()->setInt64(kKeyTime, timeUs);
+                mbuf->meta_data().setInt64(kKeyTime, timeUs);
             } else {
-                mbuf->meta_data()->setInt64(kKeyTime, 0ll);
-                mbuf->meta_data()->setInt32(kKeyIsCodecConfig, true);
+                mbuf->meta_data().setInt64(kKeyTime, 0ll);
+                mbuf->meta_data().setInt32(kKeyIsCodecConfig, true);
             }
             if (flags & MediaCodec::BUFFER_FLAG_SYNCFRAME) {
-                mbuf->meta_data()->setInt32(kKeyIsSyncFrame, true);
+                mbuf->meta_data().setInt32(kKeyIsSyncFrame, true);
             }
             memcpy(mbuf->data(), outbuf->data(), outbuf->size());
 

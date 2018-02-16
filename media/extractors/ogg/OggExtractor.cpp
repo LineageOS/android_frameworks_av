@@ -22,7 +22,8 @@
 
 #include <cutils/properties.h>
 #include <media/DataSourceBase.h>
-#include <media/MediaSourceBase.h>
+#include <media/MediaTrack.h>
+#include <media/VorbisComment.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/base64.h>
@@ -31,7 +32,7 @@
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MetaData.h>
+#include <media/stagefright/MetaDataBase.h>
 #include <utils/String8.h>
 
 extern "C" {
@@ -45,12 +46,12 @@ extern "C" {
 
 namespace android {
 
-struct OggSource : public MediaSourceBase {
+struct OggSource : public MediaTrack {
     explicit OggSource(OggExtractor *extractor);
 
-    virtual sp<MetaData> getFormat();
+    virtual status_t getFormat(MetaDataBase &);
 
-    virtual status_t start(MetaData *params = NULL);
+    virtual status_t start(MetaDataBase *params = NULL);
     virtual status_t stop();
 
     virtual status_t read(
@@ -75,7 +76,7 @@ struct MyOggExtractor {
             int64_t seekPreRollUs);
     virtual ~MyOggExtractor();
 
-    sp<MetaData> getFormat() const;
+    status_t getFormat(MetaDataBase &) const;
 
     // Returns an approximate bitrate in bits per second.
     virtual uint64_t approxBitrate() const = 0;
@@ -86,7 +87,10 @@ struct MyOggExtractor {
 
     status_t init();
 
-    sp<MetaData> getFileMetaData() { return mFileMeta; }
+    status_t getFileMetaData(MetaDataBase &meta) {
+        meta = mFileMeta;
+        return OK;
+    }
 
 protected:
     struct Page {
@@ -124,8 +128,8 @@ protected:
     vorbis_info mVi;
     vorbis_comment mVc;
 
-    sp<MetaData> mMeta;
-    sp<MetaData> mFileMeta;
+    MetaDataBase mMeta;
+    MetaDataBase mFileMeta;
 
     Vector<TOCEntry> mTableOfContents;
 
@@ -219,9 +223,6 @@ private:
     int64_t mStartGranulePosition;
 };
 
-static void extractAlbumArt(
-        const sp<MetaData> &fileMeta, const void *data, size_t size);
-
 ////////////////////////////////////////////////////////////////////////////////
 
 OggSource::OggSource(OggExtractor *extractor)
@@ -235,11 +236,11 @@ OggSource::~OggSource() {
     }
 }
 
-sp<MetaData> OggSource::getFormat() {
-    return mExtractor->mImpl->getFormat();
+status_t OggSource::getFormat(MetaDataBase &meta) {
+    return mExtractor->mImpl->getFormat(meta);
 }
 
-status_t OggSource::start(MetaData * /* params */) {
+status_t OggSource::start(MetaDataBase * /* params */) {
     if (mStarted) {
         return INVALID_OPERATION;
     }
@@ -277,14 +278,14 @@ status_t OggSource::read(
 
 #if 0
     int64_t timeUs;
-    if (packet->meta_data()->findInt64(kKeyTime, &timeUs)) {
+    if (packet->meta_data().findInt64(kKeyTime, &timeUs)) {
         ALOGI("found time = %lld us", timeUs);
     } else {
         ALOGI("NO time");
     }
 #endif
 
-    packet->meta_data()->setInt32(kKeyIsSyncFrame, 1);
+    packet->meta_data().setInt32(kKeyIsSyncFrame, 1);
 
     *out = packet;
 
@@ -321,8 +322,9 @@ MyOggExtractor::~MyOggExtractor() {
     vorbis_info_clear(&mVi);
 }
 
-sp<MetaData> MyOggExtractor::getFormat() const {
-    return mMeta;
+status_t MyOggExtractor::getFormat(MetaDataBase &meta) const {
+    meta = mMeta;
+    return OK;
 }
 
 status_t MyOggExtractor::findNextPage(
@@ -606,17 +608,17 @@ status_t MyOpusExtractor::readNextPacket(MediaBufferBase **out) {
     int32_t currentPageSamples;
     // Calculate timestamps by accumulating durations starting from the first sample of a page;
     // We assume that we only seek to page boundaries.
-    if ((*out)->meta_data()->findInt32(kKeyValidSamples, &currentPageSamples)) {
+    if ((*out)->meta_data().findInt32(kKeyValidSamples, &currentPageSamples)) {
         // first packet in page
         if (mOffset == mFirstDataOffset) {
             currentPageSamples -= mStartGranulePosition;
-            (*out)->meta_data()->setInt32(kKeyValidSamples, currentPageSamples);
+            (*out)->meta_data().setInt32(kKeyValidSamples, currentPageSamples);
         }
         mCurGranulePosition = mCurrentPage.mGranulePosition - currentPageSamples;
     }
 
     int64_t timeUs = getTimeUsOfGranule(mCurGranulePosition);
-    (*out)->meta_data()->setInt64(kKeyTime, timeUs);
+    (*out)->meta_data().setInt64(kKeyTime, timeUs);
 
     uint32_t frames = getNumSamplesInPacket(*out);
     mCurGranulePosition += frames;
@@ -745,7 +747,7 @@ status_t MyOggExtractor::_readNextPacket(MediaBufferBase **out, bool calcVorbisT
                 // We've just read the entire packet.
 
                 if (mFirstPacketInPage) {
-                    buffer->meta_data()->setInt32(
+                    buffer->meta_data().setInt32(
                             kKeyValidSamples, mCurrentPageSamples);
                     mFirstPacketInPage = false;
                 }
@@ -767,7 +769,7 @@ status_t MyOggExtractor::_readNextPacket(MediaBufferBase **out, bool calcVorbisT
                         mCurrentPage.mPrevPacketPos += actualBlockSize / 2;
                         mCurrentPage.mPrevPacketSize = curBlockSize;
                     }
-                    buffer->meta_data()->setInt64(kKeyTime, timeUs);
+                    buffer->meta_data().setInt64(kKeyTime, timeUs);
                 }
                 *out = buffer;
 
@@ -813,10 +815,10 @@ status_t MyOggExtractor::_readNextPacket(MediaBufferBase **out, bool calcVorbisT
                 // is already complete.
 
                 if (timeUs >= 0) {
-                    buffer->meta_data()->setInt64(kKeyTime, timeUs);
+                    buffer->meta_data().setInt64(kKeyTime, timeUs);
                 }
 
-                buffer->meta_data()->setInt32(
+                buffer->meta_data().setInt32(
                         kKeyValidSamples, mCurrentPageSamples);
                 mFirstPacketInPage = false;
 
@@ -829,8 +831,7 @@ status_t MyOggExtractor::_readNextPacket(MediaBufferBase **out, bool calcVorbisT
 }
 
 status_t MyOggExtractor::init() {
-    mMeta = new MetaData;
-    mMeta->setCString(kKeyMIMEType, mMimeType);
+    mMeta.setCString(kKeyMIMEType, mMimeType);
 
     status_t err;
     MediaBufferBase *packet;
@@ -863,7 +864,7 @@ status_t MyOggExtractor::init() {
 
         int64_t durationUs = getTimeUsOfGranule(lastGranulePosition);
 
-        mMeta->setInt64(kKeyDuration, durationUs);
+        mMeta.setInt64(kKeyDuration, durationUs);
 
         buildTableOfContents();
     }
@@ -979,25 +980,35 @@ status_t MyOpusExtractor::verifyOpusHeader(MediaBufferBase *buffer) {
     mChannelCount = data[9];
     mCodecDelay = U16LE_AT(&data[10]);
 
-    mMeta->setData(kKeyOpusHeader, 0, data, size);
-    mMeta->setInt32(kKeySampleRate, kOpusSampleRate);
-    mMeta->setInt32(kKeyChannelCount, mChannelCount);
-    mMeta->setInt64(kKeyOpusSeekPreRoll /* ns */, kOpusSeekPreRollUs * 1000 /* = 80 ms*/);
-    mMeta->setInt64(kKeyOpusCodecDelay /* ns */,
+    mMeta.setData(kKeyOpusHeader, 0, data, size);
+    mMeta.setInt32(kKeySampleRate, kOpusSampleRate);
+    mMeta.setInt32(kKeyChannelCount, mChannelCount);
+    mMeta.setInt64(kKeyOpusSeekPreRoll /* ns */, kOpusSeekPreRollUs * 1000 /* = 80 ms*/);
+    mMeta.setInt64(kKeyOpusCodecDelay /* ns */,
             mCodecDelay /* sample/s */ * 1000000000ll / kOpusSampleRate);
 
     return OK;
 }
 
+struct TmpData {
+    uint8_t *data;
+    TmpData(size_t size) {
+        data = (uint8_t*) malloc(size);
+    }
+    ~TmpData() {
+        free(data);
+    }
+};
+
 status_t MyOpusExtractor::verifyOpusComments(MediaBufferBase *buffer) {
     // add artificial framing bit so we can reuse _vorbis_unpack_comment
     int32_t commentSize = buffer->range_length() + 1;
-    sp<ABuffer> aBuf = new ABuffer(commentSize);
-    if (aBuf->capacity() <= buffer->range_length()) {
+    TmpData commentDataHolder(commentSize);
+    uint8_t *commentData = commentDataHolder.data;
+    if (commentData == nullptr) {
         return ERROR_MALFORMED;
     }
 
-    uint8_t* commentData = aBuf->data();
     memcpy(commentData,
             (uint8_t *)buffer->data() + buffer->range_offset(),
             buffer->range_length());
@@ -1120,10 +1131,10 @@ status_t MyVorbisExtractor::verifyHeader(
                 return ERROR_MALFORMED;
             }
 
-            mMeta->setData(kKeyVorbisInfo, 0, data, size);
-            mMeta->setInt32(kKeySampleRate, mVi.rate);
-            mMeta->setInt32(kKeyChannelCount, mVi.channels);
-            mMeta->setInt32(kKeyBitRate, mVi.bitrate_nominal);
+            mMeta.setData(kKeyVorbisInfo, 0, data, size);
+            mMeta.setInt32(kKeySampleRate, mVi.rate);
+            mMeta.setInt32(kKeyChannelCount, mVi.channels);
+            mMeta.setInt32(kKeyBitRate, mVi.bitrate_nominal);
 
             ALOGV("lower-bitrate = %ld", mVi.bitrate_lower);
             ALOGV("upper-bitrate = %ld", mVi.bitrate_upper);
@@ -1138,7 +1149,7 @@ status_t MyVorbisExtractor::verifyHeader(
             if (mSource->getSize(&size) == OK) {
                 uint64_t bps = approxBitrate();
                 if (bps != 0) {
-                    mMeta->setInt64(kKeyDuration, size * 8000000ll / bps);
+                    mMeta.setInt64(kKeyDuration, size * 8000000ll / bps);
                 }
             }
             break;
@@ -1160,7 +1171,7 @@ status_t MyVorbisExtractor::verifyHeader(
                 return ERROR_MALFORMED;
             }
 
-            mMeta->setData(kKeyVorbisBooks, 0, data, size);
+            mMeta.setData(kKeyVorbisBooks, 0, data, size);
             break;
         }
     }
@@ -1176,138 +1187,14 @@ uint64_t MyVorbisExtractor::approxBitrate() const {
     return (mVi.bitrate_lower + mVi.bitrate_upper) / 2;
 }
 
-// also exists in FLACExtractor, candidate for moving to utility/support library?
-static void parseVorbisComment(
-        const sp<MetaData> &fileMeta, const char *comment, size_t commentLength)
-{
-    struct {
-        const char *const mTag;
-        uint32_t mKey;
-    } kMap[] = {
-        { "TITLE", kKeyTitle },
-        { "ARTIST", kKeyArtist },
-        { "ALBUMARTIST", kKeyAlbumArtist },
-        { "ALBUM ARTIST", kKeyAlbumArtist },
-        { "COMPILATION", kKeyCompilation },
-        { "ALBUM", kKeyAlbum },
-        { "COMPOSER", kKeyComposer },
-        { "GENRE", kKeyGenre },
-        { "AUTHOR", kKeyAuthor },
-        { "TRACKNUMBER", kKeyCDTrackNumber },
-        { "DISCNUMBER", kKeyDiscNumber },
-        { "DATE", kKeyDate },
-        { "YEAR", kKeyYear },
-        { "LYRICIST", kKeyWriter },
-        { "METADATA_BLOCK_PICTURE", kKeyAlbumArt },
-        { "ANDROID_LOOP", kKeyAutoLoop },
-    };
-
-        for (size_t j = 0; j < sizeof(kMap) / sizeof(kMap[0]); ++j) {
-            size_t tagLen = strlen(kMap[j].mTag);
-            if (!strncasecmp(kMap[j].mTag, comment, tagLen)
-                    && comment[tagLen] == '=') {
-                if (kMap[j].mKey == kKeyAlbumArt) {
-                    extractAlbumArt(
-                            fileMeta,
-                            &comment[tagLen + 1],
-                            commentLength - tagLen - 1);
-                } else if (kMap[j].mKey == kKeyAutoLoop) {
-                    if (!strcasecmp(&comment[tagLen + 1], "true")) {
-                        fileMeta->setInt32(kKeyAutoLoop, true);
-                    }
-                } else {
-                    fileMeta->setCString(kMap[j].mKey, &comment[tagLen + 1]);
-                }
-            }
-        }
-
-}
-
-// also exists in FLACExtractor, candidate for moving to utility/support library?
-static void extractAlbumArt(
-        const sp<MetaData> &fileMeta, const void *data, size_t size) {
-    ALOGV("extractAlbumArt from '%s'", (const char *)data);
-
-    sp<ABuffer> flacBuffer = decodeBase64(AString((const char *)data, size));
-    if (flacBuffer == NULL) {
-        ALOGE("malformed base64 encoded data.");
-        return;
-    }
-
-    size_t flacSize = flacBuffer->size();
-    uint8_t *flac = flacBuffer->data();
-    ALOGV("got flac of size %zu", flacSize);
-
-    uint32_t picType;
-    uint32_t typeLen;
-    uint32_t descLen;
-    uint32_t dataLen;
-    char type[128];
-
-    if (flacSize < 8) {
-        return;
-    }
-
-    picType = U32_AT(flac);
-
-    if (picType != 3) {
-        // This is not a front cover.
-        return;
-    }
-
-    typeLen = U32_AT(&flac[4]);
-    if (typeLen > sizeof(type) - 1) {
-        return;
-    }
-
-    // we've already checked above that flacSize >= 8
-    if (flacSize - 8 < typeLen) {
-        return;
-    }
-
-    memcpy(type, &flac[8], typeLen);
-    type[typeLen] = '\0';
-
-    ALOGV("picType = %d, type = '%s'", picType, type);
-
-    if (!strcmp(type, "-->")) {
-        // This is not inline cover art, but an external url instead.
-        return;
-    }
-
-    if (flacSize < 32 || flacSize - 32 < typeLen) {
-        return;
-    }
-
-    descLen = U32_AT(&flac[8 + typeLen]);
-    if (flacSize - 32 - typeLen < descLen) {
-        return;
-    }
-
-    dataLen = U32_AT(&flac[8 + typeLen + 4 + descLen + 16]);
-
-    // we've already checked above that (flacSize - 32 - typeLen - descLen) >= 0
-    if (flacSize - 32 - typeLen - descLen < dataLen) {
-        return;
-    }
-
-    ALOGV("got image data, %zu trailing bytes",
-         flacSize - 32 - typeLen - descLen - dataLen);
-
-    fileMeta->setData(
-            kKeyAlbumArt, 0, &flac[8 + typeLen + 4 + descLen + 20], dataLen);
-
-    fileMeta->setCString(kKeyAlbumArtMIME, type);
-}
 
 void MyOggExtractor::parseFileMetaData() {
-    mFileMeta = new MetaData;
-    mFileMeta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_CONTAINER_OGG);
+    mFileMeta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_CONTAINER_OGG);
 
     for (int i = 0; i < mVc.comments; ++i) {
         const char *comment = mVc.user_comments[i];
         size_t commentLength = mVc.comment_lengths[i];
-        parseVorbisComment(mFileMeta, comment, commentLength);
+        parseVorbisComment(&mFileMeta, comment, commentLength);
         //ALOGI("comment #%d: '%s'", i + 1, mVc.user_comments[i]);
     }
 }
@@ -1348,7 +1235,7 @@ size_t OggExtractor::countTracks() {
     return mInitCheck != OK ? 0 : 1;
 }
 
-MediaSourceBase *OggExtractor::getTrack(size_t index) {
+MediaTrack *OggExtractor::getTrack(size_t index) {
     if (index >= 1) {
         return NULL;
     }
@@ -1356,17 +1243,18 @@ MediaSourceBase *OggExtractor::getTrack(size_t index) {
     return new OggSource(this);
 }
 
-sp<MetaData> OggExtractor::getTrackMetaData(
+status_t OggExtractor::getTrackMetaData(
+        MetaDataBase &meta,
         size_t index, uint32_t /* flags */) {
     if (index >= 1) {
-        return NULL;
+        return UNKNOWN_ERROR;
     }
 
-    return mImpl->getFormat();
+    return mImpl->getFormat(meta);
 }
 
-sp<MetaData> OggExtractor::getMetaData() {
-    return mImpl->getFileMetaData();
+status_t OggExtractor::getMetaData(MetaDataBase &meta) {
+    return mImpl->getFileMetaData(meta);
 }
 
 static MediaExtractor* CreateExtractor(

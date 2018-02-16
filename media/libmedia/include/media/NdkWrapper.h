@@ -149,7 +149,7 @@ private:
 };
 
 struct AMediaCodecCryptoInfoWrapper : public RefBase {
-    static sp<AMediaCodecCryptoInfoWrapper> Create(sp<MetaData> meta);
+    static sp<AMediaCodecCryptoInfoWrapper> Create(MetaDataBase &meta);
 
     AMediaCodecCryptoInfoWrapper(int numsubsamples,
                                  uint8_t key[16],

@@ -19,6 +19,7 @@
 #define AAC_EXTRACTOR_H_
 
 #include <media/MediaExtractor.h>
+#include <media/stagefright/MetaDataBase.h>
 
 #include <utils/Vector.h>
 
@@ -29,13 +30,13 @@ class String8;
 
 class AACExtractor : public MediaExtractor {
 public:
-    AACExtractor(DataSourceBase *source, const sp<AMessage> &meta);
+    AACExtractor(DataSourceBase *source, off64_t offset);
 
     virtual size_t countTracks();
-    virtual MediaSourceBase *getTrack(size_t index);
-    virtual sp<MetaData> getTrackMetaData(size_t index, uint32_t flags);
+    virtual MediaTrack *getTrack(size_t index);
+    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
 
-    virtual sp<MetaData> getMetaData();
+    virtual status_t getMetaData(MetaDataBase& meta);
     virtual const char * name() { return "AACExtractor"; }
 
 protected:
@@ -43,7 +44,7 @@ protected:
 
 private:
     DataSourceBase *mDataSource;
-    sp<MetaData> mMeta;
+    MetaDataBase mMeta;
     status_t mInitCheck;
 
     Vector<uint64_t> mOffsetVector;
@@ -54,8 +55,7 @@ private:
 };
 
 bool SniffAAC(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *);
+        DataSourceBase *source, String8 *mimeType, float *confidence, off64_t *offset);
 
 }  // namespace android
 

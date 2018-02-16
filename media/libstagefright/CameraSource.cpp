@@ -1100,7 +1100,7 @@ status_t CameraSource::read(
         *buffer = new MediaBuffer(frame->pointer(), frame->size());
         (*buffer)->setObserver(this);
         (*buffer)->add_ref();
-        (*buffer)->meta_data()->setInt64(kKeyTime, frameTime);
+        (*buffer)->meta_data().setInt64(kKeyTime, frameTime);
     }
     return OK;
 }

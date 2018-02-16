@@ -68,7 +68,7 @@ protected:
 
     virtual status_t onInputReceived(
             const sp<MediaCodecBuffer> &codecBuffer,
-            const sp<MetaData> &sampleMeta,
+            MetaDataBase &sampleMeta,
             bool firstSample,
             uint32_t *flags) = 0;
 
@@ -123,7 +123,7 @@ protected:
 
     virtual status_t onInputReceived(
             const sp<MediaCodecBuffer> &codecBuffer,
-            const sp<MetaData> &sampleMeta,
+            MetaDataBase &sampleMeta,
             bool firstSample,
             uint32_t *flags) override;
 
@@ -158,7 +158,7 @@ protected:
 
     virtual status_t onInputReceived(
             const sp<MediaCodecBuffer> &codecBuffer __unused,
-            const sp<MetaData> &sampleMeta __unused,
+            MetaDataBase &sampleMeta __unused,
             bool firstSample __unused,
             uint32_t *flags __unused) override { return OK; }
 

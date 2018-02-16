@@ -265,7 +265,7 @@ status_t AudioSource::read(
 
     // Mute/suppress the recording sound
     int64_t timeUs;
-    CHECK(buffer->meta_data()->findInt64(kKeyTime, &timeUs));
+    CHECK(buffer->meta_data().findInt64(kKeyTime, &timeUs));
     int64_t elapsedTimeUs = timeUs - mStartTimeUs;
     if (elapsedTimeUs < kAutoRampStartUs) {
         memset((uint8_t *) buffer->data(), 0, buffer->range_length());
@@ -289,7 +289,7 @@ status_t AudioSource::read(
 
     if (mSampleRate != mOutSampleRate) {
             timeUs *= (int64_t)mSampleRate / (int64_t)mOutSampleRate;
-            buffer->meta_data()->setInt64(kKeyTime, timeUs);
+            buffer->meta_data().setInt64(kKeyTime, timeUs);
     }
 
     *out = buffer;
@@ -433,11 +433,11 @@ void AudioSource::queueInputBuffer_l(MediaBuffer *buffer, int64_t timeUs) {
                         (mSampleRate >> 1)) / mSampleRate;
 
     if (mNumFramesReceived == 0) {
-        buffer->meta_data()->setInt64(kKeyAnchorTime, mStartTimeUs);
+        buffer->meta_data().setInt64(kKeyAnchorTime, mStartTimeUs);
     }
 
-    buffer->meta_data()->setInt64(kKeyTime, mPrevSampleTimeUs);
-    buffer->meta_data()->setInt64(kKeyDriftTime, timeUs - mInitialReadTimeUs);
+    buffer->meta_data().setInt64(kKeyTime, mPrevSampleTimeUs);
+    buffer->meta_data().setInt64(kKeyDriftTime, timeUs - mInitialReadTimeUs);
     mPrevSampleTimeUs = timestampUs;
     mNumFramesReceived += bufferSize / frameSize;
     mBuffersReceived.push_back(buffer);

@@ -23,11 +23,11 @@
 
 namespace android {
 
-class MidiIoWrapper : public RefBase {
+class MidiIoWrapper {
 public:
-    MidiIoWrapper(const char *path);
-    MidiIoWrapper(int fd, off64_t offset, int64_t size);
-    MidiIoWrapper(DataSourceBase *source);
+    explicit MidiIoWrapper(const char *path);
+    explicit MidiIoWrapper(int fd, off64_t offset, int64_t size);
+    explicit MidiIoWrapper(DataSourceBase *source);
 
     ~MidiIoWrapper();
 

@@ -22,7 +22,7 @@
 
 #include <audio_utils/primitives.h>
 #include <media/DataSourceBase.h>
-#include <media/MediaSourceBase.h>
+#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
@@ -55,17 +55,17 @@ static uint16_t U16_LE_AT(const uint8_t *ptr) {
     return ptr[1] << 8 | ptr[0];
 }
 
-struct WAVSource : public MediaSourceBase {
+struct WAVSource : public MediaTrack {
     WAVSource(
             DataSourceBase *dataSource,
-            const sp<MetaData> &meta,
+            MetaDataBase &meta,
             uint16_t waveFormat,
             int32_t bitsPerSample,
             off64_t offset, size_t size);
 
-    virtual status_t start(MetaData *params = NULL);
+    virtual status_t start(MetaDataBase *params = NULL);
     virtual status_t stop();
-    virtual sp<MetaData> getFormat();
+    virtual status_t getFormat(MetaDataBase &meta);
 
     virtual status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL);
@@ -79,7 +79,7 @@ private:
     static const size_t kMaxFrameSize;
 
     DataSourceBase *mDataSource;
-    sp<MetaData> mMeta;
+    MetaDataBase &mMeta;
     uint16_t mWaveFormat;
     int32_t mSampleRate;
     int32_t mNumChannels;
@@ -104,23 +104,20 @@ WAVExtractor::WAVExtractor(DataSourceBase *source)
 WAVExtractor::~WAVExtractor() {
 }
 
-sp<MetaData> WAVExtractor::getMetaData() {
-    sp<MetaData> meta = new MetaData;
-
-    if (mInitCheck != OK) {
-        return meta;
+status_t WAVExtractor::getMetaData(MetaDataBase &meta) {
+    meta.clear();
+    if (mInitCheck == OK) {
+        meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_CONTAINER_WAV);
     }
 
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_CONTAINER_WAV);
-
-    return meta;
+    return OK;
 }
 
 size_t WAVExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaSourceBase *WAVExtractor::getTrack(size_t index) {
+MediaTrack *WAVExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index > 0) {
         return NULL;
     }
@@ -130,13 +127,15 @@ MediaSourceBase *WAVExtractor::getTrack(size_t index) {
             mWaveFormat, mBitsPerSample, mDataOffset, mDataSize);
 }
 
-sp<MetaData> WAVExtractor::getTrackMetaData(
+status_t WAVExtractor::getTrackMetaData(
+        MetaDataBase &meta,
         size_t index, uint32_t /* flags */) {
     if (mInitCheck != OK || index > 0) {
-        return NULL;
+        return UNKNOWN_ERROR;
     }
 
-    return mTrackMeta;
+    meta = mTrackMeta;
+    return OK;
 }
 
 status_t WAVExtractor::init() {
@@ -285,33 +284,33 @@ status_t WAVExtractor::init() {
                 mDataOffset = offset;
                 mDataSize = chunkSize;
 
-                mTrackMeta = new MetaData;
+                mTrackMeta.clear();
 
                 switch (mWaveFormat) {
                     case WAVE_FORMAT_PCM:
                     case WAVE_FORMAT_IEEE_FLOAT:
-                        mTrackMeta->setCString(
+                        mTrackMeta.setCString(
                                 kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_RAW);
                         break;
                     case WAVE_FORMAT_ALAW:
-                        mTrackMeta->setCString(
+                        mTrackMeta.setCString(
                                 kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_G711_ALAW);
                         break;
                     case WAVE_FORMAT_MSGSM:
-                        mTrackMeta->setCString(
+                        mTrackMeta.setCString(
                                 kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MSGSM);
                         break;
                     default:
                         CHECK_EQ(mWaveFormat, (uint16_t)WAVE_FORMAT_MULAW);
-                        mTrackMeta->setCString(
+                        mTrackMeta.setCString(
                                 kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_G711_MLAW);
                         break;
                 }
 
-                mTrackMeta->setInt32(kKeyChannelCount, mNumChannels);
-                mTrackMeta->setInt32(kKeyChannelMask, mChannelMask);
-                mTrackMeta->setInt32(kKeySampleRate, mSampleRate);
-                mTrackMeta->setInt32(kKeyPcmEncoding, kAudioEncodingPcm16bit);
+                mTrackMeta.setInt32(kKeyChannelCount, mNumChannels);
+                mTrackMeta.setInt32(kKeyChannelMask, mChannelMask);
+                mTrackMeta.setInt32(kKeySampleRate, mSampleRate);
+                mTrackMeta.setInt32(kKeyPcmEncoding, kAudioEncodingPcm16bit);
 
                 int64_t durationUs = 0;
                 if (mWaveFormat == WAVE_FORMAT_MSGSM) {
@@ -333,7 +332,7 @@ status_t WAVExtractor::init() {
                         1000000LL * num_samples / mSampleRate;
                 }
 
-                mTrackMeta->setInt64(kKeyDuration, durationUs);
+                mTrackMeta.setInt64(kKeyDuration, durationUs);
 
                 return OK;
             }
@@ -349,7 +348,7 @@ const size_t WAVSource::kMaxFrameSize = 32768;
 
 WAVSource::WAVSource(
         DataSourceBase *dataSource,
-        const sp<MetaData> &meta,
+        MetaDataBase &meta,
         uint16_t waveFormat,
         int32_t bitsPerSample,
         off64_t offset, size_t size)
@@ -363,10 +362,10 @@ WAVSource::WAVSource(
       mSize(size),
       mStarted(false),
       mGroup(NULL) {
-    CHECK(mMeta->findInt32(kKeySampleRate, &mSampleRate));
-    CHECK(mMeta->findInt32(kKeyChannelCount, &mNumChannels));
+    CHECK(mMeta.findInt32(kKeySampleRate, &mSampleRate));
+    CHECK(mMeta.findInt32(kKeyChannelCount, &mNumChannels));
 
-    mMeta->setInt32(kKeyMaxInputSize, kMaxFrameSize);
+    mMeta.setInt32(kKeyMaxInputSize, kMaxFrameSize);
 }
 
 WAVSource::~WAVSource() {
@@ -375,7 +374,7 @@ WAVSource::~WAVSource() {
     }
 }
 
-status_t WAVSource::start(MetaData * /* params */) {
+status_t WAVSource::start(MetaDataBase * /* params */) {
     ALOGV("WAVSource::start");
 
     CHECK(!mStarted);
@@ -408,10 +407,11 @@ status_t WAVSource::stop() {
     return OK;
 }
 
-sp<MetaData> WAVSource::getFormat() {
+status_t WAVSource::getFormat(MetaDataBase &meta) {
     ALOGV("WAVSource::getFormat");
 
-    return mMeta;
+    meta = mMeta;
+    return OK;
 }
 
 status_t WAVSource::read(
@@ -532,9 +532,9 @@ status_t WAVSource::read(
                 / (mNumChannels * bytesPerSample) / mSampleRate;
     }
 
-    buffer->meta_data()->setInt64(kKeyTime, timeStampUs);
+    buffer->meta_data().setInt64(kKeyTime, timeStampUs);
 
-    buffer->meta_data()->setInt32(kKeyIsSyncFrame, 1);
+    buffer->meta_data().setInt32(kKeyIsSyncFrame, 1);
     mCurrentPos += n;
 
     *out = buffer;

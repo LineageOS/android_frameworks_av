@@ -21,7 +21,7 @@
 #include "AMRExtractor.h"
 
 #include <media/DataSourceBase.h>
-#include <media/MediaSourceBase.h>
+#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
@@ -31,18 +31,19 @@
 
 namespace android {
 
-class AMRSource : public MediaSourceBase {
+class AMRSource : public MediaTrack {
 public:
-    AMRSource(DataSourceBase *source,
-              const sp<MetaData> &meta,
-              bool isWide,
-              const off64_t *offset_table,
-              size_t offset_table_length);
+    AMRSource(
+            DataSourceBase *source,
+            MetaDataBase &meta,
+            bool isWide,
+            const off64_t *offset_table,
+            size_t offset_table_length);
 
-    virtual status_t start(MetaData *params = NULL);
+    virtual status_t start(MetaDataBase *params = NULL);
     virtual status_t stop();
 
-    virtual sp<MetaData> getFormat();
+    virtual status_t getFormat(MetaDataBase &);
 
     virtual status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL);
@@ -52,7 +53,7 @@ protected:
 
 private:
     DataSourceBase *mDataSource;
-    sp<MetaData> mMeta;
+    MetaDataBase mMeta;
     bool mIsWide;
 
     off64_t mOffset;
@@ -116,25 +117,48 @@ static status_t getFrameSizeByOffset(DataSourceBase *source,
     return OK;
 }
 
+static bool SniffAMR(
+        DataSourceBase *source, bool *isWide, float *confidence) {
+    char header[9];
+
+    if (source->readAt(0, header, sizeof(header)) != sizeof(header)) {
+        return false;
+    }
+
+    if (!memcmp(header, "#!AMR\n", 6)) {
+        if (isWide != nullptr) {
+            *isWide = false;
+        }
+        *confidence = 0.5;
+
+        return true;
+    } else if (!memcmp(header, "#!AMR-WB\n", 9)) {
+        if (isWide != nullptr) {
+            *isWide = true;
+        }
+        *confidence = 0.5;
+
+        return true;
+    }
+
+    return false;
+}
+
 AMRExtractor::AMRExtractor(DataSourceBase *source)
     : mDataSource(source),
       mInitCheck(NO_INIT),
       mOffsetTableLength(0) {
-    String8 mimeType;
     float confidence;
-    if (!SniffAMR(mDataSource, &mimeType, &confidence)) {
+    if (!SniffAMR(mDataSource, &mIsWide, &confidence)) {
         return;
     }
 
-    mIsWide = (mimeType == MEDIA_MIMETYPE_AUDIO_AMR_WB);
-
-    mMeta = new MetaData;
-    mMeta->setCString(
+    mMeta.setCString(
             kKeyMIMEType, mIsWide ? MEDIA_MIMETYPE_AUDIO_AMR_WB
                                   : MEDIA_MIMETYPE_AUDIO_AMR_NB);
 
-    mMeta->setInt32(kKeyChannelCount, 1);
-    mMeta->setInt32(kKeySampleRate, mIsWide ? 16000 : 8000);
+    mMeta.setInt32(kKeyChannelCount, 1);
+    mMeta.setInt32(kKeySampleRate, mIsWide ? 16000 : 8000);
 
     off64_t offset = mIsWide ? 9 : 6;
     off64_t streamSize;
@@ -161,7 +185,7 @@ AMRExtractor::AMRExtractor(DataSourceBase *source)
             numFrames ++;
         }
 
-        mMeta->setInt64(kKeyDuration, duration);
+        mMeta.setInt64(kKeyDuration, duration);
     }
 
     mInitCheck = OK;
@@ -170,23 +194,21 @@ AMRExtractor::AMRExtractor(DataSourceBase *source)
 AMRExtractor::~AMRExtractor() {
 }
 
-sp<MetaData> AMRExtractor::getMetaData() {
-    sp<MetaData> meta = new MetaData;
+status_t AMRExtractor::getMetaData(MetaDataBase &meta) {
+    meta.clear();
 
-    if (mInitCheck != OK) {
-        return meta;
+    if (mInitCheck == OK) {
+        meta.setCString(kKeyMIMEType, mIsWide ? "audio/amr-wb" : "audio/amr");
     }
 
-    meta->setCString(kKeyMIMEType, mIsWide ? "audio/amr-wb" : "audio/amr");
-
-    return meta;
+    return OK;
 }
 
 size_t AMRExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaSourceBase *AMRExtractor::getTrack(size_t index) {
+MediaTrack *AMRExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }
@@ -195,18 +217,19 @@ MediaSourceBase *AMRExtractor::getTrack(size_t index) {
             mOffsetTable, mOffsetTableLength);
 }
 
-sp<MetaData> AMRExtractor::getTrackMetaData(size_t index, uint32_t /* flags */) {
+status_t AMRExtractor::getTrackMetaData(MetaDataBase &meta, size_t index, uint32_t /* flags */) {
     if (mInitCheck != OK || index != 0) {
-        return NULL;
+        return UNKNOWN_ERROR;
     }
 
-    return mMeta;
+    meta = mMeta;
+    return OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 AMRSource::AMRSource(
-        DataSourceBase *source, const sp<MetaData> &meta,
+        DataSourceBase *source, MetaDataBase &meta,
         bool isWide, const off64_t *offset_table, size_t offset_table_length)
     : mDataSource(source),
       mMeta(meta),
@@ -227,7 +250,7 @@ AMRSource::~AMRSource() {
     }
 }
 
-status_t AMRSource::start(MetaData * /* params */) {
+status_t AMRSource::start(MetaDataBase * /* params */) {
     CHECK(!mStarted);
 
     mOffset = mIsWide ? 9 : 6;
@@ -249,8 +272,9 @@ status_t AMRSource::stop() {
     return OK;
 }
 
-sp<MetaData> AMRSource::getFormat() {
-    return mMeta;
+status_t AMRSource::getFormat(MetaDataBase &meta) {
+    meta = mMeta;
+    return OK;
 }
 
 status_t AMRSource::read(
@@ -325,8 +349,8 @@ status_t AMRSource::read(
     }
 
     buffer->set_range(0, frameSize);
-    buffer->meta_data()->setInt64(kKeyTime, mCurrentTimeUs);
-    buffer->meta_data()->setInt32(kKeyIsSyncFrame, 1);
+    buffer->meta_data().setInt64(kKeyTime, mCurrentTimeUs);
+    buffer->meta_data().setInt32(kKeyIsSyncFrame, 1);
 
     mOffset += frameSize;
     mCurrentTimeUs += 20000;  // Each frame is 20ms
@@ -337,33 +361,6 @@ status_t AMRSource::read(
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-
-bool SniffAMR(
-        DataSourceBase *source, String8 *mimeType, float *confidence) {
-    char header[9];
-
-    if (source->readAt(0, header, sizeof(header)) != sizeof(header)) {
-        return false;
-    }
-
-    if (!memcmp(header, "#!AMR\n", 6)) {
-        if (mimeType != nullptr) {
-            *mimeType = MEDIA_MIMETYPE_AUDIO_AMR_NB;
-        }
-        *confidence = 0.5;
-
-        return true;
-    } else if (!memcmp(header, "#!AMR-WB\n", 9)) {
-        if (mimeType != nullptr) {
-            *mimeType = MEDIA_MIMETYPE_AUDIO_AMR_WB;
-        }
-        *confidence = 0.5;
-
-        return true;
-    }
-
-    return false;
-}
 
 extern "C" {
 // This is the only symbol that needs to be exported
