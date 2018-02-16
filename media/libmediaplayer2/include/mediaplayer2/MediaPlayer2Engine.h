@@ -48,6 +48,8 @@ public:
     virtual void            disconnect() = 0;
 
     virtual status_t        setDataSource(const sp<DataSourceDesc>& source) = 0;
+    virtual status_t        prepareNextDataSource(const sp<DataSourceDesc>& source) = 0;
+    virtual status_t        playNextDataSource(int64_t srcId) = 0;
     virtual status_t        setVideoSurfaceTexture(const sp<ANativeWindowWrapper>& nww) = 0;
     virtual status_t        getBufferingSettings(
                                     BufferingSettings* buffering /* nonnull */) = 0;

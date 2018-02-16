@@ -114,7 +114,24 @@ enum media2_info_type {
     // player, which just completed playback
     MEDIA2_INFO_STARTED_AS_NEXT = 2,
     // The player just pushed the very first video frame for rendering
-    MEDIA2_INFO_RENDERING_START = 3,
+    MEDIA2_INFO_VIDEO_RENDERING_START = 3,
+    // The player just pushed the very first audio frame for rendering
+    MEDIA2_INFO_AUDIO_RENDERING_START = 4,
+    // The player just completed the playback of this data source
+    MEDIA2_INFO_PLAYBACK_COMPLETE = 5,
+    // The player just completed the playback of the full play list
+    MEDIA2_INFO_PLAYLIST_END = 6,
+
+    //1xx
+    // The player just prepared a data source.
+    MEDIA2_INFO_PREPARED = 100,
+    // The player just completed a call play().
+    MEDIA2_INFO_COMPLETE_CALL_PLAY = 101,
+    // The player just completed a call pause().
+    MEDIA2_INFO_COMPLETE_CALL_PAUSE = 102,
+    // The player just completed a call seekTo.
+    MEDIA2_INFO_COMPLETE_CALL_SEEK = 103,
+
     // 7xx
     // The video is too complex for the decoder: it can't decode frames fast
     // enough. Possibly only the audio plays fine at this stage.
@@ -206,11 +223,12 @@ public:
 
             status_t        getSrcId(int64_t *srcId);
             status_t        setDataSource(const sp<DataSourceDesc> &dsd);
+            status_t        prepareNextDataSource(const sp<DataSourceDesc> &dsd);
+            status_t        playNextDataSource(int64_t srcId);
             status_t        setVideoSurfaceTexture(const sp<ANativeWindowWrapper>& nww);
             status_t        setListener(const sp<MediaPlayer2Listener>& listener);
             status_t        getBufferingSettings(BufferingSettings* buffering /* nonnull */);
             status_t        setBufferingSettings(const BufferingSettings& buffering);
-            status_t        prepare();
             status_t        prepareAsync();
             status_t        start();
             status_t        stop();
@@ -271,7 +289,6 @@ private:
     thread_id_t                 mLockThreadId;
     Mutex                       mLock;
     Mutex                       mNotifyLock;
-    Condition                   mSignal;
     sp<MediaPlayer2Listener>    mListener;
     void*                       mCookie;
     media_player2_states        mCurrentState;
@@ -279,8 +296,6 @@ private:
     MediaPlayer2SeekMode        mCurrentSeekMode;
     int                         mSeekPosition;
     MediaPlayer2SeekMode        mSeekMode;
-    bool                        mPrepareSync;
-    status_t                    mPrepareStatus;
     audio_stream_type_t         mStreamType;
     Parcel*                     mAudioAttributesParcel;
     bool                        mLoop;

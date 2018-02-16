@@ -63,8 +63,6 @@ MediaPlayer2::MediaPlayer2()
     mSeekPosition = -1;
     mSeekMode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC;
     mCurrentState = MEDIA_PLAYER2_IDLE;
-    mPrepareSync = false;
-    mPrepareStatus = NO_ERROR;
     mLoop = false;
     mLeftVolume = mRightVolume = 1.0;
     mVideoWidth = mVideoHeight = 0;
@@ -176,6 +174,32 @@ status_t MediaPlayer2::setDataSource(const sp<DataSourceDesc> &dsd)
     return err;
 }
 
+status_t MediaPlayer2::prepareNextDataSource(const sp<DataSourceDesc> &dsd) {
+    if (dsd == NULL) {
+        return BAD_VALUE;
+    }
+    ALOGV("prepareNextDataSource type(%d), srcId(%lld)", dsd->mType, (long long)dsd->mId);
+
+    Mutex::Autolock _l(mLock);
+    if (mPlayer != NULL) {
+        return mPlayer->prepareNextDataSource(dsd);
+    }
+    ALOGE("prepareNextDataSource failed: state %X, mPlayer(%p)", mCurrentState, mPlayer.get());
+    return INVALID_OPERATION;
+}
+
+status_t MediaPlayer2::playNextDataSource(int64_t srcId) {
+    ALOGV("playNextDataSource srcId(%lld)", (long long)srcId);
+
+    Mutex::Autolock _l(mLock);
+    if (mPlayer != NULL) {
+        mSrcId = srcId;
+        return mPlayer->playNextDataSource(srcId);
+    }
+    ALOGE("playNextDataSource failed: state %X, mPlayer(%p)", mCurrentState, mPlayer.get());
+    return INVALID_OPERATION;
+}
+
 status_t MediaPlayer2::invoke(const Parcel& request, Parcel *reply)
 {
     Mutex::Autolock _l(mLock);
@@ -254,35 +278,6 @@ status_t MediaPlayer2::prepareAsync_l()
     }
     ALOGE("prepareAsync called in state %d, mPlayer(%p)", mCurrentState, mPlayer.get());
     return INVALID_OPERATION;
-}
-
-// TODO: In case of error, prepareAsync provides the caller with 2 error codes,
-// one defined in the Android framework and one provided by the implementation
-// that generated the error. The sync version of prepare returns only 1 error
-// code.
-status_t MediaPlayer2::prepare()
-{
-    ALOGV("prepare");
-    Mutex::Autolock _l(mLock);
-    mLockThreadId = getThreadId();
-    if (mPrepareSync) {
-        mLockThreadId = 0;
-        return -EALREADY;
-    }
-    mPrepareSync = true;
-    status_t ret = prepareAsync_l();
-    if (ret != NO_ERROR) {
-        mLockThreadId = 0;
-        return ret;
-    }
-
-    if (mPrepareSync) {
-        mSignal.wait(mLock);  // wait for prepare done
-        mPrepareSync = false;
-    }
-    ALOGV("prepare complete - status=%d", mPrepareStatus);
-    mLockThreadId = 0;
-    return mPrepareStatus;
 }
 
 status_t MediaPlayer2::prepareAsync()
@@ -576,7 +571,6 @@ status_t MediaPlayer2::reset_l()
 {
     mLoop = false;
     if (mCurrentState == MEDIA_PLAYER2_IDLE) return NO_ERROR;
-    mPrepareSync = false;
     if (mPlayer != 0) {
         status_t ret = mPlayer->reset();
         if (ret != NO_ERROR) {
@@ -808,12 +802,6 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Parc
     case MEDIA2_PREPARED:
         ALOGV("MediaPlayer2::notify() prepared");
         mCurrentState = MEDIA_PLAYER2_PREPARED;
-        if (mPrepareSync) {
-            ALOGV("signal application thread");
-            mPrepareSync = false;
-            mPrepareStatus = NO_ERROR;
-            mSignal.signal();
-        }
         break;
     case MEDIA2_DRM_INFO:
         ALOGV("MediaPlayer2::notify() MEDIA2_DRM_INFO(%lld, %d, %d, %d, %p)",
@@ -834,14 +822,6 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Parc
         // ext2: Implementation dependant error code.
         ALOGE("error (%d, %d)", ext1, ext2);
         mCurrentState = MEDIA_PLAYER2_STATE_ERROR;
-        if (mPrepareSync)
-        {
-            ALOGV("signal application thread");
-            mPrepareSync = false;
-            mPrepareStatus = ext1;
-            mSignal.signal();
-            send = false;
-        }
         break;
     case MEDIA2_INFO:
         // ext1: Media framework error code.
