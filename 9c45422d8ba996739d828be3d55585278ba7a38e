@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "f2fdc41e_6dd93800",
+        "filename": "camera/cameraserver/Android.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 36,
+      "author": {
+        "id": 3962
+      },
+      "writtenOn": "2018-02-17T19:49:50Z",
+      "side": 1,
+      "message": "Not anymore, we had to disable it when soong came along due to global flags mismatch",
+      "parentUuid": "d0123e4e_a1d3cb18",
+      "range": {
+        "startLine": 36,
+        "startChar": 17,
+        "endLine": 36,
+        "endChar": 31
+      },
+      "revId": "9c45422d8ba996739d828be3d55585278ba7a38e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "704678ba_cdc3ed0e",
         "filename": "services/camera/libcameraservice/device1/CameraHardwareInterface.h",
         "patchSetId": 1
@@ -36,6 +60,30 @@
       "writtenOn": "2018-02-17T19:46:34Z",
       "side": 1,
       "message": "Was QCOM_HARDWARE the flag that got settled on, IIRC there was QTI_HARDWARE at some point too right?",
+      "range": {
+        "startLine": 32,
+        "startChar": 7,
+        "endLine": 32,
+        "endChar": 20
+      },
+      "revId": "9c45422d8ba996739d828be3d55585278ba7a38e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "a008d014_ff8c2cc6",
+        "filename": "services/camera/libcameraservice/device1/CameraHardwareInterface.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 32,
+      "author": {
+        "id": 3962
+      },
+      "writtenOn": "2018-02-17T19:49:50Z",
+      "side": 1,
+      "message": "Doesn\u0027t really matter",
+      "parentUuid": "704678ba_cdc3ed0e",
       "range": {
         "startLine": 32,
         "startChar": 7,
