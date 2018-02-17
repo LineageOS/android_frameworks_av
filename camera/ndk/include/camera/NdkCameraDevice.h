@@ -153,6 +153,11 @@ typedef struct ACameraDevice_StateCallbacks {
 } ACameraDevice_StateCallbacks;
 
 /**
+ * For backward compatiblity.
+ */
+typedef ACameraDevice_StateCallbacks ACameraDevice_stateCallbacks;
+
+/**
  * Close the connection and free this ACameraDevice synchronously. Access to the ACameraDevice
  * after calling this method will cause a crash.
  *
