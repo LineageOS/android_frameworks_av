@@ -19,10 +19,10 @@
 #include <utils/Log.h>
 
 #include <binder/Parcel.h>
-#include <media/IDrm.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
+#include <mediadrm/IDrm.h>
 
 namespace android {
 

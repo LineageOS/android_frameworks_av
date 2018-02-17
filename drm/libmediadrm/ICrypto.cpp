@@ -19,10 +19,10 @@
 #include <binder/Parcel.h>
 #include <binder/IMemory.h>
 #include <cutils/log.h>
-#include <media/ICrypto.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
+#include <mediadrm/ICrypto.h>
 #include <utils/Log.h>
 
 namespace android {

@@ -18,8 +18,8 @@
 #include <utility>
 
 #include <android-base/macros.h>
-#include <media/DrmMetrics.h>
 #include <media/stagefright/foundation/base64.h>
+#include <mediadrm/DrmMetrics.h>
 #include <sys/time.h>
 #include <utils/Log.h>
 #include <utils/Timers.h>

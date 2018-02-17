@@ -24,7 +24,7 @@
 #include <binder/Parcel.h>
 
 #include <media/IMediaPlayerClient.h>
-#include <media/IDrmClient.h>
+#include <mediadrm/IDrmClient.h>
 
 namespace android {
 

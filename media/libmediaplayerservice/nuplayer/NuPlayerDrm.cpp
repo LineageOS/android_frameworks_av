@@ -20,7 +20,7 @@
 #include "NuPlayerDrm.h"
 
 #include <binder/IServiceManager.h>
-#include <media/IMediaDrmService.h>
+#include <mediadrm/IMediaDrmService.h>
 #include <utils/Log.h>
 
 
