@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a30dc21_6c9696da",
+        "filename": "media/libstagefright/MediaCodecSource.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 749,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-02-18T18:08:31Z",
+      "side": 1,
+      "message": "This is supposed to be ||, right?",
+      "range": {
+        "startLine": 749,
+        "startChar": 18,
+        "endLine": 749,
+        "endChar": 19
+      },
+      "revId": "6caa48ef222e6f17b74ab9a8c08e6fa7f83af052",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
