@@ -49,6 +49,7 @@ public:
                       const sp<TCamCallbacks>& remoteCallback,
                       const String16& clientPackageName,
                       const String8& cameraId,
+                      int api1CameraId,
                       int cameraFacing,
                       int clientPid,
                       uid_t clientUid,
@@ -139,6 +140,8 @@ protected:
     virtual void          detachDevice();
 
     bool                  mDeviceActive;
+
+    const int             mApi1CameraId; // -1 if client is API2
 
 private:
     template<typename TProviderPtr>

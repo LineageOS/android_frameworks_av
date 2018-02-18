@@ -40,13 +40,13 @@ public:
     virtual status_t stop();
     virtual sp<MetaData> getFormat();
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
     /////////////////////////////////////////////////
     // Inherited functions from MediaBufferObserver
     /////////////////////////////////////////////////
 
-    virtual void signalBufferReturned(MediaBuffer *buffer);
+    virtual void signalBufferReturned(MediaBufferBase *buffer);
 
     /////////////////////////////////////////////////
     // Non-inherited functions:

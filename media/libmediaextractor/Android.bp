@@ -25,6 +25,7 @@ cc_library {
     srcs: [
         "DataSourceBase.cpp",
         "MediaBuffer.cpp",
+        "MediaBufferBase.cpp",
         "MediaBufferGroup.cpp",
         "MediaSourceBase.cpp",
         "MediaSource.cpp",

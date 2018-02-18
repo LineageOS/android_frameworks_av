@@ -274,7 +274,9 @@ private:
         virtual status_t        getParameter(int key, Parcel *reply);
         virtual status_t        setNextPlayer(const sp<MediaPlayer2Engine>& player);
 
-        virtual status_t        setDataSource(const sp<DataSourceDesc> &dsd);
+        virtual status_t        setDataSource(const sp<DataSourceDesc> &dsd) override;
+        virtual status_t        prepareNextDataSource(const sp<DataSourceDesc> &dsd) override;
+        virtual status_t        playNextDataSource(int64_t srcId) override;
 
         static  void            notify(const wp<MediaPlayer2Engine> &listener, int64_t srcId,
                                        int msg, int ext1, int ext2, const Parcel *obj);

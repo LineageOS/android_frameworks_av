@@ -42,7 +42,7 @@ CameraClient::CameraClient(const sp<CameraService>& cameraService,
         int clientPid, int clientUid,
         int servicePid, bool legacyMode):
         Client(cameraService, cameraClient, clientPackageName,
-                String8::format("%d", cameraId), cameraFacing, clientPid,
+                String8::format("%d", cameraId), cameraId, cameraFacing, clientPid,
                 clientUid, servicePid)
 {
     int callingPid = getCallingPid();

@@ -24,7 +24,7 @@
 namespace android {
 
 struct MediaBufferHolder : public RefBase {
-    MediaBufferHolder(MediaBuffer* buffer)
+    MediaBufferHolder(MediaBufferBase* buffer)
         : mMediaBuffer(buffer) {
         if (mMediaBuffer != nullptr) {
             mMediaBuffer->add_ref();
@@ -37,10 +37,10 @@ struct MediaBufferHolder : public RefBase {
         }
     }
 
-    MediaBuffer* mediaBuffer() { return mMediaBuffer; }
+    MediaBufferBase* mediaBuffer() { return mMediaBuffer; }
 
 private:
-    MediaBuffer* const mMediaBuffer;
+    MediaBufferBase* const mMediaBuffer;
 };
 
 }  // android

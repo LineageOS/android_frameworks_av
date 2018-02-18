@@ -86,7 +86,7 @@ struct NuPlayer::GenericSource : public NuPlayer::Source,
     virtual bool isStreaming() const;
 
     // Modular DRM
-    virtual void signalBufferReturned(MediaBuffer *buffer);
+    virtual void signalBufferReturned(MediaBufferBase *buffer);
 
     virtual status_t prepareDrm(
             const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId, sp<ICrypto> *outCrypto);
@@ -201,7 +201,7 @@ private:
             int32_t curGen, const sp<AnotherPacketSource>& packets, const sp<AMessage>& msg);
 
     sp<ABuffer> mediaBufferToABuffer(
-            MediaBuffer *mbuf,
+            MediaBufferBase *mbuf,
             media_track_type trackType);
 
     void postReadBuffer(media_track_type trackType);

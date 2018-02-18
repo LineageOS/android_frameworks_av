@@ -423,6 +423,14 @@ void NuPlayer2::prepareNextDataSourceAsync(const sp<DataSourceDesc> &dsd) {
     msg->post();
 }
 
+void NuPlayer2::playNextDataSource(int64_t srcId) {
+    disconnectSource();
+
+    sp<AMessage> msg = new AMessage(kWhatPlayNextDataSource, this);
+    msg->setInt64("srcId", srcId);
+    msg->post();
+}
+
 status_t NuPlayer2::getBufferingSettings(
         BufferingSettings *buffering /* nonnull */) {
     sp<AMessage> msg = new AMessage(kWhatGetBufferingSettings, this);
@@ -538,6 +546,11 @@ void NuPlayer2::pause() {
 }
 
 void NuPlayer2::resetAsync() {
+    disconnectSource();
+    (new AMessage(kWhatReset, this))->post();
+}
+
+void NuPlayer2::disconnectSource() {
     sp<Source> source;
     {
         Mutex::Autolock autoLock(mSourceLock);
@@ -554,7 +567,6 @@ void NuPlayer2::resetAsync() {
         source->disconnect();
     }
 
-    (new AMessage(kWhatReset, this))->post();
 }
 
 status_t NuPlayer2::notifyAt(int64_t mediaTimeUs) {
@@ -668,6 +680,32 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
                 err = UNKNOWN_ERROR;
             }
 
+            break;
+        }
+
+        case kWhatPlayNextDataSource:
+        {
+            ALOGV("kWhatPlayNextDataSource");
+            int64_t srcId;
+            CHECK(msg->findInt64("srcId", &srcId));
+            if (srcId != mNextSrcId) {
+                notifyListener(srcId, MEDIA2_ERROR, MEDIA2_ERROR_UNKNOWN, 0);
+                return;
+            }
+
+            mResetting = true;
+            stopPlaybackTimer("kWhatPlayNextDataSource");
+            stopRebufferingTimer(true);
+
+            mDeferredActions.push_back(
+                    new FlushDecoderAction(
+                        FLUSH_CMD_SHUTDOWN /* audio */,
+                        FLUSH_CMD_SHUTDOWN /* video */));
+
+            mDeferredActions.push_back(
+                    new SimpleAction(&NuPlayer2::performPlayNextDataSource));
+
+            processDeferredActions();
             break;
         }
 
@@ -1382,7 +1420,7 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
                 handleFlushComplete(audio, false /* isDecoder */);
                 finishFlushIfPossible();
             } else if (what == Renderer::kWhatVideoRenderingStart) {
-                notifyListener(mSrcId, MEDIA2_INFO, MEDIA2_INFO_RENDERING_START, 0);
+                notifyListener(mSrcId, MEDIA2_INFO, MEDIA2_INFO_VIDEO_RENDERING_START, 0);
             } else if (what == Renderer::kWhatMediaRenderingStart) {
                 ALOGV("media rendering started");
                 notifyListener(mSrcId, MEDIA2_STARTED, 0, 0);
@@ -2401,6 +2439,67 @@ void NuPlayer2::performReset() {
         mCrypto.clear();
     }
     mIsDrmProtected = false;
+}
+
+void NuPlayer2::performPlayNextDataSource() {
+    ALOGV("performPlayNextDataSource");
+
+    CHECK(mAudioDecoder == NULL);
+    CHECK(mVideoDecoder == NULL);
+
+    stopPlaybackTimer("performPlayNextDataSource");
+    stopRebufferingTimer(true);
+
+    cancelPollDuration();
+
+    ++mScanSourcesGeneration;
+    mScanSourcesPending = false;
+
+    ++mRendererGeneration;
+
+    if (mSource != NULL) {
+        mSource->stop();
+    }
+
+    long previousSrcId;
+    {
+        Mutex::Autolock autoLock(mSourceLock);
+        mSource = mNextSource;
+        mNextSource = NULL;
+        previousSrcId = mSrcId;
+        mSrcId = mNextSrcId;
+        ++mNextSrcId;  // to distinguish the two sources.
+    }
+
+    if (mDriver != NULL) {
+        sp<NuPlayer2Driver> driver = mDriver.promote();
+        if (driver != NULL) {
+            notifyListener(previousSrcId, MEDIA2_INFO, MEDIA2_INFO_PLAYBACK_COMPLETE, 0);
+            notifyListener(mSrcId, MEDIA2_INFO, MEDIA2_INFO_STARTED_AS_NEXT, 0);
+        }
+    }
+
+    mStarted = false;
+    mPrepared = true;  // TODO: what if it's not prepared
+    mResetting = false;
+    mSourceStarted = false;
+
+    // Modular DRM
+    if (mCrypto != NULL) {
+        // decoders will be flushed before this so their mCrypto would go away on their own
+        // TODO change to ALOGV
+        ALOGD("performReset mCrypto: %p", mCrypto.get());
+        mCrypto.clear();
+    }
+    mIsDrmProtected = false;
+
+    if (mRenderer != NULL) {
+        mRenderer->resume();
+    }
+
+    onStart();
+    mPausedByClient = false;
+    notifyListener(mSrcId, MEDIA2_STARTED, 0, 0);
 }
 
 void NuPlayer2::performScanSources() {

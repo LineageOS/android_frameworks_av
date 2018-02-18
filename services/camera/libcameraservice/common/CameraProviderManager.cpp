@@ -20,11 +20,13 @@
 
 #include "CameraProviderManager.h"
 
+#include <algorithm>
 #include <chrono>
 #include <inttypes.h>
 #include <hidl/ServiceManagement.h>
 #include <functional>
 #include <camera_metadata_hidden.h>
+#include <android-base/parseint.h>
 
 namespace android {
 
@@ -38,7 +40,7 @@ const std::string kLegacyProviderName("legacy/0");
 const std::string kExternalProviderName("external/0");
 
 // Slash-separated list of provider types to consider for use via the old camera API
-const std::string kStandardProviderTypes("internal/legacy");
+const std::string kStandardProviderTypes("internal/legacy/external");
 
 } // anonymous namespace
 
@@ -79,18 +81,7 @@ int CameraProviderManager::getCameraCount() const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     int count = 0;
     for (auto& provider : mProviders) {
-        count += provider->mUniqueDeviceCount;
-    }
-    return count;
-}
-
-int CameraProviderManager::getAPI1CompatibleCameraCount() const {
-    std::lock_guard<std::mutex> lock(mInterfaceMutex);
-    int count = 0;
-    for (auto& provider : mProviders) {
-        if (kStandardProviderTypes.find(provider->getType()) != std::string::npos) {
-            count += provider->mUniqueAPI1CompatibleCameraIds.size();
-        }
+        count += provider->mUniqueCameraIds.size();
     }
     return count;
 }
@@ -116,6 +107,24 @@ std::vector<std::string> CameraProviderManager::getAPI1CompatibleCameraDeviceIds
             }
         }
     }
+
+    std::sort(deviceIds.begin(), deviceIds.end(),
+            [](const std::string& a, const std::string& b) -> bool {
+                uint32_t aUint = 0, bUint = 0;
+                bool aIsUint = base::ParseUint(a, &aUint);
+                bool bIsUint = base::ParseUint(b, &bUint);
+
+                // Uint device IDs first
+                if (aIsUint && bIsUint) {
+                    return aUint < bUint;
+                } else if (aIsUint) {
+                    return true;
+                } else if (bIsUint) {
+                    return false;
+                }
+                // Simple string compare if both id are not uint
+                return a < b;
+            });
     return deviceIds;
 }
 
@@ -480,6 +489,8 @@ status_t CameraProviderManager::ProviderInfo::initialize() {
     }
     ALOGI("Connecting to new camera provider: %s, isRemote? %d",
             mProviderName.c_str(), mInterface->isRemote());
+    // cameraDeviceStatusChange callbacks may be called (and causing new devices added)
+    // before setCallback returns
     hardware::Return<Status> status = mInterface->setCallback(this);
     if (!status.isOk()) {
         ALOGE("%s: Transaction error setting up callbacks with camera provider '%s': %s",
@@ -536,17 +547,10 @@ status_t CameraProviderManager::ProviderInfo::initialize() {
         }
     }
 
-    for (auto& device : mDevices) {
-        mUniqueCameraIds.insert(device->mId);
-        if (device->isAPI1Compatible()) {
-            mUniqueAPI1CompatibleCameraIds.insert(device->mId);
-        }
-    }
-    mUniqueDeviceCount = mUniqueCameraIds.size();
-
     ALOGI("Camera provider %s ready with %zu camera devices",
             mProviderName.c_str(), mDevices.size());
 
+    mInitialized = true;
     return OK;
 }
 
@@ -594,8 +598,14 @@ status_t CameraProviderManager::ProviderInfo::addDevice(const std::string& name,
     }
     if (deviceInfo == nullptr) return BAD_VALUE;
     deviceInfo->mStatus = initialStatus;
+    bool isAPI1Compatible = deviceInfo->isAPI1Compatible();
 
     mDevices.push_back(std::move(deviceInfo));
+
+    mUniqueCameraIds.insert(id);
+    if (isAPI1Compatible) {
+        mUniqueAPI1CompatibleCameraIds.insert(id);
+    }
 
     if (parsedId != nullptr) {
         *parsedId = id;
@@ -606,6 +616,10 @@ status_t CameraProviderManager::ProviderInfo::addDevice(const std::string& name,
 void CameraProviderManager::ProviderInfo::removeDevice(std::string id) {
     for (auto it = mDevices.begin(); it != mDevices.end(); it++) {
         if ((*it)->mId == id) {
+            mUniqueCameraIds.erase(id);
+            if ((*it)->isAPI1Compatible()) {
+                mUniqueAPI1CompatibleCameraIds.erase(id);
+            }
             mDevices.erase(it);
             break;
         }
@@ -671,6 +685,7 @@ hardware::Return<void> CameraProviderManager::ProviderInfo::cameraDeviceStatusCh
         CameraDeviceStatus newStatus) {
     sp<StatusListener> listener;
     std::string id;
+    bool initialized = false;
     {
         std::lock_guard<std::mutex> lock(mLock);
         bool known = false;
@@ -697,9 +712,13 @@ hardware::Return<void> CameraProviderManager::ProviderInfo::cameraDeviceStatusCh
             removeDevice(id);
         }
         listener = mManager->getStatusListener();
+        initialized = mInitialized;
     }
     // Call without lock held to allow reentrancy into provider manager
-    if (listener != nullptr) {
+    // Don't send the callback if providerInfo hasn't been initialized.
+    // CameraService will initialize device status after provider is
+    // initialized
+    if (listener != nullptr && initialized) {
         listener->onDeviceStatusChanged(String8(id.c_str()), newStatus);
     }
     return hardware::Void();

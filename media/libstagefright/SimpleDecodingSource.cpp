@@ -200,7 +200,7 @@ SimpleDecodingSource::ProtectedState::ProtectedState(const sp<AMessage> &format)
 }
 
 status_t SimpleDecodingSource::read(
-        MediaBuffer **buffer, const ReadOptions *options) {
+        MediaBufferBase **buffer, const ReadOptions *options) {
     *buffer = NULL;
 
     Mutexed<ProtectedState>::Locked me(mProtectedState);
@@ -221,7 +221,7 @@ status_t SimpleDecodingSource::read(
 }
 
 status_t SimpleDecodingSource::doRead(
-        Mutexed<ProtectedState>::Locked &me, MediaBuffer **buffer, const ReadOptions *options) {
+        Mutexed<ProtectedState>::Locked &me, MediaBufferBase **buffer, const ReadOptions *options) {
     // |me| is always locked on entry, but is allowed to be unlocked on exit
     CHECK_EQ(me->mState, STARTED);
 
@@ -267,7 +267,7 @@ status_t SimpleDecodingSource::doRead(
                 return UNKNOWN_ERROR;
             }
 
-            MediaBuffer *in_buf;
+            MediaBufferBase *in_buf;
             while (true) {
                 in_buf = NULL;
                 me.unlock();

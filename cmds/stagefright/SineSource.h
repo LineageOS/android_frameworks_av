@@ -18,7 +18,7 @@ struct SineSource : public MediaSource {
     virtual sp<MetaData> getFormat();
 
     virtual status_t read(
-            MediaBuffer **out, const ReadOptions *options = NULL);
+            MediaBufferBase **out, const ReadOptions *options = NULL);
 
 protected:
     virtual ~SineSource();

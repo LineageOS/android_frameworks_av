@@ -150,9 +150,11 @@ public:
 
     virtual void        setAudioSink(const sp<AudioSink>& audioSink) { mAudioSink = audioSink; }
 
-    virtual status_t    setDataSource(const sp<DataSourceDesc>& /* dsd */) {
-        return INVALID_OPERATION;
-    }
+    virtual status_t    setDataSource(const sp<DataSourceDesc> &dsd) = 0;
+
+    virtual status_t    prepareNextDataSource(const sp<DataSourceDesc> &dsd) = 0;
+
+    virtual status_t    playNextDataSource(int64_t srcId) = 0;
 
     // pass the buffered native window to the media player service
     virtual status_t    setVideoSurfaceTexture(const sp<ANativeWindowWrapper>& nww) = 0;
@@ -166,7 +168,6 @@ public:
         return OK;
     }
 
-    virtual status_t    prepare() = 0;
     virtual status_t    prepareAsync() = 0;
     virtual status_t    start() = 0;
     virtual status_t    stop() = 0;

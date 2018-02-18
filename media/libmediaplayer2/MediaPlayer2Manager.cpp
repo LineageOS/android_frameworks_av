@@ -606,6 +606,39 @@ status_t MediaPlayer2Manager::Client::setDataSource(
     return status;
 }
 
+status_t MediaPlayer2Manager::Client::prepareNextDataSource(
+        const sp<DataSourceDesc> &dsd) {
+    sp<MediaPlayer2Interface> p = getPlayer();
+    if (p == NULL) {
+        return NO_INIT;
+    }
+
+    if (dsd == NULL) {
+        return BAD_VALUE;
+    }
+
+    status_t status = p->prepareNextDataSource(dsd);
+    if (status != OK) {
+        ALOGE("prepareNextDataSource error: %d", status);
+    }
+
+    return status;
+}
+
+status_t MediaPlayer2Manager::Client::playNextDataSource(int64_t srcId) {
+    sp<MediaPlayer2Interface> p = getPlayer();
+    if (p == NULL) {
+        return NO_INIT;
+    }
+
+    status_t status = p->playNextDataSource(srcId);
+    if (status != OK) {
+        ALOGE("playNextDataSource error: %d", status);
+    }
+
+    return status;
+}
+
 void MediaPlayer2Manager::Client::disconnectNativeWindow_l() {
     if (mConnectedWindow != NULL && mConnectedWindow->getANativeWindow() != NULL) {
         status_t err = native_window_api_disconnect(

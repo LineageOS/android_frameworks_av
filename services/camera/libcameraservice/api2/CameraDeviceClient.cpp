@@ -49,6 +49,7 @@ CameraDeviceClientBase::CameraDeviceClientBase(
         const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
         const String16& clientPackageName,
         const String8& cameraId,
+        int api1CameraId,
         int cameraFacing,
         int clientPid,
         uid_t clientUid,
@@ -62,6 +63,8 @@ CameraDeviceClientBase::CameraDeviceClientBase(
             clientUid,
             servicePid),
     mRemoteCallback(remoteCallback) {
+    // We don't need it for API2 clients, but Camera2ClientBase requires it.
+    (void) api1CameraId;
 }
 
 // Interface used by CameraService
@@ -75,7 +78,8 @@ CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
         uid_t clientUid,
         int servicePid) :
     Camera2ClientBase(cameraService, remoteCallback, clientPackageName,
-                cameraId, cameraFacing, clientPid, clientUid, servicePid),
+                cameraId, /*API1 camera ID*/ -1,
+                cameraFacing, clientPid, clientUid, servicePid),
     mInputStream(),
     mStreamingRequestId(REQUEST_ID_NONE),
     mRequestIdCounter(0) {
@@ -654,14 +658,6 @@ binder::Status CameraDeviceClient::createStream(
             return res;
 
         if (!isStreamInfoValid) {
-            // Streaming sharing is only supported for IMPLEMENTATION_DEFINED
-            // formats.
-            if (isShared && streamInfo.format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
-                String8 msg = String8::format("Camera %s: Stream sharing is only supported for "
-                        "IMPLEMENTATION_DEFINED format", mCameraIdStr.string());
-                ALOGW("%s: %s", __FUNCTION__, msg.string());
-                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
-            }
             isStreamInfoValid = true;
         }
 
@@ -941,14 +937,6 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
         if (!res.isOk())
             return res;
 
-        // Stream sharing is only supported for IMPLEMENTATION_DEFINED
-        // formats.
-        if (outInfo.format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
-            String8 msg = String8::format("Camera %s: Stream sharing is only supported for "
-                    "IMPLEMENTATION_DEFINED format", mCameraIdStr.string());
-            ALOGW("%s: %s", __FUNCTION__, msg.string());
-            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
-        }
         streamInfos.push_back(outInfo);
         newOutputs.push_back(surface);
     }

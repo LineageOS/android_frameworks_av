@@ -328,7 +328,7 @@ int main(int /* argc */, char ** /* argv */) {
 
     int32_t n = 0;
     status_t err;
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     while ((err = encoder->read(&buffer)) == OK) {
         printf(".");
         fflush(stdout);

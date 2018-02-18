@@ -65,7 +65,7 @@ public:
     virtual sp<MetaData> getFormat();
 
     // reads from the source. This call always blocks.
-    virtual status_t read(MediaBuffer **buffer, const ReadOptions *options);
+    virtual status_t read(MediaBufferBase **buffer, const ReadOptions *options);
 
     // unsupported methods
     virtual status_t pause() { return INVALID_OPERATION; }
@@ -104,7 +104,8 @@ private:
 
     // do the actual reading
     status_t doRead(
-            Mutexed<ProtectedState>::Locked &me, MediaBuffer **buffer, const ReadOptions *options);
+            Mutexed<ProtectedState>::Locked &me, MediaBufferBase **buffer,
+            const ReadOptions *options);
 };
 
 } // namespace android

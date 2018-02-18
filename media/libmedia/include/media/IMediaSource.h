@@ -64,7 +64,7 @@ public:
     //
     // TODO: consider removing read() in favor of readMultiple().
     virtual status_t read(
-            MediaBuffer **buffer,
+            MediaBufferBase **buffer,
             const MediaSource::ReadOptions *options = NULL) = 0;
 
     // Returns a vector of new buffers of data, where the new buffers are added
@@ -80,7 +80,7 @@ public:
     // ReadOptions may be specified. Persistent options apply to all reads;
     // non-persistent options (e.g. seek) apply only to the first read.
     virtual status_t readMultiple(
-            Vector<MediaBuffer *> *buffers, uint32_t maxNumBuffers = 1,
+            Vector<MediaBufferBase *> *buffers, uint32_t maxNumBuffers = 1,
             const MediaSource::ReadOptions *options = nullptr) = 0;
 
     // Returns true if |readMultiple| is supported, otherwise false.
@@ -110,7 +110,7 @@ public:
 
     // TODO: Implement this for local media sources.
     virtual status_t readMultiple(
-            Vector<MediaBuffer *> * /* buffers */, uint32_t /* maxNumBuffers = 1 */,
+            Vector<MediaBufferBase *> * /* buffers */, uint32_t /* maxNumBuffers = 1 */,
             const MediaSource::ReadOptions * /* options = nullptr */) {
         return ERROR_UNSUPPORTED;
     }

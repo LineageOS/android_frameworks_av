@@ -36,7 +36,7 @@ sp<MetaData> CallbackMediaSource::getFormat() {
     return mSource->getFormat();
 }
 
-status_t CallbackMediaSource::read(MediaBuffer **buffer, const ReadOptions *options) {
+status_t CallbackMediaSource::read(MediaBufferBase **buffer, const ReadOptions *options) {
     return mSource->read(buffer, reinterpret_cast<const ReadOptions*>(options));
 }
 

@@ -33,6 +33,7 @@
  * Do not #include files that aren't part of the NDK.
  */
 #include <sys/cdefs.h>
+#include <stdbool.h>
 
 #include <android/native_window.h>
 #include "NdkCameraError.h"

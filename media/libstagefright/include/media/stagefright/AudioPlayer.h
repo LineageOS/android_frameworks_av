@@ -69,7 +69,7 @@ private:
     sp<MediaSource> mSource;
     sp<AudioTrack> mAudioTrack;
 
-    MediaBuffer *mInputBuffer;
+    MediaBufferBase *mInputBuffer;
 
     int mSampleRate;
     int64_t mLatencyUs;
@@ -91,7 +91,7 @@ private:
 
     bool mIsFirstBuffer;
     status_t mFirstBufferResult;
-    MediaBuffer *mFirstBuffer;
+    MediaBufferBase *mFirstBuffer;
 
     sp<MediaPlayerBase::AudioSink> mAudioSink;
 

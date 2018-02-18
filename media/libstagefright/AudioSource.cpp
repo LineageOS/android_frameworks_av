@@ -240,7 +240,7 @@ void AudioSource::rampVolume(
 }
 
 status_t AudioSource::read(
-        MediaBuffer **out, const ReadOptions * /* options */) {
+        MediaBufferBase **out, const ReadOptions * /* options */) {
     Mutex::Autolock autoLock(mLock);
     *out = NULL;
 
@@ -311,7 +311,7 @@ status_t AudioSource::setStopTimeUs(int64_t stopTimeUs) {
     return OK;
 }
 
-void AudioSource::signalBufferReturned(MediaBuffer *buffer) {
+void AudioSource::signalBufferReturned(MediaBufferBase *buffer) {
     ALOGV("signalBufferReturned: %p", buffer->data());
     Mutex::Autolock autoLock(mLock);
     --mNumClientOwnedBuffers;

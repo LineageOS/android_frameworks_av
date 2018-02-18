@@ -58,20 +58,6 @@ public:
     bool getUInt32Var(off64_t offset, uint32_t *x, size_t size);
     bool getUInt64Var(off64_t offset, uint64_t *x, size_t size);
 
-    // Reads in "count" entries of type T into vector *x.
-    // Returns true if "count" entries can be read.
-    // If fewer than "count" entries can be read, return false. In this case,
-    // the output vector *x will still have those entries that were read. Call
-    // x->size() to obtain the number of entries read.
-    // The optional parameter chunkSize specifies how many entries should be
-    // read from the data source at one time into a temporary buffer. Increasing
-    // chunkSize can improve the performance at the cost of extra memory usage.
-    // The default value for chunkSize is set to read at least 4k bytes at a
-    // time, depending on sizeof(T).
-    template <typename T>
-    bool getVector(off64_t offset, Vector<T>* x, size_t count,
-                   size_t chunkSize = (4095 / sizeof(T)) + 1);
-
     // May return ERROR_UNSUPPORTED.
     virtual status_t getSize(off64_t *size);
 
@@ -109,51 +95,6 @@ private:
     DataSourceBase(const DataSourceBase &);
     DataSourceBase &operator=(const DataSourceBase &);
 };
-
-template <typename T>
-bool DataSourceBase::getVector(off64_t offset, Vector<T>* x, size_t count,
-                           size_t chunkSize)
-{
-    x->clear();
-    if (chunkSize == 0) {
-        return false;
-    }
-    if (count == 0) {
-        return true;
-    }
-
-    T tmp[chunkSize];
-    ssize_t numBytesRead;
-    size_t numBytesPerChunk = chunkSize * sizeof(T);
-    size_t i;
-
-    for (i = 0; i + chunkSize < count; i += chunkSize) {
-        // This loops is executed when more than chunkSize records need to be
-        // read.
-        numBytesRead = this->readAt(offset, (void*)&tmp, numBytesPerChunk);
-        if (numBytesRead == -1) { // If readAt() returns -1, there is an error.
-            return false;
-        }
-        if (static_cast<size_t>(numBytesRead) < numBytesPerChunk) {
-            // This case is triggered when the stream ends before the whole
-            // chunk is read.
-            x->appendArray(tmp, (size_t)numBytesRead / sizeof(T));
-            return false;
-        }
-        x->appendArray(tmp, chunkSize);
-        offset += numBytesPerChunk;
-    }
-
-    // There are (count - i) more records to read.
-    // Right now, (count - i) <= chunkSize.
-    // We do the same thing as above, but with chunkSize replaced by count - i.
-    numBytesRead = this->readAt(offset, (void*)&tmp, (count - i) * sizeof(T));
-    if (numBytesRead == -1) {
-        return false;
-    }
-    x->appendArray(tmp, (size_t)numBytesRead / sizeof(T));
-    return x->size() == count;
-}
 
 }  // namespace android
 

@@ -337,7 +337,7 @@ void WebmFrameMediaSourceThread::run() {
     mStartTimeUs = kUninitialized;
 
     status_t err = OK;
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     while (!mDone && (err = mSource->read(&buffer, NULL)) == OK) {
         if (buffer->range_length() == 0) {
             buffer->release();
