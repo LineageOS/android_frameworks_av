@@ -203,6 +203,16 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
                 return null;
             }
         }
+
+        @Override
+        public void onSubscribed(ControllerInfo controller, String parentId, Bundle extras) {
+            mCallbackProxy.onSubscribed(controller, parentId, extras);
+        }
+
+        @Override
+        public void onUnsubscribed(ControllerInfo controller, String parentId) {
+            mCallbackProxy.onUnsubscribed(controller, parentId);
+        }
     }
 
     private List<MediaItem2> getPaginatedResult(List<MediaItem2> items, int page, int pageSize) {

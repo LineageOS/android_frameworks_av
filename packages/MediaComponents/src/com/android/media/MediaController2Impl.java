@@ -162,7 +162,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     private void connectToSession(IMediaSession2 sessionBinder) {
         try {
-            sessionBinder.connect(mContext.getPackageName(), mSessionCallbackStub);
+            sessionBinder.connect(mSessionCallbackStub, mContext.getPackageName());
         } catch (RemoteException e) {
             Log.w(TAG, "Failed to call connection request. Framework will retry"
                     + " automatically");

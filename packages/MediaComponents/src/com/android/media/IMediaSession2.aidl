@@ -37,7 +37,7 @@ oneway interface IMediaSession2 {
     //               not to expose other methods to the controller whose connection wasn't accepted.
     //               But this would be enough for now because it's the same as existing
     //               MediaBrowser and MediaBrowserService.
-    void connect(String callingPackage, IMediaSession2Callback callback);
+    void connect(IMediaSession2Callback caller, String callingPackage);
     void release(IMediaSession2Callback caller);
 
     void setVolumeTo(IMediaSession2Callback caller, int value, int flags);
@@ -61,13 +61,15 @@ oneway interface IMediaSession2 {
     void setRating(IMediaSession2Callback caller, String mediaId, in Bundle rating);
 
    //////////////////////////////////////////////////////////////////////////////////////////////
-    // Get library service specific
+    // library service specific
     //////////////////////////////////////////////////////////////////////////////////////////////
-    void getBrowserRoot(IMediaSession2Callback callback, in Bundle rootHints);
-    void getItem(IMediaSession2Callback callback, String mediaId);
-    void getChildren(IMediaSession2Callback callback, String parentId, int page, int pageSize,
+    void getBrowserRoot(IMediaSession2Callback caller, in Bundle rootHints);
+    void getItem(IMediaSession2Callback caller, String mediaId);
+    void getChildren(IMediaSession2Callback caller, String parentId, int page, int pageSize,
             in Bundle extras);
-    void search(IMediaSession2Callback callback, String query, in Bundle extras);
-    void getSearchResult(IMediaSession2Callback callback, String query, int page, int pageSize,
+    void search(IMediaSession2Callback caller, String query, in Bundle extras);
+    void getSearchResult(IMediaSession2Callback caller, String query, int page, int pageSize,
             in Bundle extras);
+    void subscribe(IMediaSession2Callback caller, String parentId, in Bundle extras);
+    void unsubscribe(IMediaSession2Callback caller, String parentId);
 }

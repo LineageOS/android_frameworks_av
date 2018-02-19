@@ -63,12 +63,36 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
 
     @Override
     public void subscribe_impl(String parentId, Bundle extras) {
-        // TODO(jaewan): Implement
+        final IMediaSession2 binder = getSessionBinder();
+        if (binder != null) {
+            try {
+                binder.subscribe(getControllerStub(), parentId, extras);
+            } catch (RemoteException e) {
+                // TODO(jaewan): Handle disconnect.
+                if (DEBUG) {
+                    Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+                }
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     @Override
-    public void unsubscribe_impl(String parentId, Bundle extras) {
-        // TODO(jaewan): Implement
+    public void unsubscribe_impl(String parentId) {
+        final IMediaSession2 binder = getSessionBinder();
+        if (binder != null) {
+            try {
+                binder.unsubscribe(getControllerStub(), parentId);
+            } catch (RemoteException e) {
+                // TODO(jaewan): Handle disconnect.
+                if (DEBUG) {
+                    Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+                }
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     @Override

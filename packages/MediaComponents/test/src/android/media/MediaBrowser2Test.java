@@ -28,13 +28,17 @@ import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
+import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
+import android.media.TestServiceRegistry.SessionCallbackProxy;
 import android.os.Bundle;
 import android.os.ResultReceiver;
+import android.os.Process;
 import android.support.annotation.CallSuper;
 import android.support.annotation.NonNull;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
+import android.text.TextUtils;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -319,6 +323,50 @@ public class MediaBrowser2Test extends MediaController2Test {
         MediaBrowser2 browser = (MediaBrowser2) createController(token, true, callback);
         browser.search(query, extras);
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    public void testSubscribe() throws InterruptedException {
+        final String testParentId = "testSubscribeId";
+        final Bundle testExtra = new Bundle();
+        testExtra.putString(testParentId, testParentId);
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final SessionCallbackProxy callbackProxy = new SessionCallbackProxy(mContext) {
+            @Override
+            public void onSubscribed(ControllerInfo info, String parentId, Bundle extra) {
+                if (Process.myUid() == info.getUid()) {
+                    assertEquals(testParentId, parentId);
+                    assertTrue(TestUtils.equals(testExtra, extra));
+                    latch.countDown();
+                }
+            }
+        };
+        TestServiceRegistry.getInstance().setSessionCallbackProxy(callbackProxy);
+        final SessionToken2 token = MockMediaLibraryService2.getToken(mContext);
+        MediaBrowser2 browser = (MediaBrowser2) createController(token);
+        browser.subscribe(testParentId, testExtra);
+        assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    public void testUnsubscribe() throws InterruptedException {
+        final String testParentId = "testUnsubscribeId";
+        final CountDownLatch latch = new CountDownLatch(1);
+        final SessionCallbackProxy callbackProxy = new SessionCallbackProxy(mContext) {
+            @Override
+            public void onUnsubscribed(ControllerInfo info, String parentId) {
+                if (Process.myUid() == info.getUid()) {
+                    assertEquals(testParentId, parentId);
+                    latch.countDown();
+                }
+            }
+        };
+        TestServiceRegistry.getInstance().setSessionCallbackProxy(callbackProxy);
+        final SessionToken2 token = MockMediaLibraryService2.getToken(mContext);
+        MediaBrowser2 browser = (MediaBrowser2) createController(token);
+        browser.unsubscribe(testParentId);
+        assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
     }
 
     public static class TestBrowserCallback extends BrowserCallback

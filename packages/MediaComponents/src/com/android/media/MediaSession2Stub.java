@@ -48,6 +48,8 @@ import com.android.media.MediaSession2Impl.ControllerInfoImpl;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 
 public class MediaSession2Stub extends IMediaSession2.Stub {
 
@@ -64,6 +66,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @GuardedBy("mLock")
     private final ArrayMap<IBinder, ControllerInfo> mControllers = new ArrayMap<>();
+    @GuardedBy("mLock")
+    private final ArrayMap<ControllerInfo, Set<String>> mSubscriptions = new ArrayMap<>();
 
     public MediaSession2Stub(MediaSession2Impl session) {
         mSession = new WeakReference<>(session);
@@ -77,11 +81,11 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             mControllers.clear();
         }
         for (int i = 0; i < list.size(); i++) {
-            IMediaSession2Callback callbackBinder =
+            IMediaSession2Callback controllerBinder =
                     ((ControllerInfoImpl) list.get(i).getProvider()).getControllerBinder();
             try {
                 // Should be used without a lock hold to prevent potential deadlock.
-                callbackBinder.onDisconnected();
+                controllerBinder.onDisconnected();
             } catch (RemoteException e) {
                 // Controller is gone. Should be fine because we're destroying.
             }
@@ -118,12 +122,12 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     @Override
-    public void connect(String callingPackage, final IMediaSession2Callback callback)
+    public void connect(final IMediaSession2Callback caller, String callingPackage)
             throws RuntimeException {
         final MediaSession2Impl sessionImpl = getSession();
         final Context context = sessionImpl.getContext();
         final ControllerInfo request = new ControllerInfo(context,
-                Binder.getCallingUid(), Binder.getCallingPid(), callingPackage, callback);
+                Binder.getCallingUid(), Binder.getCallingPid(), callingPackage, caller);
         sessionImpl.getCallbackExecutor().execute(() -> {
             final MediaSession2Impl session = mSession.get();
             if (session == null) {
@@ -156,8 +160,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 // TODO(jaewan): Should we protect getting playback state?
                 final PlaybackState2 state = session.getInstance().getPlaybackState();
                 final Bundle playbackStateBundle = (state != null) ? state.toBundle() : null;
-                final Bundle playbackInfoBundle =
-                        ((MediaController2Impl.PlaybackInfoImpl) session.getPlaybackInfo().getProvider()).toBundle();
+                final Bundle playbackInfoBundle = ((MediaController2Impl.PlaybackInfoImpl)
+                        session.getPlaybackInfo().getProvider()).toBundle();
                 final PlaylistParams params = session.getInstance().getPlaylistParams();
                 final Bundle paramsBundle = (params != null) ? params.toBundle() : null;
                 final PendingIntent sessionActivity = session.getSessionActivity();
@@ -182,7 +186,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     return;
                 }
                 try {
-                    callback.onConnected(MediaSession2Stub.this,
+                    caller.onConnected(MediaSession2Stub.this,
                             allowedCommands.toBundle(), playbackStateBundle, playbackInfoBundle,
                             paramsBundle, playlistBundle, sessionActivity);
                 } catch (RemoteException e) {
@@ -194,7 +198,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     Log.d(TAG, "Rejecting connection, request=" + request);
                 }
                 try {
-                    callback.onDisconnected();
+                    caller.onDisconnected();
                 } catch (RemoteException e) {
                     // Controller may be died prematurely.
                     // Not an issue because we'll ignore it anyway.
@@ -210,6 +214,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (DEBUG) {
                 Log.d(TAG, "releasing " + controllerInfo);
             }
+            mSubscriptions.remove(controllerInfo);
         }
     }
 
@@ -733,6 +738,56 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
+    @Override
+    public void subscribe(final IMediaSession2Callback caller, final String parentId,
+            final Bundle option) {
+        final MediaLibrarySessionImpl sessionImpl = getLibrarySession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "subscribe() from a browser that hasn't connected. Ignore");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaLibrarySessionImpl session = getLibrarySession();
+            if (session == null) {
+                return;
+            }
+            session.getCallback().onSubscribed(controller, parentId, option);
+            synchronized (mLock) {
+                Set<String> subscription = mSubscriptions.get(controller);
+                if (subscription == null) {
+                    subscription = new HashSet<>();
+                    mSubscriptions.put(controller, subscription);
+                }
+                subscription.add(parentId);
+            }
+        });
+    }
+
+    @Override
+    public void unsubscribe(final IMediaSession2Callback caller, final String parentId) {
+        final MediaLibrarySessionImpl sessionImpl = getLibrarySession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "unsubscribe() from a browser that hasn't connected. Ignore");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaLibrarySessionImpl session = getLibrarySession();
+            if (session == null) {
+                return;
+            }
+            session.getCallback().onUnsubscribed(controller, parentId);
+            synchronized (mLock) {
+                mSubscriptions.remove(controller);
+            }
+        });
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////////
     // APIs for MediaSession2Impl
     //////////////////////////////////////////////////////////////////////////////////////////////
@@ -752,11 +807,11 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     public void notifyPlaybackStateChangedNotLocked(PlaybackState2 state) {
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
-            IMediaSession2Callback callbackBinder =
+            IMediaSession2Callback controllerBinder =
                     ControllerInfoImpl.from(list.get(i)).getControllerBinder();
             try {
                 final Bundle bundle = state != null ? state.toBundle() : null;
-                callbackBinder.onPlaybackStateChanged(bundle);
+                controllerBinder.onPlaybackStateChanged(bundle);
             } catch (RemoteException e) {
                 Log.w(TAG, "Controller is gone", e);
                 // TODO(jaewan): What to do when the controller is gone?
@@ -767,7 +822,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     public void notifyCustomLayoutNotLocked(ControllerInfo controller, List<CommandButton> layout) {
         // TODO(jaewan): It's OK to be called while it's connecting, but not OK if the connection
         //               is rejected. Handle the case.
-        IMediaSession2Callback callbackBinder =
+        IMediaSession2Callback controllerBinder =
                 ControllerInfoImpl.from(controller).getControllerBinder();
         try {
             List<Bundle> layoutBundles = new ArrayList<>();
@@ -777,7 +832,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     layoutBundles.add(bundle);
                 }
             }
-            callbackBinder.onCustomLayoutChanged(layoutBundles);
+            controllerBinder.onCustomLayoutChanged(layoutBundles);
         } catch (RemoteException e) {
             Log.w(TAG, "Controller is gone", e);
             // TODO(jaewan): What to do when the controller is gone?
@@ -799,10 +854,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         }
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
-            IMediaSession2Callback callbackBinder =
+            IMediaSession2Callback controllerBinder =
                     ControllerInfoImpl.from(list.get(i)).getControllerBinder();
             try {
-                callbackBinder.onPlaylistChanged(bundleList);
+                controllerBinder.onPlaylistChanged(bundleList);
             } catch (RemoteException e) {
                 Log.w(TAG, "Controller is gone", e);
                 // TODO(jaewan): What to do when the controller is gone?
@@ -813,10 +868,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     public void notifyPlaylistParamsChanged(MediaSession2.PlaylistParams params) {
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
-            IMediaSession2Callback callbackBinder =
+            IMediaSession2Callback controllerBinder =
                     ControllerInfoImpl.from(list.get(i)).getControllerBinder();
             try {
-                callbackBinder.onPlaylistParamsChanged(params.toBundle());
+                controllerBinder.onPlaylistParamsChanged(params.toBundle());
             } catch (RemoteException e) {
                 Log.w(TAG, "Controller is gone", e);
                 // TODO(jaewan): What to do when the controller is gone?
@@ -827,11 +882,11 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     public void notifyPlaybackInfoChanged(MediaController2.PlaybackInfo playbackInfo) {
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
-            IMediaSession2Callback callbackBinder =
+            IMediaSession2Callback controllerBinder =
                     ControllerInfoImpl.from(list.get(i)).getControllerBinder();
             try {
-                callbackBinder.onPlaybackInfoChanged(
-                        ((MediaController2Impl.PlaybackInfoImpl) playbackInfo.getProvider()).toBundle());
+                controllerBinder.onPlaybackInfoChanged(((MediaController2Impl.PlaybackInfoImpl)
+                        playbackInfo.getProvider()).toBundle());
             } catch (RemoteException e) {
                 Log.w(TAG, "Controller is gone", e);
                 // TODO(jaewan): What to do when the controller is gone?
@@ -848,9 +903,9 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         if (command == null) {
             throw new IllegalArgumentException("command shouldn't be null");
         }
-        final IMediaSession2Callback callbackBinder =
+        final IMediaSession2Callback controllerBinder =
                 ControllerInfoImpl.from(controller).getControllerBinder();
-        if (getController(callbackBinder) == null) {
+        if (getController(controllerBinder) == null) {
             throw new IllegalArgumentException("Controller is gone");
         }
         sendCustomCommandInternal(controller, command, args, receiver);
@@ -868,11 +923,11 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     private void sendCustomCommandInternal(ControllerInfo controller, Command command, Bundle args,
             ResultReceiver receiver) {
-        final IMediaSession2Callback callbackBinder =
+        final IMediaSession2Callback controllerBinder =
                 ControllerInfoImpl.from(controller).getControllerBinder();
         try {
             Bundle commandBundle = command.toBundle();
-            callbackBinder.sendCustomCommand(commandBundle, args, receiver);
+            controllerBinder.sendCustomCommand(commandBundle, args, receiver);
         } catch (RemoteException e) {
             Log.w(TAG, "Controller is gone", e);
             // TODO(jaewan): What to do when the controller is gone?

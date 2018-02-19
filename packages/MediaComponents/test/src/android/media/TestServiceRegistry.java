@@ -22,6 +22,7 @@ import android.content.Context;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.TestUtils.SyncHandler;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Process;
 import android.support.annotation.GuardedBy;
@@ -73,6 +74,9 @@ public class TestServiceRegistry {
          * Called when enclosing service is destroyed.
          */
         public void onServiceDestroyed() { }
+
+        public void onSubscribed(ControllerInfo info, String parentId, Bundle extra) { }
+        public void onUnsubscribed(ControllerInfo info, String parentId) { }
     }
 
     @GuardedBy("TestServiceRegistry.class")
