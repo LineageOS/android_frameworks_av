@@ -212,4 +212,10 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
             mCallback.onSearchResultLoaded(query, page, pageSize, result, extras);
         });
     }
+
+    public void onChildrenChanged(final String parentId, int childCount, final Bundle extras) {
+        getCallbackExecutor().execute(() -> {
+            mCallback.onChildrenChanged(parentId, childCount, extras);
+        });
+    }
 }

@@ -309,4 +309,20 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
         }
         browser.onSearchResultLoaded(query, page, pageSize, result, extras);
     }
+
+    @Override
+    public void onChildrenChanged(String parentId, int childCount, Bundle extras) {
+        final MediaBrowser2Impl browser;
+        try {
+            browser = getBrowser();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        if (browser == null) {
+            // TODO(jaewan): Revisit here. Could be a bug
+            return;
+        }
+        browser.onChildrenChanged(parentId, childCount, extras);
+    }
 }

@@ -46,7 +46,7 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
     public static final String ID = "TestLibrary";
 
     public static final String ROOT_ID = "rootId";
-    public static final Bundle EXTRA = new Bundle();
+    public static final Bundle EXTRAS = new Bundle();
 
     public static final String MEDIA_ID_GET_ITEM = "media_id_get_item";
 
@@ -71,7 +71,7 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
     private static final String TAG = "MockMediaLibrarySvc2";
 
     static {
-        EXTRA.putString(ROOT_ID, ROOT_ID);
+        EXTRAS.putString(ROOT_ID, ROOT_ID);
     }
     @GuardedBy("MockMediaLibraryService2.class")
     private static SessionToken2 sToken;
@@ -149,7 +149,7 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
 
         @Override
         public LibraryRoot onGetRoot(ControllerInfo controller, Bundle rootHints) {
-            return new LibraryRoot(MockMediaLibraryService2.this, ROOT_ID, EXTRA);
+            return new LibraryRoot(MockMediaLibraryService2.this, ROOT_ID, EXTRAS);
         }
 
         @Override

@@ -394,7 +394,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void prepareFromUri(final IMediaSession2Callback caller, final Uri uri,
-            final Bundle extra) {
+            final Bundle extras) {
         final MediaSession2Impl sessionImpl = getSession();
         final ControllerInfo controller = getController(caller);
         if (controller == null) {
@@ -408,13 +408,13 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (session == null) {
                 return;
             }
-            session.getCallback().onPrepareFromUri(controller, uri, extra);
+            session.getCallback().onPrepareFromUri(controller, uri, extras);
         });
     }
 
     @Override
     public void prepareFromSearch(final IMediaSession2Callback caller, final String query,
-            final Bundle extra) {
+            final Bundle extras) {
         final MediaSession2Impl sessionImpl = getSession();
         final ControllerInfo controller = getController(caller);
         if (controller == null) {
@@ -428,13 +428,13 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (session == null) {
                 return;
             }
-            session.getCallback().onPrepareFromSearch(controller, query, extra);
+            session.getCallback().onPrepareFromSearch(controller, query, extras);
         });
     }
 
     @Override
     public void prepareFromMediaId(final IMediaSession2Callback caller, final String mediaId,
-            final Bundle extra) {
+            final Bundle extras) {
         final MediaSession2Impl sessionImpl = getSession();
         final ControllerInfo controller = getController(caller);
         if (controller == null) {
@@ -448,13 +448,13 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (session == null) {
                 return;
             }
-            session.getCallback().onPrepareFromMediaId(controller, mediaId, extra);
+            session.getCallback().onPrepareFromMediaId(controller, mediaId, extras);
         });
     }
 
     @Override
     public void playFromUri(final IMediaSession2Callback caller, final Uri uri,
-            final Bundle extra) {
+            final Bundle extras) {
         final MediaSession2Impl sessionImpl = getSession();
         final ControllerInfo controller = getController(caller);
         if (controller == null) {
@@ -468,13 +468,13 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (session == null) {
                 return;
             }
-            session.getCallback().onPlayFromUri(controller, uri, extra);
+            session.getCallback().onPlayFromUri(controller, uri, extras);
         });
     }
 
     @Override
     public void playFromSearch(final IMediaSession2Callback caller, final String query,
-            final Bundle extra) {
+            final Bundle extras) {
         final MediaSession2Impl sessionImpl = getSession();
         final ControllerInfo controller = getController(caller);
         if (controller == null) {
@@ -488,13 +488,13 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (session == null) {
                 return;
             }
-            session.getCallback().onPlayFromSearch(controller, query, extra);
+            session.getCallback().onPlayFromSearch(controller, query, extras);
         });
     }
 
     @Override
     public void playFromMediaId(final IMediaSession2Callback caller, final String mediaId,
-            final Bundle extra) {
+            final Bundle extras) {
         final MediaSession2Impl sessionImpl = getSession();
         final ControllerInfo controller = getController(caller);
         if (controller == null) {
@@ -508,7 +508,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (session == null) {
                 return;
             }
-            session.getCallback().onPlayFromMediaId(controller, mediaId, extra);
+            session.getCallback().onPlayFromMediaId(controller, mediaId, extras);
         });
     }
 
@@ -947,6 +947,40 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         } catch (RemoteException e) {
             Log.w(TAG, "Controller is gone", e);
             // TODO(jaewan): What to do when the controller is gone?
+        }
+    }
+
+    public void notifyChildrenChangedNotLocked(ControllerInfo controller, String parentId,
+            int childCount, Bundle extras) {
+        // TODO(jaewan): Handle when controller is disconnected and no longer valid.
+        //               Note: Commands may be sent while onConnected() is running. Should we also
+        //                     consider it as error?
+        notifyChildrenChangedInternalNotLocked(controller, parentId, childCount, extras);
+    }
+
+    public void notifyChildrenChangedNotLocked(String parentId, int childCount, Bundle extras) {
+        final List<ControllerInfo> controllers = getControllers();
+        for (int i = 0; i < controllers.size(); i++) {
+            notifyChildrenChangedInternalNotLocked(controllers.get(i), parentId, childCount,
+                    extras);
+        }
+    }
+
+    public void notifyChildrenChangedInternalNotLocked(final ControllerInfo controller,
+            String parentId, int childCount, Bundle extras) {
+        // Ensure subscription
+        synchronized (mLock) {
+            Set<String> subscriptions = mSubscriptions.get(controller);
+            if (subscriptions == null || !subscriptions.contains(parentId)) {
+                return;
+            }
+        }
+        final IMediaSession2Callback callbackBinder =
+                ControllerInfoImpl.from(controller).getControllerBinder();
+        try {
+            callbackBinder.onChildrenChanged(parentId, childCount, extras);
+        } catch (RemoteException e) {
+            // TODO(jaewan): Handle controller removed?
         }
     }
 }

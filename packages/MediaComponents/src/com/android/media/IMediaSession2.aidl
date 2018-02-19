@@ -52,15 +52,15 @@ oneway interface IMediaSession2 {
     void sendCustomCommand(IMediaSession2Callback caller, in Bundle command, in Bundle args,
             in ResultReceiver receiver);
 
-    void prepareFromUri(IMediaSession2Callback caller, in Uri uri, in Bundle extra);
-    void prepareFromSearch(IMediaSession2Callback caller, String query, in Bundle extra);
-    void prepareFromMediaId(IMediaSession2Callback caller, String mediaId, in Bundle extra);
-    void playFromUri(IMediaSession2Callback caller, in Uri uri, in Bundle extra);
-    void playFromSearch(IMediaSession2Callback caller, String query, in Bundle extra);
-    void playFromMediaId(IMediaSession2Callback caller, String mediaId, in Bundle extra);
+    void prepareFromUri(IMediaSession2Callback caller, in Uri uri, in Bundle extras);
+    void prepareFromSearch(IMediaSession2Callback caller, String query, in Bundle extras);
+    void prepareFromMediaId(IMediaSession2Callback caller, String mediaId, in Bundle extras);
+    void playFromUri(IMediaSession2Callback caller, in Uri uri, in Bundle extras);
+    void playFromSearch(IMediaSession2Callback caller, String query, in Bundle extras);
+    void playFromMediaId(IMediaSession2Callback caller, String mediaId, in Bundle extras);
     void setRating(IMediaSession2Callback caller, String mediaId, in Bundle rating);
 
-   //////////////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////////////
     // library service specific
     //////////////////////////////////////////////////////////////////////////////////////////////
     void getBrowserRoot(IMediaSession2Callback caller, in Bundle rootHints);

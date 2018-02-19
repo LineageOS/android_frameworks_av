@@ -95,13 +95,23 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
 
         @Override
         public void notifyChildrenChanged_impl(ControllerInfo controller, String parentId,
-                Bundle extras) {
-            // TODO(jaewan): Implements
+                int childCount, Bundle extras) {
+            if (controller == null) {
+                throw new IllegalArgumentException("controller shouldn't be null");
+            }
+            if (parentId == null) {
+                throw new IllegalArgumentException("parentId shouldn't be null");
+            }
+            getSessionStub().notifyChildrenChangedNotLocked(controller, parentId, childCount,
+                    extras);
         }
 
         @Override
-        public void notifyChildrenChanged_impl(String parentId, Bundle extras) {
-            // TODO(jaewan): Implements
+        public void notifyChildrenChanged_impl(String parentId, int childCount, Bundle extras) {
+            if (parentId == null) {
+                throw new IllegalArgumentException("parentId shouldn't be null");
+            }
+            getSessionStub().notifyChildrenChangedNotLocked(parentId, childCount, extras);
         }
 
         @Override
