@@ -3031,16 +3031,14 @@ Vector<Parameters::Size> Parameters::getAvailableJpegSizes() {
 
 Vector<Parameters::Size> Parameters::getAvailableRawSizes() {
     Vector<Parameters::Size> rawSizes;
-    const int JPEG_SIZE_ENTRY_COUNT = 2;
-    const int WIDTH_OFFSET = 0;
-    const int HEIGHT_OFFSET = 1;
-    camera_metadata_ro_entry_t availableRawSizes =
-    staticInfo(ANDROID_SCALER_AVAILABLE_RAW_SIZES);
-    for (size_t i = 0; i < availableRawSizes.count; i+= JPEG_SIZE_ENTRY_COUNT) {
-        int width = availableRawSizes.data.i32[i + WIDTH_OFFSET];
-        int height = availableRawSizes.data.i32[i + HEIGHT_OFFSET];
-        Size sz = {width, height};
-        rawSizes.add(sz);
+    Vector<StreamConfiguration> scs = getStreamConfigurations();
+    for (size_t i = 0; i < scs.size(); i++) {
+        const StreamConfiguration &sc = scs[i];
+        if (sc.isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT &&
+                sc.format == HAL_PIXEL_FORMAT_RAW10) {
+            Size sz = {sc.width, sc.height};
+            rawSizes.add(sz);
+        }
     }
     return rawSizes;
 }
