@@ -30,7 +30,6 @@ public final class PlaybackState2Impl implements PlaybackState2Provider {
     private static final String KEY_BUFFERED_POSITION =
             "android.media.playbackstate2.buffered_position";
     private static final String KEY_SPEED = "android.media.playbackstate2.speed";
-    private static final String KEY_ERROR_MESSAGE = "android.media.playbackstate2.error_message";
     private static final String KEY_UPDATE_TIME = "android.media.playbackstate2.update_time";
     private static final String KEY_ACTIVE_ITEM_ID = "android.media.playbackstate2.active_item_id";
 
@@ -42,11 +41,9 @@ public final class PlaybackState2Impl implements PlaybackState2Provider {
     private final float mSpeed;
     private final long mBufferedPosition;
     private final long mActiveItemId;
-    private final CharSequence mErrorMessage;
 
     public PlaybackState2Impl(Context context, PlaybackState2 instance, int state, long position,
-            long updateTime, float speed, long bufferedPosition, long activeItemId,
-            CharSequence error) {
+            long updateTime, float speed, long bufferedPosition, long activeItemId) {
         mContext = context;
         mInstance = instance;
         mState = state;
@@ -55,7 +52,6 @@ public final class PlaybackState2Impl implements PlaybackState2Provider {
         mUpdateTime = updateTime;
         mBufferedPosition = bufferedPosition;
         mActiveItemId = activeItemId;
-        mErrorMessage = error;
     }
 
     @Override
@@ -67,7 +63,6 @@ public final class PlaybackState2Impl implements PlaybackState2Provider {
         bob.append(", speed=").append(mSpeed);
         bob.append(", updated=").append(mUpdateTime);
         bob.append(", active item id=").append(mActiveItemId);
-        bob.append(", error=").append(mErrorMessage);
         bob.append("}");
         return bob.toString();
     }
@@ -93,11 +88,6 @@ public final class PlaybackState2Impl implements PlaybackState2Provider {
     }
 
     @Override
-    public CharSequence getErrorMessage_impl() {
-        return mErrorMessage;
-    }
-
-    @Override
     public long getLastPositionUpdateTime_impl() {
         return mUpdateTime;
     }
@@ -116,7 +106,6 @@ public final class PlaybackState2Impl implements PlaybackState2Provider {
         bundle.putFloat(KEY_SPEED, mSpeed);
         bundle.putLong(KEY_BUFFERED_POSITION, mBufferedPosition);
         bundle.putLong(KEY_ACTIVE_ITEM_ID, mActiveItemId);
-        bundle.putCharSequence(KEY_ERROR_MESSAGE, mErrorMessage);
         return bundle;
     }
 
@@ -129,18 +118,15 @@ public final class PlaybackState2Impl implements PlaybackState2Provider {
                 || !bundle.containsKey(KEY_UPDATE_TIME)
                 || !bundle.containsKey(KEY_SPEED)
                 || !bundle.containsKey(KEY_BUFFERED_POSITION)
-                || !bundle.containsKey(KEY_ACTIVE_ITEM_ID)
-                || !bundle.containsKey(KEY_ERROR_MESSAGE)) {
+                || !bundle.containsKey(KEY_ACTIVE_ITEM_ID)) {
             return null;
         }
-
         return new PlaybackState2(context,
                 bundle.getInt(KEY_STATE),
                 bundle.getLong(KEY_POSITION),
                 bundle.getLong(KEY_UPDATE_TIME),
                 bundle.getFloat(KEY_SPEED),
                 bundle.getLong(KEY_BUFFERED_POSITION),
-                bundle.getLong(KEY_ACTIVE_ITEM_ID),
-                bundle.getCharSequence(KEY_ERROR_MESSAGE));
+                bundle.getLong(KEY_ACTIVE_ITEM_ID));
     }
 }

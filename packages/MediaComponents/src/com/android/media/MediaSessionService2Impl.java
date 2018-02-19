@@ -22,7 +22,7 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
-import android.media.MediaPlayerInterface.PlaybackListener;
+import android.media.MediaPlayerInterface.EventCallback;
 import android.media.MediaSession2;
 import android.media.MediaSessionService2;
 import android.media.MediaSessionService2.MediaNotification;
@@ -42,7 +42,7 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
     private static final boolean DEBUG = true; // TODO(jaewan): Change this.
 
     private final MediaSessionService2 mInstance;
-    private final PlaybackListener mListener = new SessionServicePlaybackListener();
+    private final EventCallback mCallback = new SessionServiceEventCallback();
 
     private final Object mLock = new Object();
     @GuardedBy("mLock")
@@ -94,7 +94,7 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
                     + ", but got " + mSession);
         }
         // TODO(jaewan): Uncomment here.
-        // mSession.addPlaybackListener(mListener, mSession.getExecutor());
+        // mSession.registerPlayerEventCallback(mCallback, mSession.getExecutor());
     }
 
     @TokenType int getSessionType() {
@@ -135,9 +135,9 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
                 mediaNotification.getNotification());
     }
 
-    private class SessionServicePlaybackListener implements PlaybackListener {
+    private class SessionServiceEventCallback implements EventCallback {
         @Override
-        public void onPlaybackChanged(PlaybackState2 state) {
+        public void onPlaybackStateChanged(PlaybackState2 state) {
             if (state == null) {
                 Log.w(TAG, "Ignoring null playback state");
                 return;

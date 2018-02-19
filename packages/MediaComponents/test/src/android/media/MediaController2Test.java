@@ -19,7 +19,7 @@ package android.media;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.media.MediaPlayerInterface.PlaybackListener;
+import android.media.MediaPlayerInterface.EventCallback;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
@@ -675,7 +675,7 @@ public class MediaController2Test extends MediaSession2TestBase {
         // TODO(jaewan): Add equivalent tests again
         /*
         final CountDownLatch latch = new CountDownLatch(1);
-        mController.addPlaybackListener((state) -> {
+        mController.registerPlayerEventCallback((state) -> {
             assertNotNull(state);
             assertEquals(PlaybackState.STATE_REWINDING, state.getState());
             latch.countDown();
@@ -774,16 +774,19 @@ public class MediaController2Test extends MediaSession2TestBase {
 
     private void testNoInteraction() throws InterruptedException {
         final CountDownLatch latch = new CountDownLatch(1);
-        final PlaybackListener playbackListener = (state) -> {
-            fail("Controller shouldn't be notified about change in session after the close.");
-            latch.countDown();
+        final EventCallback callback = new EventCallback() {
+            @Override
+            public void onPlaybackStateChanged(PlaybackState2 state) {
+                fail("Controller shouldn't be notified about change in session after the close.");
+                latch.countDown();
+            }
         };
         // TODO(jaewan): Add equivalent tests again
         /*
-        mController.addPlaybackListener(playbackListener, sHandler);
+        mController.registerPlayerEventCallback(playbackListener, sHandler);
         mPlayer.notifyPlaybackState(TestUtils.createPlaybackState(PlaybackState.STATE_BUFFERING));
         assertFalse(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
-        mController.removePlaybackListener(playbackListener);
+        mController.unregisterPlayerEventCallback(playbackListener);
         */
     }
 

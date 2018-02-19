@@ -294,9 +294,9 @@ public class ApiFactory implements StaticProvider {
     @Override
     public PlaybackState2Provider createPlaybackState2(Context context, PlaybackState2 instance,
             int state, long position, long updateTime, float speed, long bufferedPosition,
-            long activeItemId, CharSequence error) {
+            long activeItemId) {
         return new PlaybackState2Impl(context, instance, state, position, updateTime, speed,
-                bufferedPosition, activeItemId, error);
+                bufferedPosition, activeItemId);
     }
 
     @Override

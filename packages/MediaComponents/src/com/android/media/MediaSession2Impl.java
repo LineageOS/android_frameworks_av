@@ -38,7 +38,7 @@ import android.media.MediaItem2;
 import android.media.MediaLibraryService2;
 import android.media.MediaMetadata2;
 import android.media.MediaPlayerInterface;
-import android.media.MediaPlayerInterface.PlaybackListener;
+import android.media.MediaPlayerInterface.EventCallback;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.Command;
@@ -62,6 +62,7 @@ import android.os.Process;
 import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
 import android.text.TextUtils;
+import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
 
@@ -84,7 +85,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private final MediaSession2Stub mSessionStub;
     private final SessionToken2 mSessionToken;
     private final AudioManager mAudioManager;
-    private final List<PlaybackListenerHolder> mListeners = new ArrayList<>();
+    private final ArrayMap<EventCallback, Executor> mCallbacks = new ArrayMap<>();
     private final PendingIntent mSessionActivity;
 
     // mPlayer is set to null when the session is closed, and we shouldn't throw an exception
@@ -110,7 +111,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @GuardedBy("mLock")
     private PlaybackInfo mPlaybackInfo;
     @GuardedBy("mLock")
-    private MyPlaybackListener mListener;
+    private MyEventCallback mEventCallback;
 
     /**
      * Can be only called by the {@link Builder#build()}.
@@ -223,19 +224,20 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     private void setPlayer(MediaPlayerInterface player, VolumeProvider2 volumeProvider) {
-        PlaybackInfo info = createPlaybackInfo(volumeProvider, player.getAudioAttributes());
+        final PlaybackInfo info = createPlaybackInfo(volumeProvider, player.getAudioAttributes());
         synchronized (mLock) {
-            if (mPlayer != null && mListener != null) {
+            if (mPlayer != null && mEventCallback != null) {
                 // This might not work for a poorly implemented player.
-                mPlayer.removePlaybackListener(mListener);
+                mPlayer.unregisterEventCallback(mEventCallback);
             }
             mPlayer = player;
-            mListener = new MyPlaybackListener(this, player);
-            player.addPlaybackListener(mCallbackExecutor, mListener);
+            mEventCallback = new MyEventCallback(this, player);
+            player.registerEventCallback(mCallbackExecutor, mEventCallback);
             mVolumeProvider = volumeProvider;
             mPlaybackInfo = info;
         }
         mSessionStub.notifyPlaybackInfoChanged(info);
+        notifyPlaybackStateChangedNotLocked(mInstance.getPlaybackState());
     }
 
     private PlaybackInfo createPlaybackInfo(VolumeProvider2 volumeProvider, AudioAttributes attrs) {
@@ -291,7 +293,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         synchronized (mLock) {
             if (mPlayer != null) {
                 // close can be called multiple times
-                mPlayer.removePlaybackListener(mListener);
+                mPlayer.unregisterEventCallback(mEventCallback);
                 mPlayer = null;
             }
         }
@@ -520,32 +522,31 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void addPlaybackListener_impl(Executor executor, PlaybackListener listener) {
+    public void registerPlayerEventCallback_impl(Executor executor, EventCallback callback) {
         if (executor == null) {
             throw new IllegalArgumentException("executor shouldn't be null");
         }
-        if (listener == null) {
-            throw new IllegalArgumentException("listener shouldn't be null");
+        if (callback == null) {
+            throw new IllegalArgumentException("callback shouldn't be null");
         }
         ensureCallingThread();
-        if (PlaybackListenerHolder.contains(mListeners, listener)) {
-            Log.w(TAG, "listener is already added. Ignoring.");
+        if (mCallbacks.get(callback) != null) {
+            Log.w(TAG, "callback is already added. Ignoring.");
             return;
         }
-        mListeners.add(new PlaybackListenerHolder(executor, listener));
-        executor.execute(() -> listener.onPlaybackChanged(getInstance().getPlaybackState()));
+        mCallbacks.put(callback, executor);
+        // TODO(jaewan): Double check if we need this.
+        final PlaybackState2 state = getInstance().getPlaybackState();
+        executor.execute(() -> callback.onPlaybackStateChanged(state));
     }
 
     @Override
-    public void removePlaybackListener_impl(PlaybackListener listener) {
-        if (listener == null) {
-            throw new IllegalArgumentException("listener shouldn't be null");
+    public void unregisterPlayerEventCallback_impl(EventCallback callback) {
+        if (callback == null) {
+            throw new IllegalArgumentException("callback shouldn't be null");
         }
         ensureCallingThread();
-        int idx = PlaybackListenerHolder.indexOf(mListeners, listener);
-        if (idx >= 0) {
-            mListeners.remove(idx);
-        }
+        mCallbacks.remove(callback);
     }
 
     @Override
@@ -586,17 +587,33 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }*/
     }
 
-    private void notifyPlaybackStateChangedNotLocked(PlaybackState2 state) {
-        List<PlaybackListenerHolder> listeners = new ArrayList<>();
+    private void notifyPlaybackStateChangedNotLocked(final PlaybackState2 state) {
+        ArrayMap<EventCallback, Executor> callbacks = new ArrayMap<>();
         synchronized (mLock) {
-            listeners.addAll(mListeners);
+            callbacks.putAll(mCallbacks);
         }
-        // Notify to listeners added directly to this session
-        for (int i = 0; i < listeners.size(); i++) {
-            listeners.get(i).postPlaybackChange(state);
+        // Notify to callbacks added directly to this session
+        for (int i = 0; i < callbacks.size(); i++) {
+            final EventCallback callback = callbacks.keyAt(i);
+            final Executor executor = callbacks.valueAt(i);
+            executor.execute(() -> callback.onPlaybackStateChanged(state));
         }
         // Notify to controllers as well.
         mSessionStub.notifyPlaybackStateChangedNotLocked(state);
+    }
+
+    private void notifyErrorNotLocked(String mediaId, int what, int extra) {
+        ArrayMap<EventCallback, Executor> callbacks = new ArrayMap<>();
+        synchronized (mLock) {
+            callbacks.putAll(mCallbacks);
+        }
+        // Notify to callbacks added directly to this session
+        for (int i = 0; i < callbacks.size(); i++) {
+            final EventCallback callback = callbacks.keyAt(i);
+            final Executor executor = callbacks.valueAt(i);
+            executor.execute(() -> callback.onError(mediaId, what, extra));
+        }
+        // TODO(jaewan): Notify to controllers as well.
     }
 
     Context getContext() {
@@ -637,24 +654,42 @@ public class MediaSession2Impl implements MediaSession2Provider {
         return mSessionActivity;
     }
 
-    private static class MyPlaybackListener implements MediaPlayerInterface.PlaybackListener {
+    private static class MyEventCallback implements EventCallback {
         private final WeakReference<MediaSession2Impl> mSession;
         private final MediaPlayerInterface mPlayer;
 
-        private MyPlaybackListener(MediaSession2Impl session, MediaPlayerInterface player) {
+        private MyEventCallback(MediaSession2Impl session, MediaPlayerInterface player) {
             mSession = new WeakReference<>(session);
             mPlayer = player;
         }
 
         @Override
-        public void onPlaybackChanged(PlaybackState2 state) {
+        public void onPlaybackStateChanged(PlaybackState2 state) {
             MediaSession2Impl session = mSession.get();
             if (mPlayer != session.mInstance.getPlayer()) {
                 Log.w(TAG, "Unexpected playback state change notifications. Ignoring.",
                         new IllegalStateException());
                 return;
             }
+            if (DEBUG) {
+                Log.d(TAG, "onPlaybackStateChanged from player, state=" + state);
+            }
             session.notifyPlaybackStateChangedNotLocked(state);
+        }
+
+        @Override
+        public void onError(String mediaId, int what, int extra) {
+            MediaSession2Impl session = mSession.get();
+            if (mPlayer != session.mInstance.getPlayer()) {
+                Log.w(TAG, "Unexpected playback state change notifications. Ignoring.",
+                        new IllegalStateException());
+                return;
+            }
+            if (DEBUG) {
+                Log.d(TAG, "onError from player, mediaId=" + mediaId + ", what=" + what
+                        + ", extra=" + extra);
+            }
+            session.notifyErrorNotLocked(mediaId, what, extra);
         }
     }
 

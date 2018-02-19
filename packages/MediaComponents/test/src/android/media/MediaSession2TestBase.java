@@ -118,7 +118,7 @@ abstract class MediaSession2TestBase {
      */
     public PlaybackState2 createPlaybackState(int state) {
         return new PlaybackState2(mContext, state, 0, 0, 1.0f,
-                0, 0, null);
+                0, 0);
     }
 
     final MediaController2 createController(SessionToken2 token) throws InterruptedException {
