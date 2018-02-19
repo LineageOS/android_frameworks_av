@@ -403,9 +403,30 @@ public class MediaController2Impl implements MediaController2Provider {
             // TODO(jaewan): Handle.
         }
     }
+
     @Override
-    public void setRating_impl(Rating2 rating) {
-        // TODO(jaewan): Implement
+    public void setRating_impl(String mediaId, Rating2 rating) {
+        if (mediaId == null) {
+            throw new IllegalArgumentException("mediaId shouldn't be null");
+        }
+        if (rating == null) {
+            throw new IllegalArgumentException("rating shouldn't be null");
+        }
+        // TODO (hdmoon): All 'ratingStyle' should be changed to 'ratingType'.
+        if (rating.getRatingStyle() != getRatingType_impl()) {
+            throw new IllegalArgumentException("rating type should be matched");
+        }
+
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.setRating(mSessionCallbackStub, mediaId, rating.toBundle());
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            // TODO(jaewan): Handle.
+        }
     }
 
     @Override

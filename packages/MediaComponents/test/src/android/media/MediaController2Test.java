@@ -391,7 +391,7 @@ public class MediaController2Test extends MediaSession2TestBase {
                 assertEquals(mContext.getPackageName(), controller.getPackageName());
                 assertEquals(request, query);
                 assertTrue(TestUtils.equals(bundle, extras));
-                latch.countDown();;
+                latch.countDown();
             }
         };
         try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
@@ -415,7 +415,7 @@ public class MediaController2Test extends MediaSession2TestBase {
                 assertEquals(mContext.getPackageName(), controller.getPackageName());
                 assertEquals(request, uri);
                 assertTrue(TestUtils.equals(bundle, extras));
-                latch.countDown();;
+                latch.countDown();
             }
         };
         try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
@@ -439,7 +439,7 @@ public class MediaController2Test extends MediaSession2TestBase {
                 assertEquals(mContext.getPackageName(), controller.getPackageName());
                 assertEquals(request, id);
                 assertTrue(TestUtils.equals(bundle, extras));
-                latch.countDown();;
+                latch.countDown();
             }
         };
         try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
@@ -464,7 +464,7 @@ public class MediaController2Test extends MediaSession2TestBase {
                 assertEquals(mContext.getPackageName(), controller.getPackageName());
                 assertEquals(request, query);
                 assertTrue(TestUtils.equals(bundle, extras));
-                latch.countDown();;
+                latch.countDown();
             }
         };
         try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
@@ -488,7 +488,7 @@ public class MediaController2Test extends MediaSession2TestBase {
                 assertEquals(mContext.getPackageName(), controller.getPackageName());
                 assertEquals(request, uri);
                 assertTrue(TestUtils.equals(bundle, extras));
-                latch.countDown();;
+                latch.countDown();
             }
         };
         try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
@@ -512,7 +512,7 @@ public class MediaController2Test extends MediaSession2TestBase {
                 assertEquals(mContext.getPackageName(), controller.getPackageName());
                 assertEquals(request, id);
                 assertTrue(TestUtils.equals(bundle, extras));
-                latch.countDown();;
+                latch.countDown();
             }
         };
         try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
@@ -521,6 +521,58 @@ public class MediaController2Test extends MediaSession2TestBase {
             MediaController2 controller = createController(session.getToken());
             controller.prepareFromMediaId(request, bundle);
             assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        }
+    }
+
+    @Test
+    public void testSetRating() throws InterruptedException {
+        final int sessionRatingType = Rating2.RATING_5_STARS;
+        final float ratingValue = 3.5f;
+        final Rating2 rating = Rating2.newStarRating(mContext, sessionRatingType, ratingValue);
+        final String mediaId = "media_id";
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final SessionCallback callback = new SessionCallback(mContext) {
+            @Override
+            public void onSetRating(ControllerInfo controller, String mediaIdOut,
+                    Rating2 ratingOut) {
+                assertEquals(mContext.getPackageName(), controller.getPackageName());
+                assertEquals(mediaId, mediaIdOut);
+                assertEquals(rating, ratingOut);
+                latch.countDown();
+            }
+        };
+
+        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+                .setRatingType(sessionRatingType)
+                .setSessionCallback(sHandlerExecutor, callback)
+                .setId("testSetRating").build()) {
+            MediaController2 controller = createController(session.getToken());
+            controller.setRating(mediaId, rating);
+            assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        }
+    }
+
+    @Test
+    public void testSetRatingTypeNotMatched() throws InterruptedException {
+        final String mediaId = "media_id";
+        final int sessionRatingType = Rating2.RATING_5_STARS;
+
+        final SessionCallback callback = new SessionCallback(mContext);
+        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+                .setRatingType(sessionRatingType)
+                .setSessionCallback(sHandlerExecutor, callback)
+                .setId("testSetRatingTypeNotMatched").build()) {
+
+            // Set 'Heart' type rating which is different from the session's rating type (5-Stars).
+            MediaController2 controller = createController(session.getToken());
+            Rating2 nonMatchingTypeRating = Rating2.newHeartRating(mContext, true);
+            try {
+                controller.setRating(mediaId, nonMatchingTypeRating);
+                fail();
+            } catch (IllegalArgumentException ex) {
+                // Expected.
+            }
         }
     }
 
@@ -639,7 +691,7 @@ public class MediaController2Test extends MediaSession2TestBase {
                 if (Process.myUid() == controller.getUid()) {
                     assertEquals(mContext.getPackageName(), controller.getPackageName());
                     assertFalse(controller.isTrusted());
-                    latch.countDown();;
+                    latch.countDown();
                 }
                 return super.onConnect(controller);
             }

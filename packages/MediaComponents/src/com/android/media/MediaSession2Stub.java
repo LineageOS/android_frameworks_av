@@ -28,6 +28,7 @@ import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.PlaybackState2;
+import android.media.Rating2;
 import android.media.VolumeProvider2;
 import android.net.Uri;
 import android.os.Binder;
@@ -504,6 +505,27 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 return;
             }
             session.getCallback().onPlayFromMediaId(controller, mediaId, extra);
+        });
+    }
+
+    @Override
+    public void setRating(final IMediaSession2Callback caller, final String mediaId,
+            final Bundle ratingBundle) {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            Rating2 rating = Rating2Impl.fromBundle(session.getContext(), ratingBundle);
+            session.getCallback().onSetRating(controller, mediaId, rating);
         });
     }
 
