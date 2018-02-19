@@ -609,6 +609,9 @@ public class MediaController2Test extends MediaSession2TestBase {
     }
 
     private void connectToService(SessionToken2 token) throws InterruptedException {
+        if (mSession != null) {
+            mSession.close();
+        }
         mController = createController(token);
         mSession = TestServiceRegistry.getInstance().getServiceInstance().getSession();
         mPlayer = (MockPlayer) mSession.getPlayer();
@@ -638,7 +641,7 @@ public class MediaController2Test extends MediaSession2TestBase {
             }
         };
         TestServiceRegistry.getInstance().setSessionCallbackProxy(proxy);
-        mController = createController(TestUtils.getServiceToken(mContext, id));
+        connectToService(TestUtils.getServiceToken(mContext, id));
         assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
 
         // Test command from controller to session service
