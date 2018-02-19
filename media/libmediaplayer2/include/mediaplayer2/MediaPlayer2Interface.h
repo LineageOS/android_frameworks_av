@@ -21,18 +21,17 @@
 
 #include <sys/types.h>
 #include <utils/Errors.h>
-#include <utils/KeyedVector.h>
 #include <utils/String8.h>
 #include <utils/RefBase.h>
 
+#include <media/AVSyncSettings.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTimestamp.h>
-#include <media/AVSyncSettings.h>
 #include <media/BufferingSettings.h>
 #include <media/Metadata.h>
 #include <media/stagefright/foundation/AHandler.h>
-#include <mediaplayer2/mediaplayer2.h>
+#include <mediaplayer2/MediaPlayer2Types.h>
 
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
 // global, and not in android::
@@ -40,13 +39,9 @@ struct sockaddr_in;
 
 namespace android {
 
-class DataSource;
 struct DataSourceDesc;
-struct MediaHTTPService;
 class Parcel;
 struct ANativeWindowWrapper;
-
-template<typename T> class SortedVector;
 
 #define DEFAULT_AUDIOSINK_BUFFERCOUNT 4
 #define DEFAULT_AUDIOSINK_BUFFERSIZE 1200
@@ -58,14 +53,14 @@ template<typename T> class SortedVector;
 // duration below which we do not allow deep audio buffering
 #define AUDIO_SINK_MIN_DEEP_BUFFER_DURATION_US 5000000
 
-// abstract base class - use MediaPlayer2Interface
-class MediaPlayer2Interface : public AHandler
+class MediaPlayer2InterfaceListener: public RefBase
 {
 public:
-    // callback mechanism for passing messages to MediaPlayer2 object
-    typedef void (*NotifyCallback)(const wp<MediaPlayer2Engine> &listener,
-            int64_t srcId, int msg, int ext1, int ext2, const Parcel *obj);
+    virtual void notify(int64_t srcId, int msg, int ext1, int ext2, const Parcel *obj) = 0;
+};
 
+class MediaPlayer2Interface : public AHandler {
+public:
     // AudioSink: abstraction layer for audio output
     class AudioSink : public RefBase {
     public:
@@ -79,29 +74,28 @@ public:
 
         // Callback returns the number of bytes actually written to the buffer.
         typedef size_t (*AudioCallback)(
-                AudioSink *audioSink, void *buffer, size_t size, void *cookie,
-                        cb_event_t event);
+                AudioSink *audioSink, void *buffer, size_t size, void *cookie, cb_event_t event);
 
-        virtual             ~AudioSink() {}
-        virtual bool        ready() const = 0; // audio output is open and ready
-        virtual ssize_t     bufferSize() const = 0;
-        virtual ssize_t     frameCount() const = 0;
-        virtual ssize_t     channelCount() const = 0;
-        virtual ssize_t     frameSize() const = 0;
-        virtual uint32_t    latency() const = 0;
-        virtual float       msecsPerFrame() const = 0;
-        virtual status_t    getPosition(uint32_t *position) const = 0;
-        virtual status_t    getTimestamp(AudioTimestamp &ts) const = 0;
-        virtual int64_t     getPlayedOutDurationUs(int64_t nowUs) const = 0;
-        virtual status_t    getFramesWritten(uint32_t *frameswritten) const = 0;
+        virtual ~AudioSink() {}
+        virtual bool ready() const = 0; // audio output is open and ready
+        virtual ssize_t bufferSize() const = 0;
+        virtual ssize_t frameCount() const = 0;
+        virtual ssize_t channelCount() const = 0;
+        virtual ssize_t frameSize() const = 0;
+        virtual uint32_t latency() const = 0;
+        virtual float msecsPerFrame() const = 0;
+        virtual status_t getPosition(uint32_t *position) const = 0;
+        virtual status_t getTimestamp(AudioTimestamp &ts) const = 0;
+        virtual int64_t getPlayedOutDurationUs(int64_t nowUs) const = 0;
+        virtual status_t getFramesWritten(uint32_t *frameswritten) const = 0;
         virtual audio_session_t getSessionId() const = 0;
         virtual audio_stream_type_t getAudioStreamType() const = 0;
-        virtual uint32_t    getSampleRate() const = 0;
-        virtual int64_t     getBufferDurationInUs() const = 0;
+        virtual uint32_t getSampleRate() const = 0;
+        virtual int64_t getBufferDurationInUs() const = 0;
 
         // If no callback is specified, use the "write" API below to submit
         // audio data.
-        virtual status_t    open(
+        virtual status_t open(
                 uint32_t sampleRate, int channelCount, audio_channel_mask_t channelMask,
                 audio_format_t format=AUDIO_FORMAT_PCM_16_BIT,
                 int bufferCount=DEFAULT_AUDIOSINK_BUFFERCOUNT,
@@ -112,7 +106,7 @@ public:
                 bool doNotReconnect = false,
                 uint32_t suggestedFrameCount = 0) = 0;
 
-        virtual status_t    start() = 0;
+        virtual status_t start() = 0;
 
         /* Input parameter |size| is in byte units stored in |buffer|.
          * Data is copied over and actual number of bytes written (>= 0)
@@ -124,19 +118,25 @@ public:
          * buffer, unless an error occurs or the copy operation is
          * prematurely stopped.
          */
-        virtual ssize_t     write(const void* buffer, size_t size, bool blocking = true) = 0;
+        virtual ssize_t write(const void* buffer, size_t size, bool blocking = true) = 0;
 
-        virtual void        stop() = 0;
-        virtual void        flush() = 0;
-        virtual void        pause() = 0;
-        virtual void        close() = 0;
+        virtual void stop() = 0;
+        virtual void flush() = 0;
+        virtual void pause() = 0;
+        virtual void close() = 0;
 
-        virtual status_t    setPlaybackRate(const AudioPlaybackRate& rate) = 0;
-        virtual status_t    getPlaybackRate(AudioPlaybackRate* rate /* nonnull */) = 0;
-        virtual bool        needsTrailingPadding() { return true; }
+        virtual status_t setPlaybackRate(const AudioPlaybackRate& rate) = 0;
+        virtual status_t getPlaybackRate(AudioPlaybackRate* rate /* nonnull */) = 0;
+        virtual bool needsTrailingPadding() {
+            return true;
+        }
 
-        virtual status_t    setParameters(const String8& /* keyValuePairs */) { return NO_ERROR; }
-        virtual String8     getParameters(const String8& /* keys */) { return String8::empty(); }
+        virtual status_t setParameters(const String8& /* keyValuePairs */) {
+            return NO_ERROR;
+        }
+        virtual String8 getParameters(const String8& /* keys */) {
+            return String8::empty();
+        }
 
         // AudioRouting
         virtual status_t    setOutputDevice(audio_port_handle_t deviceId);
@@ -144,47 +144,48 @@ public:
         virtual status_t    enableAudioDeviceCallback(bool enabled);
     };
 
-                        MediaPlayer2Interface() : mClient(0), mNotify(0) { }
-    virtual             ~MediaPlayer2Interface() { }
-    virtual status_t    initCheck() = 0;
+    MediaPlayer2Interface() : mListener(NULL) { }
+    virtual ~MediaPlayer2Interface() { }
+    virtual status_t initCheck() = 0;
 
-    virtual void        setAudioSink(const sp<AudioSink>& audioSink) { mAudioSink = audioSink; }
+    virtual void setAudioSink(const sp<AudioSink>& audioSink) {
+        mAudioSink = audioSink;
+    }
 
-    virtual status_t    setDataSource(const sp<DataSourceDesc> &dsd) = 0;
+    virtual status_t setDataSource(const sp<DataSourceDesc> &dsd) = 0;
 
-    virtual status_t    prepareNextDataSource(const sp<DataSourceDesc> &dsd) = 0;
+    virtual status_t prepareNextDataSource(const sp<DataSourceDesc> &dsd) = 0;
 
-    virtual status_t    playNextDataSource(int64_t srcId) = 0;
+    virtual status_t playNextDataSource(int64_t srcId) = 0;
 
     // pass the buffered native window to the media player service
-    virtual status_t    setVideoSurfaceTexture(const sp<ANativeWindowWrapper>& nww) = 0;
+    virtual status_t setVideoSurfaceTexture(const sp<ANativeWindowWrapper>& nww) = 0;
 
-    virtual status_t    getBufferingSettings(
-                                BufferingSettings* buffering /* nonnull */) {
+    virtual status_t getBufferingSettings(BufferingSettings* buffering /* nonnull */) {
         *buffering = BufferingSettings();
         return OK;
     }
-    virtual status_t    setBufferingSettings(const BufferingSettings& /* buffering */) {
+    virtual status_t setBufferingSettings(const BufferingSettings& /* buffering */) {
         return OK;
     }
 
-    virtual status_t    prepareAsync() = 0;
-    virtual status_t    start() = 0;
-    virtual status_t    stop() = 0;
-    virtual status_t    pause() = 0;
-    virtual bool        isPlaying() = 0;
-    virtual status_t    setPlaybackSettings(const AudioPlaybackRate& rate) {
+    virtual status_t prepareAsync() = 0;
+    virtual status_t start() = 0;
+    virtual status_t stop() = 0;
+    virtual status_t pause() = 0;
+    virtual bool isPlaying() = 0;
+    virtual status_t setPlaybackSettings(const AudioPlaybackRate& rate) {
         // by default, players only support setting rate to the default
         if (!isAudioPlaybackRateEqual(rate, AUDIO_PLAYBACK_RATE_DEFAULT)) {
             return BAD_VALUE;
         }
         return OK;
     }
-    virtual status_t    getPlaybackSettings(AudioPlaybackRate* rate /* nonnull */) {
+    virtual status_t getPlaybackSettings(AudioPlaybackRate* rate /* nonnull */) {
         *rate = AUDIO_PLAYBACK_RATE_DEFAULT;
         return OK;
     }
-    virtual status_t    setSyncSettings(const AVSyncSettings& sync, float /* videoFps */) {
+    virtual status_t setSyncSettings(const AVSyncSettings& sync, float /* videoFps */) {
         // By default, players only support setting sync source to default; all other sync
         // settings are ignored. There is no requirement for getters to return set values.
         if (sync.mSource != AVSYNC_SOURCE_DEFAULT) {
@@ -192,27 +193,23 @@ public:
         }
         return OK;
     }
-    virtual status_t    getSyncSettings(
-                                AVSyncSettings* sync /* nonnull */, float* videoFps /* nonnull */) {
+    virtual status_t getSyncSettings(
+            AVSyncSettings* sync /* nonnull */, float* videoFps /* nonnull */) {
         *sync = AVSyncSettings();
         *videoFps = -1.f;
         return OK;
     }
-    virtual status_t    seekTo(
+    virtual status_t seekTo(
             int msec, MediaPlayer2SeekMode mode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC) = 0;
-    virtual status_t    getCurrentPosition(int *msec) = 0;
-    virtual status_t    getDuration(int *msec) = 0;
-    virtual status_t    reset() = 0;
-    virtual status_t    notifyAt(int64_t /* mediaTimeUs */) {
+    virtual status_t getCurrentPosition(int *msec) = 0;
+    virtual status_t getDuration(int *msec) = 0;
+    virtual status_t reset() = 0;
+    virtual status_t notifyAt(int64_t /* mediaTimeUs */) {
         return INVALID_OPERATION;
     }
-    virtual status_t    setLooping(int loop) = 0;
-    virtual status_t    setParameter(int key, const Parcel &request) = 0;
-    virtual status_t    getParameter(int key, Parcel *reply) = 0;
-
-    virtual status_t setNextPlayer(const sp<MediaPlayer2Interface>& /* next */) {
-        return OK;
-    }
+    virtual status_t setLooping(int loop) = 0;
+    virtual status_t setParameter(int key, const Parcel &request) = 0;
+    virtual status_t getParameter(int key, Parcel *reply) = 0;
 
     // Invoke a generic method on the player by using opaque parcels
     // for the request and reply.
@@ -221,7 +218,7 @@ public:
     //                data sent by the java layer.
     // @param[out] reply Parcel to hold the reply data. Cannot be null.
     // @return OK if the call was successful.
-    virtual status_t    invoke(const Parcel& request, Parcel *reply) = 0;
+    virtual status_t invoke(const Parcel& request, Parcel *reply) = 0;
 
     // The Client in the MetadataPlayerService calls this method on
     // the native player to retrieve all or a subset of metadata.
@@ -230,28 +227,26 @@ public:
     //            the known metadata should be returned.
     // @param[inout] records Parcel where the player appends its metadata.
     // @return OK if the call was successful.
-    virtual status_t    getMetadata(const media::Metadata::Filter& /* ids */,
-                                    Parcel* /* records */) {
+    virtual status_t getMetadata(const media::Metadata::Filter& /* ids */,
+                                 Parcel* /* records */) {
         return INVALID_OPERATION;
     };
 
-    void        setNotifyCallback(
-            const wp<MediaPlayer2Engine> &client, NotifyCallback notifyFunc) {
-        Mutex::Autolock autoLock(mNotifyLock);
-        mClient = client; mNotify = notifyFunc;
+    void setListener(const sp<MediaPlayer2InterfaceListener> &listener) {
+        Mutex::Autolock autoLock(mListenerLock);
+        mListener = listener;
     }
 
-    void        sendEvent(int64_t srcId, int msg, int ext1=0, int ext2=0,
-                          const Parcel *obj=NULL) {
-        NotifyCallback notifyCB;
-        wp<MediaPlayer2Engine> client;
+    void sendEvent(int64_t srcId, int msg, int ext1=0, int ext2=0, const Parcel *obj=NULL) {
+        sp<MediaPlayer2InterfaceListener> listener;
         {
-            Mutex::Autolock autoLock(mNotifyLock);
-            notifyCB = mNotify;
-            client = mClient;
+            Mutex::Autolock autoLock(mListenerLock);
+            listener = mListener;
         }
 
-        if (notifyCB) notifyCB(client, srcId, msg, ext1, ext2, obj);
+        if (listener) {
+            listener->notify(srcId, msg, ext1, ext2, obj);
+        }
     }
 
     virtual status_t dump(int /* fd */, const Vector<String16>& /* args */) const {
@@ -261,7 +256,8 @@ public:
     virtual void onMessageReceived(const sp<AMessage> & /* msg */) override { }
 
     // Modular DRM
-    virtual status_t prepareDrm(const uint8_t /* uuid */[16], const Vector<uint8_t>& /* drmSessionId */) {
+    virtual status_t prepareDrm(const uint8_t /* uuid */[16],
+                                const Vector<uint8_t>& /* drmSessionId */) {
         return INVALID_OPERATION;
     }
     virtual status_t releaseDrm() {
@@ -269,14 +265,11 @@ public:
     }
 
 protected:
-    sp<AudioSink>       mAudioSink;
+    sp<AudioSink> mAudioSink;
 
 private:
-    friend class MediaPlayer2Manager;
-
-    Mutex                  mNotifyLock;
-    wp<MediaPlayer2Engine> mClient;
-    NotifyCallback         mNotify;
+    Mutex mListenerLock;
+    sp<MediaPlayer2InterfaceListener> mListener;
 };
 
 }; // namespace android
