@@ -51,6 +51,11 @@ public:
             void        flush();
             void        destroy();
             int         name() const { return mName; }
+            void        setName(int name) {
+                LOG_ALWAYS_FATAL_IF(mName >= 0 && name >= 0,
+                        "%s both old name %d and new name %d are valid", __func__, mName, name);
+                mName = name;
+            }
 
     virtual uint32_t    sampleRate() const;
 
@@ -146,10 +151,7 @@ protected:
 
     bool                mResetDone;
     const audio_stream_type_t mStreamType;
-    int                 mName;      // track name on the normal mixer,
-                                    // allocated statically at track creation time,
-                                    // and is even allocated (though unused) for fast tracks
-                                    // FIXME don't allocate track name for fast tracks
+    int                 mName;
     effect_buffer_t     *mMainBuffer;
 
     int32_t             *mAuxBuffer;

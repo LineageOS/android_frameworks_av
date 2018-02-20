@@ -46,10 +46,6 @@ namespace android {
 class AudioMixer
 {
 public:
-    // This mixer has a hard-coded upper limit of active track inputs;
-    // the value is arbitrary but should be less than TRACK0 to avoid confusion.
-    static constexpr int32_t MAX_NUM_TRACKS = 256;
-
     // Do not change these unless underlying code changes.
     // This mixer has a hard-coded upper limit of 8 channels for output.
     static constexpr uint32_t MAX_NUM_CHANNELS = FCC_8;
@@ -61,12 +57,6 @@ public:
     static const CONSTEXPR float UNITY_GAIN_FLOAT = 1.0f;
 
     enum { // names
-
-        // track names (MAX_NUM_TRACKS units)
-        TRACK0          = 0x1000,
-
-        // 0x2000 is unused
-
         // setParameter targets
         TRACK           = 0x3000,
         RESAMPLE        = 0x3001,
@@ -105,23 +95,33 @@ public:
                                   // parameter 'value' is a pointer to the new playback rate.
     };
 
-    AudioMixer(size_t frameCount, uint32_t sampleRate, int32_t maxNumTracks = MAX_NUM_TRACKS)
-        : mMaxNumTracks(maxNumTracks)
-        , mSampleRate(sampleRate)
+    AudioMixer(size_t frameCount, uint32_t sampleRate)
+        : mSampleRate(sampleRate)
         , mFrameCount(frameCount) {
         pthread_once(&sOnceControl, &sInitRoutine);
     }
 
-    // For all APIs with "name": TRACK0 <= name < TRACK0 + MAX_NUM_TRACKS
+    // Create a new track in the mixer.
+    //
+    // \param name        a unique user-provided integer associated with the track.
+    //                    If name already exists, the function will abort.
+    // \param channelMask output channel mask.
+    // \param format      PCM format
+    // \param sessionId   Session id for the track. Tracks with the same
+    //                    session id will be submixed together.
+    //
+    // \return OK        on success.
+    //         BAD_VALUE if the format does not satisfy isValidFormat()
+    //                   or the channelMask does not satisfy isValidChannelMask().
+    status_t    create(
+            int name, audio_channel_mask_t channelMask, audio_format_t format, int sessionId);
 
-    // Allocate a track name.  Returns new track name if successful, -1 on failure.
-    // The failure could be because of an invalid channelMask or format, or that
-    // the track capacity of the mixer is exceeded.
-    int         getTrackName(audio_channel_mask_t channelMask,
-                             audio_format_t format, int sessionId);
+    bool        exists(int name) const {
+        return mTracks.count(name) > 0;
+    }
 
-    // Free an allocated track by name
-    void        deleteTrackName(int name);
+    // Free an allocated track by name.
+    void        destroy(int name);
 
     // Enable or disable an allocated track by name
     void        enable(int name);
@@ -147,6 +147,23 @@ public:
 
     void        setNBLogWriter(NBLog::Writer *logWriter) {
         mNBLogWriter = logWriter;
+    }
+
+    static inline bool isValidFormat(audio_format_t format) {
+        switch (format) {
+        case AUDIO_FORMAT_PCM_8_BIT:
+        case AUDIO_FORMAT_PCM_16_BIT:
+        case AUDIO_FORMAT_PCM_24_BIT_PACKED:
+        case AUDIO_FORMAT_PCM_32_BIT:
+        case AUDIO_FORMAT_PCM_FLOAT:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    static inline bool isValidChannelMask(audio_channel_mask_t channelMask) {
+        return audio_channel_mask_is_valid(channelMask); // the RemixBufferProvider is flexible.
     }
 
 private:
@@ -361,23 +378,9 @@ private:
     static void convertMixerFormat(void *out, audio_format_t mixerOutFormat,
             void *in, audio_format_t mixerInFormat, size_t sampleCount);
 
-    static inline bool isValidPcmTrackFormat(audio_format_t format) {
-        switch (format) {
-        case AUDIO_FORMAT_PCM_8_BIT:
-        case AUDIO_FORMAT_PCM_16_BIT:
-        case AUDIO_FORMAT_PCM_24_BIT_PACKED:
-        case AUDIO_FORMAT_PCM_32_BIT:
-        case AUDIO_FORMAT_PCM_FLOAT:
-            return true;
-        default:
-            return false;
-        }
-    }
-
     static void sInitRoutine();
 
     // initialization constants
-    const int mMaxNumTracks;
     const uint32_t mSampleRate;
     const size_t mFrameCount;
 
@@ -389,12 +392,6 @@ private:
     // by the mixer.
     std::unique_ptr<int32_t[]> mOutputTemp;
     std::unique_ptr<int32_t[]> mResampleTemp;
-
-    // fast lookup of previously deleted track names for reuse.
-    // the AudioMixer tries to return the smallest unused name -
-    // this is an arbitrary decision (actually any non-negative
-    // integer that isn't in mTracks could be used).
-    std::set<int /* name */> mUnusedNames;    // set of unused track names (may be empty)
 
     // track names grouped by main buffer, in no particular order of main buffer.
     // however names for a particular main buffer are in order (by construction).
