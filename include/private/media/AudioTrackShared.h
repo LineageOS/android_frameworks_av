@@ -438,7 +438,11 @@ public:
         return 0;
     }
 
-    virtual uint32_t    getUnderrunFrames() const {
+    virtual uint32_t getUnderrunFrames() const override {
+        return 0;
+    }
+
+    virtual uint32_t getUnderrunCount() const override {
         return 0;
     }
 
