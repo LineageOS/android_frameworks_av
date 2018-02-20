@@ -434,6 +434,20 @@ void MediaCodecSource::signalBufferReturned(MediaBufferBase *buffer) {
     buffer->release();
 }
 
+status_t MediaCodecSource::setEncodingBitrate(int32_t bitRate) {
+    ALOGV("setEncodingBitrate (%d)", bitRate);
+
+    if (mEncoder == NULL) {
+        ALOGW("setEncodingBitrate (%d) : mEncoder is null", bitRate);
+        return BAD_VALUE;
+    }
+
+    sp<AMessage> params = new AMessage;
+    params->setInt32("video-bitrate", bitRate);
+
+    return mEncoder->setParameters(params);
+}
+
 MediaCodecSource::MediaCodecSource(
         const sp<ALooper> &looper,
         const sp<AMessage> &outputFormat,

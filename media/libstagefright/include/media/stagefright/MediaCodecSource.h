@@ -64,6 +64,7 @@ struct MediaCodecSource : public MediaSource,
 
     // MediaBufferObserver
     virtual void signalBufferReturned(MediaBufferBase *buffer);
+    virtual status_t setEncodingBitrate(int32_t bitRate);
 
     // for AHandlerReflector
     void onMessageReceived(const sp<AMessage> &msg);

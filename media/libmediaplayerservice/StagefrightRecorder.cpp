@@ -567,6 +567,17 @@ status_t StagefrightRecorder::setParamVideoEncodingBitRate(int32_t bitRate) {
     // range that a specific encoder supports. The mismatch between the
     // the target and requested bit rate will NOT be treated as an error.
     mVideoBitRate = bitRate;
+
+    // A new bitrate(TMMBR) should be applied on runtime as well if OutputFormat is RTP_AVP
+    if (mOutputFormat == OUTPUT_FORMAT_RTP_AVP &&  mStarted && mPauseStartTimeUs == 0) {
+        /* Regular I frames overloads on the network so we should consider about it.
+         * Discounted encoding bitrate will be margins for the overloads.
+         * But applied bitrate reply(TMMBN) must be sent as same as TMMBR */
+        const float coefficient = 0.8f;
+        mVideoBitRate = (bitRate * coefficient) / 1000 * 1000;
+        mVideoEncoderSource->setEncodingBitrate(mVideoBitRate);
+    }
+
     return OK;
 }
 
