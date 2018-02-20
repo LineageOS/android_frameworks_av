@@ -134,7 +134,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             // media keys to.
             boolean accept = allowedCommands != null || request.isTrusted();
             ControllerInfoImpl impl = ControllerInfoImpl.from(request);
-            if (accept && allowedCommands != null) {
+            if (accept) {
                 if (DEBUG) {
                     Log.d(TAG, "Accepting connection, request=" + request
                             + " allowedCommands=" + allowedCommands);
