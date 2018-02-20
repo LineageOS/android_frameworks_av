@@ -9,7 +9,7 @@ cc_library {
 
     srcs: [
         "JAudioTrack.cpp",
-        "MediaPlayer2Manager.cpp",
+        "MediaPlayer2AudioOutput.cpp",
         "mediaplayer2.cpp",
     ],
 
