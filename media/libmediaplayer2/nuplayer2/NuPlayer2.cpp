@@ -2765,10 +2765,10 @@ void NuPlayer2::onSourceNotify(const sp<AMessage> &msg) {
                 break;
             }
 
-            int posMs;
+            int64_t posMs;
             int64_t timeUs, posUs;
             driver->getCurrentPosition(&posMs);
-            posUs = (int64_t) posMs * 1000ll;
+            posUs = posMs * 1000ll;
             CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
 
             if (posUs < timeUs) {

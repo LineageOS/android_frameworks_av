@@ -87,7 +87,6 @@ public:
 
     static bool isOnEmulator();
     static int getMinBufferCount();
-    void setNextOutput(const sp<MediaPlayer2AudioOutput>& nextOutput);
     virtual bool needsTrailingPadding() {
         return true;
         // TODO: return correct value.

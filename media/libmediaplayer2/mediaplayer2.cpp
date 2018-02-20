@@ -936,27 +936,27 @@ status_t MediaPlayer2::getVideoHeight(int *h) {
     return NO_ERROR;
 }
 
-status_t MediaPlayer2::getCurrentPosition(int *msec) {
+status_t MediaPlayer2::getCurrentPosition(int64_t *msec) {
     ALOGV("getCurrentPosition");
     Mutex::Autolock _l(mLock);
     if (mPlayer == 0) {
         return INVALID_OPERATION;
     }
     if (mCurrentPosition >= 0) {
-        ALOGV("Using cached seek position: %d", mCurrentPosition);
+        ALOGV("Using cached seek position: %lld", (long long)mCurrentPosition);
         *msec = mCurrentPosition;
         return NO_ERROR;
     }
     status_t ret = mPlayer->getCurrentPosition(msec);
     if (ret == NO_ERROR) {
-        ALOGV("getCurrentPosition = %d", *msec);
+        ALOGV("getCurrentPosition = %lld", (long long)*msec);
     } else {
         ALOGE("getCurrentPosition returned %d", ret);
     }
     return ret;
 }
 
-status_t MediaPlayer2::getDuration(int *msec) {
+status_t MediaPlayer2::getDuration(int64_t *msec) {
     Mutex::Autolock _l(mLock);
     ALOGV("getDuration_l");
     bool isValidState = (mCurrentState & (MEDIA_PLAYER2_PREPARED | MEDIA_PLAYER2_STARTED |
@@ -966,11 +966,11 @@ status_t MediaPlayer2::getDuration(int *msec) {
                 mPlayer.get(), mCurrentState);
         return INVALID_OPERATION;
     }
-    int durationMs;
+    int64_t durationMs;
     status_t ret = mPlayer->getDuration(&durationMs);
 
     if (ret == NO_ERROR) {
-        ALOGV("getDuration = %d", durationMs);
+        ALOGV("getDuration = %lld", (long long)durationMs);
     } else {
         ALOGE("getDuration returned %d", ret);
         // Do not enter error state just because no duration was available.
@@ -983,50 +983,47 @@ status_t MediaPlayer2::getDuration(int *msec) {
     return OK;
 }
 
-status_t MediaPlayer2::seekTo_l(int msec, MediaPlayer2SeekMode mode) {
-    ALOGV("seekTo (%d, %d)", msec, mode);
-    if ((mPlayer != 0) && ( mCurrentState & ( MEDIA_PLAYER2_STARTED | MEDIA_PLAYER2_PREPARED |
-            MEDIA_PLAYER2_PAUSED |  MEDIA_PLAYER2_PLAYBACK_COMPLETE) ) ) {
-        if (msec < 0) {
-            ALOGW("Attempt to seek to invalid position: %d", msec);
-            msec = 0;
-        }
-
-        int durationMs;
-        status_t err = mPlayer->getDuration(&durationMs);
-
-        if (err != OK) {
-            ALOGW("Stream has no duration and is therefore not seekable.");
-            return err;
-        }
-
-        if (msec > durationMs) {
-            ALOGW("Attempt to seek to past end of file: request = %d, "
-                  "durationMs = %d",
-                  msec,
-                  durationMs);
-
-            msec = durationMs;
-        }
-
-        // cache duration
-        mCurrentPosition = msec;
-        mCurrentSeekMode = mode;
-        if (mSeekPosition < 0) {
-            mSeekPosition = msec;
-            mSeekMode = mode;
-            return mPlayer->seekTo(msec, mode);
-        } else {
-            ALOGV("Seek in progress - queue up seekTo[%d, %d]", msec, mode);
-            return NO_ERROR;
-        }
+status_t MediaPlayer2::seekTo_l(int64_t msec, MediaPlayer2SeekMode mode) {
+    ALOGV("seekTo (%lld, %d)", (long long)msec, mode);
+    if ((mPlayer == 0) || !(mCurrentState & (MEDIA_PLAYER2_STARTED | MEDIA_PLAYER2_PREPARED |
+            MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_PLAYBACK_COMPLETE))) {
+        ALOGE("Attempt to perform seekTo in wrong state: mPlayer=%p, mCurrentState=%u",
+              mPlayer.get(), mCurrentState);
+        return INVALID_OPERATION;
     }
-    ALOGE("Attempt to perform seekTo in wrong state: mPlayer=%p, mCurrentState=%u", mPlayer.get(),
-            mCurrentState);
-    return INVALID_OPERATION;
+    if (msec < 0) {
+        ALOGW("Attempt to seek to invalid position: %lld", (long long)msec);
+        msec = 0;
+    }
+
+    int64_t durationMs;
+    status_t err = mPlayer->getDuration(&durationMs);
+
+    if (err != OK) {
+        ALOGW("Stream has no duration and is therefore not seekable.");
+        return err;
+    }
+
+    if (msec > durationMs) {
+        ALOGW("Attempt to seek to past end of file: request = %lld, durationMs = %lld",
+              (long long)msec, (long long)durationMs);
+
+        msec = durationMs;
+    }
+
+    // cache duration
+    mCurrentPosition = msec;
+    mCurrentSeekMode = mode;
+    if (mSeekPosition < 0) {
+        mSeekPosition = msec;
+        mSeekMode = mode;
+        return mPlayer->seekTo(msec, mode);
+    }
+    ALOGV("Seek in progress - queue up seekTo[%lld, %d]", (long long)msec, mode);
+    return NO_ERROR;
 }
 
-status_t MediaPlayer2::seekTo(int msec, MediaPlayer2SeekMode mode) {
+status_t MediaPlayer2::seekTo(int64_t msec, MediaPlayer2SeekMode mode) {
     mLockThreadId = getThreadId();
     Mutex::Autolock _l(mLock);
     status_t result = seekTo_l(msec, mode);
@@ -1228,6 +1225,16 @@ status_t MediaPlayer2::setParameter(int key, const Parcel& request) {
 status_t MediaPlayer2::getParameter(int key, Parcel *reply) {
     ALOGV("MediaPlayer2::getParameter(%d)", key);
     Mutex::Autolock _l(mLock);
+    if (key == MEDIA2_KEY_PARAMETER_AUDIO_ATTRIBUTES) {
+        if (reply == NULL) {
+            return BAD_VALUE;
+        }
+        if (mAudioAttributesParcel != NULL) {
+            reply->appendFrom(mAudioAttributesParcel, 0, mAudioAttributesParcel->dataSize());
+        }
+        return OK;
+    }
+
     if (mPlayer == NULL) {
         ALOGV("getParameter: no active player");
         return INVALID_OPERATION;
@@ -1339,7 +1346,8 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Parc
     case MEDIA2_SEEK_COMPLETE:
         ALOGV("Received seek complete");
         if (mSeekPosition != mCurrentPosition || (mSeekMode != mCurrentSeekMode)) {
-            ALOGV("Executing queued seekTo(%d, %d)", mCurrentPosition, mCurrentSeekMode);
+            ALOGV("Executing queued seekTo(%lld, %d)",
+                  (long long)mCurrentPosition, mCurrentSeekMode);
             mSeekPosition = -1;
             mSeekMode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC;
             seekTo_l(mCurrentPosition, mCurrentSeekMode);
@@ -1385,10 +1393,6 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Parc
         listener->notify(srcId, msg, ext1, ext2, obj);
         ALOGV("back from callback");
     }
-}
-
-status_t MediaPlayer2::setNextMediaPlayer(const sp<MediaPlayer2>& /* next */) {
-    return INVALID_OPERATION;
 }
 
 // Modular DRM
