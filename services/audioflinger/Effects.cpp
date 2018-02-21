@@ -2016,7 +2016,20 @@ std::vector<int> AudioFlinger::EffectChain::getEffectIds()
 void AudioFlinger::EffectChain::clearInputBuffer()
 {
     Mutex::Autolock _l(mLock);
+<<<<<<< HEAD   (1dab63 Camera: Add support for preview frame fd)
     clearInputBuffer_l();
+=======
+    sp<ThreadBase> thread = mThread.promote();
+    if (thread == 0) {
+        ALOGW("clearInputBuffer(): cannot promote mixer thread");
+        return;
+    }
+    clearInputBuffer_l(thread);
+
+    for (size_t i = 0; i < mEffects.size(); i++) {
+        mEffects[i]->reset_l();
+    }
+>>>>>>> CHANGE (4f286f Request to reset effect buffer in clearInputBuffer)
 }
 
 // Must be called with EffectChain::mLock locked
