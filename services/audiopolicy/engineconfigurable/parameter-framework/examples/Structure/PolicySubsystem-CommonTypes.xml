@@ -37,6 +37,10 @@
             <BitParameter Name="speaker_safe" Size="1" Pos="22"/>
             <BitParameter Name="ip" Size="1" Pos="23"/>
             <BitParameter Name="bus" Size="1" Pos="24"/>
+            <BitParameter Name="proxy" Size="1" Pos="25"/>
+            <BitParameter Name="usb_headset" Size="1" Pos="26"/>
+            <BitParameter Name="hearing_aid" Size="1" Pos="27"/>
+            <BitParameter Name="echo_canceller" Size="1" Pos="28"/>
             <BitParameter Name="stub" Size="1" Pos="30"/>
         </BitParameterBlock>
     </ComponentType>
@@ -67,6 +71,9 @@
             <BitParameter Name="loopback" Size="1" Pos="18"/>
             <BitParameter Name="ip" Size="1" Pos="19"/>
             <BitParameter Name="bus" Size="1" Pos="20"/>
+            <BitParameter Name="proxy" Size="1" Pos="21"/>
+            <BitParameter Name="usb_headset" Size="1" Pos="22"/>
+            <BitParameter Name="bluetooth_ble" Size="1" Pos="23"/>
             <BitParameter Name="stub" Size="1" Pos="30"/>
         </BitParameterBlock>
     </ComponentType>
