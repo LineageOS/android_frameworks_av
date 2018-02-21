@@ -466,5 +466,9 @@ c2_status_t C2AllocatorIon::priorLinearAllocation(
     return ret;
 }
 
+bool C2AllocatorIon::isValid(const C2Handle* const o) {
+    return C2HandleIon::isValid(o);
+}
+
 } // namespace android
 

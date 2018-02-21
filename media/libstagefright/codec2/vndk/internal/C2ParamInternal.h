@@ -20,6 +20,14 @@
 #include <C2Param.h>
 
 struct C2_HIDE _C2ParamInspector {
+    inline static uint32_t GetOffset(const C2FieldDescriptor &fd) {
+        return fd._mFieldId._mOffset;
+    }
+
+    inline static uint32_t GetSize(const C2FieldDescriptor &fd) {
+        return fd._mFieldId._mSize;
+    }
+
     inline static uint32_t GetIndex(const C2ParamField &pf) {
         return pf._mIndex;
     }

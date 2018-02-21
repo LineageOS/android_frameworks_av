@@ -646,4 +646,8 @@ c2_status_t C2AllocatorGralloc::status() const {
     return mImpl->status();
 }
 
+bool C2AllocatorGralloc::isValid(const C2Handle* const o) {
+    return C2HandleGralloc::isValid(o);
+}
+
 } // namespace android

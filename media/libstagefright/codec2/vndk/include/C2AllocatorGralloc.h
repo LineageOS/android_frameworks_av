@@ -65,6 +65,8 @@ public:
 
     virtual ~C2AllocatorGralloc() override;
 
+    static bool isValid(const C2Handle* const o);
+
 private:
     class Impl;
     Impl *mImpl;
