@@ -21,8 +21,6 @@
 
 #include <C2Buffer.h>
 
-namespace android {
-
 class C2BasicLinearBlockPool : public C2BlockPool {
 public:
     explicit C2BasicLinearBlockPool(const std::shared_ptr<C2Allocator> &allocator);
@@ -72,7 +70,5 @@ public:
 private:
     const std::shared_ptr<C2Allocator> mAllocator;
 };
-
-} // namespace android
 
 #endif // STAGEFRIGHT_CODEC2_BUFFER_PRIV_H_

@@ -21,12 +21,13 @@
 #include <util/_C2MacroUtils.h>
 
 #include <iostream>
+#include <list>
+#include <utility>
+#include <vector>
 
 /** \file
  * Utilities for parameter handling to be used by Codec2 implementations.
  */
-
-namespace android {
 
 /// \cond INTERNAL
 
@@ -312,8 +313,6 @@ std::list<const C2FieldDescriptor> describeC2Params() {
 #endif
 
 /* ---------------------------- UTILITIES FOR ENUMERATION REFLECTION ---------------------------- */
-
-}  // namespace android
 
 #endif  // C2UTILS_PARAM_UTILS_H_
 

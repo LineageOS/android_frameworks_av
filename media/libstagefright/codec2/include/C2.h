@@ -17,40 +17,18 @@
 #ifndef C2_H_
 #define C2_H_
 
-#include <string>
-#include <vector>
-#include <list>
-
-#ifdef __ANDROID__
-
-#include <utils/Errors.h>       // for status_t
-#include <utils/Timers.h>       // for nsecs_t
-
-namespace android {
-
-#else
-
 #include <errno.h>
-typedef int64_t nsecs_t;
 
-enum {
-    GRALLOC_USAGE_SW_READ_OFTEN,
-    GRALLOC_USAGE_RENDERSCRIPT,
-    GRALLOC_USAGE_HW_TEXTURE,
-    GRALLOC_USAGE_HW_COMPOSER,
-    GRALLOC_USAGE_HW_VIDEO_ENCODER,
-    GRALLOC_USAGE_PROTECTED,
-    GRALLOC_USAGE_SW_WRITE_OFTEN,
-    GRALLOC_USAGE_HW_RENDER,
-};
+#include <string>
 
-#endif
+/** nanoseconds with arbitrary origin. */
+typedef int64_t c2_nsecs_t;
 
 /** \mainpage Codec2
  *
- * Codec2 is a frame-based data processing API used by android.
+ * Codec2 is a generic frame-based data processing API.
  *
- * The framework accesses components via the \ref API.
+ * The media subsystem accesses components via the \ref API.
  */
 
 /** \ingroup API
@@ -109,53 +87,35 @@ typedef const char *C2StringLiteral;
  * c2_status_t: status codes used.
  */
 enum c2_status_t : int32_t {
-
 /*
- * Use android status constants if available. Otherwise, define the android status constants as
- * additional enum values using POSIX errno constants.
+ * Use POSIX errno constants.
  */
-#ifndef __ANDROID__
-    ALREADY_EXISTS      = -EEXIST,
-    BAD_VALUE           = -EINVAL,
-    BAD_INDEX           = -EOVERFLOW,
-    FAILED_TRANSACTION  = -ENOTSUP,
-    INVALID_OPERATION   = -ENOSYS,
-    NAME_NOT_FOUND      = -ENOENT,
-    NO_MEMORY           = -ENOMEM,
-    NO_INIT             = -ENODEV,
-    OK                  = 0,
-    PERMISSION_DENIED   = -EPERM,
-    TIMED_OUT           = -ETIMEDOUT,
-    UNKNOWN_ERROR       = -EFAULT,
-    UNKNOWN_TRANSACTION = -EBADMSG,
-    WOULD_BLOCK         = -EWOULDBLOCK,
-#endif
-
-    C2_OK        = OK,                   ///< operation completed successfully
+    C2_OK        = 0,            ///< operation completed successfully
 
     // bad input
-    C2_BAD_VALUE = BAD_VALUE,            ///< argument has invalid value (user error)
-    C2_BAD_INDEX = BAD_INDEX,            ///< argument uses invalid index (user error)
-    C2_CANNOT_DO = FAILED_TRANSACTION,   ///< argument/index is valid but not possible
+    C2_BAD_VALUE = EINVAL,       ///< argument has invalid value (user error)
+    C2_BAD_INDEX = ENXIO,        ///< argument uses invalid index (user error)
+    C2_CANNOT_DO = ENOTSUP,      ///< argument/index is valid but not possible
 
     // bad sequencing of events
-    C2_DUPLICATE = ALREADY_EXISTS,       ///< object already exists
-    C2_NOT_FOUND = NAME_NOT_FOUND,       ///< object not found
-    C2_BAD_STATE = INVALID_OPERATION,    ///< operation is not permitted in the current state
-    C2_BLOCKING  = WOULD_BLOCK,          ///< operation would block but blocking is not permitted
+    C2_DUPLICATE = EEXIST,       ///< object already exists
+    C2_NOT_FOUND = ENOENT,       ///< object not found
+    C2_BAD_STATE = EPERM,        ///< operation is not permitted in the current state
+    C2_BLOCKING  = EWOULDBLOCK,  ///< operation would block but blocking is not permitted
+    C2_CANCELED  = EINTR,        ///< operation interrupted/canceled
 
     // bad environment
-    C2_NO_MEMORY = NO_MEMORY,            ///< not enough memory to complete operation
-    C2_REFUSED   = PERMISSION_DENIED,    ///< missing permission to complete operation
+    C2_NO_MEMORY = ENOMEM,       ///< not enough memory to complete operation
+    C2_REFUSED   = EACCES,       ///< missing permission to complete operation
 
-    C2_TIMED_OUT = TIMED_OUT,            ///< operation did not complete within timeout
+    C2_TIMED_OUT = ETIMEDOUT,    ///< operation did not complete within timeout
 
     // bad versioning
-    C2_OMITTED   = UNKNOWN_TRANSACTION,  ///< operation is not implemented/supported (optional only)
+    C2_OMITTED   = ENOSYS,       ///< operation is not implemented/supported (optional only)
 
     // unknown fatal
-    C2_CORRUPTED = UNKNOWN_ERROR,        ///< some unexpected error prevented the operation
-    C2_NO_INIT   = NO_INIT,              ///< status has not been initialized
+    C2_CORRUPTED = EFAULT,       ///< some unexpected error prevented the operation
+    C2_NO_INIT   = ENODEV,       ///< status has not been initialized
 };
 
 /**
@@ -185,11 +145,12 @@ enum c2_blocking_t : int32_t {
     type args& operator=(const type args&) = delete; \
     type(const type args&) = delete; \
 
-#define C2_PURE __attribute__((pure))
-#define C2_CONST __attribute__((const))
-#define C2_HIDE __attribute__((visibility("hidden")))
-#define C2_INTERNAL __attribute__((internal_linkage))
 #define C2_ALLOW_OVERFLOW __attribute__((no_sanitize("integer")))
+#define C2_CONST    __attribute__((const))
+#define C2_HIDE     __attribute__((visibility("hidden")))
+#define C2_INTERNAL __attribute__((internal_linkage))
+#define C2_PACK     __attribute__((packed))
+#define C2_PURE     __attribute__((pure))
 
 #define DEFINE_OTHER_COMPARISON_OPERATORS(type) \
     inline bool operator!=(const type &other) const { return !(*this == other); } \
@@ -548,32 +509,28 @@ inline constexpr typename c2_types<T, V>::wide_type c2_clamp(const T a, const U 
 
 /// @}
 
-#ifdef __ANDROID__
-} // namespace android
-#endif
-
 #include <functional>
 template<typename T>
-struct std::less<::android::c2_cntr_t<T>> {
-    constexpr bool operator()(const ::android::c2_cntr_t<T> &lh, const ::android::c2_cntr_t<T> &rh) const {
+struct std::less<::c2_cntr_t<T>> {
+    constexpr bool operator()(const ::c2_cntr_t<T> &lh, const ::c2_cntr_t<T> &rh) const {
         return lh.peeku() < rh.peeku();
     }
 };
 template<typename T>
-struct std::less_equal<::android::c2_cntr_t<T>> {
-    constexpr bool operator()(const ::android::c2_cntr_t<T> &lh, const ::android::c2_cntr_t<T> &rh) const {
+struct std::less_equal<::c2_cntr_t<T>> {
+    constexpr bool operator()(const ::c2_cntr_t<T> &lh, const ::c2_cntr_t<T> &rh) const {
         return lh.peeku() <= rh.peeku();
     }
 };
 template<typename T>
-struct std::greater<::android::c2_cntr_t<T>> {
-    constexpr bool operator()(const ::android::c2_cntr_t<T> &lh, const ::android::c2_cntr_t<T> &rh) const {
+struct std::greater<::c2_cntr_t<T>> {
+    constexpr bool operator()(const ::c2_cntr_t<T> &lh, const ::c2_cntr_t<T> &rh) const {
         return lh.peeku() > rh.peeku();
     }
 };
 template<typename T>
-struct std::greater_equal<::android::c2_cntr_t<T>> {
-    constexpr bool operator()(const ::android::c2_cntr_t<T> &lh, const ::android::c2_cntr_t<T> &rh) const {
+struct std::greater_equal<::c2_cntr_t<T>> {
+    constexpr bool operator()(const ::c2_cntr_t<T> &lh, const ::c2_cntr_t<T> &rh) const {
         return lh.peeku() >= rh.peeku();
     }
 };
