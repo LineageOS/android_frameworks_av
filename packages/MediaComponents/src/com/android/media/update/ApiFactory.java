@@ -44,7 +44,6 @@ import android.media.MediaSessionService2;
 import android.media.MediaSessionService2.MediaNotification;
 import android.media.PlaybackState2;
 import android.media.Rating2;
-import android.media.SessionPlayer2;
 import android.media.SessionToken2;
 import android.media.VolumeProvider2;
 import android.media.update.MediaBrowser2Provider;
@@ -60,7 +59,6 @@ import android.media.update.MediaSession2Provider.PlaylistParamsProvider;
 import android.media.update.MediaSessionService2Provider;
 import android.media.update.MediaSessionService2Provider.MediaNotificationProvider;
 import android.media.update.PlaybackState2Provider;
-import android.media.update.SessionPlayer2Provider;
 import android.media.update.SessionToken2Provider;
 import android.media.update.StaticProvider;
 import android.media.update.VideoView2Provider;
@@ -227,12 +225,6 @@ public class ApiFactory implements StaticProvider {
     @Override
     public SessionToken2 SessionToken2_fromBundle(Context context, Bundle bundle) {
         return SessionToken2Impl.fromBundle_impl(context, bundle);
-    }
-
-    @Override
-    public SessionPlayer2Provider createSessionPlayer2(Context context, SessionPlayer2 instance) {
-        // TODO(jaewan): Implement this
-        return null;
     }
 
     @Override
