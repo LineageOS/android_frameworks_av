@@ -17,8 +17,10 @@
 #ifndef CLEARKEY_DRM_PLUGIN_H_
 #define CLEARKEY_DRM_PLUGIN_H_
 
-
 #include <android/hardware/drm/1.1/IDrmPlugin.h>
+
+#include <stdio.h>
+#include <map>
 
 #include "SessionLibrary.h"
 #include "Utils.h"
@@ -36,6 +38,7 @@ using ::android::hardware::drm::V1_0::KeyType;
 using ::android::hardware::drm::V1_0::KeyValue;
 using ::android::hardware::drm::V1_0::SecureStop;
 using ::android::hardware::drm::V1_0::SecureStopId;
+using ::android::hardware::drm::V1_0::SessionId;
 using ::android::hardware::drm::V1_0::Status;
 using ::android::hardware::drm::V1_1::DrmMetricGroup;
 using ::android::hardware::drm::V1_1::IDrmPlugin;
@@ -122,34 +125,6 @@ struct DrmPlugin : public IDrmPlugin {
         }
         _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, hidl_vec<uint8_t>(), hidl_vec<uint8_t>());
         return Void();
-    }
-
-    Return<void> getSecureStops(getSecureStops_cb _hidl_cb) {
-        _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, hidl_vec<SecureStop>());
-        return Void();
-    }
-
-    Return<void> getSecureStop(
-        const hidl_vec<uint8_t>& secureStopId,
-        getSecureStop_cb _hidl_cb) {
-
-        if (secureStopId.size() == 0) {
-            _hidl_cb(Status::BAD_VALUE, SecureStop());
-            return Void();
-        }
-        _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, SecureStop());
-        return Void();
-    }
-
-    Return<Status> releaseSecureStop(const hidl_vec<uint8_t>& ssRelease) {
-        if (ssRelease.size() == 0) {
-            return Status::BAD_VALUE;
-        }
-        return Status::ERROR_DRM_CANNOT_HANDLE;
-    }
-
-    Return<Status> releaseAllSecureStops() {
-        return Status::ERROR_DRM_CANNOT_HANDLE;
     }
 
     Return<void> getHdcpLevels(getHdcpLevels_cb _hidl_cb) {
@@ -305,31 +280,26 @@ struct DrmPlugin : public IDrmPlugin {
         return Void();
     }
 
-    Return<void> getSecureStopIds(getSecureStopIds_cb _hidl_cb) {
-        _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, hidl_vec<SecureStopId>());
-        return Void();
-    }
+    Return<void> getSecureStops(getSecureStops_cb _hidl_cb);
 
-    Return<Status> releaseSecureStops(const SecureStopRelease& ssRelease) {
-        if (ssRelease.opaqueData.size() == 0) {
-            return Status::BAD_VALUE;
-        }
-        return Status::ERROR_DRM_CANNOT_HANDLE;
-    }
+    Return<void> getSecureStop(const hidl_vec<uint8_t>& secureStopId,
+            getSecureStop_cb _hidl_cb);
 
-    Return<Status> removeSecureStop(const hidl_vec<uint8_t>& secureStopId) {
-        if (secureStopId.size() == 0) {
-            return Status::BAD_VALUE;
-        }
-        return Status::ERROR_DRM_CANNOT_HANDLE;
-    }
+    Return<Status> releaseSecureStop(const hidl_vec<uint8_t>& ssRelease);
 
-    Return<Status> removeAllSecureStops() {
-        return Status::ERROR_DRM_CANNOT_HANDLE;
-    }
+    Return<Status> releaseAllSecureStops();
+
+    Return<void> getSecureStopIds(getSecureStopIds_cb _hidl_cb);
+
+    Return<Status> releaseSecureStops(const SecureStopRelease& ssRelease);
+
+    Return<Status> removeSecureStop(const hidl_vec<uint8_t>& secureStopId);
+
+    Return<Status> removeAllSecureStops();
 
 private:
     void initProperties();
+    void installSecureStop(const hidl_vec<uint8_t>& sessionId);
     void setPlayPolicy();
 
     Return<Status> setSecurityLevel(const hidl_vec<uint8_t>& sessionId,
@@ -344,6 +314,12 @@ private:
             KeyRequestType *getKeyRequestType,
             std::string *defaultUrl);
 
+    struct ClearkeySecureStop {
+        std::vector<uint8_t> id;
+        std::vector<uint8_t> data;
+    };
+
+    std::map<std::vector<uint8_t>, ClearkeySecureStop> mSecureStops;
     std::vector<KeyValue> mPlayPolicy;
     std::map<std::string, std::string> mStringProperties;
     std::map<std::string, std::vector<uint8_t> > mByteArrayProperties;
@@ -353,6 +329,7 @@ private:
     int64_t mOpenSessionOkCount;
     int64_t mCloseSessionOkCount;
     int64_t mCloseSessionNotOpenedCount;
+    uint32_t mNextSecureStopId;
 
     CLEARKEY_DISALLOW_COPY_AND_ASSIGN_AND_NEW(DrmPlugin);
 };
