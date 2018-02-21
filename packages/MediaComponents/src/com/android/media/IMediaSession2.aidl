@@ -58,6 +58,7 @@ oneway interface IMediaSession2 {
     void playFromUri(IMediaSession2Callback caller, in Uri uri, in Bundle extra);
     void playFromSearch(IMediaSession2Callback caller, String query, in Bundle extra);
     void playFromMediaId(IMediaSession2Callback caller, String mediaId, in Bundle extra);
+    void setRating(IMediaSession2Callback caller, String mediaId, in Bundle rating);
 
    //////////////////////////////////////////////////////////////////////////////////////////////
     // Get library service specific
