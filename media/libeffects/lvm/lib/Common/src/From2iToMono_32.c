@@ -68,5 +68,47 @@ void From2iToMono_Float( const LVM_FLOAT *src,
 
     return;
 }
+#ifdef SUPPORT_MC
+/*
+ * FUNCTION:       FromMcToMono_Float
+ *
+ * DESCRIPTION:
+ *  Creates a mono stream from a multichannel input taking the avergae of
+ *  sample values of all channels
+ *
+ * PARAMETERS:
+ *  src            Source
+ *  dst            Destination
+ *  NrFrames       Number of frames
+ *  NrChannels     Number of channels
+ *
+ * RETURNS:
+ *  void
+ *
+ */
+void FromMcToMono_Float(const LVM_FLOAT *src,
+                        LVM_FLOAT *dst,
+                        LVM_INT16 NrFrames,
+                        LVM_INT16 NrChannels)
+{
+    LVM_INT16 ii, jj;
+    LVM_FLOAT Temp;
+
+    for (ii = NrFrames; ii != 0; ii--)
+    {
+        Temp = 0.0f;
+        for (jj = NrChannels; jj !=0; jj--)
+        {
+            Temp += (*src);
+            src++;
+        }
+        *dst = Temp / NrChannels;
+        dst++;
+    }
+
+    return;
+}
+#endif
+
 #endif
 /**********************************************************************************/

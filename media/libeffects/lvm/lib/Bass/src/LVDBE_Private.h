@@ -64,7 +64,12 @@ extern "C" {
 #define LVDBE_PERSISTENT_COEF_ALIGN      4       /* 32-bit alignment for coef */
 #define LVDBE_SCRATCH_ALIGN              4       /* 32-bit alignment for long data */
 
+#ifdef SUPPORT_MC
+/* Number of buffers required for inplace processing */
+#define LVDBE_SCRATCHBUFFERS_INPLACE     (LVM_MAX_CHANNELS * 3)
+#else
 #define LVDBE_SCRATCHBUFFERS_INPLACE     6       /* Number of buffers required for inplace processing */
+#endif
 
 #define LVDBE_MIXER_TC                   5       /* Mixer time  */
 #define LVDBE_BYPASS_MIXER_TC            100     /* Bypass mixer time */

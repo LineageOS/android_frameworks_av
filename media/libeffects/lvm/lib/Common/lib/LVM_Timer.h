@@ -44,7 +44,15 @@ extern "C" {
 
 typedef struct
 {
-    LVM_INT32 Storage[6];
+    /*
+     * The memory area created using this structure is internally
+     * typecast to LVM_Timer_Instance_Private_t and used.
+     * The LVM_Timer_Instance_Private_t structure has 3 pointer type elements
+     * 2 elements of type LVM_INT32 and one element of type LVM_INT16.
+     * Inorder to cater both 32 and 64 bit builds, Storage array should
+     * have a minimum of 9 elements of type LVM_INT32.
+     */
+    LVM_INT32 Storage[9];
 
 } LVM_Timer_Instance_t;
 

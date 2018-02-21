@@ -144,12 +144,19 @@ typedef struct
     LVM_FLOAT               *pScratch;          /* Bundle scratch buffer */
 
     LVM_INT16               BufferState;        /* Buffer status */
+#ifdef SUPPORT_MC
+    LVM_FLOAT               InDelayBuffer[3 * LVM_MAX_CHANNELS * MIN_INTERNAL_BLOCKSIZE];
+#else
     LVM_FLOAT               InDelayBuffer[6 * MIN_INTERNAL_BLOCKSIZE]; /* Input buffer delay line, \
                                                                            left and right */
+#endif
     LVM_INT16               InDelaySamples;     /* Number of samples in the input delay buffer */
-
+#ifdef SUPPORT_MC
+    LVM_FLOAT               OutDelayBuffer[LVM_MAX_CHANNELS * MIN_INTERNAL_BLOCKSIZE];
+#else
     LVM_FLOAT               OutDelayBuffer[2 * MIN_INTERNAL_BLOCKSIZE]; /* Output buffer delay \
                                                                                       line */
+#endif
     LVM_INT16               OutDelaySamples;    /* Number of samples in the output delay buffer, \
                                                                              left and right */
     LVM_INT16               SamplesToOutput;    /* Samples to write to the output */
@@ -281,6 +288,10 @@ typedef struct
 #endif
 
     LVM_INT16              NoSmoothVolume;      /* Enable or disable smooth volume changes*/
+
+#ifdef SUPPORT_MC
+    LVM_INT16              NrChannels;
+#endif
 
 } LVM_Instance_t;
 

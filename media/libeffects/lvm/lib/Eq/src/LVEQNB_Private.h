@@ -46,7 +46,12 @@ extern "C" {
 #define LVEQNB_INSTANCE_ALIGN       4                   /* 32-bit alignment for instance structures */
 #define LVEQNB_DATA_ALIGN           4                   /* 32-bit alignment for structures */
 #define LVEQNB_COEF_ALIGN           4                   /* 32-bit alignment for long words */
+#ifdef SUPPORT_MC
+/* Number of buffers required for inplace processing */
+#define LVEQNB_SCRATCHBUFFERS       (LVM_MAX_CHANNELS * 2)
+#else
 #define LVEQNB_SCRATCHBUFFERS       4                   /* Number of buffers required for inplace processing */
+#endif
 #define LVEQNB_SCRATCH_ALIGN        4                   /* 32-bit alignment for long data */
 
 #define LVEQNB_BYPASS_MIXER_TC      100                 /* Bypass Mixer TC */

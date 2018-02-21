@@ -64,12 +64,21 @@ LVREV_ReturnStatus_en LVREV_SetControlParameters(LVREV_Handle_t           hInsta
         (
         (pNewParams->SampleRate != LVM_FS_8000) && (pNewParams->SampleRate != LVM_FS_11025) && (pNewParams->SampleRate != LVM_FS_12000)       &&
         (pNewParams->SampleRate != LVM_FS_16000) && (pNewParams->SampleRate != LVM_FS_22050) && (pNewParams->SampleRate != LVM_FS_24000)       &&
-        (pNewParams->SampleRate != LVM_FS_32000) && (pNewParams->SampleRate != LVM_FS_44100) && (pNewParams->SampleRate != LVM_FS_48000)      
+        (pNewParams->SampleRate != LVM_FS_32000) &&
+        (pNewParams->SampleRate != LVM_FS_44100) &&
+        (pNewParams->SampleRate != LVM_FS_48000)
 #ifdef HIGHER_FS
         && (pNewParams->SampleRate != LVM_FS_96000) && (pNewParams->SampleRate != LVM_FS_192000)
 #endif
         )
+#ifdef SUPPORT_MC
+        || ((pNewParams->SourceFormat != LVM_STEREO)       &&
+            (pNewParams->SourceFormat != LVM_MONOINSTEREO) &&
+            (pNewParams->SourceFormat != LVM_MONO)         &&
+            (pNewParams->SourceFormat != LVM_MULTICHANNEL)))
+#else
         || ((pNewParams->SourceFormat != LVM_STEREO) && (pNewParams->SourceFormat != LVM_MONOINSTEREO) && (pNewParams->SourceFormat != LVM_MONO)) )
+#endif
     {
         return (LVREV_OUTOFRANGE);
     }

@@ -76,6 +76,22 @@ LVCS_ReturnStatus_en LVCS_Process_CS(LVCS_Handle_t              hInstance,
     LVCS_Instance_t     *pInstance = (LVCS_Instance_t  *)hInstance;
     LVM_FLOAT           *pScratch;
     LVCS_ReturnStatus_en err;
+#ifdef SUPPORT_MC
+    LVM_FLOAT           *pStIn;
+    LVM_INT32           channels = pInstance->Params.NrChannels;
+#define NrFrames NumSamples  // alias for clarity
+
+    /*In case of mono processing, stereo input is created from mono
+     *and stored in pInData before applying any of the effects.
+     *However we do not update the value pInstance->Params.NrChannels
+     *at this point.
+     *So to treat the pInData as stereo we are setting channels to 2
+     */
+    if (channels == 1)
+    {
+        channels = 2;
+    }
+#endif
 
     pScratch  = (LVM_FLOAT *) \
                   pInstance->MemoryTable.Region[LVCS_MEMREGION_TEMPORARY_FAST].pBaseAddress;
@@ -83,6 +99,25 @@ LVCS_ReturnStatus_en LVCS_Process_CS(LVCS_Handle_t              hInstance,
     /*
      * Check if the processing is inplace
      */
+#ifdef SUPPORT_MC
+    /*
+     * The pInput buffer holds the first 2 (Left, Right) channels information.
+     * Hence the memory required by this buffer is 2 * NumFrames.
+     * The Concert Surround module carries out processing only on L, R.
+     */
+    pInput = pScratch + (2 * NrFrames);
+    pStIn  = pScratch + (LVCS_SCRATCHBUFFERS * NrFrames);
+    /* The first two channel data is extracted from the input data and
+     * copied into pInput buffer
+     */
+    Copy_Float_Mc_Stereo((LVM_FLOAT *)pInData,
+                         (LVM_FLOAT *)pInput,
+                         NrFrames,
+                         channels);
+    Copy_Float((LVM_FLOAT *)pInput,
+               (LVM_FLOAT *)pStIn,
+               (LVM_INT16)(2 * NrFrames));
+#else
     if (pInData == pOutData)
     {
         /* Processing inplace */
@@ -96,14 +131,21 @@ LVCS_ReturnStatus_en LVCS_Process_CS(LVCS_Handle_t              hInstance,
         /* Processing outplace */
         pInput = pInData;
     }
-
+#endif
     /*
      * Call the stereo enhancer
      */
+#ifdef SUPPORT_MC
+    err = LVCS_StereoEnhancer(hInstance,              /* Instance handle */
+                              pStIn,                  /* Pointer to the input data */
+                              pOutData,               /* Pointer to the output data */
+                              NrFrames);              /* Number of frames to process */
+#else
     err = LVCS_StereoEnhancer(hInstance,              /* Instance handle */
                               pInData,                    /* Pointer to the input data */
                               pOutData,                   /* Pointer to the output data */
                               NumSamples);                /* Number of samples to process */
+#endif
 
     /*
      * Call the reverb generator
@@ -112,7 +154,7 @@ LVCS_ReturnStatus_en LVCS_Process_CS(LVCS_Handle_t              hInstance,
                                pOutData,                  /* Pointer to the input data */
                                pOutData,                  /* Pointer to the output data */
                                NumSamples);               /* Number of samples to process */
-    
+
     /*
      * Call the equaliser
      */
@@ -239,7 +281,15 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
 
     LVCS_Instance_t *pInstance = (LVCS_Instance_t  *)hInstance;
     LVCS_ReturnStatus_en err;
-
+#ifdef SUPPORT_MC
+    /*Extract number of Channels info*/
+    LVM_INT32 channels = pInstance->Params.NrChannels;
+#define NrFrames NumSamples  // alias for clarity
+    if (channels == 1)
+    {
+        channels = 2;
+    }
+#endif
     /*
      * Check the number of samples is not too large
      */
@@ -260,8 +310,8 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
                                   pInData,
                                   pOutData,
                                   NumSamples);
-            
-            
+
+
         /*
          * Compress to reduce expansion effect of Concert Sound and correct volume
          * differences for difference settings. Not applied in test modes
@@ -376,17 +426,32 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
                             (LVM_INT16)NumSamples);
             }
         }
+#ifdef SUPPORT_MC
+        Copy_Float_Stereo_Mc(pInData,
+                             pOutData,
+                             NrFrames,
+                             channels);
+#endif
     }
     else
     {
         if (pInData != pOutData)
         {
+#ifdef SUPPORT_MC
+            /*
+             * The algorithm is disabled so just copy the data
+             */
+            Copy_Float((LVM_FLOAT *)pInData,               /* Source */
+                       (LVM_FLOAT *)pOutData,                  /* Destination */
+                       (LVM_INT16)(channels * NrFrames));    /* All Channels*/
+#else
             /*
              * The algorithm is disabled so just copy the data
              */
             Copy_Float((LVM_FLOAT *)pInData,               /* Source */
                        (LVM_FLOAT *)pOutData,                  /* Destination */
                        (LVM_INT16)(2 * NumSamples));             /* Left and right */
+#endif
         }
     }
 
