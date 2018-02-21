@@ -7289,12 +7289,16 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
         }
     }
 
-    float rate;
-    if (params->findFloat("operating-rate", &rate) && rate > 0) {
-        status_t err = setOperatingRate(rate, mIsVideo);
+    int32_t rateInt = -1;
+    float rateFloat = -1;
+    if (!params->findFloat("operating-rate", &rateFloat)) {
+        params->findInt32("operating-rate", &rateInt);
+        rateFloat = (float) rateInt; // 16MHz (FLINTMAX) is OK for upper bound.
+    }
+    if (rateFloat > 0) {
+        status_t err = setOperatingRate(rateFloat, mIsVideo);
         if (err != OK) {
-            ALOGE("Failed to set parameter 'operating-rate' (err %d)", err);
-            return err;
+            ALOGI("Failed to set parameter 'operating-rate' (err %d)", err);
         }
     }
 
@@ -7319,10 +7323,8 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
         }
     }
 
-    status_t err = configureTemporalLayers(params, false /* inConfigure */, mOutputFormat);
-    if (err != OK) {
-        err = OK; // ignore failure
-    }
+    // Ignore errors as failure is expected for codecs that aren't video encoders.
+    (void)configureTemporalLayers(params, false /* inConfigure */, mOutputFormat);
 
     return setVendorParameters(params);
 }
