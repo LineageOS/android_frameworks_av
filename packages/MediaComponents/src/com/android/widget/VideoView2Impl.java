@@ -123,10 +123,17 @@ public class VideoView2Impl extends BaseLayout
     private int mVideoWidth;
     private int mVideoHeight;
 
+    private ArrayList<Integer> mVideoTrackIndices;
+    private ArrayList<Integer> mAudioTrackIndices;
     private ArrayList<Integer> mSubtitleTrackIndices;
+
+    // selected video/audio/subtitle track index as MediaPlayer2 returns
+    private int mSelectedVideoTrackIndex;
+    private int mSelectedAudioTrackIndex;
+    private int mSelectedSubtitleTrackIndex;
+
     private SubtitleView mSubtitleView;
     private boolean mSubtitleEnabled;
-    private int mSelectedTrackIndex;  // selected subtitle track index as MediaPlayer2 returns
 
     private float mSpeed;
     // TODO: Remove mFallbackSpeed when integration with MediaPlayer2's new setPlaybackParams().
@@ -147,7 +154,7 @@ public class VideoView2Impl extends BaseLayout
         mVideoHeight = 0;
         mSpeed = 1.0f;
         mFallbackSpeed = mSpeed;
-        mSelectedTrackIndex = INVALID_TRACK_INDEX;
+        mSelectedSubtitleTrackIndex = INVALID_TRACK_INDEX;
         // TODO: add attributes to get this value.
         mShowControllerIntervalMs = DEFAULT_SHOW_CONTROLLER_INTERVAL_MS;
 
@@ -409,8 +416,11 @@ public class VideoView2Impl extends BaseLayout
         if (mMediaRouter != null) {
             mMediaRouter.setMediaSession(mMediaSession);
         }
-
         attachMediaControlView();
+        // TODO: remove this after moving MediaSession creating code inside initializing VideoView2
+        if (mCurrentState == STATE_PREPARED) {
+            extractTracks();
+        }
     }
 
     @Override
@@ -773,48 +783,44 @@ public class VideoView2Impl extends BaseLayout
         }
         if (select) {
             if (mSubtitleTrackIndices.size() > 0) {
-                // Select first subtitle track
-                mSelectedTrackIndex = mSubtitleTrackIndices.get(0);
-                mMediaPlayer.selectTrack(mSelectedTrackIndex);
+                // TODO: make this selection dynamic
+                mSelectedSubtitleTrackIndex = mSubtitleTrackIndices.get(0);
+                mMediaPlayer.selectTrack(mSelectedSubtitleTrackIndex);
                 mSubtitleView.setVisibility(View.VISIBLE);
             }
         } else {
-            if (mSelectedTrackIndex != INVALID_TRACK_INDEX) {
-                mMediaPlayer.deselectTrack(mSelectedTrackIndex);
-                mSelectedTrackIndex = INVALID_TRACK_INDEX;
+            if (mSelectedSubtitleTrackIndex != INVALID_TRACK_INDEX) {
+                mMediaPlayer.deselectTrack(mSelectedSubtitleTrackIndex);
+                mSelectedSubtitleTrackIndex = INVALID_TRACK_INDEX;
                 mSubtitleView.setVisibility(View.GONE);
             }
         }
     }
 
-    private void extractSubtitleTracks() {
+    private void extractTracks() {
         MediaPlayer.TrackInfo[] trackInfos = mMediaPlayer.getTrackInfo();
-        boolean previouslyNoTracks = mSubtitleTrackIndices == null
-                || mSubtitleTrackIndices.size() == 0;
+        mVideoTrackIndices = new ArrayList<>();
+        mAudioTrackIndices = new ArrayList<>();
         mSubtitleTrackIndices = new ArrayList<>();
         for (int i = 0; i < trackInfos.length; ++i) {
             int trackType = trackInfos[i].getTrackType();
-            if (trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE
+            if (trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_VIDEO) {
+                mVideoTrackIndices.add(i);
+            } else if (trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO) {
+                mAudioTrackIndices.add(i);
+            } else if (trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE
                     || trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT) {
                   mSubtitleTrackIndices.add(i);
             }
         }
+        Bundle data = new Bundle();
+        data.putInt(MediaControlView2Impl.KEY_VIDEO_TRACK_COUNT, mVideoTrackIndices.size());
+        data.putInt(MediaControlView2Impl.KEY_AUDIO_TRACK_COUNT, mAudioTrackIndices.size());
+        data.putInt(MediaControlView2Impl.KEY_SUBTITLE_TRACK_COUNT, mSubtitleTrackIndices.size());
         if (mSubtitleTrackIndices.size() > 0) {
-            if (previouslyNoTracks) {
-                selectOrDeselectSubtitle(mSubtitleEnabled);
-                // Notify MediaControlView that subtitle track exists
-                // TODO: Send the subtitle track list to MediaSession for MCV2.
-                Bundle data = new Bundle();
-                data.putBoolean(MediaControlView2Impl.KEY_STATE_CONTAINS_SUBTITLE, true);
-                mMediaSession.sendSessionEvent(
-                        MediaControlView2Impl.EVENT_UPDATE_SUBTITLE_STATUS, data);
-            }
-        } else {
-            Bundle data = new Bundle();
-            data.putBoolean(MediaControlView2Impl.KEY_STATE_CONTAINS_SUBTITLE, false);
-            mMediaSession.sendSessionEvent(
-                    MediaControlView2Impl.EVENT_UPDATE_SUBTITLE_STATUS, data);
+            selectOrDeselectSubtitle(mSubtitleEnabled);
         }
+        mMediaSession.sendSessionEvent(MediaControlView2Impl.EVENT_UPDATE_TRACK_STATUS, data);
     }
 
     MediaPlayer.OnVideoSizeChangedListener mSizeChangedListener =
@@ -845,7 +851,12 @@ public class VideoView2Impl extends BaseLayout
             mCurrentState = STATE_PREPARED;
             // Create and set playback state for MediaControlView2
             updatePlaybackState();
-            extractSubtitleTracks();
+
+            // TODO: change this to send TrackInfos to MediaControlView2
+            // TODO: create MediaSession when initializing VideoView2
+            if (mMediaSession != null) {
+                extractTracks();
+            }
 
             if (mMediaControlView != null) {
                 mMediaControlView.setEnabled(true);
@@ -924,7 +935,7 @@ public class VideoView2Impl extends BaseLayout
             new MediaPlayer.OnInfoListener() {
                 public boolean onInfo(MediaPlayer mp, int what, int extra) {
                     if (what == MediaPlayer.MEDIA_INFO_METADATA_UPDATE) {
-                        extractSubtitleTracks();
+                        extractTracks();
                     }
                     return true;
                 }

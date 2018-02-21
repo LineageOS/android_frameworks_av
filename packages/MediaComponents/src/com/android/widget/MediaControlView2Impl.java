@@ -30,6 +30,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.ImageButton;
@@ -63,8 +64,11 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     static final String ARGUMENT_KEY_FULLSCREEN = "fullScreen";
 
     // TODO: Move these constants to public api to support custom video view.
-    static final String KEY_STATE_CONTAINS_SUBTITLE = "StateContainsSubtitle";
-    static final String EVENT_UPDATE_SUBTITLE_STATUS = "UpdateSubtitleStatus";
+    // TODO: Combine these constants into one regarding TrackInfo.
+    static final String KEY_VIDEO_TRACK_COUNT = "VideoTrackCount";
+    static final String KEY_AUDIO_TRACK_COUNT = "AudioTrackCount";
+    static final String KEY_SUBTITLE_TRACK_COUNT = "SubtitleTrackCount";
+    static final String EVENT_UPDATE_TRACK_STATUS = "UpdateTrackStatus";
 
     // TODO: Remove this once integrating with MediaSession2 & MediaMetadata2
     static final String KEY_STATE_IS_ADVERTISEMENT = "MediaTypeAdvertisement";
@@ -76,6 +80,7 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private static final int FORWARD_TIME_MS = 30000;
     private static final int AD_SKIP_WAIT_TIME_MS = 5000;
     private static final int RESOURCE_NON_EXISTENT = -1;
+    private static final String RESOURCE_EMPTY = "";
 
     private Resources mResources;
     private MediaController mController;
@@ -91,13 +96,15 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private int mDuration;
     private int mPrevState;
     private int mPrevLeftBarWidth;
+    private int mVideoTrackCount;
+    private int mAudioTrackCount;
+    private int mSubtitleTrackCount;
     private long mPlaybackActions;
     private boolean mDragging;
     private boolean mIsFullScreen;
     private boolean mOverflowExpanded;
     private boolean mIsStopped;
     private boolean mSubtitleIsEnabled;
-    private boolean mContainsSubtitle;
     private boolean mSeekAvailable;
     private boolean mIsAdvertisement;
     private ImageButton mPlayPauseButton;
@@ -118,11 +125,17 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private ImageButton mAspectRationButton;
     private ImageButton mSettingsButton;
 
+    private ListView mSettingsListView;
     private PopupWindow mSettingsWindow;
     private SettingsAdapter mSettingsAdapter;
-    private List<Integer> mSettingsMainTextIdsList;
-    private List<Integer> mSettingsSubTextIdsList;
+
+    private List<String> mSettingsMainTextsList;
+    private List<String> mSettingsSubTextsList;
     private List<Integer> mSettingsIconIdsList;
+    private List<String> mSubtitleDescriptionsList;
+    private List<String> mAudioTrackList;
+    private List<String> mVideoQualityList;
+    private List<String> mPlaybackSpeedTextIdsList;
 
     private CharSequence mPlayDescription;
     private CharSequence mPauseDescription;
@@ -200,7 +213,7 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
                 }
                 break;
             case MediaControlView2.BUTTON_SUBTITLE:
-                if (mSubtitleButton != null && mContainsSubtitle) {
+                if (mSubtitleButton != null && mSubtitleTrackCount > 0) {
                     mSubtitleButton.setVisibility(visibility);
                 }
                 break;
@@ -459,17 +472,17 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         mAdRemainingView = v.findViewById(R.id.ad_remaining);
         mAdExternalLink = v.findViewById(R.id.ad_external_link);
 
-        populateResourceIds();
-        ListView settingsListView = (ListView) ApiHelper.inflateLibLayout(mInstance.getContext(),
+        initializeSettingsLists();
+        mSettingsListView = (ListView) ApiHelper.inflateLibLayout(mInstance.getContext(),
                 R.layout.settings_list);
-        mSettingsAdapter = new SettingsAdapter(mSettingsMainTextIdsList, mSettingsSubTextIdsList,
-                mSettingsIconIdsList, true);
-        settingsListView.setAdapter(mSettingsAdapter);
-
+        mSettingsAdapter = new SettingsAdapter(mSettingsMainTextsList, mSettingsSubTextsList,
+                mSettingsIconIdsList, false);
+        mSettingsListView.setAdapter(mSettingsAdapter);
+        mSettingsListView.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+        mSettingsListView.setOnItemClickListener(mSettingsItemClickListener);
         int width = mResources.getDimensionPixelSize(R.dimen.MediaControlView2_settings_width);
-        mSettingsWindow = new PopupWindow(settingsListView, width,
+        mSettingsWindow = new PopupWindow(mSettingsListView, width,
                 ViewGroup.LayoutParams.WRAP_CONTENT, true);
-        // TODO: add listener to list view to allow each item to be selected.
     }
 
     /**
@@ -769,11 +782,72 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private final View.OnClickListener mSettingsButtonListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
+            mSettingsAdapter = new SettingsAdapter(mSettingsMainTextsList,
+                    mSettingsSubTextsList, mSettingsIconIdsList, false);
+            mSettingsListView.setAdapter(mSettingsAdapter);
             int itemHeight = mResources.getDimensionPixelSize(
                     R.dimen.MediaControlView2_settings_height);
             int totalHeight = mSettingsAdapter.getCount() * itemHeight;
             int margin = (-1) * mResources.getDimensionPixelSize(
                     R.dimen.MediaControlView2_settings_offset);
+            mSettingsWindow.dismiss();
+            mSettingsWindow.showAsDropDown(mInstance, margin, margin - totalHeight,
+                    Gravity.BOTTOM | Gravity.RIGHT);
+        }
+    };
+
+    private final AdapterView.OnItemClickListener mSettingsItemClickListener
+            = new AdapterView.OnItemClickListener() {
+        @Override
+        public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+            switch (position) {
+                // change to identifiers
+                case 0:
+                    // TODO: add additional subtitle track details
+                    mSubtitleDescriptionsList = new ArrayList<String>();
+                    mSubtitleDescriptionsList.add(mResources.getString(
+                            R.string.MediaControlView2_subtitle_off_text));
+                    for (int i = 0; i < mSubtitleTrackCount; i++) {
+                        String track = mResources.getString(
+                                R.string.MediaControlView2_subtitle_track_number_text, i + 1);
+                        mSubtitleDescriptionsList.add(track);
+                    }
+                    mSettingsAdapter = new SettingsAdapter(mSubtitleDescriptionsList, null,
+                            null, true);
+                    break;
+                case 1:
+                    // TODO: add additional audio track details
+                    mAudioTrackList = new ArrayList<String>();
+                    mAudioTrackList.add(mResources.getString(
+                            R.string.MediaControlView2_audio_track_none_text));
+                    for (int i = 0; i < mAudioTrackCount; i++) {
+                        String track = mResources.getString(
+                                R.string.MediaControlView2_audio_track_number_text, i + 1);
+                        mAudioTrackList.add(track);
+                    }
+                    mSettingsAdapter = new SettingsAdapter(mAudioTrackList, null,
+                            null, true);
+                    break;
+                case 2:
+                    // TODO: add support for multiple quality video tracks
+                    mSettingsAdapter = new SettingsAdapter(mVideoQualityList, null,
+                            null, true);
+                    break;
+                case 3:
+                    // TODO: implement code to reflect change in speed.
+                    mSettingsAdapter = new SettingsAdapter(mPlaybackSpeedTextIdsList, null,
+                            null, true);
+                    break;
+                default:
+                    return;
+            }
+            mSettingsListView.setAdapter(mSettingsAdapter);
+            int itemHeight = mResources.getDimensionPixelSize(
+                    R.dimen.MediaControlView2_settings_height);
+            int totalHeight = mSettingsAdapter.getCount() * itemHeight;
+            int margin = (-1) * mResources.getDimensionPixelSize(
+                    R.dimen.MediaControlView2_settings_offset);
+            mSettingsWindow.dismiss();
             mSettingsWindow.showAsDropDown(mInstance, margin, margin - totalHeight,
                     Gravity.BOTTOM | Gravity.RIGHT);
         }
@@ -860,29 +934,79 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         }
     }
 
-    private void populateResourceIds() {
-        // TODO: create record class for storing this info
-        mSettingsMainTextIdsList = new ArrayList<Integer>();
-        mSettingsMainTextIdsList.add(R.string.MediaControlView2_cc_text);
-        mSettingsMainTextIdsList.add(R.string.MediaControlView2_audio_track_text);
-        mSettingsMainTextIdsList.add(R.string.MediaControlView2_video_quality_text);
-        mSettingsMainTextIdsList.add(R.string.MediaControlView2_playback_speed_text);
-        mSettingsMainTextIdsList.add(R.string.MediaControlView2_help_text);
+    private void initializeSettingsLists() {
+        if (mSettingsMainTextsList == null) {
+            mSettingsMainTextsList = new ArrayList<String>();
+            mSettingsMainTextsList.add(
+                    mResources.getString(R.string.MediaControlView2_subtitle_text));
+            mSettingsMainTextsList.add(
+                    mResources.getString(R.string.MediaControlView2_audio_track_text));
+            mSettingsMainTextsList.add(
+                    mResources.getString(R.string.MediaControlView2_video_quality_text));
+            mSettingsMainTextsList.add(
+                    mResources.getString(R.string.MediaControlView2_playback_speed_text));
+            mSettingsMainTextsList.add(
+                    mResources.getString(R.string.MediaControlView2_help_text));
+        }
 
         // TODO: Update the following code to be dynamic.
-        mSettingsSubTextIdsList = new ArrayList<Integer>();
-        mSettingsSubTextIdsList.add(R.string.MediaControlView2_cc_text);
-        mSettingsSubTextIdsList.add(R.string.MediaControlView2_audio_track_text);
-        mSettingsSubTextIdsList.add(R.string.MediaControlView2_video_quality_text);
-        mSettingsSubTextIdsList.add(R.string.MediaControlView2_playback_speed_text);
-        mSettingsSubTextIdsList.add(RESOURCE_NON_EXISTENT);
+        if (mSettingsSubTextsList == null) {
+            mSettingsSubTextsList = new ArrayList<String>();
+            mSettingsSubTextsList.add(
+                    mResources.getString(R.string.MediaControlView2_subtitle_off_text));
+            mSettingsSubTextsList.add(
+                    mResources.getString(R.string.MediaControlView2_audio_track_none_text));
+            mSettingsSubTextsList.add(
+                    mResources.getString(R.string.MediaControlView2_video_quality_auto_text));
+            mSettingsSubTextsList.add(
+                    mResources.getString(R.string.MediaControlView2_playback_speed_1x_text));
+            mSettingsSubTextsList.add(RESOURCE_EMPTY);
+        }
 
-        mSettingsIconIdsList = new ArrayList<Integer>();
-        mSettingsIconIdsList.add(R.drawable.ic_closed_caption_off);
-        mSettingsIconIdsList.add(R.drawable.ic_audiotrack);
-        mSettingsIconIdsList.add(R.drawable.ic_high_quality);
-        mSettingsIconIdsList.add(R.drawable.ic_play_circle_filled);
-        mSettingsIconIdsList.add(R.drawable.ic_help);
+        if (mSettingsIconIdsList == null) {
+            mSettingsIconIdsList = new ArrayList<Integer>();
+            mSettingsIconIdsList.add(R.drawable.ic_closed_caption_off);
+            mSettingsIconIdsList.add(R.drawable.ic_audiotrack);
+            mSettingsIconIdsList.add(R.drawable.ic_high_quality);
+            mSettingsIconIdsList.add(R.drawable.ic_play_circle_filled);
+            mSettingsIconIdsList.add(R.drawable.ic_help);
+        }
+
+        if (mSubtitleDescriptionsList == null) {
+            mSubtitleDescriptionsList = new ArrayList<String>();
+            mSubtitleDescriptionsList.add(
+                    mResources.getString(R.string.MediaControlView2_subtitle_off_text));
+        }
+
+        if (mAudioTrackList == null) {
+            mAudioTrackList = new ArrayList<String>();
+            mAudioTrackList.add(
+                    mResources.getString(R.string.MediaControlView2_audio_track_none_text));
+        }
+
+        if (mVideoQualityList == null) {
+            mVideoQualityList = new ArrayList<String>();
+            mVideoQualityList.add(
+                    mResources.getString(R.string.MediaControlView2_video_quality_auto_text));
+        }
+
+        if (mPlaybackSpeedTextIdsList == null) {
+            mPlaybackSpeedTextIdsList = new ArrayList<String>();
+            mPlaybackSpeedTextIdsList.add(
+                    mResources.getString(R.string.MediaControlView2_playback_speed_0_25x_text));
+            mPlaybackSpeedTextIdsList.add(
+                    mResources.getString(R.string.MediaControlView2_playback_speed_0_5x_text));
+            mPlaybackSpeedTextIdsList.add(
+                    mResources.getString(R.string.MediaControlView2_playback_speed_0_75x_text));
+            mPlaybackSpeedTextIdsList.add(
+                    mResources.getString(R.string.MediaControlView2_playback_speed_1x_text));
+            mPlaybackSpeedTextIdsList.add(
+                    mResources.getString(R.string.MediaControlView2_playback_speed_1_25x_text));
+            mPlaybackSpeedTextIdsList.add(
+                    mResources.getString(R.string.MediaControlView2_playback_speed_1_5x_text));
+            mPlaybackSpeedTextIdsList.add(
+                    mResources.getString(R.string.MediaControlView2_playback_speed_2x_text));
+        }
     }
 
     private class MediaControllerCallback extends MediaController.Callback {
@@ -977,45 +1101,48 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
 
         @Override
         public void onSessionEvent(String event, Bundle extras) {
-            if (event.equals(EVENT_UPDATE_SUBTITLE_STATUS)) {
-                boolean newSubtitleStatus = extras.getBoolean(KEY_STATE_CONTAINS_SUBTITLE);
-                if (newSubtitleStatus != mContainsSubtitle) {
-                    if (newSubtitleStatus) {
+            switch (event) {
+                case EVENT_UPDATE_TRACK_STATUS:
+                    mVideoTrackCount = extras.getInt(KEY_VIDEO_TRACK_COUNT);
+                    mAudioTrackCount = extras.getInt(KEY_AUDIO_TRACK_COUNT);
+                    int newSubtitleTrackCount = extras.getInt(KEY_SUBTITLE_TRACK_COUNT);
+                    if (newSubtitleTrackCount > 0) {
                         mSubtitleButton.clearColorFilter();
                         mSubtitleButton.setEnabled(true);
                     } else {
                         mSubtitleButton.setColorFilter(R.color.gray);
                         mSubtitleButton.setEnabled(false);
                     }
-                    mContainsSubtitle = newSubtitleStatus;
-                }
-            } else if (event.equals(EVENT_UPDATE_MEDIA_TYPE_STATUS)) {
-                boolean newStatus = extras.getBoolean(KEY_STATE_IS_ADVERTISEMENT);
-                if (newStatus != mIsAdvertisement) {
-                    mIsAdvertisement = newStatus;
-                    updateLayout();
-                }
+                    mSubtitleTrackCount = newSubtitleTrackCount;
+                    break;
+                case EVENT_UPDATE_MEDIA_TYPE_STATUS:
+                    boolean newStatus = extras.getBoolean(KEY_STATE_IS_ADVERTISEMENT);
+                    if (newStatus != mIsAdvertisement) {
+                        mIsAdvertisement = newStatus;
+                        updateLayout();
+                    }
+                    break;
             }
         }
     }
 
     private class SettingsAdapter extends BaseAdapter {
-        List<Integer> mMainTextIds;
-        List<Integer> mSubTextIds;
         List<Integer> mIconIds;
+        List<String> mMainTexts;
+        List<String> mSubTexts;
         boolean mIsCheckable;
 
-        public SettingsAdapter(List<Integer> mainTextIds, @Nullable List<Integer> subTextIds,
+        public SettingsAdapter(List<String> mainTexts, @Nullable List<String> subTexts,
                 @Nullable List<Integer> iconIds, boolean isCheckable) {
-            mMainTextIds = mainTextIds;
-            mSubTextIds = subTextIds;
+            mMainTexts = mainTexts;
+            mSubTexts = subTexts;
             mIconIds = iconIds;
             mIsCheckable = isCheckable;
         }
 
         @Override
         public int getCount() {
-            return (mMainTextIds == null) ? 0 : mMainTextIds.size();
+            return (mMainTexts == null) ? 0 : mMainTexts.size();
         }
 
         @Override
@@ -1042,15 +1169,15 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             ImageView checkView = (ImageView) row.findViewById(R.id.check);
 
             // Set main text
-            mainTextView.setText(mResources.getString(mMainTextIds.get(position)));
+            mainTextView.setText(mMainTexts.get(position));
 
             // Remove sub text and center the main text if sub texts do not exist at all or the sub
-            // text at this particular position is set to RESOURCE_NON_EXISTENT.
-            if (mSubTextIds == null || mSubTextIds.get(position) == RESOURCE_NON_EXISTENT) {
+            // text at this particular position is empty.
+            if (mSubTexts == null || mSubTexts.get(position) == RESOURCE_EMPTY) {
                 subTextView.setVisibility(View.GONE);
             } else {
                 // Otherwise, set sub text.
-                subTextView.setText(mResources.getString(mSubTextIds.get(position)));
+                subTextView.setText(mSubTexts.get(position));
             }
 
             // Remove main icon and set visibility to gone if icons are set to null or the icon at
