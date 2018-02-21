@@ -20,8 +20,6 @@
 #include <errno.h>
 #include <C2.h>
 
-namespace android {
-
 // standard ERRNO mappings
 template<int N> constexpr c2_status_t _c2_errno2status_impl();
 template<> constexpr c2_status_t _c2_errno2status_impl<0>()       { return C2_OK; }
@@ -51,8 +49,6 @@ template<int... N>
 c2_status_t c2_map_errno(int result) {
     return _c2_map_errno_impl<N...>::map(result);
 }
-
-} // namespace android
 
 #endif // STAGEFRIGHT_CODEC2_ERRNO_UTILS_H_
 

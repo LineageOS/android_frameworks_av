@@ -25,9 +25,6 @@
 #include <media/stagefright/codec2/1.0/InputSurfaceConnection.h>
 
 namespace android {
-
-class C2Allocator;
-
 namespace hardware {
 namespace media {
 namespace c2 {

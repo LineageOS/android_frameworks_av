@@ -28,8 +28,6 @@
 #include <list>
 #include <vector>
 
-namespace android {
-
 /// \defgroup work Work and data processing
 /// @{
 
@@ -75,9 +73,8 @@ struct C2SettingResult {
 //  WORK
 // ================================================================================================
 
-// c2_node_id_t-s
+/** Unique ID for a processing node. */
 typedef uint32_t c2_node_id_t;
-typedef c2_node_id_t c2_node_id_t;
 
 enum {
     kParamIndexWorkOrdinal,
@@ -210,7 +207,5 @@ struct C2WorkOutline {
 };
 
 /// @}
-
-}  // namespace android
 
 #endif  // C2WORK_H_

@@ -24,8 +24,6 @@
 
 #include <C2Param.h>
 
-namespace android {
-
 /// \addtogroup Parameters
 /// @{
 
@@ -904,7 +902,5 @@ DESCRIBE_TEMPLATED_C2STRUCT(C2SimpleArrayStruct<float>, { C2FIELD(values, "value
 /// @}
 
 /// @}
-
-}  // namespace android
 
 #endif  // C2PARAM_DEF_H_

@@ -18,13 +18,12 @@
 #define LOG_TAG "C2Buffer"
 #include <utils/Log.h>
 
+#include <list>
 #include <map>
 #include <mutex>
 
 #include <C2BufferPriv.h>
 #include <C2BlockInternal.h>
-
-namespace android {
 
 namespace {
 
@@ -34,63 +33,63 @@ namespace {
 // Inherit from the parent, share with the friend.
 class ReadViewBuddy : public C2ReadView {
     using C2ReadView::C2ReadView;
-    friend class ::android::C2ConstLinearBlock;
+    friend class ::C2ConstLinearBlock;
 };
 
 class WriteViewBuddy : public C2WriteView {
     using C2WriteView::C2WriteView;
-    friend class ::android::C2LinearBlock;
+    friend class ::C2LinearBlock;
 };
 
 class ConstLinearBlockBuddy : public C2ConstLinearBlock {
     using C2ConstLinearBlock::C2ConstLinearBlock;
-    friend class ::android::C2LinearBlock;
+    friend class ::C2LinearBlock;
 };
 
 class LinearBlockBuddy : public C2LinearBlock {
     using C2LinearBlock::C2LinearBlock;
-    friend class ::android::C2BasicLinearBlockPool;
+    friend class ::C2BasicLinearBlockPool;
 };
 
 class AcquirableReadViewBuddy : public C2Acquirable<C2ReadView> {
     using C2Acquirable::C2Acquirable;
-    friend class ::android::C2ConstLinearBlock;
+    friend class ::C2ConstLinearBlock;
 };
 
 class AcquirableWriteViewBuddy : public C2Acquirable<C2WriteView> {
     using C2Acquirable::C2Acquirable;
-    friend class ::android::C2LinearBlock;
+    friend class ::C2LinearBlock;
 };
 
 class GraphicViewBuddy : public C2GraphicView {
     using C2GraphicView::C2GraphicView;
-    friend class ::android::C2ConstGraphicBlock;
-    friend class ::android::C2GraphicBlock;
+    friend class ::C2ConstGraphicBlock;
+    friend class ::C2GraphicBlock;
 };
 
 class AcquirableConstGraphicViewBuddy : public C2Acquirable<const C2GraphicView> {
     using C2Acquirable::C2Acquirable;
-    friend class ::android::C2ConstGraphicBlock;
+    friend class ::C2ConstGraphicBlock;
 };
 
 class AcquirableGraphicViewBuddy : public C2Acquirable<C2GraphicView> {
     using C2Acquirable::C2Acquirable;
-    friend class ::android::C2GraphicBlock;
+    friend class ::C2GraphicBlock;
 };
 
 class ConstGraphicBlockBuddy : public C2ConstGraphicBlock {
     using C2ConstGraphicBlock::C2ConstGraphicBlock;
-    friend class ::android::C2GraphicBlock;
+    friend class ::C2GraphicBlock;
 };
 
 class GraphicBlockBuddy : public C2GraphicBlock {
     using C2GraphicBlock::C2GraphicBlock;
-    friend class ::android::C2BasicGraphicBlockPool;
+    friend class ::C2BasicGraphicBlockPool;
 };
 
 class BufferDataBuddy : public C2BufferData {
     using C2BufferData::C2BufferData;
-    friend class ::android::C2Buffer;
+    friend class ::C2Buffer;
 };
 
 }  // namespace
@@ -803,4 +802,3 @@ std::shared_ptr<C2Buffer> C2Buffer::CreateGraphicBuffer(const C2ConstGraphicBloc
     return std::shared_ptr<C2Buffer>(new C2Buffer({ block }));
 }
 
-} // namespace android

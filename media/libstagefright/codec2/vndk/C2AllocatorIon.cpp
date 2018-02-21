@@ -20,6 +20,7 @@
 
 #include <ion/ion.h>
 #include <sys/mman.h>
+#include <unistd.h>
 
 #include <C2AllocatorIon.h>
 #include <C2Buffer.h>
@@ -232,10 +233,10 @@ public:
 
         int prot = PROT_NONE;
         int flags = MAP_PRIVATE;
-        if (usage.consumer & C2MemoryUsage::CPU_READ) {
+        if (usage.expected & C2MemoryUsage::CPU_READ) {
             prot |= PROT_READ;
         }
-        if (usage.producer & C2MemoryUsage::CPU_WRITE) {
+        if (usage.expected & C2MemoryUsage::CPU_WRITE) {
             prot |= PROT_WRITE;
             flags = MAP_SHARED;
         }
