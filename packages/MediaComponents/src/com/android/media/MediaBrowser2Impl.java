@@ -20,7 +20,6 @@ import android.content.Context;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaItem2;
-import android.media.MediaSession2.CommandButton;
 import android.media.SessionToken2;
 import android.media.update.MediaBrowser2Provider;
 import android.os.Bundle;
@@ -174,6 +173,12 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
             List<MediaItem2> result) {
         getCallbackExecutor().execute(() -> {
             mCallback.onChildrenLoaded(parentId, page, pageSize, extras, result);
+        });
+    }
+
+    public void onSearchResultChanged(String query, Bundle extras, int itemCount) {
+        getCallbackExecutor().execute(() -> {
+            mCallback.onSearchResultChanged(query, extras, itemCount);
         });
     }
 

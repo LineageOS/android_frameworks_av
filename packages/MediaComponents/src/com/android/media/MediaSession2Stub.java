@@ -28,6 +28,7 @@ import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.PlaybackState2;
+import android.media.Rating2;
 import android.media.VolumeProvider2;
 import android.net.Uri;
 import android.os.Binder;
@@ -507,6 +508,27 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
+    @Override
+    public void setRating(final IMediaSession2Callback caller, final String mediaId,
+            final Bundle ratingBundle) {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo controller = getController(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            Rating2 rating = Rating2Impl.fromBundle(session.getContext(), ratingBundle);
+            session.getCallback().onSetRating(controller, mediaId, rating);
+        });
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////////
     // AIDL methods for LibrarySession overrides
     //////////////////////////////////////////////////////////////////////////////////////////////
@@ -852,6 +874,22 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         try {
             Bundle commandBundle = command.toBundle();
             callbackBinder.sendCustomCommand(commandBundle, args, receiver);
+        } catch (RemoteException e) {
+            Log.w(TAG, "Controller is gone", e);
+            // TODO(jaewan): What to do when the controller is gone?
+        }
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////////////
+    // APIs for MediaLibrarySessionImpl
+    //////////////////////////////////////////////////////////////////////////////////////////////
+
+    public void notifySearchResultChanged(ControllerInfo controller, String query, Bundle extras,
+            int itemCount) {
+        final IMediaSession2Callback callbackBinder =
+                ControllerInfoImpl.from(controller).getControllerBinder();
+        try {
+            callbackBinder.onSearchResultChanged(query, extras, itemCount);
         } catch (RemoteException e) {
             Log.w(TAG, "Controller is gone", e);
             // TODO(jaewan): What to do when the controller is gone?

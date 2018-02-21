@@ -624,6 +624,7 @@ public:
     static const int8_t kMaxTrackStartupRetriesOffload = 100;
     static const int8_t kMaxTrackStopRetriesOffload = 2;
     static constexpr uint32_t kMaxTracksPerUid = 40;
+    static constexpr size_t kMaxTracks = 256;
 
     // Maximum delay (in nanoseconds) for upcoming buffers in suspend mode, otherwise
     // if delay is greater, the estimated time for timeLoopNextNs is reset.
@@ -778,6 +779,16 @@ public:
 
     virtual     bool        isOutput() const override { return true; }
 
+                // returns true if the track is allowed to be added to the thread.
+    virtual     bool        isTrackAllowed_l(
+                                    audio_channel_mask_t channelMask __unused,
+                                    audio_format_t format __unused,
+                                    audio_session_t sessionId __unused,
+                                    uid_t uid) const {
+                                return trackCountForUid_l(uid) < PlaybackThread::kMaxTracksPerUid
+                                       && mTracks.size() < PlaybackThread::kMaxTracks;
+                            }
+
 protected:
     // updated by readOutputParameters_l()
     size_t                          mNormalFrameCount;  // normal mixer and effects
@@ -866,12 +877,6 @@ private:
 protected:
     ActiveTracks<Track>     mActiveTracks;
 
-    // Allocate a track name for a given channel mask.
-    //   Returns name >= 0 if successful, -1 on failure.
-    virtual int             getTrackName_l(audio_channel_mask_t channelMask, audio_format_t format,
-                                           audio_session_t sessionId, uid_t uid) = 0;
-    virtual void            deleteTrackName_l(int name) = 0;
-
     // Time to sleep between cycles when:
     virtual uint32_t        activeSleepTimeUs() const;      // mixer state MIXER_TRACKS_ENABLED
     virtual uint32_t        idleSleepTimeUs() const = 0;    // mixer state MIXER_IDLE
@@ -899,7 +904,7 @@ protected:
                                     && mHwSupportsPause
                                     && (mOutput->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC); }
 
-                uint32_t    trackCountForUid_l(uid_t uid);
+                uint32_t    trackCountForUid_l(uid_t uid) const;
 
 private:
 
@@ -916,7 +921,64 @@ private:
     virtual void dumpInternals(int fd, const Vector<String16>& args);
     void        dumpTracks(int fd, const Vector<String16>& args);
 
-    SortedVector< sp<Track> >       mTracks;
+    // The Tracks class manages names for all tracks
+    // added and removed from the Thread.
+    template <typename T>
+    class Tracks {
+    public:
+        Tracks(bool saveDeletedTrackNames) :
+            mSaveDeletedTrackNames(saveDeletedTrackNames) { }
+
+        // SortedVector methods
+        ssize_t         add(const sp<T> &track);
+        ssize_t         remove(const sp<T> &track);
+        size_t          size() const {
+            return mTracks.size();
+        }
+        bool            isEmpty() const {
+            return mTracks.isEmpty();
+        }
+        ssize_t         indexOf(const sp<T> &item) {
+            return mTracks.indexOf(item);
+        }
+        sp<T>           operator[](size_t index) const {
+            return mTracks[index];
+        }
+        typename SortedVector<sp<T>>::iterator begin() {
+            return mTracks.begin();
+        }
+        typename SortedVector<sp<T>>::iterator end() {
+            return mTracks.end();
+        }
+
+        size_t          processDeletedTrackNames(std::function<void(int)> f) {
+            const size_t size = mDeletedTrackNames.size();
+            if (size > 0) {
+                for (const int name : mDeletedTrackNames) {
+                    f(name);
+                }
+            }
+            return size;
+        }
+
+        void            clearDeletedTrackNames() { mDeletedTrackNames.clear(); }
+
+    private:
+        // Track names pending deletion for MIXER type threads
+        const bool mSaveDeletedTrackNames; // true to enable tracking
+        std::set<int> mDeletedTrackNames;
+
+        // Fast lookup of previously deleted track names for reuse.
+        // This is an arbitrary decision (actually any non-negative
+        // integer that isn't in mTracks[*]->names() could be used) - we attempt
+        // to use the smallest possible available name.
+        std::set<int> mUnusedTrackNames;
+
+        SortedVector<sp<T>> mTracks; // wrapped SortedVector.
+    };
+
+    Tracks<Track>                   mTracks;
+
     stream_type_t                   mStreamTypes[AUDIO_STREAM_CNT];
     AudioStreamOut                  *mOutput;
 
@@ -1023,11 +1085,11 @@ public:
                                                    status_t& status);
     virtual     void        dumpInternals(int fd, const Vector<String16>& args);
 
+    virtual     bool        isTrackAllowed_l(
+                                    audio_channel_mask_t channelMask, audio_format_t format,
+                                    audio_session_t sessionId, uid_t uid) const override;
 protected:
     virtual     mixer_state prepareTracks_l(Vector< sp<Track> > *tracksToRemove);
-    virtual     int         getTrackName_l(audio_channel_mask_t channelMask, audio_format_t format,
-                                           audio_session_t sessionId, uid_t uid);
-    virtual     void        deleteTrackName_l(int name);
     virtual     uint32_t    idleSleepTimeUs() const;
     virtual     uint32_t    suspendSleepTimeUs() const;
     virtual     void        cacheParameters_l();
@@ -1105,9 +1167,6 @@ public:
     virtual     void        flushHw_l();
 
 protected:
-    virtual     int         getTrackName_l(audio_channel_mask_t channelMask, audio_format_t format,
-                                           audio_session_t sessionId, uid_t uid);
-    virtual     void        deleteTrackName_l(int name);
     virtual     uint32_t    activeSleepTimeUs() const;
     virtual     uint32_t    idleSleepTimeUs() const;
     virtual     uint32_t    suspendSleepTimeUs() const;
@@ -1211,6 +1270,8 @@ public:
     virtual                 ~DuplicatingThread();
 
     // Thread virtuals
+    virtual     void        dumpInternals(int fd, const Vector<String16>& args) override;
+
                 void        addOutputTrack(MixerThread* thread);
                 void        removeOutputTrack(MixerThread* thread);
                 uint32_t    waitTimeMs() const { return mWaitTimeMs; }

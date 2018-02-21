@@ -90,34 +90,21 @@ static inline audio_format_t selectMixerInFormat(audio_format_t inputFormat __un
     return kUseFloat && kUseNewMixer ? AUDIO_FORMAT_PCM_FLOAT : AUDIO_FORMAT_PCM_16_BIT;
 }
 
-int AudioMixer::getTrackName(
-        audio_channel_mask_t channelMask, audio_format_t format, int sessionId)
+status_t AudioMixer::create(
+        int name, audio_channel_mask_t channelMask, audio_format_t format, int sessionId)
 {
-    if (!isValidPcmTrackFormat(format)) {
-        ALOGE("AudioMixer::getTrackName invalid format (%#x)", format);
-        return -1;
-    }
-    if (mTracks.size() >= (size_t)mMaxNumTracks) {
-        ALOGE("%s: out of track names (max = %d)", __func__, mMaxNumTracks);
-        return -1;
-    }
+    LOG_ALWAYS_FATAL_IF(exists(name), "name %d already exists", name);
 
-    // get a new name for the track.
-    int name;
-    if (mUnusedNames.size() != 0) {
-        // reuse first name for deleted track.
-        auto it = mUnusedNames.begin();
-        name = *it;
-        (void)mUnusedNames.erase(it);
-    } else {
-        // we're fully populated, so create a new name.
-        name = mTracks.size();
+    if (!isValidChannelMask(channelMask)) {
+        ALOGE("%s invalid channelMask: %#x", __func__, channelMask);
+        return BAD_VALUE;
     }
-    ALOGV("add track (%d)", name);
+    if (!isValidFormat(format)) {
+        ALOGE("%s invalid format: %#x", __func__, format);
+        return BAD_VALUE;
+    }
 
     auto t = std::make_shared<Track>();
-    mTracks[name] = t;
-
     {
         // TODO: move initialization to the Track constructor.
         // assume default parameters for the track, except where noted below
@@ -179,12 +166,14 @@ int AudioMixer::getTrackName(
         status_t status = t->prepareForDownmix();
         if (status != OK) {
             ALOGE("AudioMixer::getTrackName invalid channelMask (%#x)", channelMask);
-            return -1;
+            return BAD_VALUE;
         }
         // prepareForDownmix() may change mDownmixRequiresFormat
         ALOGVV("mMixerFormat:%#x  mMixerInFormat:%#x\n", t->mMixerFormat, t->mMixerInFormat);
         t->prepareForReformat();
-        return TRACK0 + name;
+
+        mTracks[name] = t;
+        return OK;
     }
 }
 
@@ -193,7 +182,7 @@ int AudioMixer::getTrackName(
 // which will simplify this logic.
 bool AudioMixer::setChannelMasks(int name,
         audio_channel_mask_t trackChannelMask, audio_channel_mask_t mixerChannelMask) {
-    LOG_ALWAYS_FATAL_IF(mTracks.find(name) == mTracks.end(), "invalid name: %d", name);
+    LOG_ALWAYS_FATAL_IF(!exists(name), "invalid name: %d", name);
     const std::shared_ptr<Track> &track = mTracks[name];
 
     if (trackChannelMask == track->channelMask
@@ -361,23 +350,20 @@ void AudioMixer::Track::reconfigureBufferProviders()
     }
 }
 
-void AudioMixer::deleteTrackName(int name)
+void AudioMixer::destroy(int name)
 {
-    name -= TRACK0;
-    LOG_ALWAYS_FATAL_IF(mTracks.find(name) == mTracks.end(), "invalid name: %d", name);
+    LOG_ALWAYS_FATAL_IF(!exists(name), "invalid name: %d", name);
     ALOGV("deleteTrackName(%d)", name);
 
     if (mTracks[name]->enabled) {
         invalidate();
     }
     mTracks.erase(name); // deallocate track
-    mUnusedNames.emplace(name); // recycle name
 }
 
 void AudioMixer::enable(int name)
 {
-    name -= TRACK0;
-    LOG_ALWAYS_FATAL_IF(mTracks.find(name) == mTracks.end(), "invalid name: %d", name);
+    LOG_ALWAYS_FATAL_IF(!exists(name), "invalid name: %d", name);
     const std::shared_ptr<Track> &track = mTracks[name];
 
     if (!track->enabled) {
@@ -389,8 +375,7 @@ void AudioMixer::enable(int name)
 
 void AudioMixer::disable(int name)
 {
-    name -= TRACK0;
-    LOG_ALWAYS_FATAL_IF(mTracks.find(name) == mTracks.end(), "invalid name: %d", name);
+    LOG_ALWAYS_FATAL_IF(!exists(name), "invalid name: %d", name);
     const std::shared_ptr<Track> &track = mTracks[name];
 
     if (track->enabled) {
@@ -528,8 +513,7 @@ static inline bool setVolumeRampVariables(float newVolume, int32_t ramp,
 
 void AudioMixer::setParameter(int name, int target, int param, void *value)
 {
-    name -= TRACK0;
-    LOG_ALWAYS_FATAL_IF(mTracks.find(name) == mTracks.end(), "invalid name: %d", name);
+    LOG_ALWAYS_FATAL_IF(!exists(name), "invalid name: %d", name);
     const std::shared_ptr<Track> &track = mTracks[name];
 
     int valueInt = static_cast<int>(reinterpret_cast<uintptr_t>(value));
@@ -808,7 +792,6 @@ inline void AudioMixer::Track::adjustVolumeRamp(bool aux, bool useFloat)
 
 size_t AudioMixer::getUnreleasedFrames(int name) const
 {
-    name -= TRACK0;
     const auto it = mTracks.find(name);
     if (it != mTracks.end()) {
         return it->second->getUnreleasedFrames();
@@ -818,7 +801,7 @@ size_t AudioMixer::getUnreleasedFrames(int name) const
 
 void AudioMixer::setBufferProvider(int name, AudioBufferProvider* bufferProvider)
 {
-    name -= TRACK0;
+    LOG_ALWAYS_FATAL_IF(!exists(name), "invalid name: %d", name);
     const std::shared_ptr<Track> &track = mTracks[name];
 
     if (track->mInputBufferProvider == bufferProvider) {

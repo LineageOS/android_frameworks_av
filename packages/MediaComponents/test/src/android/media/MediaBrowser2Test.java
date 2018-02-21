@@ -68,7 +68,10 @@ public class MediaBrowser2Test extends MediaController2Test {
         // Browser specific callbacks
         default void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {}
         default void onItemLoaded(String mediaId, MediaItem2 result) {}
-        default void onChildrenLoaded(String parentId, int page, int pageSize, Bundle options,
+        default void onChildrenLoaded(String parentId, int page, int pageSize, Bundle extras,
+                List<MediaItem2> result) {}
+        default void onSearchResultChanged(String query, Bundle extras, int itemCount) {}
+        default void onSearchResultLoaded(String query, int page, int pageSize, Bundle extras,
                 List<MediaItem2> result) {}
     }
 
@@ -141,23 +144,22 @@ public class MediaBrowser2Test extends MediaController2Test {
         final String parentId = MockMediaLibraryService2.PARENT_ID;
         final int page = 4;
         final int pageSize = 10;
-        final Bundle options = new Bundle();
-        options.putString(TAG, TAG);
+        final Bundle extras = new Bundle();
+        extras.putString(TAG, TAG);
 
         final CountDownLatch latch = new CountDownLatch(1);
         final TestControllerCallbackInterface callback = new TestBrowserCallbackInterface() {
             @Override
             public void onChildrenLoaded(String parentIdOut, int pageOut, int pageSizeOut,
-                    Bundle optionsOut, List<MediaItem2> result) {
+                    Bundle extrasOut, List<MediaItem2> result) {
                 assertEquals(parentId, parentIdOut);
                 assertEquals(page, pageOut);
                 assertEquals(pageSize, pageSizeOut);
-                assertTrue(TestUtils.equals(options, optionsOut));
+                assertTrue(TestUtils.equals(extras, extrasOut));
                 assertNotNull(result);
 
                 int fromIndex = (page - 1) * pageSize;
-                int toIndex = Math.min(page * pageSize,
-                        MockMediaLibraryService2.GET_CHILDREN_RESULT.size());
+                int toIndex = Math.min(page * pageSize, MockMediaLibraryService2.CHILDREN_COUNT);
 
                 // Compare the given results with originals.
                 for (int originalIndex = fromIndex; originalIndex < toIndex; originalIndex++) {
@@ -173,7 +175,7 @@ public class MediaBrowser2Test extends MediaController2Test {
 
         final SessionToken2 token = MockMediaLibraryService2.getToken(mContext);
         MediaBrowser2 browser = (MediaBrowser2) createController(token, true, callback);
-        browser.getChildren(parentId, page, pageSize, options);
+        browser.getChildren(parentId, page, pageSize, extras);
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
     }
 
@@ -185,7 +187,7 @@ public class MediaBrowser2Test extends MediaController2Test {
         final TestControllerCallbackInterface callback = new TestBrowserCallbackInterface() {
             @Override
             public void onChildrenLoaded(String parentIdOut, int pageOut, int pageSizeOut,
-                    Bundle optionsOut, List<MediaItem2> result) {
+                    Bundle extrasOut, List<MediaItem2> result) {
                 assertNotNull(result);
                 assertEquals(0, result.size());
                 latch.countDown();
@@ -206,7 +208,7 @@ public class MediaBrowser2Test extends MediaController2Test {
         final TestControllerCallbackInterface callback = new TestBrowserCallbackInterface() {
             @Override
             public void onChildrenLoaded(String parentIdOut, int pageOut, int pageSizeOut,
-                    Bundle optionsOut, List<MediaItem2> result) {
+                    Bundle extrasOut, List<MediaItem2> result) {
                 assertNull(result);
                 latch.countDown();
             }
@@ -215,6 +217,107 @@ public class MediaBrowser2Test extends MediaController2Test {
         final SessionToken2 token = MockMediaLibraryService2.getToken(mContext);
         MediaBrowser2 browser = (MediaBrowser2) createController(token, true, callback);
         browser.getChildren(parentId, 1, 1, null);
+        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    public void testSearch() throws InterruptedException {
+        final String query = MockMediaLibraryService2.SEARCH_QUERY;
+        final int page = 4;
+        final int pageSize = 10;
+        final Bundle extras = new Bundle();
+        extras.putString(TAG, TAG);
+
+        final CountDownLatch latchForSearch = new CountDownLatch(1);
+        final CountDownLatch latchForGetSearchResult = new CountDownLatch(1);
+        final TestControllerCallbackInterface callback = new TestBrowserCallbackInterface() {
+            @Override
+            public void onSearchResultChanged(String queryOut, Bundle extrasOut, int itemCount) {
+                assertEquals(query, queryOut);
+                assertTrue(TestUtils.equals(extras, extrasOut));
+                assertEquals(MockMediaLibraryService2.SEARCH_RESULT_COUNT, itemCount);
+                latchForSearch.countDown();
+            }
+
+            @Override
+            public void onSearchResultLoaded(String queryOut, int pageOut, int pageSizeOut,
+                    Bundle extrasOut, List<MediaItem2> result) {
+                assertEquals(query, queryOut);
+                assertEquals(page, pageOut);
+                assertEquals(pageSize, pageSizeOut);
+                assertTrue(TestUtils.equals(extras, extrasOut));
+                assertNotNull(result);
+
+                int fromIndex = (page - 1) * pageSize;
+                int toIndex = Math.min(
+                        page * pageSize, MockMediaLibraryService2.SEARCH_RESULT_COUNT);
+
+                // Compare the given results with originals.
+                for (int originalIndex = fromIndex; originalIndex < toIndex; originalIndex++) {
+                    int relativeIndex = originalIndex - fromIndex;
+                    assertEquals(
+                            MockMediaLibraryService2.SEARCH_RESULT.get(originalIndex).getMediaId(),
+                            result.get(relativeIndex).getMediaId());
+                }
+                latchForGetSearchResult.countDown();
+            }
+        };
+
+        // Request the search.
+        final SessionToken2 token = MockMediaLibraryService2.getToken(mContext);
+        MediaBrowser2 browser = (MediaBrowser2) createController(token, true, callback);
+        browser.search(query, extras);
+        assertTrue(latchForSearch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+
+        // Get the search result.
+        browser.getSearchResult(query, page, pageSize, extras);
+        assertTrue(latchForGetSearchResult.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    public void testSearchTakesTime() throws InterruptedException {
+        final String query = MockMediaLibraryService2.SEARCH_QUERY_TAKES_TIME;
+        final Bundle extras = new Bundle();
+        extras.putString(TAG, TAG);
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final TestControllerCallbackInterface callback = new TestBrowserCallbackInterface() {
+            @Override
+            public void onSearchResultChanged(String queryOut, Bundle extrasOut, int itemCount) {
+                assertEquals(query, queryOut);
+                assertTrue(TestUtils.equals(extras, extrasOut));
+                assertEquals(MockMediaLibraryService2.SEARCH_RESULT_COUNT, itemCount);
+                latch.countDown();
+            }
+        };
+
+        final SessionToken2 token = MockMediaLibraryService2.getToken(mContext);
+        MediaBrowser2 browser = (MediaBrowser2) createController(token, true, callback);
+        browser.search(query, extras);
+        assertTrue(latch.await(
+                MockMediaLibraryService2.SEARCH_TIME_IN_MS + WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    public void testSearchEmptyResult() throws InterruptedException {
+        final String query = MockMediaLibraryService2.SEARCH_QUERY_EMPTY_RESULT;
+        final Bundle extras = new Bundle();
+        extras.putString(TAG, TAG);
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final TestControllerCallbackInterface callback = new TestBrowserCallbackInterface() {
+            @Override
+            public void onSearchResultChanged(String queryOut, Bundle extrasOut, int itemCount) {
+                assertEquals(query, queryOut);
+                assertTrue(TestUtils.equals(extras, extrasOut));
+                assertEquals(0, itemCount);
+                latch.countDown();
+            }
+        };
+
+        final SessionToken2 token = MockMediaLibraryService2.getToken(mContext);
+        MediaBrowser2 browser = (MediaBrowser2) createController(token, true, callback);
+        browser.search(query, extras);
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
     }
 
@@ -287,12 +390,31 @@ public class MediaBrowser2Test extends MediaController2Test {
         }
 
         @Override
-        public void onChildrenLoaded(String parentId, int page, int pageSize, Bundle options,
+        public void onChildrenLoaded(String parentId, int page, int pageSize, Bundle extras,
                 List<MediaItem2> result) {
-            super.onChildrenLoaded(parentId, page, pageSize, options, result);
+            super.onChildrenLoaded(parentId, page, pageSize, extras, result);
             if (mCallbackProxy instanceof TestBrowserCallbackInterface) {
                 ((TestBrowserCallbackInterface) mCallbackProxy)
-                        .onChildrenLoaded(parentId, page, pageSize, options, result);
+                        .onChildrenLoaded(parentId, page, pageSize, extras, result);
+            }
+        }
+
+        @Override
+        public void onSearchResultChanged(String query, Bundle extras, int itemCount) {
+            super.onSearchResultChanged(query, extras, itemCount);
+            if (mCallbackProxy instanceof TestBrowserCallbackInterface) {
+                ((TestBrowserCallbackInterface) mCallbackProxy)
+                        .onSearchResultChanged(query, extras, itemCount);
+            }
+        }
+
+        @Override
+        public void onSearchResultLoaded(String query, int page, int pageSize, Bundle extras,
+                List<MediaItem2> result) {
+            super.onSearchResultLoaded(query, page, pageSize, extras, result);
+            if (mCallbackProxy instanceof TestBrowserCallbackInterface) {
+                ((TestBrowserCallbackInterface) mCallbackProxy)
+                        .onSearchResultLoaded(query, page, pageSize, extras, result);
             }
         }
 

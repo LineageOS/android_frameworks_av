@@ -92,12 +92,8 @@ public class VideoView2Impl extends BaseLayout
     private int mAudioFocusType = AudioManager.AUDIOFOCUS_GAIN; // legacy focus gain
 
     private Pair<Executor, VideoView2.OnCustomActionListener> mCustomActionListenerRecord;
-    private Pair<Executor, VideoView2.OnPreparedListener> mPreparedListenerRecord;
-    private Pair<Executor, VideoView2.OnCompletionListener> mCompletionListenerRecord;
-    private Pair<Executor, VideoView2.OnErrorListener> mErrorListenerRecord;
-    private Pair<Executor, VideoView2.OnInfoListener> mInfoListenerRecord;
-    private Pair<Executor, VideoView2.OnViewTypeChangedListener> mViewTypeChangedListenerRecord;
-    private Pair<Executor, VideoView2.OnFullScreenRequestListener> mFullScreenRequestListenerRecord;
+    private VideoView2.OnViewTypeChangedListener mViewTypeChangedListener;
+    private VideoView2.OnFullScreenRequestListener mFullScreenRequestListener;
 
     private VideoViewInterface mCurrentView;
     private VideoTextureView mTextureView;
@@ -363,35 +359,13 @@ public class VideoView2Impl extends BaseLayout
     }
 
     @Override
-    public void setOnPreparedListener_impl(Executor executor, VideoView2.OnPreparedListener l) {
-        mPreparedListenerRecord = new Pair<>(executor, l);
+    public void setOnViewTypeChangedListener_impl(VideoView2.OnViewTypeChangedListener l) {
+        mViewTypeChangedListener = l;
     }
 
     @Override
-    public void setOnCompletionListener_impl(Executor executor, VideoView2.OnCompletionListener l) {
-        mCompletionListenerRecord = new Pair<>(executor, l);
-    }
-
-    @Override
-    public void setOnErrorListener_impl(Executor executor, VideoView2.OnErrorListener l) {
-        mErrorListenerRecord = new Pair<>(executor, l);
-    }
-
-    @Override
-    public void setOnInfoListener_impl(Executor executor, VideoView2.OnInfoListener l) {
-        mInfoListenerRecord = new Pair<>(executor, l);
-    }
-
-    @Override
-    public void setOnViewTypeChangedListener_impl(Executor executor,
-            VideoView2.OnViewTypeChangedListener l) {
-        mViewTypeChangedListenerRecord = new Pair<>(executor, l);
-    }
-
-    @Override
-    public void setFullScreenRequestListener_impl(Executor executor,
-            VideoView2.OnFullScreenRequestListener l) {
-        mFullScreenRequestListenerRecord = new Pair<>(executor, l);
+    public void setFullScreenRequestListener_impl(VideoView2.OnFullScreenRequestListener l) {
+        mFullScreenRequestListener = l;
     }
 
     @Override
@@ -490,10 +464,8 @@ public class VideoView2Impl extends BaseLayout
             Log.d(TAG, "onSurfaceTakeOverDone(). Now current view is: " + view);
         }
         mCurrentView = view;
-        if (mViewTypeChangedListenerRecord != null) {
-            mViewTypeChangedListenerRecord.first.execute(() ->
-                    mViewTypeChangedListenerRecord.second.onViewTypeChanged(
-                            mInstance, view.getViewType()));
+        if (mViewTypeChangedListener != null) {
+            mViewTypeChangedListener.onViewTypeChanged(mInstance, view.getViewType());
         }
         if (needToStart()) {
             mMediaController.getTransportControls().play();
@@ -845,10 +817,6 @@ public class VideoView2Impl extends BaseLayout
             updatePlaybackState();
             extractSubtitleTracks();
 
-            if (mPreparedListenerRecord != null) {
-                mPreparedListenerRecord.first.execute(() ->
-                        mPreparedListenerRecord.second.onPrepared(mInstance));
-            }
             if (mMediaControlView != null) {
                 mMediaControlView.setEnabled(true);
             }
@@ -909,10 +877,6 @@ public class VideoView2Impl extends BaseLayout
                     mTargetState = STATE_PLAYBACK_COMPLETED;
                     updatePlaybackState();
 
-                    if (mCompletionListenerRecord != null) {
-                        mCompletionListenerRecord.first.execute(() ->
-                                mCompletionListenerRecord.second.onCompletion(mInstance));
-                    }
                     if (mAudioFocusType != AudioManager.AUDIOFOCUS_NONE) {
                         mAudioManager.abandonAudioFocus(null);
                     }
@@ -922,11 +886,6 @@ public class VideoView2Impl extends BaseLayout
     private MediaPlayer.OnInfoListener mInfoListener =
             new MediaPlayer.OnInfoListener() {
                 public boolean onInfo(MediaPlayer mp, int what, int extra) {
-                    if (mInfoListenerRecord != null) {
-                        mInfoListenerRecord.first.execute(() ->
-                                mInfoListenerRecord.second.onInfo(mInstance, what, extra));
-                    }
-
                     if (what == MediaPlayer.MEDIA_INFO_METADATA_UPDATE) {
                         extractSubtitleTracks();
                     }
@@ -947,14 +906,6 @@ public class VideoView2Impl extends BaseLayout
                     if (mMediaControlView != null) {
                         mMediaControlView.setVisibility(View.GONE);
                     }
-
-                    /* If an error handler has been supplied, use it and finish. */
-                    if (mErrorListenerRecord != null) {
-                        mErrorListenerRecord.first.execute(() ->
-                            mErrorListenerRecord.second.onError(
-                                    mInstance, frameworkErr, implErr));
-                    }
-
                     return true;
                 }
             };
@@ -990,13 +941,10 @@ public class VideoView2Impl extends BaseLayout
                         mInstance.setSubtitleEnabled(false);
                         break;
                     case MediaControlView2.COMMAND_SET_FULLSCREEN:
-                        if (mFullScreenRequestListenerRecord != null) {
-                            mFullScreenRequestListenerRecord.first.execute(() ->
-                                    mFullScreenRequestListenerRecord.second.onFullScreenRequest(
-                                            mInstance,
-                                            args.getBoolean(
-                                                    MediaControlView2Impl.ARGUMENT_KEY_FULLSCREEN))
-                                    );
+                        if (mFullScreenRequestListener != null) {
+                            mFullScreenRequestListener.onFullScreenRequest(
+                                    mInstance,
+                                    args.getBoolean(MediaControlView2Impl.ARGUMENT_KEY_FULLSCREEN));
                         }
                         break;
                 }
