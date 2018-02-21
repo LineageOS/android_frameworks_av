@@ -1393,13 +1393,12 @@ void AudioMixer::process__genericResampling()
                     // been enabled for mixing.
                     if (t->mIn == nullptr) break;
 
-                    if (CC_UNLIKELY(aux != NULL)) {
-                        aux += outFrames;
-                    }
                     (t.get()->*t->hook)(
                             outTemp + outFrames * t->mMixerChannelCount, t->buffer.frameCount,
-                            mResampleTemp.get() /* naked ptr */, aux);
+                            mResampleTemp.get() /* naked ptr */,
+                            aux != nullptr ? aux + outFrames : nullptr);
                     outFrames += t->buffer.frameCount;
+
                     t->bufferProvider->releaseBuffer(&t->buffer);
                 }
             }
@@ -1687,7 +1686,7 @@ void AudioMixer::process__noResampleOneTrack()
 
         out += outFrames * channels;
         if (aux != NULL) {
-            aux += channels;
+            aux += outFrames;
         }
         numFrames -= b.frameCount;
 
