@@ -36,7 +36,7 @@ oneway interface IMediaSession2Callback {
 
     // TODO(jaewan): Handle when the playlist becomes too huge.
     void onConnected(IMediaSession2 sessionBinder, in Bundle commandGroup, in Bundle playbackState,
-            in Bundle playbackInfo, in Bundle params, in List<Bundle> playlist, int ratingType,
+            in Bundle playbackInfo, in Bundle params, in List<Bundle> playlist,
             in PendingIntent sessionActivity);
     void onDisconnected();
 

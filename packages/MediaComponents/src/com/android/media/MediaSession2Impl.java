@@ -85,7 +85,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private final SessionToken2 mSessionToken;
     private final AudioManager mAudioManager;
     private final List<PlaybackListenerHolder> mListeners = new ArrayList<>();
-    private final int mRatingType;
     private final PendingIntent mSessionActivity;
 
     // mPlayer is set to null when the session is closed, and we shouldn't throw an exception
@@ -119,13 +118,13 @@ public class MediaSession2Impl implements MediaSession2Provider {
      * @param context
      * @param player
      * @param id
-     * @param callback
      * @param volumeProvider
-     * @param ratingType
      * @param sessionActivity
+     * @param callbackExecutor
+     * @param callback
      */
     public MediaSession2Impl(Context context, MediaPlayerInterface player, String id,
-            VolumeProvider2 volumeProvider, int ratingType, PendingIntent sessionActivity,
+            VolumeProvider2 volumeProvider, PendingIntent sessionActivity,
             Executor callbackExecutor, SessionCallback callback) {
         // TODO(jaewan): Keep other params.
         mInstance = createInstance();
@@ -136,7 +135,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mId = id;
         mCallback = callback;
         mCallbackExecutor = callbackExecutor;
-        mRatingType = ratingType;
         mSessionActivity = sessionActivity;
         mSessionStub = new MediaSession2Stub(this);
         mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
@@ -633,10 +631,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         synchronized (mLock) {
             return mPlaybackInfo;
         }
-    }
-
-    int getRatingType() {
-        return mRatingType;
     }
 
     PendingIntent getSessionActivity() {
@@ -1171,7 +1165,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         Executor mCallbackExecutor;
         C mCallback;
         VolumeProvider2 mVolumeProvider;
-        int mRatingType;
         PendingIntent mSessionActivity;
 
         /**
@@ -1198,10 +1191,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         public void setVolumeProvider_impl(VolumeProvider2 volumeProvider) {
             mVolumeProvider = volumeProvider;
-        }
-
-        public void setRatingType_impl(int type) {
-            mRatingType = type;
         }
 
         public void setSessionActivity_impl(PendingIntent pi) {
@@ -1243,7 +1232,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 mCallback = new SessionCallback(mContext);
             }
 
-            return new MediaSession2Impl(mContext, mPlayer, mId, mVolumeProvider, mRatingType,
+            return new MediaSession2Impl(mContext, mPlayer, mId, mVolumeProvider,
                     mSessionActivity, mCallbackExecutor, mCallback).getInstance();
         }
     }

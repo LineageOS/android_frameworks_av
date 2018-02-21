@@ -68,10 +68,9 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
             implements MediaLibrarySessionProvider {
         public MediaLibrarySessionImpl(Context context,
                 MediaPlayerInterface player, String id, VolumeProvider2 volumeProvider,
-                int ratingType, PendingIntent sessionActivity, Executor callbackExecutor,
+                PendingIntent sessionActivity, Executor callbackExecutor,
                 MediaLibrarySessionCallback callback) {
-            super(context, player, id, volumeProvider, ratingType, sessionActivity,
-                    callbackExecutor, callback);
+            super(context, player, id, volumeProvider, sessionActivity, callbackExecutor, callback);
             // Don't put any extra initialization here. Here's the reason.
             // System service will recognize this session inside of the super constructor and would
             // connect to this session assuming that initialization is finished. However, if any
@@ -130,7 +129,7 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
 
         @Override
         public MediaLibrarySession build_impl() {
-            return new MediaLibrarySessionImpl(mContext, mPlayer, mId, mVolumeProvider, mRatingType,
+            return new MediaLibrarySessionImpl(mContext, mPlayer, mId, mVolumeProvider,
                     mSessionActivity, mCallbackExecutor, mCallback).getInstance();
         }
     }

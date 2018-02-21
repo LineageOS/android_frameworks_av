@@ -125,7 +125,7 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
     @Override
     public void onConnected(IMediaSession2 sessionBinder, Bundle commandGroup,
             Bundle playbackState, Bundle playbackInfo, Bundle playlistParams, List<Bundle>
-            playlist, int ratingType, PendingIntent sessionActivity) {
+            playlist, PendingIntent sessionActivity) {
         final MediaController2Impl controller = mController.get();
         if (controller == null) {
             if (DEBUG) {
@@ -146,7 +146,7 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
                 PlaybackState2.fromBundle(context, playbackState),
                 PlaybackInfoImpl.fromBundle(context, playbackInfo),
                 PlaylistParams.fromBundle(context, playlistParams),
-                list, ratingType, sessionActivity);
+                list, sessionActivity);
     }
 
     @Override

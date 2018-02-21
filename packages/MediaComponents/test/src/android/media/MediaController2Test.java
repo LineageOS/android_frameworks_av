@@ -60,7 +60,6 @@ import static org.junit.Assert.*;
 @FlakyTest
 public class MediaController2Test extends MediaSession2TestBase {
     private static final String TAG = "MediaController2Test";
-    private static final int DEFAULT_RATING_TYPE = Rating2.RATING_5_STARS;
 
     PendingIntent mIntent;
     MediaSession2 mSession;
@@ -78,7 +77,6 @@ public class MediaController2Test extends MediaSession2TestBase {
         mPlayer = new MockPlayer(1);
         mSession = new MediaSession2.Builder(mContext, mPlayer)
                 .setSessionCallback(sHandlerExecutor, new SessionCallback(mContext))
-                .setRatingType(DEFAULT_RATING_TYPE)
                 .setSessionActivity(mIntent)
                 .setId(TAG).build();
         mController = createController(mSession.getToken());
@@ -207,11 +205,6 @@ public class MediaController2Test extends MediaSession2TestBase {
         }
         assertTrue(mPlayer.mSetCurrentPlaylistItemCalled);
         assertEquals(itemIndex, mPlayer.mItemIndex);
-    }
-
-    @Test
-    public void testGetRatingType() throws InterruptedException {
-        assertEquals(DEFAULT_RATING_TYPE, mController.getRatingType());
     }
 
     @Test
@@ -525,9 +518,9 @@ public class MediaController2Test extends MediaSession2TestBase {
 
     @Test
     public void testSetRating() throws InterruptedException {
-        final int sessionRatingType = Rating2.RATING_5_STARS;
+        final int ratingType = Rating2.RATING_5_STARS;
         final float ratingValue = 3.5f;
-        final Rating2 rating = Rating2.newStarRating(mContext, sessionRatingType, ratingValue);
+        final Rating2 rating = Rating2.newStarRating(mContext, ratingType, ratingValue);
         final String mediaId = "media_id";
 
         final CountDownLatch latch = new CountDownLatch(1);
@@ -543,35 +536,11 @@ public class MediaController2Test extends MediaSession2TestBase {
         };
 
         try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
-                .setRatingType(sessionRatingType)
                 .setSessionCallback(sHandlerExecutor, callback)
                 .setId("testSetRating").build()) {
             MediaController2 controller = createController(session.getToken());
             controller.setRating(mediaId, rating);
             assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
-        }
-    }
-
-    @Test
-    public void testSetRatingTypeNotMatched() throws InterruptedException {
-        final String mediaId = "media_id";
-        final int sessionRatingType = Rating2.RATING_5_STARS;
-
-        final SessionCallback callback = new SessionCallback(mContext);
-        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
-                .setRatingType(sessionRatingType)
-                .setSessionCallback(sHandlerExecutor, callback)
-                .setId("testSetRatingTypeNotMatched").build()) {
-
-            // Set 'Heart' type rating which is different from the session's rating type (5-Stars).
-            MediaController2 controller = createController(session.getToken());
-            Rating2 nonMatchingTypeRating = Rating2.newHeartRating(mContext, true);
-            try {
-                controller.setRating(mediaId, nonMatchingTypeRating);
-                fail();
-            } catch (IllegalArgumentException ex) {
-                // Expected.
-            }
         }
     }
 

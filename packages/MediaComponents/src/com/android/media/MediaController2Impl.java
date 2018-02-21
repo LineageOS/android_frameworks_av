@@ -75,8 +75,6 @@ public class MediaController2Impl implements MediaController2Provider {
     @GuardedBy("mLock")
     private PlaybackInfo mPlaybackInfo;
     @GuardedBy("mLock")
-    private int mRatingType;
-    @GuardedBy("mLock")
     private PendingIntent mSessionActivity;
     @GuardedBy("mLock")
     private CommandGroup mCommandGroup;
@@ -286,11 +284,6 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public int getRatingType_impl() {
-        return mRatingType;
-    }
-
-    @Override
     public void setVolumeTo_impl(int value, int flags) {
         // TODO(hdmoon): sanity check
         final IMediaSession2 binder = mSessionBinder;
@@ -411,10 +404,6 @@ public class MediaController2Impl implements MediaController2Provider {
         }
         if (rating == null) {
             throw new IllegalArgumentException("rating shouldn't be null");
-        }
-        // TODO (hdmoon): All 'ratingStyle' should be changed to 'ratingType'.
-        if (rating.getRatingStyle() != getRatingType_impl()) {
-            throw new IllegalArgumentException("rating type should be matched");
         }
 
         final IMediaSession2 binder = mSessionBinder;
@@ -584,7 +573,7 @@ public class MediaController2Impl implements MediaController2Provider {
     // Should be used without a lock to prevent potential deadlock.
     void onConnectedNotLocked(IMediaSession2 sessionBinder,
             final CommandGroup commandGroup, final PlaybackState2 state, final PlaybackInfo info,
-            final PlaylistParams params, final List<MediaItem2> playlist, final int ratingType,
+            final PlaylistParams params, final List<MediaItem2> playlist,
             final PendingIntent sessionActivity) {
         if (DEBUG) {
             Log.d(TAG, "onConnectedNotLocked sessionBinder=" + sessionBinder
@@ -612,7 +601,6 @@ public class MediaController2Impl implements MediaController2Provider {
                 mPlaybackInfo = info;
                 mPlaylistParams = params;
                 mPlaylist = playlist;
-                mRatingType = ratingType;
                 mSessionActivity = sessionActivity;
                 mSessionBinder = sessionBinder;
                 try {

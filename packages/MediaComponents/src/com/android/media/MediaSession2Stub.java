@@ -160,7 +160,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                         ((MediaController2Impl.PlaybackInfoImpl) session.getPlaybackInfo().getProvider()).toBundle();
                 final PlaylistParams params = session.getInstance().getPlaylistParams();
                 final Bundle paramsBundle = (params != null) ? params.toBundle() : null;
-                final int ratingType = session.getRatingType();
                 final PendingIntent sessionActivity = session.getSessionActivity();
                 final List<MediaItem2> playlist = session.getInstance().getPlaylist();
                 final List<Bundle> playlistBundle = new ArrayList<>();
@@ -185,7 +184,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 try {
                     callback.onConnected(MediaSession2Stub.this,
                             allowedCommands.toBundle(), playbackStateBundle, playbackInfoBundle,
-                            paramsBundle, playlistBundle, ratingType, sessionActivity);
+                            paramsBundle, playlistBundle, sessionActivity);
                 } catch (RemoteException e) {
                     // Controller may be died prematurely.
                     // TODO(jaewan): Handle here.
