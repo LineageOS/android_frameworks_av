@@ -879,4 +879,20 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             // TODO(jaewan): What to do when the controller is gone?
         }
     }
+
+    //////////////////////////////////////////////////////////////////////////////////////////////
+    // APIs for MediaLibrarySessionImpl
+    //////////////////////////////////////////////////////////////////////////////////////////////
+
+    public void notifySearchResultChanged(ControllerInfo controller, String query, Bundle extras,
+            int itemCount) {
+        final IMediaSession2Callback callbackBinder =
+                ControllerInfoImpl.from(controller).getControllerBinder();
+        try {
+            callbackBinder.onSearchResultChanged(query, extras, itemCount);
+        } catch (RemoteException e) {
+            Log.w(TAG, "Controller is gone", e);
+            // TODO(jaewan): What to do when the controller is gone?
+        }
+    }
 }

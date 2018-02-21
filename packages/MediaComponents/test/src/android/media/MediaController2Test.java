@@ -458,7 +458,8 @@ public class MediaController2Test extends MediaSession2TestBase {
         final CountDownLatch latch = new CountDownLatch(1);
         final SessionCallback callback = new SessionCallback(mContext) {
             @Override
-            public void onPrepareFromSearch(ControllerInfo controller, String query, Bundle extras) {
+            public void onPrepareFromSearch(ControllerInfo controller, String query,
+                    Bundle extras) {
                 assertEquals(mContext.getPackageName(), controller.getPackageName());
                 assertEquals(request, query);
                 assertTrue(TestUtils.equals(bundle, extras));

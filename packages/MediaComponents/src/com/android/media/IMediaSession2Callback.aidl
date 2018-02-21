@@ -51,6 +51,7 @@ oneway interface IMediaSession2Callback {
     void onItemLoaded(String mediaId, in Bundle result);
     void onChildrenLoaded(String parentId, int page, int pageSize, in Bundle extras,
             in List<Bundle> result);
+    void onSearchResultChanged(String query, in Bundle extras, int itemCount);
     void onSearchResultLoaded(String query, int page, int pageSize, in Bundle extras,
             in List<Bundle> result);
 }
