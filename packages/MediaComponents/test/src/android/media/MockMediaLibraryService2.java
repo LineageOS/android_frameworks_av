@@ -176,19 +176,19 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         @Override
         public void onSearch(ControllerInfo controllerInfo, String query, Bundle extras) {
             if (SEARCH_QUERY.equals(query)) {
-                mSession.notifySearchResultChanged(controllerInfo, query, extras,
-                        SEARCH_RESULT_COUNT);
+                mSession.notifySearchResultChanged(controllerInfo, query, SEARCH_RESULT_COUNT,
+                        extras);
             } else if (SEARCH_QUERY_TAKES_TIME.equals(query)) {
                 // Searching takes some time. Notify after 5 seconds.
                 Executors.newSingleThreadScheduledExecutor().schedule(new Runnable() {
                     @Override
                     public void run() {
                         mSession.notifySearchResultChanged(
-                                controllerInfo, query, extras, SEARCH_RESULT_COUNT);
+                                controllerInfo, query, SEARCH_RESULT_COUNT, extras);
                     }
                 }, SEARCH_TIME_IN_MS, TimeUnit.MILLISECONDS);
             } else if (SEARCH_QUERY_EMPTY_RESULT.equals(query)) {
-                mSession.notifySearchResultChanged(controllerInfo, query, extras, 0);
+                mSession.notifySearchResultChanged(controllerInfo, query, 0, extras);
             } else {
                 // TODO: For the error case, how should we notify the browser?
             }

@@ -244,8 +244,8 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
     }
 
     @Override
-    public void onChildrenLoaded(String parentId, int page, int pageSize, Bundle extras,
-            List<Bundle> itemBundleList) throws RuntimeException {
+    public void onChildrenLoaded(String parentId, int page, int pageSize,
+            List<Bundle> itemBundleList, Bundle extras) throws RuntimeException {
         final MediaBrowser2Impl browser;
         try {
             browser = getBrowser();
@@ -265,11 +265,11 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
                 result.add(MediaItem2.fromBundle(browser.getContext(), bundle));
             }
         }
-        browser.onChildrenLoaded(parentId, page, pageSize, extras, result);
+        browser.onChildrenLoaded(parentId, page, pageSize, result, extras);
     }
 
     @Override
-    public void onSearchResultChanged(String query, Bundle extras, int itemCount)
+    public void onSearchResultChanged(String query, int itemCount, Bundle extras)
             throws RuntimeException {
         final MediaBrowser2Impl browser;
         try {
@@ -282,12 +282,12 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
             // TODO(jaewan): Revisit here. Could be a bug
             return;
         }
-        browser.onSearchResultChanged(query, extras, itemCount);
+        browser.onSearchResultChanged(query, itemCount, extras);
     }
 
     @Override
-    public void onSearchResultLoaded(String query, int page, int pageSize, Bundle extras,
-            List<Bundle> itemBundleList) throws RuntimeException {
+    public void onSearchResultLoaded(String query, int page, int pageSize,
+            List<Bundle> itemBundleList, Bundle extras) throws RuntimeException {
         final MediaBrowser2Impl browser;
         try {
             browser = getBrowser();
@@ -307,6 +307,6 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
                 result.add(MediaItem2.fromBundle(browser.getContext(), bundle));
             }
         }
-        browser.onSearchResultLoaded(query, page, pageSize, extras, result);
+        browser.onSearchResultLoaded(query, page, pageSize, result, extras);
     }
 }

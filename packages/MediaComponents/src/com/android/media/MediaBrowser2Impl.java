@@ -169,23 +169,23 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
         });
     }
 
-    public void onChildrenLoaded(String parentId, int page, int pageSize, Bundle extras,
-            List<MediaItem2> result) {
+    public void onChildrenLoaded(String parentId, int page, int pageSize, List<MediaItem2> result,
+            Bundle extras) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onChildrenLoaded(parentId, page, pageSize, extras, result);
+            mCallback.onChildrenLoaded(parentId, page, pageSize, result, extras);
         });
     }
 
-    public void onSearchResultChanged(String query, Bundle extras, int itemCount) {
+    public void onSearchResultChanged(String query, int itemCount, Bundle extras) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onSearchResultChanged(query, extras, itemCount);
+            mCallback.onSearchResultChanged(query, itemCount, extras);
         });
     }
 
-    public void onSearchResultLoaded(String query, int page, int pageSize, Bundle extras,
-            List<MediaItem2> result) {
+    public void onSearchResultLoaded(String query, int page, int pageSize, List<MediaItem2> result,
+            Bundle extras) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onSearchResultLoaded(query, page, pageSize, extras, result);
+            mCallback.onSearchResultLoaded(query, page, pageSize, result, extras);
         });
     }
 }

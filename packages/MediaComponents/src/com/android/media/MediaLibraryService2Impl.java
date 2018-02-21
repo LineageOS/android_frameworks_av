@@ -107,7 +107,7 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
 
         @Override
         public void notifySearchResultChanged_impl(ControllerInfo controller, String query,
-                Bundle extras, int itemCount) {
+                int itemCount, Bundle extras) {
             ensureCallingThread();
             if (controller == null) {
                 throw new IllegalArgumentException("controller shouldn't be null");
@@ -115,7 +115,7 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
             if (TextUtils.isEmpty(query)) {
                 throw new IllegalArgumentException("query shouldn't be empty");
             }
-            getSessionStub().notifySearchResultChanged(controller, query, extras, itemCount);
+            getSessionStub().notifySearchResultChanged(controller, query, itemCount, extras);
         }
     }
 

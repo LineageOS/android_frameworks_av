@@ -643,7 +643,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
             try {
                 controllerImpl.getControllerBinder().onChildrenLoaded(
-                        parentId, page, pageSize, extras, bundleList);
+                        parentId, page, pageSize, bundleList, extras);
             } catch (RemoteException e) {
                 // Controller may be died prematurely.
                 // TODO(jaewan): Handle this.
@@ -726,7 +726,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
             try {
                 controllerImpl.getControllerBinder().onSearchResultLoaded(
-                        query, page, pageSize, extras, bundleList);
+                        query, page, pageSize, bundleList, extras);
             } catch (RemoteException e) {
                 // Controller may be died prematurely.
                 // TODO(jaewan): Handle this.
@@ -884,12 +884,12 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     // APIs for MediaLibrarySessionImpl
     //////////////////////////////////////////////////////////////////////////////////////////////
 
-    public void notifySearchResultChanged(ControllerInfo controller, String query, Bundle extras,
-            int itemCount) {
+    public void notifySearchResultChanged(ControllerInfo controller, String query, int itemCount,
+            Bundle extras) {
         final IMediaSession2Callback callbackBinder =
                 ControllerInfoImpl.from(controller).getControllerBinder();
         try {
-            callbackBinder.onSearchResultChanged(query, extras, itemCount);
+            callbackBinder.onSearchResultChanged(query, itemCount, extras);
         } catch (RemoteException e) {
             Log.w(TAG, "Controller is gone", e);
             // TODO(jaewan): What to do when the controller is gone?
