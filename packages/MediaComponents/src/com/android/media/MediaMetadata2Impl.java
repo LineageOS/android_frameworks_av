@@ -38,16 +38,11 @@ import java.util.Set;
 public class MediaMetadata2Impl implements MediaMetadata2Provider {
     private static final String TAG = "MediaMetadata2";
 
-    /**
-     * A {@link Bundle} extra.
-     * @hide
-     */
-    public static final String METADATA_KEY_EXTRA = "android.media.metadata.EXTRA";
-
     static final int METADATA_TYPE_LONG = 0;
     static final int METADATA_TYPE_TEXT = 1;
     static final int METADATA_TYPE_BITMAP = 2;
     static final int METADATA_TYPE_RATING = 3;
+    static final int METADATA_TYPE_FLOAT = 4;
     static final ArrayMap<String, Integer> METADATA_KEYS_TYPE;
 
     static {
@@ -83,6 +78,8 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
         METADATA_KEYS_TYPE.put(METADATA_KEY_MEDIA_URI, METADATA_TYPE_TEXT);
         METADATA_KEYS_TYPE.put(METADATA_KEY_ADVERTISEMENT, METADATA_TYPE_LONG);
         METADATA_KEYS_TYPE.put(METADATA_KEY_DOWNLOAD_STATUS, METADATA_TYPE_LONG);
+        METADATA_KEYS_TYPE.put(METADATA_KEY_RADIO_FREQUENCY, METADATA_TYPE_FLOAT);
+        METADATA_KEYS_TYPE.put(METADATA_KEY_RADIO_CALLSIGN, METADATA_TYPE_TEXT);
     }
 
     private static final @TextKey
@@ -167,6 +164,11 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
     }
 
     @Override
+    public float getFloat_impl(@FloatKey String key) {
+        return mBundle.getFloat(key);
+    }
+
+    @Override
     public Bitmap getBitmap_impl(@BitmapKey String key) {
         Bitmap bmp = null;
         try {
@@ -179,9 +181,9 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
     }
 
     @Override
-    public Bundle getExtra_impl() {
+    public Bundle getExtras_impl() {
         try {
-            return mBundle.getBundle(METADATA_KEY_EXTRA);
+            return mBundle.getBundle(METADATA_KEY_EXTRAS);
         } catch (Exception e) {
             // ignore, value was not an bundle
             Log.w(TAG, "Failed to retrieve an extra");
@@ -305,8 +307,20 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
         }
 
         @Override
-        public Builder setExtra_impl(Bundle bundle) {
-            mBundle.putBundle(METADATA_KEY_EXTRA, bundle);
+        public Builder putFloat_impl(@FloatKey String key, float value) {
+            if (METADATA_KEYS_TYPE.containsKey(key)) {
+                if (METADATA_KEYS_TYPE.get(key) != METADATA_TYPE_FLOAT) {
+                    throw new IllegalArgumentException("The " + key
+                            + " key cannot be used to put a float");
+                }
+            }
+            mBundle.putFloat(key, value);
+            return mInstance;
+        }
+
+        @Override
+        public Builder setExtras_impl(Bundle bundle) {
+            mBundle.putBundle(METADATA_KEY_EXTRAS, bundle);
             return mInstance;
         }
 
