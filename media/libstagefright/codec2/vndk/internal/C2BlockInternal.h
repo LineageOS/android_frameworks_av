@@ -19,6 +19,8 @@
 
 #include <C2Buffer.h>
 
+namespace android {
+
 struct _C2BlockPoolData;
 
 /**
@@ -61,6 +63,8 @@ struct _C2BlockFactory {
             const std::shared_ptr<_C2BlockPoolData> &data = nullptr,
             const C2Rect &allottedCrop = C2Rect(~0u, ~0u));
 };
+
+}
 
 #endif // ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_
 

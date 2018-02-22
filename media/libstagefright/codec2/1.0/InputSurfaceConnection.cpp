@@ -22,6 +22,7 @@
 #include <C2BlockInternal.h>
 #include <C2PlatformSupport.h>
 
+#include <gui/Surface.h>
 #include <media/stagefright/codec2/1.0/InputSurfaceConnection.h>
 #include <system/window.h>
 

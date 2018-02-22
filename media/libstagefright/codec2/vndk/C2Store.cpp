@@ -136,13 +136,13 @@ c2_status_t GetCodec2BlockPool(
     switch (id) {
     case C2BlockPool::BASIC_LINEAR:
         res = allocatorStore->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &allocator);
-        if (res == C2_OK) {
+        if (res == OK) {
             *pool = std::make_shared<C2BasicLinearBlockPool>(allocator);
         }
         break;
     case C2BlockPool::BASIC_GRAPHIC:
         res = allocatorStore->fetchAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &allocator);
-        if (res == C2_OK) {
+        if (res == OK) {
             *pool = std::make_shared<C2BasicGraphicBlockPool>(allocator);
         }
         break;
@@ -345,7 +345,7 @@ C2PlatformComponentStore::ComponentModule::~ComponentModule() {
 
 c2_status_t C2PlatformComponentStore::ComponentModule::createInterface(
         c2_node_id_t id, std::shared_ptr<C2ComponentInterface> *interface,
-        std::function<void(::C2ComponentInterface*)> deleter) {
+        std::function<void(::android::C2ComponentInterface*)> deleter) {
     interface->reset();
     if (mInit != C2_OK) {
         return mInit;
@@ -362,7 +362,7 @@ c2_status_t C2PlatformComponentStore::ComponentModule::createInterface(
 
 c2_status_t C2PlatformComponentStore::ComponentModule::createComponent(
         c2_node_id_t id, std::shared_ptr<C2Component> *component,
-        std::function<void(::C2Component*)> deleter) {
+        std::function<void(::android::C2Component*)> deleter) {
     component->reset();
     if (mInit != C2_OK) {
         return mInit;

@@ -86,7 +86,6 @@ c2_status_t GetCodec2BlockPool(
  * \retval nullptr if the platform component store could not be obtained
  */
 std::shared_ptr<C2ComponentStore> GetCodec2PlatformComponentStore();
-
 } // namespace android
 
 #endif // STAGEFRIGHT_CODEC2_PLATFORM_SUPPORT_H_

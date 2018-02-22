@@ -23,10 +23,13 @@
 #include <stdint.h>
 
 #include <algorithm>
+#include <list>
 #include <string>
 #include <type_traits>
-#include <utility>
-#include <vector>
+
+#define C2_PACK __attribute__((packed))
+
+namespace android {
 
 /// \addtogroup Parameters
 /// @{
@@ -86,6 +89,7 @@
  */
 
 /// \ingroup internal
+struct _C2ParamManipulator;
 
 /**
  * Parameter base class.
@@ -729,6 +733,17 @@ private:
 };
 
 /**
+ * Structure uniquely specifying a field, an array element of a field, or a
+ * parameter in a configuration
+ */
+struct C2ParamOrField : public C2ParamField {
+//public:
+    template<typename S>
+    inline C2ParamOrField(S* param)
+        : C2ParamField(param->index(), 0u, param->size()) {}
+};
+
+/**
  * A shared (union) representation of numeric values
  */
 class C2Value {
@@ -1360,5 +1375,7 @@ struct C2ParamFieldValues {
 };
 
 /// @}
+
+}  // namespace android
 
 #endif  // C2PARAM_H_
