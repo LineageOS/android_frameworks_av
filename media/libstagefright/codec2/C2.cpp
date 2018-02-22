@@ -22,6 +22,8 @@
 #include <C2ParamDef.h>
 #include <C2Work.h>
 
+namespace android {
+
 /**
  * There is nothing here yet. This library is built to see what symbols and methods get
  * defined as part of the API include files.
@@ -30,4 +32,5 @@
  * Codec2 clients.
  */
 
+} // namespace android
 

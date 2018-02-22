@@ -23,6 +23,8 @@
 #include <util/C2ParamUtils.h>
 #include <C2ParamDef.h>
 
+namespace android {
+
 void PrintTo(const _C2FieldId &id, ::std::ostream* os) {
     *os << "@" << id._mOffset << "+" << id._mSize;
 }
@@ -2395,10 +2397,14 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
 
 // ***********************
 
+}
+
 #include <util/C2ParamUtils.h>
 #include <C2Config.h>
 #include <C2Component.h>
 #include <unordered_map>
+
+namespace android {
 
 C2ENUM(
     MetadataType, int32_t,
@@ -2929,3 +2935,4 @@ TEST_F(C2ParamTest, C2ValueTest) {
     EXPECT_EQ(15.25f, fp);
 }
 
+} // namespace android

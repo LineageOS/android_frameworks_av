@@ -19,6 +19,8 @@
 
 #include <C2ParamDef.h>
 
+namespace android {
+
 /// \defgroup config Component configuration
 /// @{
 
@@ -259,5 +261,7 @@ typedef C2PortParam<C2Setting, C2VideoSizeStruct, kParamIndexMaxVideoSizeHint> C
 typedef C2StreamParam<C2Tuning, C2VideoSizeStruct, kParamIndexVideoSizeTuning> C2VideoSizeStreamTuning;
 
 /// @}
+
+} // namespace android
 
 #endif

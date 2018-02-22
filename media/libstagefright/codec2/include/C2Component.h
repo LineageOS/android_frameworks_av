@@ -29,8 +29,12 @@
 #include <C2Param.h>
 #include <C2Work.h>
 
+namespace android {
+
 /// \defgroup components Components
 /// @{
+
+class C2Component;
 
 struct C2FieldSupportedValuesQuery {
     enum type_t : uint32_t {
@@ -943,11 +947,6 @@ public:
 
 /// @}
 
-namespace android {
-    /// \deprecated
-    typedef ::C2Component C2Component;
-    /// \deprecated
-    typedef ::C2ComponentInterface C2ComponentInterface;
-}
+}  // namespace android
 
 #endif  // C2COMPONENT_H_

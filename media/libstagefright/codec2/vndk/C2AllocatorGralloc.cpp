@@ -29,36 +29,6 @@
 
 namespace android {
 
-namespace {
-    enum : uint64_t {
-        /**
-         * Usage mask that is passed through from gralloc to Codec 2.0 usage.
-         */
-        PASSTHROUGH_USAGE_MASK =
-            ~(GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK | GRALLOC_USAGE_PROTECTED)
-    };
-
-    // verify that passthrough mask is within the platform mask
-    static_assert((~C2MemoryUsage::PLATFORM_MASK & PASSTHROUGH_USAGE_MASK) == 0, "");
-}
-
-C2MemoryUsage C2AndroidMemoryUsage::FromGrallocUsage(uint64_t usage) {
-    // gralloc does not support WRITE_PROTECTED
-    return C2MemoryUsage(
-            ((usage & GRALLOC_USAGE_SW_READ_MASK) ? C2MemoryUsage::CPU_READ : 0) |
-            ((usage & GRALLOC_USAGE_SW_WRITE_MASK) ? C2MemoryUsage::CPU_WRITE : 0) |
-            ((usage & GRALLOC_USAGE_PROTECTED) ? C2MemoryUsage::READ_PROTECTED : 0) |
-            (usage & PASSTHROUGH_USAGE_MASK));
-}
-
-uint64_t C2AndroidMemoryUsage::asGrallocUsage() const {
-    // gralloc does not support WRITE_PROTECTED
-    return (((expected & C2MemoryUsage::CPU_READ) ? GRALLOC_USAGE_SW_READ_MASK : 0) |
-            ((expected & C2MemoryUsage::CPU_WRITE) ? GRALLOC_USAGE_SW_WRITE_MASK : 0) |
-            ((expected & C2MemoryUsage::READ_PROTECTED) ? GRALLOC_USAGE_PROTECTED : 0) |
-            (expected & PASSTHROUGH_USAGE_MASK));
-}
-
 using ::android::hardware::graphics::allocator::V2_0::IAllocator;
 using ::android::hardware::graphics::common::V1_0::BufferUsage;
 using ::android::hardware::graphics::common::V1_0::PixelFormat;

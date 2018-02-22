@@ -22,6 +22,8 @@
 #include <functional>
 #include <memory>
 
+namespace android {
+
 /**
  * Component factory object that enables to create a component and/or interface from a dynamically
  * linked library. This is needed because the component/interfaces are managed objects, but we
@@ -34,8 +36,8 @@
  */
 class C2ComponentFactory {
 public:
-    typedef std::function<void(::C2Component*)> ComponentDeleter;
-    typedef std::function<void(::C2ComponentInterface*)> InterfaceDeleter;
+    typedef std::function<void(::android::C2Component*)> ComponentDeleter;
+    typedef std::function<void(::android::C2ComponentInterface*)> InterfaceDeleter;
 
     /**
      * Creates a component.
@@ -79,12 +81,9 @@ public:
 
     virtual ~C2ComponentFactory() = default;
 
-    typedef ::C2ComponentFactory* (*CreateCodec2FactoryFunc)(void);
-    typedef void (*DestroyCodec2FactoryFunc)(::C2ComponentFactory*);
+    typedef ::android::C2ComponentFactory* (*CreateCodec2FactoryFunc)(void);
+    typedef void (*DestroyCodec2FactoryFunc)(::android::C2ComponentFactory*);
 };
-
-namespace android {
-    typedef ::C2ComponentFactory C2ComponentFactory;
-}
+} // namespace android
 
 #endif // STAGEFRIGHT_CODEC2_COMPONENT_FACTORY_H_

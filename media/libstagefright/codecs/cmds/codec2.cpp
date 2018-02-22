@@ -59,6 +59,11 @@
 #include <C2PlatformSupport.h>
 #include <C2Work.h>
 
+extern "C" ::android::C2ComponentFactory *CreateCodec2Factory();
+extern "C" void DestroyCodec2Factory(::android::C2ComponentFactory *);
+
+#include "../avcdec/C2SoftAvcDec.h"
+
 using namespace android;
 using namespace std::chrono_literals;
 
