@@ -180,23 +180,23 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
         }
     }
 
-    public void onGetRootResult(
+    public void onGetLibraryRootDone(
             final Bundle rootHints, final String rootMediaId, final Bundle rootExtra) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onGetRootResult(rootHints, rootMediaId, rootExtra);
+            mCallback.onGetLibraryRootDone(rootHints, rootMediaId, rootExtra);
         });
     }
 
-    public void onItemLoaded(String mediaId, MediaItem2 item) {
+    public void onGetItemDone(String mediaId, MediaItem2 item) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onItemLoaded(mediaId, item);
+            mCallback.onGetItemDone(mediaId, item);
         });
     }
 
-    public void onChildrenLoaded(String parentId, int page, int pageSize, List<MediaItem2> result,
+    public void onGetChildrenDone(String parentId, int page, int pageSize, List<MediaItem2> result,
             Bundle extras) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onChildrenLoaded(parentId, page, pageSize, result, extras);
+            mCallback.onGetChildrenDone(parentId, page, pageSize, result, extras);
         });
     }
 
@@ -206,16 +206,16 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
         });
     }
 
-    public void onSearchResultLoaded(String query, int page, int pageSize, List<MediaItem2> result,
+    public void onGetSearchResultDone(String query, int page, int pageSize, List<MediaItem2> result,
             Bundle extras) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onSearchResultLoaded(query, page, pageSize, result, extras);
+            mCallback.onGetSearchResultDone(query, page, pageSize, result, extras);
         });
     }
 
-    public void onChildrenChanged(final String parentId, int childCount, final Bundle extras) {
+    public void onChildrenChanged(final String parentId, int itemCount, final Bundle extras) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onChildrenChanged(parentId, childCount, extras);
+            mCallback.onChildrenChanged(parentId, itemCount, extras);
         });
     }
 }

@@ -71,13 +71,13 @@ public class MediaBrowser2Test extends MediaController2Test {
 
     interface TestBrowserCallbackInterface extends TestControllerCallbackInterface {
         // Browser specific callbacks
-        default void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {}
-        default void onItemLoaded(String mediaId, MediaItem2 result) {}
-        default void onChildrenChanged(String parentId, int childCount, Bundle extras) {}
-        default void onChildrenLoaded(String parentId, int page, int pageSize,
+        default void onGetLibraryRootDone(Bundle rootHints, String rootMediaId, Bundle rootExtra) {}
+        default void onGetItemDone(String mediaId, MediaItem2 result) {}
+        default void onChildrenChanged(String parentId, int itemCount, Bundle extras) {}
+        default void onGetChildrenDone(String parentId, int page, int pageSize,
                 List<MediaItem2> result, Bundle extras) {}
         default void onSearchResultChanged(String query, int itemCount, Bundle extras) {}
-        default void onSearchResultLoaded(String query, int page, int pageSize,
+        default void onGetSearchResultDone(String query, int page, int pageSize,
                 List<MediaItem2> result, Bundle extras) {}
     }
 
@@ -89,7 +89,8 @@ public class MediaBrowser2Test extends MediaController2Test {
         final CountDownLatch latch = new CountDownLatch(1);
         final TestControllerCallbackInterface callback = new TestBrowserCallbackInterface() {
             @Override
-            public void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {
+            public void onGetLibraryRootDone(Bundle rootHints, String rootMediaId,
+                    Bundle rootExtra) {
                 assertTrue(TestUtils.equals(param, rootHints));
                 assertEquals(MockMediaLibraryService2.ROOT_ID, rootMediaId);
                 assertTrue(TestUtils.equals(MockMediaLibraryService2.EXTRAS, rootExtra));
@@ -111,7 +112,7 @@ public class MediaBrowser2Test extends MediaController2Test {
         final CountDownLatch latch = new CountDownLatch(1);
         final TestControllerCallbackInterface callback = new TestBrowserCallbackInterface() {
             @Override
-            public void onItemLoaded(String mediaIdOut, MediaItem2 result) {
+            public void onGetItemDone(String mediaIdOut, MediaItem2 result) {
                 assertEquals(mediaId, mediaIdOut);
                 assertNotNull(result);
                 assertEquals(mediaId, result.getMediaId());
@@ -132,7 +133,7 @@ public class MediaBrowser2Test extends MediaController2Test {
         final CountDownLatch latch = new CountDownLatch(1);
         final TestControllerCallbackInterface callback = new TestBrowserCallbackInterface() {
             @Override
-            public void onItemLoaded(String mediaIdOut, MediaItem2 result) {
+            public void onGetItemDone(String mediaIdOut, MediaItem2 result) {
                 assertEquals(mediaId, mediaIdOut);
                 assertNull(result);
                 latch.countDown();
@@ -156,7 +157,7 @@ public class MediaBrowser2Test extends MediaController2Test {
         final CountDownLatch latch = new CountDownLatch(1);
         final TestControllerCallbackInterface callback = new TestBrowserCallbackInterface() {
             @Override
-            public void onChildrenLoaded(String parentIdOut, int pageOut, int pageSizeOut,
+            public void onGetChildrenDone(String parentIdOut, int pageOut, int pageSizeOut,
                     List<MediaItem2> result, Bundle extrasOut) {
                 assertEquals(parentId, parentIdOut);
                 assertEquals(page, pageOut);
@@ -192,7 +193,7 @@ public class MediaBrowser2Test extends MediaController2Test {
         final CountDownLatch latch = new CountDownLatch(1);
         final TestControllerCallbackInterface callback = new TestBrowserCallbackInterface() {
             @Override
-            public void onChildrenLoaded(String parentIdOut, int pageOut, int pageSizeOut,
+            public void onGetChildrenDone(String parentIdOut, int pageOut, int pageSizeOut,
                     List<MediaItem2> result, Bundle extrasOut) {
                 assertNotNull(result);
                 assertEquals(0, result.size());
@@ -213,7 +214,7 @@ public class MediaBrowser2Test extends MediaController2Test {
         final CountDownLatch latch = new CountDownLatch(1);
         final TestControllerCallbackInterface callback = new TestBrowserCallbackInterface() {
             @Override
-            public void onChildrenLoaded(String parentIdOut, int pageOut, int pageSizeOut,
+            public void onGetChildrenDone(String parentIdOut, int pageOut, int pageSizeOut,
                     List<MediaItem2> result, Bundle extrasOut) {
                 assertNull(result);
                 latch.countDown();
@@ -246,7 +247,7 @@ public class MediaBrowser2Test extends MediaController2Test {
             }
 
             @Override
-            public void onSearchResultLoaded(String queryOut, int pageOut, int pageSizeOut,
+            public void onGetSearchResultDone(String queryOut, int pageOut, int pageSizeOut,
                     List<MediaItem2> result, Bundle extrasOut) {
                 assertEquals(query, queryOut);
                 assertEquals(page, pageOut);
@@ -336,7 +337,7 @@ public class MediaBrowser2Test extends MediaController2Test {
         final CountDownLatch latch = new CountDownLatch(1);
         final SessionCallbackProxy callbackProxy = new SessionCallbackProxy(mContext) {
             @Override
-            public void onSubscribed(ControllerInfo info, String parentId, Bundle extras) {
+            public void onSubscribe(ControllerInfo info, String parentId, Bundle extras) {
                 if (Process.myUid() == info.getUid()) {
                     assertEquals(testParentId, parentId);
                     assertTrue(TestUtils.equals(testExtras, extras));
@@ -357,7 +358,7 @@ public class MediaBrowser2Test extends MediaController2Test {
         final CountDownLatch latch = new CountDownLatch(1);
         final SessionCallbackProxy callbackProxy = new SessionCallbackProxy(mContext) {
             @Override
-            public void onUnsubscribed(ControllerInfo info, String parentId) {
+            public void onUnsubscribe(ControllerInfo info, String parentId) {
                 if (Process.myUid() == info.getUid()) {
                     assertEquals(testParentId, parentId);
                     latch.countDown();
@@ -395,7 +396,7 @@ public class MediaBrowser2Test extends MediaController2Test {
             }
 
             @Override
-            public void onSubscribed(ControllerInfo info, String parentId, Bundle extras) {
+            public void onSubscribe(ControllerInfo info, String parentId, Bundle extras) {
                 if (Process.myUid() == info.getUid()) {
                     final MediaLibrarySession session =  (MediaLibrarySession) mSession;
                     session.notifyChildrenChanged(testParentId2, testChildrenCount, null);
@@ -407,18 +408,17 @@ public class MediaBrowser2Test extends MediaController2Test {
         final TestBrowserCallbackInterface controllerCallbackProxy =
                 new TestBrowserCallbackInterface() {
                     @Override
-                    public void onChildrenChanged(String parentId, int childCount,
-                            Bundle extras) {
+                    public void onChildrenChanged(String parentId, int itemCount, Bundle extras) {
                         switch ((int) latch.getCount()) {
                             case 3:
                                 assertEquals(testParentId2, parentId);
-                                assertEquals(testChildrenCount, childCount);
+                                assertEquals(testChildrenCount, itemCount);
                                 assertNull(extras);
                                 latch.countDown();
                                 break;
                             case 2:
                                 assertEquals(testParentId2, parentId);
-                                assertEquals(testChildrenCount, childCount);
+                                assertEquals(testChildrenCount, itemCount);
                                 assertTrue(TestUtils.equals(testExtras, extras));
                                 latch.countDown();
                                 break;
@@ -496,29 +496,29 @@ public class MediaBrowser2Test extends MediaController2Test {
         }
 
         @Override
-        public void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra) {
-            super.onGetRootResult(rootHints, rootMediaId, rootExtra);
+        public void onGetLibraryRootDone(Bundle rootHints, String rootMediaId, Bundle rootExtra) {
+            super.onGetLibraryRootDone(rootHints, rootMediaId, rootExtra);
             if (mCallbackProxy instanceof TestBrowserCallbackInterface) {
                 ((TestBrowserCallbackInterface) mCallbackProxy)
-                        .onGetRootResult(rootHints, rootMediaId, rootExtra);
+                        .onGetLibraryRootDone(rootHints, rootMediaId, rootExtra);
             }
         }
 
         @Override
-        public void onItemLoaded(String mediaId, MediaItem2 result) {
-            super.onItemLoaded(mediaId, result);
+        public void onGetItemDone(String mediaId, MediaItem2 result) {
+            super.onGetItemDone(mediaId, result);
             if (mCallbackProxy instanceof TestBrowserCallbackInterface) {
-                ((TestBrowserCallbackInterface) mCallbackProxy).onItemLoaded(mediaId, result);
+                ((TestBrowserCallbackInterface) mCallbackProxy).onGetItemDone(mediaId, result);
             }
         }
 
         @Override
-        public void onChildrenLoaded(String parentId, int page, int pageSize,
+        public void onGetChildrenDone(String parentId, int page, int pageSize,
                 List<MediaItem2> result, Bundle extras) {
-            super.onChildrenLoaded(parentId, page, pageSize, result, extras);
+            super.onGetChildrenDone(parentId, page, pageSize, result, extras);
             if (mCallbackProxy instanceof TestBrowserCallbackInterface) {
                 ((TestBrowserCallbackInterface) mCallbackProxy)
-                        .onChildrenLoaded(parentId, page, pageSize, result, extras);
+                        .onGetChildrenDone(parentId, page, pageSize, result, extras);
             }
         }
 
@@ -532,21 +532,21 @@ public class MediaBrowser2Test extends MediaController2Test {
         }
 
         @Override
-        public void onSearchResultLoaded(String query, int page, int pageSize,
+        public void onGetSearchResultDone(String query, int page, int pageSize,
                 List<MediaItem2> result, Bundle extras) {
-            super.onSearchResultLoaded(query, page, pageSize, result, extras);
+            super.onGetSearchResultDone(query, page, pageSize, result, extras);
             if (mCallbackProxy instanceof TestBrowserCallbackInterface) {
                 ((TestBrowserCallbackInterface) mCallbackProxy)
-                        .onSearchResultLoaded(query, page, pageSize, result, extras);
+                        .onGetSearchResultDone(query, page, pageSize, result, extras);
             }
         }
 
         @Override
-        public void onChildrenChanged(String parentId, int childCount, Bundle extras) {
-            super.onChildrenChanged(parentId, childCount, extras);
+        public void onChildrenChanged(String parentId, int itemCount, Bundle extras) {
+            super.onChildrenChanged(parentId, itemCount, extras);
             if (mCallbackProxy instanceof TestBrowserCallbackInterface) {
                 ((TestBrowserCallbackInterface) mCallbackProxy)
-                        .onChildrenChanged(parentId, childCount, extras);
+                        .onChildrenChanged(parentId, itemCount, extras);
             }
         }
 
