@@ -29,7 +29,7 @@ import static org.junit.Assert.fail;
 
 import android.content.Context;
 import android.media.MediaController2.PlaybackInfo;
-import android.media.MediaPlayerInterface.EventCallback;
+import android.media.MediaPlayerBase.EventCallback;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
@@ -73,7 +73,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
         super.setUp();
         mPlayer = new MockPlayer(0);
         mSession = new MediaSession2.Builder(mContext, mPlayer)
-                .setSessionCallback(sHandlerExecutor, new SessionCallback(mContext)).build();
+                .setSessionCallback(sHandlerExecutor, new SessionCallback(mContext) {}).build();
     }
 
     @After

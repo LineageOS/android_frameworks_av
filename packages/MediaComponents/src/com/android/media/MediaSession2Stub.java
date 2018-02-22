@@ -357,8 +357,11 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     session.getInstance().seekTo(args.getLong(ARGUMENT_KEY_POSITION));
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM:
-                    session.getInstance().setCurrentPlaylistItem(
+                    // TODO(jaewan): Implement
+                    /*
+                    session.getInstance().skipToPlaylistItem(
                             args.getInt(ARGUMENT_KEY_ITEM_INDEX));
+                    */
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS:
                     session.getInstance().setPlaylistParams(

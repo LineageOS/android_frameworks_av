@@ -465,11 +465,14 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public void setCurrentPlaylistItem_impl(int index) {
+    public void skipToPlaylistItem_impl(MediaItem2 item) {
+        // TODO(jaewan): Implement this
+        /*
         Bundle args = new Bundle();
-        args.putInt(MediaSession2Stub.ARGUMENT_KEY_ITEM_INDEX, index);
+        args.putInt(MediaSession2Stub.ARGUMENT_KEY_ITEM_INDEX, item);
         sendTransportControlCommand(
                 MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM, args);
+        */
     }
 
     @Override
@@ -486,7 +489,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void addPlaylistItem_impl(int index, MediaItem2 item) {
-    // TODO(jaewan): Implement
+        // TODO(jaewan): Implement
     }
 
     @Override
@@ -511,6 +514,36 @@ public class MediaController2Impl implements MediaController2Provider {
         Bundle args = new Bundle();
         args.putBundle(MediaSession2Stub.ARGUMENT_KEY_PLAYLIST_PARAMS, params.toBundle());
         sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS, args);
+    }
+
+    @Override
+    public int getPlayerState_impl() {
+        // TODO(jaewan): Implement
+        return 0;
+    }
+
+    @Override
+    public long getPosition_impl() {
+        // TODO(jaewan): Implement
+        return 0;
+    }
+
+    @Override
+    public float getPlaybackSpeed_impl() {
+        // TODO(jaewan): Implement
+        return 0;
+    }
+
+    @Override
+    public long getBufferedPosition_impl() {
+        // TODO(jaewan): Implement
+        return 0;
+    }
+
+    @Override
+    public MediaItem2 getCurrentPlaylistItem_impl() {
+        // TODO(jaewan): Implement
+        return null;
     }
 
     void pushPlaybackStateChanges(final PlaybackState2 state) {
