@@ -151,7 +151,7 @@
 
     <!--#################### STRATEGY COMMON TYPES BEGIN ####################-->
 
-    <ComponentType Name="StrategyConfig" Mapping="Strategy:'%1'">
+    <ComponentType Name="StrategyConfig" Mapping="Strategy">
         <Component Name="selected_output_devices" Type="OutputDevicesMask"/>
     </ComponentType>
 
@@ -177,7 +177,7 @@
         </EnumParameter>
     </ComponentType>
 
-    <ComponentType Name="Stream">
+    <ComponentType Name="Stream"  Mapping="Stream">
         <Component Name="applicable_strategy" Type="Strategy"/>
         <Component Name="applicable_volume_profile" Type="VolumeProfileType"
                    Description="Volume profile followed by a given stream type."/>
@@ -188,7 +188,7 @@
     <!--#################### USAGE COMMON TYPES BEGIN ####################-->
 
     <ComponentType Name="Usage">
-        <Component Name="applicable_strategy" Type="Strategy" Mapping="Usage:'%1'"/>
+        <Component Name="applicable_strategy" Type="Strategy" Mapping="Usage"/>
     </ComponentType>
 
     <!--#################### USAGE COMMON TYPES END ####################-->
@@ -197,7 +197,7 @@
 
     <ComponentType Name="InputSource">
         <Component Name="applicable_input_device" Type="InputDevicesMask"
-                   Mapping="InputSource:'%1'" Description="Selected Input device"/>
+                   Mapping="InputSource" Description="Selected Input device"/>
     </ComponentType>
 
     <!--#################### INPUT SOURCE COMMON TYPES END ####################-->

@@ -17,6 +17,7 @@
 #include "Usage.h"
 #include "PolicyMappingKeys.h"
 #include "PolicySubsystem.h"
+#include <media/TypeConverter.h>
 
 using std::string;
 using android::routing_strategy;
@@ -34,10 +35,13 @@ Usage::Usage(const string &mappingValue,
                            instanceConfigurableElement->getBelongingSubsystem())),
       mPolicyPluginInterface(mPolicySubsystem->getPolicyPluginInterface())
 {
-    mId = static_cast<audio_usage_t>(context.getItemAsInteger(MappingKeyIdentifier));
+    std::string name(context.getItem(MappingKeyName));
 
+    if (not android::UsageTypeConverter::fromString(name, mId)) {
+        LOG_ALWAYS_FATAL("Invalid Usage name: %s, invalid XML structure file", name.c_str());
+    }
     // Declares the strategy to audio policy engine
-    mPolicyPluginInterface->addUsage(getFormattedMappingValue(), mId);
+    mPolicyPluginInterface->addUsage(name, mId);
 }
 
 bool Usage::sendToHW(string & /*error*/)

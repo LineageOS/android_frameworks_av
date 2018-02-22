@@ -17,6 +17,7 @@
 #include "InputSource.h"
 #include "PolicyMappingKeys.h"
 #include "PolicySubsystem.h"
+#include <media/TypeConverter.h>
 
 using std::string;
 
@@ -33,9 +34,13 @@ InputSource::InputSource(const string &mappingValue,
                            instanceConfigurableElement->getBelongingSubsystem())),
       mPolicyPluginInterface(mPolicySubsystem->getPolicyPluginInterface())
 {
-    mId = static_cast<audio_source_t>(context.getItemAsInteger(MappingKeyIdentifier));
+    std::string name(context.getItem(MappingKeyName));
+
+    if(not android::SourceTypeConverter::fromString(name, mId)) {
+        LOG_ALWAYS_FATAL("Invalid Input Source name: %s, invalid XML structure file", name.c_str());
+    }
     // Declares the strategy to audio policy engine
-    mPolicyPluginInterface->addInputSource(getFormattedMappingValue(), mId);
+    mPolicyPluginInterface->addInputSource(name, mId);
 }
 
 bool InputSource::sendToHW(string & /*error*/)
