@@ -96,7 +96,7 @@ const String8& Camera3Device::getId() const {
     return mId;
 }
 
-status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
+status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const String8& monitorTags) {
     ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
@@ -169,6 +169,10 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager) {
     mInterface = new HalInterface(session, queue);
     std::string providerType;
     mVendorTagId = manager->getProviderTagIdLocked(mId.string());
+    mTagMonitor.initialize(mVendorTagId);
+    if (!monitorTags.isEmpty()) {
+        mTagMonitor.parseTagsToMonitor(String8(monitorTags));
+    }
 
     return initializeCommonLocked();
 }
@@ -191,8 +195,6 @@ status_t Camera3Device::initializeCommonLocked() {
 
     /** Create buffer manager */
     mBufferManager = new Camera3BufferManager();
-
-    mTagMonitor.initialize(mVendorTagId);
 
     Vector<int32_t> sessionParamKeys;
     camera_metadata_entry_t sessionKeysEntry = mDeviceInfo.find(
@@ -582,13 +584,12 @@ status_t Camera3Device::dump(int fd, const Vector<String16> &args) {
     bool dumpTemplates = false;
 
     String16 templatesOption("-t");
-    String16 monitorOption("-m");
     int n = args.size();
     for (int i = 0; i < n; i++) {
         if (args[i] == templatesOption) {
             dumpTemplates = true;
         }
-        if (args[i] == monitorOption) {
+        if (args[i] == TagMonitor::kMonitorOption) {
             if (i + 1 < n) {
                 String8 monitorTags = String8(args[i + 1]);
                 if (monitorTags == "off") {

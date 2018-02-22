@@ -62,7 +62,8 @@ CameraClient::CameraClient(const sp<CameraService>& cameraService,
     LOG1("CameraClient::CameraClient X (pid %d, id %d)", callingPid, cameraId);
 }
 
-status_t CameraClient::initialize(sp<CameraProviderManager> manager) {
+status_t CameraClient::initialize(sp<CameraProviderManager> manager,
+        const String8& /*monitorTags*/) {
     int callingPid = getCallingPid();
     status_t res;
 

@@ -67,6 +67,7 @@
 #include "api1/Camera2Client.h"
 #include "api2/CameraDeviceClient.h"
 #include "utils/CameraTraces.h"
+#include "utils/TagMonitor.h"
 
 namespace {
     const char* kPermissionServiceName = "permission";
@@ -1364,7 +1365,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         LOG_ALWAYS_FATAL_IF(client.get() == nullptr, "%s: CameraService in invalid state",
                 __FUNCTION__);
 
-        err = client->initialize(mCameraProviderManager);
+        err = client->initialize(mCameraProviderManager, mMonitorTags);
         if (err != OK) {
             ALOGE("%s: Could not initialize client from HAL.", __FUNCTION__);
             // Errors could be from the HAL module open call or from AppOpsManager
@@ -2638,6 +2639,16 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
     bool stateLocked = tryLock(mCameraStatesLock);
     if (!stateLocked) {
         dprintf(fd, "CameraStates in use, may be deadlocked\n");
+    }
+
+    int argSize = args.size();
+    for (int i = 0; i < argSize; i++) {
+        if (args[i] == TagMonitor::kMonitorOption) {
+            if (i + 1 < argSize) {
+                mMonitorTags = String8(args[i + 1]);
+            }
+            break;
+        }
     }
 
     for (auto& state : mCameraStates) {
