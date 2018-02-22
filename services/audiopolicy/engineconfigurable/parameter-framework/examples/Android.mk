@@ -12,9 +12,13 @@ LOCAL_PATH := $(call my-dir)
 ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), 1)
 
 PFW_CORE := external/parameter-framework
-BUILD_PFW_SETTINGS := $(PFW_CORE)/support/android/build_pfw_settings.mk
+#@TODO: upstream new domain generator
+#BUILD_PFW_SETTINGS := $(PFW_CORE)/support/android/build_pfw_settings.mk
 PFW_DEFAULT_SCHEMAS_DIR := $(PFW_CORE)/upstream/schemas
 PFW_SCHEMAS_DIR := $(PFW_DEFAULT_SCHEMAS_DIR)
+
+TOOLS := frameworks/av/services/audiopolicy/engineconfigurable/tools
+BUILD_PFW_SETTINGS := $(TOOLS)/build_audio_pfw_settings.mk
 
 ##################################################################
 # CONFIGURATION FILES
@@ -82,13 +86,13 @@ LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Settings/Policy
 LOCAL_REQUIRED_MODULES := \
-        PolicyClass.xml \
-        PolicySubsystem.xml \
-        ParameterFrameworkConfigurationPolicy.xml
+    policy_criteria.xml \
+    policy_criterion_types.xml \
+    PolicySubsystem.xml \
+    PolicyClass.xml \
+    ParameterFrameworkConfigurationPolicy.xml
 
 ifeq ($(pfw_rebuild_settings),true)
-PFW_TOPLEVEL_FILE := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/ParameterFrameworkConfigurationPolicy.xml
-PFW_CRITERIA_FILE := $(LOCAL_PATH)/policy_criteria.txt
 PFW_EDD_FILES := \
         $(LOCAL_PATH)/Settings/device_for_strategy_media.pfw \
         $(LOCAL_PATH)/Settings/device_for_strategy_phone.pfw \
@@ -103,6 +107,17 @@ PFW_EDD_FILES := \
         $(LOCAL_PATH)/Settings/strategy_for_usage.pfw \
         $(LOCAL_PATH)/Settings/device_for_input_source.pfw \
         $(LOCAL_PATH)/Settings/volumes.pfw
+
+LOCAL_ADDITIONAL_DEPENDENCIES := \
+    $(PFW_EDD_FILES)
+
+
+PFW_CRITERION_TYPES_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criterion_types.xml
+PFW_CRITERIA_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criteria.xml
+
+PFW_TOPLEVEL_FILE := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/ParameterFrameworkConfigurationPolicy.xml
+
+PFW_SCHEMAS_DIR := $(PFW_DEFAULT_SCHEMAS_DIR)
 
 include $(BUILD_PFW_SETTINGS)
 else
@@ -123,12 +138,15 @@ LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Settings/Policy
 LOCAL_REQUIRED_MODULES := \
-        PolicyClass.xml \
-        PolicySubsystem.xml \
-        ParameterFrameworkConfigurationPolicy.xml
+    policy_criteria.xml \
+    policy_criterion_types.xml \
+    PolicySubsystem.xml \
+    PolicyClass.xml \
+    ParameterFrameworkConfigurationPolicy.xml
 
 PFW_TOPLEVEL_FILE := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/ParameterFrameworkConfigurationPolicy.xml
-PFW_CRITERIA_FILE := $(LOCAL_PATH)/policy_criteria.txt
+PFW_CRITERION_TYPES_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criterion_types.xml
+PFW_CRITERIA_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criteria.xml
 PFW_EDD_FILES := \
         $(LOCAL_PATH)/SettingsNoOutput/device_for_strategies.pfw \
         $(LOCAL_PATH)/Settings/strategy_for_stream.pfw \
@@ -148,12 +166,15 @@ LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Settings/Policy
 LOCAL_REQUIRED_MODULES := \
-        PolicyClass.xml \
-        PolicySubsystem.xml \
-        ParameterFrameworkConfigurationPolicy.xml
+    policy_criteria.xml \
+    policy_criterion_types.xml \
+    PolicySubsystem.xml \
+    PolicyClass.xml \
+    ParameterFrameworkConfigurationPolicy.xml
 
 PFW_TOPLEVEL_FILE := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/ParameterFrameworkConfigurationPolicy.xml
-PFW_CRITERIA_FILE := $(LOCAL_PATH)/policy_criteria.txt
+PFW_CRITERION_TYPES_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criterion_types.xml
+PFW_CRITERIA_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criteria.xml
 PFW_EDD_FILES := \
         $(LOCAL_PATH)/Settings/device_for_strategy_media.pfw \
         $(LOCAL_PATH)/Settings/device_for_strategy_phone.pfw \
@@ -172,3 +193,9 @@ PFW_EDD_FILES := \
 include $(BUILD_PFW_SETTINGS)
 
 endif # ifeq (1, 0)
+
+#######################################################################
+# Recursive call sub-folder Android.mk
+#######################################################################
+
+include $(call all-makefiles-under,$(LOCAL_PATH))
