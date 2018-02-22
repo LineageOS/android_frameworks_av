@@ -1099,26 +1099,17 @@ status_t AudioFlinger::setStreamVolume(audio_stream_type_t stream, float value,
     if (status != NO_ERROR) {
         return status;
     }
+    if (output == AUDIO_IO_HANDLE_NONE) {
+        return BAD_VALUE;
+    }
     ALOG_ASSERT(stream != AUDIO_STREAM_PATCH, "attempt to change AUDIO_STREAM_PATCH volume");
 
     AutoMutex lock(mLock);
-    Vector<VolumeInterface *> volumeInterfaces;
-    if (output != AUDIO_IO_HANDLE_NONE) {
-        VolumeInterface *volumeInterface = getVolumeInterface_l(output);
-        if (volumeInterface == NULL) {
-            return BAD_VALUE;
-        }
-        volumeInterfaces.add(volumeInterface);
+    VolumeInterface *volumeInterface = getVolumeInterface_l(output);
+    if (volumeInterface == NULL) {
+        return BAD_VALUE;
     }
-
-    mStreamTypes[stream].volume = value;
-
-    if (volumeInterfaces.size() == 0) {
-        volumeInterfaces = getAllVolumeInterfaces_l();
-    }
-    for (size_t i = 0; i < volumeInterfaces.size(); i++) {
-        volumeInterfaces[i]->setStreamVolume(stream, value);
-    }
+    volumeInterface->setStreamVolume(stream, value);
 
     return NO_ERROR;
 }
@@ -1157,21 +1148,17 @@ float AudioFlinger::streamVolume(audio_stream_type_t stream, audio_io_handle_t o
     if (status != NO_ERROR) {
         return 0.0f;
     }
-
-    AutoMutex lock(mLock);
-    float volume;
-    if (output != AUDIO_IO_HANDLE_NONE) {
-        VolumeInterface *volumeInterface = getVolumeInterface_l(output);
-        if (volumeInterface != NULL) {
-            volume = volumeInterface->streamVolume(stream);
-        } else {
-            volume = 0.0f;
-        }
-    } else {
-        volume = streamVolume_l(stream);
+    if (output == AUDIO_IO_HANDLE_NONE) {
+        return 0.0f;
     }
 
-    return volume;
+    AutoMutex lock(mLock);
+    VolumeInterface *volumeInterface = getVolumeInterface_l(output);
+    if (volumeInterface == NULL) {
+        return 0.0f;
+    }
+
+    return volumeInterface->streamVolume(stream);
 }
 
 bool AudioFlinger::streamMute(audio_stream_type_t stream) const
