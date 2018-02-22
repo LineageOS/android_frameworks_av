@@ -63,12 +63,36 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
 
     @Override
     public void subscribe_impl(String parentId, Bundle extras) {
-        // TODO(jaewan): Implement
+        final IMediaSession2 binder = getSessionBinder();
+        if (binder != null) {
+            try {
+                binder.subscribe(getControllerStub(), parentId, extras);
+            } catch (RemoteException e) {
+                // TODO(jaewan): Handle disconnect.
+                if (DEBUG) {
+                    Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+                }
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     @Override
-    public void unsubscribe_impl(String parentId, Bundle extras) {
-        // TODO(jaewan): Implement
+    public void unsubscribe_impl(String parentId) {
+        final IMediaSession2 binder = getSessionBinder();
+        if (binder != null) {
+            try {
+                binder.unsubscribe(getControllerStub(), parentId);
+            } catch (RemoteException e) {
+                // TODO(jaewan): Handle disconnect.
+                if (DEBUG) {
+                    Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+                }
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     @Override
@@ -169,23 +193,29 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
         });
     }
 
-    public void onChildrenLoaded(String parentId, int page, int pageSize, Bundle extras,
-            List<MediaItem2> result) {
+    public void onChildrenLoaded(String parentId, int page, int pageSize, List<MediaItem2> result,
+            Bundle extras) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onChildrenLoaded(parentId, page, pageSize, extras, result);
+            mCallback.onChildrenLoaded(parentId, page, pageSize, result, extras);
         });
     }
 
-    public void onSearchResultChanged(String query, Bundle extras, int itemCount) {
+    public void onSearchResultChanged(String query, int itemCount, Bundle extras) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onSearchResultChanged(query, extras, itemCount);
+            mCallback.onSearchResultChanged(query, itemCount, extras);
         });
     }
 
-    public void onSearchResultLoaded(String query, int page, int pageSize, Bundle extras,
-            List<MediaItem2> result) {
+    public void onSearchResultLoaded(String query, int page, int pageSize, List<MediaItem2> result,
+            Bundle extras) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onSearchResultLoaded(query, page, pageSize, extras, result);
+            mCallback.onSearchResultLoaded(query, page, pageSize, result, extras);
+        });
+    }
+
+    public void onChildrenChanged(final String parentId, int childCount, final Bundle extras) {
+        getCallbackExecutor().execute(() -> {
+            mCallback.onChildrenChanged(parentId, childCount, extras);
         });
     }
 }

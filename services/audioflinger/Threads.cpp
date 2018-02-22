@@ -1703,11 +1703,14 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
     readOutputParameters_l();
 
     // ++ operator does not compile
-    for (audio_stream_type_t stream = AUDIO_STREAM_MIN; stream < AUDIO_STREAM_CNT;
+    for (audio_stream_type_t stream = AUDIO_STREAM_MIN; stream < AUDIO_STREAM_FOR_POLICY_CNT;
             stream = (audio_stream_type_t) (stream + 1)) {
-        mStreamTypes[stream].volume = mAudioFlinger->streamVolume_l(stream);
+        mStreamTypes[stream].volume = 0.0f;
         mStreamTypes[stream].mute = mAudioFlinger->streamMute_l(stream);
     }
+    // Audio patch volume is always max
+    mStreamTypes[AUDIO_STREAM_PATCH].volume = 1.0f;
+    mStreamTypes[AUDIO_STREAM_PATCH].mute = false;
 }
 
 AudioFlinger::PlaybackThread::~PlaybackThread()

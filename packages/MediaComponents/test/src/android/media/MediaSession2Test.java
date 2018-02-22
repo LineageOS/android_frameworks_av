@@ -28,9 +28,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
 import android.content.Context;
-import android.media.AudioManager;
 import android.media.MediaController2.PlaybackInfo;
-import android.media.MediaPlayerInterface.PlaybackListener;
+import android.media.MediaPlayerInterface.EventCallback;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
@@ -49,7 +48,6 @@ import android.text.TextUtils;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -253,51 +251,67 @@ public class MediaSession2Test extends MediaSession2TestBase {
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
     }
 
-    // TODO(jaewan): Re-enable test..
-    @Ignore
     @Test
-    public void testPlaybackStateChangedListener() throws InterruptedException {
-        final CountDownLatch latch = new CountDownLatch(2);
+    public void testRegisterEventCallback() throws InterruptedException {
+        final int testWhat = 1001;
         final MockPlayer player = new MockPlayer(0);
-        final PlaybackListener listener = (state) -> {
-            assertEquals(sHandler.getLooper(), Looper.myLooper());
-            assertNotNull(state);
-            switch ((int) latch.getCount()) {
-                case 2:
-                    assertEquals(PlaybackState2.STATE_PLAYING, state.getState());
-                    break;
-                case 1:
-                    assertEquals(PlaybackState2.STATE_PAUSED, state.getState());
-                    break;
-                case 0:
-                    fail();
+        final CountDownLatch playbackLatch = new CountDownLatch(3);
+        final CountDownLatch errorLatch = new CountDownLatch(1);
+        final EventCallback callback = new EventCallback() {
+            @Override
+            public void onPlaybackStateChanged(PlaybackState2 state) {
+                assertEquals(sHandler.getLooper(), Looper.myLooper());
+                switch ((int) playbackLatch.getCount()) {
+                    case 3:
+                        assertNull(state);
+                        break;
+                    case 2:
+                        assertNotNull(state);
+                        assertEquals(PlaybackState2.STATE_PLAYING, state.getState());
+                        break;
+                    case 1:
+                        assertNotNull(state);
+                        assertEquals(PlaybackState2.STATE_PAUSED, state.getState());
+                        break;
+                    case 0:
+                        fail();
+                }
+                playbackLatch.countDown();
             }
-            latch.countDown();
+
+            @Override
+            public void onError(String mediaId, int what, int extra) {
+                assertEquals(testWhat, what);
+                errorLatch.countDown();
+            }
         };
         player.notifyPlaybackState(createPlaybackState(PlaybackState2.STATE_PLAYING));
-        sHandler.postAndSync(() -> {
-            mSession.addPlaybackListener(sHandlerExecutor, listener);
-            // When the player is set, listeners will be notified about the player's current state.
-            mSession.setPlayer(player);
-        });
+        // EventCallback will be notified with the mPlayer's playback state (null)
+        mSession.registerPlayerEventCallback(sHandlerExecutor, callback);
+        // When the player is set, EventCallback will be notified about the new player's state.
+        mSession.setPlayer(player);
+        // When the player is set, EventCallback will be notified about the new player's state.
         player.notifyPlaybackState(createPlaybackState(PlaybackState2.STATE_PAUSED));
-        assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        assertTrue(playbackLatch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        player.notifyError(testWhat);
+        assertTrue(errorLatch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
     }
 
     @Test
     public void testBadPlayer() throws InterruptedException {
         // TODO(jaewan): Add equivalent tests again
-        final CountDownLatch latch = new CountDownLatch(3); // expected call + 1
+        final CountDownLatch latch = new CountDownLatch(4); // expected call + 1
         final BadPlayer player = new BadPlayer(0);
-        sHandler.postAndSync(() -> {
-            mSession.addPlaybackListener(sHandlerExecutor, (state) -> {
+        mSession.registerPlayerEventCallback(sHandlerExecutor, new EventCallback() {
+            @Override
+            public void onPlaybackStateChanged(PlaybackState2 state) {
                 // This will be called for every setPlayer() calls, but no more.
                 assertNull(state);
                 latch.countDown();
-            });
-            mSession.setPlayer(player);
-            mSession.setPlayer(mPlayer);
+            }
         });
+        mSession.setPlayer(player);
+        mSession.setPlayer(mPlayer);
         player.notifyPlaybackState(createPlaybackState(PlaybackState2.STATE_PAUSED));
         assertFalse(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
     }
@@ -308,7 +322,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
         }
 
         @Override
-        public void removePlaybackListener(@NonNull PlaybackListener listener) {
+        public void unregisterEventCallback(@NonNull EventCallback listener) {
             // No-op. This bad player will keep push notification to the listener that is previously
             // registered by session.setPlayer().
         }

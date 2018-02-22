@@ -366,26 +366,6 @@ void SimpleC2Component::processQueue() {
     }
 }
 
-namespace {
-
-class GraphicBuffer : public C2Buffer {
-public:
-    GraphicBuffer(
-            const std::shared_ptr<C2GraphicBlock> &block,
-            const C2Rect &crop)
-        : C2Buffer({ block->share(crop, ::android::C2Fence()) }) {}
-};
-
-
-class LinearBuffer : public C2Buffer {
-public:
-    LinearBuffer(
-            const std::shared_ptr<C2LinearBlock> &block, size_t offset, size_t size)
-        : C2Buffer({ block->share(offset, size, ::android::C2Fence()) }) {}
-};
-
-}  // namespace
-
 std::shared_ptr<C2Buffer> SimpleC2Component::createLinearBuffer(
         const std::shared_ptr<C2LinearBlock> &block) {
     return createLinearBuffer(block, block->offset(), block->size());
@@ -393,7 +373,7 @@ std::shared_ptr<C2Buffer> SimpleC2Component::createLinearBuffer(
 
 std::shared_ptr<C2Buffer> SimpleC2Component::createLinearBuffer(
         const std::shared_ptr<C2LinearBlock> &block, size_t offset, size_t size) {
-    return std::make_shared<LinearBuffer>(block, offset, size);
+    return C2Buffer::CreateLinearBuffer(block->share(offset, size, ::android::C2Fence()));
 }
 
 std::shared_ptr<C2Buffer> SimpleC2Component::createGraphicBuffer(
@@ -402,9 +382,8 @@ std::shared_ptr<C2Buffer> SimpleC2Component::createGraphicBuffer(
 }
 
 std::shared_ptr<C2Buffer> SimpleC2Component::createGraphicBuffer(
-        const std::shared_ptr<C2GraphicBlock> &block,
-        const C2Rect &crop) {
-    return std::make_shared<GraphicBuffer>(block, crop);
+        const std::shared_ptr<C2GraphicBlock> &block, const C2Rect &crop) {
+    return C2Buffer::CreateGraphicBuffer(block->share(crop, ::android::C2Fence()));
 }
 
 } // namespace android

@@ -44,7 +44,6 @@ import android.media.MediaSessionService2;
 import android.media.MediaSessionService2.MediaNotification;
 import android.media.PlaybackState2;
 import android.media.Rating2;
-import android.media.SessionPlayer2;
 import android.media.SessionToken2;
 import android.media.VolumeProvider2;
 import android.media.update.MediaBrowser2Provider;
@@ -60,7 +59,6 @@ import android.media.update.MediaSession2Provider.PlaylistParamsProvider;
 import android.media.update.MediaSessionService2Provider;
 import android.media.update.MediaSessionService2Provider.MediaNotificationProvider;
 import android.media.update.PlaybackState2Provider;
-import android.media.update.SessionPlayer2Provider;
 import android.media.update.SessionToken2Provider;
 import android.media.update.StaticProvider;
 import android.media.update.VideoView2Provider;
@@ -230,12 +228,6 @@ public class ApiFactory implements StaticProvider {
     }
 
     @Override
-    public SessionPlayer2Provider createSessionPlayer2(Context context, SessionPlayer2 instance) {
-        // TODO(jaewan): Implement this
-        return null;
-    }
-
-    @Override
     public MediaItem2Provider createMediaItem2(Context context, MediaItem2 instance,
             String mediaId, DataSourceDesc dsd, MediaMetadata2 metadata, int flags) {
         return new MediaItem2Impl(context, instance, mediaId, dsd, metadata, flags);
@@ -302,9 +294,9 @@ public class ApiFactory implements StaticProvider {
     @Override
     public PlaybackState2Provider createPlaybackState2(Context context, PlaybackState2 instance,
             int state, long position, long updateTime, float speed, long bufferedPosition,
-            long activeItemId, CharSequence error) {
+            long activeItemId) {
         return new PlaybackState2Impl(context, instance, state, position, updateTime, speed,
-                bufferedPosition, activeItemId, error);
+                bufferedPosition, activeItemId);
     }
 
     @Override

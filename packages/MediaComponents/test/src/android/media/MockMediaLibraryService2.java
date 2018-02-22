@@ -46,7 +46,7 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
     public static final String ID = "TestLibrary";
 
     public static final String ROOT_ID = "rootId";
-    public static final Bundle EXTRA = new Bundle();
+    public static final Bundle EXTRAS = new Bundle();
 
     public static final String MEDIA_ID_GET_ITEM = "media_id_get_item";
 
@@ -71,7 +71,7 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
     private static final String TAG = "MockMediaLibrarySvc2";
 
     static {
-        EXTRA.putString(ROOT_ID, ROOT_ID);
+        EXTRAS.putString(ROOT_ID, ROOT_ID);
     }
     @GuardedBy("MockMediaLibraryService2.class")
     private static SessionToken2 sToken;
@@ -149,7 +149,7 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
 
         @Override
         public LibraryRoot onGetRoot(ControllerInfo controller, Bundle rootHints) {
-            return new LibraryRoot(MockMediaLibraryService2.this, ROOT_ID, EXTRA);
+            return new LibraryRoot(MockMediaLibraryService2.this, ROOT_ID, EXTRAS);
         }
 
         @Override
@@ -176,19 +176,19 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         @Override
         public void onSearch(ControllerInfo controllerInfo, String query, Bundle extras) {
             if (SEARCH_QUERY.equals(query)) {
-                mSession.notifySearchResultChanged(controllerInfo, query, extras,
-                        SEARCH_RESULT_COUNT);
+                mSession.notifySearchResultChanged(controllerInfo, query, SEARCH_RESULT_COUNT,
+                        extras);
             } else if (SEARCH_QUERY_TAKES_TIME.equals(query)) {
                 // Searching takes some time. Notify after 5 seconds.
                 Executors.newSingleThreadScheduledExecutor().schedule(new Runnable() {
                     @Override
                     public void run() {
                         mSession.notifySearchResultChanged(
-                                controllerInfo, query, extras, SEARCH_RESULT_COUNT);
+                                controllerInfo, query, SEARCH_RESULT_COUNT, extras);
                     }
                 }, SEARCH_TIME_IN_MS, TimeUnit.MILLISECONDS);
             } else if (SEARCH_QUERY_EMPTY_RESULT.equals(query)) {
-                mSession.notifySearchResultChanged(controllerInfo, query, extras, 0);
+                mSession.notifySearchResultChanged(controllerInfo, query, 0, extras);
             } else {
                 // TODO: For the error case, how should we notify the browser?
             }
@@ -202,6 +202,16 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
             } else {
                 return null;
             }
+        }
+
+        @Override
+        public void onSubscribed(ControllerInfo controller, String parentId, Bundle extras) {
+            mCallbackProxy.onSubscribed(controller, parentId, extras);
+        }
+
+        @Override
+        public void onUnsubscribed(ControllerInfo controller, String parentId) {
+            mCallbackProxy.onUnsubscribed(controller, parentId);
         }
     }
 
