@@ -26,6 +26,7 @@
 #include <binder/IMemory.h>
 #include <binder/MemoryDealer.h>
 #include <cutils/native_handle.h>
+#include <hidlmemory/FrameworkUtils.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -44,10 +45,10 @@
 #include <inttypes.h>
 
 namespace android {
-using hardware::hidl_handle;
-using hardware::hidl_memory;
+using hardware::fromHeap;
 using hardware::hidl_string;
 using hardware::hidl_vec;
+using hardware::HidlMemory;
 using namespace hardware::cas::V1_0;
 using namespace hardware::cas::native::V1_0;
 
@@ -210,6 +211,7 @@ private:
     sp<AMessage> mSampleAesKeyItem;
     sp<IMemory> mMem;
     sp<MemoryDealer> mDealer;
+    sp<HidlMemory> mHidlMemory;
     hardware::cas::native::V1_0::SharedBuffer mDescramblerSrcBuffer;
     sp<ABuffer> mDescrambledBuffer;
     List<SubSampleInfo> mSubSamples;
@@ -852,14 +854,9 @@ bool ATSParser::Stream::ensureBufferCapacity(size_t neededSize) {
         if (heap == NULL) {
             return false;
         }
-        native_handle_t* nativeHandle = native_handle_create(1, 0);
-        if (!nativeHandle) {
-            ALOGE("[stream %d] failed to create native handle", mElementaryPID);
-            return false;
-        }
-        nativeHandle->data[0] = heap->getHeapID();
-        mDescramblerSrcBuffer.heapBase = hidl_memory("ashmem",
-                hidl_handle(nativeHandle), heap->getSize());
+
+        mHidlMemory = fromHeap(heap);
+        mDescramblerSrcBuffer.heapBase = *mHidlMemory;
         mDescramblerSrcBuffer.offset = (uint64_t) offset;
         mDescramblerSrcBuffer.size = (uint64_t) size;
 

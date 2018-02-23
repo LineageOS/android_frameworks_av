@@ -138,6 +138,7 @@ cc_library_shared {
         "libstagefright_xmlparser",
         "libdl",
         "libRScpp",
+        "libhidlallocatorutils",
         "libhidlbase",
         "libhidlmemory",
         // TODO: Remove libv4l2_c2_componentstore.
