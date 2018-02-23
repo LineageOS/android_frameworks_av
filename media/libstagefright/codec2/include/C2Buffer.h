@@ -746,19 +746,19 @@ public:
     /**
      * Maps a portion of an allocation starting from |offset| with |size| into local process memory.
      * Stores the starting address into |addr|, or NULL if the operation was unsuccessful.
-     * |fenceFd| is a file descriptor referring to an acquire sync fence object. If it is already
-     * safe to access the buffer contents, then -1.
+     * |fence| will contain an acquire sync fence object. If it is already
+     * safe to access the buffer contents, then it will contain an empty (already fired) fence.
      *
-     * \param offset          starting position of the portion to be mapped (this does not have to
+     * \param offset        starting position of the portion to be mapped (this does not have to
      *                      be page aligned)
-     * \param size            size of the portion to be mapped (this does not have to be page
+     * \param size          size of the portion to be mapped (this does not have to be page
      *                      aligned)
-     * \param usage           the desired usage. \todo this must be kSoftwareRead and/or
+     * \param usage         the desired usage. \todo this must be kSoftwareRead and/or
      *                      kSoftwareWrite.
-     * \param fenceFd         a pointer to a file descriptor if an async mapping is requested. If
-     *                      not-null, and acquire fence FD will be stored here on success, or -1
-     *                      on failure. If null, the mapping will be synchronous.
-     * \param addr            a pointer to where the starting address of the mapped portion will be
+     * \param fence         a pointer to a fence object if an async mapping is requested. If
+     *                      not-null, and acquire fence will be stored here on success, or empty
+     *                      fence on failure. If null, the mapping will be synchronous.
+     * \param addr          a pointer to where the starting address of the mapped portion will be
      *                      stored. On failure, nullptr will be stored here.
      *
      * \todo Only one portion can be mapped at the same time - this is true for gralloc, but there
@@ -775,19 +775,19 @@ public:
      * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
      */
     virtual c2_status_t map(
-            size_t offset, size_t size, C2MemoryUsage usage, int *fenceFd /* nullable */,
+            size_t offset, size_t size, C2MemoryUsage usage, C2Fence *fence /* nullable */,
             void **addr /* nonnull */) = 0;
 
     /**
      * Unmaps a portion of an allocation at |addr| with |size|. These must be parameters previously
-     * passed to |map|; otherwise, this operation is a no-op.
+     * passed to and returned by |map|; otherwise, this operation is a no-op.
      *
-     * \param addr            starting address of the mapped region
-     * \param size            size of the mapped region
-     * \param fenceFd         a pointer to a file descriptor if an async unmapping is requested. If
-     *                      not-null, a release fence FD will be stored here on success, or -1
+     * \param addr          starting address of the mapped region
+     * \param size          size of the mapped region
+     * \param fence         a pointer to a fence object if an async unmapping is requested. If
+     *                      not-null, a release fence will be stored here on success, or empty fence
      *                      on failure. This fence signals when the original allocation contains
-     *                      any changes that happened to the mapped region. If null, the unmapping
+     *                      all changes that happened to the mapped region. If null, the unmapping
      *                      will be synchronous.
      *
      * \retval C2_OK        the operation was successful
@@ -798,7 +798,7 @@ public:
      * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
      * \retval C2_REFUSED   no permission to unmap the portion (unexpected - system)
      */
-    virtual c2_status_t unmap(void *addr, size_t size, int *fenceFd /* nullable */) = 0;
+    virtual c2_status_t unmap(void *addr, size_t size, C2Fence *fence /* nullable */) = 0;
 
     /**
      * Returns the allocator ID for this allocation. This is useful to put the handle into context.
@@ -1510,6 +1510,15 @@ struct C2PlaneInfo {
         BIG_END,    // BIG_ENDIAN is a reserved macro
     } endianness; ///< endianness of the samples
 
+    /**
+     * The following two fields define the relation between multiple planes. If multiple planes are
+     * interleaved, they share a root plane (whichever plane's start address is the lowest), and
+     * |offset| is the offset of this plane inside the root plane (in bytes). |rootIx| is the index
+     * of the root plane. If a plane is independent, rootIx is its index and offset is 0.
+     */
+    uint32_t rootIx; ///< index of the root plane
+    uint32_t offset; ///< offset of this plane inside of the root plane
+
     inline constexpr ssize_t minOffset(uint32_t width, uint32_t height) const {
         ssize_t offs = 0;
         if (width > 0 && colInc < 0) {
@@ -1544,7 +1553,8 @@ struct C2PlanarLayout {
     };
 
     type_t type;                    // image type
-    uint32_t numPlanes;             // number of planes
+    uint32_t numPlanes;             // number of component planes
+    uint32_t rootPlanes;            // number of layout planes (root planes)
 
     enum plane_index_t : uint32_t {
         PLANE_Y = 0,
@@ -1696,22 +1706,19 @@ public:
      * Maps a rectangular section (as defined by |rect|) of a 2D allocation into local process
      * memory for flexible access. On success, it fills out |layout| with the plane specifications
      * and fills the |addr| array with pointers to the first byte of the top-left pixel of each
-     * plane used. Otherwise, it leaves |layout| and |addr| untouched. |fenceFd| is a file
-     * descriptor referring to an acquire sync fence object. If it is already safe to access the
-     * buffer contents, then -1.
+     * plane used. Otherwise, it leaves |layout| and |addr| untouched. |fence| will contain
+     * an acquire sync fence object. If it is already safe to access the
+     * buffer contents, then it will be an empty (already fired) fence.
      *
-     * Safe regions for the pointer addresses returned can be gotten via C2LayoutInfo.minOffse()/
+     * Safe regions for the pointer addresses returned can be gotten via C2LayoutInfo.minOffset()/
      * maxOffset().
-     *
-     * \note Only one portion of the graphic allocation can be mapped at the same time. (This is
-     * from gralloc1 limitation.)
      *
      * \param rect          section to be mapped (this does not have to be aligned)
      * \param usage         the desired usage. \todo this must be kSoftwareRead and/or
      *                      kSoftwareWrite.
-     * \param fenceFd       a pointer to a file descriptor if an async mapping is requested. If
-     *                      not-null, and acquire fence FD will be stored here on success, or -1
-     *                      on failure. If null, the mapping will be synchronous.
+     * \param fence         a pointer to a fence object if an async mapping is requested. If
+     *                      not-null, and acquire fence will be stored here on success, or empty
+     *                      fence on failure. If null, the mapping will be synchronous.
      * \param layout        a pointer to where the mapped planes' descriptors will be
      *                      stored. On failure, nullptr will be stored here.
      * \param addr          pointer to an array with at least C2PlanarLayout::MAX_NUM_PLANES
@@ -1719,7 +1726,8 @@ public:
      *
      * \retval C2_OK        the operation was successful
      * \retval C2_REFUSED   no permission to map the section
-     * \retval C2_DUPLICATE there is already a mapped region (caller error)
+     * \retval C2_DUPLICATE there is already a mapped region and this allocation cannot support
+     *                      multi-mapping (caller error)
      * \retval C2_TIMED_OUT the operation timed out
      * \retval C2_NO_MEMORY not enough memory to complete the operation
      * \retval C2_BAD_VALUE the parameters (rect) are invalid or outside the allocation, or the
@@ -1728,25 +1736,30 @@ public:
 
      */
     virtual c2_status_t map(
-            C2Rect rect, C2MemoryUsage usage, int *fenceFd,
+            C2Rect rect, C2MemoryUsage usage, C2Fence *fence,
             C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) = 0;
 
     /**
-     * Unmaps the last mapped rectangular section.
+     * Unmaps a section of an allocation at |addr| with |rect|. These must be parameters previously
+     * passed to and returned by |map|; otherwise, this operation is a no-op.
      *
-     * \param fenceFd         a pointer to a file descriptor if an async unmapping is requested. If
-     *                      not-null, a release fence FD will be stored here on success, or -1
+     * \param addr          pointer to an array with at least C2PlanarLayout::MAX_NUM_PLANES
+     *                      elements containing the starting addresses of the mapped layers
+     * \param rect          boundaries of the mapped section
+     * \param fence         a pointer to a fence object if an async unmapping is requested. If
+     *                      not-null, a release fence will be stored here on success, or empty fence
      *                      on failure. This fence signals when the original allocation contains
-     *                      any changes that happened to the mapped section. If null, the unmapping
+     *                      all changes that happened to the mapped section. If null, the unmapping
      *                      will be synchronous.
      *
      * \retval C2_OK        the operation was successful
      * \retval C2_TIMED_OUT the operation timed out
-     * \retval C2_NOT_FOUND there is no mapped region (caller error)
+     * \retval C2_NOT_FOUND there is no such mapped region (caller error)
      * \retval C2_CORRUPTED some unknown error prevented the operation from completing (unexpected)
      * \retval C2_REFUSED   no permission to unmap the section (unexpected - system)
      */
-    virtual c2_status_t unmap(C2Fence *fenceFd /* nullable */) = 0;
+    virtual c2_status_t unmap(
+            uint8_t **addr /* nonnull */, C2Rect rect, C2Fence *fence /* nullable */) = 0;
 
     /**
      * Returns the allocator ID for this allocation. This is useful to put the handle into context.

@@ -213,9 +213,10 @@ public:
     virtual ~C2AllocationGralloc() override;
 
     virtual c2_status_t map(
-            C2Rect rect, C2MemoryUsage usage, int *fenceFd,
+            C2Rect rect, C2MemoryUsage usage, C2Fence *fence,
             C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) override;
-    virtual c2_status_t unmap(C2Fence *fenceFd /* nullable */) override;
+    virtual c2_status_t unmap(
+            uint8_t **addr /* nonnull */, C2Rect rect, C2Fence *fence /* nullable */) override;
     virtual C2Allocator::id_t getAllocatorId() const override { return mAllocatorId; }
     virtual const C2Handle *handle() const override { return mLockedHandle ? : mHandle; }
     virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const override;
@@ -263,16 +264,18 @@ C2AllocationGralloc::~C2AllocationGralloc() {
         return;
     }
     if (mLocked) {
-        unmap(nullptr);
+        // implementation ignores addresss and rect
+        uint8_t* addr[C2PlanarLayout::MAX_NUM_PLANES] = {};
+        unmap(addr, C2Rect(), nullptr);
     }
     mMapper->freeBuffer(const_cast<native_handle_t *>(mBuffer));
 }
 
 c2_status_t C2AllocationGralloc::map(
-        C2Rect rect, C2MemoryUsage usage, int *fenceFd,
+        C2Rect rect, C2MemoryUsage usage, C2Fence *fence,
         C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) {
     // TODO
-    (void) fenceFd;
+    (void) fence;
     (void) usage;
 
     if (mBuffer && mLocked) {
@@ -326,6 +329,7 @@ c2_status_t C2AllocationGralloc::map(
             addr[C2PlanarLayout::PLANE_V] = (uint8_t *)ycbcrLayout.cr;
             layout->type = C2PlanarLayout::TYPE_YUV;
             layout->numPlanes = 3;
+            layout->rootPlanes = 3;
             layout->planes[C2PlanarLayout::PLANE_Y] = {
                 C2PlaneInfo::CHANNEL_Y,         // channel
                 1,                              // colInc
@@ -336,6 +340,8 @@ c2_status_t C2AllocationGralloc::map(
                 8,                              // bitDepth
                 0,                              // rightShift
                 C2PlaneInfo::NATIVE,            // endianness
+                C2PlanarLayout::PLANE_Y,        // rootIx
+                0,                              // offset
             };
             layout->planes[C2PlanarLayout::PLANE_U] = {
                 C2PlaneInfo::CHANNEL_CB,          // channel
@@ -347,6 +353,8 @@ c2_status_t C2AllocationGralloc::map(
                 8,                                // bitDepth
                 0,                                // rightShift
                 C2PlaneInfo::NATIVE,              // endianness
+                C2PlanarLayout::PLANE_U,          // rootIx
+                0,                                // offset
             };
             layout->planes[C2PlanarLayout::PLANE_V] = {
                 C2PlaneInfo::CHANNEL_CR,          // channel
@@ -358,7 +366,20 @@ c2_status_t C2AllocationGralloc::map(
                 8,                                // bitDepth
                 0,                                // rightShift
                 C2PlaneInfo::NATIVE,              // endianness
+                C2PlanarLayout::PLANE_V,          // rootIx
+                0,                                // offset
             };
+            // handle interleaved formats
+            intptr_t uvOffset = addr[C2PlanarLayout::PLANE_V] - addr[C2PlanarLayout::PLANE_U];
+            if (uvOffset > 0 && uvOffset < (intptr_t)ycbcrLayout.chromaStep) {
+                layout->rootPlanes = 2;
+                layout->planes[C2PlanarLayout::PLANE_V].rootIx = C2PlanarLayout::PLANE_U;
+                layout->planes[C2PlanarLayout::PLANE_V].offset = uvOffset;
+            } else if (uvOffset < 0 && uvOffset > -(intptr_t)ycbcrLayout.chromaStep) {
+                layout->rootPlanes = 2;
+                layout->planes[C2PlanarLayout::PLANE_U].rootIx = C2PlanarLayout::PLANE_V;
+                layout->planes[C2PlanarLayout::PLANE_U].offset = -uvOffset;
+            }
             break;
         }
 
@@ -387,6 +408,7 @@ c2_status_t C2AllocationGralloc::map(
             addr[C2PlanarLayout::PLANE_B] = (uint8_t *)pointer + 2;
             layout->type = C2PlanarLayout::TYPE_RGB;
             layout->numPlanes = 3;
+            layout->rootPlanes = 1;
             layout->planes[C2PlanarLayout::PLANE_R] = {
                 C2PlaneInfo::CHANNEL_R,         // channel
                 4,                              // colInc
@@ -397,6 +419,8 @@ c2_status_t C2AllocationGralloc::map(
                 8,                              // bitDepth
                 0,                              // rightShift
                 C2PlaneInfo::NATIVE,            // endianness
+                C2PlanarLayout::PLANE_R,        // rootIx
+                0,                              // offset
             };
             layout->planes[C2PlanarLayout::PLANE_G] = {
                 C2PlaneInfo::CHANNEL_G,         // channel
@@ -408,6 +432,8 @@ c2_status_t C2AllocationGralloc::map(
                 8,                              // bitDepth
                 0,                              // rightShift
                 C2PlaneInfo::NATIVE,            // endianness
+                C2PlanarLayout::PLANE_R,        // rootIx
+                1,                              // offset
             };
             layout->planes[C2PlanarLayout::PLANE_B] = {
                 C2PlaneInfo::CHANNEL_B,         // channel
@@ -419,6 +445,8 @@ c2_status_t C2AllocationGralloc::map(
                 8,                              // bitDepth
                 0,                              // rightShift
                 C2PlaneInfo::NATIVE,            // endianness
+                C2PlanarLayout::PLANE_R,        // rootIx
+                2,                              // offset
             };
             break;
         }
@@ -431,14 +459,17 @@ c2_status_t C2AllocationGralloc::map(
     return C2_OK;
 }
 
-c2_status_t C2AllocationGralloc::unmap(C2Fence *fenceFd /* nullable */) {
-    // TODO: fence
+c2_status_t C2AllocationGralloc::unmap(
+        uint8_t **addr, C2Rect rect, C2Fence *fence /* nullable */) {
+    // TODO: check addr and size, use fence
+    (void)addr;
+    (void)rect;
     c2_status_t err = C2_OK;
     mMapper->unlock(
             const_cast<native_handle_t *>(mBuffer),
-            [&err, &fenceFd](const auto &maperr, const auto &releaseFence) {
+            [&err, &fence](const auto &maperr, const auto &releaseFence) {
                 // TODO
-                (void) fenceFd;
+                (void) fence;
                 (void) releaseFence;
                 err = maperr2error(maperr);
                 if (err == C2_OK) {

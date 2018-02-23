@@ -117,9 +117,9 @@ class C2AllocationIon : public C2LinearAllocation {
 public:
     /* Interface methods */
     virtual c2_status_t map(
-        size_t offset, size_t size, C2MemoryUsage usage, int *fence,
+        size_t offset, size_t size, C2MemoryUsage usage, C2Fence *fence,
         void **addr /* nonnull */) override;
-    virtual c2_status_t unmap(void *addr, size_t size, int *fenceFd) override;
+    virtual c2_status_t unmap(void *addr, size_t size, C2Fence *fenceFd) override;
     virtual ~C2AllocationIon() override;
     virtual const C2Handle *handle() const override;
     virtual id_t getAllocatorId() const override;
@@ -218,8 +218,8 @@ public:
         return new Impl(ionFd, size, bufferFd, buffer, id, ret);
     }
 
-    c2_status_t map(size_t offset, size_t size, C2MemoryUsage usage, int *fenceFd, void **addr) {
-        (void)fenceFd; // TODO: wait for fence
+    c2_status_t map(size_t offset, size_t size, C2MemoryUsage usage, C2Fence *fence, void **addr) {
+        (void)fence; // TODO: wait for fence
         *addr = nullptr;
         if (mMapSize > 0) {
             // TODO: technically we should return DUPLICATE here, but our block views don't
@@ -272,7 +272,7 @@ public:
         return err;
     }
 
-    c2_status_t unmap(void *addr, size_t size, int *fenceFd) {
+    c2_status_t unmap(void *addr, size_t size, C2Fence *fence) {
         if (mMapFd < 0 || mMapSize == 0) {
             return C2_NOT_FOUND;
         }
@@ -284,8 +284,8 @@ public:
         if (err != 0) {
             return c2_map_errno<EINVAL>(errno);
         }
-        if (fenceFd) {
-            *fenceFd = -1; // not using fences
+        if (fence) {
+            *fence = C2Fence(); // not using fences
         }
         mMapSize = 0;
         return C2_OK;
@@ -334,12 +334,12 @@ private:
 };
 
 c2_status_t C2AllocationIon::map(
-    size_t offset, size_t size, C2MemoryUsage usage, int *fenceFd, void **addr) {
-    return mImpl->map(offset, size, usage, fenceFd, addr);
+    size_t offset, size_t size, C2MemoryUsage usage, C2Fence *fence, void **addr) {
+    return mImpl->map(offset, size, usage, fence, addr);
 }
 
-c2_status_t C2AllocationIon::unmap(void *addr, size_t size, int *fenceFd) {
-    return mImpl->unmap(addr, size, fenceFd);
+c2_status_t C2AllocationIon::unmap(void *addr, size_t size, C2Fence *fence) {
+    return mImpl->unmap(addr, size, fence);
 }
 
 c2_status_t C2AllocationIon::status() const {

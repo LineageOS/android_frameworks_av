@@ -312,13 +312,15 @@ public:
             addr[C2PlanarLayout::PLANE_V] = nullptr;
             FAIL() << "C2GraphicAllocation::map() failed: " << err;
         }
+        mMappedRect = rect;
+        memcpy(mAddrGraphic, addr, sizeof(uint8_t*) * C2PlanarLayout::MAX_NUM_PLANES);
     }
 
     void unmapGraphic() {
         ASSERT_TRUE(mGraphicAllocation);
 
         // TODO: fence
-        ASSERT_EQ(C2_OK, mGraphicAllocation->unmap(nullptr));
+        ASSERT_EQ(C2_OK, mGraphicAllocation->unmap(mAddrGraphic, mMappedRect, nullptr));
     }
 
     std::shared_ptr<C2BlockPool> makeGraphicBlockPool() {
@@ -330,6 +332,8 @@ private:
     std::shared_ptr<C2LinearAllocation> mLinearAllocation;
     size_t mSize;
     void *mAddr;
+    C2Rect mMappedRect;
+    uint8_t* mAddrGraphic[C2PlanarLayout::MAX_NUM_PLANES];
 
     std::shared_ptr<C2Allocator> mGraphicAllocator;
     std::shared_ptr<C2GraphicAllocation> mGraphicAllocation;
