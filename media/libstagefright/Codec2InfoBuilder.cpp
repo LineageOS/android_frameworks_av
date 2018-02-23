@@ -24,6 +24,7 @@
 
 #include <cutils/properties.h>
 #include <media/stagefright/foundation/MediaDefs.h>
+#include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 #include <media/stagefright/Codec2InfoBuilder.h>
 
 namespace android {
@@ -51,14 +52,45 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
         }
     }
 
+    MediaCodecsXmlParser parser(
+            MediaCodecsXmlParser::defaultSearchDirs,
+            "media_codecs_c2.xml");
+    if (parser.getParsingStatus() != OK) {
+        ALOGD("XML parser no good");
+        return OK;
+    }
     for (const ConstTraitsPtr &trait : traits) {
+        if (parser.getCodecMap().count(trait->name.c_str()) == 0) {
+            ALOGD("%s not found in xml", trait->name.c_str());
+            continue;
+        }
+        const MediaCodecsXmlParser::CodecProperties &codec = parser.getCodecMap().at(trait->name);
         std::unique_ptr<MediaCodecInfoWriter> codecInfo = writer->addMediaCodecInfo();
         codecInfo->setName(trait->name.c_str());
         codecInfo->setOwner("dummy");
         // TODO: get this from trait->kind
-        codecInfo->setEncoder(trait->name.find("encoder") != std::string::npos);
+        bool encoder = (trait->name.find("encoder") != std::string::npos);
+        codecInfo->setEncoder(encoder);
         codecInfo->setRank(trait->rank);
-        (void)codecInfo->addMime(trait->mediaType.c_str());
+        for (auto typeIt = codec.typeMap.begin(); typeIt != codec.typeMap.end(); ++typeIt) {
+            const std::string &mediaType = typeIt->first;
+            const MediaCodecsXmlParser::AttributeMap &attrMap = typeIt->second;
+            std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> caps =
+                codecInfo->addMime(mediaType.c_str());
+            for (auto attrIt = attrMap.begin(); attrIt != attrMap.end(); ++attrIt) {
+                std::string key, value;
+                std::tie(key, value) = *attrIt;
+                if (key.find("feature-") == 0 && key.find("feature-bitrate-modes") != 0) {
+                    caps->addDetail(key.c_str(), std::stoi(value));
+                } else {
+                    caps->addDetail(key.c_str(), value.c_str());
+                }
+            }
+            // TODO: get this from intf().
+            if (mediaType.find("video") != std::string::npos && !encoder) {
+                caps->addColorFormat(0x7F420888);  // COLOR_FormatYUV420Flexible
+            }
+        }
     }
     return OK;
 }
