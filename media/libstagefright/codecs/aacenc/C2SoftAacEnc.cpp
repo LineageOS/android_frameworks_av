@@ -208,7 +208,7 @@ void C2SoftAacEnc::process(
         }
 
         std::unique_ptr<C2StreamCsdInfo::output> csd =
-            C2StreamCsdInfo::output::alloc_unique(encInfo.confSize, 0u);
+            C2StreamCsdInfo::output::AllocUnique(encInfo.confSize, 0u);
         // TODO: check NO_MEMORY
         memcpy(csd->m.value, encInfo.confBuf, encInfo.confSize);
         ALOGV("put csd");
@@ -382,14 +382,14 @@ class C2SoftAacEncFactory : public C2ComponentFactory {
 public:
     virtual c2_status_t createComponent(
             c2_node_id_t id, std::shared_ptr<C2Component>* const component,
-            std::function<void(::android::C2Component*)> deleter) override {
+            std::function<void(::C2Component*)> deleter) override {
         *component = std::shared_ptr<C2Component>(new C2SoftAacEnc("aacenc", id), deleter);
         return C2_OK;
     }
 
     virtual c2_status_t createInterface(
             c2_node_id_t id, std::shared_ptr<C2ComponentInterface>* const interface,
-            std::function<void(::android::C2ComponentInterface*)> deleter) override {
+            std::function<void(::C2ComponentInterface*)> deleter) override {
         *interface =
                 SimpleC2Interface::Builder("aacenc", id, deleter)
                 .inputFormat(C2FormatAudio)
@@ -403,12 +403,12 @@ public:
 
 }  // namespace android
 
-extern "C" ::android::C2ComponentFactory* CreateCodec2Factory() {
+extern "C" ::C2ComponentFactory* CreateCodec2Factory() {
     ALOGV("in %s", __func__);
     return new ::android::C2SoftAacEncFactory();
 }
 
-extern "C" void DestroyCodec2Factory(::android::C2ComponentFactory* factory) {
+extern "C" void DestroyCodec2Factory(::C2ComponentFactory* factory) {
     ALOGV("in %s", __func__);
     delete factory;
 }

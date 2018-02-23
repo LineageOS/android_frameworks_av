@@ -398,14 +398,14 @@ class C2SoftMp3DecFactory : public C2ComponentFactory {
 public:
     virtual c2_status_t createComponent(
             c2_node_id_t id, std::shared_ptr<C2Component>* const component,
-            std::function<void(::android::C2Component*)> deleter) override {
+            std::function<void(::C2Component*)> deleter) override {
         *component = std::shared_ptr<C2Component>(new C2SoftMP3("mp3", id), deleter);
         return C2_OK;
     }
 
     virtual c2_status_t createInterface(
             c2_node_id_t id, std::shared_ptr<C2ComponentInterface>* const interface,
-            std::function<void(::android::C2ComponentInterface*)> deleter) override {
+            std::function<void(::C2ComponentInterface*)> deleter) override {
         *interface =
                 SimpleC2Interface::Builder("mp3", id, deleter)
                 .inputFormat(C2FormatCompressed)
@@ -419,12 +419,12 @@ public:
 
 }  // namespace android
 
-extern "C" ::android::C2ComponentFactory* CreateCodec2Factory() {
+extern "C" ::C2ComponentFactory* CreateCodec2Factory() {
     ALOGV("in %s", __func__);
     return new ::android::C2SoftMp3DecFactory();
 }
 
-extern "C" void DestroyCodec2Factory(::android::C2ComponentFactory* factory) {
+extern "C" void DestroyCodec2Factory(::C2ComponentFactory* factory) {
     ALOGV("in %s", __func__);
     delete factory;
 }

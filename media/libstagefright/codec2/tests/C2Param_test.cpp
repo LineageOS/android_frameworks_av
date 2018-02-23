@@ -45,14 +45,14 @@ void PrintTo(const C2FieldDescriptor &fd, ::std::ostream *os) {
         }
     }
     *os << " " << fd.name();
-    if (fd.length() > 1) {
-        *os << "[" << fd.length() << "]";
-    } else if (fd.length() == 0) {
+    if (fd.extent() > 1) {
+        *os << "[" << fd.extent() << "]";
+    } else if (fd.extent() == 0) {
         *os << "[]";
     }
     *os << " (";
     PrintTo(fd._mFieldId, os);
-    *os << "*" << fd.length() << ")";
+    *os << "*" << fd.extent() << ")";
 }
 
 enum C2ParamIndexType : C2Param::type_index_t {
@@ -102,7 +102,7 @@ DEFINE_NO_NAMED_VALUES_FOR(C2SizeStruct)
 
 bool operator==(const C2FieldDescriptor &a, const C2FieldDescriptor &b) {
     return a.type() == b.type()
-            && a.length() == b.length()
+            && a.extent() == b.extent()
             && strcmp(a.name(), b.name()) == 0
             && a._mFieldId == b._mFieldId;
 }
@@ -140,7 +140,7 @@ TEST_P(C2ParamTest_ParamFieldList, VerifyStruct) {
     // verify first field descriptor
     EXPECT_EQ(FD::INT32, fields[0].type());
     EXPECT_STREQ("s32", fields[0].name());
-    EXPECT_EQ(1u, fields[0].length());
+    EXPECT_EQ(1u, fields[0].extent());
     EXPECT_EQ(_C2FieldId(0, 4), fields[0]._mFieldId);
 
     EXPECT_EQ(expected[0], fields[0]);
@@ -736,7 +736,7 @@ void test3() {
     s.value = 11;
     s = 12;
     (void)C2NumberConfig3::FIELD_LIST;
-    std::shared_ptr<C2VideoNameConfig> n = C2VideoNameConfig::alloc_shared(25);
+    std::shared_ptr<C2VideoNameConfig> n = C2VideoNameConfig::AllocShared(25);
     strcpy(n->m.value, "lajos");
     C2NumberConfig4 t(false, 0, 11);
     t.value = 15;
@@ -764,10 +764,10 @@ typedef C2PortParam<C2Tuning, C2NumberStruct> C2NumberConfig;
 
 std::list<const C2FieldDescriptor> myList = C2NumberConfig::FIELD_LIST;
 
-    std::unique_ptr<android::C2ParamDescriptor> __test_describe(uint32_t paramType) {
+    std::unique_ptr<C2ParamDescriptor> __test_describe(uint32_t paramType) {
         std::list<const C2FieldDescriptor> fields = describeC2Params<C2NumberConfig>();
 
-        auto widths = C2NumbersInfo::alloc_shared(5);
+        auto widths = C2NumbersInfo::AllocShared(5);
         widths->flexCount();
         widths->m.mNumbers[4] = 1;
 
@@ -1110,7 +1110,7 @@ TEST_F(C2ParamTest, ParamOpsTest) {
 
     {
       C2NumberInfo inf(100);
-      std::unique_ptr<C2NumbersTuning> tun_ = C2NumbersTuning::alloc_unique(1);
+      std::unique_ptr<C2NumbersTuning> tun_ = C2NumbersTuning::AllocUnique(1);
 
       EXPECT_EQ(tun.coreIndex(), inf.coreIndex());
       EXPECT_NE(tun.coreIndex(), tun_->coreIndex());
@@ -1661,8 +1661,8 @@ TEST_F(C2ParamTest, ParamOpsTest) {
 void StaticTestAddCoreIndex() {
     struct nobase {};
     struct base { enum : uint32_t { CORE_INDEX = 1 }; };
-    static_assert(C2AddCoreIndex<nobase, 2>::CORE_INDEX == 2, "should be 2");
-    static_assert(C2AddCoreIndex<base, 1>::CORE_INDEX == 1, "should be 1");
+    static_assert(_C2AddCoreIndex<nobase, 2>::CORE_INDEX == 2, "should be 2");
+    static_assert(_C2AddCoreIndex<base, 1>::CORE_INDEX == 1, "should be 1");
 }
 
 class TestFlexHelper {
@@ -1709,10 +1709,10 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         EXPECT_EQ(index.typeIndex(), kParamIndexNumbers);
     }
 
-    std::unique_ptr<C2NumbersTuning> tun_ = C2NumbersTuning::alloc_unique(1);
+    std::unique_ptr<C2NumbersTuning> tun_ = C2NumbersTuning::AllocUnique(1);
     tun_->m.mNumbers[0] = 100;
     std::unique_ptr<const C2NumbersTuning> tun = std::move(tun_);
-    std::shared_ptr<C2NumbersTuning> btun = C2NumbersTuning::alloc_shared(1);
+    std::shared_ptr<C2NumbersTuning> btun = C2NumbersTuning::AllocShared(1);
 
     {
         // flags & invariables
@@ -1774,24 +1774,24 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         EXPECT_EQ(*(C2Param::Copy(*tun)), *tun);
     }
 
-    std::unique_ptr<C2NumbersPortTuning> outp1_(C2NumbersPortTuning::alloc_unique(1, true)),
-            inp1_ = C2NumbersPortTuning::alloc_unique(1, false);
+    std::unique_ptr<C2NumbersPortTuning> outp1_(C2NumbersPortTuning::AllocUnique(1, true)),
+            inp1_ = C2NumbersPortTuning::AllocUnique(1, false);
     outp1_->m.mNumbers[0] = 100;
     inp1_->m.mNumbers[0] = 100;
     std::unique_ptr<const C2NumbersPortTuning> outp1 = std::move(outp1_);
     std::unique_ptr<const C2NumbersPortTuning> inp1 = std::move(inp1_);
-    std::shared_ptr<C2NumbersPortTuning> boutp1(C2NumbersPortTuning::alloc_shared(1)),
-            binp1 = C2NumbersPortTuning::alloc_shared(1),
-            binp3 = C2NumbersPortTuning::alloc_shared(1, false);
+    std::shared_ptr<C2NumbersPortTuning> boutp1(C2NumbersPortTuning::AllocShared(1)),
+            binp1 = C2NumbersPortTuning::AllocShared(1),
+            binp3 = C2NumbersPortTuning::AllocShared(1, false);
     binp3->m.mNumbers[0] = 100;
-    std::unique_ptr<C2NumbersPortTuning::input> inp2_(C2NumbersPortTuning::input::alloc_unique(1));
+    std::unique_ptr<C2NumbersPortTuning::input> inp2_(C2NumbersPortTuning::input::AllocUnique(1));
     inp2_->m.mNumbers[0] = 100;
     std::unique_ptr<const C2NumbersPortTuning::input> inp2 = std::move(inp2_);
-    std::shared_ptr<C2NumbersPortTuning::input> binp2(C2NumbersPortTuning::input::alloc_shared(1));
-    std::unique_ptr<C2NumbersPortTuning::output> outp2_(C2NumbersPortTuning::output::alloc_unique(1));
+    std::shared_ptr<C2NumbersPortTuning::input> binp2(C2NumbersPortTuning::input::AllocShared(1));
+    std::unique_ptr<C2NumbersPortTuning::output> outp2_(C2NumbersPortTuning::output::AllocUnique(1));
     outp2_->m.mNumbers[0] = 100;
     std::unique_ptr<const C2NumbersPortTuning::output> outp2 = std::move(outp2_);
-    std::shared_ptr<C2NumbersPortTuning::output> boutp2(C2NumbersPortTuning::output::alloc_shared(1));
+    std::shared_ptr<C2NumbersPortTuning::output> boutp2(C2NumbersPortTuning::output::AllocShared(1));
 
     {
         static_assert(canCallSetPort(*binp3), "should be able to");
@@ -1999,24 +1999,24 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         EXPECT_EQ(*(C2Param::Copy(*outp2)), *outp2);
     }
 
-    std::unique_ptr<C2NumbersStreamTuning> outs1_(C2NumbersStreamTuning::alloc_unique(1, true, 1u));
+    std::unique_ptr<C2NumbersStreamTuning> outs1_(C2NumbersStreamTuning::AllocUnique(1, true, 1u));
     outs1_->m.mNumbers[0] = 100;
     std::unique_ptr<const C2NumbersStreamTuning> outs1 = std::move(outs1_);
-    std::unique_ptr<C2NumbersStreamTuning> ins1_(C2NumbersStreamTuning::alloc_unique(1, false, 1u));
+    std::unique_ptr<C2NumbersStreamTuning> ins1_(C2NumbersStreamTuning::AllocUnique(1, false, 1u));
     ins1_->m.mNumbers[0] = 100;
     std::unique_ptr<const C2NumbersStreamTuning> ins1 = std::move(ins1_);
-    std::shared_ptr<C2NumbersStreamTuning> bouts1(C2NumbersStreamTuning::alloc_shared(1));
-    std::shared_ptr<C2NumbersStreamTuning> bins1(C2NumbersStreamTuning::alloc_shared(1));
-    std::shared_ptr<C2NumbersStreamTuning> bins3(C2NumbersStreamTuning::alloc_shared(1, false, 1u));
+    std::shared_ptr<C2NumbersStreamTuning> bouts1(C2NumbersStreamTuning::AllocShared(1));
+    std::shared_ptr<C2NumbersStreamTuning> bins1(C2NumbersStreamTuning::AllocShared(1));
+    std::shared_ptr<C2NumbersStreamTuning> bins3(C2NumbersStreamTuning::AllocShared(1, false, 1u));
     bins3->m.mNumbers[0] = 100;
-    std::unique_ptr<C2NumbersStreamTuning::input> ins2_(C2NumbersStreamTuning::input::alloc_unique(1, 1u));
+    std::unique_ptr<C2NumbersStreamTuning::input> ins2_(C2NumbersStreamTuning::input::AllocUnique(1, 1u));
     ins2_->m.mNumbers[0] = 100;
     std::unique_ptr<const C2NumbersStreamTuning::input> ins2 = std::move(ins2_);
-    std::shared_ptr<C2NumbersStreamTuning::input> bins2(C2NumbersStreamTuning::input::alloc_shared(1));
-    std::unique_ptr<C2NumbersStreamTuning::output> outs2_(C2NumbersStreamTuning::output::alloc_unique(1, 1u));
+    std::shared_ptr<C2NumbersStreamTuning::input> bins2(C2NumbersStreamTuning::input::AllocShared(1));
+    std::unique_ptr<C2NumbersStreamTuning::output> outs2_(C2NumbersStreamTuning::output::AllocUnique(1, 1u));
     outs2_->m.mNumbers[0] = 100;
     std::unique_ptr<const C2NumbersStreamTuning::output> outs2 = std::move(outs2_);
-    std::shared_ptr<C2NumbersStreamTuning::output> bouts2(C2NumbersStreamTuning::output::alloc_shared(1));
+    std::shared_ptr<C2NumbersStreamTuning::output> bouts2(C2NumbersStreamTuning::output::AllocShared(1));
 
     {
         static_assert(canCallSetPort(*bins3), "should be able to");
@@ -2239,7 +2239,7 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         std::list<const C2FieldDescriptor> fields = int32Value.FIELD_LIST;
         EXPECT_EQ(1u, fields.size());
         EXPECT_EQ(FD::INT32, fields.cbegin()->type());
-        EXPECT_EQ(1u, fields.cbegin()->length());
+        EXPECT_EQ(1u, fields.cbegin()->extent());
         EXPECT_EQ(C2String("value"), fields.cbegin()->name());
     }
 
@@ -2250,7 +2250,7 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         std::list<const C2FieldDescriptor> fields = uint32Value.FIELD_LIST;
         EXPECT_EQ(1u, fields.size());
         EXPECT_EQ(FD::UINT32, fields.cbegin()->type());
-        EXPECT_EQ(1u, fields.cbegin()->length());
+        EXPECT_EQ(1u, fields.cbegin()->extent());
         EXPECT_EQ(C2String("value"), fields.cbegin()->name());
     }
 
@@ -2261,7 +2261,7 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         std::list<const C2FieldDescriptor> fields = int64Value.FIELD_LIST;
         EXPECT_EQ(1u, fields.size());
         EXPECT_EQ(FD::INT64, fields.cbegin()->type());
-        EXPECT_EQ(1u, fields.cbegin()->length());
+        EXPECT_EQ(1u, fields.cbegin()->extent());
         EXPECT_EQ(C2String("value"), fields.cbegin()->name());
     }
 
@@ -2272,7 +2272,7 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         std::list<const C2FieldDescriptor> fields = uint64Value.FIELD_LIST;
         EXPECT_EQ(1u, fields.size());
         EXPECT_EQ(FD::UINT64, fields.cbegin()->type());
-        EXPECT_EQ(1u, fields.cbegin()->length());
+        EXPECT_EQ(1u, fields.cbegin()->extent());
         EXPECT_EQ(C2String("value"), fields.cbegin()->name());
     }
 
@@ -2283,24 +2283,24 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         std::list<const C2FieldDescriptor> fields = floatValue.FIELD_LIST;
         EXPECT_EQ(1u, fields.size());
         EXPECT_EQ(FD::FLOAT, fields.cbegin()->type());
-        EXPECT_EQ(1u, fields.cbegin()->length());
+        EXPECT_EQ(1u, fields.cbegin()->extent());
         EXPECT_EQ(C2String("value"), fields.cbegin()->name());
     }
 
     {
         uint8_t initValue[] = "ABCD";
         typedef C2GlobalParam<C2Setting, C2BlobValue, 0> BlobSetting;
-        std::unique_ptr<BlobSetting> blobValue = BlobSetting::alloc_unique(6, C2ConstMemoryBlock<uint8_t>(initValue));
+        std::unique_ptr<BlobSetting> blobValue = BlobSetting::AllocUnique(6, C2ConstMemoryBlock<uint8_t>(initValue));
         static_assert(std::is_same<decltype(blobValue->m.value), uint8_t[]>::value, "should be uint8_t[]");
         EXPECT_EQ(0, memcmp(blobValue->m.value, "ABCD\0", 6));
         EXPECT_EQ(6u, blobValue->flexCount());
         std::list<const C2FieldDescriptor> fields = blobValue->FIELD_LIST;
         EXPECT_EQ(1u, fields.size());
         EXPECT_EQ(FD::BLOB, fields.cbegin()->type());
-        EXPECT_EQ(0u, fields.cbegin()->length());
+        EXPECT_EQ(0u, fields.cbegin()->extent());
         EXPECT_EQ(C2String("value"), fields.cbegin()->name());
 
-        blobValue = BlobSetting::alloc_unique(3, C2ConstMemoryBlock<uint8_t>(initValue));
+        blobValue = BlobSetting::AllocUnique(3, C2ConstMemoryBlock<uint8_t>(initValue));
         EXPECT_EQ(0, memcmp(blobValue->m.value, "ABC", 3));
         EXPECT_EQ(3u, blobValue->flexCount());
     }
@@ -2308,30 +2308,30 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
     {
         constexpr char initValue[] = "ABCD";
         typedef C2GlobalParam<C2Setting, C2StringValue, 0> StringSetting;
-        std::unique_ptr<StringSetting> stringValue = StringSetting::alloc_unique(6, C2ConstMemoryBlock<char>(initValue));
-        stringValue = StringSetting::alloc_unique(6, initValue);
+        std::unique_ptr<StringSetting> stringValue = StringSetting::AllocUnique(6, C2ConstMemoryBlock<char>(initValue));
+        stringValue = StringSetting::AllocUnique(6, initValue);
         static_assert(std::is_same<decltype(stringValue->m.value), char[]>::value, "should be char[]");
         EXPECT_EQ(0, memcmp(stringValue->m.value, "ABCD\0", 6));
         EXPECT_EQ(6u, stringValue->flexCount());
         std::list<const C2FieldDescriptor> fields = stringValue->FIELD_LIST;
         EXPECT_EQ(1u, fields.size());
         EXPECT_EQ(FD::STRING, fields.cbegin()->type());
-        EXPECT_EQ(0u, fields.cbegin()->length());
+        EXPECT_EQ(0u, fields.cbegin()->extent());
         EXPECT_EQ(C2String("value"), fields.cbegin()->name());
 
-        stringValue = StringSetting::alloc_unique(3, C2ConstMemoryBlock<char>(initValue));
+        stringValue = StringSetting::AllocUnique(3, C2ConstMemoryBlock<char>(initValue));
         EXPECT_EQ(0, memcmp(stringValue->m.value, "AB", 3));
         EXPECT_EQ(3u, stringValue->flexCount());
 
-        stringValue = StringSetting::alloc_unique(11, "initValue");
+        stringValue = StringSetting::AllocUnique(11, "initValue");
         EXPECT_EQ(0, memcmp(stringValue->m.value, "initValue\0", 11));
         EXPECT_EQ(11u, stringValue->flexCount());
 
-        stringValue = StringSetting::alloc_unique(initValue);
+        stringValue = StringSetting::AllocUnique(initValue);
         EXPECT_EQ(0, memcmp(stringValue->m.value, "ABCD", 5));
         EXPECT_EQ(5u, stringValue->flexCount());
 
-        stringValue = StringSetting::alloc_unique({ 'A', 'B', 'C', 'D' });
+        stringValue = StringSetting::AllocUnique({ 'A', 'B', 'C', 'D' });
         EXPECT_EQ(0, memcmp(stringValue->m.value, "ABC", 4));
         EXPECT_EQ(4u, stringValue->flexCount());
     }
@@ -2513,7 +2513,7 @@ public:
     public:
         MyParamReflector(const MyComponentInstance *i) : instance(i) { }
 
-        virtual std::unique_ptr<C2StructDescriptor> describe(C2Param::CoreIndex paramIndex) override {
+        virtual std::unique_ptr<C2StructDescriptor> describe(C2Param::CoreIndex paramIndex) const override {
             switch (paramIndex.typeIndex()) {
             case decltype(instance->mDomainInfo)::CORE_INDEX:
             default:
@@ -2531,7 +2531,7 @@ public:
             c2_blocking_t mayBlock) const override {
         (void)mayBlock;
         for (C2FieldSupportedValuesQuery &query : fields) {
-            if (query.field == C2ParamField(&mDomainInfo, &C2ComponentDomainInfo::value)) {
+            if (query.field() == C2ParamField(&mDomainInfo, &C2ComponentDomainInfo::value)) {
                 query.values = C2FieldSupportedValues(
                     false /* flag */,
                     &mDomainInfo.value
@@ -2702,7 +2702,7 @@ void dumpStruct(const C2StructDescriptor &sd) {
         if (f.namedValues().size()) {
             cout << ".named(";
             const char *sep = "";
-            for (const FD::named_value_type &p : f.namedValues()) {
+            for (const FD::NamedValueType &p : f.namedValues()) {
                 cout << sep << p.first << "=";
                 switch (f.type()) {
                 case C2Value::INT32: cout << get(p.second, (int32_t *)0); break;

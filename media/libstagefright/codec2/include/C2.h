@@ -141,9 +141,13 @@ enum c2_blocking_t : int32_t {
 /// \defgroup utils Utilities
 /// @{
 
-#define C2_DO_NOT_COPY(type, args...) \
-    type args& operator=(const type args&) = delete; \
-    type(const type args&) = delete; \
+#define C2_DO_NOT_COPY(type) \
+    type& operator=(const type &) = delete; \
+    type(const type &) = delete; \
+
+#define C2_DEFAULT_MOVE(type) \
+    type& operator=(type &&) = default; \
+    type(type &&) = default; \
 
 #define C2_ALLOW_OVERFLOW __attribute__((no_sanitize("integer")))
 #define C2_CONST    __attribute__((const))
@@ -274,7 +278,7 @@ public:
     /**
      * Convert to a smaller counter type. This is always safe.
      */
-    template<typename U, typename E=typename std::enable_if<sizeof(U) < sizeof(T)>::type>
+    template<typename U, typename E=typename std::enable_if<(sizeof(U) < sizeof(T))>::type>
     inline operator c2_cntr_t<U>() {
         return c2_cntr_t<U>(mValue);
     }
@@ -295,7 +299,7 @@ public:
         return c2_cntr_t<T>(mValue op compat::get(value)); \
     } \
     \
-    template<typename U, typename E=typename std::enable_if<sizeof(U) < sizeof(T)>::type> \
+    template<typename U, typename E=typename std::enable_if<(sizeof(U) < sizeof(T))>::type> \
     attrib inline constexpr c2_cntr_t<U> operator op(const c2_cntr_t<U> &value) const { \
         return c2_cntr_t<U>(U(mValue) op value.peeku()); \
     }

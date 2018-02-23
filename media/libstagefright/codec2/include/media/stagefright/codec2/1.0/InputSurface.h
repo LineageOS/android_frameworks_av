@@ -48,7 +48,7 @@ public:
 
     // Methods from IInputSurface
     sp<InputSurfaceConnection> connectToComponent(
-            const std::shared_ptr<::android::C2Component> &comp);
+            const std::shared_ptr<::C2Component> &comp);
     // TODO: intf()
 
     static sp<InputSurface> Create();

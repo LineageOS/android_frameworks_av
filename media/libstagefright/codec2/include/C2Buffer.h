@@ -1339,6 +1339,9 @@ struct C2Rect {
     uint32_t width;
     uint32_t height;
 
+    constexpr inline C2Rect()
+        : C2Rect(0, 0, 0, 0) { }
+
     constexpr inline C2Rect(uint32_t width_, uint32_t height_)
         : C2Rect(width_, height_, 0, 0) { }
 
@@ -2261,11 +2264,5 @@ protected:
 /// \endcond
 
 /// @}
-
-// expose some objects in android namespace
-namespace android {
-    /// \deprecated
-    typedef ::C2Fence C2Fence;
-}
 
 #endif  // C2BUFFER_H_

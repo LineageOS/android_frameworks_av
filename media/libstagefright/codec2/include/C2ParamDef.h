@@ -36,14 +36,14 @@
 struct C2_HIDE _C2Comparable_impl
 {
     template<typename S, typename=decltype(S() == S())>
-    static std::true_type __testEQ(int);
+    static std::true_type TestEqual(int);
     template<typename>
-    static std::false_type __testEQ(...);
+    static std::false_type TestEqual(...);
 
     template<typename S, typename=decltype(S() != S())>
-    static std::true_type __testNE(int);
+    static std::true_type TestNotEqual(int);
     template<typename>
-    static std::false_type __testNE(...);
+    static std::false_type TestNotEqual(...);
 };
 
 /**
@@ -53,30 +53,30 @@ struct C2_HIDE _C2Comparable_impl
  */
 template<typename S>
 struct C2_HIDE _C2Comparable
-    : public std::integral_constant<bool, decltype(_C2Comparable_impl::__testEQ<S>(0))::value
-                        || decltype(_C2Comparable_impl::__testNE<S>(0))::value> {
+    : public std::integral_constant<bool, decltype(_C2Comparable_impl::TestEqual<S>(0))::value
+                        || decltype(_C2Comparable_impl::TestNotEqual<S>(0))::value> {
 };
 
 ///  Helper class that checks if a type has a CORE_INDEX constant.
 struct C2_HIDE _C2CoreIndexHelper_impl
 {
     template<typename S, int=S::CORE_INDEX>
-    static std::true_type __testCoreIndex(int);
+    static std::true_type TestCoreIndex(int);
     template<typename>
-    static std::false_type __testCoreIndex(...);
+    static std::false_type TestCoreIndex(...);
 };
 
 /// Helper template that verifies a type's CORE_INDEX and creates it if the type does not have one.
 template<typename S, int CoreIndex,
-        bool HasBase=decltype(_C2CoreIndexHelper_impl::__testCoreIndex<S>(0))::value>
-struct C2_HIDE C2CoreIndexOverride {
+        bool HasBase=decltype(_C2CoreIndexHelper_impl::TestCoreIndex<S>(0))::value>
+struct C2_HIDE _C2CoreIndexOverride {
     // TODO: what if we allow structs without CORE_INDEX?
     static_assert(CoreIndex == S::CORE_INDEX, "CORE_INDEX differs from structure");
 };
 
 /// Specialization for types without a CORE_INDEX.
 template<typename S, int CoreIndex>
-struct C2_HIDE C2CoreIndexOverride<S, CoreIndex, false> {
+struct C2_HIDE _C2CoreIndexOverride<S, CoreIndex, false> {
 public:
     enum : uint32_t {
         CORE_INDEX = CoreIndex, ///< CORE_INDEX override.
@@ -85,7 +85,7 @@ public:
 
 /// Helper template that adds a CORE_INDEX to a type if it does not have one.
 template<typename S, int CoreIndex>
-struct C2_HIDE C2AddCoreIndex : public S, public C2CoreIndexOverride<S, CoreIndex> {};
+struct C2_HIDE _C2AddCoreIndex : public S, public _C2CoreIndexOverride<S, CoreIndex> {};
 
 /**
  * \brief Helper class to check struct requirements for parameters.
@@ -95,7 +95,7 @@ struct C2_HIDE C2AddCoreIndex : public S, public C2CoreIndexOverride<S, CoreInde
  *  - expose PARAM_TYPE, and non-flex FLEX_SIZE.
  */
 template<typename S, int CoreIndex, unsigned TypeFlags>
-struct C2_HIDE C2StructCheck {
+struct C2_HIDE _C2StructCheck {
     static_assert(
             std::is_default_constructible<S>::value, "C2 structure must have default constructor");
     static_assert(!std::is_polymorphic<S>::value, "C2 structure must not have virtual methods");
@@ -116,15 +116,15 @@ protected:
 struct C2_HIDE _C2Flexible_impl {
     /// specialization for types that have a FLEX_SIZE member
     template<typename S, unsigned=S::FLEX_SIZE>
-    static std::true_type __testFlexSize(int);
+    static std::true_type TestFlexSize(int);
     template<typename>
-    static std::false_type __testFlexSize(...);
+    static std::false_type TestFlexSize(...);
 };
 
 /// Helper template that returns if a type has an integer FLEX_SIZE member.
 template<typename S>
 struct C2_HIDE _C2Flexible
-    : public std::integral_constant<bool, decltype(_C2Flexible_impl::__testFlexSize<S>(0))::value> {
+    : public std::integral_constant<bool, decltype(_C2Flexible_impl::TestFlexSize<S>(0))::value> {
 };
 
 /// Macro to test if a type is flexible (has a FLEX_SIZE member).
@@ -165,9 +165,9 @@ struct C2_HIDE _C2FlexHelper<S[],
  *    flexible struct, so may not be needed here)
  */
 template<typename S, int ParamIndex, unsigned TypeFlags>
-struct C2_HIDE C2FlexStructCheck :
-// add flexible flag as C2StructCheck defines PARAM_TYPE
-        public C2StructCheck<S, ParamIndex | C2Param::CoreIndex::IS_FLEX_FLAG, TypeFlags> {
+struct C2_HIDE _C2FlexStructCheck :
+// add flexible flag as _C2StructCheck defines PARAM_TYPE
+        public _C2StructCheck<S, ParamIndex | C2Param::CoreIndex::IS_FLEX_FLAG, TypeFlags> {
 public:
     enum : uint32_t {
         /// \hideinitializer
@@ -177,12 +177,12 @@ public:
     const static std::initializer_list<const C2FieldDescriptor> FIELD_LIST; // TODO assign here
 
     // default constructor needed because of the disabled copy constructor
-    inline C2FlexStructCheck() = default;
+    inline _C2FlexStructCheck() = default;
 
 protected:
     // cannot copy flexible params
-    C2FlexStructCheck(const C2FlexStructCheck<S, ParamIndex, TypeFlags> &) = delete;
-    C2FlexStructCheck& operator= (const C2FlexStructCheck<S, ParamIndex, TypeFlags> &) = delete;
+    _C2FlexStructCheck(const _C2FlexStructCheck<S, ParamIndex, TypeFlags> &) = delete;
+    _C2FlexStructCheck& operator= (const _C2FlexStructCheck<S, ParamIndex, TypeFlags> &) = delete;
 
     // constants used for helper methods
     enum : uint32_t {
@@ -195,7 +195,7 @@ protected:
     };
 
     /// returns the allocated size of this param with flexCount, or 0 if it would overflow.
-    inline static size_t calcSize(size_t flexCount, size_t size = BASE_SIZE) {
+    inline static size_t CalcSize(size_t flexCount, size_t size = BASE_SIZE) {
         if (flexCount <= (MAX_SIZE - size) / S::FLEX_SIZE) {
             return size + S::FLEX_SIZE * flexCount;
         }
@@ -205,7 +205,7 @@ protected:
     /// dynamic new operator usable for params of type S
     inline void* operator new(size_t size, size_t flexCount) noexcept {
         // TODO: assert(size == BASE_SIZE);
-        size = calcSize(flexCount, size);
+        size = CalcSize(flexCount, size);
         if (size > 0) {
             return ::operator new(size);
         }
@@ -217,12 +217,12 @@ protected:
 /// Expose FIELD_LIST from subClass;
 template<typename S, int ParamIndex, unsigned TypeFlags>
 const std::initializer_list<const C2FieldDescriptor>
-C2FlexStructCheck<S, ParamIndex, TypeFlags>::FIELD_LIST = S::FIELD_LIST;
+_C2FlexStructCheck<S, ParamIndex, TypeFlags>::FIELD_LIST = S::FIELD_LIST;
 
 /// Define From() cast operators for params.
 #define DEFINE_CAST_OPERATORS(_Type) \
     inline static _Type* From(C2Param *other) { \
-        return (_Type*)C2Param::ifSuitable( \
+        return (_Type*)C2Param::IfSuitable( \
                 other, sizeof(_Type), _Type::PARAM_TYPE, _Type::FLEX_SIZE, \
                 (_Type::PARAM_TYPE & T::Index::DIR_UNDEFINED) != T::Index::DIR_UNDEFINED); \
     } \
@@ -232,40 +232,40 @@ C2FlexStructCheck<S, ParamIndex, TypeFlags>::FIELD_LIST = S::FIELD_LIST;
     inline static _Type* From(std::nullptr_t) { return nullptr; } \
 
 /**
- * Define flexible allocators (alloc_shared or alloc_unique) for flexible params.
- *  - P::alloc_xyz(flexCount, args...): allocate for given flex-count.
- *  - P::alloc_xyz(args..., T[]): allocate for size of (and with) init array.
- *  - P::alloc_xyz(T[]): allocate for size of (and with) init array with no other args.
- *  - P::alloc_xyz(args..., std::initializer_list<T>): allocate for size of (and with) initializer
+ * Define flexible allocators (AllocShared or AllocUnique) for flexible params.
+ *  - P::AllocXyz(flexCount, args...): allocate for given flex-count.
+ *  - P::AllocXyz(args..., T[]): allocate for size of (and with) init array.
+ *  - P::AllocXyz(T[]): allocate for size of (and with) init array with no other args.
+ *  - P::AllocXyz(args..., std::initializer_list<T>): allocate for size of (and with) initializer
  *    list.
  */
-#define DEFINE_FLEXIBLE_ALLOC(_Type, S, ptr) \
+#define DEFINE_FLEXIBLE_ALLOC(_Type, S, ptr, Ptr) \
     template<typename ...Args> \
-    inline static std::ptr##_ptr<_Type> alloc_##ptr(size_t flexCount, const Args(&... args)) { \
+    inline static std::ptr##_ptr<_Type> Alloc##Ptr(size_t flexCount, const Args(&... args)) { \
         return std::ptr##_ptr<_Type>(new(flexCount) _Type(flexCount, args...)); \
     } \
     /* NOTE: unfortunately this is not supported by clang yet */ \
     template<typename ...Args, typename U=typename S::FlexType, unsigned N> \
-    inline static std::ptr##_ptr<_Type> alloc_##ptr(const Args(&... args), const U(&init)[N]) { \
+    inline static std::ptr##_ptr<_Type> Alloc##Ptr(const Args(&... args), const U(&init)[N]) { \
         return std::ptr##_ptr<_Type>(new(N) _Type(N, args..., init)); \
     } \
     /* so for now, specialize for no args */ \
     template<typename U=typename S::FlexType, unsigned N> \
-    inline static std::ptr##_ptr<_Type> alloc_##ptr(const U(&init)[N]) { \
+    inline static std::ptr##_ptr<_Type> Alloc##Ptr(const U(&init)[N]) { \
         return std::ptr##_ptr<_Type>(new(N) _Type(N, init)); \
     } \
     template<typename ...Args, typename U=typename S::FlexType> \
-    inline static std::ptr##_ptr<_Type> alloc_##ptr( \
+    inline static std::ptr##_ptr<_Type> Alloc##Ptr( \
             const Args(&... args), const std::initializer_list<U> &init) { \
         return std::ptr##_ptr<_Type>(new(init.size()) _Type(init.size(), args..., init)); \
     } \
 
 /**
- * Define flexible methods alloc_shared, alloc_unique and flexCount.
+ * Define flexible methods AllocShared, AllocUnique and flexCount.
  */
 #define DEFINE_FLEXIBLE_METHODS(_Type, S) \
-    DEFINE_FLEXIBLE_ALLOC(_Type, S, shared) \
-    DEFINE_FLEXIBLE_ALLOC(_Type, S, unique) \
+    DEFINE_FLEXIBLE_ALLOC(_Type, S, shared, Shared) \
+    DEFINE_FLEXIBLE_ALLOC(_Type, S, unique, Unique) \
     inline size_t flexCount() const { \
         static_assert(sizeof(_Type) == _Type::BASE_SIZE, "incorrect BASE_SIZE"); \
         size_t sz = this->size(); \
@@ -312,8 +312,8 @@ public: \
  * structures.
  */
 template<typename T, typename S, int ParamIndex=S::CORE_INDEX, class Flex=void>
-struct C2_HIDE C2GlobalParam : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
-        public C2StructCheck<S, ParamIndex, T::PARAM_KIND | T::Type::DIR_GLOBAL> {
+struct C2_HIDE C2GlobalParam : public T, public S, public _C2CoreIndexOverride<S, ParamIndex>,
+        public _C2StructCheck<S, ParamIndex, T::PARAM_KIND | T::Type::DIR_GLOBAL> {
 private:
     typedef C2GlobalParam<T, S, ParamIndex> _Type;
 
@@ -342,14 +342,14 @@ public:
  */
 template<typename T, typename S, int ParamIndex>
 struct C2_HIDE C2GlobalParam<T, S, ParamIndex, IF_FLEXIBLE(S)>
-    : public T, public C2FlexStructCheck<S, ParamIndex, T::PARAM_KIND | T::Type::DIR_GLOBAL> {
+    : public T, public _C2FlexStructCheck<S, ParamIndex, T::PARAM_KIND | T::Type::DIR_GLOBAL> {
 private:
     typedef C2GlobalParam<T, S, ParamIndex> _Type;
 
     /// Wrapper around base structure's constructor.
     template<typename ...Args>
     inline C2GlobalParam(size_t flexCount, const Args(&... args))
-        : T(_Type::calcSize(flexCount), _Type::PARAM_TYPE), m(flexCount, args...) { }
+        : T(_Type::CalcSize(flexCount), _Type::PARAM_TYPE), m(flexCount, args...) { }
 
 public:
     S m; ///< wrapped flexible structure
@@ -378,8 +378,8 @@ public:
  * unspecified port expose a setPort method, and add an initial port parameter to the constructor.
  */
 template<typename T, typename S, int ParamIndex=S::CORE_INDEX, class Flex=void>
-struct C2_HIDE C2PortParam : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
-        private C2StructCheck<S, ParamIndex, T::PARAM_KIND | T::Index::DIR_UNDEFINED> {
+struct C2_HIDE C2PortParam : public T, public S, public _C2CoreIndexOverride<S, ParamIndex>,
+        private _C2StructCheck<S, ParamIndex, T::PARAM_KIND | T::Index::DIR_UNDEFINED> {
 private:
     typedef C2PortParam<T, S, ParamIndex> _Type;
 
@@ -396,8 +396,8 @@ public:
     DEFINE_CAST_OPERATORS(_Type)
 
     /// Specialization for an input port parameter.
-    struct input : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
-            public C2StructCheck<S, ParamIndex, T::PARAM_KIND | T::Index::DIR_INPUT> {
+    struct input : public T, public S, public _C2CoreIndexOverride<S, ParamIndex>,
+            public _C2StructCheck<S, ParamIndex, T::PARAM_KIND | T::Index::DIR_INPUT> {
         /// Wrapper around base structure's constructor.
         template<typename ...Args>
         inline input(const Args(&... args)) : T(sizeof(_Type), input::PARAM_TYPE), S(args...) { }
@@ -407,8 +407,8 @@ public:
     };
 
     /// Specialization for an output port parameter.
-    struct output : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
-            public C2StructCheck<S, ParamIndex, T::PARAM_KIND | T::Index::DIR_OUTPUT> {
+    struct output : public T, public S, public _C2CoreIndexOverride<S, ParamIndex>,
+            public _C2StructCheck<S, ParamIndex, T::PARAM_KIND | T::Index::DIR_OUTPUT> {
         /// Wrapper around base structure's constructor.
         template<typename ...Args>
         inline output(const Args(&... args)) : T(sizeof(_Type), output::PARAM_TYPE), S(args...) { }
@@ -438,16 +438,16 @@ public:
  */
 template<typename T, typename S, int ParamIndex>
 struct C2_HIDE C2PortParam<T, S, ParamIndex, IF_FLEXIBLE(S)>
-    : public T, public C2FlexStructCheck<S, ParamIndex, T::PARAM_KIND | T::Type::DIR_UNDEFINED> {
+    : public T, public _C2FlexStructCheck<S, ParamIndex, T::PARAM_KIND | T::Type::DIR_UNDEFINED> {
 private:
     typedef C2PortParam<T, S, ParamIndex> _Type;
 
     /// Default constructor for basic allocation: new(flexCount) P.
-    inline C2PortParam(size_t flexCount) : T(_Type::calcSize(flexCount), _Type::PARAM_TYPE) { }
+    inline C2PortParam(size_t flexCount) : T(_Type::CalcSize(flexCount), _Type::PARAM_TYPE) { }
     template<typename ...Args>
     /// Wrapper around base structure's constructor while also specifying port/direction.
     inline C2PortParam(size_t flexCount, bool _output, const Args(&... args))
-        : T(_Type::calcSize(flexCount), _output ? output::PARAM_TYPE : input::PARAM_TYPE),
+        : T(_Type::CalcSize(flexCount), _output ? output::PARAM_TYPE : input::PARAM_TYPE),
           m(flexCount, args...) { }
 
 public:
@@ -461,12 +461,12 @@ public:
 
     /// Specialization for an input port parameter.
     struct input : public T,
-            public C2FlexStructCheck<S, ParamIndex, T::PARAM_KIND | T::Index::DIR_INPUT> {
+            public _C2FlexStructCheck<S, ParamIndex, T::PARAM_KIND | T::Index::DIR_INPUT> {
     private:
         /// Wrapper around base structure's constructor while also specifying port/direction.
         template<typename ...Args>
         inline input(size_t flexCount, const Args(&... args))
-            : T(_Type::calcSize(flexCount), input::PARAM_TYPE), m(flexCount, args...) { }
+            : T(_Type::CalcSize(flexCount), input::PARAM_TYPE), m(flexCount, args...) { }
 
     public:
         S m; ///< wrapped flexible structure
@@ -477,12 +477,12 @@ public:
 
     /// Specialization for an output port parameter.
     struct output : public T,
-            public C2FlexStructCheck<S, ParamIndex, T::PARAM_KIND | T::Index::DIR_OUTPUT> {
+            public _C2FlexStructCheck<S, ParamIndex, T::PARAM_KIND | T::Index::DIR_OUTPUT> {
     private:
         /// Wrapper around base structure's constructor while also specifying port/direction.
         template<typename ...Args>
         inline output(size_t flexCount, const Args(&... args))
-            : T(_Type::calcSize(flexCount), output::PARAM_TYPE), m(flexCount, args...) { }
+            : T(_Type::CalcSize(flexCount), output::PARAM_TYPE), m(flexCount, args...) { }
 
     public:
         S m; ///< wrapped flexible structure
@@ -514,8 +514,8 @@ public:
  * parameter to the constructor.
  */
 template<typename T, typename S, int ParamIndex=S::CORE_INDEX, class Flex=void>
-struct C2_HIDE C2StreamParam : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
-        private C2StructCheck<S, ParamIndex,
+struct C2_HIDE C2StreamParam : public T, public S, public _C2CoreIndexOverride<S, ParamIndex>,
+        private _C2StructCheck<S, ParamIndex,
                 T::PARAM_KIND | T::Index::IS_STREAM_FLAG | T::Index::DIR_UNDEFINED> {
 private:
     typedef C2StreamParam<T, S, ParamIndex> _Type;
@@ -537,8 +537,8 @@ public:
     DEFINE_CAST_OPERATORS(_Type)
 
     /// Specialization for an input stream parameter.
-    struct input : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
-            public C2StructCheck<S, ParamIndex,
+    struct input : public T, public S, public _C2CoreIndexOverride<S, ParamIndex>,
+            public _C2StructCheck<S, ParamIndex,
                     T::PARAM_KIND | T::Index::IS_STREAM_FLAG | T::Type::DIR_INPUT> {
         /// Default constructor. Stream-ID is undefined.
         inline input() : T(sizeof(_Type), input::PARAM_TYPE) { }
@@ -553,8 +553,8 @@ public:
     };
 
     /// Specialization for an output stream parameter.
-    struct output : public T, public S, public C2CoreIndexOverride<S, ParamIndex>,
-            public C2StructCheck<S, ParamIndex,
+    struct output : public T, public S, public _C2CoreIndexOverride<S, ParamIndex>,
+            public _C2StructCheck<S, ParamIndex,
                     T::PARAM_KIND | T::Index::IS_STREAM_FLAG | T::Type::DIR_OUTPUT> {
         /// Default constructor. Stream-ID is undefined.
         inline output() : T(sizeof(_Type), output::PARAM_TYPE) { }
@@ -593,17 +593,17 @@ public:
 template<typename T, typename S, int ParamIndex>
 struct C2_HIDE C2StreamParam<T, S, ParamIndex, IF_FLEXIBLE(S)>
     : public T,
-      public C2FlexStructCheck<S, ParamIndex,
+      public _C2FlexStructCheck<S, ParamIndex,
               T::PARAM_KIND | T::Index::IS_STREAM_FLAG | T::Index::DIR_UNDEFINED> {
 private:
     typedef C2StreamParam<T, S, ParamIndex> _Type;
     /// Default constructor. Port/direction and stream-ID is undefined.
-    inline C2StreamParam(size_t flexCount) : T(_Type::calcSize(flexCount), _Type::PARAM_TYPE, 0u) { }
+    inline C2StreamParam(size_t flexCount) : T(_Type::CalcSize(flexCount), _Type::PARAM_TYPE, 0u) { }
     /// Wrapper around base structure's constructor while also specifying port/direction and
     /// stream-ID.
     template<typename ...Args>
     inline C2StreamParam(size_t flexCount, bool _output, unsigned stream, const Args(&... args))
-        : T(_Type::calcSize(flexCount), _output ? output::PARAM_TYPE : input::PARAM_TYPE, stream),
+        : T(_Type::CalcSize(flexCount), _output ? output::PARAM_TYPE : input::PARAM_TYPE, stream),
           m(flexCount, args...) { }
 
 public:
@@ -619,15 +619,15 @@ public:
 
     /// Specialization for an input stream parameter.
     struct input : public T,
-            public C2FlexStructCheck<S, ParamIndex,
+            public _C2FlexStructCheck<S, ParamIndex,
                     T::PARAM_KIND | T::Index::IS_STREAM_FLAG | T::Type::DIR_INPUT> {
     private:
         /// Default constructor. Stream-ID is undefined.
-        inline input(size_t flexCount) : T(_Type::calcSize(flexCount), input::PARAM_TYPE) { }
+        inline input(size_t flexCount) : T(_Type::CalcSize(flexCount), input::PARAM_TYPE) { }
         /// Wrapper around base structure's constructor while also specifying stream-ID.
         template<typename ...Args>
         inline input(size_t flexCount, unsigned stream, const Args(&... args))
-            : T(_Type::calcSize(flexCount), input::PARAM_TYPE, stream), m(flexCount, args...) { }
+            : T(_Type::CalcSize(flexCount), input::PARAM_TYPE, stream), m(flexCount, args...) { }
 
     public:
         S m; ///< wrapped flexible structure
@@ -641,15 +641,15 @@ public:
 
     /// Specialization for an output stream parameter.
     struct output : public T,
-            public C2FlexStructCheck<S, ParamIndex,
+            public _C2FlexStructCheck<S, ParamIndex,
                     T::PARAM_KIND | T::Index::IS_STREAM_FLAG | T::Type::DIR_OUTPUT> {
     private:
         /// Default constructor. Stream-ID is undefined.
-        inline output(size_t flexCount) : T(_Type::calcSize(flexCount), output::PARAM_TYPE) { }
+        inline output(size_t flexCount) : T(_Type::CalcSize(flexCount), output::PARAM_TYPE) { }
         /// Wrapper around base structure's constructor while also specifying stream-ID.
         template<typename ...Args>
         inline output(size_t flexCount, unsigned stream, const Args(&... args))
-            : T(_Type::calcSize(flexCount), output::PARAM_TYPE, stream), m(flexCount, args...) { }
+            : T(_Type::CalcSize(flexCount), output::PARAM_TYPE, stream), m(flexCount, args...) { }
 
     public:
         S m; ///< wrapped flexible structure
@@ -818,19 +818,19 @@ struct C2SimpleArrayStruct {
 
 private:
     /// Construct from a C2MemoryBlock.
-    /// Used only by the flexible parameter allocators (alloc_unique & alloc_shared).
+    /// Used only by the flexible parameter allocators (AllocUnique & AllocShared).
     inline C2SimpleArrayStruct(size_t flexCount, const C2MemoryBlock<T> &block) {
         _C2ValueArrayHelper::init(values, flexCount, block);
     }
 
     /// Construct from an initializer list.
-    /// Used only by the flexible parameter allocators (alloc_unique & alloc_shared).
+    /// Used only by the flexible parameter allocators (AllocUnique & AllocShared).
     inline C2SimpleArrayStruct(size_t flexCount, const std::initializer_list<T> &init) {
         _C2ValueArrayHelper::init(values, flexCount, init);
     }
 
     /// Construct from another flexible array.
-    /// Used only by the flexible parameter allocators (alloc_unique & alloc_shared).
+    /// Used only by the flexible parameter allocators (AllocUnique & AllocShared).
     template<unsigned N>
     inline C2SimpleArrayStruct(size_t flexCount, const T(&init)[N]) {
         _C2ValueArrayHelper::init(values, flexCount, init);

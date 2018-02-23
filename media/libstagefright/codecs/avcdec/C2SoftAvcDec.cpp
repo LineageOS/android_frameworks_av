@@ -266,9 +266,9 @@ C2SoftAvcDecIntf::C2SoftAvcDecIntf(const char *name, c2_node_id_t id)
       mBlocksPerSecond(0u, 0),
       mParamReflector(new ParamReflector) {
     ALOGV("in %s", __func__);
-    mInputPortMime = C2PortMimeConfig::input::alloc_unique(strlen(CODEC_MIME_TYPE) + 1);
+    mInputPortMime = C2PortMimeConfig::input::AllocUnique(strlen(CODEC_MIME_TYPE) + 1);
     strcpy(mInputPortMime->m.value, CODEC_MIME_TYPE);
-    mOutputPortMime = C2PortMimeConfig::output::alloc_unique(strlen(MEDIA_MIMETYPE_VIDEO_RAW) + 1);
+    mOutputPortMime = C2PortMimeConfig::output::AllocUnique(strlen(MEDIA_MIMETYPE_VIDEO_RAW) + 1);
     strcpy(mOutputPortMime->m.value, MEDIA_MIMETYPE_VIDEO_RAW);
 
     mVideoSize.width = 320;
@@ -281,7 +281,7 @@ C2SoftAvcDecIntf::C2SoftAvcDecIntf(const char *name, c2_node_id_t id)
     mMaxVideoSizeHint.width = H264_MAX_FRAME_WIDTH;
     mMaxVideoSizeHint.height = H264_MAX_FRAME_HEIGHT;
 
-    mOutputBlockPools = C2PortBlockPoolsTuning::output::alloc_unique({});
+    mOutputBlockPools = C2PortBlockPoolsTuning::output::AllocUnique({});
 
     auto insertParam = [&params = mParams] (C2Param *param) {
         params[param->index()] = param;
@@ -1328,14 +1328,14 @@ class C2SoftAvcDecFactory : public C2ComponentFactory {
 public:
     virtual c2_status_t createComponent(
             c2_node_id_t id, std::shared_ptr<C2Component>* const component,
-            std::function<void(::android::C2Component*)> deleter) override {
+            std::function<void(::C2Component*)> deleter) override {
         *component = std::shared_ptr<C2Component>(new C2SoftAvcDec("avc", id), deleter);
         return C2_OK;
     }
 
     virtual c2_status_t createInterface(
             c2_node_id_t id, std::shared_ptr<C2ComponentInterface>* const interface,
-            std::function<void(::android::C2ComponentInterface*)> deleter) override {
+            std::function<void(::C2ComponentInterface*)> deleter) override {
         *interface =
               SimpleC2Interface::Builder("avc", id, deleter)
               .inputFormat(C2FormatCompressed)
@@ -1350,12 +1350,12 @@ public:
 
 }  // namespace android
 
-extern "C" ::android::C2ComponentFactory* CreateCodec2Factory() {
+extern "C" ::C2ComponentFactory* CreateCodec2Factory() {
     ALOGV("in %s", __func__);
     return new ::android::C2SoftAvcDecFactory();
 }
 
-extern "C" void DestroyCodec2Factory(::android::C2ComponentFactory* factory) {
+extern "C" void DestroyCodec2Factory(::C2ComponentFactory* factory) {
     ALOGV("in %s", __func__);
     delete factory;
 }
