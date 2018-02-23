@@ -25,4 +25,5 @@ LOCAL_STATIC_JAVA_LIBRARIES := \
     compatibility-device-util
 
 LOCAL_PACKAGE_NAME := MediaComponentsTest
+LOCAL_PRIVATE_PLATFORM_APIS := true
 include $(BUILD_PACKAGE)
