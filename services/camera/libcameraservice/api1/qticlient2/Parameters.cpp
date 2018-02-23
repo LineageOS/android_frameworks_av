@@ -554,7 +554,7 @@ status_t Parameters::initialize(const CameraMetadata *info, int deviceVersion,
             addComma = true;
             switch (availableSceneModes.data.u8[i]) {
                 case ANDROID_CONTROL_SCENE_MODE_DISABLED:
-                    noSceneModes = true;
+                    addComma = false;
                     break;
                 case ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY:
                     // Not in old API
