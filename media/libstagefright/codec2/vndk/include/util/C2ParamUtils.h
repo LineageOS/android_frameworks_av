@@ -62,7 +62,7 @@ private:
 
 #undef DEFINE_C2_ENUM_VALUE_AUTO_HELPER
 #define DEFINE_C2_ENUM_VALUE_AUTO_HELPER(name, type, prefix, ...) \
-template<> C2FieldDescriptor::named_values_type C2FieldDescriptor::namedValuesFor(const name &r __unused) { \
+template<> C2FieldDescriptor::NamedValuesType C2FieldDescriptor::namedValuesFor(const name &r __unused) { \
     return C2ParamUtils::sanitizeEnumValues( \
             std::vector<C2Value::Primitive> { _C2_MAP(_C2_GET_ENUM_VALUE, type, __VA_ARGS__) }, \
             { _C2_MAP(_C2_GET_ENUM_NAME, type, __VA_ARGS__) }, \
@@ -71,7 +71,7 @@ template<> C2FieldDescriptor::named_values_type C2FieldDescriptor::namedValuesFo
 
 #undef DEFINE_C2_ENUM_VALUE_CUSTOM_HELPER
 #define DEFINE_C2_ENUM_VALUE_CUSTOM_HELPER(name, type, names, ...) \
-template<> C2FieldDescriptor::named_values_type C2FieldDescriptor::namedValuesFor(const name &r __unused) { \
+template<> C2FieldDescriptor::NamedValuesType C2FieldDescriptor::namedValuesFor(const name &r __unused) { \
     return C2ParamUtils::customEnumValues( \
             std::vector<std::pair<C2StringLiteral, name>> names); \
 }
@@ -242,11 +242,11 @@ public:
     }
 
     template<typename T>
-    static C2FieldDescriptor::named_values_type sanitizeEnumValues(
+    static C2FieldDescriptor::NamedValuesType sanitizeEnumValues(
             std::vector<T> values,
             std::vector<C2StringLiteral> names,
             C2StringLiteral prefix = NULL) {
-        C2FieldDescriptor::named_values_type namedValues;
+        C2FieldDescriptor::NamedValuesType namedValues;
         std::vector<C2String> sanitizedNames = sanitizeEnumValueNames(names, prefix);
         for (size_t i = 0; i < values.size() && i < sanitizedNames.size(); ++i) {
             namedValues.emplace_back(sanitizedNames[i], values[i]);
@@ -255,9 +255,9 @@ public:
     }
 
     template<typename E>
-    static C2FieldDescriptor::named_values_type customEnumValues(
+    static C2FieldDescriptor::NamedValuesType customEnumValues(
             std::vector<std::pair<C2StringLiteral, E>> items) {
-        C2FieldDescriptor::named_values_type namedValues;
+        C2FieldDescriptor::NamedValuesType namedValues;
         for (auto &item : items) {
             namedValues.emplace_back(item.first, item.second);
         }

@@ -83,8 +83,5 @@ public:
     typedef void (*DestroyCodec2FactoryFunc)(::C2ComponentFactory*);
 };
 
-namespace android {
-    typedef ::C2ComponentFactory C2ComponentFactory;
-}
 
 #endif // STAGEFRIGHT_CODEC2_COMPONENT_FACTORY_H_

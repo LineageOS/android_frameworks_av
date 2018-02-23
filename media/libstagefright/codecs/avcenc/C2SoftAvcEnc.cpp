@@ -1044,7 +1044,7 @@ void C2SoftAvcEnc::process(
         mSpsPpsHeaderReceived = true;
 
         std::unique_ptr<C2StreamCsdInfo::output> csd =
-            C2StreamCsdInfo::output::alloc_unique(s_encode_op.s_out_buf.u4_bytes, 0u);
+            C2StreamCsdInfo::output::AllocUnique(s_encode_op.s_out_buf.u4_bytes, 0u);
         memcpy(csd->m.value, header, s_encode_op.s_out_buf.u4_bytes);
         work->worklets.front()->output.configUpdate.push_back(std::move(csd));
 
@@ -1210,14 +1210,14 @@ class C2SoftAvcEncFactory : public C2ComponentFactory {
 public:
     virtual c2_status_t createComponent(
             c2_node_id_t id, std::shared_ptr<C2Component>* const component,
-            std::function<void(::android::C2Component*)> deleter) override {
+            std::function<void(::C2Component*)> deleter) override {
         *component = std::shared_ptr<C2Component>(new C2SoftAvcEnc("avcenc", id), deleter);
         return C2_OK;
     }
 
     virtual c2_status_t createInterface(
             c2_node_id_t id, std::shared_ptr<C2ComponentInterface>* const interface,
-            std::function<void(::android::C2ComponentInterface*)> deleter) override {
+            std::function<void(::C2ComponentInterface*)> deleter) override {
         *interface =
               SimpleC2Interface::Builder("avcenc", id, deleter)
               .inputFormat(C2FormatVideo)
@@ -1231,12 +1231,12 @@ public:
 
 }  // namespace android
 
-extern "C" ::android::C2ComponentFactory* CreateCodec2Factory() {
+extern "C" ::C2ComponentFactory* CreateCodec2Factory() {
     ALOGV("in %s", __func__);
     return new ::android::C2SoftAvcEncFactory();
 }
 
-extern "C" void DestroyCodec2Factory(::android::C2ComponentFactory* factory) {
+extern "C" void DestroyCodec2Factory(::C2ComponentFactory* factory) {
     ALOGV("in %s", __func__);
     delete factory;
 }

@@ -38,23 +38,29 @@ struct C2FieldSupportedValuesQuery {
         CURRENT,  ///< query currently possible values given dependent settings
     };
 
-    const C2ParamField field;
-    const type_t type;
+private:
+    C2ParamField _mField;
+    type_t _mType;
+public:
     c2_status_t status;
     C2FieldSupportedValues values;
 
     C2FieldSupportedValuesQuery(const C2ParamField &field_, type_t type_)
-        : field(field_), type(type_), status(C2_NO_INIT) { }
+        : _mField(field_), _mType(type_), status(C2_NO_INIT) { }
 
-    static C2FieldSupportedValuesQuery&&
+    static C2FieldSupportedValuesQuery
     Current(const C2ParamField &field_) {
-        return std::move(C2FieldSupportedValuesQuery(field_, CURRENT));
+        return C2FieldSupportedValuesQuery(field_, CURRENT);
     }
 
-    static C2FieldSupportedValuesQuery&&
+    static C2FieldSupportedValuesQuery
     Possible(const C2ParamField &field_) {
-        return std::move(C2FieldSupportedValuesQuery(field_, POSSIBLE));
+        return C2FieldSupportedValuesQuery(field_, POSSIBLE);
     }
+
+    inline C2ParamField field() const { return _mField; };
+
+    inline type_t type() const { return _mType; }
 };
 
 /**
@@ -942,12 +948,5 @@ public:
 // ================================================================================================
 
 /// @}
-
-namespace android {
-    /// \deprecated
-    typedef ::C2Component C2Component;
-    /// \deprecated
-    typedef ::C2ComponentInterface C2ComponentInterface;
-}
 
 #endif  // C2COMPONENT_H_
