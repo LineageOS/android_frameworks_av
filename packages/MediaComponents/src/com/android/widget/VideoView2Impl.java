@@ -86,6 +86,7 @@ public class VideoView2Impl extends BaseLayout
     private static final int STATE_PLAYBACK_COMPLETED = 5;
 
     private static final int INVALID_TRACK_INDEX = -1;
+    private static final float INVALID_SPEED = 0f;
 
     private AccessibilityManager mAccessibilityManager;
     private AudioManager mAudioManager;
@@ -854,8 +855,6 @@ public class VideoView2Impl extends BaseLayout
         }
         if (select) {
             if (mSubtitleTrackIndices.size() > 0) {
-                // TODO: make this selection dynamic
-                mSelectedSubtitleTrackIndex = mSubtitleTrackIndices.get(0);
                 mMediaPlayer.selectTrack(mSelectedSubtitleTrackIndex);
                 mSubtitleView.setVisibility(View.VISIBLE);
             }
@@ -881,9 +880,17 @@ public class VideoView2Impl extends BaseLayout
                 mAudioTrackIndices.add(i);
             } else if (trackType == MediaPlayer2.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE
                     || trackType == MediaPlayer2.TrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT) {
-                  mSubtitleTrackIndices.add(i);
+                mSubtitleTrackIndices.add(i);
             }
         }
+        // Select first tracks as default
+        if (mVideoTrackIndices.size() > 0) {
+            mSelectedVideoTrackIndex = 0;
+        }
+        if (mAudioTrackIndices.size() > 0) {
+            mSelectedAudioTrackIndex = 0;
+        }
+
         Bundle data = new Bundle();
         data.putInt(MediaControlView2Impl.KEY_VIDEO_TRACK_COUNT, mVideoTrackIndices.size());
         data.putInt(MediaControlView2Impl.KEY_AUDIO_TRACK_COUNT, mAudioTrackIndices.size());
@@ -1048,16 +1055,44 @@ public class VideoView2Impl extends BaseLayout
             } else {
                 switch (command) {
                     case MediaControlView2Impl.COMMAND_SHOW_SUBTITLE:
-                        mInstance.setSubtitleEnabled(true);
+                        int subtitleIndex = args.getInt(
+                                MediaControlView2Impl.KEY_SELECTED_SUBTITLE_INDEX,
+                                INVALID_TRACK_INDEX);
+                        if (subtitleIndex != INVALID_TRACK_INDEX) {
+                            int subtitleTrackIndex = mSubtitleTrackIndices.get(subtitleIndex);
+                            if (subtitleTrackIndex != mSelectedSubtitleTrackIndex) {
+                                mSelectedSubtitleTrackIndex = subtitleTrackIndex;
+                                selectOrDeselectSubtitle(true);
+                            }
+                        }
                         break;
                     case MediaControlView2Impl.COMMAND_HIDE_SUBTITLE:
-                        mInstance.setSubtitleEnabled(false);
+                        selectOrDeselectSubtitle(false);
                         break;
                     case MediaControlView2Impl.COMMAND_SET_FULLSCREEN:
                         if (mFullScreenRequestListener != null) {
                             mFullScreenRequestListener.onFullScreenRequest(
                                     mInstance,
                                     args.getBoolean(MediaControlView2Impl.ARGUMENT_KEY_FULLSCREEN));
+                        }
+                        break;
+                    case MediaControlView2Impl.COMMAND_SELECT_AUDIO_TRACK:
+                        int audioIndex = args.getInt(MediaControlView2Impl.KEY_SELECTED_AUDIO_INDEX,
+                                INVALID_TRACK_INDEX);
+                        if (audioIndex != INVALID_TRACK_INDEX) {
+                            int audioTrackIndex = mAudioTrackIndices.get(audioIndex);
+                            if (audioTrackIndex != mSelectedAudioTrackIndex) {
+                                mSelectedAudioTrackIndex = audioTrackIndex;
+                                mMediaPlayer.selectTrack(mSelectedAudioTrackIndex);
+                            }
+                        }
+                        break;
+                    case MediaControlView2Impl.COMMAND_SET_PLAYBACK_SPEED:
+                        float speed = args.getFloat(
+                                MediaControlView2Impl.KEY_PLAYBACK_SPEED, INVALID_SPEED);
+                        if (speed != INVALID_SPEED && speed != mSpeed) {
+                            mInstance.setSpeed(speed);
+                            mSpeed = speed;
                         }
                         break;
                 }
