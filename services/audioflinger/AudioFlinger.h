@@ -27,6 +27,7 @@
 
 #include <android-base/macros.h>
 
+#include <cutils/atomic.h>
 #include <cutils/compiler.h>
 #include <cutils/properties.h>
 
@@ -39,7 +40,6 @@
 #include <media/MmapStreamInterface.h>
 #include <media/MmapStreamCallback.h>
 
-#include <utils/Atomic.h>
 #include <utils/Errors.h>
 #include <utils/threads.h>
 #include <utils/SortedVector.h>
