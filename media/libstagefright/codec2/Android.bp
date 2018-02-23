@@ -1,6 +1,9 @@
 cc_library_shared {
     name: "libstagefright_codec2",
     vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
 
     tags: [
         "optional",
