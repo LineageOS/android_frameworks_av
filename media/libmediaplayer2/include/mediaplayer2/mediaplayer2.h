@@ -77,11 +77,11 @@ public:
             status_t        getVideoWidth(int *w);
             status_t        getVideoHeight(int *h);
             status_t        seekTo(
-                    int msec,
+                    int64_t msec,
                     MediaPlayer2SeekMode mode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC);
             status_t        notifyAt(int64_t mediaTimeUs);
-            status_t        getCurrentPosition(int *msec);
-            status_t        getDuration(int *msec);
+            status_t        getCurrentPosition(int64_t *msec);
+            status_t        getDuration(int64_t *msec);
             status_t        reset();
             status_t        setAudioStreamType(audio_stream_type_t type);
             status_t        getAudioStreamType(audio_stream_type_t *type);
@@ -99,7 +99,6 @@ public:
             status_t        attachAuxEffect(int effectId);
             status_t        setParameter(int key, const Parcel& request);
             status_t        getParameter(int key, Parcel* reply);
-            status_t        setNextMediaPlayer(const sp<MediaPlayer2>& player);
 
             // Modular DRM
             status_t        prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId);
@@ -131,9 +130,9 @@ private:
     status_t setAudioAttributes_l(const Parcel &request);
 
     void clear_l();
-    status_t seekTo_l(int msec, MediaPlayer2SeekMode mode);
+    status_t seekTo_l(int64_t msec, MediaPlayer2SeekMode mode);
     status_t prepareAsync_l();
-    status_t getDuration_l(int *msec);
+    status_t getDuration_l(int64_t *msec);
     status_t reset_l();
     status_t checkStateForKeySet_l(int key);
 
@@ -147,9 +146,9 @@ private:
     Mutex                       mNotifyLock;
     sp<MediaPlayer2Listener>    mListener;
     media_player2_states        mCurrentState;
-    int                         mCurrentPosition;
+    int64_t                     mCurrentPosition;
     MediaPlayer2SeekMode        mCurrentSeekMode;
-    int                         mSeekPosition;
+    int64_t                     mSeekPosition;
     MediaPlayer2SeekMode        mSeekMode;
     audio_stream_type_t         mStreamType;
     Parcel*                     mAudioAttributesParcel;

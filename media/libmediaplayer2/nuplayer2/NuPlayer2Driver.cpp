@@ -354,7 +354,7 @@ status_t NuPlayer2Driver::pause() {
     // down for audio offload mode. If that happens, the NuPlayerRenderer will no longer know the
     // current position. So similar to seekTo, update |mPositionUs| to the pause position by calling
     // getCurrentPosition here.
-    int unused;
+    int64_t unused;
     getCurrentPosition(&unused);
 
     Mutex::Autolock autoLock(mLock);
@@ -384,7 +384,7 @@ status_t NuPlayer2Driver::setPlaybackSettings(const AudioPlaybackRate &rate) {
     status_t err = mPlayer->setPlaybackSettings(rate);
     if (err == OK) {
         // try to update position
-        int unused;
+        int64_t unused;
         getCurrentPosition(&unused);
         Mutex::Autolock autoLock(mLock);
         if (rate.mSpeed == 0.f && mState == STATE_RUNNING) {
@@ -411,8 +411,8 @@ status_t NuPlayer2Driver::getSyncSettings(AVSyncSettings *sync, float *videoFps)
     return mPlayer->getSyncSettings(sync, videoFps);
 }
 
-status_t NuPlayer2Driver::seekTo(int msec, MediaPlayer2SeekMode mode) {
-    ALOGD("seekTo(%p) (%d ms, %d) at state %d", this, msec, mode, mState);
+status_t NuPlayer2Driver::seekTo(int64_t msec, MediaPlayer2SeekMode mode) {
+    ALOGD("seekTo(%p) (%lld ms, %d) at state %d", this, (long long)msec, mode, mState);
     Mutex::Autolock autoLock(mLock);
 
     int64_t seekTimeUs = msec * 1000ll;
@@ -437,13 +437,13 @@ status_t NuPlayer2Driver::seekTo(int msec, MediaPlayer2SeekMode mode) {
     return OK;
 }
 
-status_t NuPlayer2Driver::getCurrentPosition(int *msec) {
+status_t NuPlayer2Driver::getCurrentPosition(int64_t *msec) {
     int64_t tempUs = 0;
     {
         Mutex::Autolock autoLock(mLock);
         if (mSeekInProgress || (mState == STATE_PAUSED && !mAtEOS)) {
             tempUs = (mPositionUs <= 0) ? 0 : mPositionUs;
-            *msec = (int)divRound(tempUs, (int64_t)(1000));
+            *msec = divRound(tempUs, (int64_t)(1000));
             return OK;
         }
     }
@@ -459,11 +459,11 @@ status_t NuPlayer2Driver::getCurrentPosition(int *msec) {
     } else {
         mPositionUs = tempUs;
     }
-    *msec = (int)divRound(tempUs, (int64_t)(1000));
+    *msec = divRound(tempUs, (int64_t)(1000));
     return OK;
 }
 
-status_t NuPlayer2Driver::getDuration(int *msec) {
+status_t NuPlayer2Driver::getDuration(int64_t *msec) {
     Mutex::Autolock autoLock(mLock);
 
     if (mDurationUs < 0) {
@@ -529,7 +529,7 @@ void NuPlayer2Driver::updateMetrics(const char *where) {
     // always provide duration and playing time, even if they have 0/unknown values.
 
     // getDuration() uses mLock for mutex -- careful where we use it.
-    int duration_ms = -1;
+    int64_t duration_ms = -1;
     getDuration(&duration_ms);
     mAnalyticsItem->setInt64(kPlayerDuration, duration_ms);
 
@@ -661,7 +661,7 @@ status_t NuPlayer2Driver::invoke(const Parcel &request, Parcel *reply) {
         case MEDIA_PLAYER2_INVOKE_ID_SELECT_TRACK:
         {
             int trackIndex = request.readInt32();
-            int msec = 0;
+            int64_t msec = 0;
             // getCurrentPosition should always return OK
             getCurrentPosition(&msec);
             return mPlayer->selectTrack(trackIndex, true /* select */, msec * 1000ll);

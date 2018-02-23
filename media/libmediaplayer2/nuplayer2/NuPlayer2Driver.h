@@ -50,9 +50,9 @@ struct NuPlayer2Driver : public MediaPlayer2Interface {
     virtual status_t setSyncSettings(const AVSyncSettings &sync, float videoFpsHint);
     virtual status_t getSyncSettings(AVSyncSettings *sync, float *videoFps);
     virtual status_t seekTo(
-            int msec, MediaPlayer2SeekMode mode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC);
-    virtual status_t getCurrentPosition(int *msec);
-    virtual status_t getDuration(int *msec);
+            int64_t msec, MediaPlayer2SeekMode mode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC);
+    virtual status_t getCurrentPosition(int64_t *msec);
+    virtual status_t getDuration(int64_t *msec);
     virtual status_t reset();
     virtual status_t notifyAt(int64_t mediaTimeUs) override;
     virtual status_t setLooping(int loop);

@@ -200,9 +200,9 @@ public:
         return OK;
     }
     virtual status_t seekTo(
-            int msec, MediaPlayer2SeekMode mode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC) = 0;
-    virtual status_t getCurrentPosition(int *msec) = 0;
-    virtual status_t getDuration(int *msec) = 0;
+            int64_t msec, MediaPlayer2SeekMode mode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC) = 0;
+    virtual status_t getCurrentPosition(int64_t *msec) = 0;
+    virtual status_t getDuration(int64_t *msec) = 0;
     virtual status_t reset() = 0;
     virtual status_t notifyAt(int64_t /* mediaTimeUs */) {
         return INVALID_OPERATION;
