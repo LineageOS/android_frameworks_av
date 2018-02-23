@@ -4573,11 +4573,6 @@ typedef enum acamera_metadata_tag {
      *   <li>ACaptureRequest</li>
      * </ul></p>
      *
-     * <p>When set to ON,
-     * ACAMERA_STATISTICS_OIS_TIMESTAMPS, android.statistics.oisShiftPixelX,
-     * and android.statistics.oisShiftPixelY provide OIS data in the output result metadata.</p>
-     *
-     * @see ACAMERA_STATISTICS_OIS_TIMESTAMPS
      */
     ACAMERA_STATISTICS_OIS_DATA_MODE =                          // byte (acamera_metadata_enum_android_statistics_ois_data_mode_t)
             ACAMERA_STATISTICS_START + 17,
@@ -4610,7 +4605,7 @@ typedef enum acamera_metadata_tag {
      *
      * <p>The array contains the amount of shifts in x direction, in pixels, based on OIS samples.
      * A positive value is a shift from left to right in active array coordinate system. For
-     * example, if the optical center is (1000, 500) in active array coordinates, an shift of
+     * example, if the optical center is (1000, 500) in active array coordinates, a shift of
      * (3, 0) puts the new optical center at (1003, 500).</p>
      * <p>The number of shifts must match the number of timestamps in
      * ACAMERA_STATISTICS_OIS_TIMESTAMPS.</p>
@@ -4631,7 +4626,7 @@ typedef enum acamera_metadata_tag {
      *
      * <p>The array contains the amount of shifts in y direction, in pixels, based on OIS samples.
      * A positive value is a shift from top to bottom in active array coordinate system. For
-     * example, if the optical center is (1000, 500) in active array coordinates, an shift of
+     * example, if the optical center is (1000, 500) in active array coordinates, a shift of
      * (0, 5) puts the new optical center at (1000, 505).</p>
      * <p>The number of shifts must match the number of timestamps in
      * ACAMERA_STATISTICS_OIS_TIMESTAMPS.</p>
@@ -7370,6 +7365,12 @@ typedef enum acamera_metadata_enum_acamera_statistics_ois_data_mode {
 
     /**
      * <p>Include OIS data in the capture result.</p>
+     * <p>ACAMERA_STATISTICS_OIS_TIMESTAMPS, ACAMERA_STATISTICS_OIS_X_SHIFTS,
+     * and ACAMERA_STATISTICS_OIS_Y_SHIFTS provide OIS data in the output result metadata.</p>
+     *
+     * @see ACAMERA_STATISTICS_OIS_TIMESTAMPS
+     * @see ACAMERA_STATISTICS_OIS_X_SHIFTS
+     * @see ACAMERA_STATISTICS_OIS_Y_SHIFTS
      */
     ACAMERA_STATISTICS_OIS_DATA_MODE_ON                              = 1,
 
