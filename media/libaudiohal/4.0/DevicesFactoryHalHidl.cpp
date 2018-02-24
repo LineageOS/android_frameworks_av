@@ -52,36 +52,11 @@ DevicesFactoryHalHidl::DevicesFactoryHalHidl() {
 DevicesFactoryHalHidl::~DevicesFactoryHalHidl() {
 }
 
-// static
-status_t DevicesFactoryHalHidl::nameFromHal(const char *name, IDevicesFactory::Device *device) {
-    if (strcmp(name, AUDIO_HARDWARE_MODULE_ID_PRIMARY) == 0) {
-        *device = IDevicesFactory::Device::PRIMARY;
-        return OK;
-    } else if(strcmp(name, AUDIO_HARDWARE_MODULE_ID_A2DP) == 0) {
-        *device = IDevicesFactory::Device::A2DP;
-        return OK;
-    } else if(strcmp(name, AUDIO_HARDWARE_MODULE_ID_USB) == 0) {
-        *device = IDevicesFactory::Device::USB;
-        return OK;
-    } else if(strcmp(name, AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX) == 0) {
-        *device = IDevicesFactory::Device::R_SUBMIX;
-        return OK;
-    } else if(strcmp(name, AUDIO_HARDWARE_MODULE_ID_STUB) == 0) {
-        *device = IDevicesFactory::Device::STUB;
-        return OK;
-    }
-    ALOGE("Invalid device name %s", name);
-    return BAD_VALUE;
-}
-
 status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterface> *device) {
     if (mDevicesFactory == 0) return NO_INIT;
-    IDevicesFactory::Device hidlDevice;
-    status_t status = nameFromHal(name, &hidlDevice);
-    if (status != OK) return status;
     Result retval = Result::NOT_INITIALIZED;
     Return<void> ret = mDevicesFactory->openDevice(
-            hidlDevice,
+            name,
             [&](Result r, const sp<IDevice>& result) {
                 retval = r;
                 if (retval == Result::OK) {

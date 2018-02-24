@@ -17,7 +17,7 @@
 #define LOG_TAG "DevicesFactoryHalHybrid"
 //#define LOG_NDEBUG 0
 
-#include "DevicesFactoryHalHybrid.h"
+#include <libaudiohal/4.0/DevicesFactoryHalHybrid.h>
 #include "DevicesFactoryHalLocal.h"
 #include "DevicesFactoryHalHidl.h"
 
