@@ -24,6 +24,7 @@
 
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
+#include <media/TimeCheck.h>
 #include <private/android_filesystem_config.h>
 
 #include "IAudioFlinger.h"
@@ -932,6 +933,8 @@ status_t BnAudioFlinger::onTransact(
         default:
             break;
     }
+
+    TimeCheck check("IAudioFlinger");
 
     switch (code) {
         case CREATE_TRACK: {
