@@ -18,11 +18,11 @@
 //#define LOG_NDEBUG 0
 
 #include <cutils/native_handle.h>
+#include <libaudiohal/4.0/EffectsFactoryHalHidl.h>
 
 #include "ConversionHelperHidl.h"
 #include "EffectBufferHalHidl.h"
 #include "EffectHalHidl.h"
-#include "EffectsFactoryHalHidl.h"
 #include "HidlUtils.h"
 
 using ::android::hardware::audio::common::V4_0::HidlUtils;
@@ -133,7 +133,7 @@ status_t EffectsFactoryHalHidl::dumpEffects(int fd) {
     if (mEffectsFactory == 0) return NO_INIT;
     native_handle_t* hidlHandle = native_handle_create(1, 0);
     hidlHandle->data[0] = fd;
-    Return<void> ret = mEffectsFactory->debugDump(hidlHandle);
+    Return<void> ret = mEffectsFactory->debug(hidlHandle, {} /* options */);
     native_handle_delete(hidlHandle);
     return processReturn(__FUNCTION__, ret);
 }
