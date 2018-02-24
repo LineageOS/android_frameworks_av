@@ -29,6 +29,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/MediaDefs.h>
+#include <media/stagefright/Codec2InfoBuilder.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/OmxInfoBuilder.h>
@@ -77,6 +78,15 @@ bool isProfilingNeeded() {
 }
 
 OmxInfoBuilder sOmxInfoBuilder;
+Codec2InfoBuilder sCodec2InfoBuilder;
+
+std::initializer_list<MediaCodecListBuilderBase *> GetBuilders() {
+    if (property_get_bool("debug.stagefright.ccodec", false)) {
+        return {&sOmxInfoBuilder, &sCodec2InfoBuilder};
+    } else {
+        return {&sOmxInfoBuilder};
+    }
+}
 
 }  // unnamed namespace
 
@@ -88,7 +98,7 @@ void *MediaCodecList::profilerThreadWrapper(void * /*arg*/) {
     ALOGV("Enter profilerThreadWrapper.");
     remove(kProfilingResults);  // remove previous result so that it won't be loaded to
                                 // the new MediaCodecList
-    sp<MediaCodecList> codecList(new MediaCodecList(&sOmxInfoBuilder));
+    sp<MediaCodecList> codecList(new MediaCodecList(GetBuilders()));
     if (codecList->initCheck() != OK) {
         ALOGW("Failed to create a new MediaCodecList, skipping codec profiling.");
         return nullptr;
@@ -98,7 +108,7 @@ void *MediaCodecList::profilerThreadWrapper(void * /*arg*/) {
     ALOGV("Codec profiling started.");
     profileCodecs(infos, kProfilingResults);
     ALOGV("Codec profiling completed.");
-    codecList = new MediaCodecList(&sOmxInfoBuilder);
+    codecList = new MediaCodecList(GetBuilders());
     if (codecList->initCheck() != OK) {
         ALOGW("Failed to parse profiling results.");
         return nullptr;
@@ -116,7 +126,7 @@ sp<IMediaCodecList> MediaCodecList::getLocalInstance() {
     Mutex::Autolock autoLock(sInitMutex);
 
     if (sCodecList == nullptr) {
-        MediaCodecList *codecList = new MediaCodecList(&sOmxInfoBuilder);
+        MediaCodecList *codecList = new MediaCodecList(GetBuilders());
         if (codecList->initCheck() == OK) {
             sCodecList = codecList;
 
@@ -169,11 +179,28 @@ sp<IMediaCodecList> MediaCodecList::getInstance() {
     return sRemoteList;
 }
 
-MediaCodecList::MediaCodecList(MediaCodecListBuilderBase* builder) {
+MediaCodecList::MediaCodecList(std::initializer_list<MediaCodecListBuilderBase*> builders) {
     mGlobalSettings = new AMessage();
     mCodecInfos.clear();
     MediaCodecListWriter writer(this);
-    mInitCheck = builder->buildMediaCodecList(&writer);
+    for (MediaCodecListBuilderBase *builder : builders) {
+        mInitCheck = builder->buildMediaCodecList(&writer);
+        if (mInitCheck != OK) {
+            break;
+        }
+    }
+    std::stable_sort(
+            mCodecInfos.begin(),
+            mCodecInfos.end(),
+            [](const sp<MediaCodecInfo> &info1, const sp<MediaCodecInfo> &info2) {
+                if (info2 == nullptr) {
+                    return false;
+                } else if (info1 == nullptr) {
+                    return true;
+                } else {
+                    return info1->rank() < info2->rank();
+                }
+            });
 }
 
 MediaCodecList::~MediaCodecList() {

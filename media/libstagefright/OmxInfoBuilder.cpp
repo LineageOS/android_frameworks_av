@@ -154,22 +154,22 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
     // codec name -> index into swCodecs/hwCodecs
     std::map<hidl_string, std::unique_ptr<MediaCodecInfoWriter>>
             swCodecName2Info, hwCodecName2Info;
-    // owner name -> MediaCodecInfo
-    // This map will be used to obtain the correct IOmx service(s) needed for
-    // creating IOmxNode instances and querying capabilities.
-    std::map<std::string, std::vector<sp<MediaCodecInfo> > >
-            owner2CodecInfo;
 
-    for (const auto& role : roles) {
-        const auto& typeName = role.type;
+    char rank[PROPERTY_VALUE_MAX];
+    uint32_t defaultRank = 0x100;
+    if (property_get("debug.stagefright.omx_default_rank", rank, nullptr)) {
+        defaultRank = std::strtoul(rank, nullptr, 10);
+    }
+    for (const IOmxStore::RoleInfo& role : roles) {
+        const hidl_string& typeName = role.type;
         bool isEncoder = role.isEncoder;
         bool preferPlatformNodes = role.preferPlatformNodes;
         // If preferPlatformNodes is true, hardware nodes must be added after
         // platform (software) nodes. hwCodecs is used to hold hardware nodes
         // that need to be added after software nodes for the same role.
         std::vector<const IOmxStore::NodeInfo*> hwCodecs;
-        for (const auto& node : role.nodes) {
-            const auto& nodeName = node.name;
+        for (const IOmxStore::NodeInfo& node : role.nodes) {
+            const hidl_string& nodeName = node.name;
             bool isSoftware = hasPrefix(nodeName, "OMX.google");
             MediaCodecInfoWriter* info;
             if (isSoftware) {
@@ -182,6 +182,7 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                     info->setName(nodeName.c_str());
                     info->setOwner(node.owner.c_str());
                     info->setEncoder(isEncoder);
+                    info->setRank(defaultRank);
                 } else {
                     // The node has been seen before. Simply retrieve the
                     // existing MediaCodecInfoWriter.
@@ -198,6 +199,7 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                         info->setName(nodeName.c_str());
                         info->setOwner(node.owner.c_str());
                         info->setEncoder(isEncoder);
+                        info->setRank(defaultRank);
                     } else {
                         // If preferPlatformNodes is true, this node must be
                         // added after all software nodes.
@@ -224,9 +226,9 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
         // added in the loop above, but rather saved in hwCodecs. They are
         // going to be added here.
         if (preferPlatformNodes) {
-            for (const auto& node : hwCodecs) {
+            for (const IOmxStore::NodeInfo *node : hwCodecs) {
                 MediaCodecInfoWriter* info;
-                const auto& nodeName = node->name;
+                const hidl_string& nodeName = node->name;
                 auto c2i = hwCodecName2Info.find(nodeName);
                 if (c2i == hwCodecName2Info.end()) {
                     // Create a new MediaCodecInfo for a new node.
@@ -236,6 +238,7 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                     info->setName(nodeName.c_str());
                     info->setOwner(node->owner.c_str());
                     info->setEncoder(isEncoder);
+                    info->setRank(defaultRank);
                 } else {
                     // The node has been seen before. Simply retrieve the
                     // existing MediaCodecInfoWriter.

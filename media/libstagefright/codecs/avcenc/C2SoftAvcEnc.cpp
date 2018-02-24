@@ -35,7 +35,9 @@
 
 namespace android {
 
-#define ive_api_function ih264e_api_function
+#define ive_api_function  ih264e_api_function
+
+constexpr char kComponentName[] = "c2.google.avc.encoder";
 
 namespace {
 
@@ -53,6 +55,18 @@ static size_t GetCPUCoreCount() {
     CHECK(cpuCoreCount >= 1);
     ALOGV("Number of CPU cores: %ld", cpuCoreCount);
     return (size_t)cpuCoreCount;
+}
+
+std::shared_ptr<C2ComponentInterface> BuildIntf(
+        const char *name, c2_node_id_t id,
+        std::function<void(C2ComponentInterface*)> deleter =
+            std::default_delete<C2ComponentInterface>()) {
+    return SimpleC2Interface::Builder(name, id, deleter)
+            .inputFormat(C2FormatVideo)
+            .outputFormat(C2FormatCompressed)
+            .inputMediaType(MEDIA_MIMETYPE_VIDEO_RAW)
+            .outputMediaType(MEDIA_MIMETYPE_VIDEO_AVC)
+            .build();
 }
 
 void ConvertRGBToPlanarYUV(
@@ -115,11 +129,7 @@ void ConvertRGBToPlanarYUV(
 }  // namespace
 
 C2SoftAvcEnc::C2SoftAvcEnc(const char *name, c2_node_id_t id)
-    : SimpleC2Component(
-          SimpleC2Interface::Builder(name, id)
-          .inputFormat(C2FormatVideo)
-          .outputFormat(C2FormatCompressed)
-          .build()),
+    : SimpleC2Component(BuildIntf(name, id)),
       mUpdateFlag(0),
       mIvVideoColorFormat(IV_YUV_420P),
       mAVCEncProfile(IV_PROFILE_BASE),
@@ -1209,20 +1219,18 @@ c2_status_t C2SoftAvcEnc::drain(
 class C2SoftAvcEncFactory : public C2ComponentFactory {
 public:
     virtual c2_status_t createComponent(
-            c2_node_id_t id, std::shared_ptr<C2Component>* const component,
-            std::function<void(::C2Component*)> deleter) override {
-        *component = std::shared_ptr<C2Component>(new C2SoftAvcEnc("avcenc", id), deleter);
+            c2_node_id_t id,
+            std::shared_ptr<C2Component>* const component,
+            std::function<void(C2Component*)> deleter) override {
+        *component = std::shared_ptr<C2Component>(new C2SoftAvcEnc(kComponentName, id), deleter);
         return C2_OK;
     }
 
     virtual c2_status_t createInterface(
-            c2_node_id_t id, std::shared_ptr<C2ComponentInterface>* const interface,
-            std::function<void(::C2ComponentInterface*)> deleter) override {
-        *interface =
-              SimpleC2Interface::Builder("avcenc", id, deleter)
-              .inputFormat(C2FormatVideo)
-              .outputFormat(C2FormatCompressed)
-              .build();
+            c2_node_id_t id,
+            std::shared_ptr<C2ComponentInterface>* const interface,
+            std::function<void(C2ComponentInterface*)> deleter) override {
+        *interface = BuildIntf(kComponentName, id, deleter);
         return C2_OK;
     }
 

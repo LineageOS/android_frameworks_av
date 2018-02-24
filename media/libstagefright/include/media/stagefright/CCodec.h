@@ -83,7 +83,7 @@ private:
     void setInputSurface(const sp<PersistentSurface> &surface);
     status_t setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &surface);
 
-    void setDeadline(const TimePoint &deadline);
+    void setDeadline(const TimePoint &deadline, const char *name);
 
     enum {
         kWhatAllocate,
@@ -126,10 +126,25 @@ private:
         sp<AMessage> outputFormat;
     };
 
+    struct NamedTimePoint {
+        inline void set(
+                const TimePoint &timePoint,
+                const char *name) {
+            mTimePoint = timePoint;
+            mName = name;
+        }
+
+        inline TimePoint get() const { return mTimePoint; }
+        inline const char *getName() const { return mName; }
+    private:
+        TimePoint mTimePoint;
+        const char *mName;
+    };
+
     Mutexed<State> mState;
     std::shared_ptr<CCodecBufferChannel> mChannel;
     std::shared_ptr<C2Component::Listener> mListener;
-    Mutexed<TimePoint> mDeadline;
+    Mutexed<NamedTimePoint> mDeadline;
     Mutexed<Formats> mFormats;
     Mutexed<std::list<std::unique_ptr<C2Work>>> mWorkDoneQueue;
 
