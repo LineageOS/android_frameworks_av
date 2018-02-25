@@ -18,13 +18,12 @@
 #define LOG_TAG "C2Buffer"
 #include <utils/Log.h>
 
+#include <list>
 #include <map>
 #include <mutex>
 
 #include <C2BufferPriv.h>
 #include <C2BlockInternal.h>
-
-namespace android {
 
 namespace {
 
@@ -34,63 +33,63 @@ namespace {
 // Inherit from the parent, share with the friend.
 class ReadViewBuddy : public C2ReadView {
     using C2ReadView::C2ReadView;
-    friend class ::android::C2ConstLinearBlock;
+    friend class ::C2ConstLinearBlock;
 };
 
 class WriteViewBuddy : public C2WriteView {
     using C2WriteView::C2WriteView;
-    friend class ::android::C2LinearBlock;
+    friend class ::C2LinearBlock;
 };
 
 class ConstLinearBlockBuddy : public C2ConstLinearBlock {
     using C2ConstLinearBlock::C2ConstLinearBlock;
-    friend class ::android::C2LinearBlock;
+    friend class ::C2LinearBlock;
 };
 
 class LinearBlockBuddy : public C2LinearBlock {
     using C2LinearBlock::C2LinearBlock;
-    friend class ::android::C2BasicLinearBlockPool;
+    friend class ::C2BasicLinearBlockPool;
 };
 
 class AcquirableReadViewBuddy : public C2Acquirable<C2ReadView> {
     using C2Acquirable::C2Acquirable;
-    friend class ::android::C2ConstLinearBlock;
+    friend class ::C2ConstLinearBlock;
 };
 
 class AcquirableWriteViewBuddy : public C2Acquirable<C2WriteView> {
     using C2Acquirable::C2Acquirable;
-    friend class ::android::C2LinearBlock;
+    friend class ::C2LinearBlock;
 };
 
 class GraphicViewBuddy : public C2GraphicView {
     using C2GraphicView::C2GraphicView;
-    friend class ::android::C2ConstGraphicBlock;
-    friend class ::android::C2GraphicBlock;
+    friend class ::C2ConstGraphicBlock;
+    friend class ::C2GraphicBlock;
 };
 
 class AcquirableConstGraphicViewBuddy : public C2Acquirable<const C2GraphicView> {
     using C2Acquirable::C2Acquirable;
-    friend class ::android::C2ConstGraphicBlock;
+    friend class ::C2ConstGraphicBlock;
 };
 
 class AcquirableGraphicViewBuddy : public C2Acquirable<C2GraphicView> {
     using C2Acquirable::C2Acquirable;
-    friend class ::android::C2GraphicBlock;
+    friend class ::C2GraphicBlock;
 };
 
 class ConstGraphicBlockBuddy : public C2ConstGraphicBlock {
     using C2ConstGraphicBlock::C2ConstGraphicBlock;
-    friend class ::android::C2GraphicBlock;
+    friend class ::C2GraphicBlock;
 };
 
 class GraphicBlockBuddy : public C2GraphicBlock {
     using C2GraphicBlock::C2GraphicBlock;
-    friend class ::android::C2BasicGraphicBlockPool;
+    friend class ::C2BasicGraphicBlockPool;
 };
 
 class BufferDataBuddy : public C2BufferData {
     using C2BufferData::C2BufferData;
-    friend class ::android::C2Buffer;
+    friend class ::C2Buffer;
 };
 
 }  // namespace
@@ -415,6 +414,7 @@ public:
             if (mError != C2_OK) {
                 memset(&mLayout, 0, sizeof(mLayout));
                 memset(mData, 0, sizeof(mData));
+                memset(mOffsetData, 0, sizeof(mData));
             } else {
                 // TODO: validate plane layout and
                 // adjust data pointers to the crop region's top left corner.
@@ -425,14 +425,16 @@ public:
                     if (crop.left % colSampling || crop.right() % colSampling
                             || crop.top % rowSampling || crop.bottom() % rowSampling) {
                         // cannot calculate data pointer
-                        mImpl->getAllocation()->unmap(nullptr);
+                        mImpl->getAllocation()->unmap(mData, crop, nullptr);
                         memset(&mLayout, 0, sizeof(mLayout));
                         memset(mData, 0, sizeof(mData));
+                        memset(mOffsetData, 0, sizeof(mData));
                         mError = C2_BAD_VALUE;
                         return;
                     }
-                    mData[planeIx] += (ssize_t)crop.left * mLayout.planes[planeIx].colInc
-                            + (ssize_t)crop.top * mLayout.planes[planeIx].rowInc;
+                    mOffsetData[planeIx] =
+                        mData[planeIx] + (ssize_t)crop.left * mLayout.planes[planeIx].colInc
+                                + (ssize_t)crop.top * mLayout.planes[planeIx].rowInc;
                 }
             }
         }
@@ -442,12 +444,13 @@ public:
             // CHECK(error != C2_OK);
             memset(&mLayout, 0, sizeof(mLayout));
             memset(mData, 0, sizeof(mData));
+            memset(mOffsetData, 0, sizeof(mData));
         }
 
     public:
         ~Mapped() {
             if (mData[0] != nullptr) {
-                mImpl->getAllocation()->unmap(nullptr);
+                mImpl->getAllocation()->unmap(mData, mImpl->crop(), nullptr);
             }
         }
 
@@ -455,7 +458,7 @@ public:
         c2_status_t error() const { return mError; }
 
         /** returns data pointer */
-        uint8_t *const *data() const { return mData; }
+        uint8_t *const *data() const { return mOffsetData; }
 
         /** returns the plane layout */
         C2PlanarLayout layout() const { return mLayout; }
@@ -468,6 +471,7 @@ public:
         bool mWritable;
         c2_status_t mError;
         uint8_t *mData[C2PlanarLayout::MAX_NUM_PLANES];
+        uint8_t *mOffsetData[C2PlanarLayout::MAX_NUM_PLANES];
         C2PlanarLayout mLayout;
     };
 
@@ -803,4 +807,3 @@ std::shared_ptr<C2Buffer> C2Buffer::CreateGraphicBuffer(const C2ConstGraphicBloc
     return std::shared_ptr<C2Buffer>(new C2Buffer({ block }));
 }
 
-} // namespace android

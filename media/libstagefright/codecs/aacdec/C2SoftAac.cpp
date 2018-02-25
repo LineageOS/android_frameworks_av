@@ -25,6 +25,7 @@
 
 #include <cutils/properties.h>
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaErrors.h>
 #include <utils/misc.h>
@@ -50,12 +51,22 @@
 
 namespace android {
 
-C2SoftAac::C2SoftAac(const char *name, c2_node_id_t id)
-    : SimpleC2Component(
-            SimpleC2Interface::Builder(name, id)
+constexpr char kComponentName[] = "c2.google.aac.decoder";
+
+static std::shared_ptr<C2ComponentInterface> BuildIntf(
+        const char *name, c2_node_id_t id,
+        std::function<void(C2ComponentInterface*)> deleter =
+            std::default_delete<C2ComponentInterface>()) {
+    return SimpleC2Interface::Builder(name, id, deleter)
             .inputFormat(C2FormatCompressed)
             .outputFormat(C2FormatAudio)
-            .build()),
+            .inputMediaType(MEDIA_MIMETYPE_AUDIO_AAC)
+            .outputMediaType(MEDIA_MIMETYPE_AUDIO_RAW)
+            .build();
+}
+
+C2SoftAac::C2SoftAac(const char *name, c2_node_id_t id)
+    : SimpleC2Component(BuildIntf(name, id)),
       mAACDecoder(NULL),
       mStreamInfo(NULL),
       mIsADTS(false),
@@ -333,6 +344,7 @@ void C2SoftAac::process(
         const std::unique_ptr<C2Work> &work,
         const std::shared_ptr<C2BlockPool> &pool) {
     work->workletsProcessed = 0u;
+    work->result = C2_OK;
     if (mSignalledError) {
         return;
     }
@@ -675,20 +687,18 @@ void C2SoftAac::drainDecoder() {
 class C2SoftAacDecFactory : public C2ComponentFactory {
 public:
     virtual c2_status_t createComponent(
-            c2_node_id_t id, std::shared_ptr<C2Component>* const component,
-            std::function<void(::android::C2Component*)> deleter) override {
-        *component = std::shared_ptr<C2Component>(new C2SoftAac("aac", id), deleter);
+            c2_node_id_t id,
+            std::shared_ptr<C2Component>* const component,
+            std::function<void(C2Component*)> deleter) override {
+        *component = std::shared_ptr<C2Component>(new C2SoftAac(kComponentName, id), deleter);
         return C2_OK;
     }
 
     virtual c2_status_t createInterface(
-            c2_node_id_t id, std::shared_ptr<C2ComponentInterface>* const interface,
-            std::function<void(::android::C2ComponentInterface*)> deleter) override {
-        *interface =
-                SimpleC2Interface::Builder("aac", id, deleter)
-                .inputFormat(C2FormatCompressed)
-                .outputFormat(C2FormatVideo)
-                .build();
+            c2_node_id_t id,
+            std::shared_ptr<C2ComponentInterface>* const interface,
+            std::function<void(C2ComponentInterface*)> deleter) override {
+        *interface = BuildIntf(kComponentName, id, deleter);
         return C2_OK;
     }
 
@@ -697,12 +707,12 @@ public:
 
 }  // namespace android
 
-extern "C" ::android::C2ComponentFactory* CreateCodec2Factory() {
+extern "C" ::C2ComponentFactory* CreateCodec2Factory() {
     ALOGV("in %s", __func__);
     return new ::android::C2SoftAacDecFactory();
 }
 
-extern "C" void DestroyCodec2Factory(::android::C2ComponentFactory* factory) {
+extern "C" void DestroyCodec2Factory(::C2ComponentFactory* factory) {
     ALOGV("in %s", __func__);
     delete factory;
 }

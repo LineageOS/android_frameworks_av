@@ -136,13 +136,13 @@ c2_status_t GetCodec2BlockPool(
     switch (id) {
     case C2BlockPool::BASIC_LINEAR:
         res = allocatorStore->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &allocator);
-        if (res == OK) {
+        if (res == C2_OK) {
             *pool = std::make_shared<C2BasicLinearBlockPool>(allocator);
         }
         break;
     case C2BlockPool::BASIC_GRAPHIC:
         res = allocatorStore->fetchAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &allocator);
-        if (res == OK) {
+        if (res == C2_OK) {
             *pool = std::make_shared<C2BasicGraphicBlockPool>(allocator);
         }
         break;
@@ -203,9 +203,17 @@ private:
         /**
          * Creates an uninitialized component module.
          *
+         * \param name[in]  component name.
+         *
          * \note Only used by ComponentLoader.
          */
-        ComponentModule() : mInit(C2_NO_INIT) {}
+        ComponentModule()
+            : mInit(C2_NO_INIT),
+              mLibHandle(nullptr),
+              createFactory(nullptr),
+              destroyFactory(nullptr),
+              mComponentFactory(nullptr) {
+        }
 
         /**
          * Initializes a component module with a given library path. Must be called exactly once.
@@ -345,7 +353,7 @@ C2PlatformComponentStore::ComponentModule::~ComponentModule() {
 
 c2_status_t C2PlatformComponentStore::ComponentModule::createInterface(
         c2_node_id_t id, std::shared_ptr<C2ComponentInterface> *interface,
-        std::function<void(::android::C2ComponentInterface*)> deleter) {
+        std::function<void(::C2ComponentInterface*)> deleter) {
     interface->reset();
     if (mInit != C2_OK) {
         return mInit;
@@ -362,7 +370,7 @@ c2_status_t C2PlatformComponentStore::ComponentModule::createInterface(
 
 c2_status_t C2PlatformComponentStore::ComponentModule::createComponent(
         c2_node_id_t id, std::shared_ptr<C2Component> *component,
-        std::function<void(::android::C2Component*)> deleter) {
+        std::function<void(::C2Component*)> deleter) {
     component->reset();
     if (mInit != C2_OK) {
         return mInit;
@@ -383,12 +391,35 @@ std::shared_ptr<const C2Component::Traits> C2PlatformComponentStore::ComponentMo
         std::shared_ptr<C2ComponentInterface> intf;
         c2_status_t res = createInterface(0, &intf);
         if (res != C2_OK) {
+            ALOGD("failed to create interface: %d", res);
             return nullptr;
         }
 
         std::shared_ptr<C2Component::Traits> traits(new (std::nothrow) C2Component::Traits);
         if (traits) {
-            // traits->name = intf->getName();
+            traits->name = intf->getName();
+            // TODO: get this from interface properly.
+            bool encoder = (traits->name.find("encoder") != std::string::npos);
+            uint32_t mediaTypeIndex = encoder ? C2PortMimeConfig::output::PARAM_TYPE
+                    : C2PortMimeConfig::input::PARAM_TYPE;
+            std::vector<std::unique_ptr<C2Param>> params;
+            res = intf->query_vb({}, { mediaTypeIndex }, C2_MAY_BLOCK, &params);
+            if (res != C2_OK) {
+                ALOGD("failed to query interface: %d", res);
+                return nullptr;
+            }
+            if (params.size() != 1u) {
+                ALOGD("failed to query interface: unexpected vector size: %zu", params.size());
+                return nullptr;
+            }
+            C2PortMimeConfig *mediaTypeConfig = (C2PortMimeConfig *)(params[0].get());
+            if (mediaTypeConfig == nullptr) {
+                ALOGD("failed to query media type");
+                return nullptr;
+            }
+            traits->mediaType = mediaTypeConfig->m.value;
+            // TODO: get this properly.
+            traits->rank = 0x200;
         }
 
         mTraits = traits;

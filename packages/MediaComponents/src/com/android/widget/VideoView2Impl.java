@@ -27,6 +27,7 @@ import android.media.MediaPlayer;
 import android.media.MediaPlayerInterface;
 import android.media.Cea708CaptionRenderer;
 import android.media.ClosedCaptionRenderer;
+import android.media.MediaMetadata2;
 import android.media.Metadata;
 import android.media.PlaybackParams;
 import android.media.SRTRenderer;
@@ -107,6 +108,9 @@ public class VideoView2Impl extends BaseLayout
     private MediaRouter mMediaRouter;
     private MediaRouteSelector mRouteSelector;
     private Metadata mMetadata;
+    private MediaMetadata2 mMediaMetadata;
+    private boolean mNeedUpdateMediaType;
+    private Bundle mMediaTypeData;
     private String mTitle;
 
     private PlaybackState.Builder mStateBuilder;
@@ -232,6 +236,32 @@ public class VideoView2Impl extends BaseLayout
     @Override
     public MediaControlView2 getMediaControlView2_impl() {
         return mMediaControlView;
+    }
+
+    @Override
+    public MediaMetadata2 getMediaMetadata_impl() {
+        return mMediaMetadata;
+    }
+
+    @Override
+    public void setMediaMetadata_impl(MediaMetadata2 metadata) {
+        // TODO: integrate this with MediaSession2#MediaItem2
+        mMediaMetadata = metadata;
+
+        // TODO: add support for handling website link
+        mMediaTypeData = new Bundle();
+        boolean isAd = metadata == null ?
+                false : metadata.getLong(MediaMetadata2.METADATA_KEY_ADVERTISEMENT) != 0;
+        mMediaTypeData.putBoolean(
+                MediaControlView2Impl.KEY_STATE_IS_ADVERTISEMENT, isAd);
+
+        if (mMediaSession != null) {
+            mMediaSession.sendSessionEvent(
+                    MediaControlView2Impl.EVENT_UPDATE_MEDIA_TYPE_STATUS, mMediaTypeData);
+        } else {
+            // Update later inside OnPreparedListener after MediaSession is initialized.
+            mNeedUpdateMediaType = true;
+        }
     }
 
     @Override
@@ -866,6 +896,13 @@ public class VideoView2Impl extends BaseLayout
 
             if (mMediaSession != null) {
                 mMediaSession.setMetadata(builder.build());
+
+                // TODO: merge this code with the above code when integrating with MediaSession2.
+                if (mNeedUpdateMediaType) {
+                    mMediaSession.sendSessionEvent(
+                            MediaControlView2Impl.EVENT_UPDATE_MEDIA_TYPE_STATUS, mMediaTypeData);
+                    mNeedUpdateMediaType = false;
+                }
             }
         }
     };

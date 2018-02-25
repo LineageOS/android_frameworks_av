@@ -59,11 +59,6 @@
 #include <C2PlatformSupport.h>
 #include <C2Work.h>
 
-extern "C" ::android::C2ComponentFactory *CreateCodec2Factory();
-extern "C" void DestroyCodec2Factory(::android::C2ComponentFactory *);
-
-#include "../avcdec/C2SoftAvcDec.h"
-
 using namespace android;
 using namespace std::chrono_literals;
 
@@ -72,7 +67,7 @@ namespace {
 class LinearBuffer : public C2Buffer {
 public:
     explicit LinearBuffer(const std::shared_ptr<C2LinearBlock> &block)
-        : C2Buffer({ block->share(block->offset(), block->size(), ::android::C2Fence()) }) {}
+        : C2Buffer({ block->share(block->offset(), block->size(), ::C2Fence()) }) {}
 };
 
 class Listener;
@@ -220,7 +215,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
 
     (void)component->setListener_vb(mListener, C2_DONT_BLOCK);
     std::unique_ptr<C2PortBlockPoolsTuning::output> pools =
-        C2PortBlockPoolsTuning::output::alloc_unique({ (uint64_t)C2BlockPool::BASIC_GRAPHIC });
+        C2PortBlockPoolsTuning::output::AllocUnique({ (uint64_t)C2BlockPool::BASIC_GRAPHIC });
     std::vector<std::unique_ptr<C2SettingResult>> result;
     (void)component->intf()->config_vb({pools.get()}, C2_DONT_BLOCK, &result);
     component->start();

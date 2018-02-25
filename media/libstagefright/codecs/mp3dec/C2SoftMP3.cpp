@@ -26,17 +26,28 @@
 #include <SimpleC2Interface.h>
 
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 
 #include <numeric>
 
 namespace android {
 
-C2SoftMP3::C2SoftMP3(const char *name, c2_node_id_t id)
-    : SimpleC2Component(
-            SimpleC2Interface::Builder(name, id)
+constexpr char kComponentName[] = "c2.google.aac.encoder";
+
+static std::shared_ptr<C2ComponentInterface> BuildIntf(
+        const char *name, c2_node_id_t id,
+        std::function<void(C2ComponentInterface*)> deleter =
+            std::default_delete<C2ComponentInterface>()) {
+    return SimpleC2Interface::Builder(name, id, deleter)
             .inputFormat(C2FormatCompressed)
             .outputFormat(C2FormatAudio)
-            .build()),
+            .inputMediaType(MEDIA_MIMETYPE_AUDIO_MPEG)
+            .outputMediaType(MEDIA_MIMETYPE_AUDIO_RAW)
+            .build();
+}
+
+C2SoftMP3::C2SoftMP3(const char *name, c2_node_id_t id)
+    : SimpleC2Component(BuildIntf(name, id)),
       mConfig(nullptr),
       mDecoderBuf(nullptr) {
 }
@@ -397,20 +408,18 @@ void C2SoftMP3::process(
 class C2SoftMp3DecFactory : public C2ComponentFactory {
 public:
     virtual c2_status_t createComponent(
-            c2_node_id_t id, std::shared_ptr<C2Component>* const component,
-            std::function<void(::android::C2Component*)> deleter) override {
-        *component = std::shared_ptr<C2Component>(new C2SoftMP3("mp3", id), deleter);
+            c2_node_id_t id,
+            std::shared_ptr<C2Component>* const component,
+            std::function<void(C2Component*)> deleter) override {
+        *component = std::shared_ptr<C2Component>(new C2SoftMP3(kComponentName, id), deleter);
         return C2_OK;
     }
 
     virtual c2_status_t createInterface(
-            c2_node_id_t id, std::shared_ptr<C2ComponentInterface>* const interface,
-            std::function<void(::android::C2ComponentInterface*)> deleter) override {
-        *interface =
-                SimpleC2Interface::Builder("mp3", id, deleter)
-                .inputFormat(C2FormatCompressed)
-                .outputFormat(C2FormatAudio)
-                .build();
+            c2_node_id_t id,
+            std::shared_ptr<C2ComponentInterface>* const interface,
+            std::function<void(C2ComponentInterface*)> deleter) override {
+        *interface = BuildIntf(kComponentName, id, deleter);
         return C2_OK;
     }
 
@@ -419,12 +428,12 @@ public:
 
 }  // namespace android
 
-extern "C" ::android::C2ComponentFactory* CreateCodec2Factory() {
+extern "C" ::C2ComponentFactory* CreateCodec2Factory() {
     ALOGV("in %s", __func__);
     return new ::android::C2SoftMp3DecFactory();
 }
 
-extern "C" void DestroyCodec2Factory(::android::C2ComponentFactory* factory) {
+extern "C" void DestroyCodec2Factory(::C2ComponentFactory* factory) {
     ALOGV("in %s", __func__);
     delete factory;
 }

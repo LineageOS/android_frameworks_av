@@ -18,6 +18,8 @@
 
 #define MEDIA_CODEC_LIST_H_
 
+#include <initializer_list>
+
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AString.h>
 #include <media/IMediaCodecList.h>
@@ -94,9 +96,9 @@ private:
 
     /**
      * This constructor will call `buildMediaCodecList()` from the given
-     * `MediaCodecListBuilderBase` object.
+     * `MediaCodecListBuilderBase` objects.
      */
-    MediaCodecList(MediaCodecListBuilderBase* builder);
+    MediaCodecList(std::initializer_list<MediaCodecListBuilderBase*> builders);
 
     ~MediaCodecList();
 

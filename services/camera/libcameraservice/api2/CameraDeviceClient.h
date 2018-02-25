@@ -157,7 +157,8 @@ public:
             int servicePid);
     virtual ~CameraDeviceClient();
 
-    virtual status_t      initialize(sp<CameraProviderManager> manager) override;
+    virtual status_t      initialize(sp<CameraProviderManager> manager,
+            const String8& monitorTags) override;
 
     virtual status_t      dump(int fd, const Vector<String16>& args);
 
@@ -225,7 +226,7 @@ private:
     std::vector<int32_t> mSupportedPhysicalRequestKeys;
 
     template<typename TProviderPtr>
-    status_t      initializeImpl(TProviderPtr providerPtr);
+    status_t      initializeImpl(TProviderPtr providerPtr, const String8& monitorTags);
 
     /** Utility members */
     binder::Status checkPidStatus(const char* checkLocation);

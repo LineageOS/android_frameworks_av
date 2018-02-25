@@ -226,7 +226,9 @@ c2_status_t SimpleC2Component::release() {
         releasing = std::move(state->mThread);
     }
     mExitRequested = true;
-    releasing.join();
+    if (releasing.joinable()) {
+        releasing.join();
+    }
     onRelease();
     return C2_OK;
 }
@@ -373,7 +375,7 @@ std::shared_ptr<C2Buffer> SimpleC2Component::createLinearBuffer(
 
 std::shared_ptr<C2Buffer> SimpleC2Component::createLinearBuffer(
         const std::shared_ptr<C2LinearBlock> &block, size_t offset, size_t size) {
-    return C2Buffer::CreateLinearBuffer(block->share(offset, size, ::android::C2Fence()));
+    return C2Buffer::CreateLinearBuffer(block->share(offset, size, ::C2Fence()));
 }
 
 std::shared_ptr<C2Buffer> SimpleC2Component::createGraphicBuffer(
@@ -383,7 +385,7 @@ std::shared_ptr<C2Buffer> SimpleC2Component::createGraphicBuffer(
 
 std::shared_ptr<C2Buffer> SimpleC2Component::createGraphicBuffer(
         const std::shared_ptr<C2GraphicBlock> &block, const C2Rect &crop) {
-    return C2Buffer::CreateGraphicBuffer(block->share(crop, ::android::C2Fence()));
+    return C2Buffer::CreateGraphicBuffer(block->share(crop, ::C2Fence()));
 }
 
 } // namespace android

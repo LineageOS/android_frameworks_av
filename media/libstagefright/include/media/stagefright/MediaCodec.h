@@ -334,8 +334,6 @@ private:
 
     // initial create parameters
     AString mInitName;
-    bool mInitNameIsType;
-    bool mInitIsEncoder;
 
     // configure parameter
     sp<AMessage> mConfigureMsg;
@@ -370,14 +368,14 @@ private:
 
     MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid);
 
-    static sp<CodecBase> GetCodecBase(const AString &name, bool nameIsType = false);
+    static sp<CodecBase> GetCodecBase(const AString &name);
 
     static status_t PostAndAwaitResponse(
             const sp<AMessage> &msg, sp<AMessage> *response);
 
     void PostReplyWithError(const sp<AReplyToken> &replyID, int32_t err);
 
-    status_t init(const AString &name, bool nameIsType, bool encoder);
+    status_t init(const AString &name);
 
     void setState(State newState);
     void returnBuffersToCodec(bool isReclaim = false);

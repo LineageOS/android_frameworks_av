@@ -80,13 +80,15 @@ status_t Camera2ClientBase<TClientBase>::checkPid(const char* checkLocation)
 }
 
 template <typename TClientBase>
-status_t Camera2ClientBase<TClientBase>::initialize(sp<CameraProviderManager> manager) {
-    return initializeImpl(manager);
+status_t Camera2ClientBase<TClientBase>::initialize(sp<CameraProviderManager> manager,
+        const String8& monitorTags) {
+    return initializeImpl(manager, monitorTags);
 }
 
 template <typename TClientBase>
 template <typename TProviderPtr>
-status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr) {
+status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr,
+        const String8& monitorTags) {
     ATRACE_CALL();
     ALOGV("%s: Initializing client for camera %s", __FUNCTION__,
           TClientBase::mCameraIdStr.string());
@@ -104,7 +106,7 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
         return NO_INIT;
     }
 
-    res = mDevice->initialize(providerPtr);
+    res = mDevice->initialize(providerPtr, monitorTags);
     if (res != OK) {
         ALOGE("%s: Camera %s: unable to initialize device: %s (%d)",
                 __FUNCTION__, TClientBase::mCameraIdStr.string(), strerror(-res), res);

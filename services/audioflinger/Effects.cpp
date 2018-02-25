@@ -589,13 +589,6 @@ status_t AudioFlinger::EffectModule::configure()
         status = cmdStatus;
     }
 
-    // Ignore error if non-offloadable effect is created on an offload thread.
-    // Will be switched to non-offload thread when the effect is enabled.
-    if (status != NO_ERROR && thread->type() == ThreadBase::OFFLOAD && !isOffloaded()) {
-        ALOGV("Ignore error %d on non-offloadable effect on offload thread", status);
-        status = NO_ERROR;
-    }
-
 #ifdef MULTICHANNEL_EFFECT_CHAIN
     if (status != NO_ERROR &&
             (mConfig.inputCfg.channels != AUDIO_CHANNEL_OUT_STEREO

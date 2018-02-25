@@ -313,6 +313,19 @@ void CCodec::initiateConfigureComponent(const sp<AMessage> &format) {
 }
 
 void CCodec::configure(const sp<AMessage> &msg) {
+    std::shared_ptr<C2ComponentInterface> intf;
+    {
+        Mutexed<State>::Locked state(mState);
+        if (state->get() != ALLOCATED) {
+            state->set(RELEASED);
+            state.unlock();
+            mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
+            state.lock();
+            return;
+        }
+        intf = state->comp->intf();
+    }
+
     sp<AMessage> inputFormat(new AMessage);
     sp<AMessage> outputFormat(new AMessage);
     if (status_t err = [=] {
@@ -332,11 +345,34 @@ void CCodec::configure(const sp<AMessage> &msg) {
             setSurface(surface);
         }
 
+        std::vector<std::unique_ptr<C2Param>> params;
+        std::initializer_list<C2Param::Index> indices {
+            C2PortMimeConfig::input::PARAM_TYPE,
+            C2PortMimeConfig::output::PARAM_TYPE,
+        };
+        c2_status_t c2err = intf->query_vb(
+                {},
+                indices,
+                C2_DONT_BLOCK,
+                &params);
+        if (c2err != C2_OK) {
+            ALOGE("Failed to query component interface: %d", c2err);
+            return UNKNOWN_ERROR;
+        }
+        if (params.size() != indices.size()) {
+            ALOGE("Component returns wrong number of params");
+            return UNKNOWN_ERROR;
+        }
+        if (!params[0] || !params[1]) {
+            ALOGE("Component returns null params");
+            return UNKNOWN_ERROR;
+        }
+        inputFormat->setString("mime", ((C2PortMimeConfig *)params[0].get())->m.value);
+        outputFormat->setString("mime", ((C2PortMimeConfig *)params[1].get())->m.value);
+
         // XXX: hack
         bool audio = mime.startsWithIgnoreCase("audio/");
         if (encoder) {
-            outputFormat->setString("mime", mime);
-            inputFormat->setString("mime", AStringPrintf("%s/raw", audio ? "audio" : "video"));
             if (audio) {
                 inputFormat->setInt32("channel-count", 1);
                 inputFormat->setInt32("sample-rate", 44100);
@@ -347,8 +383,6 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 outputFormat->setInt32("height", 1920);
             }
         } else {
-            inputFormat->setString("mime", mime);
-            outputFormat->setString("mime", AStringPrintf("%s/raw", audio ? "audio" : "video"));
             if (audio) {
                 outputFormat->setInt32("channel-count", 2);
                 outputFormat->setInt32("sample-rate", 44100);
@@ -712,7 +746,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatAllocate: {
             // C2ComponentStore::createComponent() should return within 100ms.
-            setDeadline(now + 150ms);
+            setDeadline(now + 150ms, "allocate");
             AString componentName;
             CHECK(msg->findString("componentName", &componentName));
             allocate(componentName);
@@ -720,7 +754,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
         }
         case kWhatConfigure: {
             // C2Component::commit_sm() should return within 5ms.
-            setDeadline(now + 50ms);
+            setDeadline(now + 50ms, "configure");
             sp<AMessage> format;
             CHECK(msg->findMessage("format", &format));
             configure(format);
@@ -728,31 +762,31 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
         }
         case kWhatStart: {
             // C2Component::start() should return within 500ms.
-            setDeadline(now + 550ms);
+            setDeadline(now + 550ms, "start");
             start();
             break;
         }
         case kWhatStop: {
             // C2Component::stop() should return within 500ms.
-            setDeadline(now + 550ms);
+            setDeadline(now + 550ms, "stop");
             stop();
             break;
         }
         case kWhatFlush: {
             // C2Component::flush_sm() should return within 5ms.
-            setDeadline(now + 50ms);
+            setDeadline(now + 50ms, "flush");
             flush();
             break;
         }
         case kWhatCreateInputSurface: {
             // Surface operations may be briefly blocking.
-            setDeadline(now + 100ms);
+            setDeadline(now + 100ms, "createInputSurface");
             createInputSurface();
             break;
         }
         case kWhatSetInputSurface: {
             // Surface operations may be briefly blocking.
-            setDeadline(now + 100ms);
+            setDeadline(now + 100ms, "setInputSurface");
             sp<RefBase> obj;
             CHECK(msg->findObject("surface", &obj));
             sp<PersistentSurface> surface(static_cast<PersistentSurface *>(obj.get()));
@@ -780,25 +814,28 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
     }
-    setDeadline(TimePoint::max());
+    setDeadline(TimePoint::max(), "none");
 }
 
-void CCodec::setDeadline(const TimePoint &newDeadline) {
-    Mutexed<TimePoint>::Locked deadline(mDeadline);
-    *deadline = newDeadline;
+void CCodec::setDeadline(const TimePoint &newDeadline, const char *name) {
+    Mutexed<NamedTimePoint>::Locked deadline(mDeadline);
+    deadline->set(newDeadline, name);
 }
 
 void CCodec::initiateReleaseIfStuck() {
+    std::string name;
     {
-        Mutexed<TimePoint>::Locked deadline(mDeadline);
-        if (*deadline >= std::chrono::steady_clock::now()) {
+        Mutexed<NamedTimePoint>::Locked deadline(mDeadline);
+        if (deadline->get() >= std::chrono::steady_clock::now()) {
             // We're not stuck.
             return;
         }
+        name = deadline->getName();
     }
 
+    ALOGW("previous call to %s exceeded timeout", name.c_str());
     mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
-    initiateRelease();
+    initiateRelease(false);
 }
 
 }  // namespace android

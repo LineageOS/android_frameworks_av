@@ -28,8 +28,6 @@
 #include <list>
 #include <vector>
 
-namespace android {
-
 /// \defgroup work Work and data processing
 /// @{
 
@@ -39,17 +37,20 @@ namespace android {
  */
 struct C2SettingResult {
     enum Failure : uint32_t {
-        READ_ONLY,  ///< parameter is read-only and cannot be set
-        MISMATCH,   ///< parameter mismatches input data
-        BAD_VALUE,  ///< parameter does not accept value
+        /* parameter failures below */
         BAD_TYPE,   ///< parameter is not supported
         BAD_PORT,   ///< parameter is not supported on the specific port
         BAD_INDEX,  ///< parameter is not supported on the specific stream
-        CONFLICT,   ///< parameter is in conflict with an/other setting(s)
-        /// parameter is out of range due to other settings (this failure mode
-        /// can only be used for strict parameters)
-        UNSUPPORTED,
+        READ_ONLY,  ///< parameter is read-only and cannot be set
+        MISMATCH,   ///< parameter mismatches input data
 
+        /* field failures below */
+        BAD_VALUE,  ///< parameter does not accept value for the field at all
+        CONFLICT,   ///< parameter field value is in conflict with an/other setting(s)
+
+        /// parameter field is out of range due to other settings (this failure mode
+        /// can only be used for strict calculated parameters)
+        UNSUPPORTED,
 
         /// requested parameter value is in conflict with an/other setting(s)
         /// and has been corrected to the closest supported value. This failure
@@ -60,14 +61,15 @@ struct C2SettingResult {
 
     Failure failure;    ///< failure code
 
-    /// Failing (or corrected) field. Currently supported values for the field. This is set if
+    /// Failing (or corrected) field or parameterand optionally, currently supported values for the
+    /// field. Values must only be set for field failures other than BAD_VALUE, and only if they are
     /// different from the globally supported values (e.g. due to restrictions by another param or
-    /// input data)
-    /// \todo need to define suggestions for masks to be set and unset.
+    /// input data).
     C2ParamFieldValues field;
 
     /// Conflicting parameters or fields with optional suggestions with (optional) suggested values
-    /// for any conflicting fields to avoid the conflict.
+    /// for any conflicting fields to avoid the conflict. Must only be set for CONFLICT, UNSUPPORTED
+    /// and INFO_CONFLICT failure codes.
     std::vector<C2ParamFieldValues> conflicts;
 };
 
@@ -75,9 +77,8 @@ struct C2SettingResult {
 //  WORK
 // ================================================================================================
 
-// c2_node_id_t-s
+/** Unique ID for a processing node. */
 typedef uint32_t c2_node_id_t;
-typedef c2_node_id_t c2_node_id_t;
 
 enum {
     kParamIndexWorkOrdinal,
@@ -210,7 +211,5 @@ struct C2WorkOutline {
 };
 
 /// @}
-
-}  // namespace android
 
 #endif  // C2WORK_H_

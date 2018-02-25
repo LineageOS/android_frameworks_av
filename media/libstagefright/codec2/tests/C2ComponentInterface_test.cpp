@@ -37,7 +37,7 @@ namespace android {
 
 template <class T> std::unique_ptr<T> alloc_unique_cstr(const char *cstr) {
     size_t len = strlen(cstr);
-    std::unique_ptr<T> ptr = T::alloc_unique(len);
+    std::unique_ptr<T> ptr = T::AllocUnique(len);
     memcpy(ptr->m.value, cstr, len);
     return ptr;
 }
@@ -182,7 +182,7 @@ template <typename T> std::unique_ptr<T> makeParam() {
 
 template <> std::unique_ptr<C2PortMimeConfig::input> makeParam() {
     // TODO(hiroh): Set more precise length.
-    return C2PortMimeConfig::input::alloc_unique(100);
+    return C2PortMimeConfig::input::AllocUnique(100);
 }
 
 #define TRACED_FAILURE(func)                            \

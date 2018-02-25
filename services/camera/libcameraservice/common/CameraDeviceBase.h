@@ -60,7 +60,7 @@ class CameraDeviceBase : public virtual RefBase {
      */
     virtual metadata_vendor_id_t getVendorTagId() const = 0;
 
-    virtual status_t initialize(sp<CameraProviderManager> manager) = 0;
+    virtual status_t initialize(sp<CameraProviderManager> manager, const String8& monitorTags) = 0;
     virtual status_t disconnect() = 0;
 
     virtual status_t dump(int fd, const Vector<String16> &args) = 0;

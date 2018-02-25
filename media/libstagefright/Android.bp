@@ -63,6 +63,7 @@ cc_library_shared {
         "C2OMXNode.cpp",
         "CCodec.cpp",
         "CCodecBufferChannel.cpp",
+        "Codec2InfoBuilder.cpp",
         "CodecBase.cpp",
         "CallbackDataSource.cpp",
         "CallbackMediaSource.cpp",
@@ -138,6 +139,7 @@ cc_library_shared {
         "libstagefright_xmlparser",
         "libdl",
         "libRScpp",
+        "libhidlallocatorutils",
         "libhidlbase",
         "libhidlmemory",
         // TODO: Remove libv4l2_c2_componentstore.

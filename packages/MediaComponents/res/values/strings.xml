@@ -14,7 +14,9 @@
      limitations under the License.
 -->
 
-<resources>
+<resources xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+
     <!-- Name for the default system route prior to Jellybean. [CHAR LIMIT=30] -->
     <string name="mr_system_route_name">System</string>
 
@@ -92,4 +94,15 @@
     <string name="VideoView2_error_text_unknown">Can\'t play this video.</string>
     <!-- Button to close error alert when a video cannot be played. -->
     <string name="VideoView2_error_button">OK</string>
+
+    <!-- Text for displaying ad skip wait time. -->
+    <string name="MediaControlView2_ad_skip_wait_time">
+        You can skip Ad in <xliff:g id="wait_time" example="5">%1$d</xliff:g>s
+    </string>
+    <!-- Text for displaying ad total remaining time. -->
+    <string name="MediaControlView2_ad_remaining_time">
+        Ad · <xliff:g id="remaining_time" example="1:15">%1$s</xliff:g> remaining
+    </string>
+    <!-- Placeholder text indicating that the user can press the button to go to an external website. -->
+    <string name="MediaControlView2_ad_text">Visit Advertiser</string>
 </resources>

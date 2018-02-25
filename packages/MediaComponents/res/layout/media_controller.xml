@@ -71,7 +71,7 @@
             android:orientation="horizontal">
 
             <LinearLayout
-                android:id="@+id/ad"
+                android:id="@+id/ad_external_link"
                 android:clickable="true"
                 android:gravity="center"
                 android:layout_width="wrap_content"
@@ -80,7 +80,8 @@
                 android:layout_centerVertical="true"
                 android:paddingLeft="5dip"
                 android:paddingRight="10dip"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:visibility="gone">
 
                 <TextView
                     android:id="@+id/ad_text"
@@ -88,7 +89,7 @@
                     android:layout_height="wrap_content"
                     android:layout_centerVertical="true"
                     android:paddingRight="5dip"
-                    android:text="Visit Advertiser"
+                    android:text="@string/MediaControlView2_ad_text"
                     android:textSize="10sp"
                     android:textColor="#FFFFFFFF" />
 
@@ -163,13 +164,34 @@
             android:textStyle="bold"
             android:textColor="#BBBBBB" />
 
+        <TextView
+            android:id="@+id/ad_skip_time"
+            android:gravity="center"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:visibility="gone" />
+
         <LinearLayout
             android:id="@+id/basic_controls"
+            android:gravity="center"
             android:layout_alignParentRight="true"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_centerVertical="true"
             android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/ad_remaining"
+                android:gravity="center"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:textSize="12sp"
+                android:textColor="#FFFFFF"
+                android:visibility="gone" />
 
             <ImageButton
                 android:id="@+id/subtitle"

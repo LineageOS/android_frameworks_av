@@ -22,7 +22,6 @@
 #include <C2BlockInternal.h>
 #include <C2PlatformSupport.h>
 
-#include <gui/Surface.h>
 #include <media/stagefright/codec2/1.0/InputSurfaceConnection.h>
 #include <system/window.h>
 
@@ -124,7 +123,7 @@ public:
         std::shared_ptr<C2Buffer> c2Buffer(
                 // TODO: fence
                 new Buffer2D(block->share(
-                        C2Rect(block->width(), block->height()), ::android::C2Fence())),
+                        C2Rect(block->width(), block->height()), ::C2Fence())),
                 [handle, bufferId, src = mSource](C2Buffer *ptr) {
                     delete ptr;
                     native_handle_delete(handle);

@@ -33,6 +33,7 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.MediaControlView2;
 import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
@@ -58,11 +59,15 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     static final String KEY_STATE_CONTAINS_SUBTITLE = "StateContainsSubtitle";
     static final String EVENT_UPDATE_SUBTITLE_STATUS = "UpdateSubtitleStatus";
 
+    // TODO: Remove this once integrating with MediaSession2 & MediaMetadata2
+    static final String KEY_STATE_IS_ADVERTISEMENT = "MediaTypeAdvertisement";
+    static final String EVENT_UPDATE_MEDIA_TYPE_STATUS = "UpdateMediaTypeStatus";
+
     private static final int MAX_PROGRESS = 1000;
     private static final int DEFAULT_PROGRESS_UPDATE_TIME_MS = 1000;
-
     private static final int REWIND_TIME_MS = 10000;
     private static final int FORWARD_TIME_MS = 30000;
+    private static final int AD_SKIP_WAIT_TIME_MS = 5000;
 
     private MediaController mController;
     private MediaController.TransportControls mControls;
@@ -71,8 +76,12 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private ProgressBar mProgress;
     private TextView mEndTime, mCurrentTime;
     private TextView mTitleView;
+    private TextView mAdSkipView, mAdRemainingView;
+    private View mAdExternalLink;
+    private View mRoot;
     private int mDuration;
     private int mPrevState;
+    private int mPrevLeftBarWidth;
     private long mPlaybackActions;
     private boolean mDragging;
     private boolean mIsFullScreen;
@@ -81,6 +90,7 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private boolean mSubtitleIsEnabled;
     private boolean mContainsSubtitle;
     private boolean mSeekAvailable;
+    private boolean mIsAdvertisement;
     private ImageButton mPlayPauseButton;
     private ImageButton mFfwdButton;
     private ImageButton mRewButton;
@@ -118,8 +128,9 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     @Override
     public void initialize(@Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         // Inflate MediaControlView2 from XML
-        View root = makeControllerView();
-        mInstance.addView(root);
+        mRoot = makeControllerView();
+        mRoot.addOnLayoutChangeListener(mTitleBarLayoutChangeListener);
+        mInstance.addView(mRoot);
     }
 
     @Override
@@ -140,6 +151,8 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
 
     @Override
     public void setButtonVisibility_impl(int button, int visibility) {
+        // TODO: add member variables for Fast-Forward/Prvious/Rewind buttons to save visibility in
+        // order to prevent being overriden inside updateLayout().
         switch (button) {
             case MediaControlView2.BUTTON_PLAY_PAUSE:
                 if (mPlayPauseButton != null && canPause()) {
@@ -421,6 +434,10 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         mCurrentTime = v.findViewById(R.id.time_current);
         mFormatBuilder = new StringBuilder();
         mFormatter = new Formatter(mFormatBuilder, Locale.getDefault());
+
+        mAdSkipView = v.findViewById(R.id.ad_skip_time);
+        mAdRemainingView = v.findViewById(R.id.ad_remaining);
+        mAdExternalLink = v.findViewById(R.id.ad_external_link);
     }
 
     /**
@@ -505,6 +522,36 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             mCurrentTime.setText(stringForTime(currentPosition));
         }
 
+        if (mIsAdvertisement) {
+            // Update the remaining number of seconds until the first 5 seconds of the
+            // advertisement.
+            if (mAdSkipView != null) {
+                if (currentPosition <= AD_SKIP_WAIT_TIME_MS) {
+                    if (mAdSkipView.getVisibility() == View.GONE) {
+                        mAdSkipView.setVisibility(View.VISIBLE);
+                    }
+                    String skipTimeText = ApiHelper.getLibResources().getString(
+                            R.string.MediaControlView2_ad_skip_wait_time,
+                            ((AD_SKIP_WAIT_TIME_MS - currentPosition) / 1000 + 1));
+                    mAdSkipView.setText(skipTimeText);
+                } else {
+                    if (mAdSkipView.getVisibility() == View.VISIBLE) {
+                        mAdSkipView.setVisibility(View.GONE);
+                        mNextButton.setEnabled(true);
+                        mNextButton.clearColorFilter();
+                    }
+                }
+            }
+            // Update the remaining number of seconds of the advertisement.
+            if (mAdRemainingView != null) {
+                int remainingTime =
+                        (mDuration - currentPosition < 0) ? 0 : (mDuration - currentPosition);
+                String remainingTimeText = ApiHelper.getLibResources().getString(
+                        R.string.MediaControlView2_ad_remaining_time,
+                        stringForTime(remainingTime));
+                mAdRemainingView.setText(remainingTimeText);
+            }
+        }
         return currentPosition;
     }
 
@@ -693,6 +740,36 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         }
     };
 
+    // The title bar is made up of two separate LinearLayouts. If the sum of the two bars are
+    // greater than the length of the title bar, reduce the size of the left bar (which makes the
+    // TextView that contains the title of the media file shrink).
+    private final View.OnLayoutChangeListener mTitleBarLayoutChangeListener
+            = new View.OnLayoutChangeListener() {
+        @Override
+        public void onLayoutChange(View v, int left, int top, int right, int bottom, int oldLeft,
+                int oldTop, int oldRight, int oldBottom) {
+            if (mRoot != null) {
+                int titleBarWidth = mRoot.findViewById(R.id.title_bar).getWidth();
+
+                View leftBar = mRoot.findViewById(R.id.title_bar_left);
+                View rightBar = mRoot.findViewById(R.id.title_bar_right);
+                int leftBarWidth = leftBar.getWidth();
+                int rightBarWidth = rightBar.getWidth();
+
+                RelativeLayout.LayoutParams params =
+                        (RelativeLayout.LayoutParams) leftBar.getLayoutParams();
+                if (leftBarWidth + rightBarWidth > titleBarWidth) {
+                    params.width = titleBarWidth - rightBarWidth;
+                    mPrevLeftBarWidth = leftBarWidth;
+                } else if (leftBarWidth + rightBarWidth < titleBarWidth && mPrevLeftBarWidth != 0) {
+                    params.width = mPrevLeftBarWidth;
+                    mPrevLeftBarWidth = 0;
+                }
+                leftBar.setLayoutParams(params);
+            }
+        }
+    };
+
     private void updateDuration() {
         if (mMetadata != null) {
             if (mMetadata.containsKey(MediaMetadata.METADATA_KEY_DURATION)) {
@@ -708,6 +785,39 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             if (mMetadata.containsKey(MediaMetadata.METADATA_KEY_TITLE)) {
                 mTitleView.setText(mMetadata.getString(MediaMetadata.METADATA_KEY_TITLE));
             }
+        }
+    }
+
+    private void updateLayout() {
+        if (mIsAdvertisement) {
+            mRewButton.setVisibility(View.GONE);
+            mFfwdButton.setVisibility(View.GONE);
+            mPrevButton.setVisibility(View.GONE);
+            mCurrentTime.setVisibility(View.GONE);
+            mEndTime.setVisibility(View.GONE);
+
+            mAdSkipView.setVisibility(View.VISIBLE);
+            mAdRemainingView.setVisibility(View.VISIBLE);
+            mAdExternalLink.setVisibility(View.VISIBLE);
+
+            mProgress.setEnabled(false);
+            mNextButton.setEnabled(false);
+            mNextButton.setColorFilter(R.integer.gray);
+        } else {
+            mRewButton.setVisibility(View.VISIBLE);
+            mFfwdButton.setVisibility(View.VISIBLE);
+            mPrevButton.setVisibility(View.VISIBLE);
+            mCurrentTime.setVisibility(View.VISIBLE);
+            mEndTime.setVisibility(View.VISIBLE);
+
+            mAdSkipView.setVisibility(View.GONE);
+            mAdRemainingView.setVisibility(View.GONE);
+            mAdExternalLink.setVisibility(View.GONE);
+
+            mProgress.setEnabled(true);
+            mNextButton.setEnabled(true);
+            mNextButton.clearColorFilter();
+            disableUnsupportedButtons();
         }
     }
 
@@ -817,6 +927,12 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
                         mSubtitleButton.setEnabled(false);
                     }
                     mContainsSubtitle = newSubtitleStatus;
+                }
+            } else if (event.equals(EVENT_UPDATE_MEDIA_TYPE_STATUS)) {
+                boolean newStatus = extras.getBoolean(KEY_STATE_IS_ADVERTISEMENT);
+                if (newStatus != mIsAdvertisement) {
+                    mIsAdvertisement = newStatus;
+                    updateLayout();
                 }
             }
         }

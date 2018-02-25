@@ -19,22 +19,20 @@
 
 #include <C2Param.h>
 
-namespace android {
-
 struct C2_HIDE _C2ParamInspector {
-    inline static uint32_t getIndex(const C2ParamField &pf) {
+    inline static uint32_t GetIndex(const C2ParamField &pf) {
         return pf._mIndex;
     }
 
-    inline static uint32_t getOffset(const C2ParamField &pf) {
+    inline static uint32_t GetOffset(const C2ParamField &pf) {
         return pf._mFieldId._mOffset;
     }
 
-    inline static uint32_t getSize(const C2ParamField &pf) {
+    inline static uint32_t GetSize(const C2ParamField &pf) {
         return pf._mFieldId._mSize;
     }
 
-    inline static uint32_t getAttrib(const C2ParamDescriptor &pd) {
+    inline static uint32_t GetAttrib(const C2ParamDescriptor &pd) {
         return pd._mAttrib;
     }
 
@@ -42,9 +40,15 @@ struct C2_HIDE _C2ParamInspector {
     C2ParamField CreateParamField(C2Param::Index index, uint32_t offset, uint32_t size) {
         return C2ParamField(index, offset, size);
     }
-};
 
-}
+    inline static
+    C2ParamField CreateParamField(C2Param::Index index, _C2FieldId field) {
+        return C2ParamField(index, field._mOffset, field._mSize);
+    }
+
+    // expose attributes
+    typedef C2ParamDescriptor::attrib_t attrib_t;
+};
 
 #endif // ANDROID_STAGEFRIGHT_C2PARAM_INTERNAL_H_
 
