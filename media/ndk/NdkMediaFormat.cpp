@@ -309,6 +309,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_MAX_HEIGHT = "max-height";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_INPUT_SIZE = "max-input-size";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_WIDTH = "max-width";
 EXPORT const char* AMEDIAFORMAT_KEY_MIME = "mime";
+EXPORT const char* AMEDIAFORMAT_KEY_MPEG_USER_DATA = "mpeg-user-data";
 EXPORT const char* AMEDIAFORMAT_KEY_OPERATING_RATE = "operating-rate";
 EXPORT const char* AMEDIAFORMAT_KEY_PCM_ENCODING = "pcm-encoding";
 EXPORT const char* AMEDIAFORMAT_KEY_PRIORITY = "priority";
@@ -317,10 +318,13 @@ EXPORT const char* AMEDIAFORMAT_KEY_PUSH_BLANK_BUFFERS_ON_STOP = "push-blank-buf
 EXPORT const char* AMEDIAFORMAT_KEY_REPEAT_PREVIOUS_FRAME_AFTER = "repeat-previous-frame-after";
 EXPORT const char* AMEDIAFORMAT_KEY_ROTATION = "rotation-degrees";
 EXPORT const char* AMEDIAFORMAT_KEY_SAMPLE_RATE = "sample-rate";
+EXPORT const char* AMEDIAFORMAT_KEY_SEI = "sei";
 EXPORT const char* AMEDIAFORMAT_KEY_SLICE_HEIGHT = "slice-height";
 EXPORT const char* AMEDIAFORMAT_KEY_STRIDE = "stride";
+EXPORT const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYER_ID = "temporal-layer-id";
 EXPORT const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYERING = "ts-schema";
 EXPORT const char* AMEDIAFORMAT_KEY_TRACK_ID = "track-id";
+EXPORT const char* AMEDIAFORMAT_KEY_TRACK_INDEX = "track-index";
 EXPORT const char* AMEDIAFORMAT_KEY_WIDTH = "width";
 
 

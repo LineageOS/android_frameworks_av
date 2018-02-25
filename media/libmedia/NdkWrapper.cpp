@@ -111,6 +111,10 @@ static const char *AMediaFormatKeyGroupFloatInt32[] = {
 static status_t translateErrorCode(media_status_t err) {
     if (err == AMEDIA_OK) {
         return OK;
+    } else if (err == AMEDIA_ERROR_END_OF_STREAM) {
+        return ERROR_END_OF_STREAM;
+    } else if (err == AMEDIA_ERROR_IO) {
+        return ERROR_IO;
     } else if (err == AMEDIACODEC_INFO_TRY_AGAIN_LATER) {
         return -EAGAIN;
     }
@@ -1148,6 +1152,15 @@ int64_t AMediaExtractorWrapper::getSampleTime() {
         return -1;
     }
     return AMediaExtractor_getSampleTime(mAMediaExtractor);
+}
+
+status_t AMediaExtractorWrapper::getSampleFormat(sp<AMediaFormatWrapper> &formatWrapper) {
+    if (mAMediaExtractor == NULL) {
+        return DEAD_OBJECT;
+    }
+    AMediaFormat *format = AMediaFormat_new();
+    formatWrapper = new AMediaFormatWrapper(format);
+    return translateErrorCode(AMediaExtractor_getSampleFormat(mAMediaExtractor, format));
 }
 
 int64_t AMediaExtractorWrapper::getCachedDuration() {
