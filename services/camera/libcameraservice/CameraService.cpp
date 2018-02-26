@@ -2218,8 +2218,8 @@ status_t CameraService::BasicClient::startCameraOps() {
 
     mAppOpsManager.startWatchingMode(AppOpsManager::OP_CAMERA,
             mClientPackageName, mOpsCallback);
-    res = mAppOpsManager.startOp(AppOpsManager::OP_CAMERA,
-            mClientUid, mClientPackageName);
+    res = mAppOpsManager.startOpNoThrow(AppOpsManager::OP_CAMERA,
+            mClientUid, mClientPackageName, /*startIfModeDefault*/ false);
 
     if (res == AppOpsManager::MODE_ERRORED) {
         ALOGI("Camera %s: Access for \"%s\" has been revoked",
