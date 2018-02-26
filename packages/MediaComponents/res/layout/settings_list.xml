@@ -14,9 +14,9 @@
      limitations under the License.
 -->
 
-<resources>
-    <color name="gray">#808080</color>
-    <color name="white">#ffffff</color>
-    <color name="white_transparent_70">#B3ffffff</color>
-    <color name="black_transparent_70">#B3000000</color>
-</resources>
+<ListView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="@dimen/MediaControlView2_settings_width"
+    android:layout_height="@dimen/MediaControlView2_settings_height"
+    android:divider="@null"
+    android:dividerHeight="0dp">
+</ListView>
