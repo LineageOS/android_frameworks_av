@@ -75,8 +75,8 @@ public class TestServiceRegistry {
          */
         public void onServiceDestroyed() { }
 
-        public void onSubscribed(ControllerInfo info, String parentId, Bundle extra) { }
-        public void onUnsubscribed(ControllerInfo info, String parentId) { }
+        public void onSubscribe(ControllerInfo info, String parentId, Bundle extra) { }
+        public void onUnsubscribe(ControllerInfo info, String parentId) { }
     }
 
     @GuardedBy("TestServiceRegistry.class")

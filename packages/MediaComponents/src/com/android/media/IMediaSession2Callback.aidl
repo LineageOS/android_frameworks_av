@@ -47,12 +47,12 @@ oneway interface IMediaSession2Callback {
     //////////////////////////////////////////////////////////////////////////////////////////////
     // Browser sepcific
     //////////////////////////////////////////////////////////////////////////////////////////////
-    void onGetRootResult(in Bundle rootHints, String rootMediaId, in Bundle rootExtra);
-    void onItemLoaded(String mediaId, in Bundle result);
-    void onChildrenChanged(String rootMediaId, int childCount, in Bundle extras);
-    void onChildrenLoaded(String parentId, int page, int pageSize, in List<Bundle> result,
+    void onGetLibraryRootDone(in Bundle rootHints, String rootMediaId, in Bundle rootExtra);
+    void onGetItemDone(String mediaId, in Bundle result);
+    void onChildrenChanged(String rootMediaId, int itemCount, in Bundle extras);
+    void onGetChildrenDone(String parentId, int page, int pageSize, in List<Bundle> result,
             in Bundle extras);
     void onSearchResultChanged(String query, int itemCount, in Bundle extras);
-    void onSearchResultLoaded(String query, int page, int pageSize, in List<Bundle> result,
+    void onGetSearchResultDone(String query, int page, int pageSize, in List<Bundle> result,
             in Bundle extras);
 }

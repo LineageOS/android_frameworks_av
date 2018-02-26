@@ -148,12 +148,12 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         }
 
         @Override
-        public LibraryRoot onGetRoot(ControllerInfo controller, Bundle rootHints) {
+        public LibraryRoot onGetLibraryRoot(ControllerInfo controller, Bundle rootHints) {
             return new LibraryRoot(MockMediaLibraryService2.this, ROOT_ID, EXTRAS);
         }
 
         @Override
-        public MediaItem2 onLoadItem(ControllerInfo controller, String mediaId) {
+        public MediaItem2 onGetItem(ControllerInfo controller, String mediaId) {
             if (MEDIA_ID_GET_ITEM.equals(mediaId)) {
                 return createMediaItem(mediaId);
             } else {
@@ -162,7 +162,7 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         }
 
         @Override
-        public List<MediaItem2> onLoadChildren(ControllerInfo controller, String parentId, int page,
+        public List<MediaItem2> onGetChildren(ControllerInfo controller, String parentId, int page,
                 int pageSize, Bundle extras) {
             if (PARENT_ID.equals(parentId)) {
                 return getPaginatedResult(GET_CHILDREN_RESULT, page, pageSize);
@@ -195,7 +195,7 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         }
 
         @Override
-        public List<MediaItem2> onLoadSearchResult(ControllerInfo controllerInfo,
+        public List<MediaItem2> onGetSearchResult(ControllerInfo controllerInfo,
                 String query, int page, int pageSize, Bundle extras) {
             if (SEARCH_QUERY.equals(query)) {
                 return getPaginatedResult(SEARCH_RESULT, page, pageSize);
@@ -205,13 +205,13 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         }
 
         @Override
-        public void onSubscribed(ControllerInfo controller, String parentId, Bundle extras) {
-            mCallbackProxy.onSubscribed(controller, parentId, extras);
+        public void onSubscribe(ControllerInfo controller, String parentId, Bundle extras) {
+            mCallbackProxy.onSubscribe(controller, parentId, extras);
         }
 
         @Override
-        public void onUnsubscribed(ControllerInfo controller, String parentId) {
-            mCallbackProxy.onUnsubscribed(controller, parentId);
+        public void onUnsubscribe(ControllerInfo controller, String parentId) {
+            mCallbackProxy.onUnsubscribe(controller, parentId);
         }
     }
 

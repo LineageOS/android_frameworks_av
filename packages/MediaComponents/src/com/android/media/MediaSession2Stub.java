@@ -554,9 +554,9 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 return;
             }
             final ControllerInfoImpl controllerImpl = ControllerInfoImpl.from(controller);
-            LibraryRoot root = session.getCallback().onGetRoot(controller, rootHints);
+            LibraryRoot root = session.getCallback().onGetLibraryRoot(controller, rootHints);
             try {
-                controllerImpl.getControllerBinder().onGetRootResult(rootHints,
+                controllerImpl.getControllerBinder().onGetLibraryRootDone(rootHints,
                         root == null ? null : root.getRootId(),
                         root == null ? null : root.getExtras());
             } catch (RemoteException e) {
@@ -588,9 +588,9 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 return;
             }
             final ControllerInfoImpl controllerImpl = ControllerInfoImpl.from(controller);
-            MediaItem2 result = session.getCallback().onLoadItem(controller, mediaId);
+            MediaItem2 result = session.getCallback().onGetItem(controller, mediaId);
             try {
-                controllerImpl.getControllerBinder().onItemLoaded(
+                controllerImpl.getControllerBinder().onGetItemDone(
                         mediaId, result == null ? null : result.toBundle());
             } catch (RemoteException e) {
                 // Controller may be died prematurely.
@@ -629,10 +629,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 return;
             }
             final ControllerInfoImpl controllerImpl = ControllerInfoImpl.from(controller);
-            List<MediaItem2> result = session.getCallback().onLoadChildren(
+            List<MediaItem2> result = session.getCallback().onGetChildren(
                     controller, parentId, page, pageSize, extras);
             if (result != null && result.size() > pageSize) {
-                throw new IllegalArgumentException("onLoadChildren() shouldn't return media items "
+                throw new IllegalArgumentException("onGetChildren() shouldn't return media items "
                         + "more than pageSize. result.size()=" + result.size() + " pageSize="
                         + pageSize);
             }
@@ -646,7 +646,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             }
 
             try {
-                controllerImpl.getControllerBinder().onChildrenLoaded(
+                controllerImpl.getControllerBinder().onGetChildrenDone(
                         parentId, page, pageSize, bundleList, extras);
             } catch (RemoteException e) {
                 // Controller may be died prematurely.
@@ -712,10 +712,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 return;
             }
             final ControllerInfoImpl controllerImpl = ControllerInfoImpl.from(controller);
-            List<MediaItem2> result = session.getCallback().onLoadSearchResult(
+            List<MediaItem2> result = session.getCallback().onGetSearchResult(
                     controller, query, page, pageSize, extras);
             if (result != null && result.size() > pageSize) {
-                throw new IllegalArgumentException("onLoadSearchResult() shouldn't return media "
+                throw new IllegalArgumentException("onGetSearchResult() shouldn't return media "
                         + "items more than pageSize. result.size()=" + result.size() + " pageSize="
                         + pageSize);
             }
@@ -729,7 +729,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             }
 
             try {
-                controllerImpl.getControllerBinder().onSearchResultLoaded(
+                controllerImpl.getControllerBinder().onGetSearchResultDone(
                         query, page, pageSize, bundleList, extras);
             } catch (RemoteException e) {
                 // Controller may be died prematurely.
@@ -754,7 +754,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (session == null) {
                 return;
             }
-            session.getCallback().onSubscribed(controller, parentId, option);
+            session.getCallback().onSubscribe(controller, parentId, option);
             synchronized (mLock) {
                 Set<String> subscription = mSubscriptions.get(controller);
                 if (subscription == null) {
@@ -781,7 +781,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (session == null) {
                 return;
             }
-            session.getCallback().onUnsubscribed(controller, parentId);
+            session.getCallback().onUnsubscribe(controller, parentId);
             synchronized (mLock) {
                 mSubscriptions.remove(controller);
             }
@@ -951,23 +951,23 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     public void notifyChildrenChangedNotLocked(ControllerInfo controller, String parentId,
-            int childCount, Bundle extras) {
+            int itemCount, Bundle extras) {
         // TODO(jaewan): Handle when controller is disconnected and no longer valid.
         //               Note: Commands may be sent while onConnected() is running. Should we also
         //                     consider it as error?
-        notifyChildrenChangedInternalNotLocked(controller, parentId, childCount, extras);
+        notifyChildrenChangedInternalNotLocked(controller, parentId, itemCount, extras);
     }
 
-    public void notifyChildrenChangedNotLocked(String parentId, int childCount, Bundle extras) {
+    public void notifyChildrenChangedNotLocked(String parentId, int itemCount, Bundle extras) {
         final List<ControllerInfo> controllers = getControllers();
         for (int i = 0; i < controllers.size(); i++) {
-            notifyChildrenChangedInternalNotLocked(controllers.get(i), parentId, childCount,
+            notifyChildrenChangedInternalNotLocked(controllers.get(i), parentId, itemCount,
                     extras);
         }
     }
 
     public void notifyChildrenChangedInternalNotLocked(final ControllerInfo controller,
-            String parentId, int childCount, Bundle extras) {
+            String parentId, int itemCount, Bundle extras) {
         // Ensure subscription
         synchronized (mLock) {
             Set<String> subscriptions = mSubscriptions.get(controller);
@@ -978,7 +978,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         final IMediaSession2Callback callbackBinder =
                 ControllerInfoImpl.from(controller).getControllerBinder();
         try {
-            callbackBinder.onChildrenChanged(parentId, childCount, extras);
+            callbackBinder.onChildrenChanged(parentId, itemCount, extras);
         } catch (RemoteException e) {
             // TODO(jaewan): Handle controller removed?
         }

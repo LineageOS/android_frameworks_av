@@ -209,7 +209,7 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
     // MediaBrowser specific
     ////////////////////////////////////////////////////////////////////////////////////////////
     @Override
-    public void onGetRootResult(Bundle rootHints, String rootMediaId, Bundle rootExtra)
+    public void onGetLibraryRootDone(Bundle rootHints, String rootMediaId, Bundle rootExtra)
             throws RuntimeException {
         final MediaBrowser2Impl browser;
         try {
@@ -222,12 +222,12 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
             // TODO(jaewan): Revisit here. Could be a bug
             return;
         }
-        browser.onGetRootResult(rootHints, rootMediaId, rootExtra);
+        browser.onGetLibraryRootDone(rootHints, rootMediaId, rootExtra);
     }
 
 
     @Override
-    public void onItemLoaded(String mediaId, Bundle itemBundle) throws RuntimeException {
+    public void onGetItemDone(String mediaId, Bundle itemBundle) throws RuntimeException {
         final MediaBrowser2Impl browser;
         try {
             browser = getBrowser();
@@ -239,12 +239,12 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
             // TODO(jaewan): Revisit here. Could be a bug
             return;
         }
-        browser.onItemLoaded(mediaId,
+        browser.onGetItemDone(mediaId,
                 MediaItem2Impl.fromBundle(browser.getContext(), itemBundle));
     }
 
     @Override
-    public void onChildrenLoaded(String parentId, int page, int pageSize,
+    public void onGetChildrenDone(String parentId, int page, int pageSize,
             List<Bundle> itemBundleList, Bundle extras) throws RuntimeException {
         final MediaBrowser2Impl browser;
         try {
@@ -265,7 +265,7 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
                 result.add(MediaItem2.fromBundle(browser.getContext(), bundle));
             }
         }
-        browser.onChildrenLoaded(parentId, page, pageSize, result, extras);
+        browser.onGetChildrenDone(parentId, page, pageSize, result, extras);
     }
 
     @Override
@@ -286,7 +286,7 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
     }
 
     @Override
-    public void onSearchResultLoaded(String query, int page, int pageSize,
+    public void onGetSearchResultDone(String query, int page, int pageSize,
             List<Bundle> itemBundleList, Bundle extras) throws RuntimeException {
         final MediaBrowser2Impl browser;
         try {
@@ -307,11 +307,11 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
                 result.add(MediaItem2.fromBundle(browser.getContext(), bundle));
             }
         }
-        browser.onSearchResultLoaded(query, page, pageSize, result, extras);
+        browser.onGetSearchResultDone(query, page, pageSize, result, extras);
     }
 
     @Override
-    public void onChildrenChanged(String parentId, int childCount, Bundle extras) {
+    public void onChildrenChanged(String parentId, int itemCount, Bundle extras) {
         final MediaBrowser2Impl browser;
         try {
             browser = getBrowser();
@@ -323,6 +323,6 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
             // TODO(jaewan): Revisit here. Could be a bug
             return;
         }
-        browser.onChildrenChanged(parentId, childCount, extras);
+        browser.onChildrenChanged(parentId, itemCount, extras);
     }
 }
