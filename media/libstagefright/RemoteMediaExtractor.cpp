@@ -57,13 +57,13 @@ RemoteMediaExtractor::RemoteMediaExtractor(
         // tracks (size_t)
         mAnalyticsItem->setInt32(kExtractorTracks, ntracks);
         // metadata
-        sp<MetaData> pMetaData = extractor->getMetaData();
-        if (pMetaData != nullptr) {
-            String8 xx = pMetaData->toString();
+        MetaDataBase pMetaData;
+        if (extractor->getMetaData(pMetaData) == OK) {
+            String8 xx = pMetaData.toString();
             // 'titl' -- but this verges into PII
             // 'mime'
             const char *mime = nullptr;
-            if (pMetaData->findCString(kKeyMIMEType, &mime)) {
+            if (pMetaData.findCString(kKeyMIMEType, &mime)) {
                 mAnalyticsItem->setCString(kExtractorMime,  mime);
             }
             // what else is interesting and not already available?
@@ -95,17 +95,25 @@ size_t RemoteMediaExtractor::countTracks() {
 }
 
 sp<IMediaSource> RemoteMediaExtractor::getTrack(size_t index) {
-    MediaSourceBase *source = mExtractor->getTrack(index);
+    MediaTrack *source = mExtractor->getTrack(index);
     return (source == nullptr)
             ? nullptr : CreateIMediaSourceFromMediaSourceBase(this, source, mExtractorPlugin);
 }
 
 sp<MetaData> RemoteMediaExtractor::getTrackMetaData(size_t index, uint32_t flags) {
-    return mExtractor->getTrackMetaData(index, flags);
+    sp<MetaData> meta = new MetaData();
+    if (mExtractor->getTrackMetaData(*meta.get(), index, flags) == OK) {
+        return meta;
+    }
+    return nullptr;
 }
 
 sp<MetaData> RemoteMediaExtractor::getMetaData() {
-    return mExtractor->getMetaData();
+    sp<MetaData> meta = new MetaData();
+    if (mExtractor->getMetaData(*meta.get()) == OK) {
+        return meta;
+    }
+    return nullptr;
 }
 
 status_t RemoteMediaExtractor::getMetrics(Parcel *reply) {

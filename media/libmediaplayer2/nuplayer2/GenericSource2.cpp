@@ -1187,7 +1187,7 @@ sp<ABuffer> NuPlayer2::GenericSource2::mediaBufferToABuffer(
 
     if (audio && mAudioIsVorbis) {
         int32_t numPageSamples;
-        if (!mb->meta_data()->findInt32(kKeyValidSamples, &numPageSamples)) {
+        if (!mb->meta_data().findInt32(kKeyValidSamples, &numPageSamples)) {
             numPageSamples = -1;
         }
 
@@ -1198,12 +1198,12 @@ sp<ABuffer> NuPlayer2::GenericSource2::mediaBufferToABuffer(
     sp<AMessage> meta = ab->meta();
 
     int64_t timeUs;
-    CHECK(mb->meta_data()->findInt64(kKeyTime, &timeUs));
+    CHECK(mb->meta_data().findInt64(kKeyTime, &timeUs));
     meta->setInt64("timeUs", timeUs);
 
     if (trackType == MEDIA_TRACK_TYPE_VIDEO) {
         int32_t layerId;
-        if (mb->meta_data()->findInt32(kKeyTemporalLayerId, &layerId)) {
+        if (mb->meta_data().findInt32(kKeyTemporalLayerId, &layerId)) {
             meta->setInt32("temporal-layer-id", layerId);
         }
     }
@@ -1216,7 +1216,7 @@ sp<ABuffer> NuPlayer2::GenericSource2::mediaBufferToABuffer(
     }
 
     int64_t durationUs;
-    if (mb->meta_data()->findInt64(kKeyDuration, &durationUs)) {
+    if (mb->meta_data().findInt64(kKeyDuration, &durationUs)) {
         meta->setInt64("durationUs", durationUs);
     }
 
@@ -1227,14 +1227,14 @@ sp<ABuffer> NuPlayer2::GenericSource2::mediaBufferToABuffer(
     uint32_t dataType; // unused
     const void *seiData;
     size_t seiLength;
-    if (mb->meta_data()->findData(kKeySEI, &dataType, &seiData, &seiLength)) {
+    if (mb->meta_data().findData(kKeySEI, &dataType, &seiData, &seiLength)) {
         sp<ABuffer> sei = ABuffer::CreateAsCopy(seiData, seiLength);;
         meta->setBuffer("sei", sei);
     }
 
     const void *mpegUserDataPointer;
     size_t mpegUserDataLength;
-    if (mb->meta_data()->findData(
+    if (mb->meta_data().findData(
             kKeyMpegUserData, &dataType, &mpegUserDataPointer, &mpegUserDataLength)) {
         sp<ABuffer> mpegUserData = ABuffer::CreateAsCopy(mpegUserDataPointer, mpegUserDataLength);
         meta->setBuffer("mpegUserData", mpegUserData);
@@ -1366,8 +1366,8 @@ void NuPlayer2::GenericSource2::readBuffer(
         for (; id < count; ++id) {
             int64_t timeUs;
             MediaBufferBase *mbuf = mediaBuffers[id];
-            if (!mbuf->meta_data()->findInt64(kKeyTime, &timeUs)) {
-                mbuf->meta_data()->dumpToLog();
+            if (!mbuf->meta_data().findInt64(kKeyTime, &timeUs)) {
+                mbuf->meta_data().dumpToLog();
                 track->mPackets->signalEOS(ERROR_MALFORMED);
                 break;
             }

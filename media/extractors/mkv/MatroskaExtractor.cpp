@@ -22,7 +22,7 @@
 #include "MatroskaExtractor.h"
 
 #include <media/DataSourceBase.h>
-#include <media/MediaSourceBase.h>
+#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -121,13 +121,13 @@ private:
     BlockIterator &operator=(const BlockIterator &);
 };
 
-struct MatroskaSource : public MediaSourceBase {
+struct MatroskaSource : public MediaTrack {
     MatroskaSource(MatroskaExtractor *extractor, size_t index);
 
-    virtual status_t start(MetaData *params);
+    virtual status_t start(MetaDataBase *params);
     virtual status_t stop();
 
-    virtual sp<MetaData> getFormat();
+    virtual status_t getFormat(MetaDataBase &);
 
     virtual status_t read(
             MediaBufferBase **buffer, const ReadOptions *options);
@@ -219,10 +219,10 @@ MatroskaSource::MatroskaSource(
                  mExtractor->mTracks.itemAt(index).mTrackNum,
                  index),
       mNALSizeLen(-1) {
-    sp<MetaData> meta = mExtractor->mTracks.itemAt(index).mMeta;
+    MetaDataBase &meta = mExtractor->mTracks.editItemAt(index).mMeta;
 
     const char *mime;
-    CHECK(meta->findCString(kKeyMIMEType, &mime));
+    CHECK(meta.findCString(kKeyMIMEType, &mime));
 
     mIsAudio = !strncasecmp("audio/", mime, 6);
 
@@ -233,11 +233,11 @@ MatroskaSource::MatroskaSource(
         const uint8_t *avcc;
         size_t avccSize;
         int32_t nalSizeLen = 0;
-        if (meta->findInt32(kKeyNalLengthSize, &nalSizeLen)) {
+        if (meta.findInt32(kKeyNalLengthSize, &nalSizeLen)) {
             if (nalSizeLen >= 0 && nalSizeLen <= 4) {
                 mNALSizeLen = nalSizeLen;
             }
-        } else if (meta->findData(kKeyAVCC, &dummy, (const void **)&avcc, &avccSize)
+        } else if (meta.findData(kKeyAVCC, &dummy, (const void **)&avcc, &avccSize)
                 && avccSize >= 5u) {
             mNALSizeLen = 1 + (avcc[4] & 3);
             ALOGV("mNALSizeLen = %zd", mNALSizeLen);
@@ -250,7 +250,7 @@ MatroskaSource::MatroskaSource(
         uint32_t dummy;
         const uint8_t *hvcc;
         size_t hvccSize;
-        if (meta->findData(kKeyHVCC, &dummy, (const void **)&hvcc, &hvccSize)
+        if (meta.findData(kKeyHVCC, &dummy, (const void **)&hvcc, &hvccSize)
                 && hvccSize >= 22u) {
             mNALSizeLen = 1 + (hvcc[14+7] & 3);
             ALOGV("mNALSizeLen = %zu", mNALSizeLen);
@@ -266,7 +266,7 @@ MatroskaSource::~MatroskaSource() {
     clearPendingFrames();
 }
 
-status_t MatroskaSource::start(MetaData * /* params */) {
+status_t MatroskaSource::start(MetaDataBase * /* params */) {
     if (mType == AVC && mNALSizeLen < 0) {
         return ERROR_MALFORMED;
     }
@@ -282,8 +282,9 @@ status_t MatroskaSource::stop() {
     return OK;
 }
 
-sp<MetaData> MatroskaSource::getFormat() {
-    return mExtractor->mTracks.itemAt(mTrackIndex).mMeta;
+status_t MatroskaSource::getFormat(MetaDataBase &meta) {
+    meta = mExtractor->mTracks.itemAt(mTrackIndex).mMeta;
+    return OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -589,7 +590,7 @@ status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferBase *mbuf) {
         return ERROR_MALFORMED;
     }
 
-    sp<MetaData> meta = mbuf->meta_data();
+    MetaDataBase &meta = mbuf->meta_data();
     if (blockEncrypted) {
         /*
          *  0                   1                   2                   3
@@ -612,13 +613,13 @@ status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferBase *mbuf) {
         uint32_t type;
         const uint8_t *keyId;
         size_t keyIdSize;
-        sp<MetaData> trackMeta = mExtractor->mTracks.itemAt(mTrackIndex).mMeta;
-        CHECK(trackMeta->findData(kKeyCryptoKey, &type, (const void **)&keyId, &keyIdSize));
-        meta->setData(kKeyCryptoKey, 0, keyId, keyIdSize);
+        const MetaDataBase &trackMeta = mExtractor->mTracks.itemAt(mTrackIndex).mMeta;
+        CHECK(trackMeta.findData(kKeyCryptoKey, &type, (const void **)&keyId, &keyIdSize));
+        meta.setData(kKeyCryptoKey, 0, keyId, keyIdSize);
         memcpy(ctrCounter, data + 1, 8);
-        meta->setData(kKeyCryptoIV, 0, ctrCounter, 16);
-        meta->setData(kKeyPlainSizes, 0, plainSizes, sizeof(plainSizes));
-        meta->setData(kKeyEncryptedSizes, 0, encryptedSizes, sizeof(encryptedSizes));
+        meta.setData(kKeyCryptoIV, 0, ctrCounter, 16);
+        meta.setData(kKeyPlainSizes, 0, plainSizes, sizeof(plainSizes));
+        meta.setData(kKeyEncryptedSizes, 0, encryptedSizes, sizeof(encryptedSizes));
         mbuf->set_range(9, mbuf->range_length() - 9);
     } else {
         /*
@@ -634,8 +635,8 @@ status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferBase *mbuf) {
          */
         int32_t plainSizes[] = { static_cast<int32_t>(mbuf->range_length() - 1) };
         int32_t encryptedSizes[] = { 0 };
-        meta->setData(kKeyPlainSizes, 0, plainSizes, sizeof(plainSizes));
-        meta->setData(kKeyEncryptedSizes, 0, encryptedSizes, sizeof(encryptedSizes));
+        meta.setData(kKeyPlainSizes, 0, plainSizes, sizeof(plainSizes));
+        meta.setData(kKeyEncryptedSizes, 0, encryptedSizes, sizeof(encryptedSizes));
         mbuf->set_range(1, mbuf->range_length() - 1);
     }
 
@@ -668,8 +669,8 @@ status_t MatroskaSource::readBlock() {
             memcpy(data, trackInfo->mHeader, trackInfo->mHeaderLen);
         }
 
-        mbuf->meta_data()->setInt64(kKeyTime, timeUs);
-        mbuf->meta_data()->setInt32(kKeyIsSyncFrame, block->IsKey());
+        mbuf->meta_data().setInt64(kKeyTime, timeUs);
+        mbuf->meta_data().setInt32(kKeyIsSyncFrame, block->IsKey());
 
         status_t err = frame.Read(mExtractor->mReader, data + trackInfo->mHeaderLen);
         if (err == OK
@@ -736,7 +737,7 @@ status_t MatroskaSource::read(
 
     if ((mType != AVC && mType != HEVC) || mNALSizeLen == 0) {
         if (targetSampleTimeUs >= 0ll) {
-            frame->meta_data()->setInt64(
+            frame->meta_data().setInt64(
                     kKeyTargetTime, targetSampleTimeUs);
         }
 
@@ -824,12 +825,12 @@ status_t MatroskaSource::read(
             }
 
             int64_t timeUs;
-            CHECK(frame->meta_data()->findInt64(kKeyTime, &timeUs));
+            CHECK(frame->meta_data().findInt64(kKeyTime, &timeUs));
             int32_t isSync;
-            CHECK(frame->meta_data()->findInt32(kKeyIsSyncFrame, &isSync));
+            CHECK(frame->meta_data().findInt32(kKeyIsSyncFrame, &isSync));
 
-            buffer->meta_data()->setInt64(kKeyTime, timeUs);
-            buffer->meta_data()->setInt32(kKeyIsSyncFrame, isSync);
+            buffer->meta_data().setInt64(kKeyTime, timeUs);
+            buffer->meta_data().setInt32(kKeyIsSyncFrame, isSync);
 
             dstPtr = (uint8_t *)buffer->data();
         }
@@ -841,7 +842,7 @@ status_t MatroskaSource::read(
     }
 
     if (targetSampleTimeUs >= 0ll) {
-        buffer->meta_data()->setInt64(
+        buffer->meta_data().setInt64(
                 kKeyTargetTime, targetSampleTimeUs);
     }
 
@@ -927,7 +928,7 @@ size_t MatroskaExtractor::countTracks() {
     return mTracks.size();
 }
 
-MediaSourceBase *MatroskaExtractor::getTrack(size_t index) {
+MediaTrack *MatroskaExtractor::getTrack(size_t index) {
     if (index >= mTracks.size()) {
         return NULL;
     }
@@ -935,10 +936,11 @@ MediaSourceBase *MatroskaExtractor::getTrack(size_t index) {
     return new MatroskaSource(this, index);
 }
 
-sp<MetaData> MatroskaExtractor::getTrackMetaData(
+status_t MatroskaExtractor::getTrackMetaData(
+        MetaDataBase &meta,
         size_t index, uint32_t flags) {
     if (index >= mTracks.size()) {
-        return NULL;
+        return UNKNOWN_ERROR;
     }
 
     if ((flags & kIncludeExtensiveMetaData) && !mExtractedThumbnails
@@ -947,7 +949,8 @@ sp<MetaData> MatroskaExtractor::getTrackMetaData(
         mExtractedThumbnails = true;
     }
 
-    return mTracks.itemAt(index).mMeta;
+    meta = mTracks.itemAt(index).mMeta;
+    return OK;
 }
 
 bool MatroskaExtractor::isLiveStreaming() const {
@@ -982,7 +985,7 @@ static void storeSize(uint8_t *data, size_t &idx, size_t size) {
 }
 
 static void addESDSFromCodecPrivate(
-        const sp<MetaData> &meta,
+        MetaDataBase &meta,
         bool isAudio, const void *priv, size_t privSize) {
 
     int privSizeBytesRequired = bytesForSize(privSize);
@@ -1010,14 +1013,14 @@ static void addESDSFromCodecPrivate(
     storeSize(esds, idx, privSize);
     memcpy(esds + idx, priv, privSize);
 
-    meta->setData(kKeyESDS, 0, esds, esdsSize);
+    meta.setData(kKeyESDS, 0, esds, esdsSize);
 
     delete[] esds;
     esds = NULL;
 }
 
 status_t addVorbisCodecInfo(
-        const sp<MetaData> &meta,
+        MetaDataBase &meta,
         const void *_codecPrivate, size_t codecPrivateSize) {
     // hexdump(_codecPrivate, codecPrivateSize);
 
@@ -1075,7 +1078,7 @@ status_t addVorbisCodecInfo(
     if (codecPrivate[offset] != 0x01) {
         return ERROR_MALFORMED;
     }
-    meta->setData(kKeyVorbisInfo, 0, &codecPrivate[offset], len1);
+    meta.setData(kKeyVorbisInfo, 0, &codecPrivate[offset], len1);
 
     offset += len1;
     if (codecPrivate[offset] != 0x03) {
@@ -1087,7 +1090,7 @@ status_t addVorbisCodecInfo(
         return ERROR_MALFORMED;
     }
 
-    meta->setData(
+    meta.setData(
             kKeyVorbisBooks, 0, &codecPrivate[offset],
             codecPrivateSize - offset);
 
@@ -1095,11 +1098,11 @@ status_t addVorbisCodecInfo(
 }
 
 static status_t addFlacMetadata(
-        const sp<MetaData> &meta,
+        MetaDataBase &meta,
         const void *codecPrivate, size_t codecPrivateSize) {
     // hexdump(codecPrivate, codecPrivateSize);
 
-    meta->setData(kKeyFlacMetadata, 0, codecPrivate, codecPrivateSize);
+    meta.setData(kKeyFlacMetadata, 0, codecPrivate, codecPrivateSize);
 
     int32_t maxInputSize = 64 << 10;
     sp<FLACDecoder> flacDecoder = FLACDecoder::Create();
@@ -1120,7 +1123,7 @@ static status_t addFlacMetadata(
                 * streamInfo.max_blocksize * streamInfo.channels;
         }
     }
-    meta->setInt32(kKeyMaxInputSize, maxInputSize);
+    meta.setInt32(kKeyMaxInputSize, maxInputSize);
 
     return OK;
 }
@@ -1143,14 +1146,12 @@ status_t MatroskaExtractor::synthesizeAVCC(TrackInfo *trackInfo, size_t index) {
         return ERROR_MALFORMED;
     }
 
-    sp<MetaData> avcMeta = MakeAVCCodecSpecificData(abuf);
-    if (avcMeta == NULL) {
+    if (!MakeAVCCodecSpecificData(trackInfo->mMeta, abuf)) {
         return ERROR_MALFORMED;
     }
 
     // Override the synthesized nal length size, which is arbitrary
-    avcMeta->setInt32(kKeyNalLengthSize, 0);
-    trackInfo->mMeta = avcMeta;
+    trackInfo->mMeta.setInt32(kKeyNalLengthSize, 0);
     return OK;
 }
 
@@ -1172,7 +1173,7 @@ static inline bool isValidPrimary(const mkvparser::PrimaryChromaticity *primary)
 }
 
 void MatroskaExtractor::getColorInformation(
-        const mkvparser::VideoTrack *vtrack, sp<MetaData> &meta) {
+        const mkvparser::VideoTrack *vtrack, MetaDataBase &meta) {
     const mkvparser::Colour *color = vtrack->GetColour();
     if (color == NULL) {
         return;
@@ -1206,10 +1207,10 @@ void MatroskaExtractor::getColorInformation(
         ColorAspects aspects;
         ColorUtils::convertIsoColorAspectsToCodecAspects(
                 primaries, transfer, coeffs, fullRange, aspects);
-        meta->setInt32(kKeyColorPrimaries, aspects.mPrimaries);
-        meta->setInt32(kKeyTransferFunction, aspects.mTransfer);
-        meta->setInt32(kKeyColorMatrix, aspects.mMatrixCoeffs);
-        meta->setInt32(
+        meta.setInt32(kKeyColorPrimaries, aspects.mPrimaries);
+        meta.setInt32(kKeyTransferFunction, aspects.mTransfer);
+        meta.setInt32(kKeyColorMatrix, aspects.mMatrixCoeffs);
+        meta.setInt32(
                 kKeyColorRange, rangeSpecified ? aspects.mRange : ColorAspects::RangeUnspecified);
     }
 
@@ -1254,13 +1255,13 @@ void MatroskaExtractor::getColorInformation(
         // Only advertise static info if at least one of the groups have been specified.
         if (memcmp(&info, &nullInfo, sizeof(info)) != 0) {
             info.mID = HDRStaticInfo::kType1;
-            meta->setData(kKeyHdrStaticInfo, 'hdrS', &info, sizeof(info));
+            meta.setData(kKeyHdrStaticInfo, 'hdrS', &info, sizeof(info));
         }
     }
 }
 
 status_t MatroskaExtractor::initTrackInfo(
-        const mkvparser::Track *track, const sp<MetaData> &meta, TrackInfo *trackInfo) {
+        const mkvparser::Track *track, MetaDataBase &meta, TrackInfo *trackInfo) {
     trackInfo->mTrackNum = track->GetNumber();
     trackInfo->mMeta = meta;
     trackInfo->mExtractor = this;
@@ -1273,7 +1274,7 @@ status_t MatroskaExtractor::initTrackInfo(
         for(size_t j = 0; j < encoding->GetEncryptionCount(); j++) {
             const mkvparser::ContentEncoding::ContentEncryption *encryption;
             encryption = encoding->GetEncryptionByIndex(j);
-            trackInfo->mMeta->setData(kKeyCryptoKey, 0, encryption->key_id, encryption->key_id_len);
+            trackInfo->mMeta.setData(kKeyCryptoKey, 0, encryption->key_id, encryption->key_id_len);
             trackInfo->mEncrypted = true;
             break;
         }
@@ -1322,7 +1323,7 @@ void MatroskaExtractor::addTracks() {
 
         enum { VIDEO_TRACK = 1, AUDIO_TRACK = 2 };
 
-        sp<MetaData> meta = new MetaData;
+        MetaDataBase meta;
 
         status_t err = OK;
 
@@ -1333,19 +1334,19 @@ void MatroskaExtractor::addTracks() {
                     static_cast<const mkvparser::VideoTrack *>(track);
 
                 if (!strcmp("V_MPEG4/ISO/AVC", codecID)) {
-                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
-                    meta->setData(kKeyAVCC, 0, codecPrivate, codecPrivateSize);
+                    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
+                    meta.setData(kKeyAVCC, 0, codecPrivate, codecPrivateSize);
                 } else if (!strcmp("V_MPEGH/ISO/HEVC", codecID)) {
-                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
+                    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
                     if (codecPrivateSize > 0) {
-                        meta->setData(kKeyHVCC, kTypeHVCC, codecPrivate, codecPrivateSize);
+                        meta.setData(kKeyHVCC, kTypeHVCC, codecPrivate, codecPrivateSize);
                     } else {
                         ALOGW("HEVC is detected, but does not have configuration.");
                         continue;
                     }
                 } else if (!strcmp("V_MPEG4/ISO/ASP", codecID)) {
                     if (codecPrivateSize > 0) {
-                        meta->setCString(
+                        meta.setCString(
                                 kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG4);
                         addESDSFromCodecPrivate(
                                 meta, false, codecPrivate, codecPrivateSize);
@@ -1355,13 +1356,13 @@ void MatroskaExtractor::addTracks() {
                         continue;
                     }
                 } else if (!strcmp("V_VP8", codecID)) {
-                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP8);
+                    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP8);
                 } else if (!strcmp("V_VP9", codecID)) {
-                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP9);
+                    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP9);
                     if (codecPrivateSize > 0) {
                       // 'csd-0' for VP9 is the Blob of Codec Private data as
                       // specified in http://www.webmproject.org/vp9/profiles/.
-                      meta->setData(
+                        meta.setData(
                               kKeyVp9CodecPrivate, 0, codecPrivate,
                               codecPrivateSize);
                     }
@@ -1380,8 +1381,8 @@ void MatroskaExtractor::addTracks() {
                     ALOGW("track height exceeds int32_t, %lld", height);
                     continue;
                 }
-                meta->setInt32(kKeyWidth, (int32_t)width);
-                meta->setInt32(kKeyHeight, (int32_t)height);
+                meta.setInt32(kKeyWidth, (int32_t)width);
+                meta.setInt32(kKeyHeight, (int32_t)height);
 
                 // setting display width/height is optional
                 const long long displayUnit = vtrack->GetDisplayUnit();
@@ -1391,8 +1392,8 @@ void MatroskaExtractor::addTracks() {
                         && displayHeight > 0 && displayHeight <= INT32_MAX) {
                     switch (displayUnit) {
                     case 0: // pixels
-                        meta->setInt32(kKeyDisplayWidth, (int32_t)displayWidth);
-                        meta->setInt32(kKeyDisplayHeight, (int32_t)displayHeight);
+                        meta.setInt32(kKeyDisplayWidth, (int32_t)displayWidth);
+                        meta.setInt32(kKeyDisplayHeight, (int32_t)displayHeight);
                         break;
                     case 1: // centimeters
                     case 2: // inches
@@ -1406,8 +1407,8 @@ void MatroskaExtractor::addTracks() {
                         const long long computedHeight =
                                 std::max(height, width * displayHeight / displayWidth);
                         if (computedWidth <= INT32_MAX && computedHeight <= INT32_MAX) {
-                            meta->setInt32(kKeyDisplayWidth, (int32_t)computedWidth);
-                            meta->setInt32(kKeyDisplayHeight, (int32_t)computedHeight);
+                            meta.setInt32(kKeyDisplayWidth, (int32_t)computedWidth);
+                            meta.setInt32(kKeyDisplayHeight, (int32_t)computedHeight);
                         }
                         break;
                     }
@@ -1427,34 +1428,34 @@ void MatroskaExtractor::addTracks() {
                     static_cast<const mkvparser::AudioTrack *>(track);
 
                 if (!strcmp("A_AAC", codecID)) {
-                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC);
+                    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC);
                     CHECK(codecPrivateSize >= 2);
 
                     addESDSFromCodecPrivate(
                             meta, true, codecPrivate, codecPrivateSize);
                 } else if (!strcmp("A_VORBIS", codecID)) {
-                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_VORBIS);
+                    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_VORBIS);
 
                     err = addVorbisCodecInfo(
                             meta, codecPrivate, codecPrivateSize);
                 } else if (!strcmp("A_OPUS", codecID)) {
-                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_OPUS);
-                    meta->setData(kKeyOpusHeader, 0, codecPrivate, codecPrivateSize);
-                    meta->setInt64(kKeyOpusCodecDelay, track->GetCodecDelay());
-                    meta->setInt64(kKeyOpusSeekPreRoll, track->GetSeekPreRoll());
+                    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_OPUS);
+                    meta.setData(kKeyOpusHeader, 0, codecPrivate, codecPrivateSize);
+                    meta.setInt64(kKeyOpusCodecDelay, track->GetCodecDelay());
+                    meta.setInt64(kKeyOpusSeekPreRoll, track->GetSeekPreRoll());
                     mSeekPreRollNs = track->GetSeekPreRoll();
                 } else if (!strcmp("A_MPEG/L3", codecID)) {
-                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MPEG);
+                    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MPEG);
                 } else if (!strcmp("A_FLAC", codecID)) {
-                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_FLAC);
+                    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_FLAC);
                     err = addFlacMetadata(meta, codecPrivate, codecPrivateSize);
                 } else {
                     ALOGW("%s is not supported.", codecID);
                     continue;
                 }
 
-                meta->setInt32(kKeySampleRate, atrack->GetSamplingRate());
-                meta->setInt32(kKeyChannelCount, atrack->GetChannels());
+                meta.setInt32(kKeySampleRate, atrack->GetSamplingRate());
+                meta.setInt32(kKeyChannelCount, atrack->GetChannels());
                 break;
             }
 
@@ -1467,7 +1468,7 @@ void MatroskaExtractor::addTracks() {
            char lang[4];
            strncpy(lang, language, 3);
            lang[3] = '\0';
-           meta->setCString(kKeyMediaLanguage, lang);
+           meta.setCString(kKeyMediaLanguage, lang);
         }
 
         if (err != OK) {
@@ -1476,7 +1477,7 @@ void MatroskaExtractor::addTracks() {
         }
 
         long long durationNs = mSegment->GetDuration();
-        meta->setInt64(kKeyDuration, (durationNs + 500) / 1000);
+        meta.setInt64(kKeyDuration, (durationNs + 500) / 1000);
 
         mTracks.push();
         size_t n = mTracks.size() - 1;
@@ -1498,7 +1499,7 @@ void MatroskaExtractor::findThumbnails() {
         TrackInfo *info = &mTracks.editItemAt(i);
 
         const char *mime;
-        CHECK(info->mMeta->findCString(kKeyMIMEType, &mime));
+        CHECK(info->mMeta.findCString(kKeyMIMEType, &mime));
 
         if (strncasecmp(mime, "video/", 6)) {
             continue;
@@ -1524,18 +1525,16 @@ void MatroskaExtractor::findThumbnails() {
             }
             iter.advance();
         }
-        info->mMeta->setInt64(kKeyThumbnailTime, thumbnailTimeUs);
+        info->mMeta.setInt64(kKeyThumbnailTime, thumbnailTimeUs);
     }
 }
 
-sp<MetaData> MatroskaExtractor::getMetaData() {
-    sp<MetaData> meta = new MetaData;
-
-    meta->setCString(
+status_t MatroskaExtractor::getMetaData(MetaDataBase &meta) {
+    meta.setCString(
             kKeyMIMEType,
             mIsWebm ? "video/webm" : MEDIA_MIMETYPE_CONTAINER_MATROSKA);
 
-    return meta;
+    return OK;
 }
 
 uint32_t MatroskaExtractor::flags() const {

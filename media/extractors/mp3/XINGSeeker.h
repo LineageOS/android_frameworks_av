@@ -25,7 +25,7 @@ namespace android {
 class DataSourceBase;
 
 struct XINGSeeker : public MP3Seeker {
-    static sp<XINGSeeker> CreateFromSource(
+    static XINGSeeker *CreateFromSource(
             DataSourceBase *source, off64_t first_frame_pos);
 
     virtual bool getDuration(int64_t *durationUs);

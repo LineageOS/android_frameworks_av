@@ -76,11 +76,8 @@ bool XINGSeeker::getOffsetForTime(int64_t *timeUs, off64_t *pos) {
 }
 
 // static
-sp<XINGSeeker> XINGSeeker::CreateFromSource(
+XINGSeeker *XINGSeeker::CreateFromSource(
         DataSourceBase *source, off64_t first_frame_pos) {
-    sp<XINGSeeker> seeker = new XINGSeeker;
-
-    seeker->mFirstFramePos = first_frame_pos;
 
     uint8_t buffer[4];
     int offset = first_frame_pos;
@@ -98,8 +95,6 @@ sp<XINGSeeker> XINGSeeker::CreateFromSource(
                                NULL, &samples_per_frame)) {
         return NULL;
     }
-    seeker->mFirstFramePos += xingframesize;
-
     uint8_t version = (buffer[1] >> 3) & 3;
 
     // determine offset of XING header
@@ -132,9 +127,13 @@ sp<XINGSeeker> XINGSeeker::CreateFromSource(
     offset += 4;
     uint32_t flags = U32_AT(buffer);
 
+    XINGSeeker *seeker = new XINGSeeker;
+    seeker->mFirstFramePos = first_frame_pos + xingframesize;
+
     if (flags & 0x0001) {  // Frames field is present
         if (source->readAt(offset, buffer, 4) < 4) {
-             return NULL;
+            delete seeker;
+            return NULL;
         }
         int32_t frames = U32_AT(buffer);
         // only update mDurationUs if the calculated duration is valid (non zero)
@@ -148,6 +147,7 @@ sp<XINGSeeker> XINGSeeker::CreateFromSource(
     }
     if (flags & 0x0002) {  // Bytes field is present
         if (source->readAt(offset, buffer, 4) < 4) {
+            delete seeker;
             return NULL;
         }
         seeker->mSizeBytes = U32_AT(buffer);
@@ -155,6 +155,7 @@ sp<XINGSeeker> XINGSeeker::CreateFromSource(
     }
     if (flags & 0x0004) {  // TOC field is present
         if (source->readAt(offset + 1, seeker->mTOC, 99) < 99) {
+            delete seeker;
             return NULL;
         }
         seeker->mTOCValid = true;
@@ -164,6 +165,7 @@ sp<XINGSeeker> XINGSeeker::CreateFromSource(
 #if 0
     if (flags & 0x0008) {  // Quality indicator field is present
         if (source->readAt(offset, buffer, 4) < 4) {
+            delete seeker;
             return NULL;
         }
         // do something with the quality indicator
@@ -171,6 +173,7 @@ sp<XINGSeeker> XINGSeeker::CreateFromSource(
     }
 
     if (source->readAt(xingbase + 0xaf - 0x24, &buffer, 1) < 1) { // encoding flags
+        delete seeker;
         return false;
     }
 

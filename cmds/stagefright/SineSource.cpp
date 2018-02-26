@@ -89,7 +89,7 @@ status_t SineSource::read(
         x += k;
     }
 
-    buffer->meta_data()->setInt64(
+    buffer->meta_data().setInt64(
             kKeyTime, ((int64_t)mPhase * 1000000) / mSampleRate);
 
     mPhase += numFramesPerBuffer;

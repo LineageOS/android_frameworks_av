@@ -21,17 +21,18 @@
 #include <media/MediaExtractor.h>
 #include <media/stagefright/MediaBufferBase.h>
 #include <media/stagefright/MediaBufferGroup.h>
+#include <media/stagefright/MetaDataBase.h>
 #include <media/MidiIoWrapper.h>
 #include <utils/String8.h>
 #include <libsonivox/eas.h>
 
 namespace android {
 
-class MidiEngine : public RefBase {
+class MidiEngine {
 public:
-    MidiEngine(DataSourceBase *dataSource,
-            const sp<MetaData> &fileMetadata,
-            const sp<MetaData> &trackMetadata);
+    explicit MidiEngine(DataSourceBase *dataSource,
+            MetaDataBase *fileMetadata,
+            MetaDataBase *trackMetadata);
     ~MidiEngine();
 
     status_t initCheck();
@@ -41,7 +42,7 @@ public:
     status_t seekTo(int64_t positionUs);
     MediaBufferBase* readBuffer();
 private:
-    sp<MidiIoWrapper> mIoWrapper;
+    MidiIoWrapper *mIoWrapper;
     MediaBufferGroup *mGroup;
     EAS_DATA_HANDLE mEasData;
     EAS_HANDLE mEasHandle;
@@ -55,10 +56,10 @@ public:
     explicit MidiExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();
-    virtual MediaSourceBase *getTrack(size_t index);
-    virtual sp<MetaData> getTrackMetaData(size_t index, uint32_t flags);
+    virtual MediaTrack *getTrack(size_t index);
+    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
 
-    virtual sp<MetaData> getMetaData();
+    virtual status_t getMetaData(MetaDataBase& meta);
     virtual const char * name() { return "MidiExtractor"; }
 
 protected:
@@ -67,12 +68,12 @@ protected:
 private:
     DataSourceBase *mDataSource;
     status_t mInitCheck;
-    sp<MetaData> mFileMetadata;
+    MetaDataBase mFileMetadata;
 
     // There is only one track
-    sp<MetaData> mTrackMetadata;
+    MetaDataBase mTrackMetadata;
 
-    sp<MidiEngine> mEngine;
+    MidiEngine *mEngine;
 
     EAS_DATA_HANDLE     mEasData;
     EAS_HANDLE          mEasHandle;

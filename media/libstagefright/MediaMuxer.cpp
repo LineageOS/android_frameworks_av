@@ -181,13 +181,13 @@ status_t MediaMuxer::writeSampleData(const sp<ABuffer> &buffer, size_t trackInde
     mediaBuffer->add_ref(); // Released in MediaAdapter::signalBufferReturned().
     mediaBuffer->set_range(buffer->offset(), buffer->size());
 
-    sp<MetaData> sampleMetaData = mediaBuffer->meta_data();
-    sampleMetaData->setInt64(kKeyTime, timeUs);
+    MetaDataBase &sampleMetaData = mediaBuffer->meta_data();
+    sampleMetaData.setInt64(kKeyTime, timeUs);
     // Just set the kKeyDecodingTime as the presentation time for now.
-    sampleMetaData->setInt64(kKeyDecodingTime, timeUs);
+    sampleMetaData.setInt64(kKeyDecodingTime, timeUs);
 
     if (flags & MediaCodec::BUFFER_FLAG_SYNCFRAME) {
-        sampleMetaData->setInt32(kKeyIsSyncFrame, true);
+        sampleMetaData.setInt32(kKeyIsSyncFrame, true);
     }
 
     sp<MediaAdapter> currentTrack = mTrackList[trackIndex];

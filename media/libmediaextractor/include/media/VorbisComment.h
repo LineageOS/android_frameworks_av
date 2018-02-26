@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,19 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef META_DATA_UTILS_H_
 
-#define META_DATA_UTILS_H_
-
-#include <media/stagefright/MetaData.h>
+#ifndef VORBIS_COMMENT_H_
+#define VORBIS_COMMENT_H_
 
 namespace android {
 
-struct ABuffer;
-bool MakeAVCCodecSpecificData(MetaDataBase &meta, const sp<ABuffer> &accessUnit);
-bool MakeAACCodecSpecificData(MetaDataBase &meta, unsigned profile, unsigned sampling_freq_index,
-        unsigned channel_configuration);
+class MetaDataBase;
+
+void parseVorbisComment(
+        MetaDataBase *fileMeta, const char *comment, size_t commentLength);
 
 }  // namespace android
 
-#endif  // META_DATA_UTILS_H_
+#endif // VORBIS_COMMENT_H_

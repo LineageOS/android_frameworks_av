@@ -667,7 +667,7 @@ status_t Harness::testSeek(
                 actualSeekTimeUs = -1;
             } else {
                 CHECK(buffer != NULL);
-                CHECK(buffer->meta_data()->findInt64(kKeyTime, &actualSeekTimeUs));
+                CHECK(buffer->meta_data().findInt64(kKeyTime, &actualSeekTimeUs));
                 CHECK(actualSeekTimeUs >= 0);
 
                 buffer->release();
@@ -728,7 +728,7 @@ status_t Harness::testSeek(
             CHECK(buffer != NULL);
 
             int64_t bufferTimeUs;
-            CHECK(buffer->meta_data()->findInt64(kKeyTime, &bufferTimeUs));
+            CHECK(buffer->meta_data().findInt64(kKeyTime, &bufferTimeUs));
             if (!CloseEnough(bufferTimeUs, actualSeekTimeUs)) {
                 printf("\n  * Attempted seeking to %" PRId64 " us (%.2f secs)",
                        requestedSeekTimeUs, requestedSeekTimeUs / 1E6);

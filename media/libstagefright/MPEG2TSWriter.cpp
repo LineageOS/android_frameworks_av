@@ -264,11 +264,11 @@ void MPEG2TSWriter::SourceInfo::appendAVCFrame(MediaBufferBase *buffer) {
            buffer->range_length());
 
     int64_t timeUs;
-    CHECK(buffer->meta_data()->findInt64(kKeyTime, &timeUs));
+    CHECK(buffer->meta_data().findInt64(kKeyTime, &timeUs));
     mBuffer->meta()->setInt64("timeUs", timeUs);
 
     int32_t isSync;
-    if (buffer->meta_data()->findInt32(kKeyIsSyncFrame, &isSync)
+    if (buffer->meta_data().findInt32(kKeyIsSyncFrame, &isSync)
             && isSync != 0) {
         mBuffer->meta()->setInt32("isSync", true);
     }
@@ -288,7 +288,7 @@ void MPEG2TSWriter::SourceInfo::appendAACFrames(MediaBufferBase *buffer) {
     }
 
     int64_t timeUs;
-    CHECK(buffer->meta_data()->findInt64(kKeyTime, &timeUs));
+    CHECK(buffer->meta_data().findInt64(kKeyTime, &timeUs));
 
     mBuffer->meta()->setInt64("timeUs", timeUs);
     mBuffer->meta()->setInt32("isSync", true);

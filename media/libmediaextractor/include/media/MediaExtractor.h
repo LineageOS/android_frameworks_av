@@ -28,8 +28,8 @@
 namespace android {
 
 class DataSourceBase;
-class MetaData;
-struct MediaSourceBase;
+class MetaDataBase;
+struct MediaTrack;
 
 
 class ExtractorAllocTracker {
@@ -49,17 +49,18 @@ class MediaExtractor
 public:
     virtual ~MediaExtractor();
     virtual size_t countTracks() = 0;
-    virtual MediaSourceBase *getTrack(size_t index) = 0;
+    virtual MediaTrack *getTrack(size_t index) = 0;
 
     enum GetTrackMetaDataFlags {
         kIncludeExtensiveMetaData = 1
     };
-    virtual sp<MetaData> getTrackMetaData(
+    virtual status_t getTrackMetaData(
+            MetaDataBase& meta,
             size_t index, uint32_t flags = 0) = 0;
 
     // Return container specific meta-data. The default implementation
     // returns an empty metadata object.
-    virtual sp<MetaData> getMetaData();
+    virtual status_t getMetaData(MetaDataBase& meta) = 0;
 
     enum Flags {
         CAN_SEEK_BACKWARD  = 1,  // the "seek 10secs back button"

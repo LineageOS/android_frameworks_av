@@ -572,7 +572,7 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
     CHECK_GE(kMaxPacketSize, 12u + 2u);
 
     int64_t timeUs;
-    CHECK(mediaBuf->meta_data()->findInt64(kKeyTime, &timeUs));
+    CHECK(mediaBuf->meta_data().findInt64(kKeyTime, &timeUs));
 
     uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100ll);
 
@@ -667,7 +667,7 @@ void ARTPWriter::sendH263Data(MediaBufferBase *mediaBuf) {
     CHECK_GE(kMaxPacketSize, 12u + 2u);
 
     int64_t timeUs;
-    CHECK(mediaBuf->meta_data()->findInt64(kKeyTime, &timeUs));
+    CHECK(mediaBuf->meta_data().findInt64(kKeyTime, &timeUs));
 
     uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100ll);
 
@@ -752,7 +752,7 @@ void ARTPWriter::sendAMRData(MediaBufferBase *mediaBuf) {
     const bool isWide = (mMode == AMR_WB);
 
     int64_t timeUs;
-    CHECK(mediaBuf->meta_data()->findInt64(kKeyTime, &timeUs));
+    CHECK(mediaBuf->meta_data().findInt64(kKeyTime, &timeUs));
     uint32_t rtpTime = mRTPTimeBase + (timeUs / (isWide ? 250 : 125));
 
     // hexdump(mediaData, mediaLength);

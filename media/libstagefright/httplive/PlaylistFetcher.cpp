@@ -2066,7 +2066,8 @@ status_t PlaylistFetcher::extractAndQueueAccessUnits(
         CHECK_NE(channel_configuration, 0u);
         bits.skipBits(2);  // original_copy, home
 
-        sp<MetaData> meta = MakeAACCodecSpecificData(
+        sp<MetaData> meta = new MetaData();
+        MakeAACCodecSpecificData(*meta,
                 profile, sampling_freq_index, channel_configuration);
 
         meta->setInt32(kKeyIsADTS, true);

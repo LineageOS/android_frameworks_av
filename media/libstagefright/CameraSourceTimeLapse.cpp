@@ -191,13 +191,13 @@ void createMediaBufferCopy(
     (*newBuffer) = new MediaBuffer(sourceSize);
     memcpy((*newBuffer)->data(), sourcePointer, sourceSize);
 
-    (*newBuffer)->meta_data()->setInt64(kKeyTime, frameTime);
+    (*newBuffer)->meta_data().setInt64(kKeyTime, frameTime);
 }
 
 void CameraSourceTimeLapse::fillLastReadBufferCopy(MediaBufferBase& sourceBuffer) {
     ALOGV("fillLastReadBufferCopy");
     int64_t frameTime;
-    CHECK(sourceBuffer.meta_data()->findInt64(kKeyTime, &frameTime));
+    CHECK(sourceBuffer.meta_data().findInt64(kKeyTime, &frameTime));
     createMediaBufferCopy(sourceBuffer, frameTime, &mLastReadBufferCopy);
     mLastReadBufferCopy->add_ref();
     mLastReadBufferCopy->setObserver(this);

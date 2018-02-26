@@ -28,7 +28,7 @@ class RemoteMediaSource : public BnMediaSource {
 public:
     static sp<IMediaSource> wrap(
             const sp<RemoteMediaExtractor> &extractor,
-            MediaSourceBase *source,
+            MediaTrack *source,
             const sp<RefBase> &plugin);
     virtual ~RemoteMediaSource();
     virtual status_t start(MetaData *params = NULL);
@@ -42,12 +42,12 @@ public:
 
 private:
     sp<RemoteMediaExtractor> mExtractor;
-    MediaSourceBase *mSource;
+    MediaTrack *mSource;
     sp<RefBase> mExtractorPlugin;
 
     explicit RemoteMediaSource(
             const sp<RemoteMediaExtractor> &extractor,
-            MediaSourceBase *source,
+            MediaTrack *source,
             const sp<RefBase> &plugin);
 
     DISALLOW_EVIL_CONSTRUCTORS(RemoteMediaSource);

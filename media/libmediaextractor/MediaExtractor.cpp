@@ -35,10 +35,6 @@ MediaExtractor::MediaExtractor() {
 
 MediaExtractor::~MediaExtractor() {}
 
-sp<MetaData> MediaExtractor::getMetaData() {
-    return new MetaData;
-}
-
 uint32_t MediaExtractor::flags() const {
     return CAN_SEEK_BACKWARD | CAN_SEEK_FORWARD | CAN_PAUSE | CAN_SEEK;
 }

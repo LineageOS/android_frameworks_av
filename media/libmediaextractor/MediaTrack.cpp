@@ -14,51 +14,51 @@
  * limitations under the License.
  */
 
-#include <media/MediaSourceBase.h>
+#include <media/MediaTrack.h>
 
 namespace android {
 
-MediaSourceBase::MediaSourceBase() {}
+MediaTrack::MediaTrack() {}
 
-MediaSourceBase::~MediaSourceBase() {}
+MediaTrack::~MediaTrack() {}
 
 ////////////////////////////////////////////////////////////////////////////////
 
-MediaSourceBase::ReadOptions::ReadOptions() {
+MediaTrack::ReadOptions::ReadOptions() {
     reset();
 }
 
-void MediaSourceBase::ReadOptions::reset() {
+void MediaTrack::ReadOptions::reset() {
     mOptions = 0;
     mSeekTimeUs = 0;
     mNonBlocking = false;
 }
 
-void MediaSourceBase::ReadOptions::setNonBlocking() {
+void MediaTrack::ReadOptions::setNonBlocking() {
     mNonBlocking = true;
 }
 
-void MediaSourceBase::ReadOptions::clearNonBlocking() {
+void MediaTrack::ReadOptions::clearNonBlocking() {
     mNonBlocking = false;
 }
 
-bool MediaSourceBase::ReadOptions::getNonBlocking() const {
+bool MediaTrack::ReadOptions::getNonBlocking() const {
     return mNonBlocking;
 }
 
-void MediaSourceBase::ReadOptions::setSeekTo(int64_t time_us, SeekMode mode) {
+void MediaTrack::ReadOptions::setSeekTo(int64_t time_us, SeekMode mode) {
     mOptions |= kSeekTo_Option;
     mSeekTimeUs = time_us;
     mSeekMode = mode;
 }
 
-void MediaSourceBase::ReadOptions::clearSeekTo() {
+void MediaTrack::ReadOptions::clearSeekTo() {
     mOptions &= ~kSeekTo_Option;
     mSeekTimeUs = 0;
     mSeekMode = SEEK_CLOSEST_SYNC;
 }
 
-bool MediaSourceBase::ReadOptions::getSeekTo(
+bool MediaTrack::ReadOptions::getSeekTo(
         int64_t *time_us, SeekMode *mode) const {
     *time_us = mSeekTimeUs;
     *mode = mSeekMode;

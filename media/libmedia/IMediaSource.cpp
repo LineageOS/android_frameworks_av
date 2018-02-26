@@ -171,13 +171,13 @@ public:
                 size_t length = reply.readInt32();
                 buf = new RemoteMediaBufferWrapper(mem);
                 buf->set_range(offset, length);
-                buf->meta_data()->updateFromParcel(reply);
+                buf->meta_data().updateFromParcel(reply);
             } else { // INLINE_BUFFER
                 int32_t len = reply.readInt32();
                 ALOGV("INLINE_BUFFER status %d and len %d", ret, len);
                 buf = new MediaBuffer(len);
                 reply.read(buf->data(), len);
-                buf->meta_data()->updateFromParcel(reply);
+                buf->meta_data().updateFromParcel(reply);
             }
             buffers->push_back(buf);
             ++bufferCount;
@@ -408,7 +408,7 @@ status_t BnMediaSource::onTransact(
                     }
                     reply->writeInt32(offset);
                     reply->writeInt32(length);
-                    buf->meta_data()->writeToParcel(*reply);
+                    buf->meta_data().writeToParcel(*reply);
                     transferBuf->addRemoteRefcount(1);
                     if (transferBuf != buf) {
                         transferBuf->release(); // release local ref
@@ -421,7 +421,7 @@ status_t BnMediaSource::onTransact(
                             buf, buf->mMemory->size(), length);
                     reply->writeInt32(INLINE_BUFFER);
                     reply->writeByteArray(length, (uint8_t*)buf->data() + offset);
-                    buf->meta_data()->writeToParcel(*reply);
+                    buf->meta_data().writeToParcel(*reply);
                     inlineTransferSize += length;
                     if (inlineTransferSize > kInlineMaxTransfer) {
                         maxNumBuffers = 0; // stop readMultiple if inline transfer is too large.

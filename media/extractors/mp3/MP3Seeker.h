@@ -23,7 +23,7 @@
 
 namespace android {
 
-struct MP3Seeker : public RefBase {
+struct MP3Seeker {
     MP3Seeker() {}
 
     virtual bool getDuration(int64_t *durationUs) = 0;
@@ -33,7 +33,6 @@ struct MP3Seeker : public RefBase {
     // the actual time that seekpoint represents.
     virtual bool getOffsetForTime(int64_t *timeUs, off64_t *pos) = 0;
 
-protected:
     virtual ~MP3Seeker() {}
 
 private:

@@ -309,7 +309,7 @@ status_t SimpleDecodingSource::doRead(
 
             if (in_buf != NULL) {
                 int64_t timestampUs = 0;
-                CHECK(in_buf->meta_data()->findInt64(kKeyTime, &timestampUs));
+                CHECK(in_buf->meta_data().findInt64(kKeyTime, &timestampUs));
                 if (in_buf->range_length() + (mIsVorbis ? 4 : 0) > in_buffer->capacity()) {
                     ALOGW("'%s' received %zu input bytes for buffer of size %zu",
                             mComponentName.c_str(),
@@ -321,7 +321,7 @@ status_t SimpleDecodingSource::doRead(
 
                 if (mIsVorbis) {
                     int32_t numPageSamples;
-                    if (!in_buf->meta_data()->findInt32(kKeyValidSamples, &numPageSamples)) {
+                    if (!in_buf->meta_data().findInt32(kKeyValidSamples, &numPageSamples)) {
                         numPageSamples = -1;
                     }
                     memcpy(in_buffer->base() + cpLen, &numPageSamples, sizeof(numPageSamples));
@@ -393,7 +393,7 @@ status_t SimpleDecodingSource::doRead(
             *buffer = new MediaBuffer(out_size);
             CHECK_LE(out_buffer->size(), (*buffer)->size());
             memcpy((*buffer)->data(), out_buffer->data(), out_buffer->size());
-            (*buffer)->meta_data()->setInt64(kKeyTime, out_pts);
+            (*buffer)->meta_data().setInt64(kKeyTime, out_pts);
             mCodec->releaseOutputBuffer(out_ix);
         }
         return OK;

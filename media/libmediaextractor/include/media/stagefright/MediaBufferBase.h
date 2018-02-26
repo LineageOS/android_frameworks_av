@@ -18,12 +18,10 @@
 
 #define MEDIA_BUFFER_BASE_H_
 
-#include <utils/RefBase.h>
-
 namespace android {
 
 class MediaBufferBase;
-class MetaData;
+class MetaDataBase;
 
 class MediaBufferObserver {
 public:
@@ -61,7 +59,7 @@ public:
 
     virtual void set_range(size_t offset, size_t length) = 0;
 
-    virtual sp<MetaData> meta_data() = 0;
+    virtual MetaDataBase& meta_data() = 0;
 
     // Clears meta data and resets the range to the full extent.
     virtual void reset() = 0;

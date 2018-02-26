@@ -2831,7 +2831,7 @@ status_t MPEG4Writer::Track::threadEntry() {
         ++count;
 
         int32_t isCodecConfig;
-        if (buffer->meta_data()->findInt32(kKeyIsCodecConfig, &isCodecConfig)
+        if (buffer->meta_data().findInt32(kKeyIsCodecConfig, &isCodecConfig)
                 && isCodecConfig) {
             // if config format (at track addition) already had CSD, keep that
             // UNLESS we have not received any frames yet.
@@ -2890,7 +2890,7 @@ status_t MPEG4Writer::Track::threadEntry() {
         memcpy(copy->data(), (uint8_t *)buffer->data() + buffer->range_offset(),
                 buffer->range_length());
         copy->set_range(0, buffer->range_length());
-        meta_data = new MetaData(*buffer->meta_data().get());
+        meta_data = new MetaData(buffer->meta_data());
         buffer->release();
         buffer = NULL;
 

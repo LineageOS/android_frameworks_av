@@ -253,7 +253,7 @@ static void playSource(sp<MediaSource> &source) {
                 shouldSeek = true;
             } else {
                 int64_t timestampUs;
-                CHECK(buffer->meta_data()->findInt64(kKeyTime, &timestampUs));
+                CHECK(buffer->meta_data().findInt64(kKeyTime, &timestampUs));
 
                 bool failed = false;
 
@@ -492,12 +492,12 @@ status_t DetectSyncSource::read(
 
         if (mStreamType == AVC) {
             bool isIDR = isIDRFrame(*buffer);
-            (*buffer)->meta_data()->setInt32(kKeyIsSyncFrame, isIDR);
+            (*buffer)->meta_data().setInt32(kKeyIsSyncFrame, isIDR);
             if (isIDR) {
                 mSawFirstIDRFrame = true;
             }
         } else {
-            (*buffer)->meta_data()->setInt32(kKeyIsSyncFrame, true);
+            (*buffer)->meta_data().setInt32(kKeyIsSyncFrame, true);
         }
 
         if (mStreamType != AVC || mSawFirstIDRFrame) {
@@ -591,7 +591,7 @@ static void performSeekTest(const sp<MediaSource> &source) {
 
         if (err == OK) {
             int64_t timeUs;
-            CHECK(buffer->meta_data()->findInt64(kKeyTime, &timeUs));
+            CHECK(buffer->meta_data().findInt64(kKeyTime, &timeUs));
 
             printf("%" PRId64 "\t%" PRId64 "\t%" PRId64 "\n",
                    seekTimeUs, timeUs, seekTimeUs - timeUs);
