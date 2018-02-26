@@ -35,6 +35,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/DataSourceFactory.h>
+#include <media/stagefright/FileSource.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaClock.h>
@@ -161,30 +162,15 @@ sp<MetaData> NuPlayer2::GenericSource2::getFileFormatMeta() const {
 
 status_t NuPlayer2::GenericSource2::initFromDataSource() {
     sp<IMediaExtractor> extractor;
-    CHECK(mDataSource != NULL || mFd != -1);
+    CHECK(mDataSource != NULL);
     sp<DataSource> dataSource = mDataSource;
-    const int fd = mFd;
-    const int64_t offset = mOffset;
-    const int64_t length = mLength;
 
     mLock.unlock();
     // This might take long time if data source is not reliable.
-    if (dataSource != nullptr) {
-        extractor = MediaExtractorFactory::Create(dataSource, NULL /* mime */);
-    } else {
-        extractor = MediaExtractorFactory::CreateFromFd(
-                fd, offset, length, NULL /* mime */, &dataSource);
-    }
-
-    if (dataSource == nullptr) {
-        ALOGE("initFromDataSource, failed to create data source!");
-        mLock.lock();
-        return UNKNOWN_ERROR;
-    }
+    extractor = MediaExtractorFactory::Create(dataSource, NULL);
 
     if (extractor == NULL) {
         ALOGE("initFromDataSource, cannot create extractor!");
-        mLock.lock();
         return UNKNOWN_ERROR;
     }
 
@@ -193,13 +179,10 @@ status_t NuPlayer2::GenericSource2::initFromDataSource() {
     size_t numtracks = extractor->countTracks();
     if (numtracks == 0) {
         ALOGE("initFromDataSource, source has no track!");
-        mLock.lock();
         return UNKNOWN_ERROR;
     }
 
     mLock.lock();
-    mFd = -1;
-    mDataSource = dataSource;
     mFileMeta = fileMeta;
     if (mFileMeta != NULL) {
         int64_t duration;
@@ -408,16 +391,51 @@ void NuPlayer2::GenericSource2::onPrepareAsync() {
             if (!mDisconnected) {
                 mDataSource = dataSource;
             }
+        } else {
+            if (property_get_bool("media.stagefright.extractremote", true) &&
+                    !FileSource::requiresDrm(mFd, mOffset, mLength, nullptr /* mime */)) {
+                sp<IBinder> binder =
+                        defaultServiceManager()->getService(String16("media.extractor"));
+                if (binder != nullptr) {
+                    ALOGD("FileSource remote");
+                    sp<IMediaExtractorService> mediaExService(
+                            interface_cast<IMediaExtractorService>(binder));
+                    sp<IDataSource> source =
+                            mediaExService->makeIDataSource(mFd, mOffset, mLength);
+                    ALOGV("IDataSource(FileSource): %p %d %lld %lld",
+                            source.get(), mFd, (long long)mOffset, (long long)mLength);
+                    if (source.get() != nullptr) {
+                        mDataSource = CreateDataSourceFromIDataSource(source);
+                        if (mDataSource != nullptr) {
+                            // Close the local file descriptor as it is not needed anymore.
+                            close(mFd);
+                            mFd = -1;
+                        }
+                    } else {
+                        ALOGW("extractor service cannot make data source");
+                    }
+                } else {
+                    ALOGW("extractor service not running");
+                }
+            }
+            if (mDataSource == nullptr) {
+                ALOGD("FileSource local");
+                mDataSource = new FileSource(mFd, mOffset, mLength);
+            }
+            // TODO: close should always be done on mFd, see the lines following
+            // CreateDataSourceFromIDataSource above,
+            // and the FileSource constructor should dup the mFd argument as needed.
+            mFd = -1;
         }
 
-        if (mFd == -1 && mDataSource == NULL) {
+        if (mDataSource == NULL) {
             ALOGE("Failed to create data source!");
             notifyPreparedAndCleanup(UNKNOWN_ERROR);
             return;
         }
     }
 
-    if (mDataSource != nullptr && mDataSource->flags() & DataSource::kIsCachingDataSource) {
+    if (mDataSource->flags() & DataSource::kIsCachingDataSource) {
         mCachedSource = static_cast<NuCachedSource2 *>(mDataSource.get());
     }
 

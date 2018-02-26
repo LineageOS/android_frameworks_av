@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/DataSourceBase.h>
+#include <media/IDataSource.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 #include <utils/threads.h>
@@ -34,6 +35,11 @@ class String8;
 class DataSource : public DataSourceBase, public virtual RefBase {
 public:
     DataSource() {}
+
+    // returns a pointer to IDataSource if it is wrapped.
+    virtual sp<IDataSource> getIDataSource() const {
+        return nullptr;
+    }
 
 protected:
     virtual ~DataSource() {}
