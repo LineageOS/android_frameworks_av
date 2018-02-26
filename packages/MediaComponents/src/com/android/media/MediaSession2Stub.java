@@ -126,26 +126,26 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             throws RuntimeException {
         final MediaSession2Impl sessionImpl = getSession();
         final Context context = sessionImpl.getContext();
-        final ControllerInfo request = new ControllerInfo(context,
+        final ControllerInfo controllerInfo = new ControllerInfo(context,
                 Binder.getCallingUid(), Binder.getCallingPid(), callingPackage, caller);
         sessionImpl.getCallbackExecutor().execute(() -> {
             final MediaSession2Impl session = mSession.get();
             if (session == null) {
                 return;
             }
-            CommandGroup allowedCommands = session.getCallback().onConnect(request);
-            // Don't reject connection for the request from trusted app.
+            CommandGroup allowedCommands = session.getCallback().onConnect(controllerInfo);
+            // Don't reject connection for the controllerInfo from trusted app.
             // Otherwise server will fail to retrieve session's information to dispatch
             // media keys to.
-            boolean accept = allowedCommands != null || request.isTrusted();
-            ControllerInfoImpl impl = ControllerInfoImpl.from(request);
+            boolean accept = allowedCommands != null || controllerInfo.isTrusted();
+            ControllerInfoImpl impl = ControllerInfoImpl.from(controllerInfo);
             if (accept) {
                 if (DEBUG) {
-                    Log.d(TAG, "Accepting connection, request=" + request
+                    Log.d(TAG, "Accepting connection, controllerInfo=" + controllerInfo
                             + " allowedCommands=" + allowedCommands);
                 }
                 synchronized (mLock) {
-                    mControllers.put(impl.getId(), request);
+                    mControllers.put(impl.getId(), controllerInfo);
                 }
                 if (allowedCommands == null) {
                     // For trusted apps, send non-null allowed commands to keep connection.
@@ -195,7 +195,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 }
             } else {
                 if (DEBUG) {
-                    Log.d(TAG, "Rejecting connection, request=" + request);
+                    Log.d(TAG, "Rejecting connection, controllerInfo=" + controllerInfo);
                 }
                 try {
                     caller.onDisconnected();

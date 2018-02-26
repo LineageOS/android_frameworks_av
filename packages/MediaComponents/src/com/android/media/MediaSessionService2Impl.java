@@ -103,7 +103,7 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
 
     public IBinder onBind_impl(Intent intent) {
         if (MediaSessionService2.SERVICE_INTERFACE.equals(intent.getAction())) {
-            return SessionToken2Impl.from(mSession.getToken()).getSessionBinder().asBinder();
+            return ((MediaSession2Impl) mSession.getProvider()).getSessionStub().asBinder();
         }
         return null;
     }

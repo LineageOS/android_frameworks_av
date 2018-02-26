@@ -118,16 +118,15 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void initialize() {
-        SessionToken2Impl impl = SessionToken2Impl.from(mToken);
         // TODO(jaewan): More sanity checks.
-        if (impl.getSessionBinder() == null) {
+        if (mToken.getType() == SessionToken2.TYPE_SESSION) {
+            // Session
+            mServiceConnection = null;
+            connectToSession(SessionToken2Impl.from(mToken).getSessionBinder());
+        } else {
             // Session service
             mServiceConnection = new SessionServiceConnection();
             connectToService();
-        } else {
-            // Session
-            mServiceConnection = null;
-            connectToSession(impl.getSessionBinder());
         }
     }
 
