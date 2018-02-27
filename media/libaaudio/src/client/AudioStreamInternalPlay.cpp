@@ -38,6 +38,18 @@ AudioStreamInternalPlay::AudioStreamInternalPlay(AAudioServiceInterface  &servic
 
 AudioStreamInternalPlay::~AudioStreamInternalPlay() {}
 
+constexpr int kRampMSec = 10; // time to apply a change in volume
+
+aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder) {
+    aaudio_result_t result = AudioStreamInternal::open(builder);
+    if (result == AAUDIO_OK) {
+        // Sample rate is constrained to common values by now and should not overflow.
+        int32_t numFrames = kRampMSec * getSampleRate() / AAUDIO_MILLIS_PER_SECOND;
+        mVolumeRamp.setLengthInFrames(numFrames);
+    }
+    return result;
+}
+
 aaudio_result_t AudioStreamInternalPlay::requestPause()
 {
     aaudio_result_t result = stopCallback();
@@ -45,7 +57,7 @@ aaudio_result_t AudioStreamInternalPlay::requestPause()
         return result;
     }
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("AudioStreamInternal::requestPauseInternal() mServiceStreamHandle invalid = 0x%08X",
+        ALOGE("requestPauseInternal() mServiceStreamHandle invalid = 0x%08X",
               mServiceStreamHandle);
         return AAUDIO_ERROR_INVALID_STATE;
     }
