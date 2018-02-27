@@ -32,6 +32,7 @@
 #include <media/drm/DrmAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
+#include <media/stagefright/foundation/base64.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaErrors.h>
 #include <mediadrm/DrmHal.h>
@@ -63,8 +64,26 @@ namespace {
 // This constant corresponds to the PROPERTY_DEVICE_UNIQUE_ID constant
 // in the MediaDrm API.
 constexpr char kPropertyDeviceUniqueId[] = "deviceUniqueId";
+constexpr char kEqualsSign[] = "=";
 
+template<typename T>
+std::string toBase64StringNoPad(const T* data, size_t size) {
+    if (size == 0) {
+      return "";
+    }
+    CHECK(sizeof(data[0] == 1));
+
+    android::AString outputString;
+    encodeBase64(data, size, &outputString);
+    // Remove trailing equals padding if it exists.
+    while (outputString.size() > 0 && outputString.endsWith(kEqualsSign)) {
+        outputString.erase(outputString.size() - 1, 1);
+    }
+
+    return std::string(outputString.c_str(), outputString.size());
 }
+
+}  // anonymous namespace
 
 namespace android {
 
@@ -99,15 +118,6 @@ static String8 toString8(const hidl_string &string) {
 
 static hidl_string toHidlString(const String8& string) {
     return hidl_string(string.string());
-}
-
-std::string toHexString(const std::string& str) {
-  std::ostringstream out;
-  out << std::hex << std::setfill('0');
-  for (size_t i = 0; i < str.size(); i++) {
-    out << std::setw(2) << (int)(str[i]);
-  }
-  return out.str();
 }
 
 static DrmPlugin::SecurityLevel toSecurityLevel(SecurityLevel level) {
@@ -340,6 +350,7 @@ Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
 
 sp<IDrmPlugin> DrmHal::makeDrmPlugin(const sp<IDrmFactory>& factory,
         const uint8_t uuid[16], const String8& appPackageName) {
+    mAppPackageName = appPackageName;
     mMetrics.SetAppPackageName(appPackageName);
 
     sp<IDrmPlugin> plugin;
@@ -1353,9 +1364,10 @@ void DrmHal::reportFrameworkMetrics() const
     if (result != OK) {
         ALOGE("Failed to serialize framework metrics: %d", result);
     }
-    serializedMetrics = toHexString(serializedMetrics);
-    if (!serializedMetrics.empty()) {
-        item.setCString("serialized_metrics", serializedMetrics.c_str());
+    std::string b64EncodedMetrics = toBase64StringNoPad(serializedMetrics.data(),
+                                                        serializedMetrics.size());
+    if (!b64EncodedMetrics.empty()) {
+        item.setCString("serialized_metrics", b64EncodedMetrics.c_str());
     }
     if (!item.selfrecord()) {
         ALOGE("Failed to self record framework metrics");
@@ -1364,14 +1376,16 @@ void DrmHal::reportFrameworkMetrics() const
 
 void DrmHal::reportPluginMetrics() const
 {
-    Vector<uint8_t> metrics;
+    Vector<uint8_t> metricsVector;
     String8 vendor;
     String8 description;
     if (getPropertyStringInternal(String8("vendor"), vendor) == OK &&
             getPropertyStringInternal(String8("description"), description) == OK &&
-            getPropertyByteArrayInternal(String8("metrics"), metrics) == OK) {
-        status_t res = android::reportDrmPluginMetrics(
-                metrics, vendor, description);
+            getPropertyByteArrayInternal(String8("metrics"), metricsVector) == OK) {
+        std::string metricsString = toBase64StringNoPad(metricsVector.array(),
+                                                        metricsVector.size());
+        status_t res = android::reportDrmPluginMetrics(metricsString, vendor,
+                                                       description, mAppPackageName);
         if (res != OK) {
             ALOGE("Metrics were retrieved but could not be reported: %d", res);
         }

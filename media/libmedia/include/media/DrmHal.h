@@ -182,6 +182,7 @@ private:
     const Vector<sp<IDrmFactory>> mFactories;
     sp<IDrmPlugin> mPlugin;
     sp<drm::V1_1::IDrmPlugin> mPluginV1_1;
+    String8 mAppPackageName;
 
     // Mutable to allow modification within GetPropertyByteArray.
     mutable MediaDrmMetrics mMetrics;
