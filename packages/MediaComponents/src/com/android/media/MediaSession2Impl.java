@@ -39,6 +39,7 @@ import android.media.MediaLibraryService2;
 import android.media.MediaMetadata2;
 import android.media.MediaPlayerBase;
 import android.media.MediaPlayerBase.PlayerEventCallback;
+import android.media.MediaPlaylistController;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.Command;
@@ -202,24 +203,13 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void setPlayer_impl(MediaPlayerBase player) {
+    public void setPlayer_impl(MediaPlayerBase player, MediaPlaylistController mpcl,
+            VolumeProvider2 volumeProvider) throws IllegalArgumentException {
         ensureCallingThread();
         if (player == null) {
             throw new IllegalArgumentException("player shouldn't be null");
         }
-        setPlayer(player, null);
-    }
 
-    @Override
-    public void setPlayer_impl(MediaPlayerBase player, VolumeProvider2 volumeProvider)
-            throws IllegalArgumentException {
-        ensureCallingThread();
-        if (player == null) {
-            throw new IllegalArgumentException("player shouldn't be null");
-        }
-        if (volumeProvider == null) {
-            throw new IllegalArgumentException("volumeProvider shouldn't be null");
-        }
         setPlayer(player, volumeProvider);
     }
 
@@ -629,7 +619,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void notifyError_impl(int errorCode, int extra) {
+    public void notifyError_impl(int errorCode, Bundle extras) {
         // TODO(jaewan): Implement
     }
 
@@ -778,30 +768,30 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 = "android.media.media_session2.command.command_code";
         private static final String KEY_COMMAND_CUSTOM_COMMAND
                 = "android.media.media_session2.command.custom_command";
-        private static final String KEY_COMMAND_EXTRA
-                = "android.media.media_session2.command.extra";
+        private static final String KEY_COMMAND_EXTRAS
+                = "android.media.media_session2.command.extras";
 
         private final Command mInstance;
         private final int mCommandCode;
         // Nonnull if it's custom command
         private final String mCustomCommand;
-        private final Bundle mExtra;
+        private final Bundle mExtras;
 
         public CommandImpl(Command instance, int commandCode) {
             mInstance = instance;
             mCommandCode = commandCode;
             mCustomCommand = null;
-            mExtra = null;
+            mExtras = null;
         }
 
-        public CommandImpl(Command instance, @NonNull String action, @Nullable Bundle extra) {
+        public CommandImpl(Command instance, @NonNull String action, @Nullable Bundle extras) {
             if (action == null) {
                 throw new IllegalArgumentException("action shouldn't be null");
             }
             mInstance = instance;
             mCommandCode = COMMAND_CODE_CUSTOM;
             mCustomCommand = action;
-            mExtra = extra;
+            mExtras = extras;
         }
 
         public int getCommandCode_impl() {
@@ -812,8 +802,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
             return mCustomCommand;
         }
 
-        public @Nullable Bundle getExtra_impl() {
-            return mExtra;
+        public @Nullable Bundle getExtras_impl() {
+            return mExtras;
         }
 
         /**
@@ -823,7 +813,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             Bundle bundle = new Bundle();
             bundle.putInt(KEY_COMMAND_CODE, mCommandCode);
             bundle.putString(KEY_COMMAND_CUSTOM_COMMAND, mCustomCommand);
-            bundle.putBundle(KEY_COMMAND_EXTRA, mExtra);
+            bundle.putBundle(KEY_COMMAND_EXTRAS, mExtras);
             return bundle;
         }
 
@@ -839,7 +829,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 if (customCommand == null) {
                     return null;
                 }
-                return new Command(context, customCommand, command.getBundle(KEY_COMMAND_EXTRA));
+                return new Command(context, customCommand, command.getBundle(KEY_COMMAND_EXTRAS));
             }
         }
 
@@ -1132,8 +1122,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 = "android.media.media_session2.command_button.icon_res_id";
         private static final String KEY_DISPLAY_NAME
                 = "android.media.media_session2.command_button.display_name";
-        private static final String KEY_EXTRA
-                = "android.media.media_session2.command_button.extra";
+        private static final String KEY_EXTRAS
+                = "android.media.media_session2.command_button.extras";
         private static final String KEY_ENABLED
                 = "android.media.media_session2.command_button.enabled";
 
@@ -1141,15 +1131,15 @@ public class MediaSession2Impl implements MediaSession2Provider {
         private Command mCommand;
         private int mIconResId;
         private String mDisplayName;
-        private Bundle mExtra;
+        private Bundle mExtras;
         private boolean mEnabled;
 
         public CommandButtonImpl(Context context, @Nullable Command command, int iconResId,
-                @Nullable String displayName, Bundle extra, boolean enabled) {
+                @Nullable String displayName, Bundle extras, boolean enabled) {
             mCommand = command;
             mIconResId = iconResId;
             mDisplayName = displayName;
-            mExtra = extra;
+            mExtras = extras;
             mEnabled = enabled;
             mInstance = new CommandButton(this);
         }
@@ -1170,8 +1160,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public @Nullable Bundle getExtra_impl() {
-            return mExtra;
+        public @Nullable Bundle getExtras_impl() {
+            return mExtras;
         }
 
         @Override
@@ -1184,7 +1174,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             bundle.putBundle(KEY_COMMAND, mCommand.toBundle());
             bundle.putInt(KEY_ICON_RES_ID, mIconResId);
             bundle.putString(KEY_DISPLAY_NAME, mDisplayName);
-            bundle.putBundle(KEY_EXTRA, mExtra);
+            bundle.putBundle(KEY_EXTRAS, mExtras);
             bundle.putBoolean(KEY_ENABLED, mEnabled);
             return bundle;
         }
@@ -1197,7 +1187,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             builder.setCommand(Command.fromBundle(context, bundle.getBundle(KEY_COMMAND)));
             builder.setIconResId(bundle.getInt(KEY_ICON_RES_ID, 0));
             builder.setDisplayName(bundle.getString(KEY_DISPLAY_NAME));
-            builder.setExtra(bundle.getBundle(KEY_EXTRA));
+            builder.setExtras(bundle.getBundle(KEY_EXTRAS));
             builder.setEnabled(bundle.getBoolean(KEY_ENABLED));
             try {
                 return builder.build();
@@ -1216,7 +1206,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             private Command mCommand;
             private int mIconResId;
             private String mDisplayName;
-            private Bundle mExtra;
+            private Bundle mExtras;
             private boolean mEnabled;
 
             public BuilderImpl(Context context, CommandButton.Builder instance) {
@@ -1250,8 +1240,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
             }
 
             @Override
-            public CommandButton.Builder setExtra_impl(Bundle extra) {
-                mExtra = extra;
+            public CommandButton.Builder setExtras_impl(Bundle extras) {
+                mExtras = extras;
                 return mInstance;
             }
 
@@ -1267,7 +1257,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
                             + " and name to display");
                 }
                 return new CommandButtonImpl(
-                        mContext, mCommand, mIconResId, mDisplayName, mExtra, mEnabled).mInstance;
+                        mContext, mCommand, mIconResId, mDisplayName, mExtras, mEnabled).mInstance;
             }
         }
     }
@@ -1275,7 +1265,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     public static abstract class BuilderBaseImpl<T extends MediaSession2, C extends SessionCallback>
             implements BuilderBaseProvider<T, C> {
         final Context mContext;
-        final MediaPlayerBase mPlayer;
+        MediaPlayerBase mPlayer;
         String mId;
         Executor mCallbackExecutor;
         C mCallback;
@@ -1291,17 +1281,23 @@ public class MediaSession2Impl implements MediaSession2Provider {
          *      {@link MediaSession2} or {@link MediaController2}.
          */
         // TODO(jaewan): Also need executor
-        public BuilderBaseImpl(Context context, MediaPlayerBase player) {
+        public BuilderBaseImpl(Context context) {
             if (context == null) {
                 throw new IllegalArgumentException("context shouldn't be null");
             }
+            mContext = context;
+            // Ensure non-null
+            mId = "";
+        }
+
+        public void setPlayer_impl(MediaPlayerBase player, MediaPlaylistController mplc,
+                VolumeProvider2 volumeProvider) {
+            // TODO: Use MediaPlaylistController
             if (player == null) {
                 throw new IllegalArgumentException("player shouldn't be null");
             }
-            mContext = context;
             mPlayer = player;
-            // Ensure non-null
-            mId = "";
+            mVolumeProvider = volumeProvider;
         }
 
         public void setVolumeProvider_impl(VolumeProvider2 volumeProvider) {
@@ -1334,8 +1330,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     public static class BuilderImpl extends BuilderBaseImpl<MediaSession2, SessionCallback> {
-        public BuilderImpl(Context context, Builder instance, MediaPlayerBase player) {
-            super(context, player);
+        public BuilderImpl(Context context, Builder instance) {
+            super(context);
         }
 
         @Override
