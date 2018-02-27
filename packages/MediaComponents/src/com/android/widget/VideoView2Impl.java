@@ -22,11 +22,13 @@ import android.content.res.Resources;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
+import android.media.DataSourceDesc;
 import android.media.MediaMetadata;
 import android.media.MediaPlayer;
 import android.media.MediaPlayerBase;
 import android.media.Cea708CaptionRenderer;
 import android.media.ClosedCaptionRenderer;
+import android.media.MediaItem2;
 import android.media.MediaMetadata2;
 import android.media.Metadata;
 import android.media.PlaybackParams;
@@ -39,6 +41,7 @@ import android.media.session.MediaController;
 import android.media.session.MediaController.PlaybackInfo;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
+import android.media.SessionToken2;
 import android.media.update.VideoView2Provider;
 import android.media.update.ViewGroupProvider;
 import android.net.Uri;
@@ -234,6 +237,12 @@ public class VideoView2Impl extends BaseLayout
     }
 
     @Override
+    public SessionToken2 getMediaSessionToken_impl() {
+        // TODO: implement this
+        return null;
+    }
+
+    @Override
     public MediaControlView2 getMediaControlView2_impl() {
         return mMediaControlView;
     }
@@ -349,6 +358,16 @@ public class VideoView2Impl extends BaseLayout
     public void setVideoUri_impl(Uri uri, Map<String, String> headers) {
         mSeekWhenPrepared = 0;
         openVideo(uri, headers);
+    }
+
+    @Override
+    public void setMediaItem_impl(MediaItem2 mediaItem) {
+        // TODO: implement this
+    }
+
+    @Override
+    public void setDataSource_impl(DataSourceDesc dsd) {
+        // TODO: implement this
     }
 
     @Override
