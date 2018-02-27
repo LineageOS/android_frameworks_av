@@ -20,6 +20,7 @@ import android.content.res.Resources;
 import android.media.MediaMetadata;
 import android.media.session.MediaController;
 import android.media.session.PlaybackState;
+import android.media.SessionToken2;
 import android.media.update.MediaControlView2Provider;
 import android.media.update.ViewGroupProvider;
 import android.os.Bundle;
@@ -147,6 +148,16 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         mRoot = makeControllerView();
         mRoot.addOnLayoutChangeListener(mTitleBarLayoutChangeListener);
         mInstance.addView(mRoot);
+    }
+
+    @Override
+    public void setMediaSessionToken_impl(SessionToken2 token) {
+        // TODO: implement this
+    }
+
+    @Override
+    public void setOnFullScreenListener_impl(MediaControlView2.OnFullScreenListener l) {
+        // TODO: implement this
     }
 
     @Override
