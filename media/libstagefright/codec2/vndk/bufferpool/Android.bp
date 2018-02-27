@@ -1,5 +1,5 @@
-cc_library_shared {
-    name: "android.hardware.media.bufferpool@1.0-impl",
+cc_library {
+    name: "libstagefright_bufferpool@1.0",
     vendor_available: true,
     vndk: {
         enabled: true,
