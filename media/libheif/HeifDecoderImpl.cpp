@@ -321,8 +321,8 @@ bool HeifDecoderImpl::init(HeifStream* stream, HeifFrameInfo* frameInfo) {
 
     if (frameInfo != nullptr) {
         frameInfo->set(
-                videoFrame->mDisplayWidth,
-                videoFrame->mDisplayHeight,
+                videoFrame->mWidth,
+                videoFrame->mHeight,
                 videoFrame->mRotationAngle,
                 videoFrame->mBytesPerPixel,
                 videoFrame->mIccSize,
@@ -393,8 +393,8 @@ bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
 
     if (frameInfo != nullptr) {
         frameInfo->set(
-                videoFrame->mDisplayWidth,
-                videoFrame->mDisplayHeight,
+                videoFrame->mWidth,
+                videoFrame->mHeight,
                 videoFrame->mRotationAngle,
                 videoFrame->mBytesPerPixel,
                 videoFrame->mIccSize,
@@ -413,12 +413,12 @@ bool HeifDecoderImpl::getScanline(uint8_t* dst) {
         return false;
     }
     VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->pointer());
-    if (mCurScanline >= videoFrame->mDisplayHeight) {
+    if (mCurScanline >= videoFrame->mHeight) {
         ALOGE("no more scanline available");
         return false;
     }
     uint8_t* src = videoFrame->getFlattenedData() + videoFrame->mRowBytes * mCurScanline++;
-    memcpy(dst, src, videoFrame->mBytesPerPixel * videoFrame->mDisplayWidth);
+    memcpy(dst, src, videoFrame->mBytesPerPixel * videoFrame->mWidth);
     return true;
 }
 
@@ -430,8 +430,8 @@ size_t HeifDecoderImpl::skipScanlines(size_t count) {
 
     uint32_t oldScanline = mCurScanline;
     mCurScanline += count;
-    if (mCurScanline > videoFrame->mDisplayHeight) {
-        mCurScanline = videoFrame->mDisplayHeight;
+    if (mCurScanline > videoFrame->mHeight) {
+        mCurScanline = videoFrame->mHeight;
     }
     return (mCurScanline > oldScanline) ? (mCurScanline - oldScanline) : 0;
 }

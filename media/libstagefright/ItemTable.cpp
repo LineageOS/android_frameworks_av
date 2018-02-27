@@ -1441,16 +1441,11 @@ sp<MetaData> ItemTable::getImageMeta() {
         if (tileIndex < 0) {
             return NULL;
         }
-        // when there are tiles, (kKeyWidth, kKeyHeight) is the full tiled area,
-        // and (kKeyDisplayWidth, kKeyDisplayHeight) may be smaller than that.
-        meta->setInt32(kKeyDisplayWidth, image->width);
-        meta->setInt32(kKeyDisplayHeight, image->height);
-        int32_t gridRows = image->rows, gridCols = image->columns;
+        meta->setInt32(kKeyGridRows, image->rows);
+        meta->setInt32(kKeyGridCols, image->columns);
 
         // point image to the first tile for grid size and HVCC
         image = &mItemIdToImageMap.editValueAt(tileIndex);
-        meta->setInt32(kKeyWidth, image->width * gridCols);
-        meta->setInt32(kKeyHeight, image->height * gridRows);
         meta->setInt32(kKeyGridWidth, image->width);
         meta->setInt32(kKeyGridHeight, image->height);
         meta->setInt32(kKeyMaxInputSize, image->width * image->height * 1.5);
