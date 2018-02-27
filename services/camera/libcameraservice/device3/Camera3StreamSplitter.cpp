@@ -364,7 +364,7 @@ status_t Camera3StreamSplitter::outputBufferLocked(const sp<IGraphicBufferProduc
     // queue, no onBufferReleased is called by the buffer queue.
     // Proactively trigger the callback to avoid buffer loss.
     if (queueOutput.bufferReplaced) {
-        onBufferReleasedByOutputLocked(output, surfaceId);
+        onBufferReplacedLocked(output, surfaceId);
     }
 
     return res;
@@ -582,7 +582,16 @@ void Camera3StreamSplitter::decrementBufRefCountLocked(uint64_t id, size_t surfa
 void Camera3StreamSplitter::onBufferReleasedByOutput(
         const sp<IGraphicBufferProducer>& from) {
     ATRACE_CALL();
+    sp<Fence> fence;
+
+    int slot = BufferItem::INVALID_BUFFER_SLOT;
+    auto res = from->dequeueBuffer(&slot, &fence, mWidth, mHeight, mFormat, mProducerUsage,
+            nullptr, nullptr);
     Mutex::Autolock lock(mMutex);
+    handleOutputDequeueStatusLocked(res, slot);
+    if (res != OK) {
+        return;
+    }
 
     size_t surfaceId = 0;
     bool found = false;
@@ -598,61 +607,47 @@ void Camera3StreamSplitter::onBufferReleasedByOutput(
         return;
     }
 
-    onBufferReleasedByOutputLocked(from, surfaceId);
+    returnOutputBufferLocked(fence, from, surfaceId, slot);
 }
 
-void Camera3StreamSplitter::onBufferReleasedByOutputLocked(
+void Camera3StreamSplitter::onBufferReplacedLocked(
         const sp<IGraphicBufferProducer>& from, size_t surfaceId) {
     ATRACE_CALL();
-    sp<GraphicBuffer> buffer;
     sp<Fence> fence;
-    if (mOutputSlots[from] == nullptr) {
-        //Output surface got likely removed by client.
-        return;
-    }
-    auto outputSlots = *mOutputSlots[from];
 
     int slot = BufferItem::INVALID_BUFFER_SLOT;
     auto res = from->dequeueBuffer(&slot, &fence, mWidth, mHeight, mFormat, mProducerUsage,
             nullptr, nullptr);
-    if (res == NO_INIT) {
-        // If we just discovered that this output has been abandoned, note that,
-        // but we can't do anything else, since buffer is invalid
-        onAbandonedLocked();
-        return;
-    } else if (res == IGraphicBufferProducer::BUFFER_NEEDS_REALLOCATION) {
-        SP_LOGE("%s: Producer needs to re-allocate buffer!", __FUNCTION__);
-        SP_LOGE("%s: This should not happen with buffer allocation disabled!", __FUNCTION__);
-        return;
-    } else if (res == IGraphicBufferProducer::RELEASE_ALL_BUFFERS) {
-        SP_LOGE("%s: All slot->buffer mapping should be released!", __FUNCTION__);
-        SP_LOGE("%s: This should not happen with buffer allocation disabled!", __FUNCTION__);
-        return;
-    } else if (res == NO_MEMORY) {
-        SP_LOGE("%s: No free buffers", __FUNCTION__);
-        return;
-    } else if (res == WOULD_BLOCK) {
-        SP_LOGE("%s: Dequeue call will block", __FUNCTION__);
-        return;
-    } else if (res != OK || (slot == BufferItem::INVALID_BUFFER_SLOT)) {
-        SP_LOGE("%s: dequeue buffer from output failed (%d)", __FUNCTION__, res);
+    handleOutputDequeueStatusLocked(res, slot);
+    if (res != OK) {
         return;
     }
-    buffer = outputSlots[slot];
 
+    returnOutputBufferLocked(fence, from, surfaceId, slot);
+}
+
+void Camera3StreamSplitter::returnOutputBufferLocked(const sp<Fence>& fence,
+        const sp<IGraphicBufferProducer>& from, size_t surfaceId, int slot) {
+    sp<GraphicBuffer> buffer;
+
+    if (mOutputSlots[from] == nullptr) {
+        //Output surface got likely removed by client.
+        return;
+    }
+
+    auto outputSlots = *mOutputSlots[from];
+    buffer = outputSlots[slot];
     BufferTracker& tracker = *(mBuffers[buffer->getId()]);
     // Merge the release fence of the incoming buffer so that the fence we send
     // back to the input includes all of the outputs' fences
     if (fence != nullptr && fence->isValid()) {
         tracker.mergeFence(fence);
     }
-    SP_LOGV("%s: dequeued buffer %" PRId64 " %p from output %p", __FUNCTION__,
-            buffer->getId(), buffer.get(), from.get());
 
     auto detachBuffer = mDetachedBuffers.find(buffer->getId());
     bool detach = (detachBuffer != mDetachedBuffers.end());
     if (detach) {
-        res = from->detachBuffer(slot);
+        auto res = from->detachBuffer(slot);
         if (res == NO_ERROR) {
             outputSlots[slot] = nullptr;
         } else {
@@ -662,6 +657,26 @@ void Camera3StreamSplitter::onBufferReleasedByOutputLocked(
 
     // Check to see if this is the last outstanding reference to this buffer
     decrementBufRefCountLocked(buffer->getId(), surfaceId);
+}
+
+void Camera3StreamSplitter::handleOutputDequeueStatusLocked(status_t res, int slot) {
+    if (res == NO_INIT) {
+        // If we just discovered that this output has been abandoned, note that,
+        // but we can't do anything else, since buffer is invalid
+        onAbandonedLocked();
+    } else if (res == IGraphicBufferProducer::BUFFER_NEEDS_REALLOCATION) {
+        SP_LOGE("%s: Producer needs to re-allocate buffer!", __FUNCTION__);
+        SP_LOGE("%s: This should not happen with buffer allocation disabled!", __FUNCTION__);
+    } else if (res == IGraphicBufferProducer::RELEASE_ALL_BUFFERS) {
+        SP_LOGE("%s: All slot->buffer mapping should be released!", __FUNCTION__);
+        SP_LOGE("%s: This should not happen with buffer allocation disabled!", __FUNCTION__);
+    } else if (res == NO_MEMORY) {
+        SP_LOGE("%s: No free buffers", __FUNCTION__);
+    } else if (res == WOULD_BLOCK) {
+        SP_LOGE("%s: Dequeue call will block", __FUNCTION__);
+    } else if (res != OK || (slot == BufferItem::INVALID_BUFFER_SLOT)) {
+        SP_LOGE("%s: dequeue buffer from output failed (%d)", __FUNCTION__, res);
+    }
 }
 
 void Camera3StreamSplitter::onAbandonedLocked() {
