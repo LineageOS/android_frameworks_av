@@ -19,7 +19,7 @@
 #include <utils/Log.h>
 
 #include <cutils/properties.h>
-#include <media/DrmPluginPath.h>
+#include <mediadrm/DrmPluginPath.h>
 
 namespace android {
 

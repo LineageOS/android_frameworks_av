@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "DrmMetricsTest"
-#include "DrmMetrics.h"
+#include "mediadrm/DrmMetrics.h"
 
 #include <binder/PersistableBundle.h>
 #include <google/protobuf/text_format.h>

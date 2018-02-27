@@ -24,10 +24,10 @@
 #include <android/hardware/drm/1.1/IDrmFactory.h>
 #include <android/hardware/drm/1.1/IDrmPlugin.h>
 
-#include <media/DrmMetrics.h>
-#include <media/IDrm.h>
-#include <media/IDrmClient.h>
 #include <media/MediaAnalyticsItem.h>
+#include <mediadrm/DrmMetrics.h>
+#include <mediadrm/IDrm.h>
+#include <mediadrm/IDrmClient.h>
 #include <utils/threads.h>
 
 namespace drm = ::android::hardware::drm;

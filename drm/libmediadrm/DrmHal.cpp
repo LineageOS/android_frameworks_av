@@ -27,9 +27,6 @@
 #include <android/hidl/manager/1.0/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
 
-#include <media/DrmHal.h>
-#include <media/DrmSessionClientInterface.h>
-#include <media/DrmSessionManager.h>
 #include <media/EventMetric.h>
 #include <media/PluginMetricsReporting.h>
 #include <media/drm/DrmAPI.h>
@@ -37,6 +34,9 @@
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaErrors.h>
+#include <mediadrm/DrmHal.h>
+#include <mediadrm/DrmSessionClientInterface.h>
+#include <mediadrm/DrmSessionManager.h>
 
 using drm::V1_0::KeyedVector;
 using drm::V1_0::KeyStatusType;
