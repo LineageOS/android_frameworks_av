@@ -21,15 +21,14 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.ArrayMap;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 
 /**
- * A mock implementation of {@link MediaPlayerInterface} for testing.
+ * A mock implementation of {@link MediaPlayerBase} for testing.
  */
-public class MockPlayer implements MediaPlayerInterface {
+public class MockPlayer extends MediaPlayerBase {
     public final CountDownLatch mCountDownLatch;
 
     public boolean mPlayCalled;
@@ -43,7 +42,7 @@ public class MockPlayer implements MediaPlayerInterface {
     public boolean mSeekToCalled;
     public long mSeekPosition;
     public boolean mSetCurrentPlaylistItemCalled;
-    public int mItemIndex;
+    public MediaItem2 mCurrentItem;
     public boolean mSetPlaylistCalled;
     public boolean mSetPlaylistParamsCalled;
 
@@ -56,6 +55,11 @@ public class MockPlayer implements MediaPlayerInterface {
 
     public MockPlayer(int count) {
         mCountDownLatch = (count > 0) ? new CountDownLatch(count) : null;
+    }
+
+    @Override
+    public void close() {
+        // no-op
     }
 
     @Override
@@ -132,9 +136,9 @@ public class MockPlayer implements MediaPlayerInterface {
     }
 
     @Override
-    public void setCurrentPlaylistItem(int index) {
+    public void setCurrentPlaylistItem(MediaItem2 item) {
         mSetCurrentPlaylistItemCalled = true;
-        mItemIndex = index;
+        mCurrentItem = item;
         if (mCountDownLatch != null) {
             mCountDownLatch.countDown();
         }
@@ -144,6 +148,11 @@ public class MockPlayer implements MediaPlayerInterface {
     @Override
     public PlaybackState2 getPlaybackState() {
         return mLastPlaybackState;
+    }
+
+    @Override
+    public int getPlayerState() {
+        return mLastPlaybackState.getState();
     }
 
     @Override

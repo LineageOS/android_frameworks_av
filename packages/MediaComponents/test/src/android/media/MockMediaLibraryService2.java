@@ -23,6 +23,8 @@ import static org.junit.Assert.assertEquals;
 import android.content.Context;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
+import android.media.MediaLibraryService2.MediaLibrarySession;
+import android.media.MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback;
 import android.media.TestServiceRegistry.SessionCallbackProxy;
 import android.media.TestUtils.SyncHandler;
 import android.os.Bundle;
@@ -112,7 +114,7 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         }
         TestLibrarySessionCallback callback =
                 new TestLibrarySessionCallback(sessionCallbackProxy);
-        mSession = new MediaLibrarySessionBuilder(MockMediaLibraryService2.this, player,
+        mSession = new MediaLibrarySession.Builder(MockMediaLibraryService2.this, player,
                 executor, callback).setId(sessionId).build();
         return mSession;
     }

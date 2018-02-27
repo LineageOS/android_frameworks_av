@@ -53,8 +53,8 @@ public class SessionToken2Impl implements SessionToken2Provider {
     private final IMediaSession2 mSessionBinder;
 
     /**
-     * Public constructor for the legacy support (i.e. browser can try connecting to any browser service
-     * if it knows the service name)
+     * Public constructor for the legacy support (i.e. browser can try connecting to any browser
+     * service if it knows the service name)
      */
     public SessionToken2Impl(Context context, SessionToken2 instance,
             String packageName, String serviceName, int uid) {

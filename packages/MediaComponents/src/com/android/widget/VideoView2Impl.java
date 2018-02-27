@@ -24,7 +24,7 @@ import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.MediaPlayer;
-import android.media.MediaPlayerInterface;
+import android.media.MediaPlayerBase;
 import android.media.Cea708CaptionRenderer;
 import android.media.ClosedCaptionRenderer;
 import android.media.MediaMetadata2;
@@ -312,7 +312,7 @@ public class VideoView2Impl extends BaseLayout
     }
 
     @Override
-    public void setRouteAttributes_impl(List<String> routeCategories, MediaPlayerInterface player) {
+    public void setRouteAttributes_impl(List<String> routeCategories, MediaPlayerBase player) {
         // TODO: implement this.
     }
 
