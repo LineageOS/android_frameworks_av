@@ -2239,9 +2239,13 @@ status_t CameraService::BasicClient::startCameraOps() {
     // Transition device availability listeners from PRESENT -> NOT_AVAILABLE
     sCameraService->updateStatus(StatusInternal::NOT_AVAILABLE, mCameraIdStr);
 
+    int apiLevel = hardware::ICameraServiceProxy::CAMERA_API_LEVEL_1;
+    if (canCastToApiClient(API_2)) {
+        apiLevel = hardware::ICameraServiceProxy::CAMERA_API_LEVEL_2;
+    }
     // Transition device state to OPEN
     sCameraService->updateProxyDeviceState(ICameraServiceProxy::CAMERA_STATE_OPEN,
-            mCameraIdStr, mCameraFacing, mClientPackageName);
+            mCameraIdStr, mCameraFacing, mClientPackageName, apiLevel);
 
     return OK;
 }
@@ -2266,9 +2270,13 @@ status_t CameraService::BasicClient::finishCameraOps() {
         sCameraService->updateStatus(StatusInternal::PRESENT,
                 mCameraIdStr, rejected);
 
+        int apiLevel = hardware::ICameraServiceProxy::CAMERA_API_LEVEL_1;
+        if (canCastToApiClient(API_2)) {
+            apiLevel = hardware::ICameraServiceProxy::CAMERA_API_LEVEL_2;
+        }
         // Transition device state to CLOSED
         sCameraService->updateProxyDeviceState(ICameraServiceProxy::CAMERA_STATE_CLOSED,
-                mCameraIdStr, mCameraFacing, mClientPackageName);
+                mCameraIdStr, mCameraFacing, mClientPackageName, apiLevel);
     }
     // Always stop watching, even if no camera op is active
     if (mOpsCallback != NULL) {
@@ -2884,11 +2892,11 @@ void CameraService::CameraState::updateStatus(StatusInternal status,
 }
 
 void CameraService::updateProxyDeviceState(int newState,
-        const String8& cameraId, int facing, const String16& clientName) {
+        const String8& cameraId, int facing, const String16& clientName, int apiLevel) {
     sp<ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
     if (proxyBinder == nullptr) return;
     String16 id(cameraId);
-    proxyBinder->notifyCameraState(id, newState, facing, clientName);
+    proxyBinder->notifyCameraState(id, newState, facing, clientName, apiLevel);
 }
 
 status_t CameraService::getTorchStatusLocked(
