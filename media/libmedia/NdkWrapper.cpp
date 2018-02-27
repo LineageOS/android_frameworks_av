@@ -574,17 +574,13 @@ bool AMediaCryptoWrapper::requiresSecureDecoderComponent(const char *mime) {
 
 //////////// AMediaCodecCryptoInfoWrapper
 // static
-sp<AMediaCodecCryptoInfoWrapper> AMediaCodecCryptoInfoWrapper::Create(sp<MetaData> meta) {
-    if (meta == NULL) {
-        ALOGE("Create: Unexpected. No meta data for sample.");
-        return NULL;
-    }
+sp<AMediaCodecCryptoInfoWrapper> AMediaCodecCryptoInfoWrapper::Create(MetaDataBase &meta) {
 
     uint32_t type;
     const void *crypteddata;
     size_t cryptedsize;
 
-    if (!meta->findData(kKeyEncryptedSizes, &type, &crypteddata, &cryptedsize)) {
+    if (!meta.findData(kKeyEncryptedSizes, &type, &crypteddata, &cryptedsize)) {
         return NULL;
     }
 
@@ -597,7 +593,7 @@ sp<AMediaCodecCryptoInfoWrapper> AMediaCodecCryptoInfoWrapper::Create(sp<MetaDat
 
     const void *cleardata;
     size_t clearsize;
-    if (meta->findData(kKeyPlainSizes, &type, &cleardata, &clearsize)) {
+    if (meta.findData(kKeyPlainSizes, &type, &cleardata, &clearsize)) {
         if (clearsize != cryptedsize) {
             // The two must be of the same length.
             ALOGE("Create: mismatch cryptedsize: %zu != clearsize: %zu", cryptedsize, clearsize);
@@ -607,7 +603,7 @@ sp<AMediaCodecCryptoInfoWrapper> AMediaCodecCryptoInfoWrapper::Create(sp<MetaDat
 
     const void *key;
     size_t keysize;
-    if (meta->findData(kKeyCryptoKey, &type, &key, &keysize)) {
+    if (meta.findData(kKeyCryptoKey, &type, &key, &keysize)) {
         if (keysize != kAESBlockSize) {
             // Keys must be 16 bytes in length.
             ALOGE("Create: Keys must be %zu bytes in length: %zu", kAESBlockSize, keysize);
@@ -617,7 +613,7 @@ sp<AMediaCodecCryptoInfoWrapper> AMediaCodecCryptoInfoWrapper::Create(sp<MetaDat
 
     const void *iv;
     size_t ivsize;
-    if (meta->findData(kKeyCryptoIV, &type, &iv, &ivsize)) {
+    if (meta.findData(kKeyCryptoIV, &type, &iv, &ivsize)) {
         if (ivsize != kAESBlockSize) {
             // IVs must be 16 bytes in length.
             ALOGE("Create: IV must be %zu bytes in length: %zu", kAESBlockSize, ivsize);
@@ -626,7 +622,7 @@ sp<AMediaCodecCryptoInfoWrapper> AMediaCodecCryptoInfoWrapper::Create(sp<MetaDat
     }
 
     int32_t mode;
-    if (!meta->findInt32(kKeyCryptoMode, &mode)) {
+    if (!meta.findInt32(kKeyCryptoMode, &mode)) {
         mode = CryptoPlugin::kMode_AES_CTR;
     }
 

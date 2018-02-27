@@ -145,8 +145,8 @@ void MediaBuffer::set_range(size_t offset, size_t length) {
     mRangeLength = length;
 }
 
-sp<MetaData> MediaBuffer::meta_data() {
-    return mMetaData;
+MetaDataBase& MediaBuffer::meta_data() {
+    return *mMetaData;
 }
 
 void MediaBuffer::reset() {
@@ -170,6 +170,7 @@ MediaBuffer::~MediaBuffer() {
    if (mMemory.get() != nullptr) {
        getSharedControl()->setDeadObject();
    }
+   delete mMetaData;
 }
 
 void MediaBuffer::setObserver(MediaBufferObserver *observer) {
@@ -180,7 +181,7 @@ void MediaBuffer::setObserver(MediaBufferObserver *observer) {
 MediaBufferBase *MediaBuffer::clone() {
     MediaBuffer *buffer = new MediaBuffer(mData, mSize);
     buffer->set_range(mRangeOffset, mRangeLength);
-    buffer->mMetaData = new MetaData(*mMetaData.get());
+    buffer->mMetaData = new MetaDataBase(*mMetaData);
 
     add_ref();
     buffer->mOriginal = this;

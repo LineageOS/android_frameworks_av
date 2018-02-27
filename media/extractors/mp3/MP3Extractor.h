@@ -20,6 +20,7 @@
 
 #include <utils/Errors.h>
 #include <media/MediaExtractor.h>
+#include <media/stagefright/MetaDataBase.h>
 
 namespace android {
 
@@ -27,16 +28,18 @@ struct AMessage;
 class DataSourceBase;
 struct MP3Seeker;
 class String8;
+struct Mp3Meta;
 
 class MP3Extractor : public MediaExtractor {
 public:
-    MP3Extractor(DataSourceBase *source, const sp<AMessage> &meta);
+    MP3Extractor(DataSourceBase *source, Mp3Meta *meta);
+    ~MP3Extractor();
 
     virtual size_t countTracks();
-    virtual MediaSourceBase *getTrack(size_t index);
-    virtual sp<MetaData> getTrackMetaData(size_t index, uint32_t flags);
+    virtual MediaTrack *getTrack(size_t index);
+    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
 
-    virtual sp<MetaData> getMetaData();
+    virtual status_t getMetaData(MetaDataBase& meta);
     virtual const char * name() { return "MP3Extractor"; }
 
 private:
@@ -44,17 +47,13 @@ private:
 
     DataSourceBase *mDataSource;
     off64_t mFirstFramePos;
-    sp<MetaData> mMeta;
+    MetaDataBase mMeta;
     uint32_t mFixedHeader;
-    sp<MP3Seeker> mSeeker;
+    MP3Seeker *mSeeker;
 
     MP3Extractor(const MP3Extractor &);
     MP3Extractor &operator=(const MP3Extractor &);
 };
-
-bool SniffMP3(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *meta);
 
 }  // namespace android
 

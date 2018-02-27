@@ -22,7 +22,7 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
-import android.media.MediaPlayerInterface.EventCallback;
+import android.media.MediaPlayerBase.EventCallback;
 import android.media.MediaSession2;
 import android.media.MediaSessionService2;
 import android.media.MediaSessionService2.MediaNotification;
@@ -72,7 +72,7 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
     }
 
     @Override
-    public MediaNotification onUpdateNotification_impl(PlaybackState2 state) {
+    public MediaNotification onUpdateNotification_impl() {
         // Provide default notification UI later.
         return null;
     }
@@ -103,13 +103,13 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
 
     public IBinder onBind_impl(Intent intent) {
         if (MediaSessionService2.SERVICE_INTERFACE.equals(intent.getAction())) {
-            return SessionToken2Impl.from(mSession.getToken()).getSessionBinder().asBinder();
+            return ((MediaSession2Impl) mSession.getProvider()).getSessionStub().asBinder();
         }
         return null;
     }
 
     private void updateNotification(PlaybackState2 state) {
-        MediaNotification mediaNotification = mInstance.onUpdateNotification(state);
+        MediaNotification mediaNotification = mInstance.onUpdateNotification();
         if (mediaNotification == null) {
             return;
         }
@@ -135,7 +135,7 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
                 mediaNotification.getNotification());
     }
 
-    private class SessionServiceEventCallback implements EventCallback {
+    private class SessionServiceEventCallback extends EventCallback {
         @Override
         public void onPlaybackStateChanged(PlaybackState2 state) {
             if (state == null) {
@@ -143,7 +143,7 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
                 return;
             }
             MediaSession2Impl impl = (MediaSession2Impl) mSession.getProvider();
-            updateNotification(state);
+            updateNotification(impl.getInstance().getPlaybackState());
         }
     }
 

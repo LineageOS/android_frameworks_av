@@ -114,8 +114,8 @@ public:
         x = x >= 0xa0 ? 0x60 : x + 1;
 #endif
         (*buffer)->set_range(0, mSize);
-        (*buffer)->meta_data()->clear();
-        (*buffer)->meta_data()->setInt64(
+        (*buffer)->meta_data().clear();
+        (*buffer)->meta_data().setInt64(
                 kKeyTime, (mNumFramesOutput * 1000000) / mFrameRate);
         ++mNumFramesOutput;
 

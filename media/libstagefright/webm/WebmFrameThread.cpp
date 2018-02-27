@@ -345,8 +345,8 @@ void WebmFrameMediaSourceThread::run() {
             continue;
         }
 
-        sp<MetaData> md = buffer->meta_data();
-        CHECK(md->findInt64(kKeyTime, &timestampUs));
+        MetaDataBase &md = buffer->meta_data();
+        CHECK(md.findInt64(kKeyTime, &timestampUs));
         if (mStartTimeUs == kUninitialized) {
             mStartTimeUs = timestampUs;
         }
@@ -374,7 +374,7 @@ void WebmFrameMediaSourceThread::run() {
         CHECK_GE(timestampUs, 0ll);
 
         int32_t isSync = false;
-        md->findInt32(kKeyIsSyncFrame, &isSync);
+        md.findInt32(kKeyIsSyncFrame, &isSync);
         const sp<WebmFrame> f = new WebmFrame(
             mType,
             isSync,

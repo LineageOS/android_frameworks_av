@@ -27,10 +27,12 @@ cc_library {
         "MediaBuffer.cpp",
         "MediaBufferBase.cpp",
         "MediaBufferGroup.cpp",
-        "MediaSourceBase.cpp",
         "MediaSource.cpp",
+        "MediaTrack.cpp",
         "MediaExtractor.cpp",
         "MetaData.cpp",
+        "MetaDataBase.cpp",
+        "VorbisComment.cpp",
     ],
 
     clang: true,

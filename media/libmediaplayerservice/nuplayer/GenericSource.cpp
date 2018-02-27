@@ -27,6 +27,7 @@
 #include <media/MediaBufferHolder.h>
 #include <media/MediaExtractor.h>
 #include <media/MediaSource.h>
+#include <media/IMediaExtractorService.h>
 #include <media/IMediaHTTPService.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -161,30 +162,15 @@ sp<MetaData> NuPlayer::GenericSource::getFileFormatMeta() const {
 
 status_t NuPlayer::GenericSource::initFromDataSource() {
     sp<IMediaExtractor> extractor;
-    CHECK(mDataSource != NULL || mFd != -1);
+    CHECK(mDataSource != NULL);
     sp<DataSource> dataSource = mDataSource;
-    const int fd = mFd;
-    const int64_t offset = mOffset;
-    const int64_t length = mLength;
 
     mLock.unlock();
     // This might take long time if data source is not reliable.
-    if (dataSource != nullptr) {
-        extractor = MediaExtractorFactory::Create(dataSource, NULL /* mime */);
-    } else {
-        extractor = MediaExtractorFactory::CreateFromFd(
-                fd, offset, length, NULL /* mime */, &dataSource);
-    }
-
-    if (dataSource == nullptr) {
-        ALOGE("initFromDataSource, failed to create data source!");
-        mLock.lock();
-        return UNKNOWN_ERROR;
-    }
+    extractor = MediaExtractorFactory::Create(dataSource, NULL);
 
     if (extractor == NULL) {
         ALOGE("initFromDataSource, cannot create extractor!");
-        mLock.lock();
         return UNKNOWN_ERROR;
     }
 
@@ -193,13 +179,10 @@ status_t NuPlayer::GenericSource::initFromDataSource() {
     size_t numtracks = extractor->countTracks();
     if (numtracks == 0) {
         ALOGE("initFromDataSource, source has no track!");
-        mLock.lock();
         return UNKNOWN_ERROR;
     }
 
     mLock.lock();
-    mFd = -1;
-    mDataSource = dataSource;
     mFileMeta = fileMeta;
     if (mFileMeta != NULL) {
         int64_t duration;
@@ -403,15 +386,51 @@ void NuPlayer::GenericSource::onPrepareAsync() {
             if (!mDisconnected) {
                 mDataSource = dataSource;
             }
+        } else {
+            if (property_get_bool("media.stagefright.extractremote", true) &&
+                    !FileSource::requiresDrm(mFd, mOffset, mLength, nullptr /* mime */)) {
+                sp<IBinder> binder =
+                        defaultServiceManager()->getService(String16("media.extractor"));
+                if (binder != nullptr) {
+                    ALOGD("FileSource remote");
+                    sp<IMediaExtractorService> mediaExService(
+                            interface_cast<IMediaExtractorService>(binder));
+                    sp<IDataSource> source =
+                            mediaExService->makeIDataSource(mFd, mOffset, mLength);
+                    ALOGV("IDataSource(FileSource): %p %d %lld %lld",
+                            source.get(), mFd, (long long)mOffset, (long long)mLength);
+                    if (source.get() != nullptr) {
+                        mDataSource = CreateDataSourceFromIDataSource(source);
+                        if (mDataSource != nullptr) {
+                            // Close the local file descriptor as it is not needed anymore.
+                            close(mFd);
+                            mFd = -1;
+                        }
+                    } else {
+                        ALOGW("extractor service cannot make data source");
+                    }
+                } else {
+                    ALOGW("extractor service not running");
+                }
+            }
+            if (mDataSource == nullptr) {
+                ALOGD("FileSource local");
+                mDataSource = new FileSource(mFd, mOffset, mLength);
+            }
+            // TODO: close should always be done on mFd, see the lines following
+            // CreateDataSourceFromIDataSource above,
+            // and the FileSource constructor should dup the mFd argument as needed.
+            mFd = -1;
         }
-        if (mFd == -1 && mDataSource == NULL) {
+
+        if (mDataSource == NULL) {
             ALOGE("Failed to create data source!");
             notifyPreparedAndCleanup(UNKNOWN_ERROR);
             return;
         }
     }
 
-    if (mDataSource != nullptr && mDataSource->flags() & DataSource::kIsCachingDataSource) {
+    if (mDataSource->flags() & DataSource::kIsCachingDataSource) {
         mCachedSource = static_cast<NuCachedSource2 *>(mDataSource.get());
     }
 
@@ -1180,7 +1199,7 @@ sp<ABuffer> NuPlayer::GenericSource::mediaBufferToABuffer(
 
     if (audio && mAudioIsVorbis) {
         int32_t numPageSamples;
-        if (!mb->meta_data()->findInt32(kKeyValidSamples, &numPageSamples)) {
+        if (!mb->meta_data().findInt32(kKeyValidSamples, &numPageSamples)) {
             numPageSamples = -1;
         }
 
@@ -1191,12 +1210,12 @@ sp<ABuffer> NuPlayer::GenericSource::mediaBufferToABuffer(
     sp<AMessage> meta = ab->meta();
 
     int64_t timeUs;
-    CHECK(mb->meta_data()->findInt64(kKeyTime, &timeUs));
+    CHECK(mb->meta_data().findInt64(kKeyTime, &timeUs));
     meta->setInt64("timeUs", timeUs);
 
     if (trackType == MEDIA_TRACK_TYPE_VIDEO) {
         int32_t layerId;
-        if (mb->meta_data()->findInt32(kKeyTemporalLayerId, &layerId)) {
+        if (mb->meta_data().findInt32(kKeyTemporalLayerId, &layerId)) {
             meta->setInt32("temporal-layer-id", layerId);
         }
     }
@@ -1209,7 +1228,7 @@ sp<ABuffer> NuPlayer::GenericSource::mediaBufferToABuffer(
     }
 
     int64_t durationUs;
-    if (mb->meta_data()->findInt64(kKeyDuration, &durationUs)) {
+    if (mb->meta_data().findInt64(kKeyDuration, &durationUs)) {
         meta->setInt64("durationUs", durationUs);
     }
 
@@ -1220,14 +1239,14 @@ sp<ABuffer> NuPlayer::GenericSource::mediaBufferToABuffer(
     uint32_t dataType; // unused
     const void *seiData;
     size_t seiLength;
-    if (mb->meta_data()->findData(kKeySEI, &dataType, &seiData, &seiLength)) {
+    if (mb->meta_data().findData(kKeySEI, &dataType, &seiData, &seiLength)) {
         sp<ABuffer> sei = ABuffer::CreateAsCopy(seiData, seiLength);;
         meta->setBuffer("sei", sei);
     }
 
     const void *mpegUserDataPointer;
     size_t mpegUserDataLength;
-    if (mb->meta_data()->findData(
+    if (mb->meta_data().findData(
             kKeyMpegUserData, &dataType, &mpegUserDataPointer, &mpegUserDataLength)) {
         sp<ABuffer> mpegUserData = ABuffer::CreateAsCopy(mpegUserDataPointer, mpegUserDataLength);
         meta->setBuffer("mpegUserData", mpegUserData);
@@ -1359,8 +1378,8 @@ void NuPlayer::GenericSource::readBuffer(
         for (; id < count; ++id) {
             int64_t timeUs;
             MediaBufferBase *mbuf = mediaBuffers[id];
-            if (!mbuf->meta_data()->findInt64(kKeyTime, &timeUs)) {
-                mbuf->meta_data()->dumpToLog();
+            if (!mbuf->meta_data().findInt64(kKeyTime, &timeUs)) {
+                mbuf->meta_data().dumpToLog();
                 track->mPackets->signalEOS(ERROR_MALFORMED);
                 break;
             }

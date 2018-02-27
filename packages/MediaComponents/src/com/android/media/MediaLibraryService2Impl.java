@@ -21,9 +21,9 @@ import android.content.Context;
 import android.media.MediaLibraryService2;
 import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaLibraryService2.MediaLibrarySession;
-import android.media.MediaLibraryService2.MediaLibrarySessionBuilder;
-import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
-import android.media.MediaPlayerInterface;
+import android.media.MediaLibraryService2.MediaLibrarySession.Builder;
+import android.media.MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback;
+import android.media.MediaPlayerBase;
 import android.media.MediaSession2;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSessionService2;
@@ -67,7 +67,7 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
     public static class MediaLibrarySessionImpl extends MediaSession2Impl
             implements MediaLibrarySessionProvider {
         public MediaLibrarySessionImpl(Context context,
-                MediaPlayerInterface player, String id, VolumeProvider2 volumeProvider,
+                MediaPlayerBase player, String id, VolumeProvider2 volumeProvider,
                 PendingIntent sessionActivity, Executor callbackExecutor,
                 MediaLibrarySessionCallback callback) {
             super(context, player, id, volumeProvider, sessionActivity, callbackExecutor, callback);
@@ -130,10 +130,10 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
 
     public static class BuilderImpl
             extends BuilderBaseImpl<MediaLibrarySession, MediaLibrarySessionCallback> {
-        public BuilderImpl(Context context, MediaLibrarySessionBuilder instance,
-                MediaPlayerInterface player, Executor callbackExecutor,
+        public BuilderImpl(MediaLibraryService2 service, Builder instance,
+                MediaPlayerBase player, Executor callbackExecutor,
                 MediaLibrarySessionCallback callback) {
-            super(context, player);
+            super(service, player);
             setSessionCallback_impl(callbackExecutor, callback);
         }
 

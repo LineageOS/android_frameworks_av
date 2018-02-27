@@ -87,7 +87,7 @@ private:
 
     int                 mMaxTracks; // max number of MIDI tracks, usually 32
     EAS_DATA_HANDLE     mEasData;
-    sp<MidiIoWrapper>   mIoWrapper;
+    MidiIoWrapper*      mIoWrapper;
     EAS_PCM*            mAudioBuffer;// EAS renders the MIDI data into this buffer,
     sp<AudioTrack>      mAudioTrack; // and we play it in this audio track
     int                 mTrackBufferSize;

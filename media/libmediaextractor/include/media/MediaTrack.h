@@ -42,14 +42,14 @@ public:
     }
 };
 
-struct MediaSourceBase
+struct MediaTrack
 //    : public SourceBaseAllocTracker
 {
-    MediaSourceBase();
+    MediaTrack();
 
     // To be called before any other methods on this object, except
     // getFormat().
-    virtual status_t start(MetaData *params = NULL) = 0;
+    virtual status_t start(MetaDataBase *params = NULL) = 0;
 
     // Any blocking read call returns immediately with a result of NO_INIT.
     // It is an error to call any methods other than start after this call
@@ -59,8 +59,8 @@ struct MediaSourceBase
     // held onto by callers be released before a call to stop() !!!
     virtual status_t stop() = 0;
 
-    // Returns the format of the data output by this media source.
-    virtual sp<MetaData> getFormat() = 0;
+    // Returns the format of the data output by this media track.
+    virtual status_t getFormat(MetaDataBase& format) = 0;
 
     // Options that modify read() behaviour. The default is to
     // a) not request a seek
@@ -113,36 +113,11 @@ struct MediaSourceBase
     virtual status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL) = 0;
 
-    // Causes this source to suspend pulling data from its upstream source
-    // until a subsequent read-with-seek. This is currently not supported
-    // as such by any source. E.g. MediaCodecSource does not suspend its
-    // upstream source, and instead discard upstream data while paused.
-    virtual status_t pause() {
-        return ERROR_UNSUPPORTED;
-    }
-
-    // The consumer of this media source requests the source stops sending
-    // buffers with timestamp larger than or equal to stopTimeUs. stopTimeUs
-    // must be in the same time base as the startTime passed in start(). If
-    // source does not support this request, ERROR_UNSUPPORTED will be returned.
-    // If stopTimeUs is invalid, BAD_VALUE will be returned. This could be
-    // called at any time even before source starts and it could be called
-    // multiple times. Setting stopTimeUs to be -1 will effectively cancel the stopTimeUs
-    // set previously. If stopTimeUs is larger than or equal to last buffer's timestamp,
-    // source will start to drop buffer when it gets a buffer with timestamp larger
-    // than or equal to stopTimeUs. If stopTimeUs is smaller than or equal to last
-    // buffer's timestamp, source will drop all the incoming buffers immediately.
-    // After setting stopTimeUs, source may still stop sending buffers with timestamp
-    // less than stopTimeUs if it is stopped by the consumer.
-    virtual status_t setStopTimeUs(int64_t /* stopTimeUs */) {
-        return ERROR_UNSUPPORTED;
-    }
-
-    virtual ~MediaSourceBase();
+    virtual ~MediaTrack();
 
 private:
-    MediaSourceBase(const MediaSourceBase &);
-    MediaSourceBase &operator=(const MediaSourceBase &);
+    MediaTrack(const MediaTrack &);
+    MediaTrack &operator=(const MediaTrack &);
 };
 
 }  // namespace android

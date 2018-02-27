@@ -39,8 +39,8 @@
 #include <memunreachable/memunreachable.h>
 #include <utils/String16.h>
 #include <utils/threads.h>
-#include <utils/Atomic.h>
 
+#include <cutils/atomic.h>
 #include <cutils/properties.h>
 
 #include <system/audio.h>

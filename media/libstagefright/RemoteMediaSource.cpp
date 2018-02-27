@@ -22,7 +22,7 @@ namespace android {
 
 RemoteMediaSource::RemoteMediaSource(
         const sp<RemoteMediaExtractor> &extractor,
-        MediaSourceBase *source,
+        MediaTrack *source,
         const sp<RefBase> &plugin)
     : mExtractor(extractor),
       mSource(source),
@@ -42,7 +42,11 @@ status_t RemoteMediaSource::stop() {
 }
 
 sp<MetaData> RemoteMediaSource::getFormat() {
-    return mSource->getFormat();
+    sp<MetaData> meta = new MetaData();
+    if (mSource->getFormat(*meta.get()) == OK) {
+        return meta;
+    }
+    return nullptr;
 }
 
 status_t RemoteMediaSource::read(
@@ -51,11 +55,11 @@ status_t RemoteMediaSource::read(
 }
 
 status_t RemoteMediaSource::pause() {
-    return mSource->pause();
+    return ERROR_UNSUPPORTED;
 }
 
-status_t RemoteMediaSource::setStopTimeUs(int64_t stopTimeUs) {
-    return mSource->setStopTimeUs(stopTimeUs);
+status_t RemoteMediaSource::setStopTimeUs(int64_t /* stopTimeUs */) {
+    return ERROR_UNSUPPORTED;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -63,7 +67,7 @@ status_t RemoteMediaSource::setStopTimeUs(int64_t stopTimeUs) {
 // static
 sp<IMediaSource> RemoteMediaSource::wrap(
         const sp<RemoteMediaExtractor> &extractor,
-        MediaSourceBase *source, const sp<RefBase> &plugin) {
+        MediaTrack *source, const sp<RefBase> &plugin) {
     if (source == nullptr) {
         return nullptr;
     }

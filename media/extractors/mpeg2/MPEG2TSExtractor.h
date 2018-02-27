@@ -1,4 +1,5 @@
 /*
+
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +21,8 @@
 
 #include <media/stagefright/foundation/ABase.h>
 #include <media/MediaExtractor.h>
-#include <media/MediaSourceBase.h>
+#include <media/MediaTrack.h>
+#include <media/stagefright/MetaDataBase.h>
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
@@ -40,10 +42,10 @@ struct MPEG2TSExtractor : public MediaExtractor {
     explicit MPEG2TSExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();
-    virtual MediaSourceBase *getTrack(size_t index);
-    virtual sp<MetaData> getTrackMetaData(size_t index, uint32_t flags);
+    virtual MediaTrack *getTrack(size_t index);
+    virtual status_t getTrackMetaData(MetaDataBase &meta, size_t index, uint32_t flags);
 
-    virtual sp<MetaData> getMetaData();
+    virtual status_t getMetaData(MetaDataBase& meta);
 
     virtual status_t setMediaCas(const uint8_t* /*casToken*/, size_t /*size*/) override;
 
@@ -72,7 +74,7 @@ private:
 
     off64_t mOffset;
 
-    static bool isScrambledFormat(const sp<MetaData> &format);
+    static bool isScrambledFormat(MetaDataBase &format);
 
     void init();
     void addSource(const sp<AnotherPacketSource> &impl);

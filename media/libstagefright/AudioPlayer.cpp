@@ -543,7 +543,7 @@ size_t AudioPlayer::fillBuffer(void *data, size_t size) {
             }
 
             if(mInputBuffer->range_length() != 0) {
-                CHECK(mInputBuffer->meta_data()->findInt64(
+                CHECK(mInputBuffer->meta_data().findInt64(
                         kKeyTime, &mPositionTimeMediaUs));
             }
 

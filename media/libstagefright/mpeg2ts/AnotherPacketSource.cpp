@@ -203,23 +203,23 @@ status_t AnotherPacketSource::read(
         }
 
         MediaBufferBase *mediaBuffer = new MediaBuffer(buffer);
-        sp<MetaData> bufmeta = mediaBuffer->meta_data();
+        MetaDataBase &bufmeta = mediaBuffer->meta_data();
 
-        bufmeta->setInt64(kKeyTime, timeUs);
+        bufmeta.setInt64(kKeyTime, timeUs);
 
         int32_t isSync;
         if (buffer->meta()->findInt32("isSync", &isSync)) {
-            bufmeta->setInt32(kKeyIsSyncFrame, isSync);
+            bufmeta.setInt32(kKeyIsSyncFrame, isSync);
         }
 
         sp<ABuffer> sei;
         if (buffer->meta()->findBuffer("sei", &sei) && sei != NULL) {
-            bufmeta->setData(kKeySEI, 0, sei->data(), sei->size());
+            bufmeta.setData(kKeySEI, 0, sei->data(), sei->size());
         }
 
         sp<ABuffer> mpegUserData;
         if (buffer->meta()->findBuffer("mpegUserData", &mpegUserData) && mpegUserData != NULL) {
-            bufmeta->setData(
+            bufmeta.setData(
                     kKeyMpegUserData, 0, mpegUserData->data(), mpegUserData->size());
         }
 
@@ -234,18 +234,18 @@ status_t AnotherPacketSource::read(
             CHECK(buffer->meta()->findBuffer("encBytes", &encBytesBuffer)
                     && encBytesBuffer != NULL);
 
-            bufmeta->setInt32(kKeyCryptoMode, cryptoMode);
+            bufmeta.setInt32(kKeyCryptoMode, cryptoMode);
 
             uint8_t array[16] = {0};
-            bufmeta->setData(kKeyCryptoIV, 0, array, 16);
+            bufmeta.setData(kKeyCryptoIV, 0, array, 16);
 
             array[0] = (uint8_t) (cryptoKey & 0xff);
-            bufmeta->setData(kKeyCryptoKey, 0, array, 16);
+            bufmeta.setData(kKeyCryptoKey, 0, array, 16);
 
-            bufmeta->setData(kKeyPlainSizes, 0,
+            bufmeta.setData(kKeyPlainSizes, 0,
                     clearBytesBuffer->data(), clearBytesBuffer->size());
 
-            bufmeta->setData(kKeyEncryptedSizes, 0,
+            bufmeta.setData(kKeyEncryptedSizes, 0,
                     encBytesBuffer->data(), encBytesBuffer->size());
         }
 

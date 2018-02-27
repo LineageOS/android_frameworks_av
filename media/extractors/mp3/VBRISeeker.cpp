@@ -36,7 +36,7 @@ static uint32_t U24_AT(const uint8_t *ptr) {
 }
 
 // static
-sp<VBRISeeker> VBRISeeker::CreateFromSource(
+VBRISeeker *VBRISeeker::CreateFromSource(
         DataSourceBase *source, off64_t post_id3_pos) {
     off64_t pos = post_id3_pos;
 
@@ -87,7 +87,7 @@ sp<VBRISeeker> VBRISeeker::CreateFromSource(
         return NULL;
     }
 
-    sp<VBRISeeker> seeker = new (std::nothrow) VBRISeeker;
+    VBRISeeker *seeker = new (std::nothrow) VBRISeeker;
     if (seeker == NULL) {
         ALOGW("Couldn't allocate VBRISeeker");
         return NULL;
@@ -97,6 +97,7 @@ sp<VBRISeeker> VBRISeeker::CreateFromSource(
     uint8_t *buffer = new (std::nothrow) uint8_t[totalEntrySize];
     if (!buffer) {
         ALOGW("Couldn't allocate %zu bytes", totalEntrySize);
+        delete seeker;
         return NULL;
     }
 
@@ -104,7 +105,7 @@ sp<VBRISeeker> VBRISeeker::CreateFromSource(
     if (n < (ssize_t)totalEntrySize) {
         delete[] buffer;
         buffer = NULL;
-
+        delete seeker;
         return NULL;
     }
 

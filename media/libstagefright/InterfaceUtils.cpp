@@ -56,7 +56,7 @@ sp<MediaSource> CreateMediaSourceFromIMediaSource(const sp<IMediaSource> &source
 
 sp<IMediaSource> CreateIMediaSourceFromMediaSourceBase(
         const sp<RemoteMediaExtractor> &extractor,
-        MediaSourceBase *source, const sp<RefBase> &plugin) {
+        MediaTrack *source, const sp<RefBase> &plugin) {
     if (source == nullptr) {
         return nullptr;
     }

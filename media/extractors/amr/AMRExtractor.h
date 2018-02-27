@@ -20,6 +20,7 @@
 
 #include <utils/Errors.h>
 #include <media/MediaExtractor.h>
+#include <media/stagefright/MetaDataBase.h>
 
 namespace android {
 
@@ -32,10 +33,10 @@ public:
     explicit AMRExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();
-    virtual MediaSourceBase *getTrack(size_t index);
-    virtual sp<MetaData> getTrackMetaData(size_t index, uint32_t flags);
+    virtual MediaTrack *getTrack(size_t index);
+    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
 
-    virtual sp<MetaData> getMetaData();
+    virtual status_t getMetaData(MetaDataBase& meta);
     virtual const char * name() { return "AMRExtractor"; }
 
 protected:
@@ -43,7 +44,7 @@ protected:
 
 private:
     DataSourceBase *mDataSource;
-    sp<MetaData> mMeta;
+    MetaDataBase mMeta;
     status_t mInitCheck;
     bool mIsWide;
 
@@ -53,9 +54,6 @@ private:
     AMRExtractor(const AMRExtractor &);
     AMRExtractor &operator=(const AMRExtractor &);
 };
-
-bool SniffAMR(
-        DataSourceBase *source, String8 *mimeType, float *confidence);
 
 }  // namespace android
 

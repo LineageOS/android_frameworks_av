@@ -29,13 +29,11 @@ import android.media.MediaItem2;
 import android.media.MediaLibraryService2;
 import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaLibraryService2.MediaLibrarySession;
-import android.media.MediaLibraryService2.MediaLibrarySessionBuilder;
-import android.media.MediaLibraryService2.MediaLibrarySessionCallback;
+import android.media.MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback;
 import android.media.MediaMetadata2;
-import android.media.MediaPlayerInterface;
+import android.media.MediaPlayerBase;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
-import android.media.MediaSession2.CommandButton.Builder;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
@@ -159,12 +157,12 @@ public class ApiFactory implements StaticProvider {
 
     @Override
     public BuilderProvider createMediaSession2CommandButtonBuilder(Context context,
-            Builder instance) {
+            MediaSession2.CommandButton.Builder instance) {
         return new MediaSession2Impl.CommandButtonImpl.BuilderImpl(context, instance);
     }
 
     public BuilderBaseProvider<MediaSession2, SessionCallback> createMediaSession2Builder(
-            Context context, MediaSession2.Builder instance, MediaPlayerInterface player) {
+            Context context, MediaSession2.Builder instance, MediaPlayerBase player) {
         return new MediaSession2Impl.BuilderImpl(context, instance, player);
     }
 
@@ -189,10 +187,10 @@ public class ApiFactory implements StaticProvider {
 
     @Override
     public BuilderBaseProvider<MediaLibrarySession, MediaLibrarySessionCallback>
-        createMediaLibraryService2Builder(
-            Context context, MediaLibrarySessionBuilder instance, MediaPlayerInterface player,
+        createMediaLibraryService2Builder(MediaLibraryService2 service,
+            MediaLibrarySession.Builder instance, MediaPlayerBase player,
             Executor callbackExecutor, MediaLibrarySessionCallback callback) {
-        return new MediaLibraryService2Impl.BuilderImpl(context, instance, player, callbackExecutor,
+        return new MediaLibraryService2Impl.BuilderImpl(service, instance, player, callbackExecutor,
                 callback);
     }
 
@@ -223,7 +221,7 @@ public class ApiFactory implements StaticProvider {
     }
 
     @Override
-    public SessionToken2 SessionToken2_fromBundle(Context context, Bundle bundle) {
+    public SessionToken2 fromBundle_SessionToken2(Context context, Bundle bundle) {
         return SessionToken2Impl.fromBundle_impl(context, bundle);
     }
 

@@ -19,6 +19,7 @@
 
 #include <media/DataSourceBase.h>
 #include <media/MediaExtractor.h>
+#include <media/stagefright/MetaDataBase.h>
 #include <utils/String8.h>
 
 namespace android {
@@ -31,10 +32,10 @@ public:
     explicit FLACExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();
-    virtual MediaSourceBase *getTrack(size_t index);
-    virtual sp<MetaData> getTrackMetaData(size_t index, uint32_t flags);
+    virtual MediaTrack *getTrack(size_t index);
+    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
 
-    virtual sp<MetaData> getMetaData();
+    virtual status_t getMetaData(MetaDataBase& meta);
     virtual const char * name() { return "FLACExtractor"; }
 
 protected:
@@ -42,14 +43,12 @@ protected:
 
 private:
     DataSourceBase *mDataSource;
-    sp<FLACParser> mParser;
+    FLACParser *mParser;
     status_t mInitCheck;
-    sp<MetaData> mFileMetadata;
+    MetaDataBase mFileMetadata;
 
     // There is only one track
-    sp<MetaData> mTrackMetadata;
-
-    status_t init();
+    MetaDataBase mTrackMetadata;
 
     FLACExtractor(const FLACExtractor &);
     FLACExtractor &operator=(const FLACExtractor &);

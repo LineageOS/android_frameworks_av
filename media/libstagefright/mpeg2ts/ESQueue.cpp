@@ -633,7 +633,10 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
         mBuffer->setRange(0, mBuffer->size() - info.mLength);
 
         if (mFormat == NULL) {
-            mFormat = MakeAVCCodecSpecificData(accessUnit);
+            mFormat = new MetaData;
+            if (!MakeAVCCodecSpecificData(*mFormat, accessUnit)) {
+                mFormat.clear();
+            }
         }
 
         return accessUnit;
@@ -862,7 +865,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAAC() {
             }
             bits.skipBits(2);  // original_copy, home
 
-            mFormat = MakeAACCodecSpecificData(
+            MakeAACCodecSpecificData(*mFormat,
                     profile, sampling_freq_index, channel_configuration);
 
             mFormat->setInt32(kKeyIsADTS, true);
@@ -1005,9 +1008,9 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitH264() {
             return NULL;
         }
         if (mFormat == NULL) {
-            mFormat = MakeAVCCodecSpecificData(mBuffer);
-            if (mFormat == NULL) {
-                ALOGI("Creating dummy AVC format for scrambled content");
+            mFormat = new MetaData;
+            if (!MakeAVCCodecSpecificData(*mFormat, mBuffer)) {
+                ALOGW("Creating dummy AVC format for scrambled content");
                 mFormat = new MetaData;
                 mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
                 mFormat->setInt32(kKeyWidth, 1280);
@@ -1167,7 +1170,10 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitH264() {
             }
 
             if (mFormat == NULL) {
-                mFormat = MakeAVCCodecSpecificData(accessUnit);
+                mFormat = new MetaData;
+                if (!MakeAVCCodecSpecificData(*mFormat, accessUnit)) {
+                    mFormat.clear();
+                }
             }
 
             if (mSampleDecryptor != NULL && shrunkBytes > 0) {

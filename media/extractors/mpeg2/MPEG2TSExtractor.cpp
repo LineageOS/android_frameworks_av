@@ -24,7 +24,7 @@
 
 #include <media/DataSourceBase.h>
 #include <media/IStreamSource.h>
-#include <media/MediaSourceBase.h>
+#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
@@ -49,16 +49,16 @@ static const size_t kTSPacketSize = 188;
 static const int kMaxDurationReadSize = 250000LL;
 static const int kMaxDurationRetry = 6;
 
-struct MPEG2TSSource : public MediaSourceBase {
+struct MPEG2TSSource : public MediaTrack {
     MPEG2TSSource(
             MPEG2TSExtractor *extractor,
             const sp<AnotherPacketSource> &impl,
             bool doesSeek);
     virtual ~MPEG2TSSource();
 
-    virtual status_t start(MetaData *params = NULL);
+    virtual status_t start(MetaDataBase *params = NULL);
     virtual status_t stop();
-    virtual sp<MetaData> getFormat();
+    virtual status_t getFormat(MetaDataBase &);
 
     virtual status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL);
@@ -86,16 +86,18 @@ MPEG2TSSource::MPEG2TSSource(
 MPEG2TSSource::~MPEG2TSSource() {
 }
 
-status_t MPEG2TSSource::start(MetaData *params) {
-    return mImpl->start(params);
+status_t MPEG2TSSource::start(MetaDataBase *) {
+    return mImpl->start(NULL); // AnotherPacketSource::start() doesn't use its argument
 }
 
 status_t MPEG2TSSource::stop() {
     return mImpl->stop();
 }
 
-sp<MetaData> MPEG2TSSource::getFormat() {
-    return mImpl->getFormat();
+status_t MPEG2TSSource::getFormat(MetaDataBase &meta) {
+    sp<MetaData> implMeta = mImpl->getFormat();
+    meta = *implMeta;
+    return OK;
 }
 
 status_t MPEG2TSSource::read(
@@ -133,7 +135,7 @@ size_t MPEG2TSExtractor::countTracks() {
     return mSourceImpls.size();
 }
 
-MediaSourceBase *MPEG2TSExtractor::getTrack(size_t index) {
+MediaTrack *MPEG2TSExtractor::getTrack(size_t index) {
     if (index >= mSourceImpls.size()) {
         return NULL;
     }
@@ -144,23 +146,28 @@ MediaSourceBase *MPEG2TSExtractor::getTrack(size_t index) {
             (mSeekSyncPoints == &mSyncPoints.editItemAt(index)));
 }
 
-sp<MetaData> MPEG2TSExtractor::getTrackMetaData(
+status_t MPEG2TSExtractor::getTrackMetaData(
+        MetaDataBase &meta,
         size_t index, uint32_t /* flags */) {
-    return index < mSourceImpls.size()
+    sp<MetaData> implMeta = index < mSourceImpls.size()
         ? mSourceImpls.editItemAt(index)->getFormat() : NULL;
+    if (implMeta == NULL) {
+        return UNKNOWN_ERROR;
+    }
+    meta = *implMeta;
+    return OK;
 }
 
-sp<MetaData> MPEG2TSExtractor::getMetaData() {
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_CONTAINER_MPEG2TS);
+status_t MPEG2TSExtractor::getMetaData(MetaDataBase &meta) {
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_CONTAINER_MPEG2TS);
 
-    return meta;
+    return OK;
 }
 
 //static
-bool MPEG2TSExtractor::isScrambledFormat(const sp<MetaData> &format) {
+bool MPEG2TSExtractor::isScrambledFormat(MetaDataBase &format) {
     const char *mime;
-    return format->findCString(kKeyMIMEType, &mime)
+    return format.findCString(kKeyMIMEType, &mime)
             && (!strcasecmp(MEDIA_MIMETYPE_VIDEO_SCRAMBLED, mime)
                     || !strcasecmp(MEDIA_MIMETYPE_AUDIO_SCRAMBLED, mime));
 }
@@ -213,7 +220,7 @@ void MPEG2TSExtractor::init() {
                 if (format != NULL) {
                     haveVideo = true;
                     addSource(impl);
-                    if (!isScrambledFormat(format)) {
+                    if (!isScrambledFormat(*(format.get()))) {
                         mSyncPoints.push();
                         mSeekSyncPoints = &mSyncPoints.editTop();
                     }
@@ -229,7 +236,7 @@ void MPEG2TSExtractor::init() {
                 if (format != NULL) {
                     haveAudio = true;
                     addSource(impl);
-                    if (!isScrambledFormat(format)) {
+                    if (!isScrambledFormat(*(format.get()))) {
                         mSyncPoints.push();
                         if (!haveVideo) {
                             mSeekSyncPoints = &mSyncPoints.editTop();
@@ -470,7 +477,7 @@ uint32_t MPEG2TSExtractor::flags() const {
 }
 
 status_t MPEG2TSExtractor::seek(int64_t seekTimeUs,
-        const MediaSourceBase::ReadOptions::SeekMode &seekMode) {
+        const MediaTrack::ReadOptions::SeekMode &seekMode) {
     if (mSeekSyncPoints == NULL || mSeekSyncPoints->isEmpty()) {
         ALOGW("No sync point to seek to.");
         // ... and therefore we have nothing useful to do here.
@@ -491,18 +498,18 @@ status_t MPEG2TSExtractor::seek(int64_t seekTimeUs,
     }
 
     switch (seekMode) {
-        case MediaSourceBase::ReadOptions::SEEK_NEXT_SYNC:
+        case MediaTrack::ReadOptions::SEEK_NEXT_SYNC:
             if (index == mSeekSyncPoints->size()) {
                 ALOGW("Next sync not found; starting from the latest sync.");
                 --index;
             }
             break;
-        case MediaSourceBase::ReadOptions::SEEK_CLOSEST_SYNC:
-        case MediaSourceBase::ReadOptions::SEEK_CLOSEST:
+        case MediaTrack::ReadOptions::SEEK_CLOSEST_SYNC:
+        case MediaTrack::ReadOptions::SEEK_CLOSEST:
             ALOGW("seekMode not supported: %d; falling back to PREVIOUS_SYNC",
                     seekMode);
             // fall-through
-        case MediaSourceBase::ReadOptions::SEEK_PREVIOUS_SYNC:
+        case MediaTrack::ReadOptions::SEEK_PREVIOUS_SYNC:
             if (index == 0) {
                 ALOGW("Previous sync not found; starting from the earliest "
                         "sync.");

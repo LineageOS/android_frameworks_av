@@ -33,7 +33,7 @@ namespace android {
 struct ABuffer;
 class MediaBuffer;
 class MediaBufferObserver;
-class MetaData;
+class MetaDataBase;
 
 class MediaBuffer : public MediaBufferBase {
 public:
@@ -73,7 +73,7 @@ public:
 
     virtual void set_range(size_t offset, size_t length);
 
-    virtual sp<MetaData> meta_data();
+    MetaDataBase& meta_data();
 
     // Clears meta data and resets the range to the full extent.
     virtual void reset();
@@ -154,7 +154,7 @@ private:
 
     bool mOwnsData;
 
-    sp<MetaData> mMetaData;
+    MetaDataBase* mMetaData;
 
     MediaBuffer *mOriginal;
 

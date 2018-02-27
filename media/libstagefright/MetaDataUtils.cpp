@@ -24,33 +24,33 @@
 
 namespace android {
 
-sp<MetaData> MakeAVCCodecSpecificData(const sp<ABuffer> &accessUnit) {
+bool MakeAVCCodecSpecificData(MetaDataBase &meta, const sp<ABuffer> &accessUnit) {
     int32_t width;
     int32_t height;
     int32_t sarWidth;
     int32_t sarHeight;
     sp<ABuffer> csd = MakeAVCCodecSpecificData(accessUnit, &width, &height, &sarWidth, &sarHeight);
     if (csd == nullptr) {
-        return nullptr;
+        return false;
     }
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
 
-    meta->setData(kKeyAVCC, kTypeAVCC, csd->data(), csd->size());
-    meta->setInt32(kKeyWidth, width);
-    meta->setInt32(kKeyHeight, height);
+    meta.setData(kKeyAVCC, kTypeAVCC, csd->data(), csd->size());
+    meta.setInt32(kKeyWidth, width);
+    meta.setInt32(kKeyHeight, height);
     if (sarWidth > 0 && sarHeight > 0) {
-        meta->setInt32(kKeySARWidth, sarWidth);
-        meta->setInt32(kKeySARHeight, sarHeight);
+        meta.setInt32(kKeySARWidth, sarWidth);
+        meta.setInt32(kKeySARHeight, sarHeight);
     }
-    return meta;
+    return true;
 }
 
-sp<MetaData> MakeAACCodecSpecificData(
+bool MakeAACCodecSpecificData(
+        MetaDataBase &meta,
         unsigned profile, unsigned sampling_freq_index,
         unsigned channel_configuration) {
     if(sampling_freq_index > 11u) {
-        return nullptr;
+        return false;
     }
     int32_t sampleRate;
     int32_t channelCount;
@@ -91,15 +91,14 @@ sp<MetaData> MakeAACCodecSpecificData(
     csd[sizeof(kStaticESDS) + 1] =
         ((sampling_freq_index << 7) & 0x80) | (channel_configuration << 3);
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC);
 
-    meta->setInt32(kKeySampleRate, sampleRate);
-    meta->setInt32(kKeyChannelCount, channelCount);
+    meta.setInt32(kKeySampleRate, sampleRate);
+    meta.setInt32(kKeyChannelCount, channelCount);
 
-    meta->setData(kKeyESDS, 0, csd, csdSize);
+    meta.setData(kKeyESDS, 0, csd, csdSize);
     delete [] csd;
-    return meta;
+    return true;
 }
 
 }  // namespace android

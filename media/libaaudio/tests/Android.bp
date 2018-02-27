@@ -148,3 +148,15 @@ cc_test {
         "libutils",
     ],
 }
+
+cc_test {
+    name: "test_interference",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_interference.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}

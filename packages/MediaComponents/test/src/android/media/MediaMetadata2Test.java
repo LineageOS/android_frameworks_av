@@ -42,20 +42,20 @@ public class MediaMetadata2Test {
 
     @Test
     public void testBuilder() {
-        final Bundle extra = new Bundle();
-        extra.putString("MediaMetadata2Test", "testBuilder");
+        final Bundle extras = new Bundle();
+        extras.putString("MediaMetadata2Test", "testBuilder");
         final String title = "title";
         final long discNumber = 10;
         final Rating2 rating = Rating2.newThumbRating(mContext, true);
 
         MediaMetadata2.Builder builder = new Builder(mContext);
-        builder.setExtra(extra);
+        builder.setExtras(extras);
         builder.putString(MediaMetadata2.METADATA_KEY_DISPLAY_TITLE, title);
         builder.putLong(MediaMetadata2.METADATA_KEY_DISC_NUMBER, discNumber);
         builder.putRating(MediaMetadata2.METADATA_KEY_USER_RATING, rating);
 
         MediaMetadata2 metadata = builder.build();
-        assertTrue(TestUtils.equals(extra, metadata.getExtra()));
+        assertTrue(TestUtils.equals(extras, metadata.getExtras()));
         assertEquals(title, metadata.getString(MediaMetadata2.METADATA_KEY_DISPLAY_TITLE));
         assertEquals(discNumber, metadata.getLong(MediaMetadata2.METADATA_KEY_DISC_NUMBER));
         assertEquals(rating, metadata.getRating(MediaMetadata2.METADATA_KEY_USER_RATING));

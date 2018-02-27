@@ -23,8 +23,8 @@
 namespace android {
 
 struct ABuffer;
-sp<MetaData> MakeAVCCodecSpecificData(const sp<ABuffer> &accessUnit);
-sp<MetaData> MakeAACCodecSpecificData(unsigned profile, unsigned sampling_freq_index,
+bool MakeAVCCodecSpecificData(MetaDataBase &meta, const sp<ABuffer> &accessUnit);
+bool MakeAACCodecSpecificData(MetaDataBase &meta, unsigned profile, unsigned sampling_freq_index,
         unsigned channel_configuration);
 
 }  // namespace android

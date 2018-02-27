@@ -109,7 +109,7 @@ namespace android {
                 size_t *clearbytes,
                 size_t *encryptedbytes);
 
-        static CryptoInfo *getSampleCryptoInfo(sp<MetaData> meta);
+        static CryptoInfo *getSampleCryptoInfo(MetaDataBase &meta);
 
     };  // NuPlayerDrm
 

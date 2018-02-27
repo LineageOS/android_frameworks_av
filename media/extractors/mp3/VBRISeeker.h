@@ -27,7 +27,7 @@ namespace android {
 class DataSourceBase;
 
 struct VBRISeeker : public MP3Seeker {
-    static sp<VBRISeeker> CreateFromSource(
+    static VBRISeeker *CreateFromSource(
             DataSourceBase *source, off64_t post_id3_pos);
 
     virtual bool getDuration(int64_t *durationUs);

@@ -525,10 +525,10 @@ void NuMediaExtractor::fetchTrackSamples(TrackInfo *info,
             mbuf->release();
             continue;
         }
-        if (mbuf->meta_data()->findInt64(kKeyTime, &timeUs)) {
+        if (mbuf->meta_data().findInt64(kKeyTime, &timeUs)) {
             info->mSamples.emplace_back(mbuf, timeUs);
         } else {
-            mbuf->meta_data()->dumpToLog();
+            mbuf->meta_data().dumpToLog();
             info->mFinalResult = ERROR_MALFORMED;
             mbuf->release();
             releaseRemaining = true;
@@ -568,7 +568,7 @@ status_t NuMediaExtractor::advance() {
 status_t NuMediaExtractor::appendVorbisNumPageSamples(
         MediaBufferBase *mbuf, const sp<ABuffer> &buffer) {
     int32_t numPageSamples;
-    if (!mbuf->meta_data()->findInt32(
+    if (!mbuf->meta_data().findInt32(
             kKeyValidSamples, &numPageSamples)) {
         numPageSamples = -1;
     }
@@ -580,7 +580,7 @@ status_t NuMediaExtractor::appendVorbisNumPageSamples(
     uint32_t type;
     const void *data;
     size_t size, size2;
-    if (mbuf->meta_data()->findData(kKeyEncryptedSizes, &type, &data, &size)) {
+    if (mbuf->meta_data().findData(kKeyEncryptedSizes, &type, &data, &size)) {
         // Signal numPageSamples (a plain int32_t) is appended at the end,
         // i.e. sizeof(numPageSamples) plain bytes + 0 encrypted bytes
         if (SIZE_MAX - size < sizeof(int32_t)) {
@@ -598,9 +598,9 @@ status_t NuMediaExtractor::appendVorbisNumPageSamples(
         int32_t zero = 0;
         memcpy(adata, data, size);
         memcpy(adata + size, &zero, sizeof(zero));
-        mbuf->meta_data()->setData(kKeyEncryptedSizes, type, adata, newSize);
+        mbuf->meta_data().setData(kKeyEncryptedSizes, type, adata, newSize);
 
-        if (mbuf->meta_data()->findData(kKeyPlainSizes, &type, &data, &size2)) {
+        if (mbuf->meta_data().findData(kKeyPlainSizes, &type, &data, &size2)) {
             if (size2 != size) {
                 return ERROR_MALFORMED;
             }
@@ -613,7 +613,7 @@ status_t NuMediaExtractor::appendVorbisNumPageSamples(
         // append sizeof(numPageSamples) to plain sizes.
         int32_t int32Size = sizeof(numPageSamples);
         memcpy(adata + size, &int32Size, sizeof(int32Size));
-        mbuf->meta_data()->setData(kKeyPlainSizes, type, adata, newSize);
+        mbuf->meta_data().setData(kKeyPlainSizes, type, adata, newSize);
     }
 
     return OK;
@@ -725,7 +725,7 @@ status_t NuMediaExtractor::getSampleMeta(sp<MetaData> *sampleMeta) {
     }
 
     TrackInfo *info = &mSelectedTracks.editItemAt(minIndex);
-    *sampleMeta = info->mSamples.begin()->mBuffer->meta_data();
+    *sampleMeta = new MetaData(info->mSamples.begin()->mBuffer->meta_data());
 
     return OK;
 }

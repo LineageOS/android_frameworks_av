@@ -51,7 +51,7 @@ sp<MediaSource> CreateMediaSourceFromIMediaSource(const sp<IMediaSource> &source
 // Creates an IMediaSource wrapper to the given MediaSource.
 sp<IMediaSource> CreateIMediaSourceFromMediaSourceBase(
         const sp<RemoteMediaExtractor> &extractor,
-        MediaSourceBase *source, const sp<RefBase> &plugin);
+        MediaTrack *source, const sp<RefBase> &plugin);
 
 }  // namespace android
 
