@@ -771,7 +771,8 @@ status_t DrmHal::removeKeys(Vector<uint8_t> const &keySetId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    return toStatusT(mPlugin->removeKeys(toHidlVec(keySetId)));
+    Return<Status> status = mPlugin->removeKeys(toHidlVec(keySetId));
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
 status_t DrmHal::restoreKeys(Vector<uint8_t> const &sessionId,
@@ -781,8 +782,9 @@ status_t DrmHal::restoreKeys(Vector<uint8_t> const &sessionId,
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
-    return toStatusT(mPlugin->restoreKeys(toHidlVec(sessionId),
-                    toHidlVec(keySetId)));
+    Return<Status> status = mPlugin->restoreKeys(toHidlVec(sessionId),
+            toHidlVec(keySetId));
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
 status_t DrmHal::queryKeyStatus(Vector<uint8_t> const &sessionId,
@@ -923,13 +925,15 @@ status_t DrmHal::releaseSecureStops(Vector<uint8_t> const &ssRelease) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
+    Return<Status> status(Status::ERROR_DRM_UNKNOWN);
     if (mPluginV1_1 != NULL) {
         SecureStopRelease secureStopRelease;
         secureStopRelease.opaqueData = toHidlVec(ssRelease);
-        return toStatusT(mPluginV1_1->releaseSecureStops(secureStopRelease));
+        status = mPluginV1_1->releaseSecureStops(secureStopRelease);
+    } else {
+        status = mPlugin->releaseSecureStop(toHidlVec(ssRelease));
     }
-
-    return toStatusT(mPlugin->releaseSecureStop(toHidlVec(ssRelease)));
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
 status_t DrmHal::removeSecureStop(Vector<uint8_t> const &ssid) {
@@ -943,17 +947,21 @@ status_t DrmHal::removeSecureStop(Vector<uint8_t> const &ssid) {
         return ERROR_DRM_CANNOT_HANDLE;
     }
 
-    return toStatusT(mPluginV1_1->removeSecureStop(toHidlVec(ssid)));
+    Return<Status> status = mPluginV1_1->removeSecureStop(toHidlVec(ssid));
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
 status_t DrmHal::removeAllSecureStops() {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
+    Return<Status> status(Status::ERROR_DRM_UNKNOWN);
     if (mPluginV1_1 != NULL) {
-        return toStatusT(mPluginV1_1->removeAllSecureStops());
+        status = mPluginV1_1->removeAllSecureStops();
+    } else {
+        status = mPlugin->releaseAllSecureStops();
     }
-    return toStatusT(mPlugin->releaseAllSecureStops());
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
 status_t DrmHal::getHdcpLevels(DrmPlugin::HdcpLevel *connected,
@@ -1099,9 +1107,9 @@ status_t DrmHal::setPropertyString(String8 const &name, String8 const &value ) c
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    Status status = mPlugin->setPropertyString(toHidlString(name),
+    Return<Status> status = mPlugin->setPropertyString(toHidlString(name),
             toHidlString(value));
-    return toStatusT(status);
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
 status_t DrmHal::setPropertyByteArray(String8 const &name,
@@ -1109,9 +1117,9 @@ status_t DrmHal::setPropertyByteArray(String8 const &name,
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    Status status = mPlugin->setPropertyByteArray(toHidlString(name),
+    Return<Status> status = mPlugin->setPropertyByteArray(toHidlString(name),
             toHidlVec(value));
-    return toStatusT(status);
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
 status_t DrmHal::getMetrics(PersistableBundle* item) {
