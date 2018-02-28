@@ -123,8 +123,8 @@ status_t DataSourceBase::getSize(off64_t *size) {
     return ERROR_UNSUPPORTED;
 }
 
-String8 DataSourceBase::getMIMEType() const {
-    return String8("application/octet-stream");
+bool DataSourceBase::getUri(char *uriString __unused, size_t bufferSize __unused) {
+    return false;
 }
 
 }  // namespace android
