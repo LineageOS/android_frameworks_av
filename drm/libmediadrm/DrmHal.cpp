@@ -48,6 +48,7 @@ using drm::V1_1::SecureStopRelease;
 using drm::V1_0::SecureStopId;
 using drm::V1_1::SecurityLevel;
 using drm::V1_0::Status;
+using ::android::hardware::drm::V1_1::DrmMetricGroup;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
@@ -1122,12 +1123,48 @@ status_t DrmHal::setPropertyByteArray(String8 const &name,
     return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
-status_t DrmHal::getMetrics(PersistableBundle* item) {
-    if (item == nullptr) {
-      return UNEXPECTED_NULL;
+status_t DrmHal::getMetrics(PersistableBundle* metrics) {
+    if (metrics == nullptr) {
+        return UNEXPECTED_NULL;
+    }
+    mMetrics.Export(metrics);
+
+    // Append vendor metrics if they are supported.
+    if (mPluginV1_1 != NULL) {
+        String8 vendor;
+        String8 description;
+        if (getPropertyStringInternal(String8("vendor"), vendor) != OK
+            || vendor.isEmpty()) {
+          ALOGE("Get vendor failed or is empty");
+          vendor = "NONE";
+        }
+        if (getPropertyStringInternal(String8("description"), description) != OK
+            || description.isEmpty()) {
+          ALOGE("Get description failed or is empty.");
+          description = "NONE";
+        }
+        vendor += ".";
+        vendor += description;
+
+        hidl_vec<DrmMetricGroup> pluginMetrics;
+        status_t err = UNKNOWN_ERROR;
+
+        Return<void> status = mPluginV1_1->getMetrics(
+                [&](Status status, hidl_vec<DrmMetricGroup> pluginMetrics) {
+                    if (status != Status::OK) {
+                      ALOGV("Error getting plugin metrics: %d", status);
+                    } else {
+                        PersistableBundle pluginBundle;
+                        if (MediaDrmMetrics::HidlMetricsToBundle(
+                                pluginMetrics, &pluginBundle) == OK) {
+                            metrics->putPersistableBundle(String16(vendor), pluginBundle);
+                        }
+                    }
+                    err = toStatusT(status);
+                });
+        return status.isOk() ? err : DEAD_OBJECT;
     }
 
-    mMetrics.Export(item);
     return OK;
 }
 

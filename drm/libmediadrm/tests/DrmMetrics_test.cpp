@@ -17,6 +17,8 @@
 #define LOG_TAG "DrmMetricsTest"
 #include "mediadrm/DrmMetrics.h"
 
+#include <android/hardware/drm/1.0/types.h>
+#include <android/hardware/drm/1.1/types.h>
 #include <binder/PersistableBundle.h>
 #include <google/protobuf/text_format.h>
 #include <google/protobuf/util/message_differencer.h>
@@ -26,8 +28,11 @@
 #include "protos/metrics.pb.h"
 
 using ::android::drm_metrics::DrmFrameworkMetrics;
+using ::android::hardware::hidl_vec;
 using ::android::hardware::drm::V1_0::EventType;
 using ::android::hardware::drm::V1_0::KeyStatusType;
+using ::android::hardware::drm::V1_0::Status;
+using ::android::hardware::drm::V1_1::DrmMetricGroup;
 using ::android::os::PersistableBundle;
 using ::google::protobuf::util::MessageDifferencer;
 using ::google::protobuf::TextFormat;
@@ -343,19 +348,19 @@ TEST_F(MediaDrmMetricsTest, TimeMetricsProtoSerialization) {
   ASSERT_TRUE(metricsProto.ParseFromString(serializedMetrics));
 
   std::string expectedMetrics =
-      "get_key_request_timing { "
+      "get_key_request_time_us { "
       "  min: 1 max: 5 mean: 3.5 variance: 1 operation_count: 5 "
       "  attributes { error_code: -0x7FFFFFF8 } "
       "} "
-      "get_key_request_timing { "
+      "get_key_request_time_us { "
       "  min: 1 max: 5 mean: 3.5 variance: 1 operation_count: 5 "
       "  attributes { error_code: 0 } "
       "} "
-      "provide_key_response_timing { "
+      "provide_key_response_time_us { "
       "  min: 1 max: 5 mean: 3.5 variance: 1 operation_count: 5 "
       "  attributes { error_code: -0x7FFFFFF8 } "
       "} "
-      "provide_key_response_timing { "
+      "provide_key_response_time_us { "
       "  min: 1 max: 5 mean: 3.5 variance: 1 operation_count: 5 "
       "  attributes { error_code: 0 } "
       "} ";
@@ -410,6 +415,57 @@ TEST_F(MediaDrmMetricsTest, SessionLifetimeProtoSerialization) {
   differ.ReportDifferencesToString(&diffString);
   ASSERT_TRUE(differ.Compare(expectedMetricsProto, metricsProto))
       << diffString;
+}
+
+TEST_F(MediaDrmMetricsTest, HidlToBundleMetricsEmpty) {
+  hidl_vec<DrmMetricGroup> hidlMetricGroups;
+  PersistableBundle bundleMetricGroups;
+
+  ASSERT_EQ(OK, MediaDrmMetrics::HidlMetricsToBundle(hidlMetricGroups, &bundleMetricGroups));
+  ASSERT_EQ(0U, bundleMetricGroups.size());
+}
+
+TEST_F(MediaDrmMetricsTest, HidlToBundleMetricsMultiple) {
+  DrmMetricGroup hidlMetricGroup =
+      { { {
+              "open_session_ok",
+              { { "status", DrmMetricGroup::ValueType::INT64_TYPE, (int64_t) Status::OK, 0.0, "" } },
+              { { "count", DrmMetricGroup::ValueType::INT64_TYPE, 3, 0.0, "" } }
+          },
+          {
+              "close_session_not_opened",
+              { { "status", DrmMetricGroup::ValueType::INT64_TYPE,
+                  (int64_t) Status::ERROR_DRM_SESSION_NOT_OPENED, 0.0, "" } },
+              { { "count", DrmMetricGroup::ValueType::INT64_TYPE, 7, 0.0, "" } }
+          } } };
+
+  PersistableBundle bundleMetricGroups;
+  ASSERT_EQ(OK, MediaDrmMetrics::HidlMetricsToBundle(hidl_vec<DrmMetricGroup>({hidlMetricGroup}),
+                                                     &bundleMetricGroups));
+  ASSERT_EQ(1U, bundleMetricGroups.size());
+  PersistableBundle bundleMetricGroup;
+  ASSERT_TRUE(bundleMetricGroups.getPersistableBundle(String16("0"), &bundleMetricGroup));
+  ASSERT_EQ(2U, bundleMetricGroup.size());
+
+  // Verify each metric.
+  PersistableBundle metric;
+  ASSERT_TRUE(bundleMetricGroup.getPersistableBundle(String16("open_session_ok"), &metric));
+  int64_t value = 0;
+  ASSERT_TRUE(metric.getLong(String16("count"), &value));
+  ASSERT_EQ(3, value);
+  PersistableBundle attributeBundle;
+  ASSERT_TRUE(metric.getPersistableBundle(String16("attributes"), &attributeBundle));
+  ASSERT_TRUE(attributeBundle.getLong(String16("status"), &value));
+  ASSERT_EQ((int64_t) Status::OK, value);
+
+  ASSERT_TRUE(bundleMetricGroup.getPersistableBundle(String16("close_session_not_opened"),
+                                                     &metric));
+  ASSERT_TRUE(metric.getLong(String16("count"), &value));
+  ASSERT_EQ(7, value);
+  ASSERT_TRUE(metric.getPersistableBundle(String16("attributes"), &attributeBundle));
+  value = 0;
+  ASSERT_TRUE(attributeBundle.getLong(String16("status"), &value));
+  ASSERT_EQ((int64_t) Status::ERROR_DRM_SESSION_NOT_OPENED, value);
 }
 
 }  // namespace android

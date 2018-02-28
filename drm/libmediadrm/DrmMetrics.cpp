@@ -29,8 +29,10 @@
 using ::android::String16;
 using ::android::String8;
 using ::android::drm_metrics::DrmFrameworkMetrics;
+using ::android::hardware::hidl_vec;
 using ::android::hardware::drm::V1_0::EventType;
 using ::android::hardware::drm::V1_0::KeyStatusType;
+using ::android::hardware::drm::V1_1::DrmMetricGroup;
 using ::android::os::PersistableBundle;
 
 namespace {
@@ -170,6 +172,24 @@ std::string ToHexString(const android::Vector<uint8_t> &sessionId) {
         out << std::setw(2) << (int)(sessionId[i]);
     }
     return out.str();
+}
+
+template <typename CT>
+void SetValue(const String16 &name, DrmMetricGroup::ValueType type,
+              const CT &value, PersistableBundle *bundle) {
+    switch (type) {
+    case DrmMetricGroup::ValueType::INT64_TYPE:
+        bundle->putLong(name, value.int64Value);
+        break;
+    case DrmMetricGroup::ValueType::DOUBLE_TYPE:
+        bundle->putDouble(name, value.doubleValue);
+        break;
+    case DrmMetricGroup::ValueType::STRING_TYPE:
+        bundle->putString(name, String16(value.stringValue.c_str()));
+        break;
+    default:
+        ALOGE("Unexpected value type: %hhu", type);
+    }
 }
 
 } // namespace
@@ -337,6 +357,48 @@ int64_t MediaDrmMetrics::GetCurrentTimeMs() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return ((int64_t)tv.tv_sec * 1000) + ((int64_t)tv.tv_usec / 1000);
+}
+
+status_t MediaDrmMetrics::HidlMetricsToBundle(
+    const hidl_vec<DrmMetricGroup> &hidlMetricGroups,
+    PersistableBundle *bundleMetricGroups) {
+    if (bundleMetricGroups == nullptr) {
+        return UNEXPECTED_NULL;
+    }
+    if (hidlMetricGroups.size() == 0) {
+        return OK;
+    }
+
+    int groupIndex = 0;
+    for (const auto &hidlMetricGroup : hidlMetricGroups) {
+        PersistableBundle bundleMetricGroup;
+        for (const auto &hidlMetric : hidlMetricGroup.metrics) {
+            PersistableBundle bundleMetric;
+            // Add metric component values.
+            for (const auto &value : hidlMetric.values) {
+                SetValue(String16(value.componentName.c_str()), value.type,
+                         value, &bundleMetric);
+            }
+            // Set metric attributes.
+            PersistableBundle bundleMetricAttributes;
+            for (const auto &attribute : hidlMetric.attributes) {
+                SetValue(String16(attribute.name.c_str()), attribute.type,
+                         attribute, &bundleMetricAttributes);
+            }
+            // Add attributes to the bundle metric.
+            bundleMetric.putPersistableBundle(String16("attributes"),
+                                              bundleMetricAttributes);
+            // Add the bundle metric to the group of metrics.
+            bundleMetricGroup.putPersistableBundle(
+                String16(hidlMetric.name.c_str()), bundleMetric);
+        }
+        // Add the bundle metric group to the collection of groups.
+        bundleMetricGroups->putPersistableBundle(
+            String16(std::to_string(groupIndex).c_str()), bundleMetricGroup);
+        groupIndex++;
+    }
+
+    return OK;
 }
 
 } // namespace android
