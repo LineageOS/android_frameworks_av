@@ -46,6 +46,7 @@ import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.os.UserHandle;
 import android.support.annotation.GuardedBy;
+import android.text.TextUtils;
 import android.util.Log;
 
 import java.util.ArrayList;
@@ -380,6 +381,9 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void prepareFromUri_impl(Uri uri, Bundle extras) {
         final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PREPARE_FROM_URI);
+        if (uri == null) {
+            throw new IllegalArgumentException("uri shouldn't be null");
+        }
         if (binder != null) {
             try {
                 binder.prepareFromUri(mSessionCallbackStub, uri, extras);
@@ -394,6 +398,9 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void prepareFromSearch_impl(String query, Bundle extras) {
         final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PREPARE_FROM_SEARCH);
+        if (TextUtils.isEmpty(query)) {
+            throw new IllegalArgumentException("query shouldn't be empty");
+        }
         if (binder != null) {
             try {
                 binder.prepareFromSearch(mSessionCallbackStub, query, extras);
@@ -406,8 +413,11 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public void prepareMediaId_impl(String mediaId, Bundle extras) {
+    public void prepareFromMediaId_impl(String mediaId, Bundle extras) {
         final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PREPARE_FROM_MEDIA_ID);
+        if (mediaId == null) {
+            throw new IllegalArgumentException("mediaId shouldn't be null");
+        }
         if (binder != null) {
             try {
                 binder.prepareFromMediaId(mSessionCallbackStub, mediaId, extras);
@@ -422,6 +432,9 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void playFromUri_impl(Uri uri, Bundle extras) {
         final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAY_FROM_URI);
+        if (uri == null) {
+            throw new IllegalArgumentException("uri shouldn't be null");
+        }
         if (binder != null) {
             try {
                 binder.playFromUri(mSessionCallbackStub, uri, extras);
@@ -436,6 +449,9 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void playFromSearch_impl(String query, Bundle extras) {
         final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAY_FROM_SEARCH);
+        if (TextUtils.isEmpty(query)) {
+            throw new IllegalArgumentException("query shouldn't be empty");
+        }
         if (binder != null) {
             try {
                 binder.playFromSearch(mSessionCallbackStub, query, extras);
@@ -450,6 +466,9 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void playFromMediaId_impl(String mediaId, Bundle extras) {
         final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAY_FROM_MEDIA_ID);
+        if (mediaId == null) {
+            throw new IllegalArgumentException("mediaId shouldn't be null");
+        }
         if (binder != null) {
             try {
                 binder.playFromMediaId(mSessionCallbackStub, mediaId, extras);
@@ -523,6 +542,9 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void seekTo_impl(long pos) {
+        if (pos < 0) {
+            throw new IllegalArgumentException("position shouldn't be negative");
+        }
         Bundle args = new Bundle();
         args.putLong(MediaSession2Stub.ARGUMENT_KEY_POSITION, pos);
         sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO, args);
@@ -530,6 +552,10 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void skipToPlaylistItem_impl(MediaItem2 item) {
+        if (item == null) {
+            throw new IllegalArgumentException("item shouldn't be null");
+        }
+
         // TODO(jaewan): Implement this
         /*
         Bundle args = new Bundle();
@@ -549,16 +575,31 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void addPlaylistItem_impl(int index, MediaItem2 item) {
         // TODO(jaewan): Implement (b/73149584)
+        if (index < 0) {
+            throw new IllegalArgumentException("index shouldn't be negative");
+        }
+        if (item == null) {
+            throw new IllegalArgumentException("item shouldn't be null");
+        }
     }
 
     @Override
     public void removePlaylistItem_impl(MediaItem2 item) {
         // TODO(jaewan): Implement (b/73149584)
+        if (item == null) {
+            throw new IllegalArgumentException("item shouldn't be null");
+        }
     }
 
     @Override
     public void replacePlaylistItem_impl(int index, MediaItem2 item) {
         // TODO: Implement this (b/73149407)
+        if (index < 0) {
+            throw new IllegalArgumentException("index shouldn't be negative");
+        }
+        if (item == null) {
+            throw new IllegalArgumentException("item shouldn't be null");
+        }
     }
 
     @Override
@@ -578,7 +619,7 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void setPlaylistParams_impl(PlaylistParams params) {
         if (params == null) {
-            throw new IllegalArgumentException("PlaylistParams should not be null!");
+            throw new IllegalArgumentException("params shouldn't be null");
         }
         Bundle args = new Bundle();
         args.putBundle(MediaSession2Stub.ARGUMENT_KEY_PLAYLIST_PARAMS, params.toBundle());
@@ -651,15 +692,7 @@ public class MediaController2Impl implements MediaController2Provider {
         });
     }
 
-    void pushPlaylistChanges(final List<Bundle> list) {
-        final List<MediaItem2> playlist = new ArrayList<>();
-        for (int i = 0; i < list.size(); i++) {
-            MediaItem2 item = MediaItem2.fromBundle(mContext, list.get(i));
-            if (item != null) {
-                playlist.add(item);
-            }
-        }
-
+    void pushPlaylistChanges(final List<MediaItem2> playlist) {
         synchronized (mLock) {
             mPlaylist = playlist;
             mCallbackExecutor.execute(() -> {
