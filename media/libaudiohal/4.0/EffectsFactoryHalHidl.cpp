@@ -25,13 +25,14 @@
 #include "EffectsFactoryHalHidl.h"
 #include "HidlUtils.h"
 
-using ::android::hardware::audio::common::V2_0::HidlUtils;
-using ::android::hardware::audio::common::V2_0::Uuid;
-using ::android::hardware::audio::effect::V2_0::IEffect;
-using ::android::hardware::audio::effect::V2_0::Result;
+using ::android::hardware::audio::common::V4_0::HidlUtils;
+using ::android::hardware::audio::common::V4_0::Uuid;
+using ::android::hardware::audio::effect::V4_0::IEffect;
+using ::android::hardware::audio::effect::V4_0::Result;
 using ::android::hardware::Return;
 
 namespace android {
+namespace V4_0 {
 
 EffectsFactoryHalHidl::EffectsFactoryHalHidl() : ConversionHelperHidl("EffectsFactory") {
     mEffectsFactory = IEffectsFactory::getService();
@@ -147,4 +148,5 @@ status_t EffectsFactoryHalHidl::mirrorBuffer(void* external, size_t size,
 }
 
 
+} // namespace V4_0
 } // namespace android

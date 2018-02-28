@@ -14,19 +14,20 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_CONVERSION_HELPER_HIDL_H
-#define ANDROID_HARDWARE_CONVERSION_HELPER_HIDL_H
+#ifndef ANDROID_HARDWARE_CONVERSION_HELPER_HIDL_4_0_H
+#define ANDROID_HARDWARE_CONVERSION_HELPER_HIDL_4_0_H
 
-#include <android/hardware/audio/2.0/types.h>
+#include <android/hardware/audio/4.0/types.h>
 #include <hidl/HidlSupport.h>
 #include <utils/String8.h>
 
-using ::android::hardware::audio::V2_0::ParameterValue;
+using ::android::hardware::audio::V4_0::ParameterValue;
 using ::android::hardware::Return;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 
 namespace android {
+namespace V4_0 {
 
 class ConversionHelperHidl {
   protected:
@@ -54,7 +55,7 @@ class ConversionHelperHidl {
         return ret.isOk() ? OK : FAILED_TRANSACTION;
     }
 
-    status_t processReturn(const char* funcName, const Return<hardware::audio::V2_0::Result>& ret) {
+    status_t processReturn(const char* funcName, const Return<hardware::audio::V4_0::Result>& ret) {
         if (!ret.isOk()) {
             emitError(funcName, ret.description().c_str());
         }
@@ -63,7 +64,7 @@ class ConversionHelperHidl {
 
     template<typename T>
     status_t processReturn(
-            const char* funcName, const Return<T>& ret, hardware::audio::V2_0::Result retval) {
+            const char* funcName, const Return<T>& ret, hardware::audio::V4_0::Result retval) {
         if (!ret.isOk()) {
             emitError(funcName, ret.description().c_str());
         }
@@ -73,11 +74,12 @@ class ConversionHelperHidl {
   private:
     const char* mClassName;
 
-    static status_t analyzeResult(const hardware::audio::V2_0::Result& result);
+    static status_t analyzeResult(const hardware::audio::V4_0::Result& result);
 
     void emitError(const char* funcName, const char* description);
 };
 
+}  // namespace V4_0
 }  // namespace android
 
-#endif // ANDROID_HARDWARE_CONVERSION_HELPER_HIDL_H
+#endif // ANDROID_HARDWARE_CONVERSION_HELPER_HIDL_4_0_H

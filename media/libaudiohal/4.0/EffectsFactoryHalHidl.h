@@ -14,19 +14,20 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_H
-#define ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_H
+#ifndef ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_4_0_H
+#define ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_4_0_H
 
-#include <android/hardware/audio/effect/2.0/IEffectsFactory.h>
-#include <android/hardware/audio/effect/2.0/types.h>
+#include <android/hardware/audio/effect/4.0/IEffectsFactory.h>
+#include <android/hardware/audio/effect/4.0/types.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 
 #include "ConversionHelperHidl.h"
 
 namespace android {
+namespace V4_0 {
 
-using ::android::hardware::audio::effect::V2_0::EffectDescriptor;
-using ::android::hardware::audio::effect::V2_0::IEffectsFactory;
+using ::android::hardware::audio::effect::V4_0::EffectDescriptor;
+using ::android::hardware::audio::effect::V4_0::IEffectsFactory;
 using ::android::hardware::hidl_vec;
 
 class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public ConversionHelperHidl
@@ -68,6 +69,7 @@ class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public Conversi
     status_t queryAllDescriptors();
 };
 
+} // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_H
+#endif // ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_4_0_H
