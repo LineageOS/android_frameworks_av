@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_STREAM_POWER_LOG_H
-#define ANDROID_HARDWARE_STREAM_POWER_LOG_H
+#ifndef ANDROID_HARDWARE_STREAM_POWER_LOG_4_0_H
+#define ANDROID_HARDWARE_STREAM_POWER_LOG_4_0_H
 
 #include <audio_utils/clock.h>
 #include <audio_utils/PowerLog.h>
@@ -23,6 +23,7 @@
 #include <system/audio.h>
 
 namespace android {
+namespace V4_0 {
 
 class StreamPowerLog {
 public:
@@ -97,6 +98,7 @@ private:
     size_t mFrameSize;
 };
 
+} // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_STREAM_POWER_LOG_H
+#endif // ANDROID_HARDWARE_STREAM_POWER_LOG_4_0_H

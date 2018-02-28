@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_H
-#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_H
+#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_4_0_H
+#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_4_0_H
 
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 
 namespace android {
+namespace V4_0 {
 
 class DevicesFactoryHalHybrid : public DevicesFactoryHalInterface
 {
@@ -42,6 +43,7 @@ class DevicesFactoryHalHybrid : public DevicesFactoryHalInterface
     sp<DevicesFactoryHalInterface> mHidlFactory;
 };
 
+} // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_H
+#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_4_0_H

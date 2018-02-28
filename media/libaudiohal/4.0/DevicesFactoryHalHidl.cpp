@@ -19,7 +19,7 @@
 #define LOG_TAG "DevicesFactoryHalHidl"
 //#define LOG_NDEBUG 0
 
-#include <android/hardware/audio/2.0/IDevice.h>
+#include <android/hardware/audio/4.0/IDevice.h>
 #include <media/audiohal/hidl/HalDeathHandler.h>
 #include <utils/Log.h>
 
@@ -27,11 +27,12 @@
 #include "DeviceHalHidl.h"
 #include "DevicesFactoryHalHidl.h"
 
-using ::android::hardware::audio::V2_0::IDevice;
-using ::android::hardware::audio::V2_0::Result;
+using ::android::hardware::audio::V4_0::IDevice;
+using ::android::hardware::audio::V4_0::Result;
 using ::android::hardware::Return;
 
 namespace android {
+namespace V4_0 {
 
 DevicesFactoryHalHidl::DevicesFactoryHalHidl() {
     mDevicesFactory = IDevicesFactory::getService();
@@ -95,4 +96,5 @@ status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterfa
     return FAILED_TRANSACTION;
 }
 
+} // namespace V4_0
 } // namespace android

@@ -17,7 +17,7 @@
 #define LOG_TAG "StreamHalHidl"
 //#define LOG_NDEBUG 0
 
-#include <android/hardware/audio/2.0/IStreamOutCallback.h>
+#include <android/hardware/audio/4.0/IStreamOutCallback.h>
 #include <hwbinder/IPCThreadState.h>
 #include <mediautils/SchedulingPolicyService.h>
 #include <utils/Log.h>
@@ -26,23 +26,24 @@
 #include "EffectHalHidl.h"
 #include "StreamHalHidl.h"
 
-using ::android::hardware::audio::common::V2_0::AudioChannelMask;
-using ::android::hardware::audio::common::V2_0::AudioFormat;
-using ::android::hardware::audio::common::V2_0::ThreadInfo;
-using ::android::hardware::audio::V2_0::AudioDrain;
-using ::android::hardware::audio::V2_0::IStreamOutCallback;
-using ::android::hardware::audio::V2_0::MessageQueueFlagBits;
-using ::android::hardware::audio::V2_0::MmapBufferInfo;
-using ::android::hardware::audio::V2_0::MmapPosition;
-using ::android::hardware::audio::V2_0::ParameterValue;
-using ::android::hardware::audio::V2_0::Result;
-using ::android::hardware::audio::V2_0::TimeSpec;
+using ::android::hardware::audio::common::V4_0::AudioChannelMask;
+using ::android::hardware::audio::common::V4_0::AudioFormat;
+using ::android::hardware::audio::common::V4_0::ThreadInfo;
+using ::android::hardware::audio::V4_0::AudioDrain;
+using ::android::hardware::audio::V4_0::IStreamOutCallback;
+using ::android::hardware::audio::V4_0::MessageQueueFlagBits;
+using ::android::hardware::audio::V4_0::MmapBufferInfo;
+using ::android::hardware::audio::V4_0::MmapPosition;
+using ::android::hardware::audio::V4_0::ParameterValue;
+using ::android::hardware::audio::V4_0::Result;
+using ::android::hardware::audio::V4_0::TimeSpec;
 using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
-using ReadCommand = ::android::hardware::audio::V2_0::IStreamIn::ReadCommand;
+using ReadCommand = ::android::hardware::audio::V4_0::IStreamIn::ReadCommand;
 
 namespace android {
+namespace V4_0 {
 
 StreamHalHidl::StreamHalHidl(IStream *stream)
         : ConversionHelperHidl("Stream"),
@@ -749,4 +750,5 @@ status_t StreamInHalHidl::getCapturePosition(int64_t *frames, int64_t *time) {
     }
 }
 
+} // namespace V4_0
 } // namespace android

@@ -19,7 +19,7 @@
 #define LOG_TAG "DeviceHalHidl"
 //#define LOG_NDEBUG 0
 
-#include <android/hardware/audio/2.0/IPrimaryDevice.h>
+#include <android/hardware/audio/4.0/IPrimaryDevice.h>
 #include <cutils/native_handle.h>
 #include <hwbinder/IPCThreadState.h>
 #include <utils/Log.h>
@@ -28,24 +28,25 @@
 #include "HidlUtils.h"
 #include "StreamHalHidl.h"
 
-using ::android::hardware::audio::common::V2_0::AudioConfig;
-using ::android::hardware::audio::common::V2_0::AudioDevice;
-using ::android::hardware::audio::common::V2_0::AudioInputFlag;
-using ::android::hardware::audio::common::V2_0::AudioOutputFlag;
-using ::android::hardware::audio::common::V2_0::AudioPatchHandle;
-using ::android::hardware::audio::common::V2_0::AudioPort;
-using ::android::hardware::audio::common::V2_0::AudioPortConfig;
-using ::android::hardware::audio::common::V2_0::AudioMode;
-using ::android::hardware::audio::common::V2_0::AudioSource;
-using ::android::hardware::audio::common::V2_0::HidlUtils;
-using ::android::hardware::audio::V2_0::DeviceAddress;
-using ::android::hardware::audio::V2_0::IPrimaryDevice;
-using ::android::hardware::audio::V2_0::ParameterValue;
-using ::android::hardware::audio::V2_0::Result;
+using ::android::hardware::audio::common::V4_0::AudioConfig;
+using ::android::hardware::audio::common::V4_0::AudioDevice;
+using ::android::hardware::audio::common::V4_0::AudioInputFlag;
+using ::android::hardware::audio::common::V4_0::AudioOutputFlag;
+using ::android::hardware::audio::common::V4_0::AudioPatchHandle;
+using ::android::hardware::audio::common::V4_0::AudioPort;
+using ::android::hardware::audio::common::V4_0::AudioPortConfig;
+using ::android::hardware::audio::common::V4_0::AudioMode;
+using ::android::hardware::audio::common::V4_0::AudioSource;
+using ::android::hardware::audio::common::V4_0::HidlUtils;
+using ::android::hardware::audio::V4_0::DeviceAddress;
+using ::android::hardware::audio::V4_0::IPrimaryDevice;
+using ::android::hardware::audio::V4_0::ParameterValue;
+using ::android::hardware::audio::V4_0::Result;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 
 namespace android {
+namespace V4_0 {
 
 namespace {
 
@@ -355,4 +356,5 @@ status_t DeviceHalHidl::dump(int fd) {
     return processReturn("dump", ret);
 }
 
+} // namespace V4_0
 } // namespace android
