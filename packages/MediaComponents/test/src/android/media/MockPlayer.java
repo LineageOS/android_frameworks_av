@@ -46,7 +46,7 @@ public class MockPlayer extends MediaPlayerBase {
     public boolean mSetPlaylistCalled;
     public boolean mSetPlaylistParamsCalled;
 
-    public ArrayMap<EventCallback, Executor> mCallbacks = new ArrayMap<>();
+    public ArrayMap<PlayerEventCallback, Executor> mCallbacks = new ArrayMap<>();
     public List<MediaItem2> mPlaylist;
     public PlaylistParams mPlaylistParams;
 
@@ -78,6 +78,8 @@ public class MockPlayer extends MediaPlayerBase {
         }
     }
 
+    // TODO: Uncomment or remove
+    /*
     @Override
     public void stop() {
         mStopCalled = true;
@@ -85,7 +87,10 @@ public class MockPlayer extends MediaPlayerBase {
             mCountDownLatch.countDown();
         }
     }
+    */
 
+    // TODO: Uncomment or remove
+    /*
     @Override
     public void skipToPrevious() {
         mSkipToPreviousCalled = true;
@@ -93,6 +98,7 @@ public class MockPlayer extends MediaPlayerBase {
             mCountDownLatch.countDown();
         }
     }
+    */
 
     @Override
     public void skipToNext() {
@@ -110,6 +116,8 @@ public class MockPlayer extends MediaPlayerBase {
         }
     }
 
+    // TODO: Uncomment or remove
+    /*
     @Override
     public void fastForward() {
         mFastForwardCalled = true;
@@ -117,7 +125,10 @@ public class MockPlayer extends MediaPlayerBase {
             mCountDownLatch.countDown();
         }
     }
+    */
 
+    // TODO: Uncomment or remove
+    /*
     @Override
     public void rewind() {
         mRewindCalled = true;
@@ -125,6 +136,7 @@ public class MockPlayer extends MediaPlayerBase {
             mCountDownLatch.countDown();
         }
     }
+    */
 
     @Override
     public void seekTo(long pos) {
@@ -135,6 +147,8 @@ public class MockPlayer extends MediaPlayerBase {
         }
     }
 
+    // TODO: Uncomment or remove
+    /*
     @Override
     public void setCurrentPlaylistItem(MediaItem2 item) {
         mSetCurrentPlaylistItemCalled = true;
@@ -143,12 +157,16 @@ public class MockPlayer extends MediaPlayerBase {
             mCountDownLatch.countDown();
         }
     }
+    */
 
+    // TODO: Uncomment or remove
+    /*
     @Nullable
     @Override
     public PlaybackState2 getPlaybackState() {
         return mLastPlaybackState;
     }
+    */
 
     @Override
     public int getPlayerState() {
@@ -156,51 +174,71 @@ public class MockPlayer extends MediaPlayerBase {
     }
 
     @Override
-    public void registerEventCallback(@NonNull Executor executor,
-            @NonNull EventCallback callback) {
+    public int getBufferingState() {
+        // TODO: implement this
+        return -1;
+    }
+
+    @Override
+    public void registerPlayerEventCallback(@NonNull Executor executor,
+            @NonNull PlayerEventCallback callback) {
         mCallbacks.put(callback, executor);
     }
 
     @Override
-    public void unregisterEventCallback(@NonNull EventCallback callback) {
+    public void unregisterPlayerEventCallback(@NonNull PlayerEventCallback callback) {
         mCallbacks.remove(callback);
     }
 
     public void notifyPlaybackState(final PlaybackState2 state) {
         mLastPlaybackState = state;
         for (int i = 0; i < mCallbacks.size(); i++) {
-            final EventCallback callback = mCallbacks.keyAt(i);
+            final PlayerEventCallback callback = mCallbacks.keyAt(i);
             final Executor executor = mCallbacks.valueAt(i);
-            executor.execute(() -> callback.onPlaybackStateChanged(state));
+            // TODO: Uncomment or remove
+            //executor.execute(() -> callback.onPlaybackStateChanged(state));
         }
     }
 
     public void notifyError(int what) {
         for (int i = 0; i < mCallbacks.size(); i++) {
-            final EventCallback callback = mCallbacks.keyAt(i);
+            final PlayerEventCallback callback = mCallbacks.keyAt(i);
             final Executor executor = mCallbacks.valueAt(i);
-            executor.execute(() -> callback.onError(null, what, 0));
+            // TODO: Uncomment or remove
+            //executor.execute(() -> callback.onError(null, what, 0));
         }
     }
 
+    // TODO: Uncomment or remove
+    /*
     @Override
     public void setPlaylistParams(PlaylistParams params) {
         mSetPlaylistParamsCalled = true;
         mPlaylistParams = params;
     }
+    */
 
+    // TODO: Uncomment or remove
+    /*
     @Override
     public void addPlaylistItem(int index, MediaItem2 item) {
     }
+    */
 
+    // TODO: Uncomment or remove
+    /*
     @Override
     public void removePlaylistItem(MediaItem2 item) {
     }
+    */
 
+    // TODO: Uncomment or remove
+    /*
     @Override
     public PlaylistParams getPlaylistParams() {
         return mPlaylistParams;
     }
+    */
 
     @Override
     public void setAudioAttributes(AudioAttributes attributes) {
@@ -212,14 +250,62 @@ public class MockPlayer extends MediaPlayerBase {
         return mAudioAttributes;
     }
 
+    // TODO: Uncomment or remove
+    /*
     @Override
     public void setPlaylist(List<MediaItem2> playlist) {
         mSetPlaylistCalled = true;
         mPlaylist = playlist;
     }
+    */
 
+    // TODO: Uncomment or remove
+    /*
     @Override
     public List<MediaItem2> getPlaylist() {
         return mPlaylist;
+    }
+    */
+
+    @Override
+    public void setDataSource(@NonNull DataSourceDesc dsd) {
+        // TODO: Implement this
+    }
+
+    @Override
+    public void setNextDataSource(@NonNull DataSourceDesc dsd) {
+        // TODO: Implement this
+    }
+
+    @Override
+    public void setNextDataSources(@NonNull List<DataSourceDesc> dsds) {
+        // TODO: Implement this
+    }
+
+    @Override
+    public DataSourceDesc getCurrentDataSource() {
+        // TODO: Implement this
+        return null;
+    }
+
+    @Override
+    public void loopCurrent(boolean loop) {
+        // TODO: implement this
+    }
+
+    @Override
+    public void setPlaybackSpeed(float speed) {
+        // TODO: implement this
+    }
+
+    @Override
+    public void setVolume(float volume) {
+        // TODO: implement this
+    }
+
+    @Override
+    public float getPlayerVolume() {
+        // TODO: implement this
+        return -1;
     }
 }

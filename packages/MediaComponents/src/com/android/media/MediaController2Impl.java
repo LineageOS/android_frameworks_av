@@ -493,6 +493,11 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
+    public void replacePlaylistItem_impl(int index, MediaItem2 item) {
+        // TODO: Implement this
+    }
+
+    @Override
     public PlaylistParams getPlaylistParams_impl() {
         synchronized (mLock) {
             return mPlaylistParams;

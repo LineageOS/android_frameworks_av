@@ -38,7 +38,7 @@ import android.media.MediaItem2;
 import android.media.MediaLibraryService2;
 import android.media.MediaMetadata2;
 import android.media.MediaPlayerBase;
-import android.media.MediaPlayerBase.EventCallback;
+import android.media.MediaPlayerBase.PlayerEventCallback;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.Command;
@@ -85,7 +85,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private final MediaSession2Stub mSessionStub;
     private final SessionToken2 mSessionToken;
     private final AudioManager mAudioManager;
-    private final ArrayMap<EventCallback, Executor> mCallbacks = new ArrayMap<>();
+    private final ArrayMap<PlayerEventCallback, Executor> mCallbacks = new ArrayMap<>();
     private final PendingIntent mSessionActivity;
 
     // mPlayer is set to null when the session is closed, and we shouldn't throw an exception
@@ -228,11 +228,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
         synchronized (mLock) {
             if (mPlayer != null && mEventCallback != null) {
                 // This might not work for a poorly implemented player.
-                mPlayer.unregisterEventCallback(mEventCallback);
+                mPlayer.unregisterPlayerEventCallback(mEventCallback);
             }
             mPlayer = player;
             mEventCallback = new MyEventCallback(this, player);
-            player.registerEventCallback(mCallbackExecutor, mEventCallback);
+            player.registerPlayerEventCallback(mCallbackExecutor, mEventCallback);
             mVolumeProvider = volumeProvider;
             mPlaybackInfo = info;
         }
@@ -293,7 +293,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         synchronized (mLock) {
             if (mPlayer != null) {
                 // close can be called multiple times
-                mPlayer.unregisterEventCallback(mEventCallback);
+                mPlayer.unregisterPlayerEventCallback(mEventCallback);
                 mPlayer = null;
             }
         }
@@ -347,7 +347,9 @@ public class MediaSession2Impl implements MediaSession2Provider {
         ensureCallingThread();
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
-            player.stop();
+            // TODO: Uncomment or remove
+            //player.stop();
+            player.pause();
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
@@ -356,12 +358,16 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public void skipToPrevious_impl() {
         ensureCallingThread();
+        // TODO: Uncomment or remove
+        /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
-            player.skipToPrevious();
+            // TODO implement
+            //player.skipToPrevious();
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
+        */
     }
 
     @Override
@@ -393,23 +399,32 @@ public class MediaSession2Impl implements MediaSession2Provider {
             throw new IllegalArgumentException("params shouldn't be null");
         }
         ensureCallingThread();
+        // TODO: Uncomment or remove
+        /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
-            player.setPlaylistParams(params);
+            // TODO implement
+            //player.setPlaylistParams(params);
             mSessionStub.notifyPlaylistParamsChanged(params);
         }
+        */
     }
 
     @Override
     public PlaylistParams getPlaylistParams_impl() {
+        // TODO: Uncomment or remove
+        /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
             // TODO(jaewan): Is it safe to be called on any thread?
             //               Otherwise MediaSession2 should cache parameter of setPlaylistParams.
-            return player.getPlaylistParams();
+            // TODO implement
+            //return player.getPlaylistParams();
+            return null;
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
+        */
         return null;
     }
 
@@ -439,13 +454,17 @@ public class MediaSession2Impl implements MediaSession2Provider {
             throw new IllegalArgumentException("playlist shouldn't be null");
         }
         ensureCallingThread();
+        // TODO: Uncomment or remove
+        /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
-            player.setPlaylist(playlist);
+            // TODO implement, use the SessionPlaylistController itf
+            //player.setPlaylist(playlist);
             mSessionStub.notifyPlaylistChanged(playlist);
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
+        */
     }
 
     @Override
@@ -464,15 +483,25 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
+    public void replacePlaylistItem_impl(int index, MediaItem2 item) {
+        // TODO(jaewan): Implement
+    }
+
+    @Override
     public List<MediaItem2> getPlaylist_impl() {
+        // TODO: Uncomment or remove
+        /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
             // TODO(jaewan): Is it safe to be called on any thread?
             //               Otherwise MediaSession2 should cache parameter of setPlaylist.
-            return player.getPlaylist();
+            // TODO implement
+            //return player.getPlaylist();
+            return null;
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
+        */
         return null;
     }
 
@@ -496,23 +525,31 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public void fastForward_impl() {
         ensureCallingThread();
+        // TODO: Uncomment or remove
+        /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
-            player.fastForward();
+            // TODO implement
+            //player.fastForward();
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
+        */
     }
 
     @Override
     public void rewind_impl() {
         ensureCallingThread();
+        // TODO: Uncomment or remove
+        /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
-            player.rewind();
+            // TODO implement
+            //player.rewind();
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
+        */
     }
 
     @Override
@@ -529,16 +566,20 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public void skipToPlaylistItem_impl(MediaItem2 item) {
         ensureCallingThread();
+        // TODO: Uncomment or remove
+        /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
-            player.setCurrentPlaylistItem(item);
+            // TODO implement
+            //player.setCurrentPlaylistItem(item);
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
+        */
     }
 
     @Override
-    public void registerPlayerEventCallback_impl(Executor executor, EventCallback callback) {
+    public void registerPlayerEventCallback_impl(Executor executor, PlayerEventCallback callback) {
         if (executor == null) {
             throw new IllegalArgumentException("executor shouldn't be null");
         }
@@ -551,13 +592,16 @@ public class MediaSession2Impl implements MediaSession2Provider {
             return;
         }
         mCallbacks.put(callback, executor);
+        // TODO: Uncomment or remove
+        /*
         // TODO(jaewan): Double check if we need this.
         final PlaybackState2 state = getInstance().getPlaybackState();
         executor.execute(() -> callback.onPlaybackStateChanged(state));
+        */
     }
 
     @Override
-    public void unregisterPlayerEventCallback_impl(EventCallback callback) {
+    public void unregisterPlayerEventCallback_impl(PlayerEventCallback callback) {
         if (callback == null) {
             throw new IllegalArgumentException("callback shouldn't be null");
         }
@@ -568,14 +612,19 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public PlaybackState2 getPlaybackState_impl() {
         ensureCallingThread();
+        // TODO: Uncomment or remove
+        /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
-            // TODO(jaewan): Is it safe to be called on any thread?
+           // TODO(jaewan): Is it safe to be called on any thread?
             //               Otherwise MediaSession2 should cache the result from listener.
-            return player.getPlaybackState();
+            // TODO implement
+            //return player.getPlaybackState();
+            return null;
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
+        */
         return null;
     }
 
@@ -609,30 +658,32 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     private void notifyPlaybackStateChangedNotLocked(final PlaybackState2 state) {
-        ArrayMap<EventCallback, Executor> callbacks = new ArrayMap<>();
+        ArrayMap<PlayerEventCallback, Executor> callbacks = new ArrayMap<>();
         synchronized (mLock) {
             callbacks.putAll(mCallbacks);
         }
         // Notify to callbacks added directly to this session
         for (int i = 0; i < callbacks.size(); i++) {
-            final EventCallback callback = callbacks.keyAt(i);
+            final PlayerEventCallback callback = callbacks.keyAt(i);
             final Executor executor = callbacks.valueAt(i);
-            executor.execute(() -> callback.onPlaybackStateChanged(state));
+            // TODO: Uncomment or remove
+            //executor.execute(() -> callback.onPlaybackStateChanged(state));
         }
         // Notify to controllers as well.
         mSessionStub.notifyPlaybackStateChangedNotLocked(state);
     }
 
     private void notifyErrorNotLocked(String mediaId, int what, int extra) {
-        ArrayMap<EventCallback, Executor> callbacks = new ArrayMap<>();
+        ArrayMap<PlayerEventCallback, Executor> callbacks = new ArrayMap<>();
         synchronized (mLock) {
             callbacks.putAll(mCallbacks);
         }
         // Notify to callbacks added directly to this session
         for (int i = 0; i < callbacks.size(); i++) {
-            final EventCallback callback = callbacks.keyAt(i);
+            final PlayerEventCallback callback = callbacks.keyAt(i);
             final Executor executor = callbacks.valueAt(i);
-            executor.execute(() -> callback.onError(mediaId, what, extra));
+            // TODO: Uncomment or remove
+            //executor.execute(() -> callback.onError(mediaId, what, extra));
         }
         // TODO(jaewan): Notify to controllers as well.
     }
@@ -675,7 +726,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         return mSessionActivity;
     }
 
-    private static class MyEventCallback extends EventCallback {
+    private static class MyEventCallback extends PlayerEventCallback {
         private final WeakReference<MediaSession2Impl> mSession;
         private final MediaPlayerBase mPlayer;
 
@@ -684,6 +735,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mPlayer = player;
         }
 
+        // TODO: Uncomment or remove
+        /*
         @Override
         public void onPlaybackStateChanged(PlaybackState2 state) {
             MediaSession2Impl session = mSession.get();
@@ -697,7 +750,10 @@ public class MediaSession2Impl implements MediaSession2Provider {
             }
             session.notifyPlaybackStateChangedNotLocked(state);
         }
+        */
 
+        // TODO: Uncomment or remove
+        /*
         @Override
         public void onError(String mediaId, int what, int extra) {
             MediaSession2Impl session = mSession.get();
@@ -712,6 +768,9 @@ public class MediaSession2Impl implements MediaSession2Provider {
             }
             session.notifyErrorNotLocked(mediaId, what, extra);
         }
+        */
+
+        //TODO implement the real PlayerEventCallback methods
     }
 
     public static final class CommandImpl implements CommandProvider {

@@ -26,6 +26,7 @@ import android.support.test.runner.AndroidJUnit4;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -70,6 +71,7 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
     }
 
     // TODO(jaewan): Make this host-side test to see per-user behavior.
+    @Ignore
     @Test
     public void testGetMediaSession2Tokens_hasMediaController() throws InterruptedException {
         final MockPlayer player = (MockPlayer) mSession.getPlayer();
