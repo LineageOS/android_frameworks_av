@@ -200,6 +200,9 @@ const char KEY_QTI_DIS[] = "dis";
 // Values for raw image formats
 const char QTIParameters::QC_PIXEL_FORMAT_BAYER_MIPI_RAW_10RGGB[] = "bayer-mipi-10rggb";
 
+// Default sharpness value
+int32_t defaultSharpness = 2;
+
 status_t QTIParameters::initialize(void *parametersParent,
             sp<CameraDeviceBase> device, sp<CameraProviderManager> manager) {
     status_t res = OK;
@@ -338,7 +341,7 @@ status_t QTIParameters::initialize(void *parametersParent,
     if (availableSharpnessRange.count == 2) {
         ParentParams->params.set(KEY_QTI_MAX_SHARPNESS,availableSharpnessRange.data.i32[1]);
         //Default value
-        ParentParams->params.set(KEY_QTI_SHARPNESS,availableSharpnessRange.data.i32[1]);
+        ParentParams->params.set(KEY_QTI_SHARPNESS, defaultSharpness);
     }
 
     //Saturation
@@ -953,9 +956,14 @@ status_t QTIParameters::updateRequest(CameraMetadata *request) const {
 
     //Video-Hdr
     res = CameraMetadata::getTagFromName(KEY_QTI_VENDOR_VIDEO_HDR_MODE, vTags.get(), &tag);
-    res = request->update(tag,&videoHdr, 1);
-    if (res != OK) {
-        return res;
+    if (res == OK) {
+        res = request->update(tag,&videoHdr, 1);
+        if (res != OK) {
+            return res;
+        }
+    } else {
+        ALOGE("%s: get vendor tag failed for %s with error %d",
+                __FUNCTION__, KEY_QTI_VENDOR_VIDEO_HDR_MODE, res);
     }
 
     if (exposureTime > 0) {
