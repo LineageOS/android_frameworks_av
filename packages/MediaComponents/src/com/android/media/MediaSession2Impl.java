@@ -148,10 +148,10 @@ public class MediaSession2Impl implements MediaSession2Provider {
                     + " session services define the same id=" + id);
         } else if (libraryService != null) {
             mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_LIBRARY_SERVICE,
-                    mContext.getPackageName(), libraryService, id, null).getInstance();
+                    mContext.getPackageName(), libraryService, id, mSessionStub).getInstance();
         } else if (sessionService != null) {
             mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_SESSION_SERVICE,
-                    mContext.getPackageName(), sessionService, id, null).getInstance();
+                    mContext.getPackageName(), sessionService, id, mSessionStub).getInstance();
         } else {
             mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_SESSION,
                     mContext.getPackageName(), null, id, mSessionStub).getInstance();

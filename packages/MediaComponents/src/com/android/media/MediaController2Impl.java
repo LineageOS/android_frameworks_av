@@ -39,8 +39,10 @@ import android.media.update.MediaController2Provider;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Process;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
+import android.os.UserHandle;
 import android.support.annotation.GuardedBy;
 import android.util.Log;
 
@@ -125,6 +127,24 @@ public class MediaController2Impl implements MediaController2Provider {
             connectToSession(SessionToken2Impl.from(mToken).getSessionBinder());
         } else {
             // Session service
+            if (Process.myUid() == Process.SYSTEM_UID) {
+                // It's system server (MediaSessionService) that wants to monitor session.
+                // Don't bind if able..
+                IMediaSession2 binder = SessionToken2Impl.from(mToken).getSessionBinder();
+                if (binder != null) {
+                    // Use binder in the session token instead of bind by its own.
+                    // Otherwise server will holds the binding to the service *forever* and service
+                    // will never stop.
+                    mServiceConnection = null;
+                    connectToSession(SessionToken2Impl.from(mToken).getSessionBinder());
+                    return;
+                } else if (DEBUG) {
+                    // Should happen only when system server wants to dispatch media key events to
+                    // a dead service.
+                    Log.d(TAG, "System server binds to a session service. Should unbind"
+                            + " immediately after the use.");
+                }
+            }
             mServiceConnection = new SessionServiceConnection();
             connectToService();
         }
@@ -150,8 +170,15 @@ public class MediaController2Impl implements MediaController2Provider {
         //    If a service wants to keep running, it should be either foreground service or
         //    bounded service. But there had been request for the feature for system apps
         //    and using bindService() will be better fit with it.
-        // TODO(jaewan): Use bindServiceAsUser()??
-        boolean result = mContext.bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
+        boolean result;
+        if (Process.myUid() == Process.SYSTEM_UID) {
+            // Use bindServiceAsUser() for binding from system service to avoid following warning.
+            // ContextImpl: Calling a method in the system process without a qualified user
+            result = mContext.bindServiceAsUser(intent, mServiceConnection, Context.BIND_AUTO_CREATE,
+                    UserHandle.getUserHandleForUid(mToken.getUid()));
+        } else {
+            result = mContext.bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
+        }
         if (!result) {
             Log.w(TAG, "bind to " + mToken + " failed");
         } else if (DEBUG) {
