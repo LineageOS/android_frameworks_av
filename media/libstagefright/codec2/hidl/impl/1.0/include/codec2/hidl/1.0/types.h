@@ -53,77 +53,79 @@ struct C2Hidl_Rect {
 typedef C2GlobalParam<C2Info, C2Hidl_Rect, 1> C2Hidl_RectInfo;
 
 // C2SettingResult -> SettingResult
-Status C2_HIDE objcpy(
+Status objcpy(
         SettingResult* d,
         const C2SettingResult& s);
 
-// SettingResult -> C2SettingResult
-c2_status_t C2_HIDE objcpy(
-        C2SettingResult* d,
+// SettingResult -> std::unique_ptr<C2SettingResult>
+c2_status_t objcpy(
+        std::unique_ptr<C2SettingResult>* d,
         const SettingResult& s);
 
 // C2ParamDescriptor -> ParamDescriptor
-Status C2_HIDE objcpy(
+Status objcpy(
         ParamDescriptor* d,
         const C2ParamDescriptor& s);
 
-// ParamDescriptor -> std::unique_ptr<C2ParamDescriptor>
-c2_status_t C2_HIDE objcpy(
-        std::unique_ptr<C2ParamDescriptor>* d,
+// ParamDescriptor -> std::shared_ptr<C2ParamDescriptor>
+c2_status_t objcpy(
+        std::shared_ptr<C2ParamDescriptor>* d,
         const ParamDescriptor& s);
 
 // C2FieldSupportedValuesQuery -> FieldSupportedValuesQuery
-Status C2_HIDE objcpy(
+Status objcpy(
         FieldSupportedValuesQuery* d,
         const C2FieldSupportedValuesQuery& s);
 
 // FieldSupportedValuesQuery -> C2FieldSupportedValuesQuery
-c2_status_t C2_HIDE objcpy(
+c2_status_t objcpy(
         C2FieldSupportedValuesQuery* d,
         const FieldSupportedValuesQuery& s);
 
 // C2FieldSupportedValuesQuery -> FieldSupportedValuesQueryResult
-Status C2_HIDE objcpy(
+Status objcpy(
         FieldSupportedValuesQueryResult* d,
         const C2FieldSupportedValuesQuery& s);
 
 // FieldSupportedValuesQuery, FieldSupportedValuesQueryResult -> C2FieldSupportedValuesQuery
-c2_status_t C2_HIDE objcpy(
+c2_status_t objcpy(
         C2FieldSupportedValuesQuery* d,
         const FieldSupportedValuesQuery& sq,
         const FieldSupportedValuesQueryResult& sr);
 
 // C2Component::Traits -> ComponentTraits
-Status C2_HIDE objcpy(
+Status objcpy(
         IComponentStore::ComponentTraits* d,
         const C2Component::Traits& s);
 
-// ComponentTraits -> C2Component::Traits
-c2_status_t C2_HIDE objcpy(
+// ComponentTraits -> C2Component::Traits, std::unique_ptr<std::vector<std::string>>
+// Note: The output d is only valid as long as aliasesBuffer remains alive.
+c2_status_t objcpy(
         C2Component::Traits* d,
+        std::unique_ptr<std::vector<std::string>>* aliasesBuffer,
         const IComponentStore::ComponentTraits& s);
 
 // C2StructDescriptor -> StructDescriptor
-Status C2_HIDE objcpy(
+Status objcpy(
         StructDescriptor* d,
         const C2StructDescriptor& s);
 
 // StructDescriptor -> C2StructDescriptor
 // TODO: This cannot be implemented yet because C2StructDescriptor does not
 // allow dynamic construction/modification.
-c2_status_t C2_HIDE objcpy(
+c2_status_t objcpy(
         C2StructDescriptor* d,
         const StructDescriptor& s);
 
 // std::list<std::unique_ptr<C2Work>> -> WorkBundle
 // TODO: Connect with Bufferpool
-Status C2_HIDE objcpy(
+Status objcpy(
         WorkBundle* d,
         const std::list<std::unique_ptr<C2Work>>& s);
 
 // WorkBundle -> std::list<std::unique_ptr<C2Work>>
 // TODO: Connect with Bufferpool
-c2_status_t C2_HIDE objcpy(
+c2_status_t objcpy(
         std::list<std::unique_ptr<C2Work>>* d,
         const WorkBundle& s);
 
@@ -158,6 +160,29 @@ Status createParamsBlob(
 Status createParamsBlob(
         hidl_vec<uint8_t> *blob,
         const std::vector<std::unique_ptr<C2Tuning>> &params);
+
+/**
+ * Parses a params blob and create a vector of C2Params whose members are copies
+ * of the params in the blob.
+ * \param[out] params the resulting vector
+ * \param[in] blob parameter blob to parse
+ * \retval C2_OK if the full blob was parsed and params was constructed
+ * \retval C2_BAD_VALUE otherwise
+ */
+c2_status_t copyParamsFromBlob(
+        std::vector<std::unique_ptr<C2Param>>* params,
+        Params blob);
+
+/**
+ * Parses a params blob and applies updates to params
+ * \param[in,out] params params to be updated
+ * \param[in] blob parameter blob containing updates
+ * \retval C2_OK if the full blob was parsed and params was updated
+ * \retval C2_BAD_VALUE otherwise
+ */
+c2_status_t updateParamsFromBlob(
+        const std::vector<C2Param*>& params,
+        const Params& blob);
 
 }  // namespace implementation
 }  // namespace V1_0

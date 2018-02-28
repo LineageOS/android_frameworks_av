@@ -48,7 +48,7 @@ struct CompIntf : public ConfigurableC2Intf {
     virtual c2_status_t query(
             const std::vector<C2Param::Index>& indices,
             c2_blocking_t mayBlock,
-            std::vector<std::unique_ptr<C2Param>>* const params) override {
+            std::vector<std::unique_ptr<C2Param>>* const params) const override {
         return mIntf->query_vb({}, indices, mayBlock, params);
     }
 
@@ -108,7 +108,9 @@ struct Listener : public C2Component::Listener {
             for (const std::shared_ptr<C2SettingResult> &c2result :
                     c2settingResult) {
                 if (c2result) {
-                    objcpy(&settingResults[ix++], *c2result);
+                    if (objcpy(&settingResults[ix++], *c2result) != Status::OK) {
+                        break;
+                    }
                 }
             }
             settingResults.resize(ix);
@@ -166,7 +168,6 @@ Return<Status> Component::queue(const WorkBundle& workBundle) {
     if (objcpy(&c2works, workBundle) != C2_OK) {
         return Status::CORRUPTED;
     }
-    (void)workBundle;
     return static_cast<Status>(mComponent->queue_nb(&c2works));
 }
 

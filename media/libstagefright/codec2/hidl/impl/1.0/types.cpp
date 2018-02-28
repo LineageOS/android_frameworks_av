@@ -31,6 +31,7 @@
 #include <C2Component.h>
 #include <util/C2ParamUtils.h>
 
+#include <unordered_map>
 #include <algorithm>
 
 namespace vendor {
@@ -264,25 +265,26 @@ Status objcpy(
     return Status::OK;
 }
 
-// ComponentTraits -> C2Component::Traits
+// ComponentTraits -> C2Component::Traits, std::unique_ptr<std::vector<std::string>>
 c2_status_t objcpy(
         C2Component::Traits* d,
+        std::unique_ptr<std::vector<std::string>>* aliasesBuffer,
         const IComponentStore::ComponentTraits& s) {
-    d->name = s.name;
-
-    // TODO: Currently, we do not have any domain values defined in Codec2.0.
+    d->name = s.name.c_str();
     d->domain = static_cast<C2Component::domain_t>(s.domainOther);
-
-    // TODO: Currently, we do not have any kind values defined in Codec2.0.
     d->kind = static_cast<C2Component::kind_t>(s.kindOther);
-
     d->rank = static_cast<C2Component::rank_t>(s.rank);
-
     d->mediaType = s.mediaType.c_str();
 
-    // TODO: Currently, aliases are pointers to static strings. This is not
-    // supported by HIDL.
-    d->aliases.clear();
+    // aliasesBuffer must not be resized after this.
+    *aliasesBuffer = std::make_unique<std::vector<std::string>>(
+            s.aliases.size());
+    (*aliasesBuffer)->resize(s.aliases.size());
+    std::vector<C2StringLiteral> dAliases(s.aliases.size());
+    for (size_t i = 0; i < s.aliases.size(); ++i) {
+        (**aliasesBuffer)[i] = s.aliases[i].c_str();
+        d->aliases[i] = (**aliasesBuffer)[i].c_str();
+    }
     return C2_OK;
 }
 
@@ -366,48 +368,60 @@ Status objcpy(SettingResult *d, const C2SettingResult &s) {
     return Status::OK;
 }
 
-// SettingResult -> C2SettingResult
-c2_status_t objcpy(C2SettingResult *d, const SettingResult &s) {
+// SettingResult -> std::unique_ptr<C2SettingResult>
+c2_status_t objcpy(std::unique_ptr<C2SettingResult> *d, const SettingResult &s) {
+    *d = std::unique_ptr<C2SettingResult>(new C2SettingResult {
+            .field = C2ParamFieldValues(C2ParamFieldBuilder()) });
+    if (!*d) {
+        return C2_NO_MEMORY;
+    }
+
+    // failure
     switch (s.failure) {
     case SettingResult::Failure::READ_ONLY:
-        d->failure = C2SettingResult::READ_ONLY;
+        (*d)->failure = C2SettingResult::READ_ONLY;
         break;
     case SettingResult::Failure::MISMATCH:
-        d->failure = C2SettingResult::MISMATCH;
+        (*d)->failure = C2SettingResult::MISMATCH;
         break;
     case SettingResult::Failure::BAD_VALUE:
-        d->failure = C2SettingResult::BAD_VALUE;
+        (*d)->failure = C2SettingResult::BAD_VALUE;
         break;
     case SettingResult::Failure::BAD_TYPE:
-        d->failure = C2SettingResult::BAD_TYPE;
+        (*d)->failure = C2SettingResult::BAD_TYPE;
         break;
     case SettingResult::Failure::BAD_PORT:
-        d->failure = C2SettingResult::BAD_PORT;
+        (*d)->failure = C2SettingResult::BAD_PORT;
         break;
     case SettingResult::Failure::BAD_INDEX:
-        d->failure = C2SettingResult::BAD_INDEX;
+        (*d)->failure = C2SettingResult::BAD_INDEX;
         break;
     case SettingResult::Failure::CONFLICT:
-        d->failure = C2SettingResult::CONFLICT;
+        (*d)->failure = C2SettingResult::CONFLICT;
         break;
     case SettingResult::Failure::UNSUPPORTED:
-        d->failure = C2SettingResult::UNSUPPORTED;
+        (*d)->failure = C2SettingResult::UNSUPPORTED;
         break;
     case SettingResult::Failure::INFO_CONFLICT:
-        d->failure = C2SettingResult::INFO_CONFLICT;
+        (*d)->failure = C2SettingResult::INFO_CONFLICT;
         break;
     default:
-        d->failure = static_cast<C2SettingResult::Failure>(s.failureOther);
+        (*d)->failure = static_cast<C2SettingResult::Failure>(s.failureOther);
     }
-    c2_status_t status = objcpy(&d->field, s.field);
+
+    // field
+    c2_status_t status = objcpy(&(*d)->field, s.field);
     if (status != C2_OK) {
         return status;
     }
-    d->conflicts.clear();
+
+    // conflicts
+    (*d)->conflicts.clear();
+    (*d)->conflicts.reserve(s.conflicts.size());
     for (const ParamFieldValues& sConflict : s.conflicts) {
-        d->conflicts.emplace_back(
+        (*d)->conflicts.emplace_back(
                 C2ParamFieldValues{ C2ParamFieldBuilder(), nullptr });
-        status = objcpy(&d->conflicts.back(), sConflict);
+        status = objcpy(&(*d)->conflicts.back(), sConflict);
         if (status != C2_OK) {
             return status;
         }
@@ -426,13 +440,13 @@ Status objcpy(ParamDescriptor *d, const C2ParamDescriptor &s) {
 }
 
 // ParamDescriptor -> C2ParamDescriptor
-c2_status_t objcpy(std::unique_ptr<C2ParamDescriptor> *d, const ParamDescriptor &s) {
+c2_status_t objcpy(std::shared_ptr<C2ParamDescriptor> *d, const ParamDescriptor &s) {
     std::vector<C2Param::Index> dDependencies;
     dDependencies.reserve(s.dependencies.size());
     for (const ParamIndex& sDependency : s.dependencies) {
         dDependencies.emplace_back(static_cast<uint32_t>(sDependency));
     }
-    *d = std::make_unique<C2ParamDescriptor>(
+    *d = std::make_shared<C2ParamDescriptor>(
             C2Param::Index(static_cast<uint32_t>(s.index)),
             static_cast<C2ParamDescriptor::attrib_t>(s.attrib),
             C2String(s.name.c_str()),
@@ -1058,10 +1072,8 @@ c2_status_t objcpy(std::list<std::unique_ptr<C2Work>>* d, const WorkBundle& s) {
             dWorklet->failures.clear();
             dWorklet->failures.reserve(sWorklet.failures.size());
             for (const SettingResult& sFailure : sWorklet.failures) {
-                std::unique_ptr<C2SettingResult> dFailure(
-                        new C2SettingResult { .field = C2ParamFieldValues {
-                        C2ParamFieldBuilder(), nullptr } });
-                status = objcpy(dFailure.get(), sFailure);
+                std::unique_ptr<C2SettingResult> dFailure;
+                status = objcpy(&dFailure, sFailure);
                 if (status != C2_OK) {
                     ALOGE("Failed to create C2SettingResult in C2Worklet.");
                     return C2_BAD_VALUE;
@@ -1175,6 +1187,74 @@ Status createParamsBlob(
         const std::vector<std::shared_ptr<const C2Info>> &params) {
     return _createParamsBlob(blob, params);
 }
+
+// Params -> std::vector<std::unique_ptr<C2Param>>
+c2_status_t copyParamsFromBlob(
+        std::vector<std::unique_ptr<C2Param>>* params,
+        Params blob) {
+    std::vector<C2Param*> paramPointers;
+    c2_status_t status = parseParamsBlob(&paramPointers, blob);
+    if (status != C2_OK) {
+        ALOGE("copyParamsFromBlob -- blob parsing failed.");
+        return status;
+    }
+    params->resize(paramPointers.size());
+    size_t i = 0;
+    for (C2Param* const& paramPointer : paramPointers) {
+        if (!paramPointer) {
+            ALOGE("copyParamsFromBlob -- corrupted params blob.");
+            return C2_BAD_VALUE;
+        }
+        (*params)[i++] = C2Param::Copy(*paramPointer);
+    }
+    return C2_OK;
+}
+
+// Params -> update std::vector<std::unique_ptr<C2Param>>
+c2_status_t updateParamsFromBlob(
+        const std::vector<C2Param*>& params,
+        const Params& blob) {
+    std::unordered_map<uint32_t, C2Param*> index2param;
+    for (C2Param* const& param : params) {
+        if (!param) {
+            ALOGE("updateParamsFromBlob -- corrupted input params.");
+            return C2_BAD_VALUE;
+        }
+        if (index2param.find(param->index()) == index2param.end()) {
+            index2param.emplace(param->index(), param);
+        }
+    }
+
+    std::vector<C2Param*> paramPointers;
+    c2_status_t status = parseParamsBlob(&paramPointers, blob);
+    if (status != C2_OK) {
+        ALOGE("updateParamsFromBlob -- blob parsing failed.");
+        return status;
+    }
+
+    for (C2Param* const& paramPointer : paramPointers) {
+        if (!paramPointer) {
+            ALOGE("updateParamsFromBlob -- corrupted param in blob.");
+            return C2_BAD_VALUE;
+        }
+        decltype(index2param)::iterator i = index2param.find(
+                paramPointer->index());
+        if (i == index2param.end()) {
+            ALOGW("updateParamsFromBlob -- unseen param index.");
+            continue;
+        }
+        if (!i->second->updateFrom(*paramPointer)) {
+            ALOGE("updateParamsFromBlob -- mismatching sizes: "
+                    "%u vs %u (index = %u).",
+                    static_cast<unsigned>(params.size()),
+                    static_cast<unsigned>(paramPointer->size()),
+                    static_cast<unsigned>(i->first));
+            return C2_BAD_VALUE;
+        }
+    }
+    return C2_OK;
+}
+
 
 }  // namespace implementation
 }  // namespace V1_0
