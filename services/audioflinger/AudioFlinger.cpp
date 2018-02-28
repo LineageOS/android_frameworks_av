@@ -3051,6 +3051,7 @@ sp<IEffect> AudioFlinger::createEffect(
 
         // check recording permission for visualizer
         if ((memcmp(&desc.type, SL_IID_VISUALIZATION, sizeof(effect_uuid_t)) == 0) &&
+            // TODO: Do we need to start/stop op - i.e. is there recording being performed?
             !recordingAllowed(opPackageName, pid, IPCThreadState::self()->getCallingUid())) {
             lStatus = PERMISSION_DENIED;
             goto Exit;
