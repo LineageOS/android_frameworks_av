@@ -27,9 +27,6 @@
 #include <android/hidl/manager/1.0/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
 
-#include <media/DrmHal.h>
-#include <media/DrmSessionClientInterface.h>
-#include <media/DrmSessionManager.h>
 #include <media/EventMetric.h>
 #include <media/PluginMetricsReporting.h>
 #include <media/drm/DrmAPI.h>
@@ -37,6 +34,9 @@
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaErrors.h>
+#include <mediadrm/DrmHal.h>
+#include <mediadrm/DrmSessionClientInterface.h>
+#include <mediadrm/DrmSessionManager.h>
 
 using drm::V1_0::KeyedVector;
 using drm::V1_0::KeyStatusType;
@@ -48,6 +48,7 @@ using drm::V1_1::SecureStopRelease;
 using drm::V1_0::SecureStopId;
 using drm::V1_1::SecurityLevel;
 using drm::V1_0::Status;
+using ::android::hardware::drm::V1_1::DrmMetricGroup;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
@@ -771,7 +772,8 @@ status_t DrmHal::removeKeys(Vector<uint8_t> const &keySetId) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    return toStatusT(mPlugin->removeKeys(toHidlVec(keySetId)));
+    Return<Status> status = mPlugin->removeKeys(toHidlVec(keySetId));
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
 status_t DrmHal::restoreKeys(Vector<uint8_t> const &sessionId,
@@ -781,8 +783,9 @@ status_t DrmHal::restoreKeys(Vector<uint8_t> const &sessionId,
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
-    return toStatusT(mPlugin->restoreKeys(toHidlVec(sessionId),
-                    toHidlVec(keySetId)));
+    Return<Status> status = mPlugin->restoreKeys(toHidlVec(sessionId),
+            toHidlVec(keySetId));
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
 status_t DrmHal::queryKeyStatus(Vector<uint8_t> const &sessionId,
@@ -923,13 +926,15 @@ status_t DrmHal::releaseSecureStops(Vector<uint8_t> const &ssRelease) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
+    Return<Status> status(Status::ERROR_DRM_UNKNOWN);
     if (mPluginV1_1 != NULL) {
         SecureStopRelease secureStopRelease;
         secureStopRelease.opaqueData = toHidlVec(ssRelease);
-        return toStatusT(mPluginV1_1->releaseSecureStops(secureStopRelease));
+        status = mPluginV1_1->releaseSecureStops(secureStopRelease);
+    } else {
+        status = mPlugin->releaseSecureStop(toHidlVec(ssRelease));
     }
-
-    return toStatusT(mPlugin->releaseSecureStop(toHidlVec(ssRelease)));
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
 status_t DrmHal::removeSecureStop(Vector<uint8_t> const &ssid) {
@@ -943,17 +948,21 @@ status_t DrmHal::removeSecureStop(Vector<uint8_t> const &ssid) {
         return ERROR_DRM_CANNOT_HANDLE;
     }
 
-    return toStatusT(mPluginV1_1->removeSecureStop(toHidlVec(ssid)));
+    Return<Status> status = mPluginV1_1->removeSecureStop(toHidlVec(ssid));
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
 status_t DrmHal::removeAllSecureStops() {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
+    Return<Status> status(Status::ERROR_DRM_UNKNOWN);
     if (mPluginV1_1 != NULL) {
-        return toStatusT(mPluginV1_1->removeAllSecureStops());
+        status = mPluginV1_1->removeAllSecureStops();
+    } else {
+        status = mPlugin->releaseAllSecureStops();
     }
-    return toStatusT(mPlugin->releaseAllSecureStops());
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
 status_t DrmHal::getHdcpLevels(DrmPlugin::HdcpLevel *connected,
@@ -1099,9 +1108,9 @@ status_t DrmHal::setPropertyString(String8 const &name, String8 const &value ) c
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    Status status = mPlugin->setPropertyString(toHidlString(name),
+    Return<Status> status = mPlugin->setPropertyString(toHidlString(name),
             toHidlString(value));
-    return toStatusT(status);
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
 status_t DrmHal::setPropertyByteArray(String8 const &name,
@@ -1109,17 +1118,53 @@ status_t DrmHal::setPropertyByteArray(String8 const &name,
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    Status status = mPlugin->setPropertyByteArray(toHidlString(name),
+    Return<Status> status = mPlugin->setPropertyByteArray(toHidlString(name),
             toHidlVec(value));
-    return toStatusT(status);
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
-status_t DrmHal::getMetrics(PersistableBundle* item) {
-    if (item == nullptr) {
-      return UNEXPECTED_NULL;
+status_t DrmHal::getMetrics(PersistableBundle* metrics) {
+    if (metrics == nullptr) {
+        return UNEXPECTED_NULL;
+    }
+    mMetrics.Export(metrics);
+
+    // Append vendor metrics if they are supported.
+    if (mPluginV1_1 != NULL) {
+        String8 vendor;
+        String8 description;
+        if (getPropertyStringInternal(String8("vendor"), vendor) != OK
+            || vendor.isEmpty()) {
+          ALOGE("Get vendor failed or is empty");
+          vendor = "NONE";
+        }
+        if (getPropertyStringInternal(String8("description"), description) != OK
+            || description.isEmpty()) {
+          ALOGE("Get description failed or is empty.");
+          description = "NONE";
+        }
+        vendor += ".";
+        vendor += description;
+
+        hidl_vec<DrmMetricGroup> pluginMetrics;
+        status_t err = UNKNOWN_ERROR;
+
+        Return<void> status = mPluginV1_1->getMetrics(
+                [&](Status status, hidl_vec<DrmMetricGroup> pluginMetrics) {
+                    if (status != Status::OK) {
+                      ALOGV("Error getting plugin metrics: %d", status);
+                    } else {
+                        PersistableBundle pluginBundle;
+                        if (MediaDrmMetrics::HidlMetricsToBundle(
+                                pluginMetrics, &pluginBundle) == OK) {
+                            metrics->putPersistableBundle(String16(vendor), pluginBundle);
+                        }
+                    }
+                    err = toStatusT(status);
+                });
+        return status.isOk() ? err : DEAD_OBJECT;
     }
 
-    mMetrics.Export(item);
     return OK;
 }
 

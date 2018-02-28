@@ -19,10 +19,7 @@
 #define DATA_SOURCE_BASE_H_
 
 #include <sys/types.h>
-#include <media/stagefright/MediaErrors.h>
 #include <utils/Errors.h>
-#include <utils/threads.h>
-#include <drm/DrmManagerClient.h>
 
 namespace android {
 
@@ -61,30 +58,11 @@ public:
     // May return ERROR_UNSUPPORTED.
     virtual status_t getSize(off64_t *size);
 
+    virtual bool getUri(char *uriString, size_t bufferSize);
+
     virtual uint32_t flags() {
         return 0;
     }
-
-    virtual String8 toString() {
-        return String8("<unspecified>");
-    }
-
-    virtual status_t reconnectAtOffset(off64_t /*offset*/) {
-        return ERROR_UNSUPPORTED;
-    }
-
-    ////////////////////////////////////////////////////////////////////////////
-
-    // for DRM
-    virtual sp<DecryptHandle> DrmInitialization(const char * /*mime*/ = NULL) {
-        return NULL;
-    }
-
-    virtual String8 getUri() {
-        return String8();
-    }
-
-    virtual String8 getMIMEType() const;
 
     virtual void close() {};
 

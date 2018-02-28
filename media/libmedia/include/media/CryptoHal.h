@@ -22,7 +22,7 @@
 #include <android/hardware/drm/1.0/ICryptoPlugin.h>
 #include <android/hardware/drm/1.1/ICryptoFactory.h>
 
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <utils/KeyedVector.h>
 #include <utils/threads.h>
 

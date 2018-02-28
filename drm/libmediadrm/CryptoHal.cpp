@@ -23,13 +23,14 @@
 
 #include <binder/IMemory.h>
 #include <cutils/native_handle.h>
-#include <media/CryptoHal.h>
+#include <hidlmemory/FrameworkUtils.h>
 #include <media/hardware/CryptoAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaErrors.h>
-#include <hidlmemory/FrameworkUtils.h>
+#include <mediadrm/CryptoHal.h>
+
 
 using ::android::hardware::drm::V1_0::BufferType;
 using ::android::hardware::drm::V1_0::DestinationBuffer;

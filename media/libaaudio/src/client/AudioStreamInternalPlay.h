@@ -33,6 +33,8 @@ public:
     AudioStreamInternalPlay(AAudioServiceInterface  &serviceInterface, bool inService = false);
     virtual ~AudioStreamInternalPlay();
 
+    aaudio_result_t open(const AudioStreamBuilder &builder) override;
+
     aaudio_result_t requestPause() override;
 
     aaudio_result_t requestFlush() override;

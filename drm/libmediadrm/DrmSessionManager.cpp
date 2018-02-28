@@ -21,9 +21,9 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IProcessInfoService.h>
 #include <binder/IServiceManager.h>
-#include <media/DrmSessionManager.h>
-#include <media/DrmSessionClientInterface.h>
 #include <media/stagefright/ProcessInfo.h>
+#include <mediadrm/DrmSessionClientInterface.h>
+#include <mediadrm/DrmSessionManager.h>
 #include <unistd.h>
 #include <utils/String8.h>
 

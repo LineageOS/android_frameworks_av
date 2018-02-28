@@ -24,7 +24,7 @@
 
 #include <media/Metadata.h>
 #include <media/stagefright/foundation/ABase.h>
-#include <media/IMediaDrmService.h>
+#include <mediadrm/IMediaDrmService.h>
 
 namespace android {
 

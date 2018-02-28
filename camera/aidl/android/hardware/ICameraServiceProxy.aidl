@@ -46,8 +46,14 @@ interface ICameraServiceProxy
     const int CAMERA_FACING_EXTERNAL = 2;
 
     /**
+     * Values for notifyCameraState api level
+     */
+     const int CAMERA_API_LEVEL_1 = 1;
+     const int CAMERA_API_LEVEL_2 = 2;
+
+    /**
      * Update the status of a camera device.
      */
     oneway void notifyCameraState(String cameraId, int facing, int newCameraState,
-            String clientName);
+            String clientName, int apiLevel);
 }

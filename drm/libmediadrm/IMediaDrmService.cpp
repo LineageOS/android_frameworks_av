@@ -20,9 +20,9 @@
 
 #include <binder/Parcel.h>
 #include <binder/IMemory.h>
-#include <media/ICrypto.h>
-#include <media/IDrm.h>
-#include <media/IMediaDrmService.h>
+#include <mediadrm/ICrypto.h>
+#include <mediadrm/IDrm.h>
+#include <mediadrm/IMediaDrmService.h>
 
 #include <utils/Errors.h>  // for status_t
 #include <utils/String8.h>
