@@ -22,9 +22,8 @@
 #include <fmq/MessageQueue.h>
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
-#include <C2Buffer.h>
 
-struct C2_HIDE _C2BlockPoolData {
+struct __attribute__((visibility("hidden"))) _C2BlockPoolData {
     uint32_t mId; //BufferId
     native_handle_t *mHandle;
 
@@ -56,6 +55,52 @@ typedef int64_t ConnectionId;
 
 typedef android::hardware::MessageQueue<BufferStatusMessage, kSynchronizedReadWrite> BufferStatusQueue;
 typedef BufferStatusQueue::Descriptor QueueDescriptor;
+
+/**
+ * Allocation wrapper class for buffer pool.
+ */
+struct BufferPoolAllocation {
+    const native_handle_t *mHandle;
+
+    const native_handle_t *handle() {
+        return mHandle;
+    }
+
+    BufferPoolAllocation(const native_handle_t *handle) : mHandle(handle) {}
+
+    ~BufferPoolAllocation() {};
+};
+
+/**
+ * Allocator wrapper class for buffer pool.
+ */
+class BufferPoolAllocator {
+public:
+
+    /**
+     * Allocate an allocation(buffer) for bufer pool.
+     *
+     * @param params    allocation parameters
+     * @param alloc     created allocation
+     *
+     * @return OK when an allocation is created successfully.
+     */
+    virtual ResultStatus allocate(
+            const std::vector<uint8_t> &params,
+            std::shared_ptr<BufferPoolAllocation> *alloc) = 0;
+
+    /**
+     * Returns whether allocation parameters of an old allocation are
+     * compatible with new allocation parameters.
+     */
+    virtual bool compatible(const std::vector<uint8_t> &newParams,
+                            const std::vector<uint8_t> &oldParams) = 0;
+
+protected:
+    BufferPoolAllocator() = default;
+
+    virtual ~BufferPoolAllocator() = default;
+};
 
 }  // namespace implementation
 }  // namespace V1_0

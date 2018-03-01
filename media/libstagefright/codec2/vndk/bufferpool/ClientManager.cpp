@@ -36,8 +36,7 @@ public:
     ResultStatus registerSender(const sp<IAccessor> &accessor,
                                 ConnectionId *pConnectionId);
 
-    ResultStatus create(const std::shared_ptr<C2Allocator> &allocator,
-                        bool linear,
+    ResultStatus create(const std::shared_ptr<BufferPoolAllocator> &allocator,
                         ConnectionId *pConnectionId);
 
     ResultStatus close(ConnectionId connectionId);
@@ -139,10 +138,9 @@ ResultStatus ClientManager::Impl::registerSender(
 }
 
 ResultStatus ClientManager::Impl::create(
-        const std::shared_ptr<C2Allocator> &allocator,
-        bool linear,
+        const std::shared_ptr<BufferPoolAllocator> &allocator,
         ConnectionId *pConnectionId) {
-    const sp<Accessor> accessor = new Accessor(allocator, linear);
+    const sp<Accessor> accessor = new Accessor(allocator);
     if (!accessor || !accessor->isValid()) {
         return ResultStatus::CRITICAL_ERROR;
     }
@@ -273,11 +271,10 @@ ClientManager::~ClientManager() {
 }
 
 ResultStatus ClientManager::create(
-        const std::shared_ptr<C2Allocator> &allocator,
-        bool linear,
+        const std::shared_ptr<BufferPoolAllocator> &allocator,
         ConnectionId *pConnectionId) {
     if (mImpl) {
-        return mImpl->create(allocator, linear, pConnectionId);
+        return mImpl->create(allocator, pConnectionId);
     }
     return ResultStatus::CRITICAL_ERROR;
 }

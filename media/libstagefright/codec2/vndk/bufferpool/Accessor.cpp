@@ -43,8 +43,8 @@ Return<void> Accessor::connect(connect_cb _hidl_cb) {
     return Void();
 }
 
-Accessor::Accessor(const std::shared_ptr<C2Allocator> &allocator, bool linear)
-    : mImpl(new Impl(allocator, linear)) {}
+Accessor::Accessor(const std::shared_ptr<BufferPoolAllocator> &allocator)
+    : mImpl(new Impl(allocator)) {}
 
 Accessor::~Accessor() {
 }

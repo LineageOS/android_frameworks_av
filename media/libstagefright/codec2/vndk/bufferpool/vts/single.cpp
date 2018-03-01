@@ -32,6 +32,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include "allocator.h"
 
 using android::C2AllocatorIon;
 using android::C2PlatformAllocatorStore;
@@ -44,9 +45,6 @@ using android::hardware::media::bufferpool::V1_0::implementation::ConnectionId;
 using android::hardware::media::bufferpool::V1_0::implementation::TransactionId;
 
 namespace {
-
-// Buffer allocation size for tests.
-constexpr static int kAllocationSize = 1024 * 10;
 
 // Number of iteration for buffer allocation test.
 constexpr static int kNumAllocationTest = 3;
@@ -63,11 +61,14 @@ class BufferpoolSingleTest : public ::testing::Test {
     mManager = ClientManager::getInstance();
     ASSERT_NE(mManager, nullptr);
 
-    mAllocator =
+    std::shared_ptr<C2Allocator> allocator =
         std::make_shared<C2AllocatorIon>(C2PlatformAllocatorStore::ION);
+    ASSERT_TRUE((bool)allocator);
+
+    mAllocator = std::make_shared<VtsBufferPoolAllocator>(allocator);
     ASSERT_TRUE((bool)mAllocator);
 
-    status = mManager->create(mAllocator, true, &mConnectionId);
+    status = mManager->create(mAllocator, &mConnectionId);
     ASSERT_TRUE(status == ResultStatus::OK);
 
     status = mManager->getAccessor(mConnectionId, &mAccessor);
@@ -91,23 +92,10 @@ class BufferpoolSingleTest : public ::testing::Test {
 
   android::sp<ClientManager> mManager;
   android::sp<IAccessor> mAccessor;
-  std::shared_ptr<C2Allocator> mAllocator;
+  std::shared_ptr<BufferPoolAllocator> mAllocator;
   ConnectionId mConnectionId;
   ConnectionId mReceiverId;
 
-  void getAllocationParams(std::vector<uint8_t>* vecParams) {
-    union Params {
-      struct {
-        uint32_t capacity;
-        C2MemoryUsage usage;
-      } data;
-      uint8_t array[0];
-      Params()
-          : data{kAllocationSize,
-                 {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE}} {}
-    } params;
-    vecParams->assign(params.array, params.array + sizeof(params));
-  }
 };
 
 // Buffer allocation test.
@@ -116,7 +104,7 @@ class BufferpoolSingleTest : public ::testing::Test {
 TEST_F(BufferpoolSingleTest, AllocateBuffer) {
   ResultStatus status;
   std::vector<uint8_t> vecParams;
-  getAllocationParams(&vecParams);
+  getVtsAllocatorParams(&vecParams);
 
   std::shared_ptr<_C2BlockPoolData> buffer[kNumAllocationTest];
   for (int i = 0; i < kNumAllocationTest; ++i) {
@@ -136,7 +124,7 @@ TEST_F(BufferpoolSingleTest, AllocateBuffer) {
 TEST_F(BufferpoolSingleTest, RecycleBuffer) {
   ResultStatus status;
   std::vector<uint8_t> vecParams;
-  getAllocationParams(&vecParams);
+  getVtsAllocatorParams(&vecParams);
 
   BufferId bid[kNumRecycleTest];
   for (int i = 0; i < kNumRecycleTest; ++i) {
@@ -156,7 +144,7 @@ TEST_F(BufferpoolSingleTest, RecycleBuffer) {
 TEST_F(BufferpoolSingleTest, TransferBuffer) {
   ResultStatus status;
   std::vector<uint8_t> vecParams;
-  getAllocationParams(&vecParams);
+  getVtsAllocatorParams(&vecParams);
   std::shared_ptr<_C2BlockPoolData> sbuffer, rbuffer;
 
   TransactionId transactionId;

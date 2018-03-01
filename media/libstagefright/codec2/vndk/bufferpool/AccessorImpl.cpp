@@ -22,7 +22,6 @@
 #include <time.h>
 #include <unistd.h>
 #include <utils/Log.h>
-#include <C2Buffer.h>
 #include "AccessorImpl.h"
 #include "Connection.h"
 
@@ -38,48 +37,18 @@ struct InternalBuffer {
     BufferId mId;
     size_t mOwnerCount;
     size_t mTransactionCount;
-    const bool mLinear;
-    const std::shared_ptr<C2LinearAllocation> mLinearAllocation;
-    const std::shared_ptr<C2GraphicAllocation> mGraphicAllocation;
+    const std::shared_ptr<BufferPoolAllocation> mAllocation;
     const std::vector<uint8_t> mConfig;
 
     InternalBuffer(
             BufferId id,
-            const std::shared_ptr<C2LinearAllocation> &alloc,
+            const std::shared_ptr<BufferPoolAllocation> &alloc,
             const std::vector<uint8_t> &allocConfig)
             : mId(id), mOwnerCount(0), mTransactionCount(0),
-            mLinear(true), mLinearAllocation(alloc),
-            mGraphicAllocation(nullptr),
-            mConfig(allocConfig) {}
-
-    InternalBuffer(
-            BufferId id,
-            const std::shared_ptr<C2GraphicAllocation> &alloc,
-            const std::vector<uint8_t> &allocConfig)
-            : mId(id), mOwnerCount(0), mTransactionCount(0),
-            mLinear(false), mLinearAllocation(nullptr),
-            mGraphicAllocation(alloc),
-            mConfig(allocConfig) {}
+            mAllocation(alloc), mConfig(allocConfig) {}
 
     const native_handle_t *handle() {
-        if (mLinear) {
-            return mLinearAllocation->handle();
-        } else {
-            return mGraphicAllocation->handle();
-        }
-    }
-
-    // TODO : support non exact matching. e.g) capacity
-    bool isRecyclable(const std::vector<uint8_t> &config) {
-        if (mConfig.size() == config.size()) {
-            for (size_t i = 0; i < config.size(); ++i) {
-                if (mConfig[i] != config[i]) {
-                    return false;
-                }
-            }
-                return true;
-        }
-        return false;
+        return mAllocation->handle();
     }
 };
 
@@ -154,8 +123,8 @@ int32_t Accessor::Impl::sPid = getpid();
 uint32_t Accessor::Impl::sSeqId = time(NULL);
 
 Accessor::Impl::Impl(
-        const std::shared_ptr<C2Allocator> &allocator, bool linear)
-        : mAllocator(allocator), mLinear(linear) {}
+        const std::shared_ptr<BufferPoolAllocator> &allocator)
+        : mAllocator(allocator) {}
 
 Accessor::Impl::~Impl() {
 }
@@ -193,14 +162,8 @@ ResultStatus Accessor::Impl::allocate(
     std::lock_guard<std::mutex> lock(mBufferPool.mMutex);
     mBufferPool.processStatusMessages();
     ResultStatus status = ResultStatus::OK;
-    if (!mBufferPool.getFreeBuffer(params, bufferId, handle)) {
-        if (mLinear) {
-            status = mBufferPool.getNewLinearBuffer(
-                    mAllocator, params, bufferId, handle);
-        } else {
-            status = mBufferPool.getNewGraphicBuffer(
-                    mAllocator, params, bufferId, handle);
-        }
+    if (!mBufferPool.getFreeBuffer(mAllocator, params, bufferId, handle)) {
+        status = mBufferPool.getNewBuffer(mAllocator, params, bufferId, handle);
         ALOGV("create a buffer %d : %u %p",
               status == ResultStatus::OK, *bufferId, *handle);
     }
@@ -437,12 +400,13 @@ bool Accessor::Impl::BufferPool::handleClose(ConnectionId connectionId) {
 }
 
 bool Accessor::Impl::BufferPool::getFreeBuffer(
+        const std::shared_ptr<BufferPoolAllocator> &allocator,
         const std::vector<uint8_t> &params, BufferId *pId,
         const native_handle_t** handle) {
     auto bufferIt = mFreeBuffers.begin();
     for (;bufferIt != mFreeBuffers.end(); ++bufferIt) {
         BufferId bufferId = *bufferIt;
-        if (mBuffers[bufferId]->isRecyclable(params)) {
+        if (allocator->compatible(params, mBuffers[bufferId]->mConfig)) {
             break;
         }
     }
@@ -457,81 +421,30 @@ bool Accessor::Impl::BufferPool::getFreeBuffer(
     return false;
 }
 
-ResultStatus Accessor::Impl::BufferPool::getNewLinearBuffer(
-        const std::shared_ptr<C2Allocator> &allocator,
+ResultStatus Accessor::Impl::BufferPool::getNewBuffer(
+        const std::shared_ptr<BufferPoolAllocator> &allocator,
         const std::vector<uint8_t> &params, BufferId *pId,
         const native_handle_t** handle) {
-    union LinearParam {
-        struct {
-            uint32_t capacity;
-            C2MemoryUsage usage;
-        } data;
-        uint8_t array[0];
-        LinearParam() : data{0, {0, 0}} {}
-    } linearParam;
-    memcpy(&linearParam, params.data(),
-           std::min(sizeof(linearParam), params.size()));
-    std::shared_ptr<C2LinearAllocation> linearAlloc;
-    c2_status_t status = allocator->newLinearAllocation(
-            linearParam.data.capacity, linearParam.data.usage, &linearAlloc);
-    if (status == C2_OK) {
+    std::shared_ptr<BufferPoolAllocation> alloc;
+    ResultStatus status = allocator->allocate(params, &alloc);
+
+    if (status == ResultStatus::OK) {
         BufferId bufferId = mSeq++;
         std::unique_ptr<InternalBuffer> buffer =
                 std::make_unique<InternalBuffer>(
-                        bufferId, linearAlloc, params);
+                        bufferId, alloc, params);
         if (buffer) {
             auto res = mBuffers.insert(std::make_pair(
                     bufferId, std::move(buffer)));
             if (res.second) {
-                *handle = linearAlloc->handle();
+                *handle = alloc->handle();
                 *pId = bufferId;
                 return ResultStatus::OK;
             }
         }
         return ResultStatus::NO_MEMORY;
     }
-    // TODO: map C2 error code
-    return ResultStatus::CRITICAL_ERROR;
-}
-
-ResultStatus Accessor::Impl::BufferPool::getNewGraphicBuffer(
-        const std::shared_ptr<C2Allocator> &allocator,
-        const std::vector<uint8_t> &params, BufferId *pId,
-        const native_handle_t** handle) {
-    union GraphicParam {
-        struct {
-            uint32_t width;
-            uint32_t height;
-            uint32_t format;
-            C2MemoryUsage usage;
-        } data;
-        uint8_t array[0];
-        GraphicParam() : data{0, 0, 0, {0, 0}} {}
-    } graphicParam;
-    memcpy(&graphicParam, params.data(),
-           std::min(sizeof(graphicParam), params.size()));
-    std::shared_ptr<C2GraphicAllocation> graphicAlloc;
-    c2_status_t status = allocator->newGraphicAllocation(
-            graphicParam.data.width, graphicParam.data.height,
-            graphicParam.data.format, graphicParam.data.usage, &graphicAlloc);
-    if (status == C2_OK) {
-        BufferId bufferId = mSeq;
-        std::unique_ptr<InternalBuffer> buffer =
-                std::make_unique<InternalBuffer>(
-                        bufferId, graphicAlloc, params);
-        if (buffer) {
-            auto res = mBuffers.insert(std::make_pair(
-                    bufferId, std::move(buffer)));
-            if (res.second) {
-                *handle = graphicAlloc->handle();
-                *pId = bufferId;
-                return ResultStatus::OK;
-            }
-        }
-        return ResultStatus::NO_MEMORY;
-    }
-    // TODO: map C2 error code
-    return ResultStatus::CRITICAL_ERROR;
+    return status;
 }
 
 }  // namespace implementation
