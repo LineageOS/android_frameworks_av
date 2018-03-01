@@ -99,6 +99,8 @@ struct NuPlayer : public AHandler {
 
     const char *getDataSourceType();
 
+    void updateInternalTimers();
+
 protected:
     virtual ~NuPlayer();
 
@@ -180,12 +182,12 @@ private:
 
     Mutex mPlayingTimeLock;
     int64_t mLastStartedPlayingTimeNs;
-    void stopPlaybackTimer(const char *where);
+    void updatePlaybackTimer(bool stopping, const char *where);
     void startPlaybackTimer(const char *where);
 
     int64_t mLastStartedRebufferingTimeNs;
     void startRebufferingTimer();
-    void stopRebufferingTimer(bool exitingPlayback);
+    void updateRebufferingTimer(bool stopping, bool exitingPlayback);
 
     int64_t mPreviousSeekTimeUs;
 
