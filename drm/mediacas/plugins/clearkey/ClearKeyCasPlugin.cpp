@@ -347,6 +347,9 @@ ssize_t ClearKeyCasSession::decrypt(
         return ERROR_CAS_CANNOT_HANDLE;
     }
 
+    scramblingControl = (DescramblerPlugin::ScramblingControl)
+        (scramblingControl & DescramblerPlugin::kScrambling_Mask_Key);
+
     AES_KEY contentKey;
 
     if (scramblingControl != DescramblerPlugin::kScrambling_Unscrambled) {

@@ -27,6 +27,7 @@
 #include <binder/MemoryDealer.h>
 #include <cutils/native_handle.h>
 #include <hidlmemory/FrameworkUtils.h>
+#include <media/cas/DescramblerAPI.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -1387,6 +1388,9 @@ status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
 
     uint32_t sctrl = tsScramblingControl != 0 ?
             tsScramblingControl : pesScramblingControl;
+    if (mQueue->isScrambled()) {
+        sctrl |= DescramblerPlugin::kScrambling_Flag_PesHeader;
+    }
 
     // Perform the 1st pass descrambling if needed
     if (descrambleBytes > 0) {
