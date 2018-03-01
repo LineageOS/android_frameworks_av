@@ -51,6 +51,8 @@ void SimpleC2Component::WorkQueue::markDrain(uint32_t drainMode) {
     mQueue.push_back({ nullptr, drainMode });
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 SimpleC2Component::SimpleC2Component(
         const std::shared_ptr<C2ComponentInterface> &intf)
     : mIntf(intf) {
@@ -91,13 +93,13 @@ c2_status_t SimpleC2Component::queue_nb(std::list<std::unique_ptr<C2Work>> * con
 }
 
 c2_status_t SimpleC2Component::announce_nb(const std::vector<C2WorkOutline> &items) {
-    (void) items;
+    (void)items;
     return C2_OMITTED;
 }
 
 c2_status_t SimpleC2Component::flush_sm(
-        flush_mode_t flushThrough, std::list<std::unique_ptr<C2Work>>* const flushedWork) {
-    (void) flushThrough;
+        flush_mode_t flushMode, std::list<std::unique_ptr<C2Work>>* const flushedWork) {
+    (void)flushMode;
     {
         Mutexed<ExecState>::Locked state(mExecState);
         if (state->mState != RUNNING) {
@@ -107,6 +109,7 @@ c2_status_t SimpleC2Component::flush_sm(
     {
         Mutexed<WorkQueue>::Locked queue(mWorkQueue);
         queue->incGeneration();
+        // TODO: queue->splicedBy(flushedWork, flushedWork->end());
         while (!queue->empty()) {
             std::unique_ptr<C2Work> work = queue->pop_front();
             if (work) {
@@ -122,7 +125,7 @@ c2_status_t SimpleC2Component::flush_sm(
         }
     }
 
-    return onFlush_sm();
+    return C2_OK;
 }
 
 c2_status_t SimpleC2Component::drain_nb(drain_mode_t drainMode) {
@@ -160,6 +163,10 @@ c2_status_t SimpleC2Component::start() {
     }
     if (!state->mThread.joinable()) {
         mExitRequested = false;
+        {
+            Mutexed<ExitMonitor>::Locked monitor(mExitMonitor);
+            monitor->mExited = false;
+        }
         state->mThread = std::thread(
                 [](std::weak_ptr<SimpleC2Component> wp) {
                     while (true) {
@@ -168,6 +175,8 @@ c2_status_t SimpleC2Component::start() {
                             return;
                         }
                         if (thiz->exitRequested()) {
+                            ALOGV("stop processing");
+                            thiz->signalExit();
                             return;
                         }
                         thiz->processQueue();
@@ -179,7 +188,42 @@ c2_status_t SimpleC2Component::start() {
     return C2_OK;
 }
 
+void SimpleC2Component::signalExit() {
+    Mutexed<ExitMonitor>::Locked monitor(mExitMonitor);
+    monitor->mExited = true;
+    monitor->mCondition.broadcast();
+}
+
+void SimpleC2Component::requestExitAndWait(std::function<void()> job) {
+    {
+        Mutexed<ExecState>::Locked state(mExecState);
+        if (!state->mThread.joinable()) {
+            return;
+        }
+    }
+    mExitRequested = true;
+    {
+        Mutexed<WorkQueue>::Locked queue(mWorkQueue);
+        queue->mCondition.broadcast();
+    }
+    // TODO: timeout?
+    {
+        Mutexed<ExitMonitor>::Locked monitor(mExitMonitor);
+        while (!monitor->mExited) {
+            monitor.waitForCondition(monitor->mCondition);
+        }
+        job();
+    }
+    Mutexed<ExecState>::Locked state(mExecState);
+    if (state->mThread.joinable()) {
+        ALOGV("joining the processing thread");
+        state->mThread.join();
+        ALOGV("joined the processing thread");
+    }
+}
+
 c2_status_t SimpleC2Component::stop() {
+    ALOGV("stop");
     {
         Mutexed<ExecState>::Locked state(mExecState);
         if (state->mState != RUNNING) {
@@ -195,7 +239,8 @@ c2_status_t SimpleC2Component::stop() {
         Mutexed<PendingWork>::Locked pending(mPendingWork);
         pending->clear();
     }
-    c2_status_t err = onStop();
+    c2_status_t err;
+    requestExitAndWait([this, &err]{ err = onStop(); });
     if (err != C2_OK) {
         return err;
     }
@@ -203,6 +248,7 @@ c2_status_t SimpleC2Component::stop() {
 }
 
 c2_status_t SimpleC2Component::reset() {
+    ALOGV("reset");
     {
         Mutexed<ExecState>::Locked state(mExecState);
         state->mState = UNINITIALIZED;
@@ -215,21 +261,13 @@ c2_status_t SimpleC2Component::reset() {
         Mutexed<PendingWork>::Locked pending(mPendingWork);
         pending->clear();
     }
-    onReset();
+    requestExitAndWait([this]{ onReset(); });
     return C2_OK;
 }
 
 c2_status_t SimpleC2Component::release() {
-    std::thread releasing;
-    {
-        Mutexed<ExecState>::Locked state(mExecState);
-        releasing = std::move(state->mThread);
-    }
-    mExitRequested = true;
-    if (releasing.joinable()) {
-        releasing.join();
-    }
-    onRelease();
+    ALOGV("release");
+    requestExitAndWait([this]{ onRelease(); });
     return C2_OK;
 }
 
@@ -271,10 +309,14 @@ void SimpleC2Component::processQueue() {
     std::unique_ptr<C2Work> work;
     uint64_t generation;
     int32_t drainMode;
+    bool isFlushPending = false;
     {
         Mutexed<WorkQueue>::Locked queue(mWorkQueue);
         nsecs_t deadline = systemTime() + ms2ns(250);
         while (queue->empty()) {
+            if (exitRequested()) {
+                return;
+            }
             nsecs_t now = systemTime();
             if (now >= deadline) {
                 return;
@@ -287,7 +329,16 @@ void SimpleC2Component::processQueue() {
 
         generation = queue->generation();
         drainMode = queue->drainMode();
+        isFlushPending = queue->popPendingFlush();
         work = queue->pop_front();
+    }
+    if (isFlushPending) {
+        ALOGV("processing pending flush");
+        c2_status_t err = onFlush_sm();
+        if (err != C2_OK) {
+            ALOGD("flush err: %d", err);
+            // TODO: error
+        }
     }
 
     if (!mOutputBlockPool) {
@@ -333,10 +384,12 @@ void SimpleC2Component::processQueue() {
     }
 
     process(work, mOutputBlockPool);
+    ALOGV("processed frame #%" PRIu64, work->input.ordinal.frameIndex.peeku());
     {
         Mutexed<WorkQueue>::Locked queue(mWorkQueue);
         if (queue->generation() != generation) {
-            ALOGW("work form old generation: was %" PRIu64 " now %" PRIu64, queue->generation(), generation);
+            ALOGD("work form old generation: was %" PRIu64 " now %" PRIu64,
+                    queue->generation(), generation);
             work->result = C2_NOT_FOUND;
             queue.unlock();
             {
@@ -361,9 +414,10 @@ void SimpleC2Component::processQueue() {
                 unexpected = std::move(pending->at(frameIndex));
                 pending->erase(frameIndex);
             }
-            (void) pending->insert({ frameIndex, std::move(work) });
+            (void)pending->insert({ frameIndex, std::move(work) });
         }
         if (unexpected) {
+            ALOGD("unexpected pending work");
             unexpected->result = C2_CORRUPTED;
             Mutexed<ExecState>::Locked state(mExecState);
             state->mListener->onWorkDone_nb(shared_from_this(), vec(unexpected));
