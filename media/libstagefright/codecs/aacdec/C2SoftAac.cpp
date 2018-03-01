@@ -305,37 +305,57 @@ void C2SoftAac::drainRingBuffer(
         ALOGV("getting %d from ringbuffer", numSamples);
 
         std::shared_ptr<C2LinearBlock> block;
-        C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
-        // TODO: error handling, proper usage, etc.
-        c2_status_t err = pool->fetchLinearBlock(numSamples * sizeof(int16_t), usage, &block);
-        if (err != C2_OK) {
-            ALOGE("err = %d", err);
-        }
+        std::function<void(const std::unique_ptr<C2Work>&)> fillWork =
+            [&block, numSamples, pool, this]()
+                    -> std::function<void(const std::unique_ptr<C2Work>&)> {
+                auto fillEmptyWork = [](const std::unique_ptr<C2Work> &work, c2_status_t err) {
+                    work->result = err;
+                    work->worklets.front()->output.flags = work->input.flags;
+                    work->worklets.front()->output.buffers.clear();
+                    work->worklets.front()->output.ordinal = work->input.ordinal;
+                    work->workletsProcessed = 1u;
+                };
 
-        C2WriteView wView = block->map().get();
-        // TODO
-        INT_PCM *outBuffer = reinterpret_cast<INT_PCM *>(wView.data());
-        int32_t ns = outputDelayRingBufferGetSamples(outBuffer, numSamples);
-        if (ns != numSamples) {
-            ALOGE("not a complete frame of samples available");
-            mSignalledError = true;
-            // TODO: notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
-            return;
-        }
-        auto fillWork = [buffer = createLinearBuffer(block)](const std::unique_ptr<C2Work> &work) {
-            work->worklets.front()->output.flags = work->input.flags;
-            work->worklets.front()->output.buffers.clear();
-            work->worklets.front()->output.buffers.push_back(buffer);
-            work->worklets.front()->output.ordinal = work->input.ordinal;
-            work->workletsProcessed = 1u;
-        };
+                using namespace std::placeholders;
+                if (numSamples == 0) {
+                    return std::bind(fillEmptyWork, _1, C2_OK);
+                }
+
+                // TODO: error handling, proper usage, etc.
+                C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
+                c2_status_t err = pool->fetchLinearBlock(
+                        numSamples * sizeof(int16_t), usage, &block);
+                if (err != C2_OK) {
+                    ALOGD("failed to fetch a linear block (%d)", err);
+                    mSignalledError = true;
+                    return std::bind(fillEmptyWork, _1, C2_NO_MEMORY);
+                }
+                C2WriteView wView = block->map().get();
+                // TODO
+                INT_PCM *outBuffer = reinterpret_cast<INT_PCM *>(wView.data());
+                int32_t ns = outputDelayRingBufferGetSamples(outBuffer, numSamples);
+                if (ns != numSamples) {
+                    ALOGE("not a complete frame of samples available");
+                    mSignalledError = true;
+                    return std::bind(fillEmptyWork, _1, C2_CORRUPTED);
+                }
+                return [buffer = createLinearBuffer(block)](const std::unique_ptr<C2Work> &work) {
+                    work->result = C2_OK;
+                    work->worklets.front()->output.flags = work->input.flags;
+                    work->worklets.front()->output.buffers.clear();
+                    work->worklets.front()->output.buffers.push_back(buffer);
+                    work->worklets.front()->output.ordinal = work->input.ordinal;
+                    work->workletsProcessed = 1u;
+                };
+            }();
+
         if (work && work->input.ordinal.frameIndex == c2_cntr64_t(outInfo.frameIndex)) {
             fillWork(work);
         } else {
             finish(outInfo.frameIndex, fillWork);
         }
 
-        ALOGV("out timestamp %" PRIu64 " / %u", outInfo.timestamp, block->capacity());
+        ALOGV("out timestamp %" PRIu64 " / %u", outInfo.timestamp, block ? block->capacity() : 0);
         mBuffersInfo.pop_front();
     }
 }
