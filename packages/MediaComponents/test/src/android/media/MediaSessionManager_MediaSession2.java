@@ -20,7 +20,6 @@ import android.content.Context;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
 import android.media.session.MediaSessionManager;
-import android.media.session.MediaSessionManager.OnSessionTokensChangedListener;
 import android.media.session.PlaybackState;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
@@ -31,9 +30,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.util.UUID;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.*;
@@ -212,122 +209,9 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
         assertTrue(foundTestLibraryService);
     }
 
-    @Test
-    public void testAddOnSessionTokensChangedListener() throws InterruptedException {
-        TokensChangedListener listener = new TokensChangedListener();
-        mManager.addOnSessionTokensChangedListener(sHandlerExecutor, listener);
-
-        listener.reset();
-        MediaSession2 session1 = new MediaSession2.Builder(mContext, new MockPlayer(0))
-                .setId(UUID.randomUUID().toString())
-                .build();
-        assertTrue(listener.await());
-        assertTrue(listener.findToken(session1.getToken()));
-
-        listener.reset();
-        session1.close();
-        assertTrue(listener.await());
-        assertFalse(listener.findToken(session1.getToken()));
-
-        listener.reset();
-        MediaSession2 session2 = new MediaSession2.Builder(mContext, new MockPlayer(0))
-                .setId(UUID.randomUUID().toString())
-                .build();
-        assertTrue(listener.await());
-        assertFalse(listener.findToken(session1.getToken()));
-        assertTrue(listener.findToken(session2.getToken()));
-
-        listener.reset();
-        MediaSession2 session3 = new MediaSession2.Builder(mContext, new MockPlayer(0))
-                .setId(UUID.randomUUID().toString())
-                .build();
-        assertTrue(listener.await());
-        assertFalse(listener.findToken(session1.getToken()));
-        assertTrue(listener.findToken(session2.getToken()));
-        assertTrue(listener.findToken(session3.getToken()));
-
-        listener.reset();
-        session2.close();
-        assertTrue(listener.await());
-        assertFalse(listener.findToken(session1.getToken()));
-        assertFalse(listener.findToken(session2.getToken()));
-        assertTrue(listener.findToken(session3.getToken()));
-
-        listener.reset();
-        session3.close();
-        assertTrue(listener.await());
-        assertFalse(listener.findToken(session1.getToken()));
-        assertFalse(listener.findToken(session2.getToken()));
-        assertFalse(listener.findToken(session3.getToken()));
-
-        mManager.removeOnSessionTokensChangedListener(listener);
-    }
-
-    @Test
-    public void testRemoveOnSessionTokensChangedListener() throws InterruptedException {
-        TokensChangedListener listener = new TokensChangedListener();
-        mManager.addOnSessionTokensChangedListener(sHandlerExecutor, listener);
-
-        listener.reset();
-        MediaSession2 session1 = new MediaSession2.Builder(mContext, new MockPlayer(0))
-                .setId(UUID.randomUUID().toString())
-                .build();
-        assertTrue(listener.await());
-
-        mManager.removeOnSessionTokensChangedListener(listener);
-
-        listener.reset();
-        session1.close();
-        assertFalse(listener.await());
-
-        listener.reset();
-        MediaSession2 session2 = new MediaSession2.Builder(mContext, new MockPlayer(0))
-                .setId(UUID.randomUUID().toString())
-                .build();
-        assertFalse(listener.await());
-
-        listener.reset();
-        MediaSession2 session3 = new MediaSession2.Builder(mContext, new MockPlayer(0))
-                .setId(UUID.randomUUID().toString())
-                .build();
-        assertFalse(listener.await());
-
-        listener.reset();
-        session2.close();
-        assertFalse(listener.await());
-
-        listener.reset();
-        session3.close();
-        assertFalse(listener.await());
-    }
-
     // Ensures if the session creation/release is notified to the server.
     private void ensureChangeInSession() throws InterruptedException {
         // TODO(jaewan): Wait by listener.
         Thread.sleep(WAIT_TIME_MS);
-    }
-
-    private class TokensChangedListener implements OnSessionTokensChangedListener {
-        private CountDownLatch mLatch;
-        private List<SessionToken2> mTokens;
-
-        private void reset() {
-            mLatch = new CountDownLatch(1);
-            mTokens = null;
-        }
-
-        private boolean await() throws InterruptedException {
-            return mLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS);
-        }
-
-        private boolean findToken(SessionToken2 token) {
-            return mTokens.contains(token);
-        }
-
-        @Override
-        public void onSessionTokensChanged(List<SessionToken2> tokens) {
-            mTokens = tokens;
-            mLatch.countDown();
-        }
     }
 }
