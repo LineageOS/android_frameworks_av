@@ -114,8 +114,8 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         }
         TestLibrarySessionCallback callback =
                 new TestLibrarySessionCallback(sessionCallbackProxy);
-        mSession = new MediaLibrarySession.Builder(MockMediaLibraryService2.this, player,
-                executor, callback).setId(sessionId).build();
+        mSession = new MediaLibrarySession.Builder(MockMediaLibraryService2.this, executor,
+                callback).setPlayer(player).setId(sessionId).build();
         return mSession;
     }
 

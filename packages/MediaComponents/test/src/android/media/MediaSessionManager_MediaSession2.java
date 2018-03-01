@@ -55,7 +55,8 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
         // Specify TAG here so {@link MediaSession2.getInstance()} doesn't complaint about
         // per test thread differs across the {@link MediaSession2} with the same TAG.
         final MockPlayer player = new MockPlayer(1);
-        mSession = new MediaSession2.Builder(mContext, player)
+        mSession = new MediaSession2.Builder(mContext)
+                .setPlayer(player)
                 .setSessionCallback(sHandlerExecutor, new SessionCallback(mContext) { })
                 .setId(TAG)
                 .build();
@@ -107,8 +108,8 @@ public class MediaSessionManager_MediaSession2 extends MediaSession2TestBase {
     public void testGetSessionTokens_sessionRejected() throws InterruptedException {
         sHandler.postAndSync(() -> {
             mSession.close();
-            mSession = new MediaSession2.Builder(mContext, new MockPlayer(0)).setId(TAG)
-                    .setSessionCallback(sHandlerExecutor, new SessionCallback(mContext) {
+            mSession = new MediaSession2.Builder(mContext).setPlayer(new MockPlayer(0))
+                    .setId(TAG).setSessionCallback(sHandlerExecutor, new SessionCallback(mContext) {
                         @Override
                         public MediaSession2.CommandGroup onConnect(ControllerInfo controller) {
                             // Reject all connection request.

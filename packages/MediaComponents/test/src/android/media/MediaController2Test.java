@@ -76,7 +76,8 @@ public class MediaController2Test extends MediaSession2TestBase {
         mIntent = PendingIntent.getActivity(mContext, 0, sessionActivity, 0);
 
         mPlayer = new MockPlayer(1);
-        mSession = new MediaSession2.Builder(mContext, mPlayer)
+        mSession = new MediaSession2.Builder(mContext)
+                .setPlayer(mPlayer)
                 .setSessionCallback(sHandlerExecutor, new SessionCallback(mContext) {})
                 .setSessionActivity(mIntent)
                 .setId(TAG).build();
@@ -256,7 +257,7 @@ public class MediaController2Test extends MediaSession2TestBase {
         TestVolumeProvider volumeProvider =
                 new TestVolumeProvider(mContext, volumeControlType, maxVolume, currentVolume);
 
-        mSession.setPlayer(new MockPlayer(0), volumeProvider);
+        mSession.updatePlayer(new MockPlayer(0), null, volumeProvider);
         final MediaController2 controller = createController(mSession.getToken(), true, null);
 
         final int targetVolume = 50;
@@ -274,7 +275,7 @@ public class MediaController2Test extends MediaSession2TestBase {
         TestVolumeProvider volumeProvider =
                 new TestVolumeProvider(mContext, volumeControlType, maxVolume, currentVolume);
 
-        mSession.setPlayer(new MockPlayer(0), volumeProvider);
+        mSession.updatePlayer(new MockPlayer(0), null, volumeProvider);
         final MediaController2 controller = createController(mSession.getToken(), true, null);
 
         final int direction = AudioManager.ADJUST_RAISE;
@@ -332,7 +333,7 @@ public class MediaController2Test extends MediaSession2TestBase {
             }
         };
         mSession.close();
-        mSession = new MediaSession2.Builder(mContext, mPlayer)
+        mSession = new MediaSession2.Builder(mContext).setPlayer(mPlayer)
                 .setSessionCallback(sHandlerExecutor, callback).setId(TAG).build();
         final MediaController2 controller = createController(mSession.getToken());
         controller.sendCustomCommand(testCommand, testArgs, null);
@@ -357,7 +358,7 @@ public class MediaController2Test extends MediaSession2TestBase {
         };
         sHandler.postAndSync(() -> {
             mSession.close();
-            mSession = new MediaSession2.Builder(mContext, mPlayer)
+            mSession = new MediaSession2.Builder(mContext).setPlayer(mPlayer)
                     .setSessionCallback(sHandlerExecutor, sessionCallback).build();
         });
         MediaController2 controller =
@@ -396,7 +397,8 @@ public class MediaController2Test extends MediaSession2TestBase {
                 latch.countDown();
             }
         };
-        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+        try (MediaSession2 session = new MediaSession2.Builder(mContext)
+                .setPlayer(mPlayer)
                 .setSessionCallback(sHandlerExecutor, callback)
                 .setId("testPlayFromSearch").build()) {
             MediaController2 controller = createController(session.getToken());
@@ -420,7 +422,8 @@ public class MediaController2Test extends MediaSession2TestBase {
                 latch.countDown();
             }
         };
-        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+        try (MediaSession2 session = new MediaSession2.Builder(mContext)
+                .setPlayer(mPlayer)
                 .setSessionCallback(sHandlerExecutor, callback)
                 .setId("testPlayFromUri").build()) {
             MediaController2 controller = createController(session.getToken());
@@ -444,7 +447,8 @@ public class MediaController2Test extends MediaSession2TestBase {
                 latch.countDown();
             }
         };
-        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+        try (MediaSession2 session = new MediaSession2.Builder(mContext)
+                .setPlayer(mPlayer)
                 .setSessionCallback(sHandlerExecutor, callback)
                 .setId("testPlayFromMediaId").build()) {
             MediaController2 controller = createController(session.getToken());
@@ -470,7 +474,8 @@ public class MediaController2Test extends MediaSession2TestBase {
                 latch.countDown();
             }
         };
-        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+        try (MediaSession2 session = new MediaSession2.Builder(mContext)
+                .setPlayer(mPlayer)
                 .setSessionCallback(sHandlerExecutor, callback)
                 .setId("testPrepareFromSearch").build()) {
             MediaController2 controller = createController(session.getToken());
@@ -494,7 +499,8 @@ public class MediaController2Test extends MediaSession2TestBase {
                 latch.countDown();
             }
         };
-        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+        try (MediaSession2 session = new MediaSession2.Builder(mContext)
+                .setPlayer(mPlayer)
                 .setSessionCallback(sHandlerExecutor, callback)
                 .setId("testPrepareFromUri").build()) {
             MediaController2 controller = createController(session.getToken());
@@ -518,7 +524,8 @@ public class MediaController2Test extends MediaSession2TestBase {
                 latch.countDown();
             }
         };
-        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+        try (MediaSession2 session = new MediaSession2.Builder(mContext)
+                .setPlayer(mPlayer)
                 .setSessionCallback(sHandlerExecutor, callback)
                 .setId("testPrepareFromMediaId").build()) {
             MediaController2 controller = createController(session.getToken());
@@ -546,7 +553,8 @@ public class MediaController2Test extends MediaSession2TestBase {
             }
         };
 
-        try (MediaSession2 session = new MediaSession2.Builder(mContext, mPlayer)
+        try (MediaSession2 session = new MediaSession2.Builder(mContext)
+                .setPlayer(mPlayer)
                 .setSessionCallback(sHandlerExecutor, callback)
                 .setId("testSetRating").build()) {
             MediaController2 controller = createController(session.getToken());
@@ -588,7 +596,8 @@ public class MediaController2Test extends MediaSession2TestBase {
         try {
             final MockPlayer player = new MockPlayer(0);
             sessionHandler.postAndSync(() -> {
-                mSession = new MediaSession2.Builder(mContext, mPlayer)
+                mSession = new MediaSession2.Builder(mContext)
+                        .setPlayer(mPlayer)
                         .setSessionCallback(sHandlerExecutor, new SessionCallback(mContext) {})
                         .setId("testDeadlock").build();
             });
@@ -780,7 +789,8 @@ public class MediaController2Test extends MediaSession2TestBase {
         sHandler.postAndSync(() -> {
             // Recreated session has different session stub, so previously created controller
             // shouldn't be available.
-            mSession = new MediaSession2.Builder(mContext, mPlayer)
+            mSession = new MediaSession2.Builder(mContext)
+                    .setPlayer(mPlayer)
                     .setSessionCallback(sHandlerExecutor, new SessionCallback(mContext) {})
                     .setId(id).build();
         });

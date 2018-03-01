@@ -356,7 +356,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO:
                     session.getInstance().seekTo(args.getLong(ARGUMENT_KEY_POSITION));
                     break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM:
+                case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_TO_PLAYLIST_ITEM:
                     // TODO(jaewan): Implement
                     /*
                     session.getInstance().skipToPlaylistItem(

@@ -471,7 +471,7 @@ public class MediaController2Impl implements MediaController2Provider {
         Bundle args = new Bundle();
         args.putInt(MediaSession2Stub.ARGUMENT_KEY_ITEM_INDEX, item);
         sendTransportControlCommand(
-                MediaSession2.COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM, args);
+                MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_TO_PLAYLIST_ITEM, args);
         */
     }
 
@@ -483,12 +483,12 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public void removePlaylistItem_impl(MediaItem2 index) {
+    public void addPlaylistItem_impl(int index, MediaItem2 item) {
         // TODO(jaewan): Implement
     }
 
     @Override
-    public void addPlaylistItem_impl(int index, MediaItem2 item) {
+    public void removePlaylistItem_impl(MediaItem2 item) {
         // TODO(jaewan): Implement
     }
 
