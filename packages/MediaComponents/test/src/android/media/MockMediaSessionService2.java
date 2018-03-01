@@ -64,7 +64,8 @@ public class MockMediaSessionService2 extends MediaSessionService2 {
         }
         TestSessionServiceCallback callback =
                 new TestSessionServiceCallback(sessionCallbackProxy);
-        mSession = new MediaSession2.Builder(this, player)
+        mSession = new MediaSession2.Builder(this)
+                .setPlayer(player)
                 .setSessionCallback(executor, callback)
                 .setId(sessionId).build();
         return mSession;

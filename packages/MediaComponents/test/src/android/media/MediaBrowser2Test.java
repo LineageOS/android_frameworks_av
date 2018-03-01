@@ -41,6 +41,7 @@ import android.support.annotation.NonNull;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -227,6 +228,7 @@ public class MediaBrowser2Test extends MediaController2Test {
         assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
     }
 
+    @Ignore
     @Test
     public void testSearch() throws InterruptedException {
         final String query = MockMediaLibraryService2.SEARCH_QUERY;
@@ -352,6 +354,7 @@ public class MediaBrowser2Test extends MediaController2Test {
         assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
     }
 
+    @Ignore
     @Test
     public void testUnsubscribe() throws InterruptedException {
         final String testParentId = "testUnsubscribeId";

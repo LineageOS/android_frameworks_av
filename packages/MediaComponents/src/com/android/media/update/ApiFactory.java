@@ -162,8 +162,8 @@ public class ApiFactory implements StaticProvider {
     }
 
     public BuilderBaseProvider<MediaSession2, SessionCallback> createMediaSession2Builder(
-            Context context, MediaSession2.Builder instance, MediaPlayerBase player) {
-        return new MediaSession2Impl.BuilderImpl(context, instance, player);
+            Context context, MediaSession2.Builder instance) {
+        return new MediaSession2Impl.BuilderImpl(context, instance);
     }
 
     @Override
@@ -188,9 +188,9 @@ public class ApiFactory implements StaticProvider {
     @Override
     public BuilderBaseProvider<MediaLibrarySession, MediaLibrarySessionCallback>
         createMediaLibraryService2Builder(MediaLibraryService2 service,
-            MediaLibrarySession.Builder instance, MediaPlayerBase player,
-            Executor callbackExecutor, MediaLibrarySessionCallback callback) {
-        return new MediaLibraryService2Impl.BuilderImpl(service, instance, player, callbackExecutor,
+            MediaLibrarySession.Builder instance, Executor callbackExecutor,
+            MediaLibrarySessionCallback callback) {
+        return new MediaLibraryService2Impl.BuilderImpl(service, instance, callbackExecutor,
                 callback);
     }
 

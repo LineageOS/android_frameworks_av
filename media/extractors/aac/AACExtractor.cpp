@@ -373,6 +373,7 @@ static MediaExtractor::CreatorFunc Sniff(
         *confidence = 0.2;
 
         off64_t *offPtr = (off64_t*) malloc(sizeof(off64_t));
+        *offPtr = pos;
         *meta = offPtr;
         *freeMeta = ::free;
 

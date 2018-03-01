@@ -131,9 +131,8 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
     public static class BuilderImpl
             extends BuilderBaseImpl<MediaLibrarySession, MediaLibrarySessionCallback> {
         public BuilderImpl(MediaLibraryService2 service, Builder instance,
-                MediaPlayerBase player, Executor callbackExecutor,
-                MediaLibrarySessionCallback callback) {
-            super(service, player);
+                Executor callbackExecutor, MediaLibrarySessionCallback callback) {
+            super(service);
             setSessionCallback_impl(callbackExecutor, callback);
         }
 
