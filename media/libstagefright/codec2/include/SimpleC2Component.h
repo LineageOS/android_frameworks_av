@@ -52,6 +52,7 @@ public:
     // for thread
     inline bool exitRequested() { return mExitRequested; }
     void processQueue();
+    void signalExit();
 
 protected:
     /**
@@ -157,16 +158,21 @@ private:
 
     class WorkQueue {
     public:
-        inline WorkQueue() : mGeneration(0ul) {}
+        inline WorkQueue() : mFlush(false), mGeneration(0ul) {}
 
         inline uint64_t generation() const { return mGeneration; }
-        inline void incGeneration() { ++mGeneration; }
+        inline void incGeneration() { ++mGeneration; mFlush = true; }
 
         std::unique_ptr<C2Work> pop_front();
         void push_back(std::unique_ptr<C2Work> work);
         bool empty() const;
         uint32_t drainMode() const;
         void markDrain(uint32_t drainMode);
+        inline bool popPendingFlush() {
+            bool flush = mFlush;
+            mFlush = false;
+            return flush;
+        }
         void clear();
 
         Condition mCondition;
@@ -177,6 +183,7 @@ private:
             uint32_t drainMode;
         };
 
+        bool mFlush;
         uint64_t mGeneration;
         std::list<Entry> mQueue;
     };
@@ -185,9 +192,18 @@ private:
     typedef std::unordered_map<uint64_t, std::unique_ptr<C2Work>> PendingWork;
     Mutexed<PendingWork> mPendingWork;
 
+    struct ExitMonitor {
+        inline ExitMonitor() : mExited(false) {}
+        Condition mCondition;
+        bool mExited;
+    };
+    Mutexed<ExitMonitor> mExitMonitor;
+
     std::shared_ptr<C2BlockPool> mOutputBlockPool;
 
     SimpleC2Component() = delete;
+
+    void requestExitAndWait(std::function<void()> job);
 };
 
 }  // namespace android
