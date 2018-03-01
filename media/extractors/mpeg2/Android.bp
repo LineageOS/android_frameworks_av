@@ -22,6 +22,7 @@ cc_library_shared {
         "libhidlbase",
         "liblog",
         "libmediaextractor",
+        "libmediandk",
         "libstagefright_foundation",
         "libutils",
     ],

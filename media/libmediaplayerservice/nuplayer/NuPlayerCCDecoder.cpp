@@ -21,6 +21,7 @@
 
 #include "NuPlayerCCDecoder.h"
 
+#include <media/NdkMediaFormat.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -301,7 +302,7 @@ bool NuPlayer::CCDecoder::parseSEINalUnit(int64_t timeUs, const uint8_t *data, s
 // returns true if a new CC track is found
 bool NuPlayer::CCDecoder::extractFromMPEGUserData(const sp<ABuffer> &accessUnit) {
     sp<ABuffer> mpegUserData;
-    if (!accessUnit->meta()->findBuffer("mpegUserData", &mpegUserData)
+    if (!accessUnit->meta()->findBuffer(AMEDIAFORMAT_KEY_MPEG_USER_DATA, &mpegUserData)
             || mpegUserData == NULL) {
         return false;
     }
@@ -538,7 +539,7 @@ void NuPlayer::CCDecoder::display(int64_t timeUs) {
         dumpBytePair(ccBuf);
 #endif
 
-        ccBuf->meta()->setInt32("trackIndex", mSelectedTrack);
+        ccBuf->meta()->setInt32(AMEDIAFORMAT_KEY_TRACK_INDEX, mSelectedTrack);
         ccBuf->meta()->setInt64("timeUs", timeUs);
         ccBuf->meta()->setInt64("durationUs", 0ll);
 

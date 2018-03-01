@@ -11,6 +11,7 @@ cc_library_static {
 
     include_dirs: [
         "frameworks/av/media/libstagefright",
+        "frameworks/av/media/ndk/include",
         "frameworks/native/include/media/openmax",
     ],
 
@@ -33,6 +34,7 @@ cc_library_static {
     shared_libs: [
         "libcrypto",
         "libmedia",
+        "libmediandk",
         "libhidlallocatorutils",
         "android.hardware.cas.native@1.0",
         "android.hidl.memory@1.0",
