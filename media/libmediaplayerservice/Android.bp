@@ -23,7 +23,6 @@ cc_library_shared {
         "libhidlmemory",
         "liblog",
         "libmedia",
-        "libmediandk",
         "libmedia_omx",
         "libmediaextractor",
         "libmediadrm",

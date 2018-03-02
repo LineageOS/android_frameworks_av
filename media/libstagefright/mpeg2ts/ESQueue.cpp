@@ -20,7 +20,6 @@
 
 #include "ESQueue.h"
 
-#include <media/NdkMediaFormat.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -1476,7 +1475,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEGVideo() {
                                     mpegUserData->data() + i * sizeof(size_t),
                                     &userDataPositions[i], sizeof(size_t));
                         }
-                        accessUnit->meta()->setBuffer(AMEDIAFORMAT_KEY_MPEG_USER_DATA, mpegUserData);
+                        accessUnit->meta()->setBuffer("mpegUserData", mpegUserData);
                     }
                 }
 

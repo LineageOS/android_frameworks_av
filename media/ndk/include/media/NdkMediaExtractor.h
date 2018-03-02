@@ -203,17 +203,6 @@ ssize_t AMediaExtractor_getSampleSize(AMediaExtractor*);
  */
 int64_t AMediaExtractor_getCachedDuration(AMediaExtractor *);
 
-/**
- * Read the current sample's metadata format into |fmt|. Examples of sample metadata are
- * SEI (supplemental enhancement information) and MPEG user data, both of which can embed
- * closed-caption data.
- *
- * Returns AMEDIA_OK on success or AMEDIA_ERROR_* to indicate failure reason.
- * Existing key-value pairs in |fmt| would be removed if this API returns AMEDIA_OK.
- * The contents of |fmt| is undefined if this API returns AMEDIA_ERROR_*.
- */
-media_status_t AMediaExtractor_getSampleFormat(AMediaExtractor *ex, AMediaFormat *fmt);
-
 #endif /* __ANDROID_API__ >= 28 */
 
 #endif /* __ANDROID_API__ >= 21 */
