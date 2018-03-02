@@ -241,13 +241,12 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
 
     private MediaItem2 createMediaItem(String mediaId) {
         Context context = MockMediaLibraryService2.this;
-        return new MediaItem2(
-                context,
-                mediaId,
-                DATA_SOURCE_DESC,
-                new MediaMetadata2.Builder(context)
-                        .putString(MediaMetadata2.METADATA_KEY_MEDIA_ID, mediaId)
-                        .build(),
-                0 /* Flags */);
+        return new MediaItem2.Builder(context, 0 /* Flags */)
+                .setMediaId(mediaId)
+                .setDataSourceDesc(DATA_SOURCE_DESC)
+                .setMetadata(new MediaMetadata2.Builder(context)
+                                .putString(MediaMetadata2.METADATA_KEY_MEDIA_ID, mediaId)
+                                .build())
+                .build();
     }
 }
