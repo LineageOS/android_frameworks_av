@@ -125,7 +125,7 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
     @Override
     public void onConnected(IMediaSession2 sessionBinder, Bundle commandGroup,
             Bundle playbackState, Bundle playbackInfo, Bundle playlistParams, List<Bundle>
-            playlist, PendingIntent sessionActivity) {
+            itemBundleList, PendingIntent sessionActivity) {
         final MediaController2Impl controller = mController.get();
         if (controller == null) {
             if (DEBUG) {
@@ -134,11 +134,14 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
             return;
         }
         final Context context = controller.getContext();
-        List<MediaItem2> list = new ArrayList<>();
-        for (int i = 0; i < playlist.size(); i++) {
-            MediaItem2 item = MediaItem2.fromBundle(context, playlist.get(i));
-            if (item != null) {
-                list.add(item);
+        List<MediaItem2> itemList = null;
+        if (itemBundleList != null) {
+            itemList = new ArrayList<>();
+            for (int i = 0; i < itemBundleList.size(); i++) {
+                MediaItem2 item = MediaItem2.fromBundle(context, itemBundleList.get(i));
+                if (item != null) {
+                    itemList.add(item);
+                }
             }
         }
         controller.onConnectedNotLocked(sessionBinder,
@@ -146,7 +149,7 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
                 PlaybackState2.fromBundle(context, playbackState),
                 PlaybackInfoImpl.fromBundle(context, playbackInfo),
                 PlaylistParams.fromBundle(context, playlistParams),
-                list, sessionActivity);
+                itemList, sessionActivity);
     }
 
     @Override

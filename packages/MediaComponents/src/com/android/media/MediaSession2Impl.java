@@ -807,7 +807,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         /**
-         * @ 7return a new Bundle instance from the Command
+         * @return a new Bundle instance from the Command
          */
         public Bundle toBundle_impl() {
             Bundle bundle = new Bundle();

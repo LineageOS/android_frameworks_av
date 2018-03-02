@@ -404,6 +404,10 @@ public class MediaSession2Test extends MediaSession2TestBase {
                 .setId("testSetCustomLayout")
                 .setSessionCallback(sHandlerExecutor, sessionCallback)
                 .build()) {
+            if (mSession != null) {
+                mSession.close();
+                mSession = session;
+            }
             final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
                 @Override
                 public void onCustomLayoutChanged(List<CommandButton> layout) {
