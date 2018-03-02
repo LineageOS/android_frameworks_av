@@ -6346,9 +6346,6 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
 
     sp<AMessage> notify = new AMessage(kWhatOMXDied, mCodec);
 
-    Vector<AString> matchingCodecs;
-    Vector<AString> owners;
-
     AString componentName;
     CHECK(msg->findString("componentName", &componentName));
 
@@ -6424,7 +6421,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
 
     mCodec->mOMX = omx;
     mCodec->mOMXNode = omxNode;
-    mCodec->mCallback->onComponentAllocated(mCodec->mComponentName.c_str());
+    mCodec->mCallback->onComponentAllocated(mCodec->mComponentName.c_str(), info);
     mCodec->changeState(mCodec->mLoadedState);
 
     return true;

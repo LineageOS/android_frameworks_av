@@ -74,8 +74,7 @@ struct MediaCodecList : public BnMediaCodecList {
             const char *mime,
             bool createEncoder,
             uint32_t flags,
-            Vector<AString> *matchingCodecs,
-            Vector<AString> *owners = nullptr);
+            Vector<AString> *matchingCodecs);
 
     static bool isSoftwareCodec(const AString &componentName);
 
