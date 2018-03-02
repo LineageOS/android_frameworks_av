@@ -128,7 +128,7 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
 
             myData->audioRecording.write(myData->inputData,
                                         myData->actualInputChannelCount,
-                                        numFrames);
+                                         framesRead);
 
             int32_t numSamples = framesRead * myData->actualInputChannelCount;
             convertPcm16ToFloat(myData->inputData, myData->conversionBuffer, numSamples);
@@ -161,17 +161,17 @@ static void MyErrorCallbackProc(
 static void usage() {
     printf("Usage: aaudio_loopback [OPTION]...\n\n");
     AAudioArgsParser::usage();
-    printf("          -C{channels}      number of input channels\n");
-    printf("          -g{gain}          recirculating loopback gain\n");
-    printf("          -P{inPerf}        set input AAUDIO_PERFORMANCE_MODE*\n");
-    printf("              n for _NONE\n");
-    printf("              l for _LATENCY\n");
-    printf("              p for _POWER_SAVING\n");
-    printf("          -t{test}          select test mode\n");
-    printf("              m for sine magnitude\n");
-    printf("              e for echo latency (default)\n");
-    printf("              f for file latency, analyzes %s\n\n", FILENAME_ECHOS);
-    printf("          -X  use EXCLUSIVE mode for input\n");
+    printf("      -C{channels}      number of input channels\n");
+    printf("      -g{gain}          recirculating loopback gain\n");
+    printf("      -P{inPerf}        set input AAUDIO_PERFORMANCE_MODE*\n");
+    printf("          n for _NONE\n");
+    printf("          l for _LATENCY\n");
+    printf("          p for _POWER_SAVING\n");
+    printf("      -t{test}          select test mode\n");
+    printf("          m for sine magnitude\n");
+    printf("          e for echo latency (default)\n");
+    printf("          f for file latency, analyzes %s\n\n", FILENAME_ECHOS);
+    printf("      -X  use EXCLUSIVE mode for input\n");
     printf("Example:  aaudio_loopback -n2 -pl -Pl -x\n");
 }
 
@@ -448,7 +448,7 @@ int main(int argc, const char **argv)
     }
 
     if (loopbackData.loopbackProcessor->getResult() < 0) {
-        printf("Test failed!\n");
+        printf("ERROR: Could not get a good loopback signal. Probably because the volume was too low.\n");
     } else {
         printf("input error = %d = %s\n",
                loopbackData.inputError, AAudio_convertResultToText(loopbackData.inputError));
@@ -467,11 +467,16 @@ int main(int argc, const char **argv)
         }
 
         int written = loopbackData.loopbackProcessor->save(FILENAME_ECHOS);
-        printf("main() wrote %d mono samples to %s on Android device\n", written,
-               FILENAME_ECHOS);
-        printf("main() loopbackData.audioRecording.getSampleRate() = %d\n", loopbackData.audioRecording.getSampleRate());
+        if (written > 0) {
+            printf("main() wrote %8d mono samples to \"%s\" on Android device\n",
+                   written, FILENAME_ECHOS);
+        }
+
         written = loopbackData.audioRecording.save(FILENAME_ALL);
-        printf("main() wrote %d mono samples to %s on Android device\n", written, FILENAME_ALL);
+        if (written > 0) {
+            printf("main() wrote %8d mono samples to \"%s\" on Android device\n",
+                   written, FILENAME_ALL);
+        }
     }
 
 finish:
@@ -481,9 +486,8 @@ finish:
     delete[] loopbackData.inputData;
     delete[] outputData;
 
-    printf(RESULT_TAG "error = %d = %s\n", result, AAudio_convertResultToText(result));
+    printf(RESULT_TAG "result = %s\n", AAudio_convertResultToText(result));
     if ((result != AAUDIO_OK)) {
-        printf("error %d = %s\n", result, AAudio_convertResultToText(result));
         return EXIT_FAILURE;
     } else {
         printf("SUCCESS\n");

@@ -19,7 +19,8 @@
 
 #define MAX_CHANNELS                     8
 
-#include <cctype>
+//#include <cctype>
+#include <dlfcn.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,6 +29,63 @@
 #include <aaudio/AAudioTesting.h>
 
 #include "AAudioExampleUtils.h"
+
+
+static void (*s_setUsage)(AAudioStreamBuilder* builder, aaudio_usage_t usage) = nullptr;
+static void (*s_setContentType)(AAudioStreamBuilder* builder,
+                                aaudio_content_type_t contentType) = nullptr;
+static void (*s_setInputPreset)(AAudioStreamBuilder* builder,
+                                aaudio_input_preset_t inputPreset) = nullptr;
+
+static bool s_loadAttempted = false;
+static aaudio_usage_t (*s_getUsage)(AAudioStream *stream) = nullptr;
+static aaudio_content_type_t (*s_getContentType)(AAudioStream *stream) = nullptr;
+static aaudio_input_preset_t (*s_getInputPreset)(AAudioStream *stream) = nullptr;
+
+// Link to test functions in shared library.
+static void loadFutureFunctions() {
+    if (s_loadAttempted)  return; // only try once
+    s_loadAttempted = true;
+
+    void *handle = dlopen("libaaudio.so", RTLD_NOW);
+    if (handle != nullptr) {
+        s_setUsage = (void (*)(AAudioStreamBuilder *, aaudio_usage_t))
+                dlsym(handle, "AAudioStreamBuilder_setUsage");
+        if (s_setUsage == nullptr) goto error;
+
+        s_setContentType = (void (*)(AAudioStreamBuilder *, aaudio_content_type_t))
+                dlsym(handle, "AAudioStreamBuilder_setContentType");
+        if (s_setContentType == nullptr) goto error;
+
+        s_setInputPreset = (void (*)(AAudioStreamBuilder *, aaudio_input_preset_t))
+                dlsym(handle, "AAudioStreamBuilder_setInputPreset");
+        if (s_setInputPreset == nullptr) goto error;
+
+        s_getUsage = (aaudio_usage_t (*)(AAudioStream *))
+                dlsym(handle, "AAudioStream_getUsage");
+        if (s_getUsage == nullptr) goto error;
+
+        s_getContentType = (aaudio_content_type_t (*)(AAudioStream *))
+                dlsym(handle, "AAudioStream_getContentType");
+        if (s_getContentType == nullptr) goto error;
+
+        s_getInputPreset = (aaudio_input_preset_t (*)(AAudioStream *))
+                dlsym(handle, "AAudioStream_getInputPreset");
+        if (s_getInputPreset == nullptr) goto error;
+    }
+    return;
+
+error:
+    // prevent any calls to these functions
+    s_setUsage = nullptr;
+    s_setContentType = nullptr;
+    s_setInputPreset = nullptr;
+    s_getUsage = nullptr;
+    s_getContentType = nullptr;
+    s_getInputPreset = nullptr;
+    dlclose(handle);
+    return;
+}
 
 // TODO use this as a base class within AAudio
 class AAudioParameters {
@@ -140,9 +198,24 @@ public:
         AAudioStreamBuilder_setDeviceId(builder, mDeviceId);
         AAudioStreamBuilder_setSharingMode(builder, mSharingMode);
         AAudioStreamBuilder_setPerformanceMode(builder, mPerformanceMode);
-        AAudioStreamBuilder_setUsage(builder, mUsage);
-        AAudioStreamBuilder_setContentType(builder, mContentType);
-        AAudioStreamBuilder_setInputPreset(builder, mInputPreset);
+
+        // Call P functions if supported.
+        loadFutureFunctions();
+        if (s_setUsage != nullptr) {
+            s_setUsage(builder, mUsage);
+        } else if (mUsage != AAUDIO_UNSPECIFIED){
+            printf("WARNING: setUsage not supported");
+        }
+        if (s_setContentType != nullptr) {
+            s_setContentType(builder, mContentType);
+        } else if (mUsage != AAUDIO_UNSPECIFIED){
+            printf("WARNING: setContentType not supported");
+        }
+        if (s_setInputPreset != nullptr) {
+            s_setInputPreset(builder, mInputPreset);
+        } else if (mUsage != AAUDIO_UNSPECIFIED){
+            printf("WARNING: setInputPreset not supported");
+        }
     }
 
 private:
@@ -332,14 +405,21 @@ public:
         printf("  PerformanceMode: requested = %d, actual = %d\n",
                getPerformanceMode(), AAudioStream_getPerformanceMode(stream));
 
-        printf("  Usage:        requested = %d, actual = %d\n",
-               getUsage(), AAudioStream_getUsage(stream));
-        printf("  ContentType:  requested = %d, actual = %d\n",
-               getContentType(), AAudioStream_getContentType(stream));
+        loadFutureFunctions();
 
-        if (AAudioStream_getDirection(stream) == AAUDIO_DIRECTION_INPUT) {
-            printf("  InputPreset:  requested = %d, actual = %d\n",
-                   getInputPreset(), AAudioStream_getInputPreset(stream));
+        if (s_setUsage != nullptr) {
+            printf("  Usage:        requested = %d, actual = %d\n",
+                   getUsage(), s_getUsage(stream));
+        }
+        if (s_getContentType != nullptr) {
+            printf("  ContentType:  requested = %d, actual = %d\n",
+                   getContentType(), s_getContentType(stream));
+        }
+
+        if (AAudioStream_getDirection(stream) == AAUDIO_DIRECTION_INPUT
+            && s_getInputPreset != nullptr) {
+                printf("  InputPreset:  requested = %d, actual = %d\n",
+                       getInputPreset(), s_getInputPreset(stream));
         }
 
         printf("  Is MMAP used? %s\n", AAudioStream_isMMapUsed(stream)
