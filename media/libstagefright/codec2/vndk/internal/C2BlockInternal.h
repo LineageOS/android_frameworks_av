@@ -39,7 +39,7 @@ struct _C2BlockFactory {
      *         create this block.
      */
     static
-    std::shared_ptr<C2LinearBlock> C2_HIDE CreateLinearBlock(
+    std::shared_ptr<C2LinearBlock> CreateLinearBlock(
             const std::shared_ptr<C2LinearAllocation> &alloc,
             const std::shared_ptr<_C2BlockPoolData> &data = nullptr,
             size_t offset = 0,
