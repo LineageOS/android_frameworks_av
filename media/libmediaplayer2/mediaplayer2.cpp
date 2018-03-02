@@ -860,6 +860,27 @@ bool MediaPlayer2::isPlaying() {
     return false;
 }
 
+mediaplayer2_states MediaPlayer2::getMediaPlayer2State() {
+    Mutex::Autolock _l(mLock);
+    if (mCurrentState & MEDIA_PLAYER2_STATE_ERROR) {
+        return MEDIAPLAYER2_STATE_ERROR;
+    }
+    if (mPlayer == 0
+        || (mCurrentState &
+            (MEDIA_PLAYER2_IDLE | MEDIA_PLAYER2_INITIALIZED | MEDIA_PLAYER2_PREPARING))) {
+        return MEDIAPLAYER2_STATE_IDLE;
+    }
+    if (mCurrentState & MEDIA_PLAYER2_STARTED) {
+        return MEDIAPLAYER2_STATE_PLAYING;
+    }
+    if (mCurrentState
+        & (MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_STOPPED | MEDIA_PLAYER2_PLAYBACK_COMPLETE)) {
+        return MEDIAPLAYER2_STATE_PAUSED;
+    }
+    // now only mCurrentState & MEDIA_PLAYER2_PREPARED is true
+    return MEDIAPLAYER2_STATE_PREPARED;
+}
+
 status_t MediaPlayer2::setPlaybackSettings(const AudioPlaybackRate& rate) {
     ALOGV("setPlaybackSettings: %f %f %d %d",
             rate.mSpeed, rate.mPitch, rate.mFallbackMode, rate.mStretchMode);
