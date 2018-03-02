@@ -63,6 +63,11 @@ public class MockPlayer extends MediaPlayerBase {
     }
 
     @Override
+    public void reset() {
+        // no-op
+    }
+
+    @Override
     public void play() {
         mPlayCalled = true;
         if (mCountDownLatch != null) {
