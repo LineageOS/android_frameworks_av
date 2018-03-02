@@ -103,7 +103,8 @@ public class MockMediaSessionService2 extends MediaSessionService2 {
         }
 
         @Override
-        public CommandGroup onConnect(ControllerInfo controller) {
+        public CommandGroup onConnect(MediaSession2 session,
+                ControllerInfo controller) {
             return mCallbackProxy.onConnect(controller);
         }
     }

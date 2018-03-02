@@ -187,23 +187,24 @@ abstract class MediaSession2TestBase {
 
         @CallSuper
         @Override
-        public void onConnected(CommandGroup commands) {
+        public void onConnected(MediaController2 controller, CommandGroup commands) {
             connectLatch.countDown();
         }
 
         @CallSuper
         @Override
-        public void onDisconnected() {
+        public void onDisconnected(MediaController2 controller) {
             disconnectLatch.countDown();
         }
 
         @Override
-        public void onPlaybackStateChanged(PlaybackState2 state) {
+        public void onPlaybackStateChanged(MediaController2 controller, PlaybackState2 state) {
             mCallbackProxy.onPlaybackStateChanged(state);
         }
 
         @Override
-        public void onCustomCommand(Command command, Bundle args, ResultReceiver receiver) {
+        public void onCustomCommand(MediaController2 controller, Command command, Bundle args,
+                ResultReceiver receiver) {
             mCallbackProxy.onCustomCommand(command, args, receiver);
         }
 
@@ -226,22 +227,24 @@ abstract class MediaSession2TestBase {
         }
 
         @Override
-        public void onPlaylistChanged(List<MediaItem2> params) {
+        public void onPlaylistChanged(MediaController2 controller, List<MediaItem2> params) {
             mCallbackProxy.onPlaylistChanged(params);
         }
 
         @Override
-        public void onPlaylistParamsChanged(MediaSession2.PlaylistParams params) {
+        public void onPlaylistParamsChanged(MediaController2 controller,
+                MediaSession2.PlaylistParams params) {
             mCallbackProxy.onPlaylistParamsChanged(params);
         }
 
         @Override
-        public void onPlaybackInfoChanged(MediaController2.PlaybackInfo info) {
+        public void onPlaybackInfoChanged(MediaController2 controller,
+                MediaController2.PlaybackInfo info) {
             mCallbackProxy.onPlaybackInfoChanged(info);
         }
 
         @Override
-        public void onCustomLayoutChanged(List<CommandButton> layout) {
+        public void onCustomLayoutChanged(MediaController2 controller, List<CommandButton> layout) {
             mCallbackProxy.onCustomLayoutChanged(layout);
         }
     }

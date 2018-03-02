@@ -231,7 +231,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 // instead of pending them.
                 mConnectingControllers.add(ControllerInfoImpl.from(controllerInfo).getId());
             }
-            CommandGroup allowedCommands = session.getCallback().onConnect(controllerInfo);
+            CommandGroup allowedCommands = session.getCallback().onConnect(
+                    session.getInstance(), controllerInfo);
             // Don't reject connection for the request from trusted app.
             // Otherwise server will fail to retrieve session's information to dispatch
             // media keys to.
@@ -342,7 +343,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             // TODO(jaewan): Sanity check.
             Command command = new Command(
                     session.getContext(), MediaSession2.COMMAND_CODE_SET_VOLUME);
-            boolean accepted = session.getCallback().onCommandRequest(controller, command);
+            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                    controller, command);
             if (!accepted) {
                 // Don't run rejected command.
                 if (DEBUG) {
@@ -377,7 +379,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             // TODO(jaewan): Sanity check.
             Command command = new Command(
                     session.getContext(), MediaSession2.COMMAND_CODE_SET_VOLUME);
-            boolean accepted = session.getCallback().onCommandRequest(controller, command);
+            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                    controller, command);
             if (!accepted) {
                 // Don't run rejected command.
                 if (DEBUG) {
@@ -416,7 +419,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             }
             // TODO(jaewan): Sanity check.
             Command command = new Command(session.getContext(), commandCode);
-            boolean accepted = session.getCallback().onCommandRequest(controller, command);
+            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                    controller, command);
             if (!accepted) {
                 // Don't run rejected command.
                 if (DEBUG) {
@@ -488,7 +492,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (getControllerIfAble(caller, command) == null) {
                 return;
             }
-            session.getCallback().onCustomCommand(controller, command, args, receiver);
+            session.getCallback().onCustomCommand(session.getInstance(),
+                    controller, command, args, receiver);
         });
     }
 
@@ -506,7 +511,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_URI) == null) {
                 return;
             }
-            session.getCallback().onPrepareFromUri(controller, uri, extras);
+            session.getCallback().onPrepareFromUri(session.getInstance(),
+                    controller, uri, extras);
         });
     }
 
@@ -524,7 +530,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_SEARCH) == null) {
                 return;
             }
-            session.getCallback().onPrepareFromSearch(controller, query, extras);
+            session.getCallback().onPrepareFromSearch(session.getInstance(),
+                    controller, query, extras);
         });
     }
 
@@ -542,7 +549,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_MEDIA_ID) == null) {
                 return;
             }
-            session.getCallback().onPrepareFromMediaId(controller, mediaId, extras);
+            session.getCallback().onPrepareFromMediaId(session.getInstance(),
+                    controller, mediaId, extras);
         });
     }
 
@@ -560,7 +568,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     caller, MediaSession2.COMMAND_CODE_PLAY_FROM_URI) == null) {
                 return;
             }
-            session.getCallback().onPlayFromUri(controller, uri, extras);
+            session.getCallback().onPlayFromUri(session.getInstance(), controller, uri, extras);
         });
     }
 
@@ -578,7 +586,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     caller, MediaSession2.COMMAND_CODE_PLAY_FROM_SEARCH) == null) {
                 return;
             }
-            session.getCallback().onPlayFromSearch(controller, query, extras);
+            session.getCallback().onPlayFromSearch(session.getInstance(),
+                    controller, query, extras);
         });
     }
 
@@ -595,7 +604,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (session == null) {
                 return;
             }
-            session.getCallback().onPlayFromMediaId(controller, mediaId, extras);
+            session.getCallback().onPlayFromMediaId(session.getInstance(),
+                    controller, mediaId, extras);
         });
     }
 
@@ -616,7 +626,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 return;
             }
             Rating2 rating = Rating2Impl.fromBundle(session.getContext(), ratingBundle);
-            session.getCallback().onSetRating(controller, mediaId, rating);
+            session.getCallback().onSetRating(session.getInstance(),
+                    controller, mediaId, rating);
         });
     }
 
@@ -637,7 +648,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
                 return;
             }
-            LibraryRoot root = session.getCallback().onGetLibraryRoot(controller, rootHints);
+            LibraryRoot root = session.getCallback().onGetLibraryRoot(session.getInstance(),
+                    controller, rootHints);
             try {
                 caller.onGetLibraryRootDone(rootHints,
                         root == null ? null : root.getRootId(),
@@ -668,7 +680,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
                 return;
             }
-            MediaItem2 result = session.getCallback().onGetItem(controller, mediaId);
+            MediaItem2 result = session.getCallback().onGetItem(session.getInstance(),
+                    controller, mediaId);
             try {
                 caller.onGetItemDone(mediaId, result == null ? null : result.toBundle());
             } catch (RemoteException e) {
@@ -703,7 +716,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
                 return;
             }
-            List<MediaItem2> result = session.getCallback().onGetChildren(
+            List<MediaItem2> result = session.getCallback().onGetChildren(session.getInstance(),
                     controller, parentId, page, pageSize, extras);
             if (result != null && result.size() > pageSize) {
                 throw new IllegalArgumentException("onGetChildren() shouldn't return media items "
@@ -738,7 +751,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
                 return;
             }
-            session.getCallback().onSearch(controller, query, extras);
+            session.getCallback().onSearch(session.getInstance(),
+                    controller, query, extras);
         });
     }
 
@@ -767,7 +781,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
                 return;
             }
-            List<MediaItem2> result = session.getCallback().onGetSearchResult(
+            List<MediaItem2> result = session.getCallback().onGetSearchResult(session.getInstance(),
                     controller, query, page, pageSize, extras);
             if (result != null && result.size() > pageSize) {
                 throw new IllegalArgumentException("onGetSearchResult() shouldn't return media "
@@ -804,7 +818,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
                 return;
             }
-            session.getCallback().onSubscribe(controller, parentId, option);
+            session.getCallback().onSubscribe(session.getInstance(),
+                    controller, parentId, option);
             synchronized (mLock) {
                 Set<String> subscription = mSubscriptions.get(controller);
                 if (subscription == null) {
@@ -828,7 +843,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
                 return;
             }
-            session.getCallback().onUnsubscribe(controller, parentId);
+            session.getCallback().onUnsubscribe(session.getInstance(), controller, parentId);
             synchronized (mLock) {
                 mSubscriptions.remove(controller);
             }

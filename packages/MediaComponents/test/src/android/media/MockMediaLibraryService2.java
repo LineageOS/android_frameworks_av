@@ -23,7 +23,6 @@ import static org.junit.Assert.assertEquals;
 import android.content.Context;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
-import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback;
 import android.media.TestServiceRegistry.SessionCallbackProxy;
 import android.media.TestUtils.SyncHandler;
@@ -145,17 +144,20 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         }
 
         @Override
-        public CommandGroup onConnect(ControllerInfo controller) {
+        public CommandGroup onConnect(MediaSession2 session,
+                ControllerInfo controller) {
             return mCallbackProxy.onConnect(controller);
         }
 
         @Override
-        public LibraryRoot onGetLibraryRoot(ControllerInfo controller, Bundle rootHints) {
+        public LibraryRoot onGetLibraryRoot(MediaLibrarySession session, ControllerInfo controller,
+                Bundle rootHints) {
             return new LibraryRoot(MockMediaLibraryService2.this, ROOT_ID, EXTRAS);
         }
 
         @Override
-        public MediaItem2 onGetItem(ControllerInfo controller, String mediaId) {
+        public MediaItem2 onGetItem(MediaLibrarySession session, ControllerInfo controller,
+                String mediaId) {
             if (MEDIA_ID_GET_ITEM.equals(mediaId)) {
                 return createMediaItem(mediaId);
             } else {
@@ -164,8 +166,8 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         }
 
         @Override
-        public List<MediaItem2> onGetChildren(ControllerInfo controller, String parentId, int page,
-                int pageSize, Bundle extras) {
+        public List<MediaItem2> onGetChildren(MediaLibrarySession session,
+                ControllerInfo controller, String parentId, int page, int pageSize, Bundle extras) {
             if (PARENT_ID.equals(parentId)) {
                 return getPaginatedResult(GET_CHILDREN_RESULT, page, pageSize);
             } else if (PARENT_ID_ERROR.equals(parentId)) {
@@ -176,7 +178,8 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         }
 
         @Override
-        public void onSearch(ControllerInfo controllerInfo, String query, Bundle extras) {
+        public void onSearch(MediaLibrarySession session, ControllerInfo controllerInfo,
+                String query, Bundle extras) {
             if (SEARCH_QUERY.equals(query)) {
                 mSession.notifySearchResultChanged(controllerInfo, query, SEARCH_RESULT_COUNT,
                         extras);
@@ -197,8 +200,9 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         }
 
         @Override
-        public List<MediaItem2> onGetSearchResult(ControllerInfo controllerInfo,
-                String query, int page, int pageSize, Bundle extras) {
+        public List<MediaItem2> onGetSearchResult(MediaLibrarySession session,
+                ControllerInfo controllerInfo, String query, int page, int pageSize,
+                Bundle extras) {
             if (SEARCH_QUERY.equals(query)) {
                 return getPaginatedResult(SEARCH_RESULT, page, pageSize);
             } else {
@@ -207,12 +211,14 @@ public class MockMediaLibraryService2 extends MediaLibraryService2 {
         }
 
         @Override
-        public void onSubscribe(ControllerInfo controller, String parentId, Bundle extras) {
+        public void onSubscribe(MediaLibrarySession session, ControllerInfo controller,
+                String parentId, Bundle extras) {
             mCallbackProxy.onSubscribe(controller, parentId, extras);
         }
 
         @Override
-        public void onUnsubscribe(ControllerInfo controller, String parentId) {
+        public void onUnsubscribe(MediaLibrarySession session, ControllerInfo controller,
+                String parentId) {
             mCallbackProxy.onUnsubscribe(controller, parentId);
         }
     }
