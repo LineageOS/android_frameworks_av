@@ -54,7 +54,7 @@ struct StoreIntf : public ConfigurableC2Intf {
     c2_status_t query(
             const std::vector<C2Param::Index> &indices,
             c2_blocking_t mayBlock,
-            std::vector<std::unique_ptr<C2Param>> *const params) override {
+            std::vector<std::unique_ptr<C2Param>> *const params) const override {
         // Assume all params are blocking
         // TODO: Filter for supported params
         if (mayBlock == C2_DONT_BLOCK && indices.size() != 0) {
@@ -201,7 +201,7 @@ Return<Status> ComponentStore::copyBuffer(const Buffer& src, const Buffer& dst) 
     // TODO implement
     (void)src;
     (void)dst;
-    return Status {};
+    return Status::OMITTED;
 }
 
 }  // namespace implementation

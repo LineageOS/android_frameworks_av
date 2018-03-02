@@ -49,7 +49,7 @@ struct ConfigurableC2Intf {
     virtual c2_status_t query(
             const std::vector<C2Param::Index> &indices,
             c2_blocking_t mayBlock,
-            std::vector<std::unique_ptr<C2Param>>* const params) = 0;
+            std::vector<std::unique_ptr<C2Param>>* const params) const = 0;
     /** C2ComponentInterface::config_vb */
     virtual c2_status_t config(
             const std::vector<C2Param*> &params,
@@ -60,7 +60,7 @@ struct ConfigurableC2Intf {
             std::vector<std::shared_ptr<C2ParamDescriptor>>* const params) const = 0;
     /** C2ComponentInterface::querySupportedParams_nb */
     virtual c2_status_t querySupportedValues(
-            std::vector<C2FieldSupportedValuesQuery> &fields, c2_blocking_t mayBlock) const = 0;
+            std::vector<C2FieldSupportedValuesQuery>& fields, c2_blocking_t mayBlock) const = 0;
 
     virtual ~ConfigurableC2Intf() = default;
 
