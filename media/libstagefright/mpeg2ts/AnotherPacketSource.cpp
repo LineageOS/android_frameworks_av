@@ -19,7 +19,6 @@
 
 #include "AnotherPacketSource.h"
 
-#include <media/NdkMediaFormat.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -219,7 +218,7 @@ status_t AnotherPacketSource::read(
         }
 
         sp<ABuffer> mpegUserData;
-        if (buffer->meta()->findBuffer(AMEDIAFORMAT_KEY_MPEG_USER_DATA, &mpegUserData) && mpegUserData != NULL) {
+        if (buffer->meta()->findBuffer("mpegUserData", &mpegUserData) && mpegUserData != NULL) {
             bufmeta.setData(
                     kKeyMpegUserData, 0, mpegUserData->data(), mpegUserData->size());
         }

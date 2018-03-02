@@ -313,8 +313,6 @@ struct AMediaExtractorWrapper : public RefBase {
 
     int64_t getSampleTime();
 
-    status_t getSampleFormat(sp<AMediaFormatWrapper> &formatWrapper);
-
     int64_t getCachedDuration();
 
     bool advance();

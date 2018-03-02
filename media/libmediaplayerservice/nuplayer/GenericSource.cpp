@@ -28,7 +28,6 @@
 #include <media/MediaExtractor.h>
 #include <media/MediaSource.h>
 #include <media/IMediaExtractorService.h>
-#include <media/NdkMediaFormat.h>
 #include <media/IMediaHTTPService.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -1234,7 +1233,7 @@ sp<ABuffer> NuPlayer::GenericSource::mediaBufferToABuffer(
     }
 
     if (trackType == MEDIA_TRACK_TYPE_SUBTITLE) {
-        meta->setInt32(AMEDIAFORMAT_KEY_TRACK_INDEX, mSubtitleTrack.mIndex);
+        meta->setInt32("trackIndex", mSubtitleTrack.mIndex);
     }
 
     uint32_t dataType; // unused
@@ -1250,7 +1249,7 @@ sp<ABuffer> NuPlayer::GenericSource::mediaBufferToABuffer(
     if (mb->meta_data().findData(
             kKeyMpegUserData, &dataType, &mpegUserDataPointer, &mpegUserDataLength)) {
         sp<ABuffer> mpegUserData = ABuffer::CreateAsCopy(mpegUserDataPointer, mpegUserDataLength);
-        meta->setBuffer(AMEDIAFORMAT_KEY_MPEG_USER_DATA, mpegUserData);
+        meta->setBuffer("mpegUserData", mpegUserData);
     }
 
     mb->release();
