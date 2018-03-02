@@ -744,13 +744,11 @@ public class MediaController2Test extends MediaSession2TestBase {
         testControllerAfterSessionIsGone(id);
     }
 
-    @Ignore
     @Test
     public void testClose_sessionService() throws InterruptedException {
         testCloseFromService(MockMediaSessionService2.ID);
     }
 
-    @Ignore
     @Test
     public void testClose_libraryService() throws InterruptedException {
         testCloseFromService(MockMediaLibraryService2.ID);
