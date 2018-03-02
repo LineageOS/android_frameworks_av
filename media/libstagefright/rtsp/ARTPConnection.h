@@ -90,6 +90,8 @@ private:
     status_t parseRTP(StreamInfo *info, const sp<ABuffer> &buffer);
     status_t parseRTCP(StreamInfo *info, const sp<ABuffer> &buffer);
     status_t parseSR(StreamInfo *info, const uint8_t *data, size_t size);
+    status_t parseTSFB(StreamInfo *info, const uint8_t *data, size_t size);
+    status_t parsePSFB(StreamInfo *info, const uint8_t *data, size_t size);
     status_t parseBYE(StreamInfo *info, const uint8_t *data, size_t size);
 
     sp<ARTPSource> findSource(StreamInfo *info, uint32_t id);

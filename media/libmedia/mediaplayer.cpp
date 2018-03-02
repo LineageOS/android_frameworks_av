@@ -959,6 +959,9 @@ void MediaPlayer::notify(int msg, int ext1, int ext2, const Parcel *obj)
     case MEDIA_META_DATA:
         ALOGV("Received timed metadata message");
         break;
+    case MEDIA_IMS_RX_NOTICE:
+        ALOGV("Received IMS Rx notice message");
+        break;
     default:
         ALOGV("unrecognized message: (%d, %d, %d)", msg, ext1, ext2);
         break;
