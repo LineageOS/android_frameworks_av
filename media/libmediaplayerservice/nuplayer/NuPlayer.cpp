@@ -2727,6 +2727,14 @@ void NuPlayer::onSourceNotify(const sp<AMessage> &msg) {
             break;
         }
 
+        case Source::kWhatIMSRxNotice:
+        {
+            sp<AMessage> IMSRxNotice;
+            CHECK(msg->findMessage("message", &IMSRxNotice));
+            sendIMSRxNotice(IMSRxNotice);
+            break;
+        }
+
         default:
             TRESPASS();
     }
@@ -2827,6 +2835,38 @@ void NuPlayer::sendTimedTextData(const sp<ABuffer> &buffer) {
     } else {  // send an empty timed text
         notifyListener(MEDIA_TIMED_TEXT, 0, 0);
     }
+}
+
+void NuPlayer::sendIMSRxNotice(const sp<AMessage> &msg) {
+    int32_t notice, payloadType, feedbackType, id, bitrate;
+
+    CHECK(msg->findInt32("IMS-Rx-notice", &notice));
+    CHECK(msg->findInt32("payload-type", &payloadType));
+    CHECK(msg->findInt32("feedback-type", &feedbackType));
+    CHECK(msg->findInt32("sender", &id));
+
+    Parcel in;
+    in.writeInt32(payloadType);
+    in.writeInt32(feedbackType);
+    in.writeInt32(id);
+
+    switch (payloadType) {
+        case 205:   // TSFB
+        {
+            CHECK(msg->findInt32("bit-rate", &bitrate));
+            in.writeInt32(bitrate);
+            break;
+        }
+        case 206:   // PSFB
+        {
+            // nothing to do yet
+            break;
+        }
+        default:
+        break;
+    }
+
+    notifyListener(MEDIA_IMS_RX_NOTICE, 0, 0, &in);
 }
 
 const char *NuPlayer::getDataSourceType() {

@@ -337,6 +337,7 @@ private:
     void sendSubtitleData(const sp<ABuffer> &buffer, int32_t baseIndex);
     void sendTimedMetaData(const sp<ABuffer> &buffer);
     void sendTimedTextData(const sp<ABuffer> &buffer);
+    void sendIMSRxNotice(const sp<AMessage> &msg);
 
     void writeTrackInfo(Parcel* reply, const sp<AMessage>& format) const;
 

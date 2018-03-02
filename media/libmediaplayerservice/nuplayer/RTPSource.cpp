@@ -356,6 +356,22 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
                 break;
             }
 
+            int32_t IMSRxNotice;
+            if (msg->findInt32("IMS-Rx-notice", &IMSRxNotice)) {
+                int32_t payloadType, feedbackType;
+                CHECK(msg->findInt32("payload-type", &payloadType));
+                CHECK(msg->findInt32("feedback-type", &feedbackType));
+
+                sp<AMessage> notify = dupNotify();
+                notify->setInt32("what", kWhatIMSRxNotice);
+                notify->setMessage("message", msg);
+                notify->post();
+
+                ALOGV("IMSRxNotice \t\t payload : %d feedback : %d",
+                      payloadType, feedbackType);
+                break;
+            }
+
             size_t trackIndex;
             CHECK(msg->findSize("trackIndex", &trackIndex));
 
