@@ -176,16 +176,16 @@ aaudio_result_t AudioStreamInternalCapture::readNowWithConversion(void *buffer,
         int32_t numSamples = framesToProcess * getSamplesPerFrame();
 
         // TODO factor this out into a utility function
-        if (mDeviceFormat == getFormat()) {
+        if (getDeviceFormat() == getFormat()) {
             memcpy(destination, wrappingBuffer.data[partIndex], numBytes);
-        } else if (mDeviceFormat == AAUDIO_FORMAT_PCM_I16
+        } else if (getDeviceFormat() == AAUDIO_FORMAT_PCM_I16
                    && getFormat() == AAUDIO_FORMAT_PCM_FLOAT) {
             AAudioConvert_pcm16ToFloat(
                     (const int16_t *) wrappingBuffer.data[partIndex],
                     (float *) destination,
                     numSamples,
                     1.0f);
-        } else if (mDeviceFormat == AAUDIO_FORMAT_PCM_FLOAT
+        } else if (getDeviceFormat() == AAUDIO_FORMAT_PCM_FLOAT
                    && getFormat() == AAUDIO_FORMAT_PCM_I16) {
             AAudioConvert_floatToPcm16(
                     (const float *) wrappingBuffer.data[partIndex],
