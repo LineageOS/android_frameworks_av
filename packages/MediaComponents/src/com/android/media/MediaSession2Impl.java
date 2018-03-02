@@ -203,13 +203,13 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void setPlayer_impl(MediaPlayerBase player, MediaPlaylistController mpcl,
+    public void updatePlayer_impl(MediaPlayerBase player, MediaPlaylistController mpcl,
             VolumeProvider2 volumeProvider) throws IllegalArgumentException {
         ensureCallingThread();
         if (player == null) {
             throw new IllegalArgumentException("player shouldn't be null");
         }
-
+        // TODO(jaewan): Handle mpcl
         setPlayer(player, volumeProvider);
     }
 
@@ -294,7 +294,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
         return getPlayer();
     }
 
-    // TODO(jaewan): Change this to @NonNull
+    @Override
+    public VolumeProvider2 getVolumeProvider_impl() {
+        return mVolumeProvider;
+    }
+
     @Override
     public SessionToken2 getToken_impl() {
         return mSessionToken;
@@ -859,7 +863,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     public static class CommandGroupImpl implements CommandGroupProvider {
         private static final String KEY_COMMANDS =
                 "android.media.mediasession2.commandgroup.commands";
-        private ArraySet<Command> mCommands = new ArraySet<>();
+        private List<Command> mCommands = new ArrayList<>();
         private final Context mContext;
         private final CommandGroup mInstance;
 
@@ -900,11 +904,16 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 throw new IllegalArgumentException("Use hasCommand(Command) for custom command");
             }
             for (int i = 0; i < mCommands.size(); i++) {
-                if (mCommands.valueAt(i).getCommandCode() == code) {
+                if (mCommands.get(i).getCommandCode() == code) {
                     return true;
                 }
             }
             return false;
+        }
+
+        @Override
+        public List<Command> getCommands_impl() {
+            return mCommands;
         }
 
         /**
@@ -915,7 +924,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         public Bundle toBundle_impl() {
             ArrayList<Bundle> list = new ArrayList<>();
             for (int i = 0; i < mCommands.size(); i++) {
-                list.add(mCommands.valueAt(i).toBundle());
+                list.add(mCommands.get(i).toBundle());
             }
             Bundle bundle = new Bundle();
             bundle.putParcelableArrayList(KEY_COMMANDS, list);
@@ -1010,8 +1019,17 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public boolean equals_impl(ControllerInfoProvider obj) {
-            return equals(obj);
+        public boolean equals_impl(Object obj) {
+            if (!(obj instanceof ControllerInfo)) {
+                return false;
+            }
+            return equals(((ControllerInfo) obj).getProvider());
+        }
+
+        @Override
+        public String toString_impl() {
+            return "ControllerInfo {pkg=" + mPackageName + ", uid=" + mUid + ", trusted="
+                    + mIsTrusted + "}";
         }
 
         @Override
@@ -1276,7 +1294,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
          * Constructor.
          *
          * @param context a context
-         * @param player a player to handle incoming command from any controller.
          * @throws IllegalArgumentException if any parameter is null, or the player is a
          *      {@link MediaSession2} or {@link MediaController2}.
          */

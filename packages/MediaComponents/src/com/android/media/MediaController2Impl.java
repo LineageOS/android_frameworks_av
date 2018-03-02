@@ -548,17 +548,17 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void addPlaylistItem_impl(int index, MediaItem2 item) {
-        // TODO(jaewan): Implement
+        // TODO(jaewan): Implement (b/73149584)
     }
 
     @Override
     public void removePlaylistItem_impl(MediaItem2 item) {
-        // TODO(jaewan): Implement
+        // TODO(jaewan): Implement (b/73149584)
     }
 
     @Override
     public void replacePlaylistItem_impl(int index, MediaItem2 item) {
-        // TODO: Implement this
+        // TODO: Implement this (b/73149407)
     }
 
     @Override

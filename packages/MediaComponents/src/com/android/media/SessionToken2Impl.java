@@ -100,7 +100,7 @@ public class SessionToken2Impl implements SessionToken2Provider {
 
     public SessionToken2Impl(Context context, int uid, int type,
             String packageName, String serviceName, String id, IMediaSession2 sessionBinder) {
-        // TODO(jaewan): Add sanity check
+        // TODO(jaewan): Add sanity check (b/73863865)
         mUid = uid;
         mType = type;
         mPackageName = packageName;
@@ -207,9 +207,6 @@ public class SessionToken2Impl implements SessionToken2Provider {
         if (TextUtils.isEmpty(packageName) || id == null) {
             throw new IllegalArgumentException("Package name nor ID cannot be null.");
         }
-        // TODO(jaewan): Revisit here when we add connection callback to the session for individual
-        //               controller's permission check. With it, sessionBinder should be available
-        //               if and only if for session, not session service.
         return new SessionToken2Impl(context, uid, type, packageName, serviceName, id,
                 sessionBinder != null ? IMediaSession2.Stub.asInterface(sessionBinder) : null)
                 .getInstance();

@@ -400,12 +400,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void sendCommand(IMediaSession2Callback caller, Bundle command, Bundle args)
-            throws RuntimeException {
-        // TODO(jaewan): Generic command
-    }
-
-    @Override
     public void sendTransportControlCommand(IMediaSession2Callback caller,
             int commandCode, Bundle args) throws RuntimeException {
         final MediaSession2Impl session = getSession();
