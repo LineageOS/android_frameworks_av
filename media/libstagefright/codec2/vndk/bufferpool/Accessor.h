@@ -20,7 +20,6 @@
 #include <android/hardware/media/bufferpool/1.0/IAccessor.h>
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
-#include <C2Buffer.h>
 #include <BufferPoolTypes.h>
 #include "BufferStatus.h"
 
@@ -53,9 +52,8 @@ struct Accessor : public IAccessor {
      * Creates a buffer pool accessor which uses the specified allocator.
      *
      * @param allocator buffer allocator.
-     * @param linear    whether the allocator is linear or not.
      */
-    Accessor(const std::shared_ptr<C2Allocator> &allocator, bool linear);
+    explicit Accessor(const std::shared_ptr<BufferPoolAllocator> &allocator);
 
     /** Destructs a buffer pool accessor. */
     ~Accessor();

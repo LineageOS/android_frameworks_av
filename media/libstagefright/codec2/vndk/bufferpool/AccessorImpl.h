@@ -35,7 +35,7 @@ struct TransactionStatus;
  * An implementation of a buffer pool accessor(or a buffer pool implementation.) */
 class Accessor::Impl {
 public:
-    Impl(const std::shared_ptr<C2Allocator> &allocator, bool linear);
+    Impl(const std::shared_ptr<BufferPoolAllocator> &allocator);
 
     ~Impl();
 
@@ -64,8 +64,7 @@ private:
     static uint32_t sSeqId;
     static int32_t sPid;
 
-    const std::shared_ptr<C2Allocator> mAllocator;
-    bool mLinear;
+    const std::shared_ptr<BufferPoolAllocator> mAllocator;
 
     /**
      * Buffer pool implementation.
@@ -172,6 +171,7 @@ private:
         /**
          * Recycles a existing free buffer if it is possible.
          *
+         * @param allocator the buffer allocator
          * @param params    the allocation parameters.
          * @param pId       the id of the recycled buffer.
          * @param handle    the native handle of the recycled buffer.
@@ -179,40 +179,25 @@ private:
          * @return {@code true} when a buffer is recycled, {@code false}
          *         otherwise.
          */
-        bool getFreeBuffer(const std::vector<uint8_t> &params, BufferId *pId,
-                           const native_handle_t **handle);
+        bool getFreeBuffer(
+                const std::shared_ptr<BufferPoolAllocator> &allocator,
+                const std::vector<uint8_t> &params,
+                BufferId *pId, const native_handle_t **handle);
 
         /**
-         * Creates a new linear buffer.
+         * Creates a new buffer.
          *
-         * @param allocator the linear buffer allocator
+         * @param allocator the buffer allocator
          * @param params    the allocator parameters
          * @param pId       the buffer id for the newly allocated buffer.
          * @param handle    the native handle for the newly allocated buffer.
          *
-         * @return OK when a linear allocation is successfully allocated.
+         * @return OK when an allocation is successfully allocated.
          *         NO_MEMORY when there is no memory.
          *         CRITICAL_ERROR otherwise.
          */
-        ResultStatus getNewLinearBuffer(
-                const std::shared_ptr<C2Allocator> &allocator,
-                const std::vector<uint8_t> &params, BufferId *pId,
-                const native_handle_t **handle);
-
-        /**
-         * Creates a new graphic buffer.
-         *
-         * @param allocator the graphic buffer allocator
-         * @param params    the allocator parameters
-         * @param pId       the buffer id for the newly allocated buffer.
-         * @param handle    the native handle for the newly allocated buffer.
-         *
-         * @return OK when a graphic allocation is successfully allocated.
-         *         NO_MEMORY when there is no memory.
-         *         CRITICAL_ERROR otherwise.
-         */
-        ResultStatus getNewGraphicBuffer(
-                const std::shared_ptr<C2Allocator> &allocator,
+        ResultStatus getNewBuffer(
+                const std::shared_ptr<BufferPoolAllocator> &allocator,
                 const std::vector<uint8_t> &params, BufferId *pId,
                 const native_handle_t **handle);
 

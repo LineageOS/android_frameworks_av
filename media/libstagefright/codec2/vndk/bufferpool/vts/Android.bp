@@ -18,6 +18,7 @@ cc_test {
     name: "VtsVndkHidlBufferpoolV1_0TargetSingleTest",
     defaults: ["VtsHalTargetTestDefaults"],
     srcs: [
+        "allocator.cpp",
         "single.cpp",
     ],
     static_libs: [
@@ -37,6 +38,7 @@ cc_test {
     name: "VtsVndkHidlBufferpoolV1_0TargetMultiTest",
     defaults: ["VtsHalTargetTestDefaults"],
     srcs: [
+        "allocator.cpp",
         "multi.cpp",
     ],
     static_libs: [
