@@ -226,7 +226,7 @@ public class MediaController2Impl implements MediaController2Provider {
             }
         }
         mCallbackExecutor.execute(() -> {
-            mCallback.onDisconnected();
+            mCallback.onDisconnected(mInstance);
         });
     }
 
@@ -623,7 +623,7 @@ public class MediaController2Impl implements MediaController2Provider {
             if (!mInstance.isConnected()) {
                 return;
             }
-            mCallback.onPlaybackStateChanged(state);
+            mCallback.onPlaybackStateChanged(mInstance, state);
         });
     }
 
@@ -635,7 +635,7 @@ public class MediaController2Impl implements MediaController2Provider {
             if (!mInstance.isConnected()) {
                 return;
             }
-            mCallback.onPlaylistParamsChanged(params);
+            mCallback.onPlaylistParamsChanged(mInstance, params);
         });
     }
 
@@ -647,7 +647,7 @@ public class MediaController2Impl implements MediaController2Provider {
             if (!mInstance.isConnected()) {
                 return;
             }
-            mCallback.onPlaybackInfoChanged(info);
+            mCallback.onPlaybackInfoChanged(mInstance, info);
         });
     }
 
@@ -666,7 +666,7 @@ public class MediaController2Impl implements MediaController2Provider {
                 if (!mInstance.isConnected()) {
                     return;
                 }
-                mCallback.onPlaylistChanged(playlist);
+                mCallback.onPlaylistChanged(mInstance, playlist);
             });
         }
     }
@@ -721,7 +721,7 @@ public class MediaController2Impl implements MediaController2Provider {
                 // Note: We may trigger ControllerCallbacks with the initial values
                 // But it's hard to define the order of the controller callbacks
                 // Only notify about the
-                mCallback.onConnected(allowedCommands);
+                mCallback.onConnected(mInstance, allowedCommands);
             });
         } finally {
             if (close) {
@@ -739,13 +739,13 @@ public class MediaController2Impl implements MediaController2Provider {
         }
         mCallbackExecutor.execute(() -> {
             // TODO(jaewan): Double check if the controller exists.
-            mCallback.onCustomCommand(command, args, receiver);
+            mCallback.onCustomCommand(mInstance, command, args, receiver);
         });
     }
 
     void onCustomLayoutChanged(final List<CommandButton> layout) {
         mCallbackExecutor.execute(() -> {
-            mCallback.onCustomLayoutChanged(layout);
+            mCallback.onCustomLayoutChanged(mInstance, layout);
         });
     }
 

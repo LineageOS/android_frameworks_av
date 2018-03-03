@@ -56,7 +56,11 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
     private MediaSession2 mSession;
     private MediaSession2.SessionCallback mCallback;
 
-    private static ControllerInfo matchesSelf() {
+    private MediaSession2 matchesSession() {
+        return argThat((session) -> session == mSession);
+    }
+
+    private static ControllerInfo matchesCaller() {
         return argThat((controllerInfo) -> controllerInfo.getUid() == Process.myUid());
     }
 
@@ -88,7 +92,7 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
             commands = new CommandGroup(mContext);
         }
         mCallback = mock(SessionCallback.class);
-        when(mCallback.onConnect(any())).thenReturn(commands);
+        when(mCallback.onConnect(any(), any())).thenReturn(commands);
         if (mSession != null) {
             mSession.close();
         }
@@ -114,36 +118,36 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
     public void testPlay() throws InterruptedException {
         createSessionWithAllowedActions(createCommandGroupWith(COMMAND_CODE_PLAYBACK_PLAY));
         createController(mSession.getToken()).play();
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(matchesSelf(),
-                matches(COMMAND_CODE_PLAYBACK_PLAY));
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
+                matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_PLAY));
 
         createSessionWithAllowedActions(createCommandGroupWithout(COMMAND_CODE_PLAYBACK_PLAY));
         createController(mSession.getToken()).play();
-        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
     @Test
     public void testPause() throws InterruptedException {
         createSessionWithAllowedActions(createCommandGroupWith(COMMAND_CODE_PLAYBACK_PAUSE));
         createController(mSession.getToken()).pause();
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(matchesSelf(),
-                matches(COMMAND_CODE_PLAYBACK_PAUSE));
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
+                matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_PAUSE));
 
         createSessionWithAllowedActions(createCommandGroupWithout(COMMAND_CODE_PLAYBACK_PAUSE));
         createController(mSession.getToken()).pause();
-        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
     @Test
     public void testStop() throws InterruptedException {
         createSessionWithAllowedActions(createCommandGroupWith(COMMAND_CODE_PLAYBACK_STOP));
         createController(mSession.getToken()).stop();
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(matchesSelf(),
-                matches(COMMAND_CODE_PLAYBACK_STOP));
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
+                matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_STOP));
 
         createSessionWithAllowedActions(createCommandGroupWithout(COMMAND_CODE_PLAYBACK_STOP));
         createController(mSession.getToken()).stop();
-        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
     @Test
@@ -151,13 +155,13 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM));
         createController(mSession.getToken()).skipToNext();
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(matchesSelf(),
-                matches(COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM));
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
+                matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM));
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM));
         createController(mSession.getToken()).skipToNext();
-        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
     @Test
@@ -165,13 +169,13 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM));
         createController(mSession.getToken()).skipToPrevious();
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(matchesSelf(),
-                matches(COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM));
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
+                matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM));
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM));
         createController(mSession.getToken()).skipToPrevious();
-        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
     @Test
@@ -179,13 +183,13 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAYBACK_FAST_FORWARD));
         createController(mSession.getToken()).fastForward();
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(matchesSelf(),
-                matches(COMMAND_CODE_PLAYBACK_FAST_FORWARD));
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
+                matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_FAST_FORWARD));
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PLAYBACK_FAST_FORWARD));
         createController(mSession.getToken()).fastForward();
-        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
     @Test
@@ -193,12 +197,12 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAYBACK_REWIND));
         createController(mSession.getToken()).rewind();
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(matchesSelf(),
-                matches(COMMAND_CODE_PLAYBACK_REWIND));
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
+                matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_REWIND));
 
         createSessionWithAllowedActions(createCommandGroupWithout(COMMAND_CODE_PLAYBACK_REWIND));
         createController(mSession.getToken()).rewind();
-        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
     @Test
@@ -207,12 +211,12 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAYBACK_SEEK_TO));
         createController(mSession.getToken()).seekTo(position);
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(matchesSelf(),
-                matches(COMMAND_CODE_PLAYBACK_SEEK_TO));
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
+                matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_SEEK_TO));
 
         createSessionWithAllowedActions(createCommandGroupWithout(COMMAND_CODE_PLAYBACK_SEEK_TO));
         createController(mSession.getToken()).seekTo(position);
-        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
     // TODO(jaewan): Uncomment when we implement skipToPlaylistItem()
@@ -227,7 +231,7 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM));
         createController(mSession.getToken()).skipToPlaylistItem(item);
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(matchesSelf(),
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(matchesCaller(),
                 matches(COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM));
 
         createSessionWithAllowedActions(
@@ -244,25 +248,26 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS));
         createController(mSession.getToken()).setPlaylistParams(param);
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(matchesSelf(),
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
+                matchesSession(), matchesCaller(),
                 matches(COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS));
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS));
         createController(mSession.getToken()).setPlaylistParams(param);
-        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
     @Test
     public void testSetVolume() throws InterruptedException {
         createSessionWithAllowedActions(createCommandGroupWith(COMMAND_CODE_SET_VOLUME));
         createController(mSession.getToken()).setVolumeTo(0, 0);
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(matchesSelf(),
-                matches(COMMAND_CODE_SET_VOLUME));
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
+                matchesSession(), matchesCaller(), matches(COMMAND_CODE_SET_VOLUME));
 
         createSessionWithAllowedActions(createCommandGroupWithout(COMMAND_CODE_SET_VOLUME));
         createController(mSession.getToken()).setVolumeTo(0, 0);
-        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
     @Test
@@ -271,13 +276,14 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAY_FROM_MEDIA_ID));
         createController(mSession.getToken()).playFromMediaId(mediaId, null);
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onPlayFromMediaId(matchesSelf(),
-                eq(mediaId), isNull());
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onPlayFromMediaId(
+                matchesSession(), matchesCaller(), eq(mediaId), isNull());
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PLAY_FROM_MEDIA_ID));
         createController(mSession.getToken()).playFromMediaId(mediaId, null);
-        verify(mCallback, after(WAIT_TIME_MS).never()).onPlayFromMediaId(any(), any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onPlayFromMediaId(
+                any(), any(), any(), any());
     }
 
     @Test
@@ -286,13 +292,13 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAY_FROM_URI));
         createController(mSession.getToken()).playFromUri(uri, null);
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onPlayFromUri(matchesSelf(),
-                eq(uri), isNull());
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onPlayFromUri(
+                matchesSession(), matchesCaller(), eq(uri), isNull());
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PLAY_FROM_URI));
         createController(mSession.getToken()).playFromUri(uri, null);
-        verify(mCallback, after(WAIT_TIME_MS).never()).onPlayFromUri(any(), any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onPlayFromUri(any(), any(), any(), any());
     }
 
     @Test
@@ -301,13 +307,13 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAY_FROM_SEARCH));
         createController(mSession.getToken()).playFromSearch(query, null);
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onPlayFromSearch(matchesSelf(),
-                eq(query), isNull());
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onPlayFromSearch(
+                matchesSession(), matchesCaller(), eq(query), isNull());
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PLAY_FROM_SEARCH));
         createController(mSession.getToken()).playFromSearch(query, null);
-        verify(mCallback, after(WAIT_TIME_MS).never()).onPlayFromSearch(any(), any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onPlayFromSearch(any(), any(), any(), any());
     }
 
     @Test
@@ -316,13 +322,14 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PREPARE_FROM_MEDIA_ID));
         createController(mSession.getToken()).prepareFromMediaId(mediaId, null);
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onPrepareFromMediaId(matchesSelf(),
-                eq(mediaId), isNull());
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onPrepareFromMediaId(
+                matchesSession(), matchesCaller(), eq(mediaId), isNull());
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PREPARE_FROM_MEDIA_ID));
         createController(mSession.getToken()).prepareFromMediaId(mediaId, null);
-        verify(mCallback, after(WAIT_TIME_MS).never()).onPrepareFromMediaId(any(), any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onPrepareFromMediaId(
+                any(), any(), any(), any());
     }
 
     @Test
@@ -331,13 +338,13 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PREPARE_FROM_URI));
         createController(mSession.getToken()).prepareFromUri(uri, null);
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onPrepareFromUri(matchesSelf(),
-                eq(uri), isNull());
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onPrepareFromUri(
+                matchesSession(), matchesCaller(), eq(uri), isNull());
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PREPARE_FROM_URI));
         createController(mSession.getToken()).prepareFromUri(uri, null);
-        verify(mCallback, after(WAIT_TIME_MS).never()).onPrepareFromUri(any(), any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onPrepareFromUri(any(), any(), any(), any());
     }
 
     @Test
@@ -346,12 +353,13 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PREPARE_FROM_SEARCH));
         createController(mSession.getToken()).prepareFromSearch(query, null);
-        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onPrepareFromSearch(matchesSelf(),
-                eq(query), isNull());
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onPrepareFromSearch(
+                matchesSession(), matchesCaller(), eq(query), isNull());
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PREPARE_FROM_SEARCH));
         createController(mSession.getToken()).prepareFromSearch(query, null);
-        verify(mCallback, after(WAIT_TIME_MS).never()).onPrepareFromSearch(any(), any(), any());
+        verify(mCallback, after(WAIT_TIME_MS).never()).onPrepareFromSearch(
+                any(), any(), any(), any());
     }
 }
