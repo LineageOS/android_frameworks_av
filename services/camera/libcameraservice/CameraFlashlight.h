@@ -92,8 +92,6 @@ class CameraFlashlight : public virtual VirtualLightRefBase {
         // opening cameras)
         bool isBackwardCompatibleMode(const String8& cameraId);
 
-        int getNumberOfCameras();
-
         sp<FlashControlBase> mFlashControl;
 
         sp<CameraProviderManager> mProviderManager;
