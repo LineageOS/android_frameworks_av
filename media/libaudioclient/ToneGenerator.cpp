@@ -1030,7 +1030,7 @@ bool ToneGenerator::startTone(tone_type toneType, int durationMs) {
     bool lResult = false;
     status_t lStatus;
 
-    if ((toneType < 0) || (toneType >= NUM_TONES))
+    if (toneType >= NUM_TONES)
         return lResult;
 
     toneType = getToneForRegion(toneType);
