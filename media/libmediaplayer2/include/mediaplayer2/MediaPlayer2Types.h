@@ -148,7 +148,16 @@ enum media2_info_type {
     MEDIA2_INFO_TIMED_TEXT_ERROR = 900,
 };
 
-enum media_player2_states {
+// Do not change these values without updating their counterparts in MediaPlayer2.java
+enum mediaplayer2_states {
+    MEDIAPLAYER2_STATE_IDLE         = 1,
+    MEDIAPLAYER2_STATE_PREPARED     = 2,
+    MEDIAPLAYER2_STATE_PLAYING      = 3,
+    MEDIAPLAYER2_STATE_PAUSED       = 4,
+    MEDIAPLAYER2_STATE_ERROR        = 5,
+};
+
+enum media_player2_internal_states {
     MEDIA_PLAYER2_STATE_ERROR        = 0,
     MEDIA_PLAYER2_IDLE               = 1 << 0,
     MEDIA_PLAYER2_INITIALIZED        = 1 << 1,
