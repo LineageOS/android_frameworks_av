@@ -49,6 +49,8 @@ public:
 
     virtual ~C2AllocatorIon() override;
 
+    static bool isValid(const C2Handle* const o);
+
 private:
     std::shared_ptr<const Traits> mTraits;
     c2_status_t mInit;

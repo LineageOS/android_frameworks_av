@@ -35,6 +35,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include "allocator.h"
 
 using android::C2AllocatorIon;
 using android::C2PlatformAllocatorStore;
@@ -49,9 +50,6 @@ using android::hardware::media::bufferpool::V1_0::implementation::ConnectionId;
 using android::hardware::media::bufferpool::V1_0::implementation::TransactionId;
 
 namespace {
-
-// Buffer allocation size for tests.
-constexpr static int kAllocationSize = 1024 * 10;
 
 // communication message types between processes.
 enum PipeCommand : int32_t {
@@ -95,11 +93,14 @@ class BufferpoolMultiTest : public ::testing::Test {
     mManager = ClientManager::getInstance();
     ASSERT_NE(mManager, nullptr);
 
-    mAllocator =
+    std::shared_ptr<C2Allocator> allocator =
         std::make_shared<C2AllocatorIon>(C2PlatformAllocatorStore::ION);
+    ASSERT_TRUE((bool)allocator);
+
+    mAllocator = std::make_shared<VtsBufferPoolAllocator>(allocator);
     ASSERT_TRUE((bool)mAllocator);
 
-    status = mManager->create(mAllocator, true, &mConnectionId);
+    status = mManager->create(mAllocator, &mConnectionId);
     ASSERT_TRUE(status == ResultStatus::OK);
 
     status = mManager->getAccessor(mConnectionId, &mAccessor);
@@ -121,25 +122,11 @@ class BufferpoolMultiTest : public ::testing::Test {
 
   android::sp<ClientManager> mManager;
   android::sp<IAccessor> mAccessor;
-  std::shared_ptr<C2Allocator> mAllocator;
+  std::shared_ptr<BufferPoolAllocator> mAllocator;
   ConnectionId mConnectionId;
   pid_t mReceiverPid;
   int mCommandPipeFds[2];
   int mResultPipeFds[2];
-
-  void getAllocationParams(std::vector<uint8_t>* vecParams) {
-    union Params {
-      struct {
-        uint32_t capacity;
-        C2MemoryUsage usage;
-      } data;
-      uint8_t array[0];
-      Params()
-          : data{kAllocationSize,
-                 {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE}} {}
-    } params;
-    vecParams->assign(params.array, params.array + sizeof(params));
-  }
 
   bool sendMessage(int *pipes, const PipeMessage &message) {
     int ret = write(pipes[1], message.array, sizeof(PipeMessage));
@@ -211,7 +198,7 @@ TEST_F(BufferpoolMultiTest, TransferBuffer) {
     int64_t postUs;
     std::vector<uint8_t> vecParams;
 
-    getAllocationParams(&vecParams);
+    getVtsAllocatorParams(&vecParams);
     status = mManager->allocate(mConnectionId, vecParams, &sbuffer);
     ASSERT_TRUE(status == ResultStatus::OK);
 

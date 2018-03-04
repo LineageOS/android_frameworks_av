@@ -6,6 +6,9 @@ cc_library_headers {
     ],
 
     vendor_available: false,
+    vndk: {
+        enabled: true,
+    },
 }
 
 cc_library_shared {

@@ -16,6 +16,8 @@
 
 package com.android.media;
 
+import static android.media.MediaSession2.*;
+
 import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
@@ -39,8 +41,10 @@ import android.media.update.MediaController2Provider;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Process;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
+import android.os.UserHandle;
 import android.support.annotation.GuardedBy;
 import android.util.Log;
 
@@ -77,7 +81,7 @@ public class MediaController2Impl implements MediaController2Provider {
     @GuardedBy("mLock")
     private PendingIntent mSessionActivity;
     @GuardedBy("mLock")
-    private CommandGroup mCommandGroup;
+    private CommandGroup mAllowedCommands;
 
     // Assignment should be used with the lock hold, but should be used without a lock to prevent
     // potential deadlock.
@@ -125,6 +129,24 @@ public class MediaController2Impl implements MediaController2Provider {
             connectToSession(SessionToken2Impl.from(mToken).getSessionBinder());
         } else {
             // Session service
+            if (Process.myUid() == Process.SYSTEM_UID) {
+                // It's system server (MediaSessionService) that wants to monitor session.
+                // Don't bind if able..
+                IMediaSession2 binder = SessionToken2Impl.from(mToken).getSessionBinder();
+                if (binder != null) {
+                    // Use binder in the session token instead of bind by its own.
+                    // Otherwise server will holds the binding to the service *forever* and service
+                    // will never stop.
+                    mServiceConnection = null;
+                    connectToSession(SessionToken2Impl.from(mToken).getSessionBinder());
+                    return;
+                } else if (DEBUG) {
+                    // Should happen only when system server wants to dispatch media key events to
+                    // a dead service.
+                    Log.d(TAG, "System server binds to a session service. Should unbind"
+                            + " immediately after the use.");
+                }
+            }
             mServiceConnection = new SessionServiceConnection();
             connectToService();
         }
@@ -150,8 +172,15 @@ public class MediaController2Impl implements MediaController2Provider {
         //    If a service wants to keep running, it should be either foreground service or
         //    bounded service. But there had been request for the feature for system apps
         //    and using bindService() will be better fit with it.
-        // TODO(jaewan): Use bindServiceAsUser()??
-        boolean result = mContext.bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
+        boolean result;
+        if (Process.myUid() == Process.SYSTEM_UID) {
+            // Use bindServiceAsUser() for binding from system service to avoid following warning.
+            // ContextImpl: Calling a method in the system process without a qualified user
+            result = mContext.bindServiceAsUser(intent, mServiceConnection, Context.BIND_AUTO_CREATE,
+                    UserHandle.getUserHandleForUid(mToken.getUid()));
+        } else {
+            result = mContext.bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
+        }
         if (!result) {
             Log.w(TAG, "bind to " + mToken + " failed");
         } else if (DEBUG) {
@@ -197,7 +226,7 @@ public class MediaController2Impl implements MediaController2Provider {
             }
         }
         mCallbackExecutor.execute(() -> {
-            mCallback.onDisconnected();
+            mCallback.onDisconnected(mInstance);
         });
     }
 
@@ -219,6 +248,42 @@ public class MediaController2Impl implements MediaController2Provider {
 
     MediaController2 getInstance() {
         return mInstance;
+    }
+
+    // Returns session binder if the controller can send the command.
+    IMediaSession2 getSessionBinderIfAble(int commandCode) {
+        synchronized (mLock) {
+            if (!mAllowedCommands.hasCommand(commandCode)) {
+                // Cannot send because isn't allowed to.
+                Log.w(TAG, "Controller isn't allowed to call command, commandCode="
+                        + commandCode);
+                return null;
+            }
+        }
+        // TODO(jaewan): Should we do this with the lock hold?
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder == null) {
+            // Cannot send because disconnected.
+            Log.w(TAG, "Session is disconnected");
+        }
+        return binder;
+    }
+
+    // Returns session binder if the controller can send the command.
+    IMediaSession2 getSessionBinderIfAble(Command command) {
+        synchronized (mLock) {
+            if (!mAllowedCommands.hasCommand(command)) {
+                Log.w(TAG, "Controller isn't allowed to call command, command=" + command);
+                return null;
+            }
+        }
+        // TODO(jaewan): Should we do this with the lock hold?
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder == null) {
+            // Cannot send because disconnected.
+            Log.w(TAG, "Session is disconnected");
+        }
+        return binder;
     }
 
     @Override
@@ -285,7 +350,7 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void setVolumeTo_impl(int value, int flags) {
         // TODO(hdmoon): sanity check
-        final IMediaSession2 binder = mSessionBinder;
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_SET_VOLUME);
         if (binder != null) {
             try {
                 binder.setVolumeTo(mSessionCallbackStub, value, flags);
@@ -300,7 +365,7 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void adjustVolume_impl(int direction, int flags) {
         // TODO(hdmoon): sanity check
-        final IMediaSession2 binder = mSessionBinder;
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_SET_VOLUME);
         if (binder != null) {
             try {
                 binder.adjustVolume(mSessionCallbackStub, direction, flags);
@@ -314,7 +379,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void prepareFromUri_impl(Uri uri, Bundle extras) {
-        final IMediaSession2 binder = mSessionBinder;
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PREPARE_FROM_URI);
         if (binder != null) {
             try {
                 binder.prepareFromUri(mSessionCallbackStub, uri, extras);
@@ -328,7 +393,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void prepareFromSearch_impl(String query, Bundle extras) {
-        final IMediaSession2 binder = mSessionBinder;
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PREPARE_FROM_SEARCH);
         if (binder != null) {
             try {
                 binder.prepareFromSearch(mSessionCallbackStub, query, extras);
@@ -342,7 +407,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void prepareMediaId_impl(String mediaId, Bundle extras) {
-        final IMediaSession2 binder = mSessionBinder;
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PREPARE_FROM_MEDIA_ID);
         if (binder != null) {
             try {
                 binder.prepareFromMediaId(mSessionCallbackStub, mediaId, extras);
@@ -356,7 +421,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void playFromUri_impl(Uri uri, Bundle extras) {
-        final IMediaSession2 binder = mSessionBinder;
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAY_FROM_URI);
         if (binder != null) {
             try {
                 binder.playFromUri(mSessionCallbackStub, uri, extras);
@@ -370,7 +435,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void playFromSearch_impl(String query, Bundle extras) {
-        final IMediaSession2 binder = mSessionBinder;
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAY_FROM_SEARCH);
         if (binder != null) {
             try {
                 binder.playFromSearch(mSessionCallbackStub, query, extras);
@@ -384,7 +449,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void playFromMediaId_impl(String mediaId, Bundle extras) {
-        final IMediaSession2 binder = mSessionBinder;
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAY_FROM_MEDIA_ID);
         if (binder != null) {
             try {
                 binder.playFromMediaId(mSessionCallbackStub, mediaId, extras);
@@ -422,8 +487,7 @@ public class MediaController2Impl implements MediaController2Provider {
         if (command == null) {
             throw new IllegalArgumentException("command shouldn't be null");
         }
-        // TODO(jaewan): Also check if the command is allowed.
-        final IMediaSession2 binder = mSessionBinder;
+        final IMediaSession2 binder = getSessionBinderIfAble(command);
         if (binder != null) {
             try {
                 binder.sendCustomCommand(mSessionCallbackStub, command.toBundle(), args, cb);
@@ -559,7 +623,7 @@ public class MediaController2Impl implements MediaController2Provider {
             if (!mInstance.isConnected()) {
                 return;
             }
-            mCallback.onPlaybackStateChanged(state);
+            mCallback.onPlaybackStateChanged(mInstance, state);
         });
     }
 
@@ -571,7 +635,7 @@ public class MediaController2Impl implements MediaController2Provider {
             if (!mInstance.isConnected()) {
                 return;
             }
-            mCallback.onPlaylistParamsChanged(params);
+            mCallback.onPlaylistParamsChanged(mInstance, params);
         });
     }
 
@@ -583,7 +647,7 @@ public class MediaController2Impl implements MediaController2Provider {
             if (!mInstance.isConnected()) {
                 return;
             }
-            mCallback.onPlaybackInfoChanged(info);
+            mCallback.onPlaybackInfoChanged(mInstance, info);
         });
     }
 
@@ -602,23 +666,23 @@ public class MediaController2Impl implements MediaController2Provider {
                 if (!mInstance.isConnected()) {
                     return;
                 }
-                mCallback.onPlaylistChanged(playlist);
+                mCallback.onPlaylistChanged(mInstance, playlist);
             });
         }
     }
 
     // Should be used without a lock to prevent potential deadlock.
     void onConnectedNotLocked(IMediaSession2 sessionBinder,
-            final CommandGroup commandGroup, final PlaybackState2 state, final PlaybackInfo info,
+            final CommandGroup allowedCommands, final PlaybackState2 state, final PlaybackInfo info,
             final PlaylistParams params, final List<MediaItem2> playlist,
             final PendingIntent sessionActivity) {
         if (DEBUG) {
             Log.d(TAG, "onConnectedNotLocked sessionBinder=" + sessionBinder
-                    + ", commands=" + commandGroup);
+                    + ", allowedCommands=" + allowedCommands);
         }
         boolean close = false;
         try {
-            if (sessionBinder == null || commandGroup == null) {
+            if (sessionBinder == null || allowedCommands == null) {
                 // Connection rejected.
                 close = true;
                 return;
@@ -633,7 +697,7 @@ public class MediaController2Impl implements MediaController2Provider {
                     close = true;
                     return;
                 }
-                mCommandGroup = commandGroup;
+                mAllowedCommands = allowedCommands;
                 mPlaybackState = state;
                 mPlaybackInfo = info;
                 mPlaylistParams = params;
@@ -657,7 +721,7 @@ public class MediaController2Impl implements MediaController2Provider {
                 // Note: We may trigger ControllerCallbacks with the initial values
                 // But it's hard to define the order of the controller callbacks
                 // Only notify about the
-                mCallback.onConnected(commandGroup);
+                mCallback.onConnected(mInstance, allowedCommands);
             });
         } finally {
             if (close) {
@@ -675,13 +739,13 @@ public class MediaController2Impl implements MediaController2Provider {
         }
         mCallbackExecutor.execute(() -> {
             // TODO(jaewan): Double check if the controller exists.
-            mCallback.onCustomCommand(command, args, receiver);
+            mCallback.onCustomCommand(mInstance, command, args, receiver);
         });
     }
 
     void onCustomLayoutChanged(final List<CommandButton> layout) {
         mCallbackExecutor.execute(() -> {
-            mCallback.onCustomLayoutChanged(layout);
+            mCallback.onCustomLayoutChanged(mInstance, layout);
         });
     }
 

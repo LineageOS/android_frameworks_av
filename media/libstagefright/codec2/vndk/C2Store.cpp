@@ -433,9 +433,29 @@ C2PlatformComponentStore::C2PlatformComponentStore() {
     mComponents.emplace("c2.google.avc.encoder", "libstagefright_soft_c2avcenc.so");
     mComponents.emplace("c2.google.aac.decoder", "libstagefright_soft_c2aacdec.so");
     mComponents.emplace("c2.google.aac.encoder", "libstagefright_soft_c2aacenc.so");
-    mComponents.emplace("c2.google.mp3.decoder", "libstagefright_soft_c2mp3dec.so");
+    mComponents.emplace("c2.google.amrnb.decoder", "libstagefright_soft_c2amrnbdec.so");
+    mComponents.emplace("c2.google.amrnb.encoder", "libstagefright_soft_c2amrnbenc.so");
+    mComponents.emplace("c2.google.amrwb.decoder", "libstagefright_soft_c2amrwbdec.so");
+    mComponents.emplace("c2.google.amrwb.encoder", "libstagefright_soft_c2amrwbenc.so");
+    mComponents.emplace("c2.google.hevc.decoder", "libstagefright_soft_c2hevcdec.so");
     mComponents.emplace("c2.google.g711.alaw.decoder", "libstagefright_soft_c2g711alawdec.so");
     mComponents.emplace("c2.google.g711.mlaw.decoder", "libstagefright_soft_c2g711mlawdec.so");
+    mComponents.emplace("c2.google.mpeg2.decoder", "libstagefright_soft_c2mpeg2dec.so");
+    mComponents.emplace("c2.google.h263.decoder", "libstagefright_soft_c2h263dec.so");
+    mComponents.emplace("c2.google.h263.encoder", "libstagefright_soft_c2h263enc.so");
+    mComponents.emplace("c2.google.mpeg4.decoder", "libstagefright_soft_c2mpeg4dec.so");
+    mComponents.emplace("c2.google.mpeg4.encoder", "libstagefright_soft_c2mpeg4enc.so");
+    mComponents.emplace("c2.google.mp3.decoder", "libstagefright_soft_c2mp3dec.so");
+    mComponents.emplace("c2.google.vorbis.decoder", "libstagefright_soft_c2vorbisdec.so");
+    mComponents.emplace("c2.google.opus.decoder", "libstagefright_soft_c2opusdec.so");
+    mComponents.emplace("c2.google.vp8.decoder", "libstagefright_soft_c2vp8dec.so");
+    mComponents.emplace("c2.google.vp9.decoder", "libstagefright_soft_c2vp9dec.so");
+    mComponents.emplace("c2.google.vp8.encoder", "libstagefright_soft_c2vp8enc.so");
+    mComponents.emplace("c2.google.vp9.encoder", "libstagefright_soft_c2vp9enc.so");
+    mComponents.emplace("c2.google.raw.decoder", "libstagefright_soft_c2rawdec.so");
+    mComponents.emplace("c2.google.flac.decoder", "libstagefright_soft_c2flacdec.so");
+    mComponents.emplace("c2.google.flac.encoder", "libstagefright_soft_c2flacenc.so");
+    mComponents.emplace("c2.google.gsm.decoder", "libstagefright_soft_c2gsmdec.so");
 }
 
 c2_status_t C2PlatformComponentStore::copyBuffer(

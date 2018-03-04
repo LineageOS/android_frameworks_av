@@ -68,6 +68,7 @@ public:
             status_t        stop();
             status_t        pause();
             bool            isPlaying();
+            mediaplayer2_states getMediaPlayer2State();
             status_t        setPlaybackSettings(const AudioPlaybackRate& rate);
             status_t        getPlaybackSettings(AudioPlaybackRate* rate /* nonnull */);
             status_t        setSyncSettings(const AVSyncSettings& sync, float videoFpsHint);
@@ -145,7 +146,7 @@ private:
     mutable Mutex               mLock;
     Mutex                       mNotifyLock;
     sp<MediaPlayer2Listener>    mListener;
-    media_player2_states        mCurrentState;
+    media_player2_internal_states mCurrentState;
     int64_t                     mCurrentPosition;
     MediaPlayer2SeekMode        mCurrentSeekMode;
     int64_t                     mSeekPosition;

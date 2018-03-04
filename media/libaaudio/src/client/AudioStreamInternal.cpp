@@ -104,7 +104,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     request.setUserId(getuid());
     request.setProcessId(getpid());
     request.setSharingModeMatchRequired(isSharingModeMatchRequired());
-    request.setInService(mInService);
+    request.setInService(isInService());
 
     request.getConfiguration().setDeviceId(getDeviceId());
     request.getConfiguration().setSampleRate(getSampleRate());
@@ -118,11 +118,24 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
     request.getConfiguration().setBufferCapacity(builder.getBufferCapacity());
 
+    mDeviceChannelCount = getSamplesPerFrame(); // Assume it will be the same. Update if not.
+
     mServiceStreamHandle = mServiceInterface.openStream(request, configurationOutput);
+    if (mServiceStreamHandle < 0
+            && request.getConfiguration().getSamplesPerFrame() == 1 // mono?
+            && getDirection() == AAUDIO_DIRECTION_OUTPUT
+            && !isInService()) {
+        // if that failed then try switching from mono to stereo if OUTPUT.
+        // Only do this in the client. Otherwise we end up with a mono mixer in the service
+        // that writes to a stereo MMAP stream.
+        ALOGD("%s - openStream() returned %d, try switching from MONO to STEREO",
+              __func__, mServiceStreamHandle);
+        request.getConfiguration().setSamplesPerFrame(2); // stereo
+        mServiceStreamHandle = mServiceInterface.openStream(request, configurationOutput);
+    }
     if (mServiceStreamHandle < 0) {
-        result = mServiceStreamHandle;
-        ALOGE("%s - openStream() returned %d", __func__, result);
-        return result;
+        ALOGE("%s - openStream() returned %d", __func__, mServiceStreamHandle);
+        return mServiceStreamHandle;
     }
 
     result = configurationOutput.validate();
@@ -130,8 +143,12 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         goto error;
     }
     // Save results of the open.
+    if (getSamplesPerFrame() == AAUDIO_UNSPECIFIED) {
+        setSamplesPerFrame(configurationOutput.getSamplesPerFrame());
+    }
+    mDeviceChannelCount = configurationOutput.getSamplesPerFrame();
+
     setSampleRate(configurationOutput.getSampleRate());
-    setSamplesPerFrame(configurationOutput.getSamplesPerFrame());
     setDeviceId(configurationOutput.getDeviceId());
     setSessionId(configurationOutput.getSessionId());
     setSharingMode(configurationOutput.getSharingMode());
@@ -159,7 +176,6 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     if (result != AAUDIO_OK) {
         goto error;
     }
-
 
     // Validate result from server.
     framesPerBurst = mEndpointDescriptor.dataQueueDescriptor.framesPerBurst;

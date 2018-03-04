@@ -20,7 +20,6 @@
 #include <android/hardware/media/bufferpool/1.0/IClientManager.h>
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
-#include <C2Buffer.h>
 #include <memory>
 #include <BufferPoolTypes.h>
 
@@ -52,7 +51,6 @@ struct ClientManager : public IClientManager {
      * Creates a local connection with a newly created buffer pool.
      *
      * @param allocator     for new buffer allocation.
-     * @param linear        whether the allocator is linear or not.
      * @param pConnectionId Id of the created connection. This is
      *                      system-wide unique.
      *
@@ -61,8 +59,7 @@ struct ClientManager : public IClientManager {
      *         NO_MEMORY when there is no memory.
      *         CRITICAL_ERROR otherwise.
      */
-    ResultStatus create(const std::shared_ptr<C2Allocator> &allocator,
-                        bool linear,
+    ResultStatus create(const std::shared_ptr<BufferPoolAllocator> &allocator,
                         ConnectionId *pConnectionId);
 
     /**

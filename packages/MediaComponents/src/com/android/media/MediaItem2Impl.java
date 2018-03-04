@@ -24,6 +24,7 @@ import android.annotation.Nullable;
 import android.content.Context;
 import android.media.DataSourceDesc;
 import android.media.MediaItem2;
+import android.media.MediaItem2.Builder;
 import android.media.MediaItem2.Flags;
 import android.media.MediaMetadata2;
 import android.media.update.MediaItem2Provider;
@@ -43,7 +44,7 @@ public class MediaItem2Impl implements MediaItem2Provider {
     private DataSourceDesc mDataSourceDesc;
 
     // From the public API
-    public MediaItem2Impl(Context context, MediaItem2 instance, String mediaId,
+    public MediaItem2Impl(Context context, String mediaId,
             DataSourceDesc dsd, MediaMetadata2 metadata, @Flags int flags) {
         if (mediaId == null) {
             throw new IllegalArgumentException("mediaId shouldn't be null");
@@ -56,12 +57,12 @@ public class MediaItem2Impl implements MediaItem2Provider {
         }
 
         mContext = context;
-        mInstance = instance;
-
         mId = mediaId;
         mDataSourceDesc = dsd;
         mMetadata = metadata;
         mFlags = flags;
+
+        mInstance = new MediaItem2(this);
     }
 
     // Create anonymized version
@@ -156,5 +157,53 @@ public class MediaItem2Impl implements MediaItem2Provider {
     @Override
     public @Nullable DataSourceDesc getDataSourceDesc_impl() {
         return mDataSourceDesc;
+    }
+
+    public static class BuilderImpl implements MediaItem2Provider.BuilderProvider {
+        private Context mContext;
+        private Builder mInstance;
+        private @Flags int mFlags;
+        private String mMediaId;
+        private MediaMetadata2 mMetadata;
+        private DataSourceDesc mDataSourceDesc;
+
+        public BuilderImpl(Context context, Builder instance, int flags) {
+            mContext = context;
+            mInstance = instance;
+            mFlags = flags;
+        }
+
+        @Override
+        public Builder setMediaId_impl(@Nullable String mediaId) {
+            mMediaId = mediaId;
+            return mInstance;
+        }
+
+        @Override
+        public Builder setMetadata_impl(@Nullable MediaMetadata2 metadata) {
+            mMetadata = metadata;
+            return mInstance;
+        }
+
+        @Override
+        public Builder setDataSourceDesc_impl(@NonNull DataSourceDesc dataSourceDesc) {
+            if (dataSourceDesc == null) {
+                throw new IllegalArgumentException("dataSourceDesc shouldn't be null");
+            }
+            mDataSourceDesc = dataSourceDesc;
+            return mInstance;
+        }
+
+        @Override
+        public MediaItem2 build_impl() {
+            String id = (mMetadata != null)
+                    ? mMetadata.getString(MediaMetadata2.METADATA_KEY_MEDIA_ID) : null;
+            if (id == null) {
+                //  TODO(jaewan): Double check if its sufficient (e.g. Use UUID instead?)
+                id = (mMediaId != null) ? mMediaId : toString();
+            }
+            return new MediaItem2Impl(mContext, id, mDataSourceDesc, mMetadata, mFlags)
+                    .getInstance();
+        }
     }
 }

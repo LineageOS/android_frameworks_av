@@ -242,7 +242,9 @@ status_t Parameters::initialize(const CameraMetadata *info, int deviceVersion) {
                 HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED, availableFpsRanges.data.i32[i+1])) {
                 continue;
             }
-            if (i != 0) supportedPreviewFpsRange += ",";
+            if (supportedPreviewFpsRange.length() > 0) {
+                supportedPreviewFpsRange += ",";
+            }
             supportedPreviewFpsRange += String8::format("(%d,%d)",
                     availableFpsRanges.data.i32[i] * kFpsToApiScale,
                     availableFpsRanges.data.i32[i+1] * kFpsToApiScale);

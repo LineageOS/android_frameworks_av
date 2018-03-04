@@ -24,7 +24,6 @@ cc_library {
         "libhidlbase",
         "libhidltransport",
         "liblog",
-        "libstagefright_codec2",
         "libutils",
         "android.hardware.media.bufferpool@1.0",
     ],

@@ -63,6 +63,11 @@ public class MockPlayer extends MediaPlayerBase {
     }
 
     @Override
+    public void reset() {
+        // no-op
+    }
+
+    @Override
     public void play() {
         mPlayCalled = true;
         if (mCountDownLatch != null) {
@@ -299,7 +304,7 @@ public class MockPlayer extends MediaPlayerBase {
     }
 
     @Override
-    public void setVolume(float volume) {
+    public void setPlayerVolume(float volume) {
         // TODO: implement this
     }
 

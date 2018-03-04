@@ -19,6 +19,7 @@ package com.android.media;
 import android.content.Context;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
+import android.media.MediaController2;
 import android.media.MediaItem2;
 import android.media.SessionToken2;
 import android.media.update.MediaBrowser2Provider;
@@ -42,6 +43,10 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
         super(context, instance, token, executor, callback);
         mInstance = instance;
         mCallback = callback;
+    }
+
+    @Override MediaBrowser2 getInstance() {
+        return (MediaBrowser2) super.getInstance();
     }
 
     @Override
@@ -183,39 +188,39 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
     public void onGetLibraryRootDone(
             final Bundle rootHints, final String rootMediaId, final Bundle rootExtra) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onGetLibraryRootDone(rootHints, rootMediaId, rootExtra);
+            mCallback.onGetLibraryRootDone(getInstance(), rootHints, rootMediaId, rootExtra);
         });
     }
 
     public void onGetItemDone(String mediaId, MediaItem2 item) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onGetItemDone(mediaId, item);
+            mCallback.onGetItemDone(getInstance(), mediaId, item);
         });
     }
 
     public void onGetChildrenDone(String parentId, int page, int pageSize, List<MediaItem2> result,
             Bundle extras) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onGetChildrenDone(parentId, page, pageSize, result, extras);
+            mCallback.onGetChildrenDone(getInstance(), parentId, page, pageSize, result, extras);
         });
     }
 
     public void onSearchResultChanged(String query, int itemCount, Bundle extras) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onSearchResultChanged(query, itemCount, extras);
+            mCallback.onSearchResultChanged(getInstance(), query, itemCount, extras);
         });
     }
 
     public void onGetSearchResultDone(String query, int page, int pageSize, List<MediaItem2> result,
             Bundle extras) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onGetSearchResultDone(query, page, pageSize, result, extras);
+            mCallback.onGetSearchResultDone(getInstance(), query, page, pageSize, result, extras);
         });
     }
 
     public void onChildrenChanged(final String parentId, int itemCount, final Bundle extras) {
         getCallbackExecutor().execute(() -> {
-            mCallback.onChildrenChanged(parentId, itemCount, extras);
+            mCallback.onChildrenChanged(getInstance(), parentId, itemCount, extras);
         });
     }
 }

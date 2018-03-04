@@ -865,6 +865,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAAC() {
             }
             bits.skipBits(2);  // original_copy, home
 
+            mFormat = new MetaData;
             MakeAACCodecSpecificData(*mFormat,
                     profile, sampling_freq_index, channel_configuration);
 

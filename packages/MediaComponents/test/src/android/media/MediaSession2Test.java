@@ -29,7 +29,6 @@ import static org.junit.Assert.fail;
 
 import android.content.Context;
 import android.media.MediaController2.PlaybackInfo;
-import android.media.MediaPlayerBase.PlayerEventCallback;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
@@ -38,7 +37,6 @@ import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.os.Bundle;
-import android.os.Looper;
 import android.os.Process;
 import android.os.ResultReceiver;
 import android.support.annotation.NonNull;
@@ -391,11 +389,12 @@ public class MediaSession2Test extends MediaSession2TestBase {
         final CountDownLatch latch = new CountDownLatch(1);
         final SessionCallback sessionCallback = new SessionCallback(mContext) {
             @Override
-            public CommandGroup onConnect(ControllerInfo controller) {
+            public CommandGroup onConnect(MediaSession2 session,
+                    ControllerInfo controller) {
                 if (mContext.getPackageName().equals(controller.getPackageName())) {
                     mSession.setCustomLayout(controller, buttons);
                 }
-                return super.onConnect(controller);
+                return super.onConnect(session, controller);
             }
         };
 
@@ -404,6 +403,10 @@ public class MediaSession2Test extends MediaSession2TestBase {
                 .setId("testSetCustomLayout")
                 .setSessionCallback(sHandlerExecutor, sessionCallback)
                 .build()) {
+            if (mSession != null) {
+                mSession.close();
+                mSession = session;
+            }
             final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
                 @Override
                 public void onCustomLayoutChanged(List<CommandButton> layout) {
@@ -470,7 +473,8 @@ public class MediaSession2Test extends MediaSession2TestBase {
         }
 
         @Override
-        public MediaSession2.CommandGroup onConnect(ControllerInfo controllerInfo) {
+        public MediaSession2.CommandGroup onConnect(MediaSession2 session,
+                ControllerInfo controllerInfo) {
             if (Process.myUid() != controllerInfo.getUid()) {
                 return null;
             }
@@ -490,7 +494,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
         }
 
         @Override
-        public boolean onCommandRequest(ControllerInfo controllerInfo,
+        public boolean onCommandRequest(MediaSession2 session, ControllerInfo controllerInfo,
                 MediaSession2.Command command) {
             assertEquals(mContext.getPackageName(), controllerInfo.getPackageName());
             assertEquals(Process.myUid(), controllerInfo.getUid());
