@@ -985,7 +985,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         }
         try {
             Bundle commandBundle = command.toBundle();
-            controllerBinder.sendCustomCommand(commandBundle, args, receiver);
+            controllerBinder.onCustomCommand(commandBundle, args, receiver);
         } catch (RemoteException e) {
             Log.w(TAG, "Controller is gone", e);
             // TODO(jaewan): What to do when the controller is gone?

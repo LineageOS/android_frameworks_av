@@ -42,7 +42,7 @@ oneway interface IMediaSession2Callback {
 
     void onCustomLayoutChanged(in List<Bundle> commandButtonlist);
 
-    void sendCustomCommand(in Bundle command, in Bundle args, in ResultReceiver receiver);
+    void onCustomCommand(in Bundle command, in Bundle args, in ResultReceiver receiver);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     // Browser sepcific
