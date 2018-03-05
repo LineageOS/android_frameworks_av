@@ -29,6 +29,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.MediaController2;
 import android.media.MediaController2.PlaybackInfo;
@@ -311,7 +312,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void setAudioFocusRequest_impl(int focusGain) {
+    public void setAudioFocusRequest_impl(AudioFocusRequest afr) {
         // implement
     }
 
@@ -442,11 +443,20 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public void sendCustomCommand_impl(ControllerInfo controller, Command command, Bundle args,
             ResultReceiver receiver) {
+        if (controller == null) {
+            throw new IllegalArgumentException("controller shouldn't be null");
+        }
+        if (command == null) {
+            throw new IllegalArgumentException("command shouldn't be null");
+        }
         mSessionStub.sendCustomCommand(controller, command, args, receiver);
     }
 
     @Override
     public void sendCustomCommand_impl(Command command, Bundle args) {
+        if (command == null) {
+            throw new IllegalArgumentException("command shouldn't be null");
+        }
         mSessionStub.sendCustomCommand(command, args);
     }
 
@@ -471,21 +481,39 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     @Override
     public void addPlaylistItem_impl(int index, MediaItem2 item) {
+        if (index < 0) {
+            throw new IllegalArgumentException("index shouldn't be negative");
+        }
+        if (item == null) {
+            throw new IllegalArgumentException("item shouldn't be null");
+        }
         // TODO(jaewan): Implement
     }
 
     @Override
     public void removePlaylistItem_impl(MediaItem2 item) {
+        if (item == null) {
+            throw new IllegalArgumentException("item shouldn't be null");
+        }
         // TODO(jaewan): Implement
     }
 
     @Override
     public void editPlaylistItem_impl(MediaItem2 item) {
+        if (item == null) {
+            throw new IllegalArgumentException("item shouldn't be null");
+        }
         // TODO(jaewan): Implement
     }
 
     @Override
     public void replacePlaylistItem_impl(int index, MediaItem2 item) {
+        if (index < 0) {
+            throw new IllegalArgumentException("index shouldn't be negative");
+        }
+        if (item == null) {
+            throw new IllegalArgumentException("item shouldn't be null");
+        }
         // TODO(jaewan): Implement
     }
 
@@ -568,6 +596,9 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public void skipToPlaylistItem_impl(MediaItem2 item) {
         ensureCallingThread();
+        if (item == null) {
+            throw new IllegalArgumentException("item shouldn't be null");
+        }
         // TODO: Uncomment or remove
         /*
         final MediaPlayerBase player = mPlayer;
@@ -833,6 +864,9 @@ public class MediaSession2Impl implements MediaSession2Provider {
          * @return a new Command instance from the Bundle
          */
         public static Command fromBundle_impl(Context context, Bundle command) {
+            if (command == null) {
+                throw new IllegalArgumentException("command shouldn't be null");
+            }
             int code = command.getInt(KEY_COMMAND_CODE);
             if (code != COMMAND_CODE_CUSTOM) {
                 return new Command(context, code);
@@ -885,6 +919,9 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         @Override
         public void addCommand_impl(Command command) {
+            if (command == null) {
+                throw new IllegalArgumentException("command shouldn't be null");
+            }
             mCommands.add(command);
         }
 
@@ -897,11 +934,17 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         @Override
         public void removeCommand_impl(Command command) {
+            if (command == null) {
+                throw new IllegalArgumentException("command shouldn't be null");
+            }
             mCommands.remove(command);
         }
 
         @Override
         public boolean hasCommand_impl(Command command) {
+            if (command == null) {
+                throw new IllegalArgumentException("command shouldn't be null");
+            }
             return mCommands.contains(command);
         }
 
@@ -975,6 +1018,13 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         public ControllerInfoImpl(Context context, ControllerInfo instance, int uid,
                 int pid, String packageName, IMediaSession2Callback callback) {
+            if (TextUtils.isEmpty(packageName)) {
+                throw new IllegalArgumentException("packageName shouldn't be empty");
+            }
+            if (callback == null) {
+                throw new IllegalArgumentException("callback shouldn't be null");
+            }
+
             mInstance = instance;
             mUid = uid;
             mPackageName = packageName;
@@ -1297,6 +1347,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mId = "";
         }
 
+        @Override
         public void setPlayer_impl(MediaPlayerBase player) {
             if (player == null) {
                 throw new IllegalArgumentException("player shouldn't be null");
@@ -1312,17 +1363,17 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mPlaylistAgent = playlistAgent;
         }
 
+        @Override
         public void setVolumeProvider_impl(VolumeProvider2 volumeProvider) {
-            if (volumeProvider == null) {
-                throw new IllegalArgumentException("volumeProvider shouldn't be null");
-            }
             mVolumeProvider = volumeProvider;
         }
 
+        @Override
         public void setSessionActivity_impl(PendingIntent pi) {
             mSessionActivity = pi;
         }
 
+        @Override
         public void setId_impl(String id) {
             if (id == null) {
                 throw new IllegalArgumentException("id shouldn't be null");
@@ -1330,6 +1381,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mId = id;
         }
 
+        @Override
         public void setSessionCallback_impl(Executor executor, C callback) {
             if (executor == null) {
                 throw new IllegalArgumentException("executor shouldn't be null");
@@ -1341,6 +1393,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mCallback = callback;
         }
 
+        @Override
         public abstract T build_impl();
     }
 
@@ -1357,7 +1410,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
             if (mCallback == null) {
                 mCallback = new SessionCallback(mContext) {};
             }
-
             return new MediaSession2Impl(mContext, mPlayer, mId, mPlaylistAgent,
                     mVolumeProvider, mSessionActivity, mCallbackExecutor, mCallback).getInstance();
         }

@@ -15,6 +15,10 @@
  */
 package com.android.media;
 
+import static android.media.VolumeProvider2.VOLUME_CONTROL_ABSOLUTE;
+import static android.media.VolumeProvider2.VOLUME_CONTROL_FIXED;
+import static android.media.VolumeProvider2.VOLUME_CONTROL_RELATIVE;
+
 import android.content.Context;
 import android.media.VolumeProvider2;
 import android.media.update.VolumeProvider2Provider;
@@ -31,6 +35,18 @@ public class VolumeProvider2Impl implements VolumeProvider2Provider {
 
     public VolumeProvider2Impl(Context context, VolumeProvider2 instance,
             @VolumeProvider2.ControlType int controlType, int maxVolume, int currentVolume) {
+        if (controlType != VOLUME_CONTROL_FIXED && controlType != VOLUME_CONTROL_RELATIVE
+                && controlType != VOLUME_CONTROL_ABSOLUTE) {
+            throw new IllegalArgumentException("wrong controlType " + controlType);
+        }
+        if (maxVolume < 0 || currentVolume < 0) {
+            throw new IllegalArgumentException("volume shouldn't be negative"
+                    + ", maxVolume=" + maxVolume + ", currentVolume=" + currentVolume);
+        }
+        if (currentVolume > maxVolume) {
+            throw new IllegalArgumentException("currentVolume shouldn't be greater than maxVolume"
+                    + ", maxVolume=" + maxVolume + ", currentVolume=" + currentVolume);
+        }
         mContext = context;
         mInstance = instance;
         mControlType = controlType;
@@ -55,6 +71,10 @@ public class VolumeProvider2Impl implements VolumeProvider2Provider {
 
     @Override
     public void setCurrentVolume_impl(int currentVolume) {
+        if (currentVolume < 0) {
+            throw new IllegalArgumentException("currentVolume shouldn't be negative"
+                    + ", currentVolume=" + currentVolume);
+        }
         mCurrentVolume = currentVolume;
         if (mCallback != null) {
             mCallback.onVolumeChanged(mInstance);
