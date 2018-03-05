@@ -139,6 +139,11 @@ ssize_t HeifDataSource::readAt(off64_t offset, size_t size) {
     // have been caught above.
     CHECK(offset >= mCachedOffset);
 
+    off64_t resultOffset;
+    if (__builtin_add_overflow(offset, size, &resultOffset)) {
+        return ERROR_IO;
+    }
+
     if (size == 0) {
         return 0;
     }
