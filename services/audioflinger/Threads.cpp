@@ -1837,6 +1837,10 @@ void AudioFlinger::PlaybackThread::onFirstRef()
 void AudioFlinger::PlaybackThread::preExit()
 {
     ALOGV("  preExit()");
+    // FIXME this is using hard-coded strings but in the future, this functionality will be
+    //       converted to use audio HAL extensions required to support tunneling
+    status_t result = mOutput->stream->setParameters(String8("exiting=1"));
+    ALOGE_IF(result != OK, "Error when setting parameters on exit: %d", result);
 }
 
 // PlaybackThread::createTrack_l() must be called with AudioFlinger::mLock held
