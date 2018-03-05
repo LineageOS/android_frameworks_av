@@ -400,12 +400,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void sendCommand(IMediaSession2Callback caller, Bundle command, Bundle args)
-            throws RuntimeException {
-        // TODO(jaewan): Generic command
-    }
-
-    @Override
     public void sendTransportControlCommand(IMediaSession2Callback caller,
             int commandCode, Bundle args) throws RuntimeException {
         final MediaSession2Impl session = getSession();
@@ -991,7 +985,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         }
         try {
             Bundle commandBundle = command.toBundle();
-            controllerBinder.sendCustomCommand(commandBundle, args, receiver);
+            controllerBinder.onCustomCommand(commandBundle, args, receiver);
         } catch (RemoteException e) {
             Log.w(TAG, "Controller is gone", e);
             // TODO(jaewan): What to do when the controller is gone?

@@ -194,6 +194,9 @@
                 android:visibility="gone" />
 
             <ImageButton
+                android:id="@+id/mute"
+                style="@style/BottomBarButton.Mute" />
+            <ImageButton
                 android:id="@+id/subtitle"
                 android:scaleType="fitCenter"
                 style="@style/BottomBarButton.CC" />
@@ -221,11 +224,11 @@
                 android:layout_height="wrap_content" />
 
             <ImageButton
-                android:id="@+id/mute"
-                style="@style/BottomBarButton.Mute" />
-            <ImageButton
                 android:id="@+id/aspect_ratio"
                 style="@style/BottomBarButton.AspectRatio" />
+            <ImageButton
+                android:id="@+id/video_quality"
+                style="@style/BottomBarButton.VideoQuality" />
             <ImageButton
                 android:id="@+id/settings"
                 style="@style/BottomBarButton.Settings" />

@@ -68,6 +68,10 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
 
     @Override
     public void subscribe_impl(String parentId, Bundle extras) {
+        if (parentId == null) {
+            throw new IllegalArgumentException("parentId shouldn't be null");
+        }
+
         final IMediaSession2 binder = getSessionBinder();
         if (binder != null) {
             try {
@@ -85,6 +89,10 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
 
     @Override
     public void unsubscribe_impl(String parentId) {
+        if (parentId == null) {
+            throw new IllegalArgumentException("parentId shouldn't be null");
+        }
+
         final IMediaSession2 binder = getSessionBinder();
         if (binder != null) {
             try {
@@ -169,6 +177,9 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
     public void getSearchResult_impl(String query, int page, int pageSize, Bundle extras) {
         if (TextUtils.isEmpty(query)) {
             throw new IllegalArgumentException("query shouldn't be empty");
+        }
+        if (page < 1 || pageSize < 1) {
+            throw new IllegalArgumentException("Neither page nor pageSize should be less than 1");
         }
         final IMediaSession2 binder = getSessionBinder();
         if (binder != null) {
