@@ -218,7 +218,7 @@ status_t AnotherPacketSource::read(
         }
 
         sp<ABuffer> mpegUserData;
-        if (buffer->meta()->findBuffer("mpegUserData", &mpegUserData) && mpegUserData != NULL) {
+        if (buffer->meta()->findBuffer("mpeg-user-data", &mpegUserData) && mpegUserData != NULL) {
             bufmeta.setData(
                     kKeyMpegUserData, 0, mpegUserData->data(), mpegUserData->size());
         }

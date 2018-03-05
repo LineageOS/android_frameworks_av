@@ -446,11 +446,16 @@ void NuMediaExtractor::releaseAllTrackSamples() {
 ssize_t NuMediaExtractor::fetchAllTrackSamples(
         int64_t seekTimeUs, MediaSource::ReadOptions::SeekMode mode) {
     TrackInfo *minInfo = NULL;
-    ssize_t minIndex = -1;
+    ssize_t minIndex = ERROR_END_OF_STREAM;
 
     for (size_t i = 0; i < mSelectedTracks.size(); ++i) {
         TrackInfo *info = &mSelectedTracks.editItemAt(i);
         fetchTrackSamples(info, seekTimeUs, mode);
+
+        status_t err = info->mFinalResult;
+        if (err != OK && err != ERROR_END_OF_STREAM) {
+            return err;
+        }
 
         if (info->mSamples.empty()) {
             continue;
@@ -721,7 +726,8 @@ status_t NuMediaExtractor::getSampleMeta(sp<MetaData> *sampleMeta) {
     ssize_t minIndex = fetchAllTrackSamples();
 
     if (minIndex < 0) {
-        return ERROR_END_OF_STREAM;
+        status_t err = minIndex;
+        return err;
     }
 
     TrackInfo *info = &mSelectedTracks.editItemAt(minIndex);
