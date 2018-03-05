@@ -352,7 +352,7 @@ bool C2SoftMpeg2Dec::setDecodeArgs(ivd_video_decode_ip_t *ps_decode_ip,
     if (inBuffer) {
         ps_decode_ip->u4_ts = tsMarker;
         ps_decode_ip->pv_stream_buffer = const_cast<uint8_t *>(inBuffer->data() + inOffset);
-        ps_decode_ip->u4_num_Bytes = inSize - inOffset;
+        ps_decode_ip->u4_num_Bytes = inSize;
     } else {
         ps_decode_ip->u4_ts = 0;
         ps_decode_ip->pv_stream_buffer = nullptr;
@@ -630,7 +630,8 @@ void C2SoftMpeg2Dec::process(
     ALOGV("in buffer attr. size %zu timestamp %d frameindex %d, flags %x",
           inSize, (int)work->input.ordinal.timestamp.peeku(),
           (int)work->input.ordinal.frameIndex.peeku(), work->input.flags);
-    while (inOffset < inSize) {
+    size_t inPos = 0;
+    while (inPos < inSize) {
         if (C2_OK != ensureDecoderState(pool)) {
             mSignalledError = true;
             work->result = C2_CORRUPTED;
@@ -646,7 +647,7 @@ void C2SoftMpeg2Dec::process(
         ivd_video_decode_ip_t s_decode_ip;
         ivd_video_decode_op_t s_decode_op;
         if (!setDecodeArgs(&s_decode_ip, &s_decode_op, &rView, &wView,
-                           inOffset, inSize, workIndex)) {
+                           inOffset + inPos, inSize - inPos, workIndex)) {
             mSignalledError = true;
             work->result = C2_CORRUPTED;
             return;
@@ -693,10 +694,10 @@ void C2SoftMpeg2Dec::process(
         if (s_decode_op.u4_output_present) {
             finishWork(s_decode_op.u4_ts, work);
         }
-        inOffset += s_decode_op.u4_num_bytes_consumed;
-        if (hasPicture && (inSize - inOffset)) {
+        inPos += s_decode_op.u4_num_bytes_consumed;
+        if (hasPicture && (inSize - inPos) != 0) {
             ALOGD("decoded frame in current access nal, ignoring further trailing bytes %d",
-                  (int)inSize - (int)inOffset);
+                  (int)inSize - (int)inPos);
             break;
         }
     }

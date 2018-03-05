@@ -181,11 +181,13 @@ void C2SoftFlacEnc::process(
 
     mEncoderWriteData = true;
     mEncoderReturnedNbBytes = 0;
-    while (inOffset < inSize) {
-        size_t processSize = MIN(kInBlockSize * mNumChannels * sizeof(int16_t), (inSize - inOffset));
+    size_t inPos = 0;
+    const uint8_t *inPtr = rView.data() + inOffset;
+    while (inPos < inSize) {
+        size_t processSize = MIN(kInBlockSize * mNumChannels * sizeof(int16_t), (inSize - inPos));
         const unsigned nbInputFrames = processSize / (mNumChannels * sizeof(int16_t));
         const unsigned nbInputSamples = processSize / sizeof(int16_t);
-        const int16_t *pcm16 = reinterpret_cast<const int16_t *>(rView.data() + inOffset);
+        const int16_t *pcm16 = reinterpret_cast<const int16_t *>(inPtr + inPos);
         ALOGV("about to encode %zu bytes", processSize);
 
         for (unsigned i = 0; i < nbInputSamples; i++) {
@@ -201,7 +203,7 @@ void C2SoftFlacEnc::process(
             mOutputBlock.reset();
             return;
         }
-        inOffset += processSize;
+        inPos += processSize;
     }
     if (eos && !drain(DRAIN_COMPONENT_WITH_EOS, pool)) {
         ALOGE("error encountered during encoding");

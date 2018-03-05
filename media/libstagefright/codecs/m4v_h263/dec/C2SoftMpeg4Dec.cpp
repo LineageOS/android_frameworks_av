@@ -371,7 +371,8 @@ void C2SoftMpeg4Dec::process(
         }
     }
 
-    while (inOffset < inSize) {
+    size_t inPos = 0;
+    while (inPos < inSize) {
         c2_status_t err = ensureDecoderState(pool);
         if (C2_OK != err) {
             mSignalledError = true;
@@ -401,7 +402,7 @@ void C2SoftMpeg4Dec::process(
 
         // Need to check if header contains new info, e.g., width/height, etc.
         VopHeaderInfo header_info;
-        uint32_t useExtTimestamp = (inOffset == 0);
+        uint32_t useExtTimestamp = (inPos == 0);
         int32_t tmpInSize = (int32_t)inSize;
         uint8_t *bitstreamTmp = bitstream;
         uint32_t timestamp = workIndex;
@@ -442,12 +443,12 @@ void C2SoftMpeg4Dec::process(
         (void)copyOutputBufferToYV12Frame(outputBufferY, mOutputBuffer[mNumSamplesOutput & 1],
                                           wView.width(), align(mWidth, 16), mWidth, mHeight);
 
-        inOffset += inSize - (size_t)tmpInSize;
+        inPos += inSize - (size_t)tmpInSize;
         finishWork(workIndex, work);
         ++mNumSamplesOutput;
-        if (inSize - inOffset) {
-            ALOGD("decoded frame, ignoring further trailing bytes %zu",
-                   inSize - (size_t)tmpInSize);
+        if (inSize - inPos != 0) {
+            ALOGD("decoded frame, ignoring further trailing bytes %d",
+                  (int)inSize - (int)inPos);
             break;
         }
     }
