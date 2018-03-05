@@ -81,4 +81,8 @@
     <style name="BottomBarButton.Mute">
         <item name="android:src">@drawable/ic_mute</item>
     </style>
+
+    <style name="BottomBarButton.VideoQuality">
+        <item name="android:src">@drawable/ic_high_quality</item>
+    </style>
 </resources>

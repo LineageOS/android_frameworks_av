@@ -105,11 +105,27 @@
     </string>
     <!-- Placeholder text indicating that the user can press the button to go to an external website. -->
     <string name="MediaControlView2_ad_text">Visit Advertiser</string>
-    <string name="MediaControlView2_cc_text">Closed caption</string>
+    <string name="MediaControlView2_subtitle_text">Closed caption</string>
+    <string name="MediaControlView2_subtitle_off_text">Off</string>
     <string name="MediaControlView2_audio_track_text">Audio track</string>
+    <string name="MediaControlView2_audio_track_none_text">None</string>
     <string name="MediaControlView2_video_quality_text">Video quality</string>
     <string name="MediaControlView2_video_quality_auto_text">Auto</string>
     <string name="MediaControlView2_playback_speed_text">Playback speed</string>
-    <string name="MediaControlView2_playback_speed_normal_text">Normal</string>
+    <string name="MediaControlView2_playback_speed_0_25x_text">0.25x</string>
+    <string name="MediaControlView2_playback_speed_0_5x_text">0.5x</string>
+    <string name="MediaControlView2_playback_speed_0_75x_text">0.75x</string>
+    <string name="MediaControlView2_playback_speed_1x_text">Normal</string>
+    <string name="MediaControlView2_playback_speed_1_25x_text">1.25x</string>
+    <string name="MediaControlView2_playback_speed_1_5x_text">1.5x</string>
+    <string name="MediaControlView2_playback_speed_2x_text">2x</string>
     <string name="MediaControlView2_help_text">Help &amp; feedback</string>
+    <!-- Text for displaying subtitle track number. -->
+    <string name="MediaControlView2_subtitle_track_number_text">
+        Track <xliff:g id="track_number" example="1">%1$s</xliff:g>
+    </string>
+    <!-- Text for displaying audio track number. -->
+    <string name="MediaControlView2_audio_track_number_text">
+        Track <xliff:g id="audio_number" example="1">%1$s</xliff:g>
+    </string>
 </resources>
