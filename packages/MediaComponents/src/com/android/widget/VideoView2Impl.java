@@ -1001,13 +1001,13 @@ public class VideoView2Impl extends BaseLayout
                 mRouteSessionCallback.onCommand(command, args, receiver);
             } else {
                 switch (command) {
-                    case MediaControlView2.COMMAND_SHOW_SUBTITLE:
+                    case MediaControlView2Impl.COMMAND_SHOW_SUBTITLE:
                         mInstance.setSubtitleEnabled(true);
                         break;
-                    case MediaControlView2.COMMAND_HIDE_SUBTITLE:
+                    case MediaControlView2Impl.COMMAND_HIDE_SUBTITLE:
                         mInstance.setSubtitleEnabled(false);
                         break;
-                    case MediaControlView2.COMMAND_SET_FULLSCREEN:
+                    case MediaControlView2Impl.COMMAND_SET_FULLSCREEN:
                         if (mFullScreenRequestListener != null) {
                             mFullScreenRequestListener.onFullScreenRequest(
                                     mInstance,
