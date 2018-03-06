@@ -50,7 +50,7 @@ private:
         kNumOutputBuffers  = 4,
     };
 
-    sp<FLACDecoder> mFLACDecoder;
+    FLACDecoder *mFLACDecoder;
     FLAC__StreamMetadata_StreamInfo mStreamInfo;
     bool mHasStreamInfo;
     size_t mInputBufferCount;

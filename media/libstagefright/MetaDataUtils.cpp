@@ -24,11 +24,12 @@
 
 namespace android {
 
-bool MakeAVCCodecSpecificData(MetaDataBase &meta, const sp<ABuffer> &accessUnit) {
+bool MakeAVCCodecSpecificData(MetaDataBase &meta, const uint8_t *data, size_t size) {
     int32_t width;
     int32_t height;
     int32_t sarWidth;
     int32_t sarHeight;
+    sp<ABuffer> accessUnit = new ABuffer((void*)data,  size);
     sp<ABuffer> csd = MakeAVCCodecSpecificData(accessUnit, &width, &height, &sarWidth, &sarHeight);
     if (csd == nullptr) {
         return false;
