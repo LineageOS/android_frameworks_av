@@ -98,7 +98,6 @@ cc_library_shared {
         "libstagefright_flacdec",
         "libstagefright_foundation",
         "libstagefright_xmlparser",
-        "libdl",
         "libRScpp",
         "libhidlbase",
         "libhidlmemory",
