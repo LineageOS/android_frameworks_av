@@ -760,18 +760,17 @@ void CCodecBufferChannel::setComponent(const std::shared_ptr<C2Component> &compo
 
         ALOGV("graphic = %s", graphic ? "true" : "false");
         std::shared_ptr<C2BlockPool> pool;
-        err = GetCodec2BlockPool(
-                graphic ? C2BlockPool::BASIC_GRAPHIC : C2BlockPool::BASIC_LINEAR,
-                component,
-                &pool);
+        if (graphic) {
+            err = GetCodec2BlockPool(C2BlockPool::BASIC_GRAPHIC, component, &pool);
+        } else {
+            err = CreateCodec2BlockPool(C2PlatformAllocatorStore::ION,
+                                        component, &pool);
+        }
+
         if (err == C2_OK) {
             (*buffers)->setPool(pool);
         } else {
             // TODO: error
-        }
-        // TODO: remove once we switch to proper buffer pool.
-        if (!graphic) {
-            *buffers = (*buffers)->toArrayMode();
         }
     }
 

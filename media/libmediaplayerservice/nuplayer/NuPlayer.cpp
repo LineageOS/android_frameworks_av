@@ -2702,7 +2702,7 @@ void NuPlayer::onClosedCaptionNotify(const sp<AMessage> &msg) {
 void NuPlayer::sendSubtitleData(const sp<ABuffer> &buffer, int32_t baseIndex) {
     int32_t trackIndex;
     int64_t timeUs, durationUs;
-    CHECK(buffer->meta()->findInt32("trackIndex", &trackIndex));
+    CHECK(buffer->meta()->findInt32("track-index", &trackIndex));
     CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
     CHECK(buffer->meta()->findInt64("durationUs", &durationUs));
 

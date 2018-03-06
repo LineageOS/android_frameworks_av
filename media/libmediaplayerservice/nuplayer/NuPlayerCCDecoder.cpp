@@ -301,7 +301,7 @@ bool NuPlayer::CCDecoder::parseSEINalUnit(int64_t timeUs, const uint8_t *data, s
 // returns true if a new CC track is found
 bool NuPlayer::CCDecoder::extractFromMPEGUserData(const sp<ABuffer> &accessUnit) {
     sp<ABuffer> mpegUserData;
-    if (!accessUnit->meta()->findBuffer("mpegUserData", &mpegUserData)
+    if (!accessUnit->meta()->findBuffer("mpeg-user-data", &mpegUserData)
             || mpegUserData == NULL) {
         return false;
     }
@@ -538,7 +538,7 @@ void NuPlayer::CCDecoder::display(int64_t timeUs) {
         dumpBytePair(ccBuf);
 #endif
 
-        ccBuf->meta()->setInt32("trackIndex", mSelectedTrack);
+        ccBuf->meta()->setInt32("track-index", mSelectedTrack);
         ccBuf->meta()->setInt64("timeUs", timeUs);
         ccBuf->meta()->setInt64("durationUs", 0ll);
 

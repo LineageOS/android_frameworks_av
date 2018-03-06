@@ -25,6 +25,9 @@
 
 #include <media/stagefright/MediaBuffer.h>
 #include <mediaplayer2/mediaplayer2.h>
+#include <media/NdkMediaDataSource.h>
+#include <media/NdkMediaExtractor.h>
+#include <media/NdkWrapper.h>
 
 namespace android {
 
@@ -101,6 +104,7 @@ protected:
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
 
+    virtual sp<AMessage> getFormat(bool audio);
     virtual sp<MetaData> getFormatMeta(bool audio);
 
 private:
@@ -122,19 +126,14 @@ private:
 
     struct Track {
         size_t mIndex;
-        sp<IMediaSource> mSource;
+        sp<AMediaExtractorWrapper> mExtractor;
         sp<AnotherPacketSource> mPackets;
     };
 
-    Vector<sp<IMediaSource> > mSources;
-    Track mAudioTrack;
     int64_t mAudioTimeUs;
     int64_t mAudioLastDequeueTimeUs;
-    Track mVideoTrack;
     int64_t mVideoTimeUs;
     int64_t mVideoLastDequeueTimeUs;
-    Track mSubtitleTrack;
-    Track mTimedTextTrack;
 
     BufferingSettings mBufferingSettings;
     int32_t mPrevBufferPercentage;
@@ -164,11 +163,19 @@ private:
     sp<NuCachedSource2> mCachedSource;
     sp<DataSource> mHttpSource;
     sp<MetaData> mFileMeta;
+    sp<AMediaDataSourceWrapper> mDataSourceWrapper;
+    sp<AMediaExtractorWrapper> mExtractor;
+    Vector<sp<AMediaExtractorWrapper> > mExtractors;
     bool mStarted;
     bool mPreparing;
     int64_t mBitrate;
     uint32_t mPendingReadBufferTypes;
     sp<ABuffer> mGlobalTimedText;
+
+    Track mVideoTrack;
+    Track mAudioTrack;
+    Track mSubtitleTrack;
+    Track mTimedTextTrack;
 
     mutable Mutex mLock;
 
@@ -227,6 +234,7 @@ private:
 
     void sendCacheStats();
 
+    sp<AMessage> getFormat_l(bool audio);
     sp<MetaData> getFormatMeta_l(bool audio);
     int32_t getDataGeneration(media_track_type type) const;
 
