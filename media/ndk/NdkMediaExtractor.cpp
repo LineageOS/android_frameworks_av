@@ -43,7 +43,12 @@ using namespace android;
 static media_status_t translate_error(status_t err) {
     if (err == OK) {
         return AMEDIA_OK;
+    } else if (err == ERROR_END_OF_STREAM) {
+        return AMEDIA_ERROR_END_OF_STREAM;
+    } else if (err == ERROR_IO) {
+        return AMEDIA_ERROR_IO;
     }
+
     ALOGE("sf error code: %d", err);
     return AMEDIA_ERROR_UNKNOWN;
 }
@@ -409,6 +414,65 @@ int64_t AMediaExtractor_getCachedDuration(AMediaExtractor *ex) {
         return durationUs;
     }
     return -1;
+}
+
+EXPORT
+media_status_t AMediaExtractor_getSampleFormat(AMediaExtractor *ex, AMediaFormat *fmt) {
+    if (fmt == NULL) {
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    sp<MetaData> sampleMeta;
+    status_t err = ex->mImpl->getSampleMeta(&sampleMeta);
+    if (err != OK) {
+        return translate_error(err);
+    }
+
+    sp<AMessage> meta;
+    AMediaFormat_getFormat(fmt, &meta);
+    meta->clear();
+
+    int32_t layerId;
+    if (sampleMeta->findInt32(kKeyTemporalLayerId, &layerId)) {
+        meta->setInt32(AMEDIAFORMAT_KEY_TEMPORAL_LAYER_ID, layerId);
+    }
+
+    size_t trackIndex;
+    err = ex->mImpl->getSampleTrackIndex(&trackIndex);
+    if (err == OK) {
+        meta->setInt32(AMEDIAFORMAT_KEY_TRACK_INDEX, trackIndex);
+        sp<AMessage> trackFormat;
+        AString mime;
+        err = ex->mImpl->getTrackFormat(trackIndex, &trackFormat);
+        if (err == OK
+                && trackFormat != NULL
+                && trackFormat->findString(AMEDIAFORMAT_KEY_MIME, &mime)) {
+            meta->setString(AMEDIAFORMAT_KEY_MIME, mime);
+        }
+    }
+
+    int64_t durationUs;
+    if (sampleMeta->findInt64(kKeyDuration, &durationUs)) {
+        meta->setInt64(AMEDIAFORMAT_KEY_DURATION, durationUs);
+    }
+
+    uint32_t dataType; // unused
+    const void *seiData;
+    size_t seiLength;
+    if (sampleMeta->findData(kKeySEI, &dataType, &seiData, &seiLength)) {
+        sp<ABuffer> sei = ABuffer::CreateAsCopy(seiData, seiLength);;
+        meta->setBuffer(AMEDIAFORMAT_KEY_SEI, sei);
+    }
+
+    const void *mpegUserDataPointer;
+    size_t mpegUserDataLength;
+    if (sampleMeta->findData(
+            kKeyMpegUserData, &dataType, &mpegUserDataPointer, &mpegUserDataLength)) {
+        sp<ABuffer> mpegUserData = ABuffer::CreateAsCopy(mpegUserDataPointer, mpegUserDataLength);
+        meta->setBuffer(AMEDIAFORMAT_KEY_MPEG_USER_DATA, mpegUserData);
+    }
+
+    return AMEDIA_OK;
 }
 
 } // extern "C"

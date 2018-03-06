@@ -1233,7 +1233,7 @@ sp<ABuffer> NuPlayer::GenericSource::mediaBufferToABuffer(
     }
 
     if (trackType == MEDIA_TRACK_TYPE_SUBTITLE) {
-        meta->setInt32("trackIndex", mSubtitleTrack.mIndex);
+        meta->setInt32("track-index", mSubtitleTrack.mIndex);
     }
 
     uint32_t dataType; // unused
@@ -1249,7 +1249,7 @@ sp<ABuffer> NuPlayer::GenericSource::mediaBufferToABuffer(
     if (mb->meta_data().findData(
             kKeyMpegUserData, &dataType, &mpegUserDataPointer, &mpegUserDataLength)) {
         sp<ABuffer> mpegUserData = ABuffer::CreateAsCopy(mpegUserDataPointer, mpegUserDataLength);
-        meta->setBuffer("mpegUserData", mpegUserData);
+        meta->setBuffer("mpeg-user-data", mpegUserData);
     }
 
     mb->release();

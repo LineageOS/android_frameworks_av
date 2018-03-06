@@ -412,7 +412,7 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId, bool *silenc
     }
 
     // check calling permissions
-    if (!recordingAllowed(client->opPackageName, client->pid, client->uid)) {
+    if (!startRecording(client->opPackageName, client->pid, client->uid)) {
         ALOGE("%s permission denied: recording not allowed for uid %d pid %d",
                 __func__, client->uid, client->pid);
         return PERMISSION_DENIED;
@@ -439,6 +439,8 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId, bool *silenc
         if (concurrency & AudioPolicyInterface::API_INPUT_CONCURRENCY_CAPTURE) {
             //TODO: check concurrent capture permission
         }
+    } else {
+        finishRecording(client->opPackageName, client->uid);
     }
 
     return status;
@@ -456,6 +458,9 @@ status_t AudioPolicyService::stopInput(audio_port_handle_t portId)
         return INVALID_OPERATION;
     }
     sp<AudioRecordClient> client = mAudioRecordClients.valueAt(index);
+
+    // finish the recording app op
+    finishRecording(client->opPackageName, client->uid);
 
     return mAudioPolicyManager->stopInput(client->input, client->session);
 }
