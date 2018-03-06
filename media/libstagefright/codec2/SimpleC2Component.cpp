@@ -302,12 +302,15 @@ void SimpleC2Component::processQueue() {
             if (err != C2_OK) {
                 return err;
             }
-            err = GetCodec2BlockPool(
-                    (outputFormat.value == C2FormatVideo)
-                    ? C2BlockPool::BASIC_GRAPHIC
-                    : C2BlockPool::BASIC_LINEAR,
-                    shared_from_this(),
-                    &mOutputBlockPool);
+            if (outputFormat.value == C2FormatVideo) {
+                err = GetCodec2BlockPool(
+                        C2BlockPool::BASIC_GRAPHIC,
+                        shared_from_this(), &mOutputBlockPool);
+            } else {
+                err = CreateCodec2BlockPool(
+                        C2PlatformAllocatorStore::ION,
+                        shared_from_this(), &mOutputBlockPool);
+            }
             if (err != C2_OK) {
                 return err;
             }

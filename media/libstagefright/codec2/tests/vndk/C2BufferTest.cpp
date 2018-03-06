@@ -232,7 +232,8 @@ class C2BufferUtilsTest : public ::testing::Test {
 class C2BufferTest : public ::testing::Test {
 public:
     C2BufferTest()
-        : mLinearAllocator(std::make_shared<C2AllocatorIon>('i')),
+        : mBlockPoolId(C2BlockPool::PLATFORM_START),
+          mLinearAllocator(std::make_shared<C2AllocatorIon>('i')),
           mSize(0u),
           mAddr(nullptr),
           mGraphicAllocator(std::make_shared<C2AllocatorGralloc>('g')) {
@@ -281,7 +282,7 @@ public:
     }
 
     std::shared_ptr<C2BlockPool> makeLinearBlockPool() {
-        return std::make_shared<C2BasicLinearBlockPool>(mLinearAllocator);
+        return std::make_shared<C2PooledBlockPool>(mLinearAllocator, mBlockPoolId++);
     }
 
     void allocateGraphic(uint32_t width, uint32_t height) {
@@ -328,6 +329,7 @@ public:
     }
 
 private:
+    C2BlockPool::local_id_t mBlockPoolId;
     std::shared_ptr<C2Allocator> mLinearAllocator;
     std::shared_ptr<C2LinearAllocation> mLinearAllocation;
     size_t mSize;
