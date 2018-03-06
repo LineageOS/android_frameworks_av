@@ -1475,7 +1475,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEGVideo() {
                                     mpegUserData->data() + i * sizeof(size_t),
                                     &userDataPositions[i], sizeof(size_t));
                         }
-                        accessUnit->meta()->setBuffer("mpegUserData", mpegUserData);
+                        accessUnit->meta()->setBuffer("mpeg-user-data", mpegUserData);
                     }
                 }
 
