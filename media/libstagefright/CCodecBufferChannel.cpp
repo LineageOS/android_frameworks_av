@@ -181,6 +181,7 @@ namespace {
 // TODO: get this info from component
 const static size_t kMinBufferArraySize = 16;
 const static size_t kLinearBufferSize = 524288;
+const static size_t kMaxGraphicBufferRefCount = 4;
 
 /**
  * Simple local buffer pool backed by std::vector.
@@ -1061,8 +1062,8 @@ status_t CCodecBufferChannel::renderOutputBuffer(
         c2Buffer = (*buffers)->releaseBuffer(buffer);
     }
 
-    Mutexed<sp<Surface>>::Locked surface(mSurface);
-    if (*surface == nullptr) {
+    Mutexed<OutputSurface>::Locked output(mOutputSurface);
+    if (output->surface == nullptr) {
         ALOGE("no surface");
         return OK;
     }
@@ -1087,7 +1088,7 @@ status_t CCodecBufferChannel::renderOutputBuffer(
             blocks.front().width()));
     native_handle_delete(grallocHandle);
 
-    status_t result = (*surface)->attachBuffer(graphicBuffer.get());
+    status_t result = output->surface->attachBuffer(graphicBuffer.get());
     if (result != OK) {
         ALOGE("attachBuffer failed: %d", result);
         return result;
@@ -1095,21 +1096,30 @@ status_t CCodecBufferChannel::renderOutputBuffer(
 
     // TODO: read and set crop
 
-    result = native_window_set_buffers_timestamp((*surface).get(), timestampNs);
+    result = native_window_set_buffers_timestamp(output->surface.get(), timestampNs);
     ALOGW_IF(result != OK, "failed to set buffer timestamp: %d", result);
 
     // TODO: fix after C2Fence implementation
 #if 0
     const C2Fence &fence = blocks.front().fence();
-    result = ((ANativeWindow *)(*surface).get())->queueBuffer(
-            (*surface).get(), graphicBuffer.get(), fence.valid() ? fence.fd() : -1);
+    result = ((ANativeWindow *)output->surface.get())->queueBuffer(
+            output->surface.get(), graphicBuffer.get(), fence.valid() ? fence.fd() : -1);
 #else
-    result = ((ANativeWindow *)(*surface).get())->queueBuffer(
-            (*surface).get(), graphicBuffer.get(), -1);
+    result = ((ANativeWindow *)output->surface.get())->queueBuffer(
+            output->surface.get(), graphicBuffer.get(), -1);
 #endif
     if (result != OK) {
         ALOGE("queueBuffer failed: %d", result);
         return result;
+    }
+
+    // XXX: Hack to keep C2Buffers unreleased until the consumer is done
+    //      reading the content. Eventually IGBP-based C2BlockPool should handle
+    //      the lifecycle.
+    output->bufferRefs.push_back(c2Buffer);
+    if (output->bufferRefs.size() > output->maxBufferCount + 1) {
+        output->bufferRefs.pop_front();
+        ALOGV("%zu buffer refs remaining", output->bufferRefs.size());
     }
 
     return OK;
@@ -1200,8 +1210,8 @@ status_t CCodecBufferChannel::start(
     if (outputFormat != nullptr) {
         bool hasOutputSurface = false;
         {
-            Mutexed<sp<Surface>>::Locked surface(mSurface);
-            hasOutputSurface = (*surface != nullptr);
+            Mutexed<OutputSurface>::Locked output(mOutputSurface);
+            hasOutputSurface = (output->surface != nullptr);
         }
 
         Mutexed<std::unique_ptr<OutputBuffers>>::Locked buffers(mOutputBuffers);
@@ -1381,7 +1391,7 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
         newSurface->setScalingMode(NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
     }
 
-    Mutexed<sp<Surface>>::Locked surface(mSurface);
+    Mutexed<OutputSurface>::Locked output(mOutputSurface);
 //    if (newSurface == nullptr) {
 //        if (*surface != nullptr) {
 //            ALOGW("cannot unset a surface");
@@ -1395,7 +1405,11 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
 //        return INVALID_OPERATION;
 //    }
 
-    *surface = newSurface;
+    output->surface = newSurface;
+    output->bufferRefs.clear();
+    // XXX: hack
+    output->maxBufferCount = kMaxGraphicBufferRefCount;
+
     return OK;
 }
 
