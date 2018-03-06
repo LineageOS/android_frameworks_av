@@ -634,7 +634,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
 
         if (mFormat == NULL) {
             mFormat = new MetaData;
-            if (!MakeAVCCodecSpecificData(*mFormat, accessUnit)) {
+            if (!MakeAVCCodecSpecificData(*mFormat, accessUnit->data(), accessUnit->size())) {
                 mFormat.clear();
             }
         }
@@ -1010,7 +1010,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitH264() {
         }
         if (mFormat == NULL) {
             mFormat = new MetaData;
-            if (!MakeAVCCodecSpecificData(*mFormat, mBuffer)) {
+            if (!MakeAVCCodecSpecificData(*mFormat, mBuffer->data(), mBuffer->size())) {
                 ALOGW("Creating dummy AVC format for scrambled content");
                 mFormat = new MetaData;
                 mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
@@ -1172,7 +1172,9 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitH264() {
 
             if (mFormat == NULL) {
                 mFormat = new MetaData;
-                if (!MakeAVCCodecSpecificData(*mFormat, accessUnit)) {
+                if (!MakeAVCCodecSpecificData(*mFormat,
+                        accessUnit->data(),
+                        accessUnit->size())) {
                     mFormat.clear();
                 }
             }
