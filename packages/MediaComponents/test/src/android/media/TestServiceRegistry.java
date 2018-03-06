@@ -19,6 +19,7 @@ package android.media;
 import static org.junit.Assert.fail;
 
 import android.content.Context;
+import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.TestUtils.SyncHandler;
@@ -26,6 +27,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Process;
 import android.support.annotation.GuardedBy;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 
 /**
  * Keeps the instance of currently running {@link MockMediaSessionService2}. And also provides
@@ -36,7 +39,7 @@ import android.support.annotation.GuardedBy;
 public class TestServiceRegistry {
     /**
      * Proxy for both {@link MediaSession2.SessionCallback} and
-     * {@link MediaLibraryService2.MediaLibrarySessionCallback}.
+     * {@link MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback}.
      */
     public static abstract class SessionCallbackProxy {
         private final Context mContext;
@@ -56,7 +59,8 @@ public class TestServiceRegistry {
          * @param controller
          * @return
          */
-        public CommandGroup onConnect(ControllerInfo controller) {
+        public CommandGroup onConnect(@NonNull MediaSession2 session,
+                @NonNull ControllerInfo controller) {
             if (Process.myUid() == controller.getUid()) {
                 CommandGroup commands = new CommandGroup(mContext);
                 commands.addAllPredefinedCommands();
@@ -75,8 +79,10 @@ public class TestServiceRegistry {
          */
         public void onServiceDestroyed() { }
 
-        public void onSubscribe(ControllerInfo info, String parentId, Bundle extra) { }
-        public void onUnsubscribe(ControllerInfo info, String parentId) { }
+        public void onSubscribe(@NonNull MediaLibrarySession session, @NonNull ControllerInfo info,
+                @NonNull String parentId, @Nullable Bundle extra) { }
+        public void onUnsubscribe(@NonNull MediaLibrarySession session,
+                @NonNull ControllerInfo info, @NonNull String parentId) { }
     }
 
     @GuardedBy("TestServiceRegistry.class")
