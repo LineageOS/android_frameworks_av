@@ -137,7 +137,6 @@ cc_library_shared {
         "libstagefright_omx",
         "libstagefright_omx_utils",
         "libstagefright_xmlparser",
-        "libdl",
         "libRScpp",
         "libhidlallocatorutils",
         "libhidlbase",
