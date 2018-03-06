@@ -745,4 +745,23 @@ TEST_F(C2BufferTest, BufferTest) {
     EXPECT_FALSE(buffer->hasInfo(info2->type()));
 }
 
+TEST_F(C2BufferTest, MultipleLinearMapTest) {
+    std::shared_ptr<C2BlockPool> pool(makeLinearBlockPool());
+    constexpr size_t kCapacity = 524288u;
+    for (int i = 0; i < 100; ++i) {
+        std::vector<C2WriteView> wViews;
+        std::vector<C2ReadView> rViews;
+        for (int j = 0; j < 16; ++j) {
+            std::shared_ptr<C2LinearBlock> block;
+            ASSERT_EQ(C2_OK, pool->fetchLinearBlock(
+                    kCapacity,
+                    { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
+                    &block));
+            wViews.push_back(block->map().get());
+            C2ConstLinearBlock cBlock = block->share(0, kCapacity / 2, C2Fence());
+            rViews.push_back(cBlock.map().get());
+        }
+    }
+}
+
 } // namespace android
