@@ -159,6 +159,7 @@ LIBMEDIANDK {
     AMediaExtractor_getPsshInfo;
     AMediaExtractor_getSampleCryptoInfo;
     AMediaExtractor_getSampleFlags;
+    AMediaExtractor_getSampleFormat;   # introduced=28
     AMediaExtractor_getSampleSize;     # introduced=28
     AMediaExtractor_getSampleTime;
     AMediaExtractor_getSampleTrackIndex;

@@ -123,6 +123,7 @@ extern const char* AMEDIAFORMAT_KEY_MAX_HEIGHT;
 extern const char* AMEDIAFORMAT_KEY_MAX_INPUT_SIZE;
 extern const char* AMEDIAFORMAT_KEY_MAX_WIDTH;
 extern const char* AMEDIAFORMAT_KEY_MIME;
+extern const char* AMEDIAFORMAT_KEY_MPEG_USER_DATA;
 extern const char* AMEDIAFORMAT_KEY_OPERATING_RATE;
 extern const char* AMEDIAFORMAT_KEY_PCM_ENCODING;
 extern const char* AMEDIAFORMAT_KEY_PRIORITY;
@@ -131,10 +132,13 @@ extern const char* AMEDIAFORMAT_KEY_PUSH_BLANK_BUFFERS_ON_STOP;
 extern const char* AMEDIAFORMAT_KEY_REPEAT_PREVIOUS_FRAME_AFTER;
 extern const char* AMEDIAFORMAT_KEY_ROTATION;
 extern const char* AMEDIAFORMAT_KEY_SAMPLE_RATE;
+extern const char* AMEDIAFORMAT_KEY_SEI;
 extern const char* AMEDIAFORMAT_KEY_SLICE_HEIGHT;
 extern const char* AMEDIAFORMAT_KEY_STRIDE;
+extern const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYER_ID;
 extern const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYERING;
 extern const char* AMEDIAFORMAT_KEY_TRACK_ID;
+extern const char* AMEDIAFORMAT_KEY_TRACK_INDEX;
 extern const char* AMEDIAFORMAT_KEY_WIDTH;
 
 #endif /* __ANDROID_API__ >= 21 */
