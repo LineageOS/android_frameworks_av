@@ -18,7 +18,7 @@ package com.android.widget;
 
 import android.content.Context;
 import android.graphics.SurfaceTexture;
-import android.media.MediaPlayer;
+import android.media.MediaPlayer2;
 import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
 import android.util.AttributeSet;
@@ -38,7 +38,7 @@ class VideoTextureView extends TextureView
     private SurfaceTexture mSurfaceTexture;
     private Surface mSurface;
     private SurfaceListener mSurfaceListener;
-    private MediaPlayer mMediaPlayer;
+    private MediaPlayer2 mMediaPlayer;
     // A flag to indicate taking over other view should be proceed.
     private boolean mIsTakingOverOldView;
     private VideoViewInterface mOldView;
@@ -66,7 +66,7 @@ class VideoTextureView extends TextureView
     ////////////////////////////////////////////////////
 
     @Override
-    public boolean assignSurfaceToMediaPlayer(MediaPlayer mp) {
+    public boolean assignSurfaceToMediaPlayer(MediaPlayer2 mp) {
         Log.d(TAG, "assignSurfaceToMediaPlayer(): mSurfaceTexture: " + mSurfaceTexture);
         if (mp == null || !hasAvailableSurface()) {
             // Surface is not ready.
@@ -87,7 +87,7 @@ class VideoTextureView extends TextureView
     }
 
     @Override
-    public void setMediaPlayer(MediaPlayer mp) {
+    public void setMediaPlayer(MediaPlayer2 mp) {
         mMediaPlayer = mp;
         if (mIsTakingOverOldView) {
             takeOver(mOldView);
