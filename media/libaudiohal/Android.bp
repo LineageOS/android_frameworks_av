@@ -12,9 +12,12 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "android.hardware.audio@2.0",
         "android.hardware.audio.effect@2.0",
+        "android.hardware.audio.effect@4.0",
+        "android.hardware.audio@2.0",
+        "android.hardware.audio@4.0",
         "libaudiohal@2.0",
+        "libaudiohal@4.0",
         "libutils",
     ],
 
