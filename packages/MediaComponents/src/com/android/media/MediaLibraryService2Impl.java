@@ -24,6 +24,7 @@ import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySession.Builder;
 import android.media.MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback;
 import android.media.MediaPlayerBase;
+import android.media.MediaPlaylistController;
 import android.media.MediaSession2;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSessionService2;
@@ -67,10 +68,12 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
     public static class MediaLibrarySessionImpl extends MediaSession2Impl
             implements MediaLibrarySessionProvider {
         public MediaLibrarySessionImpl(Context context,
-                MediaPlayerBase player, String id, VolumeProvider2 volumeProvider,
+                MediaPlayerBase player, String id, MediaPlaylistController mplc,
+                VolumeProvider2 volumeProvider,
                 PendingIntent sessionActivity, Executor callbackExecutor,
                 MediaLibrarySessionCallback callback) {
-            super(context, player, id, volumeProvider, sessionActivity, callbackExecutor, callback);
+            super(context, player, id, mplc, volumeProvider, sessionActivity, callbackExecutor,
+                    callback);
             // Don't put any extra initialization here. Here's the reason.
             // System service will recognize this session inside of the super constructor and would
             // connect to this session assuming that initialization is finished. However, if any
@@ -138,8 +141,8 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
 
         @Override
         public MediaLibrarySession build_impl() {
-            return new MediaLibrarySessionImpl(mContext, mPlayer, mId, mVolumeProvider,
-                    mSessionActivity, mCallbackExecutor, mCallback).getInstance();
+            return new MediaLibrarySessionImpl(mContext, mPlayer, mId, mMplc,
+                    mVolumeProvider, mSessionActivity, mCallbackExecutor, mCallback).getInstance();
         }
     }
 
