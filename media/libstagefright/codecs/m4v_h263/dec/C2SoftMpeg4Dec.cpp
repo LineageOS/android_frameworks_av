@@ -57,7 +57,8 @@ static std::shared_ptr<C2ComponentInterface> BuildIntf(
 
 C2SoftMpeg4Dec::C2SoftMpeg4Dec(const char *name, c2_node_id_t id)
     : SimpleC2Component(BuildIntf(name, id)),
-      mDecHandle(nullptr) {
+      mDecHandle(nullptr),
+      mOutputBuffer{} {
 }
 
 C2SoftMpeg4Dec::~C2SoftMpeg4Dec() {
@@ -95,6 +96,7 @@ void C2SoftMpeg4Dec::onReset() {
 void C2SoftMpeg4Dec::onRelease() {
     if (mInitialized) {
         PVCleanUpVideoDecoder(mDecHandle);
+        mInitialized = false;
     }
     if (mOutBlock) {
         mOutBlock.reset();
@@ -129,10 +131,6 @@ status_t C2SoftMpeg4Dec::initDecoder() {
         mDecHandle = new tagvideoDecControls;
     }
     memset(mDecHandle, 0, sizeof(tagvideoDecControls));
-
-    for (int32_t i = 0; i < kNumOutputBuffers; ++i) {
-        mOutputBuffer[i] = nullptr;
-    }
 
     /* TODO: bring these values to 352 and 288. It cannot be done as of now
      * because, h263 doesn't seem to allow port reconfiguration. In OMX, the
