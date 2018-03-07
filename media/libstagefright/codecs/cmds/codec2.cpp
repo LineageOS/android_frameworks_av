@@ -248,7 +248,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
             ALOGV("Render: Frame #%lld", work->worklets.front()->output.ordinal.frameIndex.peekll());
             const std::shared_ptr<C2Buffer> &output = work->worklets.front()->output.buffers[0];
             if (output) {
-                const C2ConstGraphicBlock &block = output->data().graphicBlocks().front();
+                const C2ConstGraphicBlock block = output->data().graphicBlocks().front();
                 native_handle_t *grallocHandle = UnwrapNativeCodec2GrallocHandle(block.handle());
                 sp<GraphicBuffer> buffer(new GraphicBuffer(
                         grallocHandle,
