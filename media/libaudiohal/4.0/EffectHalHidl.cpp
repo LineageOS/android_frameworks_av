@@ -17,6 +17,7 @@
 #define LOG_TAG "EffectHalHidl"
 //#define LOG_NDEBUG 0
 
+#include <common/all-versions/VersionUtils.h>
 #include <hwbinder/IPCThreadState.h>
 #include <media/EffectsFactoryApi.h>
 #include <utils/Log.h>
@@ -34,6 +35,7 @@ using ::android::hardware::audio::effect::V4_0::Result;
 using ::android::hardware::audio::common::V4_0::HidlUtils;
 using ::android::hardware::audio::common::V4_0::AudioChannelMask;
 using ::android::hardware::audio::common::V4_0::AudioFormat;
+using ::android::hardware::audio::common::utils::mkEnumConverter;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
@@ -76,10 +78,10 @@ void EffectHalHidl::effectDescriptorToHal(
 void EffectHalHidl::effectBufferConfigFromHal(
         const buffer_config_t& halConfig, EffectBufferConfig* config) {
     config->samplingRateHz = halConfig.samplingRate;
-    config->channels = AudioChannelMask(halConfig.channels);
+    config->channels = mkEnumConverter<AudioChannelMask>(halConfig.channels);
     config->format = AudioFormat(halConfig.format);
     config->accessMode = EffectBufferAccess(halConfig.accessMode);
-    config->mask = EffectConfigParameters(halConfig.mask);
+    config->mask = mkEnumConverter<EffectConfigParameters>(halConfig.mask);
 }
 
 // static

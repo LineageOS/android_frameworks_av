@@ -42,8 +42,6 @@ class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
     sp<IDevicesFactory> mDevicesFactory;
     sp<IDevicesFactory> mDevicesFactoryMsd;
 
-    static status_t nameFromHal(const char *name, IDevicesFactory::Device *device);
-
     // Can not be constructed directly by clients.
     DevicesFactoryHalHidl();
 

@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "EffectsFactoryHalHidl"
-//#define LOG_NDEBUG 0
+#include <android/hardware/audio/effect/2.0/IEffectsFactory.h>
+#include <android/hardware/audio/effect/4.0/IEffectsFactory.h>
 
-#include "EffectHalHidl.h"
-#include "EffectsFactoryHalHidl.h"
+#include <EffectsFactoryHalHidl.h>
+#include <libaudiohal/4.0/EffectsFactoryHalHidl.h>
 
-using ::android::hardware::Return;
-
-using namespace ::android::hardware::audio::effect;
 
 namespace android {
 
 // static
 sp<EffectsFactoryHalInterface> EffectsFactoryHalInterface::create() {
-    if (V2_0::IEffectsFactory::getService() != nullptr) {
+    if (hardware::audio::effect::V4_0::IEffectsFactory::getService() != nullptr) {
+        return new V4_0::EffectsFactoryHalHidl();
+    }
+    if (hardware::audio::effect::V2_0::IEffectsFactory::getService() != nullptr) {
         return new EffectsFactoryHalHidl();
     }
     return nullptr;

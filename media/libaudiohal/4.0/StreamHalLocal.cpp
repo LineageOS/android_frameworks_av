@@ -22,6 +22,7 @@
 
 #include "DeviceHalLocal.h"
 #include "StreamHalLocal.h"
+#include "VersionUtils.h"
 
 namespace android {
 namespace V4_0 {

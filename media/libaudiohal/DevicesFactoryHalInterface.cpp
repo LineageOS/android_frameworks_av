@@ -14,16 +14,20 @@
  * limitations under the License.
  */
 
-#include "DevicesFactoryHalHybrid.h"
 #include <android/hardware/audio/2.0/IDevicesFactory.h>
+#include <android/hardware/audio/4.0/IDevicesFactory.h>
 
-using namespace ::android::hardware::audio;
+#include <DevicesFactoryHalHybrid.h>
+#include <libaudiohal/4.0/DevicesFactoryHalHybrid.h>
 
 namespace android {
 
 // static
 sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
-    if (V2_0::IDevicesFactory::getService() != nullptr) {
+    if (hardware::audio::V4_0::IDevicesFactory::getService() != nullptr) {
+        return new V4_0::DevicesFactoryHalHybrid();
+    }
+    if (hardware::audio::V2_0::IDevicesFactory::getService() != nullptr) {
         return new DevicesFactoryHalHybrid();
     }
     return nullptr;
