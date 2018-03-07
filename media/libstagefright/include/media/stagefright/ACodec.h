@@ -253,6 +253,7 @@ private:
 
     sp<AMessage> mLastOutputFormat;
     bool mIsVideo;
+    bool mIsImage;
     bool mIsEncoder;
     bool mFatalError;
     bool mShutdownInProgress;
@@ -489,11 +490,12 @@ private:
     status_t setupMPEG4EncoderParameters(const sp<AMessage> &msg);
     status_t setupH263EncoderParameters(const sp<AMessage> &msg);
     status_t setupAVCEncoderParameters(const sp<AMessage> &msg);
-    status_t setupHEVCEncoderParameters(const sp<AMessage> &msg);
+    status_t setupHEVCEncoderParameters(const sp<AMessage> &msg, sp<AMessage> &outputFormat);
     status_t setupVPXEncoderParameters(const sp<AMessage> &msg, sp<AMessage> &outputFormat);
 
     status_t verifySupportForProfileAndLevel(int32_t profile, int32_t level);
 
+    status_t configureImageGrid(const sp<AMessage> &msg, sp<AMessage> &outputFormat);
     status_t configureBitrate(
             OMX_VIDEO_CONTROLRATETYPE bitrateMode, int32_t bitrate, int32_t quality = 0);
     void configureEncoderLatency(const sp<AMessage> &msg);
