@@ -25,7 +25,15 @@
 #include <C2BufferPriv.h>
 #include <C2BlockInternal.h>
 
+#include <ClientManager.h>
+
 namespace {
+
+using android::hardware::media::bufferpool::V1_0::ResultStatus;
+using android::hardware::media::bufferpool::V1_0::implementation::BufferPoolAllocation;
+using android::hardware::media::bufferpool::V1_0::implementation::BufferPoolAllocator;
+using android::hardware::media::bufferpool::V1_0::implementation::ClientManager;
+using android::hardware::media::bufferpool::V1_0::implementation::ConnectionId;
 
 // This anonymous namespace contains the helper classes that allow our implementation to create
 // block/buffer objects.
@@ -341,6 +349,257 @@ std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
     return std::shared_ptr<C2LinearBlock>(new C2LinearBlock(impl, *impl));
 }
 
+/**
+ * Wrapped C2Allocator which is injected to buffer pool on behalf of
+ * C2BlockPool.
+ */
+class _C2BufferPoolAllocator : public BufferPoolAllocator {
+public:
+    _C2BufferPoolAllocator(const std::shared_ptr<C2Allocator> &allocator)
+        : mAllocator(allocator) {}
+
+    ~_C2BufferPoolAllocator() override {}
+
+    ResultStatus allocate(const std::vector<uint8_t> &params,
+                          std::shared_ptr<BufferPoolAllocation> *alloc) override;
+
+    bool compatible(const std::vector<uint8_t> &newParams,
+                    const std::vector<uint8_t> &oldParams) override;
+
+    // Methods for codec2 component (C2BlockPool).
+    /**
+     * Transforms linear allocation parameters for C2Allocator to parameters
+     * for buffer pool.
+     *
+     * @param capacity      size of linear allocation
+     * @param usage         memory usage pattern for linear allocation
+     * @param params        allocation parameters for buffer pool
+     */
+    void getLinearParams(uint32_t capacity, C2MemoryUsage usage,
+                         std::vector<uint8_t> *params);
+
+    /**
+     * Transforms graphic allocation parameters for C2Allocator to parameters
+     * for buffer pool.
+     *
+     * @param width         width of graphic allocation
+     * @param height        height of graphic allocation
+     * @param format        color format of graphic allocation
+     * @param params        allocation parameter for buffer pool
+     */
+    void getGraphicParams(uint32_t width, uint32_t height,
+                          uint32_t format, C2MemoryUsage usage,
+                          std::vector<uint8_t> *params);
+
+    /**
+     * Transforms an existing native handle to an C2LinearAllcation.
+     * Wrapper to C2Allocator#priorLinearAllocation
+     */
+    c2_status_t priorLinearAllocation(
+            const C2Handle *handle,
+            std::shared_ptr<C2LinearAllocation> *c2Allocation);
+
+    /**
+     * Transforms an existing native handle to an C2GraphicAllcation.
+     * Wrapper to C2Allocator#priorGraphicAllocation
+     */
+    c2_status_t priorGraphicAllocation(
+            const C2Handle *handle,
+            std::shared_ptr<C2GraphicAllocation> *c2Allocation);
+
+private:
+    static constexpr int kMaxIntParams = 5; // large enough number;
+
+    enum AllocType : uint8_t {
+        ALLOC_NONE = 0,
+
+        ALLOC_LINEAR,
+        ALLOC_GRAPHIC,
+    };
+
+    union AllocParams {
+        struct {
+            AllocType allocType;
+            C2MemoryUsage usage;
+            uint32_t params[kMaxIntParams];
+        } data;
+        uint8_t array[0];
+
+        AllocParams() : data{ALLOC_NONE, {0, 0}, {0}} {}
+        AllocParams(C2MemoryUsage usage, uint32_t capacity)
+            : data{ALLOC_LINEAR, usage, {[0] = capacity}} {}
+        AllocParams(
+                C2MemoryUsage usage,
+                uint32_t width, uint32_t height, uint32_t format)
+                : data{ALLOC_GRAPHIC, usage, {width, height, format}} {}
+    };
+
+    const std::shared_ptr<C2Allocator> mAllocator;
+};
+
+struct LinearAllocationDtor {
+    LinearAllocationDtor(const std::shared_ptr<C2LinearAllocation> &alloc)
+        : mAllocation(alloc) {}
+
+    void operator()(BufferPoolAllocation *poolAlloc) { delete poolAlloc; }
+
+    const std::shared_ptr<C2LinearAllocation> mAllocation;
+};
+
+ResultStatus _C2BufferPoolAllocator::allocate(
+        const std::vector<uint8_t>  &params,
+        std::shared_ptr<BufferPoolAllocation> *alloc) {
+    AllocParams c2Params;
+    memcpy(&c2Params, params.data(), std::min(sizeof(AllocParams), params.size()));
+    std::shared_ptr<C2LinearAllocation> c2Linear;
+    c2_status_t status = C2_BAD_VALUE;
+    switch(c2Params.data.allocType) {
+        case ALLOC_NONE:
+            break;
+        case ALLOC_LINEAR:
+            status = mAllocator->newLinearAllocation(
+                    c2Params.data.params[0], c2Params.data.usage, &c2Linear);
+            if (status == C2_OK && c2Linear) {
+                BufferPoolAllocation *ptr = new BufferPoolAllocation(c2Linear->handle());
+                if (ptr) {
+                    *alloc = std::shared_ptr<BufferPoolAllocation>(
+                            ptr, LinearAllocationDtor(c2Linear));
+                    if (*alloc) {
+                        return ResultStatus::OK;
+                    }
+                    delete ptr;
+                }
+                return ResultStatus::NO_MEMORY;
+            }
+            break;
+        case ALLOC_GRAPHIC:
+            // TODO
+            break;
+        default:
+            break;
+    }
+    return ResultStatus::CRITICAL_ERROR;
+}
+
+bool _C2BufferPoolAllocator::compatible(
+        const std::vector<uint8_t>  &newParams,
+        const std::vector<uint8_t>  &oldParams) {
+    size_t newSize = newParams.size();
+    size_t oldSize = oldParams.size();
+
+    // TODO: support not exact matching. e.g) newCapacity < oldCapacity
+    if (newSize == oldSize) {
+        for (size_t i = 0; i < newSize; ++i) {
+            if (newParams[i] != oldParams[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+void _C2BufferPoolAllocator::getLinearParams(
+        uint32_t capacity, C2MemoryUsage usage, std::vector<uint8_t> *params) {
+    AllocParams c2Params(usage, capacity);
+    params->assign(c2Params.array, c2Params.array + sizeof(AllocParams));
+}
+
+void _C2BufferPoolAllocator::getGraphicParams(
+        uint32_t width, uint32_t height, uint32_t format, C2MemoryUsage usage,
+        std::vector<uint8_t> *params) {
+    AllocParams c2Params(usage, width, height, format);
+    params->assign(c2Params.array, c2Params.array + sizeof(AllocParams));
+}
+
+c2_status_t _C2BufferPoolAllocator::priorLinearAllocation(
+        const C2Handle *handle,
+        std::shared_ptr<C2LinearAllocation> *c2Allocation) {
+    return mAllocator->priorLinearAllocation(handle, c2Allocation);
+}
+
+c2_status_t _C2BufferPoolAllocator::priorGraphicAllocation(
+        const C2Handle *handle,
+        std::shared_ptr<C2GraphicAllocation> *c2Allocation) {
+    return mAllocator->priorGraphicAllocation(handle, c2Allocation);
+}
+
+class C2PooledBlockPool::Impl {
+public:
+    Impl(const std::shared_ptr<C2Allocator> &allocator)
+            : mInit(C2_OK),
+              mBufferPoolManager(ClientManager::getInstance()),
+              mAllocator(std::make_shared<_C2BufferPoolAllocator>(allocator)) {
+        if (mAllocator && mBufferPoolManager) {
+            if (mBufferPoolManager->create(
+                    mAllocator, &mConnectionId) == ResultStatus::OK) {
+                return;
+            }
+        }
+        mInit = C2_NO_INIT;
+    }
+
+    ~Impl() {
+        if (mInit == C2_OK) {
+            mBufferPoolManager->close(mConnectionId);
+        }
+    }
+
+    c2_status_t fetchLinearBlock(
+            uint32_t capacity, C2MemoryUsage usage,
+            std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
+        block->reset();
+        if (mInit != C2_OK) {
+            return mInit;
+        }
+        std::vector<uint8_t> params;
+        mAllocator->getLinearParams(capacity, usage, &params);
+        std::shared_ptr<_C2BlockPoolData> poolData;
+        ResultStatus status = mBufferPoolManager->allocate(
+                mConnectionId, params, &poolData);
+        if (status == ResultStatus::OK) {
+            std::shared_ptr<C2LinearAllocation> alloc;
+            c2_status_t err = mAllocator->priorLinearAllocation(
+                    poolData->mHandle, &alloc);
+            if (err == C2_OK && poolData && alloc) {
+                *block = _C2BlockFactory::CreateLinearBlock(
+                        alloc, poolData, 0, capacity);
+                if (*block) {
+                    return C2_OK;
+                }
+            }
+            return C2_NO_MEMORY;
+        }
+        if (status == ResultStatus::NO_MEMORY) {
+            return C2_NO_MEMORY;
+        }
+        return C2_CORRUPTED;
+    }
+
+private:
+    c2_status_t mInit;
+    const android::sp<ClientManager> mBufferPoolManager;
+    ConnectionId mConnectionId; // locally
+    const std::shared_ptr<_C2BufferPoolAllocator> mAllocator;
+};
+
+C2PooledBlockPool::C2PooledBlockPool(
+        const std::shared_ptr<C2Allocator> &allocator, const local_id_t localId)
+        : mAllocator(allocator), mLocalId(localId), mImpl(new Impl(allocator)) {}
+
+C2PooledBlockPool::~C2PooledBlockPool() {
+}
+
+c2_status_t C2PooledBlockPool::fetchLinearBlock(
+        uint32_t capacity,
+        C2MemoryUsage usage,
+        std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
+    if (mImpl) {
+        return mImpl->fetchLinearBlock(capacity, usage, block);
+    }
+    return C2_CORRUPTED;
+}
+
 /* ========================================== 2D BLOCK ========================================= */
 
 /**
@@ -388,7 +647,8 @@ private:
     std::shared_ptr<_C2BlockPoolData> mPoolData;
 };
 
-class C2_HIDE _C2MappingBlock2DImpl : public _C2Block2DImpl {
+class C2_HIDE _C2MappingBlock2DImpl
+    : public _C2Block2DImpl, public std::enable_shared_from_this<_C2MappingBlock2DImpl> {
 public:
     using _C2Block2DImpl::_C2Block2DImpl;
 
@@ -399,7 +659,7 @@ public:
     private:
         friend class _C2MappingBlock2DImpl;
 
-        Mapped(const _C2Block2DImpl *impl, bool writable, C2Fence *fence __unused)
+        Mapped(const std::shared_ptr<_C2Block2DImpl> &impl, bool writable, C2Fence *fence __unused)
             : mImpl(impl), mWritable(writable) {
             memset(mData, 0, sizeof(mData));
             const C2Rect crop = mImpl->crop();
@@ -467,7 +727,7 @@ public:
         bool writable() const { return mWritable; }
 
     private:
-        const _C2Block2DImpl *mImpl;
+        const std::shared_ptr<_C2Block2DImpl> mImpl;
         bool mWritable;
         c2_status_t mError;
         uint8_t *mData[C2PlanarLayout::MAX_NUM_PLANES];
@@ -485,7 +745,7 @@ public:
         std::lock_guard<std::mutex> lock(mMappedLock);
         std::shared_ptr<Mapped> existing = mMapped.lock();
         if (!existing) {
-            existing = std::shared_ptr<Mapped>(new Mapped(this, writable, fence));
+            existing = std::shared_ptr<Mapped>(new Mapped(shared_from_this(), writable, fence));
             mMapped = existing;
         } else {
             // if we mapped the region read-only, we cannot remap it read-write

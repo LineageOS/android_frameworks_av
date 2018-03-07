@@ -81,11 +81,16 @@ static const char *AMediaFormatKeyGroupInt32[] = {
     AMEDIAFORMAT_KEY_STRIDE,
     AMEDIAFORMAT_KEY_TRACK_ID,
     AMEDIAFORMAT_KEY_WIDTH,
+    AMEDIAFORMAT_KEY_DISPLAY_HEIGHT,
+    AMEDIAFORMAT_KEY_DISPLAY_WIDTH,
+    AMEDIAFORMAT_KEY_TEMPORAL_LAYER_ID,
+    AMEDIAFORMAT_KEY_TRACK_INDEX,
 };
 
 static const char *AMediaFormatKeyGroupInt64[] = {
     AMEDIAFORMAT_KEY_DURATION,
     AMEDIAFORMAT_KEY_REPEAT_PREVIOUS_FRAME_AFTER,
+    AMEDIAFORMAT_KEY_TIME_US,
 };
 
 static const char *AMediaFormatKeyGroupString[] = {
@@ -96,6 +101,14 @@ static const char *AMediaFormatKeyGroupString[] = {
 
 static const char *AMediaFormatKeyGroupBuffer[] = {
     AMEDIAFORMAT_KEY_HDR_STATIC_INFO,
+    AMEDIAFORMAT_KEY_SEI,
+    AMEDIAFORMAT_KEY_MPEG_USER_DATA,
+};
+
+static const char *AMediaFormatKeyGroupCsd[] = {
+    AMEDIAFORMAT_KEY_CSD_0,
+    AMEDIAFORMAT_KEY_CSD_1,
+    AMEDIAFORMAT_KEY_CSD_2,
 };
 
 static const char *AMediaFormatKeyGroupRect[] = {
@@ -307,11 +320,19 @@ AMediaFormat *AMediaFormatWrapper::getAMediaFormat() const {
 }
 
 sp<AMessage> AMediaFormatWrapper::toAMessage() const {
+  sp<AMessage> msg;
+  writeToAMessage(msg);
+  return msg;
+}
+
+void AMediaFormatWrapper::writeToAMessage(sp<AMessage> &msg) const {
     if (mAMediaFormat == NULL) {
-        return NULL;
+        msg = NULL;
     }
 
-    sp<AMessage> msg = new AMessage;
+    if (msg == NULL) {
+        msg = new AMessage;
+    }
     for (auto& key : AMediaFormatKeyGroupInt32) {
         int32_t val;
         if (getInt32(key, &val)) {
@@ -338,6 +359,16 @@ sp<AMessage> AMediaFormatWrapper::toAMessage() const {
             msg->setBuffer(key, buffer);
         }
     }
+    for (auto& key : AMediaFormatKeyGroupCsd) {
+        void *data;
+        size_t size;
+        if (getBuffer(key, &data, &size)) {
+            sp<ABuffer> buffer = ABuffer::CreateAsCopy(data, size);
+            buffer->meta()->setInt32(AMEDIAFORMAT_KEY_CSD, 1);
+            buffer->meta()->setInt64(AMEDIAFORMAT_KEY_TIME_US, 0);
+            msg->setBuffer(key, buffer);
+        }
+    }
     for (auto& key : AMediaFormatKeyGroupRect) {
         int32_t left, top, right, bottom;
         if (getRect(key, &left, &top, &right, &bottom)) {
@@ -355,7 +386,6 @@ sp<AMessage> AMediaFormatWrapper::toAMessage() const {
             }
         }
     }
-    return msg;
 }
 
 const char* AMediaFormatWrapper::toString() const {

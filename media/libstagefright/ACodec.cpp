@@ -553,6 +553,7 @@ ACodec::ACodec()
       mNativeWindowUsageBits(0),
       mLastNativeWindowDataSpace(HAL_DATASPACE_UNKNOWN),
       mIsVideo(false),
+      mIsImage(false),
       mIsEncoder(false),
       mFatalError(false),
       mShutdownInProgress(false),
@@ -1713,6 +1714,7 @@ status_t ACodec::configureCodec(
 
     mIsEncoder = encoder;
     mIsVideo = !strncasecmp(mime, "video/", 6);
+    mIsImage = !strncasecmp(mime, "image/", 6);
 
     mPortMode[kPortIndexInput] = IOMX::kPortModePresetByteBuffer;
     mPortMode[kPortIndexOutput] = IOMX::kPortModePresetByteBuffer;
@@ -1728,10 +1730,11 @@ status_t ACodec::configureCodec(
     // FLAC encoder or video encoder in constant quality mode doesn't need a
     // bitrate, other encoders do.
     if (encoder) {
-        if (mIsVideo && !findVideoBitrateControlInfo(
-                msg, &bitrateMode, &bitrate, &quality)) {
-            return INVALID_OPERATION;
-        } else if (!mIsVideo && strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_FLAC)
+        if (mIsVideo || mIsImage) {
+            if (!findVideoBitrateControlInfo(msg, &bitrateMode, &bitrate, &quality)) {
+                return INVALID_OPERATION;
+            }
+        } else if (strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_FLAC)
             && !msg->findInt32("bitrate", &bitrate)) {
             return INVALID_OPERATION;
         }
@@ -2010,7 +2013,7 @@ status_t ACodec::configureCodec(
     (void)msg->findInt32("pcm-encoding", (int32_t*)&pcmEncoding);
     // invalid encodings will default to PCM-16bit in setupRawAudioFormat.
 
-    if (mIsVideo) {
+    if (mIsVideo || mIsImage) {
         // determine need for software renderer
         bool usingSwRenderer = false;
         if (haveNativeWindow && mComponentName.startsWith("OMX.google.")) {
@@ -2290,7 +2293,7 @@ status_t ACodec::configureCodec(
     }
 
     // create data converters if needed
-    if (!mIsVideo && err == OK) {
+    if (!mIsVideo && !mIsImage && err == OK) {
         AudioEncoding codecPcmEncoding = kAudioEncodingPcm16bit;
         if (encoder) {
             (void)mInputFormat->findInt32("pcm-encoding", (int32_t*)&codecPcmEncoding);
@@ -3215,6 +3218,7 @@ static const struct VideoCodingMapEntry {
     { MEDIA_MIMETYPE_VIDEO_VP8, OMX_VIDEO_CodingVP8 },
     { MEDIA_MIMETYPE_VIDEO_VP9, OMX_VIDEO_CodingVP9 },
     { MEDIA_MIMETYPE_VIDEO_DOLBY_VISION, OMX_VIDEO_CodingDolbyVision },
+    { MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC, OMX_VIDEO_CodingImageHEIC },
 };
 
 static status_t GetVideoCodingTypeFromMime(
@@ -3872,7 +3876,8 @@ status_t ACodec::setupVideoEncoder(
             break;
 
         case OMX_VIDEO_CodingHEVC:
-            err = setupHEVCEncoderParameters(msg);
+        case OMX_VIDEO_CodingImageHEIC:
+            err = setupHEVCEncoderParameters(msg, outputFormat);
             break;
 
         case OMX_VIDEO_CodingVP8:
@@ -4378,25 +4383,61 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
     return configureBitrate(bitrateMode, bitrate);
 }
 
-status_t ACodec::setupHEVCEncoderParameters(const sp<AMessage> &msg) {
-    float iFrameInterval;
-    if (!msg->findAsFloat("i-frame-interval", &iFrameInterval)) {
-        return INVALID_OPERATION;
+status_t ACodec::configureImageGrid(
+        const sp<AMessage> &msg, sp<AMessage> &outputFormat) {
+    int32_t gridWidth, gridHeight, gridRows, gridCols;
+    if (!msg->findInt32("grid-width", &gridWidth) ||
+        !msg->findInt32("grid-height", &gridHeight) ||
+        !msg->findInt32("grid-rows", &gridRows) ||
+        !msg->findInt32("grid-cols", &gridCols)) {
+        return OK;
     }
 
+    OMX_VIDEO_PARAM_ANDROID_IMAGEGRIDTYPE gridType;
+    InitOMXParams(&gridType);
+    gridType.nPortIndex = kPortIndexOutput;
+    gridType.bEnabled = OMX_TRUE;
+    gridType.nGridWidth = gridWidth;
+    gridType.nGridHeight = gridHeight;
+    gridType.nGridRows = gridRows;
+    gridType.nGridCols = gridCols;
+
+    status_t err = mOMXNode->setParameter(
+            (OMX_INDEXTYPE)OMX_IndexParamVideoAndroidImageGrid,
+            &gridType, sizeof(gridType));
+
+    // for video encoders, grid config is only a hint.
+    if (!mIsImage) {
+        return OK;
+    }
+
+    // image encoders must support grid config.
+    if (err != OK) {
+        return err;
+    }
+
+    // query to get the image encoder's real grid config as it might be
+    // different from the requested, and transfer that to the output.
+    err = mOMXNode->getParameter(
+            (OMX_INDEXTYPE)OMX_IndexParamVideoAndroidImageGrid,
+            &gridType, sizeof(gridType));
+
+    if (err == OK && gridType.bEnabled) {
+        outputFormat->setInt32("grid-width", gridType.nGridWidth);
+        outputFormat->setInt32("grid-height", gridType.nGridHeight);
+        outputFormat->setInt32("grid-rows", gridType.nGridRows);
+        outputFormat->setInt32("grid-cols", gridType.nGridCols);
+    }
+
+    return err;
+}
+
+status_t ACodec::setupHEVCEncoderParameters(
+        const sp<AMessage> &msg, sp<AMessage> &outputFormat) {
     OMX_VIDEO_CONTROLRATETYPE bitrateMode;
     int32_t bitrate, quality;
     if (!findVideoBitrateControlInfo(msg, &bitrateMode, &bitrate, &quality)) {
         return INVALID_OPERATION;
-    }
-
-    float frameRate;
-    if (!msg->findFloat("frame-rate", &frameRate)) {
-        int32_t tmp;
-        if (!msg->findInt32("frame-rate", &tmp)) {
-            return INVALID_OPERATION;
-        }
-        frameRate = (float)tmp;
     }
 
     OMX_VIDEO_PARAM_HEVCTYPE hevcType;
@@ -4426,10 +4467,36 @@ status_t ACodec::setupHEVCEncoderParameters(const sp<AMessage> &msg) {
         hevcType.eLevel = static_cast<OMX_VIDEO_HEVCLEVELTYPE>(level);
     }
     // TODO: finer control?
-    hevcType.nKeyFrameInterval = setPFramesSpacing(iFrameInterval, frameRate) + 1;
+    if (mIsImage) {
+        hevcType.nKeyFrameInterval = 1;
+    } else {
+        float iFrameInterval;
+        if (!msg->findAsFloat("i-frame-interval", &iFrameInterval)) {
+            return INVALID_OPERATION;
+        }
+
+        float frameRate;
+        if (!msg->findFloat("frame-rate", &frameRate)) {
+            int32_t tmp;
+            if (!msg->findInt32("frame-rate", &tmp)) {
+                return INVALID_OPERATION;
+            }
+            frameRate = (float)tmp;
+        }
+
+        hevcType.nKeyFrameInterval =
+                setPFramesSpacing(iFrameInterval, frameRate) + 1;
+    }
+
 
     err = mOMXNode->setParameter(
             (OMX_INDEXTYPE)OMX_IndexParamVideoHevc, &hevcType, sizeof(hevcType));
+    if (err != OK) {
+        return err;
+    }
+
+    err = configureImageGrid(msg, outputFormat);
+
     if (err != OK) {
         return err;
     }
@@ -4875,7 +4942,8 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
                             (void)getHDRStaticInfoForVideoCodec(kPortIndexInput, notify);
                         }
                         uint32_t latency = 0;
-                        if (mIsEncoder && getLatency(&latency) == OK && latency > 0) {
+                        if (mIsEncoder && !mIsImage &&
+                                getLatency(&latency) == OK && latency > 0) {
                             notify->setInt32("latency", latency);
                         }
                     }
@@ -4931,7 +4999,8 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
                         notify->setString("mime", mime.c_str());
                     }
                     uint32_t intraRefreshPeriod = 0;
-                    if (mIsEncoder && getIntraRefreshPeriod(&intraRefreshPeriod) == OK
+                    if (mIsEncoder && !mIsImage &&
+                            getIntraRefreshPeriod(&intraRefreshPeriod) == OK
                             && intraRefreshPeriod > 0) {
                         notify->setInt32("intra-refresh-period", intraRefreshPeriod);
                     }
@@ -6346,9 +6415,6 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
 
     sp<AMessage> notify = new AMessage(kWhatOMXDied, mCodec);
 
-    Vector<AString> matchingCodecs;
-    Vector<AString> owners;
-
     AString componentName;
     CHECK(msg->findString("componentName", &componentName));
 
@@ -6424,7 +6490,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
 
     mCodec->mOMX = omx;
     mCodec->mOMXNode = omxNode;
-    mCodec->mCallback->onComponentAllocated(mCodec->mComponentName.c_str());
+    mCodec->mCallback->onComponentAllocated(mCodec->mComponentName.c_str(), info);
     mCodec->changeState(mCodec->mLoadedState);
 
     return true;
@@ -8226,8 +8292,9 @@ status_t ACodec::queryCapabilities(
     }
 
     bool isVideo = strncasecmp(mime, "video/", 6) == 0;
+    bool isImage = strncasecmp(mime, "image/", 6) == 0;
 
-    if (isVideo) {
+    if (isVideo || isImage) {
         OMX_VIDEO_PARAM_PROFILELEVELTYPE param;
         InitOMXParams(&param);
         param.nPortIndex = isEncoder ? kPortIndexOutput : kPortIndexInput;

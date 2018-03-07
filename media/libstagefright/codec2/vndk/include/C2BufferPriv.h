@@ -71,4 +71,32 @@ private:
     const std::shared_ptr<C2Allocator> mAllocator;
 };
 
+class C2PooledBlockPool : public C2BlockPool {
+public:
+    C2PooledBlockPool(const std::shared_ptr<C2Allocator> &allocator, const local_id_t localId);
+
+    virtual ~C2PooledBlockPool() override;
+
+    virtual C2Allocator::id_t getAllocatorId() const override {
+        return mAllocator->getId();
+    }
+
+    virtual local_id_t getLocalId() const override {
+        return mLocalId;
+    }
+
+    virtual c2_status_t fetchLinearBlock(
+            uint32_t capacity,
+            C2MemoryUsage usage,
+            std::shared_ptr<C2LinearBlock> *block /* nonnull */) override;
+
+    // TODO: fetchGraphicBlock, fetchCircularBlock
+private:
+    const std::shared_ptr<C2Allocator> mAllocator;
+    const local_id_t mLocalId;
+
+    class Impl;
+    std::unique_ptr<Impl> mImpl;
+};
+
 #endif // STAGEFRIGHT_CODEC2_BUFFER_PRIV_H_

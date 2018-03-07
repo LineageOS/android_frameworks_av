@@ -18,6 +18,8 @@
 #define LOG_TAG "C2AllocatorIon"
 #include <utils/Log.h>
 
+#include <list>
+
 #include <ion/ion.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -148,6 +150,7 @@ private:
      * so that we can capture the error.
      *
      * \param ionFd     ion client (ownership transferred to created object)
+     * \param owned     whehter native_handle_t is owned by an allocation or not.
      * \param capacity  size of allocation
      * \param bufferFd  buffer handle (ownership transferred to created object). Must be
      *                  invalid if err is not 0.
@@ -155,14 +158,14 @@ private:
      *                  invalid if err is not 0.
      * \param err       errno during buffer allocation or import
      */
-    Impl(int ionFd, size_t capacity, int bufferFd, ion_user_handle_t buffer, C2Allocator::id_t id, int err)
+    Impl(int ionFd, bool owned, size_t capacity, int bufferFd, ion_user_handle_t buffer, C2Allocator::id_t id, int err)
         : mIonFd(ionFd),
+          mHandleOwned(owned),
           mHandle(bufferFd, capacity),
           mBuffer(buffer),
           mId(id),
           mInit(c2_map_errno<ENOMEM, EACCES, EINVAL>(err)),
-          mMapFd(-1),
-          mMapSize(0) {
+          mMapFd(-1) {
         if (mInit != C2_OK) {
             // close ionFd now on error
             if (mIonFd >= 0) {
@@ -188,7 +191,7 @@ public:
     static Impl *Import(int ionFd, size_t capacity, int bufferFd, C2Allocator::id_t id) {
         ion_user_handle_t buffer = -1;
         int ret = ion_import(ionFd, bufferFd, &buffer);
-        return new Impl(ionFd, capacity, bufferFd, buffer, id, ret);
+        return new Impl(ionFd, false, capacity, bufferFd, buffer, id, ret);
     }
 
     /**
@@ -215,13 +218,14 @@ public:
                 buffer = -1;
             }
         }
-        return new Impl(ionFd, size, bufferFd, buffer, id, ret);
+        return new Impl(ionFd, true, size, bufferFd, buffer, id, ret);
     }
 
     c2_status_t map(size_t offset, size_t size, C2MemoryUsage usage, C2Fence *fence, void **addr) {
         (void)fence; // TODO: wait for fence
         *addr = nullptr;
-        if (mMapSize > 0) {
+        if (!mMappings.empty()) {
+            ALOGV("multiple map");
             // TODO: technically we should return DUPLICATE here, but our block views don't
             // actually unmap, so we end up remapping an ion buffer multiple times.
             //
@@ -244,54 +248,63 @@ public:
         size_t alignmentBytes = offset % PAGE_SIZE;
         size_t mapOffset = offset - alignmentBytes;
         size_t mapSize = size + alignmentBytes;
+        Mapping map = { nullptr, alignmentBytes, mapSize };
 
         c2_status_t err = C2_OK;
         if (mMapFd == -1) {
             int ret = ion_map(mIonFd, mBuffer, mapSize, prot,
-                              flags, mapOffset, (unsigned char**)&mMapAddr, &mMapFd);
+                              flags, mapOffset, (unsigned char**)&map.addr, &mMapFd);
             if (ret) {
                 mMapFd = -1;
-                *addr = nullptr;
+                map.addr = *addr = nullptr;
                 err = c2_map_errno<EINVAL>(-ret);
             } else {
-                *addr = (uint8_t *)mMapAddr + alignmentBytes;
-                mMapAlignmentBytes = alignmentBytes;
-                mMapSize = mapSize;
+                *addr = (uint8_t *)map.addr + alignmentBytes;
             }
         } else {
-            mMapAddr = mmap(nullptr, mapSize, prot, flags, mMapFd, mapOffset);
-            if (mMapAddr == MAP_FAILED) {
-                mMapAddr = *addr = nullptr;
+            map.addr = mmap(nullptr, mapSize, prot, flags, mMapFd, mapOffset);
+            if (map.addr == MAP_FAILED) {
+                map.addr = *addr = nullptr;
                 err = c2_map_errno<EINVAL>(errno);
             } else {
-                *addr = (uint8_t *)mMapAddr + alignmentBytes;
-                mMapAlignmentBytes = alignmentBytes;
-                mMapSize = mapSize;
+                *addr = (uint8_t *)map.addr + alignmentBytes;
             }
+        }
+        if (map.addr) {
+            mMappings.push_back(map);
         }
         return err;
     }
 
     c2_status_t unmap(void *addr, size_t size, C2Fence *fence) {
-        if (mMapFd < 0 || mMapSize == 0) {
+        if (mMapFd < 0 || mMappings.empty()) {
             return C2_NOT_FOUND;
         }
-        if (addr != (uint8_t *)mMapAddr + mMapAlignmentBytes ||
-                size + mMapAlignmentBytes != mMapSize) {
-            return C2_BAD_VALUE;
+        for (auto it = mMappings.begin(); it != mMappings.end(); ++it) {
+            if (addr != (uint8_t *)it->addr + it->alignmentBytes ||
+                    size + it->alignmentBytes != it->size) {
+                continue;
+            }
+            int err = munmap(it->addr, it->size);
+            if (err != 0) {
+                return c2_map_errno<EINVAL>(errno);
+            }
+            if (fence) {
+                *fence = C2Fence(); // not using fences
+            }
+            (void)mMappings.erase(it);
+            return C2_OK;
         }
-        int err = munmap(mMapAddr, mMapSize);
-        if (err != 0) {
-            return c2_map_errno<EINVAL>(errno);
-        }
-        if (fence) {
-            *fence = C2Fence(); // not using fences
-        }
-        mMapSize = 0;
-        return C2_OK;
+        return C2_BAD_VALUE;
     }
 
     ~Impl() {
+        if (!mMappings.empty()) {
+            ALOGD("Dangling mappings!");
+            for (const Mapping &map : mMappings) {
+                (void)munmap(map.addr, map.size);
+            }
+        }
         if (mMapFd >= 0) {
             close(mMapFd);
             mMapFd = -1;
@@ -302,7 +315,9 @@ public:
         if (mIonFd >= 0) {
             close(mIonFd);
         }
-        native_handle_close(&mHandle);
+        if (mHandleOwned) {
+            native_handle_close(&mHandle);
+        }
     }
 
     c2_status_t status() const {
@@ -323,14 +338,18 @@ public:
 
 private:
     int mIonFd;
+    bool mHandleOwned;
     C2HandleIon mHandle;
     ion_user_handle_t mBuffer;
     C2Allocator::id_t mId;
     c2_status_t mInit;
     int mMapFd; // only one for now
-    void *mMapAddr;
-    size_t mMapAlignmentBytes;
-    size_t mMapSize;
+    struct Mapping {
+        void *addr;
+        size_t alignmentBytes;
+        size_t size;
+    };
+    std::list<Mapping> mMappings;
 };
 
 c2_status_t C2AllocationIon::map(

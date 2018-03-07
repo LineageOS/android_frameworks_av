@@ -45,6 +45,7 @@ struct AMessage;
 class MetaData;
 
 struct AMediaFormatWrapper : public RefBase {
+
     static sp<AMediaFormatWrapper> Create(const sp<AMessage> &message);
 
     AMediaFormatWrapper();
@@ -54,6 +55,7 @@ struct AMediaFormatWrapper : public RefBase {
     AMediaFormat *getAMediaFormat() const;
 
     sp<AMessage> toAMessage() const ;
+    void writeToAMessage(sp<AMessage>&) const ;
     const char* toString() const ;
 
     status_t release();

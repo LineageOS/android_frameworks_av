@@ -152,6 +152,39 @@ c2_status_t GetCodec2BlockPool(
     return res;
 }
 
+c2_status_t CreateCodec2BlockPool(
+        C2PlatformAllocatorStore::id_t allocatorId,
+        std::shared_ptr<const C2Component> component,
+        std::shared_ptr<C2BlockPool> *pool) {
+    pool->reset();
+    if (!component) {
+        return C2_BAD_VALUE;
+    }
+    // TODO: support caching block pool along with GetCodec2BlockPool.
+    static std::atomic_int sBlockPoolId(C2BlockPool::PLATFORM_START);
+    std::shared_ptr<C2AllocatorStore> allocatorStore = GetCodec2PlatformAllocatorStore();
+    std::shared_ptr<C2Allocator> allocator;
+    c2_status_t res = C2_NOT_FOUND;
+
+    switch (allocatorId) {
+    case C2PlatformAllocatorStore::ION:
+        res = allocatorStore->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &allocator);
+        if (res == C2_OK) {
+            *pool = std::make_shared<C2PooledBlockPool>(allocator, sBlockPoolId++);
+            if (!*pool) {
+                res = C2_NO_MEMORY;
+            }
+        }
+        break;
+    case C2PlatformAllocatorStore::GRALLOC:
+        // TODO: support gralloc
+        break;
+    default:
+        break;
+    }
+    return res;
+}
+
 class C2PlatformComponentStore : public C2ComponentStore {
 public:
     virtual std::vector<std::shared_ptr<const C2Component::Traits>> listComponents() override;

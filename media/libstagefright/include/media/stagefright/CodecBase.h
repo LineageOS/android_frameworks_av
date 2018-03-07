@@ -95,8 +95,11 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
          *
          * @param componentName the unique name of the component specified in
          *                      MediaCodecList.
+         * @param codecInfo the associated codec info if available.
          */
-        virtual void onComponentAllocated(const char *componentName) = 0;
+        virtual void onComponentAllocated(
+                const char *componentName,
+                const sp<MediaCodecInfo> &codecInfo = nullptr) = 0;
         /**
          * Notify MediaCodec that the underlying component is configured.
          *

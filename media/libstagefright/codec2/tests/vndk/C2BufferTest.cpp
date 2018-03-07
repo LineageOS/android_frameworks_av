@@ -232,7 +232,8 @@ class C2BufferUtilsTest : public ::testing::Test {
 class C2BufferTest : public ::testing::Test {
 public:
     C2BufferTest()
-        : mLinearAllocator(std::make_shared<C2AllocatorIon>('i')),
+        : mBlockPoolId(C2BlockPool::PLATFORM_START),
+          mLinearAllocator(std::make_shared<C2AllocatorIon>('i')),
           mSize(0u),
           mAddr(nullptr),
           mGraphicAllocator(std::make_shared<C2AllocatorGralloc>('g')) {
@@ -281,7 +282,7 @@ public:
     }
 
     std::shared_ptr<C2BlockPool> makeLinearBlockPool() {
-        return std::make_shared<C2BasicLinearBlockPool>(mLinearAllocator);
+        return std::make_shared<C2PooledBlockPool>(mLinearAllocator, mBlockPoolId++);
     }
 
     void allocateGraphic(uint32_t width, uint32_t height) {
@@ -328,6 +329,7 @@ public:
     }
 
 private:
+    C2BlockPool::local_id_t mBlockPoolId;
     std::shared_ptr<C2Allocator> mLinearAllocator;
     std::shared_ptr<C2LinearAllocation> mLinearAllocation;
     size_t mSize;
@@ -743,6 +745,25 @@ TEST_F(C2BufferTest, BufferTest) {
     EXPECT_TRUE(buffer->info().empty());
     EXPECT_FALSE(buffer->hasInfo(info1->type()));
     EXPECT_FALSE(buffer->hasInfo(info2->type()));
+}
+
+TEST_F(C2BufferTest, MultipleLinearMapTest) {
+    std::shared_ptr<C2BlockPool> pool(makeLinearBlockPool());
+    constexpr size_t kCapacity = 524288u;
+    for (int i = 0; i < 100; ++i) {
+        std::vector<C2WriteView> wViews;
+        std::vector<C2ReadView> rViews;
+        for (int j = 0; j < 16; ++j) {
+            std::shared_ptr<C2LinearBlock> block;
+            ASSERT_EQ(C2_OK, pool->fetchLinearBlock(
+                    kCapacity,
+                    { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
+                    &block));
+            wViews.push_back(block->map().get());
+            C2ConstLinearBlock cBlock = block->share(0, kCapacity / 2, C2Fence());
+            rViews.push_back(cBlock.map().get());
+        }
+    }
 }
 
 } // namespace android

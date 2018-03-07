@@ -64,7 +64,6 @@ import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
 import android.text.TextUtils;
 import android.util.ArrayMap;
-import android.util.ArraySet;
 import android.util.Log;
 
 import java.lang.ref.WeakReference;
@@ -108,6 +107,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @GuardedBy("mLock")
     private MediaPlayerBase mPlayer;
     @GuardedBy("mLock")
+    private MediaPlaylistController mMplc;
+    @GuardedBy("mLock")
     private VolumeProvider2 mVolumeProvider;
     @GuardedBy("mLock")
     private PlaybackInfo mPlaybackInfo;
@@ -116,17 +117,18 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     /**
      * Can be only called by the {@link Builder#build()}.
-     *
      * @param context
      * @param player
      * @param id
+     * @param mplc
      * @param volumeProvider
      * @param sessionActivity
      * @param callbackExecutor
      * @param callback
      */
     public MediaSession2Impl(Context context, MediaPlayerBase player, String id,
-            VolumeProvider2 volumeProvider, PendingIntent sessionActivity,
+            MediaPlaylistController mplc, VolumeProvider2 volumeProvider,
+            PendingIntent sessionActivity,
             Executor callbackExecutor, SessionCallback callback) {
         // TODO(jaewan): Keep other params.
         mInstance = createInstance();
@@ -140,6 +142,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mSessionActivity = sessionActivity;
         mSessionStub = new MediaSession2Stub(this);
         mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        mMplc = mplc;
 
         // Infer type from the id and package name.
         String libraryService = getServiceName(context, MediaLibraryService2.SERVICE_INTERFACE, id);
@@ -203,13 +206,13 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void updatePlayer_impl(MediaPlayerBase player, MediaPlaylistController mpcl,
+    public void updatePlayer_impl(MediaPlayerBase player, MediaPlaylistController mplc,
             VolumeProvider2 volumeProvider) throws IllegalArgumentException {
         ensureCallingThread();
         if (player == null) {
             throw new IllegalArgumentException("player shouldn't be null");
         }
-        // TODO(jaewan): Handle mpcl
+        mMplc = mplc;
         setPlayer(player, volumeProvider);
     }
 
@@ -882,8 +885,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         @Override
         public void addAllPredefinedCommands_impl() {
-            final int COMMAND_CODE_MAX = 22;
-            for (int i = 1; i <= COMMAND_CODE_MAX; i++) {
+            for (int i = 1; i <= MediaSession2.COMMAND_CODE_MAX; i++) {
                 mCommands.add(new Command(mContext, i));
             }
         }
@@ -971,31 +973,13 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mInstance = instance;
             mUid = uid;
             mPackageName = packageName;
-
-            // TODO(jaewan): Remove this workaround
-            if ("com.android.server.media".equals(packageName)) {
-                mIsTrusted = true;
-            } else if (context.checkPermission(permission.MEDIA_CONTENT_CONTROL, pid, uid) ==
-                    PackageManager.PERMISSION_GRANTED) {
-                mIsTrusted = true;
-            } else {
-                // TODO(jaewan): Also consider enabled notification listener.
-                mIsTrusted = false;
-                // System apps may bind across the user so uid can be differ.
-                // Skip sanity check for the system app.
-                try {
-                    int uidForPackage = context.getPackageManager().getPackageUid(packageName, 0);
-                    if (uid != uidForPackage) {
-                        throw new IllegalArgumentException("Illegal call from uid=" + uid +
-                                ", pkg=" + packageName + ". Expected uid" + uidForPackage);
-                    }
-                } catch (NameNotFoundException e) {
-                    // Rethrow exception with different name because binder methods only accept
-                    // RemoteException.
-                    throw new IllegalArgumentException(e);
-                }
-            }
             mControllerBinder = callback;
+            MediaSessionManager manager =
+                  (MediaSessionManager) context.getSystemService(Context.MEDIA_SESSION_SERVICE);
+            // Ask server whether the controller is trusted.
+            // App cannot know this because apps cannot query enabled notification listener for
+            // another package, but system server can do.
+            mIsTrusted = manager.isTrusted(uid, packageName);
         }
 
         @Override
@@ -1287,6 +1271,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         String mId;
         Executor mCallbackExecutor;
         C mCallback;
+        MediaPlaylistController mMplc;
         VolumeProvider2 mVolumeProvider;
         PendingIntent mSessionActivity;
 
@@ -1307,17 +1292,25 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mId = "";
         }
 
-        public void setPlayer_impl(MediaPlayerBase player, MediaPlaylistController mplc,
-                VolumeProvider2 volumeProvider) {
-            // TODO: Use MediaPlaylistController
+        public void setPlayer_impl(MediaPlayerBase player) {
             if (player == null) {
                 throw new IllegalArgumentException("player shouldn't be null");
             }
             mPlayer = player;
-            mVolumeProvider = volumeProvider;
+        }
+
+        @Override
+        public void setPlaylistController_impl(MediaPlaylistController mplc) {
+            if (mplc == null) {
+                throw new IllegalArgumentException("mplc shouldn't be null");
+            }
+            mMplc = mplc;
         }
 
         public void setVolumeProvider_impl(VolumeProvider2 volumeProvider) {
+            if (volumeProvider == null) {
+                throw new IllegalArgumentException("volumeProvider shouldn't be null");
+            }
             mVolumeProvider = volumeProvider;
         }
 
@@ -1360,8 +1353,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 mCallback = new SessionCallback(mContext) {};
             }
 
-            return new MediaSession2Impl(mContext, mPlayer, mId, mVolumeProvider,
-                    mSessionActivity, mCallbackExecutor, mCallback).getInstance();
+            return new MediaSession2Impl(mContext, mPlayer, mId, mMplc,
+                    mVolumeProvider, mSessionActivity, mCallbackExecutor, mCallback).getInstance();
         }
     }
 }
