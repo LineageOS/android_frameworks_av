@@ -974,31 +974,13 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mInstance = instance;
             mUid = uid;
             mPackageName = packageName;
-
-            // TODO(jaewan): Remove this workaround
-            if ("com.android.server.media".equals(packageName)) {
-                mIsTrusted = true;
-            } else if (context.checkPermission(permission.MEDIA_CONTENT_CONTROL, pid, uid) ==
-                    PackageManager.PERMISSION_GRANTED) {
-                mIsTrusted = true;
-            } else {
-                // TODO(jaewan): Also consider enabled notification listener.
-                mIsTrusted = false;
-                // System apps may bind across the user so uid can be differ.
-                // Skip sanity check for the system app.
-                try {
-                    int uidForPackage = context.getPackageManager().getPackageUid(packageName, 0);
-                    if (uid != uidForPackage) {
-                        throw new IllegalArgumentException("Illegal call from uid=" + uid +
-                                ", pkg=" + packageName + ". Expected uid" + uidForPackage);
-                    }
-                } catch (NameNotFoundException e) {
-                    // Rethrow exception with different name because binder methods only accept
-                    // RemoteException.
-                    throw new IllegalArgumentException(e);
-                }
-            }
             mControllerBinder = callback;
+            MediaSessionManager manager =
+                  (MediaSessionManager) context.getSystemService(Context.MEDIA_SESSION_SERVICE);
+            // Ask server whether the controller is trusted.
+            // App cannot know this because apps cannot query enabled notification listener for
+            // another package, but system server can do.
+            mIsTrusted = manager.isTrusted(uid, packageName);
         }
 
         @Override
