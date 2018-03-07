@@ -251,7 +251,7 @@ void C2SoftOpus::process(
         return;
     }
 
-    const C2ConstLinearBlock &inBuffer = work->input.buffers[0]->data().linearBlocks().front();
+    const C2ConstLinearBlock inBuffer = work->input.buffers[0]->data().linearBlocks().front();
     bool eos = ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM) != 0);
     size_t inOffset = inBuffer.offset();
     size_t inSize = inBuffer.size();

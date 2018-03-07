@@ -614,7 +614,7 @@ void C2SoftMpeg2Dec::process(
         return;
     }
 
-    const C2ConstLinearBlock &inBuffer = work->input.buffers[0]->data().linearBlocks().front();
+    const C2ConstLinearBlock inBuffer = work->input.buffers[0]->data().linearBlocks().front();
     size_t inOffset = inBuffer.offset();
     size_t inSize = inBuffer.size();
     uint32_t workIndex = work->input.ordinal.frameIndex.peeku() & 0xFFFFFFFF;

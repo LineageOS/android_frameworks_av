@@ -1093,7 +1093,7 @@ void C2SoftAvcDec::process(
     work->result = C2_OK;
     work->workletsProcessed = 0u;
 
-    const C2ConstLinearBlock &buffer =
+    const C2ConstLinearBlock buffer =
         work->input.buffers[0]->data().linearBlocks().front();
     if (buffer.capacity() == 0) {
         ALOGV("empty input: %llu", work->input.ordinal.frameIndex.peekull());
