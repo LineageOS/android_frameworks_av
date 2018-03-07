@@ -122,10 +122,8 @@ private:
     // onFrameAvailable call to proceed.
     void onBufferReleasedByOutput(const sp<IGraphicBufferProducer>& from);
 
-    // This is the implementation of onBufferReleasedByOutput without the mutex locked.
-    // It could either be called from onBufferReleasedByOutput or from
-    // onFrameAvailable when a buffer in the async buffer queue is overwritten.
-    void onBufferReleasedByOutputLocked(const sp<IGraphicBufferProducer>& from, size_t surfaceId);
+    // Called by outputBufferLocked when a buffer in the async buffer queue got replaced.
+    void onBufferReplacedLocked(const sp<IGraphicBufferProducer>& from, size_t surfaceId);
 
     // When this is called, the splitter disconnects from (i.e., abandons) its
     // input queue and signals any waiting onFrameAvailable calls to wake up.
@@ -137,6 +135,13 @@ private:
     // Decrement the buffer's reference count. Once the reference count becomes
     // 0, return the buffer back to the input BufferQueue.
     void decrementBufRefCountLocked(uint64_t id, size_t surfaceId);
+
+    // Check for and handle any output surface dequeue errors.
+    void handleOutputDequeueStatusLocked(status_t res, int slot);
+
+    // Handles released output surface buffers.
+    void returnOutputBufferLocked(const sp<Fence>& fence, const sp<IGraphicBufferProducer>& from,
+            size_t surfaceId, int slot);
 
     // This is a thin wrapper class that lets us determine which BufferQueue
     // the IProducerListener::onBufferReleased callback is associated with. We
