@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_LOCAL_H
-#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_LOCAL_H
+#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_LOCAL_4_0_H
+#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_LOCAL_4_0_H
 
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <utils/Errors.h>
@@ -24,6 +24,7 @@
 #include "DeviceHalLocal.h"
 
 namespace android {
+namespace V4_0 {
 
 class DevicesFactoryHalLocal : public DevicesFactoryHalInterface
 {
@@ -41,6 +42,7 @@ class DevicesFactoryHalLocal : public DevicesFactoryHalInterface
     virtual ~DevicesFactoryHalLocal() {}
 };
 
+} // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_LOCAL_H
+#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_LOCAL_4_0_H

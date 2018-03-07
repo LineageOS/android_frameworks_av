@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_STREAM_HAL_LOCAL_H
-#define ANDROID_HARDWARE_STREAM_HAL_LOCAL_H
+#ifndef ANDROID_HARDWARE_STREAM_HAL_LOCAL_4_0_H
+#define ANDROID_HARDWARE_STREAM_HAL_LOCAL_4_0_H
 
 #include <media/audiohal/StreamHalInterface.h>
 #include "StreamPowerLog.h"
 
 namespace android {
+namespace V4_0 {
 
 class DeviceHalLocal;
 
@@ -205,6 +206,7 @@ class StreamInHalLocal : public StreamInHalInterface, public StreamHalLocal {
     virtual ~StreamInHalLocal();
 };
 
+} // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_STREAM_HAL_LOCAL_H
+#endif // ANDROID_HARDWARE_STREAM_HAL_LOCAL_4_0_H

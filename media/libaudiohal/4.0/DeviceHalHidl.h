@@ -14,20 +14,21 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_DEVICE_HAL_HIDL_H
-#define ANDROID_HARDWARE_DEVICE_HAL_HIDL_H
+#ifndef ANDROID_HARDWARE_DEVICE_HAL_HIDL_4_0_H
+#define ANDROID_HARDWARE_DEVICE_HAL_HIDL_4_0_H
 
-#include <android/hardware/audio/2.0/IDevice.h>
-#include <android/hardware/audio/2.0/IPrimaryDevice.h>
+#include <android/hardware/audio/4.0/IDevice.h>
+#include <android/hardware/audio/4.0/IPrimaryDevice.h>
 #include <media/audiohal/DeviceHalInterface.h>
 
 #include "ConversionHelperHidl.h"
 
-using ::android::hardware::audio::V2_0::IDevice;
-using ::android::hardware::audio::V2_0::IPrimaryDevice;
+using ::android::hardware::audio::V4_0::IDevice;
+using ::android::hardware::audio::V4_0::IPrimaryDevice;
 using ::android::hardware::Return;
 
 namespace android {
+namespace V4_0 {
 
 class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
 {
@@ -121,6 +122,7 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
     virtual ~DeviceHalHidl();
 };
 
+} // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_DEVICE_HAL_HIDL_H
+#endif // ANDROID_HARDWARE_DEVICE_HAL_HIDL_4_0_H

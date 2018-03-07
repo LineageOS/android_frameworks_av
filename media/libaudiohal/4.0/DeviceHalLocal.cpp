@@ -23,6 +23,7 @@
 #include "StreamHalLocal.h"
 
 namespace android {
+namespace V4_0 {
 
 DeviceHalLocal::DeviceHalLocal(audio_hw_device_t *dev)
         : mDev(dev) {
@@ -196,4 +197,5 @@ void DeviceHalLocal::closeInputStream(struct audio_stream_in *stream_in) {
     mDev->close_input_stream(mDev, stream_in);
 }
 
+} // namespace V4_0
 } // namespace android

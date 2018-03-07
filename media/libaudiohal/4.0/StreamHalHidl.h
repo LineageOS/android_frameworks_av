@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_STREAM_HAL_HIDL_H
-#define ANDROID_HARDWARE_STREAM_HAL_HIDL_H
+#ifndef ANDROID_HARDWARE_STREAM_HAL_HIDL_4_0_H
+#define ANDROID_HARDWARE_STREAM_HAL_HIDL_4_0_H
 
 #include <atomic>
 
-#include <android/hardware/audio/2.0/IStream.h>
-#include <android/hardware/audio/2.0/IStreamIn.h>
-#include <android/hardware/audio/2.0/IStreamOut.h>
+#include <android/hardware/audio/4.0/IStream.h>
+#include <android/hardware/audio/4.0/IStreamIn.h>
+#include <android/hardware/audio/4.0/IStreamOut.h>
 #include <fmq/EventFlag.h>
 #include <fmq/MessageQueue.h>
 #include <media/audiohal/StreamHalInterface.h>
@@ -29,18 +29,19 @@
 #include "ConversionHelperHidl.h"
 #include "StreamPowerLog.h"
 
-using ::android::hardware::audio::V2_0::IStream;
-using ::android::hardware::audio::V2_0::IStreamIn;
-using ::android::hardware::audio::V2_0::IStreamOut;
+using ::android::hardware::audio::V4_0::IStream;
+using ::android::hardware::audio::V4_0::IStreamIn;
+using ::android::hardware::audio::V4_0::IStreamOut;
 using ::android::hardware::EventFlag;
 using ::android::hardware::MessageQueue;
 using ::android::hardware::Return;
-using ReadParameters = ::android::hardware::audio::V2_0::IStreamIn::ReadParameters;
-using ReadStatus = ::android::hardware::audio::V2_0::IStreamIn::ReadStatus;
-using WriteCommand = ::android::hardware::audio::V2_0::IStreamOut::WriteCommand;
-using WriteStatus = ::android::hardware::audio::V2_0::IStreamOut::WriteStatus;
+using ReadParameters = ::android::hardware::audio::V4_0::IStreamIn::ReadParameters;
+using ReadStatus = ::android::hardware::audio::V4_0::IStreamIn::ReadStatus;
+using WriteCommand = ::android::hardware::audio::V4_0::IStreamOut::WriteCommand;
+using WriteStatus = ::android::hardware::audio::V4_0::IStreamOut::WriteStatus;
 
 namespace android {
+namespace V4_0 {
 
 class DeviceHalHidl;
 
@@ -234,6 +235,7 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
     status_t prepareForReading(size_t bufferSize);
 };
 
+} // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_STREAM_HAL_HIDL_H
+#endif // ANDROID_HARDWARE_STREAM_HAL_HIDL_4_0_H

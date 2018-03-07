@@ -24,6 +24,7 @@
 #include "StreamHalLocal.h"
 
 namespace android {
+namespace V4_0 {
 
 StreamHalLocal::StreamHalLocal(audio_stream_t *stream, sp<DeviceHalLocal> device)
         : mDevice(device),
@@ -313,4 +314,5 @@ status_t StreamInHalLocal::getMmapPosition(struct audio_mmap_position *position)
     return mStream->get_mmap_position(mStream, position);
 }
 
+} // namespace V4_0
 } // namespace android

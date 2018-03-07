@@ -26,19 +26,20 @@
 #include "EffectHalHidl.h"
 #include "HidlUtils.h"
 
-using ::android::hardware::audio::effect::V2_0::AudioBuffer;
-using ::android::hardware::audio::effect::V2_0::EffectBufferAccess;
-using ::android::hardware::audio::effect::V2_0::EffectConfigParameters;
-using ::android::hardware::audio::effect::V2_0::MessageQueueFlagBits;
-using ::android::hardware::audio::effect::V2_0::Result;
-using ::android::hardware::audio::common::V2_0::HidlUtils;
-using ::android::hardware::audio::common::V2_0::AudioChannelMask;
-using ::android::hardware::audio::common::V2_0::AudioFormat;
+using ::android::hardware::audio::effect::V4_0::AudioBuffer;
+using ::android::hardware::audio::effect::V4_0::EffectBufferAccess;
+using ::android::hardware::audio::effect::V4_0::EffectConfigParameters;
+using ::android::hardware::audio::effect::V4_0::MessageQueueFlagBits;
+using ::android::hardware::audio::effect::V4_0::Result;
+using ::android::hardware::audio::common::V4_0::HidlUtils;
+using ::android::hardware::audio::common::V4_0::AudioChannelMask;
+using ::android::hardware::audio::common::V4_0::AudioFormat;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
 
 namespace android {
+namespace V4_0 {
 
 EffectHalHidl::EffectHalHidl(const sp<IEffect>& effect, uint64_t effectId)
         : mEffect(effect), mEffectId(effectId), mBuffersChanged(true), mEfGroup(nullptr) {
@@ -335,4 +336,5 @@ status_t EffectHalHidl::setConfigImpl(
     return result;
 }
 
+} // namespace V4_0
 } // namespace android

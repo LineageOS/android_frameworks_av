@@ -14,20 +14,21 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_EFFECT_BUFFER_HAL_HIDL_H
-#define ANDROID_HARDWARE_EFFECT_BUFFER_HAL_HIDL_H
+#ifndef ANDROID_HARDWARE_EFFECT_BUFFER_HAL_HIDL_4_0_H
+#define ANDROID_HARDWARE_EFFECT_BUFFER_HAL_HIDL_4_0_H
 
-#include <android/hardware/audio/effect/2.0/types.h>
+#include <android/hardware/audio/effect/4.0/types.h>
 #include <android/hidl/memory/1.0/IMemory.h>
 #include <hidl/HidlSupport.h>
 #include <media/audiohal/EffectBufferHalInterface.h>
 #include <system/audio_effect.h>
 
-using android::hardware::audio::effect::V2_0::AudioBuffer;
+using android::hardware::audio::effect::V4_0::AudioBuffer;
 using android::hardware::hidl_memory;
 using android::hidl::memory::V1_0::IMemory;
 
 namespace android {
+namespace V4_0 {
 
 class EffectBufferHalHidl : public EffectBufferHalInterface
 {
@@ -71,6 +72,7 @@ class EffectBufferHalHidl : public EffectBufferHalInterface
     status_t init();
 };
 
+} // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_EFFECT_BUFFER_HAL_HIDL_H
+#endif // ANDROID_HARDWARE_EFFECT_BUFFER_HAL_HIDL_4_0_H
