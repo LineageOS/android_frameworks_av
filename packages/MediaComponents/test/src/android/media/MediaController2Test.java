@@ -118,8 +118,8 @@ public class MediaController2Test extends MediaSession2TestBase {
 
     @Ignore
     @Test
-    public void testSkipToPrevious() throws InterruptedException {
-        mController.skipToPrevious();
+    public void testSkipToPreviousItem() throws InterruptedException {
+        mController.skipToPreviousItem();
         try {
             assertTrue(mPlayer.mCountDownLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
         } catch (InterruptedException e) {
@@ -129,8 +129,8 @@ public class MediaController2Test extends MediaSession2TestBase {
     }
 
     @Test
-    public void testSkipToNext() throws InterruptedException {
-        mController.skipToNext();
+    public void testSkipToNextItem() throws InterruptedException {
+        mController.skipToNextItem();
         try {
             assertTrue(mPlayer.mCountDownLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
         } catch (InterruptedException e) {
@@ -211,7 +211,7 @@ public class MediaController2Test extends MediaSession2TestBase {
         } catch (InterruptedException e) {
             fail(e.getMessage());
         }
-        assertTrue(mPlayer.mSetCurrentPlaylistItemCalled);
+        assertTrue(mPlayer.mSetCurrentPlaylistCalled);
         assertEquals(itemIndex, mPlayer.mCurrentItem);
     }
     */
@@ -622,9 +622,9 @@ public class MediaController2Test extends MediaSession2TestBase {
                     player.notifyPlaybackState(state);
                     controller.stop();
                     player.notifyPlaybackState(state);
-                    controller.skipToNext();
+                    controller.skipToNextItem();
                     player.notifyPlaybackState(state);
-                    controller.skipToPrevious();
+                    controller.skipToPreviousItem();
                 }
                 // This may hang if deadlock happens.
                 latch.countDown();

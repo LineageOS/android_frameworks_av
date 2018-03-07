@@ -21,14 +21,12 @@ import static android.media.SessionToken2.TYPE_LIBRARY_SERVICE;
 import static android.media.SessionToken2.TYPE_SESSION;
 import static android.media.SessionToken2.TYPE_SESSION_SERVICE;
 
-import android.Manifest.permission;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
@@ -39,7 +37,7 @@ import android.media.MediaLibraryService2;
 import android.media.MediaMetadata2;
 import android.media.MediaPlayerBase;
 import android.media.MediaPlayerBase.PlayerEventCallback;
-import android.media.MediaPlaylistController;
+import android.media.MediaPlaylistAgent;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Builder;
 import android.media.MediaSession2.Command;
@@ -107,7 +105,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @GuardedBy("mLock")
     private MediaPlayerBase mPlayer;
     @GuardedBy("mLock")
-    private MediaPlaylistController mMplc;
+    private MediaPlaylistAgent mMplc;
     @GuardedBy("mLock")
     private VolumeProvider2 mVolumeProvider;
     @GuardedBy("mLock")
@@ -127,7 +125,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
      * @param callback
      */
     public MediaSession2Impl(Context context, MediaPlayerBase player, String id,
-            MediaPlaylistController mplc, VolumeProvider2 volumeProvider,
+            MediaPlaylistAgent mplc, VolumeProvider2 volumeProvider,
             PendingIntent sessionActivity,
             Executor callbackExecutor, SessionCallback callback) {
         // TODO(jaewan): Keep other params.
@@ -206,7 +204,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void updatePlayer_impl(MediaPlayerBase player, MediaPlaylistController mplc,
+    public void updatePlayer_impl(MediaPlayerBase player, MediaPlaylistAgent mplc,
             VolumeProvider2 volumeProvider) throws IllegalArgumentException {
         ensureCallingThread();
         if (player == null) {
@@ -1271,7 +1269,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         String mId;
         Executor mCallbackExecutor;
         C mCallback;
-        MediaPlaylistController mMplc;
+        MediaPlaylistAgent mMplc;
         VolumeProvider2 mVolumeProvider;
         PendingIntent mSessionActivity;
 
@@ -1300,7 +1298,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public void setPlaylistController_impl(MediaPlaylistController mplc) {
+        public void setPlaylistController_impl(MediaPlaylistAgent mplc) {
             if (mplc == null) {
                 throw new IllegalArgumentException("mplc shouldn't be null");
             }
