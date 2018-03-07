@@ -435,10 +435,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     session.getInstance().stop();
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM:
-                    session.getInstance().skipToPrevious();
+                    session.getInstance().skipToPreviousItem();
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM:
-                    session.getInstance().skipToNext();
+                    session.getInstance().skipToNextItem();
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE:
                     session.getInstance().prepare();

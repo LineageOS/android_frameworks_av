@@ -189,18 +189,18 @@ public class MediaSession2Test extends MediaSession2TestBase {
     }
 
     @Test
-    public void testSkipToNext() throws Exception {
+    public void testSkipToNextItem() throws Exception {
         sHandler.postAndSync(() -> {
-            mSession.skipToNext();
+            mSession.skipToNextItem();
             assertTrue(mPlayer.mSkipToNextCalled);
         });
     }
 
     @Ignore
     @Test
-    public void testSkipToPrevious() throws Exception {
+    public void testSkipToPreviousItem() throws Exception {
         sHandler.postAndSync(() -> {
-            mSession.skipToPrevious();
+            mSession.skipToPreviousItem();
             assertTrue(mPlayer.mSkipToPreviousCalled);
         });
     }
@@ -356,7 +356,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
         assertEquals(1, callback.commands.size());
         assertEquals(MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE,
                 (long) callback.commands.get(0).getCommandCode());
-        controller.skipToNext();
+        controller.skipToNextItem();
         assertTrue(mPlayer.mCountDownLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
         assertTrue(mPlayer.mSkipToNextCalled);
         assertFalse(mPlayer.mPauseCalled);

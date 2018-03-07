@@ -151,13 +151,13 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
     public void testSkipToNext() throws InterruptedException {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM));
-        createController(mSession.getToken()).skipToNext();
+        createController(mSession.getToken()).skipToNextItem();
         verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
                 matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM));
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM));
-        createController(mSession.getToken()).skipToNext();
+        createController(mSession.getToken()).skipToNextItem();
         verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
@@ -165,13 +165,13 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
     public void testSkipToPrevious() throws InterruptedException {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM));
-        createController(mSession.getToken()).skipToPrevious();
+        createController(mSession.getToken()).skipToPreviousItem();
         verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
                 matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM));
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM));
-        createController(mSession.getToken()).skipToPrevious();
+        createController(mSession.getToken()).skipToPreviousItem();
         verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
