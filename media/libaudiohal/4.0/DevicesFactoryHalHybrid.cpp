@@ -14,23 +14,30 @@
  * limitations under the License.
  */
 
-#include <android/hardware/audio/2.0/IDevicesFactory.h>
-#include <android/hardware/audio/4.0/IDevicesFactory.h>
+#define LOG_TAG "DevicesFactoryHalHybrid"
+//#define LOG_NDEBUG 0
 
-#include <DevicesFactoryHalHybrid.h>
 #include <libaudiohal/4.0/DevicesFactoryHalHybrid.h>
+#include "DevicesFactoryHalLocal.h"
+#include "DevicesFactoryHalHidl.h"
 
 namespace android {
+namespace V4_0 {
 
-// static
-sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
-    if (hardware::audio::V4_0::IDevicesFactory::getService() != nullptr) {
-        return new V4_0::DevicesFactoryHalHybrid();
-    }
-    if (hardware::audio::V2_0::IDevicesFactory::getService() != nullptr) {
-        return new DevicesFactoryHalHybrid();
-    }
-    return nullptr;
+DevicesFactoryHalHybrid::DevicesFactoryHalHybrid()
+        : mLocalFactory(new DevicesFactoryHalLocal()),
+          mHidlFactory(new DevicesFactoryHalHidl()) {
 }
 
+DevicesFactoryHalHybrid::~DevicesFactoryHalHybrid() {
+}
+
+status_t DevicesFactoryHalHybrid::openDevice(const char *name, sp<DeviceHalInterface> *device) {
+    if (mHidlFactory != 0 && strcmp(AUDIO_HARDWARE_MODULE_ID_A2DP, name) != 0) {
+        return mHidlFactory->openDevice(name, device);
+    }
+    return mLocalFactory->openDevice(name, device);
+}
+
+} // namespace V4_0
 } // namespace android

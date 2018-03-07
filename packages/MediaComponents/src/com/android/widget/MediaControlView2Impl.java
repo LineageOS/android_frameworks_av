@@ -75,6 +75,13 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     static final String KEY_STATE_IS_ADVERTISEMENT = "MediaTypeAdvertisement";
     static final String EVENT_UPDATE_MEDIA_TYPE_STATUS = "UpdateMediaTypeStatus";
 
+    // String for receiving command to show subtitle from MediaSession.
+    static final String COMMAND_SHOW_SUBTITLE = "showSubtitle";
+    // String for receiving command to hide subtitle from MediaSession.
+    static final String COMMAND_HIDE_SUBTITLE = "hideSubtitle";
+    // TODO: remove once the implementation is revised
+    public static final String COMMAND_SET_FULLSCREEN = "setFullscreen";
+
     private static final int MAX_PROGRESS = 1000;
     private static final int DEFAULT_PROGRESS_UPDATE_TIME_MS = 1000;
     private static final int REWIND_TIME_MS = 10000;
@@ -743,12 +750,12 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             if (!mSubtitleIsEnabled) {
                 mSubtitleButton.setImageDrawable(
                         mResources.getDrawable(R.drawable.ic_media_subtitle_enabled, null));
-                mController.sendCommand(MediaControlView2.COMMAND_SHOW_SUBTITLE, null, null);
+                mController.sendCommand(MediaControlView2Impl.COMMAND_SHOW_SUBTITLE, null, null);
                 mSubtitleIsEnabled = true;
             } else {
                 mSubtitleButton.setImageDrawable(
                         mResources.getDrawable(R.drawable.ic_media_subtitle_disabled, null));
-                mController.sendCommand(MediaControlView2.COMMAND_HIDE_SUBTITLE, null, null);
+                mController.sendCommand(MediaControlView2Impl.COMMAND_HIDE_SUBTITLE, null, null);
                 mSubtitleIsEnabled = false;
             }
         }
@@ -768,7 +775,7 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             }
             Bundle args = new Bundle();
             args.putBoolean(ARGUMENT_KEY_FULLSCREEN, isEnteringFullScreen);
-            mController.sendCommand(MediaControlView2.COMMAND_SET_FULLSCREEN, args, null);
+            mController.sendCommand(MediaControlView2Impl.COMMAND_SET_FULLSCREEN, args, null);
 
             mIsFullScreen = isEnteringFullScreen;
         }
