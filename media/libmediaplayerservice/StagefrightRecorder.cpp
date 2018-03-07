@@ -105,7 +105,7 @@ StagefrightRecorder::StagefrightRecorder(const String16 &opPackageName)
     : MediaRecorderBase(opPackageName),
       mWriter(NULL),
       mOutputFd(-1),
-      mAudioSource(AUDIO_SOURCE_CNT),
+      mAudioSource((audio_source_t)AUDIO_SOURCE_CNT), // initialize with invalid value
       mVideoSource(VIDEO_SOURCE_LIST_END),
       mStarted(false),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
@@ -2047,7 +2047,7 @@ status_t StagefrightRecorder::reset() {
     stop();
 
     // No audio or video source by default
-    mAudioSource = AUDIO_SOURCE_CNT;
+    mAudioSource = (audio_source_t)AUDIO_SOURCE_CNT; // reset to invalid value
     mVideoSource = VIDEO_SOURCE_LIST_END;
 
     // Default parameters
