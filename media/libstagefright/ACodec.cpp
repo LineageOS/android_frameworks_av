@@ -1115,8 +1115,13 @@ status_t ACodec::setupNativeWindowSizeFormatAndUsage(
     ALOGV("gralloc usage: %#x(OMX) => %#x(ACodec)", omxUsage, usage);
     return setNativeWindowSizeFormatAndUsage(
             nativeWindow,
+#if defined(MTK_HARDWARE)
+            def.format.video.nStride;
+            def.format.video.nSliceHeight;
+#else
             def.format.video.nFrameWidth,
             def.format.video.nFrameHeight,
+#endif
             def.format.video.eColorFormat,
             mRotationDegrees,
             usage,
