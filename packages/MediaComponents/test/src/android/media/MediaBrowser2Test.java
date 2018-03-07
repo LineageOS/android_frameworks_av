@@ -499,10 +499,14 @@ public class MediaBrowser2Test extends MediaController2Test {
             mCallbackProxy.onCustomCommand(command, args, receiver);
         }
 
-
         @Override
         public void onCustomLayoutChanged(MediaController2 controller, List<CommandButton> layout) {
             mCallbackProxy.onCustomLayoutChanged(layout);
+        }
+
+        @Override
+        public void onAllowedCommandsChanged(MediaController2 controller, CommandGroup commands) {
+            mCallbackProxy.onAllowedCommandsChanged(commands);
         }
 
         @Override

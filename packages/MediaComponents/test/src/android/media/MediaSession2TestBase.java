@@ -69,6 +69,7 @@ abstract class MediaSession2TestBase {
         default void onPlaybackInfoChanged(MediaController2.PlaybackInfo info) {}
         default void onPlaybackStateChanged(PlaybackState2 state) {}
         default void onCustomLayoutChanged(List<CommandButton> layout) {}
+        default void onAllowedCommandsChanged(CommandGroup commands) {}
         default void onCustomCommand(Command command, Bundle args, ResultReceiver receiver) {}
     }
 
@@ -246,6 +247,11 @@ abstract class MediaSession2TestBase {
         @Override
         public void onCustomLayoutChanged(MediaController2 controller, List<CommandButton> layout) {
             mCallbackProxy.onCustomLayoutChanged(layout);
+        }
+
+        @Override
+        public void onAllowedCommandsChanged(MediaController2 controller, CommandGroup commands) {
+            mCallbackProxy.onAllowedCommandsChanged(commands);
         }
     }
 

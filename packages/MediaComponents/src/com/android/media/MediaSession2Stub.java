@@ -958,6 +958,22 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         }
     }
 
+    public void setAllowedCommands(ControllerInfo controller, CommandGroup commands) {
+        synchronized (mLock) {
+            mAllowedCommandGroupMap.put(controller, commands);
+        }
+        final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(controller);
+        if (controllerBinder == null) {
+            return;
+        }
+        try {
+            controllerBinder.onAllowedCommandsChanged(commands.toBundle());
+        } catch (RemoteException e) {
+            Log.w(TAG, "Controller is gone", e);
+            // TODO(jaewan): What to do when the controller is gone?
+        }
+    }
+
     public void sendCustomCommand(ControllerInfo controller, Command command, Bundle args,
             ResultReceiver receiver) {
         if (receiver != null && controller == null) {
