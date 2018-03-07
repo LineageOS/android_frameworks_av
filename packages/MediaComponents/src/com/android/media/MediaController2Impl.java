@@ -776,6 +776,12 @@ public class MediaController2Impl implements MediaController2Provider {
         });
     }
 
+    void onAllowedCommandsChanged(final CommandGroup commands) {
+        mCallbackExecutor.execute(() -> {
+            mCallback.onAllowedCommandsChanged(mInstance, commands);
+        });
+    }
+
     void onCustomLayoutChanged(final List<CommandButton> layout) {
         mCallbackExecutor.execute(() -> {
             mCallback.onCustomLayoutChanged(mInstance, layout);

@@ -429,7 +429,13 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     @Override
     public void setAllowedCommands_impl(ControllerInfo controller, CommandGroup commands) {
-        // TODO(jaewan): Implement
+        if (controller == null) {
+            throw new IllegalArgumentException("controller shouldn't be null");
+        }
+        if (commands == null) {
+            throw new IllegalArgumentException("commands shouldn't be null");
+        }
+        mSessionStub.setAllowedCommands(controller, commands);
     }
 
     @Override

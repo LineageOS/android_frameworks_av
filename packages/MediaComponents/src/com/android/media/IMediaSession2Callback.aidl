@@ -41,6 +41,7 @@ oneway interface IMediaSession2Callback {
     void onDisconnected();
 
     void onCustomLayoutChanged(in List<Bundle> commandButtonlist);
+    void onAllowedCommandsChanged(in Bundle commands);
 
     void onCustomCommand(in Bundle command, in Bundle args, in ResultReceiver receiver);
 
