@@ -351,7 +351,7 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void setVolumeTo_impl(int value, int flags) {
         // TODO(hdmoon): sanity check
-        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_SET_VOLUME);
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYBACK_SET_VOLUME);
         if (binder != null) {
             try {
                 binder.setVolumeTo(mSessionCallbackStub, value, flags);
@@ -366,7 +366,7 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void adjustVolume_impl(int direction, int flags) {
         // TODO(hdmoon): sanity check
-        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_SET_VOLUME);
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYBACK_SET_VOLUME);
         if (binder != null) {
             try {
                 binder.adjustVolume(mSessionCallbackStub, direction, flags);
@@ -561,7 +561,7 @@ public class MediaController2Impl implements MediaController2Provider {
         Bundle args = new Bundle();
         args.putInt(MediaSession2Stub.ARGUMENT_KEY_ITEM_INDEX, item);
         sendTransportControlCommand(
-                MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_TO_PLAYLIST_ITEM, args);
+                MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_TO_PLAYLIST_ITEM, args);
         */
     }
 

@@ -885,8 +885,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         @Override
         public void addAllPredefinedCommands_impl() {
-            final int COMMAND_CODE_MAX = 22;
-            for (int i = 1; i <= COMMAND_CODE_MAX; i++) {
+            for (int i = 1; i <= MediaSession2.COMMAND_CODE_MAX; i++) {
                 mCommands.add(new Command(mContext, i));
             }
         }

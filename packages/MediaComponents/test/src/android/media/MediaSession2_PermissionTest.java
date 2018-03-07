@@ -28,7 +28,6 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.SessionCallback;
@@ -41,8 +40,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentMatcher;
-import org.mockito.Mockito;
 
 /**
  * Tests whether {@link MediaSession2} receives commands that hasn't allowed.
@@ -260,12 +257,12 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
 
     @Test
     public void testSetVolume() throws InterruptedException {
-        createSessionWithAllowedActions(createCommandGroupWith(COMMAND_CODE_SET_VOLUME));
+        createSessionWithAllowedActions(createCommandGroupWith(COMMAND_CODE_PLAYBACK_SET_VOLUME));
         createController(mSession.getToken()).setVolumeTo(0, 0);
         verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
-                matchesSession(), matchesCaller(), matches(COMMAND_CODE_SET_VOLUME));
+                matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_SET_VOLUME));
 
-        createSessionWithAllowedActions(createCommandGroupWithout(COMMAND_CODE_SET_VOLUME));
+        createSessionWithAllowedActions(createCommandGroupWithout(COMMAND_CODE_PLAYBACK_SET_VOLUME));
         createController(mSession.getToken()).setVolumeTo(0, 0);
         verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }

@@ -267,7 +267,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 final Bundle paramsBundle = (params != null) ? params.toBundle() : null;
                 final PendingIntent sessionActivity = session.getSessionActivity();
                 final List<MediaItem2> playlist =
-                        allowedCommands.hasCommand(MediaSession2.COMMAND_CODE_PLAYLIST_GET)
+                        allowedCommands.hasCommand(MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST)
                                 ? session.getInstance().getPlaylist() : null;
                 final List<Bundle> playlistBundle;
                 if (playlist != null) {
@@ -332,23 +332,23 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             throws RuntimeException {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_SET_VOLUME);
+                caller, MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME);
         if (session == null || controller == null) {
             return;
         }
         session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_SET_VOLUME) == null) {
+            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME) == null) {
                 return;
             }
             // TODO(jaewan): Sanity check.
             Command command = new Command(
-                    session.getContext(), MediaSession2.COMMAND_CODE_SET_VOLUME);
+                    session.getContext(), MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME);
             boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
                     controller, command);
             if (!accepted) {
                 // Don't run rejected command.
                 if (DEBUG) {
-                    Log.d(TAG, "Command " + MediaSession2.COMMAND_CODE_SET_VOLUME + " from "
+                    Log.d(TAG, "Command " + MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME + " from "
                             + controller + " was rejected by " + session);
                 }
                 return;
@@ -368,23 +368,23 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             throws RuntimeException {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_SET_VOLUME);
+                caller, MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME);
         if (session == null || controller == null) {
             return;
         }
         session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_SET_VOLUME) == null) {
+            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME) == null) {
                 return;
             }
             // TODO(jaewan): Sanity check.
             Command command = new Command(
-                    session.getContext(), MediaSession2.COMMAND_CODE_SET_VOLUME);
+                    session.getContext(), MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME);
             boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
                     controller, command);
             if (!accepted) {
                 // Don't run rejected command.
                 if (DEBUG) {
-                    Log.d(TAG, "Command " + MediaSession2.COMMAND_CODE_SET_VOLUME + " from "
+                    Log.d(TAG, "Command " + MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME + " from "
                             + controller + " was rejected by " + session);
                 }
                 return;
@@ -452,18 +452,21 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO:
                     session.getInstance().seekTo(args.getLong(ARGUMENT_KEY_POSITION));
                     break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_TO_PLAYLIST_ITEM:
+                case MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_TO_PLAYLIST_ITEM:
                     // TODO(jaewan): Implement
                     /*
                     session.getInstance().skipToPlaylistItem(
                             args.getInt(ARGUMENT_KEY_ITEM_INDEX));
                     */
                     break;
+                    // TODO(jaewan): Remove (b/74116823)
+                    /*
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS:
                     session.getInstance().setPlaylistParams(
                             PlaylistParams.fromBundle(session.getContext(),
                                     args.getBundle(ARGUMENT_KEY_PLAYLIST_PARAMS)));
                     break;
+                    */
                 default:
                     // TODO(jaewan): Resend unknown (new) commands through the custom command.
             }
@@ -910,7 +913,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
             final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(
-                    list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET);
+                    list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST);
             if (controllerBinder != null) {
                 try {
                     controllerBinder.onPlaylistChanged(bundleList);
