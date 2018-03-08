@@ -184,7 +184,7 @@ ERROR_CODE pvmp3_decode_header(tmp3Bits  *inputStream,
     info->emphasis           = (temp << 30) >> 30;  /* 2 */
 
 
-    if (!info->bitrate_index || info->sampling_frequency == 3)
+    if (!info->bitrate_index || info->bitrate_index == 15 || info->sampling_frequency == 3)
     {
         err = UNSUPPORTED_FREE_BITRATE;
     }
