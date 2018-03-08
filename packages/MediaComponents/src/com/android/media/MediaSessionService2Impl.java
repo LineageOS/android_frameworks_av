@@ -138,7 +138,7 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
 
     private class SessionServiceEventCallback extends PlayerEventCallback {
         @Override
-        public void onPlayerStateChanged(MediaPlayerBase mpb, int state) {
+        public void onPlayerStateChanged(MediaPlayerBase player, int state) {
             // TODO: Implement this
             return;
         }
