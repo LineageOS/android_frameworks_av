@@ -16,9 +16,7 @@
 
 package com.android.widget;
 
-import android.annotation.NonNull;
 import android.content.Context;
-import android.content.res.Resources;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
@@ -27,7 +25,6 @@ import android.media.MediaMetadata;
 import android.media.MediaPlayer2;
 import android.media.MediaPlayer2.MediaPlayer2EventCallback;
 import android.media.MediaPlayer2Impl;
-import android.media.MediaPlayerBase;
 import android.media.Cea708CaptionRenderer;
 import android.media.ClosedCaptionRenderer;
 import android.media.MediaItem2;
@@ -47,6 +44,7 @@ import android.media.SessionToken2;
 import android.media.update.VideoView2Provider;
 import android.media.update.ViewGroupProvider;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.ResultReceiver;
 import android.support.annotation.Nullable;
@@ -60,15 +58,12 @@ import android.view.accessibility.AccessibilityManager;
 import android.widget.MediaControlView2;
 import android.widget.VideoView2;
 
-import com.android.media.update.ApiHelper;
-import com.android.media.update.R;
+import com.android.media.RoutePlayer;
+import com.android.support.mediarouter.media.MediaItemStatus;
+import com.android.support.mediarouter.media.MediaControlIntent;
 import com.android.support.mediarouter.media.MediaRouter;
 import com.android.support.mediarouter.media.MediaRouteSelector;
-import com.android.support.mediarouter.media.RemotePlaybackClient;
-import com.android.support.mediarouter.media.MediaItemStatus;
-import com.android.support.mediarouter.media.MediaSessionStatus;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -106,12 +101,10 @@ public class VideoView2Impl extends BaseLayout
     private VideoSurfaceView mSurfaceView;
 
     private MediaPlayer2 mMediaPlayer;
+    private DataSourceDesc mDsd;
     private MediaControlView2 mMediaControlView;
     private MediaSession mMediaSession;
     private MediaController mMediaController;
-    private MediaSession.Callback mRouteSessionCallback = new RouteSessionCallback();
-    private MediaRouter mMediaRouter;
-    private MediaRouteSelector mRouteSelector;
     private Metadata mMetadata;
     private MediaMetadata2 mMediaMetadata;
     private boolean mNeedUpdateMediaType;
@@ -144,8 +137,79 @@ public class VideoView2Impl extends BaseLayout
     // TODO: Remove mFallbackSpeed when integration with MediaPlayer2's new setPlaybackParams().
     // Refer: https://docs.google.com/document/d/1nzAfns6i2hJ3RkaUre3QMT6wsDedJ5ONLiA_OOBFFX8/edit
     private float mFallbackSpeed;  // keep the original speed before 'pause' is called.
-
     private long mShowControllerIntervalMs;
+
+    private MediaRouter mMediaRouter;
+    private MediaRouteSelector mRouteSelector;
+    private MediaRouter.RouteInfo mRoute;
+    private RoutePlayer mRoutePlayer;
+
+    private final MediaRouter.Callback mRouterCallback = new MediaRouter.Callback() {
+        @Override
+        public void onRouteSelected(MediaRouter router, MediaRouter.RouteInfo route) {
+            if (route.supportsControlCategory(MediaControlIntent.CATEGORY_REMOTE_PLAYBACK)) {
+                // Stop local playback (if necessary)
+                resetPlayer();
+                mRoute = route;
+                mRoutePlayer = new RoutePlayer(mInstance.getContext(), route);
+                mRoutePlayer.setPlayerEventCallback(new RoutePlayer.PlayerEventCallback() {
+                    @Override
+                    public void onPlayerStateChanged(MediaItemStatus itemStatus) {
+                        PlaybackState.Builder psBuilder = new PlaybackState.Builder();
+                        psBuilder.setActions(RoutePlayer.PLAYBACK_ACTIONS);
+                        long position = itemStatus.getContentPosition();
+                        switch (itemStatus.getPlaybackState()) {
+                            case MediaItemStatus.PLAYBACK_STATE_PENDING:
+                                psBuilder.setState(PlaybackState.STATE_NONE, position, 0);
+                                mCurrentState = STATE_IDLE;
+                                break;
+                            case MediaItemStatus.PLAYBACK_STATE_PLAYING:
+                                psBuilder.setState(PlaybackState.STATE_PLAYING, position, 1);
+                                mCurrentState = STATE_PLAYING;
+                                break;
+                            case MediaItemStatus.PLAYBACK_STATE_PAUSED:
+                                psBuilder.setState(PlaybackState.STATE_PAUSED, position, 0);
+                                mCurrentState = STATE_PAUSED;
+                                break;
+                            case MediaItemStatus.PLAYBACK_STATE_BUFFERING:
+                                psBuilder.setState(PlaybackState.STATE_BUFFERING, position, 0);
+                                mCurrentState = STATE_PAUSED;
+                                break;
+                            case MediaItemStatus.PLAYBACK_STATE_FINISHED:
+                                psBuilder.setState(PlaybackState.STATE_STOPPED, position, 0);
+                                mCurrentState = STATE_PLAYBACK_COMPLETED;
+                                break;
+                        }
+
+                        PlaybackState pbState = psBuilder.build();
+                        mMediaSession.setPlaybackState(pbState);
+
+                        MediaMetadata.Builder mmBuilder = new MediaMetadata.Builder();
+                        mmBuilder.putLong(MediaMetadata.METADATA_KEY_DURATION,
+                                itemStatus.getContentDuration());
+                        mMediaSession.setMetadata(mmBuilder.build());
+                    }
+                });
+                // Start remote playback (if necessary)
+                mRoutePlayer.openVideo(mDsd);
+            }
+        }
+
+        @Override
+        public void onRouteUnselected(MediaRouter router, MediaRouter.RouteInfo route, int reason) {
+            if (mRoute != null && mRoutePlayer != null) {
+                mRoutePlayer.release();
+                mRoutePlayer = null;
+            }
+            if (mRoute == route) {
+                mRoute = null;
+            }
+            if (reason != MediaRouter.UNSELECT_REASON_ROUTE_CHANGED) {
+                // TODO: Resume local playback  (if necessary)
+                openVideo(mDsd);
+            }
+        }
+    };
 
     public VideoView2Impl(VideoView2 instance,
             ViewGroupProvider superProvider, ViewGroupProvider privateProvider) {
@@ -220,16 +284,20 @@ public class VideoView2Impl extends BaseLayout
             Log.d(TAG, "viewType attribute is textureView.");
             // TODO: implement
         }
+
+        MediaRouteSelector.Builder builder = new MediaRouteSelector.Builder();
+        builder.addControlCategory(MediaControlIntent.CATEGORY_REMOTE_PLAYBACK);
+        builder.addControlCategory(MediaControlIntent.CATEGORY_LIVE_AUDIO);
+        builder.addControlCategory(MediaControlIntent.CATEGORY_LIVE_VIDEO);
+        mRouteSelector = builder.build();
     }
 
     @Override
     public void setMediaControlView2_impl(MediaControlView2 mediaControlView, long intervalMs) {
         mMediaControlView = mediaControlView;
         mShowControllerIntervalMs = intervalMs;
-        if (mRouteSelector != null) {
-            ((MediaControlView2Impl) mMediaControlView.getProvider())
-                    .setRouteSelector(mRouteSelector);
-        }
+        // TODO: Call MediaControlView2.setRouteSelector only when cast availalbe.
+        ((MediaControlView2Impl) mMediaControlView.getProvider()).setRouteSelector(mRouteSelector);
 
         if (mInstance.isAttachedToWindow()) {
             attachMediaControlView();
@@ -329,30 +397,6 @@ public class VideoView2Impl extends BaseLayout
     }
 
     @Override
-    public void setRouteAttributes_impl(List<String> routeCategories, MediaPlayerBase player) {
-        // TODO: implement this.
-    }
-
-    @Override
-    public void setRouteAttributes_impl(@NonNull List<String> routeCategories,
-            MediaSession.Callback sessionPlayer) {
-        MediaRouteSelector.Builder builder = new MediaRouteSelector.Builder();
-        for (String category : routeCategories) {
-            builder.addControlCategory(category);
-        }
-        mRouteSelector = builder.build();
-        if (mMediaControlView != null) {
-            ((MediaControlView2Impl) mMediaControlView.getProvider())
-                    .setRouteSelector(mRouteSelector);
-        }
-        mMediaRouter = MediaRouter.getInstance(mInstance.getContext());
-        mRouteSessionCallback = sessionPlayer;
-        if (mMediaSession != null) {
-            mMediaRouter.setMediaSession(mMediaSession);
-        }
-    }
-
-    @Override
     public void setVideoPath_impl(String path) {
         mInstance.setVideoUri(Uri.parse(path));
     }
@@ -376,6 +420,7 @@ public class VideoView2Impl extends BaseLayout
 
     @Override
     public void setDataSource_impl(DataSourceDesc dsd) {
+        mDsd = dsd;
         mSeekWhenPrepared = 0;
         openVideo(dsd);
     }
@@ -434,10 +479,11 @@ public class VideoView2Impl extends BaseLayout
         // Create MediaSession
         mMediaSession = new MediaSession(mInstance.getContext(), "VideoView2MediaSession");
         mMediaSession.setCallback(new MediaSessionCallback());
+        mMediaSession.setActive(true);
         mMediaController = mMediaSession.getController();
-        if (mMediaRouter != null) {
-            mMediaRouter.setMediaSession(mMediaSession);
-        }
+        mMediaRouter = MediaRouter.getInstance(mInstance.getContext());
+        mMediaRouter.setMediaSession(mMediaSession);
+        mMediaRouter.addCallback(mRouteSelector, mRouterCallback);
         attachMediaControlView();
         // TODO: remove this after moving MediaSession creating code inside initializing VideoView2
         if (mCurrentState == STATE_PREPARED) {
@@ -548,16 +594,16 @@ public class VideoView2Impl extends BaseLayout
     }
 
     private boolean isInPlaybackState() {
-        return (mMediaPlayer != null
+        return (mMediaPlayer != null || mRoutePlayer != null)
                 && mCurrentState != STATE_ERROR
                 && mCurrentState != STATE_IDLE
-                && mCurrentState != STATE_PREPARING);
+                && mCurrentState != STATE_PREPARING;
     }
 
     private boolean needToStart() {
-        return (mMediaPlayer != null
+        return (mMediaPlayer != null || mRoutePlayer != null)
                 && mCurrentState != STATE_PLAYING
-                && mTargetState == STATE_PLAYING);
+                && mTargetState == STATE_PLAYING;
     }
 
     // Creates a MediaPlayer2 instance and prepare playback.
@@ -565,6 +611,10 @@ public class VideoView2Impl extends BaseLayout
         Uri uri = dsd.getUri();
         Map<String, String> headers = dsd.getUriHeaders();
         resetPlayer();
+        if (isRemotePlayback()) {
+            mRoutePlayer.openVideo(dsd);
+            return;
+        }
         if (mAudioFocusType != AudioManager.AUDIOFOCUS_NONE) {
             // TODO this should have a focus listener
             AudioFocusRequest focusRequest;
@@ -634,9 +684,18 @@ public class VideoView2Impl extends BaseLayout
      */
     private void resetPlayer() {
         if (mMediaPlayer != null) {
-            mMediaPlayer.reset();
-            mMediaPlayer.close();
+            final MediaPlayer2 player = mMediaPlayer;
+            new AsyncTask<MediaPlayer2, Void, Void>() {
+                @Override
+                protected Void doInBackground(MediaPlayer2... players) {
+                    // TODO: Fix NPE while MediaPlayer2.close()
+                    //players[0].close();
+                    return null;
+                }
+            }.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, player);
             mMediaPlayer = null;
+            mTextureView.setMediaPlayer(null);
+            mSurfaceView.setMediaPlayer(null);
             //mPendingSubtitleTracks.clear();
             mCurrentState = STATE_IDLE;
             mTargetState = STATE_IDLE;
@@ -785,8 +844,8 @@ public class VideoView2Impl extends BaseLayout
             return false;
         }
         PlaybackInfo playbackInfo = mMediaController.getPlaybackInfo();
-        return (playbackInfo != null)
-                && (playbackInfo.getPlaybackType() == PlaybackInfo.PLAYBACK_TYPE_REMOTE);
+        return playbackInfo != null
+                && playbackInfo.getPlaybackType() == PlaybackInfo.PLAYBACK_TYPE_REMOTE;
     }
 
     private void selectOrDeselectSubtitle(boolean select) {
@@ -985,7 +1044,7 @@ public class VideoView2Impl extends BaseLayout
         @Override
         public void onCommand(String command, Bundle args, ResultReceiver receiver) {
             if (isRemotePlayback()) {
-                mRouteSessionCallback.onCommand(command, args, receiver);
+                mRoutePlayer.onCommand(command, args, receiver);
             } else {
                 switch (command) {
                     case MediaControlView2Impl.COMMAND_SHOW_SUBTITLE:
@@ -1015,57 +1074,57 @@ public class VideoView2Impl extends BaseLayout
 
         @Override
         public void onPlay() {
-            if (isRemotePlayback()) {
-                mRouteSessionCallback.onPlay();
-            } else {
-                if (isInPlaybackState() && mCurrentView.hasAvailableSurface()) {
+            if (isInPlaybackState() && mCurrentView.hasAvailableSurface()) {
+                if (isRemotePlayback()) {
+                    mRoutePlayer.onPlay();
+                } else {
                     applySpeed();
                     mMediaPlayer.play();
                     mCurrentState = STATE_PLAYING;
                     updatePlaybackState();
                 }
-                mTargetState = STATE_PLAYING;
-                if (DEBUG) {
-                    Log.d(TAG, "onPlay(). mCurrentState=" + mCurrentState
-                            + ", mTargetState=" + mTargetState);
-                }
+                mCurrentState = STATE_PLAYING;
+            }
+            mTargetState = STATE_PLAYING;
+            if (DEBUG) {
+                Log.d(TAG, "onPlay(). mCurrentState=" + mCurrentState
+                        + ", mTargetState=" + mTargetState);
             }
             showController();
         }
 
         @Override
         public void onPause() {
-            if (isRemotePlayback()) {
-                mRouteSessionCallback.onPause();
-            } else {
-                if (isInPlaybackState()) {
-                    if (mMediaPlayer.isPlaying()) {
-                        mMediaPlayer.pause();
-                        mCurrentState = STATE_PAUSED;
-                        updatePlaybackState();
-                    }
+            if (isInPlaybackState()) {
+                if (isRemotePlayback()) {
+                    mRoutePlayer.onPause();
+                    mCurrentState = STATE_PAUSED;
+                } else if (mMediaPlayer.isPlaying()) {
+                    mMediaPlayer.pause();
+                    mCurrentState = STATE_PAUSED;
+                    updatePlaybackState();
                 }
-                mTargetState = STATE_PAUSED;
-                if (DEBUG) {
-                    Log.d(TAG, "onPause(). mCurrentState=" + mCurrentState
-                            + ", mTargetState=" + mTargetState);
-                }
+            }
+            mTargetState = STATE_PAUSED;
+            if (DEBUG) {
+                Log.d(TAG, "onPause(). mCurrentState=" + mCurrentState
+                        + ", mTargetState=" + mTargetState);
             }
             showController();
         }
 
         @Override
         public void onSeekTo(long pos) {
-            if (isRemotePlayback()) {
-                mRouteSessionCallback.onSeekTo(pos);
-            } else {
-                if (isInPlaybackState()) {
+            if (isInPlaybackState()) {
+                if (isRemotePlayback()) {
+                    mRoutePlayer.onSeekTo(pos);
+                } else {
                     mMediaPlayer.seekTo(pos, MediaPlayer2.SEEK_PREVIOUS_SYNC);
                     mSeekWhenPrepared = 0;
                     updatePlaybackState();
-                } else {
-                    mSeekWhenPrepared = pos;
                 }
+            } else {
+                mSeekWhenPrepared = pos;
             }
             showController();
         }
@@ -1073,74 +1132,11 @@ public class VideoView2Impl extends BaseLayout
         @Override
         public void onStop() {
             if (isRemotePlayback()) {
-                mRouteSessionCallback.onStop();
+                mRoutePlayer.onStop();
             } else {
                 resetPlayer();
             }
             showController();
-        }
-    }
-
-    private class RouteSessionCallback extends MediaSession.Callback {
-        RemotePlaybackClient mClient;
-
-        RemotePlaybackClient.StatusCallback mStatusCallback =
-                new RemotePlaybackClient.StatusCallback() {
-            @Override
-            public void onItemStatusChanged(Bundle data,
-                    String sessionId, MediaSessionStatus sessionStatus,
-                    String itemId, MediaItemStatus itemStatus) {
-                // TODO: implement this
-            }
-
-            @Override
-            public void onSessionStatusChanged(Bundle data,
-                    String sessionId, MediaSessionStatus sessionStatus) {
-                // TODO: implement this
-            }
-
-            @Override
-            public void onSessionChanged(String sessionId) {
-                // TODO: implement this
-            }
-        };
-
-        @Override
-        public void onCommand(String command, Bundle args, ResultReceiver receiver) {
-            ensureClient();
-            // TODO: implement this
-        }
-
-        @Override
-        public void onPlay() {
-            ensureClient();
-            // TODO: implement this
-        }
-
-        @Override
-        public void onPause() {
-            ensureClient();
-            // TODO: implement this
-        }
-
-        @Override
-        public void onSeekTo(long pos) {
-            ensureClient();
-            // TODO: implement this
-        }
-
-        @Override
-        public void onStop() {
-            ensureClient();
-            // TODO: implement this
-        }
-
-        private void ensureClient() {
-            if (mClient == null) {
-                mClient = new RemotePlaybackClient(
-                        mInstance.getContext(), mMediaRouter.getSelectedRoute());
-                mClient.setStatusCallback(mStatusCallback);
-            }
         }
     }
 }
