@@ -25,13 +25,23 @@ import android.media.MediaMetadata2;
 import android.media.MediaPlaylistAgent;
 import android.media.MediaPlaylistAgent.PlaylistEventCallback;
 import android.media.update.MediaPlaylistAgentProvider;
+import android.util.ArrayMap;
+import android.util.Log;
+
+import com.android.internal.annotations.GuardedBy;
 
 import java.util.List;
 import java.util.concurrent.Executor;
 
 public class MediaPlaylistAgentImpl implements MediaPlaylistAgentProvider {
+    private static final String TAG = "MediaPlaylistAgent";
+
     private final Context mContext;
     private final MediaPlaylistAgent mInstance;
+
+    private final Object mLock = new Object();
+    @GuardedBy("mLock")
+    private final ArrayMap<PlaylistEventCallback, Executor> mCallbacks = new ArrayMap<>();
 
     public MediaPlaylistAgentImpl(Context context, MediaPlaylistAgent instance) {
         mContext = context;
@@ -46,7 +56,14 @@ public class MediaPlaylistAgentImpl implements MediaPlaylistAgentProvider {
         if (callback == null) {
             throw new IllegalArgumentException("callback shouldn't be null");
         }
-        // TODO(jaewan): implement this (b/74090741)
+
+        synchronized (mLock) {
+            if (mCallbacks.get(callback) != null) {
+                Log.w(TAG, "callback is already added. Ignoring.");
+                return;
+            }
+            mCallbacks.put(callback, executor);
+        }
     }
 
     final public void unregisterPlaylistEventCallback_impl(
@@ -54,101 +71,118 @@ public class MediaPlaylistAgentImpl implements MediaPlaylistAgentProvider {
         if (callback == null) {
             throw new IllegalArgumentException("callback shouldn't be null");
         }
-        // TODO(jaewan): implement this (b/74090741)
+        synchronized (mLock) {
+            mCallbacks.remove(callback);
+        }
     }
 
     final public void notifyPlaylistChanged_impl() {
-        // TODO(jaewan): implement this (b/74090741)
+        ArrayMap<PlaylistEventCallback, Executor> callbacks = getCallbacks();
+        List<MediaItem2> playlist= mInstance.getPlaylist();
+        MediaMetadata2 metadata = mInstance.getPlaylistMetadata();
+        for (int i = 0; i < callbacks.size(); i++) {
+            final PlaylistEventCallback callback = callbacks.keyAt(i);
+            final Executor executor = callbacks.valueAt(i);
+            executor.execute(() -> callback.onPlaylistChanged(
+                    mInstance, playlist, metadata));
+        }
     }
 
     final public void notifyPlaylistMetadataChanged_impl() {
-        // TODO(jaewan): implement this (b/74090741)
+        ArrayMap<PlaylistEventCallback, Executor> callbacks = getCallbacks();
+        for (int i = 0; i < callbacks.size(); i++) {
+            final PlaylistEventCallback callback = callbacks.keyAt(i);
+            final Executor executor = callbacks.valueAt(i);
+            executor.execute(() -> callback.onPlaylistMetadataChanged(
+                    mInstance, mInstance.getPlaylistMetadata()));
+        }
     }
 
     final public void notifyShuffleModeChanged_impl() {
-        // TODO(jaewan): implement this (b/74090741)
+        ArrayMap<PlaylistEventCallback, Executor> callbacks = getCallbacks();
+        for (int i = 0; i < callbacks.size(); i++) {
+            final PlaylistEventCallback callback = callbacks.keyAt(i);
+            final Executor executor = callbacks.valueAt(i);
+            executor.execute(() -> callback.onShuffleModeChanged(
+                    mInstance, mInstance.getShuffleMode()));
+        }
     }
 
     final public void notifyRepeatModeChanged_impl() {
-        // TODO(jaewan): implement this (b/74090741)
+        ArrayMap<PlaylistEventCallback, Executor> callbacks = getCallbacks();
+        for (int i = 0; i < callbacks.size(); i++) {
+            final PlaylistEventCallback callback = callbacks.keyAt(i);
+            final Executor executor = callbacks.valueAt(i);
+            executor.execute(() -> callback.onRepeatModeChanged(
+                    mInstance, mInstance.getRepeatMode()));
+        }
     }
 
     public @Nullable List<MediaItem2> getPlaylist_impl() {
-        // TODO(jaewan): implement this (b/74090741)
+        // empty implementation
         return null;
     }
 
     public void setPlaylist_impl(@NonNull List<MediaItem2> list,
             @Nullable MediaMetadata2 metadata) {
-        if (list == null) {
-            throw new IllegalArgumentException("list shouldn't be null");
-        }
-        // TODO(jaewan): implement this (b/74090741)
+        // empty implementation
     }
 
     public @Nullable MediaMetadata2 getPlaylistMetadata_impl() {
-        // TODO(jaewan): implement this (b/74090741)
+        // empty implementation
         return null;
     }
 
     public void updatePlaylistMetadata_impl(@Nullable MediaMetadata2 metadata) {
-        // TODO(jaewan): implement this (b/74090741)
+        // empty implementation
     }
 
     public void addPlaylistItem_impl(int index, @NonNull MediaItem2 item) {
-        if (item == null) {
-            throw new IllegalArgumentException("item shouldn't be null");
-        }
-        // TODO(jaewan): implement this (b/74090741)
+        // empty implementation
     }
 
     public void removePlaylistItem_impl(@NonNull MediaItem2 item) {
-        if (item == null) {
-            throw new IllegalArgumentException("item shouldn't be null");
-        }
-        // TODO(jaewan): implement this (b/74090741)
+        // empty implementation
     }
 
     public void replacePlaylistItem_impl(int index, @NonNull MediaItem2 item) {
-        if (index < 0) {
-            throw new IllegalArgumentException("index can not have a negative value");
-        }
-        if (item == null) {
-            throw new IllegalArgumentException("item shouldn't be null");
-        }
-        // TODO(jaewan): implement this (b/74090741)
+        // empty implementation
     }
 
     public void skipToPlaylistItem_impl(@NonNull MediaItem2 item) {
-        if (item == null) {
-            throw new IllegalArgumentException("item shouldn't be null");
-        }
-        // TODO(jaewan): implement this (b/74090741)
+        // empty implementation
     }
 
     public void skipToPreviousItem_impl() {
-        // TODO(jaewan): implement this (b/74090741)
+        // empty implementation
     }
 
     public void skipToNextItem_impl() {
-        // TODO(jaewan): implement this (b/74090741)
+        // empty implementation
     }
 
     public int getRepeatMode_impl() {
-        // TODO(jaewan): implement this (b/74090741)
         return MediaPlaylistAgent.REPEAT_MODE_NONE;
     }
 
     public void setRepeatMode_impl(int repeatMode) {
-        // TODO(jaewan): implement this (b/74090741)
+        // empty implementation
     }
 
     public int getShuffleMode_impl() {
-        // TODO(jaewan): implement this (b/74090741)
+        // empty implementation
         return MediaPlaylistAgent.SHUFFLE_MODE_NONE;
     }
 
     public void setShuffleMode_impl(int shuffleMode) {
-        // TODO(jaewan): implement this (b/74090741)
+        // empty implementation
+    }
+
+    private ArrayMap<PlaylistEventCallback, Executor> getCallbacks() {
+        ArrayMap<PlaylistEventCallback, Executor> callbacks = new ArrayMap<>();
+        synchronized (mLock) {
+            callbacks.putAll(mCallbacks);
+        }
+        return callbacks;
     }
 }
