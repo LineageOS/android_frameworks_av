@@ -20,6 +20,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.media.MediaController2;
 import android.media.MediaItem2;
+import android.media.MediaMetadata2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
@@ -81,7 +82,7 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
     }
 
     @Override
-    public void onPlaylistChanged(List<Bundle> playlistBundle) throws RuntimeException {
+    public void onPlaylistChanged(List<Bundle> playlistBundle, Bundle metadataBundle) {
         final MediaController2Impl controller;
         try {
             controller = getController();
@@ -90,7 +91,7 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
             return;
         }
         if (playlistBundle == null) {
-            Log.w(TAG, "onPlaylistChanged(): Ignoring null playlist");
+            Log.w(TAG, "onPlaylistChanged(): Ignoring null playlist from " + controller);
             return;
         }
         List<MediaItem2> playlist = new ArrayList<>();
@@ -102,7 +103,9 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
                 playlist.add(item);
             }
         }
-        controller.pushPlaylistChanges(playlist);
+        MediaMetadata2 metadata =
+                MediaMetadata2.fromBundle(controller.getContext(), metadataBundle);
+        controller.pushPlaylistChanges(playlist, metadata);
     }
 
     @Override

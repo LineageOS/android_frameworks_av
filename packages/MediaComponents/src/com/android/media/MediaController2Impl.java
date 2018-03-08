@@ -28,6 +28,7 @@ import android.media.MediaController2;
 import android.media.MediaController2.ControllerCallback;
 import android.media.MediaController2.PlaybackInfo;
 import android.media.MediaItem2;
+import android.media.MediaMetadata2;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
@@ -75,6 +76,8 @@ public class MediaController2Impl implements MediaController2Provider {
     private PlaybackState2 mPlaybackState;
     @GuardedBy("mLock")
     private List<MediaItem2> mPlaylist;
+    @GuardedBy("mLock")
+    private MediaMetadata2 mPlaylistMetadata;
     @GuardedBy("mLock")
     private PlaylistParams mPlaylistParams;
     @GuardedBy("mLock")
@@ -526,6 +529,28 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
+    public void setPlaylist_impl(List<MediaItem2> list, MediaMetadata2 metadata) {
+        if (list == null) {
+            throw new IllegalArgumentException("list shouldn't be null");
+        }
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYLIST_SET_LIST);
+        if (binder != null) {
+            List<Bundle> bundleList = new ArrayList<>();
+            for (int i = 0; i < list.size(); i++) {
+                bundleList.add(list.get(i).toBundle());
+            }
+            Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
+            try {
+                binder.setPlaylist(mSessionCallbackStub, bundleList, metadataBundle);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
+    }
+
+    @Override
     public void prepare_impl() {
         sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE);
     }
@@ -692,16 +717,18 @@ public class MediaController2Impl implements MediaController2Provider {
         });
     }
 
-    void pushPlaylistChanges(final List<MediaItem2> playlist) {
+    void pushPlaylistChanges(final List<MediaItem2> playlist, final MediaMetadata2 metadata) {
         synchronized (mLock) {
             mPlaylist = playlist;
-            mCallbackExecutor.execute(() -> {
-                if (!mInstance.isConnected()) {
-                    return;
-                }
-                mCallback.onPlaylistChanged(mInstance, playlist);
-            });
+            mPlaylistMetadata = metadata;
         }
+        mCallbackExecutor.execute(() -> {
+            if (!mInstance.isConnected()) {
+                return;
+            }
+            // TODO(jaewan): Fix public API not to take playlistAgent.
+            mCallback.onPlaylistChanged(mInstance, null, playlist, metadata);
+        });
     }
 
     // Should be used without a lock to prevent potential deadlock.
