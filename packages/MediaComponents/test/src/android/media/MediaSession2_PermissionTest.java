@@ -16,13 +16,33 @@
 
 package android.media;
 
-import static android.media.MediaSession2.*;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYBACK_FAST_FORWARD;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYBACK_PLAY;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYBACK_REWIND;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYBACK_STOP;
+import static android.media.MediaSession2.COMMAND_CODE_PLAY_FROM_MEDIA_ID;
+import static android.media.MediaSession2.COMMAND_CODE_PLAY_FROM_SEARCH;
+import static android.media.MediaSession2.COMMAND_CODE_PLAY_FROM_URI;
+import static android.media.MediaSession2.COMMAND_CODE_PREPARE_FROM_MEDIA_ID;
+import static android.media.MediaSession2.COMMAND_CODE_PREPARE_FROM_SEARCH;
+import static android.media.MediaSession2.COMMAND_CODE_PREPARE_FROM_URI;
+import static android.media.MediaSession2.ControllerInfo;
+import static android.media.MediaSession2.PlaylistParams;
 
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -40,6 +60,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
+import java.util.List;
 
 /**
  * Tests whether {@link MediaSession2} receives commands that hasn't allowed.
@@ -151,13 +173,13 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
     public void testSkipToNext() throws InterruptedException {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM));
-        createController(mSession.getToken()).skipToNext();
+        createController(mSession.getToken()).skipToNextItem();
         verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
                 matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM));
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM));
-        createController(mSession.getToken()).skipToNext();
+        createController(mSession.getToken()).skipToNextItem();
         verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
@@ -165,13 +187,13 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
     public void testSkipToPrevious() throws InterruptedException {
         createSessionWithAllowedActions(
                 createCommandGroupWith(COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM));
-        createController(mSession.getToken()).skipToPrevious();
+        createController(mSession.getToken()).skipToPreviousItem();
         verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
                 matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM));
 
         createSessionWithAllowedActions(
                 createCommandGroupWithout(COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM));
-        createController(mSession.getToken()).skipToPrevious();
+        createController(mSession.getToken()).skipToPreviousItem();
         verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
 
@@ -262,7 +284,8 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onCommandRequest(
                 matchesSession(), matchesCaller(), matches(COMMAND_CODE_PLAYBACK_SET_VOLUME));
 
-        createSessionWithAllowedActions(createCommandGroupWithout(COMMAND_CODE_PLAYBACK_SET_VOLUME));
+        createSessionWithAllowedActions(
+                createCommandGroupWithout(COMMAND_CODE_PLAYBACK_SET_VOLUME));
         createController(mSession.getToken()).setVolumeTo(0, 0);
         verify(mCallback, after(WAIT_TIME_MS).never()).onCommandRequest(any(), any(), any());
     }
@@ -358,5 +381,44 @@ public class MediaSession2_PermissionTest extends MediaSession2TestBase {
         createController(mSession.getToken()).prepareFromSearch(query, null);
         verify(mCallback, after(WAIT_TIME_MS).never()).onPrepareFromSearch(
                 any(), any(), any(), any());
+    }
+
+    @Test
+    public void testChangingPermissionWithSetAllowedCommands() throws InterruptedException {
+        final String query = "testChangingPermissionWithSetAllowedCommands";
+        createSessionWithAllowedActions(
+                createCommandGroupWith(COMMAND_CODE_PREPARE_FROM_SEARCH));
+
+        TestControllerCallbackInterface controllerCallback =
+                mock(TestControllerCallbackInterface.class);
+        MediaController2 controller =
+                createController(mSession.getToken(), true, controllerCallback);
+
+        controller.prepareFromSearch(query, null);
+        verify(mCallback, timeout(TIMEOUT_MS).atLeastOnce()).onPrepareFromSearch(
+                matchesSession(), matchesCaller(), eq(query), isNull());
+        clearInvocations(mCallback);
+
+        // Change allowed commands.
+        mSession.setAllowedCommands(getTestControllerInfo(),
+                createCommandGroupWithout(COMMAND_CODE_PREPARE_FROM_SEARCH));
+        verify(controllerCallback, timeout(TIMEOUT_MS).atLeastOnce())
+                .onAllowedCommandsChanged(any());
+
+        controller.prepareFromSearch(query, null);
+        verify(mCallback, after(WAIT_TIME_MS).never()).onPrepareFromSearch(
+                any(), any(), any(), any());
+    }
+
+    private ControllerInfo getTestControllerInfo() {
+        List<ControllerInfo> controllers = mSession.getConnectedControllers();
+        assertNotNull(controllers);
+        for (int i = 0; i < controllers.size(); i++) {
+            if (Process.myUid() == controllers.get(i).getUid()) {
+                return controllers.get(i);
+            }
+        }
+        fail("Failed to get test controller info");
+        return null;
     }
 }

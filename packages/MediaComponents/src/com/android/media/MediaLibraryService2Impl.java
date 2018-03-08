@@ -24,7 +24,7 @@ import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySession.Builder;
 import android.media.MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback;
 import android.media.MediaPlayerBase;
-import android.media.MediaPlaylistController;
+import android.media.MediaPlaylistAgent;
 import android.media.MediaSession2;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSessionService2;
@@ -68,7 +68,7 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
     public static class MediaLibrarySessionImpl extends MediaSession2Impl
             implements MediaLibrarySessionProvider {
         public MediaLibrarySessionImpl(Context context,
-                MediaPlayerBase player, String id, MediaPlaylistController mplc,
+                MediaPlayerBase player, String id, MediaPlaylistAgent mplc,
                 VolumeProvider2 volumeProvider,
                 PendingIntent sessionActivity, Executor callbackExecutor,
                 MediaLibrarySessionCallback callback) {
