@@ -60,7 +60,10 @@ public:
     /**
      * Set format for MediaCodec-facing buffers.
      */
-    void setFormat(const sp<AMessage> &format) { mFormat = format; }
+    void setFormat(const sp<AMessage> &format) {
+        CHECK(format != nullptr);
+        mFormat = format;
+    }
 
     /**
      * Returns true if the buffers are operating under array mode.
@@ -585,6 +588,7 @@ public:
             size_t *index,
             sp<MediaCodecBuffer> *clientBuffer) override {
         sp<Codec2Buffer> newBuffer = wrap(buffer);
+        newBuffer->setFormat(mFormat);
         *index = mImpl.assignSlot(newBuffer);
         *clientBuffer = newBuffer;
         return true;
@@ -735,55 +739,6 @@ CCodecBufferChannel::~CCodecBufferChannel() {
 
 void CCodecBufferChannel::setComponent(const std::shared_ptr<C2Component> &component) {
     mComponent = component;
-
-    C2StreamFormatConfig::input inputFormat(0u);
-    C2StreamFormatConfig::output outputFormat(0u);
-    c2_status_t err = mComponent->intf()->query_vb(
-            { &inputFormat, &outputFormat },
-            {},
-            C2_DONT_BLOCK,
-            nullptr);
-    if (err != C2_OK) {
-        // TODO: error
-        return;
-    }
-
-    {
-        Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(mInputBuffers);
-
-        bool graphic = (inputFormat.value == C2FormatVideo);
-        if (graphic) {
-            buffers->reset(new GraphicInputBuffers);
-        } else {
-            buffers->reset(new LinearInputBuffers);
-        }
-
-        ALOGV("graphic = %s", graphic ? "true" : "false");
-        std::shared_ptr<C2BlockPool> pool;
-        if (graphic) {
-            err = GetCodec2BlockPool(C2BlockPool::BASIC_GRAPHIC, component, &pool);
-        } else {
-            err = CreateCodec2BlockPool(C2PlatformAllocatorStore::ION,
-                                        component, &pool);
-        }
-
-        if (err == C2_OK) {
-            (*buffers)->setPool(pool);
-        } else {
-            // TODO: error
-        }
-    }
-
-    {
-        Mutexed<std::unique_ptr<OutputBuffers>>::Locked buffers(mOutputBuffers);
-
-        bool graphic = (outputFormat.value == C2FormatVideo);
-        if (graphic) {
-            buffers->reset(new GraphicOutputBuffers);
-        } else {
-            buffers->reset(new LinearOutputBuffers);
-        }
-    }
 }
 
 status_t CCodecBufferChannel::setInputSurface(
@@ -812,6 +767,7 @@ status_t CCodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffe
     if (buffer->meta()->findInt32("csd", &tmp) && tmp) {
         flags |= C2FrameData::FLAG_CODEC_CONFIG;
     }
+    ALOGV("queueInputBuffer: buffer->size() = %zu", buffer->size());
     std::unique_ptr<C2Work> work(new C2Work);
     work->input.flags = (C2FrameData::flags_t)flags;
     work->input.ordinal.timestamp = timeUs;
@@ -968,13 +924,54 @@ void CCodecBufferChannel::getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *arr
     (*buffers)->getArray(array);
 }
 
-void CCodecBufferChannel::start(const sp<AMessage> &inputFormat, const sp<AMessage> &outputFormat) {
+status_t CCodecBufferChannel::start(
+        const sp<AMessage> &inputFormat, const sp<AMessage> &outputFormat) {
+    C2StreamFormatConfig::input iStreamFormat(0u);
+    C2StreamFormatConfig::output oStreamFormat(0u);
+    c2_status_t err = mComponent->intf()->query_vb(
+            { &iStreamFormat, &oStreamFormat },
+            {},
+            C2_DONT_BLOCK,
+            nullptr);
+    if (err != C2_OK) {
+        return UNKNOWN_ERROR;
+    }
+
     if (inputFormat != nullptr) {
         Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(mInputBuffers);
+
+        bool graphic = (iStreamFormat.value == C2FormatVideo);
+        if (graphic) {
+            buffers->reset(new GraphicInputBuffers);
+        } else {
+            buffers->reset(new LinearInputBuffers);
+        }
         (*buffers)->setFormat(inputFormat);
+
+        ALOGV("graphic = %s", graphic ? "true" : "false");
+        std::shared_ptr<C2BlockPool> pool;
+        if (graphic) {
+            err = GetCodec2BlockPool(C2BlockPool::BASIC_GRAPHIC, mComponent, &pool);
+        } else {
+            err = CreateCodec2BlockPool(C2PlatformAllocatorStore::ION,
+                                        mComponent, &pool);
+        }
+        if (err == C2_OK) {
+            (*buffers)->setPool(pool);
+        } else {
+            // TODO: error
+        }
     }
+
     if (outputFormat != nullptr) {
         Mutexed<std::unique_ptr<OutputBuffers>>::Locked buffers(mOutputBuffers);
+
+        bool graphic = (oStreamFormat.value == C2FormatVideo);
+        if (graphic) {
+            buffers->reset(new GraphicOutputBuffers);
+        } else {
+            buffers->reset(new LinearOutputBuffers);
+        }
         (*buffers)->setFormat(outputFormat);
     }
 
@@ -989,9 +986,7 @@ void CCodecBufferChannel::start(const sp<AMessage> &inputFormat, const sp<AMessa
                 if (!(*buffers)->requestNewBuffer(&index, &buffer)) {
                     if (i == 0) {
                         ALOGE("start: cannot allocate memory at all");
-                        buffers.unlock();
-                        mOnError(NO_MEMORY, ACTION_CODE_FATAL);
-                        buffers.lock();
+                        return NO_MEMORY;
                     } else {
                         ALOGV("start: cannot allocate memory, only %zu buffers allocated", i);
                     }
@@ -1003,6 +998,7 @@ void CCodecBufferChannel::start(const sp<AMessage> &inputFormat, const sp<AMessa
     } else {
         (void)mInputSurface->connect(mComponent);
     }
+    return OK;
 }
 
 void CCodecBufferChannel::stop() {
@@ -1010,6 +1006,7 @@ void CCodecBufferChannel::stop() {
     mFirstValidFrameIndex = mFrameIndex.load();
     if (mInputSurface != nullptr) {
         mInputSurface->disconnect();
+        mInputSurface.reset();
     }
 }
 
@@ -1025,8 +1022,13 @@ void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushe
 }
 
 void CCodecBufferChannel::onWorkDone(const std::unique_ptr<C2Work> &work) {
-    if (work->result != OK) {
-        ALOGE("work failed to complete: %d", work->result);
+    if (work->result != C2_OK) {
+        if (work->result == C2_NOT_FOUND) {
+            // TODO: Define what flushed work's result is.
+            ALOGD("flushed work; ignored.");
+            return;
+        }
+        ALOGD("work failed to complete: %d", work->result);
         mOnError(work->result, ACTION_CODE_FATAL);
         return;
     }

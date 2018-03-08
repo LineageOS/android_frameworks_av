@@ -69,6 +69,8 @@ protected:
 private:
     typedef std::chrono::time_point<std::chrono::steady_clock> TimePoint;
 
+    status_t tryAndReportOnError(std::function<status_t()> job);
+
     void initiateStop();
     void initiateRelease(bool sendCallback = true);
 
