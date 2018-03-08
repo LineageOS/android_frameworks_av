@@ -48,6 +48,7 @@ C2SoftFlacDecoder::C2SoftFlacDecoder(const char *name, c2_node_id_t id)
 }
 
 C2SoftFlacDecoder::~C2SoftFlacDecoder() {
+    delete mFLACDecoder;
 }
 
 c2_status_t C2SoftFlacDecoder::onInit() {
@@ -77,6 +78,9 @@ c2_status_t C2SoftFlacDecoder::onFlush_sm() {
 }
 
 status_t C2SoftFlacDecoder::initDecoder() {
+    if (mFLACDecoder) {
+        delete mFLACDecoder;
+    }
     mFLACDecoder = FLACDecoder::Create();
     if (!mFLACDecoder) {
         ALOGE("initDecoder: failed to create FLACDecoder");

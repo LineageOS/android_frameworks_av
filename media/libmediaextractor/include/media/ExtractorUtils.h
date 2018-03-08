@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-#ifndef META_DATA_UTILS_H_
+#ifndef EXTRACTOR_UTILS_H_
 
-#define META_DATA_UTILS_H_
+#define EXTRACTOR_UTILS_H_
 
-#include <media/stagefright/MetaData.h>
+#include <memory>
 
 namespace android {
 
-struct ABuffer;
-bool MakeAVCCodecSpecificData(MetaDataBase &meta, const uint8_t *data, size_t size);
-bool MakeAACCodecSpecificData(MetaDataBase &meta, unsigned profile, unsigned sampling_freq_index,
-        unsigned channel_configuration);
+template <class T>
+std::unique_ptr<T[]> heapbuffer(size_t size) {
+    return std::unique_ptr<T[]>(new (std::nothrow) T[size]);
+}
 
 }  // namespace android
 
-#endif  // META_DATA_UTILS_H_
+#endif  // UTILS_H_

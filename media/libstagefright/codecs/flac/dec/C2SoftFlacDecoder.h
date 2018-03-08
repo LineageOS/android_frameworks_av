@@ -46,7 +46,7 @@ private:
         kMaxBlockSize   = 4096
     };
 
-    sp<FLACDecoder> mFLACDecoder;
+    FLACDecoder *mFLACDecoder;
     FLAC__StreamMetadata_StreamInfo mStreamInfo;
     bool mSignalledError;
     bool mSignalledOutputEos;
