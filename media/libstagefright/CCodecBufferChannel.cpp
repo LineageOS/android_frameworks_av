@@ -894,7 +894,7 @@ status_t CCodecBufferChannel::renderOutputBuffer(
             GraphicBuffer::CLONE_HANDLE,
             blocks.front().width(),
             blocks.front().height(),
-            HAL_PIXEL_FORMAT_YV12,
+            HAL_PIXEL_FORMAT_YCbCr_420_888,
             // TODO
             1,
             (uint64_t)GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN,
