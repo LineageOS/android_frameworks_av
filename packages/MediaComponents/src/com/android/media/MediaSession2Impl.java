@@ -105,7 +105,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @GuardedBy("mLock")
     private MediaPlayerBase mPlayer;
     @GuardedBy("mLock")
-    private MediaPlaylistAgent mMplc;
+    private MediaPlaylistAgent mPlaylistAgent;
     @GuardedBy("mLock")
     private VolumeProvider2 mVolumeProvider;
     @GuardedBy("mLock")
@@ -118,14 +118,14 @@ public class MediaSession2Impl implements MediaSession2Provider {
      * @param context
      * @param player
      * @param id
-     * @param mplc
+     * @param playlistAgent
      * @param volumeProvider
      * @param sessionActivity
      * @param callbackExecutor
      * @param callback
      */
     public MediaSession2Impl(Context context, MediaPlayerBase player, String id,
-            MediaPlaylistAgent mplc, VolumeProvider2 volumeProvider,
+            MediaPlaylistAgent playlistAgent, VolumeProvider2 volumeProvider,
             PendingIntent sessionActivity,
             Executor callbackExecutor, SessionCallback callback) {
         // TODO(jaewan): Keep other params.
@@ -140,7 +140,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mSessionActivity = sessionActivity;
         mSessionStub = new MediaSession2Stub(this);
         mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-        mMplc = mplc;
+        mPlaylistAgent = playlistAgent;
 
         // Infer type from the id and package name.
         String libraryService = getServiceName(context, MediaLibraryService2.SERVICE_INTERFACE, id);
@@ -204,13 +204,13 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void updatePlayer_impl(MediaPlayerBase player, MediaPlaylistAgent mplc,
+    public void updatePlayer_impl(MediaPlayerBase player, MediaPlaylistAgent playlistAgent,
             VolumeProvider2 volumeProvider) throws IllegalArgumentException {
         ensureCallingThread();
         if (player == null) {
             throw new IllegalArgumentException("player shouldn't be null");
         }
-        mMplc = mplc;
+        mPlaylistAgent = playlistAgent;
         setPlayer(player, volumeProvider);
     }
 
@@ -342,18 +342,16 @@ public class MediaSession2Impl implements MediaSession2Provider {
         ensureCallingThread();
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
-            // TODO: Uncomment or remove
-            //player.stop();
-            player.pause();
+            player.reset();
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
     }
 
     @Override
-    public void skipToPrevious_impl() {
+    public void skipToPreviousItem_impl() {
         ensureCallingThread();
-        // TODO: Uncomment or remove
+        // TODO(jaewan): Implement this (b/74175632)
         /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
@@ -366,14 +364,17 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void skipToNext_impl() {
+    public void skipToNextItem_impl() {
         ensureCallingThread();
+        // TODO(jaewan): Implement this (b/74175632)
+        /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
             player.skipToNext();
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
+        */
     }
 
     @Override
@@ -1275,7 +1276,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         String mId;
         Executor mCallbackExecutor;
         C mCallback;
-        MediaPlaylistAgent mMplc;
+        MediaPlaylistAgent mPlaylistAgent;
         VolumeProvider2 mVolumeProvider;
         PendingIntent mSessionActivity;
 
@@ -1304,11 +1305,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public void setPlaylistController_impl(MediaPlaylistAgent mplc) {
-            if (mplc == null) {
-                throw new IllegalArgumentException("mplc shouldn't be null");
+        public void setPlaylistAgent_impl(MediaPlaylistAgent playlistAgent) {
+            if (playlistAgent == null) {
+                throw new IllegalArgumentException("playlistAgent shouldn't be null");
             }
-            mMplc = mplc;
+            mPlaylistAgent = playlistAgent;
         }
 
         public void setVolumeProvider_impl(VolumeProvider2 volumeProvider) {
@@ -1357,7 +1358,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 mCallback = new SessionCallback(mContext) {};
             }
 
-            return new MediaSession2Impl(mContext, mPlayer, mId, mMplc,
+            return new MediaSession2Impl(mContext, mPlayer, mId, mPlaylistAgent,
                     mVolumeProvider, mSessionActivity, mCallbackExecutor, mCallback).getInstance();
         }
     }
