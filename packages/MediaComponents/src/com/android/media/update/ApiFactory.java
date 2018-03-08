@@ -32,6 +32,7 @@ import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback;
 import android.media.MediaMetadata2;
 import android.media.MediaPlayerBase;
+import android.media.MediaPlaylistAgent;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandGroup;
@@ -50,6 +51,7 @@ import android.media.update.MediaController2Provider;
 import android.media.update.MediaItem2Provider;
 import android.media.update.MediaLibraryService2Provider.LibraryRootProvider;
 import android.media.update.MediaMetadata2Provider;
+import android.media.update.MediaPlaylistAgentProvider;
 import android.media.update.MediaSession2Provider;
 import android.media.update.MediaSession2Provider.BuilderBaseProvider;
 import android.media.update.MediaSession2Provider.CommandButtonProvider.BuilderProvider;
@@ -76,6 +78,7 @@ import com.android.media.MediaItem2Impl;
 import com.android.media.MediaLibraryService2Impl;
 import com.android.media.MediaLibraryService2Impl.LibraryRootImpl;
 import com.android.media.MediaMetadata2Impl;
+import com.android.media.MediaPlaylistAgentImpl;
 import com.android.media.MediaSession2Impl;
 import com.android.media.MediaSession2Impl.PlaylistParamsImpl;
 import com.android.media.MediaSessionService2Impl;
@@ -300,5 +303,11 @@ public class ApiFactory implements StaticProvider {
     @Override
     public PlaybackState2 fromBundle_PlaybackState2(Context context, Bundle bundle) {
         return PlaybackState2Impl.fromBundle(context, bundle);
+    }
+
+    @Override
+    public MediaPlaylistAgentProvider createMediaPlaylistAgent(Context context,
+            MediaPlaylistAgent instance) {
+        return new MediaPlaylistAgentImpl(context, instance);
     }
 }
