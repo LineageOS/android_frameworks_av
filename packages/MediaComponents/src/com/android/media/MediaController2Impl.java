@@ -314,12 +314,12 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public void skipToPrevious_impl() {
+    public void skipToPreviousItem_impl() {
         sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM);
     }
 
     @Override
-    public void skipToNext_impl() {
+    public void skipToNextItem_impl() {
         sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM);
     }
 
@@ -651,7 +651,7 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public MediaItem2 getCurrentPlaylistItem_impl() {
+    public MediaItem2 getCurrentMediaItem_impl() {
         // TODO(jaewan): Implement
         return null;
     }

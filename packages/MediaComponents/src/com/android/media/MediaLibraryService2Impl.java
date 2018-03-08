@@ -68,11 +68,11 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
     public static class MediaLibrarySessionImpl extends MediaSession2Impl
             implements MediaLibrarySessionProvider {
         public MediaLibrarySessionImpl(Context context,
-                MediaPlayerBase player, String id, MediaPlaylistAgent mplc,
+                MediaPlayerBase player, String id, MediaPlaylistAgent playlistAgent,
                 VolumeProvider2 volumeProvider,
                 PendingIntent sessionActivity, Executor callbackExecutor,
                 MediaLibrarySessionCallback callback) {
-            super(context, player, id, mplc, volumeProvider, sessionActivity, callbackExecutor,
+            super(context, player, id, playlistAgent, volumeProvider, sessionActivity, callbackExecutor,
                     callback);
             // Don't put any extra initialization here. Here's the reason.
             // System service will recognize this session inside of the super constructor and would
@@ -141,7 +141,7 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
 
         @Override
         public MediaLibrarySession build_impl() {
-            return new MediaLibrarySessionImpl(mContext, mPlayer, mId, mMplc,
+            return new MediaLibrarySessionImpl(mContext, mPlayer, mId, mPlaylistAgent,
                     mVolumeProvider, mSessionActivity, mCallbackExecutor, mCallback).getInstance();
         }
     }
