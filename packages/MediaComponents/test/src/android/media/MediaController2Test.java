@@ -32,6 +32,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Process;
 import android.os.ResultReceiver;
+import android.support.annotation.NonNull;
 import android.support.test.filters.FlakyTest;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
@@ -118,8 +119,8 @@ public class MediaController2Test extends MediaSession2TestBase {
 
     @Ignore
     @Test
-    public void testSkipToPrevious() throws InterruptedException {
-        mController.skipToPrevious();
+    public void testSkipToPreviousItem() throws InterruptedException {
+        mController.skipToPreviousItem();
         try {
             assertTrue(mPlayer.mCountDownLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
         } catch (InterruptedException e) {
@@ -129,8 +130,8 @@ public class MediaController2Test extends MediaSession2TestBase {
     }
 
     @Test
-    public void testSkipToNext() throws InterruptedException {
-        mController.skipToNext();
+    public void testSkipToNextItem() throws InterruptedException {
+        mController.skipToNextItem();
         try {
             assertTrue(mPlayer.mCountDownLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
         } catch (InterruptedException e) {
@@ -211,7 +212,7 @@ public class MediaController2Test extends MediaSession2TestBase {
         } catch (InterruptedException e) {
             fail(e.getMessage());
         }
-        assertTrue(mPlayer.mSetCurrentPlaylistItemCalled);
+        assertTrue(mPlayer.mSetCurrentPlaylistCalled);
         assertEquals(itemIndex, mPlayer.mCurrentItem);
     }
     */
@@ -622,9 +623,9 @@ public class MediaController2Test extends MediaSession2TestBase {
                     player.notifyPlaybackState(state);
                     controller.stop();
                     player.notifyPlaybackState(state);
-                    controller.skipToNext();
+                    controller.skipToNextItem();
                     player.notifyPlaybackState(state);
-                    controller.skipToPrevious();
+                    controller.skipToPreviousItem();
                 }
                 // This may hang if deadlock happens.
                 latch.countDown();
@@ -656,15 +657,6 @@ public class MediaController2Test extends MediaSession2TestBase {
         assertEquals(SessionToken2.TYPE_SESSION_SERVICE, token.getType());
     }
 
-    private void connectToService(SessionToken2 token) throws InterruptedException {
-        if (mSession != null) {
-            mSession.close();
-        }
-        mController = createController(token);
-        mSession = TestServiceRegistry.getInstance().getServiceInstance().getSession();
-        mPlayer = (MockPlayer) mSession.getPlayer();
-    }
-
     @Test
     public void testConnectToService_sessionService() throws InterruptedException {
         testConnectToService(MockMediaSessionService2.ID);
@@ -680,17 +672,24 @@ public class MediaController2Test extends MediaSession2TestBase {
         final CountDownLatch latch = new CountDownLatch(1);
         final SessionCallbackProxy proxy = new SessionCallbackProxy(mContext) {
             @Override
-            public CommandGroup onConnect(ControllerInfo controller) {
+            public CommandGroup onConnect(@NonNull MediaSession2 session,
+                    @NonNull ControllerInfo controller) {
                 if (Process.myUid() == controller.getUid()) {
+                    if (mSession != null) {
+                        mSession.close();
+                    }
+                    mSession = session;
+                    mPlayer = (MockPlayer) session.getPlayer();
                     assertEquals(mContext.getPackageName(), controller.getPackageName());
                     assertFalse(controller.isTrusted());
                     latch.countDown();
                 }
-                return super.onConnect(controller);
+                return super.onConnect(session, controller);
             }
         };
         TestServiceRegistry.getInstance().setSessionCallbackProxy(proxy);
-        connectToService(TestUtils.getServiceToken(mContext, id));
+
+        mController = createController(TestUtils.getServiceToken(mContext, id));
         assertTrue(latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS));
 
         // Test command from controller to session service
@@ -718,11 +717,14 @@ public class MediaController2Test extends MediaSession2TestBase {
         testControllerAfterSessionIsGone(mSession.getToken().getId());
     }
 
+    // TODO(jaewan): Re-enable this test
     @Ignore
     @Test
     public void testControllerAfterSessionIsGone_sessionService() throws InterruptedException {
+        /*
         connectToService(TestUtils.getServiceToken(mContext, MockMediaSessionService2.ID));
         testControllerAfterSessionIsGone(MockMediaSessionService2.ID);
+        */
     }
 
     @Test

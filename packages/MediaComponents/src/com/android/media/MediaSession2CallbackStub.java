@@ -215,6 +215,27 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
     }
 
     @Override
+    public void onAllowedCommandsChanged(Bundle commandsBundle) {
+        final MediaController2Impl controller;
+        try {
+            controller = getController();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        if (controller == null) {
+            // TODO(jaewan): Revisit here. Could be a bug
+            return;
+        }
+        CommandGroup commands = CommandGroup.fromBundle(controller.getContext(), commandsBundle);
+        if (commands == null) {
+            Log.w(TAG, "onAllowedCommandsChanged(): Ignoring null commands");
+            return;
+        }
+        controller.onAllowedCommandsChanged(commands);
+    }
+
+    @Override
     public void onCustomCommand(Bundle commandBundle, Bundle args, ResultReceiver receiver) {
         final MediaController2Impl controller;
         try {

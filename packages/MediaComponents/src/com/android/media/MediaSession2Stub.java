@@ -435,10 +435,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     session.getInstance().stop();
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM:
-                    session.getInstance().skipToPrevious();
+                    session.getInstance().skipToPreviousItem();
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM:
-                    session.getInstance().skipToNext();
+                    session.getInstance().skipToNextItem();
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE:
                     session.getInstance().prepare();
@@ -955,6 +955,22 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 Log.w(TAG, "Controller is gone", e);
                 // TODO(jaewan): What to do when the controller is gone?
             }
+        }
+    }
+
+    public void setAllowedCommands(ControllerInfo controller, CommandGroup commands) {
+        synchronized (mLock) {
+            mAllowedCommandGroupMap.put(controller, commands);
+        }
+        final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(controller);
+        if (controllerBinder == null) {
+            return;
+        }
+        try {
+            controllerBinder.onAllowedCommandsChanged(commands.toBundle());
+        } catch (RemoteException e) {
+            Log.w(TAG, "Controller is gone", e);
+            // TODO(jaewan): What to do when the controller is gone?
         }
     }
 

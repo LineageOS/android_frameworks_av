@@ -42,7 +42,6 @@ import android.os.ResultReceiver;
 import android.support.annotation.NonNull;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
-import android.text.TextUtils;
 
 import org.junit.After;
 import org.junit.Before;
@@ -189,18 +188,18 @@ public class MediaSession2Test extends MediaSession2TestBase {
     }
 
     @Test
-    public void testSkipToNext() throws Exception {
+    public void testSkipToNextItem() throws Exception {
         sHandler.postAndSync(() -> {
-            mSession.skipToNext();
+            mSession.skipToNextItem();
             assertTrue(mPlayer.mSkipToNextCalled);
         });
     }
 
     @Ignore
     @Test
-    public void testSkipToPrevious() throws Exception {
+    public void testSkipToPreviousItem() throws Exception {
         sHandler.postAndSync(() -> {
-            mSession.skipToPrevious();
+            mSession.skipToPreviousItem();
             assertTrue(mPlayer.mSkipToPreviousCalled);
         });
     }
@@ -356,7 +355,7 @@ public class MediaSession2Test extends MediaSession2TestBase {
         assertEquals(1, callback.commands.size());
         assertEquals(MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE,
                 (long) callback.commands.get(0).getCommandCode());
-        controller.skipToNext();
+        controller.skipToNextItem();
         assertTrue(mPlayer.mCountDownLatch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
         assertTrue(mPlayer.mSkipToNextCalled);
         assertFalse(mPlayer.mPauseCalled);
@@ -426,6 +425,38 @@ public class MediaSession2Test extends MediaSession2TestBase {
     }
 
     @Test
+    public void testSetAllowedCommands() throws InterruptedException {
+        final CommandGroup commands = new CommandGroup(mContext);
+        commands.addCommand(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_PLAY));
+        commands.addCommand(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE));
+        commands.addCommand(new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_STOP));
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final TestControllerCallbackInterface callback = new TestControllerCallbackInterface() {
+            @Override
+            public void onAllowedCommandsChanged(CommandGroup commandsOut) {
+                assertNotNull(commandsOut);
+                List<Command> expected = commands.getCommands();
+                List<Command> actual = commandsOut.getCommands();
+
+                assertNotNull(actual);
+                assertEquals(expected.size(), actual.size());
+                for (int i = 0; i < expected.size(); i++) {
+                    assertEquals(expected.get(i), actual.get(i));
+                }
+                latch.countDown();
+            }
+        };
+
+        final MediaController2 controller = createController(mSession.getToken(), true, callback);
+        ControllerInfo controllerInfo = getTestControllerInfo();
+        assertNotNull(controllerInfo);
+
+        mSession.setAllowedCommands(controllerInfo, commands);
+        assertTrue(latch.await(WAIT_TIME_MS, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
     public void testSendCustomAction() throws InterruptedException {
         final Command testCommand =
                 new Command(mContext, MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE);
@@ -457,13 +488,12 @@ public class MediaSession2Test extends MediaSession2TestBase {
     private ControllerInfo getTestControllerInfo() {
         List<ControllerInfo> controllers = mSession.getConnectedControllers();
         assertNotNull(controllers);
-        final String packageName = mContext.getPackageName();
         for (int i = 0; i < controllers.size(); i++) {
-            if (TextUtils.equals(packageName, controllers.get(i).getPackageName())) {
+            if (Process.myUid() == controllers.get(i).getUid()) {
                 return controllers.get(i);
             }
         }
-        fail("Fails to get custom command");
+        fail("Failed to get test controller info");
         return null;
     }
 

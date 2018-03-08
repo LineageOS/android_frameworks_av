@@ -44,13 +44,10 @@ public class MediaItem2Impl implements MediaItem2Provider {
     private DataSourceDesc mDataSourceDesc;
 
     // From the public API
-    public MediaItem2Impl(Context context, String mediaId,
-            DataSourceDesc dsd, MediaMetadata2 metadata, @Flags int flags) {
+    public MediaItem2Impl(@NonNull Context context, @NonNull String mediaId,
+            @Nullable DataSourceDesc dsd, @Nullable MediaMetadata2 metadata, @Flags int flags) {
         if (mediaId == null) {
             throw new IllegalArgumentException("mediaId shouldn't be null");
-        }
-        if (dsd == null) {
-            throw new IllegalArgumentException("dsd shouldn't be null");
         }
         if (metadata != null && !TextUtils.equals(mediaId, metadata.getMediaId())) {
             throw new IllegalArgumentException("metadata's id should be matched with the mediaid");
@@ -186,10 +183,7 @@ public class MediaItem2Impl implements MediaItem2Provider {
         }
 
         @Override
-        public Builder setDataSourceDesc_impl(@NonNull DataSourceDesc dataSourceDesc) {
-            if (dataSourceDesc == null) {
-                throw new IllegalArgumentException("dataSourceDesc shouldn't be null");
-            }
+        public Builder setDataSourceDesc_impl(@Nullable DataSourceDesc dataSourceDesc) {
             mDataSourceDesc = dataSourceDesc;
             return mInstance;
         }

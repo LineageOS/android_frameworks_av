@@ -32,6 +32,7 @@ LOCAL_CERTIFICATE := platform
 
 # TODO: Use System SDK once public APIs are approved
 # LOCAL_SDK_VERSION := system_current
+LOCAL_PRIVATE_PLATFORM_APIS := true
 
 LOCAL_SRC_FILES := \
     $(call all-java-files-under, src) \
