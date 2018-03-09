@@ -54,7 +54,7 @@ public class MediaBrowser2Impl extends MediaController2Impl implements MediaBrow
         final IMediaSession2 binder = getSessionBinder();
         if (binder != null) {
             try {
-                binder.getBrowserRoot(getControllerStub(), rootHints);
+                binder.getLibraryRoot(getControllerStub(), rootHints);
             } catch (RemoteException e) {
                 // TODO(jaewan): Handle disconnect.
                 if (DEBUG) {
