@@ -14,9 +14,12 @@
      limitations under the License.
 -->
 
-<resources>
-    <color name="gray">#808080</color>
-    <color name="white">#ffffff</color>
-    <color name="white_opacity_70">#B3ffffff</color>
-    <color name="black_opacity_70">#B3000000</color>
-</resources>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="horizontal"
+    android:visibility="visible">
+
+    <ImageButton android:id="@+id/pause" style="@style/MinimalTransportControlsButton.Pause" />
+</LinearLayout>

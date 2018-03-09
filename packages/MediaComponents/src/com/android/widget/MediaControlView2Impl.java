@@ -101,6 +101,12 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private static final int SETTINGS_MODE_VIDEO_QUALITY = 4;
     private static final int SETTINGS_MODE_MAIN = 5;
     private static final int PLAYBACK_SPEED_1x_INDEX = 3;
+
+    private static final int SIZE_TYPE_EMBEDDED = 0;
+    private static final int SIZE_TYPE_FULL = 1;
+    // TODO: add support for Minimal size type.
+    private static final int SIZE_TYPE_MINIMAL = 2;
+
     private static final int MAX_PROGRESS = 1000;
     private static final int DEFAULT_PROGRESS_UPDATE_TIME_MS = 1000;
     private static final int REWIND_TIME_MS = 10000;
@@ -114,16 +120,10 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private MediaController.TransportControls mControls;
     private PlaybackState mPlaybackState;
     private MediaMetadata mMetadata;
-    private ProgressBar mProgress;
-    private TextView mEndTime, mCurrentTime;
-    private TextView mTitleView;
-    private TextView mAdSkipView, mAdRemainingView;
-    private View mAdExternalLink;
-    private View mTitleBar;
-    private View mRoot;
     private int mDuration;
     private int mPrevState;
-    private int mPrevLeftBarWidth;
+    private int mPrevWidth;
+    private int mOriginalLeftBarWidth;
     private int mVideoTrackCount;
     private int mAudioTrackCount;
     private int mSubtitleTrackCount;
@@ -132,8 +132,13 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private int mSelectedAudioTrackIndex;
     private int mSelectedVideoQualityIndex;
     private int mSelectedSpeedIndex;
-    private int mSettingsItemHeight;
+    private int mEmbeddedSettingsItemWidth;
+    private int mFullSettingsItemWidth;
+    private int mEmbeddedSettingsItemHeight;
+    private int mFullSettingsItemHeight;
     private int mSettingsWindowMargin;
+    private int mSizeType;
+    private int mOrientation;
     private long mPlaybackActions;
     private boolean mDragging;
     private boolean mIsFullScreen;
@@ -143,30 +148,56 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private boolean mSeekAvailable;
     private boolean mIsAdvertisement;
     private boolean mIsMute;
+
+    // Relating to Title Bar View
+    private View mRoot;
+    private View mTitleBar;
+    private TextView mTitleView;
+    private View mAdExternalLink;
+    private ImageButton mBackButton;
+    private MediaRouteButton mRouteButton;
+    private MediaRouteSelector mRouteSelector;
+
+    // Relating to Center View
+    private ViewGroup mCenterView;
+    private View mTransportControls;
     private ImageButton mPlayPauseButton;
     private ImageButton mFfwdButton;
     private ImageButton mRewButton;
     private ImageButton mNextButton;
     private ImageButton mPrevButton;
-    private ImageButton mBackButton;
 
+    // Relating to Progress Bar View
+    private ProgressBar mProgress;
+
+    // Relating to Bottom Bar Left View
+    private ViewGroup mBottomBarLeftView;
+    private ViewGroup mTimeView;
+    private TextView mEndTime;
+    private TextView mCurrentTime;
+    private TextView mAdSkipView;
+    private StringBuilder mFormatBuilder;
+    private Formatter mFormatter;
+
+    // Relating to Bottom Bar Right View
+    private ViewGroup mBottomBarRightView;
     private ViewGroup mBasicControls;
+    private ViewGroup mExtraControls;
+    private ViewGroup mCustomButtons;
     private ImageButton mSubtitleButton;
     private ImageButton mFullScreenButton;
     private ImageButton mOverflowButtonRight;
-
-    private ViewGroup mExtraControls;
-    private ViewGroup mCustomButtons;
     private ImageButton mOverflowButtonLeft;
     private ImageButton mMuteButton;
     private ImageButton mVideoQualityButton;
     private ImageButton mSettingsButton;
+    private TextView mAdRemainingView;
 
+    // Relating to Settings List View
     private ListView mSettingsListView;
     private PopupWindow mSettingsWindow;
     private SettingsAdapter mSettingsAdapter;
     private SubSettingsAdapter mSubSettingsAdapter;
-
     private List<String> mSettingsMainTextsList;
     private List<String> mSettingsSubTextsList;
     private List<Integer> mSettingsIconIdsList;
@@ -179,12 +210,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private CharSequence mPlayDescription;
     private CharSequence mPauseDescription;
     private CharSequence mReplayDescription;
-
-    private StringBuilder mFormatBuilder;
-    private Formatter mFormatter;
-
-    private MediaRouteButton mRouteButton;
-    private MediaRouteSelector mRouteSelector;
 
     public MediaControlView2Impl(MediaControlView2 instance,
             ViewGroupProvider superProvider, ViewGroupProvider privateProvider) {
@@ -310,6 +335,35 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     }
 
     @Override
+    public void onMeasure_impl(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure_impl(widthMeasureSpec, heightMeasureSpec);
+
+        if (mPrevWidth != mInstance.getMeasuredWidth()) {
+            int currWidth = mInstance.getMeasuredWidth();
+
+            int iconSize = mResources.getDimensionPixelSize(R.dimen.mcv2_full_icon_size);
+            int marginSize = mResources.getDimensionPixelSize(R.dimen.mcv2_icon_margin);
+            int bottomBarRightWidthMax = iconSize * 4 + marginSize * 8;
+
+            int fullWidth = mTransportControls.getWidth() + mTimeView.getWidth()
+                    + bottomBarRightWidthMax;
+            // These views may not have been initialized yet.
+            if (mTransportControls.getWidth() == 0 || mTimeView.getWidth() == 0) {
+                return;
+            }
+            if (mSizeType == SIZE_TYPE_EMBEDDED && fullWidth <= currWidth) {
+                updateLayoutForSizeChange(SIZE_TYPE_FULL);
+            } else if (mSizeType == SIZE_TYPE_FULL && fullWidth > currWidth) {
+                updateLayoutForSizeChange(SIZE_TYPE_EMBEDDED);
+            }
+            // Dismiss SettingsWindow if it is showing.
+            mSettingsWindow.dismiss();
+            mPrevWidth = currWidth;
+        }
+        updateTitleBarLayout();
+    }
+
+    @Override
     public void setEnabled_impl(boolean enabled) {
         super.setEnabled_impl(enabled);
 
@@ -431,35 +485,47 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         mReplayDescription =
                 mResources.getText(R.string.lockscreen_replay_button_content_description);
 
-        mRouteButton = v.findViewById(R.id.cast);
-
-        mPlayPauseButton = v.findViewById(R.id.pause);
-        if (mPlayPauseButton != null) {
-            mPlayPauseButton.requestFocus();
-            mPlayPauseButton.setOnClickListener(mPlayPauseListener);
-        }
-        mFfwdButton = v.findViewById(R.id.ffwd);
-        if (mFfwdButton != null) {
-            mFfwdButton.setOnClickListener(mFfwdListener);
-        }
-        mRewButton = v.findViewById(R.id.rew);
-        if (mRewButton != null) {
-            mRewButton.setOnClickListener(mRewListener);
-        }
-        mNextButton = v.findViewById(R.id.next);
-        if (mNextButton != null) {
-            mNextButton.setOnClickListener(mNextListener);
-        }
-        mPrevButton = v.findViewById(R.id.prev);
-        if (mPrevButton != null) {
-            mPrevButton.setOnClickListener(mPrevListener);
-        }
+        // Relating to Title Bar View
+        mTitleBar = v.findViewById(R.id.title_bar);
+        mTitleView = v.findViewById(R.id.title_text);
+        mAdExternalLink = v.findViewById(R.id.ad_external_link);
         mBackButton = v.findViewById(R.id.back);
         if (mBackButton != null) {
             mBackButton.setOnClickListener(mBackListener);
         }
+        mRouteButton = v.findViewById(R.id.cast);
 
+        // Relating to Center View
+        mCenterView = v.findViewById(R.id.center_view);
+        mTransportControls = inflateTransportControls(R.layout.embedded_transport_controls);
+        mCenterView.addView(mTransportControls);
+
+        // Relating to Progress Bar View
+        mProgress = v.findViewById(R.id.mediacontroller_progress);
+        if (mProgress != null) {
+            if (mProgress instanceof SeekBar) {
+                SeekBar seeker = (SeekBar) mProgress;
+                seeker.setOnSeekBarChangeListener(mSeekListener);
+                seeker.setProgressDrawable(mResources.getDrawable(R.drawable.custom_progress));
+                seeker.setThumb(mResources.getDrawable(R.drawable.custom_progress_thumb));
+            }
+            mProgress.setMax(MAX_PROGRESS);
+        }
+
+        // Relating to Bottom Bar Left View
+        mBottomBarLeftView = v.findViewById(R.id.bottom_bar_left);
+        mTimeView = v.findViewById(R.id.time);
+        mEndTime = v.findViewById(R.id.time_end);
+        mCurrentTime = v.findViewById(R.id.time_current);
+        mAdSkipView = v.findViewById(R.id.ad_skip_time);
+        mFormatBuilder = new StringBuilder();
+        mFormatter = new Formatter(mFormatBuilder, Locale.getDefault());
+
+        // Relating to Bottom Bar Right View
+        mBottomBarRightView = v.findViewById(R.id.bottom_bar_right);
         mBasicControls = v.findViewById(R.id.basic_controls);
+        mExtraControls = v.findViewById(R.id.extra_controls);
+        mCustomButtons = v.findViewById(R.id.custom_buttons);
         mSubtitleButton = v.findViewById(R.id.subtitle);
         if (mSubtitleButton != null) {
             mSubtitleButton.setOnClickListener(mSubtitleListener);
@@ -473,10 +539,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         if (mOverflowButtonRight != null) {
             mOverflowButtonRight.setOnClickListener(mOverflowRightListener);
         }
-
-        // TODO: should these buttons be shown as default?
-        mExtraControls = v.findViewById(R.id.extra_controls);
-        mCustomButtons = v.findViewById(R.id.custom_buttons);
         mOverflowButtonLeft = v.findViewById(R.id.overflow_left);
         if (mOverflowButtonLeft != null) {
             mOverflowButtonLeft.setOnClickListener(mOverflowLeftListener);
@@ -493,33 +555,9 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         if (mVideoQualityButton != null) {
             mVideoQualityButton.setOnClickListener(mVideoQualityListener);
         }
-
-        mProgress = v.findViewById(R.id.mediacontroller_progress);
-        if (mProgress != null) {
-            if (mProgress instanceof SeekBar) {
-                SeekBar seeker = (SeekBar) mProgress;
-                seeker.setOnSeekBarChangeListener(mSeekListener);
-                seeker.setProgressDrawable(mResources.getDrawable(R.drawable.custom_progress));
-                seeker.setThumb(mResources.getDrawable(R.drawable.custom_progress_thumb));
-            }
-            mProgress.setMax(MAX_PROGRESS);
-        }
-
-        mTitleBar = v.findViewById(R.id.title_bar);
-        if (mTitleBar != null) {
-            mTitleBar.addOnLayoutChangeListener(mTitleBarLayoutChangeListener);
-        }
-        mTitleView = v.findViewById(R.id.title_text);
-
-        mEndTime = v.findViewById(R.id.time);
-        mCurrentTime = v.findViewById(R.id.time_current);
-        mFormatBuilder = new StringBuilder();
-        mFormatter = new Formatter(mFormatBuilder, Locale.getDefault());
-
-        mAdSkipView = v.findViewById(R.id.ad_skip_time);
         mAdRemainingView = v.findViewById(R.id.ad_remaining);
-        mAdExternalLink = v.findViewById(R.id.ad_external_link);
 
+        // Relating to Settings List View
         initializeSettingsLists();
         mSettingsListView = (ListView) ApiHelper.inflateLibLayout(mInstance.getContext(),
                 R.layout.settings_list);
@@ -530,12 +568,16 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         mSettingsListView.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
         mSettingsListView.setOnItemClickListener(mSettingsItemClickListener);
 
-        mSettingsItemHeight = mResources.getDimensionPixelSize(
-                R.dimen.MediaControlView2_settings_height);
+        mEmbeddedSettingsItemWidth = mResources.getDimensionPixelSize(
+                R.dimen.mcv2_embedded_settings_width);
+        mFullSettingsItemWidth = mResources.getDimensionPixelSize(R.dimen.mcv2_full_settings_width);
+        mEmbeddedSettingsItemHeight = mResources.getDimensionPixelSize(
+                R.dimen.mcv2_embedded_settings_height);
+        mFullSettingsItemHeight = mResources.getDimensionPixelSize(
+                R.dimen.mcv2_full_settings_height);
         mSettingsWindowMargin = (-1) * mResources.getDimensionPixelSize(
-                R.dimen.MediaControlView2_settings_offset);
-        int width = mResources.getDimensionPixelSize(R.dimen.MediaControlView2_settings_width);
-        mSettingsWindow = new PopupWindow(mSettingsListView, width,
+                R.dimen.mcv2_settings_offset);
+        mSettingsWindow = new PopupWindow(mSettingsListView, mEmbeddedSettingsItemWidth,
                 ViewGroup.LayoutParams.WRAP_CONTENT, true);
     }
 
@@ -954,36 +996,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         }
     };
 
-    // The title bar is made up of two separate LinearLayouts. If the sum of the two bars are
-    // greater than the length of the title bar, reduce the size of the left bar (which makes the
-    // TextView that contains the title of the media file shrink).
-    private final View.OnLayoutChangeListener mTitleBarLayoutChangeListener
-            = new View.OnLayoutChangeListener() {
-        @Override
-        public void onLayoutChange(View v, int left, int top, int right, int bottom, int oldLeft,
-                int oldTop, int oldRight, int oldBottom) {
-            if (mRoot != null) {
-                int titleBarWidth = mRoot.findViewById(R.id.title_bar).getWidth();
-
-                View leftBar = mRoot.findViewById(R.id.title_bar_left);
-                View rightBar = mRoot.findViewById(R.id.title_bar_right);
-                int leftBarWidth = leftBar.getWidth();
-                int rightBarWidth = rightBar.getWidth();
-
-                RelativeLayout.LayoutParams params =
-                        (RelativeLayout.LayoutParams) leftBar.getLayoutParams();
-                if (leftBarWidth + rightBarWidth > titleBarWidth) {
-                    params.width = titleBarWidth - rightBarWidth;
-                    mPrevLeftBarWidth = leftBarWidth;
-                } else if (leftBarWidth + rightBarWidth < titleBarWidth && mPrevLeftBarWidth != 0) {
-                    params.width = mPrevLeftBarWidth;
-                    mPrevLeftBarWidth = 0;
-                }
-                leftBar.setLayoutParams(params);
-            }
-        }
-    };
-
     private void updateDuration() {
         if (mMetadata != null) {
             if (mMetadata.containsKey(MediaMetadata.METADATA_KEY_DURATION)) {
@@ -1002,13 +1014,37 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         }
     }
 
+    // The title bar is made up of two separate LinearLayouts. If the sum of the two bars are
+    // greater than the length of the title bar, reduce the size of the left bar (which makes the
+    // TextView that contains the title of the media file shrink).
+    private void updateTitleBarLayout() {
+        if (mTitleBar != null) {
+            int titleBarWidth = mTitleBar.getWidth();
+
+            View leftBar = mTitleBar.findViewById(R.id.title_bar_left);
+            View rightBar = mTitleBar.findViewById(R.id.title_bar_right);
+            int leftBarWidth = leftBar.getWidth();
+            int rightBarWidth = rightBar.getWidth();
+
+            RelativeLayout.LayoutParams params =
+                    (RelativeLayout.LayoutParams) leftBar.getLayoutParams();
+            if (leftBarWidth + rightBarWidth > titleBarWidth) {
+                params.width = titleBarWidth - rightBarWidth;
+                mOriginalLeftBarWidth = leftBarWidth;
+            } else if (leftBarWidth + rightBarWidth < titleBarWidth && mOriginalLeftBarWidth != 0) {
+                params.width = mOriginalLeftBarWidth;
+                mOriginalLeftBarWidth = 0;
+            }
+            leftBar.setLayoutParams(params);
+        }
+    }
+
     private void updateLayout() {
         if (mIsAdvertisement) {
             mRewButton.setVisibility(View.GONE);
             mFfwdButton.setVisibility(View.GONE);
             mPrevButton.setVisibility(View.GONE);
-            mCurrentTime.setVisibility(View.GONE);
-            mEndTime.setVisibility(View.GONE);
+            mTimeView.setVisibility(View.GONE);
 
             mAdSkipView.setVisibility(View.VISIBLE);
             mAdRemainingView.setVisibility(View.VISIBLE);
@@ -1021,8 +1057,7 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             mRewButton.setVisibility(View.VISIBLE);
             mFfwdButton.setVisibility(View.VISIBLE);
             mPrevButton.setVisibility(View.VISIBLE);
-            mCurrentTime.setVisibility(View.VISIBLE);
-            mEndTime.setVisibility(View.VISIBLE);
+            mTimeView.setVisibility(View.VISIBLE);
 
             mAdSkipView.setVisibility(View.GONE);
             mAdRemainingView.setVisibility(View.GONE);
@@ -1033,6 +1068,79 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             mNextButton.clearColorFilter();
             disableUnsupportedButtons();
         }
+    }
+
+    private void updateLayoutForSizeChange(int sizeType) {
+        mSizeType = sizeType;
+        RelativeLayout.LayoutParams params =
+                (RelativeLayout.LayoutParams) mTimeView.getLayoutParams();
+        switch (mSizeType) {
+            case SIZE_TYPE_EMBEDDED:
+                mBottomBarLeftView.removeView(mTransportControls);
+                mBottomBarLeftView.setVisibility(View.GONE);
+                mTransportControls = inflateTransportControls(R.layout.embedded_transport_controls);
+                mCenterView.addView(mTransportControls, 0);
+
+                if (params.getRule(RelativeLayout.LEFT_OF) != 0) {
+                    params.removeRule(RelativeLayout.LEFT_OF);
+                    params.addRule(RelativeLayout.RIGHT_OF, R.id.bottom_bar_left);
+                }
+                break;
+            case SIZE_TYPE_FULL:
+                mCenterView.removeView(mTransportControls);
+                mTransportControls = inflateTransportControls(R.layout.full_transport_controls);
+                mBottomBarLeftView.addView(mTransportControls, 0);
+                mBottomBarLeftView.setVisibility(View.VISIBLE);
+
+                if (params.getRule(RelativeLayout.RIGHT_OF) != 0) {
+                    params.removeRule(RelativeLayout.RIGHT_OF);
+                    params.addRule(RelativeLayout.LEFT_OF, R.id.bottom_bar_right);
+                }
+                break;
+            case SIZE_TYPE_MINIMAL:
+                // TODO: implement
+                break;
+        }
+        mTimeView.setLayoutParams(params);
+
+        if (isPlaying()) {
+            mPlayPauseButton.setImageDrawable(
+                    mResources.getDrawable(R.drawable.ic_pause_circle_filled, null));
+            mPlayPauseButton.setContentDescription(mPauseDescription);
+        } else {
+            mPlayPauseButton.setImageDrawable(
+                    mResources.getDrawable(R.drawable.ic_play_circle_filled, null));
+            mPlayPauseButton.setContentDescription(mPlayDescription);
+        }
+    }
+
+    private View inflateTransportControls(int layoutId) {
+        View v = ApiHelper.inflateLibLayout(mInstance.getContext(), layoutId);
+        mPlayPauseButton = v.findViewById(R.id.pause);
+        if (mPlayPauseButton != null) {
+            mPlayPauseButton.requestFocus();
+            mPlayPauseButton.setOnClickListener(mPlayPauseListener);
+        }
+        mFfwdButton = v.findViewById(R.id.ffwd);
+        if (mFfwdButton != null) {
+            mFfwdButton.setOnClickListener(mFfwdListener);
+        }
+        mRewButton = v.findViewById(R.id.rew);
+        if (mRewButton != null) {
+            mRewButton.setOnClickListener(mRewListener);
+        }
+        // TODO: Add support for Next and Previous buttons
+        mNextButton = v.findViewById(R.id.next);
+        if (mNextButton != null) {
+            mNextButton.setOnClickListener(mNextListener);
+            mNextButton.setVisibility(View.GONE);
+        }
+        mPrevButton = v.findViewById(R.id.prev);
+        if (mPrevButton != null) {
+            mPrevButton.setOnClickListener(mPrevListener);
+            mPrevButton.setVisibility(View.GONE);
+        }
+        return v;
     }
 
     private void initializeSettingsLists() {
@@ -1079,8 +1187,18 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     }
 
     private void displaySettingsWindow(BaseAdapter adapter) {
+        // Set Adapter
         mSettingsListView.setAdapter(adapter);
-        int totalHeight = adapter.getCount() * mSettingsItemHeight;
+
+        // Set width of window
+        int itemWidth = (mSizeType == SIZE_TYPE_EMBEDDED)
+                ? mEmbeddedSettingsItemWidth : mFullSettingsItemWidth;
+        mSettingsWindow.setWidth(itemWidth);
+
+        // Calculate height of window and show
+        int itemHeight = (mSizeType == SIZE_TYPE_EMBEDDED)
+                ? mEmbeddedSettingsItemHeight : mFullSettingsItemHeight;
+        int totalHeight = adapter.getCount() * itemHeight;
         mSettingsWindow.dismiss();
         mSettingsWindow.showAsDropDown(mInstance, mSettingsWindowMargin,
                 mSettingsWindowMargin - totalHeight, Gravity.BOTTOM | Gravity.RIGHT);
@@ -1273,8 +1391,14 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
 
         @Override
         public View getView(int position, View convertView, ViewGroup container) {
-            View row = ApiHelper.inflateLibLayout(mInstance.getContext(),
-                    R.layout.settings_list_item);
+            View row;
+            if (mSizeType == SIZE_TYPE_FULL) {
+                row = ApiHelper.inflateLibLayout(mInstance.getContext(),
+                        R.layout.full_settings_list_item);
+            } else {
+                row = ApiHelper.inflateLibLayout(mInstance.getContext(),
+                        R.layout.embedded_settings_list_item);
+            }
             TextView mainTextView = (TextView) row.findViewById(R.id.main_text);
             TextView subTextView = (TextView) row.findViewById(R.id.sub_text);
             ImageView iconView = (ImageView) row.findViewById(R.id.icon);
@@ -1347,8 +1471,14 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
 
         @Override
         public View getView(int position, View convertView, ViewGroup container) {
-            View row = ApiHelper.inflateLibLayout(mInstance.getContext(),
-                    R.layout.sub_settings_list_item);
+            View row;
+            if (mSizeType == SIZE_TYPE_FULL) {
+                row = ApiHelper.inflateLibLayout(mInstance.getContext(),
+                        R.layout.full_sub_settings_list_item);
+            } else {
+                row = ApiHelper.inflateLibLayout(mInstance.getContext(),
+                        R.layout.embedded_sub_settings_list_item);
+            }
             TextView textView = (TextView) row.findViewById(R.id.text);
             ImageView checkView = (ImageView) row.findViewById(R.id.check);
 
