@@ -92,8 +92,8 @@ void C2SoftG711::process(
         return;
     }
 
-    const C2ConstLinearBlock &inBuffer =
-	work->input.buffers[0]->data().linearBlocks().front();
+    const C2ConstLinearBlock inBuffer =
+        work->input.buffers[0]->data().linearBlocks().front();
     C2ReadView rView = inBuffer.map().get();
     size_t inOffset = inBuffer.offset();
     size_t inSize = inBuffer.size();
