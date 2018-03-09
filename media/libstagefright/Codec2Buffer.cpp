@@ -18,6 +18,7 @@
 #define LOG_TAG "Codec2Buffer"
 #include <utils/Log.h>
 
+#include <hidlmemory/FrameworkUtils.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
 
@@ -611,6 +612,61 @@ bool ConstGraphicBlockBuffer::copy(const std::shared_ptr<C2Buffer> &buffer) {
     meta()->setBuffer("image-data", converter.imageData());
     mBufferRef = buffer;
     return true;
+}
+
+// EncryptedLinearBlockBuffer
+
+EncryptedLinearBlockBuffer::EncryptedLinearBlockBuffer(
+        const sp<AMessage> &format,
+        const std::shared_ptr<C2LinearBlock> &block,
+        const sp<IMemory> &memory,
+        int32_t heapSeqNum)
+    : Codec2Buffer(format, new ABuffer(memory->pointer(), memory->size())),
+      mBlock(block),
+      mMemory(memory),
+      mHeapSeqNum(heapSeqNum) {
+}
+
+std::shared_ptr<C2Buffer> EncryptedLinearBlockBuffer::asC2Buffer() {
+    return C2Buffer::CreateLinearBuffer(mBlock->share(offset(), size(), C2Fence()));
+}
+
+void EncryptedLinearBlockBuffer::fillSourceBuffer(
+        ICrypto::SourceBuffer *source) {
+    source->mSharedMemory = mMemory;
+    source->mHeapSeqNum = mHeapSeqNum;
+}
+
+void EncryptedLinearBlockBuffer::fillSourceBuffer(
+        hardware::cas::native::V1_0::SharedBuffer *source) {
+    ssize_t offset;
+    size_t size;
+
+    mHidlMemory = hardware::fromHeap(mMemory->getMemory(&offset, &size));
+    source->heapBase = *mHidlMemory;
+    source->offset = offset;
+    source->size = size;
+}
+
+bool EncryptedLinearBlockBuffer::copyDecryptedContent(
+        const sp<IMemory> &decrypted, size_t length) {
+    C2WriteView view = mBlock->map().get();
+    if (view.error() != C2_OK) {
+        return false;
+    }
+    if (view.size() < length) {
+        return false;
+    }
+    memcpy(view.data(), decrypted->pointer(), length);
+    return true;
+}
+
+bool EncryptedLinearBlockBuffer::copyDecryptedContentFromMemory(size_t length) {
+    return copyDecryptedContent(mMemory, length);
+}
+
+native_handle_t *EncryptedLinearBlockBuffer::handle() const {
+    return const_cast<native_handle_t *>(mBlock->handle());
 }
 
 }  // namespace android
