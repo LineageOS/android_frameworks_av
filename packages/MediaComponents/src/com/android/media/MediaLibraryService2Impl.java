@@ -72,8 +72,8 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
                 VolumeProvider2 volumeProvider,
                 PendingIntent sessionActivity, Executor callbackExecutor,
                 MediaLibrarySessionCallback callback) {
-            super(context, player, id, playlistAgent, volumeProvider, sessionActivity, callbackExecutor,
-                    callback);
+            super(context, player, id, playlistAgent, volumeProvider, sessionActivity,
+                    callbackExecutor, callback);
             // Don't put any extra initialization here. Here's the reason.
             // System service will recognize this session inside of the super constructor and would
             // connect to this session assuming that initialization is finished. However, if any
@@ -154,8 +154,7 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
         public LibraryRootImpl(Context context, LibraryRoot instance, String rootId,
                 Bundle extras) {
             if (rootId == null) {
-                throw new IllegalArgumentException("The root id in BrowserRoot cannot be null. " +
-                        "Use null for BrowserRoot instead.");
+                throw new IllegalArgumentException("rootId shouldn't be null.");
             }
             mInstance = instance;
             mRootId = rootId;
