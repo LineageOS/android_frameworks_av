@@ -20,8 +20,11 @@
 
 #include <C2Buffer.h>
 
+#include <android/hardware/cas/native/1.0/types.h>
+#include <binder/IMemory.h>
 #include <media/hardware/VideoAPI.h>
 #include <media/MediaCodecBuffer.h>
+#include <media/ICrypto.h>
 
 namespace android {
 
@@ -269,6 +272,79 @@ private:
     std::unique_ptr<const C2GraphicView> mView;
     std::shared_ptr<C2Buffer> mBufferRef;
     const bool mWrapped;
+};
+
+/**
+ * MediaCodecBuffer implementation wraps around C2LinearBlock for component
+ * and IMemory for client. Underlying C2LinearBlock won't be mapped for secure
+ * usecases..
+ */
+class EncryptedLinearBlockBuffer : public Codec2Buffer {
+public:
+    /**
+     * Construct a new EncryptedLinearBufferBlock wrapping around C2LinearBlock
+     * object and writable IMemory region.
+     *
+     * \param   format      mandatory buffer format for MediaCodecBuffer
+     * \param   block       C2LinearBlock object to wrap around.
+     * \param   memory      IMemory object to store encrypted content.
+     * \param   heapSeqNum  Heap sequence number from ICrypto; -1 if N/A
+     */
+    EncryptedLinearBlockBuffer(
+            const sp<AMessage> &format,
+            const std::shared_ptr<C2LinearBlock> &block,
+            const sp<IMemory> &memory,
+            int32_t heapSeqNum = -1);
+    EncryptedLinearBlockBuffer() = delete;
+
+    virtual ~EncryptedLinearBlockBuffer() = default;
+
+    std::shared_ptr<C2Buffer> asC2Buffer() override;
+
+    /**
+     * Fill the source buffer structure with appropriate value based on
+     * internal IMemory object.
+     *
+     * \param source  source buffer structure to fill.
+     */
+    void fillSourceBuffer(ICrypto::SourceBuffer *source);
+    void fillSourceBuffer(
+            hardware::cas::native::V1_0::SharedBuffer *source);
+
+    /**
+     * Copy the content of |decrypted| into C2LinearBlock inside. This shall
+     * only be called in non-secure usecases.
+     *
+     * \param   decrypted   decrypted content to copy from.
+     * \param   length      length of the content
+     * \return  true        if successful
+     *          false       otherwise.
+     */
+    bool copyDecryptedContent(const sp<IMemory> &decrypted, size_t length);
+
+    /**
+     * Copy the content of internal IMemory object into C2LinearBlock inside.
+     * This shall only be called in non-secure usecases.
+     *
+     * \param   length      length of the content
+     * \return  true        if successful
+     *          false       otherwise.
+     */
+    bool copyDecryptedContentFromMemory(size_t length);
+
+    /**
+     * Return native handle of secure buffer understood by ICrypto.
+     *
+     * \return secure buffer handle
+     */
+    native_handle_t *handle() const;
+
+private:
+
+    std::shared_ptr<C2LinearBlock> mBlock;
+    sp<IMemory> mMemory;
+    sp<hardware::HidlMemory> mHidlMemory;
+    int32_t mHeapSeqNum;
 };
 
 }  // namespace android
