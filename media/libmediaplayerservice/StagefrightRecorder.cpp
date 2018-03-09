@@ -89,6 +89,13 @@ static const char *kRecorderVideoProfile = "android.media.mediarecorder.video-en
 static const char *kRecorderVideoTimescale = "android.media.mediarecorder.video-timescale";
 static const char *kRecorderWidth = "android.media.mediarecorder.width";
 
+// new fields, not yet frozen in the public Java API definitions
+static const char *kRecorderAudioMime = "android.media.mediarecorder.audio.mime";
+static const char *kRecorderVideoMime = "android.media.mediarecorder.video.mime";
+static const char *kRecorderDurationMs = "android.media.mediarecorder.durationMs";
+static const char *kRecorderPaused = "android.media.mediarecorder.pausedMs";
+static const char *kRecorderNumPauses = "android.media.mediarecorder.NPauses";
+
 
 // To collect the encoder usage for the battery app
 static void addBatteryData(uint32_t params) {
@@ -126,21 +133,18 @@ StagefrightRecorder::~StagefrightRecorder() {
     }
 
     // log the current record, provided it has some information worth recording
-    if (mAnalyticsDirty && mAnalyticsItem != NULL) {
-        updateMetrics();
-        if (mAnalyticsItem->count() > 0) {
-            mAnalyticsItem->selfrecord();
-        }
-        delete mAnalyticsItem;
-        mAnalyticsItem = NULL;
-    }
+    // NB: this also reclaims & clears mAnalyticsItem.
+    flushAndResetMetrics(false);
 }
 
 void StagefrightRecorder::updateMetrics() {
     ALOGV("updateMetrics");
 
-    // we'll populate the values from the raw fields.
-    // (NOT going to populate as we go through the various set* ops)
+    // we run as part of the media player service; what we really want to
+    // know is the app which requested the recording.
+    mAnalyticsItem->setUid(mClientUid);
+
+    // populate the values from the raw fields.
 
     // TBD mOutputFormat  = OUTPUT_FORMAT_THREE_GPP;
     // TBD mAudioEncoder  = AUDIO_ENCODER_AMR_NB;
@@ -168,7 +172,6 @@ void StagefrightRecorder::updateMetrics() {
     // TBD mTrackEveryTimeDurationUs = 0;
     mAnalyticsItem->setInt32(kRecorderCaptureFpsEnable, mCaptureFpsEnable);
     mAnalyticsItem->setDouble(kRecorderCaptureFps, mCaptureFps);
-    // TBD mCaptureFps = -1.0;
     // TBD mCameraSourceTimeLapse = NULL;
     // TBD mMetaDataStoredInVideoBuffers = kMetadataBufferTypeInvalid;
     // TBD mEncoderProfiles = MediaProfiles::getInstance();
@@ -177,14 +180,17 @@ void StagefrightRecorder::updateMetrics() {
     // PII mLongitudex10000 = -3600000;
     // TBD mTotalBitRate = 0;
 
-    // TBD: some duration information (capture, paused)
-    //
-
+    // duration information (recorded, paused, # of pauses)
+    mAnalyticsItem->setInt64(kRecorderDurationMs, (mDurationRecordedUs+500)/1000 );
+    if (mNPauses != 0) {
+        mAnalyticsItem->setInt64(kRecorderPaused, (mDurationPausedUs+500)/1000 );
+        mAnalyticsItem->setInt32(kRecorderNumPauses, mNPauses);
+    }
 }
 
-void StagefrightRecorder::resetMetrics() {
-    ALOGV("resetMetrics");
-    // flush anything we have, restart the record
+void StagefrightRecorder::flushAndResetMetrics(bool reinitialize) {
+    ALOGV("flushAndResetMetrics");
+    // flush anything we have, maybe setup a new record
     if (mAnalyticsDirty && mAnalyticsItem != NULL) {
         updateMetrics();
         if (mAnalyticsItem->count() > 0) {
@@ -193,8 +199,10 @@ void StagefrightRecorder::resetMetrics() {
         delete mAnalyticsItem;
         mAnalyticsItem = NULL;
     }
-    mAnalyticsItem = new MediaAnalyticsItem(kKeyRecorder);
     mAnalyticsDirty = false;
+    if (reinitialize) {
+        mAnalyticsItem = new MediaAnalyticsItem(kKeyRecorder);
+    }
 }
 
 status_t StagefrightRecorder::init() {
@@ -1030,6 +1038,8 @@ status_t StagefrightRecorder::start() {
         mAnalyticsDirty = true;
         mStarted = true;
 
+        mStartedRecordingUs = systemTime() / 1000;
+
         uint32_t params = IMediaPlayerService::kBatteryDataCodecStarted;
         if (mAudioSource != AUDIO_SOURCE_CNT) {
             params |= IMediaPlayerService::kBatteryDataTrackAudio;
@@ -1107,6 +1117,14 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
         default:
             ALOGE("Unknown audio encoder: %d", mAudioEncoder);
             return NULL;
+    }
+
+    // log audio mime type for media metrics
+    if (mAnalyticsItem != NULL) {
+        AString audiomime;
+        if (format->findString("mime", &audiomime)) {
+            mAnalyticsItem->setCString(kRecorderAudioMime, audiomime.c_str());
+        }
     }
 
     int32_t maxInputSize;
@@ -1655,6 +1673,14 @@ status_t StagefrightRecorder::setupVideoEncoder(
             break;
     }
 
+    // log video mime type for media metrics
+    if (mAnalyticsItem != NULL) {
+        AString videomime;
+        if (format->findString("mime", &videomime)) {
+            mAnalyticsItem->setCString(kRecorderVideoMime, videomime.c_str());
+        }
+    }
+
     if (cameraSource != NULL) {
         sp<MetaData> meta = cameraSource->getFormat();
 
@@ -1917,6 +1943,13 @@ status_t StagefrightRecorder::pause() {
     sp<MetaData> meta = new MetaData;
     meta->setInt64(kKeyTime, mPauseStartTimeUs);
 
+    if (mStartedRecordingUs != 0) {
+        // should always be true
+        int64_t recordingUs = mPauseStartTimeUs - mStartedRecordingUs;
+        mDurationRecordedUs += recordingUs;
+        mStartedRecordingUs = 0;
+    }
+
     if (mAudioEncoderSource != NULL) {
         mAudioEncoderSource->pause();
     }
@@ -1975,6 +2008,16 @@ status_t StagefrightRecorder::resume() {
         source->setInputBufferTimeOffset((int64_t)timeOffset);
         source->start(meta.get());
     }
+
+
+    // sum info on pause duration
+    // (ignore the 30msec of overlap adjustment factored into mTotalPausedDurationUs)
+    int64_t pausedUs = resumeStartTimeUs - mPauseStartTimeUs;
+    mDurationPausedUs += pausedUs;
+    mNPauses++;
+    // and a timestamp marking that we're back to recording....
+    mStartedRecordingUs = resumeStartTimeUs;
+
     mPauseStartTimeUs = 0;
 
     return OK;
@@ -2003,10 +2046,28 @@ status_t StagefrightRecorder::stop() {
         mWriter.clear();
     }
 
-    resetMetrics();
+    // account for the last 'segment' -- whether paused or recording
+    if (mPauseStartTimeUs != 0) {
+        // we were paused
+        int64_t additive = stopTimeUs - mPauseStartTimeUs;
+        mDurationPausedUs += additive;
+        mNPauses++;
+    } else if (mStartedRecordingUs != 0) {
+        // we were recording
+        int64_t additive = stopTimeUs - mStartedRecordingUs;
+        mDurationRecordedUs += additive;
+    } else {
+        ALOGW("stop while neither recording nor paused");
+    }
 
+    flushAndResetMetrics(true);
+
+    mDurationRecordedUs = 0;
+    mDurationPausedUs = 0;
+    mNPauses = 0;
     mTotalPausedDurationUs = 0;
     mPauseStartTimeUs = 0;
+    mStartedRecordingUs = 0;
 
     mGraphicBufferProducer.clear();
     mPersistentSurface.clear();
@@ -2084,6 +2145,12 @@ status_t StagefrightRecorder::reset() {
     mLatitudex10000 = -3600000;
     mLongitudex10000 = -3600000;
     mTotalBitRate = 0;
+
+    // tracking how long we recorded.
+    mDurationRecordedUs = 0;
+    mStartedRecordingUs = 0;
+    mDurationPausedUs = 0;
+    mNPauses = 0;
 
     mOutputFd = -1;
 
