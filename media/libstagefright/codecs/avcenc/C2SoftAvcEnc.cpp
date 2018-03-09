@@ -909,6 +909,9 @@ c2_status_t C2SoftAvcEnc::setEncodeArgs(
     }
 
     ALOGV("width = %d, height = %d", input->width(), input->height());
+    if (mWidth != input->width() || mHeight != input->height()) {
+        return C2_BAD_VALUE;
+    }
     const C2PlanarLayout &layout = input->layout();
     uint8_t *yPlane = const_cast<uint8_t *>(input->data()[C2PlanarLayout::PLANE_Y]);
     uint8_t *uPlane = const_cast<uint8_t *>(input->data()[C2PlanarLayout::PLANE_U]);
