@@ -195,6 +195,7 @@ private:
         uint32_t type;
         int32_t width;
         int32_t height;
+        int32_t rotation;
         sp<ABuffer> hvcc;
     } ItemProperty;
 
