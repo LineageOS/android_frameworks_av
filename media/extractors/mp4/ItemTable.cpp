@@ -1058,9 +1058,12 @@ status_t InfeBox::parse(off64_t offset, size_t size, ItemInfo *itemInfo) {
                 return ERROR_MALFORMED;
             }
 
-            String8 content_encoding;
-            if (!parseNullTerminatedString(&offset, &size, &content_encoding)) {
-                return ERROR_MALFORMED;
+            // content_encoding is optional; can be omitted if would be empty
+            if (size > 0) {
+                String8 content_encoding;
+                if (!parseNullTerminatedString(&offset, &size, &content_encoding)) {
+                    return ERROR_MALFORMED;
+                }
             }
         } else if (item_type == FOURCC('u', 'r', 'i', ' ')) {
             String8 item_uri_type;
