@@ -203,6 +203,16 @@ public:
      */
     audio_io_handle_t getA2dpOutput() const;
 
+    /**
+     * returns true if primary HAL supports A2DP Offload
+     */
+    bool isA2dpOffloadedOnPrimary() const;
+
+    /**
+     * returns true if A2DP is supported (either via hardware offload or software encoding)
+     */
+    bool isA2dpSupported() const;
+
     sp<SwAudioOutputDescriptor> getOutputFromId(audio_port_handle_t id) const;
 
     sp<SwAudioOutputDescriptor> getPrimaryOutput() const;
