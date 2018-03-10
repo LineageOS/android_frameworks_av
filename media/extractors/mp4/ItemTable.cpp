@@ -982,25 +982,23 @@ private:
 
 bool InfeBox::parseNullTerminatedString(
         off64_t *offset, size_t *size, String8 *out) {
-    char tmp[256];
-    size_t len = 0;
+    char tmp;
+    Vector<char> buf;
+    buf.setCapacity(256);
     off64_t newOffset = *offset;
     off64_t stopOffset = *offset + *size;
     while (newOffset < stopOffset) {
-        if (!source()->readAt(newOffset++, &tmp[len], 1)) {
+        if (!source()->readAt(newOffset++, &tmp, 1)) {
             return false;
         }
-        if (tmp[len] == 0) {
-            out->append(tmp, len);
+        buf.push_back(tmp);
+        if (tmp == 0) {
+            out->setTo(buf.array());
 
             *offset = newOffset;
             *size = stopOffset - newOffset;
 
             return true;
-        }
-        if (++len >= sizeof(tmp)) {
-            out->append(tmp, len);
-            len = 0;
         }
     }
     return false;
