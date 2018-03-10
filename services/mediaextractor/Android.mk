@@ -32,7 +32,6 @@ LOCAL_REQUIRED_MODULES += \
     libmpeg2extractor \
     liboggextractor \
     libwavextractor \
-    MediaComponents \
 
 LOCAL_SRC_FILES := main_extractorservice.cpp
 LOCAL_SHARED_LIBRARIES := libmedia libmediaextractorservice libbinder libutils \
