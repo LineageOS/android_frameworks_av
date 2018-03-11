@@ -1,0 +1,44 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9e15f73b_148cdc47",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 1752,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-11T23:27:56Z",
+      "side": 1,
+      "message": "declaration is here, it looks like the point of the clear call is to reduce the refcount to each clientSp on line 1754.",
+      "range": {
+        "startLine": 1752,
+        "startChar": 37,
+        "endLine": 1752,
+        "endChar": 44
+      },
+      "revId": "e6d2f9f811125e010aae70e80bf16026bbf15f8d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "893938ce_7d23a03b",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 1784,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-11T23:27:56Z",
+      "side": 1,
+      "message": "nit: space between // and clear",
+      "revId": "e6d2f9f811125e010aae70e80bf16026bbf15f8d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
