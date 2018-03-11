@@ -23,6 +23,7 @@ function _runtest_cts_mediacomponent_usage() {
   echo '     -h|--help: This help'
   echo '     --skip: Skip build and flash. Just rerun-tests'
   echo '     --min: Only rebuild tests and updatable library.'
+  echo '     --test: Only rebuild tests'
   echo '     -s [device_id]: Specify a device name to run test against.'
   echo '                     You can define ${ADBHOST} instead.'
   echo '     -r [count]: Repeat tests for given count. It will stop when fails.'
@@ -58,6 +59,7 @@ function runtest-cts-MediaComponents() {
   while true; do
     local OPTION_SKIP="false"
     local OPTION_MIN="false"
+    local OPTION_TEST="false"
     local OPTION_REPEAT_COUNT="1"
     local OPTION_IGNORE="false"
     local OPTION_TEST_TARGET="${DEFAULT_TEST_TARGET}"
@@ -73,6 +75,9 @@ function runtest-cts-MediaComponents() {
           ;;
         --min)
           OPTION_MIN="true"
+          ;;
+        --test)
+          OPTION_TEST="true"
           ;;
         -s)
           shift
@@ -133,36 +138,43 @@ function runtest-cts-MediaComponents() {
       fi
 
       # Build test apk and required apk.
-      local build_targets="${BUILD_TARGETS[@]}"
-      if [[ "${OPTION_MIN}" != "true" ]]; then
-        build_targets="${build_targets} droid"
+      local build_targets
+      if [[ "${OPTION_TEST}" == "true" ]]; then
+        build_targets="${INSTALL_TARGETS[@]}"
+      elif [[ "${OPTION_MIN}" == "true" ]]; then
+        build_targets="${BUILD_TARGETS[@]}"
+      else
+        build_targets="${BUILD_TARGETS[@]} droid"
       fi
       m ${build_targets} -j || break
 
-      local device_build_type="$(${adb} shell getprop ro.build.type)"
-      if [[ "${device_build_type}" == "user" ]]; then
-        # User build. Cannot adb sync
-        ${adb} reboot bootloader
-        fastboot flashall
-      else
-        ${adb} root
-        local device_verity_mode="$(${adb} shell getprop ro.boot.veritymode)"
-        if [[ "${device_verity_mode}" != "disabled" ]]; then
-          ${adb} disable-verity
-          ${adb} reboot
-          ${adb} wait-for-device || break
+      if [[ "${OPTION_TEST}" != "true" ]]; then
+        # Flash only when needed
+        local device_build_type="$(${adb} shell getprop ro.build.type)"
+        if [[ "${device_build_type}" == "user" ]]; then
+          # User build. Cannot adb sync
+          ${adb} reboot bootloader
+          fastboot flashall
+        else
           ${adb} root
+          local device_verity_mode="$(${adb} shell getprop ro.boot.veritymode)"
+          if [[ "${device_verity_mode}" != "disabled" ]]; then
+            ${adb} disable-verity
+            ${adb} reboot
+            ${adb} wait-for-device || break
+            ${adb} root
+          fi
+          ${adb} remount
+          ${adb} shell stop
+          ${adb} shell setprop log.tag.MediaSessionService DEBUG
+          ${adb} sync
+          ${adb} shell start
         fi
-        ${adb} remount
-        ${adb} shell stop
-        ${adb} shell setprop log.tag.MediaSessionService DEBUG
-        ${adb} sync
-        ${adb} shell start
+        ${adb} wait-for-device || break
+        # Ensure package manager is loaded.
+        # TODO(jaewan): Find better way to wait
+        sleep 15
       fi
-      ${adb} wait-for-device || break
-      # Ensure package manager is loaded.
-      # TODO(jaewan): Find better way to wait
-      sleep 15
 
       # Install apks
       local install_failed="false"
