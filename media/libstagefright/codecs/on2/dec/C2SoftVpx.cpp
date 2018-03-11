@@ -209,7 +209,7 @@ void C2SoftVpx::process(
         return;
     }
 
-    const C2ConstLinearBlock &inBuffer = work->input.buffers[0]->data().linearBlocks().front();
+    const C2ConstLinearBlock inBuffer = work->input.buffers[0]->data().linearBlocks().front();
     size_t inOffset = inBuffer.offset();
     size_t inSize = inBuffer.size();
     C2ReadView rView = work->input.buffers[0]->data().linearBlocks().front().map().get();

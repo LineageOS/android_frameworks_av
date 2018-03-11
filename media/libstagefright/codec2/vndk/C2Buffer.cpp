@@ -647,7 +647,8 @@ private:
     std::shared_ptr<_C2BlockPoolData> mPoolData;
 };
 
-class C2_HIDE _C2MappingBlock2DImpl : public _C2Block2DImpl {
+class C2_HIDE _C2MappingBlock2DImpl
+    : public _C2Block2DImpl, public std::enable_shared_from_this<_C2MappingBlock2DImpl> {
 public:
     using _C2Block2DImpl::_C2Block2DImpl;
 
@@ -658,7 +659,7 @@ public:
     private:
         friend class _C2MappingBlock2DImpl;
 
-        Mapped(const _C2Block2DImpl *impl, bool writable, C2Fence *fence __unused)
+        Mapped(const std::shared_ptr<_C2Block2DImpl> &impl, bool writable, C2Fence *fence __unused)
             : mImpl(impl), mWritable(writable) {
             memset(mData, 0, sizeof(mData));
             const C2Rect crop = mImpl->crop();
@@ -726,7 +727,7 @@ public:
         bool writable() const { return mWritable; }
 
     private:
-        const _C2Block2DImpl *mImpl;
+        const std::shared_ptr<_C2Block2DImpl> mImpl;
         bool mWritable;
         c2_status_t mError;
         uint8_t *mData[C2PlanarLayout::MAX_NUM_PLANES];
@@ -744,7 +745,7 @@ public:
         std::lock_guard<std::mutex> lock(mMappedLock);
         std::shared_ptr<Mapped> existing = mMapped.lock();
         if (!existing) {
-            existing = std::shared_ptr<Mapped>(new Mapped(this, writable, fence));
+            existing = std::shared_ptr<Mapped>(new Mapped(shared_from_this(), writable, fence));
             mMapped = existing;
         } else {
             // if we mapped the region read-only, we cannot remap it read-write

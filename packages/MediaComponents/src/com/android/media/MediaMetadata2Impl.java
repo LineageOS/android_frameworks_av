@@ -123,11 +123,17 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
 
     @Override
     public boolean containsKey_impl(String key) {
+        if (key == null) {
+            throw new IllegalArgumentException("key shouldn't be null");
+        }
         return mBundle.containsKey(key);
     }
 
     @Override
     public CharSequence getText_impl(@TextKey String key) {
+        if (key == null) {
+            throw new IllegalArgumentException("key shouldn't be null");
+        }
         return mBundle.getCharSequence(key);
     }
 
@@ -138,6 +144,9 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
 
     @Override
     public String getString_impl(@TextKey String key) {
+        if (key == null) {
+            throw new IllegalArgumentException("key shouldn't be null");
+        }
         CharSequence text = mBundle.getCharSequence(key);
         if (text != null) {
             return text.toString();
@@ -147,11 +156,17 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
 
     @Override
     public long getLong_impl(@LongKey String key) {
+        if (key == null) {
+            throw new IllegalArgumentException("key shouldn't be null");
+        }
         return mBundle.getLong(key, 0);
     }
 
     @Override
     public Rating2 getRating_impl(@RatingKey String key) {
+        if (key == null) {
+            throw new IllegalArgumentException("key shouldn't be null");
+        }
         // TODO(jaewan): Add backward compatibility
         Rating2 rating = null;
         try {
@@ -165,11 +180,17 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
 
     @Override
     public float getFloat_impl(@FloatKey String key) {
+        if (key == null) {
+            throw new IllegalArgumentException("key shouldn't be null");
+        }
         return mBundle.getFloat(key);
     }
 
     @Override
     public Bitmap getBitmap_impl(@BitmapKey String key) {
+        if (key == null) {
+            throw new IllegalArgumentException("key shouldn't be null");
+        }
         Bitmap bmp = null;
         try {
             bmp = mBundle.getParcelable(key);
@@ -221,7 +242,8 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
             mBundle = new Bundle();
         }
 
-        public BuilderImpl(Context context, MediaMetadata2.Builder instance, MediaMetadata2 source) {
+        public BuilderImpl(Context context, MediaMetadata2.Builder instance,
+                MediaMetadata2 source) {
             if (source == null) {
                 throw new IllegalArgumentException("source shouldn't be null");
             }
@@ -248,6 +270,9 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
 
         @Override
         public Builder putText_impl(@TextKey String key, CharSequence value) {
+            if (key == null) {
+                throw new IllegalArgumentException("key shouldn't be null");
+            }
             if (METADATA_KEYS_TYPE.containsKey(key)) {
                 if (METADATA_KEYS_TYPE.get(key) != METADATA_TYPE_TEXT) {
                     throw new IllegalArgumentException("The " + key
@@ -260,6 +285,9 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
 
         @Override
         public Builder putString_impl(@TextKey String key, String value) {
+            if (key == null) {
+                throw new IllegalArgumentException("key shouldn't be null");
+            }
             if (METADATA_KEYS_TYPE.containsKey(key)) {
                 if (METADATA_KEYS_TYPE.get(key) != METADATA_TYPE_TEXT) {
                     throw new IllegalArgumentException("The " + key
@@ -272,6 +300,9 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
 
         @Override
         public Builder putLong_impl(@LongKey String key, long value) {
+            if (key == null) {
+                throw new IllegalArgumentException("key shouldn't be null");
+            }
             if (METADATA_KEYS_TYPE.containsKey(key)) {
                 if (METADATA_KEYS_TYPE.get(key) != METADATA_TYPE_LONG) {
                     throw new IllegalArgumentException("The " + key
@@ -284,6 +315,9 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
 
         @Override
         public Builder putRating_impl(@RatingKey String key, Rating2 value) {
+            if (key == null) {
+                throw new IllegalArgumentException("key shouldn't be null");
+            }
             if (METADATA_KEYS_TYPE.containsKey(key)) {
                 if (METADATA_KEYS_TYPE.get(key) != METADATA_TYPE_RATING) {
                     throw new IllegalArgumentException("The " + key
@@ -296,6 +330,9 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
 
         @Override
         public Builder putBitmap_impl(@BitmapKey String key, Bitmap value) {
+            if (key == null) {
+                throw new IllegalArgumentException("key shouldn't be null");
+            }
             if (METADATA_KEYS_TYPE.containsKey(key)) {
                 if (METADATA_KEYS_TYPE.get(key) != METADATA_TYPE_BITMAP) {
                     throw new IllegalArgumentException("The " + key
@@ -308,6 +345,9 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
 
         @Override
         public Builder putFloat_impl(@FloatKey String key, float value) {
+            if (key == null) {
+                throw new IllegalArgumentException("key shouldn't be null");
+            }
             if (METADATA_KEYS_TYPE.containsKey(key)) {
                 if (METADATA_KEYS_TYPE.get(key) != METADATA_TYPE_FLOAT) {
                     throw new IllegalArgumentException("The " + key
@@ -329,7 +369,8 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
             return new MediaMetadata2Impl(mContext, mBundle).getInstance();
         }
 
-        private Bitmap scaleBitmap(Bitmap bmp, int maxSize) { float maxSizeF = maxSize;
+        private Bitmap scaleBitmap(Bitmap bmp, int maxSize) {
+            float maxSizeF = maxSize;
             float widthScale = maxSizeF / bmp.getWidth();
             float heightScale = maxSizeF / bmp.getHeight();
             float scale = Math.min(widthScale, heightScale);

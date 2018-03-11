@@ -199,7 +199,11 @@ status_t JpegProcessor::deleteStream() {
             return INVALID_OPERATION;
         }
 
-        device->deleteStream(mCaptureStreamId);
+        status_t res = device->deleteStream(mCaptureStreamId);
+        if (res != OK) {
+            ALOGE("%s: delete stream %d failed!", __FUNCTION__, mCaptureStreamId);
+            return res;
+        }
 
         mCaptureHeap.clear();
         mCaptureWindow.clear();

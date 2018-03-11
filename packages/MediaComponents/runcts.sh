@@ -13,13 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Usage '. runtest.sh'
+# Usage '. runcts.sh'
 
-function _runtest_mediacomponent_usage() {
-  echo 'runtest-MediaComponents [option]: Run MediaComponents test'
+function _runtest_cts_mediacomponent_usage() {
+  echo 'runtest-cts-MediaComponents [option]: Build, flash device,'
+  echo '              and run subset of CtsMediaTestCases that MediaComponents covers.'
+  echo '          *Warning* This bypasses CTS setup (e.g. download media contents from server)'
+  echo '          For running CTS in official way, use atest or cts-tradefed '
   echo '     -h|--help: This help'
-  echo '     --skip: Skip build. Just rerun-tests.'
-  echo '     --min: Only rebuild test apk and updatable library.'
+  echo '     --skip: Skip build and flash. Just rerun-tests'
+  echo '     --min: Only rebuild tests and updatable library.'
+  echo '     --test: Only rebuild tests'
   echo '     -s [device_id]: Specify a device name to run test against.'
   echo '                     You can define ${ADBHOST} instead.'
   echo '     -r [count]: Repeat tests for given count. It will stop when fails.'
@@ -27,15 +31,25 @@ function _runtest_mediacomponent_usage() {
   echo '     -t [test]: Only run the specific test. Can be either a class or a method.'
 }
 
-function runtest-MediaComponents() {
+function runtest-cts-MediaComponents() {
   # Edit here if you want to support other tests.
   # List up libs and apks in the media_api needed for tests, and place test target at the last.
   local TEST_PACKAGE_DIR=("frameworks/av/packages/MediaComponents/test")
-  local BUILD_TARGETS=("MediaComponents" "MediaComponentsTest")
-  local INSTALL_TARGETS=("MediaComponentsTest")
+  local TEST_PACKAGE=("android.media.cts")
+  local BUILD_TARGETS=("MediaComponents" "CtsMediaTestCases")
+  # Don't include MediaComponents -- if we simply install it, system server
+  # wouldn't use the installed one.
+  local INSTALL_TARGETS=("CtsMediaTestCases")
   local TEST_RUNNER="android.support.test.runner.AndroidJUnitRunner"
   local DEPENDENCIES=("mockito-target-minus-junit4" "android-support-test" "compatibility-device-util")
-
+  local DEFAULT_TEST_TARGET=""
+  DEFAULT_TEST_TARGET+="android.media.cts.MediaBrowser2Test"
+  DEFAULT_TEST_TARGET+=",android.media.cts.MediaController2Test"
+  DEFAULT_TEST_TARGET+=",android.media.cts.MediaMetadata2Test"
+  DEFAULT_TEST_TARGET+=",android.media.cts.MediaSession2Test"
+  DEFAULT_TEST_TARGET+=",android.media.cts.MediaSession2_PermissionTest"
+  DEFAULT_TEST_TARGET+=",android.media.cts.MediaSessionManager_MediaSession2Test"
+  DEFAULT_TEST_TARGET+=",android.media.cts.SessionToken2Test"
   if [[ -z "${ANDROID_BUILD_TOP}" ]]; then
     echo "Needs to lunch a target first"
     return
@@ -45,14 +59,15 @@ function runtest-MediaComponents() {
   while true; do
     local OPTION_SKIP="false"
     local OPTION_MIN="false"
+    local OPTION_TEST="false"
     local OPTION_REPEAT_COUNT="1"
     local OPTION_IGNORE="false"
-    local OPTION_TEST_TARGET=""
+    local OPTION_TEST_TARGET="${DEFAULT_TEST_TARGET}"
     local adbhost_local
     while (( "$#" )); do
       case "${1}" in
         -h|--help)
-          _runtest_mediacomponent_usage
+          _runtest_cts_mediacomponent_usage
           return
           ;;
         --skip)
@@ -60,6 +75,9 @@ function runtest-MediaComponents() {
           ;;
         --min)
           OPTION_MIN="true"
+          ;;
+        --test)
+          OPTION_TEST="true"
           ;;
         -s)
           shift
@@ -95,7 +113,7 @@ function runtest-MediaComponents() {
     fi
 
     local target_dir="${ANDROID_BUILD_TOP}/${TEST_PACKAGE_DIR}"
-    local TEST_PACKAGE=$(sed -n 's/^.*\bpackage\b="\([a-z0-9\.]*\)".*$/\1/p' ${target_dir}/AndroidManifest.xml)
+    #local TEST_PACKAGE=$(sed -n 's/^.*\bpackage\b="\([a-z0-9\.]*\)".*$/\1/p' ${target_dir}/AndroidManifest.xml)
 
     if [[ "${OPTION_SKIP}" != "true" ]]; then
       # Build dependencies if needed.
@@ -120,32 +138,47 @@ function runtest-MediaComponents() {
       fi
 
       # Build test apk and required apk.
-      local build_targets="${BUILD_TARGETS[@]}"
-      if [[ "${OPTION_MIN}" != "true" ]]; then
-        build_targets="${build_targets} droid"
+      local build_targets
+      if [[ "${OPTION_TEST}" == "true" ]]; then
+        build_targets="${INSTALL_TARGETS[@]}"
+      elif [[ "${OPTION_MIN}" == "true" ]]; then
+        build_targets="${BUILD_TARGETS[@]}"
+      else
+        build_targets="${BUILD_TARGETS[@]} droid"
       fi
       m ${build_targets} -j || break
 
-      ${adb} root
-      ${adb} remount
-      ${adb} shell stop
-      ${adb} shell setprop log.tag.MediaSessionService DEBUG
-      ${adb} sync
-      ${adb} shell start
-      ${adb} wait-for-device || break
-      # Ensure package manager is loaded.
-      sleep 15
+      if [[ "${OPTION_TEST}" != "true" ]]; then
+        # Flash only when needed
+        local device_build_type="$(${adb} shell getprop ro.build.type)"
+        if [[ "${device_build_type}" == "user" ]]; then
+          # User build. Cannot adb sync
+          ${adb} reboot bootloader
+          fastboot flashall
+        else
+          ${adb} root
+          local device_verity_mode="$(${adb} shell getprop ro.boot.veritymode)"
+          if [[ "${device_verity_mode}" != "disabled" ]]; then
+            ${adb} disable-verity
+            ${adb} reboot
+            ${adb} wait-for-device || break
+            ${adb} root
+          fi
+          ${adb} remount
+          ${adb} shell stop
+          ${adb} shell setprop log.tag.MediaSessionService DEBUG
+          ${adb} sync
+          ${adb} shell start
+        fi
+        ${adb} wait-for-device || break
+        # Ensure package manager is loaded.
+        # TODO(jaewan): Find better way to wait
+        sleep 15
+      fi
 
       # Install apks
       local install_failed="false"
       for target in ${INSTALL_TARGETS[@]}; do
-        echo "${target}"
-        local target_dir=$(mgrep -l -e '^LOCAL_PACKAGE_NAME.*'"${target}$")
-        if [[ -z ${target_dir} ]]; then
-          continue
-        fi
-        target_dir=$(dirname ${target_dir})
-        local package=$(sed -n 's/^.*\bpackage\b="\([a-z0-9\._]*\)".*$/\1/p' ${target_dir}/AndroidManifest.xml)
         local apk_path=$(find ${OUT}/system ${OUT}/data -name ${target}.apk)
         local apk_num=$(find ${OUT}/system ${OUT}/data -name ${target}.apk | wc -l)
         if [[ "${apk_num}" != "1" ]]; then
@@ -188,4 +221,4 @@ function runtest-MediaComponents() {
 }
 
 echo "Following functions are added to your environment:"
-_runtest_mediacomponent_usage
+_runtest_cts_mediacomponent_usage

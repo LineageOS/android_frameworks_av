@@ -60,7 +60,10 @@ public:
     /**
      * Set format for MediaCodec-facing buffers.
      */
-    void setFormat(const sp<AMessage> &format) { mFormat = format; }
+    void setFormat(const sp<AMessage> &format) {
+        CHECK(format != nullptr);
+        mFormat = format;
+    }
 
     /**
      * Returns true if the buffers are operating under array mode.
@@ -179,19 +182,156 @@ namespace {
 const static size_t kMinBufferArraySize = 16;
 const static size_t kLinearBufferSize = 524288;
 
-sp<LinearBlockBuffer> allocateLinearBuffer(
+/**
+ * Simple local buffer pool backed by std::vector.
+ */
+class LocalBufferPool : public std::enable_shared_from_this<LocalBufferPool> {
+public:
+    /**
+     * Create a new LocalBufferPool object.
+     *
+     * \param poolCapacity  max total size of buffers managed by this pool.
+     *
+     * \return  a newly created pool object.
+     */
+    static std::shared_ptr<LocalBufferPool> Create(size_t poolCapacity) {
+        return std::shared_ptr<LocalBufferPool>(new LocalBufferPool(poolCapacity));
+    }
+
+    /**
+     * Return an ABuffer object whose size is at least |capacity|.
+     *
+     * \param   capacity  requested capacity
+     * \return  nullptr if the pool capacity is reached
+     *          an ABuffer object otherwise.
+     */
+    sp<ABuffer> newBuffer(size_t capacity) {
+        Mutex::Autolock lock(mMutex);
+        auto it = std::find_if(
+                mPool.begin(), mPool.end(),
+                [capacity](const std::vector<uint8_t> &vec) {
+                    return vec.capacity() >= capacity;
+                });
+        if (it != mPool.end()) {
+            sp<ABuffer> buffer = new VectorBuffer(std::move(*it), shared_from_this());
+            mPool.erase(it);
+            return buffer;
+        }
+        if (mUsedSize + capacity > mPoolCapacity) {
+            while (!mPool.empty()) {
+                mUsedSize -= mPool.back().capacity();
+                mPool.pop_back();
+            }
+            if (mUsedSize + capacity > mPoolCapacity) {
+                ALOGD("mUsedSize = %zu, capacity = %zu, mPoolCapacity = %zu",
+                        mUsedSize, capacity, mPoolCapacity);
+                return nullptr;
+            }
+        }
+        std::vector<uint8_t> vec(capacity);
+        mUsedSize += vec.capacity();
+        return new VectorBuffer(std::move(vec), shared_from_this());
+    }
+
+private:
+    /**
+     * ABuffer backed by std::vector.
+     */
+    class VectorBuffer : public ::android::ABuffer {
+    public:
+        /**
+         * Construct a VectorBuffer by taking the ownership of supplied vector.
+         *
+         * \param vec   backing vector of the buffer. this object takes
+         *              ownership at construction.
+         * \param pool  a LocalBufferPool object to return the vector at
+         *              destruction.
+         */
+        VectorBuffer(std::vector<uint8_t> &&vec, const std::shared_ptr<LocalBufferPool> &pool)
+            : ABuffer(vec.data(), vec.capacity()),
+              mVec(std::move(vec)),
+              mPool(pool) {
+        }
+
+        ~VectorBuffer() override {
+            std::shared_ptr<LocalBufferPool> pool = mPool.lock();
+            if (pool) {
+                // If pool is alive, return the vector back to the pool so that
+                // it can be recycled.
+                pool->returnVector(std::move(mVec));
+            }
+        }
+
+    private:
+        std::vector<uint8_t> mVec;
+        std::weak_ptr<LocalBufferPool> mPool;
+    };
+
+    Mutex mMutex;
+    size_t mPoolCapacity;
+    size_t mUsedSize;
+    std::list<std::vector<uint8_t>> mPool;
+
+    /**
+     * Private constructor to prevent constructing non-managed LocalBufferPool.
+     */
+    explicit LocalBufferPool(size_t poolCapacity)
+        : mPoolCapacity(poolCapacity), mUsedSize(0) {
+    }
+
+    /**
+     * Take back the ownership of vec from the destructed VectorBuffer and put
+     * it in front of the pool.
+     */
+    void returnVector(std::vector<uint8_t> &&vec) {
+        Mutex::Autolock lock(mMutex);
+        mPool.push_front(std::move(vec));
+    }
+
+    DISALLOW_EVIL_CONSTRUCTORS(LocalBufferPool);
+};
+
+sp<LinearBlockBuffer> AllocateLinearBuffer(
         const std::shared_ptr<C2BlockPool> &pool,
         const sp<AMessage> &format,
         size_t size,
         const C2MemoryUsage &usage) {
     std::shared_ptr<C2LinearBlock> block;
 
-    status_t err = pool->fetchLinearBlock(size, usage, &block);
-    if (err != OK) {
+    c2_status_t err = pool->fetchLinearBlock(size, usage, &block);
+    if (err != C2_OK) {
         return nullptr;
     }
 
     return LinearBlockBuffer::Allocate(format, block);
+}
+
+sp<GraphicBlockBuffer> AllocateGraphicBuffer(
+        const std::shared_ptr<C2BlockPool> &pool,
+        const sp<AMessage> &format,
+        uint32_t pixelFormat,
+        const C2MemoryUsage &usage,
+        const std::shared_ptr<LocalBufferPool> &localBufferPool) {
+    int32_t width, height;
+    if (!format->findInt32("width", &width) || !format->findInt32("height", &height)) {
+        ALOGD("format lacks width or height");
+        return nullptr;
+    }
+
+    std::shared_ptr<C2GraphicBlock> block;
+    c2_status_t err = pool->fetchGraphicBlock(
+            width, height, pixelFormat, usage, &block);
+    if (err != C2_OK) {
+        ALOGD("fetch graphic block failed: %d", err);
+        return nullptr;
+    }
+
+    return GraphicBlockBuffer::Allocate(
+            format,
+            block,
+            [localBufferPool](size_t capacity) {
+                return localBufferPool->newBuffer(capacity);
+            });
 }
 
 class BuffersArrayImpl;
@@ -383,6 +523,7 @@ private:
 class InputBuffersArray : public CCodecBufferChannel::InputBuffers {
 public:
     InputBuffersArray() = default;
+    ~InputBuffersArray() override = default;
 
     void initialize(
             const FlexBuffersImpl &impl,
@@ -432,7 +573,8 @@ public:
         // TODO: proper max input size
         // TODO: read usage from intf
         C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
-        sp<LinearBlockBuffer> newBuffer = allocateLinearBuffer(mPool, mFormat, kLinearBufferSize, usage);
+        sp<LinearBlockBuffer> newBuffer = AllocateLinearBuffer(
+                mPool, mFormat, kLinearBufferSize, usage);
         if (newBuffer == nullptr) {
             return false;
         }
@@ -458,7 +600,7 @@ public:
                 kMinBufferArraySize,
                 [pool = mPool, format = mFormat] () -> sp<Codec2Buffer> {
                     C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
-                    return allocateLinearBuffer(pool, format, kLinearBufferSize, usage);
+                    return AllocateLinearBuffer(pool, format, kLinearBufferSize, usage);
                 });
         return std::move(array);
     }
@@ -469,7 +611,54 @@ private:
 
 class GraphicInputBuffers : public CCodecBufferChannel::InputBuffers {
 public:
-    GraphicInputBuffers() = default;
+    GraphicInputBuffers() : mLocalBufferPool(LocalBufferPool::Create(1920 * 1080 * 16)) {}
+    ~GraphicInputBuffers() override = default;
+
+    bool requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) override {
+        // TODO: proper max input size
+        // TODO: read usage from intf
+        C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
+        sp<GraphicBlockBuffer> newBuffer = AllocateGraphicBuffer(
+                mPool, mFormat, HAL_PIXEL_FORMAT_YV12, usage, mLocalBufferPool);
+        if (newBuffer == nullptr) {
+            return false;
+        }
+        *index = mImpl.assignSlot(newBuffer);
+        *buffer = newBuffer;
+        return true;
+    }
+
+    std::shared_ptr<C2Buffer> releaseBuffer(const sp<MediaCodecBuffer> &buffer) override {
+        return mImpl.releaseSlot(buffer);
+    }
+
+    void flush() override {
+        // This is no-op by default unless we're in array mode where we need to keep
+        // track of the flushed work.
+    }
+
+    std::unique_ptr<CCodecBufferChannel::InputBuffers> toArrayMode() final {
+        std::unique_ptr<InputBuffersArray> array(new InputBuffersArray);
+        array->setFormat(mFormat);
+        array->initialize(
+                mImpl,
+                kMinBufferArraySize,
+                [pool = mPool, format = mFormat, lbp = mLocalBufferPool]() -> sp<Codec2Buffer> {
+                    C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
+                    return AllocateGraphicBuffer(
+                            pool, format, HAL_PIXEL_FORMAT_YV12, usage, lbp);
+                });
+        return std::move(array);
+    }
+
+private:
+    FlexBuffersImpl mImpl;
+    std::shared_ptr<LocalBufferPool> mLocalBufferPool;
+};
+
+class DummyInputBuffers : public CCodecBufferChannel::InputBuffers {
+public:
+    DummyInputBuffers() = default;
 
     bool requestNewBuffer(size_t *, sp<MediaCodecBuffer> *) override {
         return false;
@@ -495,7 +684,8 @@ public:
 
 class OutputBuffersArray : public CCodecBufferChannel::OutputBuffers {
 public:
-    using CCodecBufferChannel::OutputBuffers::OutputBuffers;
+    OutputBuffersArray() = default;
+    ~OutputBuffersArray() override = default;
 
     void initialize(
             const FlexBuffersImpl &impl,
@@ -522,12 +712,14 @@ public:
                     return clientBuffer->canCopy(buffer);
                 });
         if (err != OK) {
-            return false;
-        }
-        if (!c2Buffer->copy(buffer)) {
+            ALOGD("grabBuffer failed: %d", err);
             return false;
         }
         c2Buffer->setFormat(mFormat);
+        if (!c2Buffer->copy(buffer)) {
+            ALOGD("copy buffer failed");
+            return false;
+        }
         *clientBuffer = c2Buffer;
         return true;
     }
@@ -585,6 +777,7 @@ public:
             size_t *index,
             sp<MediaCodecBuffer> *clientBuffer) override {
         sp<Codec2Buffer> newBuffer = wrap(buffer);
+        newBuffer->setFormat(mFormat);
         *index = mImpl.assignSlot(newBuffer);
         *clientBuffer = newBuffer;
         return true;
@@ -627,8 +820,21 @@ public:
         return std::move(array);
     }
 
+    /**
+     * Return an appropriate Codec2Buffer object for the type of buffers.
+     *
+     * \param buffer  C2Buffer object to wrap.
+     *
+     * \return  appropriate Codec2Buffer object to wrap |buffer|.
+     */
     virtual sp<Codec2Buffer> wrap(const std::shared_ptr<C2Buffer> &buffer) = 0;
 
+    /**
+     * Return an appropriate Codec2Buffer object for the type of buffers, to be
+     * used as an empty array buffer.
+     *
+     * \return  appropriate Codec2Buffer object which can copy() from C2Buffers.
+     */
     virtual sp<Codec2Buffer> allocateArrayBuffer() = 0;
 
 private:
@@ -671,6 +877,34 @@ public:
     sp<Codec2Buffer> allocateArrayBuffer() override {
         return new DummyContainerBuffer(mFormat);
     }
+};
+
+class RawGraphicOutputBuffers : public FlexOutputBuffers {
+public:
+    RawGraphicOutputBuffers()
+        : mLocalBufferPool(LocalBufferPool::Create(1920 * 1080 * 16)) {
+    }
+    ~RawGraphicOutputBuffers() override = default;
+
+    sp<Codec2Buffer> wrap(const std::shared_ptr<C2Buffer> &buffer) override {
+        return ConstGraphicBlockBuffer::Allocate(
+                mFormat,
+                buffer,
+                [lbp = mLocalBufferPool](size_t capacity) {
+                    return lbp->newBuffer(capacity);
+                });
+    }
+
+    sp<Codec2Buffer> allocateArrayBuffer() override {
+        return ConstGraphicBlockBuffer::AllocateEmpty(
+                mFormat,
+                [lbp = mLocalBufferPool](size_t capacity) {
+                    return lbp->newBuffer(capacity);
+                });
+    }
+
+private:
+    std::shared_ptr<LocalBufferPool> mLocalBufferPool;
 };
 
 }  // namespace
@@ -735,55 +969,6 @@ CCodecBufferChannel::~CCodecBufferChannel() {
 
 void CCodecBufferChannel::setComponent(const std::shared_ptr<C2Component> &component) {
     mComponent = component;
-
-    C2StreamFormatConfig::input inputFormat(0u);
-    C2StreamFormatConfig::output outputFormat(0u);
-    c2_status_t err = mComponent->intf()->query_vb(
-            { &inputFormat, &outputFormat },
-            {},
-            C2_DONT_BLOCK,
-            nullptr);
-    if (err != C2_OK) {
-        // TODO: error
-        return;
-    }
-
-    {
-        Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(mInputBuffers);
-
-        bool graphic = (inputFormat.value == C2FormatVideo);
-        if (graphic) {
-            buffers->reset(new GraphicInputBuffers);
-        } else {
-            buffers->reset(new LinearInputBuffers);
-        }
-
-        ALOGV("graphic = %s", graphic ? "true" : "false");
-        std::shared_ptr<C2BlockPool> pool;
-        if (graphic) {
-            err = GetCodec2BlockPool(C2BlockPool::BASIC_GRAPHIC, component, &pool);
-        } else {
-            err = CreateCodec2BlockPool(C2PlatformAllocatorStore::ION,
-                                        component, &pool);
-        }
-
-        if (err == C2_OK) {
-            (*buffers)->setPool(pool);
-        } else {
-            // TODO: error
-        }
-    }
-
-    {
-        Mutexed<std::unique_ptr<OutputBuffers>>::Locked buffers(mOutputBuffers);
-
-        bool graphic = (outputFormat.value == C2FormatVideo);
-        if (graphic) {
-            buffers->reset(new GraphicOutputBuffers);
-        } else {
-            buffers->reset(new LinearOutputBuffers);
-        }
-    }
 }
 
 status_t CCodecBufferChannel::setInputSurface(
@@ -812,6 +997,7 @@ status_t CCodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffe
     if (buffer->meta()->findInt32("csd", &tmp) && tmp) {
         flags |= C2FrameData::FLAG_CODEC_CONFIG;
     }
+    ALOGV("queueInputBuffer: buffer->size() = %zu", buffer->size());
     std::unique_ptr<C2Work> work(new C2Work);
     work->input.flags = (C2FrameData::flags_t)flags;
     work->input.ordinal.timestamp = timeUs;
@@ -968,13 +1154,68 @@ void CCodecBufferChannel::getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *arr
     (*buffers)->getArray(array);
 }
 
-void CCodecBufferChannel::start(const sp<AMessage> &inputFormat, const sp<AMessage> &outputFormat) {
+status_t CCodecBufferChannel::start(
+        const sp<AMessage> &inputFormat, const sp<AMessage> &outputFormat) {
+    C2StreamFormatConfig::input iStreamFormat(0u);
+    C2StreamFormatConfig::output oStreamFormat(0u);
+    c2_status_t err = mComponent->intf()->query_vb(
+            { &iStreamFormat, &oStreamFormat },
+            {},
+            C2_DONT_BLOCK,
+            nullptr);
+    if (err != C2_OK) {
+        return UNKNOWN_ERROR;
+    }
+
     if (inputFormat != nullptr) {
         Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(mInputBuffers);
+
+        bool graphic = (iStreamFormat.value == C2FormatVideo);
+        if (graphic) {
+            if (mInputSurface) {
+                buffers->reset(new DummyInputBuffers);
+            } else {
+                buffers->reset(new GraphicInputBuffers);
+            }
+        } else {
+            buffers->reset(new LinearInputBuffers);
+        }
         (*buffers)->setFormat(inputFormat);
+
+        ALOGV("graphic = %s", graphic ? "true" : "false");
+        std::shared_ptr<C2BlockPool> pool;
+        if (graphic) {
+            err = GetCodec2BlockPool(C2BlockPool::BASIC_GRAPHIC, mComponent, &pool);
+        } else {
+            err = CreateCodec2BlockPool(C2PlatformAllocatorStore::ION,
+                                        mComponent, &pool);
+        }
+        if (err == C2_OK) {
+            (*buffers)->setPool(pool);
+        } else {
+            // TODO: error
+        }
     }
+
     if (outputFormat != nullptr) {
+        bool hasOutputSurface = false;
+        {
+            Mutexed<sp<Surface>>::Locked surface(mSurface);
+            hasOutputSurface = (*surface != nullptr);
+        }
+
         Mutexed<std::unique_ptr<OutputBuffers>>::Locked buffers(mOutputBuffers);
+
+        bool graphic = (oStreamFormat.value == C2FormatVideo);
+        if (graphic) {
+            if (hasOutputSurface) {
+                buffers->reset(new GraphicOutputBuffers);
+            } else {
+                buffers->reset(new RawGraphicOutputBuffers);
+            }
+        } else {
+            buffers->reset(new LinearOutputBuffers);
+        }
         (*buffers)->setFormat(outputFormat);
     }
 
@@ -989,9 +1230,7 @@ void CCodecBufferChannel::start(const sp<AMessage> &inputFormat, const sp<AMessa
                 if (!(*buffers)->requestNewBuffer(&index, &buffer)) {
                     if (i == 0) {
                         ALOGE("start: cannot allocate memory at all");
-                        buffers.unlock();
-                        mOnError(NO_MEMORY, ACTION_CODE_FATAL);
-                        buffers.lock();
+                        return NO_MEMORY;
                     } else {
                         ALOGV("start: cannot allocate memory, only %zu buffers allocated", i);
                     }
@@ -1003,6 +1242,7 @@ void CCodecBufferChannel::start(const sp<AMessage> &inputFormat, const sp<AMessa
     } else {
         (void)mInputSurface->connect(mComponent);
     }
+    return OK;
 }
 
 void CCodecBufferChannel::stop() {
@@ -1010,6 +1250,7 @@ void CCodecBufferChannel::stop() {
     mFirstValidFrameIndex = mFrameIndex.load();
     if (mInputSurface != nullptr) {
         mInputSurface->disconnect();
+        mInputSurface.reset();
     }
 }
 
@@ -1025,8 +1266,13 @@ void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushe
 }
 
 void CCodecBufferChannel::onWorkDone(const std::unique_ptr<C2Work> &work) {
-    if (work->result != OK) {
-        ALOGE("work failed to complete: %d", work->result);
+    if (work->result != C2_OK) {
+        if (work->result == C2_NOT_FOUND) {
+            // TODO: Define what flushed work's result is.
+            ALOGD("flushed work; ignored.");
+            return;
+        }
+        ALOGD("work failed to complete: %d", work->result);
         mOnError(work->result, ACTION_CODE_FATAL);
         return;
     }

@@ -88,7 +88,7 @@ public:
      * Start queueing buffers to the component. This object should never queue
      * buffers before this call.
      */
-    void start(const sp<AMessage> &inputFormat, const sp<AMessage> &outputFormat);
+    status_t start(const sp<AMessage> &inputFormat, const sp<AMessage> &outputFormat);
 
     /**
      * Stop queueing buffers to the component. This object should never queue

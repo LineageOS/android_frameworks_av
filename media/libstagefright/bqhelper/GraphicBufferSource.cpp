@@ -421,26 +421,31 @@ Status GraphicBufferSource::stop() {
 }
 
 Status GraphicBufferSource::release(){
-    Mutex::Autolock autoLock(mMutex);
-    if (mLooper != NULL) {
-        mLooper->unregisterHandler(mReflector->id());
-        mReflector.clear();
+    sp<ALooper> looper;
+    {
+        Mutex::Autolock autoLock(mMutex);
+        looper = mLooper;
+        if (mLooper != NULL) {
+            mLooper->unregisterHandler(mReflector->id());
+            mReflector.clear();
 
-        mLooper->stop();
-        mLooper.clear();
+            mLooper.clear();
+        }
+
+        ALOGV("--> release; available=%zu+%d eos=%d eosSent=%d acquired=%d",
+                mAvailableBuffers.size(), mNumAvailableUnacquiredBuffers,
+                mEndOfStream, mEndOfStreamSent, mNumOutstandingAcquires);
+
+        // Codec is no longer executing.  Releasing all buffers to bq.
+        mFreeCodecBuffers.clear();
+        mSubmittedCodecBuffers.clear();
+        mLatestBuffer.mBuffer.reset();
+        mComponent.clear();
+        mExecuting = false;
     }
-
-    ALOGV("--> release; available=%zu+%d eos=%d eosSent=%d acquired=%d",
-            mAvailableBuffers.size(), mNumAvailableUnacquiredBuffers,
-            mEndOfStream, mEndOfStreamSent, mNumOutstandingAcquires);
-
-    // Codec is no longer executing.  Releasing all buffers to bq.
-    mFreeCodecBuffers.clear();
-    mSubmittedCodecBuffers.clear();
-    mLatestBuffer.mBuffer.reset();
-    mComponent.clear();
-    mExecuting = false;
-
+    if (looper != NULL) {
+        looper->stop();
+    }
     return Status::ok();
 }
 

@@ -20,6 +20,7 @@
 
 #include <C2Buffer.h>
 
+#include <media/hardware/VideoAPI.h>
 #include <media/MediaCodecBuffer.h>
 
 namespace android {
@@ -109,6 +110,11 @@ class LinearBlockBuffer : public Codec2Buffer {
 public:
     /**
      * Allocate a new LinearBufferBlock wrapping around C2LinearBlock object.
+     *
+     * \param   format  mandatory buffer format for MediaCodecBuffer
+     * \param   block   C2LinearBlock object to wrap around.
+     * \return          LinearBlockBuffer object with writable mapping.
+     *                  nullptr if unsuccessful.
      */
     static sp<LinearBlockBuffer> Allocate(
             const sp<AMessage> &format, const std::shared_ptr<C2LinearBlock> &block);
@@ -137,6 +143,11 @@ class ConstLinearBlockBuffer : public Codec2Buffer {
 public:
     /**
      * Allocate a new ConstLinearBlockBuffer wrapping around C2Buffer object.
+     *
+     * \param   format  mandatory buffer format for MediaCodecBuffer
+     * \param   buffer  linear C2Buffer object to wrap around.
+     * \return          ConstLinearBlockBuffer object with readable mapping.
+     *                  nullptr if unsuccessful.
      */
     static sp<ConstLinearBlockBuffer> Allocate(
             const sp<AMessage> &format, const std::shared_ptr<C2Buffer> &buffer);
@@ -154,6 +165,110 @@ private:
 
     C2ReadView mReadView;
     std::shared_ptr<C2Buffer> mBufferRef;
+};
+
+/**
+ * MediaCodecBuffer implementation wraps around C2GraphicBlock.
+ *
+ * This object exposes the underlying bits via accessor APIs and "image-data"
+ * metadata, created automatically at allocation time.
+ */
+class GraphicBlockBuffer : public Codec2Buffer {
+public:
+    /**
+     * Allocate a new GraphicBlockBuffer wrapping around C2GraphicBlock object.
+     * If |block| is not in good color formats, it allocates YV12 local buffer
+     * and copies the content over at asC2Buffer().
+     *
+     * \param   format  mandatory buffer format for MediaCodecBuffer
+     * \param   block   C2GraphicBlock object to wrap around.
+     * \param   alloc   a function to allocate backing ABuffer if needed.
+     * \return          GraphicBlockBuffer object with writable mapping.
+     *                  nullptr if unsuccessful.
+     */
+    static sp<GraphicBlockBuffer> Allocate(
+            const sp<AMessage> &format,
+            const std::shared_ptr<C2GraphicBlock> &block,
+            std::function<sp<ABuffer>(size_t)> alloc);
+
+    std::shared_ptr<C2Buffer> asC2Buffer() override;
+
+    virtual ~GraphicBlockBuffer() = default;
+
+private:
+    GraphicBlockBuffer(
+            const sp<AMessage> &format,
+            const sp<ABuffer> &buffer,
+            C2GraphicView &&view,
+            const std::shared_ptr<C2GraphicBlock> &block,
+            const sp<ABuffer> &imageData,
+            bool wrapped);
+    GraphicBlockBuffer() = delete;
+
+    inline MediaImage2 *imageData() { return (MediaImage2 *)mImageData->data(); }
+
+    C2GraphicView mView;
+    std::shared_ptr<C2GraphicBlock> mBlock;
+    sp<ABuffer> mImageData;
+    const bool mWrapped;
+};
+
+/**
+ * MediaCodecBuffer implementation wraps around graphic C2Buffer object.
+ *
+ * This object exposes the underlying bits via accessor APIs and "image-data"
+ * metadata, created automatically at allocation time.
+ */
+class ConstGraphicBlockBuffer : public Codec2Buffer {
+public:
+    /**
+     * Allocate a new ConstGraphicBlockBuffer wrapping around C2Buffer object.
+     * If |buffer| is not in good color formats, it allocates YV12 local buffer
+     * and copies the content of |buffer| over to expose.
+     *
+     * \param   format  mandatory buffer format for MediaCodecBuffer
+     * \param   buffer  graphic C2Buffer object to wrap around.
+     * \param   alloc   a function to allocate backing ABuffer if needed.
+     * \return          ConstGraphicBlockBuffer object with readable mapping.
+     *                  nullptr if unsuccessful.
+     */
+    static sp<ConstGraphicBlockBuffer> Allocate(
+            const sp<AMessage> &format,
+            const std::shared_ptr<C2Buffer> &buffer,
+            std::function<sp<ABuffer>(size_t)> alloc);
+
+    /**
+     * Allocate a new ConstGraphicBlockBuffer which allocates YV12 local buffer
+     * and copies the content of |buffer| over to expose.
+     *
+     * \param   format  mandatory buffer format for MediaCodecBuffer
+     * \param   alloc   a function to allocate backing ABuffer if needed.
+     * \return          ConstGraphicBlockBuffer object with no wrapping buffer.
+     */
+    static sp<ConstGraphicBlockBuffer> AllocateEmpty(
+            const sp<AMessage> &format,
+            std::function<sp<ABuffer>(size_t)> alloc);
+
+    std::shared_ptr<C2Buffer> asC2Buffer() override;
+    bool canCopy(const std::shared_ptr<C2Buffer> &buffer) const override;
+    bool copy(const std::shared_ptr<C2Buffer> &buffer) override;
+
+    virtual ~ConstGraphicBlockBuffer() = default;
+
+private:
+    ConstGraphicBlockBuffer(
+            const sp<AMessage> &format,
+            const sp<ABuffer> &aBuffer,
+            std::unique_ptr<const C2GraphicView> &&view,
+            const std::shared_ptr<C2Buffer> &buffer,
+            const sp<ABuffer> &imageData,
+            bool wrapped);
+    ConstGraphicBlockBuffer() = delete;
+
+    sp<ABuffer> mImageData;
+    std::unique_ptr<const C2GraphicView> mView;
+    std::shared_ptr<C2Buffer> mBufferRef;
+    const bool mWrapped;
 };
 
 }  // namespace android
