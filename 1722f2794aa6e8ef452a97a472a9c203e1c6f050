@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d727dad3_6a34fd16",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 1956,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-11T23:59:12Z",
+      "side": 1,
+      "message": "Why this change?",
+      "range": {
+        "startLine": 1956,
+        "startChar": 34,
+        "endLine": 1956,
+        "endChar": 55
+      },
+      "revId": "1722f2794aa6e8ef452a97a472a9c203e1c6f050",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "09d5c8b9_2be88fea",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 346,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-11T23:59:12Z",
+      "side": 1,
+      "message": "Prefer strtoul or similar. Alternately, consider doing the check for \"off\", then using params.getInt(...) to get the rate.",
+      "range": {
+        "startLine": 346,
+        "startChar": 61,
+        "endLine": 346,
+        "endChar": 65
+      },
+      "revId": "1722f2794aa6e8ef452a97a472a9c203e1c6f050",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "0131ef61_2e1186a7",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 347,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-11T23:59:12Z",
+      "side": 1,
+      "message": "std::min(240, rate)",
+      "range": {
+        "startLine": 347,
+        "startChar": 11,
+        "endLine": 347,
+        "endChar": 34
+      },
+      "revId": "1722f2794aa6e8ef452a97a472a9c203e1c6f050",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
