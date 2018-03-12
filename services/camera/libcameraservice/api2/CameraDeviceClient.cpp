@@ -1002,10 +1002,6 @@ bool CameraDeviceClient::isPublicFormat(int32_t format)
         case HAL_PIXEL_FORMAT_BLOB:
         case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
         case HAL_PIXEL_FORMAT_YCbCr_420_888:
-        case HAL_PIXEL_FORMAT_YCbCr_422_888:
-        case HAL_PIXEL_FORMAT_YCbCr_444_888:
-        case HAL_PIXEL_FORMAT_FLEX_RGB_888:
-        case HAL_PIXEL_FORMAT_FLEX_RGBA_8888:
         case HAL_PIXEL_FORMAT_YCbCr_422_SP:
         case HAL_PIXEL_FORMAT_YCrCb_420_SP:
         case HAL_PIXEL_FORMAT_YCbCr_422_I:
