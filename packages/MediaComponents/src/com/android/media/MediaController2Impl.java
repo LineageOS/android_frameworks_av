@@ -551,6 +551,29 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
+    public MediaMetadata2 getPlaylistMetadata_impl() {
+        synchronized (mLock) {
+            return mPlaylistMetadata;
+        }
+    }
+
+    @Override
+    public void updatePlaylistMetadata_impl(MediaMetadata2 metadata) {
+        final IMediaSession2 binder = getSessionBinderIfAble(
+                COMMAND_CODE_PLAYLIST_SET_LIST_METADATA);
+        if (binder != null) {
+            Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
+            try {
+                binder.updatePlaylistMetadata(mSessionCallbackStub, metadataBundle);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
+    }
+
+    @Override
     public void prepare_impl() {
         sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE);
     }
@@ -728,6 +751,19 @@ public class MediaController2Impl implements MediaController2Provider {
             }
             // TODO(jaewan): Fix public API not to take playlistAgent.
             mCallback.onPlaylistChanged(mInstance, null, playlist, metadata);
+        });
+    }
+
+    public void pushPlaylistMetadataChanges(MediaMetadata2 metadata) {
+        synchronized (mLock) {
+            mPlaylistMetadata = metadata;
+        }
+        mCallbackExecutor.execute(() -> {
+            if (!mInstance.isConnected()) {
+                return;
+            }
+            // TODO(jaewan): Fix public API not to take playlistAgent.
+            mCallback.onPlaylistMetadataChanged(mInstance, null, metadata);
         });
     }
 
