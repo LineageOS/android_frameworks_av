@@ -4271,12 +4271,13 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                     addOutput(output, desc);
                     if (device_distinguishes_on_address(deviceType) && address != "0") {
                         sp<AudioPolicyMix> policyMix;
-                        if (mPolicyMixes.getAudioPolicyMix(address, policyMix) != NO_ERROR) {
-                            ALOGE("checkOutputsForDevice() cannot find policy for address %s",
+                        if (mPolicyMixes.getAudioPolicyMix(address, policyMix) == NO_ERROR) {
+                            policyMix->setOutput(desc);
+                            desc->mPolicyMix = policyMix->getMix();
+                        } else {
+                            ALOGW("checkOutputsForDevice() cannot find policy for address %s",
                                   address.string());
                         }
-                        policyMix->setOutput(desc);
-                        desc->mPolicyMix = policyMix->getMix();
 
                     } else if (((desc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) == 0) &&
                                     hasPrimaryOutput()) {
