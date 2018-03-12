@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "af46d86a_1a74dd07",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 1956,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2018-03-12T01:54:45Z",
+      "side": 1,
+      "message": "Without this Snap seems to freeze everytime after hsr stopped. Not quite sure. Needs more testing.",
+      "parentUuid": "d727dad3_6a34fd16",
+      "range": {
+        "startLine": 1956,
+        "startChar": 34,
+        "endLine": 1956,
+        "endChar": 55
+      },
+      "revId": "1722f2794aa6e8ef452a97a472a9c203e1c6f050",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "09d5c8b9_2be88fea",
         "filename": "media/libstagefright/CameraSource.cpp",
         "patchSetId": 3
