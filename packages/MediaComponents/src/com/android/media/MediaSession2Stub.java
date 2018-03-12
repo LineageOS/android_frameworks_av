@@ -738,6 +738,99 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
+    @Override
+    public void addPlaylistItem(IMediaSession2Callback caller, int index, Bundle mediaItem) {
+        final MediaSession2Impl session = getSession();
+        final ControllerInfo controller = getControllerIfAble(
+                caller, MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM);
+        if (session == null || controller == null) {
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(
+                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM) == null) {
+                return;
+            }
+            Command command = new Command(session.getContext(),
+                    MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM);
+            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                    controller, command);
+            if (!accepted) {
+                // Don't run rejected command.
+                if (DEBUG) {
+                    Log.d(TAG, "addPlaylistItem() from " + controller + " was rejected");
+                }
+                return;
+            }
+            // Resets the UUID from the incoming media id, so controller may reuse a media item
+            // multiple times for addPlaylistItem.
+            session.getInstance().addPlaylistItem(index,
+                    MediaItem2Impl.fromBundle(session.getContext(), mediaItem, null));
+        });
+    }
+
+    @Override
+    public void removePlaylistItem(IMediaSession2Callback caller, Bundle mediaItem) {
+        final MediaSession2Impl session = getSession();
+        final ControllerInfo controller = getControllerIfAble(
+                caller, MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM);
+        if (session == null || controller == null) {
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(
+                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM) == null) {
+                return;
+            }
+            Command command = new Command(session.getContext(),
+                    MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM);
+            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                    controller, command);
+            if (!accepted) {
+                // Don't run rejected command.
+                if (DEBUG) {
+                    Log.d(TAG, "removePlaylistItem() from " + controller + " was rejected");
+                }
+                return;
+            }
+            MediaItem2 item = MediaItem2.fromBundle(session.getContext(), mediaItem);
+            List<MediaItem2> list = session.getInstance().getPlaylist();
+            // Trick to use the same reference for calls from the controller.
+            session.getInstance().removePlaylistItem(list.get(list.indexOf(item)));
+        });
+    }
+
+    @Override
+    public void replacePlaylistItem(IMediaSession2Callback caller, int index, Bundle mediaItem) {
+        final MediaSession2Impl session = getSession();
+        final ControllerInfo controller = getControllerIfAble(
+                caller, MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM);
+        if (session == null || controller == null) {
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(
+                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM) == null) {
+                return;
+            }
+            Command command = new Command(session.getContext(),
+                    MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM);
+            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                    controller, command);
+            if (!accepted) {
+                // Don't run rejected command.
+                if (DEBUG) {
+                    Log.d(TAG, "replacePlaylistItem() from " + controller + " was rejected");
+                }
+                return;
+            }
+            // Resets the UUID from the incoming media id, so controller may reuse a media item
+            // multiple times for replacePlaylistItem.
+            session.getInstance().replacePlaylistItem(index,
+                    MediaItem2.fromBundle(session.getContext(), mediaItem));
+        });
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////////
     // AIDL methods for LibrarySession overrides
     //////////////////////////////////////////////////////////////////////////////////////////////
