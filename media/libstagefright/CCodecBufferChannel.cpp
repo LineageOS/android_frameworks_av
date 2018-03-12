@@ -49,6 +49,8 @@ using hardware::hidl_vec;
 using namespace hardware::cas::V1_0;
 using namespace hardware::cas::native::V1_0;
 
+using CasStatus = hardware::cas::V1_0::Status;
+
 /**
  * Base class for representation of buffers at one port.
  */
@@ -291,21 +293,6 @@ private:
 
     DISALLOW_EVIL_CONSTRUCTORS(LocalBufferPool);
 };
-
-sp<LinearBlockBuffer> AllocateLinearBuffer(
-        const std::shared_ptr<C2BlockPool> &pool,
-        const sp<AMessage> &format,
-        size_t size,
-        const C2MemoryUsage &usage) {
-    std::shared_ptr<C2LinearBlock> block;
-
-    c2_status_t err = pool->fetchLinearBlock(size, usage, &block);
-    if (err != C2_OK) {
-        return nullptr;
-    }
-
-    return LinearBlockBuffer::Allocate(format, block);
-}
 
 sp<GraphicBlockBuffer> AllocateGraphicBuffer(
         const std::shared_ptr<C2BlockPool> &pool,
@@ -573,9 +560,7 @@ public:
     bool requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) override {
         // TODO: proper max input size
         // TODO: read usage from intf
-        C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
-        sp<LinearBlockBuffer> newBuffer = AllocateLinearBuffer(
-                mPool, mFormat, kLinearBufferSize, usage);
+        sp<Codec2Buffer> newBuffer = alloc(kLinearBufferSize);
         if (newBuffer == nullptr) {
             return false;
         }
@@ -599,15 +584,86 @@ public:
         array->initialize(
                 mImpl,
                 kMinBufferArraySize,
-                [pool = mPool, format = mFormat] () -> sp<Codec2Buffer> {
-                    C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
-                    return AllocateLinearBuffer(pool, format, kLinearBufferSize, usage);
-                });
+                [this] () -> sp<Codec2Buffer> { return alloc(kLinearBufferSize); });
         return std::move(array);
+    }
+
+    virtual sp<Codec2Buffer> alloc(size_t size) const {
+        C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
+        std::shared_ptr<C2LinearBlock> block;
+
+        c2_status_t err = mPool->fetchLinearBlock(size, usage, &block);
+        if (err != C2_OK) {
+            return nullptr;
+        }
+
+        return LinearBlockBuffer::Allocate(mFormat, block);
     }
 
 private:
     FlexBuffersImpl mImpl;
+};
+
+class EncryptedLinearInputBuffers : public LinearInputBuffers {
+public:
+    EncryptedLinearInputBuffers(
+            bool secure,
+            const sp<MemoryDealer> &dealer,
+            const sp<ICrypto> &crypto,
+            int32_t heapSeqNum)
+        : mUsage({0, 0}),
+          mDealer(dealer),
+          mCrypto(crypto),
+          mHeapSeqNum(heapSeqNum) {
+        if (secure) {
+            mUsage = { C2MemoryUsage::READ_PROTECTED, 0 };
+        } else {
+            mUsage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
+        }
+        for (size_t i = 0; i < kMinBufferArraySize; ++i) {
+            sp<IMemory> memory = mDealer->allocate(kLinearBufferSize);
+            if (memory == nullptr) {
+                ALOGD("Failed to allocate memory from dealer: only %zu slots allocated", i);
+                break;
+            }
+            mMemoryVector.push_back({std::weak_ptr<C2LinearBlock>(), memory});
+        }
+    }
+
+    ~EncryptedLinearInputBuffers() override {
+    }
+
+    sp<Codec2Buffer> alloc(size_t size) const override {
+        sp<IMemory> memory;
+        for (const Entry &entry : mMemoryVector) {
+            if (entry.block.expired()) {
+                memory = entry.memory;
+                break;
+            }
+        }
+        if (memory == nullptr) {
+            return nullptr;
+        }
+
+        std::shared_ptr<C2LinearBlock> block;
+        c2_status_t err = mPool->fetchLinearBlock(size, mUsage, &block);
+        if (err != C2_OK) {
+            return nullptr;
+        }
+
+        return new EncryptedLinearBlockBuffer(mFormat, block, memory, mHeapSeqNum);
+    }
+
+private:
+    C2MemoryUsage mUsage;
+    sp<MemoryDealer> mDealer;
+    sp<ICrypto> mCrypto;
+    int32_t mHeapSeqNum;
+    struct Entry {
+        std::weak_ptr<C2LinearBlock> block;
+        sp<IMemory> memory;
+    };
+    std::vector<Entry> mMemoryVector;
 };
 
 class GraphicInputBuffers : public CCodecBufferChannel::InputBuffers {
@@ -957,7 +1013,8 @@ void CCodecBufferChannel::QueueSync::stop() {
 
 CCodecBufferChannel::CCodecBufferChannel(
         const std::function<void(status_t, enum ActionCode)> &onError)
-    : mOnError(onError),
+    : mHeapSeqNum(-1),
+      mOnError(onError),
       mFrameIndex(0u),
       mFirstValidFrameIndex(0u) {
 }
@@ -979,13 +1036,7 @@ status_t CCodecBufferChannel::setInputSurface(
     return OK;
 }
 
-status_t CCodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffer) {
-    QueueGuard guard(mSync);
-    if (!guard.isRunning()) {
-        ALOGW("No more buffers should be queued at current state.");
-        return -ENOSYS;
-    }
-
+status_t CCodecBufferChannel::queueInputBufferInternal(const sp<MediaCodecBuffer> &buffer) {
     int64_t timeUs;
     CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
 
@@ -1006,7 +1057,11 @@ status_t CCodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffe
     work->input.buffers.clear();
     {
         Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(mInputBuffers);
-        work->input.buffers.push_back((*buffers)->releaseBuffer(buffer));
+        std::shared_ptr<C2Buffer> c2buffer = (*buffers)->releaseBuffer(buffer);
+        if (!c2buffer) {
+            return -ENOENT;
+        }
+        work->input.buffers.push_back(c2buffer);
     }
     // TODO: fill info's
 
@@ -1018,22 +1073,103 @@ status_t CCodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffe
     return mComponent->queue_nb(&items);
 }
 
+status_t CCodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffer) {
+    QueueGuard guard(mSync);
+    if (!guard.isRunning()) {
+        ALOGW("No more buffers should be queued at current state.");
+        return -ENOSYS;
+    }
+    return queueInputBufferInternal(buffer);
+}
+
 status_t CCodecBufferChannel::queueSecureInputBuffer(
         const sp<MediaCodecBuffer> &buffer, bool secure, const uint8_t *key,
         const uint8_t *iv, CryptoPlugin::Mode mode, CryptoPlugin::Pattern pattern,
         const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
         AString *errorDetailMsg) {
-    // TODO
-    (void) buffer;
-    (void) secure;
-    (void) key;
-    (void) iv;
-    (void) mode;
-    (void) pattern;
-    (void) subSamples;
-    (void) numSubSamples;
-    (void) errorDetailMsg;
-    return -ENOSYS;
+    QueueGuard guard(mSync);
+    if (!guard.isRunning()) {
+        ALOGW("No more buffers should be queued at current state.");
+        return -ENOSYS;
+    }
+
+    if (!hasCryptoOrDescrambler()) {
+        return -ENOSYS;
+    }
+    sp<EncryptedLinearBlockBuffer> encryptedBuffer((EncryptedLinearBlockBuffer *)buffer.get());
+
+    ssize_t result = -1;
+    if (mCrypto != nullptr) {
+        ICrypto::DestinationBuffer destination;
+        if (secure) {
+            destination.mType = ICrypto::kDestinationTypeNativeHandle;
+            destination.mHandle = encryptedBuffer->handle();
+        } else {
+            destination.mType = ICrypto::kDestinationTypeSharedMemory;
+            destination.mSharedMemory = mDecryptDestination;
+        }
+        ICrypto::SourceBuffer source;
+        encryptedBuffer->fillSourceBuffer(&source);
+        result = mCrypto->decrypt(
+                key, iv, mode, pattern, source, buffer->offset(),
+                subSamples, numSubSamples, destination, errorDetailMsg);
+        if (result < 0) {
+            return result;
+        }
+        if (destination.mType == ICrypto::kDestinationTypeSharedMemory) {
+            encryptedBuffer->copyDecryptedContent(mDecryptDestination, result);
+        }
+    } else {
+        // Here we cast CryptoPlugin::SubSample to hardware::cas::native::V1_0::SubSample
+        // directly, the structure definitions should match as checked in DescramblerImpl.cpp.
+        hidl_vec<SubSample> hidlSubSamples;
+        hidlSubSamples.setToExternal((SubSample *)subSamples, numSubSamples, false /*own*/);
+
+        hardware::cas::native::V1_0::SharedBuffer srcBuffer;
+        encryptedBuffer->fillSourceBuffer(&srcBuffer);
+
+        DestinationBuffer dstBuffer;
+        if (secure) {
+            dstBuffer.type = BufferType::NATIVE_HANDLE;
+            dstBuffer.secureMemory = hidl_handle(encryptedBuffer->handle());
+        } else {
+            dstBuffer.type = BufferType::SHARED_MEMORY;
+            dstBuffer.nonsecureMemory = srcBuffer;
+        }
+
+        CasStatus status = CasStatus::OK;
+        hidl_string detailedError;
+
+        auto returnVoid = mDescrambler->descramble(
+                key != NULL ? (ScramblingControl)key[0] : ScramblingControl::UNSCRAMBLED,
+                hidlSubSamples,
+                srcBuffer,
+                0,
+                dstBuffer,
+                0,
+                [&status, &result, &detailedError] (
+                        CasStatus _status, uint32_t _bytesWritten,
+                        const hidl_string& _detailedError) {
+                    status = _status;
+                    result = (ssize_t)_bytesWritten;
+                    detailedError = _detailedError;
+                });
+
+        if (!returnVoid.isOk() || status != CasStatus::OK || result < 0) {
+            ALOGE("descramble failed, trans=%s, status=%d, result=%zd",
+                    returnVoid.description().c_str(), status, result);
+            return UNKNOWN_ERROR;
+        }
+
+        ALOGV("descramble succeeded, %zd bytes", result);
+
+        if (dstBuffer.type == BufferType::SHARED_MEMORY) {
+            encryptedBuffer->copyDecryptedContentFromMemory(result);
+        }
+    }
+
+    buffer->setRange(0, result);
+    return queueInputBufferInternal(buffer);
 }
 
 void CCodecBufferChannel::feedInputBufferIfAvailable() {
@@ -1176,6 +1312,7 @@ status_t CCodecBufferChannel::start(
     if (err != C2_OK) {
         return UNKNOWN_ERROR;
     }
+    bool secure = mComponent->intf()->getName().find(".secure") != std::string::npos;
 
     if (inputFormat != nullptr) {
         Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(mInputBuffers);
@@ -1188,7 +1325,24 @@ status_t CCodecBufferChannel::start(
                 buffers->reset(new GraphicInputBuffers);
             }
         } else {
-            buffers->reset(new LinearInputBuffers);
+            if (hasCryptoOrDescrambler()) {
+                if (mDealer == nullptr) {
+                    mDealer = new MemoryDealer(
+                            align(kLinearBufferSize, MemoryDealer::getAllocationAlignment())
+                                * (kMinBufferArraySize + 1),
+                            "EncryptedLinearInputBuffers");
+                    mDecryptDestination = mDealer->allocate(kLinearBufferSize);
+                }
+                if (mCrypto != nullptr && mHeapSeqNum < 0) {
+                    mHeapSeqNum = mCrypto->setHeap(mDealer->getMemoryHeap());
+                } else {
+                    mHeapSeqNum = -1;
+                }
+                buffers->reset(new EncryptedLinearInputBuffers(
+                        secure, mDealer, mCrypto, mHeapSeqNum));
+            } else {
+                buffers->reset(new LinearInputBuffers);
+            }
         }
         (*buffers)->setFormat(inputFormat);
 
