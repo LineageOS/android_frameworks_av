@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "cd4e131f_359fe040",
+        "filename": "services/camera/libcameraservice/api1/CameraClient.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 540,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-12T01:40:26Z",
+      "side": 1,
+      "message": "This seems a little weird to me. It seems like all you really end up needing to do here if mHardware is null is to pop the mAvailableCallbackBuffers ?",
+      "revId": "aa7c9b575b94b05560e75d2404fd8702bfa33f3b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
