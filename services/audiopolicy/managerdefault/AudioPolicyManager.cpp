@@ -26,6 +26,7 @@
 
 #define AUDIO_POLICY_XML_CONFIG_FILE_PATH_MAX_LENGTH 128
 #define AUDIO_POLICY_XML_CONFIG_FILE_NAME "audio_policy_configuration.xml"
+#define AUDIO_POLICY_A2DP_OFFLOAD_XML_CONFIG_FILE_NAME "audio_policy_a2dp_offload_configuration.xml"
 
 #include <inttypes.h>
 #include <math.h>
@@ -3517,11 +3518,14 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
 
     for (int i = 0; i < kConfigLocationListSize; i++) {
         PolicySerializer serializer;
+        bool use_a2dp_offload_config =
+                 property_get_bool("persist.bluetooth.a2dp_offload.enable", false);
         snprintf(audioPolicyXmlConfigFile,
                  sizeof(audioPolicyXmlConfigFile),
                  "%s/%s",
                  kConfigLocationList[i],
-                 AUDIO_POLICY_XML_CONFIG_FILE_NAME);
+                 use_a2dp_offload_config ? AUDIO_POLICY_A2DP_OFFLOAD_XML_CONFIG_FILE_NAME :
+                     AUDIO_POLICY_XML_CONFIG_FILE_NAME);
         ret = serializer.deserialize(audioPolicyXmlConfigFile, config);
         if (ret == NO_ERROR) {
             break;
@@ -4381,7 +4385,7 @@ void AudioPolicyManager::checkOutputForAllStrategies()
 void AudioPolicyManager::checkA2dpSuspend()
 {
     audio_io_handle_t a2dpOutput = mOutputs.getA2dpOutput();
-    if (a2dpOutput == 0) {
+    if (a2dpOutput == 0 || mOutputs.isA2dpOffloadedOnPrimary()) {
         mA2dpSuspended = false;
         return;
     }

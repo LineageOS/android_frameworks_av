@@ -306,8 +306,14 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
             sp<AudioOutputDescriptor> primaryOutput = outputs.getPrimaryOutput();
             audio_devices_t availPrimaryInputDevices =
                  availableInputDevices.getDevicesFromHwModule(primaryOutput->getModuleHandle());
+
+            // TODO: getPrimaryOutput return only devices from first module in
+            // audio_policy_configuration.xml, hearing aid is not there, but it's
+            // a primary device
+            // FIXME: this is not the right way of solving this problem
             audio_devices_t availPrimaryOutputDevices =
-                    primaryOutput->supportedDevices() & availableOutputDevices.types();
+                (primaryOutput->supportedDevices() | AUDIO_DEVICE_OUT_HEARING_AID) &
+                availableOutputDevices.types();
 
             if (((availableInputDevices.types() &
                     AUDIO_DEVICE_IN_TELEPHONY_RX & ~AUDIO_DEVICE_BIT_IN) == 0) ||
@@ -332,10 +338,12 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
             // FALL THROUGH
 
         default:    // FORCE_NONE
+            device = availableOutputDevicesType & AUDIO_DEVICE_OUT_HEARING_AID;
+            if (device) break;
             // when not in a phone call, phone strategy should route STREAM_VOICE_CALL to A2DP
             if (!isInCall() &&
                     (mForceUse[AUDIO_POLICY_FORCE_FOR_MEDIA] != AUDIO_POLICY_FORCE_NO_BT_A2DP) &&
-                    (outputs.getA2dpOutput() != 0)) {
+                     outputs.isA2dpSupported()) {
                 device = availableOutputDevicesType & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP;
                 if (device) break;
                 device = availableOutputDevicesType & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES;
@@ -369,7 +377,7 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
             // A2DP speaker when forcing to speaker output
             if (!isInCall() &&
                     (mForceUse[AUDIO_POLICY_FORCE_FOR_MEDIA] != AUDIO_POLICY_FORCE_NO_BT_A2DP) &&
-                    (outputs.getA2dpOutput() != 0)) {
+                     outputs.isA2dpSupported()) {
                 device = availableOutputDevicesType & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER;
                 if (device) break;
             }
@@ -481,9 +489,12 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
                     outputDeviceTypesToIgnore);
             break;
         }
+        if (device2 == AUDIO_DEVICE_NONE) {
+            device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_HEARING_AID;
+        }
         if ((device2 == AUDIO_DEVICE_NONE) &&
                 (mForceUse[AUDIO_POLICY_FORCE_FOR_MEDIA] != AUDIO_POLICY_FORCE_NO_BT_A2DP) &&
-                (outputs.getA2dpOutput() != 0)) {
+                 outputs.isA2dpSupported()) {
             device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP;
             if (device2 == AUDIO_DEVICE_NONE) {
                 device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES;

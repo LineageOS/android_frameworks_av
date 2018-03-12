@@ -645,6 +645,29 @@ audio_io_handle_t SwAudioOutputCollection::getA2dpOutput() const
     return 0;
 }
 
+bool SwAudioOutputCollection::isA2dpOffloadedOnPrimary() const
+{
+    sp<SwAudioOutputDescriptor> primaryOutput = getPrimaryOutput();
+
+    if ((primaryOutput != NULL) && (primaryOutput->mProfile != NULL)
+        && (primaryOutput->mProfile->mModule != NULL)) {
+        sp<HwModule> primaryHwModule = primaryOutput->mProfile->mModule;
+        Vector <sp<IOProfile>> primaryHwModuleOutputProfiles =
+                                   primaryHwModule->getOutputProfiles();
+        for (size_t i = 0; i < primaryHwModuleOutputProfiles.size(); i++) {
+            if (primaryHwModuleOutputProfiles[i]->supportDevice(AUDIO_DEVICE_OUT_ALL_A2DP)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool SwAudioOutputCollection::isA2dpSupported() const
+{
+    return (isA2dpOffloadedOnPrimary() || (getA2dpOutput() != 0));
+}
+
 sp<SwAudioOutputDescriptor> SwAudioOutputCollection::getPrimaryOutput() const
 {
     for (size_t i = 0; i < size(); i++) {

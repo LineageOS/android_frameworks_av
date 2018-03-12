@@ -104,7 +104,7 @@
             <view class="com.android.support.mediarouter.app.MediaRouteButton"
                 android:id="@+id/cast"
                 android:layout_centerVertical="true"
-                android:visibility="visible"
+                android:visibility="gone"
                 style="@style/TitleBarButton" />
         </LinearLayout>
 

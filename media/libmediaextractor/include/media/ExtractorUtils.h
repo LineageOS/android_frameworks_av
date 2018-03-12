@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,19 @@
  * limitations under the License.
  */
 
-package android.media;
+#ifndef EXTRACTOR_UTILS_H_
 
-import android.app.Activity;
+#define EXTRACTOR_UTILS_H_
 
-public class MockActivity extends Activity {
+#include <memory>
+
+namespace android {
+
+template <class T>
+std::unique_ptr<T[]> heapbuffer(size_t size) {
+    return std::unique_ptr<T[]>(new (std::nothrow) T[size]);
 }
+
+}  // namespace android
+
+#endif  // UTILS_H_

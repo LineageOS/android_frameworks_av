@@ -22,6 +22,7 @@
 
 #include <cutils/properties.h>
 #include <media/DataSourceBase.h>
+#include <media/ExtractorUtils.h>
 #include <media/MediaTrack.h>
 #include <media/VorbisComment.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -990,21 +991,11 @@ status_t MyOpusExtractor::verifyOpusHeader(MediaBufferBase *buffer) {
     return OK;
 }
 
-struct TmpData {
-    uint8_t *data;
-    TmpData(size_t size) {
-        data = (uint8_t*) malloc(size);
-    }
-    ~TmpData() {
-        free(data);
-    }
-};
-
 status_t MyOpusExtractor::verifyOpusComments(MediaBufferBase *buffer) {
     // add artificial framing bit so we can reuse _vorbis_unpack_comment
     int32_t commentSize = buffer->range_length() + 1;
-    TmpData commentDataHolder(commentSize);
-    uint8_t *commentData = commentDataHolder.data;
+    auto tmp = heapbuffer<uint8_t>(commentSize);
+    uint8_t *commentData = tmp.get();
     if (commentData == nullptr) {
         return ERROR_MALFORMED;
     }

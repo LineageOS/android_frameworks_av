@@ -59,10 +59,10 @@ public class SessionToken2Impl implements SessionToken2Provider {
     public SessionToken2Impl(Context context, SessionToken2 instance,
             String packageName, String serviceName, int uid) {
         if (TextUtils.isEmpty(packageName)) {
-            throw new IllegalArgumentException("package name shouldn't be null");
+            throw new IllegalArgumentException("packageName shouldn't be empty");
         }
         if (TextUtils.isEmpty(serviceName)) {
-            throw new IllegalArgumentException("service name shouldn't be null");
+            throw new IllegalArgumentException("serviceName shouldn't be empty");
         }
         mInstance = instance;
         // Calculate uid if it's not specified.

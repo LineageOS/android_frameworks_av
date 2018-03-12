@@ -481,6 +481,11 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             return;
         }
         final Command command = Command.fromBundle(session.getContext(), commandBundle);
+        if (command == null) {
+            Log.w(TAG, "sendCustomCommand(): Ignoring null command from "
+                    + getControllerIfAble(caller));
+            return;
+        }
         final ControllerInfo controller = getControllerIfAble(caller, command);
         if (controller == null) {
             return;
@@ -503,6 +508,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         if (session == null || controller == null) {
             return;
         }
+        if (uri == null) {
+            Log.w(TAG, "prepareFromUri(): Ignoring null uri from " + controller);
+            return;
+        }
         session.getCallbackExecutor().execute(() -> {
             if (getControllerIfAble(
                     caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_URI) == null) {
@@ -520,6 +529,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         final ControllerInfo controller = getControllerIfAble(
                 caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_SEARCH);
         if (session == null || controller == null) {
+            return;
+        }
+        if (TextUtils.isEmpty(query)) {
+            Log.w(TAG, "prepareFromSearch(): Ignoring empty query from " + controller);
             return;
         }
         session.getCallbackExecutor().execute(() -> {
@@ -541,6 +554,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         if (session == null || controller == null) {
             return;
         }
+        if (mediaId == null) {
+            Log.w(TAG, "prepareFromMediaId(): Ignoring null mediaId from " + controller);
+            return;
+        }
         session.getCallbackExecutor().execute(() -> {
             if (getControllerIfAble(
                     caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_MEDIA_ID) == null) {
@@ -558,6 +575,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         final ControllerInfo controller = getControllerIfAble(
                 caller, MediaSession2.COMMAND_CODE_PLAY_FROM_URI);
         if (session == null || controller == null) {
+            return;
+        }
+        if (uri == null) {
+            Log.w(TAG, "playFromUri(): Ignoring null uri from " + controller);
             return;
         }
         session.getCallbackExecutor().execute(() -> {
@@ -578,6 +599,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         if (session == null || controller == null) {
             return;
         }
+        if (TextUtils.isEmpty(query)) {
+            Log.w(TAG, "playFromSearch(): Ignoring empty query from " + controller);
+            return;
+        }
         session.getCallbackExecutor().execute(() -> {
             if (getControllerIfAble(
                     caller, MediaSession2.COMMAND_CODE_PLAY_FROM_SEARCH) == null) {
@@ -595,6 +620,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         final ControllerInfo controller = getControllerIfAble(
                 caller, MediaSession2.COMMAND_CODE_PLAY_FROM_MEDIA_ID);
         if (session == null || controller == null) {
+            return;
+        }
+        if (mediaId == null) {
+            Log.w(TAG, "playFromMediaId(): Ignoring null mediaId from " + controller);
             return;
         }
         session.getCallbackExecutor().execute(() -> {
@@ -617,14 +646,17 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             }
             return;
         }
+        Rating2 rating = Rating2Impl.fromBundle(sessionImpl.getContext(), ratingBundle);
+        if (rating == null) {
+            Log.w(TAG, "setRating(): Ignore null rating");
+            return;
+        }
         sessionImpl.getCallbackExecutor().execute(() -> {
             final MediaSession2Impl session = mSession.get();
             if (session == null) {
                 return;
             }
-            Rating2 rating = Rating2Impl.fromBundle(session.getContext(), ratingBundle);
-            session.getCallback().onSetRating(session.getInstance(),
-                    controller, mediaId, rating);
+            session.getCallback().onSetRating(session.getInstance(), controller, mediaId, rating);
         });
     }
 
@@ -633,7 +665,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     @Override
-    public void getBrowserRoot(final IMediaSession2Callback caller, final Bundle rootHints)
+    public void getLibraryRoot(final IMediaSession2Callback caller, final Bundle rootHints)
             throws RuntimeException {
         final MediaLibrarySessionImpl session = getLibrarySession();
         final ControllerInfo controller = getControllerIfAble(
@@ -744,34 +776,34 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         if (session == null || controller == null) {
             return;
         }
+        if (TextUtils.isEmpty(query)) {
+            Log.w(TAG, "search(): Ignoring empty query from " + controller);
+            return;
+        }
         session.getCallbackExecutor().execute(() -> {
             if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
                 return;
             }
-            session.getCallback().onSearch(session.getInstance(),
-                    controller, query, extras);
+            session.getCallback().onSearch(session.getInstance(), controller, query, extras);
         });
     }
 
     @Override
     public void getSearchResult(final IMediaSession2Callback caller, final String query,
             final int page, final int pageSize, final Bundle extras) {
-        if (TextUtils.isEmpty(query)) {
-            if (DEBUG) {
-                Log.d(TAG, "query shouldn't be empty");
-            }
-            return;
-        }
-        if (page < 1 || pageSize < 1) {
-            if (DEBUG) {
-                Log.d(TAG, "Neither page nor pageSize should be less than 1");
-            }
-            return;
-        }
         final MediaLibrarySessionImpl session = getLibrarySession();
         final ControllerInfo controller = getControllerIfAble(
                 caller, MediaSession2.COMMAND_CODE_BROWSER);
         if (session == null || controller == null) {
+            return;
+        }
+        if (TextUtils.isEmpty(query)) {
+            Log.w(TAG, "getSearchResult(): Ignoring empty query from " + controller);
+            return;
+        }
+        if (page < 1 || pageSize < 1) {
+            Log.w(TAG, "getSearchResult(): Ignoring negative page / pageSize."
+                    + " page=" + page + " pageSize=" + pageSize + " from " + controller);
             return;
         }
         session.getCallbackExecutor().execute(() -> {
@@ -811,6 +843,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         if (session == null || controller == null) {
             return;
         }
+        if (parentId == null) {
+            Log.w(TAG, "subscribe(): Ignoring null parentId from " + controller);
+            return;
+        }
         session.getCallbackExecutor().execute(() -> {
             if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
                 return;
@@ -834,6 +870,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         final ControllerInfo controller = getControllerIfAble(
                 caller, MediaSession2.COMMAND_CODE_BROWSER);
         if (session == null || controller == null) {
+            return;
+        }
+        if (parentId == null) {
+            Log.w(TAG, "unsubscribe(): Ignoring null parentId from " + controller);
             return;
         }
         session.getCallbackExecutor().execute(() -> {
