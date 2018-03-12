@@ -1376,15 +1376,12 @@ static void StripStartcode(MediaBuffer *buffer) {
 }
 
 void MPEG4Writer::addMultipleLengthPrefixedSamples_l(MediaBuffer *buffer) {
-    const size_t kExtensionNALSearchRange = 64; // bytes to look for non-VCL NALUs
-
     const uint8_t *dataStart = (const uint8_t *)buffer->data() + buffer->range_offset();
     const uint8_t *currentNalStart = dataStart;
     const uint8_t *nextNalStart;
     const uint8_t *data = dataStart;
     size_t nextNalSize;
-    size_t searchSize = buffer->range_length() > kExtensionNALSearchRange ?
-                   kExtensionNALSearchRange : buffer->range_length();
+    size_t searchSize = buffer->range_length();
 
     while (getNextNALUnit(&data, &searchSize, &nextNalStart,
             &nextNalSize, true) == OK) {
