@@ -278,8 +278,7 @@ public:
     virtual void onReleaseCompleted() override;
     virtual void onFlushCompleted() override;
     virtual void onError(status_t err, enum ActionCode actionCode) override;
-    virtual void onComponentAllocated(
-            const char *componentName, const sp<MediaCodecInfo> &codecInfo) override;
+    virtual void onComponentAllocated(const char *componentName) override;
     virtual void onComponentConfigured(
             const sp<AMessage> &inputFormat, const sp<AMessage> &outputFormat) override;
     virtual void onInputSurfaceCreated(
@@ -339,14 +338,10 @@ void CodecCallback::onError(status_t err, enum ActionCode actionCode) {
     notify->post();
 }
 
-void CodecCallback::onComponentAllocated(
-        const char *componentName, const sp<MediaCodecInfo> &codecInfo) {
+void CodecCallback::onComponentAllocated(const char *componentName) {
     sp<AMessage> notify(mNotify->dup());
     notify->setInt32("what", kWhatComponentAllocated);
     notify->setString("componentName", componentName);
-    if (codecInfo != nullptr) {
-        notify->setObject("codecInfo", codecInfo);
-    }
     notify->post();
 }
 
@@ -606,6 +601,8 @@ status_t MediaCodec::init(const AString &name) {
         return NAME_NOT_FOUND;
     }
 
+    mCodecInfo.clear();
+
     bool secureCodec = false;
     AString tmp = name;
     if (tmp.endsWith(".secure")) {
@@ -617,17 +614,24 @@ status_t MediaCodec::init(const AString &name) {
         mCodec = NULL;  // remove the codec.
         return NO_INIT; // if called from Java should raise IOException
     }
-    ssize_t codecIdx = mcl->findCodecByName(tmp.c_str());
-    if (codecIdx >= 0) {
-        const sp<MediaCodecInfo> info = mcl->getCodecInfo(codecIdx);
+    for (const AString &codecName : { name, tmp }) {
+        ssize_t codecIdx = mcl->findCodecByName(codecName.c_str());
+        if (codecIdx < 0) {
+            continue;
+        }
+        mCodecInfo = mcl->getCodecInfo(codecIdx);
         Vector<AString> mimes;
-        info->getSupportedMimes(&mimes);
+        mCodecInfo->getSupportedMimes(&mimes);
         for (size_t i = 0; i < mimes.size(); i++) {
             if (mimes[i].startsWith("video/")) {
                 mIsVideo = true;
                 break;
             }
         }
+        break;
+    }
+    if (mCodecInfo == nullptr) {
+        return NAME_NOT_FOUND;
     }
 
     if (mIsVideo) {
@@ -654,6 +658,9 @@ status_t MediaCodec::init(const AString &name) {
                     new BufferCallback(new AMessage(kWhatCodecNotify, this))));
 
     sp<AMessage> msg = new AMessage(kWhatInit, this);
+    msg->setObject("codecInfo", mCodecInfo);
+    // name may be different from mCodecInfo->getCodecName() if we stripped
+    // ".secure"
     msg->setString("name", name);
 
     if (mAnalyticsItem != NULL) {
@@ -1607,11 +1614,6 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                     CHECK(msg->findString("componentName", &mComponentName));
 
-                    sp<RefBase> obj;
-                    if (msg->findObject("codecInfo", &obj)) {
-                        mCodecInfo = static_cast<MediaCodecInfo *>(obj.get());
-                    }
-
                     if (mComponentName.c_str()) {
                         mAnalyticsItem->setCString(kCodecCodec, mComponentName.c_str());
                     }
@@ -1996,11 +1998,14 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             mReplyID = replyID;
             setState(INITIALIZING);
 
+            sp<RefBase> codecInfo;
+            CHECK(msg->findObject("codecInfo", &codecInfo));
             AString name;
             CHECK(msg->findString("name", &name));
 
             sp<AMessage> format = new AMessage;
-            format->setString("componentName", name.c_str());
+            format->setObject("codecInfo", codecInfo);
+            format->setString("componentName", name);
 
             mCodec->initiateAllocateComponent(format);
             break;
