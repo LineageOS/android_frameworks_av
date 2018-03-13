@@ -647,22 +647,29 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void setRating(final IMediaSession2Callback caller, final String mediaId,
             final Bundle ratingBundle) {
-        final MediaSession2Impl sessionImpl = getSession();
+        final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(caller);
-        if (controller == null) {
-            if (DEBUG) {
-                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+        if (session == null || controller == null) {
+            return;
+        }
+        if (mediaId == null) {
+            Log.w(TAG, "setRating(): Ignoring null mediaId from " + controller);
+            return;
+        }
+        if (ratingBundle == null) {
+            Log.w(TAG, "setRating(): Ignoring null ratingBundle from " + controller);
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(caller) == null) {
+                return;
             }
-            return;
-        }
-        Rating2 rating = Rating2Impl.fromBundle(sessionImpl.getContext(), ratingBundle);
-        if (rating == null) {
-            Log.w(TAG, "setRating(): Ignore null rating");
-            return;
-        }
-        sessionImpl.getCallbackExecutor().execute(() -> {
-            final MediaSession2Impl session = mSession.get();
-            if (session == null) {
+            Rating2 rating = Rating2Impl.fromBundle(session.getContext(), ratingBundle);
+            if (rating == null) {
+                if (ratingBundle == null) {
+                    Log.w(TAG, "setRating(): Ignoring null rating from " + controller);
+                    return;
+                }
                 return;
             }
             session.getCallback().onSetRating(session.getInstance(), controller, mediaId, rating);
@@ -672,21 +679,19 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void setPlaylist(final IMediaSession2Callback caller, final List<Bundle> playlist,
             final Bundle metadata) {
-        final MediaSession2Impl sessionImpl = getSession();
-        final ControllerInfo controller = getControllerIfAble(caller);
-        if (controller == null) {
-            if (DEBUG) {
-                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
-            }
+        final MediaSession2Impl session = getSession();
+        final ControllerInfo controller = getControllerIfAble(
+                caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST);
+        if (session == null || controller == null) {
             return;
         }
         if (playlist == null) {
-            Log.w(TAG, "setPlaylist(): Ignoring null command from " + controller);
+            Log.w(TAG, "setPlaylist(): Ignoring null playlist from " + controller);
             return;
         }
-        sessionImpl.getCallbackExecutor().execute(() -> {
-            final MediaSession2Impl session = mSession.get();
-            if (session == null) {
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(
+                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST) == null) {
                 return;
             }
             Command command = new Command(session.getContext(),
@@ -708,6 +713,35 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 }
             }
             session.getInstance().setPlaylist(list,
+                    MediaMetadata2.fromBundle(session.getContext(), metadata));
+        });
+    }
+
+    @Override
+    public void updatePlaylistMetadata(final IMediaSession2Callback caller, final Bundle metadata) {
+        final MediaSession2Impl session = getSession();
+        final ControllerInfo controller = getControllerIfAble(
+                caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA);
+        if (session == null || controller == null) {
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(
+                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA) == null) {
+                return;
+            }
+            Command command = new Command(session.getContext(),
+                    MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA);
+            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                    controller, command);
+            if (!accepted) {
+                // Don't run rejected command.
+                if (DEBUG) {
+                    Log.d(TAG, "setPlaylist() from " + controller + " was rejected");
+                }
+                return;
+            }
+            session.getInstance().updatePlaylistMetadata(
                     MediaMetadata2.fromBundle(session.getContext(), metadata));
         });
     }
@@ -1015,6 +1049,34 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (controllerBinder != null) {
                 try {
                     controllerBinder.onPlaylistChanged(bundleList, metadataBundle);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Controller is gone", e);
+                    // TODO(jaewan): What to do when the controller is gone?
+                }
+            } else {
+                final IMediaSession2Callback binder = getControllerBinderIfAble(
+                        list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA);
+                if (binder != null) {
+                    try {
+                        binder.onPlaylistMetadataChanged(metadataBundle);
+                    } catch (RemoteException e) {
+                        Log.w(TAG, "Controller is gone", e);
+                        // TODO(jaewan): What to do when the controller is gone?
+                    }
+                }
+            }
+        }
+    }
+
+    public void notifyPlaylistMetadataChangedNotLocked(MediaMetadata2 metadata) {
+        final Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
+        final List<ControllerInfo> list = getControllers();
+        for (int i = 0; i < list.size(); i++) {
+            final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(
+                    list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA);
+            if (controllerBinder != null) {
+                try {
+                    controllerBinder.onPlaylistMetadataChanged(metadataBundle);
                 } catch (RemoteException e) {
                     Log.w(TAG, "Controller is gone", e);
                     // TODO(jaewan): What to do when the controller is gone?

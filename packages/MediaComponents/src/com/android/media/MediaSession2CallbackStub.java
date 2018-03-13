@@ -109,6 +109,20 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
     }
 
     @Override
+    public void onPlaylistMetadataChanged(Bundle metadataBundle) throws RuntimeException {
+        final MediaController2Impl controller;
+        try {
+            controller = getController();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        MediaMetadata2 metadata =
+                MediaMetadata2.fromBundle(controller.getContext(), metadataBundle);
+        controller.pushPlaylistMetadataChanges(metadata);
+    }
+
+    @Override
     public void onPlaylistParamsChanged(Bundle paramsBundle) throws RuntimeException {
         final MediaController2Impl controller;
         try {

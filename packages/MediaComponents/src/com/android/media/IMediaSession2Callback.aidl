@@ -33,6 +33,7 @@ import com.android.media.IMediaSession2;
 oneway interface IMediaSession2Callback {
     void onPlaybackStateChanged(in Bundle state);
     void onPlaylistChanged(in List<Bundle> playlist, in Bundle metadata);
+    void onPlaylistMetadataChanged(in Bundle metadata);
     void onPlaylistParamsChanged(in Bundle params);
     void onPlaybackInfoChanged(in Bundle playbackInfo);
 
