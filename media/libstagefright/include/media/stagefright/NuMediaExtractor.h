@@ -64,6 +64,8 @@ struct NuMediaExtractor : public RefBase {
 
     status_t setMediaCas(const HInterfaceToken &casToken);
 
+    void disconnect();
+
     size_t countTracks() const;
     status_t getTrackFormat(size_t index, sp<AMessage> *format, uint32_t flags = 0) const;
 

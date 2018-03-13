@@ -216,6 +216,12 @@ media_status_t AMediaExtractor_getSampleFormat(AMediaExtractor *ex, AMediaFormat
 
 #endif /* __ANDROID_API__ >= 28 */
 
+#if __ANDROID_API__ >= 29
+
+media_status_t AMediaExtractor_disconnect(AMediaExtractor *ex);
+
+#endif /* __ANDROID_API__ >= 29 */
+
 #endif /* __ANDROID_API__ >= 21 */
 
 __END_DECLS
