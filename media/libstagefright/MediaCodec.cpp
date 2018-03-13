@@ -603,6 +603,8 @@ status_t MediaCodec::init(const AString &name) {
         return NAME_NOT_FOUND;
     }
 
+    mCodecInfo.clear();
+
     bool secureCodec = false;
     AString tmp = name;
     if (tmp.endsWith(".secure")) {
@@ -614,17 +616,24 @@ status_t MediaCodec::init(const AString &name) {
         mCodec = NULL;  // remove the codec.
         return NO_INIT; // if called from Java should raise IOException
     }
-    ssize_t codecIdx = mcl->findCodecByName(tmp.c_str());
-    if (codecIdx >= 0) {
-        const sp<MediaCodecInfo> info = mcl->getCodecInfo(codecIdx);
+    for (const AString &codecName : { name, tmp }) {
+        ssize_t codecIdx = mcl->findCodecByName(codecName.c_str());
+        if (codecIdx < 0) {
+            continue;
+        }
+        mCodecInfo = mcl->getCodecInfo(codecIdx);
         Vector<AString> mimes;
-        info->getSupportedMimes(&mimes);
+        mCodecInfo->getSupportedMimes(&mimes);
         for (size_t i = 0; i < mimes.size(); i++) {
             if (mimes[i].startsWith("video/")) {
                 mIsVideo = true;
                 break;
             }
         }
+        break;
+    }
+    if (mCodecInfo == nullptr) {
+        return NAME_NOT_FOUND;
     }
 
     if (mIsVideo) {
@@ -651,6 +660,9 @@ status_t MediaCodec::init(const AString &name) {
                     new BufferCallback(new AMessage(kWhatCodecNotify, this))));
 
     sp<AMessage> msg = new AMessage(kWhatInit, this);
+    msg->setObject("codecInfo", mCodecInfo);
+    // name may be different from mCodecInfo->getCodecName() if we stripped
+    // ".secure"
     msg->setString("name", name);
 
     if (mAnalyticsItem != NULL) {
@@ -1972,11 +1984,14 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             mReplyID = replyID;
             setState(INITIALIZING);
 
+            sp<RefBase> codecInfo;
+            CHECK(msg->findObject("codecInfo", &codecInfo));
             AString name;
             CHECK(msg->findString("name", &name));
 
             sp<AMessage> format = new AMessage;
-            format->setString("componentName", name.c_str());
+            format->setObject("codecInfo", codecInfo);
+            format->setString("componentName", name);
 
             mCodec->initiateAllocateComponent(format);
             break;
