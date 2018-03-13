@@ -220,9 +220,10 @@ static void copyMultiCh24(
 }
 
 // static
-sp<FLACDecoder> FLACDecoder::Create() {
-    sp<FLACDecoder> decoder = new FLACDecoder();
-    if (decoder->init() != OK) {
+FLACDecoder *FLACDecoder::Create() {
+    FLACDecoder *decoder = new (std::nothrow) FLACDecoder();
+    if (decoder == NULL || decoder->init() != OK) {
+        delete decoder;
         return NULL;
     }
     return decoder;
