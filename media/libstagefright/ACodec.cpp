@@ -37,7 +37,6 @@
 
 #include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/MediaCodec.h>
-#include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/OMXClient.h>
 #include <media/stagefright/PersistentSurface.h>
@@ -6415,33 +6414,18 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
 
     sp<AMessage> notify = new AMessage(kWhatOMXDied, mCodec);
 
-    AString componentName;
-    CHECK(msg->findString("componentName", &componentName));
-
-    sp<IMediaCodecList> list = MediaCodecList::getInstance();
-    if (list == nullptr) {
-        ALOGE("Unable to obtain MediaCodecList while "
-                "attempting to create codec \"%s\"",
-                componentName.c_str());
-        mCodec->signalError(OMX_ErrorUndefined, NO_INIT);
-        return false;
-    }
-    ssize_t index = list->findCodecByName(componentName.c_str());
-    if (index < 0) {
-        ALOGE("Unable to find codec \"%s\"",
-                componentName.c_str());
-        mCodec->signalError(OMX_ErrorInvalidComponent, NAME_NOT_FOUND);
-        return false;
-    }
-    sp<MediaCodecInfo> info = list->getCodecInfo(index);
+    sp<RefBase> obj;
+    CHECK(msg->findObject("codecInfo", &obj));
+    sp<MediaCodecInfo> info = (MediaCodecInfo *)obj.get();
     if (info == nullptr) {
-        ALOGE("Unexpected error (index out-of-bound) while "
-                "retrieving information for codec \"%s\"",
-                componentName.c_str());
+        ALOGE("Unexpected nullptr for codec information");
         mCodec->signalError(OMX_ErrorUndefined, UNKNOWN_ERROR);
         return false;
     }
     AString owner = (info->getOwnerName() == nullptr) ? "default" : info->getOwnerName();
+
+    AString componentName;
+    CHECK(msg->findString("componentName", &componentName));
 
     sp<CodecObserver> observer = new CodecObserver;
     sp<IOMX> omx;
@@ -6490,7 +6474,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
 
     mCodec->mOMX = omx;
     mCodec->mOMXNode = omxNode;
-    mCodec->mCallback->onComponentAllocated(mCodec->mComponentName.c_str(), info);
+    mCodec->mCallback->onComponentAllocated(mCodec->mComponentName.c_str());
     mCodec->changeState(mCodec->mLoadedState);
 
     return true;

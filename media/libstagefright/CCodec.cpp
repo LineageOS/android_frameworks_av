@@ -30,9 +30,7 @@
 #include <media/stagefright/codec2/1.0/InputSurface.h>
 #include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/CCodec.h>
-#include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/PersistentSurface.h>
-#include <media/IMediaCodecList.h>
 
 #include "include/C2OMXNode.h"
 #include "include/CCodecBufferChannel.h"
@@ -261,44 +259,25 @@ void CCodec::initiateAllocateComponent(const sp<AMessage> &msg) {
         return;
     }
 
-    AString componentName;
-    if (!msg->findString("componentName", &componentName)) {
-        // TODO: find componentName appropriate with the media type
-    }
+    sp<RefBase> codecInfo;
+    CHECK(msg->findObject("codecInfo", &codecInfo));
+    // For Codec 2.0 components, componentName == codecInfo->getCodecName().
 
     sp<AMessage> allocMsg(new AMessage(kWhatAllocate, this));
-    allocMsg->setString("componentName", componentName);
+    allocMsg->setObject("codecInfo", codecInfo);
     allocMsg->post();
 }
 
-void CCodec::allocate(const AString &componentName) {
-    ALOGV("allocate(%s)", componentName.c_str());
-    mListener.reset(new CCodecListener(this));
-
-    sp<IMediaCodecList> list = MediaCodecList::getInstance();
-    if (list == nullptr) {
-        ALOGE("Unable to obtain MediaCodecList while "
-                "attempting to create codec \"%s\"",
-                componentName.c_str());
-        mCallback->onError(NO_INIT, ACTION_CODE_FATAL);
-        return;
-    }
-    ssize_t index = list->findCodecByName(componentName.c_str());
-    if (index < 0) {
-        ALOGE("Unable to find codec \"%s\"",
-                componentName.c_str());
-        mCallback->onError(NAME_NOT_FOUND, ACTION_CODE_FATAL);
-        return;
-    }
-    sp<MediaCodecInfo> info = list->getCodecInfo(index);
-    if (info == nullptr) {
-        ALOGE("Unexpected error (index out-of-bound) while "
-                "retrieving information for codec \"%s\"",
-                componentName.c_str());
+void CCodec::allocate(const sp<MediaCodecInfo> &codecInfo) {
+    if (codecInfo == nullptr) {
         mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
         return;
     }
-    // TODO: use info->getOwnerName() for connecting to remote process.
+    ALOGV("allocate(%s)", codecInfo->getCodecName());
+    mListener.reset(new CCodecListener(this));
+
+    AString componentName = codecInfo->getCodecName();
+    // TODO: use codecInfo->getOwnerName() for connecting to remote process.
 
     std::shared_ptr<C2Component> comp;
     c2_status_t err = GetCodec2PlatformComponentStore()->createComponent(
@@ -334,7 +313,7 @@ void CCodec::allocate(const AString &componentName) {
     if (tryAndReportOnError(setAllocated) != OK) {
         return;
     }
-    mCallback->onComponentAllocated(comp->intf()->getName().c_str(), info);
+    mCallback->onComponentAllocated(comp->intf()->getName().c_str());
 }
 
 void CCodec::initiateConfigureComponent(const sp<AMessage> &format) {
@@ -839,9 +818,9 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
         case kWhatAllocate: {
             // C2ComponentStore::createComponent() should return within 100ms.
             setDeadline(now + 150ms, "allocate");
-            AString componentName;
-            CHECK(msg->findString("componentName", &componentName));
-            allocate(componentName);
+            sp<RefBase> obj;
+            CHECK(msg->findObject("codecInfo", &obj));
+            allocate((MediaCodecInfo *)obj.get());
             break;
         }
         case kWhatConfigure: {
