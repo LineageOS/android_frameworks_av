@@ -287,6 +287,8 @@ struct AMediaExtractorWrapper : public RefBase {
 
     status_t release();
 
+    status_t disconnect();
+
     status_t setDataSource(int fd, off64_t offset, off64_t length);
 
     status_t setDataSource(const char *location);

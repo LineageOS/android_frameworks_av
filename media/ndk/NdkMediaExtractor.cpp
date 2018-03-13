@@ -475,5 +475,11 @@ media_status_t AMediaExtractor_getSampleFormat(AMediaExtractor *ex, AMediaFormat
     return AMEDIA_OK;
 }
 
+EXPORT
+media_status_t AMediaExtractor_disconnect(AMediaExtractor * ex) {
+    ex->mImpl->disconnect();
+    return AMEDIA_OK;
+}
+
 } // extern "C"
 
