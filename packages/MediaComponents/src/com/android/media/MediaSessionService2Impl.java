@@ -27,10 +27,8 @@ import android.media.MediaPlayerBase.PlayerEventCallback;
 import android.media.MediaSession2;
 import android.media.MediaSessionService2;
 import android.media.MediaSessionService2.MediaNotification;
-import android.media.PlaybackState2;
 import android.media.SessionToken2;
 import android.media.SessionToken2.TokenType;
-import android.media.session.PlaybackState;
 import android.media.update.MediaSessionService2Provider;
 import android.os.IBinder;
 import android.support.annotation.GuardedBy;
@@ -109,13 +107,13 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
         return null;
     }
 
-    private void updateNotification(PlaybackState2 state) {
+    private void updateNotification(int playerState) {
         MediaNotification mediaNotification = mInstance.onUpdateNotification();
         if (mediaNotification == null) {
             return;
         }
-        switch((int) state.getState()) {
-            case PlaybackState.STATE_PLAYING:
+        switch(playerState) {
+            case MediaPlayerBase.PLAYER_STATE_PLAYING:
                 if (!mIsRunningForeground) {
                     mIsRunningForeground = true;
                     mInstance.startForegroundService(mStartSelfIntent);
@@ -124,7 +122,8 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
                     return;
                 }
                 break;
-            case PlaybackState.STATE_STOPPED:
+            case MediaPlayerBase.PLAYER_STATE_IDLE:
+            case MediaPlayerBase.PLAYER_STATE_ERROR:
                 if (mIsRunningForeground) {
                     mIsRunningForeground = false;
                     mInstance.stopForeground(true);
@@ -142,15 +141,6 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
             // TODO: Implement this
             return;
         }
-        // TODO: Uncomment or remove
-        //public void onPlaybackStateChanged(PlaybackState2 state) {
-        //    if (state == null) {
-        //        Log.w(TAG, "Ignoring null playback state");
-        //        return;
-        //    }
-        //    MediaSession2Impl impl = (MediaSession2Impl) mSession.getProvider();
-        //    updateNotification(impl.getInstance().getPlaybackState());
-        //}
     }
 
     public static class MediaNotificationImpl implements MediaNotificationProvider {
