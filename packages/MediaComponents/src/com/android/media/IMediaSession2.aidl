@@ -61,6 +61,9 @@ oneway interface IMediaSession2 {
 
     void setPlaylist(IMediaSession2Callback caller, in List<Bundle> playlist, in Bundle metadata);
     void updatePlaylistMetadata(IMediaSession2Callback caller, in Bundle metadata);
+    void addPlaylistItem(IMediaSession2Callback caller, int index, in Bundle mediaItem);
+    void removePlaylistItem(IMediaSession2Callback caller, in Bundle mediaItem);
+    void replacePlaylistItem(IMediaSession2Callback caller, int index, in Bundle mediaItem);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     // library service specific

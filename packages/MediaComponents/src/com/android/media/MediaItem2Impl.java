@@ -31,21 +31,31 @@ import android.media.update.MediaItem2Provider;
 import android.os.Bundle;
 import android.text.TextUtils;
 
+import java.util.UUID;
+
 public class MediaItem2Impl implements MediaItem2Provider {
     private static final String KEY_ID = "android.media.mediaitem2.id";
     private static final String KEY_FLAGS = "android.media.mediaitem2.flags";
     private static final String KEY_METADATA = "android.media.mediaitem2.metadata";
+    private static final String KEY_UUID = "android.media.mediaitem2.uuid";
 
     private final Context mContext;
     private final MediaItem2 mInstance;
     private final String mId;
     private final int mFlags;
+    private final UUID mUUID;
     private MediaMetadata2 mMetadata;
     private DataSourceDesc mDataSourceDesc;
 
     // From the public API
     public MediaItem2Impl(@NonNull Context context, @NonNull String mediaId,
             @Nullable DataSourceDesc dsd, @Nullable MediaMetadata2 metadata, @Flags int flags) {
+        this(context, mediaId, dsd, metadata, flags, null);
+    }
+
+    private MediaItem2Impl(@NonNull Context context, @NonNull String mediaId,
+            @Nullable DataSourceDesc dsd, @Nullable MediaMetadata2 metadata, @Flags int flags,
+            @Nullable UUID uuid) {
         if (mediaId == null) {
             throw new IllegalArgumentException("mediaId shouldn't be null");
         }
@@ -58,24 +68,18 @@ public class MediaItem2Impl implements MediaItem2Provider {
         mDataSourceDesc = dsd;
         mMetadata = metadata;
         mFlags = flags;
+        mUUID = (uuid == null) ? UUID.randomUUID() : uuid;
 
         mInstance = new MediaItem2(this);
     }
 
-    // Create anonymized version
-    public MediaItem2Impl(Context context, String mediaId, MediaMetadata2 metadata,
-            @Flags int flags) {
-        if (mediaId == null) {
-            throw new IllegalArgumentException("mediaId shouldn't be null");
+    @Override
+    public boolean equals_impl(Object obj) {
+        if (!(obj instanceof MediaItem2)) {
+            return false;
         }
-        if (metadata != null && !TextUtils.equals(mediaId, metadata.getMediaId())) {
-            throw new IllegalArgumentException("metadata's id should be matched with the mediaid");
-        }
-        mContext = context;
-        mId = mediaId;
-        mMetadata = metadata;
-        mFlags = flags;
-        mInstance = new MediaItem2(this);
+        MediaItem2 other = (MediaItem2) obj;
+        return mUUID.equals(((MediaItem2Impl) other.getProvider()).mUUID);
     }
 
     /**
@@ -90,10 +94,37 @@ public class MediaItem2Impl implements MediaItem2Provider {
         if (mMetadata != null) {
             bundle.putBundle(KEY_METADATA, mMetadata.toBundle());
         }
+        bundle.putString(KEY_UUID, mUUID.toString());
         return bundle;
     }
 
-    public static MediaItem2 fromBundle(Context context, Bundle bundle) {
+    /**
+     * Create a MediaItem2 from the {@link Bundle}.
+     *
+     * @param context A context.
+     * @param bundle The bundle which was published by {@link MediaItem2#toBundle()}.
+     * @return The newly created MediaItem2
+     */
+    public static MediaItem2 fromBundle(@NonNull Context context, @NonNull Bundle bundle) {
+        if (bundle == null) {
+            return null;
+        }
+        final String uuidString = bundle.getString(KEY_UUID);
+        return fromBundle(context, bundle, UUID.fromString(uuidString));
+    }
+
+    /**
+     * Create a MediaItem2 from the {@link Bundle} with the specified {@link UUID}.
+     * If {@link UUID}
+     * can be null for creating new.
+     *
+     * @param context A context.
+     * @param bundle The bundle which was published by {@link MediaItem2#toBundle()}.
+     * @param uuid A {@link UUID} to override. Can be {@link null} for override.
+     * @return The newly created MediaItem2
+     */
+    static MediaItem2 fromBundle(@NonNull Context context, @NonNull Bundle bundle,
+            @Nullable UUID uuid) {
         if (bundle == null) {
             return null;
         }
@@ -102,7 +133,7 @@ public class MediaItem2Impl implements MediaItem2Provider {
         final MediaMetadata2 metadata = metadataBundle != null
                 ? MediaMetadata2.fromBundle(context, metadataBundle) : null;
         final int flags = bundle.getInt(KEY_FLAGS);
-        return new MediaItem2Impl(context, id, metadata, flags).getInstance();
+        return new MediaItem2Impl(context, id, null, metadata, flags, uuid).getInstance();
     }
 
     private MediaItem2 getInstance() {
