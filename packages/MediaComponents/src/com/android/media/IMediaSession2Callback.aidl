@@ -28,13 +28,15 @@ import com.android.media.IMediaSession2;
  * Keep this interface oneway. Otherwise a malicious app may implement fake version of this,
  * and holds calls from session to make session owner(s) frozen.
  */
+// TODO(jaewan): (Post P) Handle when the playlist becomes too huge.
+//               Note that ParcelledSliceList isn't a good idea for the purpose. (see: b/37493677)
 oneway interface IMediaSession2Callback {
     void onPlaybackStateChanged(in Bundle state);
-    void onPlaylistChanged(in List<Bundle> playlist);
+    void onPlaylistChanged(in List<Bundle> playlist, in Bundle metadata);
+    void onPlaylistMetadataChanged(in Bundle metadata);
     void onPlaylistParamsChanged(in Bundle params);
     void onPlaybackInfoChanged(in Bundle playbackInfo);
 
-    // TODO(jaewan): Handle when the playlist becomes too huge.
     void onConnected(IMediaSession2 sessionBinder, in Bundle commandGroup, in Bundle playbackState,
             in Bundle playbackInfo, in Bundle params, in List<Bundle> playlist,
             in PendingIntent sessionActivity);
