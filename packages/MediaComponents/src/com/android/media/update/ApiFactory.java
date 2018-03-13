@@ -20,7 +20,6 @@ import android.app.Notification;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
-import android.media.DataSourceDesc;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaController2;
@@ -31,7 +30,6 @@ import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaLibraryService2.MediaLibrarySession;
 import android.media.MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback;
 import android.media.MediaMetadata2;
-import android.media.MediaPlayerBase;
 import android.media.MediaPlaylistAgent;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
@@ -71,7 +69,7 @@ import android.util.AttributeSet;
 import android.widget.MediaControlView2;
 import android.widget.VideoView2;
 
-import com.android.media.IMediaSession2Callback;
+import com.android.media.IMediaController2;
 import com.android.media.MediaBrowser2Impl;
 import com.android.media.MediaController2Impl;
 import com.android.media.MediaItem2Impl;
@@ -142,7 +140,7 @@ public class ApiFactory implements StaticProvider {
             Context context, ControllerInfo instance, int uid, int pid, String packageName,
             IInterface callback) {
         return new MediaSession2Impl.ControllerInfoImpl(context,
-                instance, uid, pid, packageName, (IMediaSession2Callback) callback);
+                instance, uid, pid, packageName, (IMediaController2) callback);
     }
 
     @Override

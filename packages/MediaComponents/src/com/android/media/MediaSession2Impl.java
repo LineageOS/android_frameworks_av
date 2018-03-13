@@ -1114,10 +1114,10 @@ public class MediaSession2Impl implements MediaSession2Provider {
         private final int mUid;
         private final String mPackageName;
         private final boolean mIsTrusted;
-        private final IMediaSession2Callback mControllerBinder;
+        private final IMediaController2 mControllerBinder;
 
         public ControllerInfoImpl(Context context, ControllerInfo instance, int uid,
-                int pid, String packageName, IMediaSession2Callback callback) {
+                int pid, String packageName, IMediaController2 callback) {
             if (TextUtils.isEmpty(packageName)) {
                 throw new IllegalArgumentException("packageName shouldn't be empty");
             }
@@ -1193,7 +1193,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             return mControllerBinder.asBinder();
         }
 
-        public IMediaSession2Callback getControllerBinder() {
+        public IMediaController2 getControllerBinder() {
             return mControllerBinder;
         }
 
