@@ -56,7 +56,7 @@
     </style>
 
     <style name="BottomBarButton.CC">
-        <item name="android:src">@drawable/ic_media_subtitle_disabled</item>
+        <item name="android:src">@drawable/ic_subtitle_off</item>
     </style>
 
     <style name="BottomBarButton.FullScreen">
@@ -76,7 +76,7 @@
     </style>
 
     <style name="BottomBarButton.Mute">
-        <item name="android:src">@drawable/ic_mute</item>
+        <item name="android:src">@drawable/ic_unmute</item>
     </style>
 
     <style name="BottomBarButton.VideoQuality">
