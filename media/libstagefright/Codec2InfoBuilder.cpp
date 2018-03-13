@@ -31,6 +31,63 @@ namespace android {
 
 using ConstTraitsPtr = std::shared_ptr<const C2Component::Traits>;
 
+struct ProfileLevel {
+    uint32_t profile;
+    uint32_t level;
+};
+static const ProfileLevel kAvcProfileLevels[] = {
+    { 0x01, 0x0001 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel1  },
+    { 0x01, 0x0002 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel1b },
+    { 0x01, 0x0004 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel11 },
+    { 0x01, 0x0008 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel12 },
+    { 0x01, 0x0010 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel13 },
+    { 0x01, 0x0020 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel2  },
+    { 0x01, 0x0040 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel21 },
+    { 0x01, 0x0080 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel22 },
+    { 0x01, 0x0100 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel3  },
+    { 0x01, 0x0200 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel31 },
+    { 0x01, 0x0400 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel32 },
+    { 0x01, 0x0800 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel4  },
+    { 0x01, 0x1000 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel41 },
+    { 0x01, 0x2000 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel42 },
+    { 0x01, 0x4000 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel5  },
+    { 0x01, 0x8000 },  // { OMX_VIDEO_AVCProfileBaseline, OMX_VIDEO_AVCLevel51 },
+
+    { 0x02, 0x0001 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel1  },
+    { 0x02, 0x0002 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel1b },
+    { 0x02, 0x0004 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel11 },
+    { 0x02, 0x0008 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel12 },
+    { 0x02, 0x0010 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel13 },
+    { 0x02, 0x0020 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel2  },
+    { 0x02, 0x0040 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel21 },
+    { 0x02, 0x0080 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel22 },
+    { 0x02, 0x0100 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel3  },
+    { 0x02, 0x0200 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel31 },
+    { 0x02, 0x0400 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel32 },
+    { 0x02, 0x0800 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel4  },
+    { 0x02, 0x1000 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel41 },
+    { 0x02, 0x2000 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel42 },
+    { 0x02, 0x4000 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel5  },
+    { 0x02, 0x8000 },  // { OMX_VIDEO_AVCProfileMain,     OMX_VIDEO_AVCLevel51 },
+
+    { 0x04, 0x0001 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel1  },
+    { 0x04, 0x0002 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel1b },
+    { 0x04, 0x0004 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel11 },
+    { 0x04, 0x0008 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel12 },
+    { 0x04, 0x0010 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel13 },
+    { 0x04, 0x0020 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel2  },
+    { 0x04, 0x0040 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel21 },
+    { 0x04, 0x0080 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel22 },
+    { 0x04, 0x0100 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel3  },
+    { 0x04, 0x0200 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel31 },
+    { 0x04, 0x0400 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel32 },
+    { 0x04, 0x0800 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel4  },
+    { 0x04, 0x1000 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel41 },
+    { 0x04, 0x2000 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel42 },
+    { 0x04, 0x4000 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel5  },
+    { 0x04, 0x8000 },  // { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel51 },
+};
+
 status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
     // Obtain C2ComponentStore
     std::shared_ptr<C2ComponentStore> store = GetCodec2PlatformComponentStore();
@@ -84,6 +141,12 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                     caps->addDetail(key.c_str(), std::stoi(value));
                 } else {
                     caps->addDetail(key.c_str(), value.c_str());
+                }
+            }
+            // TODO: get this from intf(), and apply to other codecs as well.
+            if (mediaType.find("video/avc") != std::string::npos && !encoder) {
+                for (const auto& pl : kAvcProfileLevels) {
+                    caps->addProfileLevel(pl.profile, pl.level);
                 }
             }
             // TODO: get this from intf().
