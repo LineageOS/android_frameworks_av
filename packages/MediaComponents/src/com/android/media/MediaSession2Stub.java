@@ -21,6 +21,7 @@ import android.content.Context;
 import android.media.MediaController2;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2.LibraryRoot;
+import android.media.MediaMetadata2;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
@@ -668,6 +669,49 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
+    @Override
+    public void setPlaylist(final IMediaSession2Callback caller, final List<Bundle> playlist,
+            final Bundle metadata) {
+        final MediaSession2Impl sessionImpl = getSession();
+        final ControllerInfo controller = getControllerIfAble(caller);
+        if (controller == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+            }
+            return;
+        }
+        if (playlist == null) {
+            Log.w(TAG, "setPlaylist(): Ignoring null command from " + controller);
+            return;
+        }
+        sessionImpl.getCallbackExecutor().execute(() -> {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            Command command = new Command(session.getContext(),
+                    MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST);
+            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                    controller, command);
+            if (!accepted) {
+                // Don't run rejected command.
+                if (DEBUG) {
+                    Log.d(TAG, "setPlaylist() from " + controller + " was rejected");
+                }
+                return;
+            }
+            List<MediaItem2> list = new ArrayList<>();
+            for (int i = 0; i < playlist.size(); i++) {
+                MediaItem2 item = MediaItem2.fromBundle(session.getContext(), playlist.get(i));
+                if (item != null) {
+                    list.add(item);
+                }
+            }
+            session.getInstance().setPlaylist(list,
+                    MediaMetadata2.fromBundle(session.getContext(), metadata));
+        });
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////////
     // AIDL methods for LibrarySession overrides
     //////////////////////////////////////////////////////////////////////////////////////////////
@@ -948,23 +992,29 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         }
     }
 
-    public void notifyPlaylistChanged(List<MediaItem2> playlist) {
-        final List<Bundle> bundleList = new ArrayList<>();
-        for (int i = 0; i < playlist.size(); i++) {
-            if (playlist.get(i) != null) {
-                Bundle bundle = playlist.get(i).toBundle();
-                if (bundle != null) {
-                    bundleList.add(bundle);
+    public void notifyPlaylistChangedNotLocked(List<MediaItem2> playlist, MediaMetadata2 metadata) {
+        final List<Bundle> bundleList;
+        if (playlist != null) {
+            bundleList = new ArrayList<>();
+            for (int i = 0; i < playlist.size(); i++) {
+                if (playlist.get(i) != null) {
+                    Bundle bundle = playlist.get(i).toBundle();
+                    if (bundle != null) {
+                        bundleList.add(bundle);
+                    }
                 }
             }
+        } else {
+            bundleList = null;
         }
+        final Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
             final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(
                     list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST);
             if (controllerBinder != null) {
                 try {
-                    controllerBinder.onPlaylistChanged(bundleList);
+                    controllerBinder.onPlaylistChanged(bundleList, metadataBundle);
                 } catch (RemoteException e) {
                     Log.w(TAG, "Controller is gone", e);
                     // TODO(jaewan): What to do when the controller is gone?
