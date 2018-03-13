@@ -622,31 +622,58 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void addPlaylistItem_impl(int index, MediaItem2 item) {
-        // TODO(jaewan): Implement (b/73149584)
         if (index < 0) {
             throw new IllegalArgumentException("index shouldn't be negative");
         }
         if (item == null) {
             throw new IllegalArgumentException("item shouldn't be null");
+        }
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYLIST_ADD_ITEM);
+        if (binder != null) {
+            try {
+                binder.addPlaylistItem(mSessionCallbackStub, index, item.toBundle());
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
         }
     }
 
     @Override
     public void removePlaylistItem_impl(MediaItem2 item) {
-        // TODO(jaewan): Implement (b/73149584)
         if (item == null) {
             throw new IllegalArgumentException("item shouldn't be null");
+        }
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYLIST_REMOVE_ITEM);
+        if (binder != null) {
+            try {
+                binder.removePlaylistItem(mSessionCallbackStub, item.toBundle());
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
         }
     }
 
     @Override
     public void replacePlaylistItem_impl(int index, MediaItem2 item) {
-        // TODO: Implement this (b/73149407)
         if (index < 0) {
             throw new IllegalArgumentException("index shouldn't be negative");
         }
         if (item == null) {
             throw new IllegalArgumentException("item shouldn't be null");
+        }
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYLIST_REPLACE_ITEM);
+        if (binder != null) {
+            try {
+                binder.replacePlaylistItem(mSessionCallbackStub, index, item.toBundle());
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
         }
     }
 

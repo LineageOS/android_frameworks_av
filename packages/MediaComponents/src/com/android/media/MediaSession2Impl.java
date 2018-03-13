@@ -527,7 +527,12 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (item == null) {
             throw new IllegalArgumentException("item shouldn't be null");
         }
-        // TODO(jaewan): Implement
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            agent.addPlaylistItem(index, item);
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
@@ -535,15 +540,12 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (item == null) {
             throw new IllegalArgumentException("item shouldn't be null");
         }
-        // TODO(jaewan): Implement
-    }
-
-    @Override
-    public void editPlaylistItem_impl(MediaItem2 item) {
-        if (item == null) {
-            throw new IllegalArgumentException("item shouldn't be null");
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            agent.removePlaylistItem(item);
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
-        // TODO(jaewan): Implement
     }
 
     @Override
@@ -554,7 +556,12 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (item == null) {
             throw new IllegalArgumentException("item shouldn't be null");
         }
-        // TODO(jaewan): Implement
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            agent.replacePlaylistItem(index, item);
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
