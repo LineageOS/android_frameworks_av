@@ -318,13 +318,21 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void release(final IMediaSession2Callback caller) throws RemoteException {
+        ControllerInfo controller;
         synchronized (mLock) {
-            ControllerInfo controllerInfo = mControllers.remove(caller.asBinder());
+            controller = mControllers.remove(caller.asBinder());
             if (DEBUG) {
-                Log.d(TAG, "releasing " + controllerInfo);
+                Log.d(TAG, "releasing " + controller);
             }
-            mSubscriptions.remove(controllerInfo);
+            mSubscriptions.remove(controller);
         }
+        final MediaSession2Impl session = getSession();
+        if (session == null || controller == null) {
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            session.getCallback().onDisconnected(session.getInstance(), controller);
+        });
     }
 
     @Override
