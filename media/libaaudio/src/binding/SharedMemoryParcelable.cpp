@@ -48,7 +48,10 @@ void SharedMemoryParcelable::setup(const unique_fd& fd, int32_t sizeInBytes) {
 }
 
 status_t SharedMemoryParcelable::writeToParcel(Parcel* parcel) const {
-    status_t status = parcel->writeInt32(mSizeInBytes);
+    status_t status = AAudioConvert_aaudioToAndroidStatus(validate());
+    if (status != NO_ERROR) return status;
+
+    status = parcel->writeInt32(mSizeInBytes);
     if (status != NO_ERROR) return status;
     if (mSizeInBytes > 0) {
         ALOGV("writeToParcel() mFd = %d, this = %p\n", mFd.get(), this);
@@ -61,21 +64,27 @@ status_t SharedMemoryParcelable::writeToParcel(Parcel* parcel) const {
 
 status_t SharedMemoryParcelable::readFromParcel(const Parcel* parcel) {
     status_t status = parcel->readInt32(&mSizeInBytes);
-    if (status != NO_ERROR) {
-        return status;
-    }
+    if (status != NO_ERROR) goto error;
+
     if (mSizeInBytes > 0) {
         // The Parcel owns the file descriptor and will close it later.
         unique_fd mmapFd;
         status = parcel->readUniqueFileDescriptor(&mmapFd);
         if (status != NO_ERROR) {
             ALOGE("readFromParcel() readUniqueFileDescriptor() failed : %d", status);
-        } else {
-            // Resolve the memory now while we still have the FD from the Parcel.
-            // Closing the FD will not affect the shared memory once mmap() has been called.
-            status = AAudioConvert_androidToAAudioResult(resolveSharedMemory(mmapFd));
+            goto error;
         }
+
+        // Resolve the memory now while we still have the FD from the Parcel.
+        // Closing the FD will not affect the shared memory once mmap() has been called.
+        aaudio_result_t result = resolveSharedMemory(mmapFd);
+        status = AAudioConvert_aaudioToAndroidStatus(result);
+        if (status != NO_ERROR) goto error;
     }
+
+    return AAudioConvert_aaudioToAndroidStatus(validate());
+
+error:
     return status;
 }
 
@@ -136,7 +145,7 @@ int32_t SharedMemoryParcelable::getSizeInBytes() {
     return mSizeInBytes;
 }
 
-aaudio_result_t SharedMemoryParcelable::validate() {
+aaudio_result_t SharedMemoryParcelable::validate() const {
     if (mSizeInBytes < 0 || mSizeInBytes >= MAX_MMAP_SIZE_BYTES) {
         ALOGE("invalid mSizeInBytes = %d", mSizeInBytes);
         return AAUDIO_ERROR_OUT_OF_RANGE;
