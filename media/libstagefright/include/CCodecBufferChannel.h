@@ -162,6 +162,7 @@ private:
     };
 
     void feedInputBufferIfAvailable();
+    status_t queueInputBufferInternal(const sp<MediaCodecBuffer> &buffer);
 
     QueueSync mSync;
     sp<MemoryDealer> mDealer;
@@ -180,7 +181,13 @@ private:
     std::atomic_uint64_t mFirstValidFrameIndex;
 
     sp<MemoryDealer> makeMemoryDealer(size_t heapSize);
-    Mutexed<sp<Surface>> mSurface;
+
+    struct OutputSurface {
+        sp<Surface> surface;
+        std::list<std::shared_ptr<C2Buffer>> bufferRefs;
+        size_t maxBufferCount;
+    };
+    Mutexed<OutputSurface> mOutputSurface;
 
     std::shared_ptr<InputSurfaceWrapper> mInputSurface;
 
