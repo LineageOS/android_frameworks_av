@@ -16,7 +16,18 @@
 
 package com.android.media;
 
-import static android.media.MediaSession2.*;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA;
+import static android.media.MediaSession2.COMMAND_CODE_PLAY_FROM_MEDIA_ID;
+import static android.media.MediaSession2.COMMAND_CODE_PLAY_FROM_SEARCH;
+import static android.media.MediaSession2.COMMAND_CODE_PLAY_FROM_URI;
+import static android.media.MediaSession2.COMMAND_CODE_PREPARE_FROM_MEDIA_ID;
+import static android.media.MediaSession2.COMMAND_CODE_PREPARE_FROM_SEARCH;
+import static android.media.MediaSession2.COMMAND_CODE_PREPARE_FROM_URI;
 
 import android.app.PendingIntent;
 import android.content.ComponentName;
@@ -35,7 +46,6 @@ import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSessionService2;
-import android.media.PlaybackState2;
 import android.media.Rating2;
 import android.media.SessionToken2;
 import android.media.update.MediaController2Provider;
@@ -73,13 +83,21 @@ public class MediaController2Impl implements MediaController2Provider {
     @GuardedBy("mLock")
     private boolean mIsReleased;
     @GuardedBy("mLock")
-    private PlaybackState2 mPlaybackState;
-    @GuardedBy("mLock")
     private List<MediaItem2> mPlaylist;
     @GuardedBy("mLock")
     private MediaMetadata2 mPlaylistMetadata;
     @GuardedBy("mLock")
     private PlaylistParams mPlaylistParams;
+    @GuardedBy("mLock")
+    private int mPlayerState;
+    @GuardedBy("mLock")
+    private long mPositionEventTimeMs;
+    @GuardedBy("mLock")
+    private long mPositionMs;
+    @GuardedBy("mLock")
+    private float mPlaybackSpeed;
+    @GuardedBy("mLock")
+    private long mBufferedPositionMs;
     @GuardedBy("mLock")
     private PlaybackInfo mPlaybackInfo;
     @GuardedBy("mLock")
@@ -614,13 +632,6 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public PlaybackState2 getPlaybackState_impl() {
-        synchronized (mLock) {
-            return mPlaybackState;
-        }
-    }
-
-    @Override
     public void addPlaylistItem_impl(int index, MediaItem2 item) {
         if (index < 0) {
             throw new IllegalArgumentException("index shouldn't be negative");
@@ -703,26 +714,32 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public int getPlayerState_impl() {
-        // TODO(jaewan): Implement
-        return 0;
+        synchronized (mLock) {
+            return mPlayerState;
+        }
     }
 
     @Override
     public long getPosition_impl() {
-        // TODO(jaewan): Implement
-        return 0;
+        synchronized (mLock) {
+            long timeDiff = System.currentTimeMillis() - mPositionEventTimeMs;
+            long expectedPosition = mPositionMs + (long) (mPlaybackSpeed * timeDiff);
+            return Math.max(0, expectedPosition);
+        }
     }
 
     @Override
     public float getPlaybackSpeed_impl() {
-        // TODO(jaewan): Implement
-        return 0;
+        synchronized (mLock) {
+            return mPlaybackSpeed;
+        }
     }
 
     @Override
     public long getBufferedPosition_impl() {
-        // TODO(jaewan): Implement
-        return 0;
+        synchronized (mLock) {
+            return mBufferedPositionMs;
+        }
     }
 
     @Override
@@ -731,15 +748,52 @@ public class MediaController2Impl implements MediaController2Provider {
         return null;
     }
 
-    void pushPlaybackStateChanges(final PlaybackState2 state) {
+    void pushPlayerStateChanges(final int state) {
         synchronized (mLock) {
-            mPlaybackState = state;
+            mPlayerState = state;
         }
         mCallbackExecutor.execute(() -> {
             if (!mInstance.isConnected()) {
                 return;
             }
-            mCallback.onPlaybackStateChanged(mInstance, state);
+            mCallback.onPlayerStateChanged(mInstance, state);
+        });
+    }
+
+    void pushPositionChanges(final long eventTimeMs, final long positionMs) {
+        synchronized (mLock) {
+            mPositionEventTimeMs = eventTimeMs;
+            mPositionMs = positionMs;
+        }
+        mCallbackExecutor.execute(() -> {
+            if (!mInstance.isConnected()) {
+                return;
+            }
+            mCallback.onPositionChanged(mInstance, eventTimeMs, positionMs);
+        });
+    }
+
+    void pushPlaybackSpeedChanges(final float speed) {
+        synchronized (mLock) {
+            mPlaybackSpeed = speed;
+        }
+        mCallbackExecutor.execute(() -> {
+            if (!mInstance.isConnected()) {
+                return;
+            }
+            mCallback.onPlaybackSpeedChanged(mInstance, speed);
+        });
+    }
+
+    void pushBufferedPositionChanges(final long bufferedPositionMs) {
+        synchronized (mLock) {
+            mBufferedPositionMs = bufferedPositionMs;
+        }
+        mCallbackExecutor.execute(() -> {
+            if (!mInstance.isConnected()) {
+                return;
+            }
+            mCallback.onBufferedPositionChanged(mInstance, bufferedPositionMs);
         });
     }
 
@@ -796,7 +850,13 @@ public class MediaController2Impl implements MediaController2Provider {
 
     // Should be used without a lock to prevent potential deadlock.
     void onConnectedNotLocked(IMediaSession2 sessionBinder,
-            final CommandGroup allowedCommands, final PlaybackState2 state, final PlaybackInfo info,
+            final CommandGroup allowedCommands,
+            final int playerState,
+            final long positionEventTimeMs,
+            final long positionMs,
+            final float playbackSpeed,
+            final long bufferedPositionMs,
+            final PlaybackInfo info,
             final PlaylistParams params, final List<MediaItem2> playlist,
             final PendingIntent sessionActivity) {
         if (DEBUG) {
@@ -821,7 +881,11 @@ public class MediaController2Impl implements MediaController2Provider {
                     return;
                 }
                 mAllowedCommands = allowedCommands;
-                mPlaybackState = state;
+                mPlayerState = playerState;
+                mPositionEventTimeMs = positionEventTimeMs;
+                mPositionMs = positionMs;
+                mPlaybackSpeed = playbackSpeed;
+                mBufferedPositionMs = bufferedPositionMs;
                 mPlaybackInfo = info;
                 mPlaylistParams = params;
                 mPlaylist = playlist;
