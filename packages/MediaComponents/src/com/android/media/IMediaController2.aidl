@@ -23,14 +23,14 @@ import android.os.ResultReceiver;
 import com.android.media.IMediaSession2;
 
 /**
- * Interface from MediaSession2 to MediaSession2Record.
+ * Interface from MediaSession2 to MediaController2.
  * <p>
  * Keep this interface oneway. Otherwise a malicious app may implement fake version of this,
  * and holds calls from session to make session owner(s) frozen.
  */
 // TODO(jaewan): (Post P) Handle when the playlist becomes too huge.
 //               Note that ParcelledSliceList isn't a good idea for the purpose. (see: b/37493677)
-oneway interface IMediaSession2Callback {
+oneway interface IMediaController2 {
     void onPlaybackStateChanged(in Bundle state);
     void onPlaylistChanged(in List<Bundle> playlist, in Bundle metadata);
     void onPlaylistMetadataChanged(in Bundle metadata);
