@@ -60,6 +60,7 @@ oneway interface IMediaSession2 {
     void setRating(IMediaSession2Callback caller, String mediaId, in Bundle rating);
 
     void setPlaylist(IMediaSession2Callback caller, in List<Bundle> playlist, in Bundle metadata);
+    void updatePlaylistMetadata(IMediaSession2Callback caller, in Bundle metadata);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     // library service specific

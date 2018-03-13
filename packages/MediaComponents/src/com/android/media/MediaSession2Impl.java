@@ -510,6 +510,16 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
+    public void updatePlaylistMetadata_impl(MediaMetadata2 metadata) {
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            agent.updatePlaylistMetadata(metadata);
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
+    }
+
+    @Override
     public void addPlaylistItem_impl(int index, MediaItem2 item) {
         if (index < 0) {
             throw new IllegalArgumentException("index shouldn't be negative");
@@ -552,6 +562,17 @@ public class MediaSession2Impl implements MediaSession2Provider {
         final MediaPlaylistAgent agent = mPlaylistAgent;
         if (agent != null) {
             return agent.getPlaylist();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
+        return null;
+    }
+
+    @Override
+    public MediaMetadata2 getPlaylistMetadata_impl() {
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            return agent.getPlaylistMetadata();
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
@@ -723,6 +744,16 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mSessionStub.notifyPlaylistChangedNotLocked(list, metadata);
     }
 
+    private void notifyPlaylistMetadataChangedOnExecutor(MediaPlaylistAgent playlistAgent,
+            MediaMetadata2 metadata) {
+        if (playlistAgent != mPlaylistAgent) {
+            // Ignore calls from the old agent. Ignore.
+            return;
+        }
+        mCallback.onPlaylistMetadataChanged(mInstance, playlistAgent, metadata);
+        mSessionStub.notifyPlaylistMetadataChangedNotLocked(metadata);
+    }
+
     private void notifyPlaybackStateChangedNotLocked(final PlaybackState2 state) {
         ArrayMap<PlayerEventCallback, Executor> callbacks = new ArrayMap<>();
         synchronized (mLock) {
@@ -848,8 +879,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
         @Override
         public void onPlaylistMetadataChanged(MediaPlaylistAgent playlistAgent,
                 MediaMetadata2 metadata) {
-            super.onPlaylistMetadataChanged(playlistAgent, metadata);
-            // TODO(jaewan): Handle this (b/74174649)
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            session.notifyPlaylistMetadataChangedOnExecutor(playlistAgent, metadata);
         }
 
         @Override
