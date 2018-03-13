@@ -335,13 +335,48 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
+    public void skipToPlaylistItem_impl(MediaItem2 item) {
+        if (item == null) {
+            throw new IllegalArgumentException("item shouldn't be null");
+        }
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.skipToPlaylistItem(mControllerStub, item.toBundle());
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
+    }
+
+    @Override
     public void skipToPreviousItem_impl() {
-        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM);
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.skipToPreviousItem(mControllerStub);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     @Override
     public void skipToNextItem_impl() {
-        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM);
+        final IMediaSession2 binder = mSessionBinder;
+        if (binder != null) {
+            try {
+                binder.skipToNextItem(mControllerStub);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
     }
 
     private void sendTransportControlCommand(int commandCode) {
@@ -361,9 +396,6 @@ public class MediaController2Impl implements MediaController2Provider {
         }
     }
 
-    //////////////////////////////////////////////////////////////////////////////////////
-    // TODO(jaewan): Implement follows
-    //////////////////////////////////////////////////////////////////////////////////////
     @Override
     public PendingIntent getSessionActivity_impl() {
         return mSessionActivity;
@@ -614,21 +646,6 @@ public class MediaController2Impl implements MediaController2Provider {
         Bundle args = new Bundle();
         args.putLong(MediaSession2Stub.ARGUMENT_KEY_POSITION, pos);
         sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO, args);
-    }
-
-    @Override
-    public void skipToPlaylistItem_impl(MediaItem2 item) {
-        if (item == null) {
-            throw new IllegalArgumentException("item shouldn't be null");
-        }
-
-        // TODO(jaewan): Implement this
-        /*
-        Bundle args = new Bundle();
-        args.putInt(MediaSession2Stub.ARGUMENT_KEY_ITEM_INDEX, item);
-        sendTransportControlCommand(
-                MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_TO_PLAYLIST_ITEM, args);
-        */
     }
 
     @Override
