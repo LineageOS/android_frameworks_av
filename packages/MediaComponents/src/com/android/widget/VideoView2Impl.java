@@ -138,6 +138,9 @@ public class VideoView2Impl extends BaseLayout
     // TODO: Remove mFallbackSpeed when integration with MediaPlayer2's new setPlaybackParams().
     // Refer: https://docs.google.com/document/d/1nzAfns6i2hJ3RkaUre3QMT6wsDedJ5ONLiA_OOBFFX8/edit
     private float mFallbackSpeed;  // keep the original speed before 'pause' is called.
+    private float mVolumeLevelFloat;
+    private int mVolumeLevel;
+
     private long mShowControllerIntervalMs;
 
     private MediaRouter mMediaRouter;
@@ -652,7 +655,7 @@ public class VideoView2Impl extends BaseLayout
             };
             mMediaPlayer.setMediaPlayer2EventCallback(executor, mMediaPlayer2Callback);
 
-            mCurrentBufferPercentage = 0;
+            mCurrentBufferPercentage = -1;
             mMediaPlayer.setDataSource(dsd);
             mMediaPlayer.setAudioAttributes(mAudioAttributes);
             // we don't set the target state here either, but preserve the
@@ -754,8 +757,12 @@ public class VideoView2Impl extends BaseLayout
             && mCurrentState != STATE_PREPARING) {
             // TODO: this should be replaced with MediaPlayer2.getBufferedPosition() once it is
             // implemented.
-            mStateBuilder.setBufferedPosition(
-                    (long) (mCurrentBufferPercentage / 100.0) * mMediaPlayer.getDuration());
+            if (mCurrentBufferPercentage == -1) {
+                mStateBuilder.setBufferedPosition(-1);
+            } else {
+                mStateBuilder.setBufferedPosition(
+                        (long) (mCurrentBufferPercentage / 100.0 * mMediaPlayer.getDuration()));
+            }
         }
 
         // Set PlaybackState for MediaSession
@@ -1094,6 +1101,13 @@ public class VideoView2Impl extends BaseLayout
                             mInstance.setSpeed(speed);
                             mSpeed = speed;
                         }
+                        break;
+                    case MediaControlView2Impl.COMMAND_MUTE:
+                        mVolumeLevel = mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+                        mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0);
+                        break;
+                    case MediaControlView2Impl.COMMAND_UNMUTE:
+                        mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, mVolumeLevel, 0);
                         break;
                 }
             }
