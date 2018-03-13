@@ -28,11 +28,12 @@
         android:orientation="horizontal">
 
         <ImageView
-            android:id="@+id/icon"
+            android:id="@+id/check"
             android:layout_width="@dimen/MediaControlView2_settings_icon_size"
             android:layout_height="@dimen/MediaControlView2_settings_icon_size"
             android:gravity="center"
-            android:paddingLeft="2dp"/>
+            android:paddingLeft="2dp"
+            android:src="@drawable/ic_check"/>
     </LinearLayout>
 
     <RelativeLayout
@@ -42,22 +43,12 @@
         android:orientation="vertical">
 
         <TextView
-            android:id="@+id/main_text"
+            android:id="@+id/text"
             android:layout_width="wrap_content"
             android:layout_height="@dimen/MediaControlView2_text_width"
             android:paddingLeft="2dp"
             android:textColor="@color/white"
             android:textSize="@dimen/MediaControlView2_settings_main_text_size"/>
-
-        <TextView
-            android:id="@+id/sub_text"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/MediaControlView2_text_width"
-            android:layout_below="@id/main_text"
-            android:paddingLeft="2dp"
-            android:textColor="@color/white_transparent_70"
-            android:textSize="@dimen/MediaControlView2_settings_sub_text_size"/>
     </RelativeLayout>
 
 </LinearLayout>
-
