@@ -28,12 +28,12 @@ import com.android.media.IMediaSession2Callback;
  * Keep this interface oneway. Otherwise a malicious app may implement fake version of this,
  * and holds calls from session to make session owner(s) frozen.
  */
+ // TODO(jaewan): (Post P) Handle when the playlist becomes too huge.
+ //               Note that ParcelledSliceList isn't a good idea for the purpose. (see: b/37493677)
 oneway interface IMediaSession2 {
     // TODO(jaewan): add onCommand() to send private command
-    // TODO(jaewan): Due to the nature of oneway calls, APIs can be called in out of order
-    //               Add id for individual calls to address this.
 
-    // TODO(jaewan): We may consider to add another binder just for the connection
+    // TODO(jaewan): (Post P) We may consider to add another binder just for the connection
     //               not to expose other methods to the controller whose connection wasn't accepted.
     //               But this would be enough for now because it's the same as existing
     //               MediaBrowser and MediaBrowserService.
@@ -58,6 +58,12 @@ oneway interface IMediaSession2 {
     void playFromSearch(IMediaSession2Callback caller, String query, in Bundle extras);
     void playFromMediaId(IMediaSession2Callback caller, String mediaId, in Bundle extras);
     void setRating(IMediaSession2Callback caller, String mediaId, in Bundle rating);
+
+    void setPlaylist(IMediaSession2Callback caller, in List<Bundle> playlist, in Bundle metadata);
+    void updatePlaylistMetadata(IMediaSession2Callback caller, in Bundle metadata);
+    void addPlaylistItem(IMediaSession2Callback caller, int index, in Bundle mediaItem);
+    void removePlaylistItem(IMediaSession2Callback caller, in Bundle mediaItem);
+    void replacePlaylistItem(IMediaSession2Callback caller, int index, in Bundle mediaItem);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     // library service specific

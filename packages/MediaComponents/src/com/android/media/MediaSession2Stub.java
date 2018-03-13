@@ -21,6 +21,7 @@ import android.content.Context;
 import android.media.MediaController2;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2.LibraryRoot;
+import android.media.MediaMetadata2;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
@@ -318,13 +319,21 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void release(final IMediaSession2Callback caller) throws RemoteException {
+        ControllerInfo controller;
         synchronized (mLock) {
-            ControllerInfo controllerInfo = mControllers.remove(caller.asBinder());
+            controller = mControllers.remove(caller.asBinder());
             if (DEBUG) {
-                Log.d(TAG, "releasing " + controllerInfo);
+                Log.d(TAG, "releasing " + controller);
             }
-            mSubscriptions.remove(controllerInfo);
+            mSubscriptions.remove(controller);
         }
+        final MediaSession2Impl session = getSession();
+        if (session == null || controller == null) {
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            session.getCallback().onDisconnected(session.getInstance(), controller);
+        });
     }
 
     @Override
@@ -638,25 +647,195 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void setRating(final IMediaSession2Callback caller, final String mediaId,
             final Bundle ratingBundle) {
-        final MediaSession2Impl sessionImpl = getSession();
+        final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(caller);
-        if (controller == null) {
-            if (DEBUG) {
-                Log.d(TAG, "Command from a controller that hasn't connected. Ignore");
+        if (session == null || controller == null) {
+            return;
+        }
+        if (mediaId == null) {
+            Log.w(TAG, "setRating(): Ignoring null mediaId from " + controller);
+            return;
+        }
+        if (ratingBundle == null) {
+            Log.w(TAG, "setRating(): Ignoring null ratingBundle from " + controller);
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(caller) == null) {
+                return;
             }
-            return;
-        }
-        Rating2 rating = Rating2Impl.fromBundle(sessionImpl.getContext(), ratingBundle);
-        if (rating == null) {
-            Log.w(TAG, "setRating(): Ignore null rating");
-            return;
-        }
-        sessionImpl.getCallbackExecutor().execute(() -> {
-            final MediaSession2Impl session = mSession.get();
-            if (session == null) {
+            Rating2 rating = Rating2Impl.fromBundle(session.getContext(), ratingBundle);
+            if (rating == null) {
+                if (ratingBundle == null) {
+                    Log.w(TAG, "setRating(): Ignoring null rating from " + controller);
+                    return;
+                }
                 return;
             }
             session.getCallback().onSetRating(session.getInstance(), controller, mediaId, rating);
+        });
+    }
+
+    @Override
+    public void setPlaylist(final IMediaSession2Callback caller, final List<Bundle> playlist,
+            final Bundle metadata) {
+        final MediaSession2Impl session = getSession();
+        final ControllerInfo controller = getControllerIfAble(
+                caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST);
+        if (session == null || controller == null) {
+            return;
+        }
+        if (playlist == null) {
+            Log.w(TAG, "setPlaylist(): Ignoring null playlist from " + controller);
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(
+                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST) == null) {
+                return;
+            }
+            Command command = new Command(session.getContext(),
+                    MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST);
+            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                    controller, command);
+            if (!accepted) {
+                // Don't run rejected command.
+                if (DEBUG) {
+                    Log.d(TAG, "setPlaylist() from " + controller + " was rejected");
+                }
+                return;
+            }
+            List<MediaItem2> list = new ArrayList<>();
+            for (int i = 0; i < playlist.size(); i++) {
+                MediaItem2 item = MediaItem2.fromBundle(session.getContext(), playlist.get(i));
+                if (item != null) {
+                    list.add(item);
+                }
+            }
+            session.getInstance().setPlaylist(list,
+                    MediaMetadata2.fromBundle(session.getContext(), metadata));
+        });
+    }
+
+    @Override
+    public void updatePlaylistMetadata(final IMediaSession2Callback caller, final Bundle metadata) {
+        final MediaSession2Impl session = getSession();
+        final ControllerInfo controller = getControllerIfAble(
+                caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA);
+        if (session == null || controller == null) {
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(
+                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA) == null) {
+                return;
+            }
+            Command command = new Command(session.getContext(),
+                    MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA);
+            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                    controller, command);
+            if (!accepted) {
+                // Don't run rejected command.
+                if (DEBUG) {
+                    Log.d(TAG, "setPlaylist() from " + controller + " was rejected");
+                }
+                return;
+            }
+            session.getInstance().updatePlaylistMetadata(
+                    MediaMetadata2.fromBundle(session.getContext(), metadata));
+        });
+    }
+
+    @Override
+    public void addPlaylistItem(IMediaSession2Callback caller, int index, Bundle mediaItem) {
+        final MediaSession2Impl session = getSession();
+        final ControllerInfo controller = getControllerIfAble(
+                caller, MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM);
+        if (session == null || controller == null) {
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(
+                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM) == null) {
+                return;
+            }
+            Command command = new Command(session.getContext(),
+                    MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM);
+            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                    controller, command);
+            if (!accepted) {
+                // Don't run rejected command.
+                if (DEBUG) {
+                    Log.d(TAG, "addPlaylistItem() from " + controller + " was rejected");
+                }
+                return;
+            }
+            // Resets the UUID from the incoming media id, so controller may reuse a media item
+            // multiple times for addPlaylistItem.
+            session.getInstance().addPlaylistItem(index,
+                    MediaItem2Impl.fromBundle(session.getContext(), mediaItem, null));
+        });
+    }
+
+    @Override
+    public void removePlaylistItem(IMediaSession2Callback caller, Bundle mediaItem) {
+        final MediaSession2Impl session = getSession();
+        final ControllerInfo controller = getControllerIfAble(
+                caller, MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM);
+        if (session == null || controller == null) {
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(
+                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM) == null) {
+                return;
+            }
+            Command command = new Command(session.getContext(),
+                    MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM);
+            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                    controller, command);
+            if (!accepted) {
+                // Don't run rejected command.
+                if (DEBUG) {
+                    Log.d(TAG, "removePlaylistItem() from " + controller + " was rejected");
+                }
+                return;
+            }
+            MediaItem2 item = MediaItem2.fromBundle(session.getContext(), mediaItem);
+            List<MediaItem2> list = session.getInstance().getPlaylist();
+            // Trick to use the same reference for calls from the controller.
+            session.getInstance().removePlaylistItem(list.get(list.indexOf(item)));
+        });
+    }
+
+    @Override
+    public void replacePlaylistItem(IMediaSession2Callback caller, int index, Bundle mediaItem) {
+        final MediaSession2Impl session = getSession();
+        final ControllerInfo controller = getControllerIfAble(
+                caller, MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM);
+        if (session == null || controller == null) {
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(
+                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM) == null) {
+                return;
+            }
+            Command command = new Command(session.getContext(),
+                    MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM);
+            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                    controller, command);
+            if (!accepted) {
+                // Don't run rejected command.
+                if (DEBUG) {
+                    Log.d(TAG, "replacePlaylistItem() from " + controller + " was rejected");
+                }
+                return;
+            }
+            // Resets the UUID from the incoming media id, so controller may reuse a media item
+            // multiple times for replacePlaylistItem.
+            session.getInstance().replacePlaylistItem(index,
+                    MediaItem2.fromBundle(session.getContext(), mediaItem));
         });
     }
 
@@ -940,23 +1119,57 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         }
     }
 
-    public void notifyPlaylistChanged(List<MediaItem2> playlist) {
-        final List<Bundle> bundleList = new ArrayList<>();
-        for (int i = 0; i < playlist.size(); i++) {
-            if (playlist.get(i) != null) {
-                Bundle bundle = playlist.get(i).toBundle();
-                if (bundle != null) {
-                    bundleList.add(bundle);
+    public void notifyPlaylistChangedNotLocked(List<MediaItem2> playlist, MediaMetadata2 metadata) {
+        final List<Bundle> bundleList;
+        if (playlist != null) {
+            bundleList = new ArrayList<>();
+            for (int i = 0; i < playlist.size(); i++) {
+                if (playlist.get(i) != null) {
+                    Bundle bundle = playlist.get(i).toBundle();
+                    if (bundle != null) {
+                        bundleList.add(bundle);
+                    }
                 }
             }
+        } else {
+            bundleList = null;
         }
+        final Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
             final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(
                     list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST);
             if (controllerBinder != null) {
                 try {
-                    controllerBinder.onPlaylistChanged(bundleList);
+                    controllerBinder.onPlaylistChanged(bundleList, metadataBundle);
+                } catch (RemoteException e) {
+                    Log.w(TAG, "Controller is gone", e);
+                    // TODO(jaewan): What to do when the controller is gone?
+                }
+            } else {
+                final IMediaSession2Callback binder = getControllerBinderIfAble(
+                        list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA);
+                if (binder != null) {
+                    try {
+                        binder.onPlaylistMetadataChanged(metadataBundle);
+                    } catch (RemoteException e) {
+                        Log.w(TAG, "Controller is gone", e);
+                        // TODO(jaewan): What to do when the controller is gone?
+                    }
+                }
+            }
+        }
+    }
+
+    public void notifyPlaylistMetadataChangedNotLocked(MediaMetadata2 metadata) {
+        final Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
+        final List<ControllerInfo> list = getControllers();
+        for (int i = 0; i < list.size(); i++) {
+            final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(
+                    list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA);
+            if (controllerBinder != null) {
+                try {
+                    controllerBinder.onPlaylistMetadataChanged(metadataBundle);
                 } catch (RemoteException e) {
                     Log.w(TAG, "Controller is gone", e);
                     // TODO(jaewan): What to do when the controller is gone?

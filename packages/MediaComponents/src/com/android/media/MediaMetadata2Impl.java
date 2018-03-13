@@ -228,7 +228,7 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
     }
 
     public static MediaMetadata2 fromBundle(Context context, Bundle bundle) {
-        return new MediaMetadata2Impl(context, bundle).getInstance();
+        return (bundle == null) ? null : new MediaMetadata2Impl(context, bundle).getInstance();
     }
 
     public static final class BuilderImpl implements MediaMetadata2Provider.BuilderProvider {
