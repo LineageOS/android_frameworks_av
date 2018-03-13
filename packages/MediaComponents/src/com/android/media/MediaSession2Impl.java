@@ -496,22 +496,17 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void setPlaylist_impl(List<MediaItem2> playlist) {
-        if (playlist == null) {
-            throw new IllegalArgumentException("playlist shouldn't be null");
+    public void setPlaylist_impl(List<MediaItem2> list, MediaMetadata2 metadata) {
+        if (list == null) {
+            throw new IllegalArgumentException("list shouldn't be null");
         }
         ensureCallingThread();
-        // TODO: Uncomment or remove
-        /*
-        final MediaPlayerBase player = mPlayer;
-        if (player != null) {
-            // TODO implement and use SessionPlaylistAgent
-            //player.setPlaylist(playlist);
-            mSessionStub.notifyPlaylistChanged(playlist);
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            agent.setPlaylist(list, metadata);
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
-        */
     }
 
     @Override
@@ -554,19 +549,12 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     @Override
     public List<MediaItem2> getPlaylist_impl() {
-        // TODO: Uncomment or remove
-        /*
-        final MediaPlayerBase player = mPlayer;
-        if (player != null) {
-            // TODO(jaewan): Is it safe to be called on any thread?
-            //               Otherwise MediaSession2 should cache parameter of setPlaylist.
-            // TODO implement
-            //return player.getPlaylist();
-            return null;
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            return agent.getPlaylist();
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
-        */
         return null;
     }
 
@@ -725,6 +713,16 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }*/
     }
 
+    private void notifyPlaylistChangedOnExecutor(MediaPlaylistAgent playlistAgent,
+            List<MediaItem2> list, MediaMetadata2 metadata) {
+        if (playlistAgent != mPlaylistAgent) {
+            // Ignore calls from the old agent. Ignore.
+            return;
+        }
+        mCallback.onPlaylistChanged(mInstance, playlistAgent, list, metadata);
+        mSessionStub.notifyPlaylistChangedNotLocked(list, metadata);
+    }
+
     private void notifyPlaybackStateChangedNotLocked(final PlaybackState2 state) {
         ArrayMap<PlayerEventCallback, Executor> callbacks = new ArrayMap<>();
         synchronized (mLock) {
@@ -766,6 +764,10 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     MediaPlayerBase getPlayer() {
         return mPlayer;
+    }
+
+    MediaPlaylistAgent getPlaylistAgent() {
+        return mPlaylistAgent;
     }
 
     Executor getCallbackExecutor() {
@@ -836,8 +838,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
         @Override
         public void onPlaylistChanged(MediaPlaylistAgent playlistAgent, List<MediaItem2> list,
                 MediaMetadata2 metadata) {
-            super.onPlaylistChanged(playlistAgent, list, metadata);
-            // TODO(jaewan): Handle this (b/74326040)
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            session.notifyPlaylistChangedOnExecutor(playlistAgent, list, metadata);
         }
 
         @Override
