@@ -86,7 +86,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             mControllers.clear();
         }
         for (int i = 0; i < list.size(); i++) {
-            IMediaSession2Callback controllerBinder =
+            IMediaController2 controllerBinder =
                     ((ControllerInfoImpl) list.get(i).getProvider()).getControllerBinder();
             try {
                 // Should be used without a lock hold to prevent potential deadlock.
@@ -114,7 +114,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     // Get controller if the command from caller to session is able to be handled.
-    private ControllerInfo getControllerIfAble(IMediaSession2Callback caller) {
+    private ControllerInfo getControllerIfAble(IMediaController2 caller) {
         synchronized (mLock) {
             final ControllerInfo controllerInfo = mControllers.get(caller.asBinder());
             if (controllerInfo == null && DEBUG) {
@@ -125,7 +125,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     // Get controller if the command from caller to session is able to be handled.
-    private ControllerInfo getControllerIfAble(IMediaSession2Callback caller, int commandCode) {
+    private ControllerInfo getControllerIfAble(IMediaController2 caller, int commandCode) {
         synchronized (mLock) {
             final ControllerInfo controllerInfo = getControllerIfAble(caller);
             if (controllerInfo == null) {
@@ -148,7 +148,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     // Get controller if the command from caller to session is able to be handled.
-    private ControllerInfo getControllerIfAble(IMediaSession2Callback caller, Command command) {
+    private ControllerInfo getControllerIfAble(IMediaController2 caller, Command command) {
         synchronized (mLock) {
             final ControllerInfo controllerInfo = getControllerIfAble(caller);
             if (controllerInfo == null) {
@@ -171,7 +171,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     // Return binder if the session is able to send a command to the controller.
-    private IMediaSession2Callback getControllerBinderIfAble(ControllerInfo controller) {
+    private IMediaController2 getControllerBinderIfAble(ControllerInfo controller) {
         if (getSession() == null) {
             // getSession() already logged if session is closed.
             return null;
@@ -191,7 +191,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     // Return binder if the session is able to send a command to the controller.
-    private IMediaSession2Callback getControllerBinderIfAble(ControllerInfo controller,
+    private IMediaController2 getControllerBinderIfAble(ControllerInfo controller,
             int commandCode) {
         synchronized (mLock) {
             CommandGroup allowedCommands = mAllowedCommandGroupMap.get(controller);
@@ -213,7 +213,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     // AIDL methods for session overrides
     //////////////////////////////////////////////////////////////////////////////////////////////
     @Override
-    public void connect(final IMediaSession2Callback caller, final String callingPackage)
+    public void connect(final IMediaController2 caller, final String callingPackage)
             throws RuntimeException {
         final MediaSession2Impl session = getSession();
         if (session == null) {
@@ -257,7 +257,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 // It's needed because we cannot call synchronous calls between session/controller.
                 // Note: We're doing this after the onConnectionChanged(), but there's no guarantee
                 //       that events here are notified after the onConnected() because
-                //       IMediaSession2Callback is oneway (i.e. async call) and CallbackStub will
+                //       IMediaController2 is oneway (i.e. async call) and Stub will
                 //       use thread poll for incoming calls.
                 // TODO(jaewan): Should we protect getting playback state?
                 final PlaybackState2 state = session.getInstance().getPlaybackState();
@@ -318,7 +318,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void release(final IMediaSession2Callback caller) throws RemoteException {
+    public void release(final IMediaController2 caller) throws RemoteException {
         ControllerInfo controller;
         synchronized (mLock) {
             controller = mControllers.remove(caller.asBinder());
@@ -337,7 +337,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void setVolumeTo(final IMediaSession2Callback caller, final int value, final int flags)
+    public void setVolumeTo(final IMediaController2 caller, final int value, final int flags)
             throws RuntimeException {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
@@ -373,7 +373,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void adjustVolume(IMediaSession2Callback caller, int direction, int flags)
+    public void adjustVolume(IMediaController2 caller, int direction, int flags)
             throws RuntimeException {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
@@ -409,7 +409,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void sendTransportControlCommand(IMediaSession2Callback caller,
+    public void sendTransportControlCommand(IMediaController2 caller,
             int commandCode, Bundle args) throws RuntimeException {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(caller, commandCode);
@@ -483,7 +483,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void sendCustomCommand(final IMediaSession2Callback caller, final Bundle commandBundle,
+    public void sendCustomCommand(final IMediaController2 caller, final Bundle commandBundle,
             final Bundle args, final ResultReceiver receiver) {
         final MediaSession2Impl session = getSession();
         if (session == null) {
@@ -509,7 +509,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void prepareFromUri(final IMediaSession2Callback caller, final Uri uri,
+    public void prepareFromUri(final IMediaController2 caller, final Uri uri,
             final Bundle extras) {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
@@ -532,7 +532,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void prepareFromSearch(final IMediaSession2Callback caller, final String query,
+    public void prepareFromSearch(final IMediaController2 caller, final String query,
             final Bundle extras) {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
@@ -555,7 +555,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void prepareFromMediaId(final IMediaSession2Callback caller, final String mediaId,
+    public void prepareFromMediaId(final IMediaController2 caller, final String mediaId,
             final Bundle extras) {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
@@ -578,7 +578,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void playFromUri(final IMediaSession2Callback caller, final Uri uri,
+    public void playFromUri(final IMediaController2 caller, final Uri uri,
             final Bundle extras) {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
@@ -600,7 +600,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void playFromSearch(final IMediaSession2Callback caller, final String query,
+    public void playFromSearch(final IMediaController2 caller, final String query,
             final Bundle extras) {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
@@ -623,7 +623,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void playFromMediaId(final IMediaSession2Callback caller, final String mediaId,
+    public void playFromMediaId(final IMediaController2 caller, final String mediaId,
             final Bundle extras) {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
@@ -645,7 +645,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void setRating(final IMediaSession2Callback caller, final String mediaId,
+    public void setRating(final IMediaController2 caller, final String mediaId,
             final Bundle ratingBundle) {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(caller);
@@ -677,7 +677,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void setPlaylist(final IMediaSession2Callback caller, final List<Bundle> playlist,
+    public void setPlaylist(final IMediaController2 caller, final List<Bundle> playlist,
             final Bundle metadata) {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
@@ -718,7 +718,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void updatePlaylistMetadata(final IMediaSession2Callback caller, final Bundle metadata) {
+    public void updatePlaylistMetadata(final IMediaController2 caller, final Bundle metadata) {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
                 caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA);
@@ -747,7 +747,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void addPlaylistItem(IMediaSession2Callback caller, int index, Bundle mediaItem) {
+    public void addPlaylistItem(IMediaController2 caller, int index, Bundle mediaItem) {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
                 caller, MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM);
@@ -778,7 +778,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void removePlaylistItem(IMediaSession2Callback caller, Bundle mediaItem) {
+    public void removePlaylistItem(IMediaController2 caller, Bundle mediaItem) {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
                 caller, MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM);
@@ -809,7 +809,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void replacePlaylistItem(IMediaSession2Callback caller, int index, Bundle mediaItem) {
+    public void replacePlaylistItem(IMediaController2 caller, int index, Bundle mediaItem) {
         final MediaSession2Impl session = getSession();
         final ControllerInfo controller = getControllerIfAble(
                 caller, MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM);
@@ -844,7 +844,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     @Override
-    public void getLibraryRoot(final IMediaSession2Callback caller, final Bundle rootHints)
+    public void getLibraryRoot(final IMediaController2 caller, final Bundle rootHints)
             throws RuntimeException {
         final MediaLibrarySessionImpl session = getLibrarySession();
         final ControllerInfo controller = getControllerIfAble(
@@ -870,7 +870,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void getItem(final IMediaSession2Callback caller, final String mediaId)
+    public void getItem(final IMediaController2 caller, final String mediaId)
             throws RuntimeException {
         if (mediaId == null) {
             if (DEBUG) {
@@ -900,7 +900,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void getChildren(final IMediaSession2Callback caller, final String parentId,
+    public void getChildren(final IMediaController2 caller, final String parentId,
             final int page, final int pageSize, final Bundle extras) throws RuntimeException {
         if (parentId == null) {
             if (DEBUG) {
@@ -948,7 +948,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void search(IMediaSession2Callback caller, String query, Bundle extras) {
+    public void search(IMediaController2 caller, String query, Bundle extras) {
         final MediaLibrarySessionImpl session = getLibrarySession();
         final ControllerInfo controller = getControllerIfAble(
                 caller, MediaSession2.COMMAND_CODE_BROWSER);
@@ -968,7 +968,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void getSearchResult(final IMediaSession2Callback caller, final String query,
+    public void getSearchResult(final IMediaController2 caller, final String query,
             final int page, final int pageSize, final Bundle extras) {
         final MediaLibrarySessionImpl session = getLibrarySession();
         final ControllerInfo controller = getControllerIfAble(
@@ -1014,7 +1014,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void subscribe(final IMediaSession2Callback caller, final String parentId,
+    public void subscribe(final IMediaController2 caller, final String parentId,
             final Bundle option) {
         final MediaLibrarySessionImpl session = getLibrarySession();
         final ControllerInfo controller = getControllerIfAble(
@@ -1044,7 +1044,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     @Override
-    public void unsubscribe(final IMediaSession2Callback caller, final String parentId) {
+    public void unsubscribe(final IMediaController2 caller, final String parentId) {
         final MediaLibrarySessionImpl session = getLibrarySession();
         final ControllerInfo controller = getControllerIfAble(
                 caller, MediaSession2.COMMAND_CODE_BROWSER);
@@ -1085,7 +1085,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     public void notifyPlaybackStateChangedNotLocked(PlaybackState2 state) {
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
-            final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(list.get(i));
+            final IMediaController2 controllerBinder = getControllerBinderIfAble(list.get(i));
             if (controllerBinder == null) {
                 return;
             }
@@ -1100,7 +1100,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     public void notifyCustomLayoutNotLocked(ControllerInfo controller, List<CommandButton> layout) {
-        final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(controller);
+        final IMediaController2 controllerBinder = getControllerBinderIfAble(controller);
         if (controllerBinder == null) {
             return;
         }
@@ -1137,7 +1137,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         final Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
-            final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(
+            final IMediaController2 controllerBinder = getControllerBinderIfAble(
                     list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST);
             if (controllerBinder != null) {
                 try {
@@ -1147,7 +1147,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     // TODO(jaewan): What to do when the controller is gone?
                 }
             } else {
-                final IMediaSession2Callback binder = getControllerBinderIfAble(
+                final IMediaController2 binder = getControllerBinderIfAble(
                         list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA);
                 if (binder != null) {
                     try {
@@ -1165,7 +1165,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         final Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
-            final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(
+            final IMediaController2 controllerBinder = getControllerBinderIfAble(
                     list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA);
             if (controllerBinder != null) {
                 try {
@@ -1181,7 +1181,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     public void notifyPlaylistParamsChanged(MediaSession2.PlaylistParams params) {
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
-            final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(list.get(i));
+            final IMediaController2 controllerBinder = getControllerBinderIfAble(list.get(i));
             if (controllerBinder == null) {
                 return;
             }
@@ -1197,7 +1197,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     public void notifyPlaybackInfoChanged(MediaController2.PlaybackInfo playbackInfo) {
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
-            final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(list.get(i));
+            final IMediaController2 controllerBinder = getControllerBinderIfAble(list.get(i));
             if (controllerBinder == null) {
                 return;
             }
@@ -1215,7 +1215,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         synchronized (mLock) {
             mAllowedCommandGroupMap.put(controller, commands);
         }
-        final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(controller);
+        final IMediaController2 controllerBinder = getControllerBinderIfAble(controller);
         if (controllerBinder == null) {
             return;
         }
@@ -1251,7 +1251,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     private void sendCustomCommandInternal(ControllerInfo controller, Command command, Bundle args,
             ResultReceiver receiver) {
-        final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(controller);
+        final IMediaController2 controllerBinder = getControllerBinderIfAble(controller);
         if (controllerBinder == null) {
             return;
         }
@@ -1270,7 +1270,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     public void notifySearchResultChanged(ControllerInfo controller, String query, int itemCount,
             Bundle extras) {
-        final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(controller);
+        final IMediaController2 controllerBinder = getControllerBinderIfAble(controller);
         if (controllerBinder == null) {
             return;
         }
@@ -1304,7 +1304,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 return;
             }
         }
-        final IMediaSession2Callback controllerBinder = getControllerBinderIfAble(controller);
+        final IMediaController2 controllerBinder = getControllerBinderIfAble(controller);
         if (controller == null) {
             return;
         }

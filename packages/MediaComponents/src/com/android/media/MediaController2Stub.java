@@ -38,13 +38,13 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
-    private static final String TAG = "MS2CallbackStub";
+public class MediaController2Stub extends IMediaController2.Stub {
+    private static final String TAG = "MediaController2Stub";
     private static final boolean DEBUG = true; // TODO(jaewan): Change
 
     private final WeakReference<MediaController2Impl> mController;
 
-    MediaSession2CallbackStub(MediaController2Impl controller) {
+    MediaController2Stub(MediaController2Impl controller) {
         mController = new WeakReference<>(controller);
     }
 

@@ -62,7 +62,7 @@ public class MediaController2Impl implements MediaController2Provider {
     private final Context mContext;
     private final Object mLock = new Object();
 
-    private final MediaSession2CallbackStub mSessionCallbackStub;
+    private final MediaController2Stub mControllerStub;
     private final SessionToken2 mToken;
     private final ControllerCallback mCallback;
     private final Executor mCallbackExecutor;
@@ -113,7 +113,7 @@ public class MediaController2Impl implements MediaController2Provider {
             throw new IllegalArgumentException("executor shouldn't be null");
         }
         mContext = context;
-        mSessionCallbackStub = new MediaSession2CallbackStub(this);
+        mControllerStub = new MediaController2Stub(this);
         mToken = token;
         mCallback = callback;
         mCallbackExecutor = executor;
@@ -194,7 +194,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     private void connectToSession(IMediaSession2 sessionBinder) {
         try {
-            sessionBinder.connect(mSessionCallbackStub, mContext.getPackageName());
+            sessionBinder.connect(mControllerStub, mContext.getPackageName());
         } catch (RemoteException e) {
             Log.w(TAG, "Failed to call connection request. Framework will retry"
                     + " automatically");
@@ -219,12 +219,12 @@ public class MediaController2Impl implements MediaController2Provider {
             }
             binder = mSessionBinder;
             mSessionBinder = null;
-            mSessionCallbackStub.destroy();
+            mControllerStub.destroy();
         }
         if (binder != null) {
             try {
                 binder.asBinder().unlinkToDeath(mDeathRecipient, 0);
-                binder.release(mSessionCallbackStub);
+                binder.release(mControllerStub);
             } catch (RemoteException e) {
                 // No-op.
             }
@@ -238,8 +238,8 @@ public class MediaController2Impl implements MediaController2Provider {
         return mSessionBinder;
     }
 
-    MediaSession2CallbackStub getControllerStub() {
-        return mSessionCallbackStub;
+    MediaController2Stub getControllerStub() {
+        return mControllerStub;
     }
 
     Executor getCallbackExecutor() {
@@ -334,7 +334,7 @@ public class MediaController2Impl implements MediaController2Provider {
         final IMediaSession2 binder = mSessionBinder;
         if (binder != null) {
             try {
-                binder.sendTransportControlCommand(mSessionCallbackStub, commandCode, args);
+                binder.sendTransportControlCommand(mControllerStub, commandCode, args);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -357,7 +357,7 @@ public class MediaController2Impl implements MediaController2Provider {
         final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYBACK_SET_VOLUME);
         if (binder != null) {
             try {
-                binder.setVolumeTo(mSessionCallbackStub, value, flags);
+                binder.setVolumeTo(mControllerStub, value, flags);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -372,7 +372,7 @@ public class MediaController2Impl implements MediaController2Provider {
         final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYBACK_SET_VOLUME);
         if (binder != null) {
             try {
-                binder.adjustVolume(mSessionCallbackStub, direction, flags);
+                binder.adjustVolume(mControllerStub, direction, flags);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -389,7 +389,7 @@ public class MediaController2Impl implements MediaController2Provider {
         }
         if (binder != null) {
             try {
-                binder.prepareFromUri(mSessionCallbackStub, uri, extras);
+                binder.prepareFromUri(mControllerStub, uri, extras);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -406,7 +406,7 @@ public class MediaController2Impl implements MediaController2Provider {
         }
         if (binder != null) {
             try {
-                binder.prepareFromSearch(mSessionCallbackStub, query, extras);
+                binder.prepareFromSearch(mControllerStub, query, extras);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -423,7 +423,7 @@ public class MediaController2Impl implements MediaController2Provider {
         }
         if (binder != null) {
             try {
-                binder.prepareFromMediaId(mSessionCallbackStub, mediaId, extras);
+                binder.prepareFromMediaId(mControllerStub, mediaId, extras);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -440,7 +440,7 @@ public class MediaController2Impl implements MediaController2Provider {
         }
         if (binder != null) {
             try {
-                binder.playFromUri(mSessionCallbackStub, uri, extras);
+                binder.playFromUri(mControllerStub, uri, extras);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -457,7 +457,7 @@ public class MediaController2Impl implements MediaController2Provider {
         }
         if (binder != null) {
             try {
-                binder.playFromSearch(mSessionCallbackStub, query, extras);
+                binder.playFromSearch(mControllerStub, query, extras);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -474,7 +474,7 @@ public class MediaController2Impl implements MediaController2Provider {
         }
         if (binder != null) {
             try {
-                binder.playFromMediaId(mSessionCallbackStub, mediaId, extras);
+                binder.playFromMediaId(mControllerStub, mediaId, extras);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -495,7 +495,7 @@ public class MediaController2Impl implements MediaController2Provider {
         final IMediaSession2 binder = mSessionBinder;
         if (binder != null) {
             try {
-                binder.setRating(mSessionCallbackStub, mediaId, rating.toBundle());
+                binder.setRating(mControllerStub, mediaId, rating.toBundle());
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -512,7 +512,7 @@ public class MediaController2Impl implements MediaController2Provider {
         final IMediaSession2 binder = getSessionBinderIfAble(command);
         if (binder != null) {
             try {
-                binder.sendCustomCommand(mSessionCallbackStub, command.toBundle(), args, cb);
+                binder.sendCustomCommand(mControllerStub, command.toBundle(), args, cb);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -541,7 +541,7 @@ public class MediaController2Impl implements MediaController2Provider {
             }
             Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
             try {
-                binder.setPlaylist(mSessionCallbackStub, bundleList, metadataBundle);
+                binder.setPlaylist(mControllerStub, bundleList, metadataBundle);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -564,7 +564,7 @@ public class MediaController2Impl implements MediaController2Provider {
         if (binder != null) {
             Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
             try {
-                binder.updatePlaylistMetadata(mSessionCallbackStub, metadataBundle);
+                binder.updatePlaylistMetadata(mControllerStub, metadataBundle);
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -631,7 +631,7 @@ public class MediaController2Impl implements MediaController2Provider {
         final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYLIST_ADD_ITEM);
         if (binder != null) {
             try {
-                binder.addPlaylistItem(mSessionCallbackStub, index, item.toBundle());
+                binder.addPlaylistItem(mControllerStub, index, item.toBundle());
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -648,7 +648,7 @@ public class MediaController2Impl implements MediaController2Provider {
         final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYLIST_REMOVE_ITEM);
         if (binder != null) {
             try {
-                binder.removePlaylistItem(mSessionCallbackStub, item.toBundle());
+                binder.removePlaylistItem(mControllerStub, item.toBundle());
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }
@@ -668,7 +668,7 @@ public class MediaController2Impl implements MediaController2Provider {
         final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYLIST_REPLACE_ITEM);
         if (binder != null) {
             try {
-                binder.replacePlaylistItem(mSessionCallbackStub, index, item.toBundle());
+                binder.replacePlaylistItem(mControllerStub, index, item.toBundle());
             } catch (RemoteException e) {
                 Log.w(TAG, "Cannot connect to the service or the session is gone", e);
             }

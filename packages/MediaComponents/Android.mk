@@ -19,7 +19,7 @@ LOCAL_PATH := $(call my-dir)
 ifneq ($(TARGET_BUILD_PDK),true)
 # Build MediaComponents only if this is not a PDK build.  MediaComponents won't
 # build in PDK builds because frameworks/base/core/java is not available but
-# IMediaSession2.aidl and IMediaSession2Callback.aidl are using classes from
+# IMediaSession2.aidl and IMediaController2.aidl are using classes from
 # frameworks/base/core/java.
 
 include $(CLEAR_VARS)
