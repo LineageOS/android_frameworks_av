@@ -31,15 +31,19 @@ import com.android.media.IMediaSession2;
 // TODO(jaewan): (Post P) Handle when the playlist becomes too huge.
 //               Note that ParcelledSliceList isn't a good idea for the purpose. (see: b/37493677)
 oneway interface IMediaController2 {
-    void onPlaybackStateChanged(in Bundle state);
+    void onPlayerStateChanged(int state);
+    void onPositionChanged(long eventTimeMs, long positionMs);
+    void onPlaybackSpeedChanged(float speed);
+    void onBufferedPositionChanged(long bufferedPositionMs);
     void onPlaylistChanged(in List<Bundle> playlist, in Bundle metadata);
     void onPlaylistMetadataChanged(in Bundle metadata);
     void onPlaylistParamsChanged(in Bundle params);
     void onPlaybackInfoChanged(in Bundle playbackInfo);
 
-    void onConnected(IMediaSession2 sessionBinder, in Bundle commandGroup, in Bundle playbackState,
-            in Bundle playbackInfo, in Bundle params, in List<Bundle> playlist,
-            in PendingIntent sessionActivity);
+    void onConnected(IMediaSession2 sessionBinder, in Bundle commandGroup,
+            int playerState, long positionEventTimeMs, long positionMs, float playbackSpeed,
+            long bufferedPositionMs, in Bundle playbackInfo, in Bundle params,
+            in List<Bundle> playlist, in PendingIntent sessionActivity);
     void onDisconnected();
 
     void onCustomLayoutChanged(in List<Bundle> commandButtonlist);

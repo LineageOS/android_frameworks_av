@@ -22,13 +22,13 @@ import android.media.MediaController2;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaMetadata2;
+import android.media.MediaPlayerBase;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.PlaylistParams;
-import android.media.PlaybackState2;
 import android.media.Rating2;
 import android.media.VolumeProvider2;
 import android.net.Uri;
@@ -259,9 +259,11 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 //       that events here are notified after the onConnected() because
                 //       IMediaController2 is oneway (i.e. async call) and Stub will
                 //       use thread poll for incoming calls.
-                // TODO(jaewan): Should we protect getting playback state?
-                final PlaybackState2 state = session.getInstance().getPlaybackState();
-                final Bundle playbackStateBundle = (state != null) ? state.toBundle() : null;
+                final int playerState = session.getInstance().getPlayerState();
+                final long positionEventTimeMs = System.currentTimeMillis();
+                final long positionMs = session.getInstance().getCurrentPosition();
+                final float playbackSpeed = session.getInstance().getPlaybackSpeed();
+                final long bufferedPositionMs = session.getInstance().getBufferedPosition();
                 final Bundle playbackInfoBundle = ((MediaController2Impl.PlaybackInfoImpl)
                         session.getPlaybackInfo().getProvider()).toBundle();
                 final PlaylistParams params = session.getInstance().getPlaylistParams();
@@ -293,9 +295,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     return;
                 }
                 try {
-                    caller.onConnected(MediaSession2Stub.this,
-                            allowedCommands.toBundle(), playbackStateBundle, playbackInfoBundle,
-                            paramsBundle, playlistBundle, sessionActivity);
+                    caller.onConnected(MediaSession2Stub.this, allowedCommands.toBundle(),
+                            playerState, positionEventTimeMs, positionMs, playbackSpeed,
+                            bufferedPositionMs, playbackInfoBundle, paramsBundle, playlistBundle,
+                            sessionActivity);
                 } catch (RemoteException e) {
                     // Controller may be died prematurely.
                     // TODO(jaewan): Handle here.
@@ -1082,7 +1085,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     // Should be used without a lock to prevent potential deadlock.
-    public void notifyPlaybackStateChangedNotLocked(PlaybackState2 state) {
+    public void notifyPlayerStateChangedNotLocked(int state) {
         final List<ControllerInfo> list = getControllers();
         for (int i = 0; i < list.size(); i++) {
             final IMediaController2 controllerBinder = getControllerBinderIfAble(list.get(i));
@@ -1090,8 +1093,55 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 return;
             }
             try {
-                final Bundle bundle = state != null ? state.toBundle() : null;
-                controllerBinder.onPlaybackStateChanged(bundle);
+                controllerBinder.onPlayerStateChanged(state);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Controller is gone", e);
+                // TODO(jaewan): What to do when the controller is gone?
+            }
+        }
+    }
+
+    public void notifyPositionChangedNotLocked(long eventTimeMs, long positionMs) {
+        final List<ControllerInfo> list = getControllers();
+        for (int i = 0; i < list.size(); i++) {
+            final IMediaController2 controllerBinder = getControllerBinderIfAble(list.get(i));
+            if (controllerBinder == null) {
+                return;
+            }
+            try {
+                controllerBinder.onPositionChanged(eventTimeMs, positionMs);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Controller is gone", e);
+                // TODO(jaewan): What to do when the controller is gone?
+            }
+        }
+    }
+
+    public void notifyPlaybackSpeedChangedNotLocked(float speed) {
+        final List<ControllerInfo> list = getControllers();
+        for (int i = 0; i < list.size(); i++) {
+            final IMediaController2 controllerBinder = getControllerBinderIfAble(list.get(i));
+            if (controllerBinder == null) {
+                return;
+            }
+            try {
+                controllerBinder.onPlaybackSpeedChanged(speed);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Controller is gone", e);
+                // TODO(jaewan): What to do when the controller is gone?
+            }
+        }
+    }
+
+    public void notifyBufferedPositionChangedNotLocked(long bufferedPositionMs) {
+        final List<ControllerInfo> list = getControllers();
+        for (int i = 0; i < list.size(); i++) {
+            final IMediaController2 controllerBinder = getControllerBinderIfAble(list.get(i));
+            if (controllerBinder == null) {
+                return;
+            }
+            try {
+                controllerBinder.onBufferedPositionChanged(bufferedPositionMs);
             } catch (RemoteException e) {
                 Log.w(TAG, "Controller is gone", e);
                 // TODO(jaewan): What to do when the controller is gone?
