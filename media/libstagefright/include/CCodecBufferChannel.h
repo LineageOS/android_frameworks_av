@@ -162,6 +162,7 @@ private:
     };
 
     void feedInputBufferIfAvailable();
+    status_t queueInputBufferInternal(const sp<MediaCodecBuffer> &buffer);
 
     QueueSync mSync;
     sp<MemoryDealer> mDealer;

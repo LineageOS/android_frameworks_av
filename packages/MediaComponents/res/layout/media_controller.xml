@@ -129,10 +129,10 @@
     <SeekBar
         android:id="@+id/mediacontroller_progress"
         android:layout_width="match_parent"
-        android:layout_height="32dp"
-        android:padding="0dp"
-        android:progressTint="#FFFFFFFF"
-        android:thumbTint="#FFFFFFFF"/>
+        android:layout_height="12dp"
+        android:maxHeight="2dp"
+        android:minHeight="2dp"
+        android:padding="0dp"/>
 
     <RelativeLayout
         android:layout_width="match_parent"
@@ -199,6 +199,7 @@
             <ImageButton
                 android:id="@+id/subtitle"
                 android:scaleType="fitCenter"
+                android:visibility="gone"
                 style="@style/BottomBarButton.CC" />
             <ImageButton
                 android:id="@+id/fullscreen"
@@ -223,9 +224,6 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content" />
 
-            <ImageButton
-                android:id="@+id/aspect_ratio"
-                style="@style/BottomBarButton.AspectRatio" />
             <ImageButton
                 android:id="@+id/video_quality"
                 style="@style/BottomBarButton.VideoQuality" />

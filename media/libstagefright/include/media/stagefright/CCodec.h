@@ -36,6 +36,7 @@ namespace android {
 
 class CCodecBufferChannel;
 class InputSurfaceWrapper;
+struct MediaCodecInfo;
 
 class CCodec : public CodecBase {
 public:
@@ -74,7 +75,7 @@ private:
     void initiateStop();
     void initiateRelease(bool sendCallback = true);
 
-    void allocate(const AString &componentName);
+    void allocate(const sp<MediaCodecInfo> &codecInfo);
     void configure(const sp<AMessage> &msg);
     void start();
     void stop();

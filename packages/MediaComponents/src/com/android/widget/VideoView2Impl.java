@@ -86,6 +86,7 @@ public class VideoView2Impl extends BaseLayout
     private static final int STATE_PLAYBACK_COMPLETED = 5;
 
     private static final int INVALID_TRACK_INDEX = -1;
+    private static final float INVALID_SPEED = 0f;
 
     private AccessibilityManager mAccessibilityManager;
     private AudioManager mAudioManager;
@@ -137,6 +138,9 @@ public class VideoView2Impl extends BaseLayout
     // TODO: Remove mFallbackSpeed when integration with MediaPlayer2's new setPlaybackParams().
     // Refer: https://docs.google.com/document/d/1nzAfns6i2hJ3RkaUre3QMT6wsDedJ5ONLiA_OOBFFX8/edit
     private float mFallbackSpeed;  // keep the original speed before 'pause' is called.
+    private float mVolumeLevelFloat;
+    private int mVolumeLevel;
+
     private long mShowControllerIntervalMs;
 
     private MediaRouter mMediaRouter;
@@ -651,7 +655,7 @@ public class VideoView2Impl extends BaseLayout
             };
             mMediaPlayer.setMediaPlayer2EventCallback(executor, mMediaPlayer2Callback);
 
-            mCurrentBufferPercentage = 0;
+            mCurrentBufferPercentage = -1;
             mMediaPlayer.setDataSource(dsd);
             mMediaPlayer.setAudioAttributes(mAudioAttributes);
             // we don't set the target state here either, but preserve the
@@ -753,8 +757,12 @@ public class VideoView2Impl extends BaseLayout
             && mCurrentState != STATE_PREPARING) {
             // TODO: this should be replaced with MediaPlayer2.getBufferedPosition() once it is
             // implemented.
-            mStateBuilder.setBufferedPosition(
-                    (long) (mCurrentBufferPercentage / 100.0) * mMediaPlayer.getDuration());
+            if (mCurrentBufferPercentage == -1) {
+                mStateBuilder.setBufferedPosition(-1);
+            } else {
+                mStateBuilder.setBufferedPosition(
+                        (long) (mCurrentBufferPercentage / 100.0 * mMediaPlayer.getDuration()));
+            }
         }
 
         // Set PlaybackState for MediaSession
@@ -854,8 +862,6 @@ public class VideoView2Impl extends BaseLayout
         }
         if (select) {
             if (mSubtitleTrackIndices.size() > 0) {
-                // TODO: make this selection dynamic
-                mSelectedSubtitleTrackIndex = mSubtitleTrackIndices.get(0);
                 mMediaPlayer.selectTrack(mSelectedSubtitleTrackIndex);
                 mSubtitleView.setVisibility(View.VISIBLE);
             }
@@ -881,9 +887,17 @@ public class VideoView2Impl extends BaseLayout
                 mAudioTrackIndices.add(i);
             } else if (trackType == MediaPlayer2.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE
                     || trackType == MediaPlayer2.TrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT) {
-                  mSubtitleTrackIndices.add(i);
+                mSubtitleTrackIndices.add(i);
             }
         }
+        // Select first tracks as default
+        if (mVideoTrackIndices.size() > 0) {
+            mSelectedVideoTrackIndex = 0;
+        }
+        if (mAudioTrackIndices.size() > 0) {
+            mSelectedAudioTrackIndex = 0;
+        }
+
         Bundle data = new Bundle();
         data.putInt(MediaControlView2Impl.KEY_VIDEO_TRACK_COUNT, mVideoTrackIndices.size());
         data.putInt(MediaControlView2Impl.KEY_AUDIO_TRACK_COUNT, mAudioTrackIndices.size());
@@ -1048,10 +1062,19 @@ public class VideoView2Impl extends BaseLayout
             } else {
                 switch (command) {
                     case MediaControlView2Impl.COMMAND_SHOW_SUBTITLE:
-                        mInstance.setSubtitleEnabled(true);
+                        int subtitleIndex = args.getInt(
+                                MediaControlView2Impl.KEY_SELECTED_SUBTITLE_INDEX,
+                                INVALID_TRACK_INDEX);
+                        if (subtitleIndex != INVALID_TRACK_INDEX) {
+                            int subtitleTrackIndex = mSubtitleTrackIndices.get(subtitleIndex);
+                            if (subtitleTrackIndex != mSelectedSubtitleTrackIndex) {
+                                mSelectedSubtitleTrackIndex = subtitleTrackIndex;
+                                selectOrDeselectSubtitle(true);
+                            }
+                        }
                         break;
                     case MediaControlView2Impl.COMMAND_HIDE_SUBTITLE:
-                        mInstance.setSubtitleEnabled(false);
+                        selectOrDeselectSubtitle(false);
                         break;
                     case MediaControlView2Impl.COMMAND_SET_FULLSCREEN:
                         if (mFullScreenRequestListener != null) {
@@ -1059,6 +1082,32 @@ public class VideoView2Impl extends BaseLayout
                                     mInstance,
                                     args.getBoolean(MediaControlView2Impl.ARGUMENT_KEY_FULLSCREEN));
                         }
+                        break;
+                    case MediaControlView2Impl.COMMAND_SELECT_AUDIO_TRACK:
+                        int audioIndex = args.getInt(MediaControlView2Impl.KEY_SELECTED_AUDIO_INDEX,
+                                INVALID_TRACK_INDEX);
+                        if (audioIndex != INVALID_TRACK_INDEX) {
+                            int audioTrackIndex = mAudioTrackIndices.get(audioIndex);
+                            if (audioTrackIndex != mSelectedAudioTrackIndex) {
+                                mSelectedAudioTrackIndex = audioTrackIndex;
+                                mMediaPlayer.selectTrack(mSelectedAudioTrackIndex);
+                            }
+                        }
+                        break;
+                    case MediaControlView2Impl.COMMAND_SET_PLAYBACK_SPEED:
+                        float speed = args.getFloat(
+                                MediaControlView2Impl.KEY_PLAYBACK_SPEED, INVALID_SPEED);
+                        if (speed != INVALID_SPEED && speed != mSpeed) {
+                            mInstance.setSpeed(speed);
+                            mSpeed = speed;
+                        }
+                        break;
+                    case MediaControlView2Impl.COMMAND_MUTE:
+                        mVolumeLevel = mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+                        mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0);
+                        break;
+                    case MediaControlView2Impl.COMMAND_UNMUTE:
+                        mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, mVolumeLevel, 0);
                         break;
                 }
             }

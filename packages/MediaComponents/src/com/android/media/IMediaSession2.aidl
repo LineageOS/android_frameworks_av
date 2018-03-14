@@ -20,55 +20,61 @@ import android.os.Bundle;
 import android.os.ResultReceiver;
 import android.net.Uri;
 
-import com.android.media.IMediaSession2Callback;
+import com.android.media.IMediaController2;
 
 /**
- * Interface to MediaSession2.
+ * Interface from MediaController2 to MediaSession2.
  * <p>
  * Keep this interface oneway. Otherwise a malicious app may implement fake version of this,
  * and holds calls from session to make session owner(s) frozen.
  */
+ // TODO(jaewan): (Post P) Handle when the playlist becomes too huge.
+ //               Note that ParcelledSliceList isn't a good idea for the purpose. (see: b/37493677)
 oneway interface IMediaSession2 {
     // TODO(jaewan): add onCommand() to send private command
-    // TODO(jaewan): Due to the nature of oneway calls, APIs can be called in out of order
-    //               Add id for individual calls to address this.
 
-    // TODO(jaewan): We may consider to add another binder just for the connection
+    // TODO(jaewan): (Post P) We may consider to add another binder just for the connection
     //               not to expose other methods to the controller whose connection wasn't accepted.
     //               But this would be enough for now because it's the same as existing
     //               MediaBrowser and MediaBrowserService.
-    void connect(IMediaSession2Callback caller, String callingPackage);
-    void release(IMediaSession2Callback caller);
+    void connect(IMediaController2 caller, String callingPackage);
+    void release(IMediaController2 caller);
 
-    void setVolumeTo(IMediaSession2Callback caller, int value, int flags);
-    void adjustVolume(IMediaSession2Callback caller, int direction, int flags);
+    void setVolumeTo(IMediaController2 caller, int value, int flags);
+    void adjustVolume(IMediaController2 caller, int direction, int flags);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     // send command
     //////////////////////////////////////////////////////////////////////////////////////////////
-    void sendTransportControlCommand(IMediaSession2Callback caller,
+    void sendTransportControlCommand(IMediaController2 caller,
             int commandCode, in Bundle args);
-    void sendCustomCommand(IMediaSession2Callback caller, in Bundle command, in Bundle args,
+    void sendCustomCommand(IMediaController2 caller, in Bundle command, in Bundle args,
             in ResultReceiver receiver);
 
-    void prepareFromUri(IMediaSession2Callback caller, in Uri uri, in Bundle extras);
-    void prepareFromSearch(IMediaSession2Callback caller, String query, in Bundle extras);
-    void prepareFromMediaId(IMediaSession2Callback caller, String mediaId, in Bundle extras);
-    void playFromUri(IMediaSession2Callback caller, in Uri uri, in Bundle extras);
-    void playFromSearch(IMediaSession2Callback caller, String query, in Bundle extras);
-    void playFromMediaId(IMediaSession2Callback caller, String mediaId, in Bundle extras);
-    void setRating(IMediaSession2Callback caller, String mediaId, in Bundle rating);
+    void prepareFromUri(IMediaController2 caller, in Uri uri, in Bundle extras);
+    void prepareFromSearch(IMediaController2 caller, String query, in Bundle extras);
+    void prepareFromMediaId(IMediaController2 caller, String mediaId, in Bundle extras);
+    void playFromUri(IMediaController2 caller, in Uri uri, in Bundle extras);
+    void playFromSearch(IMediaController2 caller, String query, in Bundle extras);
+    void playFromMediaId(IMediaController2 caller, String mediaId, in Bundle extras);
+    void setRating(IMediaController2 caller, String mediaId, in Bundle rating);
+
+    void setPlaylist(IMediaController2 caller, in List<Bundle> playlist, in Bundle metadata);
+    void updatePlaylistMetadata(IMediaController2 caller, in Bundle metadata);
+    void addPlaylistItem(IMediaController2 caller, int index, in Bundle mediaItem);
+    void removePlaylistItem(IMediaController2 caller, in Bundle mediaItem);
+    void replacePlaylistItem(IMediaController2 caller, int index, in Bundle mediaItem);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     // library service specific
     //////////////////////////////////////////////////////////////////////////////////////////////
-    void getLibraryRoot(IMediaSession2Callback caller, in Bundle rootHints);
-    void getItem(IMediaSession2Callback caller, String mediaId);
-    void getChildren(IMediaSession2Callback caller, String parentId, int page, int pageSize,
+    void getLibraryRoot(IMediaController2 caller, in Bundle rootHints);
+    void getItem(IMediaController2 caller, String mediaId);
+    void getChildren(IMediaController2 caller, String parentId, int page, int pageSize,
             in Bundle extras);
-    void search(IMediaSession2Callback caller, String query, in Bundle extras);
-    void getSearchResult(IMediaSession2Callback caller, String query, int page, int pageSize,
+    void search(IMediaController2 caller, String query, in Bundle extras);
+    void getSearchResult(IMediaController2 caller, String query, int page, int pageSize,
             in Bundle extras);
-    void subscribe(IMediaSession2Callback caller, String parentId, in Bundle extras);
-    void unsubscribe(IMediaSession2Callback caller, String parentId);
+    void subscribe(IMediaController2 caller, String parentId, in Bundle extras);
+    void unsubscribe(IMediaController2 caller, String parentId);
 }
