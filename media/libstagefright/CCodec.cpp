@@ -259,19 +259,25 @@ void CCodec::initiateAllocateComponent(const sp<AMessage> &msg) {
         return;
     }
 
-    AString componentName;
-    if (!msg->findString("componentName", &componentName)) {
-        // TODO: find componentName appropriate with the media type
-    }
+    sp<RefBase> codecInfo;
+    CHECK(msg->findObject("codecInfo", &codecInfo));
+    // For Codec 2.0 components, componentName == codecInfo->getCodecName().
 
     sp<AMessage> allocMsg(new AMessage(kWhatAllocate, this));
-    allocMsg->setString("componentName", componentName);
+    allocMsg->setObject("codecInfo", codecInfo);
     allocMsg->post();
 }
 
-void CCodec::allocate(const AString &componentName) {
-    ALOGV("allocate(%s)", componentName.c_str());
+void CCodec::allocate(const sp<MediaCodecInfo> &codecInfo) {
+    if (codecInfo == nullptr) {
+        mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
+        return;
+    }
+    ALOGV("allocate(%s)", codecInfo->getCodecName());
     mListener.reset(new CCodecListener(this));
+
+    AString componentName = codecInfo->getCodecName();
+    // TODO: use codecInfo->getOwnerName() for connecting to remote process.
 
     std::shared_ptr<C2Component> comp;
     c2_status_t err = GetCodec2PlatformComponentStore()->createComponent(
@@ -812,9 +818,9 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
         case kWhatAllocate: {
             // C2ComponentStore::createComponent() should return within 100ms.
             setDeadline(now + 150ms, "allocate");
-            AString componentName;
-            CHECK(msg->findString("componentName", &componentName));
-            allocate(componentName);
+            sp<RefBase> obj;
+            CHECK(msg->findObject("codecInfo", &obj));
+            allocate((MediaCodecInfo *)obj.get());
             break;
         }
         case kWhatConfigure: {

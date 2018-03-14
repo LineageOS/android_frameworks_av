@@ -49,6 +49,100 @@ cc_library_static {
 }
 
 cc_library_shared {
+    name: "libstagefright_codecbase",
+
+    export_include_dirs: ["include"],
+
+    srcs: [
+        "CodecBase.cpp",
+        "FrameRenderTracker.cpp",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    shared_libs: [
+        "libgui",
+        "liblog",
+        "libmedia",
+        "libstagefright_foundation",
+        "libui",
+        "libutils",
+        "android.hardware.cas.native@1.0",
+    ],
+
+    sanitize: {
+        cfi: true,
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        diag: {
+            cfi: true,
+        },
+    },
+}
+
+cc_library_shared {
+    name: "libstagefright_ccodec",
+
+    local_include_dirs: ["include"],
+
+    srcs: [
+        "C2OMXNode.cpp",
+        "CCodec.cpp",
+        "CCodecBufferChannel.cpp",
+        "Codec2Buffer.cpp",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    header_libs: [
+        "libstagefright_codec2_internal",
+    ],
+
+    shared_libs: [
+        "libbinder",
+        "libcutils",
+        "libgui",
+        "libhidlallocatorutils",
+        "libhidlbase",
+        "liblog",
+        "libmedia",
+        "libmedia_omx",
+        "libstagefright_codec2",
+        "libstagefright_codec2_vndk",
+        "libstagefright_codecbase",
+        "libstagefright_foundation",
+        "libstagefright_omx_utils",
+        "libui",
+        "libutils",
+        "libv4l2_c2componentstore",
+        "android.hardware.cas.native@1.0",
+
+        // TODO: do not link directly with impl
+        "libstagefright_bufferqueue_helper",
+        "android.hardware.media.c2@1.0-service-impl",
+    ],
+
+    sanitize: {
+        cfi: true,
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        diag: {
+            cfi: true,
+        },
+    },
+}
+
+cc_library_shared {
     name: "libstagefright",
 
     srcs: [
@@ -60,12 +154,7 @@ cc_library_shared {
         "AudioPresentationInfo.cpp",
         "AudioSource.cpp",
         "BufferImpl.cpp",
-        "C2OMXNode.cpp",
-        "CCodec.cpp",
-        "CCodecBufferChannel.cpp",
-        "Codec2Buffer.cpp",
         "Codec2InfoBuilder.cpp",
-        "CodecBase.cpp",
         "CallbackDataSource.cpp",
         "CallbackMediaSource.cpp",
         "CameraSource.cpp",
@@ -75,7 +164,6 @@ cc_library_shared {
         "DataURISource.cpp",
         "FileSource.cpp",
         "FrameDecoder.cpp",
-        "FrameRenderTracker.cpp",
         "HTTPBase.cpp",
         "HevcUtils.cpp",
         "InterfaceUtils.cpp",
@@ -108,10 +196,6 @@ cc_library_shared {
         "VideoFrameScheduler.cpp",
     ],
 
-    header_libs: [
-        "libstagefright_codec2_internal",
-    ],
-
     shared_libs: [
         "libaudioutils",
         "libbinder",
@@ -132,8 +216,10 @@ cc_library_shared {
         "libui",
         "libutils",
         "libmedia_helper",
+        "libstagefright_ccodec",
         "libstagefright_codec2",
         "libstagefright_codec2_vndk",
+        "libstagefright_codecbase",
         "libstagefright_foundation",
         "libstagefright_omx",
         "libstagefright_omx_utils",
@@ -150,10 +236,6 @@ cc_library_shared {
         "android.hardware.media.omx@1.0",
         "android.hardware.graphics.allocator@2.0",
         "android.hardware.graphics.mapper@2.0",
-
-        // TODO: do not link directly with impl
-        "android.hardware.media.c2@1.0-service-impl",
-        "libstagefright_bufferqueue_helper",
     ],
 
     static_libs: [
