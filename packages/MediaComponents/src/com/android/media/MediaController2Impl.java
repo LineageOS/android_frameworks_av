@@ -22,6 +22,8 @@ import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM;
 import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM;
 import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST;
 import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_REPEAT_MODE;
+import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_SHUFFLE_MODE;
 import static android.media.MediaSession2.COMMAND_CODE_PLAY_FROM_MEDIA_ID;
 import static android.media.MediaSession2.COMMAND_CODE_PLAY_FROM_SEARCH;
 import static android.media.MediaSession2.COMMAND_CODE_PLAY_FROM_URI;
@@ -40,11 +42,12 @@ import android.media.MediaController2.ControllerCallback;
 import android.media.MediaController2.PlaybackInfo;
 import android.media.MediaItem2;
 import android.media.MediaMetadata2;
+import android.media.MediaPlaylistAgent.RepeatMode;
+import android.media.MediaPlaylistAgent.ShuffleMode;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
-import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSessionService2;
 import android.media.Rating2;
 import android.media.SessionToken2;
@@ -87,7 +90,9 @@ public class MediaController2Impl implements MediaController2Provider {
     @GuardedBy("mLock")
     private MediaMetadata2 mPlaylistMetadata;
     @GuardedBy("mLock")
-    private PlaylistParams mPlaylistParams;
+    private @RepeatMode int mRepeatMode;
+    @GuardedBy("mLock")
+    private @ShuffleMode int mShuffleMode;
     @GuardedBy("mLock")
     private int mPlayerState;
     @GuardedBy("mLock")
@@ -706,9 +711,41 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public PlaylistParams getPlaylistParams_impl() {
-        synchronized (mLock) {
-            return mPlaylistParams;
+    public int getShuffleMode_impl() {
+        return mShuffleMode;
+    }
+
+    @Override
+    public void setShuffleMode_impl(int shuffleMode) {
+        final IMediaSession2 binder = getSessionBinderIfAble(
+                COMMAND_CODE_PLAYLIST_SET_SHUFFLE_MODE);
+        if (binder != null) {
+            try {
+                binder.setShuffleMode(mControllerStub, shuffleMode);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
+        }
+    }
+
+    @Override
+    public int getRepeatMode_impl() {
+        return mRepeatMode;
+    }
+
+    @Override
+    public void setRepeatMode_impl(int repeatMode) {
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYLIST_SET_REPEAT_MODE);
+        if (binder != null) {
+            try {
+                binder.setRepeatMode(mControllerStub, repeatMode);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Cannot connect to the service or the session is gone", e);
+            }
+        } else {
+            Log.w(TAG, "Session isn't active", new IllegalStateException());
         }
     }
 
@@ -717,19 +754,6 @@ public class MediaController2Impl implements MediaController2Provider {
         synchronized (mLock) {
             return mPlaybackInfo;
         }
-    }
-
-    // TODO(jaewan): Remove (b/74116823)
-    @Override
-    public void setPlaylistParams_impl(PlaylistParams params) {
-        if (params == null) {
-            throw new IllegalArgumentException("params shouldn't be null");
-        }
-        /*
-        Bundle args = new Bundle();
-        args.putBundle(MediaSession2Stub.ARGUMENT_KEY_PLAYLIST_PARAMS, params.toBundle());
-        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS, args);
-        */
     }
 
     @Override
@@ -817,18 +841,6 @@ public class MediaController2Impl implements MediaController2Provider {
         });
     }
 
-    void pushPlaylistParamsChanges(final PlaylistParams params) {
-        synchronized (mLock) {
-            mPlaylistParams = params;
-        }
-        mCallbackExecutor.execute(() -> {
-            if (!mInstance.isConnected()) {
-                return;
-            }
-            mCallback.onPlaylistParamsChanged(mInstance, params);
-        });
-    }
-
     void pushPlaybackInfoChanges(final PlaybackInfo info) {
         synchronized (mLock) {
             mPlaybackInfo = info;
@@ -855,7 +867,7 @@ public class MediaController2Impl implements MediaController2Provider {
         });
     }
 
-    public void pushPlaylistMetadataChanges(MediaMetadata2 metadata) {
+    void pushPlaylistMetadataChanges(MediaMetadata2 metadata) {
         synchronized (mLock) {
             mPlaylistMetadata = metadata;
         }
@@ -868,6 +880,32 @@ public class MediaController2Impl implements MediaController2Provider {
         });
     }
 
+    void pushShuffleModeChanges(int shuffleMode) {
+        synchronized (mLock) {
+            mShuffleMode = shuffleMode;
+        }
+        mCallbackExecutor.execute(() -> {
+            if (!mInstance.isConnected()) {
+                return;
+            }
+            // TODO(jaewan): Fix public API not to take playlistAgent.
+            mCallback.onShuffleModeChanged(mInstance, null, shuffleMode);
+        });
+    }
+
+    void pushRepeatModeChanges(int repeatMode) {
+        synchronized (mLock) {
+            mRepeatMode = repeatMode;
+        }
+        mCallbackExecutor.execute(() -> {
+            if (!mInstance.isConnected()) {
+                return;
+            }
+            // TODO(jaewan): Fix public API not to take playlistAgent.
+            mCallback.onRepeatModeChanged(mInstance, null, repeatMode);
+        });
+    }
+
     // Should be used without a lock to prevent potential deadlock.
     void onConnectedNotLocked(IMediaSession2 sessionBinder,
             final CommandGroup allowedCommands,
@@ -877,7 +915,9 @@ public class MediaController2Impl implements MediaController2Provider {
             final float playbackSpeed,
             final long bufferedPositionMs,
             final PlaybackInfo info,
-            final PlaylistParams params, final List<MediaItem2> playlist,
+            final int repeatMode,
+            final int shuffleMode,
+            final List<MediaItem2> playlist,
             final PendingIntent sessionActivity) {
         if (DEBUG) {
             Log.d(TAG, "onConnectedNotLocked sessionBinder=" + sessionBinder
@@ -907,7 +947,8 @@ public class MediaController2Impl implements MediaController2Provider {
                 mPlaybackSpeed = playbackSpeed;
                 mBufferedPositionMs = bufferedPositionMs;
                 mPlaybackInfo = info;
-                mPlaylistParams = params;
+                mRepeatMode = repeatMode;
+                mShuffleMode = shuffleMode;
                 mPlaylist = playlist;
                 mSessionActivity = sessionActivity;
                 mSessionBinder = sessionBinder;
