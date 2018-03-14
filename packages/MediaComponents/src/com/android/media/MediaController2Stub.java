@@ -25,7 +25,6 @@ import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.PlaylistParams;
-import android.media.PlaybackState2;
 import android.os.Bundle;
 import android.os.ResultReceiver;
 import android.text.TextUtils;
@@ -38,13 +37,13 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
-    private static final String TAG = "MS2CallbackStub";
+public class MediaController2Stub extends IMediaController2.Stub {
+    private static final String TAG = "MediaController2Stub";
     private static final boolean DEBUG = true; // TODO(jaewan): Change
 
     private final WeakReference<MediaController2Impl> mController;
 
-    MediaSession2CallbackStub(MediaController2Impl controller) {
+    MediaController2Stub(MediaController2Impl controller) {
         mController = new WeakReference<>(controller);
     }
 
@@ -69,7 +68,7 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
     }
 
     @Override
-    public void onPlaybackStateChanged(Bundle state) throws RuntimeException {
+    public void onPlayerStateChanged(int state) {
         final MediaController2Impl controller;
         try {
             controller = getController();
@@ -77,8 +76,55 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
             Log.w(TAG, "Don't fail silently here. Highly likely a bug");
             return;
         }
-        controller.pushPlaybackStateChanges(
-                PlaybackState2.fromBundle(controller.getContext(), state));
+        controller.pushPlayerStateChanges(state);
+    }
+
+    @Override
+    public void onPositionChanged(long eventTimeMs, long positionMs) {
+        final MediaController2Impl controller;
+        try {
+            controller = getController();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        if (eventTimeMs < 0) {
+            Log.w(TAG, "onPositionChanged(): Ignoring negative eventTimeMs");
+            return;
+        }
+        if (positionMs < 0) {
+            Log.w(TAG, "onPositionChanged(): Ignoring negative positionMs");
+            return;
+        }
+        controller.pushPositionChanges(eventTimeMs, positionMs);
+    }
+
+    @Override
+    public void onPlaybackSpeedChanged(float speed) {
+        final MediaController2Impl controller;
+        try {
+            controller = getController();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        controller.pushPlaybackSpeedChanges(speed);
+    }
+
+    @Override
+    public void onBufferedPositionChanged(long bufferedPositionMs) {
+        final MediaController2Impl controller;
+        try {
+            controller = getController();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        if (bufferedPositionMs < 0) {
+            Log.w(TAG, "onBufferedPositionChanged(): Ignoring negative bufferedPositionMs");
+            return;
+        }
+        controller.pushBufferedPositionChanges(bufferedPositionMs);
     }
 
     @Override
@@ -163,8 +209,9 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
 
     @Override
     public void onConnected(IMediaSession2 sessionBinder, Bundle commandGroup,
-            Bundle playbackState, Bundle playbackInfo, Bundle playlistParams, List<Bundle>
-            itemBundleList, PendingIntent sessionActivity) {
+            int playerState, long positionEventTimeMs, long positionMs, float playbackSpeed,
+            long bufferedPositionMs, Bundle playbackInfo, Bundle playlistParams,
+            List<Bundle> itemBundleList, PendingIntent sessionActivity) {
         final MediaController2Impl controller = mController.get();
         if (controller == null) {
             if (DEBUG) {
@@ -185,7 +232,7 @@ public class MediaSession2CallbackStub extends IMediaSession2Callback.Stub {
         }
         controller.onConnectedNotLocked(sessionBinder,
                 CommandGroup.fromBundle(context, commandGroup),
-                PlaybackState2.fromBundle(context, playbackState),
+                playerState, positionEventTimeMs, positionMs, playbackSpeed, bufferedPositionMs,
                 PlaybackInfoImpl.fromBundle(context, playbackInfo),
                 PlaylistParams.fromBundle(context, playlistParams),
                 itemList, sessionActivity);

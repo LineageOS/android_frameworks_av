@@ -26,14 +26,14 @@
 namespace android {
 
 // packet based FLAC decoder, wrapps libFLAC stream decoder.
-class FLACDecoder : public RefBase {
+class FLACDecoder {
 
 public:
     enum {
         kMaxChannels = 8,
     };
 
-    static sp<FLACDecoder> Create();
+    static FLACDecoder *Create();
 
     FLAC__StreamMetadata_StreamInfo getStreamInfo() const {
         return mStreamInfo;
@@ -43,10 +43,10 @@ public:
     status_t decodeOneFrame(const uint8_t *inBuffer, size_t inBufferLen,
             short *outBuffer, size_t *outBufferLen);
     void flush();
+    virtual ~FLACDecoder();
 
 protected:
     FLACDecoder();
-    virtual ~FLACDecoder() override;
 
 private:
     // stream properties

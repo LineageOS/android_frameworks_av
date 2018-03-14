@@ -57,6 +57,7 @@ SoftFlacDecoder::SoftFlacDecoder(
 
 SoftFlacDecoder::~SoftFlacDecoder() {
     ALOGV("dtor:");
+    delete mFLACDecoder;
 }
 
 void SoftFlacDecoder::initPorts() {

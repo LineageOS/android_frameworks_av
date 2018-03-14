@@ -22,6 +22,7 @@
 #include "MatroskaExtractor.h"
 
 #include <media/DataSourceBase.h>
+#include <media/ExtractorUtils.h>
 #include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AUtils.h>
@@ -1108,7 +1109,7 @@ static status_t addFlacMetadata(
     meta.setData(kKeyFlacMetadata, 0, codecPrivate, codecPrivateSize);
 
     int32_t maxInputSize = 64 << 10;
-    sp<FLACDecoder> flacDecoder = FLACDecoder::Create();
+    FLACDecoder *flacDecoder = FLACDecoder::Create();
     if (flacDecoder != NULL
             && flacDecoder->parseMetadata((const uint8_t*)codecPrivate, codecPrivateSize) == OK) {
         FLAC__StreamMetadata_StreamInfo streamInfo = flacDecoder->getStreamInfo();
@@ -1120,6 +1121,7 @@ static status_t addFlacMetadata(
                     && streamInfo.channels != 0
                     && ((streamInfo.bits_per_sample + 7) / 8) >
                         INT32_MAX / streamInfo.max_blocksize / streamInfo.channels) {
+                delete flacDecoder;
                 return ERROR_MALFORMED;
             }
             maxInputSize = ((streamInfo.bits_per_sample + 7) / 8)
@@ -1128,6 +1130,7 @@ static status_t addFlacMetadata(
     }
     meta.setInt32(kKeyMaxInputSize, maxInputSize);
 
+    delete flacDecoder;
     return OK;
 }
 
@@ -1143,13 +1146,13 @@ status_t MatroskaExtractor::synthesizeAVCC(TrackInfo *trackInfo, size_t index) {
     }
 
     const mkvparser::Block::Frame &frame = block->GetFrame(0);
-    sp<ABuffer> abuf = new ABuffer(frame.len);
-    long n = frame.Read(mReader, abuf->data());
+    auto tmpData = heapbuffer<unsigned char>(frame.len);
+    long n = frame.Read(mReader, tmpData.get());
     if (n != 0) {
         return ERROR_MALFORMED;
     }
 
-    if (!MakeAVCCodecSpecificData(trackInfo->mMeta, abuf)) {
+    if (!MakeAVCCodecSpecificData(trackInfo->mMeta, tmpData.get(), frame.len)) {
         return ERROR_MALFORMED;
     }
 

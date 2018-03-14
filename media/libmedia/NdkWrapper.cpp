@@ -1068,6 +1068,14 @@ status_t AMediaExtractorWrapper::release() {
     return OK;
 }
 
+status_t AMediaExtractorWrapper::disconnect() {
+    if (mAMediaExtractor != NULL) {
+        media_status_t err = AMediaExtractor_disconnect(mAMediaExtractor);
+        return translateErrorCode(err);
+    }
+    return DEAD_OBJECT;
+}
+
 AMediaExtractor *AMediaExtractorWrapper::getAMediaExtractor() const {
     return mAMediaExtractor;
 }

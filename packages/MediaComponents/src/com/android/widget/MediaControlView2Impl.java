@@ -74,19 +74,25 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     static final String KEY_SELECTED_AUDIO_INDEX = "SelectedAudioIndex";
     static final String KEY_SELECTED_SUBTITLE_INDEX = "SelectedSubtitleIndex";
     static final String EVENT_UPDATE_TRACK_STATUS = "UpdateTrackStatus";
-    static final String COMMAND_SELECT_AUDIO_TRACK = "SelectTrack";
-    static final String COMMAND_SET_PLAYBACK_SPEED = "SetPlaybackSpeed";
 
     // TODO: Remove this once integrating with MediaSession2 & MediaMetadata2
     static final String KEY_STATE_IS_ADVERTISEMENT = "MediaTypeAdvertisement";
     static final String EVENT_UPDATE_MEDIA_TYPE_STATUS = "UpdateMediaTypeStatus";
 
-    // String for receiving command to show subtitle from MediaSession.
+    // String for sending command to show subtitle to MediaSession.
     static final String COMMAND_SHOW_SUBTITLE = "showSubtitle";
-    // String for receiving command to hide subtitle from MediaSession.
+    // String for sending command to hide subtitle to MediaSession.
     static final String COMMAND_HIDE_SUBTITLE = "hideSubtitle";
     // TODO: remove once the implementation is revised
     public static final String COMMAND_SET_FULLSCREEN = "setFullscreen";
+    // String for sending command to select audio track to MediaSession.
+    static final String COMMAND_SELECT_AUDIO_TRACK = "SelectTrack";
+    // String for sending command to set playback speed to MediaSession.
+    static final String COMMAND_SET_PLAYBACK_SPEED = "SetPlaybackSpeed";
+    // String for sending command to mute audio to MediaSession.
+    static final String COMMAND_MUTE= "Mute";
+    // String for sending command to unmute audio to MediaSession.
+    static final String COMMAND_UNMUTE = "Unmute";
 
     private static final int SETTINGS_MODE_AUDIO_TRACK = 0;
     private static final int SETTINGS_MODE_PLAYBACK_SPEED = 1;
@@ -113,6 +119,7 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private TextView mTitleView;
     private TextView mAdSkipView, mAdRemainingView;
     private View mAdExternalLink;
+    private View mTitleBar;
     private View mRoot;
     private int mDuration;
     private int mPrevState;
@@ -135,11 +142,13 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private boolean mSubtitleIsEnabled;
     private boolean mSeekAvailable;
     private boolean mIsAdvertisement;
+    private boolean mIsMute;
     private ImageButton mPlayPauseButton;
     private ImageButton mFfwdButton;
     private ImageButton mRewButton;
     private ImageButton mNextButton;
     private ImageButton mPrevButton;
+    private ImageButton mBackButton;
 
     private ViewGroup mBasicControls;
     private ImageButton mSubtitleButton;
@@ -188,7 +197,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         mResources = ApiHelper.getLibResources();
         // Inflate MediaControlView2 from XML
         mRoot = makeControllerView();
-        mRoot.addOnLayoutChangeListener(mTitleBarLayoutChangeListener);
         mInstance.addView(mRoot);
     }
 
@@ -376,7 +384,8 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         }
         mPlaybackState = mController.getPlaybackState();
         if (mPlaybackState != null) {
-            return (int) (mPlaybackState.getBufferedPosition() * 100) / mDuration;
+            long bufferedPos = mPlaybackState.getBufferedPosition();
+            return (bufferedPos == -1) ? -1 : (int) (bufferedPos * 100 / mDuration);
         }
         return 0;
     }
@@ -445,6 +454,10 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         if (mPrevButton != null) {
             mPrevButton.setOnClickListener(mPrevListener);
         }
+        mBackButton = v.findViewById(R.id.back);
+        if (mBackButton != null) {
+            mBackButton.setOnClickListener(mBackListener);
+        }
 
         mBasicControls = v.findViewById(R.id.basic_controls);
         mSubtitleButton = v.findViewById(R.id.subtitle);
@@ -469,6 +482,9 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             mOverflowButtonLeft.setOnClickListener(mOverflowLeftListener);
         }
         mMuteButton = v.findViewById(R.id.mute);
+        if (mMuteButton != null) {
+            mMuteButton.setOnClickListener(mMuteButtonListener);
+        }
         mSettingsButton = v.findViewById(R.id.settings);
         if (mSettingsButton != null) {
             mSettingsButton.setOnClickListener(mSettingsButtonListener);
@@ -483,10 +499,16 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             if (mProgress instanceof SeekBar) {
                 SeekBar seeker = (SeekBar) mProgress;
                 seeker.setOnSeekBarChangeListener(mSeekListener);
+                seeker.setProgressDrawable(mResources.getDrawable(R.drawable.custom_progress));
+                seeker.setThumb(mResources.getDrawable(R.drawable.custom_progress_thumb));
             }
             mProgress.setMax(MAX_PROGRESS);
         }
 
+        mTitleBar = v.findViewById(R.id.title_bar);
+        if (mTitleBar != null) {
+            mTitleBar.addOnLayoutChangeListener(mTitleBarLayoutChangeListener);
+        }
         mTitleView = v.findViewById(R.id.title_text);
 
         mEndTime = v.findViewById(R.id.time);
@@ -588,7 +610,13 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         }
         if (mProgress != null && currentPosition != mDuration) {
             mProgress.setProgress(positionOnProgressBar);
-            mProgress.setSecondaryProgress(getBufferPercentage() * 10);
+            // If the media is a local file, there is no need to set a buffer, so set secondary
+            // progress to maximum.
+            if (getBufferPercentage() < 0) {
+                mProgress.setSecondaryProgress(MAX_PROGRESS);
+            } else {
+                mProgress.setSecondaryProgress(getBufferPercentage() * 10);
+            }
         }
 
         if (mEndTime != null) {
@@ -758,6 +786,13 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         }
     };
 
+    private final View.OnClickListener mBackListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            // TODO: implement
+        }
+    };
+
     private final View.OnClickListener mSubtitleListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
@@ -811,6 +846,23 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         public void onClick(View v) {
             mBasicControls.setVisibility(View.VISIBLE);
             mExtraControls.setVisibility(View.GONE);
+        }
+    };
+
+    private final View.OnClickListener mMuteButtonListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            if (!mIsMute) {
+                mMuteButton.setImageDrawable(
+                        mResources.getDrawable(R.drawable.ic_mute, null));
+                mIsMute = true;
+                mController.sendCommand(COMMAND_MUTE, null, null);
+            } else {
+                mMuteButton.setImageDrawable(
+                        mResources.getDrawable(R.drawable.ic_unmute, null));
+                mIsMute = false;
+                mController.sendCommand(COMMAND_UNMUTE, null, null);
+            }
         }
     };
 
@@ -879,14 +931,15 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
                             extra.putInt(KEY_SELECTED_SUBTITLE_INDEX, position - 1);
                             mController.sendCommand(
                                     MediaControlView2Impl.COMMAND_SHOW_SUBTITLE, extra, null);
-                            mSubtitleButton.setImageDrawable(mResources.getDrawable(
-                                    R.drawable.ic_media_subtitle_enabled, null));
+                            mSubtitleButton.setImageDrawable(
+                                    mResources.getDrawable(R.drawable.ic_subtitle_on, null));
                             mSubtitleIsEnabled = true;
                         } else {
                             mController.sendCommand(
                                     MediaControlView2Impl.COMMAND_HIDE_SUBTITLE, null, null);
-                            mSubtitleButton.setImageDrawable(mResources.getDrawable(
-                                    R.drawable.ic_media_subtitle_disabled, null));
+                            mSubtitleButton.setImageDrawable(
+                                    mResources.getDrawable(R.drawable.ic_subtitle_off, null));
+
                             mSubtitleIsEnabled = false;
                         }
                     }
