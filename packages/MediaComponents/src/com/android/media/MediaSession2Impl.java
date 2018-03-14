@@ -67,7 +67,9 @@ import android.util.ArrayMap;
 import android.util.Log;
 
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executor;
 
@@ -970,14 +972,17 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mExtras = extras;
         }
 
+        @Override
         public int getCommandCode_impl() {
             return mCommandCode;
         }
 
+        @Override
         public @Nullable String getCustomCommand_impl() {
             return mCustomCommand;
         }
 
+        @Override
         public @Nullable Bundle getExtras_impl() {
             return mExtras;
         }
@@ -985,6 +990,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         /**
          * @return a new Bundle instance from the Command
          */
+        @Override
         public Bundle toBundle_impl() {
             Bundle bundle = new Bundle();
             bundle.putInt(KEY_COMMAND_CODE, mCommandCode);
@@ -1038,6 +1044,16 @@ public class MediaSession2Impl implements MediaSession2Provider {
     public static class CommandGroupImpl implements CommandGroupProvider {
         private static final String KEY_COMMANDS =
                 "android.media.mediasession2.commandgroup.commands";
+
+        // Prefix for all command codes
+        private static final String PREFIX_COMMAND_CODE = "COMMAND_CODE_";
+
+        // Prefix for command codes that will be sent directly to the MediaPlayerBase
+        private static final String PREFIX_COMMAND_CODE_PLAYBACK = "COMMAND_CODE_PLAYBACK_";
+
+        // Prefix for command codes that will be sent directly to the MediaPlaylistAgent
+        private static final String PREFIX_COMMAND_CODE_PLAYLIST = "COMMAND_CODE_PLAYLIST_";
+
         private List<Command> mCommands = new ArrayList<>();
         private final Context mContext;
         private final CommandGroup mInstance;
@@ -1050,6 +1066,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
             }
         }
 
+        public CommandGroupImpl(Context context) {
+            mContext = context;
+            mInstance = new CommandGroup(this);
+        }
+
         @Override
         public void addCommand_impl(Command command) {
             if (command == null) {
@@ -1060,8 +1081,30 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         @Override
         public void addAllPredefinedCommands_impl() {
-            for (int i = 1; i <= MediaSession2.COMMAND_CODE_MAX; i++) {
-                mCommands.add(new Command(mContext, i));
+            addCommandsWithPrefix(PREFIX_COMMAND_CODE);
+        }
+
+        public void addAllPlaybackCommands() {
+            addCommandsWithPrefix(PREFIX_COMMAND_CODE_PLAYBACK);
+        }
+
+        public void addAllPlaylistCommands() {
+            addCommandsWithPrefix(PREFIX_COMMAND_CODE_PLAYLIST);
+        }
+
+        private void addCommandsWithPrefix(String prefix) {
+            // TODO(jaewan): (Can be post-P): Don't use reflection for this purpose.
+            final Field[] fields = MediaSession2.class.getFields();
+            if (fields != null) {
+                for (int i = 0; i < fields.length; i++) {
+                    if (fields[i].getName().startsWith(prefix)) {
+                        try {
+                            mCommands.add(new Command(mContext, fields[i].getInt(null)));
+                        } catch (IllegalAccessException e) {
+                            Log.w(TAG, "Unexpected " + fields[i] + " in MediaSession2");
+                        }
+                    }
+                }
             }
         }
 
@@ -1096,7 +1139,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         @Override
         public List<Command> getCommands_impl() {
-            return mCommands;
+            return getCommands();
+        }
+
+        public List<Command> getCommands() {
+            return Collections.unmodifiableList(mCommands);
         }
 
         /**
