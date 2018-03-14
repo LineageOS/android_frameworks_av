@@ -2256,7 +2256,7 @@ typedef enum acamera_metadata_tag {
      * from the main sensor along the +X axis (to the right from the user's perspective) will
      * report <code>(0.03, 0, 0)</code>.</p>
      * <p>To transform a pixel coordinates between two cameras facing the same direction, first
-     * the source camera ACAMERA_LENS_RADIAL_DISTORTION must be corrected for.  Then the source
+     * the source camera ACAMERA_LENS_DISTORTION must be corrected for.  Then the source
      * camera ACAMERA_LENS_INTRINSIC_CALIBRATION needs to be applied, followed by the
      * ACAMERA_LENS_POSE_ROTATION of the source camera, the translation of the source camera
      * relative to the destination camera, the ACAMERA_LENS_POSE_ROTATION of the destination
@@ -2268,10 +2268,10 @@ typedef enum acamera_metadata_tag {
      * <p>When ACAMERA_LENS_POSE_REFERENCE is GYROSCOPE, then this position is relative to
      * the center of the primary gyroscope on the device.</p>
      *
+     * @see ACAMERA_LENS_DISTORTION
      * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
      * @see ACAMERA_LENS_POSE_REFERENCE
      * @see ACAMERA_LENS_POSE_ROTATION
-     * @see ACAMERA_LENS_RADIAL_DISTORTION
      */
     ACAMERA_LENS_POSE_TRANSLATION =                             // float[3]
             ACAMERA_LENS_START + 7,
@@ -2381,7 +2381,7 @@ typedef enum acamera_metadata_tag {
      * where <code>(0,0)</code> is the top-left of the
      * preCorrectionActiveArraySize rectangle. Once the pose and
      * intrinsic calibration transforms have been applied to a
-     * world point, then the ACAMERA_LENS_RADIAL_DISTORTION
+     * world point, then the ACAMERA_LENS_DISTORTION
      * transform needs to be applied, and the result adjusted to
      * be in the ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE coordinate
      * system (where <code>(0, 0)</code> is the top-left of the
@@ -2389,56 +2389,15 @@ typedef enum acamera_metadata_tag {
      * coordinate of the world point for processed (non-RAW)
      * output buffers.</p>
      *
+     * @see ACAMERA_LENS_DISTORTION
      * @see ACAMERA_LENS_POSE_ROTATION
      * @see ACAMERA_LENS_POSE_TRANSLATION
-     * @see ACAMERA_LENS_RADIAL_DISTORTION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      */
     ACAMERA_LENS_INTRINSIC_CALIBRATION =                        // float[5]
             ACAMERA_LENS_START + 10,
-    /**
-     * <p>The correction coefficients to correct for this camera device's
-     * radial and tangential lens distortion.</p>
-     *
-     * <p>Type: float[6]</p>
-     *
-     * <p>This tag may appear in:
-     * <ul>
-     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
-     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
-     * </ul></p>
-     *
-     * <p>Four radial distortion coefficients <code>[kappa_0, kappa_1, kappa_2,
-     * kappa_3]</code> and two tangential distortion coefficients
-     * <code>[kappa_4, kappa_5]</code> that can be used to correct the
-     * lens's geometric distortion with the mapping equations:</p>
-     * <pre><code> x_c = x_i * ( kappa_0 + kappa_1 * r^2 + kappa_2 * r^4 + kappa_3 * r^6 ) +
-     *        kappa_4 * (2 * x_i * y_i) + kappa_5 * ( r^2 + 2 * x_i^2 )
-     *  y_c = y_i * ( kappa_0 + kappa_1 * r^2 + kappa_2 * r^4 + kappa_3 * r^6 ) +
-     *        kappa_5 * (2 * x_i * y_i) + kappa_4 * ( r^2 + 2 * y_i^2 )
-     * </code></pre>
-     * <p>Here, <code>[x_c, y_c]</code> are the coordinates to sample in the
-     * input image that correspond to the pixel values in the
-     * corrected image at the coordinate <code>[x_i, y_i]</code>:</p>
-     * <pre><code> correctedImage(x_i, y_i) = sample_at(x_c, y_c, inputImage)
-     * </code></pre>
-     * <p>The pixel coordinates are defined in a normalized
-     * coordinate system related to the
-     * ACAMERA_LENS_INTRINSIC_CALIBRATION calibration fields.
-     * Both <code>[x_i, y_i]</code> and <code>[x_c, y_c]</code> have <code>(0,0)</code> at the
-     * lens optical center <code>[c_x, c_y]</code>. The maximum magnitudes
-     * of both x and y coordinates are normalized to be 1 at the
-     * edge further from the optical center, so the range
-     * for both dimensions is <code>-1 &lt;= x &lt;= 1</code>.</p>
-     * <p>Finally, <code>r</code> represents the radial distance from the
-     * optical center, <code>r^2 = x_i^2 + y_i^2</code>, and its magnitude
-     * is therefore no larger than <code>|r| &lt;= sqrt(2)</code>.</p>
-     * <p>The distortion model used is the Brown-Conrady model.</p>
-     *
-     * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
-     */
-    ACAMERA_LENS_RADIAL_DISTORTION =                            // float[6]
+    ACAMERA_LENS_RADIAL_DISTORTION =                            // Deprecated! DO NOT USE
             ACAMERA_LENS_START + 11,
     /**
      * <p>The origin for ACAMERA_LENS_POSE_TRANSLATION.</p>
@@ -2457,6 +2416,51 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_LENS_POSE_REFERENCE =                               // byte (acamera_metadata_enum_android_lens_pose_reference_t)
             ACAMERA_LENS_START + 12,
+    /**
+     * <p>The correction coefficients to correct for this camera device's
+     * radial and tangential lens distortion.</p>
+     * <p>Replaces the deprecated ACAMERA_LENS_RADIAL_DISTORTION field, which was
+     * inconsistently defined.</p>
+     *
+     * @see ACAMERA_LENS_RADIAL_DISTORTION
+     *
+     * <p>Type: float[5]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>Three radial distortion coefficients <code>[kappa_1, kappa_2,
+     * kappa_3]</code> and two tangential distortion coefficients
+     * <code>[kappa_4, kappa_5]</code> that can be used to correct the
+     * lens's geometric distortion with the mapping equations:</p>
+     * <pre><code> x_c = x_i * ( 1 + kappa_1 * r^2 + kappa_2 * r^4 + kappa_3 * r^6 ) +
+     *        kappa_4 * (2 * x_i * y_i) + kappa_5 * ( r^2 + 2 * x_i^2 )
+     *  y_c = y_i * ( 1 + kappa_1 * r^2 + kappa_2 * r^4 + kappa_3 * r^6 ) +
+     *        kappa_5 * (2 * x_i * y_i) + kappa_4 * ( r^2 + 2 * y_i^2 )
+     * </code></pre>
+     * <p>Here, <code>[x_c, y_c]</code> are the coordinates to sample in the
+     * input image that correspond to the pixel values in the
+     * corrected image at the coordinate <code>[x_i, y_i]</code>:</p>
+     * <pre><code> correctedImage(x_i, y_i) = sample_at(x_c, y_c, inputImage)
+     * </code></pre>
+     * <p>The pixel coordinates are defined in a coordinate system
+     * related to the ACAMERA_LENS_INTRINSIC_CALIBRATION
+     * calibration fields; see that entry for details of the mapping stages.
+     * Both <code>[x_i, y_i]</code> and <code>[x_c, y_c]</code>
+     * have <code>(0,0)</code> at the lens optical center <code>[c_x, c_y]</code>, and
+     * the range of the coordinates depends on the focal length
+     * terms of the intrinsic calibration.</p>
+     * <p>Finally, <code>r</code> represents the radial distance from the
+     * optical center, <code>r^2 = x_i^2 + y_i^2</code>.</p>
+     * <p>The distortion model used is the Brown-Conrady model.</p>
+     *
+     * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
+     */
+    ACAMERA_LENS_DISTORTION =                                   // float[5]
+            ACAMERA_LENS_START + 13,
     ACAMERA_LENS_END,
 
     /**
@@ -4211,7 +4215,7 @@ typedef enum acamera_metadata_tag {
      * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.</p>
      * <p>The currently supported fields that correct for geometric distortion are:</p>
      * <ol>
-     * <li>ACAMERA_LENS_RADIAL_DISTORTION.</li>
+     * <li>ACAMERA_LENS_DISTORTION.</li>
      * </ol>
      * <p>If all of the geometric distortion fields are no-ops, this rectangle will be the same
      * as the post-distortion-corrected rectangle given in
@@ -4223,7 +4227,7 @@ typedef enum acamera_metadata_tag {
      * full array may include black calibration pixels or other inactive regions.</p>
      * <p>The data representation is <code>int[4]</code>, which maps to <code>(left, top, width, height)</code>.</p>
      *
-     * @see ACAMERA_LENS_RADIAL_DISTORTION
+     * @see ACAMERA_LENS_DISTORTION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_SENSOR_INFO_PIXEL_ARRAY_SIZE
      * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
@@ -6938,7 +6942,7 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * <li>ACAMERA_LENS_POSE_TRANSLATION</li>
      * <li>ACAMERA_LENS_POSE_ROTATION</li>
      * <li>ACAMERA_LENS_INTRINSIC_CALIBRATION</li>
-     * <li>ACAMERA_LENS_RADIAL_DISTORTION</li>
+     * <li>ACAMERA_LENS_DISTORTION</li>
      * </ul>
      * </li>
      * <li>The ACAMERA_DEPTH_DEPTH_IS_EXCLUSIVE entry is listed by this device.</li>
@@ -6956,12 +6960,12 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * rate, including depth stall time.</p>
      *
      * @see ACAMERA_DEPTH_DEPTH_IS_EXCLUSIVE
+     * @see ACAMERA_LENS_DISTORTION
      * @see ACAMERA_LENS_FACING
      * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
      * @see ACAMERA_LENS_POSE_REFERENCE
      * @see ACAMERA_LENS_POSE_ROTATION
      * @see ACAMERA_LENS_POSE_TRANSLATION
-     * @see ACAMERA_LENS_RADIAL_DISTORTION
      */
     ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_DEPTH_OUTPUT              = 8,
 
@@ -6991,7 +6995,7 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * <li>ACAMERA_LENS_POSE_ROTATION</li>
      * <li>ACAMERA_LENS_POSE_TRANSLATION</li>
      * <li>ACAMERA_LENS_INTRINSIC_CALIBRATION</li>
-     * <li>ACAMERA_LENS_RADIAL_DISTORTION</li>
+     * <li>ACAMERA_LENS_DISTORTION</li>
      * </ul>
      * </li>
      * <li>The SENSOR_INFO_TIMESTAMP_SOURCE of the logical device and physical devices must be
@@ -7017,11 +7021,11 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * not slow down the frame rate of the capture, as long as the minimum frame duration
      * of the physical and logical streams are the same.</p>
      *
+     * @see ACAMERA_LENS_DISTORTION
      * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
      * @see ACAMERA_LENS_POSE_REFERENCE
      * @see ACAMERA_LENS_POSE_ROTATION
      * @see ACAMERA_LENS_POSE_TRANSLATION
-     * @see ACAMERA_LENS_RADIAL_DISTORTION
      * @see ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE
      */
     ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA      = 11,
