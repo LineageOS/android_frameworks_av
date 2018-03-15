@@ -57,7 +57,8 @@ static std::shared_ptr<C2ComponentInterface> BuildIntf(
 
 C2SoftMpeg4Dec::C2SoftMpeg4Dec(const char *name, c2_node_id_t id)
     : SimpleC2Component(BuildIntf(name, id)),
-      mDecHandle(nullptr) {
+      mDecHandle(nullptr),
+      mOutputBuffer{} {
 }
 
 C2SoftMpeg4Dec::~C2SoftMpeg4Dec() {
@@ -95,6 +96,7 @@ void C2SoftMpeg4Dec::onReset() {
 void C2SoftMpeg4Dec::onRelease() {
     if (mInitialized) {
         PVCleanUpVideoDecoder(mDecHandle);
+        mInitialized = false;
     }
     if (mOutBlock) {
         mOutBlock.reset();
@@ -129,10 +131,6 @@ status_t C2SoftMpeg4Dec::initDecoder() {
         mDecHandle = new tagvideoDecControls;
     }
     memset(mDecHandle, 0, sizeof(tagvideoDecControls));
-
-    for (int32_t i = 0; i < kNumOutputBuffers; ++i) {
-        mOutputBuffer[i] = nullptr;
-    }
 
     /* TODO: bring these values to 352 and 288. It cannot be done as of now
      * because, h263 doesn't seem to allow port reconfiguration. In OMX, the
@@ -371,7 +369,8 @@ void C2SoftMpeg4Dec::process(
         }
     }
 
-    while (inOffset < inSize) {
+    size_t inPos = 0;
+    while (inPos < inSize) {
         c2_status_t err = ensureDecoderState(pool);
         if (C2_OK != err) {
             mSignalledError = true;
@@ -401,7 +400,7 @@ void C2SoftMpeg4Dec::process(
 
         // Need to check if header contains new info, e.g., width/height, etc.
         VopHeaderInfo header_info;
-        uint32_t useExtTimestamp = (inOffset == 0);
+        uint32_t useExtTimestamp = (inPos == 0);
         int32_t tmpInSize = (int32_t)inSize;
         uint8_t *bitstreamTmp = bitstream;
         uint32_t timestamp = workIndex;
@@ -442,12 +441,12 @@ void C2SoftMpeg4Dec::process(
         (void)copyOutputBufferToYV12Frame(outputBufferY, mOutputBuffer[mNumSamplesOutput & 1],
                                           wView.width(), align(mWidth, 16), mWidth, mHeight);
 
-        inOffset += inSize - (size_t)tmpInSize;
+        inPos += inSize - (size_t)tmpInSize;
         finishWork(workIndex, work);
         ++mNumSamplesOutput;
-        if (inSize - inOffset) {
-            ALOGD("decoded frame, ignoring further trailing bytes %zu",
-                   inSize - (size_t)tmpInSize);
+        if (inSize - inPos != 0) {
+            ALOGD("decoded frame, ignoring further trailing bytes %d",
+                  (int)inSize - (int)inPos);
             break;
         }
     }

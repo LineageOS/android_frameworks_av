@@ -702,14 +702,17 @@ public class MediaController2Impl implements MediaController2Provider {
         }
     }
 
+    // TODO(jaewan): Remove (b/74116823)
     @Override
     public void setPlaylistParams_impl(PlaylistParams params) {
         if (params == null) {
             throw new IllegalArgumentException("params shouldn't be null");
         }
+        /*
         Bundle args = new Bundle();
         args.putBundle(MediaSession2Stub.ARGUMENT_KEY_PLAYLIST_PARAMS, params.toBundle());
         sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS, args);
+        */
     }
 
     @Override

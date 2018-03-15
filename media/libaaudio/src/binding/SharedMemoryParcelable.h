@@ -61,8 +61,6 @@ public:
 
     int32_t getSizeInBytes();
 
-    aaudio_result_t validate();
-
     void dump();
 
 protected:
@@ -74,6 +72,11 @@ protected:
     android::base::unique_fd   mFd;
     int32_t     mSizeInBytes = 0;
     uint8_t    *mResolvedAddress = MMAP_UNRESOLVED_ADDRESS;
+
+private:
+
+    aaudio_result_t validate() const;
+
 };
 
 } /* namespace aaudio */

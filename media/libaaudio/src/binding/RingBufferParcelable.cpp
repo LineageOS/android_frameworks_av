@@ -21,6 +21,7 @@
 #include <stdint.h>
 
 #include <binder/Parcelable.h>
+#include <utility/AAudioUtilities.h>
 
 #include "binding/AAudioServiceDefinitions.h"
 #include "binding/SharedRegionParcelable.h"
@@ -79,7 +80,10 @@ void RingBufferParcelable::setCapacityInFrames(int32_t capacityInFrames) {
  * The read and write must be symmetric.
  */
 status_t RingBufferParcelable::writeToParcel(Parcel* parcel) const {
-    status_t status = parcel->writeInt32(mCapacityInFrames);
+    status_t status = AAudioConvert_aaudioToAndroidStatus(validate());
+    if (status != NO_ERROR) goto error;
+
+    status = parcel->writeInt32(mCapacityInFrames);
     if (status != NO_ERROR) goto error;
     if (mCapacityInFrames > 0) {
         status = parcel->writeInt32(mBytesPerFrame);
@@ -97,7 +101,7 @@ status_t RingBufferParcelable::writeToParcel(Parcel* parcel) const {
     }
     return NO_ERROR;
 error:
-    ALOGE("writeToParcel() error = %d", status);
+    ALOGE("%s returning %d", __func__, status);
     return status;
 }
 
@@ -118,9 +122,9 @@ status_t RingBufferParcelable::readFromParcel(const Parcel* parcel) {
         status = mDataParcelable.readFromParcel(parcel);
         if (status != NO_ERROR) goto error;
     }
-    return NO_ERROR;
+    return AAudioConvert_aaudioToAndroidStatus(validate());
 error:
-    ALOGE("readFromParcel() error = %d", status);
+    ALOGE("%s returning %d", __func__, status);
     return status;
 }
 
@@ -151,8 +155,7 @@ aaudio_result_t RingBufferParcelable::resolve(SharedMemoryParcelable *memoryParc
     return AAUDIO_OK;
 }
 
-aaudio_result_t RingBufferParcelable::validate() {
-    aaudio_result_t result;
+aaudio_result_t RingBufferParcelable::validate() const {
     if (mCapacityInFrames < 0 || mCapacityInFrames >= 32 * 1024) {
         ALOGE("invalid mCapacityInFrames = %d", mCapacityInFrames);
         return AAUDIO_ERROR_INTERNAL;
@@ -164,18 +167,6 @@ aaudio_result_t RingBufferParcelable::validate() {
     if (mFramesPerBurst < 0 || mFramesPerBurst >= 16 * 1024) {
         ALOGE("invalid mFramesPerBurst = %d", mFramesPerBurst);
         return AAUDIO_ERROR_INTERNAL;
-    }
-    if ((result = mReadCounterParcelable.validate()) != AAUDIO_OK) {
-        ALOGE("invalid mReadCounterParcelable = %d", result);
-        return result;
-    }
-    if ((result = mWriteCounterParcelable.validate()) != AAUDIO_OK) {
-        ALOGE("invalid mWriteCounterParcelable = %d", result);
-        return result;
-    }
-    if ((result = mDataParcelable.validate()) != AAUDIO_OK) {
-        ALOGE("invalid mDataParcelable = %d", result);
-        return result;
     }
     return AAUDIO_OK;
 }

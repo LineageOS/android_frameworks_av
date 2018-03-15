@@ -14,26 +14,21 @@
  * limitations under the License.
  */
 
-#ifndef C2_SOFT_MP3_H_
-#define C2_SOFT_MP3_H_
+#ifndef C2_SOFT_AMRWB_ENC_H_
+#define C2_SOFT_AMRWB_ENC_H_
 
 #include <SimpleC2Component.h>
 
-#include <media/stagefright/foundation/ABase.h>
+#include <media/stagefright/foundation/ADebug.h>
 
-struct tPVMP3DecoderExternal;
-
-bool parseMp3Header(uint32_t header, size_t *frame_size,
-                    uint32_t *out_sampling_rate = nullptr,
-                    uint32_t *out_channels = nullptr,
-                    uint32_t *out_bitrate = nullptr,
-                    uint32_t *out_num_samples = nullptr);
+#include "voAMRWB.h"
 
 namespace android {
 
-struct C2SoftMP3 : public SimpleC2Component {
-    C2SoftMP3(const char *name, c2_node_id_t id);
-    virtual ~C2SoftMP3();
+class C2SoftAmrWbEnc : public SimpleC2Component {
+public:
+    C2SoftAmrWbEnc(const char *name, c2_node_id_t id);
+    virtual ~C2SoftAmrWbEnc();
 
     // From SimpleC2Component
     c2_status_t onInit() override;
@@ -49,26 +44,28 @@ struct C2SoftMP3 : public SimpleC2Component {
             const std::shared_ptr<C2BlockPool> &pool) override;
 
 private:
-    enum {
-        kPVMP3DecoderDelay = 529 // samples
-    };
+    static const int32_t kNumSamplesPerFrame = 320;
+    static const int32_t kNumBytesPerInputFrame = kNumSamplesPerFrame * sizeof(int16_t);
+    static const int32_t kSampleRate = 16000;
 
-    tPVMP3DecoderExternal *mConfig;
-    void *mDecoderBuf;
-
-    int32_t mNumChannels;
-    int32_t mSamplingRate;
+    void *mEncoderHandle;
+    VO_AUDIO_CODECAPI *mApiHandle;
+    VO_MEM_OPERATOR *mMemOperator;
+    VOAMRWBMODE mMode;
     bool mIsFirst;
     bool mSignalledError;
     bool mSignalledOutputEos;
     uint64_t mAnchorTimeStamp;
     uint64_t mProcessedSamples;
+    int32_t mFilledLen;
+    int16_t mInputFrame[kNumSamplesPerFrame];
 
-    status_t initDecoder();
+    status_t initEncoder();
+    int encodeInput(uint8_t *buffer, uint32_t length);
 
-    DISALLOW_EVIL_CONSTRUCTORS(C2SoftMP3);
+    DISALLOW_EVIL_CONSTRUCTORS(C2SoftAmrWbEnc);
 };
 
 }  // namespace android
 
-#endif  // C2_SOFT_MP3_H_
+#endif  // C2_SOFT_AMRWB_ENC_H_
