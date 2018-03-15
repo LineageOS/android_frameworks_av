@@ -358,7 +358,7 @@ private:
     Vector<uint16_t> mDimgRefs;
     int32_t mIsPrimary;
     int32_t mWidth, mHeight;
-    int32_t mGridWidth, mGridHeight;
+    int32_t mTileWidth, mTileHeight;
     int32_t mGridRows, mGridCols;
     size_t mNumTiles, mTileIndex;
 
@@ -1770,8 +1770,8 @@ MPEG4Writer::Track::Track(
       mIsPrimary(0),
       mWidth(0),
       mHeight(0),
-      mGridWidth(0),
-      mGridHeight(0),
+      mTileWidth(0),
+      mTileHeight(0),
       mGridRows(0),
       mGridCols(0),
       mNumTiles(1),
@@ -1802,13 +1802,13 @@ MPEG4Writer::Track::Track(
         CHECK(mMeta->findInt32(kKeyWidth, &mWidth) && (mWidth > 0));
         CHECK(mMeta->findInt32(kKeyHeight, &mHeight) && (mHeight > 0));
 
-        int32_t gridWidth, gridHeight, gridRows, gridCols;
-        if (mMeta->findInt32(kKeyGridWidth, &gridWidth) && (gridWidth > 0) &&
-            mMeta->findInt32(kKeyGridHeight, &gridHeight) && (gridHeight > 0) &&
+        int32_t tileWidth, tileHeight, gridRows, gridCols;
+        if (mMeta->findInt32(kKeyTileWidth, &tileWidth) && (tileWidth > 0) &&
+            mMeta->findInt32(kKeyTileHeight, &tileHeight) && (tileHeight > 0) &&
             mMeta->findInt32(kKeyGridRows, &gridRows) && (gridRows > 0) &&
             mMeta->findInt32(kKeyGridCols, &gridCols) && (gridCols > 0)) {
-            mGridWidth = gridWidth;
-            mGridHeight = gridHeight;
+            mTileWidth = tileWidth;
+            mTileHeight = tileHeight;
             mGridRows = gridRows;
             mGridCols = gridCols;
             mNumTiles = gridRows * gridCols;
@@ -1978,8 +1978,8 @@ void MPEG4Writer::Track::addItemOffsetAndSize(off64_t offset, size_t size) {
 
         mProperties.push_back(mOwner->addProperty_l({
             .type = FOURCC('i', 's', 'p', 'e'),
-            .width = hasGrid ? mGridWidth : mWidth,
-            .height = hasGrid ? mGridHeight : mHeight,
+            .width = hasGrid ? mTileWidth : mWidth,
+            .height = hasGrid ? mTileHeight : mHeight,
         }));
 
         if (!hasGrid && heifRotation > 0) {
