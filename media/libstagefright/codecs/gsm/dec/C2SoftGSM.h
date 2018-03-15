@@ -14,26 +14,28 @@
  * limitations under the License.
  */
 
-#ifndef C2_SOFT_MP3_H_
-#define C2_SOFT_MP3_H_
+#ifndef C2_SOFT_GSM_H_
+#define C2_SOFT_GSM_H_
 
 #include <SimpleC2Component.h>
 
 #include <media/stagefright/foundation/ABase.h>
 
-struct tPVMP3DecoderExternal;
-
-bool parseMp3Header(uint32_t header, size_t *frame_size,
-                    uint32_t *out_sampling_rate = nullptr,
-                    uint32_t *out_channels = nullptr,
-                    uint32_t *out_bitrate = nullptr,
-                    uint32_t *out_num_samples = nullptr);
+extern "C" {
+    #include "gsm.h"
+}
 
 namespace android {
 
-struct C2SoftMP3 : public SimpleC2Component {
-    C2SoftMP3(const char *name, c2_node_id_t id);
-    virtual ~C2SoftMP3();
+#define FRGSM_IN_FRM_SZ             33
+#define FRGSM_IN_FRM_SZ_MINUS_1     32
+#define FRGSM_OUT_FRM_SZ            160
+#define MSGSM_IN_FRM_SZ             (FRGSM_IN_FRM_SZ + FRGSM_IN_FRM_SZ_MINUS_1)
+#define MSGSM_OUT_FRM_SZ            (FRGSM_OUT_FRM_SZ * 2)
+
+struct C2SoftGSM : public SimpleC2Component {
+    C2SoftGSM(const char *name, c2_node_id_t id);
+    virtual ~C2SoftGSM();
 
     // From SimpleC2Component
     c2_status_t onInit() override;
@@ -47,28 +49,14 @@ struct C2SoftMP3 : public SimpleC2Component {
     c2_status_t drain(
             uint32_t drainMode,
             const std::shared_ptr<C2BlockPool> &pool) override;
-
-private:
-    enum {
-        kPVMP3DecoderDelay = 529 // samples
-    };
-
-    tPVMP3DecoderExternal *mConfig;
-    void *mDecoderBuf;
-
-    int32_t mNumChannels;
-    int32_t mSamplingRate;
-    bool mIsFirst;
+ private:
+    gsm mGsm;
     bool mSignalledError;
-    bool mSignalledOutputEos;
-    uint64_t mAnchorTimeStamp;
-    uint64_t mProcessedSamples;
+    bool mSignalledEos;
 
-    status_t initDecoder();
-
-    DISALLOW_EVIL_CONSTRUCTORS(C2SoftMP3);
+    DISALLOW_EVIL_CONSTRUCTORS(C2SoftGSM);
 };
 
 }  // namespace android
 
-#endif  // C2_SOFT_MP3_H_
+#endif  // C2_SOFT_GSM_H_
