@@ -31,6 +31,7 @@
 #include "ItemTable.h"
 #include "include/ESDS.h"
 
+#include <media/ExtractorUtils.h>
 #include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -1324,17 +1325,17 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             if (mLastTrack == NULL)
                 return ERROR_MALFORMED;
 
-            sp<ABuffer> buffer = new ABuffer(chunk_data_size);
-            if (buffer->data() == NULL) {
+            auto buffer = heapbuffer<uint8_t>(chunk_data_size);
+            if (buffer.get() == NULL) {
                 return NO_MEMORY;
             }
 
             if (mDataSource->readAt(
-                        data_offset, buffer->data(), chunk_data_size) < chunk_data_size) {
+                        data_offset, buffer.get(), chunk_data_size) < chunk_data_size) {
                 return ERROR_IO;
             }
 
-            String8 mimeFormat((const char *)(buffer->data()), chunk_data_size);
+            String8 mimeFormat((const char *)(buffer.get()), chunk_data_size);
             mLastTrack->meta.setCString(kKeyMIMEType, mimeFormat.string());
 
             break;
@@ -1833,15 +1834,15 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         {
             *offset += chunk_size;
 
-            sp<ABuffer> buffer = new ABuffer(chunk_data_size);
+            auto buffer = heapbuffer<uint8_t>(chunk_data_size);
 
-            if (buffer->data() == NULL) {
+            if (buffer.get() == NULL) {
                 ALOGE("b/28471206");
                 return NO_MEMORY;
             }
 
             if (mDataSource->readAt(
-                        data_offset, buffer->data(), chunk_data_size) < chunk_data_size) {
+                        data_offset, buffer.get(), chunk_data_size) < chunk_data_size) {
                 return ERROR_IO;
             }
 
@@ -1849,21 +1850,21 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 return ERROR_MALFORMED;
 
             mLastTrack->meta.setData(
-                    kKeyAVCC, kTypeAVCC, buffer->data(), chunk_data_size);
+                    kKeyAVCC, kTypeAVCC, buffer.get(), chunk_data_size);
 
             break;
         }
         case FOURCC('h', 'v', 'c', 'C'):
         {
-            sp<ABuffer> buffer = new ABuffer(chunk_data_size);
+            auto buffer = heapbuffer<uint8_t>(chunk_data_size);
 
-            if (buffer->data() == NULL) {
+            if (buffer.get() == NULL) {
                 ALOGE("b/28471206");
                 return NO_MEMORY;
             }
 
             if (mDataSource->readAt(
-                        data_offset, buffer->data(), chunk_data_size) < chunk_data_size) {
+                        data_offset, buffer.get(), chunk_data_size) < chunk_data_size) {
                 return ERROR_IO;
             }
 
@@ -1871,7 +1872,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 return ERROR_MALFORMED;
 
             mLastTrack->meta.setData(
-                    kKeyHVCC, kTypeHVCC, buffer->data(), chunk_data_size);
+                    kKeyHVCC, kTypeHVCC, buffer.get(), chunk_data_size);
 
             *offset += chunk_size;
             break;
@@ -2212,13 +2213,13 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             if (chunk_data_size < 0 || static_cast<uint64_t>(chunk_data_size) >= SIZE_MAX - 1) {
                 return ERROR_MALFORMED;
             }
-            sp<ABuffer> buffer = new ABuffer(chunk_data_size + 1);
-            if (buffer->data() == NULL) {
+            auto buffer = heapbuffer<uint8_t>(chunk_data_size);
+            if (buffer.get() == NULL) {
                 ALOGE("b/28471206");
                 return NO_MEMORY;
             }
             if (mDataSource->readAt(
-                data_offset, buffer->data(), chunk_data_size) != (ssize_t)chunk_data_size) {
+                data_offset, buffer.get(), chunk_data_size) != (ssize_t)chunk_data_size) {
                 return ERROR_IO;
             }
             const int kSkipBytesOfDataBox = 16;
@@ -2228,7 +2229,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
             mFileMetaData.setData(
                 kKeyAlbumArt, MetaData::TYPE_NONE,
-                buffer->data() + kSkipBytesOfDataBox, chunk_data_size - kSkipBytesOfDataBox);
+                buffer.get() + kSkipBytesOfDataBox, chunk_data_size - kSkipBytesOfDataBox);
 
             break;
         }
@@ -2626,16 +2627,16 @@ status_t MPEG4Extractor::parseQTMetaKey(off64_t offset, size_t size) {
         keySize -= 8;
         keyOffset += 8;
 
-        sp<ABuffer> keyData = new ABuffer(keySize);
-        if (keyData->data() == NULL) {
+        auto keyData = heapbuffer<uint8_t>(keySize);
+        if (keyData.get() == NULL) {
             return ERROR_MALFORMED;
         }
         if (mDataSource->readAt(
-                keyOffset, keyData->data(), keySize) < (ssize_t) keySize) {
+                keyOffset, keyData.get(), keySize) < (ssize_t) keySize) {
             return ERROR_MALFORMED;
         }
 
-        AString key((const char *)keyData->data(), keySize);
+        AString key((const char *)keyData.get(), keySize);
         mMetaKeyMap.add(i, key);
 
         keyOffset += keySize;
