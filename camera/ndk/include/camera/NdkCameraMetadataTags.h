@@ -1309,8 +1309,8 @@ typedef enum acamera_metadata_tag {
      * Any state (excluding LOCKED) | ACAMERA_CONTROL_AE_PRECAPTURE_TRIGGER is START | PRECAPTURE     | Start AE precapture metering sequence
      * Any state (excluding LOCKED) | ACAMERA_CONTROL_AE_PRECAPTURE_TRIGGER is CANCEL| INACTIVE       | Currently active precapture metering sequence is canceled</p>
      * <p>If the camera device supports AE external flash mode (ON_EXTERNAL_FLASH is included in
-     * ACAMERA_CONTROL_AE_AVAILABLE_MODES), aeState must be FLASH_REQUIRED after the camera device
-     * finishes AE scan and it's too dark without flash.</p>
+     * ACAMERA_CONTROL_AE_AVAILABLE_MODES), ACAMERA_CONTROL_AE_STATE must be FLASH_REQUIRED after
+     * the camera device finishes AE scan and it's too dark without flash.</p>
      * <p>For the above table, the camera device may skip reporting any state changes that happen
      * without application intervention (i.e. mode switch, trigger, locking). Any state that
      * can be skipped in that manner is called a transient state.</p>
@@ -1331,6 +1331,7 @@ typedef enum acamera_metadata_tag {
      * @see ACAMERA_CONTROL_AE_LOCK
      * @see ACAMERA_CONTROL_AE_MODE
      * @see ACAMERA_CONTROL_AE_PRECAPTURE_TRIGGER
+     * @see ACAMERA_CONTROL_AE_STATE
      * @see ACAMERA_CONTROL_MODE
      * @see ACAMERA_CONTROL_SCENE_MODE
      */
@@ -5500,9 +5501,11 @@ typedef enum acamera_metadata_enum_acamera_control_ae_mode {
      * for the external flash. Otherwise, this mode acts like ON.</p>
      * <p>When the external flash is turned off, AE mode should be changed to one of the
      * other available AE modes.</p>
-     * <p>If the camera device supports AE external flash mode, aeState must be
-     * FLASH_REQUIRED after the camera device finishes AE scan and it's too dark without
+     * <p>If the camera device supports AE external flash mode, ACAMERA_CONTROL_AE_STATE must
+     * be FLASH_REQUIRED after the camera device finishes AE scan and it's too dark without
      * flash.</p>
+     *
+     * @see ACAMERA_CONTROL_AE_STATE
      */
     ACAMERA_CONTROL_AE_MODE_ON_EXTERNAL_FLASH                        = 5,
 
