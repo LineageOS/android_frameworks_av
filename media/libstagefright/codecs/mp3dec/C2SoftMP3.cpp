@@ -32,7 +32,7 @@
 
 namespace android {
 
-constexpr char kComponentName[] = "c2.google.aac.encoder";
+constexpr char kComponentName[] = "c2.google.mp3.decoder";
 
 static std::shared_ptr<C2ComponentInterface> BuildIntf(
         const char *name, c2_node_id_t id,
@@ -68,6 +68,8 @@ c2_status_t C2SoftMP3::onStop() {
     mSignalledError = false;
     mIsFirst = true;
     mSignalledOutputEos = false;
+    mAnchorTimeStamp = 0;
+    mProcessedSamples = 0;
 
     return C2_OK;
 }
@@ -105,6 +107,8 @@ status_t C2SoftMP3::initDecoder() {
     mIsFirst = true;
     mSignalledError = false;
     mSignalledOutputEos = false;
+    mAnchorTimeStamp = 0;
+    mProcessedSamples = 0;
 
     return OK;
 }
@@ -269,11 +273,6 @@ c2_status_t C2SoftMP3::drain(
 
 // TODO: Can overall error checking be improved? As in the check for validity of
 //       work, pool ptr, work->input.buffers.size() == 1, ...
-// TODO: Gapless playback: decoder has a delay of 529 samples. For the first
-//       frame we intend to remove 529 samples worth of data. When this is
-//       done it is going to effect the timestamps of future frames. This
-//       timestamp correction is handled by the client or plugin? Soft omx mp3
-//       plugin also has this problem
 // TODO: Blind removal of 529 samples from the output may not work. Because
 //       mpeg layer 1 frame size is 384 samples per frame. This should introduce
 //       negative values and can cause SEG faults. Soft omx mp3 plugin can have
@@ -292,10 +291,10 @@ void C2SoftMP3::process(
     bool eos = ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM) != 0);
     size_t inOffset = inBuffer.offset();
     size_t inSize = inBuffer.size();
-    C2ReadView rView = inBuffer.map().get();
+    C2ReadView rView = work->input.buffers[0]->data().linearBlocks().front().map().get();
     if (inSize && rView.error()) {
         ALOGE("read view map failed %d", rView.error());
-        work->result = C2_CORRUPTED;
+        work->result = rView.error();
         return;
     }
 
@@ -315,8 +314,8 @@ void C2SoftMP3::process(
 
     size_t calOutSize;
     std::vector<size_t> decodedSizes;
-    if (OK != calculateOutSize(const_cast<uint8 *>(rView.data() + inOffset),
-                               inSize, &decodedSizes)) {
+    const uint8_t *inPtr = rView.data() + inOffset;
+    if (OK != calculateOutSize(const_cast<uint8 *>(inPtr), inSize, &decodedSizes)) {
         work->result = C2_CORRUPTED;
         return;
     }
@@ -332,21 +331,22 @@ void C2SoftMP3::process(
     C2WriteView wView = block->map().get();
     if (wView.error()) {
         ALOGE("write view map failed %d", wView.error());
-        work->result = C2_CORRUPTED;
+        work->result = wView.error();
         return;
     }
 
     int outSize = 0;
     int outOffset = 0;
     auto it = decodedSizes.begin();
-    while (inOffset < inSize) {
+    size_t inPos = 0;
+    while (inPos < inSize) {
         if (it == decodedSizes.end()) {
             ALOGE("unexpected trailing bytes, ignoring them");
             break;
         }
 
-        mConfig->pInputBuffer = const_cast<uint8 *>(rView.data() + inOffset);
-        mConfig->inputBufferCurrentLength = (inSize - inOffset);
+        mConfig->pInputBuffer = const_cast<uint8 *>(inPtr + inPos);
+        mConfig->inputBufferCurrentLength = (inSize - inPos);
         mConfig->inputBufferMaxLength = 0;
         mConfig->inputBufferUsedLength = 0;
         mConfig->outputFrameSize = (calOutSize - outSize);
@@ -382,7 +382,7 @@ void C2SoftMP3::process(
             return;
         }
         outSize += mConfig->outputFrameSize * sizeof(int16_t);
-        inOffset += mConfig->inputBufferUsedLength;
+        inPos += mConfig->inputBufferUsedLength;
         it++;
     }
     if (mIsFirst) {
@@ -391,13 +391,19 @@ void C2SoftMP3::process(
         // the start of the first output buffer. This essentially makes this
         // decoder have zero delay, which the rest of the pipeline assumes.
         outOffset = kPVMP3DecoderDelay * mNumChannels * sizeof(int16_t);
+        mAnchorTimeStamp = work->input.ordinal.timestamp.peekull();
     }
-    ALOGV("out buffer attr. offset %d size %d", outOffset, outSize);
+    uint64_t outTimeStamp = mProcessedSamples * 1000000ll / mSamplingRate;
+    mProcessedSamples += ((outSize - outOffset) / (mNumChannels * sizeof(int16_t)));
+    ALOGV("out buffer attr. offset %d size %d timestamp %u", outOffset, outSize - outOffset,
+          (uint32_t)(mAnchorTimeStamp + outTimeStamp));
     decodedSizes.clear();
     work->worklets.front()->output.flags = work->input.flags;
     work->worklets.front()->output.buffers.clear();
-    work->worklets.front()->output.buffers.push_back(createLinearBuffer(block, outOffset, outSize));
+    work->worklets.front()->output.buffers.push_back(
+            createLinearBuffer(block, outOffset, outSize - outOffset));
     work->worklets.front()->output.ordinal = work->input.ordinal;
+    work->worklets.front()->output.ordinal.timestamp = mAnchorTimeStamp + outTimeStamp;
     work->workletsProcessed = 1u;
     if (eos) {
         mSignalledOutputEos = true;
