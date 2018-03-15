@@ -386,32 +386,36 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void skipToPreviousItem_impl() {
-        ensureCallingThread();
-        // TODO(jaewan): Implement this (b/74175632)
-        /*
-        final MediaPlayerBase player = mPlayer;
-        if (player != null) {
-            // TODO implement
-            //player.skipToPrevious();
+    public void skipToPlaylistItem_impl(MediaItem2 item) {
+        if (item == null) {
+            throw new IllegalArgumentException("item shouldn't be null");
+        }
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            agent.skipToPlaylistItem(item);
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
-        */
+    }
+
+    @Override
+    public void skipToPreviousItem_impl() {
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            agent.skipToPreviousItem();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
     public void skipToNextItem_impl() {
-        ensureCallingThread();
-        // TODO(jaewan): Implement this (b/74175632)
-        /*
-        final MediaPlayerBase player = mPlayer;
-        if (player != null) {
-            player.skipToNext();
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            agent.skipToNextItem();
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
-        */
     }
 
     @Override
@@ -643,24 +647,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
-    }
-
-    @Override
-    public void skipToPlaylistItem_impl(MediaItem2 item) {
-        ensureCallingThread();
-        if (item == null) {
-            throw new IllegalArgumentException("item shouldn't be null");
-        }
-        // TODO: Uncomment or remove
-        /*
-        final MediaPlayerBase player = mPlayer;
-        if (player != null) {
-            // TODO implement
-            //player.setCurrentPlaylistItem(item);
-        } else if (DEBUG) {
-            Log.d(TAG, "API calls after the close()", new IllegalStateException());
-        }
-        */
     }
 
     @Override
