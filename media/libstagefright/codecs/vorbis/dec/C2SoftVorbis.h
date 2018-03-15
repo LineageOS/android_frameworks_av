@@ -14,26 +14,21 @@
  * limitations under the License.
  */
 
-#ifndef C2_SOFT_MP3_H_
-#define C2_SOFT_MP3_H_
+#ifndef C2_SOFT_VORBIS_H_
+#define C2_SOFT_VORBIS_H_
 
 #include <SimpleC2Component.h>
 
 #include <media/stagefright/foundation/ABase.h>
 
-struct tPVMP3DecoderExternal;
-
-bool parseMp3Header(uint32_t header, size_t *frame_size,
-                    uint32_t *out_sampling_rate = nullptr,
-                    uint32_t *out_channels = nullptr,
-                    uint32_t *out_bitrate = nullptr,
-                    uint32_t *out_num_samples = nullptr);
+struct vorbis_dsp_state;
+struct vorbis_info;
 
 namespace android {
 
-struct C2SoftMP3 : public SimpleC2Component {
-    C2SoftMP3(const char *name, c2_node_id_t id);
-    virtual ~C2SoftMP3();
+struct C2SoftVorbis : public SimpleC2Component {
+    C2SoftVorbis(const char *name, c2_node_id_t id);
+    virtual ~C2SoftVorbis();
 
     // From SimpleC2Component
     c2_status_t onInit() override;
@@ -48,27 +43,27 @@ struct C2SoftMP3 : public SimpleC2Component {
             uint32_t drainMode,
             const std::shared_ptr<C2BlockPool> &pool) override;
 
-private:
+ private:
     enum {
-        kPVMP3DecoderDelay = 529 // samples
+        kMaxNumSamplesPerChannel = 8192,
     };
 
-    tPVMP3DecoderExternal *mConfig;
-    void *mDecoderBuf;
+    vorbis_dsp_state *mState;
+    vorbis_info *mVi;
 
+    int32_t mNumFramesLeftOnPage;
     int32_t mNumChannels;
     int32_t mSamplingRate;
-    bool mIsFirst;
+    size_t mInputBufferCount;
     bool mSignalledError;
     bool mSignalledOutputEos;
-    uint64_t mAnchorTimeStamp;
-    uint64_t mProcessedSamples;
 
     status_t initDecoder();
 
-    DISALLOW_EVIL_CONSTRUCTORS(C2SoftMP3);
+    DISALLOW_EVIL_CONSTRUCTORS(C2SoftVorbis);
 };
 
 }  // namespace android
 
-#endif  // C2_SOFT_MP3_H_
+#endif  // C2_SOFT_VORBIS_H_
+
