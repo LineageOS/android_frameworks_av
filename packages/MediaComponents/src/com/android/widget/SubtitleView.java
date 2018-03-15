@@ -18,12 +18,13 @@ package com.android.widget;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.media.SubtitleController.Anchor;
-import android.media.SubtitleTrack.RenderingWidget;
 import android.os.Looper;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.widget.FrameLayout;
+
+import com.android.media.subtitle.SubtitleController.Anchor;
+import com.android.media.subtitle.SubtitleTrack.RenderingWidget;
 
 class SubtitleView extends FrameLayout implements Anchor {
     private static final String TAG = "SubtitleView";
