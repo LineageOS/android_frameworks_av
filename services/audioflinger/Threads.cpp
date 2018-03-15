@@ -3481,7 +3481,8 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                             if (diff > 0) {
                                 // notify of throttle end on debug log
                                 // but prevent spamming for bluetooth
-                                ALOGD_IF(!audio_is_a2dp_out_device(outDevice()),
+                                ALOGD_IF(!audio_is_a2dp_out_device(outDevice()) &&
+                                         !audio_is_hearing_aid_out_device(outDevice()),
                                         "mixer(%p) throttle end: throttle time(%u)", this, diff);
                                 mThreadThrottleEndMs = mThreadThrottleTimeMs;
                             }
