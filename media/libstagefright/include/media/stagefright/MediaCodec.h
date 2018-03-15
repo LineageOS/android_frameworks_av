@@ -184,6 +184,8 @@ struct MediaCodec : public AHandler {
 
     status_t getName(AString *componentName) const;
 
+    status_t getCodecInfo(sp<MediaCodecInfo> *codecInfo) const;
+
     status_t getMetrics(MediaAnalyticsItem * &reply);
 
     status_t setParameters(const sp<AMessage> &params);
@@ -248,6 +250,7 @@ private:
         kWhatRequestIDRFrame                = 'ridr',
         kWhatRequestActivityNotification    = 'racN',
         kWhatGetName                        = 'getN',
+        kWhatGetCodecInfo                   = 'gCoI',
         kWhatSetParameters                  = 'setP',
         kWhatSetCallback                    = 'setC',
         kWhatSetNotification                = 'setN',
