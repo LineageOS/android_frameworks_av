@@ -47,14 +47,15 @@ public:
 
     bool isFileDescriptorSafe(SharedMemoryParcelable *memoryParcels);
 
-    aaudio_result_t validate();
-
     void dump();
 
 protected:
     int32_t mSharedMemoryIndex = -1;
     int32_t mOffsetInBytes     = 0;
     int32_t mSizeInBytes       = 0;
+
+private:
+    aaudio_result_t validate() const;
 };
 
 } /* namespace aaudio */
