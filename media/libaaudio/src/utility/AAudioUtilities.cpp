@@ -597,16 +597,21 @@ audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t pres
 }
 
 int32_t AAudioConvert_framesToBytes(int32_t numFrames,
-                                            int32_t bytesPerFrame,
-                                            int32_t *sizeInBytes) {
-    // TODO implement more elegantly
-    const int32_t maxChannels = 256; // ridiculously large
-    const int32_t maxBytesPerFrame = maxChannels * sizeof(float);
-    // Prevent overflow by limiting multiplicands.
-    if (bytesPerFrame > maxBytesPerFrame || numFrames > (0x3FFFFFFF / maxBytesPerFrame)) {
+                                    int32_t bytesPerFrame,
+                                    int32_t *sizeInBytes) {
+    *sizeInBytes = 0;
+
+    if (numFrames < 0 || bytesPerFrame < 0) {
+        ALOGE("negative size, numFrames = %d, frameSize = %d", numFrames, bytesPerFrame);
+        return AAUDIO_ERROR_OUT_OF_RANGE;
+    }
+
+    // Prevent numeric overflow.
+    if (numFrames > (INT32_MAX / bytesPerFrame)) {
         ALOGE("size overflow, numFrames = %d, frameSize = %d", numFrames, bytesPerFrame);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
+
     *sizeInBytes = numFrames * bytesPerFrame;
     return AAUDIO_OK;
 }
