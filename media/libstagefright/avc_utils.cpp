@@ -339,7 +339,7 @@ static sp<ABuffer> FindNAL(const uint8_t *data, size_t size, unsigned nalType) {
     const uint8_t *nalStart;
     size_t nalSize;
     while (getNextNALUnit(&data, &size, &nalStart, &nalSize, true) == OK) {
-        if ((nalStart[0] & 0x1f) == nalType) {
+        if (nalSize > 0 && (nalStart[0] & 0x1f) == nalType) {
             sp<ABuffer> buffer = new ABuffer(nalSize);
             memcpy(buffer->data(), nalStart, nalSize);
             return buffer;
