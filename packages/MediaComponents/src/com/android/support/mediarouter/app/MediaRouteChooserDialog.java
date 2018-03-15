@@ -99,8 +99,8 @@ public class MediaRouteChooserDialog extends Dialog {
 
     public MediaRouteChooserDialog(Context context, int theme) {
         // TODO (b/72975976): Avoid to use ContextThemeWrapper with app context and lib theme.
-        super(new ContextThemeWrapper(context,
-                ApiHelper.getLibTheme(MediaRouterThemeHelper.getRouterThemeId(context))), theme);
+        super(new ContextThemeWrapper(context, ApiHelper.getLibTheme(context,
+                MediaRouterThemeHelper.getRouterThemeId(context))), theme);
         context = getContext();
 
         mRouter = MediaRouter.getInstance(context);
@@ -187,8 +187,8 @@ public class MediaRouteChooserDialog extends Dialog {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        setContentView(ApiHelper.inflateLibLayout(getContext(),
-                ApiHelper.getLibTheme(MediaRouterThemeHelper.getRouterThemeId(getContext())),
+        setContentView(ApiHelper.inflateLibLayout(getContext(), ApiHelper.getLibTheme(getContext(),
+                MediaRouterThemeHelper.getRouterThemeId(getContext())),
                 R.layout.mr_chooser_dialog));
 
         mRoutes = new ArrayList<>();
@@ -206,7 +206,7 @@ public class MediaRouteChooserDialog extends Dialog {
      * Sets the width of the dialog. Also called when configuration changes.
      */
     void updateLayout() {
-        getWindow().setLayout(MediaRouteDialogHelper.getDialogWidth(),
+        getWindow().setLayout(MediaRouteDialogHelper.getDialogWidth(getContext()),
                 ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
@@ -263,7 +263,7 @@ public class MediaRouteChooserDialog extends Dialog {
         public RouteAdapter(Context context, List<MediaRouter.RouteInfo> routes) {
             super(context, 0, routes);
 
-            TypedArray styledAttributes = ApiHelper.getLibTheme(
+            TypedArray styledAttributes = ApiHelper.getLibTheme(context,
                     MediaRouterThemeHelper.getRouterThemeId(context)).obtainStyledAttributes(
                             new int[] {
                                 R.attr.mediaRouteDefaultIconDrawable,
@@ -294,7 +294,7 @@ public class MediaRouteChooserDialog extends Dialog {
             View view = convertView;
             if (view == null) {
                 view = ApiHelper.inflateLibLayout(getContext(),
-                        ApiHelper.getLibTheme(
+                        ApiHelper.getLibTheme(getContext(),
                                 MediaRouterThemeHelper.getRouterThemeId(getContext())),
                         R.layout.mr_chooser_list_item, parent, false);
             }
