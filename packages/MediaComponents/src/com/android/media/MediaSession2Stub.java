@@ -495,12 +495,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 case MediaSession2.COMMAND_CODE_PLAYBACK_STOP:
                     session.getInstance().stop();
                     break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM:
-                    session.getInstance().skipToPreviousItem();
-                    break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM:
-                    session.getInstance().skipToNextItem();
-                    break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE:
                     session.getInstance().prepare();
                     break;
@@ -512,13 +506,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO:
                     session.getInstance().seekTo(args.getLong(ARGUMENT_KEY_POSITION));
-                    break;
-                case MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_TO_PLAYLIST_ITEM:
-                    // TODO(jaewan): Implement
-                    /*
-                    session.getInstance().skipToPlaylistItem(
-                            args.getInt(ARGUMENT_KEY_ITEM_INDEX));
-                    */
                     break;
                     // TODO(jaewan): Remove (b/74116823)
                     /*
@@ -708,9 +695,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM,
                 (session, controller) -> {
             MediaItem2 item = MediaItem2.fromBundle(session.getContext(), mediaItem);
-            List<MediaItem2> list = session.getInstance().getPlaylist();
-            // Trick to use the same reference for calls from the controller.
-            session.getInstance().removePlaylistItem(list.get(list.indexOf(item)));
+            // Note: MediaItem2 has hidden UUID to identify it across the processes.
+            session.getInstance().removePlaylistItem(item);
         });
     }
 
@@ -721,9 +707,40 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     // Resets the UUID from the incoming media id, so controller may reuse a media
                     // item multiple times for replacePlaylistItem.
                     session.getInstance().replacePlaylistItem(index,
+                            MediaItem2Impl.fromBundle(session.getContext(), mediaItem, null));
+                });
+    }
+
+    @Override
+    public void skipToPlaylistItem(IMediaController2 caller, Bundle mediaItem) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_TO_PLAYLIST_ITEM,
+                (session, controller) -> {
+                    if (mediaItem == null) {
+                        Log.w(TAG, "skipToPlaylistItem(): Ignoring null mediaItem from "
+                                + controller);
+                    }
+                    // Note: MediaItem2 has hidden UUID to identify it across the processes.
+                    session.getInstance().skipToPlaylistItem(
                             MediaItem2.fromBundle(session.getContext(), mediaItem));
                 });
     }
+
+    @Override
+    public void skipToPreviousItem(IMediaController2 caller) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM,
+                (session, controller) -> {
+                    session.getInstance().skipToPreviousItem();
+                });
+    }
+
+    @Override
+    public void skipToNextItem(IMediaController2 caller) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM,
+                (session, controller) -> {
+                    session.getInstance().skipToNextItem();
+                });
+    }
+
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     // AIDL methods for LibrarySession overrides

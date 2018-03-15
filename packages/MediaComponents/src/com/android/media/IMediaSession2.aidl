@@ -64,6 +64,9 @@ oneway interface IMediaSession2 {
     void addPlaylistItem(IMediaController2 caller, int index, in Bundle mediaItem);
     void removePlaylistItem(IMediaController2 caller, in Bundle mediaItem);
     void replacePlaylistItem(IMediaController2 caller, int index, in Bundle mediaItem);
+    void skipToPlaylistItem(IMediaController2 caller, in Bundle mediaItem);
+    void skipToPreviousItem(IMediaController2 caller);
+    void skipToNextItem(IMediaController2 caller);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     // library service specific
