@@ -56,6 +56,7 @@ cc_library_shared {
     srcs: [
         "CodecBase.cpp",
         "FrameRenderTracker.cpp",
+        "MediaCodecListWriter.cpp",
     ],
 
     cflags: [
@@ -66,7 +67,7 @@ cc_library_shared {
     shared_libs: [
         "libgui",
         "liblog",
-        "libmedia",
+        "libmedia_omx",
         "libstagefright_foundation",
         "libui",
         "libutils",
@@ -95,6 +96,7 @@ cc_library_shared {
         "CCodec.cpp",
         "CCodecBufferChannel.cpp",
         "Codec2Buffer.cpp",
+        "Codec2InfoBuilder.cpp",
     ],
 
     cflags: [
@@ -120,8 +122,10 @@ cc_library_shared {
         "libstagefright_codecbase",
         "libstagefright_foundation",
         "libstagefright_omx_utils",
+        "libstagefright_xmlparser",
         "libui",
         "libutils",
+        // TODO: Remove libv4l2_c2_componentstore.
         "libv4l2_c2componentstore",
         "android.hardware.cas.native@1.0",
 
@@ -154,7 +158,6 @@ cc_library_shared {
         "AudioPresentationInfo.cpp",
         "AudioSource.cpp",
         "BufferImpl.cpp",
-        "Codec2InfoBuilder.cpp",
         "CallbackDataSource.cpp",
         "CallbackMediaSource.cpp",
         "CameraSource.cpp",
@@ -190,6 +193,7 @@ cc_library_shared {
         "SkipCutBuffer.cpp",
         "StagefrightMediaScanner.cpp",
         "StagefrightMetadataRetriever.cpp",
+        "StagefrightPluginLoader.cpp",
         "SurfaceUtils.cpp",
         "Utils.cpp",
         "ThrottledSource.cpp",
@@ -217,8 +221,6 @@ cc_library_shared {
         "libutils",
         "libmedia_helper",
         "libstagefright_ccodec",
-        "libstagefright_codec2",
-        "libstagefright_codec2_vndk",
         "libstagefright_codecbase",
         "libstagefright_foundation",
         "libstagefright_omx",
@@ -228,8 +230,6 @@ cc_library_shared {
         "libhidlallocatorutils",
         "libhidlbase",
         "libhidlmemory",
-        // TODO: Remove libv4l2_c2_componentstore.
-        "libv4l2_c2componentstore",
         "libziparchive",
         "android.hidl.allocator@1.0",
         "android.hardware.cas.native@1.0",

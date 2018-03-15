@@ -16,11 +16,14 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MediaCodec"
+#include <utils/Log.h>
+
 #include <inttypes.h>
 
 #include "include/SecureBuffer.h"
 #include "include/SharedMemoryBuffer.h"
 #include "include/SoftwareRenderer.h"
+#include "StagefrightPluginLoader.h"
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 
@@ -45,7 +48,6 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/ACodec.h>
 #include <media/stagefright/BufferProducerWrapper.h>
-#include <media/stagefright/CCodec.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
@@ -56,7 +58,6 @@
 #include <media/stagefright/SurfaceUtils.h>
 #include <mediautils/BatteryNotifier.h>
 #include <private/android_filesystem_config.h>
-#include <utils/Log.h>
 #include <utils/Singleton.h>
 
 namespace android {
@@ -570,11 +571,15 @@ void MediaCodec::PostReplyWithError(const sp<AReplyToken> &replyID, int32_t err)
     response->postReply(replyID);
 }
 
+static CodecBase *CreateCCodec() {
+    return StagefrightPluginLoader::GetCCodecInstance()->createCodec();
+}
+
 //static
 sp<CodecBase> MediaCodec::GetCodecBase(const AString &name) {
     static bool ccodecEnabled = property_get_bool("debug.stagefright.ccodec", false);
     if (ccodecEnabled && name.startsWithIgnoreCase("c2.")) {
-        return new CCodec;
+        return CreateCCodec();
     } else if (name.startsWithIgnoreCase("omx.")) {
         // at this time only ACodec specifies a mime type.
         return new ACodec;
