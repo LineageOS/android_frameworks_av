@@ -22,28 +22,30 @@ import android.media.MediaController2;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaMetadata2;
-import android.media.MediaPlayerBase;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
-import android.media.MediaSession2.PlaylistParams;
 import android.media.Rating2;
 import android.media.VolumeProvider2;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Bundle;
+import android.os.DeadObjectException;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
+import android.support.annotation.NonNull;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.Log;
+import android.util.SparseArray;
 
 import com.android.media.MediaLibraryService2Impl.MediaLibrarySessionImpl;
 import com.android.media.MediaSession2Impl.CommandButtonImpl;
+import com.android.media.MediaSession2Impl.CommandGroupImpl;
 import com.android.media.MediaSession2Impl.ControllerInfoImpl;
 
 import java.lang.ref.WeakReference;
@@ -62,6 +64,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     private static final String TAG = "MediaSession2Stub";
     private static final boolean DEBUG = true; // TODO(jaewan): Rename.
 
+    private static final SparseArray<Command> sCommandsForOnCommandRequest = new SparseArray<>();
+
     private final Object mLock = new Object();
     private final WeakReference<MediaSession2Impl> mSession;
 
@@ -76,6 +80,19 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     public MediaSession2Stub(MediaSession2Impl session) {
         mSession = new WeakReference<>(session);
+
+        synchronized (sCommandsForOnCommandRequest) {
+            if (sCommandsForOnCommandRequest.size() == 0) {
+                CommandGroupImpl group = new CommandGroupImpl(session.getContext());
+                group.addAllPlaybackCommands();
+                group.addAllPlaylistCommands();
+                List<Command> commands = group.getCommands();
+                for (int i = 0; i < commands.size(); i++) {
+                    Command command = commands.get(i);
+                    sCommandsForOnCommandRequest.append(command.getCommandCode(), command);
+                }
+            }
+        }
     }
 
     public void destroyNotLocked() {
@@ -209,6 +226,117 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         }
     }
 
+    private void onCommand(@NonNull IMediaController2 caller, int commandCode,
+            @NonNull SessionRunnable runnable) {
+        final MediaSession2Impl session = getSession();
+        final ControllerInfo controller = getControllerIfAble(caller, commandCode);
+        if (session == null || controller == null) {
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(caller, commandCode) == null) {
+                return;
+            }
+            Command command = sCommandsForOnCommandRequest.get(commandCode);
+            if (command != null) {
+                boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
+                        controller, command);
+                if (!accepted) {
+                    // Don't run rejected command.
+                    if (DEBUG) {
+                        Log.d(TAG, "Command (code=" + commandCode + ") from "
+                                + controller + " was rejected by " + session);
+                    }
+                    return;
+                }
+            }
+            runnable.run(session, controller);
+        });
+    }
+
+    private void onBrowserCommand(@NonNull IMediaController2 caller,
+            @NonNull LibrarySessionRunnable runnable) {
+        final MediaLibrarySessionImpl session = getLibrarySession();
+        final ControllerInfo controller =
+                getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER);
+        if (session == null || controller == null) {
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
+                return;
+            }
+            runnable.run(session, controller);
+        });
+    }
+
+
+    private void notifyAll(int commandCode, @NonNull NotifyRunnable runnable) {
+        List<ControllerInfo> controllers = getControllers();
+        for (int i = 0; i < controllers.size(); i++) {
+            notifyInternal(controllers.get(i),
+                    getControllerBinderIfAble(controllers.get(i), commandCode), runnable);
+        }
+    }
+
+    private void notifyAll(@NonNull NotifyRunnable runnable) {
+        List<ControllerInfo> controllers = getControllers();
+        for (int i = 0; i < controllers.size(); i++) {
+            notifyInternal(controllers.get(i),
+                    getControllerBinderIfAble(controllers.get(i)), runnable);
+        }
+    }
+
+    private void notify(@NonNull ControllerInfo controller, @NonNull NotifyRunnable runnable) {
+        notifyInternal(controller, getControllerBinderIfAble(controller), runnable);
+    }
+
+    private void notify(@NonNull ControllerInfo controller, int commandCode,
+            @NonNull NotifyRunnable runnable) {
+        notifyInternal(controller, getControllerBinderIfAble(controller, commandCode), runnable);
+    }
+
+    // Do not call this API directly. Use notify() instead.
+    private void notifyInternal(@NonNull ControllerInfo controller,
+            @NonNull IMediaController2 iController, @NonNull NotifyRunnable runnable) {
+        if (controller == null || iController == null) {
+            return;
+        }
+        try {
+            runnable.run(controller, iController);
+        } catch (DeadObjectException e) {
+            if (DEBUG) {
+                Log.d(TAG, controller.toString() + " is gone", e);
+            }
+            onControllerClosed(iController);
+        } catch (RemoteException e) {
+            // Currently it's TransactionTooLargeException or DeadSystemException.
+            // We'd better to leave log for those cases because
+            //   - TransactionTooLargeException means that we may need to fix our code.
+            //     (e.g. add pagination or special way to deliver Bitmap)
+            //   - DeadSystemException means that errors around it can be ignored.
+            Log.w(TAG, "Exception in " + controller.toString(), e);
+        }
+    }
+
+    private void onControllerClosed(IMediaController2 iController) {
+        ControllerInfo controller;
+        synchronized (mLock) {
+            controller = mControllers.remove(iController.asBinder());
+            if (DEBUG) {
+                Log.d(TAG, "releasing " + controller);
+            }
+            mSubscriptions.remove(controller);
+        }
+        final MediaSession2Impl session = getSession();
+        if (session == null || controller == null) {
+            return;
+        }
+        session.getCallbackExecutor().execute(() -> {
+            session.getCallback().onDisconnected(session.getInstance(), controller);
+        });
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////////
     // AIDL methods for session overrides
     //////////////////////////////////////////////////////////////////////////////////////////////
@@ -266,8 +394,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 final long bufferedPositionMs = session.getInstance().getBufferedPosition();
                 final Bundle playbackInfoBundle = ((MediaController2Impl.PlaybackInfoImpl)
                         session.getPlaybackInfo().getProvider()).toBundle();
-                final PlaylistParams params = session.getInstance().getPlaylistParams();
-                final Bundle paramsBundle = (params != null) ? params.toBundle() : null;
+                final int repeatMode = session.getInstance().getRepeatMode();
+                final int shuffleMode = session.getInstance().getShuffleMode();
                 final PendingIntent sessionActivity = session.getSessionActivity();
                 final List<MediaItem2> playlist =
                         allowedCommands.hasCommand(MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST)
@@ -297,8 +425,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 try {
                     caller.onConnected(MediaSession2Stub.this, allowedCommands.toBundle(),
                             playerState, positionEventTimeMs, positionMs, playbackSpeed,
-                            bufferedPositionMs, playbackInfoBundle, paramsBundle, playlistBundle,
-                            sessionActivity);
+                            bufferedPositionMs, playbackInfoBundle, repeatMode, shuffleMode,
+                            playlistBundle, sessionActivity);
                 } catch (RemoteException e) {
                     // Controller may be died prematurely.
                     // TODO(jaewan): Handle here.
@@ -322,50 +450,13 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void release(final IMediaController2 caller) throws RemoteException {
-        ControllerInfo controller;
-        synchronized (mLock) {
-            controller = mControllers.remove(caller.asBinder());
-            if (DEBUG) {
-                Log.d(TAG, "releasing " + controller);
-            }
-            mSubscriptions.remove(controller);
-        }
-        final MediaSession2Impl session = getSession();
-        if (session == null || controller == null) {
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            session.getCallback().onDisconnected(session.getInstance(), controller);
-        });
+        onControllerClosed(caller);
     }
 
     @Override
     public void setVolumeTo(final IMediaController2 caller, final int value, final int flags)
             throws RuntimeException {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME);
-        if (session == null || controller == null) {
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME) == null) {
-                return;
-            }
-            // TODO(jaewan): Sanity check.
-            Command command = new Command(
-                    session.getContext(), MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME);
-            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
-                    controller, command);
-            if (!accepted) {
-                // Don't run rejected command.
-                if (DEBUG) {
-                    Log.d(TAG, "Command " + MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME + " from "
-                            + controller + " was rejected by " + session);
-                }
-                return;
-            }
-
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME, (session, controller) -> {
             VolumeProvider2 volumeProvider = session.getVolumeProvider();
             if (volumeProvider == null) {
                 // TODO(jaewan): Set local stream volume
@@ -378,30 +469,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void adjustVolume(IMediaController2 caller, int direction, int flags)
             throws RuntimeException {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME);
-        if (session == null || controller == null) {
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME) == null) {
-                return;
-            }
-            // TODO(jaewan): Sanity check.
-            Command command = new Command(
-                    session.getContext(), MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME);
-            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
-                    controller, command);
-            if (!accepted) {
-                // Don't run rejected command.
-                if (DEBUG) {
-                    Log.d(TAG, "Command " + MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME + " from "
-                            + controller + " was rejected by " + session);
-                }
-                return;
-            }
-
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME, (session, controller) -> {
             VolumeProvider2 volumeProvider = session.getVolumeProvider();
             if (volumeProvider == null) {
                 // TODO(jaewan): Adjust local stream volume
@@ -414,28 +482,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void sendTransportControlCommand(IMediaController2 caller,
             int commandCode, Bundle args) throws RuntimeException {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(caller, commandCode);
-        if (session == null || controller == null) {
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller, commandCode) == null) {
-                return;
-            }
-            // TODO(jaewan): Sanity check.
-            Command command = new Command(session.getContext(), commandCode);
-            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
-                    controller, command);
-            if (!accepted) {
-                // Don't run rejected command.
-                if (DEBUG) {
-                    Log.d(TAG, "Command " + commandCode + " from "
-                            + controller + " was rejected by " + session);
-                }
-                return;
-            }
-
+        onCommand(caller, commandCode, (session, controller) -> {
             switch (commandCode) {
                 case MediaSession2.COMMAND_CODE_PLAYBACK_PLAY:
                     session.getInstance().play();
@@ -445,12 +492,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_STOP:
                     session.getInstance().stop();
-                    break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM:
-                    session.getInstance().skipToPreviousItem();
-                    break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM:
-                    session.getInstance().skipToNextItem();
                     break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE:
                     session.getInstance().prepare();
@@ -464,21 +505,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO:
                     session.getInstance().seekTo(args.getLong(ARGUMENT_KEY_POSITION));
                     break;
-                case MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_TO_PLAYLIST_ITEM:
-                    // TODO(jaewan): Implement
-                    /*
-                    session.getInstance().skipToPlaylistItem(
-                            args.getInt(ARGUMENT_KEY_ITEM_INDEX));
-                    */
-                    break;
-                    // TODO(jaewan): Remove (b/74116823)
-                    /*
-                case MediaSession2.COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS:
-                    session.getInstance().setPlaylistParams(
-                            PlaylistParams.fromBundle(session.getContext(),
-                                    args.getBundle(ARGUMENT_KEY_PLAYLIST_PARAMS)));
-                    break;
-                    */
                 default:
                     // TODO(jaewan): Resend unknown (new) commands through the custom command.
             }
@@ -514,42 +540,21 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void prepareFromUri(final IMediaController2 caller, final Uri uri,
             final Bundle extras) {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_URI);
-        if (session == null || controller == null) {
-            return;
-        }
-        if (uri == null) {
-            Log.w(TAG, "prepareFromUri(): Ignoring null uri from " + controller);
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(
-                    caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_URI) == null) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_URI, (session, controller) -> {
+            if (uri == null) {
+                Log.w(TAG, "prepareFromUri(): Ignoring null uri from " + controller);
                 return;
             }
-            session.getCallback().onPrepareFromUri(session.getInstance(),
-                    controller, uri, extras);
+            session.getCallback().onPrepareFromUri(session.getInstance(), controller, uri, extras);
         });
     }
 
     @Override
     public void prepareFromSearch(final IMediaController2 caller, final String query,
             final Bundle extras) {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_SEARCH);
-        if (session == null || controller == null) {
-            return;
-        }
-        if (TextUtils.isEmpty(query)) {
-            Log.w(TAG, "prepareFromSearch(): Ignoring empty query from " + controller);
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(
-                    caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_SEARCH) == null) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_SEARCH, (session, controller) -> {
+            if (TextUtils.isEmpty(query)) {
+                Log.w(TAG, "prepareFromSearch(): Ignoring empty query from " + controller);
                 return;
             }
             session.getCallback().onPrepareFromSearch(session.getInstance(),
@@ -560,19 +565,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void prepareFromMediaId(final IMediaController2 caller, final String mediaId,
             final Bundle extras) {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_MEDIA_ID);
-        if (session == null || controller == null) {
-            return;
-        }
-        if (mediaId == null) {
-            Log.w(TAG, "prepareFromMediaId(): Ignoring null mediaId from " + controller);
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(
-                    caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_MEDIA_ID) == null) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_MEDIA_ID,
+                (session, controller) -> {
+            if (mediaId == null) {
+                Log.w(TAG, "prepareFromMediaId(): Ignoring null mediaId from " + controller);
                 return;
             }
             session.getCallback().onPrepareFromMediaId(session.getInstance(),
@@ -583,19 +579,9 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void playFromUri(final IMediaController2 caller, final Uri uri,
             final Bundle extras) {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_PLAY_FROM_URI);
-        if (session == null || controller == null) {
-            return;
-        }
-        if (uri == null) {
-            Log.w(TAG, "playFromUri(): Ignoring null uri from " + controller);
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(
-                    caller, MediaSession2.COMMAND_CODE_PLAY_FROM_URI) == null) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAY_FROM_URI, (session, controller) -> {
+            if (uri == null) {
+                Log.w(TAG, "playFromUri(): Ignoring null uri from " + controller);
                 return;
             }
             session.getCallback().onPlayFromUri(session.getInstance(), controller, uri, extras);
@@ -605,19 +591,9 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void playFromSearch(final IMediaController2 caller, final String query,
             final Bundle extras) {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_PLAY_FROM_SEARCH);
-        if (session == null || controller == null) {
-            return;
-        }
-        if (TextUtils.isEmpty(query)) {
-            Log.w(TAG, "playFromSearch(): Ignoring empty query from " + controller);
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(
-                    caller, MediaSession2.COMMAND_CODE_PLAY_FROM_SEARCH) == null) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAY_FROM_SEARCH, (session, controller) -> {
+            if (TextUtils.isEmpty(query)) {
+                Log.w(TAG, "playFromSearch(): Ignoring empty query from " + controller);
                 return;
             }
             session.getCallback().onPlayFromSearch(session.getInstance(),
@@ -628,18 +604,9 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void playFromMediaId(final IMediaController2 caller, final String mediaId,
             final Bundle extras) {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_PLAY_FROM_MEDIA_ID);
-        if (session == null || controller == null) {
-            return;
-        }
-        if (mediaId == null) {
-            Log.w(TAG, "playFromMediaId(): Ignoring null mediaId from " + controller);
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (session == null) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAY_FROM_MEDIA_ID, (session, controller) -> {
+            if (mediaId == null) {
+                Log.w(TAG, "playFromMediaId(): Ignoring null mediaId from " + controller);
                 return;
             }
             session.getCallback().onPlayFromMediaId(session.getInstance(),
@@ -650,21 +617,14 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void setRating(final IMediaController2 caller, final String mediaId,
             final Bundle ratingBundle) {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(caller);
-        if (session == null || controller == null) {
-            return;
-        }
-        if (mediaId == null) {
-            Log.w(TAG, "setRating(): Ignoring null mediaId from " + controller);
-            return;
-        }
-        if (ratingBundle == null) {
-            Log.w(TAG, "setRating(): Ignoring null ratingBundle from " + controller);
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller) == null) {
+        // TODO(jaewan): Define COMMAND_CODE_SET_RATING
+        onCommand(caller, MediaSession2.COMMAND_CODE_SET_RATING, (session, controller) -> {
+            if (mediaId == null) {
+                Log.w(TAG, "setRating(): Ignoring null mediaId from " + controller);
+                return;
+            }
+            if (ratingBundle == null) {
+                Log.w(TAG, "setRating(): Ignoring null ratingBundle from " + controller);
                 return;
             }
             Rating2 rating = Rating2Impl.fromBundle(session.getContext(), ratingBundle);
@@ -682,35 +642,16 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void setPlaylist(final IMediaController2 caller, final List<Bundle> playlist,
             final Bundle metadata) {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST);
-        if (session == null || controller == null) {
-            return;
-        }
-        if (playlist == null) {
-            Log.w(TAG, "setPlaylist(): Ignoring null playlist from " + controller);
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(
-                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST) == null) {
-                return;
-            }
-            Command command = new Command(session.getContext(),
-                    MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST);
-            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
-                    controller, command);
-            if (!accepted) {
-                // Don't run rejected command.
-                if (DEBUG) {
-                    Log.d(TAG, "setPlaylist() from " + controller + " was rejected");
-                }
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST, (session, controller) -> {
+            if (playlist == null) {
+                Log.w(TAG, "setPlaylist(): Ignoring null playlist from " + controller);
                 return;
             }
             List<MediaItem2> list = new ArrayList<>();
             for (int i = 0; i < playlist.size(); i++) {
-                MediaItem2 item = MediaItem2.fromBundle(session.getContext(), playlist.get(i));
+                // Recreates UUID in the playlist
+                MediaItem2 item = MediaItem2Impl.fromBundle(
+                        session.getContext(), playlist.get(i), null);
                 if (item != null) {
                     list.add(item);
                 }
@@ -722,28 +663,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void updatePlaylistMetadata(final IMediaController2 caller, final Bundle metadata) {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA);
-        if (session == null || controller == null) {
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(
-                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA) == null) {
-                return;
-            }
-            Command command = new Command(session.getContext(),
-                    MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA);
-            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
-                    controller, command);
-            if (!accepted) {
-                // Don't run rejected command.
-                if (DEBUG) {
-                    Log.d(TAG, "setPlaylist() from " + controller + " was rejected");
-                }
-                return;
-            }
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA,
+                (session, controller) -> {
             session.getInstance().updatePlaylistMetadata(
                     MediaMetadata2.fromBundle(session.getContext(), metadata));
         });
@@ -751,28 +672,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void addPlaylistItem(IMediaController2 caller, int index, Bundle mediaItem) {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM);
-        if (session == null || controller == null) {
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(
-                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM) == null) {
-                return;
-            }
-            Command command = new Command(session.getContext(),
-                    MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM);
-            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
-                    controller, command);
-            if (!accepted) {
-                // Don't run rejected command.
-                if (DEBUG) {
-                    Log.d(TAG, "addPlaylistItem() from " + controller + " was rejected");
-                }
-                return;
-            }
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM, (session, controller) -> {
             // Resets the UUID from the incoming media id, so controller may reuse a media item
             // multiple times for addPlaylistItem.
             session.getInstance().addPlaylistItem(index,
@@ -782,64 +682,69 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void removePlaylistItem(IMediaController2 caller, Bundle mediaItem) {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM);
-        if (session == null || controller == null) {
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(
-                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM) == null) {
-                return;
-            }
-            Command command = new Command(session.getContext(),
-                    MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM);
-            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
-                    controller, command);
-            if (!accepted) {
-                // Don't run rejected command.
-                if (DEBUG) {
-                    Log.d(TAG, "removePlaylistItem() from " + controller + " was rejected");
-                }
-                return;
-            }
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM,
+                (session, controller) -> {
             MediaItem2 item = MediaItem2.fromBundle(session.getContext(), mediaItem);
-            List<MediaItem2> list = session.getInstance().getPlaylist();
-            // Trick to use the same reference for calls from the controller.
-            session.getInstance().removePlaylistItem(list.get(list.indexOf(item)));
+            // Note: MediaItem2 has hidden UUID to identify it across the processes.
+            session.getInstance().removePlaylistItem(item);
         });
     }
 
     @Override
     public void replacePlaylistItem(IMediaController2 caller, int index, Bundle mediaItem) {
-        final MediaSession2Impl session = getSession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM);
-        if (session == null || controller == null) {
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(
-                    caller, MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM) == null) {
-                return;
-            }
-            Command command = new Command(session.getContext(),
-                    MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM);
-            boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
-                    controller, command);
-            if (!accepted) {
-                // Don't run rejected command.
-                if (DEBUG) {
-                    Log.d(TAG, "replacePlaylistItem() from " + controller + " was rejected");
-                }
-                return;
-            }
-            // Resets the UUID from the incoming media id, so controller may reuse a media item
-            // multiple times for replacePlaylistItem.
-            session.getInstance().replacePlaylistItem(index,
-                    MediaItem2.fromBundle(session.getContext(), mediaItem));
-        });
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM,
+                (session, controller) -> {
+                    // Resets the UUID from the incoming media id, so controller may reuse a media
+                    // item multiple times for replacePlaylistItem.
+                    session.getInstance().replacePlaylistItem(index,
+                            MediaItem2Impl.fromBundle(session.getContext(), mediaItem, null));
+                });
+    }
+
+    @Override
+    public void skipToPlaylistItem(IMediaController2 caller, Bundle mediaItem) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_TO_PLAYLIST_ITEM,
+                (session, controller) -> {
+                    if (mediaItem == null) {
+                        Log.w(TAG, "skipToPlaylistItem(): Ignoring null mediaItem from "
+                                + controller);
+                    }
+                    // Note: MediaItem2 has hidden UUID to identify it across the processes.
+                    session.getInstance().skipToPlaylistItem(
+                            MediaItem2.fromBundle(session.getContext(), mediaItem));
+                });
+    }
+
+    @Override
+    public void skipToPreviousItem(IMediaController2 caller) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM,
+                (session, controller) -> {
+                    session.getInstance().skipToPreviousItem();
+                });
+    }
+
+    @Override
+    public void skipToNextItem(IMediaController2 caller) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM,
+                (session, controller) -> {
+                    session.getInstance().skipToNextItem();
+                });
+    }
+
+    @Override
+    public void setRepeatMode(IMediaController2 caller, int repeatMode) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_REPEAT_MODE,
+                (session, controller) -> {
+                    session.getInstance().setRepeatMode(repeatMode);
+                });
+    }
+
+    @Override
+    public void setShuffleMode(IMediaController2 caller, int shuffleMode) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_SHUFFLE_MODE,
+                (session, controller) -> {
+                    session.getInstance().setShuffleMode(shuffleMode);
+                });
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////
@@ -849,82 +754,49 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void getLibraryRoot(final IMediaController2 caller, final Bundle rootHints)
             throws RuntimeException {
-        final MediaLibrarySessionImpl session = getLibrarySession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_BROWSER);
-        if (session == null || controller == null) {
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
-                return;
-            }
-            LibraryRoot root = session.getCallback().onGetLibraryRoot(session.getInstance(),
+        onBrowserCommand(caller, (session, controller) -> {
+            final LibraryRoot root = session.getCallback().onGetLibraryRoot(session.getInstance(),
                     controller, rootHints);
-            try {
-                caller.onGetLibraryRootDone(rootHints,
+            notify(controller, (unused, iController) -> {
+                iController.onGetLibraryRootDone(rootHints,
                         root == null ? null : root.getRootId(),
                         root == null ? null : root.getExtras());
-            } catch (RemoteException e) {
-                // Controller may be died prematurely.
-                // TODO(jaewan): Handle this.
-            }
+            });
         });
     }
 
     @Override
     public void getItem(final IMediaController2 caller, final String mediaId)
             throws RuntimeException {
-        if (mediaId == null) {
-            if (DEBUG) {
-                Log.d(TAG, "mediaId shouldn't be null");
-            }
-            return;
-        }
-        final MediaLibrarySessionImpl session = getLibrarySession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_BROWSER);
-        if (session == null || controller == null) {
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
+        onBrowserCommand(caller, (session, controller) -> {
+            if (mediaId == null) {
+                if (DEBUG) {
+                    Log.d(TAG, "mediaId shouldn't be null");
+                }
                 return;
             }
-            MediaItem2 result = session.getCallback().onGetItem(session.getInstance(),
+            final MediaItem2 result = session.getCallback().onGetItem(session.getInstance(),
                     controller, mediaId);
-            try {
-                caller.onGetItemDone(mediaId, result == null ? null : result.toBundle());
-            } catch (RemoteException e) {
-                // Controller may be died prematurely.
-                // TODO(jaewan): Handle this.
-            }
+            notify(controller, (unused, iController) -> {
+                iController.onGetItemDone(mediaId, result == null ? null : result.toBundle());
+            });
         });
     }
 
     @Override
     public void getChildren(final IMediaController2 caller, final String parentId,
             final int page, final int pageSize, final Bundle extras) throws RuntimeException {
-        if (parentId == null) {
-            if (DEBUG) {
-                Log.d(TAG, "parentId shouldn't be null");
+        onBrowserCommand(caller, (session, controller) -> {
+            if (parentId == null) {
+                if (DEBUG) {
+                    Log.d(TAG, "parentId shouldn't be null");
+                }
+                return;
             }
-            return;
-        }
-        if (page < 1 || pageSize < 1) {
-            if (DEBUG) {
-                Log.d(TAG, "Neither page nor pageSize should be less than 1");
-            }
-            return;
-        }
-        final MediaLibrarySessionImpl session = getLibrarySession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_BROWSER);
-        if (session == null || controller == null) {
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
+            if (page < 1 || pageSize < 1) {
+                if (DEBUG) {
+                    Log.d(TAG, "Neither page nor pageSize should be less than 1");
+                }
                 return;
             }
             List<MediaItem2> result = session.getCallback().onGetChildren(session.getInstance(),
@@ -934,36 +806,26 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                         + "more than pageSize. result.size()=" + result.size() + " pageSize="
                         + pageSize);
             }
-            List<Bundle> bundleList = null;
+            final List<Bundle> bundleList;
             if (result != null) {
                 bundleList = new ArrayList<>();
                 for (MediaItem2 item : result) {
                     bundleList.add(item == null ? null : item.toBundle());
                 }
+            } else {
+                bundleList = null;
             }
-            try {
-                caller.onGetChildrenDone(parentId, page, pageSize, bundleList, extras);
-            } catch (RemoteException e) {
-                // Controller may be died prematurely.
-                // TODO(jaewan): Handle this.
-            }
+            notify(controller, (unused, iController) -> {
+                iController.onGetChildrenDone(parentId, page, pageSize, bundleList, extras);
+            });
         });
     }
 
     @Override
     public void search(IMediaController2 caller, String query, Bundle extras) {
-        final MediaLibrarySessionImpl session = getLibrarySession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_BROWSER);
-        if (session == null || controller == null) {
-            return;
-        }
-        if (TextUtils.isEmpty(query)) {
-            Log.w(TAG, "search(): Ignoring empty query from " + controller);
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
+        onBrowserCommand(caller, (session, controller) -> {
+            if (TextUtils.isEmpty(query)) {
+                Log.w(TAG, "search(): Ignoring empty query from " + controller);
                 return;
             }
             session.getCallback().onSearch(session.getInstance(), controller, query, extras);
@@ -973,23 +835,14 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void getSearchResult(final IMediaController2 caller, final String query,
             final int page, final int pageSize, final Bundle extras) {
-        final MediaLibrarySessionImpl session = getLibrarySession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_BROWSER);
-        if (session == null || controller == null) {
-            return;
-        }
-        if (TextUtils.isEmpty(query)) {
-            Log.w(TAG, "getSearchResult(): Ignoring empty query from " + controller);
-            return;
-        }
-        if (page < 1 || pageSize < 1) {
-            Log.w(TAG, "getSearchResult(): Ignoring negative page / pageSize."
-                    + " page=" + page + " pageSize=" + pageSize + " from " + controller);
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
+        onBrowserCommand(caller, (session, controller) -> {
+            if (TextUtils.isEmpty(query)) {
+                Log.w(TAG, "getSearchResult(): Ignoring empty query from " + controller);
+                return;
+            }
+            if (page < 1 || pageSize < 1) {
+                Log.w(TAG, "getSearchResult(): Ignoring negative page / pageSize."
+                        + " page=" + page + " pageSize=" + pageSize + " from " + controller);
                 return;
             }
             List<MediaItem2> result = session.getCallback().onGetSearchResult(session.getInstance(),
@@ -999,38 +852,27 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                         + "items more than pageSize. result.size()=" + result.size() + " pageSize="
                         + pageSize);
             }
-            List<Bundle> bundleList = null;
+            final List<Bundle> bundleList;
             if (result != null) {
                 bundleList = new ArrayList<>();
                 for (MediaItem2 item : result) {
                     bundleList.add(item == null ? null : item.toBundle());
                 }
+            } else {
+                bundleList = null;
             }
-
-            try {
-                caller.onGetSearchResultDone(query, page, pageSize, bundleList, extras);
-            } catch (RemoteException e) {
-                // Controller may be died prematurely.
-                // TODO(jaewan): Handle this.
-            }
+            notify(controller, (unused, iController) -> {
+                iController.onGetSearchResultDone(query, page, pageSize, bundleList, extras);
+            });
         });
     }
 
     @Override
     public void subscribe(final IMediaController2 caller, final String parentId,
             final Bundle option) {
-        final MediaLibrarySessionImpl session = getLibrarySession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_BROWSER);
-        if (session == null || controller == null) {
-            return;
-        }
-        if (parentId == null) {
-            Log.w(TAG, "subscribe(): Ignoring null parentId from " + controller);
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
+        onBrowserCommand(caller, (session, controller) -> {
+            if (parentId == null) {
+                Log.w(TAG, "subscribe(): Ignoring null parentId from " + controller);
                 return;
             }
             session.getCallback().onSubscribe(session.getInstance(),
@@ -1048,18 +890,9 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void unsubscribe(final IMediaController2 caller, final String parentId) {
-        final MediaLibrarySessionImpl session = getLibrarySession();
-        final ControllerInfo controller = getControllerIfAble(
-                caller, MediaSession2.COMMAND_CODE_BROWSER);
-        if (session == null || controller == null) {
-            return;
-        }
-        if (parentId == null) {
-            Log.w(TAG, "unsubscribe(): Ignoring null parentId from " + controller);
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
+        onBrowserCommand(caller, (session, controller) -> {
+            if (parentId == null) {
+                Log.w(TAG, "unsubscribe(): Ignoring null parentId from " + controller);
                 return;
             }
             session.getCallback().onUnsubscribe(session.getInstance(), controller, parentId);
@@ -1073,7 +906,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     // APIs for MediaSession2Impl
     //////////////////////////////////////////////////////////////////////////////////////////////
 
-    // TODO(jaewan): Need a way to get controller with permissions
+    // TODO(jaewan): (Can be Post-P) Need a way to get controller with permissions
     public List<ControllerInfo> getControllers() {
         ArrayList<ControllerInfo> controllers = new ArrayList<>();
         synchronized (mLock) {
@@ -1086,75 +919,31 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     // Should be used without a lock to prevent potential deadlock.
     public void notifyPlayerStateChangedNotLocked(int state) {
-        final List<ControllerInfo> list = getControllers();
-        for (int i = 0; i < list.size(); i++) {
-            final IMediaController2 controllerBinder = getControllerBinderIfAble(list.get(i));
-            if (controllerBinder == null) {
-                return;
-            }
-            try {
-                controllerBinder.onPlayerStateChanged(state);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Controller is gone", e);
-                // TODO(jaewan): What to do when the controller is gone?
-            }
-        }
+        notifyAll((controller, iController) -> {
+            iController.onPlayerStateChanged(state);
+        });
     }
 
     public void notifyPositionChangedNotLocked(long eventTimeMs, long positionMs) {
-        final List<ControllerInfo> list = getControllers();
-        for (int i = 0; i < list.size(); i++) {
-            final IMediaController2 controllerBinder = getControllerBinderIfAble(list.get(i));
-            if (controllerBinder == null) {
-                return;
-            }
-            try {
-                controllerBinder.onPositionChanged(eventTimeMs, positionMs);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Controller is gone", e);
-                // TODO(jaewan): What to do when the controller is gone?
-            }
-        }
+        notifyAll((controller, iController) -> {
+            iController.onPositionChanged(eventTimeMs, positionMs);
+        });
     }
 
     public void notifyPlaybackSpeedChangedNotLocked(float speed) {
-        final List<ControllerInfo> list = getControllers();
-        for (int i = 0; i < list.size(); i++) {
-            final IMediaController2 controllerBinder = getControllerBinderIfAble(list.get(i));
-            if (controllerBinder == null) {
-                return;
-            }
-            try {
-                controllerBinder.onPlaybackSpeedChanged(speed);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Controller is gone", e);
-                // TODO(jaewan): What to do when the controller is gone?
-            }
-        }
+        notifyAll((controller, iController) -> {
+            iController.onPlaybackSpeedChanged(speed);
+        });
     }
 
     public void notifyBufferedPositionChangedNotLocked(long bufferedPositionMs) {
-        final List<ControllerInfo> list = getControllers();
-        for (int i = 0; i < list.size(); i++) {
-            final IMediaController2 controllerBinder = getControllerBinderIfAble(list.get(i));
-            if (controllerBinder == null) {
-                return;
-            }
-            try {
-                controllerBinder.onBufferedPositionChanged(bufferedPositionMs);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Controller is gone", e);
-                // TODO(jaewan): What to do when the controller is gone?
-            }
-        }
+        notifyAll((controller, iController) -> {
+            iController.onBufferedPositionChanged(bufferedPositionMs);
+        });
     }
 
     public void notifyCustomLayoutNotLocked(ControllerInfo controller, List<CommandButton> layout) {
-        final IMediaController2 controllerBinder = getControllerBinderIfAble(controller);
-        if (controllerBinder == null) {
-            return;
-        }
-        try {
+        notify(controller, (unused, iController) -> {
             List<Bundle> layoutBundles = new ArrayList<>();
             for (int i = 0; i < layout.size(); i++) {
                 Bundle bundle = ((CommandButtonImpl) layout.get(i).getProvider()).toBundle();
@@ -1162,11 +951,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     layoutBundles.add(bundle);
                 }
             }
-            controllerBinder.onCustomLayoutChanged(layoutBundles);
-        } catch (RemoteException e) {
-            Log.w(TAG, "Controller is gone", e);
-            // TODO(jaewan): What to do when the controller is gone?
-        }
+            iController.onCustomLayoutChanged(layoutBundles);
+        });
     }
 
     public void notifyPlaylistChangedNotLocked(List<MediaItem2> playlist, MediaMetadata2 metadata) {
@@ -1185,96 +971,52 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             bundleList = null;
         }
         final Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
-        final List<ControllerInfo> list = getControllers();
-        for (int i = 0; i < list.size(); i++) {
-            final IMediaController2 controllerBinder = getControllerBinderIfAble(
-                    list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST);
-            if (controllerBinder != null) {
-                try {
-                    controllerBinder.onPlaylistChanged(bundleList, metadataBundle);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Controller is gone", e);
-                    // TODO(jaewan): What to do when the controller is gone?
-                }
-            } else {
-                final IMediaController2 binder = getControllerBinderIfAble(
-                        list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA);
-                if (binder != null) {
-                    try {
-                        binder.onPlaylistMetadataChanged(metadataBundle);
-                    } catch (RemoteException e) {
-                        Log.w(TAG, "Controller is gone", e);
-                        // TODO(jaewan): What to do when the controller is gone?
-                    }
-                }
+        notifyAll((controller, iController) -> {
+            if (getControllerBinderIfAble(controller,
+                    MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST) != null) {
+                iController.onPlaylistChanged(bundleList, metadataBundle);
+            } else if (getControllerBinderIfAble(controller,
+                    MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA) != null) {
+                iController.onPlaylistMetadataChanged(metadataBundle);
             }
-        }
+        });
     }
 
     public void notifyPlaylistMetadataChangedNotLocked(MediaMetadata2 metadata) {
         final Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
-        final List<ControllerInfo> list = getControllers();
-        for (int i = 0; i < list.size(); i++) {
-            final IMediaController2 controllerBinder = getControllerBinderIfAble(
-                    list.get(i), MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA);
-            if (controllerBinder != null) {
-                try {
-                    controllerBinder.onPlaylistMetadataChanged(metadataBundle);
-                } catch (RemoteException e) {
-                    Log.w(TAG, "Controller is gone", e);
-                    // TODO(jaewan): What to do when the controller is gone?
-                }
-            }
-        }
+        notifyAll(MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA,
+                (unused, iController) -> {
+                    iController.onPlaylistMetadataChanged(metadataBundle);
+                });
     }
 
-    public void notifyPlaylistParamsChanged(MediaSession2.PlaylistParams params) {
-        final List<ControllerInfo> list = getControllers();
-        for (int i = 0; i < list.size(); i++) {
-            final IMediaController2 controllerBinder = getControllerBinderIfAble(list.get(i));
-            if (controllerBinder == null) {
-                return;
-            }
-            try {
-                controllerBinder.onPlaylistParamsChanged(params.toBundle());
-            } catch (RemoteException e) {
-                Log.w(TAG, "Controller is gone", e);
-                // TODO(jaewan): What to do when the controller is gone?
-            }
-        }
+    public void notifyRepeatModeChangedNotLocked(int repeatMode) {
+        notifyAll((unused, iController) -> {
+            iController.onRepeatModeChanged(repeatMode);
+        });
+    }
+
+    public void notifyShuffleModeChangedNotLocked(int shuffleMode) {
+        notifyAll((unused, iController) -> {
+            iController.onShuffleModeChanged(shuffleMode);
+        });
     }
 
     public void notifyPlaybackInfoChanged(MediaController2.PlaybackInfo playbackInfo) {
-        final List<ControllerInfo> list = getControllers();
-        for (int i = 0; i < list.size(); i++) {
-            final IMediaController2 controllerBinder = getControllerBinderIfAble(list.get(i));
-            if (controllerBinder == null) {
-                return;
-            }
-            try {
-                controllerBinder.onPlaybackInfoChanged(((MediaController2Impl.PlaybackInfoImpl)
-                        playbackInfo.getProvider()).toBundle());
-            } catch (RemoteException e) {
-                Log.w(TAG, "Controller is gone", e);
-                // TODO(jaewan): What to do when the controller is gone?
-            }
-        }
+        final Bundle playbackInfoBundle =
+                ((MediaController2Impl.PlaybackInfoImpl) playbackInfo.getProvider()).toBundle();
+        notifyAll((unused, iController) -> {
+            iController.onPlaybackInfoChanged(playbackInfoBundle);
+        });
     }
 
     public void setAllowedCommands(ControllerInfo controller, CommandGroup commands) {
         synchronized (mLock) {
             mAllowedCommandGroupMap.put(controller, commands);
         }
-        final IMediaController2 controllerBinder = getControllerBinderIfAble(controller);
-        if (controllerBinder == null) {
-            return;
-        }
-        try {
-            controllerBinder.onAllowedCommandsChanged(commands.toBundle());
-        } catch (RemoteException e) {
-            Log.w(TAG, "Controller is gone", e);
-            // TODO(jaewan): What to do when the controller is gone?
-        }
+        notify(controller, (unused, iController) -> {
+            iController.onAllowedCommandsChanged(commands.toBundle());
+        });
     }
 
     public void sendCustomCommand(ControllerInfo controller, Command command, Bundle args,
@@ -1286,32 +1028,20 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         if (command == null) {
             throw new IllegalArgumentException("command shouldn't be null");
         }
-        sendCustomCommandInternal(controller, command, args, receiver);
+        notify(controller, (unused, iController) -> {
+            Bundle commandBundle = command.toBundle();
+            iController.onCustomCommand(commandBundle, args, null);
+        });
     }
 
     public void sendCustomCommand(Command command, Bundle args) {
         if (command == null) {
             throw new IllegalArgumentException("command shouldn't be null");
         }
-        final List<ControllerInfo> controllers = getControllers();
-        for (int i = 0; i < controllers.size(); i++) {
-            sendCustomCommand(controllers.get(i), command, args, null);
-        }
-    }
-
-    private void sendCustomCommandInternal(ControllerInfo controller, Command command, Bundle args,
-            ResultReceiver receiver) {
-        final IMediaController2 controllerBinder = getControllerBinderIfAble(controller);
-        if (controllerBinder == null) {
-            return;
-        }
-        try {
-            Bundle commandBundle = command.toBundle();
-            controllerBinder.onCustomCommand(commandBundle, args, receiver);
-        } catch (RemoteException e) {
-            Log.w(TAG, "Controller is gone", e);
-            // TODO(jaewan): What to do when the controller is gone?
-        }
+        Bundle commandBundle = command.toBundle();
+        notifyAll((unused, iController) -> {
+            iController.onCustomCommand(commandBundle, args, null);
+        });
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////
@@ -1320,48 +1050,55 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     public void notifySearchResultChanged(ControllerInfo controller, String query, int itemCount,
             Bundle extras) {
-        final IMediaController2 controllerBinder = getControllerBinderIfAble(controller);
-        if (controllerBinder == null) {
-            return;
-        }
-        try {
-            controllerBinder.onSearchResultChanged(query, itemCount, extras);
-        } catch (RemoteException e) {
-            Log.w(TAG, "Controller is gone", e);
-            // TODO(jaewan): What to do when the controller is gone?
-        }
+        notify(controller, (unused, iController) -> {
+            iController.onSearchResultChanged(query, itemCount, extras);
+        });
     }
 
     public void notifyChildrenChangedNotLocked(ControllerInfo controller, String parentId,
             int itemCount, Bundle extras) {
-        notifyChildrenChangedInternalNotLocked(controller, parentId, itemCount, extras);
+        notify(controller, (unused, iController) -> {
+            if (isSubscribed(controller, parentId)) {
+                iController.onChildrenChanged(parentId, itemCount, extras);
+            }
+        });
     }
 
     public void notifyChildrenChangedNotLocked(String parentId, int itemCount, Bundle extras) {
-        final List<ControllerInfo> controllers = getControllers();
-        for (int i = 0; i < controllers.size(); i++) {
-            notifyChildrenChangedInternalNotLocked(controllers.get(i), parentId, itemCount,
-                    extras);
-        }
+        notifyAll((controller, iController) -> {
+            if (isSubscribed(controller, parentId)) {
+                iController.onChildrenChanged(parentId, itemCount, extras);
+            }
+        });
     }
 
-    public void notifyChildrenChangedInternalNotLocked(final ControllerInfo controller,
-            String parentId, int itemCount, Bundle extras) {
-        // Ensure subscription
+    private boolean isSubscribed(ControllerInfo controller, String parentId) {
         synchronized (mLock) {
             Set<String> subscriptions = mSubscriptions.get(controller);
             if (subscriptions == null || !subscriptions.contains(parentId)) {
-                return;
+                return false;
             }
         }
-        final IMediaController2 controllerBinder = getControllerBinderIfAble(controller);
-        if (controller == null) {
-            return;
-        }
-        try {
-            controllerBinder.onChildrenChanged(parentId, itemCount, extras);
-        } catch (RemoteException e) {
-            // TODO(jaewan): Handle controller removed?
-        }
+        return true;
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////////////
+    // Misc
+    //////////////////////////////////////////////////////////////////////////////////////////////
+
+    @FunctionalInterface
+    private interface SessionRunnable {
+        void run(final MediaSession2Impl session, final ControllerInfo controller);
+    }
+
+    @FunctionalInterface
+    private interface LibrarySessionRunnable {
+        void run(final MediaLibrarySessionImpl session, final ControllerInfo controller);
+    }
+
+    @FunctionalInterface
+    private interface NotifyRunnable {
+        void run(final ControllerInfo controller,
+                final IMediaController2 iController) throws RemoteException;
     }
 }

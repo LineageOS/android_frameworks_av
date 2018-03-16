@@ -24,7 +24,6 @@ import android.media.MediaMetadata2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
-import android.media.MediaSession2.PlaylistParams;
 import android.os.Bundle;
 import android.os.ResultReceiver;
 import android.text.TextUtils;
@@ -169,7 +168,7 @@ public class MediaController2Stub extends IMediaController2.Stub {
     }
 
     @Override
-    public void onPlaylistParamsChanged(Bundle paramsBundle) throws RuntimeException {
+    public void onRepeatModeChanged(int repeatMode) {
         final MediaController2Impl controller;
         try {
             controller = getController();
@@ -177,12 +176,7 @@ public class MediaController2Stub extends IMediaController2.Stub {
             Log.w(TAG, "Don't fail silently here. Highly likely a bug");
             return;
         }
-        PlaylistParams params = PlaylistParams.fromBundle(controller.getContext(), paramsBundle);
-        if (params == null) {
-            Log.w(TAG, "onPlaylistParamsChanged(): Ignoring null playlistParams");
-            return;
-        }
-        controller.pushPlaylistParamsChanges(params);
+        controller.pushRepeatModeChanges(repeatMode);
     }
 
     @Override
@@ -208,9 +202,21 @@ public class MediaController2Stub extends IMediaController2.Stub {
     }
 
     @Override
+    public void onShuffleModeChanged(int shuffleMode) {
+        final MediaController2Impl controller;
+        try {
+            controller = getController();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        controller.pushShuffleModeChanges(shuffleMode);
+    }
+
+    @Override
     public void onConnected(IMediaSession2 sessionBinder, Bundle commandGroup,
             int playerState, long positionEventTimeMs, long positionMs, float playbackSpeed,
-            long bufferedPositionMs, Bundle playbackInfo, Bundle playlistParams,
+            long bufferedPositionMs, Bundle playbackInfo, int shuffleMode, int repeatMode,
             List<Bundle> itemBundleList, PendingIntent sessionActivity) {
         final MediaController2Impl controller = mController.get();
         if (controller == null) {
@@ -233,8 +239,7 @@ public class MediaController2Stub extends IMediaController2.Stub {
         controller.onConnectedNotLocked(sessionBinder,
                 CommandGroup.fromBundle(context, commandGroup),
                 playerState, positionEventTimeMs, positionMs, playbackSpeed, bufferedPositionMs,
-                PlaybackInfoImpl.fromBundle(context, playbackInfo),
-                PlaylistParams.fromBundle(context, playlistParams),
+                PlaybackInfoImpl.fromBundle(context, playbackInfo), repeatMode, shuffleMode,
                 itemList, sessionActivity);
     }
 

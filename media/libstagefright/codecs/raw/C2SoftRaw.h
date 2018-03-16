@@ -14,26 +14,18 @@
  * limitations under the License.
  */
 
-#ifndef C2_SOFT_MP3_H_
-#define C2_SOFT_MP3_H_
+#ifndef C2_SOFT_RAW_H_
+#define C2_SOFT_RAW_H_
 
 #include <SimpleC2Component.h>
 
 #include <media/stagefright/foundation/ABase.h>
 
-struct tPVMP3DecoderExternal;
-
-bool parseMp3Header(uint32_t header, size_t *frame_size,
-                    uint32_t *out_sampling_rate = nullptr,
-                    uint32_t *out_channels = nullptr,
-                    uint32_t *out_bitrate = nullptr,
-                    uint32_t *out_num_samples = nullptr);
-
 namespace android {
 
-struct C2SoftMP3 : public SimpleC2Component {
-    C2SoftMP3(const char *name, c2_node_id_t id);
-    virtual ~C2SoftMP3();
+struct C2SoftRaw : public SimpleC2Component {
+    C2SoftRaw(const char *name, c2_node_id_t id);
+    virtual ~C2SoftRaw();
 
     // From SimpleC2Component
     c2_status_t onInit() override;
@@ -47,28 +39,12 @@ struct C2SoftMP3 : public SimpleC2Component {
     c2_status_t drain(
             uint32_t drainMode,
             const std::shared_ptr<C2BlockPool> &pool) override;
-
 private:
-    enum {
-        kPVMP3DecoderDelay = 529 // samples
-    };
+    bool mSignalledEos;
 
-    tPVMP3DecoderExternal *mConfig;
-    void *mDecoderBuf;
-
-    int32_t mNumChannels;
-    int32_t mSamplingRate;
-    bool mIsFirst;
-    bool mSignalledError;
-    bool mSignalledOutputEos;
-    uint64_t mAnchorTimeStamp;
-    uint64_t mProcessedSamples;
-
-    status_t initDecoder();
-
-    DISALLOW_EVIL_CONSTRUCTORS(C2SoftMP3);
+    DISALLOW_EVIL_CONSTRUCTORS(C2SoftRaw);
 };
 
 }  // namespace android
 
-#endif  // C2_SOFT_MP3_H_
+#endif  // C2_SOFT_RAW_H_

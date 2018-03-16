@@ -47,9 +47,6 @@ import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
-import android.media.MediaSession2.PlaylistParams;
-import android.media.MediaSession2.PlaylistParams.RepeatMode;
-import android.media.MediaSession2.PlaylistParams.ShuffleMode;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
 import android.media.SessionToken2;
@@ -67,8 +64,11 @@ import android.util.ArrayMap;
 import android.util.Log;
 
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.Executor;
 
 public class MediaSession2Impl implements MediaSession2Provider {
@@ -85,7 +85,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private final MediaSession2Stub mSessionStub;
     private final SessionToken2 mSessionToken;
     private final AudioManager mAudioManager;
-    private final ArrayMap<PlayerEventCallback, Executor> mCallbacks = new ArrayMap<>();
     private final PendingIntent mSessionActivity;
     private final PlayerEventCallback mPlayerEventCallback;
     private final PlaylistEventCallback mPlaylistEventCallback;
@@ -252,6 +251,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mSessionStub.notifyPlaybackInfoChanged(info);
             notifyPlayerUpdatedNotLocked(oldPlayer);
         }
+        // TODO(jaewan): Repeat the same thing for the playlist agent.
     }
 
     private PlaybackInfo createPlaybackInfo(VolumeProvider2 volumeProvider, AudioAttributes attrs) {
@@ -384,32 +384,36 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void skipToPreviousItem_impl() {
-        ensureCallingThread();
-        // TODO(jaewan): Implement this (b/74175632)
-        /*
-        final MediaPlayerBase player = mPlayer;
-        if (player != null) {
-            // TODO implement
-            //player.skipToPrevious();
+    public void skipToPlaylistItem_impl(MediaItem2 item) {
+        if (item == null) {
+            throw new IllegalArgumentException("item shouldn't be null");
+        }
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            agent.skipToPlaylistItem(item);
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
-        */
+    }
+
+    @Override
+    public void skipToPreviousItem_impl() {
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            agent.skipToPreviousItem();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
     }
 
     @Override
     public void skipToNextItem_impl() {
-        ensureCallingThread();
-        // TODO(jaewan): Implement this (b/74175632)
-        /*
-        final MediaPlayerBase player = mPlayer;
-        if (player != null) {
-            player.skipToNext();
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            agent.skipToNextItem();
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
-        */
     }
 
     @Override
@@ -422,41 +426,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
             throw new IllegalArgumentException("layout shouldn't be null");
         }
         mSessionStub.notifyCustomLayoutNotLocked(controller, layout);
-    }
-
-    @Override
-    public void setPlaylistParams_impl(PlaylistParams params) {
-        if (params == null) {
-            throw new IllegalArgumentException("params shouldn't be null");
-        }
-        ensureCallingThread();
-        // TODO: Uncomment or remove
-        /*
-        final MediaPlayerBase player = mPlayer;
-        if (player != null) {
-            // TODO implement
-            //player.setPlaylistParams(params);
-            mSessionStub.notifyPlaylistParamsChanged(params);
-        }
-        */
-    }
-
-    @Override
-    public PlaylistParams getPlaylistParams_impl() {
-        // TODO: Uncomment or remove
-        /*
-        final MediaPlayerBase player = mPlayer;
-        if (player != null) {
-            // TODO(jaewan): Is it safe to be called on any thread?
-            //               Otherwise MediaSession2 should cache parameter of setPlaylistParams.
-            // TODO implement
-            //return player.getPlaylistParams();
-            return null;
-        } else if (DEBUG) {
-            Log.d(TAG, "API calls after the close()", new IllegalStateException());
-        }
-        */
-        return null;
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -592,6 +561,48 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
+    public int getRepeatMode_impl() {
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            return agent.getRepeatMode();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
+        return MediaPlaylistAgent.REPEAT_MODE_NONE;
+    }
+
+    @Override
+    public void setRepeatMode_impl(int repeatMode) {
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            agent.setRepeatMode(repeatMode);
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
+    }
+
+    @Override
+    public int getShuffleMode_impl() {
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            return agent.getShuffleMode();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
+        return MediaPlaylistAgent.SHUFFLE_MODE_NONE;
+    }
+
+    @Override
+    public void setShuffleMode_impl(int shuffleMode) {
+        final MediaPlaylistAgent agent = mPlaylistAgent;
+        if (agent != null) {
+            agent.setShuffleMode(shuffleMode);
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
+    }
+
+    @Override
     public void prepare_impl() {
         ensureCallingThread();
         final MediaPlayerBase player = mPlayer;
@@ -644,49 +655,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void skipToPlaylistItem_impl(MediaItem2 item) {
-        ensureCallingThread();
-        if (item == null) {
-            throw new IllegalArgumentException("item shouldn't be null");
-        }
-        // TODO: Uncomment or remove
-        /*
-        final MediaPlayerBase player = mPlayer;
-        if (player != null) {
-            // TODO implement
-            //player.setCurrentPlaylistItem(item);
-        } else if (DEBUG) {
-            Log.d(TAG, "API calls after the close()", new IllegalStateException());
-        }
-        */
-    }
-
-    @Override
-    public void registerPlayerEventCallback_impl(Executor executor, PlayerEventCallback callback) {
-        if (executor == null) {
-            throw new IllegalArgumentException("executor shouldn't be null");
-        }
-        if (callback == null) {
-            throw new IllegalArgumentException("callback shouldn't be null");
-        }
-        ensureCallingThread();
-        if (mCallbacks.get(callback) != null) {
-            Log.w(TAG, "callback is already added. Ignoring.");
-            return;
-        }
-        mCallbacks.put(callback, executor);
-    }
-
-    @Override
-    public void unregisterPlayerEventCallback_impl(PlayerEventCallback callback) {
-        if (callback == null) {
-            throw new IllegalArgumentException("callback shouldn't be null");
-        }
-        ensureCallingThread();
-        mCallbacks.remove(callback);
-    }
-
-    @Override
     public void notifyError_impl(int errorCode, Bundle extras) {
         // TODO(jaewan): Implement
     }
@@ -718,7 +686,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private void notifyPlaylistChangedOnExecutor(MediaPlaylistAgent playlistAgent,
             List<MediaItem2> list, MediaMetadata2 metadata) {
         if (playlistAgent != mPlaylistAgent) {
-            // Ignore calls from the old agent. Ignore.
+            // Ignore calls from the old agent.
             return;
         }
         mCallback.onPlaylistChanged(mInstance, playlistAgent, list, metadata);
@@ -728,27 +696,39 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private void notifyPlaylistMetadataChangedOnExecutor(MediaPlaylistAgent playlistAgent,
             MediaMetadata2 metadata) {
         if (playlistAgent != mPlaylistAgent) {
-            // Ignore calls from the old agent. Ignore.
+            // Ignore calls from the old agent.
             return;
         }
         mCallback.onPlaylistMetadataChanged(mInstance, playlistAgent, metadata);
         mSessionStub.notifyPlaylistMetadataChangedNotLocked(metadata);
     }
 
+    private void notifyRepeatModeChangedOnExecutor(MediaPlaylistAgent playlistAgent,
+            int repeatMode) {
+        if (playlistAgent != mPlaylistAgent) {
+            // Ignore calls from the old agent.
+            return;
+        }
+        mCallback.onRepeatModeChanged(mInstance, playlistAgent, repeatMode);
+        mSessionStub.notifyRepeatModeChangedNotLocked(repeatMode);
+    }
+
+    private void notifyShuffleModeChangedOnExecutor(MediaPlaylistAgent playlistAgent,
+            int shuffleMode) {
+        if (playlistAgent != mPlaylistAgent) {
+            // Ignore calls from the old agent.
+            return;
+        }
+        mCallback.onShuffleModeChanged(mInstance, playlistAgent, shuffleMode);
+        mSessionStub.notifyShuffleModeChangedNotLocked(shuffleMode);
+    }
+
     private void notifyPlayerUpdatedNotLocked(MediaPlayerBase oldPlayer) {
-        ArrayMap<PlayerEventCallback, Executor> callbacks = new ArrayMap<>();
-        MediaPlayerBase player;
-        synchronized (mLock) {
-            player = mPlayer;
-            callbacks.putAll(mCallbacks);
-        }
-        // Notify to callbacks added directly to this session
-        for (int i = 0; i < callbacks.size(); i++) {
-            final PlayerEventCallback callback = callbacks.keyAt(i);
-            final Executor executor = callbacks.valueAt(i);
-            // TODO: Uncomment or remove
-            //executor.execute(() -> callback.onPlaybackStateChanged(state));
-        }
+        final MediaPlayerBase player = mPlayer;
+        // TODO(jaewan): (Can be post-P) Find better way for player.getPlayerState() //
+        //               In theory, Session.getXXX() may not be the same as Player.getXXX()
+        //               and we should notify information of the session.getXXX() instead of
+        //               player.getXXX()
         // Notify to controllers as well.
         final int state = player.getPlayerState();
         if (state != oldPlayer.getPlayerState()) {
@@ -770,21 +750,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (bufferedPosition != oldPlayer.getBufferedPosition()) {
             mSessionStub.notifyBufferedPositionChangedNotLocked(bufferedPosition);
         }
-    }
-
-    private void notifyErrorNotLocked(String mediaId, int what, int extra) {
-        ArrayMap<PlayerEventCallback, Executor> callbacks = new ArrayMap<>();
-        synchronized (mLock) {
-            callbacks.putAll(mCallbacks);
-        }
-        // Notify to callbacks added directly to this session
-        for (int i = 0; i < callbacks.size(); i++) {
-            final PlayerEventCallback callback = callbacks.keyAt(i);
-            final Executor executor = callbacks.valueAt(i);
-            // TODO: Uncomment or remove
-            //executor.execute(() -> callback.onError(mediaId, what, extra));
-        }
-        // TODO(jaewan): Notify to controllers as well.
     }
 
     Context getContext() {
@@ -839,28 +804,32 @@ public class MediaSession2Impl implements MediaSession2Provider {
         @Override
         public void onCurrentDataSourceChanged(MediaPlayerBase mpb, DataSourceDesc dsd) {
             MediaSession2Impl session = getSession();
-            if (session == null) {
+            if (session == null || dsd == null) {
                 return;
             }
             session.getCallbackExecutor().execute(() -> {
-                // TODO (jaewan): Convert dsd to MediaItem (b/74506462)
+                MediaItem2 item = getMediaItem(session, dsd);
+                if (item == null) {
+                    return;
+                }
+                session.getCallback().onCurrentMediaItemChanged(session.getInstance(), mpb, item);
                 // TODO (jaewan): Notify controllers through appropriate callback. (b/74505936)
-                session.getCallback().onCurrentMediaItemChanged(
-                        session.getInstance(), mpb, null /* MediaItem */);
             });
         }
 
         @Override
         public void onMediaPrepared(MediaPlayerBase mpb, DataSourceDesc dsd) {
             MediaSession2Impl session = getSession();
-            if (session == null) {
+            if (session == null || dsd == null) {
                 return;
             }
             session.getCallbackExecutor().execute(() -> {
-                // TODO (jaewan): Convert dsd to MediaItem (b/74506462)
+                MediaItem2 item = getMediaItem(session, dsd);
+                if (item == null) {
+                    return;
+                }
+                session.getCallback().onMediaPrepared(session.getInstance(), mpb, item);
                 // TODO (jaewan): Notify controllers through appropriate callback. (b/74505936)
-                session.getCallback().onMediaPrepared(
-                        session.getInstance(), mpb, null /* MediaItem */);
             });
         }
 
@@ -879,14 +848,17 @@ public class MediaSession2Impl implements MediaSession2Provider {
         @Override
         public void onBufferingStateChanged(MediaPlayerBase mpb, DataSourceDesc dsd, int state) {
             MediaSession2Impl session = getSession();
-            if (session == null) {
+            if (session == null || dsd == null) {
                 return;
             }
             session.getCallbackExecutor().execute(() -> {
-                // TODO (jaewan): Convert dsd to MediaItem (b/74506462)
-                // TODO (jaewan): Notify controllers through appropriate callback. (b/74505936)
+                MediaItem2 item = getMediaItem(session, dsd);
+                if (item == null) {
+                    return;
+                }
                 session.getCallback().onBufferingStateChanged(
-                        session.getInstance(), mpb, null /* MediaItem */, state);
+                        session.getInstance(), mpb, item, state);
+                // TODO (jaewan): Notify controllers through appropriate callback. (b/74505936)
             });
         }
 
@@ -896,6 +868,24 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 Log.d(TAG, "Session is closed", new IllegalStateException());
             }
             return session;
+        }
+
+        private MediaItem2 getMediaItem(MediaSession2Impl session, DataSourceDesc dsd) {
+            MediaPlaylistAgent agent = session.getPlaylistAgent();
+            if (agent == null) {
+                if (DEBUG) {
+                    Log.d(TAG, "Session is closed", new IllegalStateException());
+                }
+                return null;
+            }
+            MediaItem2 item = agent.getMediaItem(dsd);
+            if (item == null) {
+                if (DEBUG) {
+                    Log.d(TAG, "Could not find matching item for dsd=" + dsd,
+                            new NoSuchElementException());
+                }
+            }
+            return item;
         }
     }
 
@@ -927,15 +917,21 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public void onShuffleModeChanged(MediaPlaylistAgent playlistAgent, int shuffleMode) {
-            super.onShuffleModeChanged(playlistAgent, shuffleMode);
-            // TODO(jaewan): Handle this (b/74118768)
+        public void onRepeatModeChanged(MediaPlaylistAgent playlistAgent, int repeatMode) {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            session.notifyRepeatModeChangedOnExecutor(playlistAgent, repeatMode);
         }
 
         @Override
-        public void onRepeatModeChanged(MediaPlaylistAgent playlistAgent, int repeatMode) {
-            super.onRepeatModeChanged(playlistAgent, repeatMode);
-            // TODO(jaewan): Handle this (b/74118768)
+        public void onShuffleModeChanged(MediaPlaylistAgent playlistAgent, int shuffleMode) {
+            final MediaSession2Impl session = mSession.get();
+            if (session == null) {
+                return;
+            }
+            session.notifyShuffleModeChangedOnExecutor(playlistAgent, shuffleMode);
         }
     }
 
@@ -970,14 +966,17 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mExtras = extras;
         }
 
+        @Override
         public int getCommandCode_impl() {
             return mCommandCode;
         }
 
+        @Override
         public @Nullable String getCustomCommand_impl() {
             return mCustomCommand;
         }
 
+        @Override
         public @Nullable Bundle getExtras_impl() {
             return mExtras;
         }
@@ -985,6 +984,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         /**
          * @return a new Bundle instance from the Command
          */
+        @Override
         public Bundle toBundle_impl() {
             Bundle bundle = new Bundle();
             bundle.putInt(KEY_COMMAND_CODE, mCommandCode);
@@ -1038,6 +1038,16 @@ public class MediaSession2Impl implements MediaSession2Provider {
     public static class CommandGroupImpl implements CommandGroupProvider {
         private static final String KEY_COMMANDS =
                 "android.media.mediasession2.commandgroup.commands";
+
+        // Prefix for all command codes
+        private static final String PREFIX_COMMAND_CODE = "COMMAND_CODE_";
+
+        // Prefix for command codes that will be sent directly to the MediaPlayerBase
+        private static final String PREFIX_COMMAND_CODE_PLAYBACK = "COMMAND_CODE_PLAYBACK_";
+
+        // Prefix for command codes that will be sent directly to the MediaPlaylistAgent
+        private static final String PREFIX_COMMAND_CODE_PLAYLIST = "COMMAND_CODE_PLAYLIST_";
+
         private List<Command> mCommands = new ArrayList<>();
         private final Context mContext;
         private final CommandGroup mInstance;
@@ -1050,6 +1060,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
             }
         }
 
+        public CommandGroupImpl(Context context) {
+            mContext = context;
+            mInstance = new CommandGroup(this);
+        }
+
         @Override
         public void addCommand_impl(Command command) {
             if (command == null) {
@@ -1060,8 +1075,30 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         @Override
         public void addAllPredefinedCommands_impl() {
-            for (int i = 1; i <= MediaSession2.COMMAND_CODE_MAX; i++) {
-                mCommands.add(new Command(mContext, i));
+            addCommandsWithPrefix(PREFIX_COMMAND_CODE);
+        }
+
+        public void addAllPlaybackCommands() {
+            addCommandsWithPrefix(PREFIX_COMMAND_CODE_PLAYBACK);
+        }
+
+        public void addAllPlaylistCommands() {
+            addCommandsWithPrefix(PREFIX_COMMAND_CODE_PLAYLIST);
+        }
+
+        private void addCommandsWithPrefix(String prefix) {
+            // TODO(jaewan): (Can be post-P): Don't use reflection for this purpose.
+            final Field[] fields = MediaSession2.class.getFields();
+            if (fields != null) {
+                for (int i = 0; i < fields.length; i++) {
+                    if (fields[i].getName().startsWith(prefix)) {
+                        try {
+                            mCommands.add(new Command(mContext, fields[i].getInt(null)));
+                        } catch (IllegalAccessException e) {
+                            Log.w(TAG, "Unexpected " + fields[i] + " in MediaSession2");
+                        }
+                    }
+                }
             }
         }
 
@@ -1096,7 +1133,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         @Override
         public List<Command> getCommands_impl() {
-            return mCommands;
+            return getCommands();
+        }
+
+        public List<Command> getCommands() {
+            return Collections.unmodifiableList(mCommands);
         }
 
         /**
@@ -1232,76 +1273,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
         public static ControllerInfoImpl from(ControllerInfo controller) {
             return (ControllerInfoImpl) controller.getProvider();
-        }
-    }
-
-    public static class PlaylistParamsImpl implements PlaylistParamsProvider {
-        /**
-         * Keys used for converting a PlaylistParams object to a bundle object and vice versa.
-         */
-        private static final String KEY_REPEAT_MODE =
-                "android.media.session2.playlistparams2.repeat_mode";
-        private static final String KEY_SHUFFLE_MODE =
-                "android.media.session2.playlistparams2.shuffle_mode";
-        private static final String KEY_MEDIA_METADATA2_BUNDLE =
-                "android.media.session2.playlistparams2.metadata2_bundle";
-
-        private Context mContext;
-        private PlaylistParams mInstance;
-        private @RepeatMode int mRepeatMode;
-        private @ShuffleMode int mShuffleMode;
-        private MediaMetadata2 mPlaylistMetadata;
-
-        public PlaylistParamsImpl(Context context, PlaylistParams instance,
-                @RepeatMode int repeatMode, @ShuffleMode int shuffleMode,
-                MediaMetadata2 playlistMetadata) {
-            // TODO(jaewan): Sanity check
-            mContext = context;
-            mInstance = instance;
-            mRepeatMode = repeatMode;
-            mShuffleMode = shuffleMode;
-            mPlaylistMetadata = playlistMetadata;
-        }
-
-        public @RepeatMode int getRepeatMode_impl() {
-            return mRepeatMode;
-        }
-
-        public @ShuffleMode int getShuffleMode_impl() {
-            return mShuffleMode;
-        }
-
-        public MediaMetadata2 getPlaylistMetadata_impl() {
-            return mPlaylistMetadata;
-        }
-
-        @Override
-        public Bundle toBundle_impl() {
-            Bundle bundle = new Bundle();
-            bundle.putInt(KEY_REPEAT_MODE, mRepeatMode);
-            bundle.putInt(KEY_SHUFFLE_MODE, mShuffleMode);
-            if (mPlaylistMetadata != null) {
-                bundle.putBundle(KEY_MEDIA_METADATA2_BUNDLE, mPlaylistMetadata.toBundle());
-            }
-            return bundle;
-        }
-
-        public static PlaylistParams fromBundle(Context context, Bundle bundle) {
-            if (bundle == null) {
-                return null;
-            }
-            if (!bundle.containsKey(KEY_REPEAT_MODE) || !bundle.containsKey(KEY_SHUFFLE_MODE)) {
-                return null;
-            }
-
-            Bundle metadataBundle = bundle.getBundle(KEY_MEDIA_METADATA2_BUNDLE);
-            MediaMetadata2 metadata = metadataBundle == null
-                    ? null : MediaMetadata2.fromBundle(context, metadataBundle);
-
-            return new PlaylistParams(context,
-                    bundle.getInt(KEY_REPEAT_MODE),
-                    bundle.getInt(KEY_SHUFFLE_MODE),
-                    metadata);
         }
     }
 
