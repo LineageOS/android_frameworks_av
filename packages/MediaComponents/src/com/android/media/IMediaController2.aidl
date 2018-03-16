@@ -37,12 +37,13 @@ oneway interface IMediaController2 {
     void onBufferedPositionChanged(long bufferedPositionMs);
     void onPlaylistChanged(in List<Bundle> playlist, in Bundle metadata);
     void onPlaylistMetadataChanged(in Bundle metadata);
-    void onPlaylistParamsChanged(in Bundle params);
     void onPlaybackInfoChanged(in Bundle playbackInfo);
+    void onRepeatModeChanged(int repeatMode);
+    void onShuffleModeChanged(int shuffleMode);
 
     void onConnected(IMediaSession2 sessionBinder, in Bundle commandGroup,
             int playerState, long positionEventTimeMs, long positionMs, float playbackSpeed,
-            long bufferedPositionMs, in Bundle playbackInfo, in Bundle params,
+            long bufferedPositionMs, in Bundle playbackInfo, int repeatMode, int shuffleMode,
             in List<Bundle> playlist, in PendingIntent sessionActivity);
     void onDisconnected();
 
