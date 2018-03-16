@@ -67,6 +67,8 @@ oneway interface IMediaSession2 {
     void skipToPlaylistItem(IMediaController2 caller, in Bundle mediaItem);
     void skipToPreviousItem(IMediaController2 caller);
     void skipToNextItem(IMediaController2 caller);
+    void setRepeatMode(IMediaController2 caller, int repeatMode);
+    void setShuffleMode(IMediaController2 caller, int shuffleMode);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     // library service specific
