@@ -4761,6 +4761,7 @@ void AudioPolicyManager::closeInput(audio_io_handle_t input)
 
     nextAudioPortGeneration();
 
+    audio_devices_t device = inputDesc->mDevice;
     ssize_t index = mAudioPatches.indexOfKey(inputDesc->getPatchHandle());
     if (index >= 0) {
         sp<AudioPatch> patchDesc = mAudioPatches.valueAt(index);
@@ -4771,6 +4772,12 @@ void AudioPolicyManager::closeInput(audio_io_handle_t input)
 
     inputDesc->close();
     mInputs.removeItem(input);
+
+    audio_devices_t primaryInputDevices = availablePrimaryInputDevices();
+    if (((device & primaryInputDevices & ~AUDIO_DEVICE_BIT_IN) != 0) &&
+            mInputs.activeInputsCountOnDevices(primaryInputDevices) == 0) {
+        SoundTrigger::setCaptureState(false);
+    }
 }
 
 SortedVector<audio_io_handle_t> AudioPolicyManager::getOutputsForDevice(
