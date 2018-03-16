@@ -71,6 +71,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.Executor;
 
 public class MediaSession2Impl implements MediaSession2Provider {
@@ -827,28 +828,32 @@ public class MediaSession2Impl implements MediaSession2Provider {
         @Override
         public void onCurrentDataSourceChanged(MediaPlayerBase mpb, DataSourceDesc dsd) {
             MediaSession2Impl session = getSession();
-            if (session == null) {
+            if (session == null || dsd == null) {
                 return;
             }
             session.getCallbackExecutor().execute(() -> {
-                // TODO (jaewan): Convert dsd to MediaItem (b/74506462)
+                MediaItem2 item = getMediaItem(session, dsd);
+                if (item == null) {
+                    return;
+                }
+                session.getCallback().onCurrentMediaItemChanged(session.getInstance(), mpb, item);
                 // TODO (jaewan): Notify controllers through appropriate callback. (b/74505936)
-                session.getCallback().onCurrentMediaItemChanged(
-                        session.getInstance(), mpb, null /* MediaItem */);
             });
         }
 
         @Override
         public void onMediaPrepared(MediaPlayerBase mpb, DataSourceDesc dsd) {
             MediaSession2Impl session = getSession();
-            if (session == null) {
+            if (session == null || dsd == null) {
                 return;
             }
             session.getCallbackExecutor().execute(() -> {
-                // TODO (jaewan): Convert dsd to MediaItem (b/74506462)
+                MediaItem2 item = getMediaItem(session, dsd);
+                if (item == null) {
+                    return;
+                }
+                session.getCallback().onMediaPrepared(session.getInstance(), mpb, item);
                 // TODO (jaewan): Notify controllers through appropriate callback. (b/74505936)
-                session.getCallback().onMediaPrepared(
-                        session.getInstance(), mpb, null /* MediaItem */);
             });
         }
 
@@ -867,14 +872,17 @@ public class MediaSession2Impl implements MediaSession2Provider {
         @Override
         public void onBufferingStateChanged(MediaPlayerBase mpb, DataSourceDesc dsd, int state) {
             MediaSession2Impl session = getSession();
-            if (session == null) {
+            if (session == null || dsd == null) {
                 return;
             }
             session.getCallbackExecutor().execute(() -> {
-                // TODO (jaewan): Convert dsd to MediaItem (b/74506462)
-                // TODO (jaewan): Notify controllers through appropriate callback. (b/74505936)
+                MediaItem2 item = getMediaItem(session, dsd);
+                if (item == null) {
+                    return;
+                }
                 session.getCallback().onBufferingStateChanged(
-                        session.getInstance(), mpb, null /* MediaItem */, state);
+                        session.getInstance(), mpb, item, state);
+                // TODO (jaewan): Notify controllers through appropriate callback. (b/74505936)
             });
         }
 
@@ -884,6 +892,24 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 Log.d(TAG, "Session is closed", new IllegalStateException());
             }
             return session;
+        }
+
+        private MediaItem2 getMediaItem(MediaSession2Impl session, DataSourceDesc dsd) {
+            MediaPlaylistAgent agent = session.getPlaylistAgent();
+            if (agent == null) {
+                if (DEBUG) {
+                    Log.d(TAG, "Session is closed", new IllegalStateException());
+                }
+                return null;
+            }
+            MediaItem2 item = agent.getMediaItem(dsd);
+            if (item == null) {
+                if (DEBUG) {
+                    Log.d(TAG, "Could not find matching item for dsd=" + dsd,
+                            new NoSuchElementException());
+                }
+            }
+            return item;
         }
     }
 

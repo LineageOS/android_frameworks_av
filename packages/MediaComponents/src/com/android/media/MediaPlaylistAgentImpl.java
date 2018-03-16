@@ -20,6 +20,7 @@ import android.annotation.CallbackExecutor;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
+import android.media.DataSourceDesc;
 import android.media.MediaItem2;
 import android.media.MediaMetadata2;
 import android.media.MediaPlaylistAgent;
@@ -48,6 +49,7 @@ public class MediaPlaylistAgentImpl implements MediaPlaylistAgentProvider {
         mInstance = instance;
     }
 
+    @Override
     final public void registerPlaylistEventCallback_impl(
             @NonNull @CallbackExecutor Executor executor, @NonNull PlaylistEventCallback callback) {
         if (executor == null) {
@@ -66,6 +68,7 @@ public class MediaPlaylistAgentImpl implements MediaPlaylistAgentProvider {
         }
     }
 
+    @Override
     final public void unregisterPlaylistEventCallback_impl(
             @NonNull PlaylistEventCallback callback) {
         if (callback == null) {
@@ -76,6 +79,7 @@ public class MediaPlaylistAgentImpl implements MediaPlaylistAgentProvider {
         }
     }
 
+    @Override
     final public void notifyPlaylistChanged_impl() {
         ArrayMap<PlaylistEventCallback, Executor> callbacks = getCallbacks();
         List<MediaItem2> playlist= mInstance.getPlaylist();
@@ -88,6 +92,7 @@ public class MediaPlaylistAgentImpl implements MediaPlaylistAgentProvider {
         }
     }
 
+    @Override
     final public void notifyPlaylistMetadataChanged_impl() {
         ArrayMap<PlaylistEventCallback, Executor> callbacks = getCallbacks();
         for (int i = 0; i < callbacks.size(); i++) {
@@ -98,6 +103,7 @@ public class MediaPlaylistAgentImpl implements MediaPlaylistAgentProvider {
         }
     }
 
+    @Override
     final public void notifyShuffleModeChanged_impl() {
         ArrayMap<PlaylistEventCallback, Executor> callbacks = getCallbacks();
         for (int i = 0; i < callbacks.size(); i++) {
@@ -108,6 +114,7 @@ public class MediaPlaylistAgentImpl implements MediaPlaylistAgentProvider {
         }
     }
 
+    @Override
     final public void notifyRepeatModeChanged_impl() {
         ArrayMap<PlaylistEventCallback, Executor> callbacks = getCallbacks();
         for (int i = 0; i < callbacks.size(); i++) {
@@ -118,64 +125,96 @@ public class MediaPlaylistAgentImpl implements MediaPlaylistAgentProvider {
         }
     }
 
+    @Override
     public @Nullable List<MediaItem2> getPlaylist_impl() {
         // empty implementation
         return null;
     }
 
+    @Override
     public void setPlaylist_impl(@NonNull List<MediaItem2> list,
             @Nullable MediaMetadata2 metadata) {
         // empty implementation
     }
 
+    @Override
     public @Nullable MediaMetadata2 getPlaylistMetadata_impl() {
         // empty implementation
         return null;
     }
 
+    @Override
     public void updatePlaylistMetadata_impl(@Nullable MediaMetadata2 metadata) {
         // empty implementation
     }
 
+    @Override
     public void addPlaylistItem_impl(int index, @NonNull MediaItem2 item) {
         // empty implementation
     }
 
+    @Override
     public void removePlaylistItem_impl(@NonNull MediaItem2 item) {
         // empty implementation
     }
 
+    @Override
     public void replacePlaylistItem_impl(int index, @NonNull MediaItem2 item) {
         // empty implementation
     }
 
+    @Override
     public void skipToPlaylistItem_impl(@NonNull MediaItem2 item) {
         // empty implementation
     }
 
+    @Override
     public void skipToPreviousItem_impl() {
         // empty implementation
     }
 
+    @Override
     public void skipToNextItem_impl() {
         // empty implementation
     }
 
+    @Override
     public int getRepeatMode_impl() {
         return MediaPlaylistAgent.REPEAT_MODE_NONE;
     }
 
+    @Override
     public void setRepeatMode_impl(int repeatMode) {
         // empty implementation
     }
 
+    @Override
     public int getShuffleMode_impl() {
         // empty implementation
         return MediaPlaylistAgent.SHUFFLE_MODE_NONE;
     }
 
+    @Override
     public void setShuffleMode_impl(int shuffleMode) {
         // empty implementation
+    }
+
+    @Override
+    public @Nullable MediaItem2 getMediaItem_impl(@NonNull DataSourceDesc dsd) {
+        if (dsd == null) {
+            throw new IllegalArgumentException("dsd shouldn't be null");
+        }
+        List<MediaItem2> itemList = mInstance.getPlaylist();
+        if (itemList == null) {
+            return null;
+        }
+        for (int i = 0; i < itemList.size(); i++) {
+            MediaItem2 item = itemList.get(i);
+            if (item != null && item.getDataSourceDesc() == dsd) {
+                return item;
+            }
+        }
+        return null;
     }
 
     private ArrayMap<PlaylistEventCallback, Executor> getCallbacks() {
