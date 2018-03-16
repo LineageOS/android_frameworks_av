@@ -9,6 +9,8 @@ cc_library {
         "FLACDecoder.cpp",
     ],
 
+    export_include_dirs: [ "." ],
+
     include_dirs: [
         "external/flac/include",
         "frameworks/av/media/libstagefright/include",
