@@ -88,7 +88,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
     private final MediaSession2Stub mSessionStub;
     private final SessionToken2 mSessionToken;
     private final AudioManager mAudioManager;
-    private final ArrayMap<PlayerEventCallback, Executor> mCallbacks = new ArrayMap<>();
     private final PendingIntent mSessionActivity;
     private final PlayerEventCallback mPlayerEventCallback;
     private final PlaylistEventCallback mPlaylistEventCallback;
@@ -651,31 +650,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void registerPlayerEventCallback_impl(Executor executor, PlayerEventCallback callback) {
-        if (executor == null) {
-            throw new IllegalArgumentException("executor shouldn't be null");
-        }
-        if (callback == null) {
-            throw new IllegalArgumentException("callback shouldn't be null");
-        }
-        ensureCallingThread();
-        if (mCallbacks.get(callback) != null) {
-            Log.w(TAG, "callback is already added. Ignoring.");
-            return;
-        }
-        mCallbacks.put(callback, executor);
-    }
-
-    @Override
-    public void unregisterPlayerEventCallback_impl(PlayerEventCallback callback) {
-        if (callback == null) {
-            throw new IllegalArgumentException("callback shouldn't be null");
-        }
-        ensureCallingThread();
-        mCallbacks.remove(callback);
-    }
-
-    @Override
     public void notifyError_impl(int errorCode, Bundle extras) {
         // TODO(jaewan): Implement
     }
@@ -725,19 +699,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     private void notifyPlayerUpdatedNotLocked(MediaPlayerBase oldPlayer) {
-        ArrayMap<PlayerEventCallback, Executor> callbacks = new ArrayMap<>();
-        MediaPlayerBase player;
-        synchronized (mLock) {
-            player = mPlayer;
-            callbacks.putAll(mCallbacks);
-        }
-        // Notify to callbacks added directly to this session
-        for (int i = 0; i < callbacks.size(); i++) {
-            final PlayerEventCallback callback = callbacks.keyAt(i);
-            final Executor executor = callbacks.valueAt(i);
-            // TODO: Uncomment or remove
-            //executor.execute(() -> callback.onPlaybackStateChanged(state));
-        }
+        final MediaPlayerBase player = mPlayer;
+        // TODO(jaewan): (Can be post-P) Find better way for player.getPlayerState() //
+        //               In theory, Session.getXXX() may not be the same as Player.getXXX()
+        //               and we should notify information of the session.getXXX() instead of
+        //               player.getXXX()
         // Notify to controllers as well.
         final int state = player.getPlayerState();
         if (state != oldPlayer.getPlayerState()) {
@@ -759,21 +725,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
         if (bufferedPosition != oldPlayer.getBufferedPosition()) {
             mSessionStub.notifyBufferedPositionChangedNotLocked(bufferedPosition);
         }
-    }
-
-    private void notifyErrorNotLocked(String mediaId, int what, int extra) {
-        ArrayMap<PlayerEventCallback, Executor> callbacks = new ArrayMap<>();
-        synchronized (mLock) {
-            callbacks.putAll(mCallbacks);
-        }
-        // Notify to callbacks added directly to this session
-        for (int i = 0; i < callbacks.size(); i++) {
-            final PlayerEventCallback callback = callbacks.keyAt(i);
-            final Executor executor = callbacks.valueAt(i);
-            // TODO: Uncomment or remove
-            //executor.execute(() -> callback.onError(mediaId, what, extra));
-        }
-        // TODO(jaewan): Notify to controllers as well.
     }
 
     Context getContext() {
