@@ -196,14 +196,16 @@ private:
 
 /**
  * Calculate the number of bytes and prevent numeric overflow.
+ * The *sizeInBytes will be set to zero if there is an error.
+ *
  * @param numFrames frame count
  * @param bytesPerFrame size of a frame in bytes
- * @param sizeInBytes total size in bytes
+ * @param sizeInBytes pointer to a variable to receive total size in bytes
  * @return AAUDIO_OK or negative error, eg. AAUDIO_ERROR_OUT_OF_RANGE
  */
 int32_t AAudioConvert_framesToBytes(int32_t numFrames,
-                                            int32_t bytesPerFrame,
-                                            int32_t *sizeInBytes);
+                                    int32_t bytesPerFrame,
+                                    int32_t *sizeInBytes);
 
 audio_format_t AAudioConvert_aaudioToAndroidDataFormat(aaudio_format_t aaudio_format);
 
