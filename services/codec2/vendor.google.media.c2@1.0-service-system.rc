@@ -1,7 +1,0 @@
-service vendor-google-media-c2-system-hal-1-0 /system/bin/hw/vendor.google.media.c2@1.0-service-system
-    class hal
-    user media
-    group mediadrm drmrpc
-    ioprio rt 4
-    writepid /dev/cpuset/foreground/tasks
-
