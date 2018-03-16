@@ -39,6 +39,7 @@ import android.media.MediaLibraryService2;
 import android.media.MediaMetadata2;
 import android.media.MediaPlayerBase;
 import android.media.MediaPlayerBase.PlayerEventCallback;
+import android.media.MediaPlayerBase.PlayerState;
 import android.media.MediaPlaylistAgent;
 import android.media.MediaPlaylistAgent.PlaylistEventCallback;
 import android.media.MediaSession2;
@@ -652,6 +653,39 @@ public class MediaSession2Impl implements MediaSession2Provider {
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
+    }
+
+    @Override
+    public @PlayerState int getPlayerState_impl() {
+        final MediaPlayerBase player = mPlayer;
+        if (player != null) {
+            return mPlayer.getPlayerState();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
+        return MediaPlayerBase.PLAYER_STATE_ERROR;
+    }
+
+    @Override
+    public long getPosition_impl() {
+        final MediaPlayerBase player = mPlayer;
+        if (player != null) {
+            return mPlayer.getCurrentPosition();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
+        return MediaPlayerBase.UNKNOWN_TIME;
+    }
+
+    @Override
+    public long getBufferedPosition_impl() {
+        final MediaPlayerBase player = mPlayer;
+        if (player != null) {
+            return mPlayer.getBufferedPosition();
+        } else if (DEBUG) {
+            Log.d(TAG, "API calls after the close()", new IllegalStateException());
+        }
+        return MediaPlayerBase.UNKNOWN_TIME;
     }
 
     @Override
