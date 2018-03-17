@@ -1360,7 +1360,7 @@ Exit:
         if (chainCreated) {
             removeEffectChain_l(chain);
         }
-        handle.clear();
+        // handle must be cleared by caller to avoid deadlock.
     }
 
     *status = lStatus;
