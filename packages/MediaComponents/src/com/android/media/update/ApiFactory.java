@@ -35,7 +35,6 @@ import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
-import android.media.MediaSession2.PlaylistParams;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
 import android.media.MediaSessionService2.MediaNotification;
@@ -52,7 +51,6 @@ import android.media.update.MediaPlaylistAgentProvider;
 import android.media.update.MediaSession2Provider;
 import android.media.update.MediaSession2Provider.BuilderBaseProvider;
 import android.media.update.MediaSession2Provider.CommandButtonProvider.BuilderProvider;
-import android.media.update.MediaSession2Provider.PlaylistParamsProvider;
 import android.media.update.MediaSessionService2Provider;
 import android.media.update.MediaSessionService2Provider.MediaNotificationProvider;
 import android.media.update.SessionToken2Provider;
@@ -76,7 +74,6 @@ import com.android.media.MediaLibraryService2Impl.LibraryRootImpl;
 import com.android.media.MediaMetadata2Impl;
 import com.android.media.MediaPlaylistAgentImpl;
 import com.android.media.MediaSession2Impl;
-import com.android.media.MediaSession2Impl.PlaylistParamsImpl;
 import com.android.media.MediaSessionService2Impl;
 import com.android.media.Rating2Impl;
 import com.android.media.SessionToken2Impl;
@@ -138,19 +135,6 @@ public class ApiFactory implements StaticProvider {
             IInterface callback) {
         return new MediaSession2Impl.ControllerInfoImpl(context,
                 instance, uid, pid, packageName, (IMediaController2) callback);
-    }
-
-    @Override
-    public PlaylistParamsProvider createMediaSession2PlaylistParams(Context context,
-            PlaylistParams playlistParams, int repeatMode, int shuffleMode,
-            MediaMetadata2 playlistMetadata) {
-        return new PlaylistParamsImpl(context, playlistParams, repeatMode, shuffleMode,
-                playlistMetadata);
-    }
-
-    @Override
-    public PlaylistParams fromBundle_PlaylistParams(Context context, Bundle bundle) {
-        return PlaylistParamsImpl.fromBundle(context, bundle);
     }
 
     @Override

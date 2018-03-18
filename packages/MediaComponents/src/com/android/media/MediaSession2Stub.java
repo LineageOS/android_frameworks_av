@@ -22,13 +22,11 @@ import android.media.MediaController2;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaMetadata2;
-import android.media.MediaPlayerBase;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
-import android.media.MediaSession2.PlaylistParams;
 import android.media.Rating2;
 import android.media.VolumeProvider2;
 import android.net.Uri;
@@ -391,13 +389,13 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 //       use thread poll for incoming calls.
                 final int playerState = session.getInstance().getPlayerState();
                 final long positionEventTimeMs = System.currentTimeMillis();
-                final long positionMs = session.getInstance().getCurrentPosition();
+                final long positionMs = session.getInstance().getPosition();
                 final float playbackSpeed = session.getInstance().getPlaybackSpeed();
                 final long bufferedPositionMs = session.getInstance().getBufferedPosition();
                 final Bundle playbackInfoBundle = ((MediaController2Impl.PlaybackInfoImpl)
                         session.getPlaybackInfo().getProvider()).toBundle();
-                final PlaylistParams params = session.getInstance().getPlaylistParams();
-                final Bundle paramsBundle = (params != null) ? params.toBundle() : null;
+                final int repeatMode = session.getInstance().getRepeatMode();
+                final int shuffleMode = session.getInstance().getShuffleMode();
                 final PendingIntent sessionActivity = session.getSessionActivity();
                 final List<MediaItem2> playlist =
                         allowedCommands.hasCommand(MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST)
@@ -427,8 +425,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 try {
                     caller.onConnected(MediaSession2Stub.this, allowedCommands.toBundle(),
                             playerState, positionEventTimeMs, positionMs, playbackSpeed,
-                            bufferedPositionMs, playbackInfoBundle, paramsBundle, playlistBundle,
-                            sessionActivity);
+                            bufferedPositionMs, playbackInfoBundle, repeatMode, shuffleMode,
+                            playlistBundle, sessionActivity);
                 } catch (RemoteException e) {
                     // Controller may be died prematurely.
                     // TODO(jaewan): Handle here.
@@ -495,12 +493,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 case MediaSession2.COMMAND_CODE_PLAYBACK_STOP:
                     session.getInstance().stop();
                     break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM:
-                    session.getInstance().skipToPreviousItem();
-                    break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM:
-                    session.getInstance().skipToNextItem();
-                    break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE:
                     session.getInstance().prepare();
                     break;
@@ -513,21 +505,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO:
                     session.getInstance().seekTo(args.getLong(ARGUMENT_KEY_POSITION));
                     break;
-                case MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_TO_PLAYLIST_ITEM:
-                    // TODO(jaewan): Implement
-                    /*
-                    session.getInstance().skipToPlaylistItem(
-                            args.getInt(ARGUMENT_KEY_ITEM_INDEX));
-                    */
-                    break;
-                    // TODO(jaewan): Remove (b/74116823)
-                    /*
-                case MediaSession2.COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS:
-                    session.getInstance().setPlaylistParams(
-                            PlaylistParams.fromBundle(session.getContext(),
-                                    args.getBundle(ARGUMENT_KEY_PLAYLIST_PARAMS)));
-                    break;
-                    */
                 default:
                     // TODO(jaewan): Resend unknown (new) commands through the custom command.
             }
@@ -708,9 +685,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM,
                 (session, controller) -> {
             MediaItem2 item = MediaItem2.fromBundle(session.getContext(), mediaItem);
-            List<MediaItem2> list = session.getInstance().getPlaylist();
-            // Trick to use the same reference for calls from the controller.
-            session.getInstance().removePlaylistItem(list.get(list.indexOf(item)));
+            // Note: MediaItem2 has hidden UUID to identify it across the processes.
+            session.getInstance().removePlaylistItem(item);
         });
     }
 
@@ -721,7 +697,53 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     // Resets the UUID from the incoming media id, so controller may reuse a media
                     // item multiple times for replacePlaylistItem.
                     session.getInstance().replacePlaylistItem(index,
+                            MediaItem2Impl.fromBundle(session.getContext(), mediaItem, null));
+                });
+    }
+
+    @Override
+    public void skipToPlaylistItem(IMediaController2 caller, Bundle mediaItem) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_TO_PLAYLIST_ITEM,
+                (session, controller) -> {
+                    if (mediaItem == null) {
+                        Log.w(TAG, "skipToPlaylistItem(): Ignoring null mediaItem from "
+                                + controller);
+                    }
+                    // Note: MediaItem2 has hidden UUID to identify it across the processes.
+                    session.getInstance().skipToPlaylistItem(
                             MediaItem2.fromBundle(session.getContext(), mediaItem));
+                });
+    }
+
+    @Override
+    public void skipToPreviousItem(IMediaController2 caller) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM,
+                (session, controller) -> {
+                    session.getInstance().skipToPreviousItem();
+                });
+    }
+
+    @Override
+    public void skipToNextItem(IMediaController2 caller) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM,
+                (session, controller) -> {
+                    session.getInstance().skipToNextItem();
+                });
+    }
+
+    @Override
+    public void setRepeatMode(IMediaController2 caller, int repeatMode) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_REPEAT_MODE,
+                (session, controller) -> {
+                    session.getInstance().setRepeatMode(repeatMode);
+                });
+    }
+
+    @Override
+    public void setShuffleMode(IMediaController2 caller, int shuffleMode) {
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_SHUFFLE_MODE,
+                (session, controller) -> {
+                    session.getInstance().setShuffleMode(shuffleMode);
                 });
     }
 
@@ -966,6 +988,18 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 (unused, iController) -> {
                     iController.onPlaylistMetadataChanged(metadataBundle);
                 });
+    }
+
+    public void notifyRepeatModeChangedNotLocked(int repeatMode) {
+        notifyAll((unused, iController) -> {
+            iController.onRepeatModeChanged(repeatMode);
+        });
+    }
+
+    public void notifyShuffleModeChangedNotLocked(int shuffleMode) {
+        notifyAll((unused, iController) -> {
+            iController.onShuffleModeChanged(shuffleMode);
+        });
     }
 
     public void notifyPlaybackInfoChanged(MediaController2.PlaybackInfo playbackInfo) {
