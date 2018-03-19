@@ -267,7 +267,7 @@ abstract class SystemMediaRouteProvider extends MediaRouteProvider {
             mCallbackObj = createCallbackObj();
             mVolumeCallbackObj = createVolumeCallbackObj();
 
-            Resources r = ApiHelper.getLibResources();
+            Resources r = ApiHelper.getLibResources(context);
             mUserRouteCategoryObj = MediaRouterJellybean.createRouteCategory(
                     mRouterObj, r.getString(R.string.mr_user_route_category_name), false);
 

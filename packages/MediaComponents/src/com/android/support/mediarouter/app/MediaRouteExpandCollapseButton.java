@@ -51,9 +51,9 @@ public class MediaRouteExpandCollapseButton extends ImageButton {
     public MediaRouteExpandCollapseButton(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         mExpandAnimationDrawable = (AnimationDrawable)
-                ApiHelper.getLibResources().getDrawable(R.drawable.mr_group_expand);
+                ApiHelper.getLibResources(context).getDrawable(R.drawable.mr_group_expand);
         mCollapseAnimationDrawable = (AnimationDrawable)
-                ApiHelper.getLibResources().getDrawable(R.drawable.mr_group_collapse);
+                ApiHelper.getLibResources(context).getDrawable(R.drawable.mr_group_collapse);
 
         ColorFilter filter = new PorterDuffColorFilter(
                 MediaRouterThemeHelper.getControllerColor(context, defStyleAttr),
@@ -62,9 +62,9 @@ public class MediaRouteExpandCollapseButton extends ImageButton {
         mCollapseAnimationDrawable.setColorFilter(filter);
 
         mExpandGroupDescription =
-                ApiHelper.getLibResources().getString(R.string.mr_controller_expand_group);
+                ApiHelper.getLibResources(context).getString(R.string.mr_controller_expand_group);
         mCollapseGroupDescription =
-                ApiHelper.getLibResources().getString(R.string.mr_controller_collapse_group);
+                ApiHelper.getLibResources(context).getString(R.string.mr_controller_collapse_group);
 
         setImageDrawable(mExpandAnimationDrawable.getFrame(0));
         setContentDescription(mExpandGroupDescription);

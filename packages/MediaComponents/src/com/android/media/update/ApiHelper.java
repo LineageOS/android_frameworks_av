@@ -19,9 +19,12 @@ package com.android.media.update;
 import android.annotation.Nullable;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
 import android.content.res.XmlResourceParser;
+import android.support.annotation.GuardedBy;
 import android.support.v4.widget.Space;
 import android.support.v7.widget.ButtonBarLayout;
 import android.util.AttributeSet;
@@ -35,45 +38,47 @@ import com.android.support.mediarouter.app.MediaRouteExpandCollapseButton;
 import com.android.support.mediarouter.app.MediaRouteVolumeSlider;
 import com.android.support.mediarouter.app.OverlayListView;
 
-public class ApiHelper {
-    private static ApiHelper sInstance;
-    private final Resources mLibResources;
-    private final Theme mLibTheme;
+public final class ApiHelper {
+    private static ApplicationInfo sUpdatableInfo;
 
-    public static ApiHelper getInstance() {
-        return sInstance;
-    }
+    @GuardedBy("this")
+    private static Theme sLibTheme;
 
-    static void initialize(Resources libResources, Theme libTheme) {
-        if (sInstance == null) {
-            sInstance = new ApiHelper(libResources, libTheme);
+    private ApiHelper() { }
+
+    static void initialize(ApplicationInfo updatableInfo) {
+        if (sUpdatableInfo != null) {
+            throw new IllegalStateException("initialize should only be called once");
         }
+
+        sUpdatableInfo = updatableInfo;
     }
 
-    private ApiHelper(Resources libResources, Theme libTheme) {
-        mLibResources = libResources;
-        mLibTheme = libTheme;
+    public static Resources getLibResources(Context context) {
+        return getLibTheme(context).getResources();
     }
 
-    public static Resources getLibResources() {
-        return sInstance.mLibResources;
+    public static Theme getLibTheme(Context context) {
+        if (sLibTheme != null) return sLibTheme;
+
+        return getLibThemeSynchronized(context);
     }
 
-    public static Theme getLibTheme() {
-        return sInstance.mLibTheme;
-    }
-
-    public static Theme getLibTheme(int themeId) {
-        Theme theme = sInstance.mLibResources.newTheme();
+    public static Theme getLibTheme(Context context, int themeId) {
+        Theme theme = getLibResources(context).newTheme();
         theme.applyStyle(themeId, true);
         return theme;
     }
 
     public static LayoutInflater getLayoutInflater(Context context) {
-        return getLayoutInflater(context, getLibTheme());
+        return getLayoutInflater(context, null);
     }
 
     public static LayoutInflater getLayoutInflater(Context context, Theme theme) {
+        if (theme == null) {
+            theme = getLibTheme(context);
+        }
+
         // TODO (b/72975976): Avoid to use ContextThemeWrapper with app context and lib theme.
         LayoutInflater layoutInflater = LayoutInflater.from(context).cloneInContext(
                 new ContextThemeWrapper(context, theme));
@@ -106,7 +111,7 @@ public class ApiHelper {
     }
 
     public static View inflateLibLayout(Context context, int libResId) {
-        return inflateLibLayout(context, getLibTheme(), libResId, null, false);
+        return inflateLibLayout(context, getLibTheme(context), libResId, null, false);
     }
 
     public static View inflateLibLayout(Context context, Theme theme, int libResId) {
@@ -115,8 +120,23 @@ public class ApiHelper {
 
     public static View inflateLibLayout(Context context, Theme theme, int libResId,
             @Nullable ViewGroup root, boolean attachToRoot) {
-        try (XmlResourceParser parser = getLibResources().getLayout(libResId)) {
+        try (XmlResourceParser parser = getLibResources(context).getLayout(libResId)) {
             return getLayoutInflater(context, theme).inflate(parser, root, attachToRoot);
+        }
+    }
+
+    private static synchronized Theme getLibThemeSynchronized(Context context) {
+        if (sLibTheme != null) return sLibTheme;
+
+        if (sUpdatableInfo == null) {
+            throw new IllegalStateException("initialize hasn't been called yet");
+        }
+
+        try {
+            return sLibTheme = context.getPackageManager()
+                    .getResourcesForApplication(sUpdatableInfo).newTheme();
+        } catch (NameNotFoundException e) {
+            throw new RuntimeException(e);
         }
     }
 }
