@@ -206,8 +206,8 @@ public class MediaRouteControllerDialog extends AlertDialog {
 
     public MediaRouteControllerDialog(Context context, int theme) {
         // TODO (b/72975976): Avoid to use ContextThemeWrapper with app context and lib theme.
-        super(new ContextThemeWrapper(context,
-                ApiHelper.getLibTheme(MediaRouterThemeHelper.getRouterThemeId(context))), theme);
+        super(new ContextThemeWrapper(context, ApiHelper.getLibTheme(context,
+                MediaRouterThemeHelper.getRouterThemeId(context))), theme);
         mContext = getContext();
 
         mControllerCallback = new MediaControllerCallback();
@@ -215,7 +215,7 @@ public class MediaRouteControllerDialog extends AlertDialog {
         mCallback = new MediaRouterCallback();
         mRoute = mRouter.getSelectedRoute();
         setMediaSession(mRouter.getMediaSessionToken());
-        mVolumeGroupListPaddingTop = ApiHelper.getLibResources().getDimensionPixelSize(
+        mVolumeGroupListPaddingTop = ApiHelper.getLibResources(context).getDimensionPixelSize(
                 R.dimen.mr_controller_volume_group_list_padding_top);
         mAccessibilityManager =
                 (AccessibilityManager) mContext.getSystemService(Context.ACCESSIBILITY_SERVICE);
@@ -334,7 +334,7 @@ public class MediaRouteControllerDialog extends AlertDialog {
         getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 
         setContentView(ApiHelper.inflateLibLayout(mContext,
-                ApiHelper.getLibTheme(MediaRouterThemeHelper.getRouterThemeId(mContext)),
+                ApiHelper.getLibTheme(mContext, MediaRouterThemeHelper.getRouterThemeId(mContext)),
                 R.layout.mr_controller_material_dialog_b));
 
         // Remove the neutral button.
@@ -359,13 +359,13 @@ public class MediaRouteControllerDialog extends AlertDialog {
         int color = MediaRouterThemeHelper.getButtonTextColor(mContext);
         mDisconnectButton = findViewById(BUTTON_DISCONNECT_RES_ID);
         mDisconnectButton.setText(
-                ApiHelper.getLibResources().getString(R.string.mr_controller_disconnect));
+                ApiHelper.getLibResources(mContext).getString(R.string.mr_controller_disconnect));
         mDisconnectButton.setTextColor(color);
         mDisconnectButton.setOnClickListener(listener);
 
         mStopCastingButton = findViewById(BUTTON_STOP_RES_ID);
         mStopCastingButton.setText(
-                ApiHelper.getLibResources().getString(R.string.mr_controller_stop_casting));
+                ApiHelper.getLibResources(mContext).getString(R.string.mr_controller_stop_casting));
         mStopCastingButton.setTextColor(color);
         mStopCastingButton.setOnClickListener(listener);
 
@@ -440,11 +440,11 @@ public class MediaRouteControllerDialog extends AlertDialog {
             }
         });
         loadInterpolator();
-        mGroupListAnimationDurationMs = ApiHelper.getLibResources().getInteger(
+        mGroupListAnimationDurationMs = ApiHelper.getLibResources(mContext).getInteger(
                 R.integer.mr_controller_volume_group_list_animation_duration_ms);
-        mGroupListFadeInDurationMs = ApiHelper.getLibResources().getInteger(
+        mGroupListFadeInDurationMs = ApiHelper.getLibResources(mContext).getInteger(
                 R.integer.mr_controller_volume_group_list_fade_in_duration_ms);
-        mGroupListFadeOutDurationMs = ApiHelper.getLibResources().getInteger(
+        mGroupListFadeOutDurationMs = ApiHelper.getLibResources(mContext).getInteger(
                 R.integer.mr_controller_volume_group_list_fade_out_duration_ms);
 
         mCustomControlView = onCreateMediaControlView(savedInstanceState);
@@ -460,13 +460,13 @@ public class MediaRouteControllerDialog extends AlertDialog {
      * Sets the width of the dialog. Also called when configuration changes.
      */
     void updateLayout() {
-        int width = MediaRouteDialogHelper.getDialogWidth();
+        int width = MediaRouteDialogHelper.getDialogWidth(mContext);
         getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
 
         View decorView = getWindow().getDecorView();
         mDialogContentWidth = width - decorView.getPaddingLeft() - decorView.getPaddingRight();
 
-        Resources res = ApiHelper.getLibResources();
+        Resources res = ApiHelper.getLibResources(mContext);
         mVolumeGroupListItemIconSize = res.getDimensionPixelSize(
                 R.dimen.mr_controller_volume_group_list_item_icon_size);
         mVolumeGroupListItemHeight = res.getDimensionPixelSize(
@@ -991,16 +991,16 @@ public class MediaRouteControllerDialog extends AlertDialog {
             if (mRoute.getPresentationDisplayId()
                     != MediaRouter.RouteInfo.PRESENTATION_DISPLAY_ID_NONE) {
                 // The user is currently casting screen.
-                mTitleView.setText(ApiHelper.getLibResources().getString(
+                mTitleView.setText(ApiHelper.getLibResources(mContext).getString(
                         R.string.mr_controller_casting_screen));
                 showTitle = true;
             } else if (mState == null || mState.getState() == PlaybackStateCompat.STATE_NONE) {
                 // Show "No media selected" as we don't yet know the playback state.
-                mTitleView.setText(ApiHelper.getLibResources().getString(
+                mTitleView.setText(ApiHelper.getLibResources(mContext).getString(
                         R.string.mr_controller_no_media_selected));
                 showTitle = true;
             } else if (!hasTitle && !hasSubtitle) {
-                mTitleView.setText(ApiHelper.getLibResources().getString(
+                mTitleView.setText(ApiHelper.getLibResources(mContext).getString(
                         R.string.mr_controller_no_info_available));
                 showTitle = true;
             } else {
@@ -1223,7 +1223,8 @@ public class MediaRouteControllerDialog extends AlertDialog {
                                 AccessibilityEventCompat.TYPE_ANNOUNCEMENT);
                         event.setPackageName(mContext.getPackageName());
                         event.setClassName(getClass().getName());
-                        event.getText().add(ApiHelper.getLibResources().getString(actionDescResId));
+                        event.getText().add(
+                                ApiHelper.getLibResources(mContext).getString(actionDescResId));
                         mAccessibilityManager.sendAccessibilityEvent(event);
                     }
                 }
