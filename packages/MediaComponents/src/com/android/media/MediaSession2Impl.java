@@ -690,7 +690,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
 
     @Override
     public void notifyError_impl(int errorCode, Bundle extras) {
-        // TODO(jaewan): Implement
+        mSessionStub.notifyError(errorCode, extras);
     }
 
     ///////////////////////////////////////////////////
