@@ -617,31 +617,23 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public void fastForward_impl() {
         ensureCallingThread();
-        // TODO: Uncomment or remove
-        /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
-            // TODO implement
-            //player.fastForward();
+            player.fastForward();
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
-        */
     }
 
     @Override
     public void rewind_impl() {
         ensureCallingThread();
-        // TODO: Uncomment or remove
-        /*
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
-            // TODO implement
-            //player.rewind();
+            player.rewind();
         } else if (DEBUG) {
             Log.d(TAG, "API calls after the close()", new IllegalStateException());
         }
-        */
     }
 
     @Override
