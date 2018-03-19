@@ -130,7 +130,7 @@ public class MediaRouteButton extends View {
         mRouter = MediaRouter.getInstance(context);
         mCallback = new MediaRouterCallback();
 
-        Resources.Theme theme = ApiHelper.getLibResources().newTheme();
+        Resources.Theme theme = ApiHelper.getLibResources(context).newTheme();
         theme.applyStyle(MediaRouterThemeHelper.getRouterThemeId(context), true);
         TypedArray a = theme.obtainStyledAttributes(attrs,
                 R.styleable.MediaRouteButton, defStyleAttr, 0);
@@ -304,7 +304,8 @@ public class MediaRouteButton extends View {
      */
     void setCheatSheetEnabled(boolean enable) {
         TooltipCompat.setTooltipText(this, enable
-                ? ApiHelper.getLibResources().getString(R.string.mr_button_content_description)
+                ? ApiHelper.getLibResources(getContext())
+                    .getString(R.string.mr_button_content_description)
                 : null);
     }
 
@@ -547,7 +548,7 @@ public class MediaRouteButton extends View {
         } else {
             resId = R.string.mr_cast_button_disconnected;
         }
-        setContentDescription(ApiHelper.getLibResources().getString(resId));
+        setContentDescription(ApiHelper.getLibResources(getContext()).getString(resId));
     }
 
     private final class MediaRouterCallback extends MediaRouter.Callback {
@@ -604,7 +605,7 @@ public class MediaRouteButton extends View {
 
         @Override
         protected Drawable doInBackground(Void... params) {
-            return ApiHelper.getLibResources().getDrawable(mResId);
+            return ApiHelper.getLibResources(getContext()).getDrawable(mResId);
         }
 
         @Override

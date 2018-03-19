@@ -41,12 +41,13 @@ final class MediaRouteDialogHelper {
      * The framework should set the dialog width properly, but somehow it doesn't work, hence
      * duplicating a similar logic here to determine the appropriate dialog width.
      */
-    public static int getDialogWidth() {
-        DisplayMetrics metrics = ApiHelper.getLibResources().getDisplayMetrics();
+    public static int getDialogWidth(Context context) {
+        DisplayMetrics metrics = ApiHelper.getLibResources(context).getDisplayMetrics();
         boolean isPortrait = metrics.widthPixels < metrics.heightPixels;
 
         TypedValue value = new TypedValue();
-        ApiHelper.getLibResources().getValue(isPortrait ? R.dimen.mr_dialog_fixed_width_minor
+        ApiHelper.getLibResources(context).getValue(isPortrait
+                ? R.dimen.mr_dialog_fixed_width_minor
                 : R.dimen.mr_dialog_fixed_width_major, value, true);
         if (value.type == TypedValue.TYPE_DIMENSION) {
             return (int) value.getDimension(metrics);

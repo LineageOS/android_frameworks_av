@@ -194,7 +194,7 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
 
     @Override
     public void initialize(@Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-        mResources = ApiHelper.getLibResources();
+        mResources = ApiHelper.getLibResources(mInstance.getContext());
         // Inflate MediaControlView2 from XML
         mRoot = makeControllerView();
         mInstance.addView(mRoot);
