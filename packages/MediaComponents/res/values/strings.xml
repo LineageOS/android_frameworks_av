@@ -122,6 +122,8 @@
         <item>1.5x</item>
         <item>2x</item>
     </string-array>
+    <!-- Placeholder text for displaying time. Used to calculate which size layout to use. -->
+    <string name="MediaControlView2_time_placeholder">00:00:00</string>
 
     <!-- Text for displaying subtitle track number. -->
     <string name="MediaControlView2_subtitle_track_number_text">
