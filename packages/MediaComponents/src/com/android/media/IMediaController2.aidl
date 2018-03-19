@@ -40,6 +40,7 @@ oneway interface IMediaController2 {
     void onPlaybackInfoChanged(in Bundle playbackInfo);
     void onRepeatModeChanged(int repeatMode);
     void onShuffleModeChanged(int shuffleMode);
+    void onError(int errorCode, in Bundle extras);
 
     void onConnected(IMediaSession2 sessionBinder, in Bundle commandGroup,
             int playerState, long positionEventTimeMs, long positionMs, float playbackSpeed,

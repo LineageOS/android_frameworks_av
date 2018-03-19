@@ -214,6 +214,18 @@ public class MediaController2Stub extends IMediaController2.Stub {
     }
 
     @Override
+    public void onError(int errorCode, Bundle extras) {
+        final MediaController2Impl controller;
+        try {
+            controller = getController();
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Don't fail silently here. Highly likely a bug");
+            return;
+        }
+        controller.pushError(errorCode, extras);
+    }
+
+    @Override
     public void onConnected(IMediaSession2 sessionBinder, Bundle commandGroup,
             int playerState, long positionEventTimeMs, long positionMs, float playbackSpeed,
             long bufferedPositionMs, Bundle playbackInfo, int shuffleMode, int repeatMode,
