@@ -18,8 +18,7 @@ package com.android.media.update;
 
 import android.app.Notification;
 import android.content.Context;
-import android.content.res.Resources;
-import android.content.res.Resources.Theme;
+import android.content.pm.ApplicationInfo;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaController2;
@@ -83,10 +82,11 @@ import com.android.widget.VideoView2Impl;
 
 import java.util.concurrent.Executor;
 
-public class ApiFactory implements StaticProvider {
-    public static Object initialize(Resources libResources, Theme libTheme)
-            throws ReflectiveOperationException {
-        ApiHelper.initialize(libResources, libTheme);
+public final class ApiFactory implements StaticProvider {
+    private ApiFactory() { }
+
+    public static ApiFactory initialize(ApplicationInfo updatableInfo) {
+        ApiHelper.initialize(updatableInfo);
         return new ApiFactory();
     }
 
