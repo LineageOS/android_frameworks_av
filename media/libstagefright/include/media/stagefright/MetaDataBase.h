@@ -244,6 +244,7 @@ enum {
 
     kKeySps              = 'sSps', // int32_t, indicates that a buffer is sps.
     kKeyPps              = 'sPps', // int32_t, indicates that a buffer is pps.
+    kKeySelfID           = 'sfid', // int32_t, source ID to identify itself on RTP protocol.
 };
 
 enum {

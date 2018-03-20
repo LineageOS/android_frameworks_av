@@ -112,6 +112,9 @@ private:
         int32_t mTimeScale;
         int32_t mAS;
 
+        /* Unique ID indicates itself */
+        uint32_t mSelfID;
+
         /* a copy of TrackInfo in RTSPSource */
         sp<AnotherPacketSource> mSource;
         uint32_t mRTPTime;

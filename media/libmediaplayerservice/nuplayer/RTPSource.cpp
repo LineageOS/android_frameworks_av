@@ -109,6 +109,7 @@ void NuPlayer::RTPSource::prepareAsync() {
         notify->setSize("trackIndex", i);
         // index(i) should be started from 1. 0 is reserved for [root]
         mRTPConn->addStream(sockRtp, sockRtcp, desc, i + 1, notify, false);
+        mRTPConn->setSelfID(info->mSelfID);
 
         info->mRTPSocket = sockRtp;
         info->mRTCPSocket = sockRtcp;
@@ -662,6 +663,8 @@ status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &va
     } else if (key == "rtp-param-rtp-timeout") {
     } else if (key == "rtp-param-rtcp-timeout") {
     } else if (key == "rtp-param-time-scale") {
+    } else if (key == "rtp-param-self-id") {
+        info->mSelfID = atoi(value);
     }
 
     return OK;

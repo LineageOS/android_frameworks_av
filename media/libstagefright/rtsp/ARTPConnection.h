@@ -44,6 +44,8 @@ struct ARTPConnection : public AHandler {
 
     void injectPacket(int index, const sp<ABuffer> &buffer);
 
+    void setSelfID(const uint32_t selfID);
+
     // Creates a pair of UDP datagram sockets bound to adjacent ports
     // (the rtpSocket is bound to an even port, the rtcpSocket to the
     // next higher port).
@@ -78,6 +80,8 @@ private:
 
     bool mPollEventPending;
     int64_t mLastReceiverReportTimeUs;
+
+    int32_t mSelfID;
 
     void onAddStream(const sp<AMessage> &msg);
     void onRemoveStream(const sp<AMessage> &msg);

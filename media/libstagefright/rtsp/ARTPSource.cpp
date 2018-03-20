@@ -36,7 +36,7 @@
 
 namespace android {
 
-static const uint32_t kSourceID = 0xdeadbeef;
+static uint32_t kSourceID = 0xdeadbeef;
 
 ARTPSource::ARTPSource(
         uint32_t id,
@@ -313,6 +313,10 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
     data[31] = DLSR & 0xff;
 
     buffer->setRange(buffer->offset(), buffer->size() + 32);
+}
+
+void ARTPSource::setSelfID(const uint32_t selfID) {
+    kSourceID = selfID;
 }
 
 void ARTPSource::noticeAbandonBuffer(int cnt) {

@@ -45,6 +45,7 @@ struct ARTPSource : public RefBase {
 
     void addReceiverReport(const sp<ABuffer> &buffer);
     void addFIR(const sp<ABuffer> &buffer);
+    void setSelfID(const uint32_t selfID);
 
     void noticeAbandonBuffer(int cnt=1);
 

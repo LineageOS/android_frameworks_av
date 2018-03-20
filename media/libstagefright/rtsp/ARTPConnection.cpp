@@ -867,6 +867,7 @@ sp<ARTPSource> ARTPConnection::findSource(StreamInfo *info, uint32_t srcId) {
         source = new ARTPSource(
                 srcId, info->mSessionDesc, info->mIndex, info->mNotifyMsg);
 
+        source->setSelfID(mSelfID);
         info->mSources.add(srcId, source);
     } else {
         source = info->mSources.valueAt(index);
@@ -880,6 +881,10 @@ void ARTPConnection::injectPacket(int index, const sp<ABuffer> &buffer) {
     msg->setInt32("index", index);
     msg->setBuffer("buffer", buffer);
     msg->post();
+}
+
+void ARTPConnection::setSelfID(const uint32_t selfID) {
+    mSelfID = selfID;
 }
 
 void ARTPConnection::onInjectPacket(const sp<AMessage> &msg) {
