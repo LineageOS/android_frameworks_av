@@ -313,4 +313,9 @@ status_t StreamInHalLocal::getMmapPosition(struct audio_mmap_position *position)
     return mStream->get_mmap_position(mStream, position);
 }
 
+status_t StreamInHalLocal::getActiveMicrophones(
+        std::vector<media::MicrophoneInfo> *microphones __unused) {
+    return INVALID_OPERATION;
+}
+
 } // namespace android

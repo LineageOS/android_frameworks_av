@@ -185,6 +185,18 @@ status_t DeviceHalLocal::setAudioPortConfig(const struct audio_port_config *conf
         return INVALID_OPERATION;
 }
 
+status_t DeviceHalLocal::getMicrophones(std::vector<media::MicrophoneInfo> *microphones) {
+    if (mDev->get_microphones == NULL) return INVALID_OPERATION;
+    size_t actual_mics = AUDIO_MICROPHONE_MAX_COUNT;
+    audio_microphone_characteristic_t mic_array[AUDIO_MICROPHONE_MAX_COUNT];
+    status_t status = mDev->get_microphones(mDev, &mic_array[0], &actual_mics);
+    for (size_t i = 0; i < actual_mics; i++) {
+        media::MicrophoneInfo microphoneInfo = media::MicrophoneInfo(mic_array[i]);
+        microphones->push_back(microphoneInfo);
+    }
+    return status;
+}
+
 status_t DeviceHalLocal::dump(int fd) {
     return mDev->dump(mDev, fd);
 }

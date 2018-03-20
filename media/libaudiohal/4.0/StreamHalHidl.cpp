@@ -33,6 +33,7 @@ using ::android::hardware::audio::common::V4_0::ThreadInfo;
 using ::android::hardware::audio::V4_0::AudioDrain;
 using ::android::hardware::audio::V4_0::IStreamOutCallback;
 using ::android::hardware::audio::V4_0::MessageQueueFlagBits;
+using ::android::hardware::audio::V4_0::MicrophoneInfo;
 using ::android::hardware::audio::V4_0::MmapBufferInfo;
 using ::android::hardware::audio::V4_0::MmapPosition;
 using ::android::hardware::audio::V4_0::ParameterValue;
@@ -752,6 +753,25 @@ status_t StreamInHalHidl::getCapturePosition(int64_t *frames, int64_t *time) {
                 });
         return processReturn("getCapturePosition", ret, retval);
     }
+}
+
+
+status_t StreamInHalHidl::getActiveMicrophones(
+        std::vector<media::MicrophoneInfo> *microphonesInfo) {
+    if (!mStream) return NO_INIT;
+    Result retval;
+    Return<void> ret = mStream->getActiveMicrophones(
+            [&](Result r, hidl_vec<MicrophoneInfo> micArrayHal) {
+        retval = r;
+        for (size_t k = 0; k < micArrayHal.size(); k++) {
+            audio_microphone_characteristic_t dst;
+            // convert
+            microphoneInfoToHal(micArrayHal[k], &dst);
+            media::MicrophoneInfo microphone = media::MicrophoneInfo(dst);
+            microphonesInfo->push_back(microphone);
+        }
+    });
+    return processReturn("getActiveMicrophones", ret, retval);
 }
 
 } // namespace V4_0

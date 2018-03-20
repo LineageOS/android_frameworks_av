@@ -3777,6 +3777,16 @@ status_t AudioPolicyManager::initialize() {
         ALOGE("Default device %08x is unreachable", mDefaultOutputDevice->type());
         status = NO_INIT;
     }
+    // If microphones address is empty, set it according to device type
+    for (size_t i = 0; i  < mAvailableInputDevices.size(); i++) {
+        if (mAvailableInputDevices[i]->mAddress.isEmpty()) {
+            if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_BUILTIN_MIC) {
+                mAvailableInputDevices[i]->mAddress = String8(AUDIO_BOTTOM_MICROPHONE_ADDRESS);
+            } else if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_BACK_MIC) {
+                mAvailableInputDevices[i]->mAddress = String8(AUDIO_BACK_MICROPHONE_ADDRESS);
+            }
+        }
+    }
 
     if (mPrimaryOutput == 0) {
         ALOGE("Failed to open primary output");

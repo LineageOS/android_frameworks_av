@@ -749,4 +749,10 @@ status_t StreamInHalHidl::getCapturePosition(int64_t *frames, int64_t *time) {
     }
 }
 
+status_t StreamInHalHidl::getActiveMicrophones(
+        std::vector<media::MicrophoneInfo> *microphones __unused) {
+    if (mStream == 0) return NO_INIT;
+    return INVALID_OPERATION;
+}
+
 } // namespace android
