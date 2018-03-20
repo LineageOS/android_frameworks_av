@@ -16,19 +16,21 @@
 
 package com.android.media;
 
+import static org.mockito.Mockito.*;
+
 import android.content.Context;
+import android.media.AudioAttributes;
 import android.media.DataSourceDesc;
 import android.media.MediaItem2;
 import android.media.MediaMetadata2;
-import android.media.MediaPlayer2;
 import android.media.MediaPlayerBase;
 import android.media.MediaPlaylistAgent;
 import android.media.MediaSession2;
+import android.media.MediaSession2.OnDataSourceMissingHelper;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.test.AndroidTestCase;
-import android.util.Log;
 
 import org.junit.After;
 import org.junit.Before;
@@ -52,10 +54,10 @@ public class SessionPlaylistAgentTest extends AndroidTestCase {
 
     private Object mWaitLock = new Object();
     private Context mContext;
-    private MediaSession2 mSession;
+    private MediaSession2Impl mSessionImpl;
     private MediaPlayerBase mPlayer;
     private SessionPlaylistAgent mAgent;
-    private MyDataSourceHelper mDataSourceHelper;
+    private OnDataSourceMissingHelper mDataSourceHelper;
     private MyPlaylistEventCallback mEventCallback;
 
     public class MyPlaylistEventCallback extends MediaPlaylistAgent.PlaylistEventCallback {
@@ -108,7 +110,7 @@ public class SessionPlaylistAgentTest extends AndroidTestCase {
         }
     }
 
-    public class MyDataSourceHelper implements MediaSession2.OnDataSourceMissingHelper {
+    public class MyDataSourceHelper implements OnDataSourceMissingHelper {
         @Override
         public DataSourceDesc onDataSourceMissing(MediaSession2 session, MediaItem2 item) {
             if (item.getMediaId().contains("WITHOUT_DSD")) {
@@ -121,8 +123,104 @@ public class SessionPlaylistAgentTest extends AndroidTestCase {
         }
     }
 
+    public class MockPlayer extends MediaPlayerBase {
+        @Override
+        public void play() {
+        }
+
+        @Override
+        public void prepare() {
+        }
+
+        @Override
+        public void pause() {
+        }
+
+        @Override
+        public void reset() {
+        }
+
+        @Override
+        public void skipToNext() {
+        }
+
+        @Override
+        public void seekTo(long pos) {
+        }
+
+        @Override
+        public int getPlayerState() {
+            return 0;
+        }
+
+        @Override
+        public int getBufferingState() {
+            return 0;
+        }
+
+        @Override
+        public void setAudioAttributes(AudioAttributes attributes) {
+        }
+
+        @Override
+        public AudioAttributes getAudioAttributes() {
+            return null;
+        }
+
+        @Override
+        public void setDataSource(DataSourceDesc dsd) {
+        }
+
+        @Override
+        public void setNextDataSource(DataSourceDesc dsd) {
+        }
+
+        @Override
+        public void setNextDataSources(List<DataSourceDesc> dsds) {
+        }
+
+        @Override
+        public DataSourceDesc getCurrentDataSource() {
+            return null;
+        }
+
+        @Override
+        public void loopCurrent(boolean loop) {
+        }
+
+        @Override
+        public void setPlaybackSpeed(float speed) {
+        }
+
+        @Override
+        public void setPlayerVolume(float volume) {
+        }
+
+        @Override
+        public float getPlayerVolume() {
+            return 0;
+        }
+
+        @Override
+        public void registerPlayerEventCallback(Executor e, PlayerEventCallback cb) {
+        }
+
+        @Override
+        public void unregisterPlayerEventCallback(PlayerEventCallback cb) {
+        }
+
+        @Override
+        public void close() throws Exception {
+        }
+    }
+
     @Before
     public void setUp() throws Exception {
+        mContext = getContext();
+        // Workaround for dexmaker bug: https://code.google.com/p/dexmaker/issues/detail?id=2
+        // Dexmaker is used by mockito.
+        System.setProperty("dexmaker.dexcache", mContext.getCacheDir().getPath());
+
         HandlerThread handlerThread = new HandlerThread("SessionPlaylistAgent");
         handlerThread.start();
         mHandler = new Handler(handlerThread.getLooper());
@@ -130,15 +228,10 @@ public class SessionPlaylistAgentTest extends AndroidTestCase {
             mHandler.post(runnable);
         };
 
-        mContext = getContext();
-        mPlayer = MediaPlayer2.create();
-        mSession = new MediaSession2.Builder(mContext)
-                .setPlayer(mPlayer)
-                .setSessionCallback(mHandlerExecutor,
-                        new MediaSession2.SessionCallback(mContext) {})
-                .setId(TAG).build();
+        mPlayer = mock(MockPlayer.class);
+        mSessionImpl = mock(MediaSession2Impl.class);
         mDataSourceHelper = new MyDataSourceHelper();
-        mAgent = new SessionPlaylistAgent(mContext, mSession, mPlayer);
+        mAgent = new SessionPlaylistAgent(mContext, mSessionImpl, mPlayer);
         mAgent.setOnDataSourceMissingHelper(mDataSourceHelper);
         mEventCallback = new MyPlaylistEventCallback(mWaitLock);
         mAgent.registerPlaylistEventCallback(mHandlerExecutor, mEventCallback);
@@ -146,8 +239,6 @@ public class SessionPlaylistAgentTest extends AndroidTestCase {
 
     @After
     public void tearDown() throws Exception {
-        mSession.close();
-        mPlayer.close();
         mHandler.getLooper().quitSafely();
         mHandler = null;
         mHandlerExecutor = null;

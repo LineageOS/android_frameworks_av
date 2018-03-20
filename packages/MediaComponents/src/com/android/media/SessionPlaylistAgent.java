@@ -24,7 +24,6 @@ import android.media.MediaItem2;
 import android.media.MediaMetadata2;
 import android.media.MediaPlayerBase;
 import android.media.MediaPlaylistAgent;
-import android.media.MediaSession2;
 import android.media.MediaSession2.OnDataSourceMissingHelper;
 import android.util.ArrayMap;
 
@@ -47,14 +46,13 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
     private final PlayItem mEopPlayItem = new PlayItem(END_OF_PLAYLIST, null);
 
     private final Object mLock = new Object();
-    private final MediaSession2 mSession;
+    private final MediaSession2Impl mSessionImpl;
 
     // TODO: Set data sources properly into mPlayer (b/74090741)
     @GuardedBy("mLock")
     private MediaPlayerBase mPlayer;
     @GuardedBy("mLock")
-    private OnDataSourceMissingHelper mDsdHelper;
-
+    private OnDataSourceMissingHelper mDsmHelper;
     // TODO: Check if having the same item is okay (b/74090741)
     @GuardedBy("mLock")
     private ArrayList<MediaItem2> mPlaylist = new ArrayList<>();
@@ -118,16 +116,16 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
         }
     }
 
-    public SessionPlaylistAgent(@NonNull Context context, @NonNull MediaSession2 session,
+    public SessionPlaylistAgent(@NonNull Context context, @NonNull MediaSession2Impl sessionImpl,
             @NonNull MediaPlayerBase player) {
         super(context);
-        if (session == null) {
-            throw new IllegalArgumentException("session shouldn't be null");
+        if (sessionImpl == null) {
+            throw new IllegalArgumentException("sessionImpl shouldn't be null");
         }
         if (player == null) {
             throw new IllegalArgumentException("player shouldn't be null");
         }
-        mSession = session;
+        mSessionImpl = sessionImpl;
         mPlayer = player;
     }
 
@@ -142,7 +140,13 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
 
     public void setOnDataSourceMissingHelper(OnDataSourceMissingHelper helper) {
         synchronized (mLock) {
-            mDsdHelper = helper;
+            mDsmHelper = helper;
+        }
+    }
+
+    public void clearOnDataSourceMissingHelper() {
+        synchronized (mLock) {
+            mDsmHelper = null;
         }
     }
 
@@ -154,8 +158,7 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
     }
 
     @Override
-    public void setPlaylist(@NonNull List<MediaItem2> list,
-            @Nullable MediaMetadata2 metadata) {
+    public void setPlaylist(@NonNull List<MediaItem2> list, @Nullable MediaMetadata2 metadata) {
         if (list == null) {
             throw new IllegalArgumentException("list shouldn't be null");
         }
@@ -359,10 +362,10 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
         if (dsd != null) {
             return dsd;
         }
-        OnDataSourceMissingHelper helper = mDsdHelper;
+        OnDataSourceMissingHelper helper = mDsmHelper;
         if (helper != null) {
             // TODO: Do not call onDataSourceMissing with the lock (b/74090741).
-            dsd = helper.onDataSourceMissing(mSession, item);
+            dsd = helper.onDataSourceMissing(mSessionImpl.getInstance(), item);
             if (dsd != null) {
                 mItemDsdMap.put(item, dsd);
             }
