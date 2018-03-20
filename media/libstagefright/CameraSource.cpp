@@ -670,6 +670,10 @@ status_t CameraSource::initWithCameraAccess(
         CHECK_EQ((status_t)OK, mCamera->setPreviewTarget(mSurface));
     }
 
+    if (property_get_bool("debug.camcorder.disablemeta", false)) {
+        storeMetaDataInVideoBuffers = false;
+    }
+
     // By default, store real data in video buffers.
     mVideoBufferMode = hardware::ICamera::VIDEO_BUFFER_MODE_DATA_CALLBACK_YUV;
     if (storeMetaDataInVideoBuffers) {
