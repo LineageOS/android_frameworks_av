@@ -232,6 +232,10 @@ CameraSource::CameraSource(
     mVideoSize.width  = -1;
     mVideoSize.height = -1;
 
+    if (property_get_bool("debug.camcorder.disablemeta", false)) {
+        storeMetaDataInVideoBuffers = false;
+    }
+
     mInitCheck = init(camera, proxy, cameraId,
                     clientName, clientUid, clientPid,
                     videoSize, frameRate,
