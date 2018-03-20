@@ -25,6 +25,7 @@
 
 struct __attribute__((visibility("hidden"))) _C2BlockPoolData {
     uint32_t mId; //BufferId
+    // Handle should be copied to somewhere else, and should be managed there.
     native_handle_t *mHandle;
 
     _C2BlockPoolData() : mId(0), mHandle(NULL) {}
@@ -33,10 +34,6 @@ struct __attribute__((visibility("hidden"))) _C2BlockPoolData {
             : mId(id), mHandle(handle) {}
 
     ~_C2BlockPoolData() {
-        if (mHandle != NULL) {
-            native_handle_close(mHandle);
-            native_handle_delete(mHandle);
-        }
     }
 };
 
