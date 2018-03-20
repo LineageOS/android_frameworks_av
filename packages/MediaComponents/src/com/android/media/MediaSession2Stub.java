@@ -1044,6 +1044,12 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
+    public void notifyError(int errorCode, Bundle extras) {
+        notifyAll((unused, iController) -> {
+            iController.onError(errorCode, extras);
+        });
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////////
     // APIs for MediaLibrarySessionImpl
     //////////////////////////////////////////////////////////////////////////////////////////////
