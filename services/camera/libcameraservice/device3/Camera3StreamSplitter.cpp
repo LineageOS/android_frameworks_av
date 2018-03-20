@@ -423,12 +423,20 @@ status_t Camera3StreamSplitter::attachBufferToOutputs(ANativeWindowBuffer* anb,
                     __FUNCTION__, gbp.get(), strerror(-res), res);
             return res;
         }
+        if ((slot < 0) || (slot > BufferQueue::NUM_BUFFER_SLOTS)) {
+            SP_LOGE("%s: Slot received %d either bigger than expected maximum %d or negative!",
+                    __FUNCTION__, slot, BufferQueue::NUM_BUFFER_SLOTS);
+            return BAD_VALUE;
+        }
         //During buffer attach 'mMutex' is not held which makes the removal of
         //"gbp" possible. Check whether this is the case and continue.
         if (mOutputSlots[gbp] == nullptr) {
             continue;
         }
         auto& outputSlots = *mOutputSlots[gbp];
+        if (static_cast<size_t> (slot + 1) > outputSlots.size()) {
+            outputSlots.resize(slot + 1);
+        }
         if (outputSlots[slot] != nullptr) {
             // If the buffer is attached to a slot which already contains a buffer,
             // the previous buffer will be removed from the output queue. Decrement

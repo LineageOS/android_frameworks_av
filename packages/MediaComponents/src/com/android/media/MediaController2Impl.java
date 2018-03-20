@@ -906,6 +906,15 @@ public class MediaController2Impl implements MediaController2Provider {
         });
     }
 
+    void pushError(int errorCode, Bundle extras) {
+        mCallbackExecutor.execute(() -> {
+            if (!mInstance.isConnected()) {
+                return;
+            }
+            mCallback.onError(mInstance, errorCode, extras);
+        });
+    }
+
     // Should be used without a lock to prevent potential deadlock.
     void onConnectedNotLocked(IMediaSession2 sessionBinder,
             final CommandGroup allowedCommands,
