@@ -1471,8 +1471,8 @@ sp<MetaData> ItemTable::getImageMeta(const uint32_t imageIndex) {
 
         // point image to the first tile for grid size and HVCC
         image = &mItemIdToItemMap.editValueAt(tileItemIndex);
-        meta->setInt32(kKeyGridWidth, image->width);
-        meta->setInt32(kKeyGridHeight, image->height);
+        meta->setInt32(kKeyTileWidth, image->width);
+        meta->setInt32(kKeyTileHeight, image->height);
         meta->setInt32(kKeyMaxInputSize, image->width * image->height * 1.5);
     }
 
