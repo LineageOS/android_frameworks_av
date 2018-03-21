@@ -255,6 +255,7 @@ C2AllocationGralloc::C2AllocationGralloc(
       mHidlHandle(std::move(hidlHandle)),
       mHandle(handle),
       mBuffer(nullptr),
+      mLockedHandle(nullptr),
       mLocked(false),
       mAllocatorId(allocatorId) {
 }
@@ -269,6 +270,8 @@ C2AllocationGralloc::~C2AllocationGralloc() {
         unmap(addr, C2Rect(), nullptr);
     }
     mMapper->freeBuffer(const_cast<native_handle_t *>(mBuffer));
+    native_handle_delete(const_cast<native_handle_t*>(
+            reinterpret_cast<const native_handle_t*>(mHandle)));
 }
 
 c2_status_t C2AllocationGralloc::map(
@@ -608,8 +611,8 @@ c2_status_t C2AllocatorGralloc::Impl::priorGraphicAllocation(
         return C2_BAD_VALUE;
     }
 
-    hidl_handle hidlHandle = C2HandleGralloc::UnwrapNativeHandle(grallocHandle);
-
+    hidl_handle hidlHandle;
+    hidlHandle.setTo(C2HandleGralloc::UnwrapNativeHandle(grallocHandle), true);
     allocation->reset(new C2AllocationGralloc(info, mMapper, hidlHandle, grallocHandle, mTraits->id));
     return C2_OK;
 }

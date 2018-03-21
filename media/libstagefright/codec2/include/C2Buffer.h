@@ -655,7 +655,8 @@ public:
      * (Re)creates a 1D allocation from a native |handle|. If successful, the allocation is stored
      * in |allocation|. Otherwise, |allocation| is set to 'nullptr'.
      *
-     * \param handle      the handle for the existing allocation
+     * \param handle      the handle for the existing allocation. On success, the allocation will
+     *                    take ownership of |handle|.
      * \param allocation  pointer to where the allocation shall be stored on success. nullptr
      *                    will be stored here on failure
      *
@@ -712,7 +713,8 @@ public:
      * (Re)creates a 2D allocation from a native handle.  If successful, the allocation is stored
      * in |allocation|. Otherwise, |allocation| is set to 'nullptr'.
      *
-     * \param handle      the handle for the existing allocation
+     * \param handle      the handle for the existing allocation. On success, the allocation will
+     *                    take ownership of |handle|.
      * \param allocation  pointer to where the allocation shall be stored on success. nullptr
      *                    will be stored here on failure
      *
