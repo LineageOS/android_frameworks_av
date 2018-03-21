@@ -215,6 +215,8 @@ enum {
 
     kKeyGridWidth        = 'grdW', // int32_t, HEIF grid width
     kKeyGridHeight       = 'grdH', // int32_t, HEIF grid height
+    kKeyGridRows         = 'grdR', // int32_t, HEIF grid rows
+    kKeyGridCols         = 'grdC', // int32_t, HEIF grid columns
     kKeyIccProfile       = 'prof', // raw data, ICC prifile data
 };
 
