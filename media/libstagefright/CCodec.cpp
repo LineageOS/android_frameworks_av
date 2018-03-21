@@ -910,3 +910,7 @@ void CCodec::initiateReleaseIfStuck() {
 }
 
 }  // namespace android
+
+extern "C" android::CodecBase *CreateCodec() {
+    return new android::CCodec;
+}
