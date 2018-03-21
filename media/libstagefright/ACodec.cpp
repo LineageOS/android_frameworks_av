@@ -4384,9 +4384,9 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
 
 status_t ACodec::configureImageGrid(
         const sp<AMessage> &msg, sp<AMessage> &outputFormat) {
-    int32_t gridWidth, gridHeight, gridRows, gridCols;
-    if (!msg->findInt32("grid-width", &gridWidth) ||
-        !msg->findInt32("grid-height", &gridHeight) ||
+    int32_t tileWidth, tileHeight, gridRows, gridCols;
+    if (!msg->findInt32("tile-width", &tileWidth) ||
+        !msg->findInt32("tile-height", &tileHeight) ||
         !msg->findInt32("grid-rows", &gridRows) ||
         !msg->findInt32("grid-cols", &gridCols)) {
         return OK;
@@ -4396,8 +4396,8 @@ status_t ACodec::configureImageGrid(
     InitOMXParams(&gridType);
     gridType.nPortIndex = kPortIndexOutput;
     gridType.bEnabled = OMX_TRUE;
-    gridType.nGridWidth = gridWidth;
-    gridType.nGridHeight = gridHeight;
+    gridType.nTileWidth = tileWidth;
+    gridType.nTileHeight = tileHeight;
     gridType.nGridRows = gridRows;
     gridType.nGridCols = gridCols;
 
@@ -4422,8 +4422,8 @@ status_t ACodec::configureImageGrid(
             &gridType, sizeof(gridType));
 
     if (err == OK && gridType.bEnabled) {
-        outputFormat->setInt32("grid-width", gridType.nGridWidth);
-        outputFormat->setInt32("grid-height", gridType.nGridHeight);
+        outputFormat->setInt32("tile-width", gridType.nTileWidth);
+        outputFormat->setInt32("tile-height", gridType.nTileHeight);
         outputFormat->setInt32("grid-rows", gridType.nGridRows);
         outputFormat->setInt32("grid-cols", gridType.nGridCols);
     }
