@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include "MediaCodecListOverrides.h"
+#include "StagefrightPluginLoader.h"
 
 #include <binder/IServiceManager.h>
 
@@ -29,7 +30,6 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/MediaDefs.h>
-#include <media/stagefright/Codec2InfoBuilder.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/OmxInfoBuilder.h>
@@ -78,14 +78,25 @@ bool isProfilingNeeded() {
 }
 
 OmxInfoBuilder sOmxInfoBuilder;
-Codec2InfoBuilder sCodec2InfoBuilder;
 
-std::initializer_list<MediaCodecListBuilderBase *> GetBuilders() {
-    if (property_get_bool("debug.stagefright.ccodec", false)) {
-        return {&sOmxInfoBuilder, &sCodec2InfoBuilder};
-    } else {
-        return {&sOmxInfoBuilder};
+Mutex sCodec2InfoBuilderMutex;
+std::unique_ptr<MediaCodecListBuilderBase> sCodec2InfoBuilder;
+
+MediaCodecListBuilderBase *GetCodec2InfoBuilder() {
+    Mutex::Autolock _l(sCodec2InfoBuilderMutex);
+    if (!sCodec2InfoBuilder) {
+        sCodec2InfoBuilder.reset(
+                StagefrightPluginLoader::GetCCodecInstance()->createBuilder());
     }
+    return sCodec2InfoBuilder.get();
+}
+
+std::vector<MediaCodecListBuilderBase *> GetBuilders() {
+    std::vector<MediaCodecListBuilderBase *> builders {&sOmxInfoBuilder};
+    if (property_get_bool("debug.stagefright.ccodec", false)) {
+        builders.push_back(GetCodec2InfoBuilder());
+    }
+    return builders;
 }
 
 }  // unnamed namespace
@@ -179,16 +190,22 @@ sp<IMediaCodecList> MediaCodecList::getInstance() {
     return sRemoteList;
 }
 
-MediaCodecList::MediaCodecList(std::initializer_list<MediaCodecListBuilderBase*> builders) {
+MediaCodecList::MediaCodecList(std::vector<MediaCodecListBuilderBase*> builders) {
     mGlobalSettings = new AMessage();
     mCodecInfos.clear();
-    MediaCodecListWriter writer(this);
+    MediaCodecListWriter writer;
     for (MediaCodecListBuilderBase *builder : builders) {
+        if (builder == nullptr) {
+            ALOGD("ignored a null builder");
+            continue;
+        }
         mInitCheck = builder->buildMediaCodecList(&writer);
         if (mInitCheck != OK) {
             break;
         }
     }
+    writer.writeGlobalSettings(mGlobalSettings);
+    writer.writeCodecInfos(&mCodecInfos);
     std::stable_sort(
             mCodecInfos.begin(),
             mCodecInfos.end(),
@@ -208,23 +225,6 @@ MediaCodecList::~MediaCodecList() {
 
 status_t MediaCodecList::initCheck() const {
     return mInitCheck;
-}
-
-MediaCodecListWriter::MediaCodecListWriter(MediaCodecList* list) :
-    mList(list) {
-}
-
-void MediaCodecListWriter::addGlobalSetting(
-        const char* key, const char* value) {
-    mList->mGlobalSettings->setString(key, value);
-}
-
-std::unique_ptr<MediaCodecInfoWriter>
-        MediaCodecListWriter::addMediaCodecInfo() {
-    sp<MediaCodecInfo> info = new MediaCodecInfo();
-    mList->mCodecInfos.push_back(info);
-    return std::unique_ptr<MediaCodecInfoWriter>(
-            new MediaCodecInfoWriter(info.get()));
 }
 
 // legacy method for non-advanced codecs
@@ -342,9 +342,6 @@ void MediaCodecList::findMatchingCodecs(
             property_get_bool("debug.stagefright.swcodec", false)) {
         matches->sort(compareSoftwareCodecsFirst);
     }
-}
-
-MediaCodecListBuilderBase::~MediaCodecListBuilderBase() {
 }
 
 }  // namespace android
