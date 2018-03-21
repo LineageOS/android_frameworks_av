@@ -495,27 +495,27 @@ sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
     mGridRows = mGridCols = 1;
     if (overrideMeta == NULL) {
         // check if we're dealing with a tiled heif
-        int32_t gridWidth, gridHeight, gridRows, gridCols;
-        if (trackMeta()->findInt32(kKeyGridWidth, &gridWidth) && gridWidth > 0
-         && trackMeta()->findInt32(kKeyGridHeight, &gridHeight) && gridHeight > 0
+        int32_t tileWidth, tileHeight, gridRows, gridCols;
+        if (trackMeta()->findInt32(kKeyTileWidth, &tileWidth) && tileWidth > 0
+         && trackMeta()->findInt32(kKeyTileHeight, &tileHeight) && tileHeight > 0
          && trackMeta()->findInt32(kKeyGridRows, &gridRows) && gridRows > 0
          && trackMeta()->findInt32(kKeyGridCols, &gridCols) && gridCols > 0) {
             int32_t width, height;
             CHECK(trackMeta()->findInt32(kKeyWidth, &width));
             CHECK(trackMeta()->findInt32(kKeyHeight, &height));
 
-            if (width <= gridWidth * gridCols && height <= gridHeight * gridRows) {
-                ALOGV("grid: %dx%d, size: %dx%d, picture size: %dx%d",
-                        gridCols, gridRows, gridWidth, gridHeight, width, height);
+            if (width <= tileWidth * gridCols && height <= tileHeight * gridRows) {
+                ALOGV("grid: %dx%d, tile size: %dx%d, picture size: %dx%d",
+                        gridCols, gridRows, tileWidth, tileHeight, width, height);
 
                 overrideMeta = new MetaData(*(trackMeta()));
-                overrideMeta->setInt32(kKeyWidth, gridWidth);
-                overrideMeta->setInt32(kKeyHeight, gridHeight);
+                overrideMeta->setInt32(kKeyWidth, tileWidth);
+                overrideMeta->setInt32(kKeyHeight, tileHeight);
                 mGridCols = gridCols;
                 mGridRows = gridRows;
             } else {
-                ALOGE("bad grid: %dx%d, size: %dx%d, picture size: %dx%d",
-                        gridCols, gridRows, gridWidth, gridHeight, width, height);
+                ALOGE("bad grid: %dx%d, tile size: %dx%d, picture size: %dx%d",
+                        gridCols, gridRows, tileWidth, tileHeight, width, height);
             }
         }
         if (overrideMeta == NULL) {
