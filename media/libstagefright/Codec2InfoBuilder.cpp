@@ -159,3 +159,7 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
 }
 
 }  // namespace android
+
+extern "C" android::MediaCodecListBuilderBase *CreateBuilder() {
+    return new android::Codec2InfoBuilder;
+}
