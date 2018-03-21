@@ -1360,7 +1360,7 @@ Exit:
         if (chainCreated) {
             removeEffectChain_l(chain);
         }
-        handle.clear();
+        // handle must be cleared by caller to avoid deadlock.
     }
 
     *status = lStatus;
@@ -8524,7 +8524,11 @@ AudioFlinger::MmapPlaybackThread::MmapPlaybackThread(
         audio_devices_t outDevice, audio_devices_t inDevice, bool systemReady)
     : MmapThread(audioFlinger, id, hwDev, output->stream, outDevice, inDevice, systemReady),
       mStreamType(AUDIO_STREAM_MUSIC),
-      mStreamVolume(1.0), mStreamMute(false), mOutput(output)
+      mStreamVolume(1.0),
+      mStreamMute(false),
+      mHalVolFloat(-1.0f), // Initialize to illegal value so it always gets set properly later.
+      mNoCallbackWarningCount(0),
+      mOutput(output)
 {
     snprintf(mThreadName, kThreadNameLength, "AudioMmapOut_%X", id);
     mChannelCount = audio_channel_count_from_out_mask(mChannelMask);
@@ -8632,7 +8636,6 @@ void AudioFlinger::MmapPlaybackThread::processVolume_l()
     }
 
     if (volume != mHalVolFloat) {
-        mHalVolFloat = volume;
 
         // Convert volumes from float to 8.24
         uint32_t vol = (uint32_t)(volume * (1 << 24));
@@ -8645,7 +8648,10 @@ void AudioFlinger::MmapPlaybackThread::processVolume_l()
             volume = (float)vol / (1 << 24);
         }
         // Try to use HW volume control and fall back to SW control if not implemented
-        if (mOutput->stream->setVolume(volume, volume) != NO_ERROR) {
+        if (mOutput->stream->setVolume(volume, volume) == NO_ERROR) {
+            mHalVolFloat = volume; // HW volume control worked, so update value.
+            mNoCallbackWarningCount = 0;
+        } else {
             sp<MmapStreamCallback> callback = mCallback.promote();
             if (callback != 0) {
                 int channelCount;
@@ -8659,8 +8665,13 @@ void AudioFlinger::MmapPlaybackThread::processVolume_l()
                     values.add(volume);
                 }
                 callback->onVolumeChanged(mChannelMask, values);
+                mHalVolFloat = volume; // SW volume control worked, so update value.
+                mNoCallbackWarningCount = 0;
             } else {
-                ALOGW("Could not set MMAP stream volume: no volume callback!");
+                if (mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
+                    ALOGW("Could not set MMAP stream volume: no volume callback!");
+                    mNoCallbackWarningCount++;
+                }
             }
         }
     }
