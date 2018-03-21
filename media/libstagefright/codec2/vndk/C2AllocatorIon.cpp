@@ -150,7 +150,6 @@ private:
      * so that we can capture the error.
      *
      * \param ionFd     ion client (ownership transferred to created object)
-     * \param owned     whehter native_handle_t is owned by an allocation or not.
      * \param capacity  size of allocation
      * \param bufferFd  buffer handle (ownership transferred to created object). Must be
      *                  invalid if err is not 0.
@@ -158,9 +157,8 @@ private:
      *                  invalid if err is not 0.
      * \param err       errno during buffer allocation or import
      */
-    Impl(int ionFd, bool owned, size_t capacity, int bufferFd, ion_user_handle_t buffer, C2Allocator::id_t id, int err)
+    Impl(int ionFd, size_t capacity, int bufferFd, ion_user_handle_t buffer, C2Allocator::id_t id, int err)
         : mIonFd(ionFd),
-          mHandleOwned(owned),
           mHandle(bufferFd, capacity),
           mBuffer(buffer),
           mId(id),
@@ -191,7 +189,7 @@ public:
     static Impl *Import(int ionFd, size_t capacity, int bufferFd, C2Allocator::id_t id) {
         ion_user_handle_t buffer = -1;
         int ret = ion_import(ionFd, bufferFd, &buffer);
-        return new Impl(ionFd, false, capacity, bufferFd, buffer, id, ret);
+        return new Impl(ionFd, capacity, bufferFd, buffer, id, ret);
     }
 
     /**
@@ -218,7 +216,7 @@ public:
                 buffer = -1;
             }
         }
-        return new Impl(ionFd, true, size, bufferFd, buffer, id, ret);
+        return new Impl(ionFd, size, bufferFd, buffer, id, ret);
     }
 
     c2_status_t map(size_t offset, size_t size, C2MemoryUsage usage, C2Fence *fence, void **addr) {
@@ -311,12 +309,10 @@ public:
         }
         if (mInit == C2_OK) {
             (void)ion_free(mIonFd, mBuffer);
+            native_handle_close(&mHandle);
         }
         if (mIonFd >= 0) {
             close(mIonFd);
-        }
-        if (mHandleOwned) {
-            native_handle_close(&mHandle);
         }
     }
 
@@ -338,7 +334,6 @@ public:
 
 private:
     int mIonFd;
-    bool mHandleOwned;
     C2HandleIon mHandle;
     ion_user_handle_t mBuffer;
     C2Allocator::id_t mId;
@@ -481,6 +476,8 @@ c2_status_t C2AllocatorIon::priorLinearAllocation(
     c2_status_t ret = alloc->status();
     if (ret == C2_OK) {
         *allocation = alloc;
+        native_handle_delete(const_cast<native_handle_t*>(
+                reinterpret_cast<const native_handle_t*>(handle)));
     }
     return ret;
 }
