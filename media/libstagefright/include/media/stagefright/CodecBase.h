@@ -222,9 +222,7 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
     virtual void signalSetParameters(const sp<AMessage> &msg) = 0;
     virtual void signalEndOfInputStream() = 0;
 
-    /*
-     * Codec-related defines
-     */
+    typedef CodecBase *(*CreateCodecFunc)(void);
 
 protected:
     CodecBase() = default;
@@ -324,4 +322,3 @@ protected:
 }  // namespace android
 
 #endif  // CODEC_BASE_H_
-

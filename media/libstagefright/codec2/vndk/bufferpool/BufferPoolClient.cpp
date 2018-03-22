@@ -135,7 +135,8 @@ private:
     bool mInvalidated; // TODO: implement
     int64_t mExpireUs;
     bool mHasCache;
-    _C2BlockPoolData mBuffer;
+    BufferId mId;
+    native_handle_t *mHandle;
     std::weak_ptr<_C2BlockPoolData> mCache;
 
     void updateExpire() {
@@ -144,9 +145,16 @@ private:
 
 public:
     ClientBuffer(BufferId id, native_handle_t *handle)
-            : mInvalidated(false), mHasCache(false), mBuffer(id, handle) {
+            : mInvalidated(false), mHasCache(false), mId(id), mHandle(handle) {
         (void)mInvalidated;
         mExpireUs = getTimestampNow() + kCacheTtlUs;
+    }
+
+    ~ClientBuffer() {
+        if (mHandle) {
+            native_handle_close(mHandle);
+            native_handle_delete(mHandle);
+        }
     }
 
     bool expire() const {
@@ -175,7 +183,7 @@ public:
             // Allocates a raw ptr in order to avoid sending #postBufferRelease
             // from deleter, in case of native_handle_clone failure.
             _C2BlockPoolData *ptr = new _C2BlockPoolData(
-                    mBuffer.mId, native_handle_clone(mBuffer.mHandle));
+                    mId, native_handle_clone(mHandle));
             if (ptr && ptr->mHandle != NULL) {
                 std::shared_ptr<_C2BlockPoolData>
                         cache(ptr, BlockPoolDataDtor(impl));

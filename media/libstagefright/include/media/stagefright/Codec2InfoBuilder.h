@@ -25,6 +25,7 @@ namespace android {
 class Codec2InfoBuilder : public MediaCodecListBuilderBase {
 public:
     Codec2InfoBuilder() = default;
+    ~Codec2InfoBuilder() override = default;
     status_t buildMediaCodecList(MediaCodecListWriter* writer) override;
 };
 
