@@ -98,8 +98,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
             .flags = AUDIO_FLAG_LOW_LATENCY,
             .tags = ""
     };
-    ALOGV("open() MMAP attributes.usage = %d, content_type = %d, source = %d",
-          attributes.usage, attributes.content_type, attributes.source);
+    ALOGD("%s(%p) MMAP attributes.usage = %d, content_type = %d, source = %d",
+          __func__, this, attributes.usage, attributes.content_type, attributes.source);
 
     mMmapClient.clientUid = request.getUserId();
     mMmapClient.clientPid = request.getProcessId();
@@ -135,7 +135,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
         mHardwareTimeOffsetNanos = INPUT_ESTIMATED_HARDWARE_OFFSET_NANOS; // frames at ADC earlier
 
     } else {
-        ALOGE("openMmapStream - invalid direction = %d", direction);
+        ALOGE("%s() invalid direction = %d", __func__, direction);
         return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     }
 
@@ -157,20 +157,20 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
                                                           this, // callback
                                                           mMmapStream,
                                                           &mPortHandle);
-    ALOGD("open() mMapClient.uid = %d, pid = %d => portHandle = %d\n",
-          mMmapClient.clientUid,  mMmapClient.clientPid, mPortHandle);
+    ALOGD("%s() mMapClient.uid = %d, pid = %d => portHandle = %d\n",
+          __func__, mMmapClient.clientUid,  mMmapClient.clientPid, mPortHandle);
     if (status != OK) {
-        ALOGE("openMmapStream returned status %d", status);
+        ALOGE("%s() openMmapStream() returned status %d",  __func__, status);
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
     if (deviceId == AAUDIO_UNSPECIFIED) {
-        ALOGW("open() - openMmapStream() failed to set deviceId");
+        ALOGW("%s() openMmapStream() failed to set deviceId", __func__);
     }
     setDeviceId(deviceId);
 
     if (sessionId == AUDIO_SESSION_ALLOCATE) {
-        ALOGW("open() - openMmapStream() failed to set sessionId");
+        ALOGW("%s() - openMmapStream() failed to set sessionId", __func__);
     }
 
     aaudio_session_id_t actualSessionId =
@@ -178,7 +178,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
             ? AAUDIO_SESSION_ID_NONE
             : (aaudio_session_id_t) sessionId;
     setSessionId(actualSessionId);
-    ALOGD("open() deviceId = %d, sessionId = %d", getDeviceId(), getSessionId());
+    ALOGD("%s() deviceId = %d, sessionId = %d", __func__, getDeviceId(), getSessionId());
 
     // Create MMAP/NOIRQ buffer.
     int32_t minSizeFrames = getBufferCapacity();
@@ -187,14 +187,14 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     }
     status = mMmapStream->createMmapBuffer(minSizeFrames, &mMmapBufferinfo);
     if (status != OK) {
-        ALOGE("open() - createMmapBuffer() failed with status %d %s",
-              status, strerror(-status));
+        ALOGE("%s() - createMmapBuffer() failed with status %d %s",
+              __func__, status, strerror(-status));
         result = AAUDIO_ERROR_UNAVAILABLE;
         goto error;
     } else {
-        ALOGD("createMmapBuffer status = %d, buffer_size = %d, burst_size %d"
+        ALOGD("%s() createMmapBuffer() returned = %d, buffer_size = %d, burst_size %d"
                       ", Sharable FD: %s",
-              status,
+              __func__, status,
               abs(mMmapBufferinfo.buffer_size_frames),
               mMmapBufferinfo.burst_size_frames,
               mMmapBufferinfo.buffer_size_frames < 0 ? "Yes" : "No");
@@ -214,7 +214,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
             // Fallback is handled by caller but indicate what is possible in case
             // this is used in the future
             setSharingMode(AAUDIO_SHARING_MODE_SHARED);
-            ALOGW("open() - exclusive FD cannot be used by client");
+            ALOGW("%s() - exclusive FD cannot be used by client", __func__);
             result = AAUDIO_ERROR_UNAVAILABLE;
             goto error;
         }
@@ -229,7 +229,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     // Assume that AudioFlinger will close the original shared_memory_fd.
     mAudioDataFileDescriptor.reset(dup(mMmapBufferinfo.shared_memory_fd));
     if (mAudioDataFileDescriptor.get() == -1) {
-        ALOGE("open() - could not dup shared_memory_fd");
+        ALOGE("%s() - could not dup shared_memory_fd", __func__);
         result = AAUDIO_ERROR_INTERNAL;
         goto error;
     }
@@ -247,12 +247,12 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
         burstMicros = mFramesPerBurst * static_cast<int64_t>(1000000) / getSampleRate();
     } while (burstMicros < burstMinMicros);
 
-    ALOGD("open() original burst = %d, minMicros = %d, to burst = %d\n",
-          mMmapBufferinfo.burst_size_frames, burstMinMicros, mFramesPerBurst);
+    ALOGD("%s() original burst = %d, minMicros = %d, to burst = %d\n",
+          __func__, mMmapBufferinfo.burst_size_frames, burstMinMicros, mFramesPerBurst);
 
-    ALOGD("open() actual rate = %d, channels = %d"
+    ALOGD("%s() actual rate = %d, channels = %d"
           ", deviceId = %d, capacity = %d\n",
-          getSampleRate(), getSamplesPerFrame(), deviceId, getBufferCapacity());
+          __func__, getSampleRate(), getSamplesPerFrame(), deviceId, getBufferCapacity());
 
     return result;
 
@@ -262,9 +262,8 @@ error:
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::close() {
-
     if (mMmapStream != 0) {
-        ALOGD("close() clear() endpoint");
+        ALOGD("%s() clear() endpoint", __func__);
         // Needs to be explicitly cleared or CTS will fail but it is not clear why.
         mMmapStream.clear();
         // Apparently the above close is asynchronous. An attempt to open a new device
@@ -299,20 +298,18 @@ aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase
 aaudio_result_t AAudioServiceEndpointMMAP::startClient(const android::AudioClient& client,
                                                        audio_port_handle_t *clientHandle) {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
-    ALOGD("startClient(%p(uid=%d, pid=%d))",
-          &client, client.clientUid, client.clientPid);
+    ALOGV("%s(%p(uid=%d, pid=%d))", __func__, &client, client.clientUid, client.clientPid);
     audio_port_handle_t originalHandle =  *clientHandle;
     status_t status = mMmapStream->start(client, clientHandle);
     aaudio_result_t result = AAudioConvert_androidToAAudioResult(status);
-    ALOGD("startClient() , %d => %d returns %d",
-          originalHandle, *clientHandle, result);
+    ALOGV("%s() , %d => %d returns %d", __func__, originalHandle, *clientHandle, result);
     return result;
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::stopClient(audio_port_handle_t clientHandle) {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
     aaudio_result_t result = AAudioConvert_androidToAAudioResult(mMmapStream->stop(clientHandle));
-    ALOGD("stopClient(%d) returns %d", clientHandle, result);
+    ALOGV("%s(%d) returns %d", __func__, clientHandle, result);
     return result;
 }
 
@@ -324,13 +321,13 @@ aaudio_result_t AAudioServiceEndpointMMAP::getFreeRunningPosition(int64_t *posit
         return AAUDIO_ERROR_NULL;
     }
     status_t status = mMmapStream->getMmapPosition(&position);
-    ALOGV("getFreeRunningPosition() status= %d, pos = %d, nanos = %lld\n",
-          status, position.position_frames, (long long) position.time_nanoseconds);
+    ALOGV("%s() status= %d, pos = %d, nanos = %lld\n",
+          __func__, status, position.position_frames, (long long) position.time_nanoseconds);
     aaudio_result_t result = AAudioConvert_androidToAAudioResult(status);
     if (result == AAUDIO_ERROR_UNAVAILABLE) {
-        ALOGW("sendCurrentTimestamp(): getMmapPosition() has no position data available");
+        ALOGW("%s(): getMmapPosition() has no position data available", __func__);
     } else if (result != AAUDIO_OK) {
-        ALOGE("sendCurrentTimestamp(): getMmapPosition() returned status %d", status);
+        ALOGE("%s(): getMmapPosition() returned status %d", __func__, status);
     } else {
         // Convert 32-bit position to 64-bit position.
         mFramesTransferred.update32(position.position_frames);
@@ -347,15 +344,16 @@ aaudio_result_t AAudioServiceEndpointMMAP::getTimestamp(int64_t *positionFrames,
 
 
 void AAudioServiceEndpointMMAP::onTearDown() {
-    ALOGD("onTearDown() called");
+    ALOGD("%s(%p) called", __func__, this);
     disconnectRegisteredStreams();
 };
 
 void AAudioServiceEndpointMMAP::onVolumeChanged(audio_channel_mask_t channels,
                                               android::Vector<float> values) {
-    // TODO do we really need a different volume for each channel?
+    // TODO Do we really need a different volume for each channel?
+    // We get called with an array filled with a single value!
     float volume = values[0];
-    ALOGD("onVolumeChanged() volume[0] = %f", volume);
+    ALOGD("%s(%p) volume[0] = %f", __func__, this, volume);
     std::lock_guard<std::mutex> lock(mLockStreams);
     for(const auto stream : mRegisteredStreams) {
         stream->onVolumeChanged(volume);
@@ -363,8 +361,7 @@ void AAudioServiceEndpointMMAP::onVolumeChanged(audio_channel_mask_t channels,
 };
 
 void AAudioServiceEndpointMMAP::onRoutingChanged(audio_port_handle_t deviceId) {
-    ALOGD("onRoutingChanged() called with dev %d, old = %d",
-          deviceId, getDeviceId());
+    ALOGD("%s(%p) called with dev %d, old = %d", __func__, this, deviceId, getDeviceId());
     if (getDeviceId() != AUDIO_PORT_HANDLE_NONE  && getDeviceId() != deviceId) {
         disconnectRegisteredStreams();
     }

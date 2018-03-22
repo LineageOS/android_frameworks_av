@@ -165,7 +165,6 @@ aaudio_result_t AAudioService::checkForPendingClose(
 }
 
 aaudio_result_t AAudioService::closeStream(aaudio_handle_t streamHandle) {
-    ALOGD("closeStream(0x%08X)", streamHandle);
     // Check permission and ownership first.
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {

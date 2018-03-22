@@ -471,16 +471,7 @@ protected:
         mFormat = format;
     }
 
-    void setState(aaudio_stream_state_t state) {
-        if (mState == AAUDIO_STREAM_STATE_CLOSED) {
-            ; // CLOSED is a final state
-        } else if (mState == AAUDIO_STREAM_STATE_DISCONNECTED
-                && state != AAUDIO_STREAM_STATE_CLOSED) {
-            ; // Once DISCONNECTED, we can only move to CLOSED state.
-        } else {
-            mState = state;
-        }
-    }
+    void setState(aaudio_stream_state_t state);
 
     void setDeviceId(int32_t deviceId) {
         mDeviceId = deviceId;
