@@ -257,9 +257,13 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
         fraction = (intervalPacketLost << 8) / intervalExpected;
     }
 
+    mQualManager.setTargetBitrate(fraction);
+
     mPrevExpected = expected;
     mPrevNumBuffersReceived = mNumBuffersReceived;
     int32_t cumulativePacketLost = (int32_t)expected - mNumBuffersReceived;
+
+    ALOGI("UID %p expectedPkts %lld lostPkts %lld", this, (long long)intervalExpected, (long long)intervalPacketLost);
 
     uint8_t *data = buffer->data() + buffer->size();
 
@@ -315,8 +319,61 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
     buffer->setRange(buffer->offset(), buffer->size() + 32);
 }
 
+void ARTPSource::addTMMBR(const sp<ABuffer> &buffer) {
+    if (buffer->size() + 32 > buffer->capacity()) {
+        ALOGW("RTCP buffer too small to accomodate RR.");
+        return;
+    }
+    if (mQualManager.mTargetBitrate <= 0)
+        return;
+
+    uint8_t *data = buffer->data() + buffer->size();
+
+    data[0] = 0x80 | 3; // TMMBR
+    data[1] = 205;      // TSFB
+    data[2] = 0;
+    data[3] = 4;        // total (4+1) * sizeof(int32_t) = 20 bytes
+    data[4] = kSourceID >> 24;
+    data[5] = (kSourceID >> 16) & 0xff;
+    data[6] = (kSourceID >> 8) & 0xff;
+    data[7] = kSourceID & 0xff;
+
+    *(int32_t*)(&data[8]) = 0;  // 4 bytes blank
+
+    data[12] = mID >> 24;
+    data[13] = (mID >> 16) & 0xff;
+    data[14] = (mID >> 8) & 0xff;
+    data[15] = mID & 0xff;
+
+    int32_t targetBitrate = mQualManager.mTargetBitrate;
+    int32_t exp, mantissa;
+
+    // Round off to the nearest 2^4th
+    ALOGI("UE -> Op Req Rx bitrate : %d ", targetBitrate & 0xfffffff0);
+    for (exp=4 ; exp < 32 ; exp++)
+        if (((targetBitrate >> exp) & 0x01) != 0)
+            break;
+    mantissa = targetBitrate >> exp;
+
+    data[16] = ((exp << 2) & 0xfc) | ((mantissa & 0x18000) >> 15);
+    data[17] =                        (mantissa & 0x07f80) >> 7;
+    data[18] =                        (mantissa & 0x0007f) << 1;
+    data[19] = 40;              // 40 bytes overhead;
+
+    buffer->setRange(buffer->offset(), buffer->size() + 20);
+}
+
 void ARTPSource::setSelfID(const uint32_t selfID) {
     kSourceID = selfID;
+}
+
+void ARTPSource::setMinMaxBitrate(int32_t min, int32_t max) {
+    mQualManager.setMinMaxBitrate(min, max);
+}
+
+bool ARTPSource::isNeedToReport() {
+    int64_t intervalReceived = mNumBuffersReceived - mPrevNumBuffersReceived;
+    return (intervalReceived > 0) ? true : false;
 }
 
 void ARTPSource::noticeAbandonBuffer(int cnt) {
