@@ -158,13 +158,13 @@ public class MediaSession2Impl implements MediaSession2Provider {
             throw new IllegalArgumentException("Ambiguous session type. Multiple"
                     + " session services define the same id=" + id);
         } else if (libraryService != null) {
-            mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_LIBRARY_SERVICE,
+            mSessionToken = new SessionToken2Impl(Process.myUid(), TYPE_LIBRARY_SERVICE,
                     mContext.getPackageName(), libraryService, id, mSessionStub).getInstance();
         } else if (sessionService != null) {
-            mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_SESSION_SERVICE,
+            mSessionToken = new SessionToken2Impl(Process.myUid(), TYPE_SESSION_SERVICE,
                     mContext.getPackageName(), sessionService, id, mSessionStub).getInstance();
         } else {
-            mSessionToken = new SessionToken2Impl(context, Process.myUid(), TYPE_SESSION,
+            mSessionToken = new SessionToken2Impl(Process.myUid(), TYPE_SESSION,
                     mContext.getPackageName(), null, id, mSessionStub).getInstance();
         }
 
@@ -232,7 +232,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             oldAgent = mPlaylistAgent;
             mPlayer = player;
             if (agent == null) {
-                mSessionPlaylistAgent = new SessionPlaylistAgent(mContext, this, mPlayer);
+                mSessionPlaylistAgent = new SessionPlaylistAgent(this, mPlayer);
                 if (mDsmHelper != null) {
                     mSessionPlaylistAgent.setOnDataSourceMissingHelper(mDsmHelper);
                 }
@@ -280,7 +280,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 }
             }
             info = MediaController2Impl.PlaybackInfoImpl.createPlaybackInfo(
-                    mContext,
                     PlaybackInfo.PLAYBACK_TYPE_LOCAL,
                     attrs,
                     mAudioManager.isVolumeFixed()
@@ -290,7 +289,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
                     mAudioManager.getStreamVolume(stream));
         } else {
             info = MediaController2Impl.PlaybackInfoImpl.createPlaybackInfo(
-                    mContext,
                     PlaybackInfo.PLAYBACK_TYPE_REMOTE /* ControlType */,
                     attrs,
                     volumeProvider.getControlType(),
@@ -1057,19 +1055,19 @@ public class MediaSession2Impl implements MediaSession2Provider {
         /**
          * @return a new Command instance from the Bundle
          */
-        public static Command fromBundle_impl(Context context, @NonNull Bundle command) {
+        public static Command fromBundle_impl(@NonNull Bundle command) {
             if (command == null) {
                 throw new IllegalArgumentException("command shouldn't be null");
             }
             int code = command.getInt(KEY_COMMAND_CODE);
             if (code != COMMAND_CODE_CUSTOM) {
-                return new Command(context, code);
+                return new Command(code);
             } else {
                 String customCommand = command.getString(KEY_COMMAND_CUSTOM_COMMAND);
                 if (customCommand == null) {
                     return null;
                 }
-                return new Command(context, customCommand, command.getBundle(KEY_COMMAND_EXTRAS));
+                return new Command(customCommand, command.getBundle(KEY_COMMAND_EXTRAS));
             }
         }
 
@@ -1109,19 +1107,16 @@ public class MediaSession2Impl implements MediaSession2Provider {
         private static final String PREFIX_COMMAND_CODE_PLAYLIST = "COMMAND_CODE_PLAYLIST_";
 
         private Set<Command> mCommands = new HashSet<>();
-        private final Context mContext;
         private final CommandGroup mInstance;
 
-        public CommandGroupImpl(Context context, CommandGroup instance, Object other) {
-            mContext = context;
+        public CommandGroupImpl(CommandGroup instance, Object other) {
             mInstance = instance;
             if (other != null && other instanceof CommandGroupImpl) {
                 mCommands.addAll(((CommandGroupImpl) other).mCommands);
             }
         }
 
-        public CommandGroupImpl(Context context) {
-            mContext = context;
+        public CommandGroupImpl() {
             mInstance = new CommandGroup(this);
         }
 
@@ -1138,11 +1133,11 @@ public class MediaSession2Impl implements MediaSession2Provider {
             addCommandsWithPrefix(PREFIX_COMMAND_CODE);
         }
 
-        public void addAllPlaybackCommands() {
+        void addAllPlaybackCommands() {
             addCommandsWithPrefix(PREFIX_COMMAND_CODE_PLAYBACK);
         }
 
-        public void addAllPlaylistCommands() {
+        void addAllPlaylistCommands() {
             addCommandsWithPrefix(PREFIX_COMMAND_CODE_PLAYLIST);
         }
 
@@ -1153,7 +1148,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 for (int i = 0; i < fields.length; i++) {
                     if (fields[i].getName().startsWith(prefix)) {
                         try {
-                            mCommands.add(new Command(mContext, fields[i].getInt(null)));
+                            mCommands.add(new Command(fields[i].getInt(null)));
                         } catch (IllegalAccessException e) {
                             Log.w(TAG, "Unexpected " + fields[i] + " in MediaSession2");
                         }
@@ -1219,7 +1214,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
          * @return new instance of CommandGroup from the bundle
          * @hide
          */
-        public static @Nullable CommandGroup fromBundle_impl(Context context, Bundle commands) {
+        public static @Nullable CommandGroup fromBundle_impl(Bundle commands) {
             if (commands == null) {
                 return null;
             }
@@ -1227,14 +1222,14 @@ public class MediaSession2Impl implements MediaSession2Provider {
             if (list == null) {
                 return null;
             }
-            CommandGroup commandGroup = new CommandGroup(context);
+            CommandGroup commandGroup = new CommandGroup();
             for (int i = 0; i < list.size(); i++) {
                 Parcelable parcelable = list.get(i);
                 if (!(parcelable instanceof Bundle)) {
                     continue;
                 }
                 Bundle commandBundle = (Bundle) parcelable;
-                Command command = Command.fromBundle(context, commandBundle);
+                Command command = Command.fromBundle(commandBundle);
                 if (command != null) {
                     commandGroup.addCommand(command);
                 }
@@ -1319,19 +1314,19 @@ public class MediaSession2Impl implements MediaSession2Provider {
             return mControllerBinder.asBinder().equals(other.mControllerBinder.asBinder());
         }
 
-        public ControllerInfo getInstance() {
+        ControllerInfo getInstance() {
             return mInstance;
         }
 
-        public IBinder getId() {
+        IBinder getId() {
             return mControllerBinder.asBinder();
         }
 
-        public IMediaController2 getControllerBinder() {
+        IMediaController2 getControllerBinder() {
             return mControllerBinder;
         }
 
-        public static ControllerInfoImpl from(ControllerInfo controller) {
+        static ControllerInfoImpl from(ControllerInfo controller) {
             return (ControllerInfoImpl) controller.getProvider();
         }
     }
@@ -1355,7 +1350,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         private Bundle mExtras;
         private boolean mEnabled;
 
-        public CommandButtonImpl(Context context, @Nullable Command command, int iconResId,
+        public CommandButtonImpl(@Nullable Command command, int iconResId,
                 @Nullable String displayName, Bundle extras, boolean enabled) {
             mCommand = command;
             mIconResId = iconResId;
@@ -1390,7 +1385,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             return mEnabled;
         }
 
-        public @NonNull Bundle toBundle() {
+        @NonNull Bundle toBundle() {
             Bundle bundle = new Bundle();
             bundle.putBundle(KEY_COMMAND, mCommand.toBundle());
             bundle.putInt(KEY_ICON_RES_ID, mIconResId);
@@ -1400,12 +1395,12 @@ public class MediaSession2Impl implements MediaSession2Provider {
             return bundle;
         }
 
-        public static @Nullable CommandButton fromBundle(Context context, Bundle bundle) {
+        static @Nullable CommandButton fromBundle(Bundle bundle) {
             if (bundle == null) {
                 return null;
             }
-            CommandButton.Builder builder = new CommandButton.Builder(context);
-            builder.setCommand(Command.fromBundle(context, bundle.getBundle(KEY_COMMAND)));
+            CommandButton.Builder builder = new CommandButton.Builder();
+            builder.setCommand(Command.fromBundle(bundle.getBundle(KEY_COMMAND)));
             builder.setIconResId(bundle.getInt(KEY_ICON_RES_ID, 0));
             builder.setDisplayName(bundle.getString(KEY_DISPLAY_NAME));
             builder.setExtras(bundle.getBundle(KEY_EXTRAS));
@@ -1422,7 +1417,6 @@ public class MediaSession2Impl implements MediaSession2Provider {
          * Builder for {@link CommandButton}.
          */
         public static class BuilderImpl implements CommandButtonProvider.BuilderProvider {
-            private final Context mContext;
             private final CommandButton.Builder mInstance;
             private Command mCommand;
             private int mIconResId;
@@ -1430,8 +1424,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             private Bundle mExtras;
             private boolean mEnabled;
 
-            public BuilderImpl(Context context, CommandButton.Builder instance) {
-                mContext = context;
+            public BuilderImpl(CommandButton.Builder instance) {
                 mInstance = instance;
                 mEnabled = true;
             }
@@ -1477,8 +1470,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
                     throw new IllegalStateException("Custom commands needs icon and"
                             + " and name to display");
                 }
-                return new CommandButtonImpl(
-                        mContext, mCommand, mIconResId, mDisplayName, mExtras, mEnabled).mInstance;
+                return new CommandButtonImpl(mCommand, mIconResId, mDisplayName, mExtras, mEnabled)
+                        .mInstance;
             }
         }
     }
@@ -1572,7 +1565,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 mCallbackExecutor = mContext.getMainExecutor();
             }
             if (mCallback == null) {
-                mCallback = new SessionCallback(mContext) {};
+                mCallback = new SessionCallback() {};
             }
             return new MediaSession2Impl(mContext, mPlayer, mId, mPlaylistAgent,
                     mVolumeProvider, mSessionActivity, mCallbackExecutor, mCallback).getInstance();

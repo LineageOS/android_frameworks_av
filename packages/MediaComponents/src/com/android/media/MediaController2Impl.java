@@ -1062,7 +1062,6 @@ public class MediaController2Impl implements MediaController2Provider {
         private static final String KEY_AUDIO_ATTRIBUTES =
                 "android.media.playbackinfo_impl.audio_attrs";
 
-        private final Context mContext;
         private final PlaybackInfo mInstance;
 
         private final int mPlaybackType;
@@ -1071,9 +1070,8 @@ public class MediaController2Impl implements MediaController2Provider {
         private final int mCurrentVolume;
         private final AudioAttributes mAudioAttrs;
 
-        private PlaybackInfoImpl(Context context, int playbackType, AudioAttributes attrs,
-                int controlType, int max, int current) {
-            mContext = context;
+        private PlaybackInfoImpl(int playbackType, AudioAttributes attrs, int controlType,
+                int max, int current) {
             mPlaybackType = playbackType;
             mAudioAttrs = attrs;
             mControlType = controlType;
@@ -1107,11 +1105,11 @@ public class MediaController2Impl implements MediaController2Provider {
             return mCurrentVolume;
         }
 
-        public PlaybackInfo getInstance() {
+        PlaybackInfo getInstance() {
             return mInstance;
         }
 
-        public Bundle toBundle() {
+        Bundle toBundle() {
             Bundle bundle = new Bundle();
             bundle.putInt(KEY_PLAYBACK_TYPE, mPlaybackType);
             bundle.putInt(KEY_CONTROL_TYPE, mControlType);
@@ -1121,13 +1119,13 @@ public class MediaController2Impl implements MediaController2Provider {
             return bundle;
         }
 
-        public static PlaybackInfo createPlaybackInfo(Context context, int playbackType,
-                AudioAttributes attrs, int controlType, int max, int current) {
-            return new PlaybackInfoImpl(context, playbackType, attrs, controlType, max, current)
+        static PlaybackInfo createPlaybackInfo(int playbackType, AudioAttributes attrs,
+                int controlType, int max, int current) {
+            return new PlaybackInfoImpl(playbackType, attrs, controlType, max, current)
                     .getInstance();
         }
 
-        public static PlaybackInfo fromBundle(Context context, Bundle bundle) {
+        static PlaybackInfo fromBundle(Bundle bundle) {
             if (bundle == null) {
                 return null;
             }
@@ -1137,8 +1135,7 @@ public class MediaController2Impl implements MediaController2Provider {
             final int currentVolume = bundle.getInt(KEY_CURRENT_VOLUME);
             final AudioAttributes attrs = bundle.getParcelable(KEY_AUDIO_ATTRIBUTES);
 
-            return createPlaybackInfo(
-                    context, volumeType, attrs, volumeControl, maxVolume, currentVolume);
+            return createPlaybackInfo(volumeType, attrs, volumeControl, maxVolume, currentVolume);
         }
     }
 }

@@ -147,8 +147,8 @@ public class MediaSessionService2Impl implements MediaSessionService2Provider {
         private int mNotificationId;
         private Notification mNotification;
 
-        public MediaNotificationImpl(Context context, MediaNotification instance,
-                int notificationId, Notification notification) {
+        public MediaNotificationImpl(MediaNotification instance, int notificationId,
+                Notification notification) {
             if (notification == null) {
                 throw new IllegalArgumentException("notification shouldn't be null");
             }
