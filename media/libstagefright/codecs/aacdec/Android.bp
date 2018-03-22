@@ -1,45 +1,4 @@
 cc_library_shared {
-    name: "libstagefright_soft_c2aacdec",
-//    vendor_available: true,
-//    vndk: {
-//        enabled: true,
-//    },
-
-    srcs: [
-        "C2SoftAac.cpp",
-        "DrcPresModeWrap.cpp",
-    ],
-
-    cflags: ["-Werror"],
-
-    sanitize: {
-        misc_undefined: [
-            "signed-integer-overflow",
-            "unsigned-integer-overflow",
-        ],
-        cfi: true,
-        diag: {
-            cfi: true,
-        },
-    },
-
-    static_libs: [
-        "libFraunhoferAAC",
-    ],
-
-    shared_libs: [
-        "libcutils",
-        "libion",
-        "liblog",
-        "libstagefright_codec2",
-        "libstagefright_codec2_vndk",
-        "libstagefright_foundation",
-        "libstagefright_simple_c2component",
-        "libutils",
-    ],
-}
-
-cc_library_shared {
     name: "libstagefright_soft_aacdec",
     vendor_available: true,
     vndk: {

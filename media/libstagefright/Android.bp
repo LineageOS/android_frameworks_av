@@ -87,66 +87,6 @@ cc_library_shared {
 }
 
 cc_library_shared {
-    name: "libstagefright_ccodec",
-
-    local_include_dirs: ["include"],
-
-    srcs: [
-        "C2OMXNode.cpp",
-        "CCodec.cpp",
-        "CCodecBufferChannel.cpp",
-        "Codec2Buffer.cpp",
-        "Codec2InfoBuilder.cpp",
-    ],
-
-    cflags: [
-        "-Werror",
-        "-Wall",
-    ],
-
-    header_libs: [
-        "libstagefright_codec2_internal",
-    ],
-
-    shared_libs: [
-        "libbinder",
-        "libcutils",
-        "libgui",
-        "libhidlallocatorutils",
-        "libhidlbase",
-        "liblog",
-        "libmedia",
-        "libmedia_omx",
-        "libstagefright_codec2",
-        "libstagefright_codec2_vndk",
-        "libstagefright_codecbase",
-        "libstagefright_foundation",
-        "libstagefright_omx_utils",
-        "libstagefright_xmlparser",
-        "libui",
-        "libutils",
-        // TODO: Remove libv4l2_c2_componentstore.
-        "libv4l2_c2componentstore",
-        "android.hardware.cas.native@1.0",
-
-        // TODO: do not link directly with impl
-        "libstagefright_bufferqueue_helper",
-        "android.hardware.media.c2@1.0-service-impl",
-    ],
-
-    sanitize: {
-        cfi: true,
-        misc_undefined: [
-            "unsigned-integer-overflow",
-            "signed-integer-overflow",
-        ],
-        diag: {
-            cfi: true,
-        },
-    },
-}
-
-cc_library_shared {
     name: "libstagefright",
 
     srcs: [
@@ -220,7 +160,6 @@ cc_library_shared {
         "libui",
         "libutils",
         "libmedia_helper",
-        "libstagefright_ccodec",
         "libstagefright_codecbase",
         "libstagefright_foundation",
         "libstagefright_omx",

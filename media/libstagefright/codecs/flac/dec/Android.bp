@@ -1,48 +1,4 @@
 cc_library_shared {
-    name: "libstagefright_soft_c2flacdec",
-//    vendor_available: true,
-//    vndk: {
-//        enabled: true,
-//    },
-
-    srcs: [
-        "C2SoftFlacDecoder.cpp",
-    ],
-
-    include_dirs: [
-        "external/flac/include",
-        "frameworks/av/media/libstagefright/flac/dec",
-    ],
-
-    cflags: [
-        "-Wall",
-        "-Werror",
-    ],
-
-    sanitize: {
-        misc_undefined: [
-            "signed-integer-overflow",
-            "unsigned-integer-overflow",
-        ],
-        cfi: true,
-        diag: {
-            cfi: true,
-        },
-    },
-
-    shared_libs: [
-        "liblog",
-        "libutils",
-        "libstagefright_flacdec",
-        "libstagefright_codec2",
-        "libstagefright_codec2_vndk",
-        "libstagefright_foundation",
-        "libstagefright_simple_c2component",
-    ],
-}
-
-
-cc_library_shared {
     name: "libstagefright_soft_flacdec",
     vendor_available: true,
     vndk: {

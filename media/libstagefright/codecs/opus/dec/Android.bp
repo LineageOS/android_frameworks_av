@@ -1,40 +1,4 @@
 cc_library_shared {
-    name: "libstagefright_soft_c2opusdec",
-//    vendor_available: true,
-//    vndk: {
-//        enabled: true,
-//    },
-
-    srcs: ["C2SoftOpus.cpp"],
-
-    cflags: [
-        "-Wall",
-        "-Werror",
-    ],
-
-    sanitize: {
-        misc_undefined: [
-            "signed-integer-overflow",
-            "unsigned-integer-overflow",
-        ],
-        cfi: true,
-        diag: {
-            cfi: true,
-        },
-    },
-
-    shared_libs: [
-        "liblog",
-        "libutils",
-        "libstagefright_codec2",
-        "libstagefright_codec2_vndk",
-        "libstagefright_foundation",
-        "libstagefright_simple_c2component",
-        "libopus",
-    ],
-}
-
-cc_library_shared {
     name: "libstagefright_soft_opusdec",
     vendor_available: true,
     vndk: {
