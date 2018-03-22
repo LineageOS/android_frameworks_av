@@ -72,7 +72,8 @@ struct ARTPConnection::StreamInfo {
 ARTPConnection::ARTPConnection(uint32_t flags)
     : mFlags(flags),
       mPollEventPending(false),
-      mLastReceiverReportTimeUs(-1) {
+      mLastReceiverReportTimeUs(-1),
+      mLastBitrateReportTimeUs(-1) {
 }
 
 ARTPConnection::~ARTPConnection() {
@@ -411,6 +412,7 @@ void ARTPConnection::onPollStreams() {
     }
 
     int64_t nowUs = ALooper::GetNowUs();
+    showRxBitrate(nowUs);
     if (mLastReceiverReportTimeUs <= 0
             || mLastReceiverReportTimeUs + 5000000LL <= nowUs) {
         sp<ABuffer> buffer = new ABuffer(kMaxUDPSize);
@@ -435,7 +437,10 @@ void ARTPConnection::onPollStreams() {
             for (size_t i = 0; i < s->mSources.size(); ++i) {
                 sp<ARTPSource> source = s->mSources.valueAt(i);
 
-                source->addReceiverReport(buffer);
+                if (source->isNeedToReport()) {
+                    source->addReceiverReport(buffer);
+                    source->addTMMBR(buffer);
+                }
 
                 if (mFlags & kRegularlyRequestFIR) {
                     source->addFIR(buffer);
@@ -513,6 +518,7 @@ status_t ARTPConnection::receive(StreamInfo *s, bool receiveRTP) {
             0,
             remoteAddrLen > 0 ? pRemoteRTCPAddr : NULL,
             remoteAddrLen > 0 ? &remoteAddrLen : NULL);
+        mCumulativeBytes += nbytes;
     } while (nbytes < 0 && errno == EINTR);
 
     if (nbytes <= 0) {
@@ -875,6 +881,7 @@ sp<ARTPSource> ARTPConnection::findSource(StreamInfo *info, uint32_t srcId) {
                 srcId, info->mSessionDesc, info->mIndex, info->mNotifyMsg);
 
         source->setSelfID(mSelfID);
+        source->setMinMaxBitrate(mMinBitrate, mMaxBitrate);
         info->mSources.add(srcId, source);
     } else {
         source = info->mSources.valueAt(index);
@@ -894,6 +901,23 @@ void ARTPConnection::setSelfID(const uint32_t selfID) {
     mSelfID = selfID;
 }
 
+void ARTPConnection::setMinMaxBitrate(int32_t min, int32_t max) {
+    mMinBitrate = min;
+    mMaxBitrate = max;
+}
+
+void ARTPConnection::showRxBitrate(int64_t nowUs) {
+    if (mLastBitrateReportTimeUs <= 0) {
+        mCumulativeBytes = 0;
+        mLastBitrateReportTimeUs = nowUs;
+    }
+    else if (mLastBitrateReportTimeUs + 1000000ll <= nowUs) {
+        int32_t timeDiff = (nowUs - mLastBitrateReportTimeUs) / 1000000ll;
+        ALOGI("Actual Rx bitrate : %d bits/sec", mCumulativeBytes * 8 / timeDiff);
+        mCumulativeBytes = 0;
+        mLastBitrateReportTimeUs = nowUs;
+    }
+}
 void ARTPConnection::onInjectPacket(const sp<AMessage> &msg) {
     int32_t index;
     CHECK(msg->findInt32("index", &index));
