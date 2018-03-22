@@ -218,6 +218,8 @@ enum {
     kKeyIccProfile       = 'prof', // raw data, ICC profile data
     kKeyIsPrimaryImage   = 'prim', // bool (int32_t), image track is the primary image
     kKeyFrameCount       = 'nfrm', // int32_t, total number of frame in video track
+    kKeyExifOffset       = 'exof', // int64_t, Exif data offset
+    kKeyExifSize         = 'exsz', // int64_t, Exif data size
 };
 
 enum {

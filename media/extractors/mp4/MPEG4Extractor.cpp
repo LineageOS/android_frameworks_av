@@ -586,6 +586,12 @@ status_t MPEG4Extractor::readMetaData() {
     }
 
     if (mIsHeif && (mItemTable != NULL) && (mItemTable->countImages() > 0)) {
+        off64_t exifOffset;
+        size_t exifSize;
+        if (mItemTable->getExifOffsetAndSize(&exifOffset, &exifSize) == OK) {
+            mFileMetaData.setInt64(kKeyExifOffset, (int64_t)exifOffset);
+            mFileMetaData.setInt64(kKeyExifSize, (int64_t)exifSize);
+        }
         for (uint32_t imageIndex = 0;
                 imageIndex < mItemTable->countImages(); imageIndex++) {
             sp<MetaData> meta = mItemTable->getImageMeta(imageIndex);
@@ -601,6 +607,7 @@ status_t MPEG4Extractor::readMetaData() {
                 ALOGW("Extracting still images only");
                 err = OK;
             }
+            mInitCheck = OK;
 
             ALOGV("adding HEIF image track %u", imageIndex);
             Track *track = new Track;
