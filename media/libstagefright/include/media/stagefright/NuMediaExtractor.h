@@ -71,6 +71,8 @@ struct NuMediaExtractor : public RefBase {
 
     status_t getFileFormat(sp<AMessage> *format) const;
 
+    status_t getExifOffsetSize(off64_t *offset, size_t *size) const;
+
     status_t selectTrack(size_t index, int64_t startTimeUs = -1ll,
             MediaSource::ReadOptions::SeekMode mode =
                 MediaSource::ReadOptions::SEEK_CLOSEST_SYNC);

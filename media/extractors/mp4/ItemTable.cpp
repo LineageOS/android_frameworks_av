@@ -76,9 +76,14 @@ struct ImageItem {
 
     Vector<uint32_t> thumbnails;
     Vector<uint32_t> dimgRefs;
+    Vector<uint32_t> cdscRefs;
     size_t nextTileIndex;
 };
 
+struct ExifItem {
+    off64_t offset;
+    size_t size;
+};
 
 /////////////////////////////////////////////////////////////////////
 //
@@ -473,7 +478,9 @@ struct ItemReference : public Box, public RefBase {
 
     uint32_t itemId() { return mItemId; }
 
-    void apply(KeyedVector<uint32_t, ImageItem> &itemIdToItemMap) const;
+    void apply(
+            KeyedVector<uint32_t, ImageItem> &itemIdToItemMap,
+            KeyedVector<uint32_t, ExifItem> &itemIdToExifMap) const;
 
 private:
     uint32_t mItemId;
@@ -483,17 +490,20 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(ItemReference);
 };
 
-void ItemReference::apply(KeyedVector<uint32_t, ImageItem> &itemIdToItemMap) const {
-    ssize_t itemIndex = itemIdToItemMap.indexOfKey(mItemId);
-
-    // ignore non-image items
-    if (itemIndex < 0) {
-        return;
-    }
-
+void ItemReference::apply(
+        KeyedVector<uint32_t, ImageItem> &itemIdToItemMap,
+        KeyedVector<uint32_t, ExifItem> &itemIdToExifMap) const {
     ALOGV("attach reference type 0x%x to item id %d)", type(), mItemId);
 
-    if (type() == FOURCC('d', 'i', 'm', 'g')) {
+    switch(type()) {
+    case FOURCC('d', 'i', 'm', 'g'): {
+        ssize_t itemIndex = itemIdToItemMap.indexOfKey(mItemId);
+
+        // ignore non-image items
+        if (itemIndex < 0) {
+            return;
+        }
+
         ImageItem &derivedImage = itemIdToItemMap.editValueAt(itemIndex);
         if (!derivedImage.dimgRefs.empty()) {
             ALOGW("dimgRefs if not clean!");
@@ -512,7 +522,16 @@ void ItemReference::apply(KeyedVector<uint32_t, ImageItem> &itemIdToItemMap) con
             // mark the source image of the derivation as hidden
             sourceImage.hidden = true;
         }
-    } else if (type() == FOURCC('t', 'h', 'm', 'b')) {
+        break;
+    }
+    case FOURCC('t', 'h', 'm', 'b'): {
+        ssize_t itemIndex = itemIdToItemMap.indexOfKey(mItemId);
+
+        // ignore non-image items
+        if (itemIndex < 0) {
+            return;
+        }
+
         // mark thumbnail image as hidden, these can be retrieved if the client
         // request thumbnail explicitly, but won't be exposed as displayables.
         ImageItem &thumbImage = itemIdToItemMap.editValueAt(itemIndex);
@@ -532,11 +551,43 @@ void ItemReference::apply(KeyedVector<uint32_t, ImageItem> &itemIdToItemMap) con
             }
             masterImage.thumbnails.push_back(mItemId);
         }
-    } else if (type() == FOURCC('a', 'u', 'x', 'l')) {
+        break;
+    }
+    case FOURCC('c', 'd', 's', 'c'): {
+        ssize_t itemIndex = itemIdToExifMap.indexOfKey(mItemId);
+
+        // ignore non-exif block items
+        if (itemIndex < 0) {
+            return;
+        }
+
+        for (size_t i = 0; i < mRefs.size(); i++) {
+            itemIndex = itemIdToItemMap.indexOfKey(mRefs[i]);
+
+            // ignore non-image items
+            if (itemIndex < 0) {
+                continue;
+            }
+            ALOGV("Image item id %d uses metadata item id %d", mRefs[i], mItemId);
+            ImageItem &image = itemIdToItemMap.editValueAt(itemIndex);
+            image.cdscRefs.push_back(mItemId);
+        }
+        break;
+    }
+    case FOURCC('a', 'u', 'x', 'l'): {
+        ssize_t itemIndex = itemIdToItemMap.indexOfKey(mItemId);
+
+        // ignore non-image items
+        if (itemIndex < 0) {
+            return;
+        }
+
         // mark auxiliary image as hidden
         ImageItem &auxImage = itemIdToItemMap.editValueAt(itemIndex);
         auxImage.hidden = true;
-    } else {
+        break;
+    }
+    default:
         ALOGW("ignoring unsupported ref type 0x%x", type());
     }
 }
@@ -1299,10 +1350,13 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
     for (size_t i = 0; i < mItemInfos.size(); i++) {
         const ItemInfo &info = mItemInfos[i];
 
-
-        // ignore non-image items
+        // Only handle 3 types of items, all others are ignored:
+        //   'grid': derived image from tiles
+        //   'hvc1': coded image (or tile)
+        //   'Exif': EXIF metadata
         if (info.itemType != FOURCC('g', 'r', 'i', 'd') &&
-            info.itemType != FOURCC('h', 'v', 'c', '1')) {
+            info.itemType != FOURCC('h', 'v', 'c', '1') &&
+            info.itemType != FOURCC('E', 'x', 'i', 'f')) {
             continue;
         }
 
@@ -1323,6 +1377,19 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
         size_t size;
         if (iloc.getLoc(&offset, &size, mIdatOffset, mIdatSize) != OK) {
             return ERROR_MALFORMED;
+        }
+
+        if (info.itemType == FOURCC('E', 'x', 'i', 'f')) {
+            // Only add if the Exif data is non-empty. The first 4 bytes contain
+            // the offset to TIFF header, which the Exif parser doesn't use.
+            if (size > 4) {
+                ExifItem exifItem = {
+                        .offset = offset,
+                        .size = size,
+                };
+                mItemIdToExifMap.add(info.itemId, exifItem);
+            }
+            continue;
         }
 
         ImageItem image(info.itemType, info.itemId, info.hidden);
@@ -1354,7 +1421,7 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
     }
 
     for (size_t i = 0; i < mItemReferences.size(); i++) {
-        mItemReferences[i]->apply(mItemIdToItemMap);
+        mItemReferences[i]->apply(mItemIdToItemMap, mItemIdToExifMap);
     }
 
     bool foundPrimary = false;
@@ -1571,6 +1638,34 @@ status_t ItemTable::getImageOffsetAndSize(
         *size = mItemIdToItemMap[mCurrentItemIndex].size;
     }
 
+    return OK;
+}
+
+status_t ItemTable::getExifOffsetAndSize(off64_t *offset, size_t *size) {
+    if (!mImageItemsValid) {
+        return INVALID_OPERATION;
+    }
+
+    ssize_t itemIndex = mItemIdToItemMap.indexOfKey(mPrimaryItemId);
+
+    // this should not happen, something's seriously wrong.
+    if (itemIndex < 0) {
+        return INVALID_OPERATION;
+    }
+
+    const ImageItem &image = mItemIdToItemMap[itemIndex];
+    if (image.cdscRefs.size() == 0) {
+        return NAME_NOT_FOUND;
+    }
+
+    ssize_t exifIndex = mItemIdToExifMap.indexOfKey(image.cdscRefs[0]);
+    if (exifIndex < 0) {
+        return NAME_NOT_FOUND;
+    }
+
+    // skip the first 4-byte of the offset to TIFF header
+    *offset = mItemIdToExifMap[exifIndex].offset + 4;
+    *size = mItemIdToExifMap[exifIndex].size - 4;
     return OK;
 }
 
