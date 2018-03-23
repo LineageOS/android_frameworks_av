@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "6be74884_95cb4bec",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 215,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-23T03:32:35Z",
+      "side": 1,
+      "message": "Shouldn\u0027t the property check+override occur here in the constructor where this value is passed in? (or in the StagefrightRecorder.cpp:setupCameraSource function)",
+      "range": {
+        "startLine": 215,
+        "startChar": 9,
+        "endLine": 215,
+        "endChar": 36
+      },
+      "revId": "bc25829642ca988ecee9d538414d2caa9d066282",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
