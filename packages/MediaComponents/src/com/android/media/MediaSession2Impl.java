@@ -61,7 +61,6 @@ import android.os.Process;
 import android.os.ResultReceiver;
 import android.support.annotation.GuardedBy;
 import android.text.TextUtils;
-import android.util.ArrayMap;
 import android.util.Log;
 
 import java.lang.ref.WeakReference;
@@ -1234,7 +1233,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             // Ask server whether the controller is trusted.
             // App cannot know this because apps cannot query enabled notification listener for
             // another package, but system server can do.
-            mIsTrusted = manager.isTrusted(uid, packageName);
+            mIsTrusted = manager.isTrusted(packageName, pid, uid);
         }
 
         @Override
