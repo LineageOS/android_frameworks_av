@@ -55,7 +55,7 @@ class AAudioServiceStreamBase
     , public Runnable  {
 
 public:
-    AAudioServiceStreamBase(android::AAudioService &aAudioService);
+    explicit AAudioServiceStreamBase(android::AAudioService &aAudioService);
 
     virtual ~AAudioServiceStreamBase();
 
@@ -218,6 +218,8 @@ public:
     void setCloseNeeded(bool needed) {
         mCloseNeeded.store(needed);
     }
+
+    virtual const char *getTypeText() const { return "Base"; }
 
 protected:
 
