@@ -4803,6 +4803,8 @@ typedef enum acamera_metadata_tag {
      * of points can be less than max (that is, the request doesn't have to
      * always provide a curve with number of points equivalent to
      * ACAMERA_TONEMAP_MAX_CURVE_POINTS).</p>
+     * <p>For devices with MONOCHROME capability, only red channel is used. Green and blue channels
+     * are ignored.</p>
      * <p>A few examples, and their corresponding graphical mappings; these
      * only specify the red channel and the precision is limited to 4
      * digits, for conciseness.</p>
@@ -7032,6 +7034,12 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * @see ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE
      */
     ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA      = 11,
+
+    /**
+     * <p>The camera device is a monochrome camera that doesn't contain a color filter array,
+     * and the pixel values on U and Y planes are all 128.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_MONOCHROME                = 12,
 
 } acamera_metadata_enum_android_request_available_capabilities_t;
 
