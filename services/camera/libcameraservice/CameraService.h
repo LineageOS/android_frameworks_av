@@ -736,7 +736,7 @@ private:
     std::vector<std::string> mNormalDeviceIds;
 
     // sounds
-    MediaPlayer*        newMediaPlayer(const char *file);
+    sp<MediaPlayer>     newMediaPlayer(const char *file);
 
     Mutex               mSoundLock;
     sp<MediaPlayer>     mSoundPlayer[NUM_SOUNDS];
