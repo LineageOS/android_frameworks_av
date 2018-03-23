@@ -89,18 +89,22 @@ aaudio_result_t AAudioServiceEndpointShared::close() {
 }
 
 // Glue between C and C++ callbacks.
-static void *aaudio_endpoint_thread_proc(void *context) {
-    AAudioServiceEndpointShared *endpoint = (AAudioServiceEndpointShared *) context;
-    if (endpoint != NULL) {
-        void *result = endpoint->callbackLoop();
-        // Close now so that the HW resource is freed and we can open a new device.
-        if (!endpoint->isConnected()) {
-            endpoint->close();
-        }
-        return result;
-    } else {
-        return NULL;
+static void *aaudio_endpoint_thread_proc(void *arg) {
+    assert(arg != nullptr);
+
+    // The caller passed in a smart pointer to prevent the endpoint from getting deleted
+    // while the thread was launching.
+    sp<AAudioServiceEndpointShared> *endpointForThread =
+            static_cast<sp<AAudioServiceEndpointShared> *>(arg);
+    sp<AAudioServiceEndpointShared> endpoint = *endpointForThread;
+    delete endpointForThread; // Just use scoped smart pointer. Don't need this anymore.
+    void *result = endpoint->callbackLoop();
+    // Close now so that the HW resource is freed and we can open a new device.
+    if (!endpoint->isConnected()) {
+        endpoint->close();
     }
+
+    return result;
 }
 
 aaudio_result_t aaudio::AAudioServiceEndpointShared::startSharingThread_l() {
@@ -109,7 +113,16 @@ aaudio_result_t aaudio::AAudioServiceEndpointShared::startSharingThread_l() {
                           * AAUDIO_NANOS_PER_SECOND
                           / getSampleRate();
     mCallbackEnabled.store(true);
-    return getStreamInternal()->createThread(periodNanos, aaudio_endpoint_thread_proc, this);
+    // Pass a smart pointer so the thread can hold a reference.
+    sp<AAudioServiceEndpointShared> *endpointForThread = new sp<AAudioServiceEndpointShared>(this);
+    aaudio_result_t result = getStreamInternal()->createThread(periodNanos,
+                                                               aaudio_endpoint_thread_proc,
+                                                               endpointForThread);
+    if (result != AAUDIO_OK) {
+        // The thread can't delete it so we have to do it here.
+        delete endpointForThread;
+    }
+    return result;
 }
 
 aaudio_result_t aaudio::AAudioServiceEndpointShared::stopSharingThread() {
