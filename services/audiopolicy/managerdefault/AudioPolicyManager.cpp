@@ -1339,6 +1339,11 @@ status_t AudioPolicyManager::startSource(const sp<AudioOutputDescriptor>& output
         }
     }
 
+    if (stream == AUDIO_STREAM_ENFORCED_AUDIBLE &&
+            mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) == AUDIO_POLICY_FORCE_SYSTEM_ENFORCED) {
+        setStrategyMute(STRATEGY_SONIFICATION, true, outputDesc);
+    }
+
     return NO_ERROR;
 }
 
@@ -1434,6 +1439,12 @@ status_t AudioPolicyManager::stopSource(const sp<AudioOutputDescriptor>& outputD
             // update the outputs if stopping one with a stream that can affect notification routing
             handleNotificationRoutingForStream(stream);
         }
+
+        if (stream == AUDIO_STREAM_ENFORCED_AUDIBLE &&
+                mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) == AUDIO_POLICY_FORCE_SYSTEM_ENFORCED) {
+            setStrategyMute(STRATEGY_SONIFICATION, false, outputDesc);
+        }
+
         if (stream == AUDIO_STREAM_MUSIC) {
             selectOutputForMusicEffects();
         }
