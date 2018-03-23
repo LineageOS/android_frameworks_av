@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "82c2af79_417c1606",
+        "filename": "services/camera/libcameraservice/api1/Camera2Client.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1558,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-23T06:10:54Z",
+      "side": 1,
+      "message": "What is up with the weird spacing",
+      "range": {
+        "startLine": 1558,
+        "startChar": 8,
+        "endLine": 1558,
+        "endChar": 9
+      },
+      "revId": "12c3a2c1982e8f2a459463a70adbd513c95d0226",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "93cd9c29_3cc76682",
+        "filename": "services/camera/libcameraservice/api1/qticlient2/QTIParameters.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 149,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-23T06:10:54Z",
+      "side": 1,
+      "message": "There\u0027s probably some implication here for devices which would otherwise expose this themselves in a custom camera parameters library.",
+      "range": {
+        "startLine": 149,
+        "startChar": 11,
+        "endLine": 149,
+        "endChar": 22
+      },
+      "revId": "12c3a2c1982e8f2a459463a70adbd513c95d0226",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
