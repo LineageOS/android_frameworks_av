@@ -25,6 +25,23 @@
     },
     {
       "key": {
+        "uuid": "86352b0c_662e571c",
+        "filename": "services/camera/libcameraservice/api1/QTICamera2Client.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-23T06:12:51Z",
+      "side": 1,
+      "message": "Did the QTICamera2Client.cpp/.h file end up in the wrong directory?",
+      "revId": "12c3a2c1982e8f2a459463a70adbd513c95d0226",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "93cd9c29_3cc76682",
         "filename": "services/camera/libcameraservice/api1/qticlient2/QTIParameters.cpp",
         "patchSetId": 1
