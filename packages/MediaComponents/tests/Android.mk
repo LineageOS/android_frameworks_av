@@ -20,6 +20,7 @@ LOCAL_MODULE_TAGS := tests
 LOCAL_STATIC_JAVA_LIBRARIES := \
     android.test.runner.stubs \
     android.test.base.stubs \
+    mockito-target-minus-junit4 \
     junit
 
 LOCAL_SRC_FILES := $(call all-java-files-under, src)
