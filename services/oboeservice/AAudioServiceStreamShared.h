@@ -43,7 +43,7 @@ class SharedRingBuffer;
 class AAudioServiceStreamShared : public AAudioServiceStreamBase {
 
 public:
-    AAudioServiceStreamShared(android::AAudioService &aAudioService);
+    explicit AAudioServiceStreamShared(android::AAudioService &aAudioService);
     virtual ~AAudioServiceStreamShared() = default;
 
     static std::string dumpHeader();
@@ -86,6 +86,8 @@ public:
     int32_t getXRunCount() const {
         return mXRunCount.load();
     }
+
+    const char *getTypeText() const override { return "Shared"; }
 
 protected:
 

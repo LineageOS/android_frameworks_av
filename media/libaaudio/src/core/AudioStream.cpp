@@ -104,17 +104,17 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mErrorCallbackUserData = builder.getErrorCallbackUserData();
 
     // This is very helpful for debugging in the future. Please leave it in.
-    ALOGI("open() rate = %d, channels = %d, format = %d, sharing = %s, dir = %s",
+    ALOGI("open() rate   = %d, channels    = %d, format   = %d, sharing = %s, dir = %s",
           mSampleRate, mSamplesPerFrame, mFormat,
           AudioStream_convertSharingModeToShortText(mSharingMode),
           (getDirection() == AAUDIO_DIRECTION_OUTPUT) ? "OUTPUT" : "INPUT");
-    ALOGI("open() device = %d, sessionId = %d, perfMode = %d, callback: %s with frames = %d",
+    ALOGI("open() device = %d, sessionId   = %d, perfMode = %d, callback: %s with frames = %d",
           mDeviceId,
           mSessionId,
           mPerformanceMode,
           (isDataCallbackSet() ? "ON" : "OFF"),
           mFramesPerDataCallback);
-    ALOGI("open() usage = %d, contentType = %d, inputPreset = %d",
+    ALOGI("open() usage  = %d, contentType = %d, inputPreset = %d",
           mUsage, mContentType, mInputPreset);
 
     return AAUDIO_OK;
@@ -242,6 +242,22 @@ aaudio_result_t AudioStream::safeClose() {
     return close();
 }
 
+void AudioStream::setState(aaudio_stream_state_t state) {
+    ALOGV("%s(%p) from %d to %d", __func__, this, mState, state);
+    // CLOSED is a final state
+    if (mState == AAUDIO_STREAM_STATE_CLOSED) {
+        ALOGE("%s(%p) tried to set to %d but already CLOSED", __func__, this, state);
+
+    // Once DISCONNECTED, we can only move to CLOSED state.
+    } else if (mState == AAUDIO_STREAM_STATE_DISCONNECTED
+               && state != AAUDIO_STREAM_STATE_CLOSED) {
+        ALOGE("%s(%p) tried to set to %d but already DISCONNECTED", __func__, this, state);
+
+    } else {
+        mState = state;
+    }
+}
+
 aaudio_result_t AudioStream::waitForStateChange(aaudio_stream_state_t currentState,
                                                 aaudio_stream_state_t *nextState,
                                                 int64_t timeoutNanoseconds)
@@ -313,7 +329,9 @@ aaudio_result_t AudioStream::createThread(int64_t periodNanoseconds,
     setPeriodNanoseconds(periodNanoseconds);
     int err = pthread_create(&mThread, nullptr, AudioStream_internalThreadProc, this);
     if (err != 0) {
-        return AAudioConvert_androidToAAudioResult(-errno);
+        android::status_t status = -errno;
+        ALOGE("createThread() - pthread_create() failed, %d", status);
+        return AAudioConvert_androidToAAudioResult(status);
     } else {
         // TODO Use AAudioThread or maybe AndroidThread
         // Name the thread with an increasing index, "AAudio_#", for debugging.
