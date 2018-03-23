@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef MEDIA_STAGEFRIGHT_CONVERSION_H_
-#define MEDIA_STAGEFRIGHT_CONVERSION_H_
+#ifndef MEDIA_STAGEFRIGHT_BQHELPER_CONVERSION_H_
+#define MEDIA_STAGEFRIGHT_BQHELPER_CONVERSION_H_
 
 #include <vector>
 #include <list>
@@ -83,17 +83,7 @@ typedef ::android::IGraphicBufferProducer
  *
  * This function does not duplicate the file descriptor.
  */
-inline native_handle_t* native_handle_create_from_fd(int fd) {
-    if (fd < 2) {
-        return native_handle_create(0, 0);
-    }
-    native_handle_t* nh = native_handle_create(1, 0);
-    if (nh == nullptr) {
-        return nullptr;
-    }
-    nh->data[0] = fd;
-    return nh;
-}
+native_handle_t* native_handle_create_from_fd(int fd);
 
 /**
  * \brief Extract a file descriptor from a native handle.
@@ -106,11 +96,7 @@ inline native_handle_t* native_handle_create_from_fd(int fd) {
  *
  * This function does not duplicate the file descriptor.
  */
-inline int native_handle_read_fd(native_handle_t const* nh, int index = 0) {
-    return ((nh == nullptr) || (nh->numFds == 0) ||
-            (nh->numFds <= index) || (index < 0)) ?
-            -1 : nh->data[index];
-}
+int native_handle_read_fd(native_handle_t const* nh, int index = 0);
 
 /**
  * Conversion functions
@@ -151,12 +137,7 @@ inline int native_handle_read_fd(native_handle_t const* nh, int index = 0) {
  * \return The corresponding `binder::Status`.
  */
 // convert: Return<void> -> ::android::binder::Status
-inline ::android::binder::Status toBinderStatus(
-        Return<void> const& t) {
-    return ::android::binder::Status::fromExceptionCode(
-            t.isOk() ? OK : UNKNOWN_ERROR,
-            t.description().c_str());
-}
+::android::binder::Status toBinderStatus(Return<void> const& t);
 
 /**
  * \brief Convert `Return<void>` to `status_t`. This is for legacy binder calls.
@@ -165,9 +146,7 @@ inline ::android::binder::Status toBinderStatus(
  * \return The corresponding `status_t`.
  */
 // convert: Return<void> -> status_t
-inline status_t toStatusT(Return<void> const& t) {
-    return t.isOk() ? OK : UNKNOWN_ERROR;
-}
+status_t toStatusT(Return<void> const& t);
 
 /**
  * \brief Wrap `native_handle_t*` in `hidl_handle`.
@@ -176,9 +155,7 @@ inline status_t toStatusT(Return<void> const& t) {
  * \return The `hidl_handle` that points to \p nh.
  */
 // wrap: native_handle_t* -> hidl_handle
-inline hidl_handle inHidlHandle(native_handle_t const* nh) {
-    return hidl_handle(nh);
-}
+hidl_handle inHidlHandle(native_handle_t const* nh);
 
 /**
  * \brief Convert `int32_t` to `Dataspace`.
@@ -187,9 +164,7 @@ inline hidl_handle inHidlHandle(native_handle_t const* nh) {
  * \result The corresponding `Dataspace`.
  */
 // convert: int32_t -> Dataspace
-inline Dataspace toHardwareDataspace(int32_t l) {
-    return static_cast<Dataspace>(l);
-}
+Dataspace toHardwareDataspace(int32_t l);
 
 /**
  * \brief Convert `Dataspace` to `int32_t`.
@@ -198,9 +173,7 @@ inline Dataspace toHardwareDataspace(int32_t l) {
  * \result The corresponding `int32_t`.
  */
 // convert: Dataspace -> int32_t
-inline int32_t toRawDataspace(Dataspace const& t) {
-    return static_cast<int32_t>(t);
-}
+int32_t toRawDataspace(Dataspace const& t);
 
 /**
  * \brief Wrap an opaque buffer inside a `hidl_vec<uint8_t>`.
@@ -210,11 +183,7 @@ inline int32_t toRawDataspace(Dataspace const& t) {
  * \return A `hidl_vec<uint8_t>` that points to the buffer.
  */
 // wrap: void*, size_t -> hidl_vec<uint8_t>
-inline hidl_vec<uint8_t> inHidlBytes(void const* l, size_t size) {
-    hidl_vec<uint8_t> t;
-    t.setToExternal(static_cast<uint8_t*>(const_cast<void*>(l)), size, false);
-    return t;
-}
+hidl_vec<uint8_t> inHidlBytes(void const* l, size_t size);
 
 /**
  * \brief Create a `hidl_vec<uint8_t>` that is a copy of an opaque buffer.
@@ -224,13 +193,7 @@ inline hidl_vec<uint8_t> inHidlBytes(void const* l, size_t size) {
  * \return A `hidl_vec<uint8_t>` that is a copy of the input buffer.
  */
 // convert: void*, size_t -> hidl_vec<uint8_t>
-inline hidl_vec<uint8_t> toHidlBytes(void const* l, size_t size) {
-    hidl_vec<uint8_t> t;
-    t.resize(size);
-    uint8_t const* src = static_cast<uint8_t const*>(l);
-    std::copy(src, src + size, t.data());
-    return t;
-}
+hidl_vec<uint8_t> toHidlBytes(void const* l, size_t size);
 
 /**
  * \brief Wrap `GraphicBuffer` in `AnwBuffer`.
@@ -239,17 +202,7 @@ inline hidl_vec<uint8_t> toHidlBytes(void const* l, size_t size) {
  * \param[in] l The source `GraphicBuffer`.
  */
 // wrap: GraphicBuffer -> AnwBuffer
-inline void wrapAs(AnwBuffer* t, GraphicBuffer const& l) {
-    t->attr.width = l.getWidth();
-    t->attr.height = l.getHeight();
-    t->attr.stride = l.getStride();
-    t->attr.format = static_cast<PixelFormat>(l.getPixelFormat());
-    t->attr.layerCount = l.getLayerCount();
-    t->attr.usage = l.getUsage();
-    t->attr.id = l.getId();
-    t->attr.generationNumber = l.getGenerationNumber();
-    t->nativeHandle = hidl_handle(l.handle);
-}
+void wrapAs(AnwBuffer* t, GraphicBuffer const& l);
 
 /**
  * \brief Convert `AnwBuffer` to `GraphicBuffer`.
@@ -261,46 +214,7 @@ inline void wrapAs(AnwBuffer* t, GraphicBuffer const& l) {
  */
 // convert: AnwBuffer -> GraphicBuffer
 // Ref: frameworks/native/libs/ui/GraphicBuffer.cpp: GraphicBuffer::flatten
-inline bool convertTo(GraphicBuffer* l, AnwBuffer const& t) {
-    native_handle_t* handle = t.nativeHandle == nullptr ?
-            nullptr : native_handle_clone(t.nativeHandle);
-
-    size_t const numInts = 12 + (handle ? handle->numInts : 0);
-    int32_t* ints = new int32_t[numInts];
-
-    size_t numFds = static_cast<size_t>(handle ? handle->numFds : 0);
-    int* fds = new int[numFds];
-
-    ints[0] = 'GBFR';
-    ints[1] = static_cast<int32_t>(t.attr.width);
-    ints[2] = static_cast<int32_t>(t.attr.height);
-    ints[3] = static_cast<int32_t>(t.attr.stride);
-    ints[4] = static_cast<int32_t>(t.attr.format);
-    ints[5] = static_cast<int32_t>(t.attr.layerCount);
-    ints[6] = static_cast<int32_t>(t.attr.usage);
-    ints[7] = static_cast<int32_t>(t.attr.id >> 32);
-    ints[8] = static_cast<int32_t>(t.attr.id & 0xFFFFFFFF);
-    ints[9] = static_cast<int32_t>(t.attr.generationNumber);
-    ints[10] = 0;
-    ints[11] = 0;
-    if (handle) {
-        ints[10] = static_cast<int32_t>(handle->numFds);
-        ints[11] = static_cast<int32_t>(handle->numInts);
-        int* intsStart = handle->data + handle->numFds;
-        std::copy(handle->data, intsStart, fds);
-        std::copy(intsStart, intsStart + handle->numInts, &ints[12]);
-    }
-
-    void const* constBuffer = static_cast<void const*>(ints);
-    size_t size = numInts * sizeof(int32_t);
-    int const* constFds = static_cast<int const*>(fds);
-    status_t status = l->unflatten(constBuffer, size, constFds, numFds);
-
-    delete [] fds;
-    delete [] ints;
-    native_handle_delete(handle);
-    return status == NO_ERROR;
-}
+bool convertTo(GraphicBuffer* l, AnwBuffer const& t);
 
 /**
  * Conversion functions for types outside media
@@ -387,9 +301,7 @@ inline bool convertTo(GraphicBuffer* l, AnwBuffer const& t) {
  * bytes required to store the number of file descriptors contained in the fd
  * part of the flat buffer.
  */
-inline size_t getFenceFlattenedSize(hidl_handle const& /* fence */) {
-    return 4;
-};
+size_t getFenceFlattenedSize(hidl_handle const& fence);
 
 /**
  * \brief Return the number of file descriptors contained in a fence.
@@ -398,9 +310,7 @@ inline size_t getFenceFlattenedSize(hidl_handle const& /* fence */) {
  * \return `0` if \p fence does not contain a valid file descriptor, or `1`
  * otherwise.
  */
-inline size_t getFenceFdCount(hidl_handle const& fence) {
-    return native_handle_read_fd(fence) == -1 ? 0 : 1;
-}
+size_t getFenceFdCount(hidl_handle const& fence);
 
 /**
  * \brief Unflatten `Fence` to `hidl_handle`.
@@ -417,38 +327,8 @@ inline size_t getFenceFdCount(hidl_handle const& fence) {
  * native handle, which needs to be deleted with `native_handle_delete()`
  * afterwards.
  */
-inline status_t unflattenFence(hidl_handle* fence, native_handle_t** nh,
-        void const*& buffer, size_t& size, int const*& fds, size_t& numFds) {
-    if (size < 4) {
-        return NO_MEMORY;
-    }
-
-    uint32_t numFdsInHandle;
-    FlattenableUtils::read(buffer, size, numFdsInHandle);
-
-    if (numFdsInHandle > 1) {
-        return BAD_VALUE;
-    }
-
-    if (numFds < numFdsInHandle) {
-        return NO_MEMORY;
-    }
-
-    if (numFdsInHandle) {
-        *nh = native_handle_create_from_fd(*fds);
-        if (*nh == nullptr) {
-            return NO_MEMORY;
-        }
-        *fence = *nh;
-        ++fds;
-        --numFds;
-    } else {
-        *nh = nullptr;
-        *fence = hidl_handle();
-    }
-
-    return NO_ERROR;
-}
+status_t unflattenFence(hidl_handle* fence, native_handle_t** nh,
+        void const*& buffer, size_t& size, int const*& fds, size_t& numFds);
 
 /**
  * \brief Flatten `hidl_handle` as `Fence`.
@@ -460,24 +340,8 @@ inline status_t unflattenFence(hidl_handle* fence, native_handle_t** nh,
  * \param[in,out] numFds The size of the flat fd buffer.
  * \return `NO_ERROR` on success; other value on failure.
  */
-inline status_t flattenFence(hidl_handle const& fence,
-        void*& buffer, size_t& size, int*& fds, size_t& numFds) {
-    if (size < getFenceFlattenedSize(fence) ||
-            numFds < getFenceFdCount(fence)) {
-        return NO_MEMORY;
-    }
-    // Cast to uint32_t since the size of a size_t can vary between 32- and
-    // 64-bit processes
-    FlattenableUtils::write(buffer, size,
-            static_cast<uint32_t>(getFenceFdCount(fence)));
-    int fd = native_handle_read_fd(fence);
-    if (fd != -1) {
-        *fds = fd;
-        ++fds;
-        --numFds;
-    }
-    return NO_ERROR;
-}
+status_t flattenFence(hidl_handle const& fence,
+        void*& buffer, size_t& size, int*& fds, size_t& numFds);
 
 /**
  * \brief Wrap `Fence` in `hidl_handle`.
@@ -490,40 +354,7 @@ inline status_t flattenFence(hidl_handle const& fence,
  * deleted manually with `native_handle_delete()` afterwards.
  */
 // wrap: Fence -> hidl_handle
-inline bool wrapAs(hidl_handle* t, native_handle_t** nh, Fence const& l) {
-    size_t const baseSize = l.getFlattenedSize();
-    std::unique_ptr<uint8_t[]> baseBuffer(
-            new (std::nothrow) uint8_t[baseSize]);
-    if (!baseBuffer) {
-        return false;
-    }
-
-    size_t const baseNumFds = l.getFdCount();
-    std::unique_ptr<int[]> baseFds(
-            new (std::nothrow) int[baseNumFds]);
-    if (!baseFds) {
-        return false;
-    }
-
-    void* buffer = static_cast<void*>(baseBuffer.get());
-    size_t size = baseSize;
-    int* fds = static_cast<int*>(baseFds.get());
-    size_t numFds = baseNumFds;
-    if (l.flatten(buffer, size, fds, numFds) != NO_ERROR) {
-        return false;
-    }
-
-    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
-    size = baseSize;
-    int const* constFds = static_cast<int const*>(baseFds.get());
-    numFds = baseNumFds;
-    if (unflattenFence(t, nh, constBuffer, size, constFds, numFds)
-            != NO_ERROR) {
-        return false;
-    }
-
-    return true;
-}
+bool wrapAs(hidl_handle* t, native_handle_t** nh, Fence const& l);
 
 /**
  * \brief Convert `hidl_handle` to `Fence`.
@@ -535,58 +366,7 @@ inline bool wrapAs(hidl_handle* t, native_handle_t** nh, Fence const& l) {
  * If \p t contains a valid file descriptor, it will be duplicated.
  */
 // convert: hidl_handle -> Fence
-inline bool convertTo(Fence* l, hidl_handle const& t) {
-    int fd = native_handle_read_fd(t);
-    if (fd != -1) {
-        fd = dup(fd);
-        if (fd == -1) {
-            return false;
-        }
-    }
-    native_handle_t* nh = native_handle_create_from_fd(fd);
-    if (nh == nullptr) {
-        if (fd != -1) {
-            close(fd);
-        }
-        return false;
-    }
-
-    size_t const baseSize = getFenceFlattenedSize(t);
-    std::unique_ptr<uint8_t[]> baseBuffer(
-            new (std::nothrow) uint8_t[baseSize]);
-    if (!baseBuffer) {
-        native_handle_delete(nh);
-        return false;
-    }
-
-    size_t const baseNumFds = getFenceFdCount(t);
-    std::unique_ptr<int[]> baseFds(
-            new (std::nothrow) int[baseNumFds]);
-    if (!baseFds) {
-        native_handle_delete(nh);
-        return false;
-    }
-
-    void* buffer = static_cast<void*>(baseBuffer.get());
-    size_t size = baseSize;
-    int* fds = static_cast<int*>(baseFds.get());
-    size_t numFds = baseNumFds;
-    if (flattenFence(hidl_handle(nh), buffer, size, fds, numFds) != NO_ERROR) {
-        native_handle_delete(nh);
-        return false;
-    }
-    native_handle_delete(nh);
-
-    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
-    size = baseSize;
-    int const* constFds = static_cast<int const*>(baseFds.get());
-    numFds = baseNumFds;
-    if (l->unflatten(constBuffer, size, constFds, numFds) != NO_ERROR) {
-        return false;
-    }
-
-    return true;
-}
+bool convertTo(Fence* l, hidl_handle const& t);
 
 // Ref: frameworks/native/libs/ui/FenceTime.cpp: FenceTime::Snapshot
 
@@ -597,20 +377,7 @@ inline bool convertTo(Fence* l, hidl_handle const& t) {
  * \param[in] t The input `FenceTimeSnapshot`.
  * \return The required size of the flat buffer.
  */
-inline size_t getFlattenedSize(
-        HGraphicBufferProducer::FenceTimeSnapshot const& t) {
-    constexpr size_t min = sizeof(t.state);
-    switch (t.state) {
-        case HGraphicBufferProducer::FenceTimeSnapshot::State::EMPTY:
-            return min;
-        case HGraphicBufferProducer::FenceTimeSnapshot::State::FENCE:
-            return min + getFenceFlattenedSize(t.fence);
-        case HGraphicBufferProducer::FenceTimeSnapshot::State::SIGNAL_TIME:
-            return min + sizeof(
-                    ::android::FenceTime::Snapshot::signalTime);
-    }
-    return 0;
-}
+size_t getFlattenedSize(HGraphicBufferProducer::FenceTimeSnapshot const& t);
 
 /**
  * \brief Return the number of file descriptors contained in
@@ -619,12 +386,7 @@ inline size_t getFlattenedSize(
  * \param[in] t The input `FenceTimeSnapshot`.
  * \return The number of file descriptors contained in \p snapshot.
  */
-inline size_t getFdCount(
-        HGraphicBufferProducer::FenceTimeSnapshot const& t) {
-    return t.state ==
-            HGraphicBufferProducer::FenceTimeSnapshot::State::FENCE ?
-            getFenceFdCount(t.fence) : 0;
-}
+size_t getFdCount(HGraphicBufferProducer::FenceTimeSnapshot const& t);
 
 /**
  * \brief Flatten `FenceTimeSnapshot`.
@@ -639,29 +401,8 @@ inline size_t getFdCount(
  * This function will duplicate the file descriptor in `t.fence` if `t.state ==
  * FENCE`.
  */
-inline status_t flatten(HGraphicBufferProducer::FenceTimeSnapshot const& t,
-        void*& buffer, size_t& size, int*& fds, size_t& numFds) {
-    if (size < getFlattenedSize(t)) {
-        return NO_MEMORY;
-    }
-
-    switch (t.state) {
-        case HGraphicBufferProducer::FenceTimeSnapshot::State::EMPTY:
-            FlattenableUtils::write(buffer, size,
-                    ::android::FenceTime::Snapshot::State::EMPTY);
-            return NO_ERROR;
-        case HGraphicBufferProducer::FenceTimeSnapshot::State::FENCE:
-            FlattenableUtils::write(buffer, size,
-                    ::android::FenceTime::Snapshot::State::FENCE);
-            return flattenFence(t.fence, buffer, size, fds, numFds);
-        case HGraphicBufferProducer::FenceTimeSnapshot::State::SIGNAL_TIME:
-            FlattenableUtils::write(buffer, size,
-                    ::android::FenceTime::Snapshot::State::SIGNAL_TIME);
-            FlattenableUtils::write(buffer, size, t.signalTimeNs);
-            return NO_ERROR;
-    }
-    return NO_ERROR;
-}
+status_t flatten(HGraphicBufferProducer::FenceTimeSnapshot const& t,
+        void*& buffer, size_t& size, int*& fds, size_t& numFds);
 
 /**
  * \brief Unflatten `FenceTimeSnapshot`.
@@ -678,56 +419,11 @@ inline status_t flatten(HGraphicBufferProducer::FenceTimeSnapshot const& t,
  * file descriptor, \p nh will be created to hold that file descriptor. In this
  * case, \p nh needs to be deleted with `native_handle_delete()` afterwards.
  */
-inline status_t unflatten(
+status_t unflatten(
         HGraphicBufferProducer::FenceTimeSnapshot* t, native_handle_t** nh,
-        void const*& buffer, size_t& size, int const*& fds, size_t& numFds) {
-    if (size < sizeof(t->state)) {
-        return NO_MEMORY;
-    }
-
-    *nh = nullptr;
-    ::android::FenceTime::Snapshot::State state;
-    FlattenableUtils::read(buffer, size, state);
-    switch (state) {
-        case ::android::FenceTime::Snapshot::State::EMPTY:
-            t->state = HGraphicBufferProducer::FenceTimeSnapshot::State::EMPTY;
-            return NO_ERROR;
-        case ::android::FenceTime::Snapshot::State::FENCE:
-            t->state = HGraphicBufferProducer::FenceTimeSnapshot::State::FENCE;
-            return unflattenFence(&t->fence, nh, buffer, size, fds, numFds);
-        case ::android::FenceTime::Snapshot::State::SIGNAL_TIME:
-            t->state = HGraphicBufferProducer::FenceTimeSnapshot::State::SIGNAL_TIME;
-            if (size < sizeof(t->signalTimeNs)) {
-                return NO_MEMORY;
-            }
-            FlattenableUtils::read(buffer, size, t->signalTimeNs);
-            return NO_ERROR;
-    }
-    return NO_ERROR;
-}
+        void const*& buffer, size_t& size, int const*& fds, size_t& numFds);
 
 // Ref: frameworks/native/libs/gui/FrameTimestamps.cpp: FrameEventsDelta
-
-/**
- * \brief Return a lower bound on the size of the non-fd buffer required to
- * flatten `FrameEventsDelta`.
- *
- * \param[in] t The input `FrameEventsDelta`.
- * \return A lower bound on the size of the flat buffer.
- */
-constexpr size_t minFlattenedSize(
-        HGraphicBufferProducer::FrameEventsDelta const& /* t */) {
-    return sizeof(uint64_t) + // mFrameNumber
-            sizeof(uint8_t) + // mIndex
-            sizeof(uint8_t) + // mAddPostCompositeCalled
-            sizeof(uint8_t) + // mAddRetireCalled
-            sizeof(uint8_t) + // mAddReleaseCalled
-            sizeof(nsecs_t) + // mPostedTime
-            sizeof(nsecs_t) + // mRequestedPresentTime
-            sizeof(nsecs_t) + // mLatchTime
-            sizeof(nsecs_t) + // mFirstRefreshStartTime
-            sizeof(nsecs_t); // mLastRefreshStartTime
-}
 
 /**
  * \brief Return the size of the non-fd buffer required to flatten
@@ -736,14 +432,7 @@ constexpr size_t minFlattenedSize(
  * \param[in] t The input `FrameEventsDelta`.
  * \return The required size of the flat buffer.
  */
-inline size_t getFlattenedSize(
-        HGraphicBufferProducer::FrameEventsDelta const& t) {
-    return minFlattenedSize(t) +
-            getFlattenedSize(t.gpuCompositionDoneFence) +
-            getFlattenedSize(t.displayPresentFence) +
-            getFlattenedSize(t.displayRetireFence) +
-            getFlattenedSize(t.releaseFence);
-};
+size_t getFlattenedSize(HGraphicBufferProducer::FrameEventsDelta const& t);
 
 /**
  * \brief Return the number of file descriptors contained in
@@ -752,13 +441,7 @@ inline size_t getFlattenedSize(
  * \param[in] t The input `FrameEventsDelta`.
  * \return The number of file descriptors contained in \p t.
  */
-inline size_t getFdCount(
-        HGraphicBufferProducer::FrameEventsDelta const& t) {
-    return getFdCount(t.gpuCompositionDoneFence) +
-            getFdCount(t.displayPresentFence) +
-            getFdCount(t.displayRetireFence) +
-            getFdCount(t.releaseFence);
-};
+size_t getFdCount(HGraphicBufferProducer::FrameEventsDelta const& t);
 
 /**
  * \brief Unflatten `FrameEventsDelta`.
@@ -775,60 +458,9 @@ inline size_t getFdCount(
  * populated with `nullptr` or newly created handles. Each non-null slot in \p
  * nh will need to be deleted manually with `native_handle_delete()`.
  */
-inline status_t unflatten(HGraphicBufferProducer::FrameEventsDelta* t,
+status_t unflatten(HGraphicBufferProducer::FrameEventsDelta* t,
         std::vector<native_handle_t*>* nh,
-        void const*& buffer, size_t& size, int const*& fds, size_t& numFds) {
-    if (size < minFlattenedSize(*t)) {
-        return NO_MEMORY;
-    }
-    FlattenableUtils::read(buffer, size, t->frameNumber);
-
-    // These were written as uint8_t for alignment.
-    uint8_t temp = 0;
-    FlattenableUtils::read(buffer, size, temp);
-    size_t index = static_cast<size_t>(temp);
-    if (index >= ::android::FrameEventHistory::MAX_FRAME_HISTORY) {
-        return BAD_VALUE;
-    }
-    t->index = static_cast<uint32_t>(index);
-
-    FlattenableUtils::read(buffer, size, temp);
-    t->addPostCompositeCalled = static_cast<bool>(temp);
-    FlattenableUtils::read(buffer, size, temp);
-    t->addRetireCalled = static_cast<bool>(temp);
-    FlattenableUtils::read(buffer, size, temp);
-    t->addReleaseCalled = static_cast<bool>(temp);
-
-    FlattenableUtils::read(buffer, size, t->postedTimeNs);
-    FlattenableUtils::read(buffer, size, t->requestedPresentTimeNs);
-    FlattenableUtils::read(buffer, size, t->latchTimeNs);
-    FlattenableUtils::read(buffer, size, t->firstRefreshStartTimeNs);
-    FlattenableUtils::read(buffer, size, t->lastRefreshStartTimeNs);
-    FlattenableUtils::read(buffer, size, t->dequeueReadyTime);
-
-    // Fences
-    HGraphicBufferProducer::FenceTimeSnapshot* tSnapshot[4];
-    tSnapshot[0] = &t->gpuCompositionDoneFence;
-    tSnapshot[1] = &t->displayPresentFence;
-    tSnapshot[2] = &t->displayRetireFence;
-    tSnapshot[3] = &t->releaseFence;
-    nh->resize(4);
-    for (size_t snapshotIndex = 0; snapshotIndex < 4; ++snapshotIndex) {
-        status_t status = unflatten(
-                tSnapshot[snapshotIndex], &((*nh)[snapshotIndex]),
-                buffer, size, fds, numFds);
-        if (status != NO_ERROR) {
-            while (snapshotIndex > 0) {
-                --snapshotIndex;
-                if ((*nh)[snapshotIndex] != nullptr) {
-                    native_handle_delete((*nh)[snapshotIndex]);
-                }
-            }
-            return status;
-        }
-    }
-    return NO_ERROR;
-}
+        void const*& buffer, size_t& size, int const*& fds, size_t& numFds);
 
 /**
  * \brief Flatten `FrameEventsDelta`.
@@ -844,47 +476,8 @@ inline status_t unflatten(HGraphicBufferProducer::FrameEventsDelta* t,
  */
 // Ref: frameworks/native/libs/gui/FrameTimestamp.cpp:
 //      FrameEventsDelta::flatten
-inline status_t flatten(HGraphicBufferProducer::FrameEventsDelta const& t,
-        void*& buffer, size_t& size, int*& fds, size_t numFds) {
-    // Check that t.index is within a valid range.
-    if (t.index >= static_cast<uint32_t>(FrameEventHistory::MAX_FRAME_HISTORY)
-            || t.index > std::numeric_limits<uint8_t>::max()) {
-        return BAD_VALUE;
-    }
-
-    FlattenableUtils::write(buffer, size, t.frameNumber);
-
-    // These are static_cast to uint8_t for alignment.
-    FlattenableUtils::write(buffer, size, static_cast<uint8_t>(t.index));
-    FlattenableUtils::write(
-            buffer, size, static_cast<uint8_t>(t.addPostCompositeCalled));
-    FlattenableUtils::write(
-            buffer, size, static_cast<uint8_t>(t.addRetireCalled));
-    FlattenableUtils::write(
-            buffer, size, static_cast<uint8_t>(t.addReleaseCalled));
-
-    FlattenableUtils::write(buffer, size, t.postedTimeNs);
-    FlattenableUtils::write(buffer, size, t.requestedPresentTimeNs);
-    FlattenableUtils::write(buffer, size, t.latchTimeNs);
-    FlattenableUtils::write(buffer, size, t.firstRefreshStartTimeNs);
-    FlattenableUtils::write(buffer, size, t.lastRefreshStartTimeNs);
-    FlattenableUtils::write(buffer, size, t.dequeueReadyTime);
-
-    // Fences
-    HGraphicBufferProducer::FenceTimeSnapshot const* tSnapshot[4];
-    tSnapshot[0] = &t.gpuCompositionDoneFence;
-    tSnapshot[1] = &t.displayPresentFence;
-    tSnapshot[2] = &t.displayRetireFence;
-    tSnapshot[3] = &t.releaseFence;
-    for (size_t snapshotIndex = 0; snapshotIndex < 4; ++snapshotIndex) {
-        status_t status = flatten(
-                *(tSnapshot[snapshotIndex]), buffer, size, fds, numFds);
-        if (status != NO_ERROR) {
-            return status;
-        }
-    }
-    return NO_ERROR;
-}
+status_t flatten(HGraphicBufferProducer::FrameEventsDelta const& t,
+        void*& buffer, size_t& size, int*& fds, size_t numFds);
 
 // Ref: frameworks/native/libs/gui/FrameTimestamps.cpp: FrameEventHistoryDelta
 
@@ -895,15 +488,8 @@ inline status_t flatten(HGraphicBufferProducer::FrameEventsDelta const& t,
  * \param[in] t The input `HGraphicBufferProducer::FrameEventHistoryDelta`.
  * \return The required size of the flat buffer.
  */
-inline size_t getFlattenedSize(
-        HGraphicBufferProducer::FrameEventHistoryDelta const& t) {
-    size_t size = 4 + // mDeltas.size()
-            sizeof(t.compositorTiming);
-    for (size_t i = 0; i < t.deltas.size(); ++i) {
-        size += getFlattenedSize(t.deltas[i]);
-    }
-    return size;
-}
+size_t getFlattenedSize(
+        HGraphicBufferProducer::FrameEventHistoryDelta const& t);
 
 /**
  * \brief Return the number of file descriptors contained in
@@ -912,14 +498,8 @@ inline size_t getFlattenedSize(
  * \param[in] t The input `HGraphicBufferProducer::FrameEventHistoryDelta`.
  * \return The number of file descriptors contained in \p t.
  */
-inline size_t getFdCount(
-        HGraphicBufferProducer::FrameEventHistoryDelta const& t) {
-    size_t numFds = 0;
-    for (size_t i = 0; i < t.deltas.size(); ++i) {
-        numFds += getFdCount(t.deltas[i]);
-    }
-    return numFds;
-}
+size_t getFdCount(
+        HGraphicBufferProducer::FrameEventHistoryDelta const& t);
 
 /**
  * \brief Unflatten `FrameEventHistoryDelta`.
@@ -936,34 +516,10 @@ inline size_t getFdCount(
  * newly created handles. The second dimension of \p nh will be 4. Each non-null
  * slot in \p nh will need to be deleted manually with `native_handle_delete()`.
  */
-inline status_t unflatten(
+status_t unflatten(
         HGraphicBufferProducer::FrameEventHistoryDelta* t,
         std::vector<std::vector<native_handle_t*> >* nh,
-        void const*& buffer, size_t& size, int const*& fds, size_t& numFds) {
-    if (size < 4) {
-        return NO_MEMORY;
-    }
-
-    FlattenableUtils::read(buffer, size, t->compositorTiming);
-
-    uint32_t deltaCount = 0;
-    FlattenableUtils::read(buffer, size, deltaCount);
-    if (static_cast<size_t>(deltaCount) >
-            ::android::FrameEventHistory::MAX_FRAME_HISTORY) {
-        return BAD_VALUE;
-    }
-    t->deltas.resize(deltaCount);
-    nh->resize(deltaCount);
-    for (size_t deltaIndex = 0; deltaIndex < deltaCount; ++deltaIndex) {
-        status_t status = unflatten(
-                &(t->deltas[deltaIndex]), &((*nh)[deltaIndex]),
-                buffer, size, fds, numFds);
-        if (status != NO_ERROR) {
-            return status;
-        }
-    }
-    return NO_ERROR;
-}
+        void const*& buffer, size_t& size, int const*& fds, size_t& numFds);
 
 /**
  * \brief Flatten `FrameEventHistoryDelta`.
@@ -977,27 +533,9 @@ inline status_t unflatten(
  *
  * This function will duplicate file descriptors contained in \p t.
  */
-inline status_t flatten(
+status_t flatten(
         HGraphicBufferProducer::FrameEventHistoryDelta const& t,
-        void*& buffer, size_t& size, int*& fds, size_t& numFds) {
-    if (t.deltas.size() > ::android::FrameEventHistory::MAX_FRAME_HISTORY) {
-        return BAD_VALUE;
-    }
-    if (size < getFlattenedSize(t)) {
-        return NO_MEMORY;
-    }
-
-    FlattenableUtils::write(buffer, size, t.compositorTiming);
-
-    FlattenableUtils::write(buffer, size, static_cast<uint32_t>(t.deltas.size()));
-    for (size_t deltaIndex = 0; deltaIndex < t.deltas.size(); ++deltaIndex) {
-        status_t status = flatten(t.deltas[deltaIndex], buffer, size, fds, numFds);
-        if (status != NO_ERROR) {
-            return status;
-        }
-    }
-    return NO_ERROR;
-}
+        void*& buffer, size_t& size, int*& fds, size_t& numFds);
 
 /**
  * \brief Wrap `::android::FrameEventHistoryData` in
@@ -1013,42 +551,9 @@ inline status_t flatten(
  * native handle. All the non-`nullptr` elements must be deleted individually
  * with `native_handle_delete()`.
  */
-inline bool wrapAs(HGraphicBufferProducer::FrameEventHistoryDelta* t,
+bool wrapAs(HGraphicBufferProducer::FrameEventHistoryDelta* t,
         std::vector<std::vector<native_handle_t*> >* nh,
-        ::android::FrameEventHistoryDelta const& l) {
-
-    size_t const baseSize = l.getFlattenedSize();
-    std::unique_ptr<uint8_t[]> baseBuffer(
-            new (std::nothrow) uint8_t[baseSize]);
-    if (!baseBuffer) {
-        return false;
-    }
-
-    size_t const baseNumFds = l.getFdCount();
-    std::unique_ptr<int[]> baseFds(
-            new (std::nothrow) int[baseNumFds]);
-    if (!baseFds) {
-        return false;
-    }
-
-    void* buffer = static_cast<void*>(baseBuffer.get());
-    size_t size = baseSize;
-    int* fds = baseFds.get();
-    size_t numFds = baseNumFds;
-    if (l.flatten(buffer, size, fds, numFds) != NO_ERROR) {
-        return false;
-    }
-
-    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
-    size = baseSize;
-    int const* constFds = static_cast<int const*>(baseFds.get());
-    numFds = baseNumFds;
-    if (unflatten(t, nh, constBuffer, size, constFds, numFds) != NO_ERROR) {
-        return false;
-    }
-
-    return true;
-}
+        ::android::FrameEventHistoryDelta const& l);
 
 /**
  * \brief Convert `HGraphicBufferProducer::FrameEventHistoryDelta` to
@@ -1059,42 +564,9 @@ inline bool wrapAs(HGraphicBufferProducer::FrameEventHistoryDelta* t,
  *
  * This function will duplicate all file descriptors contained in \p t.
  */
-inline bool convertTo(
+bool convertTo(
         ::android::FrameEventHistoryDelta* l,
-        HGraphicBufferProducer::FrameEventHistoryDelta const& t) {
-
-    size_t const baseSize = getFlattenedSize(t);
-    std::unique_ptr<uint8_t[]> baseBuffer(
-            new (std::nothrow) uint8_t[baseSize]);
-    if (!baseBuffer) {
-        return false;
-    }
-
-    size_t const baseNumFds = getFdCount(t);
-    std::unique_ptr<int[]> baseFds(
-            new (std::nothrow) int[baseNumFds]);
-    if (!baseFds) {
-        return false;
-    }
-
-    void* buffer = static_cast<void*>(baseBuffer.get());
-    size_t size = baseSize;
-    int* fds = static_cast<int*>(baseFds.get());
-    size_t numFds = baseNumFds;
-    if (flatten(t, buffer, size, fds, numFds) != NO_ERROR) {
-        return false;
-    }
-
-    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
-    size = baseSize;
-    int const* constFds = static_cast<int const*>(baseFds.get());
-    numFds = baseNumFds;
-    if (l->unflatten(constBuffer, size, constFds, numFds) != NO_ERROR) {
-        return false;
-    }
-
-    return true;
-}
+        HGraphicBufferProducer::FrameEventHistoryDelta const& t);
 
 // Ref: frameworks/native/libs/ui/Region.cpp
 
@@ -1104,9 +576,7 @@ inline bool convertTo(
  * \param[in] t The input `Region`.
  * \return The required size of the flat buffer.
  */
-inline size_t getFlattenedSize(Region const& t) {
-    return sizeof(uint32_t) + t.size() * sizeof(::android::Rect);
-}
+size_t getFlattenedSize(Region const& t);
 
 /**
  * \brief Unflatten `Region`.
@@ -1116,36 +586,7 @@ inline size_t getFlattenedSize(Region const& t) {
  * \param[in,out] size The size of the flat buffer.
  * \return `NO_ERROR` on success; other value on failure.
  */
-inline status_t unflatten(Region* t, void const*& buffer, size_t& size) {
-    if (size < sizeof(uint32_t)) {
-        return NO_MEMORY;
-    }
-
-    uint32_t numRects = 0;
-    FlattenableUtils::read(buffer, size, numRects);
-    if (size < numRects * sizeof(Rect)) {
-        return NO_MEMORY;
-    }
-    if (numRects > (UINT32_MAX / sizeof(Rect))) {
-        return NO_MEMORY;
-    }
-
-    t->resize(numRects);
-    for (size_t r = 0; r < numRects; ++r) {
-        ::android::Rect rect(::android::Rect::EMPTY_RECT);
-        status_t status = rect.unflatten(buffer, size);
-        if (status != NO_ERROR) {
-            return status;
-        }
-        FlattenableUtils::advance(buffer, size, sizeof(rect));
-        (*t)[r] = Rect{
-                static_cast<int32_t>(rect.left),
-                static_cast<int32_t>(rect.top),
-                static_cast<int32_t>(rect.right),
-                static_cast<int32_t>(rect.bottom)};
-    }
-    return NO_ERROR;
-}
+status_t unflatten(Region* t, void const*& buffer, size_t& size);
 
 /**
  * \brief Flatten `Region`.
@@ -1155,26 +596,7 @@ inline status_t unflatten(Region* t, void const*& buffer, size_t& size) {
  * \param[in,out] size The size of the flat buffer.
  * \return `NO_ERROR` on success; other value on failure.
  */
-inline status_t flatten(Region const& t, void*& buffer, size_t& size) {
-    if (size < getFlattenedSize(t)) {
-        return NO_MEMORY;
-    }
-
-    FlattenableUtils::write(buffer, size, static_cast<uint32_t>(t.size()));
-    for (size_t r = 0; r < t.size(); ++r) {
-        ::android::Rect rect(
-                static_cast<int32_t>(t[r].left),
-                static_cast<int32_t>(t[r].top),
-                static_cast<int32_t>(t[r].right),
-                static_cast<int32_t>(t[r].bottom));
-        status_t status = rect.flatten(buffer, size);
-        if (status != NO_ERROR) {
-            return status;
-        }
-        FlattenableUtils::advance(buffer, size, sizeof(rect));
-    }
-    return NO_ERROR;
-}
+status_t flatten(Region const& t, void*& buffer, size_t& size);
 
 /**
  * \brief Convert `::android::Region` to `Region`.
@@ -1183,28 +605,7 @@ inline status_t flatten(Region const& t, void*& buffer, size_t& size) {
  * \param[in] l The source `::android::Region`.
  */
 // convert: ::android::Region -> Region
-inline bool convertTo(Region* t, ::android::Region const& l) {
-    size_t const baseSize = l.getFlattenedSize();
-    std::unique_ptr<uint8_t[]> baseBuffer(
-            new (std::nothrow) uint8_t[baseSize]);
-    if (!baseBuffer) {
-        return false;
-    }
-
-    void* buffer = static_cast<void*>(baseBuffer.get());
-    size_t size = baseSize;
-    if (l.flatten(buffer, size) != NO_ERROR) {
-        return false;
-    }
-
-    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
-    size = baseSize;
-    if (unflatten(t, constBuffer, size) != NO_ERROR) {
-        return false;
-    }
-
-    return true;
-}
+bool convertTo(Region* t, ::android::Region const& l);
 
 /**
  * \brief Convert `Region` to `::android::Region`.
@@ -1213,50 +614,10 @@ inline bool convertTo(Region* t, ::android::Region const& l) {
  * \param[in] t The source `Region`.
  */
 // convert: Region -> ::android::Region
-inline bool convertTo(::android::Region* l, Region const& t) {
-    size_t const baseSize = getFlattenedSize(t);
-    std::unique_ptr<uint8_t[]> baseBuffer(
-            new (std::nothrow) uint8_t[baseSize]);
-    if (!baseBuffer) {
-        return false;
-    }
-
-    void* buffer = static_cast<void*>(baseBuffer.get());
-    size_t size = baseSize;
-    if (flatten(t, buffer, size) != NO_ERROR) {
-        return false;
-    }
-
-    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
-    size = baseSize;
-    if (l->unflatten(constBuffer, size) != NO_ERROR) {
-        return false;
-    }
-
-    return true;
-}
+bool convertTo(::android::Region* l, Region const& t);
 
 // Ref: frameworks/native/libs/gui/BGraphicBufferProducer.cpp:
 //      BGraphicBufferProducer::QueueBufferInput
-
-/**
- * \brief Return a lower bound on the size of the buffer required to flatten
- * `HGraphicBufferProducer::QueueBufferInput`.
- *
- * \param[in] t The input `HGraphicBufferProducer::QueueBufferInput`.
- * \return A lower bound on the size of the flat buffer.
- */
-constexpr size_t minFlattenedSize(
-        HGraphicBufferProducer::QueueBufferInput const& /* t */) {
-    return sizeof(int64_t) + // timestamp
-            sizeof(int) + // isAutoTimestamp
-            sizeof(android_dataspace) + // dataSpace
-            sizeof(::android::Rect) + // crop
-            sizeof(int) + // scalingMode
-            sizeof(uint32_t) + // transform
-            sizeof(uint32_t) + // stickyTransform
-            sizeof(bool); // getFrameTimestamps
-}
 
 /**
  * \brief Return the size of the buffer required to flatten
@@ -1265,12 +626,7 @@ constexpr size_t minFlattenedSize(
  * \param[in] t The input `HGraphicBufferProducer::QueueBufferInput`.
  * \return The required size of the flat buffer.
  */
-inline size_t getFlattenedSize(HGraphicBufferProducer::QueueBufferInput const& t) {
-    return minFlattenedSize(t) +
-            getFenceFlattenedSize(t.fence) +
-            getFlattenedSize(t.surfaceDamage) +
-            sizeof(HdrMetadata::validTypes);
-}
+size_t getFlattenedSize(HGraphicBufferProducer::QueueBufferInput const& t);
 
 /**
  * \brief Return the number of file descriptors contained in
@@ -1279,11 +635,8 @@ inline size_t getFlattenedSize(HGraphicBufferProducer::QueueBufferInput const& t
  * \param[in] t The input `HGraphicBufferProducer::QueueBufferInput`.
  * \return The number of file descriptors contained in \p t.
  */
-inline size_t getFdCount(
-        HGraphicBufferProducer::QueueBufferInput const& t) {
-    return getFenceFdCount(t.fence);
-}
-
+size_t getFdCount(
+        HGraphicBufferProducer::QueueBufferInput const& t);
 /**
  * \brief Flatten `HGraphicBufferProducer::QueueBufferInput`.
  *
@@ -1296,40 +649,9 @@ inline size_t getFdCount(
  * \return `NO_ERROR` on success; other value on failure.
  *
  * This function will duplicate the file descriptor in `t.fence`. */
-inline status_t flatten(HGraphicBufferProducer::QueueBufferInput const& t,
+status_t flatten(HGraphicBufferProducer::QueueBufferInput const& t,
         native_handle_t** nh,
-        void*& buffer, size_t& size, int*& fds, size_t& numFds) {
-    if (size < getFlattenedSize(t)) {
-        return NO_MEMORY;
-    }
-
-    FlattenableUtils::write(buffer, size, t.timestamp);
-    FlattenableUtils::write(buffer, size, static_cast<int>(t.isAutoTimestamp));
-    FlattenableUtils::write(buffer, size,
-            static_cast<android_dataspace_t>(t.dataSpace));
-    FlattenableUtils::write(buffer, size, ::android::Rect(
-            static_cast<int32_t>(t.crop.left),
-            static_cast<int32_t>(t.crop.top),
-            static_cast<int32_t>(t.crop.right),
-            static_cast<int32_t>(t.crop.bottom)));
-    FlattenableUtils::write(buffer, size, static_cast<int>(t.scalingMode));
-    FlattenableUtils::write(buffer, size, t.transform);
-    FlattenableUtils::write(buffer, size, t.stickyTransform);
-    FlattenableUtils::write(buffer, size, t.getFrameTimestamps);
-
-    *nh = t.fence.getNativeHandle() == nullptr ?
-            nullptr : native_handle_clone(t.fence);
-    status_t status = flattenFence(hidl_handle(*nh), buffer, size, fds, numFds);
-    if (status != NO_ERROR) {
-        return status;
-    }
-    status = flatten(t.surfaceDamage, buffer, size);
-    if (status != NO_ERROR) {
-        return status;
-    }
-    FlattenableUtils::write(buffer, size, decltype(HdrMetadata::validTypes)(0));
-    return NO_ERROR;
-}
+        void*& buffer, size_t& size, int*& fds, size_t& numFds);
 
 /**
  * \brief Unflatten `HGraphicBufferProducer::QueueBufferInput`.
@@ -1347,42 +669,9 @@ inline status_t flatten(HGraphicBufferProducer::QueueBufferInput const& t,
  * descriptor. \p nh needs to be deleted with `native_handle_delete()`
  * afterwards.
  */
-inline status_t unflatten(
+status_t unflatten(
         HGraphicBufferProducer::QueueBufferInput* t, native_handle_t** nh,
-        void const*& buffer, size_t& size, int const*& fds, size_t& numFds) {
-    if (size < minFlattenedSize(*t)) {
-        return NO_MEMORY;
-    }
-
-    FlattenableUtils::read(buffer, size, t->timestamp);
-    int lIsAutoTimestamp;
-    FlattenableUtils::read(buffer, size, lIsAutoTimestamp);
-    t->isAutoTimestamp = static_cast<int32_t>(lIsAutoTimestamp);
-    android_dataspace_t lDataSpace;
-    FlattenableUtils::read(buffer, size, lDataSpace);
-    t->dataSpace = static_cast<Dataspace>(lDataSpace);
-    Rect lCrop;
-    FlattenableUtils::read(buffer, size, lCrop);
-    t->crop = Rect{
-            static_cast<int32_t>(lCrop.left),
-            static_cast<int32_t>(lCrop.top),
-            static_cast<int32_t>(lCrop.right),
-            static_cast<int32_t>(lCrop.bottom)};
-    int lScalingMode;
-    FlattenableUtils::read(buffer, size, lScalingMode);
-    t->scalingMode = static_cast<int32_t>(lScalingMode);
-    FlattenableUtils::read(buffer, size, t->transform);
-    FlattenableUtils::read(buffer, size, t->stickyTransform);
-    FlattenableUtils::read(buffer, size, t->getFrameTimestamps);
-
-    status_t status = unflattenFence(&(t->fence), nh,
-            buffer, size, fds, numFds);
-    if (status != NO_ERROR) {
-        return status;
-    }
-    // HdrMetadata ignored
-    return unflatten(&(t->surfaceDamage), buffer, size);
-}
+        void const*& buffer, size_t& size, int const*& fds, size_t& numFds);
 
 /**
  * \brief Wrap `BGraphicBufferProducer::QueueBufferInput` in
@@ -1398,43 +687,10 @@ inline status_t unflatten(
  * descriptor. \p nh needs to be deleted with `native_handle_delete()`
  * afterwards.
  */
-inline bool wrapAs(
+bool wrapAs(
         HGraphicBufferProducer::QueueBufferInput* t,
         native_handle_t** nh,
-        BGraphicBufferProducer::QueueBufferInput const& l) {
-
-    size_t const baseSize = l.getFlattenedSize();
-    std::unique_ptr<uint8_t[]> baseBuffer(
-            new (std::nothrow) uint8_t[baseSize]);
-    if (!baseBuffer) {
-        return false;
-    }
-
-    size_t const baseNumFds = l.getFdCount();
-    std::unique_ptr<int[]> baseFds(
-            new (std::nothrow) int[baseNumFds]);
-    if (!baseFds) {
-        return false;
-    }
-
-    void* buffer = static_cast<void*>(baseBuffer.get());
-    size_t size = baseSize;
-    int* fds = baseFds.get();
-    size_t numFds = baseNumFds;
-    if (l.flatten(buffer, size, fds, numFds) != NO_ERROR) {
-        return false;
-    }
-
-    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
-    size = baseSize;
-    int const* constFds = static_cast<int const*>(baseFds.get());
-    numFds = baseNumFds;
-    if (unflatten(t, nh, constBuffer, size, constFds, numFds) != NO_ERROR) {
-        return false;
-    }
-
-    return true;
-}
+        BGraphicBufferProducer::QueueBufferInput const& l);
 
 /**
  * \brief Convert `HGraphicBufferProducer::QueueBufferInput` to
@@ -1445,48 +701,9 @@ inline bool wrapAs(
  *
  * If `t.fence` has a valid file descriptor, it will be duplicated.
  */
-inline bool convertTo(
+bool convertTo(
         BGraphicBufferProducer::QueueBufferInput* l,
-        HGraphicBufferProducer::QueueBufferInput const& t) {
-
-    size_t const baseSize = getFlattenedSize(t);
-    std::unique_ptr<uint8_t[]> baseBuffer(
-            new (std::nothrow) uint8_t[baseSize]);
-    if (!baseBuffer) {
-        return false;
-    }
-
-    size_t const baseNumFds = getFdCount(t);
-    std::unique_ptr<int[]> baseFds(
-            new (std::nothrow) int[baseNumFds]);
-    if (!baseFds) {
-        return false;
-    }
-
-    void* buffer = static_cast<void*>(baseBuffer.get());
-    size_t size = baseSize;
-    int* fds = baseFds.get();
-    size_t numFds = baseNumFds;
-    native_handle_t* nh;
-    if (flatten(t, &nh, buffer, size, fds, numFds) != NO_ERROR) {
-        return false;
-    }
-
-    void const* constBuffer = static_cast<void const*>(baseBuffer.get());
-    size = baseSize;
-    int const* constFds = static_cast<int const*>(baseFds.get());
-    numFds = baseNumFds;
-    if (l->unflatten(constBuffer, size, constFds, numFds) != NO_ERROR) {
-        if (nh != nullptr) {
-            native_handle_close(nh);
-            native_handle_delete(nh);
-        }
-        return false;
-    }
-
-    native_handle_delete(nh);
-    return true;
-}
+        HGraphicBufferProducer::QueueBufferInput const& t);
 
 // Ref: frameworks/native/libs/gui/BGraphicBufferProducer.cpp:
 //      BGraphicBufferProducer::QueueBufferOutput
@@ -1507,20 +724,9 @@ inline bool convertTo(
  */
 // wrap: BGraphicBufferProducer::QueueBufferOutput ->
 // HGraphicBufferProducer::QueueBufferOutput
-inline bool wrapAs(HGraphicBufferProducer::QueueBufferOutput* t,
+bool wrapAs(HGraphicBufferProducer::QueueBufferOutput* t,
         std::vector<std::vector<native_handle_t*> >* nh,
-        BGraphicBufferProducer::QueueBufferOutput const& l) {
-    if (!wrapAs(&(t->frameTimestamps), nh, l.frameTimestamps)) {
-        return false;
-    }
-    t->width = l.width;
-    t->height = l.height;
-    t->transformHint = l.transformHint;
-    t->numPendingBuffers = l.numPendingBuffers;
-    t->nextFrameNumber = l.nextFrameNumber;
-    t->bufferReplaced = l.bufferReplaced;
-    return true;
-}
+        BGraphicBufferProducer::QueueBufferOutput const& l);
 
 /**
  * \brief Convert `HGraphicBufferProducer::QueueBufferOutput` to
@@ -1533,20 +739,9 @@ inline bool wrapAs(HGraphicBufferProducer::QueueBufferOutput* t,
  */
 // convert: HGraphicBufferProducer::QueueBufferOutput ->
 // BGraphicBufferProducer::QueueBufferOutput
-inline bool convertTo(
+bool convertTo(
         BGraphicBufferProducer::QueueBufferOutput* l,
-        HGraphicBufferProducer::QueueBufferOutput const& t) {
-    if (!convertTo(&(l->frameTimestamps), t.frameTimestamps)) {
-        return false;
-    }
-    l->width = t.width;
-    l->height = t.height;
-    l->transformHint = t.transformHint;
-    l->numPendingBuffers = t.numPendingBuffers;
-    l->nextFrameNumber = t.nextFrameNumber;
-    l->bufferReplaced = t.bufferReplaced;
-    return true;
-}
+        HGraphicBufferProducer::QueueBufferOutput const& t);
 
 /**
  * \brief Convert `BGraphicBufferProducer::DisconnectMode` to
@@ -1555,16 +750,8 @@ inline bool convertTo(
  * \param[in] l The source `BGraphicBufferProducer::DisconnectMode`.
  * \return The corresponding `HGraphicBufferProducer::DisconnectMode`.
  */
-inline HGraphicBufferProducer::DisconnectMode toHidlDisconnectMode(
-        BGraphicBufferProducer::DisconnectMode l) {
-    switch (l) {
-        case BGraphicBufferProducer::DisconnectMode::Api:
-            return HGraphicBufferProducer::DisconnectMode::API;
-        case BGraphicBufferProducer::DisconnectMode::AllLocal:
-            return HGraphicBufferProducer::DisconnectMode::ALL_LOCAL;
-    }
-    return HGraphicBufferProducer::DisconnectMode::API;
-}
+HGraphicBufferProducer::DisconnectMode toHidlDisconnectMode(
+        BGraphicBufferProducer::DisconnectMode l);
 
 /**
  * \brief Convert `HGraphicBufferProducer::DisconnectMode` to
@@ -1573,18 +760,10 @@ inline HGraphicBufferProducer::DisconnectMode toHidlDisconnectMode(
  * \param[in] l The source `HGraphicBufferProducer::DisconnectMode`.
  * \return The corresponding `BGraphicBufferProducer::DisconnectMode`.
  */
-inline BGraphicBufferProducer::DisconnectMode toGuiDisconnectMode(
-        HGraphicBufferProducer::DisconnectMode t) {
-    switch (t) {
-        case HGraphicBufferProducer::DisconnectMode::API:
-            return BGraphicBufferProducer::DisconnectMode::Api;
-        case HGraphicBufferProducer::DisconnectMode::ALL_LOCAL:
-            return BGraphicBufferProducer::DisconnectMode::AllLocal;
-    }
-    return BGraphicBufferProducer::DisconnectMode::Api;
-}
+BGraphicBufferProducer::DisconnectMode toGuiDisconnectMode(
+        HGraphicBufferProducer::DisconnectMode t);
 
 }  // namespace conversion
 }  // namespace android
 
-#endif  // MEDIA_STAGEFRIGHT_CONVERSION_H_
+#endif  // MEDIA_STAGEFRIGHT_BQHELPER_CONVERSION_H_
