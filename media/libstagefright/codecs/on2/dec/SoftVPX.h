@@ -44,7 +44,7 @@ protected:
 
 private:
     enum {
-        kNumBuffers = 16
+        kNumBuffers = 10
     };
 
     enum {
