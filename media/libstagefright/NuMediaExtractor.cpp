@@ -307,6 +307,26 @@ status_t NuMediaExtractor::getFileFormat(sp<AMessage> *format) const {
     return OK;
 }
 
+status_t NuMediaExtractor::getExifOffsetSize(off64_t *offset, size_t *size) const {
+    Mutex::Autolock autoLock(mLock);
+
+    if (mImpl == NULL) {
+        return -EINVAL;
+    }
+
+    sp<MetaData> meta = mImpl->getMetaData();
+
+    int64_t exifOffset, exifSize;
+    if (meta->findInt64(kKeyExifOffset, &exifOffset)
+     && meta->findInt64(kKeyExifSize, &exifSize)) {
+        *offset = (off64_t) exifOffset;
+        *size = (size_t) exifSize;
+
+        return OK;
+    }
+    return ERROR_UNSUPPORTED;
+}
+
 status_t NuMediaExtractor::selectTrack(size_t index,
         int64_t startTimeUs, MediaSource::ReadOptions::SeekMode mode) {
     Mutex::Autolock autoLock(mLock);

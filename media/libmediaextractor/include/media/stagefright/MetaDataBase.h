@@ -211,13 +211,15 @@ enum {
     kKeyTemporalLayerId  = 'iLyr', // int32_t, temporal layer-id. 0-based (0 => base layer)
     kKeyTemporalLayerCount = 'cLyr', // int32_t, number of temporal layers encoded
 
-    kKeyGridWidth        = 'grdW', // int32_t, HEIF grid width
-    kKeyGridHeight       = 'grdH', // int32_t, HEIF grid height
+    kKeyTileWidth        = 'tilW', // int32_t, HEIF tile width
+    kKeyTileHeight       = 'tilH', // int32_t, HEIF tile height
     kKeyGridRows         = 'grdR', // int32_t, HEIF grid rows
     kKeyGridCols         = 'grdC', // int32_t, HEIF grid columns
-    kKeyIccProfile       = 'prof', // raw data, ICC prifile data
+    kKeyIccProfile       = 'prof', // raw data, ICC profile data
     kKeyIsPrimaryImage   = 'prim', // bool (int32_t), image track is the primary image
     kKeyFrameCount       = 'nfrm', // int32_t, total number of frame in video track
+    kKeyExifOffset       = 'exof', // int64_t, Exif data offset
+    kKeyExifSize         = 'exsz', // int64_t, Exif data size
 };
 
 enum {

@@ -518,10 +518,10 @@ private:
 
     // Observer for UID lifecycle enforcing that UIDs in idle
     // state cannot use the camera to protect user privacy.
-    class UidPolicy : public BnUidObserver {
+    class UidPolicy : public BnUidObserver, public virtual IBinder::DeathRecipient {
     public:
         explicit UidPolicy(sp<CameraService> service)
-                : mService(service) {}
+                : mRegistered(false), mService(service) {}
 
         void registerSelf();
         void unregisterSelf();
@@ -535,11 +535,14 @@ private:
         void addOverrideUid(uid_t uid, bool active);
         void removeOverrideUid(uid_t uid);
 
+        // IBinder::DeathRecipient implementation
+        virtual void binderDied(const wp<IBinder> &who);
     private:
         bool isUidActiveLocked(uid_t uid);
         void updateOverrideUid(uid_t uid, bool active, bool insert);
 
         Mutex mUidLock;
+        bool mRegistered;
         wp<CameraService> mService;
         std::unordered_set<uid_t> mActiveUids;
         std::unordered_map<uid_t, bool> mOverrideUids;

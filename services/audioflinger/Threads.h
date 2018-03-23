@@ -1666,6 +1666,8 @@ protected:
                 bool                        mMasterMute;
                 bool                        mStreamMute;
                 float                       mHalVolFloat;
+                int32_t                     mNoCallbackWarningCount;
+     static     constexpr int32_t           kMaxNoCallbackWarnings = 5;
                 AudioStreamOut*             mOutput;
 };
 

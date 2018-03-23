@@ -665,13 +665,13 @@ status_t convertMetaDataToMessage(
         }
 
         if (!strncasecmp("image/", mime, 6)) {
-            int32_t gridWidth, gridHeight, gridRows, gridCols;
-            if (meta->findInt32(kKeyGridWidth, &gridWidth)
-                    && meta->findInt32(kKeyGridHeight, &gridHeight)
+            int32_t tileWidth, tileHeight, gridRows, gridCols;
+            if (meta->findInt32(kKeyTileWidth, &tileWidth)
+                    && meta->findInt32(kKeyTileHeight, &tileHeight)
                     && meta->findInt32(kKeyGridRows, &gridRows)
                     && meta->findInt32(kKeyGridCols, &gridCols)) {
-                msg->setInt32("grid-width", gridWidth);
-                msg->setInt32("grid-height", gridHeight);
+                msg->setInt32("tile-width", tileWidth);
+                msg->setInt32("tile-height", tileHeight);
                 msg->setInt32("grid-rows", gridRows);
                 msg->setInt32("grid-cols", gridCols);
             }
@@ -1341,12 +1341,12 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             if (msg->findInt32("is-default", &isPrimary) && isPrimary) {
                 meta->setInt32(kKeyTrackIsDefault, 1);
             }
-            int32_t gridWidth, gridHeight, gridRows, gridCols;
-            if (msg->findInt32("grid-width", &gridWidth)) {
-                meta->setInt32(kKeyGridWidth, gridWidth);
+            int32_t tileWidth, tileHeight, gridRows, gridCols;
+            if (msg->findInt32("tile-width", &tileWidth)) {
+                meta->setInt32(kKeyTileWidth, tileWidth);
             }
-            if (msg->findInt32("grid-height", &gridHeight)) {
-                meta->setInt32(kKeyGridHeight, gridHeight);
+            if (msg->findInt32("tile-height", &tileHeight)) {
+                meta->setInt32(kKeyTileHeight, tileHeight);
             }
             if (msg->findInt32("grid-rows", &gridRows)) {
                 meta->setInt32(kKeyGridRows, gridRows);

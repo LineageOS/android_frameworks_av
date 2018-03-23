@@ -1550,6 +1550,9 @@ Status CameraService::notifySystemEvent(int32_t eventId,
 
     switch(eventId) {
         case ICameraService::EVENT_USER_SWITCHED: {
+            // Try to register for UID policy updates, in case we're recovering
+            // from a system server crash
+            mUidPolicy->registerSelf();
             doUserSwitch(/*newUserIds*/ args);
             break;
         }
@@ -2365,17 +2368,31 @@ void CameraService::Client::OpsCallback::opChanged(int32_t op,
 // ----------------------------------------------------------------------------
 
 void CameraService::UidPolicy::registerSelf() {
+    Mutex::Autolock _l(mUidLock);
+
     ActivityManager am;
+    if (mRegistered) return;
     am.registerUidObserver(this, ActivityManager::UID_OBSERVER_GONE
             | ActivityManager::UID_OBSERVER_IDLE
             | ActivityManager::UID_OBSERVER_ACTIVE,
             ActivityManager::PROCESS_STATE_UNKNOWN,
             String16("cameraserver"));
+    status_t res = am.linkToDeath(this);
+    if (res == OK) {
+        mRegistered = true;
+        ALOGV("UidPolicy: Registered with ActivityManager");
+    }
 }
 
 void CameraService::UidPolicy::unregisterSelf() {
+    Mutex::Autolock _l(mUidLock);
+
     ActivityManager am;
     am.unregisterUidObserver(this);
+    am.unlinkToDeath(this);
+    mRegistered = false;
+    mActiveUids.clear();
+    ALOGV("UidPolicy: Unregistered with ActivityManager");
 }
 
 void CameraService::UidPolicy::onUidGone(uid_t uid, bool disabled) {
@@ -2404,17 +2421,14 @@ void CameraService::UidPolicy::onUidIdle(uid_t uid, bool /* disabled */) {
 }
 
 bool CameraService::UidPolicy::isUidActive(uid_t uid) {
-    // Non-app UIDs are considered always active
-    if (uid < FIRST_APPLICATION_UID) {
-        return true;
-    }
     Mutex::Autolock _l(mUidLock);
     return isUidActiveLocked(uid);
 }
 
 bool CameraService::UidPolicy::isUidActiveLocked(uid_t uid) {
     // Non-app UIDs are considered always active
-    if (uid < FIRST_APPLICATION_UID) {
+    // If activity manager is unreachable, assume everything is active
+    if (uid < FIRST_APPLICATION_UID || !mRegistered) {
         return true;
     }
     auto it = mOverrideUids.find(uid);
@@ -2430,6 +2444,13 @@ void CameraService::UidPolicy::UidPolicy::addOverrideUid(uid_t uid, bool active)
 
 void CameraService::UidPolicy::removeOverrideUid(uid_t uid) {
     updateOverrideUid(uid, false, false);
+}
+
+void CameraService::UidPolicy::binderDied(const wp<IBinder>& /*who*/) {
+    Mutex::Autolock _l(mUidLock);
+    ALOGV("UidPolicy: ActivityManager has died");
+    mRegistered = false;
+    mActiveUids.clear();
 }
 
 void CameraService::UidPolicy::updateOverrideUid(uid_t uid, bool active, bool insert) {

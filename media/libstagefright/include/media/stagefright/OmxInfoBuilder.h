@@ -25,6 +25,7 @@ namespace android {
 class OmxInfoBuilder : public MediaCodecListBuilderBase {
 public:
     OmxInfoBuilder();
+    ~OmxInfoBuilder() override = default;
     status_t buildMediaCodecList(MediaCodecListWriter* writer) override;
 };
 
