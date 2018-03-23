@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "f4b8d412_fba58a4e",
+        "filename": "services/camera/libcameraservice/api1/Camera2Client.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1038,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-23T06:11:44Z",
+      "side": 1,
+      "message": "I thought we had HFR hooks elsewhere already? Or did those not end up being merged?",
+      "range": {
+        "startLine": 1038,
+        "startChar": 33,
+        "endLine": 1038,
+        "endChar": 40
+      },
+      "revId": "3ca6ff1b29226866d47ddd96ac8f9809bf0a4067",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
