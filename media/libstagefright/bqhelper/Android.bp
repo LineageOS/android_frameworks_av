@@ -6,6 +6,7 @@ cc_library_shared {
     },
 
     srcs: [
+        "Conversion.cpp",
         "FrameDropper.cpp",
         "GraphicBufferSource.cpp",
         "WProducerListener.cpp",
