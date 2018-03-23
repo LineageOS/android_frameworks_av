@@ -48,6 +48,7 @@ import android.media.MediaSession2.Command;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.CommandGroup;
 import android.media.MediaSession2.ControllerInfo;
+import android.media.MediaSession2.OnDataSourceMissingHelper;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
 import android.media.SessionToken2;
@@ -110,9 +111,13 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @GuardedBy("mLock")
     private MediaPlaylistAgent mPlaylistAgent;
     @GuardedBy("mLock")
+    private SessionPlaylistAgent mSessionPlaylistAgent;
+    @GuardedBy("mLock")
     private VolumeProvider2 mVolumeProvider;
     @GuardedBy("mLock")
     private PlaybackInfo mPlaybackInfo;
+    @GuardedBy("mLock")
+    private OnDataSourceMissingHelper mDsmHelper;
 
     /**
      * Can be only called by the {@link Builder#build()}.
@@ -206,7 +211,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void updatePlayer_impl(MediaPlayerBase player, MediaPlaylistAgent playlistAgent,
+    public void updatePlayer_impl(@NonNull MediaPlayerBase player, MediaPlaylistAgent playlistAgent,
             VolumeProvider2 volumeProvider) throws IllegalArgumentException {
         ensureCallingThread();
         if (player == null) {
@@ -224,9 +229,12 @@ public class MediaSession2Impl implements MediaSession2Provider {
             oldPlayer = mPlayer;
             oldAgent = mPlaylistAgent;
             mPlayer = player;
-            // TODO(jaewan): Replace this with the proper default agent (b/74090741)
             if (agent == null) {
-                agent = new MediaPlaylistAgent(mContext) {};
+                mSessionPlaylistAgent = new SessionPlaylistAgent(mContext, this, mPlayer);
+                if (mDsmHelper != null) {
+                    mSessionPlaylistAgent.setOnDataSourceMissingHelper(mDsmHelper);
+                }
+                agent = mSessionPlaylistAgent;
             }
             mPlaylistAgent = agent;
             mVolumeProvider = volumeProvider;
@@ -311,6 +319,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
             mPlayer = null;
             agent = mPlaylistAgent;
             mPlaylistAgent = null;
+            mSessionPlaylistAgent = null;
         }
         if (player != null) {
             player.unregisterPlayerEventCallback(mPlayerEventCallback);
@@ -384,7 +393,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void skipToPlaylistItem_impl(MediaItem2 item) {
+    public void skipToPlaylistItem_impl(@NonNull MediaItem2 item) {
         if (item == null) {
             throw new IllegalArgumentException("item shouldn't be null");
         }
@@ -417,7 +426,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void setCustomLayout_impl(ControllerInfo controller, List<CommandButton> layout) {
+    public void setCustomLayout_impl(@NonNull ControllerInfo controller,
+            @NonNull List<CommandButton> layout) {
         ensureCallingThread();
         if (controller == null) {
             throw new IllegalArgumentException("controller shouldn't be null");
@@ -433,7 +443,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
     //////////////////////////////////////////////////////////////////////////////////////
 
     @Override
-    public void setAllowedCommands_impl(ControllerInfo controller, CommandGroup commands) {
+    public void setAllowedCommands_impl(@NonNull ControllerInfo controller,
+            @NonNull CommandGroup commands) {
         if (controller == null) {
             throw new IllegalArgumentException("controller shouldn't be null");
         }
@@ -444,8 +455,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void sendCustomCommand_impl(ControllerInfo controller, Command command, Bundle args,
-            ResultReceiver receiver) {
+    public void sendCustomCommand_impl(@NonNull ControllerInfo controller, @NonNull Command command,
+            Bundle args, ResultReceiver receiver) {
         if (controller == null) {
             throw new IllegalArgumentException("controller shouldn't be null");
         }
@@ -456,7 +467,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void sendCustomCommand_impl(Command command, Bundle args) {
+    public void sendCustomCommand_impl(@NonNull Command command, Bundle args) {
         if (command == null) {
             throw new IllegalArgumentException("command shouldn't be null");
         }
@@ -464,7 +475,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void setPlaylist_impl(List<MediaItem2> list, MediaMetadata2 metadata) {
+    public void setPlaylist_impl(@NonNull List<MediaItem2> list, MediaMetadata2 metadata) {
         if (list == null) {
             throw new IllegalArgumentException("list shouldn't be null");
         }
@@ -488,7 +499,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void addPlaylistItem_impl(int index, MediaItem2 item) {
+    public void addPlaylistItem_impl(int index, @NonNull MediaItem2 item) {
         if (index < 0) {
             throw new IllegalArgumentException("index shouldn't be negative");
         }
@@ -504,7 +515,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void removePlaylistItem_impl(MediaItem2 item) {
+    public void removePlaylistItem_impl(@NonNull MediaItem2 item) {
         if (item == null) {
             throw new IllegalArgumentException("item shouldn't be null");
         }
@@ -517,7 +528,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public void replacePlaylistItem_impl(int index, MediaItem2 item) {
+    public void replacePlaylistItem_impl(int index, @NonNull MediaItem2 item) {
         if (index < 0) {
             throw new IllegalArgumentException("index shouldn't be negative");
         }
@@ -682,6 +693,29 @@ public class MediaSession2Impl implements MediaSession2Provider {
     @Override
     public void notifyError_impl(int errorCode, Bundle extras) {
         mSessionStub.notifyError(errorCode, extras);
+    }
+
+    @Override
+    public void setOnDataSourceMissingHelper_impl(@NonNull OnDataSourceMissingHelper helper) {
+        if (helper == null) {
+            throw new IllegalArgumentException("helper shouldn't be null");
+        }
+        synchronized (mLock) {
+            mDsmHelper = helper;
+            if (mSessionPlaylistAgent != null) {
+                mSessionPlaylistAgent.setOnDataSourceMissingHelper(helper);
+            }
+        }
+    }
+
+    @Override
+    public void clearOnDataSourceMissingHelper_impl() {
+        synchronized (mLock) {
+            mDsmHelper = null;
+            if (mSessionPlaylistAgent != null) {
+                mSessionPlaylistAgent.clearOnDataSourceMissingHelper();
+            }
+        }
     }
 
     ///////////////////////////////////////////////////
@@ -1021,7 +1055,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         /**
          * @return a new Command instance from the Bundle
          */
-        public static Command fromBundle_impl(Context context, Bundle command) {
+        public static Command fromBundle_impl(Context context, @NonNull Bundle command) {
             if (command == null) {
                 throw new IllegalArgumentException("command shouldn't be null");
             }
@@ -1091,7 +1125,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public void addCommand_impl(Command command) {
+        public void addCommand_impl(@NonNull Command command) {
             if (command == null) {
                 throw new IllegalArgumentException("command shouldn't be null");
             }
@@ -1128,7 +1162,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public void removeCommand_impl(Command command) {
+        public void removeCommand_impl(@NonNull Command command) {
             if (command == null) {
                 throw new IllegalArgumentException("command shouldn't be null");
             }
@@ -1136,7 +1170,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public boolean hasCommand_impl(Command command) {
+        public boolean hasCommand_impl(@NonNull Command command) {
             if (command == null) {
                 throw new IllegalArgumentException("command shouldn't be null");
             }
@@ -1216,7 +1250,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         private final IMediaController2 mControllerBinder;
 
         public ControllerInfoImpl(Context context, ControllerInfo instance, int uid,
-                int pid, String packageName, IMediaController2 callback) {
+                int pid, @NonNull String packageName, @NonNull IMediaController2 callback) {
             if (TextUtils.isEmpty(packageName)) {
                 throw new IllegalArgumentException("packageName shouldn't be empty");
             }
@@ -1467,7 +1501,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
          *      {@link MediaSession2} or {@link MediaController2}.
          */
         // TODO(jaewan): Also need executor
-        public BuilderBaseImpl(Context context) {
+        public BuilderBaseImpl(@NonNull Context context) {
             if (context == null) {
                 throw new IllegalArgumentException("context shouldn't be null");
             }
@@ -1477,7 +1511,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public void setPlayer_impl(MediaPlayerBase player) {
+        public void setPlayer_impl(@NonNull MediaPlayerBase player) {
             if (player == null) {
                 throw new IllegalArgumentException("player shouldn't be null");
             }
@@ -1485,7 +1519,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public void setPlaylistAgent_impl(MediaPlaylistAgent playlistAgent) {
+        public void setPlaylistAgent_impl(@NonNull MediaPlaylistAgent playlistAgent) {
             if (playlistAgent == null) {
                 throw new IllegalArgumentException("playlistAgent shouldn't be null");
             }
@@ -1503,7 +1537,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public void setId_impl(String id) {
+        public void setId_impl(@NonNull String id) {
             if (id == null) {
                 throw new IllegalArgumentException("id shouldn't be null");
             }
@@ -1511,7 +1545,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public void setSessionCallback_impl(Executor executor, C callback) {
+        public void setSessionCallback_impl(@NonNull Executor executor, @NonNull C callback) {
             if (executor == null) {
                 throw new IllegalArgumentException("executor shouldn't be null");
             }
