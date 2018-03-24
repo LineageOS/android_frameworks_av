@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "cb8126ee_eef2ded5",
+        "filename": "services/camera/libcameraservice/Android.mk",
+        "patchSetId": 2
+      },
+      "lineNbr": 86,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-24T18:04:04Z",
+      "side": 1,
+      "message": "Why did you use a tab here when the rest of the file is not?",
+      "range": {
+        "startLine": 86,
+        "startChar": 0,
+        "endLine": 86,
+        "endChar": 1
+      },
+      "revId": "466684f44f7c023b63430e25f59d61c074600755",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
