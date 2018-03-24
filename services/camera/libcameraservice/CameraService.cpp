@@ -1999,14 +1999,17 @@ status_t CameraService::onTransact(uint32_t code, const Parcel& data, Parcel* re
 // A reference count is kept to determine when we will actually release the
 // media players.
 
-MediaPlayer* CameraService::newMediaPlayer(const char *file) {
-    MediaPlayer* mp = new MediaPlayer();
-    if (mp->setDataSource(NULL /* httpService */, file, NULL) == NO_ERROR) {
+sp<MediaPlayer> CameraService::newMediaPlayer(const char *file) {
+    sp<MediaPlayer> mp = new MediaPlayer();
+    status_t error;
+    if ((error = mp->setDataSource(NULL /* httpService */, file, NULL)) == NO_ERROR) {
         mp->setAudioStreamType(AUDIO_STREAM_ENFORCED_AUDIBLE);
-        mp->prepare();
-    } else {
+        error = mp->prepare();
+    }
+    if (error != NO_ERROR) {
         ALOGE("Failed to load CameraService sounds: %s", file);
-        delete mp;
+        mp->disconnect();
+        mp.clear();
         return nullptr;
     }
     return mp;
