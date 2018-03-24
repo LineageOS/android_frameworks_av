@@ -903,7 +903,6 @@ status_t MediaPlayer2::getPlaybackSettings(AudioPlaybackRate* rate /* nonnull */
     if (mPlayer == 0) {
         return INVALID_OPERATION;
     }
-    return mPlayer->getPlaybackSettings(rate);
     status_t ret = mPlayer->getPlaybackSettings(rate);
     if (ret == NO_ERROR) {
         ALOGV("getPlaybackSettings(%f, %f, %d, %d)",
@@ -925,7 +924,9 @@ status_t MediaPlayer2::setSyncSettings(const AVSyncSettings& sync, float videoFp
 status_t MediaPlayer2::getSyncSettings(
         AVSyncSettings* sync /* nonnull */, float* videoFps /* nonnull */) {
     Mutex::Autolock _l(mLock);
-    if (mPlayer == 0) return INVALID_OPERATION;
+    if (mPlayer == 0) {
+        return INVALID_OPERATION;
+    }
     status_t ret = mPlayer->getSyncSettings(sync, videoFps);
     if (ret == NO_ERROR) {
         ALOGV("getSyncSettings(%u, %u, %f, %f)",

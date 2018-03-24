@@ -67,8 +67,6 @@ AudioStreamInternal::AudioStreamInternal(AAudioServiceInterface  &serviceInterfa
         , mWakeupDelayNanos(AAudioProperty_getWakeupDelayMicros() * AAUDIO_NANOS_PER_MICROSECOND)
         , mMinimumSleepNanos(AAudioProperty_getMinimumSleepMicros() * AAUDIO_NANOS_PER_MICROSECOND)
         {
-    ALOGD("%s - mWakeupDelayNanos = %d, mMinimumSleepNanos = %d",
-          __func__, mWakeupDelayNanos, mMinimumSleepNanos);
 }
 
 AudioStreamInternal::~AudioStreamInternal() {
@@ -231,8 +229,7 @@ error:
 
 aaudio_result_t AudioStreamInternal::close() {
     aaudio_result_t result = AAUDIO_OK;
-    ALOGD("close(): mServiceStreamHandle = 0x%08X",
-             mServiceStreamHandle);
+    ALOGD("%s(): mServiceStreamHandle = 0x%08X", __func__, mServiceStreamHandle);
     if (mServiceStreamHandle != AAUDIO_HANDLE_INVALID) {
         // Don't close a stream while it is running.
         aaudio_stream_state_t currentState = getState();
@@ -243,8 +240,8 @@ aaudio_result_t AudioStreamInternal::close() {
             result = waitForStateChange(currentState, &nextState,
                                                        timeoutNanoseconds);
             if (result != AAUDIO_OK) {
-                ALOGE("close() waitForStateChange() returned %d %s",
-                result, AAudio_convertResultToText(result));
+                ALOGE("%s() waitForStateChange() returned %d %s",
+                __func__, result, AAudio_convertResultToText(result));
             }
         }
         setState(AAUDIO_STREAM_STATE_CLOSING);

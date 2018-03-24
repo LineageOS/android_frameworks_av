@@ -201,14 +201,14 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openSharedEndpoint(
         if (endpoint.get() != nullptr) {
             aaudio_result_t result = endpoint->open(request);
             if (result != AAUDIO_OK) {
-                ALOGE("openSharedEndpoint(), open failed");
+                ALOGE("%s(), open failed", __func__);
                 endpoint.clear();
             } else {
                 mSharedStreams.push_back(endpoint);
             }
         }
-        ALOGD("openSharedEndpoint(), created %p, requested device = %d, dir = %d",
-              endpoint.get(), configuration.getDeviceId(), (int)direction);
+        ALOGD("%s(), created endpoint %p, requested device = %d, dir = %d",
+              __func__, endpoint.get(), configuration.getDeviceId(), (int)direction);
         IPCThreadState::self()->restoreCallingIdentity(token);
     }
 
@@ -244,8 +244,8 @@ void AAudioEndpointManager::closeExclusiveEndpoint(sp<AAudioServiceEndpoint> ser
                 mExclusiveStreams.end());
 
         serviceEndpoint->close();
-        ALOGD("closeExclusiveEndpoint() %p for device %d",
-              serviceEndpoint.get(), serviceEndpoint->getDeviceId());
+        ALOGD("%s() %p for device %d",
+              __func__, serviceEndpoint.get(), serviceEndpoint->getDeviceId());
     }
 }
 
@@ -266,7 +266,7 @@ void AAudioEndpointManager::closeSharedEndpoint(sp<AAudioServiceEndpoint> servic
                 mSharedStreams.end());
 
         serviceEndpoint->close();
-        ALOGD("closeSharedEndpoint() %p for device %d",
-              serviceEndpoint.get(), serviceEndpoint->getDeviceId());
+        ALOGD("%s() %p for device %d",
+              __func__, serviceEndpoint.get(), serviceEndpoint->getDeviceId());
     }
 }

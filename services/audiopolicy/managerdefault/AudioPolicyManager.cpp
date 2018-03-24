@@ -1271,6 +1271,11 @@ status_t AudioPolicyManager::startSource(const sp<AudioOutputDescriptor>& output
         setStrategyMute(STRATEGY_SONIFICATION, true, outputDesc);
     }
 
+    if (stream == AUDIO_STREAM_ENFORCED_AUDIBLE &&
+            mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) == AUDIO_POLICY_FORCE_SYSTEM_ENFORCED) {
+        setStrategyMute(STRATEGY_SONIFICATION, true, outputDesc);
+    }
+
     return NO_ERROR;
 }
 
@@ -5141,7 +5146,8 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
             AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
             AUDIO_DEVICE_OUT_WIRED_HEADSET |
             AUDIO_DEVICE_OUT_WIRED_HEADPHONE |
-            AUDIO_DEVICE_OUT_USB_HEADSET)) &&
+            AUDIO_DEVICE_OUT_USB_HEADSET |
+            AUDIO_DEVICE_OUT_HEARING_AID)) &&
         ((stream_strategy == STRATEGY_SONIFICATION)
                 || (stream_strategy == STRATEGY_SONIFICATION_RESPECTFUL)
                 || (stream == AUDIO_STREAM_SYSTEM)

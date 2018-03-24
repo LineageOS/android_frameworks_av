@@ -43,10 +43,12 @@ using namespace aaudio;   // TODO just import names needed
 
 AAudioServiceEndpointPlay::AAudioServiceEndpointPlay(AAudioService &audioService)
         : mStreamInternalPlay(audioService, true) {
+    ALOGD("%s(%p) created", __func__, this);
     mStreamInternal = &mStreamInternalPlay;
 }
 
 AAudioServiceEndpointPlay::~AAudioServiceEndpointPlay() {
+    ALOGD("%s(%p) destroyed", __func__, this);
 }
 
 aaudio_result_t AAudioServiceEndpointPlay::open(const aaudio::AAudioStreamRequest &request) {
@@ -68,6 +70,7 @@ aaudio_result_t AAudioServiceEndpointPlay::open(const aaudio::AAudioStreamReques
 
 // Mix data from each application stream and write result to the shared MMAP stream.
 void *AAudioServiceEndpointPlay::callbackLoop() {
+    ALOGD("%s() entering >>>>>>>>>>>>>>> MIXER", __func__);
     aaudio_result_t result = AAUDIO_OK;
     int64_t timeoutNanos = getStreamInternal()->calculateReasonableTimeout();
 
@@ -152,5 +155,7 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
         }
     }
 
+    ALOGD("%s() exiting, enabled = %d, state = %d, result = %d <<<<<<<<<<<<< MIXER",
+          __func__, mCallbackEnabled.load(), getStreamInternal()->getState(), result);
     return NULL; // TODO review
 }
