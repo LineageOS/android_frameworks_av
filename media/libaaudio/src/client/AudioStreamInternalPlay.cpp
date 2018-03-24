@@ -57,8 +57,7 @@ aaudio_result_t AudioStreamInternalPlay::requestPause()
         return result;
     }
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("requestPauseInternal() mServiceStreamHandle invalid = 0x%08X",
-              mServiceStreamHandle);
+        ALOGE("%s() mServiceStreamHandle invalid", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -70,8 +69,7 @@ aaudio_result_t AudioStreamInternalPlay::requestPause()
 
 aaudio_result_t AudioStreamInternalPlay::requestFlush() {
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("AudioStreamInternal::requestFlush() mServiceStreamHandle invalid = 0x%08X",
-              mServiceStreamHandle);
+        ALOGE("%s() mServiceStreamHandle invalid", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -86,7 +84,7 @@ void AudioStreamInternalPlay::advanceClientToMatchServerPosition() {
     // Bump offset so caller does not see the retrograde motion in getFramesRead().
     int64_t offset = writeCounter - readCounter;
     mFramesOffsetFromService += offset;
-    ALOGD("advanceClientToMatchServerPosition() readN = %lld, writeN = %lld, offset = %lld",
+    ALOGV("%s() readN = %lld, writeN = %lld, offset = %lld", __func__,
           (long long)readCounter, (long long)writeCounter, (long long)mFramesOffsetFromService);
 
     // Force writeCounter to match readCounter.
@@ -100,9 +98,7 @@ void AudioStreamInternalPlay::onFlushFromServer() {
 
 // Write the data, block if needed and timeoutMillis > 0
 aaudio_result_t AudioStreamInternalPlay::write(const void *buffer, int32_t numFrames,
-                                           int64_t timeoutNanoseconds)
-
-{
+                                               int64_t timeoutNanoseconds) {
     return processData((void *)buffer, numFrames, timeoutNanoseconds);
 }
 
@@ -121,7 +117,7 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
         // Still haven't got any timestamps from server.
         // Keep waiting until we get some valid timestamps then start writing to the
         // current buffer position.
-        ALOGD("processDataNow() wait for valid timestamps");
+        ALOGD("%s() wait for valid timestamps", __func__);
         // Sleep very briefly and hope we get a timestamp soon.
         *wakeTimePtr = currentNanoTime + (2000 * AAUDIO_NANOS_PER_MICROSECOND);
         ATRACE_END();
@@ -203,8 +199,6 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
 
 aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buffer,
                                                             int32_t numFrames) {
-    // ALOGD("AudioStreamInternal::writeNowWithConversion(%p, %d)",
-    //              buffer, numFrames);
     WrappingBuffer wrappingBuffer;
     uint8_t *byteBuffer = (uint8_t *) buffer;
     int32_t framesLeft = numFrames;
@@ -249,7 +243,6 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
     int32_t framesWritten = numFrames - framesLeft;
     mAudioEndpoint.advanceWriteIndex(framesWritten);
 
-    // ALOGD("AudioStreamInternal::writeNowWithConversion() returns %d", framesWritten);
     return framesWritten;
 }
 
@@ -268,7 +261,6 @@ int64_t AudioStreamInternalPlay::getFramesRead()
     } else {
         mLastFramesRead = framesRead;
     }
-    //ALOGD("AudioStreamInternalPlay::getFramesRead() returns %lld", (long long)framesRead);
     return framesRead;
 }
 
@@ -276,13 +268,13 @@ int64_t AudioStreamInternalPlay::getFramesWritten()
 {
     int64_t framesWritten = mAudioEndpoint.getDataWriteCounter()
                                + mFramesOffsetFromService;
-    //ALOGD("AudioStreamInternalPlay::getFramesWritten() returns %lld", (long long)framesWritten);
     return framesWritten;
 }
 
 
 // Render audio in the application callback and then write the data to the stream.
 void *AudioStreamInternalPlay::callbackLoop() {
+    ALOGD("%s() entering >>>>>>>>>>>>>>>", __func__);
     aaudio_result_t result = AAUDIO_OK;
     aaudio_data_callback_result_t callbackResult = AAUDIO_CALLBACK_RESULT_CONTINUE;
     if (!isDataCallbackSet()) return NULL;
@@ -297,7 +289,6 @@ void *AudioStreamInternalPlay::callbackLoop() {
             // Write audio data to stream. This is a BLOCKING WRITE!
             result = write(mCallbackBuffer, mCallbackFrames, timeoutNanos);
             if ((result != mCallbackFrames)) {
-                ALOGE("AudioStreamInternalPlay(): callbackLoop: write() returned %d", result);
                 if (result >= 0) {
                     // Only wrote some of the frames requested. Must have timed out.
                     result = AAUDIO_ERROR_TIMEOUT;
@@ -306,13 +297,13 @@ void *AudioStreamInternalPlay::callbackLoop() {
                 break;
             }
         } else if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
-            ALOGD("AudioStreamInternalPlay(): callback returned AAUDIO_CALLBACK_RESULT_STOP");
+            ALOGV("%s(): callback returned AAUDIO_CALLBACK_RESULT_STOP", __func__);
             break;
         }
     }
 
-    ALOGD("AudioStreamInternalPlay(): callbackLoop() exiting, result = %d, isActive() = %d",
-          result, (int) isActive());
+    ALOGD("%s() exiting, result = %d, isActive() = %d <<<<<<<<<<<<<<",
+          __func__, result, (int) isActive());
     return NULL;
 }
 

@@ -44,7 +44,7 @@ class AAudioThread
 public:
     AAudioThread();
 
-    AAudioThread(const char *prefix);
+    explicit AAudioThread(const char *prefix);
 
     virtual ~AAudioThread() = default;
 
