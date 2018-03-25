@@ -46,6 +46,24 @@
       "revId": "aa29a5bc80b02310e82158d70ef2fa605f7fc29d",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "55585e10_6cc205d4",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 235,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-25T06:34:41Z",
+      "side": 1,
+      "message": "My point is that the default should be based on the input value, but that would probably require a rename of the variable, as well as assignment of storeMetaDataInVideoBuffers to the result of property_get_bool.",
+      "parentUuid": "",
+      "revId": "aa29a5bc80b02310e82158d70ef2fa605f7fc29d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
