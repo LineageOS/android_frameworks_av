@@ -22,6 +22,30 @@
       "revId": "aa29a5bc80b02310e82158d70ef2fa605f7fc29d",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "69469fde_0d2aa1bc",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 235,
+      "author": {
+        "id": 13589
+      },
+      "writtenOn": "2018-03-25T05:28:03Z",
+      "side": 1,
+      "message": "Absolutely not, that would override is content to false all the time.\n\nThe property is supposed to be set and with a value of true for this section to be considered / used, not the old default value (which would break all newer stacks with that logic)",
+      "parentUuid": "67c78a9b_0890f027",
+      "range": {
+        "startLine": 235,
+        "startChar": 57,
+        "endLine": 235,
+        "endChar": 62
+      },
+      "revId": "aa29a5bc80b02310e82158d70ef2fa605f7fc29d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
