@@ -154,6 +154,13 @@ status_t Engine::setForceUse(audio_policy_force_use_t usage, audio_policy_forced
         }
         mForceUse[usage] = config;
         break;
+    case AUDIO_POLICY_FORCE_FOR_VIBRATE_RINGING:
+        if (config != AUDIO_POLICY_FORCE_BT_SCO && config != AUDIO_POLICY_FORCE_NONE) {
+            ALOGW("setForceUse() invalid config %d for FOR_VIBRATE_RINGING", config);
+            return BAD_VALUE;
+        }
+        mForceUse[usage] = config;
+        break;
     default:
         ALOGW("setForceUse() invalid usage %d", usage);
         break; // TODO return BAD_VALUE?
@@ -423,8 +430,7 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
 
         // if SCO headset is connected and we are told to use it, play ringtone over
         // speaker and BT SCO
-        if (((availableOutputDevicesType & AUDIO_DEVICE_OUT_ALL_SCO) != 0) &&
-                (mForceUse[AUDIO_POLICY_FORCE_FOR_COMMUNICATION] == AUDIO_POLICY_FORCE_BT_SCO)) {
+        if ((availableOutputDevicesType & AUDIO_DEVICE_OUT_ALL_SCO) != 0) {
             uint32_t device2 = AUDIO_DEVICE_NONE;
             device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT;
             if (device2 == AUDIO_DEVICE_NONE) {
@@ -433,10 +439,23 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
             if (device2 == AUDIO_DEVICE_NONE) {
                 device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_BLUETOOTH_SCO;
             }
-
-            if (device2 != AUDIO_DEVICE_NONE) {
-                device |= device2;
-                break;
+            // Use ONLY Bluetooth SCO output when ringing in vibration mode
+            if (!((mForceUse[AUDIO_POLICY_FORCE_FOR_SYSTEM] == AUDIO_POLICY_FORCE_SYSTEM_ENFORCED)
+                    && (strategy == STRATEGY_ENFORCED_AUDIBLE))) {
+                if (mForceUse[AUDIO_POLICY_FORCE_FOR_VIBRATE_RINGING]
+                        == AUDIO_POLICY_FORCE_BT_SCO) {
+                    if (device2 != AUDIO_DEVICE_NONE) {
+                        device = device2;
+                        break;
+                    }
+                }
+            }
+            // Use both Bluetooth SCO and phone default output when ringing in normal mode
+            if (mForceUse[AUDIO_POLICY_FORCE_FOR_COMMUNICATION] == AUDIO_POLICY_FORCE_BT_SCO) {
+                if (device2 != AUDIO_DEVICE_NONE) {
+                    device |= device2;
+                    break;
+                }
             }
         }
         // The second device used for sonification is the same as the device used by media strategy

@@ -1,48 +1,4 @@
 cc_library_shared {
-    name: "libstagefright_soft_c2avcenc",
-//    vendor_available: true,
-//    vndk: {
-//        enabled: true,
-//    },
-
-    static_libs: [ "libavcenc" ],
-    srcs: ["C2SoftAvcEnc.cpp"],
-
-    include_dirs: [
-        "external/libavc/encoder",
-        "external/libavc/common",
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/hardware",
-    ],
-
-    shared_libs: [
-        "libstagefright_codec2",
-        "libstagefright_codec2_vndk",
-        "libstagefright_foundation",
-        "libstagefright_simple_c2component",
-        "libutils",
-        "liblog",
-    ],
-
-    sanitize: {
-        misc_undefined: [
-            "signed-integer-overflow",
-        ],
-        cfi: true,
-        diag: {
-            cfi: true,
-        },
-    },
-
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wno-unused-variable",
-    ],
-    ldflags: ["-Wl,-Bsymbolic"],
-}
-
-cc_library_shared {
     name: "libstagefright_soft_avcenc",
     vendor_available: true,
     vndk: {

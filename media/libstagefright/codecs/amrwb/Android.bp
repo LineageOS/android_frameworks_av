@@ -45,8 +45,11 @@ cc_library_static {
     ],
 
     include_dirs: ["frameworks/av/media/libstagefright/include"],
-    local_include_dirs: ["src"],
-    export_include_dirs: ["include"],
+
+    export_include_dirs: [
+        "src",
+        "include",
+    ],
 
     cflags: [
         "-DOSCL_UNUSED_ARG(x)=(void)(x)",

@@ -563,6 +563,10 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::getConfig(
             DescribeColorAspectsParams* colorAspectsParams =
                     (DescribeColorAspectsParams *)params;
 
+            if (!isValidOMXParam(colorAspectsParams)) {
+                return OMX_ErrorBadParameter;
+            }
+
             if (colorAspectsParams->nPortIndex != kOutputPortIndex) {
                 return OMX_ErrorBadParameter;
             }
@@ -583,6 +587,10 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::getConfig(
 
             DescribeHDRStaticInfoParams* hdrStaticInfoParams =
                     (DescribeHDRStaticInfoParams *)params;
+
+            if (!isValidOMXParam(hdrStaticInfoParams)) {
+                return OMX_ErrorBadParameter;
+            }
 
             if (hdrStaticInfoParams->nPortIndex != kOutputPortIndex) {
                 return OMX_ErrorBadPortIndex;
@@ -635,15 +643,17 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::setConfig(
             const DescribeHDRStaticInfoParams* hdrStaticInfoParams =
                     (DescribeHDRStaticInfoParams *)params;
 
+            if (!isValidOMXParam(hdrStaticInfoParams)) {
+                return OMX_ErrorBadParameter;
+            }
+
             if (hdrStaticInfoParams->nPortIndex != kOutputPortIndex) {
                 return OMX_ErrorBadPortIndex;
             }
 
-            if (hdrStaticInfoParams != NULL) {
-                mOutputFormat = OMX_COLOR_FormatYUV420Planar16;
-                mHdrStaticInfo = hdrStaticInfoParams->sInfo;
-                updatePortDefinitions(false);
-            }
+            mOutputFormat = OMX_COLOR_FormatYUV420Planar16;
+            mHdrStaticInfo = hdrStaticInfoParams->sInfo;
+            updatePortDefinitions(false);
 
             return OMX_ErrorNone;
         }

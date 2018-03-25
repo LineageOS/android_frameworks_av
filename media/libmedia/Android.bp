@@ -18,7 +18,7 @@ cc_library {
     vndk: {
         enabled: true,
     },
-    srcs: ["AudioParameter.cpp", "TypeConverter.cpp"],
+    srcs: ["AudioParameter.cpp", "TypeConverter.cpp", "TimeCheck.cpp"],
     cflags: [
         "-Werror",
         "-Wno-error=deprecated-declarations",

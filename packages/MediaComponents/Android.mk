@@ -40,9 +40,6 @@ LOCAL_SRC_FILES := \
 
 LOCAL_PROGUARD_FLAG_FILES := proguard.cfg
 
-# TODO: Enable proguard (b/74090741)
-LOCAL_PROGUARD_ENABLED := disabled
-
 LOCAL_MULTILIB := first
 
 LOCAL_JAVA_LIBRARIES += android-support-annotations

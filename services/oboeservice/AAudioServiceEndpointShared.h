@@ -54,11 +54,12 @@ public:
 
     virtual void            *callbackLoop() = 0;
 
+
+protected:
+
     AudioStreamInternal *getStreamInternal() const {
         return mStreamInternal;
     };
-
-protected:
 
     aaudio_result_t          startSharingThread_l();
 

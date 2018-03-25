@@ -93,7 +93,7 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
     {
         std::lock_guard<std::mutex> lock(mUpMessageQueueLock);
         if (mUpMessageQueue != nullptr) {
-            ALOGE("open() called twice");
+            ALOGE("%s() called twice", __func__);
             return AAUDIO_ERROR_INVALID_STATE;
         }
 
@@ -108,7 +108,7 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
                                                          request,
                                                          sharingMode);
         if (mServiceEndpoint == nullptr) {
-            ALOGE("open() openEndpoint() failed");
+            ALOGE("%s() openEndpoint() failed", __func__);
             result = AAUDIO_ERROR_UNAVAILABLE;
             goto error;
         }
@@ -167,7 +167,7 @@ aaudio_result_t AAudioServiceStreamBase::start() {
     }
 
     if (mServiceEndpoint == nullptr) {
-        ALOGE("start() missing endpoint");
+        ALOGE("%s() missing endpoint", __func__);
         result = AAUDIO_ERROR_INVALID_STATE;
         goto error;
     }
@@ -201,7 +201,7 @@ aaudio_result_t AAudioServiceStreamBase::pause() {
         return result;
     }
     if (mServiceEndpoint == nullptr) {
-        ALOGE("pause() missing endpoint");
+        ALOGE("%s() missing endpoint", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -217,7 +217,7 @@ aaudio_result_t AAudioServiceStreamBase::pause() {
 
     result = mServiceEndpoint->stopStream(this, mClientHandle);
     if (result != AAUDIO_OK) {
-        ALOGE("pause() mServiceEndpoint returned %d", result);
+        ALOGE("%s() mServiceEndpoint returned %d, %s", __func__, result, getTypeText());
         disconnect(); // TODO should we return or pause Base first?
     }
 
@@ -233,7 +233,7 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
     }
 
     if (mServiceEndpoint == nullptr) {
-        ALOGE("stop() missing endpoint");
+        ALOGE("%s() missing endpoint", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -251,7 +251,7 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
     // TODO wait for data to be played out
     result = mServiceEndpoint->stopStream(this, mClientHandle);
     if (result != AAUDIO_OK) {
-        ALOGE("stop() mServiceEndpoint returned %d", result);
+        ALOGE("%s() mServiceEndpoint returned %d, %s", __func__, result, getTypeText());
         disconnect();
         // TODO what to do with result here?
     }
@@ -284,7 +284,7 @@ aaudio_result_t AAudioServiceStreamBase::flush() {
 
 // implement Runnable, periodically send timestamps to client
 void AAudioServiceStreamBase::run() {
-    ALOGD("run() entering ----------------");
+    ALOGD("%s() %s entering >>>>>>>>>>>>>> TIMESTAMPS", __func__, getTypeText());
     TimestampScheduler timestampScheduler;
     timestampScheduler.setBurstPeriod(mFramesPerBurst, getSampleRate());
     timestampScheduler.start(AudioClock::getNanoseconds());
@@ -302,7 +302,7 @@ void AAudioServiceStreamBase::run() {
             AudioClock::sleepUntilNanoTime(nextTime);
         }
     }
-    ALOGD("run() exiting ----------------");
+    ALOGD("%s() %s exiting <<<<<<<<<<<<<< TIMESTAMPS", __func__, getTypeText());
 }
 
 void AAudioServiceStreamBase::disconnect() {
@@ -333,12 +333,12 @@ aaudio_result_t AAudioServiceStreamBase::sendServiceEvent(aaudio_service_event_t
 aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessage *command) {
     std::lock_guard<std::mutex> lock(mUpMessageQueueLock);
     if (mUpMessageQueue == nullptr) {
-        ALOGE("writeUpMessageQueue(): mUpMessageQueue null! - stream not open");
+        ALOGE("%s(): mUpMessageQueue null! - stream not open", __func__);
         return AAUDIO_ERROR_NULL;
     }
     int32_t count = mUpMessageQueue->getFifoBuffer()->write(command, 1);
     if (count != 1) {
-        ALOGE("writeUpMessageQueue(): Queue full. Did client die?");
+        ALOGE("%s(): Queue full. Did client die? %s", __func__, getTypeText());
         return AAUDIO_ERROR_WOULD_BLOCK;
     } else {
         return AAUDIO_OK;
@@ -355,7 +355,7 @@ aaudio_result_t AAudioServiceStreamBase::sendCurrentTimestamp() {
     aaudio_result_t result = getFreeRunningPosition(&command.timestamp.position,
                                                     &command.timestamp.timestamp);
     if (result == AAUDIO_OK) {
-        ALOGV("sendCurrentTimestamp() SERVICE  %8lld at %lld",
+        ALOGV("%s() SERVICE  %8lld at %lld", __func__,
               (long long) command.timestamp.position,
               (long long) command.timestamp.timestamp);
         command.what = AAudioServiceMessage::code::TIMESTAMP_SERVICE;
@@ -366,7 +366,7 @@ aaudio_result_t AAudioServiceStreamBase::sendCurrentTimestamp() {
             result = getHardwareTimestamp(&command.timestamp.position,
                                           &command.timestamp.timestamp);
             if (result == AAUDIO_OK) {
-                ALOGV("sendCurrentTimestamp() HARDWARE %8lld at %lld",
+                ALOGV("%s() HARDWARE %8lld at %lld", __func__,
                       (long long) command.timestamp.position,
                       (long long) command.timestamp.timestamp);
                 command.what = AAudioServiceMessage::code::TIMESTAMP_HARDWARE;
@@ -389,7 +389,7 @@ aaudio_result_t AAudioServiceStreamBase::getDescription(AudioEndpointParcelable 
     {
         std::lock_guard<std::mutex> lock(mUpMessageQueueLock);
         if (mUpMessageQueue == nullptr) {
-            ALOGE("getDescription(): mUpMessageQueue null! - stream not open");
+            ALOGE("%s(): mUpMessageQueue null! - stream not open", __func__);
             return AAUDIO_ERROR_NULL;
         }
         // Gather information on the message queue.

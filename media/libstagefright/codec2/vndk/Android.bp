@@ -5,10 +5,12 @@ cc_library_headers {
         "internal",
     ],
 
-    vendor_available: false,
     vndk: {
         enabled: true,
     },
+
+    // TODO: Remove this when this module is moved back to frameworks/av.
+    vendor_available: true,
 }
 
 cc_library_shared {

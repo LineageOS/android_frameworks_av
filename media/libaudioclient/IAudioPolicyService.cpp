@@ -27,6 +27,7 @@
 
 #include <media/AudioEffect.h>
 #include <media/IAudioPolicyService.h>
+#include <media/TimeCheck.h>
 #include <private/android_filesystem_config.h>
 #include <system/audio.h>
 
@@ -881,6 +882,8 @@ status_t BnAudioPolicyService::onTransact(
         default:
             break;
     }
+
+    TimeCheck check("IAudioPolicyService");
 
     switch (code) {
         case SET_DEVICE_CONNECTION_STATE: {
