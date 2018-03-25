@@ -39,13 +39,12 @@ class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
   private:
     friend class DevicesFactoryHalHybrid;
 
-    sp<IDevicesFactory> mDevicesFactory;
-    sp<IDevicesFactory> mDevicesFactoryMsd;
+    std::vector<sp<IDevicesFactory>> mDeviceFactories;
 
     // Can not be constructed directly by clients.
     DevicesFactoryHalHidl();
 
-    virtual ~DevicesFactoryHalHidl();
+    virtual ~DevicesFactoryHalHidl() = default;
 };
 
 } // namespace V4_0

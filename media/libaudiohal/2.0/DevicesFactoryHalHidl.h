@@ -39,7 +39,6 @@ class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
     friend class DevicesFactoryHalHybrid;
 
     sp<IDevicesFactory> mDevicesFactory;
-    sp<IDevicesFactory> mDevicesFactoryMsd;
 
     static status_t nameFromHal(const char *name, IDevicesFactory::Device *device);
 

@@ -15,6 +15,7 @@
  */
 
 #include <string.h>
+#include <vector>
 
 #define LOG_TAG "DevicesFactoryHalHidl"
 //#define LOG_NDEBUG 0
@@ -35,40 +36,48 @@ namespace android {
 namespace V4_0 {
 
 DevicesFactoryHalHidl::DevicesFactoryHalHidl() {
-    mDevicesFactory = IDevicesFactory::getService();
-    if (mDevicesFactory != 0) {
-        // It is assumed that DevicesFactory is owned by AudioFlinger
-        // and thus have the same lifespan.
-        mDevicesFactory->linkToDeath(HalDeathHandler::getInstance(), 0 /*cookie*/);
-    } else {
-        ALOGE("Failed to obtain IDevicesFactory service, terminating process.");
+    sp<IDevicesFactory> defaultFactory{IDevicesFactory::getService()};
+    if (!defaultFactory) {
+        ALOGE("Failed to obtain IDevicesFactory/default service, terminating process.");
         exit(1);
     }
+    mDeviceFactories.push_back(defaultFactory);
     // The MSD factory is optional
-    mDevicesFactoryMsd = IDevicesFactory::getService(AUDIO_HAL_SERVICE_NAME_MSD);
-    // TODO: Register death handler, and add 'restart' directive to audioserver.rc
-}
-
-DevicesFactoryHalHidl::~DevicesFactoryHalHidl() {
+    sp<IDevicesFactory> msdFactory{IDevicesFactory::getService(AUDIO_HAL_SERVICE_NAME_MSD)};
+    if (msdFactory) {
+        mDeviceFactories.push_back(msdFactory);
+    }
+    for (const auto& factory : mDeviceFactories) {
+        // It is assumed that the DevicesFactoryHalInterface instance is owned
+        // by AudioFlinger and thus have the same lifespan.
+        factory->linkToDeath(HalDeathHandler::getInstance(), 0 /*cookie*/);
+    }
 }
 
 status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterface> *device) {
-    if (mDevicesFactory == 0) return NO_INIT;
+    if (mDeviceFactories.empty()) return NO_INIT;
     Result retval = Result::NOT_INITIALIZED;
-    Return<void> ret = mDevicesFactory->openDevice(
-            name,
-            [&](Result r, const sp<IDevice>& result) {
-                retval = r;
-                if (retval == Result::OK) {
-                    *device = new DeviceHalHidl(result);
-                }
-            });
-    if (ret.isOk()) {
-        if (retval == Result::OK) return OK;
-        else if (retval == Result::INVALID_ARGUMENTS) return BAD_VALUE;
-        else return NO_INIT;
+    for (const auto& factory : mDeviceFactories) {
+        Return<void> ret = factory->openDevice(
+                name,
+                [&](Result r, const sp<IDevice>& result) {
+                    retval = r;
+                    if (retval == Result::OK) {
+                        *device = new DeviceHalHidl(result);
+                    }
+                });
+        if (!ret.isOk()) return FAILED_TRANSACTION;
+        switch (retval) {
+            // Device was found and was initialized successfully.
+            case Result::OK: return OK;
+            // Device was found but failed to initalize.
+            case Result::NOT_INITIALIZED: return NO_INIT;
+            // Otherwise continue iterating.
+            default: ;
+        }
     }
-    return FAILED_TRANSACTION;
+    ALOGW("The specified device name is not recognized: \"%s\"", name);
+    return BAD_VALUE;
 }
 
 } // namespace V4_0
