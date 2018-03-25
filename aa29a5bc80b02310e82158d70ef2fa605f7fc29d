@@ -64,6 +64,24 @@
       "revId": "aa29a5bc80b02310e82158d70ef2fa605f7fc29d",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "b9544c22_99720087",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 235,
+      "author": {
+        "id": 13589
+      },
+      "writtenOn": "2018-03-25T06:59:24Z",
+      "side": 1,
+      "message": "Yeah but I dislike the idea of changing the \"original workflow\" for the \"normal\" devices, even if we\u0027d make it match the old behaviour, it would be an unnecessary reassignment of the value to itself.\n\nMeanwhile, checking that property is set and enabled to apply a special case is cleaner and makes more sense.",
+      "parentUuid": "55585e10_6cc205d4",
+      "revId": "aa29a5bc80b02310e82158d70ef2fa605f7fc29d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
