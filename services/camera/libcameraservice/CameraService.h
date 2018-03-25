@@ -526,20 +526,20 @@ private:
         void registerSelf();
         void unregisterSelf();
 
-        bool isUidActive(uid_t uid);
+        bool isUidActive(uid_t uid, String16 callingPackage);
 
         void onUidGone(uid_t uid, bool disabled);
         void onUidActive(uid_t uid);
         void onUidIdle(uid_t uid, bool disabled);
 
-        void addOverrideUid(uid_t uid, bool active);
-        void removeOverrideUid(uid_t uid);
+        void addOverrideUid(uid_t uid, String16 callingPackage, bool active);
+        void removeOverrideUid(uid_t uid, String16 callingPackage);
 
         // IBinder::DeathRecipient implementation
         virtual void binderDied(const wp<IBinder> &who);
     private:
-        bool isUidActiveLocked(uid_t uid);
-        void updateOverrideUid(uid_t uid, bool active, bool insert);
+        bool isUidActiveLocked(uid_t uid, String16 callingPackage);
+        void updateOverrideUid(uid_t uid, String16 callingPackage, bool active, bool insert);
 
         Mutex mUidLock;
         bool mRegistered;
