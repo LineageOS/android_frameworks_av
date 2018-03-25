@@ -82,6 +82,24 @@
       "revId": "aa29a5bc80b02310e82158d70ef2fa605f7fc29d",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "e70ef65c_0bb37fde",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 235,
+      "author": {
+        "id": 15667
+      },
+      "writtenOn": "2018-03-25T08:08:53Z",
+      "side": 1,
+      "message": "Agreed. The current implementation interferes least with the standard use case of this class. Moreover, the current logic is simpler, which should cause fewer complications for \"consumers\" of this change IMO.",
+      "parentUuid": "b9544c22_99720087",
+      "revId": "aa29a5bc80b02310e82158d70ef2fa605f7fc29d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
