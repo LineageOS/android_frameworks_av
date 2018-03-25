@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "8111bf8d_17346d09",
+        "filename": "camera/ICameraClient.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 444
+      },
+      "writtenOn": "2018-03-25T17:44:50Z",
+      "side": 1,
+      "message": "Nah. I can remove it.",
+      "parentUuid": "fee23922_7048fc05",
+      "range": {
+        "startLine": 55,
+        "startChar": 12,
+        "endLine": 55,
+        "endChar": 76
+      },
+      "revId": "7e91d16c8ef9c33dbaa52bb8d7df1348c51c735d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7da6c81d_a659023e",
         "filename": "camera/ICameraClient.cpp",
         "patchSetId": 4
