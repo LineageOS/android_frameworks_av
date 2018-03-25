@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "67c78a9b_0890f027",
+        "filename": "media/libstagefright/CameraSource.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 235,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-03-25T05:22:43Z",
+      "side": 1,
+      "message": "Shouldn\u0027t the default value be the incoming value of storeMetaDataInVideoBuffers?",
+      "range": {
+        "startLine": 235,
+        "startChar": 57,
+        "endLine": 235,
+        "endChar": 62
+      },
+      "revId": "aa29a5bc80b02310e82158d70ef2fa605f7fc29d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
