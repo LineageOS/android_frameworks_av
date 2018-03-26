@@ -20,13 +20,13 @@
 
 #include <utils/Errors.h>
 #include <utils/String8.h>
-#include <utils/Vector.h>
 
 namespace android {
 
-status_t reportDrmPluginMetrics(const Vector<uint8_t>& serializedMetrics,
+status_t reportDrmPluginMetrics(const std::string& b64EncodedMetrics,
                                 const String8& vendorName,
-                                const String8& description);
+                                const String8& description,
+                                const String8& appPackageName);
 
 }  // namespace android
 
