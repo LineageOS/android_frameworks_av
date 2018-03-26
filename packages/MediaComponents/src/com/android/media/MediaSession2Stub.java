@@ -389,7 +389,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 //       use thread poll for incoming calls.
                 final int playerState = session.getInstance().getPlayerState();
                 final long positionEventTimeMs = System.currentTimeMillis();
-                final long positionMs = session.getInstance().getPosition();
+                final long positionMs = session.getInstance().getCurrentPosition();
                 final float playbackSpeed = session.getInstance().getPlaybackSpeed();
                 final long bufferedPositionMs = session.getInstance().getBufferedPosition();
                 final Bundle playbackInfoBundle = ((MediaController2Impl.PlaybackInfoImpl)

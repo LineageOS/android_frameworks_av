@@ -669,7 +669,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
     }
 
     @Override
-    public long getPosition_impl() {
+    public long getCurrentPosition_impl() {
         final MediaPlayerBase player = mPlayer;
         if (player != null) {
             return mPlayer.getCurrentPosition();
