@@ -23,6 +23,7 @@ import android.media.DataSourceDesc;
 import android.media.MediaItem2;
 import android.media.MediaMetadata2;
 import android.media.MediaPlayerBase;
+import android.media.MediaPlayerBase.PlayerEventCallback;
 import android.media.MediaPlaylistAgent;
 import android.media.MediaSession2.OnDataSourceMissingHelper;
 import android.util.ArrayMap;
@@ -47,8 +48,8 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
 
     private final Object mLock = new Object();
     private final MediaSession2Impl mSessionImpl;
+    private final MyPlayerEventCallback mPlayerCallback;
 
-    // TODO: Set data sources properly into mPlayer (b/74090741)
     @GuardedBy("mLock")
     private MediaPlayerBase mPlayer;
     @GuardedBy("mLock")
@@ -68,6 +69,22 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
     private int mShuffleMode;
     @GuardedBy("mLock")
     private PlayItem mCurrent;
+
+    // Called on session callback executor.
+    private class MyPlayerEventCallback extends PlayerEventCallback {
+        public void onCurrentDataSourceChanged(@NonNull MediaPlayerBase mpb,
+                @Nullable DataSourceDesc dsd) {
+            if (mPlayer != mpb) {
+                return;
+            }
+            synchronized (mLock) {
+                if (dsd == null && mCurrent != null) {
+                    mCurrent = getNextValidPlayItemLocked(mCurrent.shuffledIdx, 1);
+                    updateCurrentIfNeededLocked();
+                }
+            }
+        }
+    }
 
     private class PlayItem {
         int shuffledIdx;
@@ -127,14 +144,23 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
         }
         mSessionImpl = sessionImpl;
         mPlayer = player;
+        mPlayerCallback = new MyPlayerEventCallback();
+        mPlayer.registerPlayerEventCallback(mSessionImpl.getCallbackExecutor(), mPlayerCallback);
     }
 
-    public void setPlayer(MediaPlayerBase player) {
+    public void setPlayer(@NonNull MediaPlayerBase player) {
         if (player == null) {
             throw new IllegalArgumentException("player shouldn't be null");
         }
         synchronized (mLock) {
+            if (player == mPlayer) {
+                return;
+            }
+            mPlayer.unregisterPlayerEventCallback(mPlayerCallback);
             mPlayer = player;
+            mPlayer.registerPlayerEventCallback(
+                    mSessionImpl.getCallbackExecutor(), mPlayerCallback);
+            updatePlayerDataSourceLocked();
         }
     }
 
@@ -172,6 +198,7 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
 
             mMetadata = metadata;
             mCurrent = getNextValidPlayItemLocked(END_OF_PLAYLIST, 1);
+            updatePlayerDataSourceLocked();
         }
         notifyPlaylistChanged();
     }
@@ -210,6 +237,7 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
             }
             if (!hasValidItem()) {
                 mCurrent = getNextValidPlayItemLocked(END_OF_PLAYLIST, 1);
+                updatePlayerDataSourceLocked();
             } else {
                 updateCurrentIfNeededLocked();
             }
@@ -249,6 +277,7 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
             mPlaylist.set(index, item);
             if (!hasValidItem()) {
                 mCurrent = getNextValidPlayItemLocked(END_OF_PLAYLIST, 1);
+                updatePlayerDataSourceLocked();
             } else {
                 updateCurrentIfNeededLocked();
             }
@@ -291,7 +320,7 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
     @Override
     public void skipToNextItem() {
         synchronized (mLock) {
-            if (!hasValidItem()) {
+            if (!hasValidItem() || mCurrent == mEopPlayItem) {
                 return;
             }
             PlayItem next = getNextValidPlayItemLocked(mCurrent.shuffledIdx, 1);
@@ -318,6 +347,23 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
                 return;
             }
             mRepeatMode = repeatMode;
+            switch (repeatMode) {
+                case MediaPlaylistAgent.REPEAT_MODE_ONE:
+                    if (mCurrent != null && mCurrent != mEopPlayItem) {
+                        mPlayer.loopCurrent(true);
+                    }
+                    break;
+                case MediaPlaylistAgent.REPEAT_MODE_ALL:
+                case MediaPlaylistAgent.REPEAT_MODE_GROUP:
+                    if (mCurrent == mEopPlayItem) {
+                        mCurrent = getNextValidPlayItemLocked(END_OF_PLAYLIST, 1);
+                        updatePlayerDataSourceLocked();
+                    }
+                    // pass through
+                case MediaPlaylistAgent.REPEAT_MODE_NONE:
+                    mPlayer.loopCurrent(false);
+                    break;
+            }
         }
         notifyRepeatModeChanged();
     }
@@ -339,6 +385,7 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
             }
             mShuffleMode = shuffleMode;
             applyShuffleModeLocked();
+            updateCurrentIfNeededLocked();
         }
         notifyShuffleModeChanged();
     }
@@ -373,6 +420,7 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
         return dsd;
     }
 
+    // TODO: consider to call updateCurrentIfNeededLocked inside (b/74090741)
     private PlayItem getNextValidPlayItemLocked(int curShuffledIdx, int direction) {
         int size = mPlaylist.size();
         if (curShuffledIdx == END_OF_PLAYLIST) {
@@ -414,7 +462,19 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
                 mCurrent = getNextValidPlayItemLocked(mCurrent.shuffledIdx, 1);
             }
         }
+        updatePlayerDataSourceLocked();
         return;
+    }
+
+    private void updatePlayerDataSourceLocked() {
+        if (mCurrent == null || mCurrent == mEopPlayItem) {
+            return;
+        }
+        if (mPlayer.getCurrentDataSource() != mCurrent.dsd) {
+            mPlayer.setDataSource(mCurrent.dsd);
+            mPlayer.loopCurrent(mRepeatMode == MediaPlaylistAgent.REPEAT_MODE_ONE);
+        }
+        // TODO: Call setNextDataSource (b/74090741)
     }
 
     private void applyShuffleModeLocked() {
