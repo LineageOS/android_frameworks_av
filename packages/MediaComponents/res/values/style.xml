@@ -10,30 +10,35 @@
         <item name="android:src">@drawable/ic_skip_previous</item>
         <item name="android:layout_width">@dimen/mcv2_full_icon_size</item>
         <item name="android:layout_height">@dimen/mcv2_full_icon_size</item>
+        <item name="android:contentDescription">@string/mcv2_previous_button_desc</item>
     </style>
 
     <style name="FullTransportControlsButton.Next">
         <item name="android:src">@drawable/ic_skip_next</item>
         <item name="android:layout_width">@dimen/mcv2_full_icon_size</item>
         <item name="android:layout_height">@dimen/mcv2_full_icon_size</item>
+        <item name="android:contentDescription">@string/mcv2_next_button_desc</item>
     </style>
 
     <style name="FullTransportControlsButton.Pause">
         <item name="android:src">@drawable/ic_pause_circle_filled</item>
         <item name="android:layout_width">@dimen/mcv2_pause_icon_size</item>
         <item name="android:layout_height">@dimen/mcv2_pause_icon_size</item>
+        <item name="android:contentDescription">@string/mcv2_pause_button_desc</item>
     </style>
 
     <style name="FullTransportControlsButton.Ffwd">
         <item name="android:src">@drawable/ic_forward_30</item>
         <item name="android:layout_width">@dimen/mcv2_full_icon_size</item>
         <item name="android:layout_height">@dimen/mcv2_full_icon_size</item>
+        <item name="android:contentDescription">@string/mcv2_ffwd_button_desc</item>
     </style>
 
     <style name="FullTransportControlsButton.Rew">
         <item name="android:src">@drawable/ic_rewind_10</item>
         <item name="android:layout_width">@dimen/mcv2_full_icon_size</item>
         <item name="android:layout_height">@dimen/mcv2_full_icon_size</item>
+        <item name="android:contentDescription">@string/mcv2_rewind_button_desc</item>
     </style>
 
     <style name="EmbeddedTransportControlsButton">
@@ -46,30 +51,35 @@
         <item name="android:src">@drawable/ic_skip_previous</item>
         <item name="android:layout_width">@dimen/mcv2_embedded_icon_size</item>
         <item name="android:layout_height">@dimen/mcv2_embedded_icon_size</item>
+        <item name="android:contentDescription">@string/mcv2_previous_button_desc</item>
     </style>
 
     <style name="EmbeddedTransportControlsButton.Next">
         <item name="android:src">@drawable/ic_skip_next</item>
         <item name="android:layout_width">@dimen/mcv2_embedded_icon_size</item>
         <item name="android:layout_height">@dimen/mcv2_embedded_icon_size</item>
+        <item name="android:contentDescription">@string/mcv2_next_button_desc</item>
     </style>
 
     <style name="EmbeddedTransportControlsButton.Pause">
         <item name="android:src">@drawable/ic_pause_circle_filled</item>
         <item name="android:layout_width">@dimen/mcv2_pause_icon_size</item>
         <item name="android:layout_height">@dimen/mcv2_pause_icon_size</item>
+        <item name="android:contentDescription">@string/mcv2_pause_button_desc</item>
     </style>
 
     <style name="EmbeddedTransportControlsButton.Ffwd">
         <item name="android:src">@drawable/ic_forward_30</item>
         <item name="android:layout_width">@dimen/mcv2_embedded_icon_size</item>
         <item name="android:layout_height">@dimen/mcv2_embedded_icon_size</item>
+        <item name="android:contentDescription">@string/mcv2_ffwd_button_desc</item>
     </style>
 
     <style name="EmbeddedTransportControlsButton.Rew">
         <item name="android:src">@drawable/ic_rewind_10</item>
         <item name="android:layout_width">@dimen/mcv2_embedded_icon_size</item>
         <item name="android:layout_height">@dimen/mcv2_embedded_icon_size</item>
+        <item name="android:contentDescription">@string/mcv2_rewind_button_desc</item>
     </style>
 
     <style name="MinimalTransportControlsButton">
@@ -81,6 +91,7 @@
         <item name="android:src">@drawable/ic_pause_circle_filled</item>
         <item name="android:layout_width">@dimen/mcv2_minimal_icon_size</item>
         <item name="android:layout_height">@dimen/mcv2_minimal_icon_size</item>
+        <item name="android:contentDescription">@string/mcv2_pause_button_desc</item>
     </style>
 
     <style name="TitleBar">
@@ -95,10 +106,12 @@
 
     <style name="TitleBarButton.Back">
         <item name="android:src">@drawable/ic_arrow_back</item>
+        <item name="android:contentDescription">@string/mcv2_back_button_desc</item>
     </style>
 
     <style name="TitleBarButton.Launch">
         <item name="android:src">@drawable/ic_launch</item>
+        <item name="android:contentDescription">@string/mcv2_launch_button_desc</item>
     </style>
 
     <style name="TimeText">
@@ -137,29 +150,36 @@
 
     <style name="BottomBarButton.CC">
         <item name="android:src">@drawable/ic_subtitle_off</item>
+        <item name="android:contentDescription">@string/mcv2_cc_is_off</item>
     </style>
 
     <style name="BottomBarButton.FullScreen">
         <item name="android:src">@drawable/ic_fullscreen</item>
+        <item name="android:contentDescription">@string/mcv2_full_screen_button_desc</item>
     </style>
 
     <style name="BottomBarButton.OverflowRight">
         <item name="android:src">@drawable/ic_chevron_right</item>
+        <item name="android:contentDescription">@string/mcv2_overflow_right_button_desc</item>
     </style>
 
     <style name="BottomBarButton.OverflowLeft">
         <item name="android:src">@drawable/ic_chevron_left</item>
+        <item name="android:contentDescription">@string/mcv2_overflow_left_button_desc</item>
     </style>
 
     <style name="BottomBarButton.Settings">
         <item name="android:src">@drawable/ic_settings</item>
+        <item name="android:contentDescription">@string/mcv2_settings_button_desc</item>
     </style>
 
     <style name="BottomBarButton.Mute">
         <item name="android:src">@drawable/ic_unmute</item>
+        <item name="android:contentDescription">@string/mcv2_unmuted_button_desc</item>
     </style>
 
     <style name="BottomBarButton.VideoQuality">
-        <item name="android:src">@drawable/ic_high_quality</item>
+      <item name="android:src">@drawable/ic_high_quality</item>
+      <item name="android:contentDescription">@string/mcv2_video_quality_button_desc</item>
     </style>
 </resources>
