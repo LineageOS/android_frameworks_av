@@ -764,7 +764,7 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public long getPosition_impl() {
+    public long getCurrentPosition_impl() {
         synchronized (mLock) {
             long timeDiff = System.currentTimeMillis() - mPositionEventTimeMs;
             long expectedPosition = mPositionMs + (long) (mPlaybackSpeed * timeDiff);
@@ -837,7 +837,8 @@ public class MediaController2Impl implements MediaController2Provider {
             if (!mInstance.isConnected()) {
                 return;
             }
-            mCallback.onBufferedPositionChanged(mInstance, bufferedPositionMs);
+            // TODO(jaewan): Fix this -- it's now buffered state
+            //mCallback.onBufferedPositionChanged(mInstance, bufferedPositionMs);
         });
     }
 
@@ -862,8 +863,7 @@ public class MediaController2Impl implements MediaController2Provider {
             if (!mInstance.isConnected()) {
                 return;
             }
-            // TODO(jaewan): Fix public API not to take playlistAgent.
-            mCallback.onPlaylistChanged(mInstance, null, playlist, metadata);
+            mCallback.onPlaylistChanged(mInstance, playlist, metadata);
         });
     }
 
@@ -875,8 +875,7 @@ public class MediaController2Impl implements MediaController2Provider {
             if (!mInstance.isConnected()) {
                 return;
             }
-            // TODO(jaewan): Fix public API not to take playlistAgent.
-            mCallback.onPlaylistMetadataChanged(mInstance, null, metadata);
+            mCallback.onPlaylistMetadataChanged(mInstance, metadata);
         });
     }
 
@@ -888,8 +887,7 @@ public class MediaController2Impl implements MediaController2Provider {
             if (!mInstance.isConnected()) {
                 return;
             }
-            // TODO(jaewan): Fix public API not to take playlistAgent.
-            mCallback.onShuffleModeChanged(mInstance, null, shuffleMode);
+            mCallback.onShuffleModeChanged(mInstance, shuffleMode);
         });
     }
 
@@ -901,8 +899,7 @@ public class MediaController2Impl implements MediaController2Provider {
             if (!mInstance.isConnected()) {
                 return;
             }
-            // TODO(jaewan): Fix public API not to take playlistAgent.
-            mCallback.onRepeatModeChanged(mInstance, null, repeatMode);
+            mCallback.onRepeatModeChanged(mInstance, repeatMode);
         });
     }
 
