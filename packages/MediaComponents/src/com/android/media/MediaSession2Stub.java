@@ -86,9 +86,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 CommandGroupImpl group = new CommandGroupImpl(session.getContext());
                 group.addAllPlaybackCommands();
                 group.addAllPlaylistCommands();
-                List<Command> commands = group.getCommands();
-                for (int i = 0; i < commands.size(); i++) {
-                    Command command = commands.get(i);
+                Set<Command> commands = group.getCommands();
+                for (Command command : commands) {
                     sCommandsForOnCommandRequest.append(command.getCommandCode(), command);
                 }
             }
