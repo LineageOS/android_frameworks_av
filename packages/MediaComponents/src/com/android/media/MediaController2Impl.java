@@ -24,12 +24,12 @@ import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST;
 import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA;
 import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_REPEAT_MODE;
 import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_SHUFFLE_MODE;
-import static android.media.MediaSession2.COMMAND_CODE_PLAY_FROM_MEDIA_ID;
-import static android.media.MediaSession2.COMMAND_CODE_PLAY_FROM_SEARCH;
-import static android.media.MediaSession2.COMMAND_CODE_PLAY_FROM_URI;
-import static android.media.MediaSession2.COMMAND_CODE_PREPARE_FROM_MEDIA_ID;
-import static android.media.MediaSession2.COMMAND_CODE_PREPARE_FROM_SEARCH;
-import static android.media.MediaSession2.COMMAND_CODE_PREPARE_FROM_URI;
+import static android.media.MediaSession2.COMMAND_CODE_SESSION_PLAY_FROM_MEDIA_ID;
+import static android.media.MediaSession2.COMMAND_CODE_SESSION_PLAY_FROM_SEARCH;
+import static android.media.MediaSession2.COMMAND_CODE_SESSION_PLAY_FROM_URI;
+import static android.media.MediaSession2.COMMAND_CODE_SESSION_PREPARE_FROM_MEDIA_ID;
+import static android.media.MediaSession2.COMMAND_CODE_SESSION_PREPARE_FROM_SEARCH;
+import static android.media.MediaSession2.COMMAND_CODE_SESSION_PREPARE_FROM_URI;
 
 import android.app.PendingIntent;
 import android.content.ComponentName;
@@ -438,7 +438,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void prepareFromUri_impl(Uri uri, Bundle extras) {
-        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PREPARE_FROM_URI);
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_SESSION_PREPARE_FROM_URI);
         if (uri == null) {
             throw new IllegalArgumentException("uri shouldn't be null");
         }
@@ -455,7 +455,8 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void prepareFromSearch_impl(String query, Bundle extras) {
-        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PREPARE_FROM_SEARCH);
+        final IMediaSession2 binder = getSessionBinderIfAble(
+                COMMAND_CODE_SESSION_PREPARE_FROM_SEARCH);
         if (TextUtils.isEmpty(query)) {
             throw new IllegalArgumentException("query shouldn't be empty");
         }
@@ -472,7 +473,8 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void prepareFromMediaId_impl(String mediaId, Bundle extras) {
-        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PREPARE_FROM_MEDIA_ID);
+        final IMediaSession2 binder = getSessionBinderIfAble(
+                COMMAND_CODE_SESSION_PREPARE_FROM_MEDIA_ID);
         if (mediaId == null) {
             throw new IllegalArgumentException("mediaId shouldn't be null");
         }
@@ -489,7 +491,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void playFromUri_impl(Uri uri, Bundle extras) {
-        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAY_FROM_URI);
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_SESSION_PLAY_FROM_URI);
         if (uri == null) {
             throw new IllegalArgumentException("uri shouldn't be null");
         }
@@ -506,7 +508,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void playFromSearch_impl(String query, Bundle extras) {
-        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAY_FROM_SEARCH);
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_SESSION_PLAY_FROM_SEARCH);
         if (TextUtils.isEmpty(query)) {
             throw new IllegalArgumentException("query shouldn't be empty");
         }
@@ -523,7 +525,8 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void playFromMediaId_impl(String mediaId, Bundle extras) {
-        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAY_FROM_MEDIA_ID);
+        final IMediaSession2 binder = getSessionBinderIfAble(
+                COMMAND_CODE_SESSION_PLAY_FROM_MEDIA_ID);
         if (mediaId == null) {
             throw new IllegalArgumentException("mediaId shouldn't be null");
         }
