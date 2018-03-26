@@ -764,7 +764,7 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public long getPosition_impl() {
+    public long getCurrentPosition_impl() {
         synchronized (mLock) {
             long timeDiff = System.currentTimeMillis() - mPositionEventTimeMs;
             long expectedPosition = mPositionMs + (long) (mPlaybackSpeed * timeDiff);
@@ -837,7 +837,8 @@ public class MediaController2Impl implements MediaController2Provider {
             if (!mInstance.isConnected()) {
                 return;
             }
-            mCallback.onBufferedPositionChanged(mInstance, bufferedPositionMs);
+            // TODO(jaewan): Fix this -- it's now buffered state
+            //mCallback.onBufferedPositionChanged(mInstance, bufferedPositionMs);
         });
     }
 
