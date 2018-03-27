@@ -21,9 +21,9 @@ import android.content.Context;
 import android.media.MediaController2;
 import android.media.MediaItem2;
 import android.media.MediaMetadata2;
-import android.media.MediaSession2.Command;
+import android.media.SessionCommand2;
 import android.media.MediaSession2.CommandButton;
-import android.media.MediaSession2.CommandGroup;
+import android.media.SessionCommandGroup2;
 import android.os.Bundle;
 import android.os.ResultReceiver;
 import android.text.TextUtils;
@@ -245,7 +245,7 @@ public class MediaController2Stub extends IMediaController2.Stub {
             }
         }
         controller.onConnectedNotLocked(sessionBinder,
-                CommandGroup.fromBundle(commandGroup),
+                SessionCommandGroup2.fromBundle(commandGroup),
                 playerState, positionEventTimeMs, positionMs, playbackSpeed, bufferedPositionMs,
                 PlaybackInfoImpl.fromBundle(playbackInfo), repeatMode, shuffleMode,
                 itemList, sessionActivity);
@@ -303,7 +303,7 @@ public class MediaController2Stub extends IMediaController2.Stub {
             // TODO(jaewan): Revisit here. Could be a bug
             return;
         }
-        CommandGroup commands = CommandGroup.fromBundle(commandsBundle);
+        SessionCommandGroup2 commands = SessionCommandGroup2.fromBundle(commandsBundle);
         if (commands == null) {
             Log.w(TAG, "onAllowedCommandsChanged(): Ignoring null commands");
             return;
@@ -320,7 +320,7 @@ public class MediaController2Stub extends IMediaController2.Stub {
             Log.w(TAG, "Don't fail silently here. Highly likely a bug");
             return;
         }
-        Command command = Command.fromBundle(commandBundle);
+        SessionCommand2 command = SessionCommand2.fromBundle(commandBundle);
         if (command == null) {
             Log.w(TAG, "onCustomCommand(): Ignoring null command");
             return;

@@ -16,20 +16,20 @@
 
 package com.android.media;
 
-import static android.media.MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME;
-import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM;
-import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM;
-import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM;
-import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST;
-import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA;
-import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_REPEAT_MODE;
-import static android.media.MediaSession2.COMMAND_CODE_PLAYLIST_SET_SHUFFLE_MODE;
-import static android.media.MediaSession2.COMMAND_CODE_SESSION_PLAY_FROM_MEDIA_ID;
-import static android.media.MediaSession2.COMMAND_CODE_SESSION_PLAY_FROM_SEARCH;
-import static android.media.MediaSession2.COMMAND_CODE_SESSION_PLAY_FROM_URI;
-import static android.media.MediaSession2.COMMAND_CODE_SESSION_PREPARE_FROM_MEDIA_ID;
-import static android.media.MediaSession2.COMMAND_CODE_SESSION_PREPARE_FROM_SEARCH;
-import static android.media.MediaSession2.COMMAND_CODE_SESSION_PREPARE_FROM_URI;
+import static android.media.SessionCommand2.COMMAND_CODE_SET_VOLUME;
+import static android.media.SessionCommand2.COMMAND_CODE_PLAYLIST_ADD_ITEM;
+import static android.media.SessionCommand2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM;
+import static android.media.SessionCommand2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM;
+import static android.media.SessionCommand2.COMMAND_CODE_PLAYLIST_SET_LIST;
+import static android.media.SessionCommand2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA;
+import static android.media.SessionCommand2.COMMAND_CODE_PLAYLIST_SET_REPEAT_MODE;
+import static android.media.SessionCommand2.COMMAND_CODE_PLAYLIST_SET_SHUFFLE_MODE;
+import static android.media.SessionCommand2.COMMAND_CODE_SESSION_PLAY_FROM_MEDIA_ID;
+import static android.media.SessionCommand2.COMMAND_CODE_SESSION_PLAY_FROM_SEARCH;
+import static android.media.SessionCommand2.COMMAND_CODE_SESSION_PLAY_FROM_URI;
+import static android.media.SessionCommand2.COMMAND_CODE_SESSION_PREPARE_FROM_MEDIA_ID;
+import static android.media.SessionCommand2.COMMAND_CODE_SESSION_PREPARE_FROM_SEARCH;
+import static android.media.SessionCommand2.COMMAND_CODE_SESSION_PREPARE_FROM_URI;
 
 import android.app.PendingIntent;
 import android.content.ComponentName;
@@ -44,10 +44,9 @@ import android.media.MediaItem2;
 import android.media.MediaMetadata2;
 import android.media.MediaPlaylistAgent.RepeatMode;
 import android.media.MediaPlaylistAgent.ShuffleMode;
-import android.media.MediaSession2;
-import android.media.MediaSession2.Command;
+import android.media.SessionCommand2;
 import android.media.MediaSession2.CommandButton;
-import android.media.MediaSession2.CommandGroup;
+import android.media.SessionCommandGroup2;
 import android.media.MediaSessionService2;
 import android.media.Rating2;
 import android.media.SessionToken2;
@@ -108,7 +107,7 @@ public class MediaController2Impl implements MediaController2Provider {
     @GuardedBy("mLock")
     private PendingIntent mSessionActivity;
     @GuardedBy("mLock")
-    private CommandGroup mAllowedCommands;
+    private SessionCommandGroup2 mAllowedCommands;
 
     // Assignment should be used with the lock hold, but should be used without a lock to prevent
     // potential deadlock.
@@ -297,7 +296,7 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     // Returns session binder if the controller can send the command.
-    IMediaSession2 getSessionBinderIfAble(Command command) {
+    IMediaSession2 getSessionBinderIfAble(SessionCommand2 command) {
         synchronized (mLock) {
             if (!mAllowedCommands.hasCommand(command)) {
                 Log.w(TAG, "Controller isn't allowed to call command, command=" + command);
@@ -326,17 +325,17 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void play_impl() {
-        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_PLAY);
+        sendTransportControlCommand(SessionCommand2.COMMAND_CODE_PLAYBACK_PLAY);
     }
 
     @Override
     public void pause_impl() {
-        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE);
+        sendTransportControlCommand(SessionCommand2.COMMAND_CODE_PLAYBACK_PAUSE);
     }
 
     @Override
     public void stop_impl() {
-        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_STOP);
+        sendTransportControlCommand(SessionCommand2.COMMAND_CODE_PLAYBACK_STOP);
     }
 
     @Override
@@ -409,7 +408,7 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void setVolumeTo_impl(int value, int flags) {
         // TODO(hdmoon): sanity check
-        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYBACK_SET_VOLUME);
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_SET_VOLUME);
         if (binder != null) {
             try {
                 binder.setVolumeTo(mControllerStub, value, flags);
@@ -424,7 +423,7 @@ public class MediaController2Impl implements MediaController2Provider {
     @Override
     public void adjustVolume_impl(int direction, int flags) {
         // TODO(hdmoon): sanity check
-        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_PLAYBACK_SET_VOLUME);
+        final IMediaSession2 binder = getSessionBinderIfAble(COMMAND_CODE_SET_VOLUME);
         if (binder != null) {
             try {
                 binder.adjustVolume(mControllerStub, direction, flags);
@@ -563,7 +562,7 @@ public class MediaController2Impl implements MediaController2Provider {
     }
 
     @Override
-    public void sendCustomCommand_impl(Command command, Bundle args, ResultReceiver cb) {
+    public void sendCustomCommand_impl(SessionCommand2 command, Bundle args, ResultReceiver cb) {
         if (command == null) {
             throw new IllegalArgumentException("command shouldn't be null");
         }
@@ -633,7 +632,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void prepare_impl() {
-        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE);
+        sendTransportControlCommand(SessionCommand2.COMMAND_CODE_PLAYBACK_PREPARE);
     }
 
     @Override
@@ -655,7 +654,7 @@ public class MediaController2Impl implements MediaController2Provider {
         }
         Bundle args = new Bundle();
         args.putLong(MediaSession2Stub.ARGUMENT_KEY_POSITION, pos);
-        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO, args);
+        sendTransportControlCommand(SessionCommand2.COMMAND_CODE_PLAYBACK_SEEK_TO, args);
     }
 
     @Override
@@ -919,7 +918,7 @@ public class MediaController2Impl implements MediaController2Provider {
 
     // Should be used without a lock to prevent potential deadlock.
     void onConnectedNotLocked(IMediaSession2 sessionBinder,
-            final CommandGroup allowedCommands,
+            final SessionCommandGroup2 allowedCommands,
             final int playerState,
             final long positionEventTimeMs,
             final long positionMs,
@@ -991,7 +990,7 @@ public class MediaController2Impl implements MediaController2Provider {
         }
     }
 
-    void onCustomCommand(final Command command, final Bundle args,
+    void onCustomCommand(final SessionCommand2 command, final Bundle args,
             final ResultReceiver receiver) {
         if (DEBUG) {
             Log.d(TAG, "onCustomCommand cmd=" + command);
@@ -1002,7 +1001,7 @@ public class MediaController2Impl implements MediaController2Provider {
         });
     }
 
-    void onAllowedCommandsChanged(final CommandGroup commands) {
+    void onAllowedCommandsChanged(final SessionCommandGroup2 commands) {
         mCallbackExecutor.execute(() -> {
             mCallback.onAllowedCommandsChanged(mInstance, commands);
         });
