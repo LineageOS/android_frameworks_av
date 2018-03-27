@@ -66,6 +66,8 @@ struct MediaClock : public AHandler {
     // mediaTimeUs + (adjustRealUs / playbackRate)
     void addTimer(const sp<AMessage> &notify, int64_t mediaTimeUs, int64_t adjustRealUs = 0);
 
+    void setNotificationMessage(const sp<AMessage> &msg);
+
     void reset();
 
 protected:
@@ -92,6 +94,11 @@ private:
 
     void processTimers_l();
 
+    void updateAnchorTimesAndPlaybackRate_l(
+            int64_t anchorTimeMediaUs, int64_t anchorTimeRealUs , float playbackRate);
+
+    void notifyDiscontinuity_l();
+
     sp<ALooper> mLooper;
     mutable Mutex mLock;
 
@@ -104,6 +111,7 @@ private:
 
     int32_t mGeneration;
     std::list<Timer> mTimers;
+    sp<AMessage> mNotify;
 
     DISALLOW_EVIL_CONSTRUCTORS(MediaClock);
 };
