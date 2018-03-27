@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#include <android-base/logging.h>
+#include <sys/types.h>
+
 #include "MtpDescriptors.h"
 
 namespace android {
@@ -256,5 +259,25 @@ const struct desc_v1 ptp_desc_v1 = {
     .fs_descs = ptp_fs_descriptors,
     .hs_descs = ptp_hs_descriptors,
 };
+
+bool writeDescriptors(int fd, bool ptp) {
+    ssize_t ret = TEMP_FAILURE_RETRY(write(fd,
+                &(ptp ? ptp_desc_v2 : mtp_desc_v2), sizeof(desc_v2)));
+    if (ret < 0) {
+        PLOG(ERROR) << fd << "Switching to V1 descriptor format";
+        ret = TEMP_FAILURE_RETRY(write(fd,
+                    &(ptp ? ptp_desc_v1 : mtp_desc_v1), sizeof(desc_v1)));
+        if (ret < 0) {
+            PLOG(ERROR) << fd << "Writing descriptors failed";
+            return false;
+        }
+    }
+    ret = TEMP_FAILURE_RETRY(write(fd, &mtp_strings, sizeof(mtp_strings)));
+    if (ret < 0) {
+        PLOG(ERROR) << fd << "Writing strings failed";
+        return false;
+    }
+    return true;
+}
 
 }; // namespace android
