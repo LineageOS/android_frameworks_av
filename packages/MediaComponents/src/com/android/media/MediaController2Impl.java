@@ -638,12 +638,14 @@ public class MediaController2Impl implements MediaController2Provider {
 
     @Override
     public void fastForward_impl() {
-        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_FAST_FORWARD);
+        // TODO(jaewan): Implement this. Note that fast forward isn't a transport command anymore
+        //sendTransportControlCommand(MediaSession2.COMMAND_CODE_SESSION_FAST_FORWARD);
     }
 
     @Override
     public void rewind_impl() {
-        sendTransportControlCommand(MediaSession2.COMMAND_CODE_PLAYBACK_REWIND);
+        // TODO(jaewan): Implement this. Note that rewind isn't a transport command anymore
+        //sendTransportControlCommand(MediaSession2.COMMAND_CODE_SESSION_REWIND);
     }
 
     @Override

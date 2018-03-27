@@ -495,12 +495,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 case MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE:
                     session.getInstance().prepare();
                     break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_FAST_FORWARD:
-                    session.getInstance().fastForward();
-                    break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_REWIND:
-                    session.getInstance().rewind();
-                    break;
                 case MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO:
                     session.getInstance().seekTo(args.getLong(ARGUMENT_KEY_POSITION));
                     break;
