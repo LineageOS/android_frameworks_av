@@ -615,6 +615,7 @@ static std::vector<std::pair<const char *, uint32_t>> int32Mappings {
 static std::vector<std::pair<const char *, uint32_t>> bufferMappings {
     {
         { "albumart", kKeyAlbumArt },
+        { "audio-presentation-info", kKeyAudioPresentationInfo },
         { "pssh", kKeyPssh },
         { "crypto-iv", kKeyCryptoIV },
         { "crypto-key", kKeyCryptoKey },

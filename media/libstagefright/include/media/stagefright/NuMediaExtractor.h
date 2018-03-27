@@ -20,6 +20,7 @@
 #include <list>
 #include <media/mediaplayer.h>
 #include <media/stagefright/foundation/ABase.h>
+#include <media/stagefright/foundation/AudioPresentationInfo.h>
 #include <media/IMediaExtractor.h>
 #include <media/MediaSource.h>
 #include <utils/Errors.h>
@@ -94,6 +95,9 @@ struct NuMediaExtractor : public RefBase {
     status_t getMetrics(Parcel *reply);
 
     bool getCachedDuration(int64_t *durationUs, bool *eos) const;
+
+    status_t getAudioPresentations(size_t trackIdx,
+            AudioPresentationCollection *presentations) const;
 
 protected:
     virtual ~NuMediaExtractor();
