@@ -31,8 +31,8 @@ import android.media.MediaLibraryService2.MediaLibrarySession.MediaLibrarySessio
 import android.media.MediaMetadata2;
 import android.media.MediaPlaylistAgent;
 import android.media.MediaSession2;
-import android.media.MediaSession2.Command;
-import android.media.MediaSession2.CommandGroup;
+import android.media.SessionCommand2;
+import android.media.SessionCommandGroup2;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
@@ -105,7 +105,7 @@ public final class ApiFactory implements StaticProvider {
 
     @Override
     public MediaSession2Provider.CommandProvider createMediaSession2Command(
-            Command instance, int commandCode, String action, Bundle extra) {
+            SessionCommand2 instance, int commandCode, String action, Bundle extra) {
         if (action == null && extra == null) {
             return new MediaSession2Impl.CommandImpl(instance, commandCode);
         }
@@ -113,19 +113,19 @@ public final class ApiFactory implements StaticProvider {
     }
 
     @Override
-    public Command fromBundle_MediaSession2Command(Bundle command) {
+    public SessionCommand2 fromBundle_MediaSession2Command(Bundle command) {
         return MediaSession2Impl.CommandImpl.fromBundle_impl(command);
     }
 
     @Override
     public MediaSession2Provider.CommandGroupProvider createMediaSession2CommandGroup(
-            CommandGroup instance, CommandGroup other) {
+            SessionCommandGroup2 instance, SessionCommandGroup2 other) {
         return new MediaSession2Impl.CommandGroupImpl(instance,
                 (other == null) ? null : other.getProvider());
     }
 
     @Override
-    public CommandGroup fromBundle_MediaSession2CommandGroup(Bundle commands) {
+    public SessionCommandGroup2 fromBundle_MediaSession2CommandGroup(Bundle commands) {
         return MediaSession2Impl.CommandGroupImpl.fromBundle_impl(commands);
     }
 
