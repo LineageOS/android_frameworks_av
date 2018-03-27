@@ -926,6 +926,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
+    // TODO(jaewan): Rename
     public void notifyPositionChangedNotLocked(long eventTimeMs, long positionMs) {
         notifyAll((controller, iController) -> {
             iController.onPositionChanged(eventTimeMs, positionMs);

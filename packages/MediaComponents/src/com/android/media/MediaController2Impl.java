@@ -808,6 +808,7 @@ public class MediaController2Impl implements MediaController2Provider {
         });
     }
 
+    // TODO(jaewan): Rename to seek completed
     void pushPositionChanges(final long eventTimeMs, final long positionMs) {
         synchronized (mLock) {
             mPositionEventTimeMs = eventTimeMs;
@@ -817,7 +818,7 @@ public class MediaController2Impl implements MediaController2Provider {
             if (!mInstance.isConnected()) {
                 return;
             }
-            mCallback.onPositionChanged(mInstance, eventTimeMs, positionMs);
+            mCallback.onSeekCompleted(mInstance, positionMs);
         });
     }
 
