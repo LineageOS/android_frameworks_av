@@ -88,6 +88,9 @@ public:
     aaudio_result_t getExternalPosition(uint64_t *positionFrames, int64_t *timeNanos);
 
 private:
+
+    aaudio_result_t openWithFormat(audio_format_t audioFormat);
+
     MonotonicCounter                          mFramesTransferred;
 
     // Interface to the AudioFlinger MMAP support.
