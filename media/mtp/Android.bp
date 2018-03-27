@@ -49,7 +49,6 @@ cc_library_shared {
     shared_libs: [
         "libasyncio",
         "libbase",
-        "libutils",
         "liblog",
         "libusbhost",
     ],

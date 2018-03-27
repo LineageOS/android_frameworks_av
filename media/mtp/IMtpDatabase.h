@@ -24,6 +24,7 @@ namespace android {
 class MtpDataPacket;
 class MtpProperty;
 class MtpObjectInfo;
+class MtpStringBuffer;
 
 class IMtpDatabase {
 public:
@@ -86,7 +87,7 @@ public:
     virtual void*                   getThumbnail(MtpObjectHandle handle, size_t& outThumbSize) = 0;
 
     virtual MtpResponseCode         getObjectFilePath(MtpObjectHandle handle,
-                                            MtpString& outFilePath,
+                                            MtpStringBuffer& outFilePath,
                                             int64_t& outFileLength,
                                             MtpObjectFormat& outFormat) = 0;
 
