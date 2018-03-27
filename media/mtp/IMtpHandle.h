@@ -32,8 +32,7 @@ public:
     virtual int sendEvent(mtp_event me) = 0;
 
     // Return 0 if operation is successful, or -1 else
-    virtual int start() = 0;
-    virtual int configure(bool ptp) = 0;
+    virtual int start(bool ptp) = 0;
 
     virtual void close() = 0;
 
