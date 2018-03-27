@@ -555,6 +555,11 @@ status_t StreamOutHalHidl::getPresentationPosition(uint64_t *frames, struct time
     }
 }
 
+status_t StreamOutHalHidl::updateSourceMetadata(const SourceMetadata& /* sourceMetadata */) {
+    // Audio HAL V2.0 does not support propagating source metadata
+    return INVALID_OPERATION;
+}
+
 void StreamOutHalHidl::onWriteReady() {
     sp<StreamOutHalInterfaceCallback> callback = mCallback.promote();
     if (callback == 0) return;
@@ -752,6 +757,11 @@ status_t StreamInHalHidl::getCapturePosition(int64_t *frames, int64_t *time) {
 status_t StreamInHalHidl::getActiveMicrophones(
         std::vector<media::MicrophoneInfo> *microphones __unused) {
     if (mStream == 0) return NO_INIT;
+    return INVALID_OPERATION;
+}
+
+status_t StreamInHalHidl::updateSinkMetadata(const SinkMetadata& /* sinkMetadata */) {
+    // Audio HAL V2.0 does not support propagating sink metadata
     return INVALID_OPERATION;
 }
 
