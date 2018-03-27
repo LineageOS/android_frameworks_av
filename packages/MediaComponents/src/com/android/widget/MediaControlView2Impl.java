@@ -207,10 +207,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     private List<String> mPlaybackSpeedTextList;
     private List<Float> mPlaybackSpeedList;
 
-    private CharSequence mPlayDescription;
-    private CharSequence mPauseDescription;
-    private CharSequence mReplayDescription;
-
     public MediaControlView2Impl(MediaControlView2 instance,
             ViewGroupProvider superProvider, ViewGroupProvider privateProvider) {
         super(instance, superProvider, privateProvider);
@@ -479,12 +475,6 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
     }
 
     private void initControllerView(View v) {
-        mPlayDescription = mResources.getText(R.string.lockscreen_play_button_content_description);
-        mPauseDescription =
-                mResources.getText(R.string.lockscreen_pause_button_content_description);
-        mReplayDescription =
-                mResources.getText(R.string.lockscreen_replay_button_content_description);
-
         // Relating to Title Bar View
         mTitleBar = v.findViewById(R.id.title_bar);
         mTitleView = v.findViewById(R.id.title_text);
@@ -707,12 +697,14 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             mControls.pause();
             mPlayPauseButton.setImageDrawable(
                     mResources.getDrawable(R.drawable.ic_play_circle_filled, null));
-            mPlayPauseButton.setContentDescription(mPlayDescription);
+            mPlayPauseButton.setContentDescription(
+                    mResources.getString(R.string.mcv2_play_button_desc));
         } else {
             mControls.play();
             mPlayPauseButton.setImageDrawable(
                     mResources.getDrawable(R.drawable.ic_pause_circle_filled, null));
-            mPlayPauseButton.setContentDescription(mPauseDescription);
+            mPlayPauseButton.setContentDescription(
+                    mResources.getString(R.string.mcv2_pause_button_desc));
         }
     }
 
@@ -748,7 +740,8 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             if (mIsStopped) {
                 mPlayPauseButton.setImageDrawable(
                         mResources.getDrawable(R.drawable.ic_play_circle_filled, null));
-                mPlayPauseButton.setContentDescription(mPlayDescription);
+                mPlayPauseButton.setContentDescription(
+                        mResources.getString(R.string.mcv2_play_button_desc));
                 mIsStopped = false;
             }
         }
@@ -897,11 +890,15 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
             if (!mIsMute) {
                 mMuteButton.setImageDrawable(
                         mResources.getDrawable(R.drawable.ic_mute, null));
+                mMuteButton.setContentDescription(
+                        mResources.getString(R.string.mcv2_muted_button_desc));
                 mIsMute = true;
                 mController.sendCommand(COMMAND_MUTE, null, null);
             } else {
                 mMuteButton.setImageDrawable(
                         mResources.getDrawable(R.drawable.ic_unmute, null));
+                mMuteButton.setContentDescription(
+                        mResources.getString(R.string.mcv2_unmuted_button_desc));
                 mIsMute = false;
                 mController.sendCommand(COMMAND_UNMUTE, null, null);
             }
@@ -975,12 +972,16 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
                                     MediaControlView2Impl.COMMAND_SHOW_SUBTITLE, extra, null);
                             mSubtitleButton.setImageDrawable(
                                     mResources.getDrawable(R.drawable.ic_subtitle_on, null));
+                            mSubtitleButton.setContentDescription(
+                                    mResources.getString(R.string.mcv2_cc_is_on));
                             mSubtitleIsEnabled = true;
                         } else {
                             mController.sendCommand(
                                     MediaControlView2Impl.COMMAND_HIDE_SUBTITLE, null, null);
                             mSubtitleButton.setImageDrawable(
                                     mResources.getDrawable(R.drawable.ic_subtitle_off, null));
+                            mSubtitleButton.setContentDescription(
+                                    mResources.getString(R.string.mcv2_cc_is_off));
 
                             mSubtitleIsEnabled = false;
                         }
@@ -1106,11 +1107,13 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
         if (isPlaying()) {
             mPlayPauseButton.setImageDrawable(
                     mResources.getDrawable(R.drawable.ic_pause_circle_filled, null));
-            mPlayPauseButton.setContentDescription(mPauseDescription);
+            mPlayPauseButton.setContentDescription(
+                    mResources.getString(R.string.mcv2_pause_button_desc));
         } else {
             mPlayPauseButton.setImageDrawable(
                     mResources.getDrawable(R.drawable.ic_play_circle_filled, null));
-            mPlayPauseButton.setContentDescription(mPlayDescription);
+            mPlayPauseButton.setContentDescription(
+                    mResources.getString(R.string.mcv2_play_button_desc));
         }
     }
 
@@ -1218,19 +1221,22 @@ public class MediaControlView2Impl extends BaseLayout implements MediaControlVie
                     case PlaybackState.STATE_PLAYING:
                         mPlayPauseButton.setImageDrawable(
                                 mResources.getDrawable(R.drawable.ic_pause_circle_filled, null));
-                        mPlayPauseButton.setContentDescription(mPauseDescription);
+                        mPlayPauseButton.setContentDescription(
+                                mResources.getString(R.string.mcv2_pause_button_desc));
                         mInstance.removeCallbacks(mUpdateProgress);
                         mInstance.post(mUpdateProgress);
                         break;
                     case PlaybackState.STATE_PAUSED:
                         mPlayPauseButton.setImageDrawable(
                                 mResources.getDrawable(R.drawable.ic_play_circle_filled, null));
-                        mPlayPauseButton.setContentDescription(mPlayDescription);
+                        mPlayPauseButton.setContentDescription(
+                                mResources.getString(R.string.mcv2_play_button_desc));
                         break;
                     case PlaybackState.STATE_STOPPED:
                         mPlayPauseButton.setImageDrawable(
                                 mResources.getDrawable(R.drawable.ic_replay_circle_filled, null));
-                        mPlayPauseButton.setContentDescription(mReplayDescription);
+                        mPlayPauseButton.setContentDescription(
+                                mResources.getString(R.string.mcv2_replay_button_desc));
                         mIsStopped = true;
                         break;
                     default:

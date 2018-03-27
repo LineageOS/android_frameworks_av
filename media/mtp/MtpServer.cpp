@@ -33,6 +33,7 @@
 
 #include "MtpDebug.h"
 #include "IMtpDatabase.h"
+#include "MtpDescriptors.h"
 #include "MtpDevHandle.h"
 #include "MtpFfsCompatHandle.h"
 #include "MtpFfsHandle.h"
@@ -100,7 +101,7 @@ static const MtpEventCode kSupportedEventCodes[] = {
     MTP_EVENT_DEVICE_PROP_CHANGED,
 };
 
-MtpServer::MtpServer(IMtpDatabase* database, bool ptp,
+MtpServer::MtpServer(IMtpDatabase* database, int controlFd, bool ptp,
                     const MtpString& deviceInfoManufacturer,
                     const MtpString& deviceInfoModel,
                     const MtpString& deviceInfoDeviceVersion,
@@ -118,28 +119,16 @@ MtpServer::MtpServer(IMtpDatabase* database, bool ptp,
         mSendObjectFileSize(0),
         mSendObjectModifiedTime(0)
 {
+    bool ffs_ok = access(FFS_MTP_EP0, W_OK) == 0;
+    if (ffs_ok) {
+        bool aio_compat = android::base::GetBoolProperty("sys.usb.ffs.aio_compat", false);
+        mHandle = aio_compat ? new MtpFfsCompatHandle(controlFd) : new MtpFfsHandle(controlFd);
+    } else {
+        mHandle = new MtpDevHandle();
+    }
 }
 
 MtpServer::~MtpServer() {
-}
-
-IMtpHandle* MtpServer::sHandle = nullptr;
-
-int MtpServer::configure(bool usePtp) {
-    bool ffs_ok = access(FFS_MTP_EP0, W_OK) == 0;
-    if (sHandle == nullptr) {
-        if (ffs_ok) {
-            bool aio_compat = android::base::GetBoolProperty("sys.usb.ffs.aio_compat", false);
-            sHandle = aio_compat ? new MtpFfsCompatHandle() : new MtpFfsHandle();
-        } else {
-            sHandle = new MtpDevHandle();
-        }
-    }
-
-    int ret = sHandle->configure(usePtp);
-    if (ret) ALOGE("Failed to configure MTP driver!");
-    android::base::SetProperty("sys.usb.ffs.mtp.ready", "1");
-    return ret;
 }
 
 void MtpServer::addStorage(MtpStorage* storage) {
@@ -175,19 +164,14 @@ bool MtpServer::hasStorage(MtpStorageID id) {
 }
 
 void MtpServer::run() {
-    if (!sHandle) {
-        ALOGE("MtpServer was never configured!");
-        return;
-    }
-
-    if (sHandle->start()) {
+    if (mHandle->start(mPtp)) {
         ALOGE("Failed to start usb driver!");
-        sHandle->close();
+        mHandle->close();
         return;
     }
 
     while (1) {
-        int ret = mRequest.read(sHandle);
+        int ret = mRequest.read(mHandle);
         if (ret < 0) {
             ALOGE("request read returned %d, errno: %d", ret, errno);
             if (errno == ECANCELED) {
@@ -206,7 +190,7 @@ void MtpServer::run() {
                     || operation == MTP_OPERATION_SET_OBJECT_PROP_VALUE
                     || operation == MTP_OPERATION_SET_DEVICE_PROP_VALUE);
         if (dataIn) {
-            int ret = mData.read(sHandle);
+            int ret = mData.read(mHandle);
             if (ret < 0) {
                 ALOGE("data read returned %d, errno: %d", ret, errno);
                 if (errno == ECANCELED) {
@@ -225,7 +209,7 @@ void MtpServer::run() {
                 mData.setOperationCode(operation);
                 mData.setTransactionID(transaction);
                 ALOGV("sending data:");
-                ret = mData.write(sHandle);
+                ret = mData.write(mHandle);
                 if (ret < 0) {
                     ALOGE("request write returned %d, errno: %d", ret, errno);
                     if (errno == ECANCELED) {
@@ -238,7 +222,7 @@ void MtpServer::run() {
 
             mResponse.setTransactionID(transaction);
             ALOGV("sending response %04X", mResponse.getResponseCode());
-            ret = mResponse.write(sHandle);
+            ret = mResponse.write(mHandle);
             const int savedErrno = errno;
             if (ret < 0) {
                 ALOGE("request write returned %d, errno: %d", ret, errno);
@@ -262,7 +246,7 @@ void MtpServer::run() {
     }
     mObjectEditList.clear();
 
-    sHandle->close();
+    mHandle->close();
 }
 
 void MtpServer::sendObjectAdded(MtpObjectHandle handle) {
@@ -295,7 +279,7 @@ void MtpServer::sendEvent(MtpEventCode code, uint32_t param1) {
         mEvent.setEventCode(code);
         mEvent.setTransactionID(mRequest.getTransactionID());
         mEvent.setParameter(1, param1);
-        if (mEvent.write(sHandle))
+        if (mEvent.write(mHandle))
             ALOGE("Mtp send event failed: %s", strerror(errno));
     }
 }
@@ -806,7 +790,7 @@ MtpResponseCode MtpServer::doGetObject() {
     mfr.transaction_id = mRequest.getTransactionID();
 
     // then transfer the file
-    int ret = sHandle->sendFile(mfr);
+    int ret = mHandle->sendFile(mfr);
     if (ret < 0) {
         ALOGE("Mtp send file got error %s", strerror(errno));
         if (errno == ECANCELED) {
@@ -839,7 +823,7 @@ MtpResponseCode MtpServer::doGetThumb() {
         // send data
         mData.setOperationCode(mRequest.getOperationCode());
         mData.setTransactionID(mRequest.getTransactionID());
-        mData.writeData(sHandle, thumb, thumbSize);
+        mData.writeData(mHandle, thumb, thumbSize);
         free(thumb);
         return MTP_RESPONSE_OK;
     } else {
@@ -894,7 +878,7 @@ MtpResponseCode MtpServer::doGetPartialObject(MtpOperationCode operation) {
     mResponse.setParameter(1, length);
 
     // transfer the file
-    int ret = sHandle->sendFile(mfr);
+    int ret = mHandle->sendFile(mfr);
     ALOGV("MTP_SEND_FILE_WITH_HEADER returned %d\n", ret);
     result = MTP_RESPONSE_OK;
     if (ret < 0) {
@@ -1176,7 +1160,7 @@ MtpResponseCode MtpServer::doSendObject() {
     }
 
     // read the header, and possibly some data
-    ret = mData.read(sHandle);
+    ret = mData.read(mHandle);
     if (ret < MTP_CONTAINER_HEADER_SIZE) {
         result = MTP_RESPONSE_GENERAL_ERROR;
         goto done;
@@ -1224,7 +1208,7 @@ MtpResponseCode MtpServer::doSendObject() {
         mfr.transaction_id = 0;
 
         // transfer the file
-        ret = sHandle->receiveFile(mfr, mfr.length == 0 &&
+        ret = mHandle->receiveFile(mfr, mfr.length == 0 &&
                 initialData == MTP_BUFFER_SIZE - MTP_CONTAINER_HEADER_SIZE);
         if ((ret < 0) && (errno == ECANCELED)) {
             isCanceled = true;
@@ -1353,7 +1337,7 @@ MtpResponseCode MtpServer::doSendPartialObject() {
     ALOGV("receiving partial %s %" PRIu64 " %" PRIu32, filePath, offset, length);
 
     // read the header, and possibly some data
-    int ret = mData.read(sHandle);
+    int ret = mData.read(mHandle);
     if (ret < MTP_CONTAINER_HEADER_SIZE)
         return MTP_RESPONSE_GENERAL_ERROR;
     int initialData = ret - MTP_CONTAINER_HEADER_SIZE;
@@ -1376,7 +1360,7 @@ MtpResponseCode MtpServer::doSendPartialObject() {
         mfr.transaction_id = 0;
 
         // transfer the file
-        ret = sHandle->receiveFile(mfr, mfr.length == 0 &&
+        ret = mHandle->receiveFile(mfr, mfr.length == 0 &&
                 initialData == MTP_BUFFER_SIZE - MTP_CONTAINER_HEADER_SIZE);
         if ((ret < 0) && (errno == ECANCELED)) {
             isCanceled = true;

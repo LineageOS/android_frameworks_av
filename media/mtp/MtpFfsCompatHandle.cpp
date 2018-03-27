@@ -61,7 +61,8 @@ constexpr size_t ENDPOINT_ALLOC_RETRIES = 10;
 
 namespace android {
 
-MtpFfsCompatHandle::MtpFfsCompatHandle() :
+MtpFfsCompatHandle::MtpFfsCompatHandle(int controlFd) :
+    MtpFfsHandle(controlFd),
     mMaxWrite(USB_FFS_MAX_WRITE),
     mMaxRead(USB_FFS_MAX_READ) {}
 
@@ -108,10 +109,8 @@ int MtpFfsCompatHandle::readHandle(int fd, void* data, size_t len) {
     return ret;
 }
 
-int MtpFfsCompatHandle::start() {
-    mLock.lock();
-
-    if (!openEndpoints())
+int MtpFfsCompatHandle::start(bool ptp) {
+    if (!openEndpoints(ptp))
         return -1;
 
     for (unsigned i = 0; i < NUM_IO_BUFS; i++) {

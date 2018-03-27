@@ -68,8 +68,10 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.concurrent.Executor;
 
 public class MediaSession2Impl implements MediaSession2Provider {
@@ -1077,8 +1079,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
                 return false;
             }
             CommandImpl other = (CommandImpl) obj;
-            // TODO(jaewan): Should we also compare contents in bundle?
-            //               It may not be possible if the bundle contains private class.
+            // TODO(jaewan): Compare Commands with the generated UUID, as we're doing for the MI2.
             return mCommandCode == other.mCommandCode
                     && TextUtils.equals(mCustomCommand, other.mCustomCommand);
         }
@@ -1107,7 +1108,7 @@ public class MediaSession2Impl implements MediaSession2Provider {
         // Prefix for command codes that will be sent directly to the MediaPlaylistAgent
         private static final String PREFIX_COMMAND_CODE_PLAYLIST = "COMMAND_CODE_PLAYLIST_";
 
-        private List<Command> mCommands = new ArrayList<>();
+        private Set<Command> mCommands = new HashSet<>();
         private final Context mContext;
         private final CommandGroup mInstance;
 
@@ -1182,8 +1183,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
             if (code == COMMAND_CODE_CUSTOM) {
                 throw new IllegalArgumentException("Use hasCommand(Command) for custom command");
             }
-            for (int i = 0; i < mCommands.size(); i++) {
-                if (mCommands.get(i).getCommandCode() == code) {
+            for (Command command : mCommands) {
+                if (command.getCommandCode() == code) {
                     return true;
                 }
             }
@@ -1191,12 +1192,12 @@ public class MediaSession2Impl implements MediaSession2Provider {
         }
 
         @Override
-        public List<Command> getCommands_impl() {
+        public Set<Command> getCommands_impl() {
             return getCommands();
         }
 
-        public List<Command> getCommands() {
-            return Collections.unmodifiableList(mCommands);
+        public Set<Command> getCommands() {
+            return Collections.unmodifiableSet(mCommands);
         }
 
         /**
@@ -1206,8 +1207,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
         @Override
         public Bundle toBundle_impl() {
             ArrayList<Bundle> list = new ArrayList<>();
-            for (int i = 0; i < mCommands.size(); i++) {
-                list.add(mCommands.get(i).toBundle());
+            for (Command command : mCommands) {
+                list.add(command.toBundle());
             }
             Bundle bundle = new Bundle();
             bundle.putParcelableArrayList(KEY_COMMANDS, list);

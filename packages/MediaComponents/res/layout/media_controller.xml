@@ -105,6 +105,7 @@
                 android:id="@+id/cast"
                 android:layout_centerVertical="true"
                 android:visibility="gone"
+                android:contentDescription="@string/mr_button_content_description"
                 style="@style/TitleBarButton" />
         </LinearLayout>
 
@@ -120,6 +121,7 @@
 
     <SeekBar
         android:id="@+id/mediacontroller_progress"
+        android:contentDescription="@string/mcv2_seek_bar_desc"
         android:layout_width="match_parent"
         android:layout_height="12dp"
         android:maxHeight="2dp"
