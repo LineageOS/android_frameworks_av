@@ -60,7 +60,7 @@ int MtpDevHandle::sendEvent(mtp_event me) {
     return ioctl(mFd, MTP_SEND_EVENT, reinterpret_cast<unsigned long>(&me));
 }
 
-int MtpDevHandle::start() {
+int MtpDevHandle::start(bool /* ptp */) {
     mFd.reset(TEMP_FAILURE_RETRY(open(mtp_dev_path, O_RDWR)));
     if (mFd == -1) return -1;
     return 0;
@@ -68,11 +68,6 @@ int MtpDevHandle::start() {
 
 void MtpDevHandle::close() {
     mFd.reset();
-}
-
-int MtpDevHandle::configure(bool) {
-    // Nothing to do, driver can configure itself
-    return 0;
 }
 
 } // namespace android

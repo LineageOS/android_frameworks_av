@@ -84,10 +84,6 @@
     <!-- Placeholder text indicating that the user is currently casting screen. [CHAR LIMIT=50] -->
     <string name="mr_controller_casting_screen">Casting screen</string>
 
-    <string name="lockscreen_pause_button_content_description">Pause</string>
-    <string name="lockscreen_play_button_content_description">Play</string>
-    <string name="lockscreen_replay_button_content_description">Replay</string>
-
     <!-- Text for error alert when a video container is not valid for progressive download/playback. -->
     <string name="VideoView2_error_text_invalid_progressive_playback">This video isn\'t valid for streaming to this device.</string>
     <!-- Text for error alert when a video cannot be played. It can be used by any app. -->
@@ -133,4 +129,25 @@
     <string name="MediaControlView2_audio_track_number_text">
         Track <xliff:g id="audio_number" example="1">%1$s</xliff:g>
     </string>
+
+    <!--Content Descriptions -->
+    <string name="mcv2_back_button_desc">Back</string>
+    <string name="mcv2_overflow_left_button_desc">See more buttons</string>
+    <string name="mcv2_overflow_right_button_desc">Back to previous button list</string>
+    <string name="mcv2_seek_bar_desc">Playback progress</string>
+    <string name="mcv2_settings_button_desc">Settings</string>
+    <string name="mcv2_video_quality_button_desc">Video Quality Selection</string>
+    <string name="mcv2_cc_is_on">Subtitle is on. Click to hide it.</string>
+    <string name="mcv2_cc_is_off">Subtitle is off. Click to show it.</string>
+    <string name="mcv2_replay_button_desc">Replay</string>
+    <string name="mcv2_play_button_desc">Play</string>
+    <string name="mcv2_pause_button_desc">Pause</string>
+    <string name="mcv2_previous_button_desc">Previous media</string>
+    <string name="mcv2_next_button_desc">Next media</string>
+    <string name="mcv2_rewind_button_desc">Rewind by 10 seconds</string>
+    <string name="mcv2_ffwd_button_desc">Go forward by 30 seconds</string>
+    <string name="mcv2_launch_button_desc">Launch Link</string>
+    <string name="mcv2_muted_button_desc">Muted. Click to unmute</string>
+    <string name="mcv2_unmuted_button_desc">Click to Mute</string>
+    <string name="mcv2_full_screen_button_desc">Full screen</string>
 </resources>

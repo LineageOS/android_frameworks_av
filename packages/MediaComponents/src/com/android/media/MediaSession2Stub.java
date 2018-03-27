@@ -86,9 +86,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 CommandGroupImpl group = new CommandGroupImpl(session.getContext());
                 group.addAllPlaybackCommands();
                 group.addAllPlaylistCommands();
-                List<Command> commands = group.getCommands();
-                for (int i = 0; i < commands.size(); i++) {
-                    Command command = commands.get(i);
+                Set<Command> commands = group.getCommands();
+                for (Command command : commands) {
                     sCommandsForOnCommandRequest.append(command.getCommandCode(), command);
                 }
             }
@@ -540,7 +539,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void prepareFromUri(final IMediaController2 caller, final Uri uri,
             final Bundle extras) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_URI, (session, controller) -> {
+        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_PREPARE_FROM_URI, (session, controller) -> {
             if (uri == null) {
                 Log.w(TAG, "prepareFromUri(): Ignoring null uri from " + controller);
                 return;
@@ -552,7 +551,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void prepareFromSearch(final IMediaController2 caller, final String query,
             final Bundle extras) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_SEARCH, (session, controller) -> {
+        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_PREPARE_FROM_SEARCH, (session, controller) -> {
             if (TextUtils.isEmpty(query)) {
                 Log.w(TAG, "prepareFromSearch(): Ignoring empty query from " + controller);
                 return;
@@ -565,7 +564,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void prepareFromMediaId(final IMediaController2 caller, final String mediaId,
             final Bundle extras) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PREPARE_FROM_MEDIA_ID,
+        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_PREPARE_FROM_MEDIA_ID,
                 (session, controller) -> {
             if (mediaId == null) {
                 Log.w(TAG, "prepareFromMediaId(): Ignoring null mediaId from " + controller);
@@ -579,7 +578,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void playFromUri(final IMediaController2 caller, final Uri uri,
             final Bundle extras) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAY_FROM_URI, (session, controller) -> {
+        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_PLAY_FROM_URI, (session, controller) -> {
             if (uri == null) {
                 Log.w(TAG, "playFromUri(): Ignoring null uri from " + controller);
                 return;
@@ -591,7 +590,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void playFromSearch(final IMediaController2 caller, final String query,
             final Bundle extras) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAY_FROM_SEARCH, (session, controller) -> {
+        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_PLAY_FROM_SEARCH, (session, controller) -> {
             if (TextUtils.isEmpty(query)) {
                 Log.w(TAG, "playFromSearch(): Ignoring empty query from " + controller);
                 return;
@@ -604,7 +603,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void playFromMediaId(final IMediaController2 caller, final String mediaId,
             final Bundle extras) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAY_FROM_MEDIA_ID, (session, controller) -> {
+        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_PLAY_FROM_MEDIA_ID, (session, controller) -> {
             if (mediaId == null) {
                 Log.w(TAG, "playFromMediaId(): Ignoring null mediaId from " + controller);
                 return;
@@ -617,8 +616,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void setRating(final IMediaController2 caller, final String mediaId,
             final Bundle ratingBundle) {
-        // TODO(jaewan): Define COMMAND_CODE_SET_RATING
-        onCommand(caller, MediaSession2.COMMAND_CODE_SET_RATING, (session, controller) -> {
+        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_SET_RATING, (session, controller) -> {
             if (mediaId == null) {
                 Log.w(TAG, "setRating(): Ignoring null mediaId from " + controller);
                 return;
@@ -717,7 +715,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void skipToPreviousItem(IMediaController2 caller) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM,
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_PREV_ITEM,
                 (session, controller) -> {
                     session.getInstance().skipToPreviousItem();
                 });
@@ -725,7 +723,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void skipToNextItem(IMediaController2 caller) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM,
+        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_NEXT_ITEM,
                 (session, controller) -> {
                     session.getInstance().skipToNextItem();
                 });

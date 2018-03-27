@@ -36,10 +36,8 @@ public:
     int sendFile(mtp_file_range mfr);
     int sendEvent(mtp_event me);
 
-    int start();
+    int start(bool ptp);
     void close();
-
-    int configure(bool ptp);
 };
 
 } // namespace android
