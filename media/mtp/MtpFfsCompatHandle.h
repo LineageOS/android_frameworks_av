@@ -42,9 +42,9 @@ public:
      * Open ffs endpoints and allocate necessary kernel and user memory.
      * Will sleep until endpoints are enabled, for up to 1 second.
      */
-    int start() override;
+    int start(bool ptp) override;
 
-    MtpFfsCompatHandle();
+    MtpFfsCompatHandle(int controlFd);
     ~MtpFfsCompatHandle();
 };
 
