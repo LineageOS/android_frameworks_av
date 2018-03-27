@@ -18,7 +18,6 @@ package com.android.media;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.content.Context;
 import android.media.DataSourceDesc;
 import android.media.MediaItem2;
 import android.media.MediaMetadata2;
@@ -133,9 +132,8 @@ public class SessionPlaylistAgent extends MediaPlaylistAgent {
         }
     }
 
-    public SessionPlaylistAgent(@NonNull Context context, @NonNull MediaSession2Impl sessionImpl,
+    public SessionPlaylistAgent(@NonNull MediaSession2Impl sessionImpl,
             @NonNull MediaPlayerBase player) {
-        super(context);
         if (sessionImpl == null) {
             throw new IllegalArgumentException("sessionImpl shouldn't be null");
         }

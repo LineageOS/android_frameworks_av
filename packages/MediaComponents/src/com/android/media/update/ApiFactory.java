@@ -85,7 +85,7 @@ import java.util.concurrent.Executor;
 public final class ApiFactory implements StaticProvider {
     private ApiFactory() { }
 
-    public static ApiFactory initialize(ApplicationInfo updatableInfo) {
+    public static StaticProvider initialize(ApplicationInfo updatableInfo) {
         ApiHelper.initialize(updatableInfo);
         return new ApiFactory();
     }
@@ -113,20 +113,20 @@ public final class ApiFactory implements StaticProvider {
     }
 
     @Override
-    public Command fromBundle_MediaSession2Command(Context context, Bundle command) {
-        return MediaSession2Impl.CommandImpl.fromBundle_impl(context, command);
+    public Command fromBundle_MediaSession2Command(Bundle command) {
+        return MediaSession2Impl.CommandImpl.fromBundle_impl(command);
     }
 
     @Override
     public MediaSession2Provider.CommandGroupProvider createMediaSession2CommandGroup(
-            Context context, CommandGroup instance, CommandGroup other) {
-        return new MediaSession2Impl.CommandGroupImpl(context, instance,
+            CommandGroup instance, CommandGroup other) {
+        return new MediaSession2Impl.CommandGroupImpl(instance,
                 (other == null) ? null : other.getProvider());
     }
 
     @Override
-    public CommandGroup fromBundle_MediaSession2CommandGroup(Context context, Bundle commands) {
-        return MediaSession2Impl.CommandGroupImpl.fromBundle_impl(context, commands);
+    public CommandGroup fromBundle_MediaSession2CommandGroup(Bundle commands) {
+        return MediaSession2Impl.CommandGroupImpl.fromBundle_impl(commands);
     }
 
     @Override
@@ -138,9 +138,9 @@ public final class ApiFactory implements StaticProvider {
     }
 
     @Override
-    public BuilderProvider createMediaSession2CommandButtonBuilder(Context context,
+    public BuilderProvider createMediaSession2CommandButtonBuilder(
             MediaSession2.CommandButton.Builder instance) {
-        return new MediaSession2Impl.CommandButtonImpl.BuilderImpl(context, instance);
+        return new MediaSession2Impl.CommandButtonImpl.BuilderImpl(instance);
     }
 
     public BuilderBaseProvider<MediaSession2, SessionCallback> createMediaSession2Builder(
@@ -149,21 +149,19 @@ public final class ApiFactory implements StaticProvider {
     }
 
     @Override
-    public MediaSessionService2Provider createMediaSessionService2(
-            MediaSessionService2 instance) {
+    public MediaSessionService2Provider createMediaSessionService2(MediaSessionService2 instance) {
         return new MediaSessionService2Impl(instance);
     }
 
     @Override
-    public MediaNotificationProvider createMediaSessionService2MediaNotification(Context context,
+    public MediaNotificationProvider createMediaSessionService2MediaNotification(
             MediaNotification instance, int notificationId, Notification notification) {
         return new MediaSessionService2Impl.MediaNotificationImpl(
-                context, instance, notificationId, notification);
+                instance, notificationId, notification);
     }
 
     @Override
-    public MediaSessionService2Provider createMediaLibraryService2(
-            MediaLibraryService2 instance) {
+    public MediaSessionService2Provider createMediaLibraryService2(MediaLibraryService2 instance) {
         return new MediaLibraryService2Impl(instance);
     }
 
@@ -177,9 +175,9 @@ public final class ApiFactory implements StaticProvider {
     }
 
     @Override
-    public LibraryRootProvider createMediaLibraryService2LibraryRoot(Context context,
+    public LibraryRootProvider createMediaLibraryService2LibraryRoot(
             LibraryRoot instance, String rootId, Bundle extras) {
-        return new LibraryRootImpl(context, instance, rootId, extras);
+        return new LibraryRootImpl(instance, rootId, extras);
     }
 
     @Override
@@ -203,77 +201,76 @@ public final class ApiFactory implements StaticProvider {
     }
 
     @Override
-    public SessionToken2 fromBundle_SessionToken2(Context context, Bundle bundle) {
-        return SessionToken2Impl.fromBundle_impl(context, bundle);
+    public SessionToken2 fromBundle_SessionToken2(Bundle bundle) {
+        return SessionToken2Impl.fromBundle_impl(bundle);
     }
 
     @Override
-    public MediaItem2Provider.BuilderProvider createMediaItem2Builder(
-            Context context, MediaItem2.Builder instance, int flags) {
-        return new MediaItem2Impl.BuilderImpl(context, instance, flags);
+    public MediaItem2Provider.BuilderProvider createMediaItem2Builder(MediaItem2.Builder instance,
+            int flags) {
+        return new MediaItem2Impl.BuilderImpl(instance, flags);
     }
 
     @Override
-    public MediaItem2 fromBundle_MediaItem2(Context context, Bundle bundle) {
-        return MediaItem2Impl.fromBundle(context, bundle);
+    public MediaItem2 fromBundle_MediaItem2(Bundle bundle) {
+        return MediaItem2Impl.fromBundle_impl(bundle);
     }
 
     @Override
-    public VolumeProvider2Provider createVolumeProvider2(Context context, VolumeProvider2 instance,
-            int controlType, int maxVolume, int currentVolume) {
-        return new VolumeProvider2Impl(context, instance, controlType, maxVolume, currentVolume);
+    public VolumeProvider2Provider createVolumeProvider2(VolumeProvider2 instance, int controlType,
+            int maxVolume, int currentVolume) {
+        return new VolumeProvider2Impl(instance, controlType, maxVolume, currentVolume);
     }
 
     @Override
-    public MediaMetadata2 fromBundle_MediaMetadata2(Context context, Bundle bundle) {
-        return MediaMetadata2Impl.fromBundle(context, bundle);
-    }
-
-    @Override
-    public MediaMetadata2Provider.BuilderProvider createMediaMetadata2Builder(
-            Context context, MediaMetadata2.Builder instance) {
-        return new MediaMetadata2Impl.BuilderImpl(context, instance);
+    public MediaMetadata2 fromBundle_MediaMetadata2(Bundle bundle) {
+        return MediaMetadata2Impl.fromBundle_impl(bundle);
     }
 
     @Override
     public MediaMetadata2Provider.BuilderProvider createMediaMetadata2Builder(
-            Context context, MediaMetadata2.Builder instance, MediaMetadata2 source) {
-        return new MediaMetadata2Impl.BuilderImpl(context, instance, source);
+            MediaMetadata2.Builder instance) {
+        return new MediaMetadata2Impl.BuilderImpl(instance);
     }
 
     @Override
-    public Rating2 fromBundle_Rating2(Context context, Bundle bundle) {
-        return Rating2Impl.fromBundle(context, bundle);
+    public MediaMetadata2Provider.BuilderProvider createMediaMetadata2Builder(
+            MediaMetadata2.Builder instance, MediaMetadata2 source) {
+        return new MediaMetadata2Impl.BuilderImpl(instance, source);
     }
 
     @Override
-    public Rating2 newUnratedRating_Rating2(Context context, int ratingStyle) {
-        return Rating2Impl.newUnratedRating(context, ratingStyle);
+    public Rating2 fromBundle_Rating2(Bundle bundle) {
+        return Rating2Impl.fromBundle_impl(bundle);
     }
 
     @Override
-    public Rating2 newHeartRating_Rating2(Context context, boolean hasHeart) {
-        return Rating2Impl.newHeartRating(context, hasHeart);
+    public Rating2 newUnratedRating_Rating2(int ratingStyle) {
+        return Rating2Impl.newUnratedRating_impl(ratingStyle);
     }
 
     @Override
-    public Rating2 newThumbRating_Rating2(Context context, boolean thumbIsUp) {
-        return Rating2Impl.newThumbRating(context, thumbIsUp);
+    public Rating2 newHeartRating_Rating2(boolean hasHeart) {
+        return Rating2Impl.newHeartRating_impl(hasHeart);
     }
 
     @Override
-    public Rating2 newStarRating_Rating2(Context context, int starRatingStyle, float starRating) {
-        return Rating2Impl.newStarRating(context, starRatingStyle, starRating);
+    public Rating2 newThumbRating_Rating2(boolean thumbIsUp) {
+        return Rating2Impl.newThumbRating_impl(thumbIsUp);
     }
 
     @Override
-    public Rating2 newPercentageRating_Rating2(Context context, float percent) {
-        return Rating2Impl.newPercentageRating(context, percent);
+    public Rating2 newStarRating_Rating2(int starRatingStyle, float starRating) {
+        return Rating2Impl.newStarRating_impl(starRatingStyle, starRating);
     }
 
     @Override
-    public MediaPlaylistAgentProvider createMediaPlaylistAgent(Context context,
-            MediaPlaylistAgent instance) {
-        return new MediaPlaylistAgentImpl(context, instance);
+    public Rating2 newPercentageRating_Rating2(float percent) {
+        return Rating2Impl.newPercentageRating_impl(percent);
+    }
+
+    @Override
+    public MediaPlaylistAgentProvider createMediaPlaylistAgent(MediaPlaylistAgent instance) {
+        return new MediaPlaylistAgentImpl(instance);
     }
 }

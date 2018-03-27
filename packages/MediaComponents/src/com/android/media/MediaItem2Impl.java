@@ -21,7 +21,6 @@ import static android.media.MediaItem2.FLAG_PLAYABLE;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.content.Context;
 import android.media.DataSourceDesc;
 import android.media.MediaItem2;
 import android.media.MediaItem2.Builder;
@@ -39,7 +38,6 @@ public class MediaItem2Impl implements MediaItem2Provider {
     private static final String KEY_METADATA = "android.media.mediaitem2.metadata";
     private static final String KEY_UUID = "android.media.mediaitem2.uuid";
 
-    private final Context mContext;
     private final MediaItem2 mInstance;
     private final String mId;
     private final int mFlags;
@@ -48,14 +46,13 @@ public class MediaItem2Impl implements MediaItem2Provider {
     private DataSourceDesc mDataSourceDesc;
 
     // From the public API
-    public MediaItem2Impl(@NonNull Context context, @NonNull String mediaId,
-            @Nullable DataSourceDesc dsd, @Nullable MediaMetadata2 metadata, @Flags int flags) {
-        this(context, mediaId, dsd, metadata, flags, null);
+    public MediaItem2Impl(@NonNull String mediaId, @Nullable DataSourceDesc dsd,
+            @Nullable MediaMetadata2 metadata, @Flags int flags) {
+        this(mediaId, dsd, metadata, flags, null);
     }
 
-    private MediaItem2Impl(@NonNull Context context, @NonNull String mediaId,
-            @Nullable DataSourceDesc dsd, @Nullable MediaMetadata2 metadata, @Flags int flags,
-            @Nullable UUID uuid) {
+    private MediaItem2Impl(@NonNull String mediaId, @Nullable DataSourceDesc dsd,
+            @Nullable MediaMetadata2 metadata, @Flags int flags, @Nullable UUID uuid) {
         if (mediaId == null) {
             throw new IllegalArgumentException("mediaId shouldn't be null");
         }
@@ -63,7 +60,6 @@ public class MediaItem2Impl implements MediaItem2Provider {
             throw new IllegalArgumentException("metadata's id should be matched with the mediaid");
         }
 
-        mContext = context;
         mId = mediaId;
         mDataSourceDesc = dsd;
         mMetadata = metadata;
@@ -101,16 +97,15 @@ public class MediaItem2Impl implements MediaItem2Provider {
     /**
      * Create a MediaItem2 from the {@link Bundle}.
      *
-     * @param context A context.
      * @param bundle The bundle which was published by {@link MediaItem2#toBundle()}.
      * @return The newly created MediaItem2
      */
-    public static MediaItem2 fromBundle(@NonNull Context context, @NonNull Bundle bundle) {
+    public static MediaItem2 fromBundle_impl(@NonNull Bundle bundle) {
         if (bundle == null) {
             return null;
         }
         final String uuidString = bundle.getString(KEY_UUID);
-        return fromBundle(context, bundle, UUID.fromString(uuidString));
+        return fromBundle(bundle, UUID.fromString(uuidString));
     }
 
     /**
@@ -118,22 +113,19 @@ public class MediaItem2Impl implements MediaItem2Provider {
      * If {@link UUID}
      * can be null for creating new.
      *
-     * @param context A context.
      * @param bundle The bundle which was published by {@link MediaItem2#toBundle()}.
      * @param uuid A {@link UUID} to override. Can be {@link null} for override.
      * @return The newly created MediaItem2
      */
-    static MediaItem2 fromBundle(@NonNull Context context, @NonNull Bundle bundle,
-            @Nullable UUID uuid) {
+    static MediaItem2 fromBundle(@NonNull Bundle bundle, @Nullable UUID uuid) {
         if (bundle == null) {
             return null;
         }
         final String id = bundle.getString(KEY_ID);
         final Bundle metadataBundle = bundle.getBundle(KEY_METADATA);
-        final MediaMetadata2 metadata = metadataBundle != null
-                ? MediaMetadata2.fromBundle(context, metadataBundle) : null;
+        final MediaMetadata2 metadata = MediaMetadata2.fromBundle(metadataBundle);
         final int flags = bundle.getInt(KEY_FLAGS);
-        return new MediaItem2Impl(context, id, null, metadata, flags, uuid).getInstance();
+        return new MediaItem2Impl(id, null, metadata, flags, uuid).getInstance();
     }
 
     private MediaItem2 getInstance() {
@@ -188,15 +180,13 @@ public class MediaItem2Impl implements MediaItem2Provider {
     }
 
     public static class BuilderImpl implements MediaItem2Provider.BuilderProvider {
-        private Context mContext;
         private Builder mInstance;
         private @Flags int mFlags;
         private String mMediaId;
         private MediaMetadata2 mMetadata;
         private DataSourceDesc mDataSourceDesc;
 
-        public BuilderImpl(Context context, Builder instance, int flags) {
-            mContext = context;
+        public BuilderImpl(Builder instance, int flags) {
             mInstance = instance;
             mFlags = flags;
         }
@@ -227,8 +217,7 @@ public class MediaItem2Impl implements MediaItem2Provider {
                 //  TODO(jaewan): Double check if its sufficient (e.g. Use UUID instead?)
                 id = (mMediaId != null) ? mMediaId : toString();
             }
-            return new MediaItem2Impl(mContext, id, mDataSourceDesc, mMetadata, mFlags)
-                    .getInstance();
+            return new MediaItem2Impl(id, mDataSourceDesc, mMetadata, mFlags).getInstance();
         }
     }
 }

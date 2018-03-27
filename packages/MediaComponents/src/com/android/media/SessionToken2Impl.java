@@ -98,8 +98,8 @@ public class SessionToken2Impl implements SessionToken2Provider {
         mSessionBinder = null;
     }
 
-    public SessionToken2Impl(Context context, int uid, int type,
-            String packageName, String serviceName, String id, IMediaSession2 sessionBinder) {
+    SessionToken2Impl(int uid, int type, String packageName, String serviceName, String id,
+            IMediaSession2 sessionBinder) {
         // TODO(jaewan): Add sanity check (b/73863865)
         mUid = uid;
         mType = type;
@@ -168,15 +168,15 @@ public class SessionToken2Impl implements SessionToken2Provider {
         return mType;
     }
 
-    public String getServiceName() {
+    String getServiceName() {
         return mServiceName;
     }
 
-    public IMediaSession2 getSessionBinder() {
+    IMediaSession2 getSessionBinder() {
         return mSessionBinder;
     }
 
-    public static SessionToken2 fromBundle_impl(Context context, Bundle bundle) {
+    public static SessionToken2 fromBundle_impl(Bundle bundle) {
         if (bundle == null) {
             return null;
         }
@@ -207,7 +207,7 @@ public class SessionToken2Impl implements SessionToken2Provider {
         if (TextUtils.isEmpty(packageName) || id == null) {
             throw new IllegalArgumentException("Package name nor ID cannot be null.");
         }
-        return new SessionToken2Impl(context, uid, type, packageName, serviceName, id,
+        return new SessionToken2Impl(uid, type, packageName, serviceName, id,
                 sessionBinder != null ? IMediaSession2.Stub.asInterface(sessionBinder) : null)
                 .getInstance();
     }
@@ -254,7 +254,7 @@ public class SessionToken2Impl implements SessionToken2Provider {
                 + " service=" + mServiceName + " binder=" + mSessionBinder + "}";
     }
 
-    public static SessionToken2Impl from(SessionToken2 token) {
+    static SessionToken2Impl from(SessionToken2 token) {
         return ((SessionToken2Impl) token.getProvider());
     }
 }
