@@ -108,6 +108,7 @@ LIBMEDIANDK {
     AMediaCodec_queueInputBuffer;
     AMediaCodec_queueSecureInputBuffer;
     AMediaCodec_releaseCrypto; # introduced=28
+    AMediaCodec_releaseName; # introduced=28
     AMediaCodec_releaseOutputBuffer;
     AMediaCodec_releaseOutputBufferAtTime;
     AMediaCodec_setAsyncNotifyCallback; # introduced=28
