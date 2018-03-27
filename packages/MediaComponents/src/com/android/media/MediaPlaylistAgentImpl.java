@@ -19,7 +19,6 @@ package com.android.media;
 import android.annotation.CallbackExecutor;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.content.Context;
 import android.media.DataSourceDesc;
 import android.media.MediaItem2;
 import android.media.MediaMetadata2;
@@ -37,15 +36,13 @@ import java.util.concurrent.Executor;
 public class MediaPlaylistAgentImpl implements MediaPlaylistAgentProvider {
     private static final String TAG = "MediaPlaylistAgent";
 
-    private final Context mContext;
     private final MediaPlaylistAgent mInstance;
 
     private final Object mLock = new Object();
     @GuardedBy("mLock")
     private final ArrayMap<PlaylistEventCallback, Executor> mCallbacks = new ArrayMap<>();
 
-    public MediaPlaylistAgentImpl(Context context, MediaPlaylistAgent instance) {
-        mContext = context;
+    public MediaPlaylistAgentImpl(MediaPlaylistAgent instance) {
         mInstance = instance;
     }
 

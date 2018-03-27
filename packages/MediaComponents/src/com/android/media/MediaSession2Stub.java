@@ -83,7 +83,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
         synchronized (sCommandsForOnCommandRequest) {
             if (sCommandsForOnCommandRequest.size() == 0) {
-                CommandGroupImpl group = new CommandGroupImpl(session.getContext());
+                CommandGroupImpl group = new CommandGroupImpl();
                 group.addAllPlaybackCommands();
                 group.addAllPlaylistCommands();
                 Set<Command> commands = group.getCommands();
@@ -373,7 +373,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 }
                 if (allowedCommands == null) {
                     // For trusted apps, send non-null allowed commands to keep connection.
-                    allowedCommands = new CommandGroup(context);
+                    allowedCommands = new CommandGroup();
                 }
                 synchronized (mLock) {
                     mConnectingControllers.remove(controllerImpl.getId());
@@ -517,7 +517,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         if (session == null) {
             return;
         }
-        final Command command = Command.fromBundle(session.getContext(), commandBundle);
+        final Command command = Command.fromBundle(commandBundle);
         if (command == null) {
             Log.w(TAG, "sendCustomCommand(): Ignoring null command from "
                     + getControllerIfAble(caller));
@@ -625,7 +625,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 Log.w(TAG, "setRating(): Ignoring null ratingBundle from " + controller);
                 return;
             }
-            Rating2 rating = Rating2Impl.fromBundle(session.getContext(), ratingBundle);
+            Rating2 rating = Rating2.fromBundle(ratingBundle);
             if (rating == null) {
                 if (ratingBundle == null) {
                     Log.w(TAG, "setRating(): Ignoring null rating from " + controller);
@@ -648,14 +648,12 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             List<MediaItem2> list = new ArrayList<>();
             for (int i = 0; i < playlist.size(); i++) {
                 // Recreates UUID in the playlist
-                MediaItem2 item = MediaItem2Impl.fromBundle(
-                        session.getContext(), playlist.get(i), null);
+                MediaItem2 item = MediaItem2Impl.fromBundle(playlist.get(i), null);
                 if (item != null) {
                     list.add(item);
                 }
             }
-            session.getInstance().setPlaylist(list,
-                    MediaMetadata2.fromBundle(session.getContext(), metadata));
+            session.getInstance().setPlaylist(list, MediaMetadata2.fromBundle(metadata));
         });
     }
 
@@ -663,8 +661,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     public void updatePlaylistMetadata(final IMediaController2 caller, final Bundle metadata) {
         onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA,
                 (session, controller) -> {
-            session.getInstance().updatePlaylistMetadata(
-                    MediaMetadata2.fromBundle(session.getContext(), metadata));
+            session.getInstance().updatePlaylistMetadata(MediaMetadata2.fromBundle(metadata));
         });
     }
 
@@ -674,7 +671,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             // Resets the UUID from the incoming media id, so controller may reuse a media item
             // multiple times for addPlaylistItem.
             session.getInstance().addPlaylistItem(index,
-                    MediaItem2Impl.fromBundle(session.getContext(), mediaItem, null));
+                    MediaItem2Impl.fromBundle(mediaItem, null));
         });
     }
 
@@ -682,7 +679,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     public void removePlaylistItem(IMediaController2 caller, Bundle mediaItem) {
         onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM,
                 (session, controller) -> {
-            MediaItem2 item = MediaItem2.fromBundle(session.getContext(), mediaItem);
+            MediaItem2 item = MediaItem2.fromBundle(mediaItem);
             // Note: MediaItem2 has hidden UUID to identify it across the processes.
             session.getInstance().removePlaylistItem(item);
         });
@@ -695,7 +692,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                     // Resets the UUID from the incoming media id, so controller may reuse a media
                     // item multiple times for replacePlaylistItem.
                     session.getInstance().replacePlaylistItem(index,
-                            MediaItem2Impl.fromBundle(session.getContext(), mediaItem, null));
+                            MediaItem2Impl.fromBundle(mediaItem, null));
                 });
     }
 
@@ -708,8 +705,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                                 + controller);
                     }
                     // Note: MediaItem2 has hidden UUID to identify it across the processes.
-                    session.getInstance().skipToPlaylistItem(
-                            MediaItem2.fromBundle(session.getContext(), mediaItem));
+                    session.getInstance().skipToPlaylistItem(MediaItem2.fromBundle(mediaItem));
                 });
     }
 
