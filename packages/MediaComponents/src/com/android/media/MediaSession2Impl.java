@@ -1242,7 +1242,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
             // Ask server whether the controller is trusted.
             // App cannot know this because apps cannot query enabled notification listener for
             // another package, but system server can do.
-            mIsTrusted = manager.isTrusted(packageName, pid, uid);
+            mIsTrusted = manager.isTrustedForMediaControl(
+                    new MediaSessionManager.RemoteUserInfo(packageName, pid, uid));
         }
 
         @Override
