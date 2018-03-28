@@ -1909,8 +1909,8 @@ typedef enum acamera_metadata_tag {
      * the thumbnail data will also be rotated.</p>
      * <p>Note that this orientation is relative to the orientation of the camera sensor, given
      * by ACAMERA_SENSOR_ORIENTATION.</p>
-     * <p>To translate from the device orientation given by the Android sensor APIs, the following
-     * sample code may be used:</p>
+     * <p>To translate from the device orientation given by the Android sensor APIs for camera
+     * sensors which are not EXTERNAL, the following sample code may be used:</p>
      * <pre><code>private int getJpegOrientation(CameraCharacteristics c, int deviceOrientation) {
      *     if (deviceOrientation == android.view.OrientationEventListener.ORIENTATION_UNKNOWN) return 0;
      *     int sensorOrientation = c.get(CameraCharacteristics.SENSOR_ORIENTATION);
@@ -1929,6 +1929,8 @@ typedef enum acamera_metadata_tag {
      *     return jpegOrientation;
      * }
      * </code></pre>
+     * <p>For EXTERNAL cameras the sensor orientation will always be set to 0 and the facing will
+     * also be set to EXTERNAL. The above code is not relevant in such case.</p>
      *
      * @see ACAMERA_SENSOR_ORIENTATION
      */
