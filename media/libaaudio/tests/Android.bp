@@ -167,3 +167,15 @@ cc_test {
     srcs: ["test_atomic_fifo.cpp"],
     shared_libs: ["libaaudio"],
 }
+
+cc_test {
+    name: "test_flowgraph",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_flowgraph.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
