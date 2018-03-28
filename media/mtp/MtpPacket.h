@@ -19,6 +19,7 @@
 
 #include <android-base/macros.h>
 
+#include "MtpDebug.h"
 #include "MtpTypes.h"
 
 struct usb_device;

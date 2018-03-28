@@ -17,6 +17,7 @@
 #ifndef _MTP_STORAGE_H
 #define _MTP_STORAGE_H
 
+#include "MtpStringBuffer.h"
 #include "MtpTypes.h"
 #include "mtp.h"
 
@@ -28,8 +29,8 @@ class MtpStorage {
 
 private:
     MtpStorageID            mStorageID;
-    MtpString               mFilePath;
-    MtpString               mDescription;
+    MtpStringBuffer         mFilePath;
+    MtpStringBuffer         mDescription;
     uint64_t                mMaxCapacity;
     uint64_t                mMaxFileSize;
     bool                    mRemovable;
