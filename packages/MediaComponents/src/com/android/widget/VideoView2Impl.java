@@ -1190,6 +1190,14 @@ public class VideoView2Impl extends BaseLayout
                     }
                 }
 
+                @Override
+                public void onCallCompleted(MediaPlayer2 mp, DataSourceDesc dsd, int what,
+                        int status) {
+                    if (what == MediaPlayer2.CALL_COMPLETED_SEEK_TO && status == 0) {
+                        updatePlaybackState();
+                    }
+                }
+
                 private void onPrepared(MediaPlayer2 mp, DataSourceDesc dsd) {
                     if (DEBUG) {
                         Log.d(TAG, "OnPreparedListener(). mCurrentState=" + mCurrentState
@@ -1377,7 +1385,6 @@ public class VideoView2Impl extends BaseLayout
                 } else {
                     mMediaPlayer.seekTo(pos, MediaPlayer2.SEEK_PREVIOUS_SYNC);
                     mSeekWhenPrepared = 0;
-                    updatePlaybackState();
                 }
             } else {
                 mSeekWhenPrepared = pos;
