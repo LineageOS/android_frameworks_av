@@ -18,9 +18,9 @@
 #define _MTP_DEBUG_H
 
 // #define LOG_NDEBUG 0
-#include <utils/Log.h>
-
 #include "MtpTypes.h"
+
+#include <log/log.h>
 
 namespace android {
 
