@@ -20,6 +20,8 @@
 #include "MtpPacket.h"
 #include "mtp.h"
 
+#include <errno.h>
+
 class IMtpHandle;
 
 namespace android {

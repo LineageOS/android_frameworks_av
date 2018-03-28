@@ -16,168 +16,97 @@
 
 #define LOG_TAG "MtpStringBuffer"
 
-#include <string.h>
+#include <codecvt>
+#include <locale>
+#include <string>
+#include <vector>
 
 #include "MtpDataPacket.h"
 #include "MtpStringBuffer.h"
 
-namespace android {
+namespace {
 
-MtpStringBuffer::MtpStringBuffer()
-    :   mCharCount(0),
-        mByteCount(1)
-{
-    mBuffer[0] = 0;
+std::wstring_convert<std::codecvt_utf8_utf16<char16_t>,char16_t> gConvert;
+
+static std::string utf16ToUtf8(std::u16string input_str) {
+    return gConvert.to_bytes(input_str);
 }
 
+static std::u16string utf8ToUtf16(std::string input_str) {
+    return gConvert.from_bytes(input_str);
+}
+
+} // namespace
+
+namespace android {
+
 MtpStringBuffer::MtpStringBuffer(const char* src)
-    :   mCharCount(0),
-        mByteCount(1)
 {
     set(src);
 }
 
 MtpStringBuffer::MtpStringBuffer(const uint16_t* src)
-    :   mCharCount(0),
-        mByteCount(1)
 {
     set(src);
 }
 
 MtpStringBuffer::MtpStringBuffer(const MtpStringBuffer& src)
-    :   mCharCount(src.mCharCount),
-        mByteCount(src.mByteCount)
 {
-    memcpy(mBuffer, src.mBuffer, mByteCount);
-}
-
-
-MtpStringBuffer::~MtpStringBuffer() {
+    mString = src.mString;
 }
 
 void MtpStringBuffer::set(const char* src) {
-    // count the characters
-    int count = 0;
-    char ch;
-    char* dest = (char*)mBuffer;
-
-    while ((ch = *src++) != 0 && count < MTP_STRING_MAX_CHARACTER_NUMBER) {
-        if ((ch & 0x80) == 0) {
-            // single byte character
-            *dest++ = ch;
-        } else if ((ch & 0xE0) == 0xC0) {
-            // two byte character
-            char ch1 = *src++;
-            if (! ch1) {
-                // last character was truncated, so ignore last byte
-                break;
-            }
-
-            *dest++ = ch;
-            *dest++ = ch1;
-        } else if ((ch & 0xF0) == 0xE0) {
-            // 3 byte char
-            char ch1 = *src++;
-            if (! ch1) {
-                // last character was truncated, so ignore last byte
-                break;
-            }
-            char ch2 = *src++;
-            if (! ch2) {
-                // last character was truncated, so ignore last byte
-                break;
-            }
-
-            *dest++ = ch;
-            *dest++ = ch1;
-            *dest++ = ch2;
-        }
-        count++;
-    }
-
-    *dest++ = 0;
-    mByteCount = dest - (char*)mBuffer;
-    mCharCount = count;
+    mString = std::string(src);
 }
 
 void MtpStringBuffer::set(const uint16_t* src) {
-    int count = 0;
-    uint16_t ch;
-    uint8_t* dest = mBuffer;
-
-    while ((ch = *src++) != 0 && count < MTP_STRING_MAX_CHARACTER_NUMBER) {
-        if (ch >= 0x0800) {
-            *dest++ = (uint8_t)(0xE0 | (ch >> 12));
-            *dest++ = (uint8_t)(0x80 | ((ch >> 6) & 0x3F));
-            *dest++ = (uint8_t)(0x80 | (ch & 0x3F));
-        } else if (ch >= 0x80) {
-            *dest++ = (uint8_t)(0xC0 | (ch >> 6));
-            *dest++ = (uint8_t)(0x80 | (ch & 0x3F));
-        } else {
-            *dest++ = ch;
-        }
-        count++;
-    }
-    *dest++ = 0;
-    mCharCount = count;
-    mByteCount = dest - mBuffer;
+    mString = utf16ToUtf8(std::u16string((const char16_t*)src));
 }
 
 bool MtpStringBuffer::readFromPacket(MtpDataPacket* packet) {
     uint8_t count;
     if (!packet->getUInt8(count))
         return false;
+    if (count == 0)
+        return true;
 
-    uint8_t* dest = mBuffer;
+    std::vector<char16_t> buffer(count);
     for (int i = 0; i < count; i++) {
         uint16_t ch;
-
         if (!packet->getUInt16(ch))
             return false;
-        if (ch >= 0x0800) {
-            *dest++ = (uint8_t)(0xE0 | (ch >> 12));
-            *dest++ = (uint8_t)(0x80 | ((ch >> 6) & 0x3F));
-            *dest++ = (uint8_t)(0x80 | (ch & 0x3F));
-        } else if (ch >= 0x80) {
-            *dest++ = (uint8_t)(0xC0 | (ch >> 6));
-            *dest++ = (uint8_t)(0x80 | (ch & 0x3F));
-        } else {
-            *dest++ = ch;
-        }
+        buffer[i] = ch;
     }
-    *dest++ = 0;
-    mCharCount = count;
-    mByteCount = dest - mBuffer;
+    if (buffer[count-1] != '\0') {
+        ALOGE("Mtp string not null terminated\n");
+        return false;
+    }
+    mString = utf16ToUtf8(std::u16string(buffer.data()));
     return true;
 }
 
 void MtpStringBuffer::writeToPacket(MtpDataPacket* packet) const {
-    int count = mCharCount;
-    const uint8_t* src = mBuffer;
-    packet->putUInt8(count > 0 ? count + 1 : 0);
+    std::u16string src16 = utf8ToUtf16(mString);
+    int count = src16.length();
 
-    // expand utf8 to 16 bit chars
-    for (int i = 0; i < count; i++) {
-        uint16_t ch;
-        uint16_t ch1 = *src++;
-        if ((ch1 & 0x80) == 0) {
-            // single byte character
-            ch = ch1;
-        } else if ((ch1 & 0xE0) == 0xC0) {
-            // two byte character
-            uint16_t ch2 = *src++;
-            ch = ((ch1 & 0x1F) << 6) | (ch2 & 0x3F);
-        } else {
-            // three byte character
-            uint16_t ch2 = *src++;
-            uint16_t ch3 = *src++;
-            ch = ((ch1 & 0x0F) << 12) | ((ch2 & 0x3F) << 6) | (ch3 & 0x3F);
+    if (count == 0) {
+        packet->putUInt8(0);
+        return;
+    }
+    packet->putUInt8(std::min(count + 1, MTP_STRING_MAX_CHARACTER_NUMBER));
+
+    int i = 0;
+    for (char16_t &c : src16) {
+        if (i == MTP_STRING_MAX_CHARACTER_NUMBER - 1) {
+            // Leave a slot for null termination.
+            ALOGI("Mtp truncating long string\n");
+            break;
         }
-        packet->putUInt16(ch);
+        packet->putUInt16(c);
+        i++;
     }
     // only terminate with zero if string is not empty
-    if (count > 0)
-        packet->putUInt16(0);
+    packet->putUInt16(0);
 }
 
 }  // namespace android

@@ -20,7 +20,7 @@
 #include <gtest/gtest.h>
 #include <string>
 #include <unistd.h>
-#include <utils/Log.h>
+#include <log/log.h>
 
 #include "PosixAsyncIO.h"
 
