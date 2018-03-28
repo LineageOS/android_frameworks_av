@@ -62,5 +62,8 @@
     <dimen name="mcv2_minimal_icon_size">24dp</dimen>
     <dimen name="mcv2_icon_margin">10dp</dimen>
 
+    <dimen name="mcv2_full_album_image_portrait_size">232dp</dimen>
+    <dimen name="mcv2_full_album_image_landscape_size">176dp</dimen>
+
     <!-- TODO: adjust bottom bar view -->
 </resources>
