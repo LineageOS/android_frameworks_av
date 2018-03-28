@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include <inttypes.h>
+#include <stdlib.h>
 
 #include "include/SecureBuffer.h"
 #include "include/SharedMemoryBuffer.h"
@@ -88,6 +89,22 @@ static const char *kCodecMaxWidth = "android.media.mediacodec.maxwidth";  /* 0..
 static const char *kCodecMaxHeight = "android.media.mediacodec.maxheight";  /* 0..n */
 static const char *kCodecError = "android.media.mediacodec.errcode";
 static const char *kCodecErrorState = "android.media.mediacodec.errstate";
+static const char *kCodecLatencyMax = "android.media.mediacodec.latency.max";   /* in us */
+static const char *kCodecLatencyMin = "android.media.mediacodec.latency.min";   /* in us */
+static const char *kCodecLatencyAvg = "android.media.mediacodec.latency.avg";   /* in us */
+static const char *kCodecLatencyCount = "android.media.mediacodec.latency.n";
+static const char *kCodecLatencyHist = "android.media.mediacodec.latency.hist"; /* in us */
+static const char *kCodecLatencyUnknown = "android.media.mediacodec.latency.unknown";
+
+// the kCodecRecent* fields appear only in getMetrics() results
+static const char *kCodecRecentLatencyMax = "android.media.mediacodec.recent.max";      /* in us */
+static const char *kCodecRecentLatencyMin = "android.media.mediacodec.recent.min";      /* in us */
+static const char *kCodecRecentLatencyAvg = "android.media.mediacodec.recent.avg";      /* in us */
+static const char *kCodecRecentLatencyCount = "android.media.mediacodec.recent.n";
+static const char *kCodecRecentLatencyHist = "android.media.mediacodec.recent.hist";    /* in us */
+
+// XXX suppress until we get our representation right
+static bool kEmitHistogram = false;
 
 
 static int64_t getId(const sp<IResourceManagerClient> &client) {
@@ -506,12 +523,14 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
       mDequeueOutputTimeoutGeneration(0),
       mDequeueOutputReplyID(0),
       mHaveInputSurface(false),
-      mHavePendingInputBuffers(false) {
+      mHavePendingInputBuffers(false),
+      mLatencyUnknown(0) {
     if (uid == kNoUid) {
         mUid = IPCThreadState::self()->getCallingUid();
     } else {
         mUid = uid;
     }
+
     initAnalyticsItem();
 }
 
@@ -523,16 +542,90 @@ MediaCodec::~MediaCodec() {
 }
 
 void MediaCodec::initAnalyticsItem() {
-    CHECK(mAnalyticsItem == NULL);
-    // set up our new record, get a sessionID, put it into the in-progress list
-    mAnalyticsItem = new MediaAnalyticsItem(kCodecKeyName);
-    if (mAnalyticsItem != NULL) {
-        // don't record it yet; only at the end, when we have decided that we have
-        // data worth writing (e.g. .count() > 0)
+    if (mAnalyticsItem == NULL) {
+        mAnalyticsItem = new MediaAnalyticsItem(kCodecKeyName);
+    }
+
+    mLatencyHist.setup(kLatencyHistBuckets, kLatencyHistWidth, kLatencyHistFloor);
+
+    {
+        Mutex::Autolock al(mRecentLock);
+        for (int i = 0; i<kRecentLatencyFrames; i++) {
+            mRecentSamples[i] = kRecentSampleInvalid;
+        }
+        mRecentHead = 0;
+    }
+}
+
+void MediaCodec::updateAnalyticsItem() {
+    ALOGV("MediaCodec::updateAnalyticsItem");
+    if (mAnalyticsItem == NULL) {
+        return;
+    }
+
+    if (mLatencyHist.getCount() != 0 ) {
+        mAnalyticsItem->setInt64(kCodecLatencyMax, mLatencyHist.getMax());
+        mAnalyticsItem->setInt64(kCodecLatencyMin, mLatencyHist.getMin());
+        mAnalyticsItem->setInt64(kCodecLatencyAvg, mLatencyHist.getAvg());
+        mAnalyticsItem->setInt64(kCodecLatencyCount, mLatencyHist.getCount());
+
+        if (kEmitHistogram) {
+            // and the histogram itself
+            std::string hist = mLatencyHist.emit();
+            mAnalyticsItem->setCString(kCodecLatencyHist, hist.c_str());
+        }
+    }
+    if (mLatencyUnknown > 0) {
+        mAnalyticsItem->setInt64(kCodecLatencyUnknown, mLatencyUnknown);
+    }
+
+#if 0
+    // enable for short term, only while debugging
+    updateEphemeralAnalytics(mAnalyticsItem);
+#endif
+}
+
+void MediaCodec::updateEphemeralAnalytics(MediaAnalyticsItem *item) {
+    ALOGD("MediaCodec::updateEphemeralAnalytics()");
+
+    if (item == NULL) {
+        return;
+    }
+
+    Histogram recentHist;
+
+    // build an empty histogram
+    recentHist.setup(kLatencyHistBuckets, kLatencyHistWidth, kLatencyHistFloor);
+
+    // stuff it with the samples in the ring buffer
+    {
+        Mutex::Autolock al(mRecentLock);
+
+        for (int i=0; i<kRecentLatencyFrames; i++) {
+            if (mRecentSamples[i] != kRecentSampleInvalid) {
+                recentHist.insert(mRecentSamples[i]);
+            }
+        }
+    }
+
+
+    // spit the data (if any) into the supplied analytics record
+    if (recentHist.getCount()!= 0 ) {
+        item->setInt64(kCodecRecentLatencyMax, recentHist.getMax());
+        item->setInt64(kCodecRecentLatencyMin, recentHist.getMin());
+        item->setInt64(kCodecRecentLatencyAvg, recentHist.getAvg());
+        item->setInt64(kCodecRecentLatencyCount, recentHist.getCount());
+
+        if (kEmitHistogram) {
+            // and the histogram itself
+            std::string hist = recentHist.emit();
+            item->setCString(kCodecRecentLatencyHist, hist.c_str());
+        }
     }
 }
 
 void MediaCodec::flushAnalyticsItem() {
+    updateAnalyticsItem();
     if (mAnalyticsItem != NULL) {
         // don't log empty records
         if (mAnalyticsItem->count() > 0) {
@@ -540,6 +633,190 @@ void MediaCodec::flushAnalyticsItem() {
         }
         delete mAnalyticsItem;
         mAnalyticsItem = NULL;
+    }
+}
+
+bool MediaCodec::Histogram::setup(int nbuckets, int64_t width, int64_t floor)
+{
+    if (nbuckets <= 0 || width <= 0) {
+        return false;
+    }
+
+    // get histogram buckets
+    if (nbuckets == mBucketCount && mBuckets != NULL) {
+        // reuse our existing buffer
+        memset(mBuckets, 0, sizeof(*mBuckets) * mBucketCount);
+    } else {
+        // get a new pre-zeroed buffer
+        int64_t *newbuckets = (int64_t *)calloc(nbuckets, sizeof (*mBuckets));
+        if (newbuckets == NULL) {
+            goto bad;
+        }
+        if (mBuckets != NULL)
+            free(mBuckets);
+        mBuckets = newbuckets;
+    }
+
+    mWidth = width;
+    mFloor = floor;
+    mCeiling = floor + nbuckets * width;
+    mBucketCount = nbuckets;
+
+    mMin = INT64_MAX;
+    mMax = INT64_MIN;
+    mSum = 0;
+    mCount = 0;
+    mBelow = mAbove = 0;
+
+    return true;
+
+  bad:
+    if (mBuckets != NULL) {
+        free(mBuckets);
+        mBuckets = NULL;
+    }
+
+    return false;
+}
+
+void MediaCodec::Histogram::insert(int64_t sample)
+{
+    // histogram is not set up
+    if (mBuckets == NULL) {
+        return;
+    }
+
+    mCount++;
+    mSum += sample;
+    if (mMin > sample) mMin = sample;
+    if (mMax < sample) mMax = sample;
+
+    if (sample < mFloor) {
+        mBelow++;
+    } else if (sample >= mCeiling) {
+        mAbove++;
+    } else {
+        int64_t slot = (sample - mFloor) / mWidth;
+        CHECK(slot < mBucketCount);
+        mBuckets[slot]++;
+    }
+    return;
+}
+
+std::string MediaCodec::Histogram::emit()
+{
+    std::string value;
+    char buffer[64];
+
+    // emits:  width,Below{bucket0,bucket1,...., bucketN}above
+    // unconfigured will emit: 0,0{}0
+    // XXX: is this best representation?
+    snprintf(buffer, sizeof(buffer), "%" PRId64 ",%" PRId64 ",%" PRId64 "{",
+             mFloor, mWidth, mBelow);
+    value = buffer;
+    for (int i = 0; i < mBucketCount; i++) {
+        if (i != 0) {
+            value = value + ",";
+        }
+        snprintf(buffer, sizeof(buffer), "%" PRId64, mBuckets[i]);
+        value = value + buffer;
+    }
+    snprintf(buffer, sizeof(buffer), "}%" PRId64 , mAbove);
+    value = value + buffer;
+    return value;
+}
+
+// when we send a buffer to the codec;
+void MediaCodec::statsBufferSent(int64_t presentationUs) {
+
+    // only enqueue if we have a legitimate time
+    if (presentationUs <= 0) {
+        ALOGV("presentation time: %" PRId64, presentationUs);
+        return;
+    }
+
+    const int64_t nowNs = systemTime(SYSTEM_TIME_MONOTONIC);
+    BufferFlightTiming_t startdata = { presentationUs, nowNs };
+
+    {
+        // mutex access to mBuffersInFlight and other stats
+        Mutex::Autolock al(mLatencyLock);
+
+
+        // XXX: we *could* make sure that the time is later than the end of queue
+        // as part of a consistency check...
+        mBuffersInFlight.push_back(startdata);
+    }
+}
+
+// when we get a buffer back from the codec
+void MediaCodec::statsBufferReceived(int64_t presentationUs) {
+
+    CHECK_NE(mState, UNINITIALIZED);
+
+    // mutex access to mBuffersInFlight and other stats
+    Mutex::Autolock al(mLatencyLock);
+
+    // how long this buffer took for the round trip through the codec
+    // NB: pipelining can/will make these times larger. e.g., if each packet
+    // is always 2 msec and we have 3 in flight at any given time, we're going to
+    // see "6 msec" as an answer.
+
+    // ignore stuff with no presentation time
+    if (presentationUs <= 0) {
+        ALOGD("-- returned buffer has bad timestamp %" PRId64 ", ignore it", presentationUs);
+        mLatencyUnknown++;
+        return;
+    }
+
+    BufferFlightTiming_t startdata;
+    bool valid = false;
+    while (mBuffersInFlight.size() > 0) {
+        startdata = *mBuffersInFlight.begin();
+        ALOGV("-- Looking at startdata. presentation %" PRId64 ", start %" PRId64,
+              startdata.presentationUs, startdata.startedNs);
+        if (startdata.presentationUs == presentationUs) {
+            // a match
+            ALOGV("-- match entry for %" PRId64 ", hits our frame of %" PRId64,
+                  startdata.presentationUs, presentationUs);
+            mBuffersInFlight.pop_front();
+            valid = true;
+            break;
+        } else if (startdata.presentationUs < presentationUs) {
+            // we must have missed the match for this, drop it and keep looking
+            ALOGV("--  drop entry for %" PRId64 ", before our frame of %" PRId64,
+                  startdata.presentationUs, presentationUs);
+            mBuffersInFlight.pop_front();
+            continue;
+        } else {
+            // head is after, so we don't have a frame for ourselves
+            ALOGV("--  found entry for %" PRId64 ", AFTER our frame of %" PRId64
+                  " we have nothing to pair with",
+                  startdata.presentationUs, presentationUs);
+            mLatencyUnknown++;
+            return;
+        }
+    }
+    if (!valid) {
+        ALOGV("-- empty queue, so ignore that.");
+        mLatencyUnknown++;
+        return;
+    }
+
+    // nowNs start our calculations
+    const int64_t nowNs = systemTime(SYSTEM_TIME_MONOTONIC);
+    int64_t latencyUs = (nowNs - startdata.startedNs + 500) / 1000;
+
+    mLatencyHist.insert(latencyUs);
+
+    // push into the recent samples
+    {
+        Mutex::Autolock al(mRecentLock);
+
+        if (mRecentHead >= kRecentLatencyFrames) {
+            mRecentHead = 0;
+        }
+        mRecentSamples[mRecentHead++] = latencyUs;
     }
 }
 
@@ -778,7 +1055,6 @@ status_t MediaCodec::configure(
             msg->setPointer("descrambler", descrambler.get());
         }
         if (mAnalyticsItem != NULL) {
-            // XXX: save indication that it's crypto in some way...
             mAnalyticsItem->setInt32(kCodecCrypto, 1);
         }
     } else if (mFlags & kFlagIsSecure) {
@@ -1245,10 +1521,13 @@ status_t MediaCodec::getMetrics(MediaAnalyticsItem * &reply) {
         return UNKNOWN_ERROR;
     }
 
-    // XXX: go get current values for whatever in-flight data we want
+    // update any in-flight data that's not carried within the record
+    updateAnalyticsItem();
 
     // send it back to the caller.
     reply = mAnalyticsItem->dup();
+
+    updateEphemeralAnalytics(reply);
 
     return OK;
 }
@@ -1434,6 +1713,8 @@ bool MediaCodec::handleDequeueOutputBuffer(const sp<AReplyToken> &replyID, bool 
 
         int64_t timeUs;
         CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
+
+        statsBufferReceived(timeUs);
 
         response->setInt64("timeUs", timeUs);
 
@@ -2919,6 +3200,9 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         Mutex::Autolock al(mBufferLock);
         info->mOwnedByClient = false;
         info->mData.clear();
+
+        statsBufferSent(timeUs);
+
         if (mAnalyticsItem != NULL) {
             mAnalyticsItem->addInt64(kCodecBytesIn, size);
         }
@@ -3137,6 +3421,8 @@ void MediaCodec::onOutputBufferAvailable() {
         CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
 
         msg->setInt64("timeUs", timeUs);
+
+        statsBufferReceived(timeUs);
 
         int32_t flags;
         CHECK(buffer->meta()->findInt32("flags", &flags));

@@ -320,7 +320,9 @@ private:
 
     MediaAnalyticsItem *mAnalyticsItem;
     void initAnalyticsItem();
+    void updateAnalyticsItem();
     void flushAnalyticsItem();
+    void updateEphemeralAnalytics(MediaAnalyticsItem *item);
 
     sp<AMessage> mOutputFormat;
     sp<AMessage> mInputFormat;
@@ -440,6 +442,63 @@ private:
     }
 
     void onReleaseCrypto(const sp<AMessage>& msg);
+
+    // managing time-of-flight aka latency
+    typedef struct {
+            int64_t presentationUs;
+            int64_t startedNs;
+    } BufferFlightTiming_t;
+    std::deque<BufferFlightTiming_t> mBuffersInFlight;
+    Mutex mLatencyLock;
+    int64_t mLatencyUnknown;    // buffers for which we couldn't calculate latency
+
+    void statsBufferSent(int64_t presentationUs);
+    void statsBufferReceived(int64_t presentationUs);
+
+    enum {
+        // the default shape of our latency histogram buckets
+        // XXX: should these be configurable in some way?
+        kLatencyHistBuckets = 20,
+        kLatencyHistWidth = 2000,
+        kLatencyHistFloor = 2000,
+
+        // how many samples are in the 'recent latency' histogram
+        // 300 frames = 5 sec @ 60fps or ~12 sec @ 24fps
+        kRecentLatencyFrames = 300,
+
+        // how we initialize mRecentSamples
+        kRecentSampleInvalid = -1,
+    };
+
+    int64_t mRecentSamples[kRecentLatencyFrames];
+    int mRecentHead;
+    Mutex mRecentLock;
+
+    class Histogram {
+      public:
+        Histogram() : mFloor(0), mWidth(0), mBelow(0), mAbove(0),
+                      mMin(INT64_MAX), mMax(INT64_MIN), mSum(0), mCount(0),
+                      mBucketCount(0), mBuckets(NULL) {};
+        ~Histogram() { clear(); };
+        void clear() { if (mBuckets != NULL) free(mBuckets); mBuckets = NULL; };
+        bool setup(int nbuckets, int64_t width, int64_t floor = 0);
+        void insert(int64_t sample);
+        int64_t getMin() const { return mMin; }
+        int64_t getMax() const { return mMax; }
+        int64_t getCount() const { return mCount; }
+        int64_t getSum() const { return mSum; }
+        int64_t getAvg() const { return mSum / (mCount == 0 ? 1 : mCount); }
+        std::string emit();
+      private:
+        int64_t mFloor, mCeiling, mWidth;
+        int64_t mBelow, mAbove;
+        int64_t mMin, mMax, mSum, mCount;
+
+        int mBucketCount;
+        int64_t *mBuckets;
+    };
+
+    Histogram mLatencyHist;
 
     DISALLOW_EVIL_CONSTRUCTORS(MediaCodec);
 };
