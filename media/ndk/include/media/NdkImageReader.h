@@ -256,7 +256,7 @@ media_status_t AImageReader_acquireLatestImage(AImageReader* reader, /*out*/AIma
 
 
 /**
- * The definition of {@link AImageReader} new image available callback.
+ * Signature of the callback which is called when a new image is available from {@link AImageReader}.
  *
  * @param context The optional application context provided by user in
  *                {@link AImageReader_setImageListener}.
@@ -265,11 +265,11 @@ media_status_t AImageReader_acquireLatestImage(AImageReader* reader, /*out*/AIma
 typedef void (*AImageReader_ImageCallback)(void* context, AImageReader* reader);
 
 typedef struct AImageReader_ImageListener {
-    /// optional application context.
+    /// Optional application context passed as the first parameter of the callback.
     void*                      context;
 
     /**
-     * This callback is called when there is a new image available for in the image reader's queue.
+     * This callback is called when there is a new image available in the image reader's queue.
      *
      * <p>The callback happens on one dedicated thread per {@link AImageReader} instance. It is okay
      * to use AImageReader_* and AImage_* methods within the callback. Note that it is possible that
@@ -285,11 +285,11 @@ typedef struct AImageReader_ImageListener {
 /**
  * Set the onImageAvailable listener of this image reader.
  *
- * <p>Note that calling this method will replace previously registered listeners.</p>
+ * Calling this method will replace previously registered listeners.
  *
  * @param reader The image reader of interest.
- * @param listener the {@link AImageReader_ImageListener} to be registered. Set this to NULL if
- *                 application no longer needs to listen to new images.
+ * @param listener The {@link AImageReader_ImageListener} to be registered. Set this to NULL if
+ *                 the application no longer needs to listen to new images.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -406,7 +406,7 @@ media_status_t AImageReader_acquireNextImageAsync(
 media_status_t AImageReader_acquireLatestImageAsync(
         AImageReader* reader, /*out*/AImage** image, /*out*/int* acquireFenceFd);
 /**
- * The definition of {@link AImageReader} buffer removed callback.
+ * Signature of the callback which is called when {@link AImageReader} is about to remove a buffer.
  *
  * @param context The optional application context provided by user in
  *                {@link AImageReader_setBufferRemovedListener}.
@@ -418,7 +418,7 @@ typedef void (*AImageReader_BufferRemovedCallback)(void* context,
         AHardwareBuffer* buffer);
 
 typedef struct AImageReader_BufferRemovedListener {
-    /// optional application context.
+    /// Optional application context passed as the first parameter of the callback.
     void*                      context;
 
     /**
