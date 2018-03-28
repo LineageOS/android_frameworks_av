@@ -22,10 +22,9 @@ import android.media.MediaController2;
 import android.media.MediaItem2;
 import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaMetadata2;
-import android.media.MediaSession2;
-import android.media.MediaSession2.Command;
+import android.media.SessionCommand2;
 import android.media.MediaSession2.CommandButton;
-import android.media.MediaSession2.CommandGroup;
+import android.media.SessionCommandGroup2;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.Rating2;
 import android.media.VolumeProvider2;
@@ -64,7 +63,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     private static final String TAG = "MediaSession2Stub";
     private static final boolean DEBUG = true; // TODO(jaewan): Rename.
 
-    private static final SparseArray<Command> sCommandsForOnCommandRequest = new SparseArray<>();
+    private static final SparseArray<SessionCommand2> sCommandsForOnCommandRequest =
+            new SparseArray<>();
 
     private final Object mLock = new Object();
     private final WeakReference<MediaSession2Impl> mSession;
@@ -74,7 +74,8 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @GuardedBy("mLock")
     private final Set<IBinder> mConnectingControllers = new HashSet<>();
     @GuardedBy("mLock")
-    private final ArrayMap<ControllerInfo, CommandGroup> mAllowedCommandGroupMap = new ArrayMap<>();
+    private final ArrayMap<ControllerInfo, SessionCommandGroup2> mAllowedCommandGroupMap =
+            new ArrayMap<>();
     @GuardedBy("mLock")
     private final ArrayMap<ControllerInfo, Set<String>> mSubscriptions = new ArrayMap<>();
 
@@ -83,11 +84,11 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
         synchronized (sCommandsForOnCommandRequest) {
             if (sCommandsForOnCommandRequest.size() == 0) {
-                CommandGroupImpl group = new CommandGroupImpl(session.getContext());
+                CommandGroupImpl group = new CommandGroupImpl();
                 group.addAllPlaybackCommands();
                 group.addAllPlaylistCommands();
-                Set<Command> commands = group.getCommands();
-                for (Command command : commands) {
+                Set<SessionCommand2> commands = group.getCommands();
+                for (SessionCommand2 command : commands) {
                     sCommandsForOnCommandRequest.append(command.getCommandCode(), command);
                 }
             }
@@ -147,7 +148,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (controllerInfo == null) {
                 return null;
             }
-            CommandGroup allowedCommands = mAllowedCommandGroupMap.get(controllerInfo);
+            SessionCommandGroup2 allowedCommands = mAllowedCommandGroupMap.get(controllerInfo);
             if (allowedCommands == null) {
                 Log.w(TAG, "Controller with null allowed commands. Ignoring",
                         new IllegalStateException());
@@ -164,13 +165,13 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     // Get controller if the command from caller to session is able to be handled.
-    private ControllerInfo getControllerIfAble(IMediaController2 caller, Command command) {
+    private ControllerInfo getControllerIfAble(IMediaController2 caller, SessionCommand2 command) {
         synchronized (mLock) {
             final ControllerInfo controllerInfo = getControllerIfAble(caller);
             if (controllerInfo == null) {
                 return null;
             }
-            CommandGroup allowedCommands = mAllowedCommandGroupMap.get(controllerInfo);
+            SessionCommandGroup2 allowedCommands = mAllowedCommandGroupMap.get(controllerInfo);
             if (allowedCommands == null) {
                 Log.w(TAG, "Controller with null allowed commands. Ignoring",
                         new IllegalStateException());
@@ -210,7 +211,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     private IMediaController2 getControllerBinderIfAble(ControllerInfo controller,
             int commandCode) {
         synchronized (mLock) {
-            CommandGroup allowedCommands = mAllowedCommandGroupMap.get(controller);
+            SessionCommandGroup2 allowedCommands = mAllowedCommandGroupMap.get(controller);
             if (allowedCommands == null) {
                 Log.w(TAG, "Controller with null allowed commands. Ignoring");
                 return null;
@@ -236,7 +237,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             if (getControllerIfAble(caller, commandCode) == null) {
                 return;
             }
-            Command command = sCommandsForOnCommandRequest.get(commandCode);
+            SessionCommand2 command = sCommandsForOnCommandRequest.get(commandCode);
             if (command != null) {
                 boolean accepted = session.getCallback().onCommandRequest(session.getInstance(),
                         controller, command);
@@ -256,13 +257,14 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     private void onBrowserCommand(@NonNull IMediaController2 caller,
             @NonNull LibrarySessionRunnable runnable) {
         final MediaLibrarySessionImpl session = getLibrarySession();
-        final ControllerInfo controller =
-                getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER);
+        // TODO(jaewan): Consider command code
+        final ControllerInfo controller = getControllerIfAble(caller);
         if (session == null || controller == null) {
             return;
         }
         session.getCallbackExecutor().execute(() -> {
-            if (getControllerIfAble(caller, MediaSession2.COMMAND_CODE_BROWSER) == null) {
+            // TODO(jaewan): Consider command code
+            if (getControllerIfAble(caller) == null) {
                 return;
             }
             runnable.run(session, controller);
@@ -359,7 +361,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 // instead of pending them.
                 mConnectingControllers.add(ControllerInfoImpl.from(controllerInfo).getId());
             }
-            CommandGroup allowedCommands = session.getCallback().onConnect(
+            SessionCommandGroup2 allowedCommands = session.getCallback().onConnect(
                     session.getInstance(), controllerInfo);
             // Don't reject connection for the request from trusted app.
             // Otherwise server will fail to retrieve session's information to dispatch
@@ -373,7 +375,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 }
                 if (allowedCommands == null) {
                     // For trusted apps, send non-null allowed commands to keep connection.
-                    allowedCommands = new CommandGroup(context);
+                    allowedCommands = new SessionCommandGroup2();
                 }
                 synchronized (mLock) {
                     mConnectingControllers.remove(controllerImpl.getId());
@@ -397,7 +399,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
                 final int shuffleMode = session.getInstance().getShuffleMode();
                 final PendingIntent sessionActivity = session.getSessionActivity();
                 final List<MediaItem2> playlist =
-                        allowedCommands.hasCommand(MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST)
+                        allowedCommands.hasCommand(SessionCommand2.COMMAND_CODE_PLAYLIST_GET_LIST)
                                 ? session.getInstance().getPlaylist() : null;
                 final List<Bundle> playlistBundle;
                 if (playlist != null) {
@@ -455,27 +457,29 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void setVolumeTo(final IMediaController2 caller, final int value, final int flags)
             throws RuntimeException {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME, (session, controller) -> {
-            VolumeProvider2 volumeProvider = session.getVolumeProvider();
-            if (volumeProvider == null) {
-                // TODO(jaewan): Set local stream volume
-            } else {
-                volumeProvider.onSetVolumeTo(value);
-            }
-        });
+        onCommand(caller, SessionCommand2.COMMAND_CODE_SET_VOLUME,
+                (session, controller) -> {
+                    VolumeProvider2 volumeProvider = session.getVolumeProvider();
+                    if (volumeProvider == null) {
+                        // TODO(jaewan): Set local stream volume
+                    } else {
+                        volumeProvider.onSetVolumeTo(value);
+                    }
+                });
     }
 
     @Override
     public void adjustVolume(IMediaController2 caller, int direction, int flags)
             throws RuntimeException {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYBACK_SET_VOLUME, (session, controller) -> {
-            VolumeProvider2 volumeProvider = session.getVolumeProvider();
-            if (volumeProvider == null) {
-                // TODO(jaewan): Adjust local stream volume
-            } else {
-                volumeProvider.onAdjustVolume(direction);
-            }
-        });
+        onCommand(caller, SessionCommand2.COMMAND_CODE_SET_VOLUME,
+                (session, controller) -> {
+                    VolumeProvider2 volumeProvider = session.getVolumeProvider();
+                    if (volumeProvider == null) {
+                        // TODO(jaewan): Adjust local stream volume
+                    } else {
+                        volumeProvider.onAdjustVolume(direction);
+                    }
+                });
     }
 
     @Override
@@ -483,25 +487,19 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             int commandCode, Bundle args) throws RuntimeException {
         onCommand(caller, commandCode, (session, controller) -> {
             switch (commandCode) {
-                case MediaSession2.COMMAND_CODE_PLAYBACK_PLAY:
+                case SessionCommand2.COMMAND_CODE_PLAYBACK_PLAY:
                     session.getInstance().play();
                     break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_PAUSE:
+                case SessionCommand2.COMMAND_CODE_PLAYBACK_PAUSE:
                     session.getInstance().pause();
                     break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_STOP:
+                case SessionCommand2.COMMAND_CODE_PLAYBACK_STOP:
                     session.getInstance().stop();
                     break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_PREPARE:
+                case SessionCommand2.COMMAND_CODE_PLAYBACK_PREPARE:
                     session.getInstance().prepare();
                     break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_FAST_FORWARD:
-                    session.getInstance().fastForward();
-                    break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_REWIND:
-                    session.getInstance().rewind();
-                    break;
-                case MediaSession2.COMMAND_CODE_PLAYBACK_SEEK_TO:
+                case SessionCommand2.COMMAND_CODE_PLAYBACK_SEEK_TO:
                     session.getInstance().seekTo(args.getLong(ARGUMENT_KEY_POSITION));
                     break;
                 default:
@@ -517,7 +515,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         if (session == null) {
             return;
         }
-        final Command command = Command.fromBundle(session.getContext(), commandBundle);
+        final SessionCommand2 command = SessionCommand2.fromBundle(commandBundle);
         if (command == null) {
             Log.w(TAG, "sendCustomCommand(): Ignoring null command from "
                     + getControllerIfAble(caller));
@@ -539,32 +537,35 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void prepareFromUri(final IMediaController2 caller, final Uri uri,
             final Bundle extras) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_PREPARE_FROM_URI, (session, controller) -> {
-            if (uri == null) {
-                Log.w(TAG, "prepareFromUri(): Ignoring null uri from " + controller);
-                return;
-            }
-            session.getCallback().onPrepareFromUri(session.getInstance(), controller, uri, extras);
-        });
+        onCommand(caller, SessionCommand2.COMMAND_CODE_SESSION_PREPARE_FROM_URI,
+                (session, controller) -> {
+                    if (uri == null) {
+                        Log.w(TAG, "prepareFromUri(): Ignoring null uri from " + controller);
+                        return;
+                    }
+                    session.getCallback().onPrepareFromUri(session.getInstance(), controller, uri,
+                            extras);
+                });
     }
 
     @Override
     public void prepareFromSearch(final IMediaController2 caller, final String query,
             final Bundle extras) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_PREPARE_FROM_SEARCH, (session, controller) -> {
-            if (TextUtils.isEmpty(query)) {
-                Log.w(TAG, "prepareFromSearch(): Ignoring empty query from " + controller);
-                return;
-            }
-            session.getCallback().onPrepareFromSearch(session.getInstance(),
-                    controller, query, extras);
-        });
+        onCommand(caller, SessionCommand2.COMMAND_CODE_SESSION_PREPARE_FROM_SEARCH,
+                (session, controller) -> {
+                    if (TextUtils.isEmpty(query)) {
+                        Log.w(TAG, "prepareFromSearch(): Ignoring empty query from " + controller);
+                        return;
+                    }
+                    session.getCallback().onPrepareFromSearch(session.getInstance(),
+                            controller, query, extras);
+                });
     }
 
     @Override
     public void prepareFromMediaId(final IMediaController2 caller, final String mediaId,
             final Bundle extras) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_PREPARE_FROM_MEDIA_ID,
+        onCommand(caller, SessionCommand2.COMMAND_CODE_SESSION_PREPARE_FROM_MEDIA_ID,
                 (session, controller) -> {
             if (mediaId == null) {
                 Log.w(TAG, "prepareFromMediaId(): Ignoring null mediaId from " + controller);
@@ -578,69 +579,75 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     @Override
     public void playFromUri(final IMediaController2 caller, final Uri uri,
             final Bundle extras) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_PLAY_FROM_URI, (session, controller) -> {
-            if (uri == null) {
-                Log.w(TAG, "playFromUri(): Ignoring null uri from " + controller);
-                return;
-            }
-            session.getCallback().onPlayFromUri(session.getInstance(), controller, uri, extras);
-        });
+        onCommand(caller, SessionCommand2.COMMAND_CODE_SESSION_PLAY_FROM_URI,
+                (session, controller) -> {
+                    if (uri == null) {
+                        Log.w(TAG, "playFromUri(): Ignoring null uri from " + controller);
+                        return;
+                    }
+                    session.getCallback().onPlayFromUri(session.getInstance(), controller, uri,
+                            extras);
+                });
     }
 
     @Override
     public void playFromSearch(final IMediaController2 caller, final String query,
             final Bundle extras) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_PLAY_FROM_SEARCH, (session, controller) -> {
-            if (TextUtils.isEmpty(query)) {
-                Log.w(TAG, "playFromSearch(): Ignoring empty query from " + controller);
-                return;
-            }
-            session.getCallback().onPlayFromSearch(session.getInstance(),
-                    controller, query, extras);
-        });
+        onCommand(caller, SessionCommand2.COMMAND_CODE_SESSION_PLAY_FROM_SEARCH,
+                (session, controller) -> {
+                    if (TextUtils.isEmpty(query)) {
+                        Log.w(TAG, "playFromSearch(): Ignoring empty query from " + controller);
+                        return;
+                    }
+                    session.getCallback().onPlayFromSearch(session.getInstance(),
+                            controller, query, extras);
+                });
     }
 
     @Override
     public void playFromMediaId(final IMediaController2 caller, final String mediaId,
             final Bundle extras) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_PLAY_FROM_MEDIA_ID, (session, controller) -> {
-            if (mediaId == null) {
-                Log.w(TAG, "playFromMediaId(): Ignoring null mediaId from " + controller);
-                return;
-            }
-            session.getCallback().onPlayFromMediaId(session.getInstance(),
-                    controller, mediaId, extras);
-        });
+        onCommand(caller, SessionCommand2.COMMAND_CODE_SESSION_PLAY_FROM_MEDIA_ID,
+                (session, controller) -> {
+                    if (mediaId == null) {
+                        Log.w(TAG, "playFromMediaId(): Ignoring null mediaId from " + controller);
+                        return;
+                    }
+                    session.getCallback().onPlayFromMediaId(session.getInstance(), controller,
+                            mediaId, extras);
+                });
     }
 
     @Override
     public void setRating(final IMediaController2 caller, final String mediaId,
             final Bundle ratingBundle) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_SESSION_SET_RATING, (session, controller) -> {
-            if (mediaId == null) {
-                Log.w(TAG, "setRating(): Ignoring null mediaId from " + controller);
-                return;
-            }
-            if (ratingBundle == null) {
-                Log.w(TAG, "setRating(): Ignoring null ratingBundle from " + controller);
-                return;
-            }
-            Rating2 rating = Rating2Impl.fromBundle(session.getContext(), ratingBundle);
-            if (rating == null) {
-                if (ratingBundle == null) {
-                    Log.w(TAG, "setRating(): Ignoring null rating from " + controller);
-                    return;
-                }
-                return;
-            }
-            session.getCallback().onSetRating(session.getInstance(), controller, mediaId, rating);
-        });
+        onCommand(caller, SessionCommand2.COMMAND_CODE_SESSION_SET_RATING,
+                (session, controller) -> {
+                    if (mediaId == null) {
+                        Log.w(TAG, "setRating(): Ignoring null mediaId from " + controller);
+                        return;
+                    }
+                    if (ratingBundle == null) {
+                        Log.w(TAG, "setRating(): Ignoring null ratingBundle from " + controller);
+                        return;
+                    }
+                    Rating2 rating = Rating2.fromBundle(ratingBundle);
+                    if (rating == null) {
+                        if (ratingBundle == null) {
+                            Log.w(TAG, "setRating(): Ignoring null rating from " + controller);
+                            return;
+                        }
+                        return;
+                    }
+                    session.getCallback().onSetRating(session.getInstance(), controller, mediaId,
+                            rating);
+                });
     }
 
     @Override
     public void setPlaylist(final IMediaController2 caller, final List<Bundle> playlist,
             final Bundle metadata) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST, (session, controller) -> {
+        onCommand(caller, SessionCommand2.COMMAND_CODE_PLAYLIST_SET_LIST, (session, controller) -> {
             if (playlist == null) {
                 Log.w(TAG, "setPlaylist(): Ignoring null playlist from " + controller);
                 return;
@@ -648,41 +655,39 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             List<MediaItem2> list = new ArrayList<>();
             for (int i = 0; i < playlist.size(); i++) {
                 // Recreates UUID in the playlist
-                MediaItem2 item = MediaItem2Impl.fromBundle(
-                        session.getContext(), playlist.get(i), null);
+                MediaItem2 item = MediaItem2Impl.fromBundle(playlist.get(i), null);
                 if (item != null) {
                     list.add(item);
                 }
             }
-            session.getInstance().setPlaylist(list,
-                    MediaMetadata2.fromBundle(session.getContext(), metadata));
+            session.getInstance().setPlaylist(list, MediaMetadata2.fromBundle(metadata));
         });
     }
 
     @Override
     public void updatePlaylistMetadata(final IMediaController2 caller, final Bundle metadata) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA,
+        onCommand(caller, SessionCommand2.COMMAND_CODE_PLAYLIST_SET_LIST_METADATA,
                 (session, controller) -> {
-            session.getInstance().updatePlaylistMetadata(
-                    MediaMetadata2.fromBundle(session.getContext(), metadata));
+            session.getInstance().updatePlaylistMetadata(MediaMetadata2.fromBundle(metadata));
         });
     }
 
     @Override
     public void addPlaylistItem(IMediaController2 caller, int index, Bundle mediaItem) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_ADD_ITEM, (session, controller) -> {
-            // Resets the UUID from the incoming media id, so controller may reuse a media item
-            // multiple times for addPlaylistItem.
-            session.getInstance().addPlaylistItem(index,
-                    MediaItem2Impl.fromBundle(session.getContext(), mediaItem, null));
-        });
+        onCommand(caller, SessionCommand2.COMMAND_CODE_PLAYLIST_ADD_ITEM,
+                (session, controller) -> {
+                    // Resets the UUID from the incoming media id, so controller may reuse a media
+                    // item multiple times for addPlaylistItem.
+                    session.getInstance().addPlaylistItem(index,
+                            MediaItem2Impl.fromBundle(mediaItem, null));
+                });
     }
 
     @Override
     public void removePlaylistItem(IMediaController2 caller, Bundle mediaItem) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM,
+        onCommand(caller, SessionCommand2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM,
                 (session, controller) -> {
-            MediaItem2 item = MediaItem2.fromBundle(session.getContext(), mediaItem);
+            MediaItem2 item = MediaItem2.fromBundle(mediaItem);
             // Note: MediaItem2 has hidden UUID to identify it across the processes.
             session.getInstance().removePlaylistItem(item);
         });
@@ -690,32 +695,31 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void replacePlaylistItem(IMediaController2 caller, int index, Bundle mediaItem) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM,
+        onCommand(caller, SessionCommand2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM,
                 (session, controller) -> {
                     // Resets the UUID from the incoming media id, so controller may reuse a media
                     // item multiple times for replacePlaylistItem.
                     session.getInstance().replacePlaylistItem(index,
-                            MediaItem2Impl.fromBundle(session.getContext(), mediaItem, null));
+                            MediaItem2Impl.fromBundle(mediaItem, null));
                 });
     }
 
     @Override
     public void skipToPlaylistItem(IMediaController2 caller, Bundle mediaItem) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_TO_PLAYLIST_ITEM,
+        onCommand(caller, SessionCommand2.COMMAND_CODE_PLAYLIST_SKIP_TO_PLAYLIST_ITEM,
                 (session, controller) -> {
                     if (mediaItem == null) {
                         Log.w(TAG, "skipToPlaylistItem(): Ignoring null mediaItem from "
                                 + controller);
                     }
                     // Note: MediaItem2 has hidden UUID to identify it across the processes.
-                    session.getInstance().skipToPlaylistItem(
-                            MediaItem2.fromBundle(session.getContext(), mediaItem));
+                    session.getInstance().skipToPlaylistItem(MediaItem2.fromBundle(mediaItem));
                 });
     }
 
     @Override
     public void skipToPreviousItem(IMediaController2 caller) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_PREV_ITEM,
+        onCommand(caller, SessionCommand2.COMMAND_CODE_PLAYLIST_SKIP_PREV_ITEM,
                 (session, controller) -> {
                     session.getInstance().skipToPreviousItem();
                 });
@@ -723,7 +727,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void skipToNextItem(IMediaController2 caller) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SKIP_NEXT_ITEM,
+        onCommand(caller, SessionCommand2.COMMAND_CODE_PLAYLIST_SKIP_NEXT_ITEM,
                 (session, controller) -> {
                     session.getInstance().skipToNextItem();
                 });
@@ -731,7 +735,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void setRepeatMode(IMediaController2 caller, int repeatMode) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_REPEAT_MODE,
+        onCommand(caller, SessionCommand2.COMMAND_CODE_PLAYLIST_SET_REPEAT_MODE,
                 (session, controller) -> {
                     session.getInstance().setRepeatMode(repeatMode);
                 });
@@ -739,7 +743,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     @Override
     public void setShuffleMode(IMediaController2 caller, int shuffleMode) {
-        onCommand(caller, MediaSession2.COMMAND_CODE_PLAYLIST_SET_SHUFFLE_MODE,
+        onCommand(caller, SessionCommand2.COMMAND_CODE_PLAYLIST_SET_SHUFFLE_MODE,
                 (session, controller) -> {
                     session.getInstance().setShuffleMode(shuffleMode);
                 });
@@ -922,6 +926,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
+    // TODO(jaewan): Rename
     public void notifyPositionChangedNotLocked(long eventTimeMs, long positionMs) {
         notifyAll((controller, iController) -> {
             iController.onPositionChanged(eventTimeMs, positionMs);
@@ -971,10 +976,10 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         final Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
         notifyAll((controller, iController) -> {
             if (getControllerBinderIfAble(controller,
-                    MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST) != null) {
+                    SessionCommand2.COMMAND_CODE_PLAYLIST_GET_LIST) != null) {
                 iController.onPlaylistChanged(bundleList, metadataBundle);
             } else if (getControllerBinderIfAble(controller,
-                    MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA) != null) {
+                    SessionCommand2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA) != null) {
                 iController.onPlaylistMetadataChanged(metadataBundle);
             }
         });
@@ -982,7 +987,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
 
     public void notifyPlaylistMetadataChangedNotLocked(MediaMetadata2 metadata) {
         final Bundle metadataBundle = (metadata == null) ? null : metadata.toBundle();
-        notifyAll(MediaSession2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA,
+        notifyAll(SessionCommand2.COMMAND_CODE_PLAYLIST_GET_LIST_METADATA,
                 (unused, iController) -> {
                     iController.onPlaylistMetadataChanged(metadataBundle);
                 });
@@ -1008,7 +1013,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
-    public void setAllowedCommands(ControllerInfo controller, CommandGroup commands) {
+    public void setAllowedCommands(ControllerInfo controller, SessionCommandGroup2 commands) {
         synchronized (mLock) {
             mAllowedCommandGroupMap.put(controller, commands);
         }
@@ -1017,7 +1022,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
-    public void sendCustomCommand(ControllerInfo controller, Command command, Bundle args,
+    public void sendCustomCommand(ControllerInfo controller, SessionCommand2 command, Bundle args,
             ResultReceiver receiver) {
         if (receiver != null && controller == null) {
             throw new IllegalArgumentException("Controller shouldn't be null if result receiver is"
@@ -1032,7 +1037,7 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
         });
     }
 
-    public void sendCustomCommand(Command command, Bundle args) {
+    public void sendCustomCommand(SessionCommand2 command, Bundle args) {
         if (command == null) {
             throw new IllegalArgumentException("command shouldn't be null");
         }

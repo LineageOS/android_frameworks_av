@@ -904,7 +904,7 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
     }
 
     // Make sure the UID is in an active state to use the camera
-    if (!mUidPolicy->isUidActive(callingUid)) {
+    if (!mUidPolicy->isUidActive(callingUid, String16(clientName8))) {
         ALOGE("Access Denial: can't use the camera from an idle UID pid=%d, uid=%d",
             clientPid, clientUid);
         return STATUS_ERROR_FMT(ERROR_DISABLED,
@@ -2423,12 +2423,12 @@ void CameraService::UidPolicy::onUidIdle(uid_t uid, bool /* disabled */) {
     }
 }
 
-bool CameraService::UidPolicy::isUidActive(uid_t uid) {
+bool CameraService::UidPolicy::isUidActive(uid_t uid, String16 callingPackage) {
     Mutex::Autolock _l(mUidLock);
-    return isUidActiveLocked(uid);
+    return isUidActiveLocked(uid, callingPackage);
 }
 
-bool CameraService::UidPolicy::isUidActiveLocked(uid_t uid) {
+bool CameraService::UidPolicy::isUidActiveLocked(uid_t uid, String16 callingPackage) {
     // Non-app UIDs are considered always active
     // If activity manager is unreachable, assume everything is active
     if (uid < FIRST_APPLICATION_UID || !mRegistered) {
@@ -2438,15 +2438,31 @@ bool CameraService::UidPolicy::isUidActiveLocked(uid_t uid) {
     if (it != mOverrideUids.end()) {
         return it->second;
     }
-    return mActiveUids.find(uid) != mActiveUids.end();
+    bool active = mActiveUids.find(uid) != mActiveUids.end();
+    if (!active) {
+        // We want active UIDs to always access camera with their first attempt since
+        // there is no guarantee the app is robustly written and would retry getting
+        // the camera on failure. The inverse case is not a problem as we would take
+        // camera away soon once we get the callback that the uid is no longer active.
+        ActivityManager am;
+        // Okay to access with a lock held as UID changes are dispatched without
+        // a lock and we are a higher level component.
+        active = am.isUidActive(uid, callingPackage);
+        if (active) {
+            // Now that we found out the UID is actually active, cache that
+            mActiveUids.insert(uid);
+        }
+    }
+    return active;
 }
 
-void CameraService::UidPolicy::UidPolicy::addOverrideUid(uid_t uid, bool active) {
-    updateOverrideUid(uid, active, true);
+void CameraService::UidPolicy::UidPolicy::addOverrideUid(uid_t uid,
+        String16 callingPackage, bool active) {
+    updateOverrideUid(uid, callingPackage, active, true);
 }
 
-void CameraService::UidPolicy::removeOverrideUid(uid_t uid) {
-    updateOverrideUid(uid, false, false);
+void CameraService::UidPolicy::removeOverrideUid(uid_t uid, String16 callingPackage) {
+    updateOverrideUid(uid, callingPackage, false, false);
 }
 
 void CameraService::UidPolicy::binderDied(const wp<IBinder>& /*who*/) {
@@ -2456,17 +2472,18 @@ void CameraService::UidPolicy::binderDied(const wp<IBinder>& /*who*/) {
     mActiveUids.clear();
 }
 
-void CameraService::UidPolicy::updateOverrideUid(uid_t uid, bool active, bool insert) {
+void CameraService::UidPolicy::updateOverrideUid(uid_t uid, String16 callingPackage,
+        bool active, bool insert) {
     bool wasActive = false;
     bool isActive = false;
     {
         Mutex::Autolock _l(mUidLock);
-        wasActive = isUidActiveLocked(uid);
+        wasActive = isUidActiveLocked(uid, callingPackage);
         mOverrideUids.erase(uid);
         if (insert) {
             mOverrideUids.insert(std::pair<uid_t, bool>(uid, active));
         }
-        isActive = isUidActiveLocked(uid);
+        isActive = isUidActiveLocked(uid, callingPackage);
     }
     if (wasActive != isActive && !isActive) {
         sp<CameraService> service = mService.promote();
@@ -2999,7 +3016,7 @@ status_t CameraService::handleSetUidState(const Vector<String16>& args, int err)
         ALOGE("Expected active or idle but got: '%s'", String8(args[2]).string());
         return BAD_VALUE;
     }
-    mUidPolicy->addOverrideUid(uid, active);
+    mUidPolicy->addOverrideUid(uid, args[1], active);
     return NO_ERROR;
 }
 
@@ -3011,7 +3028,7 @@ status_t CameraService::handleResetUidState(const Vector<String16>& args, int er
         dprintf(err, "Unknown package: '%s'\n", String8(args[1]).string());
         return BAD_VALUE;
     }
-    mUidPolicy->removeOverrideUid(uid);
+    mUidPolicy->removeOverrideUid(uid, args[1]);
     return NO_ERROR;
 }
 
@@ -3023,7 +3040,7 @@ status_t CameraService::handleGetUidState(const Vector<String16>& args, int out,
         dprintf(err, "Unknown package: '%s'\n", String8(args[1]).string());
         return BAD_VALUE;
     }
-    if (mUidPolicy->isUidActive(uid)) {
+    if (mUidPolicy->isUidActive(uid, args[1])) {
         return dprintf(out, "active\n");
     } else {
         return dprintf(out, "idle\n");

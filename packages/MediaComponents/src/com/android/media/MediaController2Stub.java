@@ -21,9 +21,9 @@ import android.content.Context;
 import android.media.MediaController2;
 import android.media.MediaItem2;
 import android.media.MediaMetadata2;
-import android.media.MediaSession2.Command;
+import android.media.SessionCommand2;
 import android.media.MediaSession2.CommandButton;
-import android.media.MediaSession2.CommandGroup;
+import android.media.SessionCommandGroup2;
 import android.os.Bundle;
 import android.os.ResultReceiver;
 import android.text.TextUtils;
@@ -141,15 +141,14 @@ public class MediaController2Stub extends IMediaController2.Stub {
         }
         List<MediaItem2> playlist = new ArrayList<>();
         for (Bundle bundle : playlistBundle) {
-            MediaItem2 item = MediaItem2.fromBundle(controller.getContext(), bundle);
+            MediaItem2 item = MediaItem2.fromBundle(bundle);
             if (item == null) {
                 Log.w(TAG, "onPlaylistChanged(): Ignoring null item in playlist");
             } else {
                 playlist.add(item);
             }
         }
-        MediaMetadata2 metadata =
-                MediaMetadata2.fromBundle(controller.getContext(), metadataBundle);
+        MediaMetadata2 metadata = MediaMetadata2.fromBundle(metadataBundle);
         controller.pushPlaylistChanges(playlist, metadata);
     }
 
@@ -162,8 +161,7 @@ public class MediaController2Stub extends IMediaController2.Stub {
             Log.w(TAG, "Don't fail silently here. Highly likely a bug");
             return;
         }
-        MediaMetadata2 metadata =
-                MediaMetadata2.fromBundle(controller.getContext(), metadataBundle);
+        MediaMetadata2 metadata = MediaMetadata2.fromBundle(metadataBundle);
         controller.pushPlaylistMetadataChanges(metadata);
     }
 
@@ -191,14 +189,12 @@ public class MediaController2Stub extends IMediaController2.Stub {
             Log.w(TAG, "Don't fail silently here. Highly likely a bug");
             return;
         }
-        MediaController2.PlaybackInfo info =
-                PlaybackInfoImpl.fromBundle(controller.getContext(), playbackInfo);
+        MediaController2.PlaybackInfo info = PlaybackInfoImpl.fromBundle(playbackInfo);
         if (info == null) {
             Log.w(TAG, "onPlaybackInfoChanged(): Ignoring null playbackInfo");
             return;
         }
-        controller.pushPlaybackInfoChanges(
-                PlaybackInfoImpl.fromBundle(controller.getContext(), playbackInfo));
+        controller.pushPlaybackInfoChanges(info);
     }
 
     @Override
@@ -242,16 +238,16 @@ public class MediaController2Stub extends IMediaController2.Stub {
         if (itemBundleList != null) {
             itemList = new ArrayList<>();
             for (int i = 0; i < itemBundleList.size(); i++) {
-                MediaItem2 item = MediaItem2.fromBundle(context, itemBundleList.get(i));
+                MediaItem2 item = MediaItem2.fromBundle(itemBundleList.get(i));
                 if (item != null) {
                     itemList.add(item);
                 }
             }
         }
         controller.onConnectedNotLocked(sessionBinder,
-                CommandGroup.fromBundle(context, commandGroup),
+                SessionCommandGroup2.fromBundle(commandGroup),
                 playerState, positionEventTimeMs, positionMs, playbackSpeed, bufferedPositionMs,
-                PlaybackInfoImpl.fromBundle(context, playbackInfo), repeatMode, shuffleMode,
+                PlaybackInfoImpl.fromBundle(playbackInfo), repeatMode, shuffleMode,
                 itemList, sessionActivity);
     }
 
@@ -286,8 +282,7 @@ public class MediaController2Stub extends IMediaController2.Stub {
         }
         List<CommandButton> layout = new ArrayList<>();
         for (int i = 0; i < commandButtonlist.size(); i++) {
-            CommandButton button = CommandButtonImpl.fromBundle(
-                    controller.getContext(), commandButtonlist.get(i));
+            CommandButton button = CommandButtonImpl.fromBundle(commandButtonlist.get(i));
             if (button != null) {
                 layout.add(button);
             }
@@ -308,7 +303,7 @@ public class MediaController2Stub extends IMediaController2.Stub {
             // TODO(jaewan): Revisit here. Could be a bug
             return;
         }
-        CommandGroup commands = CommandGroup.fromBundle(controller.getContext(), commandsBundle);
+        SessionCommandGroup2 commands = SessionCommandGroup2.fromBundle(commandsBundle);
         if (commands == null) {
             Log.w(TAG, "onAllowedCommandsChanged(): Ignoring null commands");
             return;
@@ -325,7 +320,7 @@ public class MediaController2Stub extends IMediaController2.Stub {
             Log.w(TAG, "Don't fail silently here. Highly likely a bug");
             return;
         }
-        Command command = Command.fromBundle(controller.getContext(), commandBundle);
+        SessionCommand2 command = SessionCommand2.fromBundle(commandBundle);
         if (command == null) {
             Log.w(TAG, "onCustomCommand(): Ignoring null command");
             return;
@@ -371,8 +366,7 @@ public class MediaController2Stub extends IMediaController2.Stub {
             // TODO(jaewan): Revisit here. Could be a bug
             return;
         }
-        browser.onGetItemDone(mediaId,
-                MediaItem2Impl.fromBundle(browser.getContext(), itemBundle));
+        browser.onGetItemDone(mediaId, MediaItem2.fromBundle(itemBundle));
     }
 
     @Override
@@ -398,7 +392,7 @@ public class MediaController2Stub extends IMediaController2.Stub {
         if (itemBundleList != null) {
             result = new ArrayList<>();
             for (Bundle bundle : itemBundleList) {
-                result.add(MediaItem2.fromBundle(browser.getContext(), bundle));
+                result.add(MediaItem2.fromBundle(bundle));
             }
         }
         browser.onGetChildrenDone(parentId, page, pageSize, result, extras);
@@ -448,7 +442,7 @@ public class MediaController2Stub extends IMediaController2.Stub {
         if (itemBundleList != null) {
             result = new ArrayList<>();
             for (Bundle bundle : itemBundleList) {
-                result.add(MediaItem2.fromBundle(browser.getContext(), bundle));
+                result.add(MediaItem2.fromBundle(bundle));
             }
         }
         browser.onGetSearchResultDone(query, page, pageSize, result, extras);

@@ -872,18 +872,33 @@ status_t BnAudioPolicyService::onTransact(
         case INIT_STREAM_VOLUME:
         case SET_STREAM_VOLUME:
         case REGISTER_POLICY_MIXES:
-        case SET_MASTER_MONO:
-            if (IPCThreadState::self()->getCallingUid() >= AID_APP_START) {
+        case SET_MASTER_MONO: {
+            uid_t multiUserClientUid = IPCThreadState::self()->getCallingUid() % AID_USER_OFFSET;
+            if (multiUserClientUid >= AID_APP_START) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
                       IPCThreadState::self()->getCallingUid());
                 return INVALID_OPERATION;
             }
+        } break;
         default:
             break;
     }
 
-    TimeCheck check("IAudioPolicyService");
+    // FIXME: extend timeout for SET_DEVICE_CONNECTION_STATE and HANDLE_DEVICE_CONFIG_CHANGE
+    // while we investigate why BT A2DP device connection/disconnection can sometimes
+    // take more than 5 seconds
+    uint32_t timeoutMs = TimeCheck::kDefaultTimeOutMs;
+    switch (code) {
+        case SET_DEVICE_CONNECTION_STATE:
+        case HANDLE_DEVICE_CONFIG_CHANGE:
+            timeoutMs *= 2;
+            break;
+        default:
+            break;
+    }
+
+    TimeCheck check("IAudioPolicyService", timeoutMs);
 
     switch (code) {
         case SET_DEVICE_CONNECTION_STATE: {

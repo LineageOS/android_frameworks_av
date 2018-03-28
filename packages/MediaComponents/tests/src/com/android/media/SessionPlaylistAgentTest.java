@@ -240,7 +240,7 @@ public class SessionPlaylistAgentTest extends AndroidTestCase {
 
         mSessionImpl = mock(MediaSession2Impl.class);
         mDataSourceHelper = new MyDataSourceHelper();
-        mAgent = new SessionPlaylistAgent(mContext, mSessionImpl, mPlayer);
+        mAgent = new SessionPlaylistAgent(mSessionImpl, mPlayer);
         mAgent.setOnDataSourceMissingHelper(mDataSourceHelper);
         mEventCallback = new MyPlaylistEventCallback(mWaitLock);
         mAgent.registerPlaylistEventCallback(mHandlerExecutor, mEventCallback);
@@ -629,13 +629,13 @@ public class SessionPlaylistAgentTest extends AndroidTestCase {
     }
 
     private MediaItem2 generateMediaItemWithoutDataSourceDesc(int key) {
-        return new MediaItem2.Builder(mContext, 0)
+        return new MediaItem2.Builder(0)
                 .setMediaId("TEST_MEDIA_ID_WITHOUT_DSD_" + key)
                 .build();
     }
 
     private MediaItem2 generateMediaItem(int key) {
-        return new MediaItem2.Builder(mContext, 0)
+        return new MediaItem2.Builder(0)
                 .setMediaId("TEST_MEDIA_ID_" + key)
                 .build();
     }

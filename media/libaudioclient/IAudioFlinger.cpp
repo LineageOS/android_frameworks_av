@@ -903,13 +903,15 @@ status_t BnAudioFlinger::onTransact(
         case SET_MODE:
         case SET_MIC_MUTE:
         case SET_LOW_RAM_DEVICE:
-        case SYSTEM_READY:
-            if (IPCThreadState::self()->getCallingUid() >= AID_APP_START) {
+        case SYSTEM_READY: {
+            uid_t multiUserClientUid = IPCThreadState::self()->getCallingUid() % AID_USER_OFFSET;
+            if (multiUserClientUid >= AID_APP_START) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
                       IPCThreadState::self()->getCallingUid());
                 return INVALID_OPERATION;
             }
+        } break;
         default:
             break;
     }

@@ -39,7 +39,7 @@ public final class Rating2Impl implements Rating2Provider {
     private final int mRatingStyle;
     private final float mRatingValue;
 
-    private Rating2Impl(Context context, @Style int ratingStyle, float rating) {
+    private Rating2Impl(@Style int ratingStyle, float rating) {
         mRatingStyle = ratingStyle;
         mRatingValue = rating;
         mInstance = new Rating2(this);
@@ -66,16 +66,15 @@ public final class Rating2Impl implements Rating2Provider {
         return Objects.hash(mRatingStyle, mRatingValue);
     }
 
-    public Rating2 getInstance() {
+    Rating2 getInstance() {
         return mInstance;
     }
 
-    public static Rating2 fromBundle(Context context, Bundle bundle) {
+    public static Rating2 fromBundle_impl(Bundle bundle) {
         if (bundle == null) {
             return null;
         }
-        return new Rating2Impl(context, bundle.getInt(KEY_STYLE), bundle.getFloat(KEY_VALUE))
-                .getInstance();
+        return new Rating2Impl(bundle.getInt(KEY_STYLE), bundle.getFloat(KEY_VALUE)).getInstance();
     }
 
     public Bundle toBundle_impl() {
@@ -85,7 +84,7 @@ public final class Rating2Impl implements Rating2Provider {
         return bundle;
     }
 
-    public static Rating2 newUnratedRating(Context context, @Style int ratingStyle) {
+    public static Rating2 newUnratedRating_impl(@Style int ratingStyle) {
         switch(ratingStyle) {
             case RATING_HEART:
             case RATING_THUMB_UP_DOWN:
@@ -93,22 +92,21 @@ public final class Rating2Impl implements Rating2Provider {
             case RATING_4_STARS:
             case RATING_5_STARS:
             case RATING_PERCENTAGE:
-                return new Rating2Impl(context, ratingStyle, RATING_NOT_RATED).getInstance();
+                return new Rating2Impl(ratingStyle, RATING_NOT_RATED).getInstance();
             default:
                 return null;
         }
     }
 
-    public static Rating2 newHeartRating(Context context, boolean hasHeart) {
-        return new Rating2Impl(context, RATING_HEART, hasHeart ? 1.0f : 0.0f).getInstance();
+    public static Rating2 newHeartRating_impl(boolean hasHeart) {
+        return new Rating2Impl(RATING_HEART, hasHeart ? 1.0f : 0.0f).getInstance();
     }
 
-    public static Rating2 newThumbRating(Context context, boolean thumbIsUp) {
-        return new Rating2Impl(context, RATING_THUMB_UP_DOWN, thumbIsUp ? 1.0f : 0.0f)
-                .getInstance();
+    public static Rating2 newThumbRating_impl(boolean thumbIsUp) {
+        return new Rating2Impl(RATING_THUMB_UP_DOWN, thumbIsUp ? 1.0f : 0.0f).getInstance();
     }
 
-    public static Rating2 newStarRating(Context context, int starRatingStyle, float starRating) {
+    public static Rating2 newStarRating_impl(int starRatingStyle, float starRating) {
         float maxRating = RATING_NOT_RATED;
         switch(starRatingStyle) {
             case RATING_3_STARS:
@@ -128,15 +126,15 @@ public final class Rating2Impl implements Rating2Provider {
             Log.e(TAG, "Trying to set out of range star-based rating");
             return null;
         }
-        return new Rating2Impl(context, starRatingStyle, starRating).getInstance();
+        return new Rating2Impl(starRatingStyle, starRating).getInstance();
     }
 
-    public static Rating2 newPercentageRating(Context context, float percent) {
+    public static Rating2 newPercentageRating_impl(float percent) {
         if ((percent < 0.0f) || (percent > 100.0f)) {
             Log.e(TAG, "Invalid percentage-based rating value");
             return null;
         } else {
-            return new Rating2Impl(context, RATING_PERCENTAGE, percent).getInstance();
+            return new Rating2Impl(RATING_PERCENTAGE, percent).getInstance();
         }
     }
 

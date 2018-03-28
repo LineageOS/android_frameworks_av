@@ -273,7 +273,7 @@ void AudioPolicyService::NotificationClient::onAudioPatchListUpdate()
 void AudioPolicyService::NotificationClient::onDynamicPolicyMixStateUpdate(
         const String8& regId, int32_t state)
 {
-    if (mAudioPolicyServiceClient != 0 && mUid < AID_APP_START) {
+    if (mAudioPolicyServiceClient != 0 && (mUid % AID_USER_OFFSET) < AID_APP_START) {
         mAudioPolicyServiceClient->onDynamicPolicyMixStateUpdate(regId, state);
     }
 }
@@ -283,7 +283,7 @@ void AudioPolicyService::NotificationClient::onRecordingConfigurationUpdate(
         const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
         audio_patch_handle_t patchHandle)
 {
-    if (mAudioPolicyServiceClient != 0 && mUid < AID_APP_START) {
+    if (mAudioPolicyServiceClient != 0 && (mUid % AID_USER_OFFSET) < AID_APP_START) {
         mAudioPolicyServiceClient->onRecordingConfigurationUpdate(event, clientInfo,
                 clientConfig, deviceConfig, patchHandle);
     }
