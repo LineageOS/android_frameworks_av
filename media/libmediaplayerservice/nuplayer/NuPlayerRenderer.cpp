@@ -1617,14 +1617,7 @@ void NuPlayer::Renderer::onFlush(const sp<AMessage> &msg) {
             // internal buffer before resuming playback.
             // FIXME: this is ignored after flush().
             mAudioSink->stop();
-            if (mPaused) {
-                // Race condition: if renderer is paused and audio sink is stopped,
-                // we need to make sure that the audio track buffer fully drains
-                // before delivering data.
-                // FIXME: remove this if we can detect if stop() is complete.
-                const int delayUs = 2 * 50 * 1000; // (2 full mixer thread cycles at 50ms)
-                mPauseDrainAudioAllowedUs = ALooper::GetNowUs() + delayUs;
-            } else {
+            if (!mPaused) {
                 mAudioSink->start();
             }
             mNumFramesWritten = 0;

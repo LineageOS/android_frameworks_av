@@ -761,6 +761,12 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
                 mState = state;
             }
         }
+
+        if (status == NO_ERROR || status == ALREADY_EXISTS) {
+            // for streaming tracks, remove the buffer read stop limit.
+            mAudioTrackServerProxy->start();
+        }
+
         // track was already in the active list, not a problem
         if (status == ALREADY_EXISTS) {
             status = NO_ERROR;
