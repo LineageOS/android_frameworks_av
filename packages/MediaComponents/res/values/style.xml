@@ -84,18 +84,19 @@
 
     <style name="MinimalTransportControlsButton">
         <item name="android:background">@null</item>
+        <item name="android:layout_width">@dimen/mcv2_pause_icon_size</item>
+        <item name="android:layout_height">@dimen/mcv2_pause_icon_size</item>
+        <item name="android:layout_margin">@dimen/mcv2_icon_margin</item>
         <item name="android:scaleType">fitXY</item>
-    </style>
-
-    <style name="MinimalTransportControlsButton.Pause">
         <item name="android:src">@drawable/ic_pause_circle_filled</item>
-        <item name="android:layout_width">@dimen/mcv2_minimal_icon_size</item>
-        <item name="android:layout_height">@dimen/mcv2_minimal_icon_size</item>
         <item name="android:contentDescription">@string/mcv2_pause_button_desc</item>
     </style>
 
     <style name="TitleBar">
+        <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">46dp</item>
+        <item name="android:paddingStart">5dp</item>
+        <item name="android:paddingEnd">5dp</item>
     </style>
 
     <style name="TitleBarButton">
@@ -181,5 +182,40 @@
     <style name="BottomBarButton.VideoQuality">
       <item name="android:src">@drawable/ic_high_quality</item>
       <item name="android:contentDescription">@string/mcv2_video_quality_button_desc</item>
+    </style>
+
+    <style name="FullMusicPortrait">
+        <item name="android:layout_height">0dp</item>
+    </style>
+
+    <style name="FullMusicPortrait.Image">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_weight">0.6</item>
+        <item name="android:gravity">center</item>
+    </style>
+
+    <style name="FullMusicPortrait.Text">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_weight">0.4</item>
+        <item name="android:gravity">top|center</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="FullMusicLandscape">
+        <item name="android:layout_width">0dp</item>
+    </style>
+
+    <style name="FullMusicLandscape.Image">
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">0.35</item>
+        <item name="android:gravity">center|right</item>
+    </style>
+
+    <style name="FullMusicLandscape.Text">
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">0.65</item>
+        <item name="android:layout_marginLeft">24dp</item>
+        <item name="android:gravity">center|left</item>
+        <item name="android:orientation">vertical</item>
     </style>
 </resources>

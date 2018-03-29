@@ -72,14 +72,15 @@ enum AIMAGE_FORMATS {
     AIMAGE_FORMAT_RGBA_8888         = 0x1,
 
     /**
-     * 32 bits RGBX format, 8 bits for each of the four channels.
+     * 32 bits RGBX format, 8 bits for each of the four channels.  The values
+     * of the alpha channel bits are ignored (image is assumed to be opaque).
      *
      * <p>
      * Corresponding formats:
      * <ul>
      * <li>AHardwareBuffer: AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM</li>
      * <li>Vulkan: VK_FORMAT_R8G8B8A8_UNORM</li>
-     * <li>OpenGL ES: GL_RGBA8</li>
+     * <li>OpenGL ES: GL_RGB8</li>
      * </ul>
      * </p>
      *
@@ -717,7 +718,7 @@ media_status_t AImage_getPlaneData(
 
 #if __ANDROID_API__ >= 26
 
-/*
+/**
  * Return the image back the the system and delete the AImage object from memory asynchronously.
  *
  * <p>Similar to {@link AImage_delete}, do NOT use the image pointer after this method returns.
@@ -746,8 +747,9 @@ void AImage_deleteAsync(AImage* image, int releaseFenceFd);
  * AHardwareBuffer_acquire} to acquire an extra reference, and call {@link AHardwareBuffer_release}
  * once it has finished using it in order to properly deallocate the underlying memory managed by
  * {@link AHardwareBuffer}. If the caller has acquired extra reference on an {@link AHardwareBuffer}
- * returned from this function, it must also listen to {@link onBufferFreed} callback to be
- * notified when the buffer is no longer used by {@link AImageReader}.</p>
+ * returned from this function, it must also register a listener using the function
+ * {@link AImageReader_setBufferRemovedListener} to be notified when the buffer is no longer used
+ * by {@link AImageReader}.</p>
  *
  * @param image the {@link AImage} of interest.
  * @param outBuffer The memory area pointed to by buffer will contain the acquired AHardwareBuffer
