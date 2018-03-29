@@ -706,6 +706,7 @@ public:
                 sp<Track>   createTrack_l(
                                 const sp<AudioFlinger::Client>& client,
                                 audio_stream_type_t streamType,
+                                const audio_attributes_t& attr,
                                 uint32_t *sampleRate,
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
@@ -1387,6 +1388,7 @@ public:
 
             sp<AudioFlinger::RecordThread::RecordTrack>  createRecordTrack_l(
                     const sp<AudioFlinger::Client>& client,
+                    const audio_attributes_t& attr,
                     uint32_t *pSampleRate,
                     audio_format_t format,
                     audio_channel_mask_t channelMask,
