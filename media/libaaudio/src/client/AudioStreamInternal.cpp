@@ -39,7 +39,6 @@
 #include "core/AudioStreamBuilder.h"
 #include "fifo/FifoBuffer.h"
 #include "utility/AudioClock.h"
-#include "utility/LinearRamp.h"
 
 #include "AudioStreamInternal.h"
 
@@ -92,11 +91,11 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     }
 
     // We have to do volume scaling. So we prefer FLOAT format.
-    if (getFormat() == AAUDIO_FORMAT_UNSPECIFIED) {
-        setFormat(AAUDIO_FORMAT_PCM_FLOAT);
+    if (getFormat() == AUDIO_FORMAT_DEFAULT) {
+        setFormat(AUDIO_FORMAT_PCM_FLOAT);
     }
     // Request FLOAT for the shared mixer.
-    request.getConfiguration().setFormat(AAUDIO_FORMAT_PCM_FLOAT);
+    request.getConfiguration().setFormat(AUDIO_FORMAT_PCM_FLOAT);
 
     // Build the request to send to the server.
     request.setUserId(getuid());
@@ -126,7 +125,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         // if that failed then try switching from mono to stereo if OUTPUT.
         // Only do this in the client. Otherwise we end up with a mono mixer in the service
         // that writes to a stereo MMAP stream.
-        ALOGD("%s - openStream() returned %d, try switching from MONO to STEREO",
+        ALOGD("%s() - openStream() returned %d, try switching from MONO to STEREO",
               __func__, mServiceStreamHandle);
         request.getConfiguration().setSamplesPerFrame(2); // stereo
         mServiceStreamHandle = mServiceInterface.openStream(request, configurationOutput);
@@ -212,9 +211,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
             mCallbackFrames = mFramesPerBurst;
         }
 
-        int32_t bytesPerFrame = getSamplesPerFrame()
-                                * AAudioConvert_formatToSizeInBytes(getFormat());
-        int32_t callbackBufferSize = mCallbackFrames * bytesPerFrame;
+        const int32_t callbackBufferSize = mCallbackFrames * getBytesPerFrame();
         mCallbackBuffer = new uint8_t[callbackBufferSize];
     }
 

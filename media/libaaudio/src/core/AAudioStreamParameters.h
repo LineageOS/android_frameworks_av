@@ -56,11 +56,11 @@ public:
         mSamplesPerFrame = samplesPerFrame;
     }
 
-    aaudio_format_t getFormat() const {
+    audio_format_t getFormat() const {
         return mAudioFormat;
     }
 
-    void setFormat(aaudio_format_t audioFormat) {
+    void setFormat(audio_format_t audioFormat) {
         mAudioFormat = audioFormat;
     }
 
@@ -120,8 +120,11 @@ public:
         mSessionId = sessionId;
     }
 
+    /**
+     * @return bytes per frame of getFormat()
+     */
     int32_t calculateBytesPerFrame() const {
-        return getSamplesPerFrame() * AAudioConvert_formatToSizeInBytes(getFormat());
+        return getSamplesPerFrame() * audio_bytes_per_sample(getFormat());
     }
 
     /**
@@ -139,7 +142,7 @@ private:
     int32_t                    mSampleRate      = AAUDIO_UNSPECIFIED;
     int32_t                    mDeviceId        = AAUDIO_UNSPECIFIED;
     aaudio_sharing_mode_t      mSharingMode     = AAUDIO_SHARING_MODE_SHARED;
-    aaudio_format_t            mAudioFormat     = AAUDIO_FORMAT_UNSPECIFIED;
+    audio_format_t             mAudioFormat     = AUDIO_FORMAT_DEFAULT;
     aaudio_direction_t         mDirection       = AAUDIO_DIRECTION_OUTPUT;
     aaudio_usage_t             mUsage           = AAUDIO_UNSPECIFIED;
     aaudio_content_type_t      mContentType     = AAUDIO_UNSPECIFIED;

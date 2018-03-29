@@ -111,11 +111,11 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     mRequestedDeviceId = deviceId = getDeviceId();
 
     // Fill in config
-    aaudio_format_t aaudioFormat = getFormat();
-    if (aaudioFormat == AAUDIO_UNSPECIFIED || aaudioFormat == AAUDIO_FORMAT_PCM_FLOAT) {
-        aaudioFormat = AAUDIO_FORMAT_PCM_I16;
+    audio_format_t audioFormat = getFormat();
+    if (audioFormat == AUDIO_FORMAT_DEFAULT || audioFormat == AUDIO_FORMAT_PCM_FLOAT) {
+        audioFormat = AUDIO_FORMAT_PCM_16_BIT;
     }
-    config.format = AAudioConvert_aaudioToAndroidDataFormat(aaudioFormat);
+    config.format = audioFormat;
 
     int32_t aaudioSampleRate = getSampleRate();
     if (aaudioSampleRate == AAUDIO_UNSPECIFIED) {
@@ -230,7 +230,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
         goto error;
     }
     mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
-    setFormat(AAudioConvert_androidToAAudioDataFormat(config.format));
+    setFormat(config.format);
     setSampleRate(config.sample_rate);
 
     // Scale up the burst size to meet the minimum equivalent in microseconds.
@@ -249,6 +249,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     ALOGD("%s() actual rate = %d, channels = %d"
           ", deviceId = %d, capacity = %d\n",
           __func__, getSampleRate(), getSamplesPerFrame(), deviceId, getBufferCapacity());
+
+    ALOGD("%s() format = =x%08x, frame size = %d",
+          __func__, getFormat(), calculateBytesPerFrame());
 
     return result;
 

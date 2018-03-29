@@ -192,7 +192,7 @@ public:
         return mSampleRate;
     }
 
-    aaudio_format_t getFormat()  const {
+    audio_format_t getFormat()  const {
         return mFormat;
     }
 
@@ -249,21 +249,14 @@ public:
      * This is only valid after setFormat() has been called.
      */
     int32_t getBytesPerSample() const {
-        return AAudioConvert_formatToSizeInBytes(mFormat);
+        return audio_bytes_per_sample(mFormat);
     }
 
     /**
      * This is only valid after setSamplesPerFrame() and setDeviceFormat() have been called.
      */
     int32_t getBytesPerDeviceFrame() const {
-        return mSamplesPerFrame * getBytesPerDeviceSample();
-    }
-
-    /**
-     * This is only valid after setDeviceFormat() has been called.
-     */
-    int32_t getBytesPerDeviceSample() const {
-        return AAudioConvert_formatToSizeInBytes(getDeviceFormat());
+        return getSamplesPerFrame() * audio_bytes_per_sample(getDeviceFormat());
     }
 
     virtual int64_t getFramesWritten() = 0;
@@ -478,18 +471,18 @@ protected:
     /**
      * This should not be called after the open() call.
      */
-    void setFormat(aaudio_format_t format) {
+    void setFormat(audio_format_t format) {
         mFormat = format;
     }
 
     /**
      * This should not be called after the open() call.
      */
-    void setDeviceFormat(aaudio_format_t format) {
+    void setDeviceFormat(audio_format_t format) {
         mDeviceFormat = format;
     }
 
-    aaudio_format_t getDeviceFormat() const {
+    audio_format_t getDeviceFormat() const {
         return mDeviceFormat;
     }
 
@@ -565,7 +558,7 @@ private:
     int32_t                     mDeviceId = AAUDIO_UNSPECIFIED;
     aaudio_sharing_mode_t       mSharingMode = AAUDIO_SHARING_MODE_SHARED;
     bool                        mSharingModeMatchRequired = false; // must match sharing mode requested
-    aaudio_format_t             mFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    audio_format_t              mFormat = AUDIO_FORMAT_DEFAULT;
     aaudio_stream_state_t       mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
     aaudio_performance_mode_t   mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
 
@@ -577,7 +570,7 @@ private:
 
     // Sometimes the hardware is operating with a different format from the app.
     // Then we require conversion in AAudio.
-    aaudio_format_t             mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    audio_format_t              mDeviceFormat = AUDIO_FORMAT_INVALID;
 
     // callback ----------------------------------
 

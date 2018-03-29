@@ -48,6 +48,20 @@ void AAudioStreamParameters::copyFrom(const AAudioStreamParameters &other) {
     mInputPreset     = other.mInputPreset;
 }
 
+static aaudio_result_t isFormatValid(audio_format_t format) {
+    switch (format) {
+        case AUDIO_FORMAT_DEFAULT:
+        case AUDIO_FORMAT_PCM_16_BIT:
+        case AUDIO_FORMAT_PCM_FLOAT:
+            break; // valid
+        default:
+            ALOGE("audioFormat not valid, audio_format_t = 0x%08x", format);
+            return AAUDIO_ERROR_INVALID_FORMAT;
+            // break;
+    }
+    return AAUDIO_OK;
+}
+
 aaudio_result_t AAudioStreamParameters::validate() const {
     if (mSamplesPerFrame != AAUDIO_UNSPECIFIED
         && (mSamplesPerFrame < SAMPLES_PER_FRAME_MIN || mSamplesPerFrame > SAMPLES_PER_FRAME_MAX)) {
@@ -79,16 +93,8 @@ aaudio_result_t AAudioStreamParameters::validate() const {
             // break;
     }
 
-    switch (mAudioFormat) {
-        case AAUDIO_FORMAT_UNSPECIFIED:
-        case AAUDIO_FORMAT_PCM_I16:
-        case AAUDIO_FORMAT_PCM_FLOAT:
-            break; // valid
-        default:
-            ALOGE("audioFormat not valid = %d", mAudioFormat);
-            return AAUDIO_ERROR_INVALID_FORMAT;
-            // break;
-    }
+    aaudio_result_t result = isFormatValid (mAudioFormat);
+    if (result != AAUDIO_OK) return result;
 
     if (mSampleRate != AAUDIO_UNSPECIFIED
         && (mSampleRate < SAMPLE_RATE_HZ_MIN || mSampleRate > SAMPLE_RATE_HZ_MAX)) {

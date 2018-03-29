@@ -70,8 +70,8 @@ protected:
     aaudio_result_t resolveSharedMemory(const android::base::unique_fd& fd);
 
     android::base::unique_fd   mFd;
-    int32_t     mSizeInBytes = 0;
-    uint8_t    *mResolvedAddress = MMAP_UNRESOLVED_ADDRESS;
+    int32_t                    mSizeInBytes = 0;
+    uint8_t                   *mResolvedAddress = MMAP_UNRESOLVED_ADDRESS;
 
 private:
 

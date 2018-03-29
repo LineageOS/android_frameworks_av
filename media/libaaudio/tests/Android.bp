@@ -34,13 +34,6 @@ cc_test {
 }
 
 cc_test {
-    name: "test_linear_ramp",
-    defaults: ["libaaudio_tests_defaults"],
-    srcs: ["test_linear_ramp.cpp"],
-    shared_libs: ["libaaudio"],
-}
-
-cc_test {
     name: "test_open_params",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_open_params.cpp"],

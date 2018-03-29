@@ -43,9 +43,17 @@ constexpr int kRampMSec = 10; // time to apply a change in volume
 aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder) {
     aaudio_result_t result = AudioStreamInternal::open(builder);
     if (result == AAUDIO_OK) {
+        result = mFlowGraph.configure(getFormat(),
+                             getSamplesPerFrame(),
+                             getDeviceFormat(),
+                             getDeviceChannelCount());
+
+        if (result != AAUDIO_OK) {
+            close();
+        }
         // Sample rate is constrained to common values by now and should not overflow.
         int32_t numFrames = kRampMSec * getSampleRate() / AAUDIO_MILLIS_PER_SECOND;
-        mVolumeRamp.setLengthInFrames(numFrames);
+        mFlowGraph.setRampLengthInFrames(numFrames);
     }
     return result;
 }
@@ -216,22 +224,10 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
             }
 
             int32_t numBytes = getBytesPerFrame() * framesToWrite;
-            // Data conversion.
-            float levelFrom;
-            float levelTo;
-            mVolumeRamp.nextSegment(framesToWrite, &levelFrom, &levelTo);
 
-            AAudioDataConverter::FormattedData source(
-                    (void *)byteBuffer,
-                    getFormat(),
-                    getSamplesPerFrame());
-            AAudioDataConverter::FormattedData destination(
-                    wrappingBuffer.data[partIndex],
-                    getDeviceFormat(),
-                    getDeviceChannelCount());
-
-            AAudioDataConverter::convert(source, destination, framesToWrite,
-                                         levelFrom, levelTo);
+            mFlowGraph.process((void *)byteBuffer,
+                               wrappingBuffer.data[partIndex],
+                               framesToWrite);
 
             byteBuffer += numBytes;
             framesLeft -= framesToWrite;
@@ -313,6 +309,6 @@ status_t AudioStreamInternalPlay::doSetVolume() {
     float combinedVolume = mStreamVolume * getDuckAndMuteVolume();
     ALOGD("%s() mStreamVolume * duckAndMuteVolume = %f * %f = %f",
           __func__, mStreamVolume, getDuckAndMuteVolume(), combinedVolume);
-    mVolumeRamp.setTarget(combinedVolume);
+    mFlowGraph.setTargetVolume(combinedVolume);
     return android::NO_ERROR;
 }
