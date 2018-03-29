@@ -284,14 +284,8 @@ public class VideoView2Impl extends BaseLayout
         mSurfaceView.setLayoutParams(params);
         mTextureView.setSurfaceListener(this);
         mSurfaceView.setSurfaceListener(this);
-
-        // TODO: Choose TextureView when SurfaceView cannot be created.
-        // Choose surface view by default
-        mTextureView.setVisibility(View.GONE);
-        mSurfaceView.setVisibility(View.VISIBLE);
         mInstance.addView(mTextureView);
         mInstance.addView(mSurfaceView);
-        mCurrentView = mSurfaceView;
 
         mSubtitleView = new SubtitleView(mInstance.getContext());
         mSubtitleView.setLayoutParams(params);
@@ -309,16 +303,22 @@ public class VideoView2Impl extends BaseLayout
                 "http://schemas.android.com/apk/res/android",
                 "enableSubtitle", false);
 
+        // TODO: Choose TextureView when SurfaceView cannot be created.
+        // Choose surface view by default
         int viewType = (attrs == null) ? VideoView2.VIEW_TYPE_SURFACEVIEW
                 : attrs.getAttributeIntValue(
                 "http://schemas.android.com/apk/res/android",
-                "viewType", 0);
-        if (viewType == 0) {
+                "viewType", VideoView2.VIEW_TYPE_SURFACEVIEW);
+        if (viewType == VideoView2.VIEW_TYPE_SURFACEVIEW) {
             Log.d(TAG, "viewType attribute is surfaceView.");
-            // TODO: implement
-        } else if (viewType == 1) {
+            mTextureView.setVisibility(View.GONE);
+            mSurfaceView.setVisibility(View.VISIBLE);
+            mCurrentView = mSurfaceView;
+        } else if (viewType == VideoView2.VIEW_TYPE_TEXTUREVIEW) {
             Log.d(TAG, "viewType attribute is textureView.");
-            // TODO: implement
+            mTextureView.setVisibility(View.VISIBLE);
+            mSurfaceView.setVisibility(View.GONE);
+            mCurrentView = mTextureView;
         }
 
         MediaRouteSelector.Builder builder = new MediaRouteSelector.Builder();
