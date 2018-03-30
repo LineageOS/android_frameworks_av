@@ -184,6 +184,11 @@ status_t DeviceHalLocal::setAudioPortConfig(const struct audio_port_config *conf
         return INVALID_OPERATION;
 }
 
+status_t DeviceHalLocal::getMicrophones(
+        std::vector<media::MicrophoneInfo> *microphones __unused) {
+    return INVALID_OPERATION;
+}
+
 status_t DeviceHalLocal::dump(int fd) {
     return mDev->dump(mDev, fd);
 }

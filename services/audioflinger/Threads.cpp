@@ -7129,42 +7129,8 @@ status_t AudioFlinger::RecordThread::getActiveMicrophones(
 {
     ALOGV("RecordThread::getActiveMicrophones");
     AutoMutex _l(mLock);
-    // Fake data
-    struct audio_microphone_characteristic_t characteristic;
-    sprintf(characteristic.device_id, "builtin_mic");
-    characteristic.device = AUDIO_DEVICE_IN_BUILTIN_MIC;
-    sprintf(characteristic.address, "");
-    characteristic.location = AUDIO_MICROPHONE_LOCATION_MAINBODY;
-    characteristic.group = 0;
-    characteristic.index_in_the_group = 0;
-    characteristic.sensitivity = 1.0f;
-    characteristic.max_spl = 100.0f;
-    characteristic.min_spl = 0.0f;
-    characteristic.directionality = AUDIO_MICROPHONE_DIRECTIONALITY_OMNI;
-    characteristic.num_frequency_responses = 5;
-    for (size_t i = 0; i < characteristic.num_frequency_responses; i++) {
-        characteristic.frequency_responses[0][i] = 100.0f - i;
-        characteristic.frequency_responses[1][i] = 100.0f + i;
-    }
-    for (size_t i = 0; i < AUDIO_CHANNEL_COUNT_MAX; i++) {
-        characteristic.channel_mapping[i] = AUDIO_MICROPHONE_CHANNEL_MAPPING_UNUSED;
-    }
-    audio_microphone_channel_mapping_t channel_mappings[] = {
-        AUDIO_MICROPHONE_CHANNEL_MAPPING_DIRECT,
-        AUDIO_MICROPHONE_CHANNEL_MAPPING_PROCESSED,
-    };
-    for (size_t i = 0; i < mChannelCount; i++) {
-        characteristic.channel_mapping[i] = channel_mappings[i % 2];
-    }
-    characteristic.geometric_location.x = 0.1f;
-    characteristic.geometric_location.y = 0.2f;
-    characteristic.geometric_location.z = 0.3f;
-    characteristic.orientation.x = 0.0f;
-    characteristic.orientation.y = 1.0f;
-    characteristic.orientation.z = 0.0f;
-    media::MicrophoneInfo microphoneInfo = media::MicrophoneInfo(characteristic);
-    activeMicrophones->push_back(microphoneInfo);
-    return NO_ERROR;
+    status_t status = mInput->stream->getActiveMicrophones(activeMicrophones);
+    return status;
 }
 
 // destroyTrack_l() must be called with ThreadBase::mLock held
