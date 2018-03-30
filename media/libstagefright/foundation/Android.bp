@@ -24,10 +24,12 @@ cc_library {
     header_libs: [
         "libhardware_headers",
         "libstagefright_foundation_headers",
+        "media_plugin_headers",
     ],
 
     export_header_lib_headers: [
         "libstagefright_foundation_headers",
+        "media_plugin_headers",
     ],
 
     export_shared_lib_headers: [
