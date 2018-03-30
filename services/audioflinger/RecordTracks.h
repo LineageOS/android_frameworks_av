@@ -24,6 +24,7 @@ class RecordTrack : public TrackBase {
 public:
                         RecordTrack(RecordThread *thread,
                                 const sp<Client>& client,
+                                const audio_attributes_t& attr,
                                 uint32_t sampleRate,
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,

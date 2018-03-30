@@ -17,6 +17,8 @@
 #ifndef ANDROID_HARDWARE_STREAM_HAL_INTERFACE_H
 #define ANDROID_HARDWARE_STREAM_HAL_INTERFACE_H
 
+#include <vector>
+
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/MicrophoneInfo.h>
 #include <system/audio.h>
@@ -143,6 +145,15 @@ class StreamOutHalInterface : public virtual StreamHalInterface {
     // Return a recent count of the number of audio frames presented to an external observer.
     virtual status_t getPresentationPosition(uint64_t *frames, struct timespec *timestamp) = 0;
 
+    struct SourceMetadata {
+        std::vector<playback_track_metadata_t> tracks;
+    };
+    /**
+     * Called when the metadata of the stream's source has been changed.
+     * @param sourceMetadata Description of the audio that is played by the clients.
+     */
+    virtual status_t updateSourceMetadata(const SourceMetadata& sourceMetadata) = 0;
+
   protected:
     virtual ~StreamOutHalInterface() {}
 };
@@ -164,6 +175,15 @@ class StreamInHalInterface : public virtual StreamHalInterface {
 
     // Get active microphones
     virtual status_t getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones) = 0;
+
+    struct SinkMetadata {
+        std::vector<record_track_metadata_t> tracks;
+    };
+    /**
+     * Called when the metadata of the stream's sink has been changed.
+     * @param sinkMetadata Description of the audio that is suggested by the clients.
+     */
+    virtual status_t updateSinkMetadata(const SinkMetadata& sinkMetadata) = 0;
 
   protected:
     virtual ~StreamInHalInterface() {}

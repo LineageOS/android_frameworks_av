@@ -28,7 +28,10 @@
 #include "VersionUtils.h"
 
 using ::android::hardware::audio::common::V4_0::AudioChannelMask;
+using ::android::hardware::audio::common::V4_0::AudioContentType;
 using ::android::hardware::audio::common::V4_0::AudioFormat;
+using ::android::hardware::audio::common::V4_0::AudioSource;
+using ::android::hardware::audio::common::V4_0::AudioUsage;
 using ::android::hardware::audio::common::V4_0::ThreadInfo;
 using ::android::hardware::audio::V4_0::AudioDrain;
 using ::android::hardware::audio::V4_0::IStreamOutCallback;
@@ -37,6 +40,8 @@ using ::android::hardware::audio::V4_0::MicrophoneInfo;
 using ::android::hardware::audio::V4_0::MmapBufferInfo;
 using ::android::hardware::audio::V4_0::MmapPosition;
 using ::android::hardware::audio::V4_0::ParameterValue;
+using ::android::hardware::audio::V4_0::PlaybackTrackMetadata;
+using ::android::hardware::audio::V4_0::RecordTrackMetadata;
 using ::android::hardware::audio::V4_0::Result;
 using ::android::hardware::audio::V4_0::TimeSpec;
 using ::android::hardware::MQDescriptorSync;
@@ -561,6 +566,28 @@ status_t StreamOutHalHidl::getPresentationPosition(uint64_t *frames, struct time
     }
 }
 
+/** Transform a standard collection to an HIDL vector. */
+template <class Values, class ElementConverter>
+static auto transformToHidlVec(const Values& values, ElementConverter converter) {
+    hidl_vec<decltype(converter(*values.begin()))> result{values.size()};
+    using namespace std;
+    transform(begin(values), end(values), begin(result), converter);
+    return result;
+}
+
+status_t StreamOutHalHidl::updateSourceMetadata(const SourceMetadata& sourceMetadata) {
+    hardware::audio::V4_0::SourceMetadata halMetadata = {
+        .tracks = transformToHidlVec(sourceMetadata.tracks,
+              [](const playback_track_metadata& metadata) -> PlaybackTrackMetadata {
+                  return {
+                    .usage=static_cast<AudioUsage>(metadata.usage),
+                    .contentType=static_cast<AudioContentType>(metadata.content_type),
+                    .gain=metadata.gain,
+                  };
+              })};
+    return processReturn("updateSourceMetadata", mStream->updateSourceMetadata(halMetadata));
+}
+
 void StreamOutHalHidl::onWriteReady() {
     sp<StreamOutHalInterfaceCallback> callback = mCallback.promote();
     if (callback == 0) return;
@@ -772,6 +799,18 @@ status_t StreamInHalHidl::getActiveMicrophones(
         }
     });
     return processReturn("getActiveMicrophones", ret, retval);
+}
+
+status_t StreamInHalHidl::updateSinkMetadata(const SinkMetadata& sinkMetadata) {
+    hardware::audio::V4_0::SinkMetadata halMetadata = {
+        .tracks = transformToHidlVec(sinkMetadata.tracks,
+              [](const record_track_metadata& metadata) -> RecordTrackMetadata {
+                  return {
+                    .source=static_cast<AudioSource>(metadata.source),
+                    .gain=metadata.gain,
+                  };
+              })};
+    return processReturn("updateSinkMetadata", mStream->updateSinkMetadata(halMetadata));
 }
 
 } // namespace V4_0

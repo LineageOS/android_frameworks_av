@@ -233,6 +233,19 @@ status_t StreamOutHalLocal::getPresentationPosition(uint64_t *frames, struct tim
     return mStream->get_presentation_position(mStream, frames, timestamp);
 }
 
+status_t StreamOutHalLocal::updateSourceMetadata(const SourceMetadata& sourceMetadata) {
+    if (mStream->update_source_metadata == nullptr) {
+        return INVALID_OPERATION;
+    }
+    const source_metadata_t metadata {
+        .track_count = sourceMetadata.tracks.size(),
+        // const cast is fine as it is in a const structure
+        .tracks = const_cast<playback_track_metadata*>(sourceMetadata.tracks.data()),
+    };
+    mStream->update_source_metadata(mStream, &metadata);
+    return OK;
+}
+
 status_t StreamOutHalLocal::start() {
     if (mStream->start == NULL) return INVALID_OPERATION;
     return mStream->start(mStream);
@@ -292,6 +305,19 @@ status_t StreamInHalLocal::getInputFramesLost(uint32_t *framesLost) {
 status_t StreamInHalLocal::getCapturePosition(int64_t *frames, int64_t *time) {
     if (mStream->get_capture_position == NULL) return INVALID_OPERATION;
     return mStream->get_capture_position(mStream, frames, time);
+}
+
+status_t StreamInHalLocal::updateSinkMetadata(const SinkMetadata& sinkMetadata) {
+    if (mStream->update_sink_metadata == nullptr) {
+        return INVALID_OPERATION;
+    }
+    const sink_metadata_t metadata {
+        .track_count = sinkMetadata.tracks.size(),
+        // const cast is fine as it is in a const structure
+        .tracks = const_cast<record_track_metadata*>(sinkMetadata.tracks.data()),
+    };
+    mStream->update_sink_metadata(mStream, &metadata);
+    return OK;
 }
 
 status_t StreamInHalLocal::start() {
