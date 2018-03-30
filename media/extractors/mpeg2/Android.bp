@@ -23,11 +23,11 @@ cc_library_shared {
         "liblog",
         "libmediaextractor",
         "libstagefright_foundation",
-        "libutils",
     ],
 
     static_libs: [
         "libstagefright_mpeg2support",
+        "libutils",
     ],
 
     name: "libmpeg2extractor",

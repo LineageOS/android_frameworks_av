@@ -9,12 +9,12 @@ cc_library_shared {
     shared_libs: [
         "liblog",
         "libmediaextractor",
-        "libstagefright_foundation"
     ],
 
     static_libs: [
         "libmedia_midiiowrapper",
         "libsonivox",
+        "libstagefright_foundation"
     ],
     name: "libmidiextractor",
     relative_install_path: "extractors",
