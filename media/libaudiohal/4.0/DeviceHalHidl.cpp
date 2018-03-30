@@ -359,6 +359,23 @@ status_t DeviceHalHidl::setAudioPortConfig(const struct audio_port_config *confi
     return processReturn("setAudioPortConfig", mDevice->setAudioPortConfig(hidlConfig));
 }
 
+status_t DeviceHalHidl::getMicrophones(std::vector<media::MicrophoneInfo> *microphonesInfo) {
+    if (mDevice == 0) return NO_INIT;
+    Result retval;
+    Return<void> ret = mDevice->getMicrophones(
+            [&](Result r, hidl_vec<MicrophoneInfo> micArrayHal) {
+        retval = r;
+        for (size_t k = 0; k < micArrayHal.size(); k++) {
+            audio_microphone_characteristic_t dst;
+            //convert
+            microphoneInfoToHal(micArrayHal[k], &dst);
+            media::MicrophoneInfo microphone = media::MicrophoneInfo(dst);
+            microphonesInfo->push_back(microphone);
+        }
+    });
+    return processReturn("getMicrophones", ret, retval);
+}
+
 status_t DeviceHalHidl::dump(int fd) {
     if (mDevice == 0) return NO_INIT;
     native_handle_t* hidlHandle = native_handle_create(1, 0);

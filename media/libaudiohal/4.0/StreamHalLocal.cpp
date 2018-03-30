@@ -315,5 +315,17 @@ status_t StreamInHalLocal::getMmapPosition(struct audio_mmap_position *position)
     return mStream->get_mmap_position(mStream, position);
 }
 
+status_t StreamInHalLocal::getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones) {
+    if (mStream->get_active_microphones == NULL) return INVALID_OPERATION;
+    size_t actual_mics = AUDIO_MICROPHONE_MAX_COUNT;
+    audio_microphone_characteristic_t mic_array[AUDIO_MICROPHONE_MAX_COUNT];
+    status_t status = mStream->get_active_microphones(mStream, &mic_array[0], &actual_mics);
+    for (size_t i = 0; i < actual_mics; i++) {
+        media::MicrophoneInfo microphoneInfo = media::MicrophoneInfo(mic_array[i]);
+        microphones->push_back(microphoneInfo);
+    }
+    return status;
+}
+
 } // namespace V4_0
 } // namespace android

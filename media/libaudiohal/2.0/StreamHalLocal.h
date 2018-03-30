@@ -194,6 +194,9 @@ class StreamInHalLocal : public StreamInHalInterface, public StreamHalLocal {
     // Get current read/write position in the mmap buffer
     virtual status_t getMmapPosition(struct audio_mmap_position *position);
 
+    // Get active microphones
+    virtual status_t getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones);
+
   private:
     audio_stream_in_t *mStream;
 
