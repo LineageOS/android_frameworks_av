@@ -70,6 +70,7 @@ typedef enum acamera_metadata_section {
     ACAMERA_REPROCESS,
     ACAMERA_DEPTH,
     ACAMERA_LOGICAL_MULTI_CAMERA,
+    ACAMERA_DISTORTION_CORRECTION,
     ACAMERA_SECTION_COUNT,
 
     ACAMERA_VENDOR = 0x8000
@@ -107,6 +108,9 @@ typedef enum acamera_metadata_section_start {
     ACAMERA_DEPTH_START            = ACAMERA_DEPTH             << 16,
     ACAMERA_LOGICAL_MULTI_CAMERA_START
                                    = ACAMERA_LOGICAL_MULTI_CAMERA
+                                                                << 16,
+    ACAMERA_DISTORTION_CORRECTION_START
+                                   = ACAMERA_DISTORTION_CORRECTION
                                                                 << 16,
     ACAMERA_VENDOR_START           = ACAMERA_VENDOR            << 16
 } acamera_metadata_section_start_t;
@@ -4803,6 +4807,8 @@ typedef enum acamera_metadata_tag {
      * of points can be less than max (that is, the request doesn't have to
      * always provide a curve with number of points equivalent to
      * ACAMERA_TONEMAP_MAX_CURVE_POINTS).</p>
+     * <p>For devices with MONOCHROME capability, only red channel is used. Green and blue channels
+     * are ignored.</p>
      * <p>A few examples, and their corresponding graphical mappings; these
      * only specify the red channel and the precision is limited to 4
      * digits, for conciseness.</p>
@@ -5284,6 +5290,63 @@ typedef enum acamera_metadata_tag {
     ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE =             // byte (acamera_metadata_enum_android_logical_multi_camera_sensor_sync_type_t)
             ACAMERA_LOGICAL_MULTI_CAMERA_START + 1,
     ACAMERA_LOGICAL_MULTI_CAMERA_END,
+
+    /**
+     * <p>Mode of operation for the lens distortion correction block.</p>
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_distortion_correction_mode_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     *   <li>ACaptureRequest</li>
+     * </ul></p>
+     *
+     * <p>The lens distortion correction block attempts to improve image quality by fixing
+     * radial, tangential, or other geometric aberrations in the camera device's optics.  If
+     * available, the ACAMERA_LENS_DISTORTION field documents the lens's distortion parameters.</p>
+     * <p>OFF means no distortion correction is done.</p>
+     * <p>FAST/HIGH_QUALITY both mean camera device determined distortion correction will be
+     * applied. HIGH_QUALITY mode indicates that the camera device will use the highest-quality
+     * correction algorithms, even if it slows down capture rate. FAST means the camera device
+     * will not slow down capture rate when applying correction. FAST may be the same as OFF if
+     * any correction at all would slow down capture rate.  Every output stream will have a
+     * similar amount of enhancement applied.</p>
+     * <p>The correction only applies to processed outputs such as YUV, JPEG, or DEPTH16; it is not
+     * applied to any RAW output.  Metadata coordinates such as face rectangles or metering
+     * regions are also not affected by correction.</p>
+     * <p>Applications enabling distortion correction need to pay extra attention when converting
+     * image coordinates between corrected output buffers and the sensor array. For example, if
+     * the app supports tap-to-focus and enables correction, it then has to apply the distortion
+     * model described in ACAMERA_LENS_DISTORTION to the image buffer tap coordinates to properly
+     * calculate the tap position on the sensor active array to be used with
+     * ACAMERA_CONTROL_AF_REGIONS. The same applies in reverse to detected face rectangles if
+     * they need to be drawn on top of the corrected output buffers.</p>
+     *
+     * @see ACAMERA_CONTROL_AF_REGIONS
+     * @see ACAMERA_LENS_DISTORTION
+     */
+    ACAMERA_DISTORTION_CORRECTION_MODE =                        // byte (acamera_metadata_enum_android_distortion_correction_mode_t)
+            ACAMERA_DISTORTION_CORRECTION_START,
+    /**
+     * <p>List of distortion correction modes for ACAMERA_DISTORTION_CORRECTION_MODE that are
+     * supported by this camera device.</p>
+     *
+     * @see ACAMERA_DISTORTION_CORRECTION_MODE
+     *
+     * <p>Type: byte[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>No device is required to support this API; such devices will always list only 'OFF'.
+     * All devices that support this API will list both FAST and HIGH_QUALITY.</p>
+     */
+    ACAMERA_DISTORTION_CORRECTION_AVAILABLE_MODES =             // byte[n]
+            ACAMERA_DISTORTION_CORRECTION_START + 1,
+    ACAMERA_DISTORTION_CORRECTION_END,
 
 } acamera_metadata_tag_t;
 
@@ -7033,6 +7096,12 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      */
     ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA      = 11,
 
+    /**
+     * <p>The camera device is a monochrome camera that doesn't contain a color filter array,
+     * and the pixel values on U and Y planes are all 128.</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_MONOCHROME                = 12,
+
 } acamera_metadata_enum_android_request_available_capabilities_t;
 
 
@@ -7680,6 +7749,29 @@ typedef enum acamera_metadata_enum_acamera_logical_multi_camera_sensor_sync_type
     ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE_CALIBRATED         = 1,
 
 } acamera_metadata_enum_android_logical_multi_camera_sensor_sync_type_t;
+
+
+// ACAMERA_DISTORTION_CORRECTION_MODE
+typedef enum acamera_metadata_enum_acamera_distortion_correction_mode {
+    /**
+     * <p>No distortion correction is applied.</p>
+     */
+    ACAMERA_DISTORTION_CORRECTION_MODE_OFF                           = 0,
+
+    /**
+     * <p>Lens distortion correction is applied without reducing frame rate
+     * relative to sensor output. It may be the same as OFF if distortion correction would
+     * reduce frame rate relative to sensor.</p>
+     */
+    ACAMERA_DISTORTION_CORRECTION_MODE_FAST                          = 1,
+
+    /**
+     * <p>High-quality distortion correction is applied, at the cost of
+     * possibly reduced frame rate relative to sensor output.</p>
+     */
+    ACAMERA_DISTORTION_CORRECTION_MODE_HIGH_QUALITY                  = 2,
+
+} acamera_metadata_enum_android_distortion_correction_mode_t;
 
 
 #endif /* __ANDROID_API__ >= 24 */

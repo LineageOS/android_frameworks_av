@@ -19,13 +19,10 @@ import static android.media.VolumeProvider2.VOLUME_CONTROL_ABSOLUTE;
 import static android.media.VolumeProvider2.VOLUME_CONTROL_FIXED;
 import static android.media.VolumeProvider2.VOLUME_CONTROL_RELATIVE;
 
-import android.content.Context;
 import android.media.VolumeProvider2;
 import android.media.update.VolumeProvider2Provider;
 
 public class VolumeProvider2Impl implements VolumeProvider2Provider {
-
-    private final Context mContext;
     private final VolumeProvider2 mInstance;
     private final int mControlType;
     private final int mMaxVolume;
@@ -33,7 +30,7 @@ public class VolumeProvider2Impl implements VolumeProvider2Provider {
     private int mCurrentVolume;
     private Callback mCallback;
 
-    public VolumeProvider2Impl(Context context, VolumeProvider2 instance,
+    public VolumeProvider2Impl(VolumeProvider2 instance,
             @VolumeProvider2.ControlType int controlType, int maxVolume, int currentVolume) {
         if (controlType != VOLUME_CONTROL_FIXED && controlType != VOLUME_CONTROL_RELATIVE
                 && controlType != VOLUME_CONTROL_ABSOLUTE) {
@@ -47,7 +44,6 @@ public class VolumeProvider2Impl implements VolumeProvider2Provider {
             throw new IllegalArgumentException("currentVolume shouldn't be greater than maxVolume"
                     + ", maxVolume=" + maxVolume + ", currentVolume=" + currentVolume);
         }
-        mContext = context;
         mInstance = instance;
         mControlType = controlType;
         mMaxVolume = maxVolume;

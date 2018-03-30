@@ -19,7 +19,6 @@ package com.android.media;
 import static android.media.MediaMetadata2.*;
 
 import android.annotation.Nullable;
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.media.MediaMetadata2;
 import android.media.MediaMetadata2.BitmapKey;
@@ -105,12 +104,10 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
             METADATA_KEY_ALBUM_ART_URI
     };
 
-    private final Context mContext;
     private final MediaMetadata2 mInstance;
     private final Bundle mBundle;
 
-    public MediaMetadata2Impl(Context context, Bundle bundle) {
-        mContext = context;
+    public MediaMetadata2Impl(Bundle bundle) {
         mInstance = new MediaMetadata2(this);
         mBundle = bundle;
     }
@@ -168,7 +165,7 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
         // TODO(jaewan): Add backward compatibility
         Rating2 rating = null;
         try {
-            rating = Rating2.fromBundle(mContext, mBundle.getBundle(key));
+            rating = Rating2.fromBundle(mBundle.getBundle(key));
         } catch (Exception e) {
             // ignore, value was not a rating
             Log.w(TAG, "Failed to retrieve a key as Rating.", e);
@@ -225,33 +222,28 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
         return mBundle;
     }
 
-    public static MediaMetadata2 fromBundle(Context context, Bundle bundle) {
-        return (bundle == null) ? null : new MediaMetadata2Impl(context, bundle).getInstance();
+    public static MediaMetadata2 fromBundle_impl(Bundle bundle) {
+        return (bundle == null) ? null : new MediaMetadata2Impl(bundle).getInstance();
     }
 
     public static final class BuilderImpl implements MediaMetadata2Provider.BuilderProvider {
-        private final Context mContext;
         private final MediaMetadata2.Builder mInstance;
         private final Bundle mBundle;
 
-        public BuilderImpl(Context context, MediaMetadata2.Builder instance) {
-            mContext = context;
+        public BuilderImpl(MediaMetadata2.Builder instance) {
             mInstance = instance;
             mBundle = new Bundle();
         }
 
-        public BuilderImpl(Context context, MediaMetadata2.Builder instance,
-                MediaMetadata2 source) {
+        public BuilderImpl(MediaMetadata2.Builder instance, MediaMetadata2 source) {
             if (source == null) {
                 throw new IllegalArgumentException("source shouldn't be null");
             }
-            mContext = context;
             mInstance = instance;
             mBundle = new Bundle(source.toBundle());
         }
 
-        public BuilderImpl(Context context, int maxBitmapSize) {
-            mContext = context;
+        public BuilderImpl(int maxBitmapSize) {
             mInstance = new MediaMetadata2.Builder(this);
             mBundle = new Bundle();
 
@@ -364,7 +356,7 @@ public class MediaMetadata2Impl implements MediaMetadata2Provider {
 
         @Override
         public MediaMetadata2 build_impl() {
-            return new MediaMetadata2Impl(mContext, mBundle).getInstance();
+            return new MediaMetadata2Impl(mBundle).getInstance();
         }
 
         private Bitmap scaleBitmap(Bitmap bmp, int maxSize) {

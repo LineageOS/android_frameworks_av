@@ -102,10 +102,10 @@ static const MtpEventCode kSupportedEventCodes[] = {
 };
 
 MtpServer::MtpServer(IMtpDatabase* database, int controlFd, bool ptp,
-                    const MtpString& deviceInfoManufacturer,
-                    const MtpString& deviceInfoModel,
-                    const MtpString& deviceInfoDeviceVersion,
-                    const MtpString& deviceInfoSerialNumber)
+                    const char *deviceInfoManufacturer,
+                    const char *deviceInfoModel,
+                    const char *deviceInfoDeviceVersion,
+                    const char *deviceInfoSerialNumber)
     :   mDatabase(database),
         mPtp(ptp),
         mDeviceInfoManufacturer(deviceInfoManufacturer),
@@ -132,14 +132,14 @@ MtpServer::~MtpServer() {
 }
 
 void MtpServer::addStorage(MtpStorage* storage) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
-    mStorages.push(storage);
+    mStorages.push_back(storage);
     sendStoreAdded(storage->getStorageID());
 }
 
 void MtpServer::removeStorage(MtpStorage* storage) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
     auto iter = std::find(mStorages.begin(), mStorages.end(), storage);
     if (iter != mStorages.end()) {
         sendStoreRemoved(storage->getStorageID());
@@ -284,10 +284,10 @@ void MtpServer::sendEvent(MtpEventCode code, uint32_t param1) {
     }
 }
 
-void MtpServer::addEditObject(MtpObjectHandle handle, MtpString& path,
+void MtpServer::addEditObject(MtpObjectHandle handle, MtpStringBuffer& path,
         uint64_t size, MtpObjectFormat format, int fd) {
     ObjectEdit*  edit = new ObjectEdit(handle, path, size, format, fd);
-    mObjectEditList.add(edit);
+    mObjectEditList.push_back(edit);
 }
 
 MtpServer::ObjectEdit* MtpServer::getEditObject(MtpObjectHandle handle) {
@@ -305,7 +305,7 @@ void MtpServer::removeEditObject(MtpObjectHandle handle) {
         ObjectEdit* edit = mObjectEditList[i];
         if (edit->mHandle == handle) {
             delete edit;
-            mObjectEditList.removeAt(i);
+            mObjectEditList.erase(mObjectEditList.begin() + i);
             return;
         }
     }
@@ -318,7 +318,7 @@ void MtpServer::commitEdit(ObjectEdit* edit) {
 
 
 bool MtpServer::handleRequest() {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     MtpOperationCode operation = mRequest.getOperationCode();
     MtpResponseCode response;
@@ -769,7 +769,7 @@ MtpResponseCode MtpServer::doGetObject() {
     if (mRequest.getParameterCount() < 1)
         return MTP_RESPONSE_INVALID_PARAMETER;
     MtpObjectHandle handle = mRequest.getParameter(1);
-    MtpString pathBuf;
+    MtpStringBuffer pathBuf;
     int64_t fileLength;
     MtpObjectFormat format;
     int result = mDatabase->getObjectFilePath(handle, pathBuf, fileLength, format);
@@ -855,7 +855,7 @@ MtpResponseCode MtpServer::doGetPartialObject(MtpOperationCode operation) {
         // standard GetPartialObject
         length = mRequest.getParameter(3);
     }
-    MtpString pathBuf;
+    MtpStringBuffer pathBuf;
     int64_t fileLength;
     MtpObjectFormat format;
     int result = mDatabase->getObjectFilePath(handle, pathBuf, fileLength, format);
@@ -892,7 +892,7 @@ MtpResponseCode MtpServer::doGetPartialObject(MtpOperationCode operation) {
 }
 
 MtpResponseCode MtpServer::doSendObjectInfo() {
-    MtpString path;
+    MtpStringBuffer path;
     uint16_t temp16;
     uint32_t temp32;
 
@@ -906,7 +906,7 @@ MtpResponseCode MtpServer::doSendObjectInfo() {
 
     // special case the root
     if (parent == MTP_PARENT_ROOT) {
-        path = storage->getPath();
+        path.set(storage->getPath());
         parent = 0;
     } else {
         int64_t length;
@@ -938,7 +938,7 @@ MtpResponseCode MtpServer::doSendObjectInfo() {
     if (!mData.getUInt32(temp32)) return MTP_RESPONSE_INVALID_PARAMETER;  // sequence number
     MtpStringBuffer name, created, modified;
     if (!mData.getString(name)) return MTP_RESPONSE_INVALID_PARAMETER;    // file name
-    if (name.getCharCount() == 0) {
+    if (name.isEmpty()) {
         ALOGE("empty name");
         return MTP_RESPONSE_INVALID_PARAMETER;
     }
@@ -952,8 +952,8 @@ MtpResponseCode MtpServer::doSendObjectInfo() {
         modifiedTime = 0;
 
     if (path[path.size() - 1] != '/')
-        path += "/";
-    path += (const char *)name;
+        path.append("/");
+    path.append(name);
 
     // check space first
     if (mSendObjectFileSize > storage->getFreeSpace())
@@ -1006,10 +1006,10 @@ MtpResponseCode MtpServer::doMoveObject() {
     MtpObjectHandle parent = mRequest.getParameter(3);
     if (!storage)
         return MTP_RESPONSE_INVALID_STORAGE_ID;
-    MtpString path;
+    MtpStringBuffer path;
     MtpResponseCode result;
 
-    MtpString fromPath;
+    MtpStringBuffer fromPath;
     int64_t fileLength;
     MtpObjectFormat format;
     MtpObjectInfo info(objectHandle);
@@ -1022,7 +1022,7 @@ MtpResponseCode MtpServer::doMoveObject() {
 
     // special case the root
     if (parent == 0) {
-        path = storage->getPath();
+        path.set(storage->getPath());
     } else {
         int64_t parentLength;
         MtpObjectFormat parentFormat;
@@ -1034,8 +1034,8 @@ MtpResponseCode MtpServer::doMoveObject() {
     }
 
     if (path[path.size() - 1] != '/')
-        path += "/";
-    path += info.mName;
+        path.append("/");
+    path.append(info.mName);
 
     result = mDatabase->beginMoveObject(objectHandle, parent, storageID);
     if (result != MTP_RESPONSE_OK)
@@ -1085,9 +1085,9 @@ MtpResponseCode MtpServer::doCopyObject() {
     MtpObjectHandle parent = mRequest.getParameter(3);
     if (!storage)
         return MTP_RESPONSE_INVALID_STORAGE_ID;
-    MtpString path;
+    MtpStringBuffer path;
 
-    MtpString fromPath;
+    MtpStringBuffer fromPath;
     int64_t fileLength;
     MtpObjectFormat format;
     MtpObjectInfo info(objectHandle);
@@ -1100,7 +1100,7 @@ MtpResponseCode MtpServer::doCopyObject() {
 
     // special case the root
     if (parent == 0) {
-        path = storage->getPath();
+        path.set(storage->getPath());
     } else {
         int64_t parentLength;
         MtpObjectFormat parentFormat;
@@ -1116,8 +1116,8 @@ MtpResponseCode MtpServer::doCopyObject() {
         return MTP_RESPONSE_STORAGE_FULL;
 
     if (path[path.size() - 1] != '/')
-        path += "/";
-    path += info.mName;
+        path.append("/");
+    path.append(info.mName);
 
     MtpObjectHandle handle = mDatabase->beginCopyObject(objectHandle, parent, storageID);
     if (handle == kInvalidObjectHandle) {
@@ -1264,7 +1264,7 @@ MtpResponseCode MtpServer::doDeleteObject() {
     // FIXME - support deleting all objects if handle is 0xFFFFFFFF
     // FIXME - implement deleting objects by format
 
-    MtpString filePath;
+    MtpStringBuffer filePath;
     int64_t fileLength;
     int result = mDatabase->getObjectFilePath(handle, filePath, fileLength, format);
     if (result != MTP_RESPONSE_OK)
@@ -1414,7 +1414,7 @@ MtpResponseCode MtpServer::doBeginEditObject() {
         return MTP_RESPONSE_GENERAL_ERROR;
     }
 
-    MtpString path;
+    MtpStringBuffer path;
     int64_t fileLength;
     MtpObjectFormat format;
     int result = mDatabase->getObjectFilePath(handle, path, fileLength, format);

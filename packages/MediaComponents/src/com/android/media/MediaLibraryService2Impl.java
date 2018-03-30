@@ -151,8 +151,7 @@ public class MediaLibraryService2Impl extends MediaSessionService2Impl implement
         private final String mRootId;
         private final Bundle mExtras;
 
-        public LibraryRootImpl(Context context, LibraryRoot instance, String rootId,
-                Bundle extras) {
+        public LibraryRootImpl(LibraryRoot instance, String rootId, Bundle extras) {
             if (rootId == null) {
                 throw new IllegalArgumentException("rootId shouldn't be null.");
             }

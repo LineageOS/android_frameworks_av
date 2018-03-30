@@ -19,6 +19,7 @@
 #include "MtpDataPacket.h"
 
 #include <algorithm>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -129,7 +130,7 @@ Int8List* MtpDataPacket::getAInt8() {
             delete result;
             return NULL;
         }
-        result->push(value);
+        result->push_back(value);
     }
     return result;
 }
@@ -145,7 +146,7 @@ UInt8List* MtpDataPacket::getAUInt8() {
             delete result;
             return NULL;
         }
-        result->push(value);
+        result->push_back(value);
     }
     return result;
 }
@@ -161,7 +162,7 @@ Int16List* MtpDataPacket::getAInt16() {
             delete result;
             return NULL;
         }
-        result->push(value);
+        result->push_back(value);
     }
     return result;
 }
@@ -177,7 +178,7 @@ UInt16List* MtpDataPacket::getAUInt16() {
             delete result;
             return NULL;
         }
-        result->push(value);
+        result->push_back(value);
     }
     return result;
 }
@@ -193,7 +194,7 @@ Int32List* MtpDataPacket::getAInt32() {
             delete result;
             return NULL;
         }
-        result->push(value);
+        result->push_back(value);
     }
     return result;
 }
@@ -209,7 +210,7 @@ UInt32List* MtpDataPacket::getAUInt32() {
             delete result;
             return NULL;
         }
-        result->push(value);
+        result->push_back(value);
     }
     return result;
 }
@@ -225,7 +226,7 @@ Int64List* MtpDataPacket::getAInt64() {
             delete result;
             return NULL;
         }
-        result->push(value);
+        result->push_back(value);
     }
     return result;
 }
@@ -241,7 +242,7 @@ UInt64List* MtpDataPacket::getAUInt64() {
             delete result;
             return NULL;
         }
-        result->push(value);
+        result->push_back(value);
     }
     return result;
 }
