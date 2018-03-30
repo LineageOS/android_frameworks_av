@@ -52,9 +52,11 @@ private:
 
     FLACDecoder *mFLACDecoder;
     FLAC__StreamMetadata_StreamInfo mStreamInfo;
-    bool mHasStreamInfo;
     size_t mInputBufferCount;
+    bool mHasStreamInfo;
     bool mSignalledError;
+    bool mSawInputEOS;
+    bool mFinishedDecoder;
 
     enum {
         NONE,
