@@ -18,6 +18,7 @@
 #define ANDROID_HARDWARE_STREAM_HAL_INTERFACE_H
 
 #include <media/audiohal/EffectHalInterface.h>
+#include <media/MicrophoneInfo.h>
 #include <system/audio.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
@@ -160,6 +161,9 @@ class StreamInHalInterface : public virtual StreamHalInterface {
     // Return a recent count of the number of audio frames received and
     // the clock time associated with that frame count.
     virtual status_t getCapturePosition(int64_t *frames, int64_t *time) = 0;
+
+    // Get active microphones
+    virtual status_t getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones) = 0;
 
   protected:
     virtual ~StreamInHalInterface() {}

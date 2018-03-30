@@ -210,6 +210,9 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
     // the clock time associated with that frame count.
     virtual status_t getCapturePosition(int64_t *frames, int64_t *time);
 
+    // Get active microphones
+    virtual status_t getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones);
+
   private:
     friend class DeviceHalHidl;
     typedef MessageQueue<ReadParameters, hardware::kSynchronizedReadWrite> CommandMQ;

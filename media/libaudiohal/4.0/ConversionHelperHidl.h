@@ -19,9 +19,11 @@
 
 #include <android/hardware/audio/4.0/types.h>
 #include <hidl/HidlSupport.h>
+#include <system/audio.h>
 #include <utils/String8.h>
 
 using ::android::hardware::audio::V4_0::ParameterValue;
+using ::android::hardware::audio::V4_0::MicrophoneInfo;
 using ::android::hardware::Return;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
@@ -34,6 +36,8 @@ class ConversionHelperHidl {
     static status_t keysFromHal(const String8& keys, hidl_vec<hidl_string> *hidlKeys);
     static status_t parametersFromHal(const String8& kvPairs, hidl_vec<ParameterValue> *hidlParams);
     static void parametersToHal(const hidl_vec<ParameterValue>& parameters, String8 *values);
+    static void microphoneInfoToHal(const MicrophoneInfo& src,
+                                    audio_microphone_characteristic_t *pDst);
 
     ConversionHelperHidl(const char* className);
 
