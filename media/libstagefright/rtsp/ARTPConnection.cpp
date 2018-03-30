@@ -185,8 +185,8 @@ void ARTPConnection::MakeRTPSocketPair(
     }
 
     int sockopt = 1;
-    setsockopt(*rtpSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
-    setsockopt(*rtcpSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
+    setsockopt(*rtpSocket, SOL_SOCKET, SO_REUSEADDR, (int *)&sockopt, sizeof(sockopt));
+    setsockopt(*rtcpSocket, SOL_SOCKET, SO_REUSEADDR, (int *)&sockopt, sizeof(sockopt));
 
     int sizeSockSt = isIPv6 ? sizeof(addr6) : sizeof(addr4);
 
