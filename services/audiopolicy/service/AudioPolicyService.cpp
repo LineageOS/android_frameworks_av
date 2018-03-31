@@ -332,16 +332,19 @@ status_t AudioPolicyService::dumpInternals(int fd)
 
 void AudioPolicyService::setRecordSilenced(uid_t uid, bool silenced)
 {
-    {
-        Mutex::Autolock _l(mLock);
-        if (mAudioPolicyManager) {
-            mAudioPolicyManager->setRecordSilenced(uid, silenced);
-        }
-    }
-    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
-    if (af) {
-        af->setRecordSilenced(uid, silenced);
-    }
+// FIXME: temporarily disable while investigating issue b/77300296
+//    {
+//        Mutex::Autolock _l(mLock);
+//        if (mAudioPolicyManager) {
+//            mAudioPolicyManager->setRecordSilenced(uid, silenced);
+//        }
+//    }
+//    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+//    if (af) {
+//        af->setRecordSilenced(uid, silenced);
+//    }
+    (void)uid;
+    (void)silenced;
 }
 
 status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
@@ -582,14 +585,17 @@ bool AudioPolicyService::UidPolicy::isUidActive(uid_t uid) {
 
 bool AudioPolicyService::UidPolicy::isUidActiveLocked(uid_t uid) {
     // Non-app UIDs are considered always active
-    if (uid < FIRST_APPLICATION_UID) {
-        return true;
-    }
-    auto it = mOverrideUids.find(uid);
-    if (it != mOverrideUids.end()) {
-        return it->second;
-    }
-    return mActiveUids.find(uid) != mActiveUids.end();
+// FIXME: temporarily disable while investigating issue b/77300296
+//    if (uid < FIRST_APPLICATION_UID) {
+//        return true;
+//    }
+//    auto it = mOverrideUids.find(uid);
+//    if (it != mOverrideUids.end()) {
+//        return it->second;
+//    }
+//    return mActiveUids.find(uid) != mActiveUids.end();
+    (void)uid;
+    return true;
 }
 
 // -----------  AudioPolicyService::AudioCommandThread implementation ----------
