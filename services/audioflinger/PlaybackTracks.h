@@ -25,6 +25,7 @@ public:
                         Track(  PlaybackThread *thread,
                                 const sp<Client>& client,
                                 audio_stream_type_t streamType,
+                                const audio_attributes_t& attr,
                                 uint32_t sampleRate,
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
