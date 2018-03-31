@@ -423,22 +423,16 @@ status_t FLACDecoder::decodeOneFrame(const uint8_t *inBuffer, size_t inBufferLen
         short *outBuffer, size_t *outBufferLen) {
     ALOGV("decodeOneFrame: input size(%zu)", inBufferLen);
 
-    if (inBufferLen == 0) {
-        ALOGV("decodeOneFrame: no input data");
-        if (outBufferLen) {
-            *outBufferLen = 0;
-        }
-        return OK;
-    }
-
     if (!mStreamInfoValid) {
         ALOGW("decodeOneFrame: no streaminfo metadata block");
     }
 
-    status_t err = addDataToBuffer(inBuffer, inBufferLen);
-    if (err != OK) {
-        ALOGW("decodeOneFrame: addDataToBuffer returns error %d", err);
-        return err;
+    if (inBufferLen != 0) {
+        status_t err = addDataToBuffer(inBuffer, inBufferLen);
+        if (err != OK) {
+            ALOGW("decodeOneFrame: addDataToBuffer returns error %d", err);
+            return err;
+        }
     }
 
     mWriteRequested = true;

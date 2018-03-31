@@ -107,6 +107,9 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
     // Set audio port configuration.
     virtual status_t setAudioPortConfig(const struct audio_port_config *config);
 
+    // List microphones
+    virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones);
+
     virtual status_t dump(int fd);
 
   private:

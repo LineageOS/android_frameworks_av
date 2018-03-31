@@ -61,6 +61,7 @@ public:
 
                         TrackBase(ThreadBase *thread,
                                 const sp<Client>& client,
+                                const audio_attributes_t& mAttr,
                                 uint32_t sampleRate,
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
@@ -97,6 +98,7 @@ public:
     virtual void        invalidate() { mIsInvalid = true; }
             bool        isInvalid() const { return mIsInvalid; }
 
+    audio_attributes_t  attributes() const { return mAttr; }
 
 protected:
     DISALLOW_COPY_AND_ASSIGN(TrackBase);
@@ -188,6 +190,7 @@ protected:
     size_t              mBufferSize; // size of mBuffer in bytes
     // we don't really need a lock for these
     track_state         mState;
+    const audio_attributes_t mAttr;
     const uint32_t      mSampleRate;    // initial sample rate only; for tracks which
                         // support dynamic rates, the current value is in control block
     const audio_format_t mFormat;

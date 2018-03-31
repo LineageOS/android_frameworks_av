@@ -101,6 +101,9 @@ class DeviceHalLocal : public DeviceHalInterface
     // Set audio port configuration.
     virtual status_t setAudioPortConfig(const struct audio_port_config *config);
 
+    // List microphones
+    virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones);
+
     virtual status_t dump(int fd);
 
     void closeOutputStream(struct audio_stream_out *stream_out);

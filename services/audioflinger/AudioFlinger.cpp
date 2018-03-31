@@ -753,8 +753,8 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
         output.notificationFrameCount = input.notificationFrameCount;
         output.flags = input.flags;
 
-        track = thread->createTrack_l(client, streamType, &output.sampleRate, input.config.format,
-                                      input.config.channel_mask,
+        track = thread->createTrack_l(client, streamType, input.attr, &output.sampleRate,
+                                      input.config.format, input.config.channel_mask,
                                       &output.frameCount, &output.notificationFrameCount,
                                       input.notificationsPerBuffer, input.speed,
                                       input.sharedBuffer, sessionId, &output.flags,
@@ -1673,7 +1673,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
         output.frameCount = input.frameCount;
         output.notificationFrameCount = input.notificationFrameCount;
 
-        recordTrack = thread->createRecordTrack_l(client, &output.sampleRate,
+        recordTrack = thread->createRecordTrack_l(client, input.attr, &output.sampleRate,
                                                   input.config.format, input.config.channel_mask,
                                                   &output.frameCount, sessionId,
                                                   &output.notificationFrameCount,
@@ -1962,39 +1962,10 @@ status_t AudioFlinger::systemReady()
 
 status_t AudioFlinger::getMicrophones(std::vector<media::MicrophoneInfo> *microphones)
 {
-    // Fake data
-    size_t fakeNum = 2;
-    audio_devices_t fakeTypes[] = { AUDIO_DEVICE_IN_BUILTIN_MIC, AUDIO_DEVICE_IN_BACK_MIC };
-    for (size_t i = 0; i < fakeNum; i++) {
-        struct audio_microphone_characteristic_t characteristics;
-        sprintf(characteristics.device_id, "microphone:%zu", i);
-        characteristics.device = fakeTypes[i];
-        sprintf(characteristics.address, "");
-        characteristics.location = AUDIO_MICROPHONE_LOCATION_MAINBODY;
-        characteristics.group = 0;
-        characteristics.index_in_the_group = i;
-        characteristics.sensitivity = 1.0f;
-        characteristics.max_spl = 100.0f;
-        characteristics.min_spl = 0.0f;
-        characteristics.directionality = AUDIO_MICROPHONE_DIRECTIONALITY_OMNI;
-        characteristics.num_frequency_responses = 5 - i;
-        for (size_t j = 0; j < characteristics.num_frequency_responses; j++) {
-            characteristics.frequency_responses[0][j] = 100.0f - j;
-            characteristics.frequency_responses[1][j] = 100.0f + j;
-        }
-        for (size_t j = 0; j < AUDIO_CHANNEL_COUNT_MAX; j++) {
-            characteristics.channel_mapping[j] = AUDIO_MICROPHONE_CHANNEL_MAPPING_UNUSED;
-        }
-        characteristics.geometric_location.x = 0.1f;
-        characteristics.geometric_location.y = 0.2f;
-        characteristics.geometric_location.z = 0.3f;
-        characteristics.orientation.x = 0.0f;
-        characteristics.orientation.y = 1.0f;
-        characteristics.orientation.z = 0.0f;
-        media::MicrophoneInfo microphoneInfo = media::MicrophoneInfo(characteristics);
-        microphones->push_back(microphoneInfo);
-    }
-    return NO_ERROR;
+    AutoMutex lock(mHardwareLock);
+    sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
+    status_t status = dev->getMicrophones(microphones);
+    return status;
 }
 
 // setAudioHwSyncForSession_l() must be called with AudioFlinger::mLock held

@@ -63,6 +63,7 @@ static volatile int32_t nextTrackId = 55;
 AudioFlinger::ThreadBase::TrackBase::TrackBase(
             ThreadBase *thread,
             const sp<Client>& client,
+            const audio_attributes_t& attr,
             uint32_t sampleRate,
             audio_format_t format,
             audio_channel_mask_t channelMask,
@@ -81,6 +82,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mCblk(NULL),
         // mBuffer, mBufferSize
         mState(IDLE),
+        mAttr(attr),
         mSampleRate(sampleRate),
         mFormat(format),
         mChannelMask(channelMask),
@@ -372,6 +374,7 @@ AudioFlinger::PlaybackThread::Track::Track(
             PlaybackThread *thread,
             const sp<Client>& client,
             audio_stream_type_t streamType,
+            const audio_attributes_t& attr,
             uint32_t sampleRate,
             audio_format_t format,
             audio_channel_mask_t channelMask,
@@ -384,7 +387,7 @@ AudioFlinger::PlaybackThread::Track::Track(
             audio_output_flags_t flags,
             track_type type,
             audio_port_handle_t portId)
-    :   TrackBase(thread, client, sampleRate, format, channelMask, frameCount,
+    :   TrackBase(thread, client, attr, sampleRate, format, channelMask, frameCount,
                   (sharedBuffer != 0) ? sharedBuffer->pointer() : buffer,
                   (sharedBuffer != 0) ? sharedBuffer->size() : bufferSize,
                   sessionId, uid, true /*isOut*/,
@@ -1259,6 +1262,7 @@ AudioFlinger::PlaybackThread::OutputTrack::OutputTrack(
             size_t frameCount,
             uid_t uid)
     :   Track(playbackThread, NULL, AUDIO_STREAM_PATCH,
+              audio_attributes_t{} /* currently unused for output track */,
               sampleRate, format, channelMask, frameCount,
               nullptr /* buffer */, (size_t)0 /* bufferSize */, nullptr /* sharedBuffer */,
               AUDIO_SESSION_NONE, uid, AUDIO_OUTPUT_FLAG_NONE,
@@ -1461,6 +1465,7 @@ AudioFlinger::PlaybackThread::PatchTrack::PatchTrack(PlaybackThread *playbackThr
                                                      size_t bufferSize,
                                                      audio_output_flags_t flags)
     :   Track(playbackThread, NULL, streamType,
+              audio_attributes_t{} /* currently unused for patch track */,
               sampleRate, format, channelMask, frameCount,
               buffer, bufferSize, nullptr /* sharedBuffer */,
               AUDIO_SESSION_NONE, getuid(), flags, TYPE_PATCH),
@@ -1595,6 +1600,7 @@ binder::Status AudioFlinger::RecordHandle::getActiveMicrophones(
 AudioFlinger::RecordThread::RecordTrack::RecordTrack(
             RecordThread *thread,
             const sp<Client>& client,
+            const audio_attributes_t& attr,
             uint32_t sampleRate,
             audio_format_t format,
             audio_channel_mask_t channelMask,
@@ -1606,7 +1612,7 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
             audio_input_flags_t flags,
             track_type type,
             audio_port_handle_t portId)
-    :   TrackBase(thread, client, sampleRate, format,
+    :   TrackBase(thread, client, attr, sampleRate, format,
                   channelMask, frameCount, buffer, bufferSize, sessionId, uid, false /*isOut*/,
                   (type == TYPE_DEFAULT) ?
                           ((flags & AUDIO_INPUT_FLAG_FAST) ? ALLOC_PIPE : ALLOC_CBLK) :
@@ -1821,7 +1827,9 @@ AudioFlinger::RecordThread::PatchRecord::PatchRecord(RecordThread *recordThread,
                                                      void *buffer,
                                                      size_t bufferSize,
                                                      audio_input_flags_t flags)
-    :   RecordTrack(recordThread, NULL, sampleRate, format, channelMask, frameCount,
+    :   RecordTrack(recordThread, NULL,
+                audio_attributes_t{} /* currently unused for patch track */,
+                sampleRate, format, channelMask, frameCount,
                 buffer, bufferSize, AUDIO_SESSION_NONE, getuid(), flags, TYPE_PATCH),
                 mProxy(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, false, true))
 {
@@ -1882,6 +1890,7 @@ void AudioFlinger::RecordThread::PatchRecord::releaseBuffer(Proxy::Buffer* buffe
 
 
 AudioFlinger::MmapThread::MmapTrack::MmapTrack(ThreadBase *thread,
+        const audio_attributes_t& attr,
         uint32_t sampleRate,
         audio_format_t format,
         audio_channel_mask_t channelMask,
@@ -1889,7 +1898,7 @@ AudioFlinger::MmapThread::MmapTrack::MmapTrack(ThreadBase *thread,
         uid_t uid,
         pid_t pid,
         audio_port_handle_t portId)
-    :   TrackBase(thread, NULL, sampleRate, format,
+    :   TrackBase(thread, NULL, attr, sampleRate, format,
                   channelMask, (size_t)0 /* frameCount */,
                   nullptr /* buffer */, (size_t)0 /* bufferSize */,
                   sessionId, uid, false /* isOut */,

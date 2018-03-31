@@ -203,7 +203,7 @@ bool parseEffect(const XMLElement& xmlEffect, Libraries& libraries, Effects* eff
         auto parseProxy = [&xmlEffect, &parseImpl](const char* tag, EffectImpl& proxyLib) {
             auto* xmlProxyLib = xmlEffect.FirstChildElement(tag);
             if (xmlProxyLib == nullptr) {
-                ALOGE("effectProxy must contain a <%s>: %s", tag, dump(*xmlProxyLib));
+                ALOGE("effectProxy must contain a <%s>: %s", tag, dump(xmlEffect));
                 return false;
             }
             return parseImpl(*xmlProxyLib, proxyLib);

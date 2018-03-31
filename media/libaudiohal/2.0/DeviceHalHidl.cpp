@@ -346,6 +346,12 @@ status_t DeviceHalHidl::setAudioPortConfig(const struct audio_port_config *confi
     return processReturn("setAudioPortConfig", mDevice->setAudioPortConfig(hidlConfig));
 }
 
+status_t DeviceHalHidl::getMicrophones(
+        std::vector<media::MicrophoneInfo> *microphonesInfo __unused) {
+    if (mDevice == 0) return NO_INIT;
+    return INVALID_OPERATION;
+}
+
 status_t DeviceHalHidl::dump(int fd) {
     if (mDevice == 0) return NO_INIT;
     native_handle_t* hidlHandle = native_handle_create(1, 0);
