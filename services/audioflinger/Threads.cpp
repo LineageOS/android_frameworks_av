@@ -57,6 +57,7 @@
 #include <powermanager/PowerManager.h>
 
 #include <media/audiohal/EffectsFactoryHalInterface.h>
+#include <media/audiohal/StreamHalInterface.h>
 
 #include "AudioFlinger.h"
 #include "FastMixer.h"
@@ -1554,6 +1555,7 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::add(const sp<T> &track) {
     mActiveTracksGeneration++;
     mLatestActiveTrack = track;
     ++mBatteryCounter[track->uid()].second;
+    mHasChanged = true;
     return mActiveTracks.add(track);
 }
 
@@ -1568,6 +1570,7 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::remove(const sp<T> &track) {
     mActiveTracksGeneration++;
     --mBatteryCounter[track->uid()].second;
     // mLatestActiveTrack is not cleared even if is the same as track.
+    mHasChanged = true;
     return index;
 }
 
@@ -1578,6 +1581,7 @@ void AudioFlinger::ThreadBase::ActiveTracks<T>::clear() {
         logTrack("clear", track);
     }
     mLastActiveTracksGeneration = mActiveTracksGeneration;
+    if (!mActiveTracks.empty()) { mHasChanged = true; }
     mActiveTracks.clear();
     mLatestActiveTrack.clear();
     mBatteryCounter.clear();
@@ -1612,6 +1616,13 @@ void AudioFlinger::ThreadBase::ActiveTracks<T>::updatePowerState(
             LOG_ALWAYS_FATAL("negative battery count %zd", current);
         }
     }
+}
+
+template <typename T>
+bool AudioFlinger::ThreadBase::ActiveTracks<T>::readAndClearHasChanged() {
+    const bool hasChanged = mHasChanged;
+    mHasChanged = false;
+    return hasChanged;
 }
 
 template <typename T>
@@ -2610,6 +2621,24 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
     }
 }
 
+void AudioFlinger::PlaybackThread::updateMetadata_l()
+{
+    // TODO: add volume support
+    if (mOutput == nullptr || mOutput->stream == nullptr ||
+            !mActiveTracks.readAndClearHasChanged()) {
+        return;
+    }
+    StreamOutHalInterface::SourceMetadata metadata;
+    for (const sp<Track> &track : mActiveTracks) {
+        // No track is invalid as this is called after prepareTrack_l in the same critical section
+        metadata.tracks.push_back({
+                .usage = track->attributes().usage,
+                .content_type = track->attributes().content_type,
+                .gain = 1,
+        });
+    }
+    mOutput->stream->updateSourceMetadata(metadata);
+}
 
 status_t AudioFlinger::PlaybackThread::getRenderPosition(uint32_t *halFrames, uint32_t *dspFrames)
 {
@@ -3306,6 +3335,8 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             mMixerStatus = prepareTracks_l(&tracksToRemove);
 
             mActiveTracks.updatePowerState(this);
+
+            updateMetadata_l();
 
             // prevent any changes in effect chain list and in each effect chain
             // during mixing and effect process as the audio buffers could be deleted
@@ -6118,6 +6149,17 @@ bool AudioFlinger::DuplicatingThread::outputsReady(
     return true;
 }
 
+void AudioFlinger::DuplicatingThread::updateMetadata_l()
+{
+    // TODO: The duplicated track metadata are stored in other threads
+    // (accessible through mActiveTracks::OutputTrack::thread()::mActiveTracks::Track::attributes())
+    // but this information can be mutated at any time by the owning threads.
+    // Taking the lock of any other owning threads is no possible due to timing constrains.
+    // Similarly, the other threads can not push the metadatas in this thread as cross deadlock
+    // would be possible.
+    // A lock-free structure needs to be used to shared the metadata (maybe an atomic shared_ptr ?).
+}
+
 uint32_t AudioFlinger::DuplicatingThread::activeSleepTimeUs() const
 {
     return (mWaitTimeMs * 1000) / 2;
@@ -6444,6 +6486,8 @@ reacquire_wakelock:
             }
 
             mActiveTracks.updatePowerState(this);
+
+            updateMetadata_l();
 
             if (allStopped) {
                 standbyIfNotAlreadyInStandby();
@@ -7133,6 +7177,23 @@ status_t AudioFlinger::RecordThread::getActiveMicrophones(
     AutoMutex _l(mLock);
     status_t status = mInput->stream->getActiveMicrophones(activeMicrophones);
     return status;
+}
+
+void AudioFlinger::RecordThread::updateMetadata_l()
+{
+    if (mInput == nullptr || mInput->stream == nullptr ||
+            !mActiveTracks.readAndClearHasChanged()) {
+        return;
+    }
+    StreamInHalInterface::SinkMetadata metadata;
+    for (const sp<RecordTrack> &track : mActiveTracks) {
+        // No track is invalid as this is called after prepareTrack_l in the same critical section
+        metadata.tracks.push_back({
+                .source = track->attributes().source,
+                .gain = 1, // capture tracks do not have volumes
+        });
+    }
+    mInput->stream->updateSinkMetadata(metadata);
 }
 
 // destroyTrack_l() must be called with ThreadBase::mLock held
@@ -8099,6 +8160,8 @@ bool AudioFlinger::MmapThread::threadLoop()
 
         mActiveTracks.updatePowerState(this);
 
+        updateMetadata_l();
+
         lockEffectChains_l(effectChains);
         for (size_t i = 0; i < effectChains.size(); i ++) {
             effectChains[i]->process_l();
@@ -8646,6 +8709,24 @@ void AudioFlinger::MmapPlaybackThread::processVolume_l()
     }
 }
 
+void AudioFlinger::MmapPlaybackThread::updateMetadata_l()
+{
+    if (mOutput == nullptr || mOutput->stream == nullptr ||
+            !mActiveTracks.readAndClearHasChanged()) {
+        return;
+    }
+    StreamOutHalInterface::SourceMetadata metadata;
+    for (const sp<MmapTrack> &track : mActiveTracks) {
+        // No track is invalid as this is called after prepareTrack_l in the same critical section
+        metadata.tracks.push_back({
+                .usage = track->attributes().usage,
+                .content_type = track->attributes().content_type,
+                .gain = mHalVolFloat, // TODO: propagate from aaudio pre-mix volume
+        });
+    }
+    mOutput->stream->updateSourceMetadata(metadata);
+}
+
 void AudioFlinger::MmapPlaybackThread::checkSilentMode_l()
 {
     if (!mMasterMute) {
@@ -8690,4 +8771,22 @@ AudioFlinger::AudioStreamIn* AudioFlinger::MmapCaptureThread::clearInput()
     mInput = NULL;
     return input;
 }
+
+void AudioFlinger::MmapCaptureThread::updateMetadata_l()
+{
+    if (mInput == nullptr || mInput->stream == nullptr ||
+            !mActiveTracks.readAndClearHasChanged()) {
+        return;
+    }
+    StreamInHalInterface::SinkMetadata metadata;
+    for (const sp<MmapTrack> &track : mActiveTracks) {
+        // No track is invalid as this is called after prepareTrack_l in the same critical section
+        metadata.tracks.push_back({
+                .source = track->attributes().source,
+                .gain = 1, // capture tracks do not have volumes
+        });
+    }
+    mInput->stream->updateSinkMetadata(metadata);
+}
+
 } // namespace android

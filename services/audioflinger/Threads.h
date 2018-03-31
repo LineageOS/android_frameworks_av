@@ -425,6 +425,9 @@ protected:
                 // check if some effects must be suspended when an effect chain is added
                 void checkSuspendOnAddEffectChain_l(const sp<EffectChain>& chain);
 
+                // sends the metadata of the active tracks to the HAL
+    virtual     void        updateMetadata_l() = 0;
+
                 String16 getWakeLockTag();
 
     virtual     void        preExit() { }
@@ -563,6 +566,10 @@ protected:
                     // periodically called in the threadLoop() to update power state uids.
                     void            updatePowerState(sp<ThreadBase> thread, bool force = false);
 
+                    /** @return true if the active tracks have changed since the last time
+                     *          this function was called or the vector was created. */
+                    bool            readAndClearHasChanged();
+
                 private:
                     void            logTrack(const char *funcName, const sp<T> &track) const;
 
@@ -581,6 +588,8 @@ protected:
                     int                 mLastActiveTracksGeneration;
                     wp<T>               mLatestActiveTrack; // latest track added to ActiveTracks
                     SimpleLog * const   mLocalLog;
+                    // If the active tracks have changed since last call to readAndClearHasChanged
+                    bool                mHasChanged = false;
                 };
 
                 SimpleLog mLocalLog;
@@ -918,6 +927,7 @@ private:
     void        removeTrack_l(const sp<Track>& track);
 
     void        readOutputParameters_l();
+    void        updateMetadata_l() override;
 
     virtual void dumpInternals(int fd, const Vector<String16>& args);
     void        dumpTracks(int fd, const Vector<String16>& args);
@@ -1276,6 +1286,8 @@ public:
                 void        addOutputTrack(MixerThread* thread);
                 void        removeOutputTrack(MixerThread* thread);
                 uint32_t    waitTimeMs() const { return mWaitTimeMs; }
+
+                void        updateMetadata_l() override;
 protected:
     virtual     uint32_t    activeSleepTimeUs() const;
 
@@ -1462,6 +1474,8 @@ public:
             void        setRecordSilenced(uid_t uid, bool silenced);
 
             status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+
+            void        updateMetadata_l() override;
 
 private:
             // Enter standby if not already in standby, and set mStandby flag
@@ -1660,6 +1674,8 @@ public:
 
     virtual     bool        isOutput() const override { return true; }
 
+                void        updateMetadata_l() override;
+
 protected:
 
                 audio_stream_type_t         mStreamType;
@@ -1685,6 +1701,8 @@ public:
                 AudioStreamIn* clearInput();
 
     virtual     bool           isOutput() const override { return false; }
+
+                void           updateMetadata_l() override;
 
 protected:
 
