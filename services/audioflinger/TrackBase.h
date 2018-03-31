@@ -98,6 +98,7 @@ public:
     virtual void        invalidate() { mIsInvalid = true; }
             bool        isInvalid() const { return mIsInvalid; }
 
+    audio_attributes_t  attributes() const { return mAttr; }
 
 protected:
     DISALLOW_COPY_AND_ASSIGN(TrackBase);
