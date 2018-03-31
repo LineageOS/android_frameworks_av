@@ -753,8 +753,8 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
         output.notificationFrameCount = input.notificationFrameCount;
         output.flags = input.flags;
 
-        track = thread->createTrack_l(client, streamType, &output.sampleRate, input.config.format,
-                                      input.config.channel_mask,
+        track = thread->createTrack_l(client, streamType, input.attr, &output.sampleRate,
+                                      input.config.format, input.config.channel_mask,
                                       &output.frameCount, &output.notificationFrameCount,
                                       input.notificationsPerBuffer, input.speed,
                                       input.sharedBuffer, sessionId, &output.flags,
@@ -1673,7 +1673,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
         output.frameCount = input.frameCount;
         output.notificationFrameCount = input.notificationFrameCount;
 
-        recordTrack = thread->createRecordTrack_l(client, &output.sampleRate,
+        recordTrack = thread->createRecordTrack_l(client, input.attr, &output.sampleRate,
                                                   input.config.format, input.config.channel_mask,
                                                   &output.frameCount, sessionId,
                                                   &output.notificationFrameCount,

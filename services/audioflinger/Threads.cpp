@@ -1847,6 +1847,7 @@ void AudioFlinger::PlaybackThread::preExit()
 sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrack_l(
         const sp<AudioFlinger::Client>& client,
         audio_stream_type_t streamType,
+        const audio_attributes_t& attr,
         uint32_t *pSampleRate,
         audio_format_t format,
         audio_channel_mask_t channelMask,
@@ -2125,7 +2126,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
             }
         }
 
-        track = new Track(this, client, streamType, sampleRate, format,
+        track = new Track(this, client, streamType, attr, sampleRate, format,
                           channelMask, frameCount,
                           nullptr /* buffer */, (size_t)0 /* bufferSize */, sharedBuffer,
                           sessionId, uid, *flags, TrackBase::TYPE_DEFAULT, portId);
@@ -6808,6 +6809,7 @@ void AudioFlinger::RecordThread::inputStandBy()
 // RecordThread::createRecordTrack_l() must be called with AudioFlinger::mLock held
 sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRecordTrack_l(
         const sp<AudioFlinger::Client>& client,
+        const audio_attributes_t& attr,
         uint32_t *pSampleRate,
         audio_format_t format,
         audio_channel_mask_t channelMask,
@@ -6941,7 +6943,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
     { // scope for mLock
         Mutex::Autolock _l(mLock);
 
-        track = new RecordTrack(this, client, sampleRate,
+        track = new RecordTrack(this, client, attr, sampleRate,
                       format, channelMask, frameCount,
                       nullptr /* buffer */, (size_t)0 /* bufferSize */, sessionId, uid,
                       *flags, TrackBase::TYPE_DEFAULT, portId);
@@ -7960,7 +7962,8 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         return PERMISSION_DENIED;
     }
 
-    sp<MmapTrack> track = new MmapTrack(this, mSampleRate, mFormat, mChannelMask, mSessionId,
+    // Given that MmapThread::mAttr is mutable, should a MmapTrack have attributes ?
+    sp<MmapTrack> track = new MmapTrack(this, mAttr, mSampleRate, mFormat, mChannelMask, mSessionId,
                                         client.clientUid, client.clientPid, portId);
 
     mActiveTracks.add(track);
