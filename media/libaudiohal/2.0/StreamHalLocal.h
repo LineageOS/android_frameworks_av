@@ -149,6 +149,9 @@ class StreamOutHalLocal : public StreamOutHalInterface, public StreamHalLocal {
     // Get current read/write position in the mmap buffer
     virtual status_t getMmapPosition(struct audio_mmap_position *position);
 
+    // Called when the metadata of the stream's source has been changed.
+    status_t updateSourceMetadata(const SourceMetadata& sourceMetadata) override;
+
   private:
     audio_stream_out_t *mStream;
     wp<StreamOutHalInterfaceCallback> mCallback;
@@ -193,6 +196,12 @@ class StreamInHalLocal : public StreamInHalInterface, public StreamHalLocal {
 
     // Get current read/write position in the mmap buffer
     virtual status_t getMmapPosition(struct audio_mmap_position *position);
+
+    // Get active microphones
+    virtual status_t getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones);
+
+    // Called when the metadata of the stream's sink has been changed.
+    status_t updateSinkMetadata(const SinkMetadata& sinkMetadata) override;
 
   private:
     audio_stream_in_t *mStream;

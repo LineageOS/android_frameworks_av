@@ -53,7 +53,7 @@ status_t deviceAddressFromHal(
         audio_devices_t device, const char* halAddress, DeviceAddress* address) {
     address->device = AudioDevice(device);
 
-    if (address == nullptr || strnlen(halAddress, AUDIO_DEVICE_MAX_ADDRESS_LEN) == 0) {
+    if (halAddress == nullptr || strnlen(halAddress, AUDIO_DEVICE_MAX_ADDRESS_LEN) == 0) {
         return OK;
     }
     const bool isInput = (device & AUDIO_DEVICE_BIT_IN) != 0;
@@ -344,6 +344,12 @@ status_t DeviceHalHidl::setAudioPortConfig(const struct audio_port_config *confi
     AudioPortConfig hidlConfig;
     HidlUtils::audioPortConfigFromHal(*config, &hidlConfig);
     return processReturn("setAudioPortConfig", mDevice->setAudioPortConfig(hidlConfig));
+}
+
+status_t DeviceHalHidl::getMicrophones(
+        std::vector<media::MicrophoneInfo> *microphonesInfo __unused) {
+    if (mDevice == 0) return NO_INIT;
+    return INVALID_OPERATION;
 }
 
 status_t DeviceHalHidl::dump(int fd) {

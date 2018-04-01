@@ -162,6 +162,9 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
     // Return a recent count of the number of audio frames presented to an external observer.
     virtual status_t getPresentationPosition(uint64_t *frames, struct timespec *timestamp);
 
+    // Called when the metadata of the stream's source has been changed.
+    status_t updateSourceMetadata(const SourceMetadata& sourceMetadata) override;
+
     // Methods used by StreamOutCallback (HIDL).
     void onWriteReady();
     void onDrainReady();
@@ -210,6 +213,12 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
     // Return a recent count of the number of audio frames received and
     // the clock time associated with that frame count.
     virtual status_t getCapturePosition(int64_t *frames, int64_t *time);
+
+    // Get active microphones
+    virtual status_t getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones);
+
+    // Called when the metadata of the stream's sink has been changed.
+    status_t updateSinkMetadata(const SinkMetadata& sinkMetadata) override;
 
   private:
     friend class DeviceHalHidl;

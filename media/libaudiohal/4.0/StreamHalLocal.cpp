@@ -233,6 +233,19 @@ status_t StreamOutHalLocal::getPresentationPosition(uint64_t *frames, struct tim
     return mStream->get_presentation_position(mStream, frames, timestamp);
 }
 
+status_t StreamOutHalLocal::updateSourceMetadata(const SourceMetadata& sourceMetadata) {
+    if (mStream->update_source_metadata == nullptr) {
+        return INVALID_OPERATION;
+    }
+    const source_metadata_t metadata {
+        .track_count = sourceMetadata.tracks.size(),
+        // const cast is fine as it is in a const structure
+        .tracks = const_cast<playback_track_metadata*>(sourceMetadata.tracks.data()),
+    };
+    mStream->update_source_metadata(mStream, &metadata);
+    return OK;
+}
+
 status_t StreamOutHalLocal::start() {
     if (mStream->start == NULL) return INVALID_OPERATION;
     return mStream->start(mStream);
@@ -294,6 +307,19 @@ status_t StreamInHalLocal::getCapturePosition(int64_t *frames, int64_t *time) {
     return mStream->get_capture_position(mStream, frames, time);
 }
 
+status_t StreamInHalLocal::updateSinkMetadata(const SinkMetadata& sinkMetadata) {
+    if (mStream->update_sink_metadata == nullptr) {
+        return INVALID_OPERATION;
+    }
+    const sink_metadata_t metadata {
+        .track_count = sinkMetadata.tracks.size(),
+        // const cast is fine as it is in a const structure
+        .tracks = const_cast<record_track_metadata*>(sinkMetadata.tracks.data()),
+    };
+    mStream->update_sink_metadata(mStream, &metadata);
+    return OK;
+}
+
 status_t StreamInHalLocal::start() {
     if (mStream->start == NULL) return INVALID_OPERATION;
     return mStream->start(mStream);
@@ -313,6 +339,18 @@ status_t StreamInHalLocal::createMmapBuffer(int32_t minSizeFrames,
 status_t StreamInHalLocal::getMmapPosition(struct audio_mmap_position *position) {
     if (mStream->get_mmap_position == NULL) return INVALID_OPERATION;
     return mStream->get_mmap_position(mStream, position);
+}
+
+status_t StreamInHalLocal::getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones) {
+    if (mStream->get_active_microphones == NULL) return INVALID_OPERATION;
+    size_t actual_mics = AUDIO_MICROPHONE_MAX_COUNT;
+    audio_microphone_characteristic_t mic_array[AUDIO_MICROPHONE_MAX_COUNT];
+    status_t status = mStream->get_active_microphones(mStream, &mic_array[0], &actual_mics);
+    for (size_t i = 0; i < actual_mics; i++) {
+        media::MicrophoneInfo microphoneInfo = media::MicrophoneInfo(mic_array[i]);
+        microphones->push_back(microphoneInfo);
+    }
+    return status;
 }
 
 } // namespace V4_0

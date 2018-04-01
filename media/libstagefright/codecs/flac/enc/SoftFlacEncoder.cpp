@@ -56,12 +56,13 @@ SoftFlacEncoder::SoftFlacEncoder(
       mCompressionLevel(FLAC_COMPRESSION_LEVEL_DEFAULT),
       mEncoderWriteData(false),
       mEncoderReturnedEncodedData(false),
+      mSawInputEOS(false),
+      mSentOutputEOS(false),
       mEncoderReturnedNbBytes(0),
-      mInputBufferPcm32(NULL)
-#ifdef WRITE_FLAC_HEADER_IN_FIRST_BUFFER
-      , mHeaderOffset(0)
-      , mWroteHeader(false)
-#endif
+      mInputBufferPcm32(NULL),
+      mHeaderOffset(0),
+      mHeaderComplete(false),
+      mWroteHeader(false)
 {
     ALOGV("SoftFlacEncoder::SoftFlacEncoder(name=%s)", name);
     initPorts();
@@ -354,54 +355,54 @@ void SoftFlacEncoder::onQueueFilled(OMX_U32 portIndex) {
     List<BufferInfo *> &inQueue = getPortQueue(0);
     List<BufferInfo *> &outQueue = getPortQueue(1);
 
-    while (!inQueue.empty() && !outQueue.empty()) {
-        BufferInfo *inInfo = *inQueue.begin();
-        OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
+    FLAC__bool ok = true;
+
+    while ((!inQueue.empty() || mSawInputEOS) && !outQueue.empty()) {
+        if (!inQueue.empty()) {
+            BufferInfo *inInfo = *inQueue.begin();
+            OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
+
+            if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
+                ALOGV("saw EOS on buffer of size %u", inHeader->nFilledLen);
+                mSawInputEOS = true;
+            }
+
+            if (inHeader->nFilledLen > kMaxInputBufferSize) {
+                ALOGE("input buffer too large (%d).", inHeader->nFilledLen);
+                mSignalledError = true;
+                notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
+                return;
+            }
+
+            assert(mNumChannels != 0);
+            mEncoderWriteData = true;
+            mEncoderReturnedEncodedData = false;
+            mEncoderReturnedNbBytes = 0;
+            mCurrentInputTimeStamp = inHeader->nTimeStamp;
+
+            const unsigned nbInputFrames = inHeader->nFilledLen / (2 * mNumChannels);
+            const unsigned nbInputSamples = inHeader->nFilledLen / 2;
+            const OMX_S16 * const pcm16 = reinterpret_cast<OMX_S16 *>(inHeader->pBuffer);
+
+            CHECK_LE(nbInputSamples, 2 * kMaxNumSamplesPerFrame);
+            for (unsigned i=0 ; i < nbInputSamples ; i++) {
+                mInputBufferPcm32[i] = (FLAC__int32) pcm16[i];
+            }
+            ALOGV(" about to encode %u samples per channel", nbInputFrames);
+            ok = FLAC__stream_encoder_process_interleaved(
+                            mFlacStreamEncoder,
+                            mInputBufferPcm32,
+                            nbInputFrames /*samples per channel*/ );
+
+            inInfo->mOwnedByUs = false;
+            inQueue.erase(inQueue.begin());
+            inInfo = NULL;
+            notifyEmptyBufferDone(inHeader);
+            inHeader = NULL;
+        }
 
         BufferInfo *outInfo = *outQueue.begin();
         OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
-
-        if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
-            inQueue.erase(inQueue.begin());
-            inInfo->mOwnedByUs = false;
-            notifyEmptyBufferDone(inHeader);
-
-            outHeader->nFilledLen = 0;
-            outHeader->nFlags = OMX_BUFFERFLAG_EOS;
-
-            outQueue.erase(outQueue.begin());
-            outInfo->mOwnedByUs = false;
-            notifyFillBufferDone(outHeader);
-
-            return;
-        }
-
-        if (inHeader->nFilledLen > kMaxInputBufferSize) {
-            ALOGE("input buffer too large (%d).", inHeader->nFilledLen);
-            mSignalledError = true;
-            notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
-            return;
-        }
-
-        assert(mNumChannels != 0);
-        mEncoderWriteData = true;
-        mEncoderReturnedEncodedData = false;
-        mEncoderReturnedNbBytes = 0;
-        mCurrentInputTimeStamp = inHeader->nTimeStamp;
-
-        const unsigned nbInputFrames = inHeader->nFilledLen / (2 * mNumChannels);
-        const unsigned nbInputSamples = inHeader->nFilledLen / 2;
-        const OMX_S16 * const pcm16 = reinterpret_cast<OMX_S16 *>(inHeader->pBuffer);
-
-        CHECK_LE(nbInputSamples, 2 * kMaxNumSamplesPerFrame);
-        for (unsigned i=0 ; i < nbInputSamples ; i++) {
-            mInputBufferPcm32[i] = (FLAC__int32) pcm16[i];
-        }
-        ALOGV(" about to encode %u samples per channel", nbInputFrames);
-        FLAC__bool ok = FLAC__stream_encoder_process_interleaved(
-                        mFlacStreamEncoder,
-                        mInputBufferPcm32,
-                        nbInputFrames /*samples per channel*/ );
 
         if (ok) {
             if (mEncoderReturnedEncodedData && (mEncoderReturnedNbBytes != 0)) {
@@ -414,6 +415,21 @@ void SoftFlacEncoder::onQueueFilled(OMX_U32 portIndex) {
                 mEncoderReturnedEncodedData = false;
             } else {
                 ALOGV(" encoder process_interleaved returned without data to write");
+                if (mSawInputEOS && !mSentOutputEOS) {
+                    ALOGV("finishing encoder");
+                    mSentOutputEOS = true;
+                    FLAC__stream_encoder_finish(mFlacStreamEncoder);
+                    if (mEncoderReturnedEncodedData && (mEncoderReturnedNbBytes != 0)) {
+                        ALOGV(" dequeueing residual buffer on output port after writing data");
+                        outInfo->mOwnedByUs = false;
+                        outQueue.erase(outQueue.begin());
+                        outInfo = NULL;
+                        outHeader->nFlags = OMX_BUFFERFLAG_EOS;
+                        notifyFillBufferDone(outHeader);
+                        outHeader = NULL;
+                        mEncoderReturnedEncodedData = false;
+                    }
+                }
             }
         } else {
             ALOGE(" error encountered during encoding");
@@ -422,11 +438,6 @@ void SoftFlacEncoder::onQueueFilled(OMX_U32 portIndex) {
             return;
         }
 
-        inInfo->mOwnedByUs = false;
-        inQueue.erase(inQueue.begin());
-        inInfo = NULL;
-        notifyEmptyBufferDone(inHeader);
-        inHeader = NULL;
     }
 }
 
@@ -438,15 +449,21 @@ FLAC__StreamEncoderWriteStatus SoftFlacEncoder::onEncodedFlacAvailable(
     ALOGV("SoftFlacEncoder::onEncodedFlacAvailable(bytes=%zu, samples=%u, curr_frame=%u)",
             bytes, samples, current_frame);
 
-#ifdef WRITE_FLAC_HEADER_IN_FIRST_BUFFER
     if (samples == 0) {
-        ALOGI(" saving %zu bytes of header", bytes);
-        memcpy(mHeader + mHeaderOffset, buffer, bytes);
-        mHeaderOffset += bytes;// will contain header size when finished receiving header
+        ALOGV("saving %zu bytes of header", bytes);
+        if (mHeaderOffset + bytes > sizeof(mHeader) || mHeaderComplete) {
+            ALOGW("header is too big, or header already received");
+            mSignalledError = true;
+            notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
+        } else {
+            memcpy(mHeader + mHeaderOffset, buffer, bytes);
+            mHeaderOffset += bytes;// will contain header size when finished receiving header
+            if (buffer[0] & 0x80) {
+                mHeaderComplete = true;
+            }
+        }
         return FLAC__STREAM_ENCODER_WRITE_STATUS_OK;
     }
-
-#endif
 
     if ((samples == 0) || !mEncoderWriteData) {
         // called by the encoder because there's header data to save, but it's not the role
@@ -460,16 +477,23 @@ FLAC__StreamEncoderWriteStatus SoftFlacEncoder::onEncodedFlacAvailable(
     BufferInfo *outInfo = *outQueue.begin();
     OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
 
-#ifdef WRITE_FLAC_HEADER_IN_FIRST_BUFFER
-    if (!mWroteHeader) {
-        ALOGI(" writing %d bytes of header on output port", mHeaderOffset);
+    if (mHeaderComplete && !mWroteHeader) {
+        ALOGV(" writing %d bytes of header on output port", mHeaderOffset);
         memcpy(outHeader->pBuffer + outHeader->nOffset + outHeader->nFilledLen,
                 mHeader, mHeaderOffset);
         outHeader->nFilledLen += mHeaderOffset;
-        outHeader->nOffset    += mHeaderOffset;
         mWroteHeader = true;
+        outInfo->mOwnedByUs = false;
+        outQueue.erase(outQueue.begin());
+        outHeader->nFlags = OMX_BUFFERFLAG_CODECCONFIG;
+        notifyFillBufferDone(outHeader);
+        outInfo = NULL;
+        outHeader = NULL;
+        // get the next buffer for the rest of the data
+        CHECK(!outQueue.empty());
+        outInfo = *outQueue.begin();
+        outHeader = outInfo->mHeader;
     }
-#endif
 
     // write encoded data
     ALOGV(" writing %zu bytes of encoded data on output port", bytes);

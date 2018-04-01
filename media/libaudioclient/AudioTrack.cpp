@@ -2248,6 +2248,16 @@ status_t AudioTrack::restoreTrack_l(const char *from)
         staticPosition = mStaticProxy->getPosition().unsignedValue();
     }
 
+    // See b/74409267. Connecting to a BT A2DP device supporting multiple codecs
+    // causes a lot of churn on the service side, and it can reject starting
+    // playback of a previously created track. May also apply to other cases.
+    const int INITIAL_RETRIES = 3;
+    int retries = INITIAL_RETRIES;
+retry:
+    if (retries < INITIAL_RETRIES) {
+        // See the comment for clearAudioConfigCache at the start of the function.
+        AudioSystem::clearAudioConfigCache();
+    }
     mFlags = mOrigFlags;
 
     // If a new IAudioTrack is successfully created, createTrack_l() will modify the
@@ -2256,7 +2266,10 @@ status_t AudioTrack::restoreTrack_l(const char *from)
     // If a new IAudioTrack cannot be created, the previous (dead) instance will be left intact.
     status_t result = createTrack_l();
 
-    if (result == NO_ERROR) {
+    if (result != NO_ERROR) {
+        ALOGW("%s(): createTrack_l failed, do not retry", __func__);
+        retries = 0;
+    } else {
         // take the frames that will be lost by track recreation into account in saved position
         // For streaming tracks, this is the amount we obtained from the user/client
         // (not the number actually consumed at the server - those are already lost).
@@ -2301,7 +2314,10 @@ status_t AudioTrack::restoreTrack_l(const char *from)
         mFramesWrittenAtRestore = mFramesWrittenServerOffset;
     }
     if (result != NO_ERROR) {
-        ALOGW("restoreTrack_l() failed status %d", result);
+        ALOGW("%s() failed status %d, retries %d", __func__, result, retries);
+        if (--retries > 0) {
+            goto retry;
+        }
         mState = STATE_STOPPED;
         mReleased = 0;
     }
