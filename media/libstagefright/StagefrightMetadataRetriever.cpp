@@ -526,7 +526,11 @@ static VideoFrame *extractVideoFrame(
                     int32_t srcFormat;
                     CHECK(outputFormat->findInt32("color-format", &srcFormat));
 
-                    ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, dstFormat);
+                    if (some check here?) {
+                        convertfromDoviHDR((OMX_COLOR_FORMATTYPE)srcFormat, src, dstFormat, dts, x, y);
+                    } else {
+                        ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, dstFormat);
+                    }
 
                     int32_t dstLeft, dstTop, dstRight, dstBottom;
                     if (numTiles == 1) {
