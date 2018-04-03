@@ -1430,12 +1430,13 @@ status_t MediaPlayerService::Client::getRetransmitEndpoint(
 }
 
 void MediaPlayerService::Client::notify(
-        void* cookie, int msg, int ext1, int ext2, const Parcel *obj)
+        const wp<IMediaPlayer> &listener, int msg, int ext1, int ext2, const Parcel *obj)
 {
-    Client* client = static_cast<Client*>(cookie);
-    if (client == NULL) {
+    sp<IMediaPlayer> spListener = listener.promote();
+    if (spListener == NULL) {
         return;
     }
+    Client* client = static_cast<Client*>(spListener.get());
 
     sp<IMediaPlayerClient> c;
     sp<Client> nextClient;
@@ -1483,7 +1484,7 @@ void MediaPlayerService::Client::notify(
     }
 
     if (c != NULL) {
-        ALOGV("[%d] notify (%p, %d, %d, %d)", client->mConnId, cookie, msg, ext1, ext2);
+        ALOGV("[%d] notify (%p, %d, %d, %d)", client->mConnId, spListener.get(), msg, ext1, ext2);
         c->notify(msg, ext1, ext2, obj);
     }
 }
@@ -1541,7 +1542,7 @@ status_t MediaPlayerService::Client::releaseDrm()
 #if CALLBACK_ANTAGONIZER
 const int Antagonizer::interval = 10000; // 10 msecs
 
-Antagonizer::Antagonizer(notify_callback_f cb, void* client) :
+Antagonizer::Antagonizer(notify_callback_f cb, const wp<IMediaPlayer> &client) :
     mExit(false), mActive(false), mClient(client), mCb(cb)
 {
     createThread(callbackThread, this);
