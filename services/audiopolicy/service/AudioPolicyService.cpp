@@ -332,19 +332,16 @@ status_t AudioPolicyService::dumpInternals(int fd)
 
 void AudioPolicyService::setRecordSilenced(uid_t uid, bool silenced)
 {
-// FIXME: temporarily disable while investigating issue b/77300296
-//    {
-//        Mutex::Autolock _l(mLock);
-//        if (mAudioPolicyManager) {
-//            mAudioPolicyManager->setRecordSilenced(uid, silenced);
-//        }
-//    }
-//    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
-//    if (af) {
-//        af->setRecordSilenced(uid, silenced);
-//    }
-    (void)uid;
-    (void)silenced;
+    {
+        Mutex::Autolock _l(mLock);
+        if (mAudioPolicyManager) {
+            mAudioPolicyManager->setRecordSilenced(uid, silenced);
+        }
+    }
+    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+    if (af) {
+        af->setRecordSilenced(uid, silenced);
+    }
 }
 
 status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
@@ -508,94 +505,129 @@ void AudioPolicyService::UidPolicy::registerSelf() {
             | ActivityManager::UID_OBSERVER_ACTIVE,
             ActivityManager::PROCESS_STATE_UNKNOWN,
             String16("audioserver"));
+    status_t res = am.linkToDeath(this);
+    if (!res) {
+        Mutex::Autolock _l(mLock);
+        mObserverRegistered = true;
+    } else {
+        ALOGE("UidPolicy::registerSelf linkToDeath failed: %d", res);
+        am.unregisterUidObserver(this);
+    }
 }
 
 void AudioPolicyService::UidPolicy::unregisterSelf() {
     ActivityManager am;
+    am.unlinkToDeath(this);
     am.unregisterUidObserver(this);
+    Mutex::Autolock _l(mLock);
+    mObserverRegistered = false;
 }
 
-void AudioPolicyService::UidPolicy::onUidGone(uid_t uid, __unused bool disabled) {
-    onUidIdle(uid, disabled);
-}
-
-void AudioPolicyService::UidPolicy::onUidActive(uid_t uid) {
-    {
-        Mutex::Autolock _l(mUidLock);
-        mActiveUids.insert(uid);
-    }
-    sp<AudioPolicyService> service = mService.promote();
-    if (service != nullptr) {
-        service->setRecordSilenced(uid, false);
-    }
-}
-
-void AudioPolicyService::UidPolicy::onUidIdle(uid_t uid, __unused bool disabled) {
-    bool deleted = false;
-    {
-        Mutex::Autolock _l(mUidLock);
-        if (mActiveUids.erase(uid) > 0) {
-            deleted = true;
-        }
-    }
-    if (deleted) {
-        sp<AudioPolicyService> service = mService.promote();
-        if (service != nullptr) {
-            service->setRecordSilenced(uid, true);
-        }
-    }
-}
-
-void AudioPolicyService::UidPolicy::addOverrideUid(uid_t uid, bool active) {
-    updateOverrideUid(uid, active, true);
-}
-
-void AudioPolicyService::UidPolicy::removeOverrideUid(uid_t uid) {
-    updateOverrideUid(uid, false, false);
-}
-
-void AudioPolicyService::UidPolicy::updateOverrideUid(uid_t uid, bool active, bool insert) {
-    bool wasActive = false;
-    bool isActive = false;
-    {
-        Mutex::Autolock _l(mUidLock);
-        wasActive = isUidActiveLocked(uid);
-        mOverrideUids.erase(uid);
-        if (insert) {
-            mOverrideUids.insert(std::pair<uid_t, bool>(uid, active));
-        }
-        isActive = isUidActiveLocked(uid);
-    }
-    if (wasActive != isActive) {
-        sp<AudioPolicyService> service = mService.promote();
-        if (service != nullptr) {
-            service->setRecordSilenced(uid, !isActive);
-        }
-    }
+void AudioPolicyService::UidPolicy::binderDied(__unused const wp<IBinder> &who) {
+    Mutex::Autolock _l(mLock);
+    mCachedUids.clear();
+    mObserverRegistered = false;
 }
 
 bool AudioPolicyService::UidPolicy::isUidActive(uid_t uid) {
-    // Non-app UIDs are considered always active
-    if (uid < FIRST_APPLICATION_UID) {
-        return true;
+    if (isServiceUid(uid)) return true;
+    bool needToReregister = false;
+    {
+        Mutex::Autolock _l(mLock);
+        needToReregister = !mObserverRegistered;
     }
-    Mutex::Autolock _l(mUidLock);
-    return isUidActiveLocked(uid);
+    if (needToReregister) {
+        // Looks like ActivityManager has died previously, attempt to re-register.
+        registerSelf();
+    }
+    {
+        Mutex::Autolock _l(mLock);
+        auto overrideIter = mOverrideUids.find(uid);
+        if (overrideIter != mOverrideUids.end()) {
+            return overrideIter->second;
+        }
+        // In an absense of the ActivityManager, assume everything to be active.
+        if (!mObserverRegistered) return true;
+        auto cacheIter = mCachedUids.find(uid);
+        if (cacheIter != mOverrideUids.end()) {
+            return cacheIter->second;
+        }
+    }
+    ActivityManager am;
+    bool active = am.isUidActive(uid, String16("audioserver"));
+    {
+        Mutex::Autolock _l(mLock);
+        mCachedUids.insert(std::pair<uid_t, bool>(uid, active));
+    }
+    return active;
 }
 
-bool AudioPolicyService::UidPolicy::isUidActiveLocked(uid_t uid) {
-    // Non-app UIDs are considered always active
-// FIXME: temporarily disable while investigating issue b/77300296
-//    if (uid < FIRST_APPLICATION_UID) {
-//        return true;
-//    }
-//    auto it = mOverrideUids.find(uid);
-//    if (it != mOverrideUids.end()) {
-//        return it->second;
-//    }
-//    return mActiveUids.find(uid) != mActiveUids.end();
-    (void)uid;
-    return true;
+void AudioPolicyService::UidPolicy::onUidActive(uid_t uid) {
+    updateUidCache(uid, true, true);
+}
+
+void AudioPolicyService::UidPolicy::onUidGone(uid_t uid, __unused bool disabled) {
+    updateUidCache(uid, false, false);
+}
+
+void AudioPolicyService::UidPolicy::onUidIdle(uid_t uid, __unused bool disabled) {
+    updateUidCache(uid, false, true);
+}
+
+bool AudioPolicyService::UidPolicy::isServiceUid(uid_t uid) const {
+    return uid % AID_USER_OFFSET < AID_APP_START;
+}
+
+void AudioPolicyService::UidPolicy::notifyService(uid_t uid, bool active) {
+    sp<AudioPolicyService> service = mService.promote();
+    if (service != nullptr) {
+        service->setRecordSilenced(uid, !active);
+    }
+}
+
+void AudioPolicyService::UidPolicy::updateOverrideUid(uid_t uid, bool active, bool insert) {
+    if (isServiceUid(uid)) return;
+    bool wasOverridden = false, wasActive = false;
+    {
+        Mutex::Autolock _l(mLock);
+        updateUidLocked(&mOverrideUids, uid, active, insert, &wasOverridden, &wasActive);
+    }
+    if (!wasOverridden && insert) {
+        notifyService(uid, active);  // Started to override.
+    } else if (wasOverridden && !insert) {
+        notifyService(uid, isUidActive(uid));  // Override ceased, notify with ground truth.
+    } else if (wasActive != active) {
+        notifyService(uid, active);  // Override updated.
+    }
+}
+
+void AudioPolicyService::UidPolicy::updateUidCache(uid_t uid, bool active, bool insert) {
+    if (isServiceUid(uid)) return;
+    bool wasActive = false;
+    {
+        Mutex::Autolock _l(mLock);
+        updateUidLocked(&mCachedUids, uid, active, insert, nullptr, &wasActive);
+        // Do not notify service if currently overridden.
+        if (mOverrideUids.find(uid) != mOverrideUids.end()) return;
+    }
+    bool nowActive = active && insert;
+    if (wasActive != nowActive) notifyService(uid, nowActive);
+}
+
+void AudioPolicyService::UidPolicy::updateUidLocked(std::unordered_map<uid_t, bool> *uids,
+        uid_t uid, bool active, bool insert, bool *wasThere, bool *wasActive) {
+    auto it = uids->find(uid);
+    if (it != uids->end()) {
+        if (wasThere != nullptr) *wasThere = true;
+        if (wasActive != nullptr) *wasActive = it->second;
+        if (insert) {
+            it->second = active;
+        } else {
+            uids->erase(it);
+        }
+    } else if (insert) {
+        uids->insert(std::pair<uid_t, bool>(uid, active));
+    }
 }
 
 // -----------  AudioPolicyService::AudioCommandThread implementation ----------
