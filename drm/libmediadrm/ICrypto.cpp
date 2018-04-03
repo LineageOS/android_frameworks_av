@@ -341,10 +341,10 @@ status_t BnCrypto::onTransact(
                 return OK;
             }
 
-            CryptoPlugin::SubSample *subSamples =
-                    new CryptoPlugin::SubSample[numSubSamples];
+            std::unique_ptr<CryptoPlugin::SubSample[]> subSamples =
+                    std::make_unique<CryptoPlugin::SubSample[]>(numSubSamples);
 
-            data.read(subSamples,
+            data.read(subSamples.get(),
                     sizeof(CryptoPlugin::SubSample) * numSubSamples);
 
             DestinationBuffer destination;
@@ -402,7 +402,7 @@ status_t BnCrypto::onTransact(
                 result = -EINVAL;
             } else {
                 result = decrypt(key, iv, mode, pattern, source, offset,
-                        subSamples, numSubSamples, destination, &errorDetailMsg);
+                        subSamples.get(), numSubSamples, destination, &errorDetailMsg);
             }
 
             reply->writeInt32(result);
@@ -421,9 +421,7 @@ status_t BnCrypto::onTransact(
                 }
             }
 
-            delete[] subSamples;
-            subSamples = NULL;
-
+            subSamples.reset();
             return OK;
         }
 
