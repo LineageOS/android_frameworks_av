@@ -340,6 +340,15 @@ public:
 
     static status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones);
 
+    // numSurroundFormats holds the maximum number of formats and bool value allowed in the array.
+    // When numSurroundFormats is 0, surroundFormats and surroundFormatsEnabled will not be
+    // populated. The actual number of surround formats should be returned at numSurroundFormats.
+    static status_t getSurroundFormats(unsigned int *numSurroundFormats,
+                                       audio_format_t *surroundFormats,
+                                       bool *surroundFormatsEnabled,
+                                       bool reported);
+    static status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
+
     // ----------------------------------------------------------------------------
 
     class AudioPortCallback : public RefBase
