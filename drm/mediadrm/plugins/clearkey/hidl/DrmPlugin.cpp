@@ -400,7 +400,7 @@ Return<Status> DrmPlugin::setSecurityLevel(const hidl_vec<uint8_t>& sessionId,
 
     if (level > SecurityLevel::SW_SECURE_CRYPTO) {
         ALOGE("Cannot set security level > max");
-        return Status::BAD_VALUE;
+        return Status::ERROR_DRM_CANNOT_HANDLE;
     }
 
     std::vector<uint8_t> sid = toVector(sessionId);
