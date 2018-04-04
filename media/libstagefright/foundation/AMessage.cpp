@@ -944,4 +944,47 @@ const char *AMessage::getEntryNameAt(size_t index, Type *type) const {
     return mItems[index].mName;
 }
 
+status_t AMessage::setEntryNameAt(size_t index, const char *name) {
+    if (index >= mNumItems) {
+        return BAD_INDEX;
+    }
+    if (name == nullptr) {
+        return BAD_VALUE;
+    }
+    if (!strcmp(name, mItems[index].mName)) {
+        return OK; // name has not changed
+    }
+    size_t len = strlen(name);
+    if (findItemIndex(name, len) < mNumItems) {
+        return ALREADY_EXISTS;
+    }
+    delete[] mItems[index].mName;
+    mItems[index].mName = nullptr;
+    mItems[index].setName(name, len);
+    return OK;
+}
+
+status_t AMessage::removeEntryAt(size_t index) {
+    if (index >= mNumItems) {
+        return BAD_INDEX;
+    }
+    // delete entry data and objects
+    --mNumItems;
+    delete[] mItems[index].mName;
+    mItems[index].mName = nullptr;
+    freeItemValue(&mItems[index]);
+
+    // swap entry with last entry and clear last entry's data
+    if (index < mNumItems) {
+        mItems[index] = mItems[mNumItems];
+        mItems[mNumItems].mName = nullptr;
+        mItems[mNumItems].mType = kTypeInt32;
+    }
+    return OK;
+}
+
+size_t AMessage::findEntryByName(const char *name) const {
+    return name == nullptr ? countEntries() : findItemIndex(name, strlen(name));
+}
+
 }  // namespace android
