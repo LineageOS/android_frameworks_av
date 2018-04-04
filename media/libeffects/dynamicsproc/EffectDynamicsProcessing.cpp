@@ -28,6 +28,7 @@
 
 #include <audio_effects/effect_dynamicsprocessing.h>
 #include <dsp/DPBase.h>
+#include <dsp/DPFrequency.h>
 
 //#define VERY_VERY_VERBOSE_LOGGING
 #ifdef VERY_VERY_VERBOSE_LOGGING
@@ -186,7 +187,7 @@ int DP_init(DynamicsProcessingContext *pContext)
     pContext->mConfig.inputCfg.accessMode = EFFECT_BUFFER_ACCESS_READ;
     pContext->mConfig.inputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
     pContext->mConfig.inputCfg.format = AUDIO_FORMAT_PCM_FLOAT;
-    pContext->mConfig.inputCfg.samplingRate = 44100;
+    pContext->mConfig.inputCfg.samplingRate = 48000;
     pContext->mConfig.inputCfg.bufferProvider.getBuffer = NULL;
     pContext->mConfig.inputCfg.bufferProvider.releaseBuffer = NULL;
     pContext->mConfig.inputCfg.bufferProvider.cookie = NULL;
@@ -194,7 +195,7 @@ int DP_init(DynamicsProcessingContext *pContext)
     pContext->mConfig.outputCfg.accessMode = EFFECT_BUFFER_ACCESS_ACCUMULATE;
     pContext->mConfig.outputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
     pContext->mConfig.outputCfg.format = AUDIO_FORMAT_PCM_FLOAT;
-    pContext->mConfig.outputCfg.samplingRate = 44100;
+    pContext->mConfig.outputCfg.samplingRate = 48000;
     pContext->mConfig.outputCfg.bufferProvider.getBuffer = NULL;
     pContext->mConfig.outputCfg.bufferProvider.releaseBuffer = NULL;
     pContext->mConfig.outputCfg.bufferProvider.cookie = NULL;
@@ -209,16 +210,51 @@ int DP_init(DynamicsProcessingContext *pContext)
 }
 
 void DP_changeVariant(DynamicsProcessingContext *pContext, int newVariant) {
-    if (pContext->mPDynamics != NULL) {
-        delete pContext->mPDynamics;
-        pContext->mPDynamics = NULL;
-    }
+    ALOGV("DP_changeVariant from %d to %d", pContext->mCurrentVariant, newVariant);
     switch(newVariant) {
-    //TODO: actually instantiate one of the variants. For now all instantiate the base;
-    default:
-        pContext->mCurrentVariant = newVariant;
-        pContext->mPDynamics = new dp_fx::DPBase();
+    case VARIANT_FAVOR_FREQUENCY_RESOLUTION: {
+        pContext->mCurrentVariant = VARIANT_FAVOR_FREQUENCY_RESOLUTION;
+        delete pContext->mPDynamics;
+        pContext->mPDynamics = new dp_fx::DPFrequency();
         break;
+    }
+    default: {
+        ALOGW("DynamicsProcessing variant %d not available for creation", newVariant);
+        break;
+    }
+    } //switch
+}
+
+static inline bool isPowerOf2(unsigned long n) {
+    return (n & (n - 1)) == 0;
+}
+
+void DP_configureVariant(DynamicsProcessingContext *pContext, int newVariant) {
+    ALOGV("DP_configureVariant %d", newVariant);
+    switch(newVariant) {
+    case VARIANT_FAVOR_FREQUENCY_RESOLUTION: {
+        int32_t minBlockSize = (int32_t)dp_fx::DPFrequency::getMinBockSize();
+        int32_t desiredBlock = pContext->mPreferredFrameDuration *
+                pContext->mConfig.inputCfg.samplingRate / 1000.0f;
+        int32_t currentBlock = desiredBlock;
+        ALOGV(" sampling rate: %d, desiredBlock size %0.2f (%d) samples",
+                pContext->mConfig.inputCfg.samplingRate, pContext->mPreferredFrameDuration,
+                desiredBlock);
+        if (desiredBlock < minBlockSize) {
+            currentBlock = minBlockSize;
+        } else if (!isPowerOf2(desiredBlock)) {
+            //find next highest power of 2.
+            currentBlock = 1 << (32 - __builtin_clz(desiredBlock));
+        }
+        ((dp_fx::DPFrequency*)pContext->mPDynamics)->configure(currentBlock,
+                currentBlock/2,
+                pContext->mConfig.inputCfg.samplingRate);
+        break;
+    }
+    default: {
+        ALOGE("DynamicsProcessing variant %d not available to configure", newVariant);
+        break;
+    }
     }
 }
 
@@ -312,6 +348,7 @@ int DP_process(effect_handle_t self, audio_buffer_t *inBuffer,
                         pContext->mConfig.inputCfg.channels);
         pContext->mPDynamics->processSamples(inBuffer->f32, inBuffer->f32,
                 inBuffer->frameCount * channelCount);
+
         if (inBuffer->raw != outBuffer->raw) {
             if (pContext->mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
                 for (size_t i = 0; i < outBuffer->frameCount * channelCount; i++) {
@@ -518,7 +555,8 @@ static dp_fx::DPEq* DP_getEq(DynamicsProcessingContext *pContext, int32_t channe
     if (pChannel == NULL) {
         return NULL;
     }
-    dp_fx::DPEq *pEq = eqType == DP_PARAM_PRE_EQ ? pChannel->getPreEq() : pChannel->getPostEq();
+    dp_fx::DPEq *pEq = (eqType == DP_PARAM_PRE_EQ ? pChannel->getPreEq() :
+            (eqType == DP_PARAM_POST_EQ ? pChannel->getPostEq() : NULL));
     ALOGE_IF(pEq == NULL,"DPEq NULL invalid eq");
     return pEq;
 }
@@ -699,8 +737,10 @@ int DP_getParameter(DynamicsProcessingContext *pContext,
 //              eqBand.getGain()};
         const int32_t channel = params[1];
         const int32_t band = params[2];
+        int eqCommand = (command == DP_PARAM_PRE_EQ_BAND ? DP_PARAM_PRE_EQ :
+                (command == DP_PARAM_POST_EQ_BAND ? DP_PARAM_POST_EQ : -1));
 
-        dp_fx::DPEqBand *pEqBand = DP_getEqBand(pContext, channel, command, band);
+        dp_fx::DPEqBand *pEqBand = DP_getEqBand(pContext, channel, eqCommand, band);
         if (pEqBand == NULL) {
             ALOGE("%s get PARAM_*_EQ_BAND invalid channel %d or band %d", __func__, channel, band);
             status = -EINVAL;
@@ -923,6 +963,8 @@ int DP_setParameter(DynamicsProcessingContext *pContext,
                 mbcInUse != 0, (uint32_t)mbcBandCount,
                 postEqInUse != 0, (uint32_t)postEqBandCount,
                 limiterInUse != 0);
+
+        DP_configureVariant(pContext, variant);
         break;
     }
     case DP_PARAM_INPUT_GAIN: {
@@ -1015,7 +1057,9 @@ int DP_setParameter(DynamicsProcessingContext *pContext,
                 (command == DP_PARAM_PRE_EQ_BAND ? "preEqBand" : "postEqBand"), channel, band,
                 enabled, cutoffFrequency, gain);
 
-        dp_fx::DPEq *pEq = DP_getEq(pContext, channel, command);
+        int eqCommand = (command == DP_PARAM_PRE_EQ_BAND ? DP_PARAM_PRE_EQ :
+                (command == DP_PARAM_POST_EQ_BAND ? DP_PARAM_POST_EQ : -1));
+        dp_fx::DPEq *pEq = DP_getEq(pContext, channel, eqCommand);
         if (pEq == NULL) {
             ALOGE("%s set PARAM_*_EQ_BAND invalid channel %d or command %d", __func__, channel,
                     command);

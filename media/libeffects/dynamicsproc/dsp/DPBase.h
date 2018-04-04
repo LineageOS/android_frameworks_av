@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#ifndef DPBASE_H_
+#define DPBASE_H_
+
+
 #include <stdint.h>
 #include <cmath>
 #include <vector>
@@ -297,8 +301,8 @@ public:
     void init(uint32_t channelCount, bool preEqInUse, uint32_t preEqBandCount,
             bool mbcInUse, uint32_t mbcBandCount, bool postEqInUse, uint32_t postEqBandCount,
             bool limiterInUse);
-    virtual size_t processSamples(float *in, float *out, size_t samples);
-    virtual void reset();
+    virtual size_t processSamples(const float *in, float *out, size_t samples) = 0;
+    virtual void reset() = 0;
 
     DPChannel* getChannel(uint32_t channelIndex);
     uint32_t getChannelCount() const {
@@ -342,3 +346,6 @@ private:
 };
 
 } //namespace dp_fx
+
+
+#endif  // DPBASE_H_
