@@ -18,9 +18,14 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_VENDOR_MODULE := true
+
+EIGEN_PATH := external/eigen
+LOCAL_C_INCLUDES += $(EIGEN_PATH)
+
 LOCAL_SRC_FILES:= \
     EffectDynamicsProcessing.cpp \
-    dsp/DPBase.cpp
+    dsp/DPBase.cpp \
+    dsp/DPFrequency.cpp
 
 LOCAL_CFLAGS+= -O2 -fvisibility=hidden
 LOCAL_CFLAGS += -Wall -Werror
