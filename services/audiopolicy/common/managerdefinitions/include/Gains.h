@@ -52,6 +52,7 @@ public :
     static const VolumeCurvePoint sLinearVolumeCurve[Volume::VOLCNT];
     static const VolumeCurvePoint sSilentVolumeCurve[Volume::VOLCNT];
     static const VolumeCurvePoint sFullScaleVolumeCurve[Volume::VOLCNT];
+    static const VolumeCurvePoint sHearingAidVolumeCurve[Volume::VOLCNT];
     // default volume curves per stream and device category. See initializeVolumeCurves()
     static const VolumeCurvePoint *sVolumeProfiles[AUDIO_STREAM_CNT][DEVICE_CATEGORY_CNT];
 };
