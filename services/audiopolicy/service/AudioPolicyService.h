@@ -35,7 +35,6 @@
 #include "managerdefault/AudioPolicyManager.h"
 
 #include <unordered_map>
-#include <unordered_set>
 
 namespace android {
 
@@ -264,31 +263,40 @@ private:
     // transparently handles recording while the UID transitions between idle/active state
     // avoiding to get stuck in a state receiving non-empty buffers while idle or in a state
     // receiving empty buffers while active.
-    class UidPolicy : public BnUidObserver {
+    class UidPolicy : public BnUidObserver, public virtual IBinder::DeathRecipient {
     public:
         explicit UidPolicy(wp<AudioPolicyService> service)
-                : mService(service) {}
+                : mService(service), mObserverRegistered(false) {}
 
         void registerSelf();
         void unregisterSelf();
 
+        // IBinder::DeathRecipient implementation
+        void binderDied(const wp<IBinder> &who) override;
+
         bool isUidActive(uid_t uid);
 
-        void onUidGone(uid_t uid, bool disabled);
-        void onUidActive(uid_t uid);
-        void onUidIdle(uid_t uid, bool disabled);
+        // BnUidObserver implementation
+        void onUidActive(uid_t uid) override;
+        void onUidGone(uid_t uid, bool disabled) override;
+        void onUidIdle(uid_t uid, bool disabled) override;
 
-        void addOverrideUid(uid_t uid, bool active);
-        void removeOverrideUid(uid_t uid);
+        void addOverrideUid(uid_t uid, bool active) { updateOverrideUid(uid, active, true); }
+        void removeOverrideUid(uid_t uid) { updateOverrideUid(uid, false, false); }
 
     private:
-        bool isUidActiveLocked(uid_t uid);
+        bool isServiceUid(uid_t uid) const;
+        void notifyService(uid_t uid, bool active);
         void updateOverrideUid(uid_t uid, bool active, bool insert);
+        void updateUidCache(uid_t uid, bool active, bool insert);
+        void updateUidLocked(std::unordered_map<uid_t, bool> *uids,
+                uid_t uid, bool active, bool insert, bool *wasThere, bool *wasActive);
 
-        Mutex mUidLock;
         wp<AudioPolicyService> mService;
-        std::unordered_set<uid_t> mActiveUids;
+        Mutex mLock;
+        bool mObserverRegistered;
         std::unordered_map<uid_t, bool> mOverrideUids;
+        std::unordered_map<uid_t, bool> mCachedUids;
     };
 
     // Thread used for tone playback and to send audio config commands to audio flinger

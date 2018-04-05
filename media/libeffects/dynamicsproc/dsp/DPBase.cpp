@@ -14,8 +14,12 @@
  * limitations under the License.
  */
 
-#include <android/log.h>
+#define LOG_TAG "DPBase"
+//#define LOG_NDEBUG 0
+
+#include <log/log.h>
 #include "DPBase.h"
+#include "DPFrequency.h"
 
 namespace dp_fx {
 
@@ -234,6 +238,7 @@ DPBase::DPBase() : mInitialized(false), mChannelCount(0), mPreEqInUse(false), mP
 void DPBase::init(uint32_t channelCount, bool preEqInUse, uint32_t preEqBandCount,
         bool mbcInUse, uint32_t mbcBandCount, bool postEqInUse, uint32_t postEqBandCount,
         bool limiterInUse) {
+    ALOGV("DPBase::init");
     mChannelCount = channelCount;
     mPreEqInUse = preEqInUse;
     mPreEqBandCount = preEqBandCount;
@@ -248,31 +253,6 @@ void DPBase::init(uint32_t channelCount, bool preEqInUse, uint32_t preEqBandCoun
                 postEqInUse, postEqBandCount, limiterInUse);
     }
     mInitialized = true;
-}
-
-void DPBase::reset() {
-    //perform reset operations with current architecture.
-}
-
-size_t DPBase::processSamples(float *in, float *out, size_t samples) {
-    //actually do something with samples, for now, just apply level.
-    uint32_t channelCount = getChannelCount();
-    std::vector<float> level(channelCount);
-    for (uint32_t ch = 0; ch < channelCount; ch++) {
-        DPChannel *pChannel = getChannel(ch);
-        if (pChannel != NULL) {
-            level[ch] = pow(10, pChannel->getInputGain() / 20.0);
-        }
-    }
-    size_t processedSamples = 0;
-    float *pInput = in;
-    float *pOutput = out;
-    for (size_t k = 0; k < samples; k++) {
-            float value = *pInput++;
-            *pOutput++ = value * level[k % channelCount];
-            processedSamples++;
-    }
-    return processedSamples;
 }
 
 DPChannel* DPBase::getChannel(uint32_t channelIndex) {
