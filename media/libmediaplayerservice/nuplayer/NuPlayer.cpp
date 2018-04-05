@@ -220,8 +220,11 @@ void NuPlayer::setUID(uid_t uid) {
     mUID = uid;
 }
 
-void NuPlayer::setDriver(const wp<NuPlayerDriver> &driver) {
+void NuPlayer::init(const wp<NuPlayerDriver> &driver) {
     mDriver = driver;
+
+    sp<AMessage> notify = new AMessage(kWhatMediaClockNotify, this);
+    mMediaClock->setNotificationMessage(notify);
 }
 
 void NuPlayer::setDataSourceAsync(const sp<IStreamSource> &source) {
@@ -1422,6 +1425,24 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
             response->postReply(replyID);
+            break;
+        }
+
+        case kWhatMediaClockNotify:
+        {
+            ALOGV("kWhatMediaClockNotify");
+            int64_t anchorMediaUs, anchorRealUs;
+            float playbackRate;
+            CHECK(msg->findInt64("anchor-media-us", &anchorMediaUs));
+            CHECK(msg->findInt64("anchor-real-us", &anchorRealUs));
+            CHECK(msg->findFloat("playback-rate", &playbackRate));
+
+            Parcel in;
+            in.writeInt64(anchorMediaUs);
+            in.writeInt64(anchorRealUs);
+            in.writeFloat(playbackRate);
+
+            notifyListener(MEDIA_TIME_DISCONTINUITY, 0, 0, &in);
             break;
         }
 
