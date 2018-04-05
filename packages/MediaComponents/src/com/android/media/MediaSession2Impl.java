@@ -44,13 +44,13 @@ import android.media.MediaPlaylistAgent;
 import android.media.MediaPlaylistAgent.PlaylistEventCallback;
 import android.media.MediaSession2;
 import android.media.MediaSession2.Builder;
-import android.media.SessionCommand2;
 import android.media.MediaSession2.CommandButton;
-import android.media.SessionCommandGroup2;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.OnDataSourceMissingHelper;
 import android.media.MediaSession2.SessionCallback;
 import android.media.MediaSessionService2;
+import android.media.SessionCommand2;
+import android.media.SessionCommandGroup2;
 import android.media.SessionToken2;
 import android.media.VolumeProvider2;
 import android.media.session.MediaSessionManager;
@@ -60,9 +60,10 @@ import android.os.IBinder;
 import android.os.Parcelable;
 import android.os.Process;
 import android.os.ResultReceiver;
-import android.support.annotation.GuardedBy;
 import android.text.TextUtils;
 import android.util.Log;
+
+import androidx.annotation.GuardedBy;
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;

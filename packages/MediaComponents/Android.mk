@@ -42,7 +42,7 @@
 #
 #LOCAL_MULTILIB := first
 #
-#LOCAL_JAVA_LIBRARIES += android-support-annotations
+#LOCAL_JAVA_LIBRARIES += androidx.annotation_annotation
 #
 ## To embed native libraries in package, uncomment the lines below.
 ##LOCAL_MODULE_TAGS := samples
@@ -60,9 +60,9 @@
 #
 ## TODO: Remove dependency with other support libraries.
 #LOCAL_STATIC_ANDROID_LIBRARIES += \
-#    android-support-v4 \
-#    android-support-v7-appcompat \
-#    android-support-v7-palette
+#    androidx.legacy_legacy-support-v4 \
+#    androidx.appcompat_appcompat \
+#    androidx.palette_palette
 #LOCAL_USE_AAPT2 := true
 #
 #include $(BUILD_PACKAGE)

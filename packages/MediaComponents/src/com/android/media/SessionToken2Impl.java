@@ -16,9 +16,9 @@
 
 package com.android.media;
 
+import static android.media.SessionToken2.TYPE_LIBRARY_SERVICE;
 import static android.media.SessionToken2.TYPE_SESSION;
 import static android.media.SessionToken2.TYPE_SESSION_SERVICE;
-import static android.media.SessionToken2.TYPE_LIBRARY_SERVICE;
 
 import android.content.Context;
 import android.content.Intent;

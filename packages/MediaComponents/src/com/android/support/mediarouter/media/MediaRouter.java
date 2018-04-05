@@ -33,14 +33,15 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
-import android.support.v4.app.ActivityManagerCompat;
-import android.support.v4.hardware.display.DisplayManagerCompat;
-import android.support.v4.media.VolumeProviderCompat;
 import android.support.v4.media.session.MediaSessionCompat;
-import android.support.v4.util.Pair;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.Display;
+
+import androidx.core.app.ActivityManagerCompat;
+import androidx.core.hardware.display.DisplayManagerCompat;
+import androidx.core.util.Pair;
+import androidx.media.VolumeProviderCompat;
 
 import com.android.support.mediarouter.media.MediaRouteProvider.ProviderMetadata;
 import com.android.support.mediarouter.media.MediaRouteProvider.RouteController;
@@ -81,13 +82,13 @@ public final class MediaRouter {
     static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
 
     /**
-     * Passed to {@link android.support.v7.media.MediaRouteProvider.RouteController#onUnselect(int)}
+     * Passed to {@link androidx.mediarouter.media.MediaRouteProvider.RouteController#onUnselect(int)}
      * and {@link Callback#onRouteUnselected(MediaRouter, RouteInfo, int)} when the reason the route
      * was unselected is unknown.
      */
     public static final int UNSELECT_REASON_UNKNOWN = 0;
     /**
-     * Passed to {@link android.support.v7.media.MediaRouteProvider.RouteController#onUnselect(int)}
+     * Passed to {@link androidx.mediarouter.media.MediaRouteProvider.RouteController#onUnselect(int)}
      * and {@link Callback#onRouteUnselected(MediaRouter, RouteInfo, int)} when the user pressed
      * the disconnect button to disconnect and keep playing.
      * <p>
@@ -96,13 +97,13 @@ public final class MediaRouter {
      */
     public static final int UNSELECT_REASON_DISCONNECTED = 1;
     /**
-     * Passed to {@link android.support.v7.media.MediaRouteProvider.RouteController#onUnselect(int)}
+     * Passed to {@link androidx.mediarouter.media.MediaRouteProvider.RouteController#onUnselect(int)}
      * and {@link Callback#onRouteUnselected(MediaRouter, RouteInfo, int)} when the user pressed
      * the stop casting button.
      */
     public static final int UNSELECT_REASON_STOPPED = 2;
     /**
-     * Passed to {@link android.support.v7.media.MediaRouteProvider.RouteController#onUnselect(int)}
+     * Passed to {@link androidx.mediarouter.media.MediaRouteProvider.RouteController#onUnselect(int)}
      * and {@link Callback#onRouteUnselected(MediaRouter, RouteInfo, int)} when the user selected
      * a different route.
      */
@@ -174,7 +175,7 @@ public final class MediaRouter {
      * Applications should typically add a callback using this flag in the
      * {@link android.app.Activity activity's} {@link android.app.Activity#onStart onStart}
      * method and remove it in the {@link android.app.Activity#onStop onStop} method.
-     * The {@link android.support.v7.app.MediaRouteDiscoveryFragment} fragment may
+     * The {@link androidx.mediarouter.app.MediaRouteDiscoveryFragment} fragment may
      * also be used for this purpose.
      * </p><p class="note">
      * On {@link ActivityManager#isLowRamDevice low-RAM devices} this flag
@@ -182,7 +183,7 @@ public final class MediaRouter {
      * {@link #addCallback(MediaRouteSelector, Callback, int) addCallback} for details.
      * </p>
      *
-     * @see android.support.v7.app.MediaRouteDiscoveryFragment
+     * @see androidx.mediarouter.app.MediaRouteDiscoveryFragment
      */
     public static final int CALLBACK_FLAG_REQUEST_DISCOVERY = 1 << 2;
 
@@ -197,7 +198,7 @@ public final class MediaRouter {
      * {@link #addCallback(MediaRouteSelector, Callback, int) addCallback} for details.
      * </p>
      *
-     * @see android.support.v7.app.MediaRouteDiscoveryFragment
+     * @see androidx.mediarouter.app.MediaRouteDiscoveryFragment
      */
     public static final int CALLBACK_FLAG_FORCE_DISCOVERY = 1 << 3;
 

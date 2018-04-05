@@ -23,7 +23,8 @@ import android.media.session.PlaybackState;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.RequiresApi;
+
+import androidx.annotation.RequiresApi;
 
 import com.android.support.mediarouter.media.MediaItemStatus;
 import com.android.support.mediarouter.media.MediaRouter;
@@ -32,8 +33,6 @@ import com.android.support.mediarouter.media.RemotePlaybackClient;
 import com.android.support.mediarouter.media.RemotePlaybackClient.ItemActionCallback;
 import com.android.support.mediarouter.media.RemotePlaybackClient.SessionActionCallback;
 import com.android.support.mediarouter.media.RemotePlaybackClient.StatusCallback;
-
-import java.util.Map;
 
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class RoutePlayer extends MediaSession.Callback {

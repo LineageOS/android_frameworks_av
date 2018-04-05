@@ -19,10 +19,11 @@ package com.android.support.mediarouter.app;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
-import android.support.v4.view.ActionProvider;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+
+import androidx.core.view.ActionProvider;
 
 import com.android.support.mediarouter.media.MediaRouteSelector;
 import com.android.support.mediarouter.media.MediaRouter;
@@ -48,7 +49,7 @@ import java.lang.ref.WeakReference;
  * <h3>Prerequisites</h3>
  * <p>
  * To use the media route action provider, the activity must be a subclass of
- * {@link AppCompatActivity} from the <code>android.support.v7.appcompat</code>
+ * {@link AppCompatActivity} from the <code>androidx.appcompat.appcompat</code>
  * support library.  Refer to support library documentation for details.
  * </p>
  *
@@ -65,7 +66,7 @@ import java.lang.ref.WeakReference;
  *     &lt;item android:id="@+id/media_route_menu_item"
  *         android:title="@string/media_route_menu_title"
  *         app:showAsAction="always"
- *         app:actionProviderClass="android.support.v7.app.MediaRouteActionProvider"/>
+ *         app:actionProviderClass="androidx.mediarouter.app.MediaRouteActionProvider"/>
  * &lt;/menu>
  * </pre><p>
  * Then configure the menu and set the route selector for the chooser.

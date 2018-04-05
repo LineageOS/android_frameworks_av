@@ -19,9 +19,10 @@ package com.android.widget;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.os.Looper;
-import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.widget.FrameLayout;
+
+import androidx.annotation.Nullable;
 
 import com.android.media.subtitle.SubtitleController.Anchor;
 import com.android.media.subtitle.SubtitleTrack.RenderingWidget;

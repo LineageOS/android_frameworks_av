@@ -18,7 +18,6 @@ package com.android.media;
 
 import static android.media.Rating2.*;
 
-import android.content.Context;
 import android.media.Rating2;
 import android.media.Rating2.Style;
 import android.media.update.Rating2Provider;

@@ -19,11 +19,12 @@ package com.android.support.mediarouter.app;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Color;
-import android.support.annotation.IntDef;
-import android.support.v4.graphics.ColorUtils;
 import android.util.TypedValue;
 import android.view.ContextThemeWrapper;
 import android.view.View;
+
+import androidx.annotation.IntDef;
+import androidx.core.graphics.ColorUtils;
 
 import com.android.media.update.R;
 
@@ -170,7 +171,7 @@ final class MediaRouterThemeHelper {
     private static boolean isLightTheme(Context context) {
         TypedValue value = new TypedValue();
         // TODO(sungsoo): Switch to com.android.internal.R.attr.isLightTheme
-        return context.getTheme().resolveAttribute(android.support.v7.appcompat.R.attr.isLightTheme,
+        return context.getTheme().resolveAttribute(androidx.appcompat.R.attr.isLightTheme,
                 value, true) && value.data != 0;
     }
 
