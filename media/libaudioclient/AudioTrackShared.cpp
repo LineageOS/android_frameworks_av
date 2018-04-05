@@ -393,19 +393,50 @@ size_t ClientProxy::getMisalignment()
 
 // ---------------------------------------------------------------------------
 
-__attribute__((no_sanitize("integer")))
 void AudioTrackClientProxy::flush()
 {
+    sendStreamingFlushStop(true /* flush */);
+}
+
+void AudioTrackClientProxy::stop()
+{
+    sendStreamingFlushStop(false /* flush */);
+}
+
+// Sets the client-written mFlush and mStop positions, which control server behavior.
+//
+// @param flush indicates whether the operation is a flush or stop.
+// A client stop sets mStop to the current write position;
+// the server will not read past this point until start() or subsequent flush().
+// A client flush sets both mStop and mFlush to the current write position.
+// This advances the server read limit (if previously set) and on the next
+// server read advances the server read position to this limit.
+//
+void AudioTrackClientProxy::sendStreamingFlushStop(bool flush)
+{
+    // TODO: Replace this by 64 bit counters - avoids wrap complication.
     // This works for mFrameCountP2 <= 2^30
-    size_t increment = mFrameCountP2 << 1;
-    size_t mask = increment - 1;
-    audio_track_cblk_t* cblk = mCblk;
     // mFlush is 32 bits concatenated as [ flush_counter ] [ newfront_offset ]
     // Should newFlush = cblk->u.mStreaming.mRear?  Only problem is
     // if you want to flush twice to the same rear location after a 32 bit wrap.
-    int32_t newFlush = (cblk->u.mStreaming.mRear & mask) |
-                        ((cblk->u.mStreaming.mFlush & ~mask) + increment);
-    android_atomic_release_store(newFlush, &cblk->u.mStreaming.mFlush);
+
+    const size_t increment = mFrameCountP2 << 1;
+    const size_t mask = increment - 1;
+    // No need for client atomic synchronization on mRear, mStop, mFlush
+    // as AudioTrack client only read/writes to them under client lock. Server only reads.
+    const int32_t rearMasked = mCblk->u.mStreaming.mRear & mask;
+
+    // update stop before flush so that the server front
+    // never advances beyond a (potential) previous stop's rear limit.
+    int32_t stopBits; // the following add can overflow
+    __builtin_add_overflow(mCblk->u.mStreaming.mStop & ~mask, increment, &stopBits);
+    android_atomic_release_store(rearMasked | stopBits, &mCblk->u.mStreaming.mStop);
+
+    if (flush) {
+        int32_t flushBits; // the following add can overflow
+        __builtin_add_overflow(mCblk->u.mStreaming.mFlush & ~mask, increment, &flushBits);
+        android_atomic_release_store(rearMasked | flushBits, &mCblk->u.mStreaming.mFlush);
+    }
 }
 
 bool AudioTrackClientProxy::clearStreamEndDone() {
@@ -540,6 +571,11 @@ void StaticAudioTrackClientProxy::flush()
     LOG_ALWAYS_FATAL("static flush");
 }
 
+void StaticAudioTrackClientProxy::stop()
+{
+    ; // no special handling required for static tracks.
+}
+
 void StaticAudioTrackClientProxy::setLoop(size_t loopStart, size_t loopEnd, int loopCount)
 {
     // This can only happen on a 64-bit client
@@ -638,6 +674,7 @@ void ServerProxy::flushBufferIfNeeded()
     if (flush != mFlush) {
         ALOGV("ServerProxy::flushBufferIfNeeded() mStreaming.mFlush = 0x%x, mFlush = 0x%0x",
                 flush, mFlush);
+        // shouldn't matter, but for range safety use mRear instead of getRear().
         int32_t rear = android_atomic_acquire_load(&cblk->u.mStreaming.mRear);
         int32_t front = cblk->u.mStreaming.mFront;
 
@@ -677,6 +714,45 @@ void ServerProxy::flushBufferIfNeeded()
 }
 
 __attribute__((no_sanitize("integer")))
+int32_t AudioTrackServerProxy::getRear() const
+{
+    const int32_t stop = android_atomic_acquire_load(&mCblk->u.mStreaming.mStop);
+    const int32_t rear = android_atomic_acquire_load(&mCblk->u.mStreaming.mRear);
+    const int32_t stopLast = mStopLast.load(std::memory_order_acquire);
+    if (stop != stopLast) {
+        const int32_t front = mCblk->u.mStreaming.mFront;
+        const size_t overflowBit = mFrameCountP2 << 1;
+        const size_t mask = overflowBit - 1;
+        int32_t newRear = (rear & ~mask) | (stop & mask);
+        ssize_t filled = newRear - front;
+        if (filled < 0) {
+            // front and rear offsets span the overflow bit of the p2 mask
+            // so rebasing newrear.
+            ALOGV("stop wrap: filled %zx >= overflowBit %zx", filled, overflowBit);
+            newRear += overflowBit;
+            filled += overflowBit;
+        }
+        if (0 <= filled && (size_t) filled <= mFrameCount) {
+            // we're stopped, return the stop level as newRear
+            return newRear;
+        }
+
+        // A corrupt stop. Log error and ignore.
+        ALOGE("mStopLast %#x -> stop %#x, front %#x, rear %#x, mask %#x, newRear %#x, "
+                "filled %zd=%#x",
+                stopLast, stop, front, rear,
+                (unsigned)mask, newRear, filled, (unsigned)filled);
+        // Don't reset mStopLast as this is const.
+    }
+    return rear;
+}
+
+void AudioTrackServerProxy::start()
+{
+    mStopLast = android_atomic_acquire_load(&mCblk->u.mStreaming.mStop);
+}
+
+__attribute__((no_sanitize("integer")))
 status_t ServerProxy::obtainBuffer(Buffer* buffer, bool ackFlush)
 {
     LOG_ALWAYS_FATAL_IF(buffer == NULL || buffer->mFrameCount == 0,
@@ -693,7 +769,7 @@ status_t ServerProxy::obtainBuffer(Buffer* buffer, bool ackFlush)
     // See notes on barriers at ClientProxy::obtainBuffer()
     if (mIsOut) {
         flushBufferIfNeeded(); // might modify mFront
-        rear = android_atomic_acquire_load(&cblk->u.mStreaming.mRear);
+        rear = getRear();
         front = cblk->u.mStreaming.mFront;
     } else {
         front = android_atomic_acquire_load(&cblk->u.mStreaming.mFront);
@@ -825,8 +901,7 @@ size_t AudioTrackServerProxy::framesReady()
         // FIXME should return an accurate value, but over-estimate is better than under-estimate
         return mFrameCount;
     }
-    // the acquire might not be necessary since not doing a subsequent read
-    int32_t rear = android_atomic_acquire_load(&cblk->u.mStreaming.mRear);
+    const int32_t rear = getRear();
     ssize_t filled = rear - cblk->u.mStreaming.mFront;
     // pipe should not already be overfull
     if (!(0 <= filled && (size_t) filled <= mFrameCount)) {
@@ -852,7 +927,7 @@ size_t AudioTrackServerProxy::framesReadySafe() const
     if (flush != mFlush) {
         return mFrameCount;
     }
-    const int32_t rear = android_atomic_acquire_load(&cblk->u.mStreaming.mRear);
+    const int32_t rear = getRear();
     const ssize_t filled = rear - cblk->u.mStreaming.mFront;
     if (!(0 <= filled && (size_t) filled <= mFrameCount)) {
         return 0; // error condition, silently return 0.
@@ -1147,6 +1222,12 @@ void StaticAudioTrackServerProxy::tallyUnderrunFrames(uint32_t frameCount)
     if (frameCount > 0) {
         (void) android_atomic_or(CBLK_UNDERRUN, &mCblk->mFlags);
     }
+}
+
+int32_t StaticAudioTrackServerProxy::getRear() const
+{
+    LOG_ALWAYS_FATAL("getRear() not permitted for static tracks");
+    return 0;
 }
 
 // ---------------------------------------------------------------------------
