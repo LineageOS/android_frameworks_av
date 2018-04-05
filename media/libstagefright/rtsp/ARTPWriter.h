@@ -44,6 +44,7 @@ struct ARTPWriter : public MediaWriter {
     virtual status_t start(MetaData *params);
     virtual status_t stop();
     virtual status_t pause();
+    void updateCVODegrees(int32_t cvoDegrees);
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
 
@@ -104,6 +105,8 @@ private:
     uint64_t mLastNTPTime;
 
     int32_t mNumSRsSent;
+    int32_t mRTPCVOExtMap;
+    int32_t mRTPCVODegrees;
 
     enum {
         INVALID,
