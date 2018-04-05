@@ -549,7 +549,7 @@ bool AudioPolicyService::UidPolicy::isUidActive(uid_t uid) {
         // In an absense of the ActivityManager, assume everything to be active.
         if (!mObserverRegistered) return true;
         auto cacheIter = mCachedUids.find(uid);
-        if (cacheIter != mOverrideUids.end()) {
+        if (cacheIter != mCachedUids.end()) {
             return cacheIter->second;
         }
     }
