@@ -770,6 +770,7 @@ void AudioTrack::stop()
         mReleased = 0;
     }
 
+    mProxy->stop(); // notify server not to read beyond current client position until start().
     mProxy->interrupt();
     mAudioTrack->stop();
 
