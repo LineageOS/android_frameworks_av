@@ -55,7 +55,7 @@ struct MediaWriter : public RefBase {
     virtual void setStartTimeOffsetMs(int /*ms*/) {}
     virtual int32_t getStartTimeOffsetMs() const { return 0; }
     virtual status_t setNextFd(int /*fd*/) { return INVALID_OPERATION; }
-
+    virtual void updateCVODegrees(int32_t /*cvoDegrees*/) {}
 protected:
     virtual ~MediaWriter() {}
     int64_t mMaxFileSizeLimitBytes;

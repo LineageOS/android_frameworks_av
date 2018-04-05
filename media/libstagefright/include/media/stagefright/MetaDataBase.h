@@ -246,6 +246,8 @@ enum {
     kKeyPps              = 'sPps', // int32_t, indicates that a buffer is pps.
     kKeySelfID           = 'sfid', // int32_t, source ID to identify itself on RTP protocol.
     kKeyPayloadType      = 'pTyp', // int32_t, SDP negotiated payload type.
+    kKeyRtpExtMap        = 'extm', // int32_t, rtp extension ID for cvo on RTP protocol.
+    kKeyRtpCvoDegrees    = 'cvod', // int32_t, rtp cvo degrees as per 3GPP 26.114.
 };
 
 enum {

@@ -198,6 +198,8 @@ status_t ARTPWriter::start(MetaData * params) {
     mLastRTPTime = 0;
     mLastNTPTime = 0;
     mNumSRsSent = 0;
+    mRTPCVOExtMap = -1;
+    mRTPCVODegrees = 0;
 
     const char *mime;
     CHECK(mSource->getFormat()->findCString(kKeyMIMEType, &mime));
@@ -206,12 +208,17 @@ status_t ARTPWriter::start(MetaData * params) {
     if(params->findInt32(kKeySelfID, &selfID))
         mSourceID = selfID;
 
-    if (mPayloadType == 0)
-        mPayloadType = PT;
-
     int32_t payloadType = 0;
     if(params->findInt32(kKeyPayloadType, &payloadType))
         mPayloadType = payloadType;
+
+    int32_t rtpExtMap = 0;
+    if(params->findInt32(kKeyRtpExtMap, &rtpExtMap))
+        mRTPCVOExtMap = rtpExtMap;
+
+    int32_t rtpCVODegrees = 0;
+    if(params->findInt32(kKeyRtpCvoDegrees, &rtpCVODegrees))
+        mRTPCVODegrees = rtpCVODegrees;
 
     mMode = INVALID;
     if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
@@ -898,6 +905,8 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
         // The data fits into a single packet
         uint8_t *data = buffer->data();
         data[0] = 0x80;
+        if (mRTPCVOExtMap > 0)
+            data[0] |= 0x10;
         if (isSpsPps)
             data[1] = mPayloadType;  // Marker bit should not be set in case of sps/pps
         else
@@ -913,16 +922,51 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
         data[10] = (mSourceID >> 8) & 0xff;
         data[11] = mSourceID & 0xff;
 
-        memcpy(&data[12],
+        int rtpExtIndex = 0;
+        if (mRTPCVOExtMap > 0) {
+            /*
+                0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+               |       0xBE    |    0xDE       |           length=3            |
+               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+               |  ID   | L=0   |     data      |  ID   |  L=1  |   data...
+               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                     ...data   |    0 (pad)    |    0 (pad)    |  ID   | L=3   |
+               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+               |                          data                                 |
+               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+
+              In the one-byte header form of extensions, the 16-bit value required
+              by the RTP specification for a header extension, labeled in the RTP
+              specification as "defined by profile", takes the fixed bit pattern
+              0xBEDE (the first version of this specification was written on the
+              feast day of the Venerable Bede).
+            */
+            data[12] = 0xBE;
+            data[13] = 0xDE;
+            // put a length of RTP Extension.
+            data[14] = 0x00;
+            data[15] = 0x01;
+            // put extmap of RTP assigned for CVO.
+            data[16] = (mRTPCVOExtMap << 4) | 0x0;
+            // put image degrees as per CVO specification.
+            data[17] = mRTPCVODegrees;
+            data[18] = 0x0;
+            data[19] = 0x0;
+            rtpExtIndex = 8;
+        }
+
+        memcpy(&data[12 + rtpExtIndex],
                mediaData, mediaBuf->range_length());
 
-        buffer->setRange(0, mediaBuf->range_length() + 12);
+        buffer->setRange(0, mediaBuf->range_length() + (12 + rtpExtIndex));
 
         send(buffer, false /* isRTCP */);
 
         ++mSeqNo;
         ++mNumRTPSent;
-        mNumRTPOctetsSent += buffer->size() - 12;
+        mNumRTPOctetsSent += buffer->size() - (12 + rtpExtIndex);
     } else {
         // FU-A
 
@@ -942,6 +986,8 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
 
             uint8_t *data = buffer->data();
             data[0] = 0x80;
+            if (lastPacket && mRTPCVOExtMap > 0)
+                data[0] |= 0x10;
             data[1] = (lastPacket ? (1 << 7) : 0x00) | mPayloadType;  // M-bit
             data[2] = (mSeqNo >> 8) & 0xff;
             data[3] = mSeqNo & 0xff;
@@ -954,24 +1000,37 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
             data[10] = (mSourceID >> 8) & 0xff;
             data[11] = mSourceID & 0xff;
 
-            data[12] = 28 | (nalType & 0xe0);
+            int rtpExtIndex = 0;
+            if (lastPacket && mRTPCVOExtMap > 0) {
+                data[12] = 0xBE;
+                data[13] = 0xDE;
+                data[14] = 0x00;
+                data[15] = 0x01;
+                data[16] = (mRTPCVOExtMap << 4) | 0x0;
+                data[17] = mRTPCVODegrees;
+                data[18] = 0x0;
+                data[19] = 0x0;
+                rtpExtIndex = 8;
+            }
+
+            data[12 + rtpExtIndex] = 28 | (nalType & 0xe0);
 
             CHECK(!firstPacket || !lastPacket);
 
-            data[13] =
+            data[13 + rtpExtIndex] =
                 (firstPacket ? 0x80 : 0x00)
                 | (lastPacket ? 0x40 : 0x00)
                 | (nalType & 0x1f);
 
-            memcpy(&data[14], &mediaData[offset], size);
+            memcpy(&data[14 + rtpExtIndex], &mediaData[offset], size);
 
-            buffer->setRange(0, 14 + size);
+            buffer->setRange(0, 14 + rtpExtIndex + size);
 
             send(buffer, false /* isRTCP */);
 
             ++mSeqNo;
             ++mNumRTPSent;
-            mNumRTPOctetsSent += buffer->size() - 12;
+            mNumRTPOctetsSent += buffer->size() - (12 + rtpExtIndex);
 
             firstPacket = false;
             offset += size;
@@ -1042,6 +1101,11 @@ void ARTPWriter::sendH263Data(MediaBufferBase *mediaBuf) {
 
     mLastRTPTime = rtpTime;
     mLastNTPTime = GetNowNTP();
+}
+
+void ARTPWriter::updateCVODegrees(int32_t cvoDegrees) {
+    Mutex::Autolock autoLock(mLock);
+    mRTPCVODegrees = cvoDegrees;
 }
 
 static size_t getFrameSize(bool isWide, unsigned FT) {
