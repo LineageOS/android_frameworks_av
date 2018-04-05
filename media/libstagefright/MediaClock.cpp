@@ -70,11 +70,9 @@ void MediaClock::reset() {
         it->mNotify->post();
         it = mTimers.erase(it);
     }
-    mAnchorTimeMediaUs = -1;
-    mAnchorTimeRealUs = -1;
     mMaxTimeMediaUs = INT64_MAX;
     mStartingTimeMediaUs = -1;
-    mPlaybackRate = 1.0;
+    updateAnchorTimesAndPlaybackRate_l(-1, -1, 1.0);
     ++mGeneration;
 }
 
@@ -85,8 +83,7 @@ void MediaClock::setStartingTimeMedia(int64_t startingTimeMediaUs) {
 
 void MediaClock::clearAnchor() {
     Mutex::Autolock autoLock(mLock);
-    mAnchorTimeMediaUs = -1;
-    mAnchorTimeRealUs = -1;
+    updateAnchorTimesAndPlaybackRate_l(-1, -1, mPlaybackRate);
 }
 
 void MediaClock::updateAnchor(
@@ -118,8 +115,7 @@ void MediaClock::updateAnchor(
             return;
         }
     }
-    mAnchorTimeRealUs = nowUs;
-    mAnchorTimeMediaUs = nowMediaUs;
+    updateAnchorTimesAndPlaybackRate_l(nowMediaUs, nowUs, mPlaybackRate);
 
     ++mGeneration;
     processTimers_l();
@@ -139,13 +135,12 @@ void MediaClock::setPlaybackRate(float rate) {
     }
 
     int64_t nowUs = ALooper::GetNowUs();
-    mAnchorTimeMediaUs += (nowUs - mAnchorTimeRealUs) * (double)mPlaybackRate;
-    if (mAnchorTimeMediaUs < 0) {
+    int64_t nowMediaUs = mAnchorTimeMediaUs + (nowUs - mAnchorTimeRealUs) * (double)mPlaybackRate;
+    if (nowMediaUs < 0) {
         ALOGW("setRate: anchor time should not be negative, set to 0.");
-        mAnchorTimeMediaUs = 0;
+        nowMediaUs = 0;
     }
-    mAnchorTimeRealUs = nowUs;
-    mPlaybackRate = rate;
+    updateAnchorTimesAndPlaybackRate_l(nowMediaUs, nowUs, rate);
 
     if (rate > 0.0) {
         ++mGeneration;
@@ -311,6 +306,33 @@ void MediaClock::processTimers_l() {
     sp<AMessage> msg = new AMessage(kWhatTimeIsUp, this);
     msg->setInt32("generation", mGeneration);
     msg->post(nextLapseRealUs);
+}
+
+void MediaClock::updateAnchorTimesAndPlaybackRate_l(int64_t anchorTimeMediaUs,
+        int64_t anchorTimeRealUs, float playbackRate) {
+    if (mAnchorTimeMediaUs != anchorTimeMediaUs
+            || mAnchorTimeRealUs != anchorTimeRealUs
+            || mPlaybackRate != playbackRate) {
+        mAnchorTimeMediaUs = anchorTimeMediaUs;
+        mAnchorTimeRealUs = anchorTimeRealUs;
+        mPlaybackRate = playbackRate;
+        notifyDiscontinuity_l();
+    }
+}
+
+void MediaClock::setNotificationMessage(const sp<AMessage> &msg) {
+    Mutex::Autolock autoLock(mLock);
+    mNotify = msg;
+}
+
+void MediaClock::notifyDiscontinuity_l() {
+    if (mNotify != nullptr) {
+        sp<AMessage> msg = mNotify->dup();
+        msg->setInt64("anchor-media-us", mAnchorTimeMediaUs);
+        msg->setInt64("anchor-real-us", mAnchorTimeRealUs);
+        msg->setFloat("playback-rate", mPlaybackRate);
+        msg->post();
+    }
 }
 
 }  // namespace android
