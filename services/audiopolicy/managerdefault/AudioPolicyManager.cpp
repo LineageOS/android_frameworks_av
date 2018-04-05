@@ -2146,6 +2146,7 @@ void AudioPolicyManager::closeAllInputs() {
         }
         inputDesc->close();
     }
+    mInputRoutes.clear();
     mInputs.clear();
     SoundTrigger::setCaptureState(false);
     nextAudioPortGeneration();
