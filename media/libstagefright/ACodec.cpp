@@ -3291,6 +3291,22 @@ status_t ACodec::setupVideoDecoder(
         return err;
     }
 
+    if (compressionFormat == OMX_VIDEO_CodingHEVC) {
+        int32_t profile;
+        if (msg->findInt32("profile", &profile)) {
+            // verify if Main10 profile is supported at all, and fail
+            // immediately if it's not supported.
+            if (profile == OMX_VIDEO_HEVCProfileMain10 ||
+                profile == OMX_VIDEO_HEVCProfileMain10HDR10) {
+                err = verifySupportForProfileAndLevel(
+                        kPortIndexInput, profile, 0);
+                if (err != OK) {
+                    return err;
+                }
+            }
+        }
+    }
+
     if (compressionFormat == OMX_VIDEO_CodingVP9) {
         OMX_VIDEO_PARAM_PROFILELEVELTYPE params;
         InitOMXParams(&params);
@@ -4059,7 +4075,7 @@ status_t ACodec::setupMPEG4EncoderParameters(const sp<AMessage> &msg) {
             return INVALID_OPERATION;
         }
 
-        err = verifySupportForProfileAndLevel(profile, level);
+        err = verifySupportForProfileAndLevel(kPortIndexOutput, profile, level);
 
         if (err != OK) {
             return err;
@@ -4131,7 +4147,7 @@ status_t ACodec::setupH263EncoderParameters(const sp<AMessage> &msg) {
             return INVALID_OPERATION;
         }
 
-        err = verifySupportForProfileAndLevel(profile, level);
+        err = verifySupportForProfileAndLevel(kPortIndexOutput, profile, level);
 
         if (err != OK) {
             return err;
@@ -4266,7 +4282,7 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
             return INVALID_OPERATION;
         }
 
-        err = verifySupportForProfileAndLevel(profile, level);
+        err = verifySupportForProfileAndLevel(kPortIndexOutput, profile, level);
 
         if (err != OK) {
             return err;
@@ -4280,7 +4296,7 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
         // Use largest supported profile for AVC recording if profile is not specified.
         for (OMX_VIDEO_AVCPROFILETYPE profile : {
                 OMX_VIDEO_AVCProfileHigh, OMX_VIDEO_AVCProfileMain }) {
-            if (verifySupportForProfileAndLevel(profile, 0) == OK) {
+            if (verifySupportForProfileAndLevel(kPortIndexOutput, profile, 0) == OK) {
                 h264type.eProfile = profile;
                 break;
             }
@@ -4457,7 +4473,7 @@ status_t ACodec::setupHEVCEncoderParameters(
             return INVALID_OPERATION;
         }
 
-        err = verifySupportForProfileAndLevel(profile, level);
+        err = verifySupportForProfileAndLevel(kPortIndexOutput, profile, level);
         if (err != OK) {
             return err;
         }
@@ -4602,10 +4618,10 @@ status_t ACodec::setupVPXEncoderParameters(const sp<AMessage> &msg, sp<AMessage>
 }
 
 status_t ACodec::verifySupportForProfileAndLevel(
-        int32_t profile, int32_t level) {
+        OMX_U32 portIndex, int32_t profile, int32_t level) {
     OMX_VIDEO_PARAM_PROFILELEVELTYPE params;
     InitOMXParams(&params);
-    params.nPortIndex = kPortIndexOutput;
+    params.nPortIndex = portIndex;
 
     for (OMX_U32 index = 0; index <= kMaxIndicesToCheck; ++index) {
         params.nProfileIndex = index;
@@ -4906,8 +4922,8 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
                             rect.nHeight = videoDef->nFrameHeight;
                         }
 
-                        if (rect.nLeft < 0 ||
-                            rect.nTop < 0 ||
+                        if (rect.nLeft < 0 || rect.nTop < 0 ||
+                            rect.nWidth == 0 || rect.nHeight == 0 ||
                             rect.nLeft + rect.nWidth > videoDef->nFrameWidth ||
                             rect.nTop + rect.nHeight > videoDef->nFrameHeight) {
                             ALOGE("Wrong cropped rect (%d, %d, %u, %u) vs. frame (%u, %u)",
