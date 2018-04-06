@@ -2631,6 +2631,10 @@ void AudioFlinger::PlaybackThread::updateMetadata_l()
     StreamOutHalInterface::SourceMetadata metadata;
     for (const sp<Track> &track : mActiveTracks) {
         // No track is invalid as this is called after prepareTrack_l in the same critical section
+        if (track->isOutputTrack()) {
+            // TODO: OutputTrack (used for duplication) are currently not supported
+            continue;
+        }
         metadata.tracks.push_back({
                 .usage = track->attributes().usage,
                 .content_type = track->attributes().content_type,
@@ -6151,13 +6155,12 @@ bool AudioFlinger::DuplicatingThread::outputsReady(
 
 void AudioFlinger::DuplicatingThread::updateMetadata_l()
 {
-    // TODO: The duplicated track metadata are stored in other threads
-    // (accessible through mActiveTracks::OutputTrack::thread()::mActiveTracks::Track::attributes())
-    // but this information can be mutated at any time by the owning threads.
-    // Taking the lock of any other owning threads is no possible due to timing constrains.
-    // Similarly, the other threads can not push the metadatas in this thread as cross deadlock
-    // would be possible.
-    // A lock-free structure needs to be used to shared the metadata (maybe an atomic shared_ptr ?).
+    // TODO: The duplicated track metadata needs to be pushed to downstream
+    // but this information can be read at any time by the downstream threads.
+    // Taking the lock of any downstream threads is no possible due to cross deadlock risks
+    // (eg: during effect move).
+    // A lock-free structure needs to be used to shared the metadata, probably an atomic
+    // pointer to a metadata vector in each output tracks.
 }
 
 uint32_t AudioFlinger::DuplicatingThread::activeSleepTimeUs() const
