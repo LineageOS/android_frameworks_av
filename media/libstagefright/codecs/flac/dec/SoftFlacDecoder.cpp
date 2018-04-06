@@ -302,7 +302,7 @@ void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
     List<BufferInfo *> &outQueue = getPortQueue(1);
 
     ALOGV("onQueueFilled %d/%d:", inQueue.empty(), outQueue.empty());
-    while ((!inQueue.empty() || mSawInputEOS) && !outQueue.empty()) {
+    while ((!inQueue.empty() || mSawInputEOS) && !outQueue.empty() && !mFinishedDecoder) {
         BufferInfo *outInfo = *outQueue.begin();
         OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
         short *outBuffer = reinterpret_cast<short *>(outHeader->pBuffer + outHeader->nOffset);
@@ -318,6 +318,21 @@ void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
             if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
                 ALOGV("saw EOS");
                 mSawInputEOS = true;
+                if (mInputBufferCount == 0 && inHeader->nFilledLen == 0) {
+                    // first buffer was empty and EOS: signal EOS on output and return
+                    ALOGV("empty first EOS");
+                    outHeader->nFilledLen = 0;
+                    outHeader->nTimeStamp = inHeader->nTimeStamp;
+                    outHeader->nFlags = OMX_BUFFERFLAG_EOS;
+                    outInfo->mOwnedByUs = false;
+                    outQueue.erase(outQueue.begin());
+                    notifyFillBufferDone(outHeader);
+                    mFinishedDecoder = true;
+                    inInfo->mOwnedByUs = false;
+                    inQueue.erase(inQueue.begin());
+                    notifyEmptyBufferDone(inHeader);
+                    return;
+                }
             }
 
             if (mInputBufferCount == 0 && !(inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG)) {
@@ -377,7 +392,7 @@ void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
                 ALOGV("no output, trying again");
                 continue;
             }
-        } else if (mSawInputEOS && !mFinishedDecoder) {
+        } else if (mSawInputEOS) {
             status_t decoderErr = mFLACDecoder->decodeOneFrame(NULL, 0, outBuffer, &outBufferSize);
             mFinishedDecoder = true;
             if (decoderErr != OK) {
@@ -388,10 +403,8 @@ void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
             }
             outHeader->nFlags = OMX_BUFFERFLAG_EOS;
         } else {
-            ALOGE("no input buffer but did not get EOS");
-            mSignalledError = true;
-            notify(OMX_EventError, OMX_ErrorStreamCorrupt, 0, NULL);
-            return;
+            // no more input buffers at this time, loop and see if there is more output
+            continue;
         }
 
         outHeader->nFilledLen = outBufferSize;
@@ -412,9 +425,12 @@ void SoftFlacDecoder::onPortFlushCompleted(OMX_U32 portIndex) {
 
 void SoftFlacDecoder::drainDecoder() {
     mFLACDecoder->flush();
+    mSawInputEOS = false;
+    mFinishedDecoder = false;
 }
 
 void SoftFlacDecoder::onReset() {
+    ALOGV("onReset");
     drainDecoder();
 
     memset(&mStreamInfo, 0, sizeof(mStreamInfo));
