@@ -357,7 +357,7 @@ void SoftFlacEncoder::onQueueFilled(OMX_U32 portIndex) {
 
     FLAC__bool ok = true;
 
-    while ((!inQueue.empty() || mSawInputEOS) && !outQueue.empty()) {
+    while ((!inQueue.empty() || mSawInputEOS) && !outQueue.empty() && !mSentOutputEOS) {
         if (!inQueue.empty()) {
             BufferInfo *inInfo = *inQueue.begin();
             OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
@@ -415,7 +415,7 @@ void SoftFlacEncoder::onQueueFilled(OMX_U32 portIndex) {
                 mEncoderReturnedEncodedData = false;
             } else {
                 ALOGV(" encoder process_interleaved returned without data to write");
-                if (mSawInputEOS && !mSentOutputEOS) {
+                if (mSawInputEOS) {
                     ALOGV("finishing encoder");
                     mSentOutputEOS = true;
                     FLAC__stream_encoder_finish(mFlacStreamEncoder);
