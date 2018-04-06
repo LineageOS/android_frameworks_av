@@ -82,7 +82,6 @@ static const char *kCodecRotation = "android.media.mediacodec.rotation-degrees";
 
 // NB: These are not yet exposed as public Java API constants.
 static const char *kCodecCrypto = "android.media.mediacodec.crypto";   /* 0,1 */
-static const char *kCodecBytesIn = "android.media.mediacodec.bytesin";  /* 0..n */
 static const char *kCodecProfile = "android.media.mediacodec.profile";  /* 0..n */
 static const char *kCodecLevel = "android.media.mediacodec.level";  /* 0..n */
 static const char *kCodecMaxWidth = "android.media.mediacodec.maxwidth";  /* 0..n */
@@ -3202,10 +3201,6 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         info->mData.clear();
 
         statsBufferSent(timeUs);
-
-        if (mAnalyticsItem != NULL) {
-            mAnalyticsItem->addInt64(kCodecBytesIn, size);
-        }
     }
 
     return err;
