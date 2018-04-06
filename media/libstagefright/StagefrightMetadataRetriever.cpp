@@ -438,6 +438,15 @@ void StagefrightMetadataRetriever::parseMetaData() {
         mMetaData.add(METADATA_KEY_CAPTURE_FRAMERATE, String8(tmp));
     }
 
+    int64_t exifOffset, exifSize;
+    if (meta->findInt64(kKeyExifOffset, &exifOffset)
+     && meta->findInt64(kKeyExifSize, &exifSize)) {
+        sprintf(tmp, "%lld", (long long)exifOffset);
+        mMetaData.add(METADATA_KEY_EXIF_OFFSET, String8(tmp));
+        sprintf(tmp, "%lld", (long long)exifSize);
+        mMetaData.add(METADATA_KEY_EXIF_LENGTH, String8(tmp));
+    }
+
     bool hasAudio = false;
     bool hasVideo = false;
     int32_t videoWidth = -1;
