@@ -183,6 +183,36 @@ struct AMessage : public RefBase {
     size_t countEntries() const;
     const char *getEntryNameAt(size_t index, Type *type) const;
 
+    /**
+     * Finds an entry by name and returns its index.
+     *
+     * \retval countEntries() if the entry is not found.
+     */
+    size_t findEntryByName(const char *name) const;
+
+    /**
+     * Sets the name of an entry based on index.
+     *
+     * \param index index of the entry
+     * \param name (new) name of the entry
+     *
+     * \retval OK the name was set successfully
+     * \retval BAD_INDEX invalid index
+     * \retval BAD_VALUE name is invalid (null)
+     * \retval ALREADY_EXISTS name is already used by another entry
+     */
+    status_t setEntryNameAt(size_t index, const char *name);
+
+    /**
+     * Removes an entry based on index.
+     *
+     * \param index index of the entry
+     *
+     * \retval OK the entry was removed successfully
+     * \retval BAD_INDEX invalid index
+     */
+    status_t removeEntryAt(size_t index);
+
 protected:
     virtual ~AMessage();
 
