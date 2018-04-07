@@ -55,7 +55,7 @@ status_t ClearKeyCasFactory::queryPlugins(
 
 status_t ClearKeyCasFactory::createPlugin(
         int32_t CA_system_id,
-        uint64_t appData,
+        void *appData,
         CasPluginCallback callback,
         CasPlugin **plugin) {
     if (!isSystemIdSupported(CA_system_id)) {
@@ -83,7 +83,7 @@ status_t ClearKeyDescramblerFactory::createPlugin(
 
 ///////////////////////////////////////////////////////////////////////////////
 ClearKeyCasPlugin::ClearKeyCasPlugin(
-        uint64_t appData, CasPluginCallback callback)
+        void *appData, CasPluginCallback callback)
     : mCallback(callback), mAppData(appData) {
     ALOGV("CTOR");
 }
