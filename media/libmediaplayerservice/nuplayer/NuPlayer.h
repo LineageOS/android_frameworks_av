@@ -39,7 +39,7 @@ struct NuPlayer : public AHandler {
 
     void setUID(uid_t uid);
 
-    void setDriver(const wp<NuPlayerDriver> &driver);
+    void init(const wp<NuPlayerDriver> &driver);
 
     void setDataSourceAsync(const sp<IStreamSource> &source);
 
@@ -158,6 +158,7 @@ private:
         kWhatSetBufferingSettings       = 'sBuS',
         kWhatPrepareDrm                 = 'pDrm',
         kWhatReleaseDrm                 = 'rDrm',
+        kWhatMediaClockNotify           = 'mckN',
     };
 
     wp<NuPlayerDriver> mDriver;
