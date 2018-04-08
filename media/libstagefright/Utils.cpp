@@ -303,6 +303,8 @@ static void parseHevcProfileLevelFromHvcc(const uint8_t *ptr, size_t size, sp<AM
     const static ALookup<uint8_t, OMX_VIDEO_HEVCPROFILETYPE> profiles {
         { 1, OMX_VIDEO_HEVCProfileMain   },
         { 2, OMX_VIDEO_HEVCProfileMain10 },
+        // use Main for Main Still Picture decoding
+        { 3, OMX_VIDEO_HEVCProfileMain },
     };
 
     // set profile & level if they are recognized
@@ -310,6 +312,7 @@ static void parseHevcProfileLevelFromHvcc(const uint8_t *ptr, size_t size, sp<AM
     OMX_VIDEO_HEVCLEVELTYPE codecLevel;
     if (!profiles.map(profile, &codecProfile)) {
         if (ptr[2] & 0x40 /* general compatibility flag 1 */) {
+            // Note that this case covers Main Still Picture too
             codecProfile = OMX_VIDEO_HEVCProfileMain;
         } else if (ptr[2] & 0x20 /* general compatibility flag 2 */) {
             codecProfile = OMX_VIDEO_HEVCProfileMain10;
