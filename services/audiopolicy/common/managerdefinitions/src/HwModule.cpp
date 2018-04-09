@@ -218,6 +218,15 @@ void HwModule::setHandle(audio_module_handle_t handle) {
     mHandle = handle;
 }
 
+bool HwModule::supportsPatch(const sp<AudioPort> &srcPort, const sp<AudioPort> &dstPort) const {
+    for (const auto &route : mRoutes) {
+        if (route->supportsPatch(srcPort, dstPort)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void HwModule::dump(String8 *dst) const
 {
     dst->appendFormat("  - name: %s\n", getName());

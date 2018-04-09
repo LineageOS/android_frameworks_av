@@ -3083,8 +3083,10 @@ status_t AudioPolicyManager::createAudioPatch(const struct audio_patch *patch,
                 // create a software bridge in PatchPanel if:
                 // - source and sink devices are on different HW modules OR
                 // - audio HAL version is < 3.0
+                // - audio HAL version is >= 3.0 but no route has been declared between devices
                 if (!srcDeviceDesc->hasSameHwModuleAs(sinkDeviceDesc) ||
-                        (srcDeviceDesc->mModule->getHalVersionMajor() < 3)) {
+                        (srcDeviceDesc->mModule->getHalVersionMajor() < 3) ||
+                        !srcDeviceDesc->mModule->supportsPatch(srcDeviceDesc, sinkDeviceDesc)) {
                     // support only one sink device for now to simplify output selection logic
                     if (patch->num_sinks > 1) {
                         return INVALID_OPERATION;
