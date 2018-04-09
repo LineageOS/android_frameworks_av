@@ -18,6 +18,7 @@
 
 #include <inttypes.h>
 
+#include <algorithm>
 #include <vector>
 #include <math.h>
 
@@ -61,8 +62,8 @@ status_t OpcodeListBuilder::addGainMapsForMetadata(uint32_t lsmWidth,
                                                    const float* lensShadingMap) {
     uint32_t activeAreaWidth = activeAreaRight - activeAreaLeft;
     uint32_t activeAreaHeight = activeAreaBottom - activeAreaTop;
-    double spacingV = 1.0 / lsmHeight;
-    double spacingH = 1.0 / lsmWidth;
+    double spacingV = 1.0 / std::max(1u, lsmHeight - 1);
+    double spacingH = 1.0 / std::max(1u, lsmWidth - 1);
 
     std::vector<float> redMapVector(lsmWidth * lsmHeight);
     float *redMap = redMapVector.data();
