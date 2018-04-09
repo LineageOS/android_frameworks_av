@@ -1966,7 +1966,8 @@ int Reverb_process(effect_handle_t   self,
 
     if (pContext->bEnabled == LVM_FALSE) {
         if (pContext->SamplesToExitCount > 0) {
-            pContext->SamplesToExitCount -= outBuffer->frameCount;
+            // signed - unsigned will trigger integer overflow if result becomes negative.
+            pContext->SamplesToExitCount -= (ssize_t)outBuffer->frameCount;
         } else {
             status = -ENODATA;
         }
