@@ -49,7 +49,7 @@ status_t MockCasFactory::queryPlugins(
 
 status_t MockCasFactory::createPlugin(
         int32_t CA_system_id,
-        uint64_t /*appData*/,
+        void* /*appData*/,
         CasPluginCallback /*callback*/,
         CasPlugin **plugin) {
     if (!isSystemIdSupported(CA_system_id)) {
