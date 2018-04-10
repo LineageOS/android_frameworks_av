@@ -21,6 +21,8 @@
 
 #include <assert.h>
 #include <binder/IPCThreadState.h>
+#include <iomanip>
+#include <iostream>
 #include <map>
 #include <mutex>
 #include <utils/Singleton.h>
@@ -38,7 +40,6 @@ ANDROID_SINGLETON_STATIC_INSTANCE(AAudioClientTracker);
 AAudioClientTracker::AAudioClientTracker()
         : Singleton<AAudioClientTracker>() {
 }
-
 
 std::string AAudioClientTracker::dump() const {
     std::stringstream result;
@@ -198,7 +199,9 @@ std::string AAudioClientTracker::NotificationClient::dump() const {
 
     result << "  client: pid = " << mProcessId << " has " << mStreams.size() << " streams\n";
     for (const auto& serviceStream : mStreams) {
-        result << "     stream: 0x" << std::hex << serviceStream->getHandle() << std::dec << "\n";
+        result << "     stream: 0x" << std::setfill('0') << std::setw(8) << std::hex
+               << serviceStream->getHandle()
+               << std::dec << std::setfill(' ') << "\n";
     }
 
     if (isLocked) {

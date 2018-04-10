@@ -428,6 +428,12 @@ android::media::VolumeShaper::Status AudioStream::applyVolumeShaper(
 }
 #endif
 
+void AudioStream::setDuckAndMuteVolume(float duckAndMuteVolume) {
+    ALOGD("%s() to %f", __func__, duckAndMuteVolume);
+    mDuckAndMuteVolume = duckAndMuteVolume;
+    doSetVolume(); // apply this change
+}
+
 AudioStream::MyPlayerBase::MyPlayerBase(AudioStream *parent) : mParent(parent) {
 }
 
@@ -448,7 +454,6 @@ void AudioStream::MyPlayerBase::unregisterWithAudioManager() {
         mRegistered = false;
     }
 }
-
 
 void AudioStream::MyPlayerBase::destroy() {
     unregisterWithAudioManager();
