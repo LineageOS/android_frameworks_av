@@ -44,7 +44,7 @@ public:
             std::vector<CasPluginDescriptor> *descriptors) const override;
     virtual status_t createPlugin(
             int32_t CA_system_id,
-            uint64_t appData,
+            void *appData,
             CasPluginCallback callback,
             CasPlugin **plugin) override;
 };
@@ -62,7 +62,7 @@ public:
 
 class ClearKeyCasPlugin : public CasPlugin {
 public:
-    ClearKeyCasPlugin(uint64_t appData, CasPluginCallback callback);
+    ClearKeyCasPlugin(void *appData, CasPluginCallback callback);
     virtual ~ClearKeyCasPlugin();
 
     virtual status_t setPrivateData(
@@ -94,7 +94,7 @@ private:
     Mutex mKeyFetcherLock;
     std::unique_ptr<KeyFetcher> mKeyFetcher;
     CasPluginCallback mCallback;
-    uint64_t mAppData;
+    void* mAppData;
 };
 
 class ClearKeyDescramblerPlugin : public DescramblerPlugin {
