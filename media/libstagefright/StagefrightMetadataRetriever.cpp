@@ -125,10 +125,10 @@ status_t StagefrightMetadataRetriever::setDataSource(
 }
 
 VideoFrame* StagefrightMetadataRetriever::getImageAtIndex(
-        int index, int colorFormat, bool metaOnly) {
+        int index, int colorFormat, bool metaOnly, bool thumbnail) {
 
-    ALOGV("getImageAtIndex: index: %d colorFormat: %d, metaOnly: %d",
-            index, colorFormat, metaOnly);
+    ALOGV("getImageAtIndex: index(%d) colorFormat(%d) metaOnly(%d) thumbnail(%d)",
+            index, colorFormat, metaOnly, thumbnail);
 
     if (mExtractor.get() == NULL) {
         ALOGE("no extractor.");
@@ -163,6 +163,10 @@ VideoFrame* StagefrightMetadataRetriever::getImageAtIndex(
 
     sp<MetaData> trackMeta = mExtractor->getTrackMetaData(i);
 
+    if (metaOnly) {
+        return FrameDecoder::getMetadataOnly(trackMeta, colorFormat, thumbnail);
+    }
+
     sp<IMediaSource> source = mExtractor->getTrack(i);
 
     if (source.get() == NULL) {
@@ -190,7 +194,7 @@ VideoFrame* StagefrightMetadataRetriever::getImageAtIndex(
         const AString &componentName = matchingCodecs[i];
         ImageDecoder decoder(componentName, trackMeta, source);
         VideoFrame* frame = decoder.extractFrame(
-                0 /*frameTimeUs*/, 0 /*seekMode*/, colorFormat, metaOnly);
+                thumbnail ? -1 : 0 /*frameTimeUs*/, 0 /*seekMode*/, colorFormat);
 
         if (frame != NULL) {
             return frame;
@@ -265,6 +269,16 @@ status_t StagefrightMetadataRetriever::getFrameInternal(
     sp<MetaData> trackMeta = mExtractor->getTrackMetaData(
             i, MediaExtractor::kIncludeExtensiveMetaData);
 
+    if (metaOnly) {
+        if (outFrame != NULL) {
+            *outFrame = FrameDecoder::getMetadataOnly(trackMeta, colorFormat);
+            if (*outFrame != NULL) {
+                return OK;
+            }
+        }
+        return UNKNOWN_ERROR;
+    }
+
     sp<IMediaSource> source = mExtractor->getTrack(i);
 
     if (source.get() == NULL) {
@@ -294,8 +308,7 @@ status_t StagefrightMetadataRetriever::getFrameInternal(
         const AString &componentName = matchingCodecs[i];
         VideoFrameDecoder decoder(componentName, trackMeta, source);
         if (outFrame != NULL) {
-            *outFrame = decoder.extractFrame(
-                    timeUs, option, colorFormat, metaOnly);
+            *outFrame = decoder.extractFrame(timeUs, option, colorFormat);
             if (*outFrame != NULL) {
                 return OK;
             }

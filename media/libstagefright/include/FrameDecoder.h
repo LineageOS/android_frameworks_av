@@ -44,11 +44,7 @@ struct FrameDecoder {
                 mDstFormat(OMX_COLOR_Format16bitRGB565),
                 mDstBpp(2) {}
 
-    VideoFrame* extractFrame(
-            int64_t frameTimeUs,
-            int option,
-            int colorFormat,
-            bool metaOnly);
+    VideoFrame* extractFrame(int64_t frameTimeUs, int option, int colorFormat);
 
     status_t extractFrames(
             int64_t frameTimeUs,
@@ -56,6 +52,9 @@ struct FrameDecoder {
             int option,
             int colorFormat,
             std::vector<VideoFrame*>* frames);
+
+    static VideoFrame* getMetadataOnly(
+            const sp<MetaData> &trackMeta, int colorFormat, bool thumbnail = false);
 
 protected:
     virtual ~FrameDecoder() {}
@@ -78,8 +77,6 @@ protected:
             int64_t timeUs,
             bool *done) = 0;
 
-    VideoFrame *allocVideoFrame(int32_t width, int32_t height, bool metaOnly);
-
     sp<MetaData> trackMeta()     const      { return mTrackMeta; }
     OMX_COLOR_FORMATTYPE dstFormat() const  { return mDstFormat; }
     int32_t dstBpp()             const      { return mDstBpp; }
@@ -96,7 +93,11 @@ private:
     int32_t mDstBpp;
     std::vector<std::unique_ptr<VideoFrame> > mFrames;
 
-    bool setDstColorFormat(android_pixel_format_t colorFormat);
+    static bool getDstColorFormat(
+            android_pixel_format_t colorFormat,
+            OMX_COLOR_FORMATTYPE *dstFormat,
+            int32_t *dstBpp);
+
     status_t extractInternal(int64_t frameTimeUs, size_t numFrames, int option);
 
     DISALLOW_EVIL_CONSTRUCTORS(FrameDecoder);
@@ -147,7 +148,8 @@ struct ImageDecoder : public FrameDecoder {
             const sp<MetaData> &trackMeta,
             const sp<IMediaSource> &source) :
                 FrameDecoder(componentName, trackMeta, source),
-                mFrame(NULL), mGridRows(1), mGridCols(1), mTilesDecoded(0) {}
+                mFrame(NULL), mGridRows(1), mGridCols(1),
+                mTilesDecoded(0), mThumbnail(false) {}
 
 protected:
     virtual sp<AMessage> onGetFormatAndSeekOptions(
@@ -173,6 +175,7 @@ private:
     int32_t mGridRows;
     int32_t mGridCols;
     int32_t mTilesDecoded;
+    bool mThumbnail;
 };
 
 }  // namespace android
