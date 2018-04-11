@@ -1945,7 +1945,7 @@ AudioFlinger::MmapThread::MmapTrack::MmapTrack(ThreadBase *thread,
                   sessionId, uid, false /* isOut */,
                   ALLOC_NONE,
                   TYPE_DEFAULT, portId),
-        mPid(pid)
+        mPid(pid), mSilenced(false), mSilencedNotified(false)
 {
 }
 
