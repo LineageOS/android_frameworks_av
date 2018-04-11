@@ -47,6 +47,7 @@ int main(int argc, char **argv)
                        SimpleRecorderDataCallbackProc, SimpleRecorderErrorCallbackProc, &myData);
     if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  recorder.open() returned %d\n", result);
+        printf("IMPORTANT - Did you remember to enter:   adb root\n");
         goto error;
     }
     printf("recorder.getFramesPerSecond() = %d\n", recorder.getFramesPerSecond());

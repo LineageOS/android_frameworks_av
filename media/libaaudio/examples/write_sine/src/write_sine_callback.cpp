@@ -204,7 +204,7 @@ static void usage() {
     AAudioArgsParser::usage();
     printf("      -l{count} loopCount start/stop, every other one is silent\n");
     printf("      -t{msec}  play a high pitched tone at the beginning\n");
-    printf("      -f        force periodic underruns by sleeping in callback\n");
+    printf("      -z        force periodic underruns by sleeping in callback\n");
 }
 
 int main(int argc, const char **argv)
@@ -219,7 +219,7 @@ int main(int argc, const char **argv)
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("%s - Play a sine sweep using an AAudio callback V0.1.3\n", argv[0]);
+    printf("%s - Play a sine sweep using an AAudio callback V0.1.4\n", argv[0]);
 
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];
@@ -234,8 +234,8 @@ int main(int argc, const char **argv)
                     case 't':
                         prefixToneMsec = atoi(&arg[2]);
                         break;
-                    case 'f':
-                        forceUnderruns = true;
+                    case 'z':
+                        forceUnderruns = true;  // Zzzzzzz
                         break;
                     default:
                         usage();
