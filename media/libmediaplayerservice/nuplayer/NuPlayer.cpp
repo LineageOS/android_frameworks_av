@@ -1289,7 +1289,8 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                 ALOGV("Tear down audio with reason %d.", reason);
                 if (reason == Renderer::kDueToTimeout && !(mPaused && mOffloadAudio)) {
                     // TimeoutWhenPaused is only for offload mode.
-                    ALOGW("Receive a stale message for teardown.");
+                    ALOGW("Received a stale message for teardown, mPaused(%d), mOffloadAudio(%d)",
+                          mPaused, mOffloadAudio);
                     break;
                 }
                 int64_t positionUs;
@@ -1789,6 +1790,8 @@ void NuPlayer::closeAudioSink() {
 
 void NuPlayer::restartAudio(
         int64_t currentPositionUs, bool forceNonOffload, bool needsToCreateAudioDecoder) {
+    ALOGD("restartAudio timeUs(%lld), dontOffload(%d), createDecoder(%d)",
+          (long long)currentPositionUs, forceNonOffload, needsToCreateAudioDecoder);
     if (mAudioDecoder != NULL) {
         mAudioDecoder->pause();
         mAudioDecoder.clear();
