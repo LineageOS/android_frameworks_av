@@ -566,8 +566,8 @@ protected:
                     // periodically called in the threadLoop() to update power state uids.
                     void            updatePowerState(sp<ThreadBase> thread, bool force = false);
 
-                    /** @return true if one or move active tracks was added or removed since the
-                     *          last time this function was called or the vector was created. */
+                    /** @return true if the active tracks have changed since the last time
+                     *          this function was called or the vector was created. */
                     bool            readAndClearHasChanged();
 
                 private:
@@ -588,7 +588,7 @@ protected:
                     int                 mLastActiveTracksGeneration;
                     wp<T>               mLatestActiveTrack; // latest track added to ActiveTracks
                     SimpleLog * const   mLocalLog;
-                    // If the vector has changed since last call to readAndClearHasChanged
+                    // If the active tracks have changed since last call to readAndClearHasChanged
                     bool                mHasChanged = false;
                 };
 
@@ -927,8 +927,7 @@ private:
     void        removeTrack_l(const sp<Track>& track);
 
     void        readOutputParameters_l();
-    void        updateMetadata_l() final;
-    virtual void sendMetadataToBackend_l(const StreamOutHalInterface::SourceMetadata& metadata);
+    void        updateMetadata_l() override;
 
     virtual void dumpInternals(int fd, const Vector<String16>& args);
     void        dumpTracks(int fd, const Vector<String16>& args);
@@ -1288,8 +1287,7 @@ public:
                 void        removeOutputTrack(MixerThread* thread);
                 uint32_t    waitTimeMs() const { return mWaitTimeMs; }
 
-                void        sendMetadataToBackend_l(
-                        const StreamOutHalInterface::SourceMetadata& metadata) override;
+                void        updateMetadata_l() override;
 protected:
     virtual     uint32_t    activeSleepTimeUs() const;
 
