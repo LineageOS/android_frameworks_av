@@ -26,30 +26,39 @@
 #include "AAudioExampleUtils.h"
 #include "AAudioSimpleRecorder.h"
 
-#define NUM_SECONDS           5
-
-int main(int argc, char **argv)
+int main(int argc, const char **argv)
 {
-    (void)argc; // unused
-    AAudioSimpleRecorder recorder;
-    PeakTrackerData_t myData = {0.0};
-    aaudio_result_t result;
+    AAudioArgsParser      argParser;
+    AAudioSimpleRecorder  recorder;
+    PeakTrackerData_t     myData = {0.0};
+    AAudioStream         *aaudioStream = nullptr;
+    aaudio_result_t       result;
     aaudio_stream_state_t state;
+
+    int       loopsNeeded = 0;
     const int displayRateHz = 20; // arbitrary
-    const int loopsNeeded = NUM_SECONDS * displayRateHz;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
-    printf("%s - Display audio input using an AAudio callback, V0.1.2\n", argv[0]);
+    printf("%s - Display audio input using an AAudio callback, V0.1.3\n", argv[0]);
 
-    result = recorder.open(2, 48000, AAUDIO_FORMAT_PCM_I16,
-                       SimpleRecorderDataCallbackProc, SimpleRecorderErrorCallbackProc, &myData);
+    if (argParser.parseArgs(argc, argv)) {
+        return EXIT_FAILURE;
+    }
+
+    result = recorder.open(argParser,
+                           SimpleRecorderDataCallbackProc,
+                           SimpleRecorderErrorCallbackProc,
+                           &myData);
     if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  recorder.open() returned %d\n", result);
         printf("IMPORTANT - Did you remember to enter:   adb root\n");
         goto error;
     }
+    aaudioStream = recorder.getStream();
+    argParser.compareWithStream(aaudioStream);
+
     printf("recorder.getFramesPerSecond() = %d\n", recorder.getFramesPerSecond());
     printf("recorder.getSamplesPerFrame() = %d\n", recorder.getSamplesPerFrame());
 
@@ -59,7 +68,9 @@ int main(int argc, char **argv)
         goto error;
     }
 
-    printf("Sleep for %d seconds while audio record in a callback thread.\n", NUM_SECONDS);
+    printf("Sleep for %d seconds while audio record in a callback thread.\n",
+           argParser.getDurationSeconds());
+    loopsNeeded = argParser.getDurationSeconds() * displayRateHz;
     for (int i = 0; i < loopsNeeded; i++)
     {
         const struct timespec request = { .tv_sec = 0,
@@ -68,7 +79,7 @@ int main(int argc, char **argv)
         printf("%08d: ", (int)recorder.getFramesRead());
         displayPeakLevel(myData.peakLevel);
 
-        result = AAudioStream_waitForStateChange(recorder.getStream(),
+        result = AAudioStream_waitForStateChange(aaudioStream,
                                                  AAUDIO_STREAM_STATE_CLOSED,
                                                  &state,
                                                  0);
@@ -94,7 +105,8 @@ int main(int argc, char **argv)
         goto error;
     }
 
-    printf("Sleep for %d seconds while audio records in a callback thread.\n", NUM_SECONDS);
+    printf("Sleep for %d seconds while audio records in a callback thread.\n",
+           argParser.getDurationSeconds());
     for (int i = 0; i < loopsNeeded; i++)
     {
         const struct timespec request = { .tv_sec = 0,
@@ -103,13 +115,14 @@ int main(int argc, char **argv)
         printf("%08d: ", (int)recorder.getFramesRead());
         displayPeakLevel(myData.peakLevel);
 
-        state = AAudioStream_getState(recorder.getStream());
+        state = AAudioStream_getState(aaudioStream);
         if (state != AAUDIO_STREAM_STATE_STARTING && state != AAUDIO_STREAM_STATE_STARTED) {
             printf("Stream state is %d %s!\n", state, AAudio_convertStreamStateToText(state));
             break;
         }
     }
     printf("Woke up now.\n");
+    argParser.compareWithStream(aaudioStream);
 
     result = recorder.stop();
     if (result != AAUDIO_OK) {
