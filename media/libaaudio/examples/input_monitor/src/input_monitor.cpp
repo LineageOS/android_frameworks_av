@@ -26,23 +26,22 @@
 #include "AAudioExampleUtils.h"
 #include "AAudioSimpleRecorder.h"
 
-// TODO support FLOAT
-#define REQUIRED_FORMAT    AAUDIO_FORMAT_PCM_I16
 #define MIN_FRAMES_TO_READ 48  /* arbitrary, 1 msec at 48000 Hz */
 
 static const int FRAMES_PER_LINE = 20000;
 
 int main(int argc, const char **argv)
 {
-    AAudioArgsParser   argParser;
-    aaudio_result_t result;
-    AAudioSimpleRecorder recorder;
-    int actualSamplesPerFrame;
-    int actualSampleRate;
-    aaudio_format_t       actualDataFormat;
+    AAudioArgsParser      argParser;
+    AAudioSimpleRecorder  recorder;
+    AAudioStream         *aaudioStream = nullptr;
 
-    AAudioStream *aaudioStream = nullptr;
+    aaudio_result_t       result;
+    aaudio_format_t       actualDataFormat;
     aaudio_stream_state_t state;
+
+    int32_t actualSamplesPerFrame;
+    int32_t actualSampleRate;
     int32_t framesPerBurst = 0;
     int32_t framesPerRead = 0;
     int32_t framesToRecord = 0;
@@ -50,18 +49,18 @@ int main(int argc, const char **argv)
     int32_t nextFrameCount = 0;
     int32_t frameCount = 0;
     int32_t xRunCount = 0;
-    int64_t previousFramePosition = -1;
-    int16_t *data = nullptr;
-    float peakLevel = 0.0;
     int32_t deviceId;
+
+    int16_t *shortData = nullptr;
+    float   *floatData = nullptr;
+    float    peakLevel = 0.0;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("%s - Monitor input level using AAudio read, V0.1.2\n", argv[0]);
+    printf("%s - Monitor input level using AAudio read, V0.1.3\n", argv[0]);
 
-    argParser.setFormat(REQUIRED_FORMAT);
     if (argParser.parseArgs(argc, argv)) {
         return EXIT_FAILURE;
     }
@@ -69,6 +68,7 @@ int main(int argc, const char **argv)
     result = recorder.open(argParser);
     if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  recorder.open() returned %d\n", result);
+        printf("IMPORTANT - Did you remember to enter:   adb root\n");
         goto finish;
     }
     aaudioStream = recorder.getStream();
@@ -96,17 +96,18 @@ int main(int argc, const char **argv)
     printf("DataFormat: framesPerRead  = %d\n",framesPerRead);
 
     actualDataFormat = AAudioStream_getFormat(aaudioStream);
-    printf("DataFormat: requested      = %d, actual = %d\n",
-           REQUIRED_FORMAT, actualDataFormat);
-    // TODO handle other data formats
-    assert(actualDataFormat == REQUIRED_FORMAT);
 
     // Allocate a buffer for the PCM_16 audio data.
-    data = new(std::nothrow) int16_t[framesPerRead * actualSamplesPerFrame];
-    if (data == nullptr) {
-        fprintf(stderr, "ERROR - could not allocate data buffer\n");
-        result = AAUDIO_ERROR_NO_MEMORY;
-        goto finish;
+    switch (actualDataFormat) {
+        case AAUDIO_FORMAT_PCM_I16:
+            shortData = new int16_t[framesPerRead * actualSamplesPerFrame];
+            break;
+        case AAUDIO_FORMAT_PCM_FLOAT:
+            floatData = new float[framesPerRead * actualSamplesPerFrame];
+            break;
+        default:
+            fprintf(stderr, "UNEXPECTED FORMAT! %d", actualDataFormat);
+            goto finish;
     }
 
     // Start the stream.
@@ -126,7 +127,12 @@ int main(int argc, const char **argv)
         // Read audio data from the stream.
         const int64_t timeoutNanos = 1000 * NANOS_PER_MILLISECOND;
         int minFrames = (framesToRecord < framesPerRead) ? framesToRecord : framesPerRead;
-        int actual = AAudioStream_read(aaudioStream, data, minFrames, timeoutNanos);
+        int actual = 0;
+        if (actualDataFormat == AAUDIO_FORMAT_PCM_I16) {
+            actual = AAudioStream_read(aaudioStream, shortData, minFrames, timeoutNanos);
+        } else if (actualDataFormat == AAUDIO_FORMAT_PCM_FLOAT) {
+            actual = AAudioStream_read(aaudioStream, floatData, minFrames, timeoutNanos);
+        }
         if (actual < 0) {
             fprintf(stderr, "ERROR - AAudioStream_read() returned %d\n", actual);
             result = actual;
@@ -140,7 +146,12 @@ int main(int argc, const char **argv)
 
         // Peak finder.
         for (int frameIndex = 0; frameIndex < actual; frameIndex++) {
-            float sample = data[frameIndex * actualSamplesPerFrame] * (1.0/32768);
+            float sample = 0.0f;
+            if (actualDataFormat == AAUDIO_FORMAT_PCM_I16) {
+                sample = shortData[frameIndex * actualSamplesPerFrame] * (1.0/32768);
+            } else if (actualDataFormat == AAUDIO_FORMAT_PCM_FLOAT) {
+                sample = floatData[frameIndex * actualSamplesPerFrame];
+            }
             if (sample > peakLevel) {
                 peakLevel = sample;
             }
@@ -151,17 +162,15 @@ int main(int argc, const char **argv)
             displayPeakLevel(peakLevel);
             peakLevel = 0.0;
             nextFrameCount += FRAMES_PER_LINE;
-        }
 
-        // Print timestamps.
-        int64_t framePosition = 0;
-        int64_t frameTime = 0;
-        aaudio_result_t timeResult;
-        timeResult = AAudioStream_getTimestamp(aaudioStream, CLOCK_MONOTONIC,
-                                               &framePosition, &frameTime);
+            // Print timestamps.
+            int64_t framePosition = 0;
+            int64_t frameTime = 0;
+            aaudio_result_t timeResult;
+            timeResult = AAudioStream_getTimestamp(aaudioStream, CLOCK_MONOTONIC,
+                                                   &framePosition, &frameTime);
 
-        if (timeResult == AAUDIO_OK) {
-            if (framePosition > (previousFramePosition + FRAMES_PER_LINE)) {
+            if (timeResult == AAUDIO_OK) {
                 int64_t realTime = getNanoseconds();
                 int64_t framesRead = AAudioStream_getFramesRead(aaudioStream);
 
@@ -175,10 +184,14 @@ int main(int argc, const char **argv)
                        (long long) framePosition,
                        (long long) frameTime,
                        latencyMillis);
-                previousFramePosition = framePosition;
+            } else {
+                printf("WARNING - AAudioStream_getTimestamp() returned %d\n", timeResult);
             }
         }
     }
+
+    state = AAudioStream_getState(aaudioStream);
+    printf("after loop, state = %s\n", AAudio_convertStreamStateToText(state));
 
     xRunCount = AAudioStream_getXRunCount(aaudioStream);
     printf("AAudioStream_getXRunCount %d\n", xRunCount);
@@ -192,7 +205,8 @@ int main(int argc, const char **argv)
 
 finish:
     recorder.close();
-    delete[] data;
+    delete[] shortData;
+    delete[] floatData;
     printf("exiting - AAudio result = %d = %s\n", result, AAudio_convertResultToText(result));
     return (result != AAUDIO_OK) ? EXIT_FAILURE : EXIT_SUCCESS;
 }
