@@ -146,6 +146,8 @@ typedef int32_t aaudio_performance_mode_t;
  * to make more refined volume or routing decisions.
  *
  * Note that these match the equivalent values in AudioAttributes in the Android Java API.
+ *
+ * Added in API level 28.
  */
 enum {
     /**
@@ -220,6 +222,8 @@ typedef int32_t aaudio_usage_t;
  * enforce audio focus.
  *
  * Note that these match the equivalent values in AudioAttributes in the Android Java API.
+ *
+ * Added in API level 28.
  */
 enum {
 
@@ -252,6 +256,8 @@ typedef int32_t aaudio_content_type_t;
  * configuration.
  *
  * Note that these match the equivalent values in MediaRecorder.AudioSource in the Android Java API.
+ *
+ * Added in API level 28.
  */
 enum {
     /**
@@ -288,6 +294,8 @@ enum {
      * Do not allocate a session ID.
      * Effects cannot be used with this stream.
      * Default.
+     *
+     * Added in API level 28.
      */
     AAUDIO_SESSION_ID_NONE = -1,
 
@@ -297,6 +305,8 @@ enum {
      * Note that the use of this flag may result in higher latency.
      *
      * Note that this matches the value of AudioManager.AUDIO_SESSION_ID_GENERATE.
+     *
+     * Added in API level 28.
      */
     AAUDIO_SESSION_ID_ALLOCATE = 0,
 };
@@ -481,6 +491,8 @@ AAUDIO_API void AAudioStreamBuilder_setPerformanceMode(AAudioStreamBuilder* buil
  *
  * The default, if you do not call this function, is AAUDIO_USAGE_MEDIA.
  *
+ * Added in API level 28.
+ *
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @param usage the desired usage, eg. AAUDIO_USAGE_GAME
  */
@@ -495,6 +507,8 @@ AAUDIO_API void AAudioStreamBuilder_setUsage(AAudioStreamBuilder* builder,
  * This could, for example, affect whether a stream is paused when a notification occurs.
  *
  * The default, if you do not call this function, is AAUDIO_CONTENT_TYPE_MUSIC.
+ *
+ * Added in API level 28.
  *
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @param contentType the type of audio data, eg. AAUDIO_CONTENT_TYPE_SPEECH
@@ -513,6 +527,8 @@ AAUDIO_API void AAudioStreamBuilder_setContentType(AAudioStreamBuilder* builder,
  * The default, if you do not call this function, is AAUDIO_INPUT_PRESET_VOICE_RECOGNITION.
  * That is because VOICE_RECOGNITION is the preset with the lowest latency
  * on many platforms.
+ *
+ * Added in API level 28.
  *
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @param inputPreset the desired configuration for recording
@@ -539,6 +555,8 @@ AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
  * and effects applied using the Java AudioEffect API.
  *
  * Allocated session IDs will always be positive and nonzero.
+ *
+ * Added in API level 28.
  *
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @param sessionId an allocated sessionID or AAUDIO_SESSION_ID_ALLOCATE
@@ -1059,6 +1077,8 @@ AAUDIO_API int64_t AAudioStream_getFramesRead(AAudioStream* stream);
  *
  * The sessionID for a stream should not change once the stream has been opened.
  *
+ * Added in API level 28.
+ *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return session ID or AAUDIO_SESSION_ID_NONE
  */
@@ -1094,6 +1114,8 @@ AAUDIO_API aaudio_result_t AAudioStream_getTimestamp(AAudioStream* stream,
 /**
  * Return the use case for the stream.
  *
+ * Added in API level 28.
+ *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return frames read
  */
@@ -1102,6 +1124,8 @@ AAUDIO_API aaudio_usage_t AAudioStream_getUsage(AAudioStream* stream);
 /**
  * Return the content type for the stream.
  *
+ * Added in API level 28.
+ *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return content type, for example AAUDIO_CONTENT_TYPE_MUSIC
  */
@@ -1109,6 +1133,8 @@ AAUDIO_API aaudio_content_type_t AAudioStream_getContentType(AAudioStream* strea
 
 /**
  * Return the input preset for the stream.
+ *
+ * Added in API level 28.
  *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return input preset, for example AAUDIO_INPUT_PRESET_CAMCORDER
