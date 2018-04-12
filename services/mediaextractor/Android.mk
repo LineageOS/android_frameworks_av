@@ -15,10 +15,9 @@ include $(BUILD_SHARED_LIBRARY)
 # service executable
 include $(CLEAR_VARS)
 # seccomp filters are defined for the following architectures:
-LOCAL_REQUIRED_MODULES := crash_dump.policy
-LOCAL_REQUIRED_MODULES_arm := mediaextractor.policy
-LOCAL_REQUIRED_MODULES_arm64 := mediaextractor.policy
-LOCAL_REQUIRED_MODULES_x86 := mediaextractor.policy
+LOCAL_REQUIRED_MODULES_arm := crash_dump.policy mediaextractor.policy
+LOCAL_REQUIRED_MODULES_arm64 := crash_dump.policy mediaextractor.policy
+LOCAL_REQUIRED_MODULES_x86 := crash_dump.policy mediaextractor.policy
 
 # extractor libraries
 LOCAL_REQUIRED_MODULES += \

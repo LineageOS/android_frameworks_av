@@ -27,9 +27,8 @@ _software_codecs := \
 include $(CLEAR_VARS)
 # seccomp is not required for coverage build.
 ifneq ($(NATIVE_COVERAGE),true)
-LOCAL_REQUIRED_MODULES := crash_dump.policy
-LOCAL_REQUIRED_MODULES_arm := mediacodec.policy
-LOCAL_REQUIRED_MODULES_x86 := mediacodec.policy
+LOCAL_REQUIRED_MODULES_arm := crash_dump.policy mediacodec.policy
+LOCAL_REQUIRED_MODULES_x86 := crash_dump.policy mediacodec.policy
 endif
 LOCAL_SRC_FILES := main_codecservice.cpp
 LOCAL_SHARED_LIBRARIES := \
