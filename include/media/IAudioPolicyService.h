@@ -111,6 +111,9 @@ public:
                                     const Parcel& data,
                                     Parcel* reply,
                                     uint32_t flags = 0);
+
+private:
+    status_t sanitizeEffectDescriptor(effect_descriptor_t* desc);
 };
 
 // ----------------------------------------------------------------------------
