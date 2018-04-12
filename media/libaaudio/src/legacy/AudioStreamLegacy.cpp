@@ -179,19 +179,17 @@ aaudio_result_t AudioStreamLegacy::getBestTimestamp(clockid_t clockId,
     int64_t localPosition;
     status_t status = extendedTimestamp->getBestTimestamp(&localPosition, timeNanoseconds,
                                                           timebase, &location);
-    // use MonotonicCounter to prevent retrograde motion.
-    mTimestampPosition.update32((int32_t)localPosition);
-    *framePosition = mTimestampPosition.get();
+    if (status == OK) {
+        // use MonotonicCounter to prevent retrograde motion.
+        mTimestampPosition.update32((int32_t) localPosition);
+        *framePosition = mTimestampPosition.get();
+    }
 
 //    ALOGD("getBestTimestamp() fposition: server = %6lld, kernel = %6lld, location = %d",
 //          (long long) extendedTimestamp->mPosition[ExtendedTimestamp::Location::LOCATION_SERVER],
 //          (long long) extendedTimestamp->mPosition[ExtendedTimestamp::Location::LOCATION_KERNEL],
 //          (int)location);
-    if (status == WOULD_BLOCK) {
-        return AAUDIO_ERROR_INVALID_STATE;
-    } else {
-        return AAudioConvert_androidToAAudioResult(status);
-    }
+    return AAudioConvert_androidToAAudioResult(status);
 }
 
 void AudioStreamLegacy::onAudioDeviceUpdate(audio_port_handle_t deviceId)
