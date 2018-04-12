@@ -8,6 +8,7 @@
         android:label="Media Components Update"
         android:multiArch="true"
         android:allowBackup="false"
+        android:hasCode="false"
         android:extractNativeLibs="false">
     </application>
 
