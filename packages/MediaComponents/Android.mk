@@ -14,59 +14,59 @@
 # limitations under the License.
 #
 
-LOCAL_PATH := $(call my-dir)
-
-ifneq ($(TARGET_BUILD_PDK),true)
-# Build MediaComponents only if this is not a PDK build.  MediaComponents won't
-# build in PDK builds because frameworks/base/core/java is not available but
-# IMediaSession2.aidl and IMediaController2.aidl are using classes from
-# frameworks/base/core/java.
-
-include $(CLEAR_VARS)
-
-LOCAL_PACKAGE_NAME := MediaComponents
-LOCAL_MODULE_OWNER := google
-
-# TODO: create a separate key for this package.
-LOCAL_CERTIFICATE := platform
-
-# TODO: Use System SDK once public APIs are approved
-# LOCAL_SDK_VERSION := system_current
-LOCAL_PRIVATE_PLATFORM_APIS := true
-
-LOCAL_SRC_FILES := \
-    $(call all-java-files-under, src) \
-    $(call all-Iaidl-files-under, src)
-
-LOCAL_PROGUARD_FLAG_FILES := proguard.cfg
-
-LOCAL_MULTILIB := first
-
-LOCAL_JAVA_LIBRARIES += android-support-annotations
-
-# To embed native libraries in package, uncomment the lines below.
-#LOCAL_MODULE_TAGS := samples
-#LOCAL_JNI_SHARED_LIBRARIES := \
-#    libaacextractor \
-#    libamrextractor \
-#    libflacextractor \
-#    libmidiextractor \
-#    libmkvextractor \
-#    libmp3extractor \
-#    libmp4extractor \
-#    libmpeg2extractor \
-#    liboggextractor \
-#    libwavextractor \
-
-# TODO: Remove dependency with other support libraries.
-LOCAL_STATIC_ANDROID_LIBRARIES += \
-    android-support-v4 \
-    android-support-v7-appcompat \
-    android-support-v7-palette
-LOCAL_USE_AAPT2 := true
-
-include $(BUILD_PACKAGE)
-
-endif  # ifneq ($(TARGET_BUILD_PDK),true)
-
-include $(call all-makefiles-under,$(LOCAL_PATH))
+# This package is excluded from build for now since APIs using this apk became hidden.
+#
+#LOCAL_PATH := $(call my-dir)
+#ifneq ($(TARGET_BUILD_PDK),true) # Build MediaComponents only if this is not a PDK build.  MediaComponents won't
+## build in PDK builds because frameworks/base/core/java is not available but
+## IMediaSession2.aidl and IMediaController2.aidl are using classes from
+## frameworks/base/core/java.
+#
+#include $(CLEAR_VARS)
+#
+#LOCAL_PACKAGE_NAME := MediaComponents
+#LOCAL_MODULE_OWNER := google
+#
+## TODO: create a separate key for this package.
+#LOCAL_CERTIFICATE := platform
+#
+## TODO: Use System SDK once public APIs are approved
+## LOCAL_SDK_VERSION := system_current
+#LOCAL_PRIVATE_PLATFORM_APIS := true
+#
+#LOCAL_SRC_FILES := \
+#    $(call all-java-files-under, src) \
+#    $(call all-Iaidl-files-under, src)
+#
+#LOCAL_PROGUARD_FLAG_FILES := proguard.cfg
+#
+#LOCAL_MULTILIB := first
+#
+#LOCAL_JAVA_LIBRARIES += android-support-annotations
+#
+## To embed native libraries in package, uncomment the lines below.
+##LOCAL_MODULE_TAGS := samples
+##LOCAL_JNI_SHARED_LIBRARIES := \
+##    libaacextractor \
+##    libamrextractor \
+##    libflacextractor \
+##    libmidiextractor \
+##    libmkvextractor \
+##    libmp3extractor \
+##    libmp4extractor \
+##    libmpeg2extractor \
+##    liboggextractor \
+##    libwavextractor \
+#
+## TODO: Remove dependency with other support libraries.
+#LOCAL_STATIC_ANDROID_LIBRARIES += \
+#    android-support-v4 \
+#    android-support-v7-appcompat \
+#    android-support-v7-palette
+#LOCAL_USE_AAPT2 := true
+#
+#include $(BUILD_PACKAGE)
+#
+#endif  # ifneq ($(TARGET_BUILD_PDK),true)
+#
+#include $(call all-makefiles-under,$(LOCAL_PATH))
