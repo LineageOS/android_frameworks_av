@@ -185,6 +185,8 @@ public:
                                     uint32_t flags = 0);
 private:
     void sanetizeAudioAttributes(audio_attributes_t* attr);
+    status_t sanitizeEffectDescriptor(effect_descriptor_t* desc);
+    status_t sanitizeAudioPortConfig(struct audio_port_config* config);
 };
 
 // ----------------------------------------------------------------------------
