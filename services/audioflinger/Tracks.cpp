@@ -1782,14 +1782,14 @@ void AudioFlinger::RecordThread::RecordTrack::invalidate()
 
 /*static*/ void AudioFlinger::RecordThread::RecordTrack::appendDumpHeader(String8& result)
 {
-    result.append("Active Client Session S  Flags   Format Chn mask  SRate   Server FrmCnt\n");
+    result.append("Active Client Session S  Flags   Format Chn mask  SRate   Server FrmCnt Sil\n");
 }
 
 void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool active)
 {
     result.appendFormat("%c%5s %6u %7u %2s 0x%03X "
             "%08X %08X %6u "
-            "%08X %6zu\n",
+            "%08X %6zu %3c\n",
             isFastTrack() ? 'F' : ' ',
             active ? "yes" : "no",
             (mClient == 0) ? getpid_cached : mClient->pid(),
@@ -1802,7 +1802,8 @@ void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool a
             mSampleRate,
 
             mCblk->mServer,
-            mFrameCount
+            mFrameCount,
+            isSilenced() ? 's' : 'n'
             );
 }
 
