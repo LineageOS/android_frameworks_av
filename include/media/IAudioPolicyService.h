@@ -111,6 +111,10 @@ public:
                                     const Parcel& data,
                                     Parcel* reply,
                                     uint32_t flags = 0);
+
+private:
+    status_t sanitizeEffectDescriptor(effect_descriptor_t* desc);
+    status_t sanitizeAudioPortConfig(struct audio_port_config* config);
 };
 
 // ----------------------------------------------------------------------------
