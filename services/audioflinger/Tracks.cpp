@@ -407,6 +407,9 @@ AudioFlinger::PlaybackThread::Track::Track(
     // mSinkTimestamp
     mFastIndex(-1),
     mCachedVolume(1.0),
+    /* The track might not play immediately after being active, similarly as if its volume was 0.
+     * When the track starts playing, its volume will be computed. */
+    mFinalVolume(0.f),
     mResumeToStopping(false),
     mFlushHwPending(false),
     mFlags(flags)
@@ -997,6 +1000,23 @@ sp<VolumeShaper::State> AudioFlinger::PlaybackThread::Track::getVolumeShaperStat
     return mVolumeHandler->getVolumeShaperState(id);
 }
 
+void AudioFlinger::PlaybackThread::Track::setFinalVolume(float volume)
+{
+    if (mFinalVolume != volume) { // Compare to an epsilon if too many meaningless updates
+        mFinalVolume = volume;
+        setMetadataHasChanged();
+    }
+}
+
+void AudioFlinger::PlaybackThread::Track::copyMetadataTo(MetadataInserter& backInserter) const
+{
+    *backInserter++ = {
+            .usage = mAttr.usage,
+            .content_type = mAttr.content_type,
+            .gain = mFinalVolume,
+    };
+}
+
 status_t AudioFlinger::PlaybackThread::Track::getTimestamp(AudioTimestamp& timestamp)
 {
     if (!isOffloaded() && !isDirect()) {
@@ -1425,6 +1445,21 @@ bool AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t frame
     }
 
     return outputBufferFull;
+}
+
+void AudioFlinger::PlaybackThread::OutputTrack::copyMetadataTo(MetadataInserter& backInserter) const
+{
+    std::lock_guard<std::mutex> lock(mTrackMetadatasMutex);
+    backInserter = std::copy(mTrackMetadatas.begin(), mTrackMetadatas.end(), backInserter);
+}
+
+void AudioFlinger::PlaybackThread::OutputTrack::setMetadatas(const SourceMetadatas& metadatas) {
+    {
+        std::lock_guard<std::mutex> lock(mTrackMetadatasMutex);
+        mTrackMetadatas = metadatas;
+    }
+    // No need to adjust metadata track volumes as OutputTrack volumes are always 0dBFS.
+    setMetadataHasChanged();
 }
 
 status_t AudioFlinger::PlaybackThread::OutputTrack::obtainBuffer(
