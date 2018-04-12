@@ -87,7 +87,6 @@ error:
     return;
 }
 
-// TODO use this as a base class within AAudio
 class AAudioParameters {
 public:
 
@@ -262,6 +261,9 @@ public:
                 case 'd':
                     setDeviceId(atoi(&arg[2]));
                     break;
+                case 'f':
+                    setFormat(atoi(&arg[2]));
+                    break;
                 case 'i':
                     setInputPreset(atoi(&arg[2]));
                     break;
@@ -326,6 +328,10 @@ public:
         printf("      -b{bufferCapacity} frames\n");
         printf("      -c{channels} for example 2 for stereo\n");
         printf("      -d{deviceId} default is %d\n", AAUDIO_UNSPECIFIED);
+        printf("      -f{0|1|2} set format\n");
+        printf("          0 = UNSPECIFIED\n");
+        printf("          1 = PCM_I16\n");
+        printf("          2 = FLOAT\n");
         printf("      -i{inputPreset} eg. 5 for AAUDIO_INPUT_PRESET_CAMCORDER\n");
         printf("      -m{0|1|2|3} set MMAP policy\n");
         printf("          0 = _UNSPECIFIED, use aaudio.mmap_policy system property, default\n");
