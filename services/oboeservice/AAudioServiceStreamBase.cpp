@@ -61,7 +61,7 @@ AAudioServiceStreamBase::~AAudioServiceStreamBase() {
 }
 
 std::string AAudioServiceStreamBase::dumpHeader() {
-    return std::string("    T   Handle   UId Run State Format Burst Chan Capacity");
+    return std::string("    T   Handle   UId   Port Run State Format Burst Chan Capacity");
 }
 
 std::string AAudioServiceStreamBase::dump() const {
@@ -70,6 +70,7 @@ std::string AAudioServiceStreamBase::dump() const {
     result << "    0x" << std::setfill('0') << std::setw(8) << std::hex << mHandle
            << std::dec << std::setfill(' ') ;
     result << std::setw(6) << mMmapClient.clientUid;
+    result << std::setw(7) << mClientHandle;
     result << std::setw(4) << (isRunning() ? "yes" : " no");
     result << std::setw(6) << getState();
     result << std::setw(7) << getFormat();

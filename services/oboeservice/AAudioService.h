@@ -83,6 +83,8 @@ public:
     aaudio_result_t stopClient(aaudio::aaudio_handle_t streamHandle,
                                        audio_port_handle_t clientHandle) override;
 
+    aaudio_result_t disconnectStreamByPortHandle(audio_port_handle_t portHandle);
+
 private:
 
     /**
