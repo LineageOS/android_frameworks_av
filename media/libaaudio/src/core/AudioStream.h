@@ -328,10 +328,7 @@ public:
     }
 
     // This is used by the AudioManager to duck and mute the stream when changing audio focus.
-    void setDuckAndMuteVolume(float duckAndMuteVolume) {
-        mDuckAndMuteVolume = duckAndMuteVolume;
-        doSetVolume(); // apply this change
-    }
+    void setDuckAndMuteVolume(float duckAndMuteVolume);
 
     float getDuckAndMuteVolume() const {
         return mDuckAndMuteVolume;
