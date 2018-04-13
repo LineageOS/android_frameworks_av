@@ -501,9 +501,9 @@ aaudio_result_t AudioStreamInternal::onEventFromServer(AAudioServiceMessage *mes
             ALOGW("%s - AAUDIO_SERVICE_EVENT_DISCONNECTED - FIFO cleared", __func__);
             break;
         case AAUDIO_SERVICE_EVENT_VOLUME:
+            ALOGD("%s - AAUDIO_SERVICE_EVENT_VOLUME %lf", __func__, message->event.dataDouble);
             mStreamVolume = (float)message->event.dataDouble;
             doSetVolume();
-            ALOGD("%s - AAUDIO_SERVICE_EVENT_VOLUME %lf", __func__, message->event.dataDouble);
             break;
         case AAUDIO_SERVICE_EVENT_XRUN:
             mXRunCount = static_cast<int32_t>(message->event.dataLong);

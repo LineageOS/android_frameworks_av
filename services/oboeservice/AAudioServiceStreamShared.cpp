@@ -122,19 +122,18 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
 
     aaudio_result_t result = AAudioServiceStreamBase::open(request, AAUDIO_SHARING_MODE_SHARED);
     if (result != AAUDIO_OK) {
-        ALOGE("open() returned %d", result);
+        ALOGE("%s() returned %d", __func__, result);
         return result;
     }
 
     const AAudioStreamConfiguration &configurationInput = request.getConstantConfiguration();
-
 
     // Is the request compatible with the shared endpoint?
     setFormat(configurationInput.getFormat());
     if (getFormat() == AAUDIO_FORMAT_UNSPECIFIED) {
         setFormat(AAUDIO_FORMAT_PCM_FLOAT);
     } else if (getFormat() != AAUDIO_FORMAT_PCM_FLOAT) {
-        ALOGE("open() mAudioFormat = %d, need FLOAT", getFormat());
+        ALOGD("%s() mAudioFormat = %d, need FLOAT", __func__, getFormat());
         result = AAUDIO_ERROR_INVALID_FORMAT;
         goto error;
     }
@@ -143,8 +142,8 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     if (getSampleRate() == AAUDIO_UNSPECIFIED) {
         setSampleRate(mServiceEndpoint->getSampleRate());
     } else if (getSampleRate() != mServiceEndpoint->getSampleRate()) {
-        ALOGE("open() mSampleRate = %d, need %d",
-              getSampleRate(), mServiceEndpoint->getSampleRate());
+        ALOGD("%s() mSampleRate = %d, need %d",
+              __func__, getSampleRate(), mServiceEndpoint->getSampleRate());
         result = AAUDIO_ERROR_INVALID_RATE;
         goto error;
     }
@@ -153,8 +152,8 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     if (getSamplesPerFrame() == AAUDIO_UNSPECIFIED) {
         setSamplesPerFrame(mServiceEndpoint->getSamplesPerFrame());
     } else if (getSamplesPerFrame() != mServiceEndpoint->getSamplesPerFrame()) {
-        ALOGE("open() mSamplesPerFrame = %d, need %d",
-              getSamplesPerFrame(), mServiceEndpoint->getSamplesPerFrame());
+        ALOGD("%s() mSamplesPerFrame = %d, need %d",
+              __func__, getSamplesPerFrame(), mServiceEndpoint->getSamplesPerFrame());
         result = AAUDIO_ERROR_OUT_OF_RANGE;
         goto error;
     }
@@ -173,15 +172,12 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
         mAudioDataQueue = new SharedRingBuffer();
         result = mAudioDataQueue->allocate(calculateBytesPerFrame(), getBufferCapacity());
         if (result != AAUDIO_OK) {
-            ALOGE("open() could not allocate FIFO with %d frames",
-                  getBufferCapacity());
+            ALOGE("%s() could not allocate FIFO with %d frames",
+                  __func__, getBufferCapacity());
             result = AAUDIO_ERROR_NO_MEMORY;
             goto error;
         }
     }
-
-    ALOGD("open() actual rate = %d, channels = %d, deviceId = %d",
-          getSampleRate(), getSamplesPerFrame(), mServiceEndpoint->getDeviceId());
 
     result = mServiceEndpoint->registerStream(keep);
     if (result != AAUDIO_OK) {
@@ -217,7 +213,7 @@ aaudio_result_t AAudioServiceStreamShared::getAudioDataDescription(
 {
     std::lock_guard<std::mutex> lock(mAudioDataQueueLock);
     if (mAudioDataQueue == nullptr) {
-        ALOGE("getAudioDataDescription(): mUpMessageQueue null! - stream not open");
+        ALOGE("%s(): mUpMessageQueue null! - stream not open", __func__);
         return AAUDIO_ERROR_NULL;
     }
     // Gather information on the data queue.
@@ -255,8 +251,8 @@ aaudio_result_t AAudioServiceStreamShared::getHardwareTimestamp(int64_t *positio
         int64_t offset = mTimestampPositionOffset.load();
         // TODO, do not go below starting value
         position -= offset; // Offset from shared MMAP stream
-        ALOGV("getHardwareTimestamp() %8lld = %8lld - %8lld",
-              (long long) position, (long long) (position + offset), (long long) offset);
+        ALOGV("%s() %8lld = %8lld - %8lld",
+              __func__, (long long) position, (long long) (position + offset), (long long) offset);
     }
     *positionFrames = position;
     return result;
