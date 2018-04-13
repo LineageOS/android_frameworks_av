@@ -276,30 +276,27 @@ static VideoFrame *extractVideoFrame(
     int32_t gridRows = 1, gridCols = 1;
     if (overrideMeta == NULL) {
         // check if we're dealing with a tiled heif
-        int32_t gridWidth, gridHeight;
+        int32_t gridWidth, gridHeight, tmpRows, tmpCols;
         if (trackMeta->findInt32(kKeyGridWidth, &gridWidth) && gridWidth > 0
-         && trackMeta->findInt32(kKeyGridHeight, &gridHeight) && gridHeight > 0) {
-            int32_t width, height, displayWidth, displayHeight;
+         && trackMeta->findInt32(kKeyGridHeight, &gridHeight) && gridHeight > 0
+         && trackMeta->findInt32(kKeyGridRows, &tmpRows) && tmpRows > 0
+         && trackMeta->findInt32(kKeyGridCols, &tmpCols) && tmpCols > 0) {
+            int32_t width, height;
             CHECK(trackMeta->findInt32(kKeyWidth, &width));
             CHECK(trackMeta->findInt32(kKeyHeight, &height));
-            CHECK(trackMeta->findInt32(kKeyDisplayWidth, &displayWidth));
-            CHECK(trackMeta->findInt32(kKeyDisplayHeight, &displayHeight));
 
-            if (width >= displayWidth && height >= displayHeight
-                    && (width % gridWidth == 0) && (height % gridHeight == 0)) {
-                ALOGV("grid config: %dx%d, display %dx%d, grid %dx%d",
-                        width, height, displayWidth, displayHeight, gridWidth, gridHeight);
+            if (width <= gridWidth * tmpCols && height <= gridHeight * tmpRows) {
+                ALOGV("grid: %dx%d, size: %dx%d, picture size: %dx%d",
+                        tmpCols, tmpRows, gridWidth, gridHeight, width, height);
 
                 overrideMeta = new MetaData(*trackMeta);
-                overrideMeta->remove(kKeyDisplayWidth);
-                overrideMeta->remove(kKeyDisplayHeight);
                 overrideMeta->setInt32(kKeyWidth, gridWidth);
                 overrideMeta->setInt32(kKeyHeight, gridHeight);
-                gridCols = width / gridWidth;
-                gridRows = height / gridHeight;
+                gridCols = tmpCols;
+                gridRows = tmpRows;
             } else {
-                ALOGE("Bad grid config: %dx%d, display %dx%d, grid %dx%d",
-                        width, height, displayWidth, displayHeight, gridWidth, gridHeight);
+                ALOGE("bad grid: %dx%d, size: %dx%d, picture size: %dx%d",
+                        tmpCols, tmpRows, gridWidth, gridHeight, width, height);
             }
         }
         if (overrideMeta == NULL) {
@@ -497,13 +494,18 @@ static VideoFrame *extractVideoFrame(
                     ALOGV("Timed-out waiting for output.. retries left = %zu", retriesLeft);
                     err = OK;
                 } else if (err == OK) {
+	            if (outputFormat == NULL) {
+                        decoder->releaseOutputBuffer(index);
+                        err = ERROR_MALFORMED;
+                        break;
+                    }
+
                     // If we're seeking with CLOSEST option and obtained a valid targetTimeUs
                     // from the extractor, decode to the specified frame. Otherwise we're done.
                     ALOGV("Received an output buffer, timeUs=%lld", (long long)timeUs);
                     sp<MediaCodecBuffer> videoFrameBuffer = outputBuffers.itemAt(index);
 
                     int32_t width, height;
-                    CHECK(outputFormat != NULL);
                     CHECK(outputFormat->findInt32("width", &width));
                     CHECK(outputFormat->findInt32("height", &height));
 
@@ -541,28 +543,31 @@ static VideoFrame *extractVideoFrame(
                         dstBottom = dstTop + height - 1;
                     }
 
-                    if (converter.isValid()) {
-                        err = converter.convert(
-                                (const uint8_t *)videoFrameBuffer->data(),
-                                width, height,
-                                crop_left, crop_top, crop_right, crop_bottom,
-                                frame->mData,
-                                frame->mWidth,
-                                frame->mHeight,
-                                dstLeft, dstTop, dstRight, dstBottom);
-                    } else {
-                        ALOGE("Unable to convert from format 0x%08x to 0x%08x",
-                                srcFormat, dstFormat);
-
-                        err = ERROR_UNSUPPORTED;
-                    }
-
                     done = (targetTimeUs < 0ll) || (timeUs >= targetTimeUs);
-                    if (numTiles > 1) {
-                        tilesDecoded++;
-                        done &= (tilesDecoded >= numTiles);
+
+                    if (done) {
+                        if (converter.isValid()) {
+                            err = converter.convert(
+                                    (const uint8_t *)videoFrameBuffer->data(),
+                                    width, height,
+                                    crop_left, crop_top, crop_right, crop_bottom,
+                                    frame->mData,
+                                    frame->mWidth,
+                                    frame->mHeight,
+                                    dstLeft, dstTop, dstRight, dstBottom);
+                        } else {
+                            ALOGE("Unable to convert from format 0x%08x to 0x%08x",
+                                    srcFormat, dstFormat);
+
+                            err = ERROR_UNSUPPORTED;
+                        }
+                        if (numTiles > 1) {
+                            tilesDecoded++;
+                            done &= (tilesDecoded >= numTiles);
+                        }
                     }
-                    err = decoder->releaseOutputBuffer(index);
+
+                    decoder->releaseOutputBuffer(index);
                 } else {
                     ALOGW("Received error %d (%s) instead of output", err, asString(err));
                     done = true;
