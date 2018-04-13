@@ -407,6 +407,9 @@ AudioFlinger::PlaybackThread::Track::Track(
     // mSinkTimestamp
     mFastIndex(-1),
     mCachedVolume(1.0),
+    /* The track might not play immediately after being active, similarly as if its volume was 0.
+     * When the track starts playing, its volume will be computed. */
+    mFinalVolume(0.f),
     mResumeToStopping(false),
     mFlushHwPending(false),
     mFlags(flags)
@@ -997,6 +1000,23 @@ sp<VolumeShaper::State> AudioFlinger::PlaybackThread::Track::getVolumeShaperStat
     return mVolumeHandler->getVolumeShaperState(id);
 }
 
+void AudioFlinger::PlaybackThread::Track::setFinalVolume(float volume)
+{
+    if (mFinalVolume != volume) { // Compare to an epsilon if too many meaningless updates
+        mFinalVolume = volume;
+        setMetadataHasChanged();
+    }
+}
+
+void AudioFlinger::PlaybackThread::Track::copyMetadataTo(MetadataInserter& backInserter) const
+{
+    *backInserter++ = {
+            .usage = mAttr.usage,
+            .content_type = mAttr.content_type,
+            .gain = mFinalVolume,
+    };
+}
+
 status_t AudioFlinger::PlaybackThread::Track::getTimestamp(AudioTimestamp& timestamp)
 {
     if (!isOffloaded() && !isDirect()) {
@@ -1427,6 +1447,21 @@ bool AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t frame
     return outputBufferFull;
 }
 
+void AudioFlinger::PlaybackThread::OutputTrack::copyMetadataTo(MetadataInserter& backInserter) const
+{
+    std::lock_guard<std::mutex> lock(mTrackMetadatasMutex);
+    backInserter = std::copy(mTrackMetadatas.begin(), mTrackMetadatas.end(), backInserter);
+}
+
+void AudioFlinger::PlaybackThread::OutputTrack::setMetadatas(const SourceMetadatas& metadatas) {
+    {
+        std::lock_guard<std::mutex> lock(mTrackMetadatasMutex);
+        mTrackMetadatas = metadatas;
+    }
+    // No need to adjust metadata track volumes as OutputTrack volumes are always 0dBFS.
+    setMetadataHasChanged();
+}
+
 status_t AudioFlinger::PlaybackThread::OutputTrack::obtainBuffer(
         AudioBufferProvider::Buffer* buffer, uint32_t waitTimeMs)
 {
@@ -1747,14 +1782,14 @@ void AudioFlinger::RecordThread::RecordTrack::invalidate()
 
 /*static*/ void AudioFlinger::RecordThread::RecordTrack::appendDumpHeader(String8& result)
 {
-    result.append("Active Client Session S  Flags   Format Chn mask  SRate   Server FrmCnt\n");
+    result.append("Active Client Session S  Flags   Format Chn mask  SRate   Server FrmCnt Sil\n");
 }
 
 void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool active)
 {
     result.appendFormat("%c%5s %6u %7u %2s 0x%03X "
             "%08X %08X %6u "
-            "%08X %6zu\n",
+            "%08X %6zu %3c\n",
             isFastTrack() ? 'F' : ' ',
             active ? "yes" : "no",
             (mClient == 0) ? getpid_cached : mClient->pid(),
@@ -1767,7 +1802,8 @@ void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool a
             mSampleRate,
 
             mCblk->mServer,
-            mFrameCount
+            mFrameCount,
+            isSilenced() ? 's' : 'n'
             );
 }
 
@@ -1910,7 +1946,7 @@ AudioFlinger::MmapThread::MmapTrack::MmapTrack(ThreadBase *thread,
                   sessionId, uid, false /* isOut */,
                   ALLOC_NONE,
                   TYPE_DEFAULT, portId),
-        mPid(pid)
+        mPid(pid), mSilenced(false), mSilencedNotified(false)
 {
 }
 

@@ -579,11 +579,11 @@ static void performSeekTest(const sp<MediaSource> &source) {
                 break;
             }
 
+            CHECK(buffer != NULL);
+
             if (buffer->range_length() > 0) {
                 break;
             }
-
-            CHECK(buffer != NULL);
 
             buffer->release();
             buffer = NULL;

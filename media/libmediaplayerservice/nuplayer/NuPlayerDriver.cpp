@@ -669,6 +669,11 @@ status_t NuPlayerDriver::reset() {
         notifyListener_l(MEDIA_STOPPED);
     }
 
+    if (property_get_bool("persist.debug.sf.stats", false)) {
+        Vector<String16> args;
+        dump(-1, args);
+    }
+
     mState = STATE_RESET_IN_PROGRESS;
     mPlayer->resetAsync();
 

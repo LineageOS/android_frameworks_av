@@ -151,8 +151,7 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
 static void MyErrorCallbackProc(
         AAudioStream *stream __unused,
         void *userData __unused,
-        aaudio_result_t error)
-{
+        aaudio_result_t error) {
     printf("Error Callback, error: %d\n",(int)error);
     LoopbackData *myData = (LoopbackData *) userData;
     myData->outputError = error;
