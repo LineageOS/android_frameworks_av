@@ -131,8 +131,14 @@ struct BufferMeta {
                 static_cast<void*>(mHidlMemory->getPointer())) : nullptr;
     }
 
-    void CopyFromOMX(const OMX_BUFFERHEADERTYPE *header) {
+    void CopyFromOMX(const OMX_BUFFERHEADERTYPE *header, OMXNodeInstance::SecureBufferType type) {
         if (!mCopyFromOmx) {
+            return;
+        }
+
+        if (type != OMXNodeInstance::kSecureBufferTypeUnknown) {
+            ALOGE("b/77486542");
+            android_errorWriteLog(0x534e4554, "77486542");
             return;
         }
 
@@ -142,8 +148,14 @@ struct BufferMeta {
         memcpy(getPointer() + header->nOffset, codec->data(), codec->size());
     }
 
-    void CopyToOMX(const OMX_BUFFERHEADERTYPE *header) {
+    void CopyToOMX(const OMX_BUFFERHEADERTYPE *header, OMXNodeInstance::SecureBufferType type) {
         if (!mCopyToOmx) {
+            return;
+        }
+
+        if (type != OMXNodeInstance::kSecureBufferTypeUnknown) {
+            ALOGE("b/77486542");
+            android_errorWriteLog(0x534e4554, "77486542");
             return;
         }
 
@@ -1680,7 +1692,7 @@ status_t OMXNodeInstance::emptyBuffer_l(
         header->nFilledLen = rangeLength;
         header->nOffset = rangeOffset;
 
-        buffer_meta->CopyToOMX(header);
+        buffer_meta->CopyToOMX(header, mSecureBufferType[kPortIndexInput]);
     }
 
     return emptyBuffer_l(header, flags, timestamp, (intptr_t)buffer, fenceFd);
@@ -1968,7 +1980,7 @@ bool OMXNodeInstance::handleMessage(omx_message &msg) {
             CLOG_ERROR(onFillBufferDone, OMX_ErrorBadParameter,
                     FULL_BUFFER(NULL, buffer, msg.fenceFd));
         }
-        buffer_meta->CopyFromOMX(buffer);
+        buffer_meta->CopyFromOMX(buffer, mSecureBufferType[kPortIndexOutput]);
 
         // fix up the buffer info (especially timestamp) if needed
         codecBufferFilled(msg);
