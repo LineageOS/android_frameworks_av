@@ -87,7 +87,7 @@ static aaudio_result_t builder_createStream(aaudio_direction_t direction,
             break;
 
         default:
-            ALOGE("bad direction = %d", direction);
+            ALOGE("%s() bad direction = %d", __func__, direction);
             result = AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     }
     return result;
@@ -99,7 +99,7 @@ static aaudio_result_t builder_createStream(aaudio_direction_t direction,
 aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     AudioStream *audioStream = nullptr;
     if (streamPtr == nullptr) {
-        ALOGE("build() streamPtr is null");
+        ALOGE("%s() streamPtr is null", __func__);
         return AAUDIO_ERROR_NULL;
     }
     *streamPtr = nullptr;
@@ -124,13 +124,11 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     if (mapExclusivePolicy == AAUDIO_UNSPECIFIED) {
         mapExclusivePolicy = AAUDIO_MMAP_EXCLUSIVE_POLICY_DEFAULT;
     }
-    ALOGD("mmapPolicy = %d, mapExclusivePolicy = %d",
-          mmapPolicy, mapExclusivePolicy);
 
     aaudio_sharing_mode_t sharingMode = getSharingMode();
     if ((sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE)
         && (mapExclusivePolicy == AAUDIO_POLICY_NEVER)) {
-        ALOGW("EXCLUSIVE sharing mode not supported. Use SHARED.");
+        ALOGD("%s() EXCLUSIVE sharing mode not supported. Use SHARED.", __func__);
         sharingMode = AAUDIO_SHARING_MODE_SHARED;
         setSharingMode(sharingMode);
     }
@@ -141,13 +139,14 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     // TODO Support other performance settings in MMAP mode.
     // Disable MMAP if low latency not requested.
     if (getPerformanceMode() != AAUDIO_PERFORMANCE_MODE_LOW_LATENCY) {
-        ALOGD("build() MMAP not available because AAUDIO_PERFORMANCE_MODE_LOW_LATENCY not used.");
+        ALOGD("%s() MMAP not available because AAUDIO_PERFORMANCE_MODE_LOW_LATENCY not used.",
+              __func__);
         allowMMap = false;
     }
 
     // SessionID and Effects are only supported in Legacy mode.
     if (getSessionId() != AAUDIO_SESSION_ID_NONE) {
-        ALOGD("build() MMAP not available because sessionId used.");
+        ALOGD("%s() MMAP not available because sessionId used.", __func__);
         allowMMap = false;
     }
 
@@ -163,7 +162,7 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
             audioStream = nullptr;
 
             if (isMMap && allowLegacy) {
-                ALOGD("build() MMAP stream did not open so try Legacy path");
+                ALOGV("%s() MMAP stream did not open so try Legacy path", __func__);
                 // If MMAP stream failed to open then TRY using a legacy stream.
                 result = builder_createStream(getDirection(), sharingMode,
                                               false, &audioStream);
