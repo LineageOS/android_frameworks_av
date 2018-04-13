@@ -31,8 +31,9 @@ class MmapStreamCallback : public virtual RefBase {
      * The mmap stream should be torn down because conditions that permitted its creation with
      * the requested parameters have changed and do not allow it to operate with the requested
      * constraints any more.
+     * \param[in] handle handle for the client stream to tear down.
      */
-    virtual void onTearDown() = 0;
+    virtual void onTearDown(audio_port_handle_t handle) = 0;
 
     /**
      * The volume to be applied to the use case specified when opening the stream has changed
