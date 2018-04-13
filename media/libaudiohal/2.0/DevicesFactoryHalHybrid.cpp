@@ -32,7 +32,8 @@ DevicesFactoryHalHybrid::~DevicesFactoryHalHybrid() {
 }
 
 status_t DevicesFactoryHalHybrid::openDevice(const char *name, sp<DeviceHalInterface> *device) {
-    if (mHidlFactory != 0 && strcmp(AUDIO_HARDWARE_MODULE_ID_A2DP, name) != 0) {
+    if (mHidlFactory != 0 && strcmp(AUDIO_HARDWARE_MODULE_ID_A2DP, name) != 0 &&
+        strcmp(AUDIO_HARDWARE_MODULE_ID_HEARING_AID, name) != 0) {
         return mHidlFactory->openDevice(name, device);
     }
     return mLocalFactory->openDevice(name, device);
