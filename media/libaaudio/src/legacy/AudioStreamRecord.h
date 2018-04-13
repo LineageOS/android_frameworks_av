@@ -76,6 +76,8 @@ public:
         return incrementFramesRead(frames);
     }
 
+    const void * maybeConvertDeviceData(const void *audioData, int32_t numFrames) override;
+
 private:
     android::sp<android::AudioRecord> mAudioRecord;
     // adapts between variable sized blocks and fixed size blocks
@@ -83,6 +85,11 @@ private:
 
     // TODO add 64-bit position reporting to AudioRecord and use it.
     android::String16                mOpPackageName;
+
+    // Only one type of conversion buffer is used.
+    std::unique_ptr<float[]>         mFormatConversionBufferFloat;
+    std::unique_ptr<int16_t[]>       mFormatConversionBufferI16;
+    int32_t                          mFormatConversionBufferSizeInFrames = 0;
 };
 
 } /* namespace aaudio */
