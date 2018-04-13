@@ -181,6 +181,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     aaudio_format_t aaudioFormat =
             AAudioConvert_androidToAAudioDataFormat(mAudioTrack->format());
     setFormat(aaudioFormat);
+    setDeviceFormat(aaudioFormat);
 
     int32_t actualSampleRate = mAudioTrack->getSampleRate();
     ALOGW_IF(actualSampleRate != getSampleRate(),
