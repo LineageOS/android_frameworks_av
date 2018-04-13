@@ -367,7 +367,6 @@ aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanosec
     return err ? AAudioConvert_androidToAAudioResult(-errno) : mThreadRegistrationResult;
 }
 
-
 aaudio_data_callback_result_t AudioStream::maybeCallDataCallback(void *audioData,
                                                                  int32_t numFrames) {
     aaudio_data_callback_result_t result = AAUDIO_CALLBACK_RESULT_STOP;

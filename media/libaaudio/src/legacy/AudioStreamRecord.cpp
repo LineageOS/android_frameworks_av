@@ -19,13 +19,15 @@
 #include <utils/Log.h>
 
 #include <stdint.h>
-#include <utils/String16.h>
-#include <media/AudioRecord.h>
-#include <aaudio/AAudio.h>
 
-#include "AudioClock.h"
+#include <aaudio/AAudio.h>
+#include <audio_utils/primitives.h>
+#include <media/AudioRecord.h>
+#include <utils/String16.h>
+
 #include "legacy/AudioStreamLegacy.h"
 #include "legacy/AudioStreamRecord.h"
+#include "utility/AudioClock.h"
 #include "utility/FixedBlockWriter.h"
 
 using namespace android;
@@ -63,10 +65,6 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     size_t frameCount = (builder.getBufferCapacity() == AAUDIO_UNSPECIFIED) ? 0
                         : builder.getBufferCapacity();
 
-    // TODO implement an unspecified Android format then use that.
-    audio_format_t format = (getFormat() == AAUDIO_FORMAT_UNSPECIFIED)
-            ? AUDIO_FORMAT_PCM_FLOAT
-            : AAudioConvert_aaudioToAndroidDataFormat(getFormat());
 
     audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE;
     aaudio_performance_mode_t perfMode = getPerformanceMode();
@@ -82,6 +80,35 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             break;
     }
 
+    // Preserve behavior of API 26
+    if (getFormat() == AAUDIO_FORMAT_UNSPECIFIED) {
+        setFormat(AAUDIO_FORMAT_PCM_FLOAT);
+    }
+
+    // Maybe change device format to get a FAST path.
+    // AudioRecord does not support FAST mode for FLOAT data.
+    // TODO AudioRecord should allow FLOAT data paths for FAST tracks.
+    // So IF the user asks for low latency FLOAT
+    // AND the sampleRate is likely to be compatible with FAST
+    // THEN request I16 and convert to FLOAT when passing to user.
+    // Note that hard coding 48000 Hz is not ideal because the sampleRate
+    // for a FAST path might not be 48000 Hz.
+    // It normally is but there is a chance that it is not.
+    // And there is no reliable way to know that in advance.
+    // Luckily the consequences of a wrong guess are minor.
+    // We just may not get a FAST track.
+    // But we wouldn't have anyway without this hack.
+    constexpr int32_t kMostLikelySampleRateForFast = 48000;
+    if (getFormat() == AAUDIO_FORMAT_PCM_FLOAT
+            && perfMode == AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
+            && (samplesPerFrame <= 2) // FAST only for mono and stereo
+            && (getSampleRate() == kMostLikelySampleRateForFast
+                || getSampleRate() == AAUDIO_UNSPECIFIED)) {
+        setDeviceFormat(AAUDIO_FORMAT_PCM_I16);
+    } else {
+        setDeviceFormat(getFormat());
+    }
+
     uint32_t notificationFrames = 0;
 
     // Setup the callback if there is one.
@@ -95,9 +122,6 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
         notificationFrames = builder.getFramesPerDataCallback();
     }
     mCallbackBufferSize = builder.getFramesPerDataCallback();
-
-    ALOGD("open(), request notificationFrames = %u, frameCount = %u",
-          notificationFrames, (uint)frameCount);
 
     // Don't call mAudioRecord->setInputDevice() because it will be overwritten by set()!
     audio_port_handle_t selectedDeviceId = (getDeviceId() == AAUDIO_UNSPECIFIED)
@@ -120,39 +144,59 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     aaudio_session_id_t requestedSessionId = builder.getSessionId();
     audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
 
-    mAudioRecord = new AudioRecord(
-            mOpPackageName // const String16& opPackageName TODO does not compile
-            );
-    mAudioRecord->set(
-            AUDIO_SOURCE_DEFAULT, // ignored because we pass attributes below
-            getSampleRate(),
-            format,
-            channelMask,
-            frameCount,
-            callback,
-            callbackData,
-            notificationFrames,
-            false /*threadCanCallJava*/,
-            sessionId,
-            streamTransferType,
-            flags,
-            AUDIO_UID_INVALID, // DEFAULT uid
-            -1,                // DEFAULT pid
-            &attributes,
-            selectedDeviceId
-            );
+    // ----------- open the AudioRecord ---------------------
+    // Might retry, but never more than once.
+    for (int i = 0; i < 2; i ++) {
+        audio_format_t requestedInternalFormat =
+                AAudioConvert_aaudioToAndroidDataFormat(getDeviceFormat());
 
-    // Did we get a valid track?
-    status_t status = mAudioRecord->initCheck();
-    if (status != OK) {
-        close();
-        ALOGE("open(), initCheck() returned %d", status);
-        return AAudioConvert_androidToAAudioResult(status);
+        mAudioRecord = new AudioRecord(
+                mOpPackageName // const String16& opPackageName TODO does not compile
+        );
+        mAudioRecord->set(
+                AUDIO_SOURCE_DEFAULT, // ignored because we pass attributes below
+                getSampleRate(),
+                requestedInternalFormat,
+                channelMask,
+                frameCount,
+                callback,
+                callbackData,
+                notificationFrames,
+                false /*threadCanCallJava*/,
+                sessionId,
+                streamTransferType,
+                flags,
+                AUDIO_UID_INVALID, // DEFAULT uid
+                -1,                // DEFAULT pid
+                &attributes,
+                selectedDeviceId
+        );
+
+        // Did we get a valid track?
+        status_t status = mAudioRecord->initCheck();
+        if (status != OK) {
+            close();
+            ALOGE("open(), initCheck() returned %d", status);
+            return AAudioConvert_androidToAAudioResult(status);
+        }
+
+        // Check to see if it was worth hacking the deviceFormat.
+        bool gotFastPath = (mAudioRecord->getFlags() & AUDIO_INPUT_FLAG_FAST)
+                           == AUDIO_INPUT_FLAG_FAST;
+        if (getFormat() != getDeviceFormat() && !gotFastPath) {
+            // We tried to get a FAST path by switching the device format.
+            // But it didn't work. So we might as well reopen using the same
+            // format for device and for app.
+            ALOGD("%s() used a different device format but no FAST path, reopen", __func__);
+            mAudioRecord.clear();
+            setDeviceFormat(getFormat());
+        } else {
+            break; // Keep the one we just opened.
+        }
     }
 
     // Get the actual values from the AudioRecord.
     setSamplesPerFrame(mAudioRecord->channelCount());
-    setFormat(AAudioConvert_androidToAAudioDataFormat(mAudioRecord->format()));
 
     int32_t actualSampleRate = mAudioRecord->getSampleRate();
     ALOGW_IF(actualSampleRate != getSampleRate(),
@@ -167,6 +211,29 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
         mBlockAdapter = &mFixedBlockWriter;
     } else {
         mBlockAdapter = nullptr;
+    }
+
+    // Allocate format conversion buffer if needed.
+    if (getDeviceFormat() == AAUDIO_FORMAT_PCM_I16
+        && getFormat() == AAUDIO_FORMAT_PCM_FLOAT) {
+
+        if (builder.getDataCallbackProc() != nullptr) {
+            // If we have a callback then we need to convert the data into an internal float
+            // array and then pass that entire array to the app.
+            mFormatConversionBufferSizeInFrames =
+                    (mCallbackBufferSize != AAUDIO_UNSPECIFIED)
+                    ? mCallbackBufferSize : getFramesPerBurst();
+            int32_t numSamples = mFormatConversionBufferSizeInFrames * getSamplesPerFrame();
+            mFormatConversionBufferFloat = std::make_unique<float[]>(numSamples);
+        } else {
+            // If we don't have a callback then we will read into an internal short array
+            // and then convert into the app float array in read().
+            mFormatConversionBufferSizeInFrames = getFramesPerBurst();
+            int32_t numSamples = mFormatConversionBufferSizeInFrames * getSamplesPerFrame();
+            mFormatConversionBufferI16 = std::make_unique<int16_t[]>(numSamples);
+        }
+        ALOGD("%s() setup I16>FLOAT conversion buffer with %d frames",
+              __func__, mFormatConversionBufferSizeInFrames);
     }
 
     // Update performance mode based on the actual stream.
@@ -214,6 +281,24 @@ aaudio_result_t AudioStreamRecord::close()
     }
     mFixedBlockWriter.close();
     return AudioStream::close();
+}
+
+const void * AudioStreamRecord::maybeConvertDeviceData(const void *audioData, int32_t numFrames) {
+    if (mFormatConversionBufferFloat.get() != nullptr) {
+        LOG_ALWAYS_FATAL_IF(numFrames > mFormatConversionBufferSizeInFrames,
+                            "%s() conversion size %d too large for buffer %d",
+                            __func__, numFrames, mFormatConversionBufferSizeInFrames);
+
+        int32_t numSamples = numFrames * getSamplesPerFrame();
+        // Only conversion supported is I16 to FLOAT
+        memcpy_to_float_from_i16(
+                    mFormatConversionBufferFloat.get(),
+                    (const int16_t *) audioData,
+                    numSamples);
+        return mFormatConversionBufferFloat.get();
+    } else {
+        return audioData;
+    }
 }
 
 void AudioStreamRecord::processCallback(int event, void *info) {
@@ -302,9 +387,10 @@ aaudio_result_t AudioStreamRecord::read(void *buffer,
                                       int32_t numFrames,
                                       int64_t timeoutNanoseconds)
 {
-    int32_t bytesPerFrame = getBytesPerFrame();
+    int32_t bytesPerDeviceFrame = getBytesPerDeviceFrame();
     int32_t numBytes;
-    aaudio_result_t result = AAudioConvert_framesToBytes(numFrames, bytesPerFrame, &numBytes);
+    // This will detect out of range values for numFrames.
+    aaudio_result_t result = AAudioConvert_framesToBytes(numFrames, bytesPerDeviceFrame, &numBytes);
     if (result != AAUDIO_OK) {
         return result;
     }
@@ -315,19 +401,49 @@ aaudio_result_t AudioStreamRecord::read(void *buffer,
 
     // TODO add timeout to AudioRecord
     bool blocking = (timeoutNanoseconds > 0);
-    ssize_t bytesRead = mAudioRecord->read(buffer, numBytes, blocking);
-    if (bytesRead == WOULD_BLOCK) {
+
+    ssize_t bytesActuallyRead = 0;
+    ssize_t totalBytesRead = 0;
+    if (mFormatConversionBufferI16.get() != nullptr) {
+        // Convert I16 data to float using an intermediate buffer.
+        float *floatBuffer = (float *) buffer;
+        int32_t framesLeft = numFrames;
+        // Perform conversion using multiple read()s if necessary.
+        while (framesLeft > 0) {
+            // Read into short internal buffer.
+            int32_t framesToRead = std::min(framesLeft, mFormatConversionBufferSizeInFrames);
+            size_t bytesToRead = framesToRead * bytesPerDeviceFrame;
+            bytesActuallyRead = mAudioRecord->read(mFormatConversionBufferI16.get(), bytesToRead, blocking);
+            if (bytesActuallyRead <= 0) {
+                break;
+            }
+            totalBytesRead += bytesActuallyRead;
+            int32_t framesToConvert = bytesActuallyRead / bytesPerDeviceFrame;
+            // Convert into app float buffer.
+            size_t numSamples = framesToConvert * getSamplesPerFrame();
+            memcpy_to_float_from_i16(
+                    floatBuffer,
+                    mFormatConversionBufferI16.get(),
+                    numSamples);
+            floatBuffer += numSamples;
+            framesLeft -= framesToConvert;
+        }
+    } else {
+        bytesActuallyRead = mAudioRecord->read(buffer, numBytes, blocking);
+        totalBytesRead = bytesActuallyRead;
+    }
+    if (bytesActuallyRead == WOULD_BLOCK) {
         return 0;
-    } else if (bytesRead < 0) {
-        // in this context, a DEAD_OBJECT is more likely to be a disconnect notification due to
-        // AudioRecord invalidation
-        if (bytesRead == DEAD_OBJECT) {
+    } else if (bytesActuallyRead < 0) {
+        // In this context, a DEAD_OBJECT is more likely to be a disconnect notification due to
+        // AudioRecord invalidation.
+        if (bytesActuallyRead == DEAD_OBJECT) {
             setState(AAUDIO_STREAM_STATE_DISCONNECTED);
             return AAUDIO_ERROR_DISCONNECTED;
         }
-        return AAudioConvert_androidToAAudioResult(bytesRead);
+        return AAudioConvert_androidToAAudioResult(bytesActuallyRead);
     }
-    int32_t framesRead = (int32_t)(bytesRead / bytesPerFrame);
+    int32_t framesRead = (int32_t)(totalBytesRead / bytesPerDeviceFrame);
     incrementFramesRead(framesRead);
 
     result = updateStateMachine();

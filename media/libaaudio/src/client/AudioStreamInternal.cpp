@@ -156,7 +156,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     setInputPreset(configurationOutput.getInputPreset());
 
     // Save device format so we can do format conversion and volume scaling together.
-    mDeviceFormat = configurationOutput.getFormat();
+    setDeviceFormat(configurationOutput.getFormat());
 
     result = mServiceInterface.getStreamDescription(mServiceStreamHandle, mEndPointParcelable);
     if (result != AAUDIO_OK) {
