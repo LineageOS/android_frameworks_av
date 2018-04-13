@@ -15,6 +15,7 @@ LOCAL_SHARED_LIBRARIES := \
     libbinder
 
 LOCAL_CFLAGS := -Wall -Werror
+LOCAL_SANITIZE := integer_overflow
 
 include $(BUILD_SHARED_LIBRARY)
 
@@ -82,6 +83,7 @@ LOCAL_CFLAGS += -DSTATE_QUEUE_INSTANTIATIONS='"StateQueueInstantiations.cpp"'
 LOCAL_CFLAGS += -fvisibility=hidden
 
 LOCAL_CFLAGS += -Werror -Wall
+LOCAL_SANITIZE := integer_overflow
 
 include $(BUILD_SHARED_LIBRARY)
 
