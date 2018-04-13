@@ -116,6 +116,11 @@ struct OMXNodeInstance : public BnOMXNode {
 
     static OMX_CALLBACKTYPE kCallbacks;
 
+    enum SecureBufferType {
+        kSecureBufferTypeUnknown,
+        kSecureBufferTypeOpaque,
+        kSecureBufferTypeNativeHandle,
+    };
 private:
     struct CallbackDispatcherThread;
     struct CallbackDispatcher;
@@ -154,11 +159,6 @@ private:
     IOMX::PortMode mPortMode[2];
     // metadata and secure buffer types and graphic buffer mode tracking
     MetadataBufferType mMetadataType[2];
-    enum SecureBufferType {
-        kSecureBufferTypeUnknown,
-        kSecureBufferTypeOpaque,
-        kSecureBufferTypeNativeHandle,
-    };
     SecureBufferType mSecureBufferType[2];
     bool mGraphicBufferEnabled[2];
 
