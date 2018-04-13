@@ -4540,10 +4540,13 @@ audio_devices_t AudioPolicyManager::getNewInputDevice(const sp<AudioInputDescrip
         }
     }
 
+    // If we are not in call and no client is active on this input, this methods returns
+    // AUDIO_DEVICE_NONE, causing the patch on the input stream to be released.
     audio_source_t source = inputDesc->getHighestPrioritySource(true /*activeOnly*/);
-    if (isInCall()) {
-        device = getDeviceAndMixForInputSource(AUDIO_SOURCE_VOICE_COMMUNICATION);
-    } else if (source != AUDIO_SOURCE_DEFAULT) {
+    if (source == AUDIO_SOURCE_DEFAULT && isInCall()) {
+        source = AUDIO_SOURCE_VOICE_COMMUNICATION;
+    }
+    if (source != AUDIO_SOURCE_DEFAULT) {
         device = getDeviceAndMixForInputSource(source);
     }
 
