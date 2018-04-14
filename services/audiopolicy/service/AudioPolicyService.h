@@ -640,6 +640,22 @@ private:
         bool isVirtualDevice;          // uses vitual device: updated by APM::getInputForAttr()
     };
 
+    // A class automatically clearing and restoring binder caller identity inside
+    // a code block (scoped variable)
+    // Declare one systematically before calling AudioPolicyManager methods so that they are
+    // executed with the same level of privilege as audioserver process.
+    class AutoCallerClear {
+    public:
+            AutoCallerClear() :
+                mToken(IPCThreadState::self()->clearCallingIdentity()) {}
+            ~AutoCallerClear() {
+                IPCThreadState::self()->restoreCallingIdentity(mToken);
+            }
+
+    private:
+        const   int64_t mToken;
+    };
+
     // Internal dump utilities.
     status_t dumpPermissionDenial(int fd);
 
