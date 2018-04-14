@@ -36,6 +36,10 @@ ifeq ($(strip $(AUDIO_FEATURE_ENABLED_EXTN_FLAC_DECODER)),true)
 endif
 endif
 
+ifeq ($(BOARD_SKIP_CVE_2017_13154),true)
+LOCAL_CFLAGS += -DSKIP_CVE_2017_13154
+endif
+
 LOCAL_MODULE:= libstagefright_omx
 LOCAL_CFLAGS += -Werror -Wall
 LOCAL_CLANG := true
