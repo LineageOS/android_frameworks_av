@@ -1591,10 +1591,9 @@ status_t ItemTable::findThumbnailItem(const uint32_t imageIndex, uint32_t *itemI
 
     ssize_t thumbItemIndex = mItemIdToItemMap.indexOfKey(masterImage.thumbnails[0]);
     if (thumbItemIndex < 0) {
-        ALOGW("%s: Thumbnail item id %d not found, use master instead",
-                __FUNCTION__, masterImage.thumbnails[0]);
-        *itemIndex = masterItemIndex;
-        return OK;
+        // Do not return the master image in this case, fail it so that the
+        // thumbnail extraction code knows we really don't have it.
+        return INVALID_OPERATION;
     }
 
     *itemIndex = thumbItemIndex;

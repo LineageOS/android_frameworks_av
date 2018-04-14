@@ -166,15 +166,16 @@ public:
         return interface_cast<IMemory>(reply.readStrongBinder());
     }
 
-    sp<IMemory> getImageAtIndex(int index, int colorFormat, bool metaOnly)
+    sp<IMemory> getImageAtIndex(int index, int colorFormat, bool metaOnly, bool thumbnail)
     {
-        ALOGV("getImageAtIndex: index %d, colorFormat(%d) metaOnly(%d)",
-                index, colorFormat, metaOnly);
+        ALOGV("getImageAtIndex: index %d, colorFormat(%d) metaOnly(%d) thumbnail(%d)",
+                index, colorFormat, metaOnly, thumbnail);
         Parcel data, reply;
         data.writeInterfaceToken(IMediaMetadataRetriever::getInterfaceDescriptor());
         data.writeInt32(index);
         data.writeInt32(colorFormat);
         data.writeInt32(metaOnly);
+        data.writeInt32(thumbnail);
 #ifndef DISABLE_GROUP_SCHEDULE_HACK
         sendSchedPolicy(data);
 #endif
@@ -356,12 +357,13 @@ status_t BnMediaMetadataRetriever::onTransact(
             int index = data.readInt32();
             int colorFormat = data.readInt32();
             bool metaOnly = (data.readInt32() != 0);
-            ALOGV("getImageAtIndex: index(%d), colorFormat(%d), metaOnly(%d)",
-                    index, colorFormat, metaOnly);
+            bool thumbnail = (data.readInt32() != 0);
+            ALOGV("getImageAtIndex: index(%d), colorFormat(%d), metaOnly(%d), thumbnail(%d)",
+                    index, colorFormat, metaOnly, thumbnail);
 #ifndef DISABLE_GROUP_SCHEDULE_HACK
             setSchedPolicy(data);
 #endif
-            sp<IMemory> bitmap = getImageAtIndex(index, colorFormat, metaOnly);
+            sp<IMemory> bitmap = getImageAtIndex(index, colorFormat, metaOnly, thumbnail);
             if (bitmap != 0) {  // Don't send NULL across the binder interface
                 reply->writeInt32(NO_ERROR);
                 reply->writeStrongBinder(IInterface::asBinder(bitmap));
