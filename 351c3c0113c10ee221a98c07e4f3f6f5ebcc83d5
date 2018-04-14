@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "c61a686f_b7d6d3c7",
+        "filename": "media/libstagefright/FLACExtractor.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 498,
+      "author": {
+        "id": 15402
+      },
+      "writtenOn": "2018-04-14T14:06:24Z",
+      "side": 1,
+      "message": "even if the memmove part is note required, this looks like a good patch.  The lineage-15.1 branch already uses kMaxChannels here.",
+      "range": {
+        "startLine": 498,
+        "startChar": 0,
+        "endLine": 498,
+        "endChar": 8
+      },
+      "revId": "351c3c0113c10ee221a98c07e4f3f6f5ebcc83d5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
