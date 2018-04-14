@@ -367,7 +367,6 @@ aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanosec
     return err ? AAudioConvert_androidToAAudioResult(-errno) : mThreadRegistrationResult;
 }
 
-
 aaudio_data_callback_result_t AudioStream::maybeCallDataCallback(void *audioData,
                                                                  int32_t numFrames) {
     aaudio_data_callback_result_t result = AAUDIO_CALLBACK_RESULT_STOP;
@@ -429,6 +428,12 @@ android::media::VolumeShaper::Status AudioStream::applyVolumeShaper(
 }
 #endif
 
+void AudioStream::setDuckAndMuteVolume(float duckAndMuteVolume) {
+    ALOGD("%s() to %f", __func__, duckAndMuteVolume);
+    mDuckAndMuteVolume = duckAndMuteVolume;
+    doSetVolume(); // apply this change
+}
+
 AudioStream::MyPlayerBase::MyPlayerBase(AudioStream *parent) : mParent(parent) {
 }
 
@@ -449,7 +454,6 @@ void AudioStream::MyPlayerBase::unregisterWithAudioManager() {
         mRegistered = false;
     }
 }
-
 
 void AudioStream::MyPlayerBase::destroy() {
     unregisterWithAudioManager();

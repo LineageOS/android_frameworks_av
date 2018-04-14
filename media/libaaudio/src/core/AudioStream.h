@@ -252,6 +252,20 @@ public:
         return AAudioConvert_formatToSizeInBytes(mFormat);
     }
 
+    /**
+     * This is only valid after setSamplesPerFrame() and setDeviceFormat() have been called.
+     */
+    int32_t getBytesPerDeviceFrame() const {
+        return mSamplesPerFrame * getBytesPerDeviceSample();
+    }
+
+    /**
+     * This is only valid after setDeviceFormat() has been called.
+     */
+    int32_t getBytesPerDeviceSample() const {
+        return AAudioConvert_formatToSizeInBytes(getDeviceFormat());
+    }
+
     virtual int64_t getFramesWritten() = 0;
 
     virtual int64_t getFramesRead() = 0;
@@ -314,10 +328,7 @@ public:
     }
 
     // This is used by the AudioManager to duck and mute the stream when changing audio focus.
-    void setDuckAndMuteVolume(float duckAndMuteVolume) {
-        mDuckAndMuteVolume = duckAndMuteVolume;
-        doSetVolume(); // apply this change
-    }
+    void setDuckAndMuteVolume(float duckAndMuteVolume);
 
     float getDuckAndMuteVolume() const {
         return mDuckAndMuteVolume;
@@ -471,6 +482,17 @@ protected:
         mFormat = format;
     }
 
+    /**
+     * This should not be called after the open() call.
+     */
+    void setDeviceFormat(aaudio_format_t format) {
+        mDeviceFormat = format;
+    }
+
+    aaudio_format_t getDeviceFormat() const {
+        return mDeviceFormat;
+    }
+
     void setState(aaudio_stream_state_t state);
 
     void setDeviceId(int32_t deviceId) {
@@ -485,8 +507,22 @@ protected:
 
     float                mDuckAndMuteVolume = 1.0f;
 
-
 protected:
+
+    /**
+     * Either convert the data from device format to app format and return a pointer
+     * to the conversion buffer,
+     * OR just pass back the original pointer.
+     *
+     * Note that this is only used for the INPUT path.
+     *
+     * @param audioData
+     * @param numFrames
+     * @return original pointer or the conversion buffer
+     */
+    virtual const void * maybeConvertDeviceData(const void *audioData, int32_t numFrames) {
+        return audioData;
+    }
 
     void setPeriodNanoseconds(int64_t periodNanoseconds) {
         mPeriodNanoseconds.store(periodNanoseconds, std::memory_order_release);
@@ -538,6 +574,10 @@ private:
     aaudio_input_preset_t       mInputPreset     = AAUDIO_UNSPECIFIED;
 
     int32_t                     mSessionId = AAUDIO_UNSPECIFIED;
+
+    // Sometimes the hardware is operating with a different format from the app.
+    // Then we require conversion in AAudio.
+    aaudio_format_t             mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
 
     // callback ----------------------------------
 

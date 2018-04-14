@@ -613,6 +613,23 @@ audio_devices_t Engine::getDeviceForInputSource(audio_source_t inputSource) cons
 
     uint32_t device = AUDIO_DEVICE_NONE;
 
+    // when a call is active, force device selection to match source VOICE_COMMUNICATION
+    // for most other input sources to avoid rerouting call TX audio
+    if (isInCall()) {
+        switch (inputSource) {
+        case AUDIO_SOURCE_DEFAULT:
+        case AUDIO_SOURCE_MIC:
+        case AUDIO_SOURCE_VOICE_RECOGNITION:
+        case AUDIO_SOURCE_UNPROCESSED:
+        case AUDIO_SOURCE_HOTWORD:
+        case AUDIO_SOURCE_CAMCORDER:
+            inputSource = AUDIO_SOURCE_VOICE_COMMUNICATION;
+            break;
+        default:
+            break;
+        }
+    }
+
     switch (inputSource) {
     case AUDIO_SOURCE_VOICE_UPLINK:
       if (availableDeviceTypes & AUDIO_DEVICE_IN_VOICE_CALL) {

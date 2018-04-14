@@ -156,7 +156,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     setInputPreset(configurationOutput.getInputPreset());
 
     // Save device format so we can do format conversion and volume scaling together.
-    mDeviceFormat = configurationOutput.getFormat();
+    setDeviceFormat(configurationOutput.getFormat());
 
     result = mServiceInterface.getStreamDescription(mServiceStreamHandle, mEndPointParcelable);
     if (result != AAUDIO_OK) {
@@ -501,9 +501,9 @@ aaudio_result_t AudioStreamInternal::onEventFromServer(AAudioServiceMessage *mes
             ALOGW("%s - AAUDIO_SERVICE_EVENT_DISCONNECTED - FIFO cleared", __func__);
             break;
         case AAUDIO_SERVICE_EVENT_VOLUME:
+            ALOGD("%s - AAUDIO_SERVICE_EVENT_VOLUME %lf", __func__, message->event.dataDouble);
             mStreamVolume = (float)message->event.dataDouble;
             doSetVolume();
-            ALOGD("%s - AAUDIO_SERVICE_EVENT_VOLUME %lf", __func__, message->event.dataDouble);
             break;
         case AAUDIO_SERVICE_EVENT_XRUN:
             mXRunCount = static_cast<int32_t>(message->event.dataLong);

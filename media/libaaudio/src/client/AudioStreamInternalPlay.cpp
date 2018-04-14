@@ -117,7 +117,7 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
         // Still haven't got any timestamps from server.
         // Keep waiting until we get some valid timestamps then start writing to the
         // current buffer position.
-        ALOGD("%s() wait for valid timestamps", __func__);
+        ALOGV("%s() wait for valid timestamps", __func__);
         // Sleep very briefly and hope we get a timestamp soon.
         *wakeTimePtr = currentNanoTime + (2000 * AAUDIO_NANOS_PER_MICROSECOND);
         ATRACE_END();
@@ -310,6 +310,9 @@ void *AudioStreamInternalPlay::callbackLoop() {
 //------------------------------------------------------------------------------
 // Implementation of PlayerBase
 status_t AudioStreamInternalPlay::doSetVolume() {
-    mVolumeRamp.setTarget(mStreamVolume * getDuckAndMuteVolume());
+    float combinedVolume = mStreamVolume * getDuckAndMuteVolume();
+    ALOGD("%s() mStreamVolume * duckAndMuteVolume = %f * %f = %f",
+          __func__, mStreamVolume, getDuckAndMuteVolume(), combinedVolume);
+    mVolumeRamp.setTarget(combinedVolume);
     return android::NO_ERROR;
 }
