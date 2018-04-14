@@ -206,6 +206,13 @@ status_t ARTPWriter::start(MetaData * params) {
     if(params->findInt32(kKeySelfID, &selfID))
         mSourceID = selfID;
 
+    if (mPayloadType == 0)
+        mPayloadType = PT;
+
+    int32_t payloadType = 0;
+    if(params->findInt32(kKeyPayloadType, &payloadType))
+        mPayloadType = payloadType;
+
     mMode = INVALID;
     if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
         mMode = H264;
@@ -760,7 +767,7 @@ void ARTPWriter::sendHEVCData(MediaBufferBase *mediaBuf) {
         // The data fits into a single packet
         uint8_t *data = buffer->data();
         data[0] = 0x80;
-        data[1] = (1 << 7) | PT;  // M-bit
+        data[1] = (1 << 7) | mPayloadType;  // M-bit
         data[2] = (mSeqNo >> 8) & 0xff;
         data[3] = mSeqNo & 0xff;
         data[4] = rtpTime >> 24;
@@ -802,7 +809,7 @@ void ARTPWriter::sendHEVCData(MediaBufferBase *mediaBuf) {
 
             uint8_t *data = buffer->data();
             data[0] = 0x80;
-            data[1] = (lastPacket ? (1 << 7) : 0x00) | PT;  // M-bit
+            data[1] = (lastPacket ? (1 << 7) : 0x00) | mPayloadType;  // M-bit
             data[2] = (mSeqNo >> 8) & 0xff;
             data[3] = mSeqNo & 0xff;
             data[4] = rtpTime >> 24;
@@ -892,9 +899,9 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
         uint8_t *data = buffer->data();
         data[0] = 0x80;
         if (isSpsPps)
-            data[1] = PT;  // Marker bit should not be set in case of sps/pps
+            data[1] = mPayloadType;  // Marker bit should not be set in case of sps/pps
         else
-            data[1] = (1 << 7) | PT;
+            data[1] = (1 << 7) | mPayloadType;
         data[2] = (mSeqNo >> 8) & 0xff;
         data[3] = mSeqNo & 0xff;
         data[4] = rtpTime >> 24;
@@ -935,7 +942,7 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
 
             uint8_t *data = buffer->data();
             data[0] = 0x80;
-            data[1] = (lastPacket ? (1 << 7) : 0x00) | PT;  // M-bit
+            data[1] = (lastPacket ? (1 << 7) : 0x00) | mPayloadType;  // M-bit
             data[2] = (mSeqNo >> 8) & 0xff;
             data[3] = mSeqNo & 0xff;
             data[4] = rtpTime >> 24;
@@ -1006,7 +1013,7 @@ void ARTPWriter::sendH263Data(MediaBufferBase *mediaBuf) {
 
         uint8_t *data = buffer->data();
         data[0] = 0x80;
-        data[1] = (lastPacket ? 0x80 : 0x00) | PT;  // M-bit
+        data[1] = (lastPacket ? 0x80 : 0x00) | mPayloadType;  // M-bit
         data[2] = (mSeqNo >> 8) & 0xff;
         data[3] = mSeqNo & 0xff;
         data[4] = rtpTime >> 24;
@@ -1088,7 +1095,7 @@ void ARTPWriter::sendAMRData(MediaBufferBase *mediaBuf) {
     // The data fits into a single packet
     uint8_t *data = buffer->data();
     data[0] = 0x80;
-    data[1] = PT;
+    data[1] = mPayloadType;
     if (mNumRTPSent == 0) {
         // Signal start of talk-spurt.
         data[1] |= 0x80;  // M-bit

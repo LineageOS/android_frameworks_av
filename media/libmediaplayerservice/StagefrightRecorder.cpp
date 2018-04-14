@@ -822,6 +822,13 @@ status_t StagefrightRecorder::setParamSelfID(int32_t selfID) {
     return OK;
 }
 
+status_t StagefrightRecorder::setParamPayloadType(int32_t payloadType) {
+    ALOGV("setParamPayloadType: %x", payloadType);
+
+    mPayloadType = payloadType;
+    return OK;
+}
+
 status_t StagefrightRecorder::setParameter(
         const String8 &key, const String8 &value) {
     ALOGV("setParameter: key (%s) => value (%s)", key.string(), value.string());
@@ -950,6 +957,11 @@ status_t StagefrightRecorder::setParameter(
         if (safe_strtoi64(value.string(), &temp)) {
             selfID = static_cast<int32_t>(temp);
             return setParamSelfID(selfID);
+        }
+    } else if (key == "rtp-param-payload-type") {
+        int32_t payloadType;
+        if (safe_strtoi32(value.string(), &payloadType)) {
+            return setParamPayloadType(payloadType);
         }
     } else {
         ALOGE("setParameter: failed to find key %s", key.string());
@@ -1118,6 +1130,7 @@ status_t StagefrightRecorder::start() {
             int64_t startTimeUs = systemTime() / 1000;
             meta->setInt64(kKeyTime, startTimeUs);
             meta->setInt32(kKeySelfID, mSelfID);
+            meta->setInt32(kKeyPayloadType, mPayloadType);
             status = mWriter->start(meta.get());
             break;
         }
