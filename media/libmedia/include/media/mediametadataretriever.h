@@ -90,7 +90,7 @@ public:
     sp<IMemory> getFrameAtTime(int64_t timeUs, int option,
             int colorFormat = HAL_PIXEL_FORMAT_RGB_565, bool metaOnly = false);
     sp<IMemory> getImageAtIndex(int index,
-            int colorFormat = HAL_PIXEL_FORMAT_RGB_565, bool metaOnly = false);
+            int colorFormat = HAL_PIXEL_FORMAT_RGB_565, bool metaOnly = false, bool thumbnail = false);
     status_t getFrameAtIndex(
             std::vector<sp<IMemory> > *frames, int frameIndex, int numFrames = 1,
             int colorFormat = HAL_PIXEL_FORMAT_RGB_565, bool metaOnly = false);

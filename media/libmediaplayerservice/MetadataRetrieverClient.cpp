@@ -234,9 +234,9 @@ sp<IMemory> MetadataRetrieverClient::getFrameAtTime(
 }
 
 sp<IMemory> MetadataRetrieverClient::getImageAtIndex(
-        int index, int colorFormat, bool metaOnly) {
-    ALOGV("getFrameAtTime: index(%d) colorFormat(%d), metaOnly(%d)",
-            index, colorFormat, metaOnly);
+        int index, int colorFormat, bool metaOnly, bool thumbnail) {
+    ALOGV("getFrameAtTime: index(%d) colorFormat(%d), metaOnly(%d) thumbnail(%d)",
+            index, colorFormat, metaOnly, thumbnail);
     Mutex::Autolock lock(mLock);
     Mutex::Autolock glock(sLock);
     mThumbnail.clear();
@@ -244,7 +244,7 @@ sp<IMemory> MetadataRetrieverClient::getImageAtIndex(
         ALOGE("retriever is not initialized");
         return NULL;
     }
-    VideoFrame *frame = mRetriever->getImageAtIndex(index, colorFormat, metaOnly);
+    VideoFrame *frame = mRetriever->getImageAtIndex(index, colorFormat, metaOnly, thumbnail);
     if (frame == NULL) {
         ALOGE("failed to extract image");
         return NULL;

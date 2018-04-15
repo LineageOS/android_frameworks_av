@@ -155,15 +155,15 @@ sp<IMemory> MediaMetadataRetriever::getFrameAtTime(
 }
 
 sp<IMemory> MediaMetadataRetriever::getImageAtIndex(
-        int index, int colorFormat, bool metaOnly) {
-    ALOGV("getImageAtIndex: index(%d) colorFormat(%d) metaOnly(%d)",
-            index, colorFormat, metaOnly);
+        int index, int colorFormat, bool metaOnly, bool thumbnail) {
+    ALOGV("getImageAtIndex: index(%d) colorFormat(%d) metaOnly(%d) thumbnail(%d)",
+            index, colorFormat, metaOnly, thumbnail);
     Mutex::Autolock _l(mLock);
     if (mRetriever == 0) {
         ALOGE("retriever is not initialized");
         return NULL;
     }
-    return mRetriever->getImageAtIndex(index, colorFormat, metaOnly);
+    return mRetriever->getImageAtIndex(index, colorFormat, metaOnly, thumbnail);
 }
 
 status_t MediaMetadataRetriever::getFrameAtIndex(

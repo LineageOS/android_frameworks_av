@@ -46,7 +46,7 @@ public:
     virtual VideoFrame* getFrameAtTime(
             int64_t timeUs, int option, int colorFormat, bool metaOnly) = 0;
     virtual VideoFrame* getImageAtIndex(
-            int index, int colorFormat, bool metaOnly) = 0;
+            int index, int colorFormat, bool metaOnly, bool thumbnail) = 0;
     virtual status_t getFrameAtIndex(
             std::vector<VideoFrame*>* frames,
             int frameIndex, int numFrames, int colorFormat, bool metaOnly) = 0;
@@ -65,7 +65,7 @@ public:
             int64_t /*timeUs*/, int /*option*/, int /*colorFormat*/, bool /*metaOnly*/)
     { return NULL; }
     virtual VideoFrame* getImageAtIndex(
-            int /*index*/, int /*colorFormat*/, bool /*metaOnly*/)
+            int /*index*/, int /*colorFormat*/, bool /*metaOnly*/, bool /*thumbnail*/)
     { return NULL; }
     virtual status_t getFrameAtIndex(
             std::vector<VideoFrame*>* /*frames*/,

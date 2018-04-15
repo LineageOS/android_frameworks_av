@@ -43,7 +43,7 @@ struct StagefrightMetadataRetriever : public MediaMetadataRetrieverInterface {
     virtual VideoFrame* getFrameAtTime(
             int64_t timeUs, int option, int colorFormat, bool metaOnly);
     virtual VideoFrame* getImageAtIndex(
-            int index, int colorFormat, bool metaOnly);
+            int index, int colorFormat, bool metaOnly, bool thumbnail);
     virtual status_t getFrameAtIndex(
             std::vector<VideoFrame*>* frames,
             int frameIndex, int numFrames, int colorFormat, bool metaOnly);
