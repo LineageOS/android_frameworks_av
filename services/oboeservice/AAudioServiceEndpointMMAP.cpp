@@ -84,6 +84,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
 
     const audio_content_type_t contentType =
             AAudioConvert_contentTypeToInternal(getContentType());
+    // Usage only used for OUTPUT
     const audio_usage_t usage = (direction == AAUDIO_DIRECTION_OUTPUT)
             ? AAudioConvert_usageToInternal(getUsage())
             : AUDIO_USAGE_UNKNOWN;
@@ -343,8 +344,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::getTimestamp(int64_t *positionFrames,
 }
 
 
-void AAudioServiceEndpointMMAP::onTearDown() {
+void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t handle __unused) {
     ALOGD("%s(%p) called", __func__, this);
+    //TODO: disconnect only stream corresponding to handle received
     disconnectRegisteredStreams();
 };
 

@@ -42,30 +42,30 @@ namespace android {
 static const int64_t kBufferTimeOutUs = 30000ll; // 30 msec
 static const size_t kRetryCount = 20; // must be >0
 
-VideoFrame *FrameDecoder::allocVideoFrame(
-        int32_t width, int32_t height, bool metaOnly) {
+//static
+VideoFrame *allocVideoFrame(const sp<MetaData> &trackMeta,
+        int32_t width, int32_t height, int32_t dstBpp, bool metaOnly = false) {
     int32_t rotationAngle;
-    if (!mTrackMeta->findInt32(kKeyRotation, &rotationAngle)) {
+    if (!trackMeta->findInt32(kKeyRotation, &rotationAngle)) {
         rotationAngle = 0;  // By default, no rotation
     }
-
     uint32_t type;
     const void *iccData;
     size_t iccSize;
-    if (!mTrackMeta->findData(kKeyIccProfile, &type, &iccData, &iccSize)){
+    if (!trackMeta->findData(kKeyIccProfile, &type, &iccData, &iccSize)){
         iccData = NULL;
         iccSize = 0;
     }
 
     int32_t sarWidth, sarHeight;
     int32_t displayWidth, displayHeight;
-    if (mTrackMeta->findInt32(kKeySARWidth, &sarWidth)
-            && mTrackMeta->findInt32(kKeySARHeight, &sarHeight)
+    if (trackMeta->findInt32(kKeySARWidth, &sarWidth)
+            && trackMeta->findInt32(kKeySARHeight, &sarHeight)
             && sarHeight != 0) {
         displayWidth = (width * sarWidth) / sarHeight;
         displayHeight = height;
-    } else if (mTrackMeta->findInt32(kKeyDisplayWidth, &displayWidth)
-                && mTrackMeta->findInt32(kKeyDisplayHeight, &displayHeight)
+    } else if (trackMeta->findInt32(kKeyDisplayWidth, &displayWidth)
+                && trackMeta->findInt32(kKeyDisplayHeight, &displayHeight)
                 && displayWidth > 0 && displayHeight > 0
                 && width > 0 && height > 0) {
         ALOGV("found display size %dx%d", displayWidth, displayHeight);
@@ -75,27 +75,66 @@ VideoFrame *FrameDecoder::allocVideoFrame(
     }
 
     return new VideoFrame(width, height, displayWidth, displayHeight,
-            rotationAngle, mDstBpp, !metaOnly, iccData, iccSize);
+            rotationAngle, dstBpp, !metaOnly, iccData, iccSize);
 }
 
-bool FrameDecoder::setDstColorFormat(android_pixel_format_t colorFormat) {
+//static
+bool findThumbnailInfo(
+        const sp<MetaData> &trackMeta, int32_t *width, int32_t *height,
+        uint32_t *type = NULL, const void **data = NULL, size_t *size = NULL) {
+    uint32_t dummyType;
+    const void *dummyData;
+    size_t dummySize;
+    return trackMeta->findInt32(kKeyThumbnailWidth, width)
+        && trackMeta->findInt32(kKeyThumbnailHeight, height)
+        && trackMeta->findData(kKeyThumbnailHVCC,
+                type ?: &dummyType, data ?: &dummyData, size ?: &dummySize);
+}
+
+//static
+VideoFrame* FrameDecoder::getMetadataOnly(
+        const sp<MetaData> &trackMeta, int colorFormat, bool thumbnail) {
+    OMX_COLOR_FORMATTYPE dstFormat;
+    int32_t dstBpp;
+    if (!getDstColorFormat(
+            (android_pixel_format_t)colorFormat, &dstFormat, &dstBpp)) {
+        return NULL;
+    }
+
+    int32_t width, height;
+    if (thumbnail) {
+        if (!findThumbnailInfo(trackMeta, &width, &height)) {
+            return NULL;
+        }
+    } else {
+        CHECK(trackMeta->findInt32(kKeyWidth, &width));
+        CHECK(trackMeta->findInt32(kKeyHeight, &height));
+    }
+    return allocVideoFrame(trackMeta, width, height, dstBpp, true /*metaOnly*/);
+}
+
+//static
+bool FrameDecoder::getDstColorFormat(
+        android_pixel_format_t colorFormat,
+        OMX_COLOR_FORMATTYPE *dstFormat,
+        int32_t *dstBpp) {
     switch (colorFormat) {
         case HAL_PIXEL_FORMAT_RGB_565:
         {
-            mDstFormat = OMX_COLOR_Format16bitRGB565;
-            mDstBpp = 2;
+            *dstFormat = OMX_COLOR_Format16bitRGB565;
+            *dstBpp = 2;
             return true;
         }
         case HAL_PIXEL_FORMAT_RGBA_8888:
         {
-            mDstFormat = OMX_COLOR_Format32BitRGBA8888;
-            mDstBpp = 4;
+            *dstFormat = OMX_COLOR_Format32BitRGBA8888;
+            *dstBpp = 4;
             return true;
         }
         case HAL_PIXEL_FORMAT_BGRA_8888:
         {
-            mDstFormat = OMX_COLOR_Format32bitBGRA8888;
-            mDstBpp = 4;
+            *dstFormat = OMX_COLOR_Format32bitBGRA8888;
+            *dstBpp = 4;
             return true;
         }
         default:
@@ -108,16 +147,10 @@ bool FrameDecoder::setDstColorFormat(android_pixel_format_t colorFormat) {
 }
 
 VideoFrame* FrameDecoder::extractFrame(
-        int64_t frameTimeUs, int option, int colorFormat, bool metaOnly) {
-    if (!setDstColorFormat((android_pixel_format_t)colorFormat)) {
+        int64_t frameTimeUs, int option, int colorFormat) {
+    if (!getDstColorFormat(
+            (android_pixel_format_t)colorFormat, &mDstFormat, &mDstBpp)) {
         return NULL;
-    }
-
-    if (metaOnly) {
-        int32_t width, height;
-        CHECK(trackMeta()->findInt32(kKeyWidth, &width));
-        CHECK(trackMeta()->findInt32(kKeyHeight, &height));
-        return allocVideoFrame(width, height, true);
     }
 
     status_t err = extractInternal(frameTimeUs, 1, option);
@@ -131,7 +164,8 @@ VideoFrame* FrameDecoder::extractFrame(
 status_t FrameDecoder::extractFrames(
         int64_t frameTimeUs, size_t numFrames, int option, int colorFormat,
         std::vector<VideoFrame*>* frames) {
-    if (!setDstColorFormat((android_pixel_format_t)colorFormat)) {
+    if (!getDstColorFormat(
+            (android_pixel_format_t)colorFormat, &mDstFormat, &mDstBpp)) {
         return ERROR_UNSUPPORTED;
     }
 
@@ -435,9 +469,10 @@ status_t VideoFrameDecoder::onOutputReceived(
     }
 
     VideoFrame *frame = allocVideoFrame(
+            trackMeta(),
             (crop_right - crop_left + 1),
             (crop_bottom - crop_top + 1),
-            false /*metaOnly*/);
+            dstBpp());
     addFrame(frame);
 
     int32_t srcFormat;
@@ -466,28 +501,28 @@ sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
         int64_t frameTimeUs, size_t /*numFrames*/,
         int /*seekMode*/, MediaSource::ReadOptions *options) {
     sp<MetaData> overrideMeta;
+    mThumbnail = false;
     if (frameTimeUs < 0) {
         uint32_t type;
         const void *data;
         size_t size;
-        int64_t thumbNailTime = 0;
-        int32_t thumbnailWidth, thumbnailHeight;
+        int32_t thumbWidth, thumbHeight;
 
         // if we have a stand-alone thumbnail, set up the override meta,
         // and set seekTo time to -1.
-        if (trackMeta()->findInt32(kKeyThumbnailWidth, &thumbnailWidth)
-         && trackMeta()->findInt32(kKeyThumbnailHeight, &thumbnailHeight)
-         && trackMeta()->findData(kKeyThumbnailHVCC, &type, &data, &size)){
-            overrideMeta = new MetaData(*(trackMeta()));
-            overrideMeta->remove(kKeyDisplayWidth);
-            overrideMeta->remove(kKeyDisplayHeight);
-            overrideMeta->setInt32(kKeyWidth, thumbnailWidth);
-            overrideMeta->setInt32(kKeyHeight, thumbnailHeight);
-            overrideMeta->setData(kKeyHVCC, type, data, size);
-            thumbNailTime = -1ll;
-            ALOGV("thumbnail: %dx%d", thumbnailWidth, thumbnailHeight);
+        if (!findThumbnailInfo(trackMeta(),
+                &thumbWidth, &thumbHeight, &type, &data, &size)) {
+            ALOGE("Thumbnail not available");
+            return NULL;
         }
-        options->setSeekTo(thumbNailTime);
+        overrideMeta = new MetaData(*(trackMeta()));
+        overrideMeta->remove(kKeyDisplayWidth);
+        overrideMeta->remove(kKeyDisplayHeight);
+        overrideMeta->setInt32(kKeyWidth, thumbWidth);
+        overrideMeta->setInt32(kKeyHeight, thumbHeight);
+        overrideMeta->setData(kKeyHVCC, type, data, size);
+        options->setSeekTo(-1);
+        mThumbnail = true;
     } else {
         options->setSeekTo(frameTimeUs);
     }
@@ -552,11 +587,16 @@ status_t ImageDecoder::onOutputReceived(
     CHECK(outputFormat->findInt32("height", &height));
 
     int32_t imageWidth, imageHeight;
-    CHECK(trackMeta()->findInt32(kKeyWidth, &imageWidth));
-    CHECK(trackMeta()->findInt32(kKeyHeight, &imageHeight));
+    if (mThumbnail) {
+        CHECK(trackMeta()->findInt32(kKeyThumbnailWidth, &imageWidth));
+        CHECK(trackMeta()->findInt32(kKeyThumbnailHeight, &imageHeight));
+    } else {
+        CHECK(trackMeta()->findInt32(kKeyWidth, &imageWidth));
+        CHECK(trackMeta()->findInt32(kKeyHeight, &imageHeight));
+    }
 
     if (mFrame == NULL) {
-        mFrame = allocVideoFrame(imageWidth, imageHeight, false /*metaOnly*/);
+        mFrame = allocVideoFrame(trackMeta(), imageWidth, imageHeight, dstBpp());
 
         addFrame(mFrame);
     }

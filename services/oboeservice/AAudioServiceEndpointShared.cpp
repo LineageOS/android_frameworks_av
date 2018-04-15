@@ -78,7 +78,6 @@ aaudio_result_t AAudioServiceEndpointShared::open(const aaudio::AAudioStreamRequ
     setSamplesPerFrame(mStreamInternal->getSamplesPerFrame());
     setDeviceId(mStreamInternal->getDeviceId());
     setSessionId(mStreamInternal->getSessionId());
-    ALOGD("open() deviceId = %d, sessionId = %d", getDeviceId(), getSessionId());
     mFramesPerBurst = mStreamInternal->getFramesPerBurst();
 
     return result;

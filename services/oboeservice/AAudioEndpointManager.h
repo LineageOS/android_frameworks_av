@@ -87,8 +87,17 @@ private:
     mutable std::mutex                                     mExclusiveLock;
     std::vector<android::sp<AAudioServiceEndpointMMAP>>    mExclusiveStreams;
 
+    // Modified under a lock.
+    int32_t mExclusiveSearchCount = 0; // number of times we SEARCHED for an exclusive endpoint
+    int32_t mExclusiveFoundCount  = 0; // number of times we FOUND an exclusive endpoint
+    int32_t mExclusiveOpenCount   = 0; // number of times we OPENED an exclusive endpoint
+    int32_t mExclusiveCloseCount  = 0; // number of times we CLOSED an exclusive endpoint
+    // Same as above but for SHARED endpoints.
+    int32_t mSharedSearchCount    = 0;
+    int32_t mSharedFoundCount     = 0;
+    int32_t mSharedOpenCount      = 0;
+    int32_t mSharedCloseCount     = 0;
 };
-
 } /* namespace aaudio */
 
 #endif //AAUDIO_AAUDIO_ENDPOINT_MANAGER_H

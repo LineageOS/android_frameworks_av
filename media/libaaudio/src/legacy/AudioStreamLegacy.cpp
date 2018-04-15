@@ -19,10 +19,12 @@
 #include <utils/Log.h>
 
 #include <stdint.h>
-#include <utils/String16.h>
+
+#include <aaudio/AAudio.h>
+#include <audio_utils/primitives.h>
 #include <media/AudioTrack.h>
 #include <media/AudioTimestamp.h>
-#include <aaudio/AAudio.h>
+#include <utils/String16.h>
 
 #include "core/AudioStream.h"
 #include "legacy/AudioStreamLegacy.h"
@@ -48,14 +50,17 @@ aaudio_legacy_callback_t AudioStreamLegacy::getLegacyCallback() {
     return AudioStreamLegacy_callback;
 }
 
-aaudio_data_callback_result_t AudioStreamLegacy::callDataCallbackFrames(uint8_t *buffer, int32_t numFrames) {
+aaudio_data_callback_result_t AudioStreamLegacy::callDataCallbackFrames(uint8_t *buffer,
+                                                                        int32_t numFrames) {
+    void *finalAudioData = buffer;
     if (getDirection() == AAUDIO_DIRECTION_INPUT) {
         // Increment before because we already got the data from the device.
         incrementFramesRead(numFrames);
+        finalAudioData = (void *) maybeConvertDeviceData(buffer, numFrames);
     }
 
     // Call using the AAudio callback interface.
-    aaudio_data_callback_result_t callbackResult = maybeCallDataCallback(buffer, numFrames);
+    aaudio_data_callback_result_t callbackResult = maybeCallDataCallback(finalAudioData, numFrames);
 
     if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE
             && getDirection() == AAUDIO_DIRECTION_OUTPUT) {
@@ -67,15 +72,15 @@ aaudio_data_callback_result_t AudioStreamLegacy::callDataCallbackFrames(uint8_t 
 
 // Implement FixedBlockProcessor
 int32_t AudioStreamLegacy::onProcessFixedBlock(uint8_t *buffer, int32_t numBytes) {
-    int32_t numFrames = numBytes / getBytesPerFrame();
+    int32_t numFrames = numBytes / getBytesPerDeviceFrame();
     return (int32_t) callDataCallbackFrames(buffer, numFrames);
 }
 
 void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode, void *info) {
     aaudio_data_callback_result_t callbackResult;
-    // This illegal size can be used to AudioFlinger to stop calling us.
+    // This illegal size can be used to tell AudioFlinger to stop calling us.
     // This takes advantage of AudioFlinger killing the stream.
-    // TODO need API change in AudioRecord and AudioTrack
+    // TODO add to API in AudioRecord and AudioTrack
     const size_t SIZE_STOP_CALLBACKS = SIZE_MAX;
 
     switch (opcode) {
@@ -100,7 +105,7 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
 
                 // If the caller specified an exact size then use a block size adapter.
                 if (mBlockAdapter != nullptr) {
-                    int32_t byteCount = audioBuffer->frameCount * getBytesPerFrame();
+                    int32_t byteCount = audioBuffer->frameCount * getBytesPerDeviceFrame();
                     callbackResult = mBlockAdapter->processVariableBlock(
                             (uint8_t *) audioBuffer->raw, byteCount);
                 } else {
@@ -109,7 +114,7 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
                                                             audioBuffer->frameCount);
                 }
                 if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
-                    audioBuffer->size = audioBuffer->frameCount * getBytesPerFrame();
+                    audioBuffer->size = audioBuffer->frameCount * getBytesPerDeviceFrame();
                 } else { // STOP or invalid result
                     ALOGW("%s() callback requested stop, fake an error", __func__);
                     audioBuffer->size = SIZE_STOP_CALLBACKS;
@@ -179,19 +184,17 @@ aaudio_result_t AudioStreamLegacy::getBestTimestamp(clockid_t clockId,
     int64_t localPosition;
     status_t status = extendedTimestamp->getBestTimestamp(&localPosition, timeNanoseconds,
                                                           timebase, &location);
-    // use MonotonicCounter to prevent retrograde motion.
-    mTimestampPosition.update32((int32_t)localPosition);
-    *framePosition = mTimestampPosition.get();
+    if (status == OK) {
+        // use MonotonicCounter to prevent retrograde motion.
+        mTimestampPosition.update32((int32_t) localPosition);
+        *framePosition = mTimestampPosition.get();
+    }
 
 //    ALOGD("getBestTimestamp() fposition: server = %6lld, kernel = %6lld, location = %d",
 //          (long long) extendedTimestamp->mPosition[ExtendedTimestamp::Location::LOCATION_SERVER],
 //          (long long) extendedTimestamp->mPosition[ExtendedTimestamp::Location::LOCATION_KERNEL],
 //          (int)location);
-    if (status == WOULD_BLOCK) {
-        return AAUDIO_ERROR_INVALID_STATE;
-    } else {
-        return AAudioConvert_androidToAAudioResult(status);
-    }
+    return AAudioConvert_androidToAAudioResult(status);
 }
 
 void AudioStreamLegacy::onAudioDeviceUpdate(audio_port_handle_t deviceId)

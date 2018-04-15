@@ -1468,14 +1468,19 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         }
         // For MMAP mode, the first call to getInputForAttr() is made on behalf of audioflinger.
         // The second call is for the first active client and sets the UID. Any further call
-        // corresponds to a new client and is only permitted from the same UId.
+        // corresponds to a new client and is only permitted from the same UID.
+        // If the first UID is silenced, allow a new UID connection and replace with new UID
         if (audioSession->openCount() == 1) {
             audioSession->setUid(uid);
         } else if (audioSession->uid() != uid) {
-            ALOGW("getInputForAttr() bad uid %d for session %d uid %d",
-                  uid, session, audioSession->uid());
-            status = INVALID_OPERATION;
-            goto error;
+            if (!audioSession->isSilenced()) {
+                ALOGW("getInputForAttr() bad uid %d for session %d uid %d",
+                      uid, session, audioSession->uid());
+                status = INVALID_OPERATION;
+                goto error;
+            }
+            audioSession->setUid(uid);
+            audioSession->setSilenced(false);
         }
         audioSession->changeOpenCount(1);
         *inputType = API_INPUT_LEGACY;
@@ -4530,10 +4535,13 @@ audio_devices_t AudioPolicyManager::getNewInputDevice(const sp<AudioInputDescrip
         }
     }
 
+    // If we are not in call and no client is active on this input, this methods returns
+    // AUDIO_DEVICE_NONE, causing the patch on the input stream to be released.
     audio_source_t source = inputDesc->getHighestPrioritySource(true /*activeOnly*/);
-    if (isInCall()) {
-        device = getDeviceAndMixForInputSource(AUDIO_SOURCE_VOICE_COMMUNICATION);
-    } else if (source != AUDIO_SOURCE_DEFAULT) {
+    if (source == AUDIO_SOURCE_DEFAULT && isInCall()) {
+        source = AUDIO_SOURCE_VOICE_COMMUNICATION;
+    }
+    if (source != AUDIO_SOURCE_DEFAULT) {
         device = getDeviceAndMixForInputSource(source);
     }
 
