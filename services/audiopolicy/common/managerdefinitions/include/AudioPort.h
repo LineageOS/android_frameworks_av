@@ -52,7 +52,7 @@ public:
     void setGains(const AudioGainCollection &gains) { mGains = gains; }
     const AudioGainCollection &getGains() const { return mGains; }
 
-    void setFlags(uint32_t flags)
+    virtual void setFlags(uint32_t flags)
     {
         //force direct flag if offload flag is set: offloading implies a direct output stream
         // and all common behaviors are driven by checking only the direct flag
