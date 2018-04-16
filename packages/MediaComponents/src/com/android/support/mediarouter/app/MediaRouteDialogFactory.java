@@ -16,7 +16,7 @@
 
 package com.android.support.mediarouter.app;
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 /**
  * The media route dialog factory is responsible for creating the media route

@@ -18,7 +18,6 @@ package com.android.support.mediarouter.media;
 import android.content.Context;
 import android.media.AudioManager;
 import android.os.Build;
-import android.support.annotation.RequiresApi;
 
 import java.lang.ref.WeakReference;
 

@@ -19,7 +19,8 @@ package com.android.support.mediarouter.media;
 import android.app.PendingIntent;
 import android.os.Bundle;
 import android.os.SystemClock;
-import android.support.v4.util.TimeUtils;
+
+import androidx.core.util.TimeUtils;
 
 /**
  * Describes the playback status of a media session.

@@ -29,17 +29,20 @@ import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
         .CLIENT_MSG_RELEASE_ROUTE_CONTROLLER;
 import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
         .CLIENT_MSG_ROUTE_CONTROL_REQUEST;
-import static com.android.support.mediarouter.media.MediaRouteProviderProtocol.CLIENT_MSG_SELECT_ROUTE;
+import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
+        .CLIENT_MSG_SELECT_ROUTE;
 import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
         .CLIENT_MSG_SET_DISCOVERY_REQUEST;
 import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
         .CLIENT_MSG_SET_ROUTE_VOLUME;
-import static com.android.support.mediarouter.media.MediaRouteProviderProtocol.CLIENT_MSG_UNREGISTER;
+import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
+        .CLIENT_MSG_UNREGISTER;
 import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
         .CLIENT_MSG_UNSELECT_ROUTE;
 import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
         .CLIENT_MSG_UPDATE_ROUTE_VOLUME;
-import static com.android.support.mediarouter.media.MediaRouteProviderProtocol.CLIENT_VERSION_CURRENT;
+import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
+        .CLIENT_VERSION_CURRENT;
 import static com.android.support.mediarouter.media.MediaRouteProviderProtocol.SERVICE_DATA_ERROR;
 import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
         .SERVICE_MSG_CONTROL_REQUEST_FAILED;
@@ -51,9 +54,11 @@ import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
         .SERVICE_MSG_GENERIC_FAILURE;
 import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
         .SERVICE_MSG_GENERIC_SUCCESS;
-import static com.android.support.mediarouter.media.MediaRouteProviderProtocol.SERVICE_MSG_REGISTERED;
+import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
+        .SERVICE_MSG_REGISTERED;
 import static com.android.support.mediarouter.media.MediaRouteProviderProtocol.SERVICE_VERSION_1;
-import static com.android.support.mediarouter.media.MediaRouteProviderProtocol.isValidRemoteMessenger;
+import static com.android.support.mediarouter.media.MediaRouteProviderProtocol
+        .isValidRemoteMessenger;
 
 import android.annotation.NonNull;
 import android.content.ComponentName;

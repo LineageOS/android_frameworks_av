@@ -16,18 +16,19 @@
 
 package com.android.widget;
 
+import static android.widget.VideoView2.VIEW_TYPE_TEXTUREVIEW;
+
 import android.content.Context;
 import android.graphics.SurfaceTexture;
 import android.media.MediaPlayer2;
-import android.support.annotation.NonNull;
-import android.support.annotation.RequiresApi;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 
-import static android.widget.VideoView2.VIEW_TYPE_TEXTUREVIEW;
+import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 
 @RequiresApi(26)
 class VideoTextureView extends TextureView

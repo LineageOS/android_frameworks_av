@@ -16,7 +16,6 @@
 
 package com.android.media;
 
-import static android.media.SessionCommand2.COMMAND_CODE_SET_VOLUME;
 import static android.media.SessionCommand2.COMMAND_CODE_PLAYLIST_ADD_ITEM;
 import static android.media.SessionCommand2.COMMAND_CODE_PLAYLIST_REMOVE_ITEM;
 import static android.media.SessionCommand2.COMMAND_CODE_PLAYLIST_REPLACE_ITEM;
@@ -30,6 +29,7 @@ import static android.media.SessionCommand2.COMMAND_CODE_SESSION_PLAY_FROM_URI;
 import static android.media.SessionCommand2.COMMAND_CODE_SESSION_PREPARE_FROM_MEDIA_ID;
 import static android.media.SessionCommand2.COMMAND_CODE_SESSION_PREPARE_FROM_SEARCH;
 import static android.media.SessionCommand2.COMMAND_CODE_SESSION_PREPARE_FROM_URI;
+import static android.media.SessionCommand2.COMMAND_CODE_SET_VOLUME;
 
 import android.app.PendingIntent;
 import android.content.ComponentName;
@@ -44,11 +44,11 @@ import android.media.MediaItem2;
 import android.media.MediaMetadata2;
 import android.media.MediaPlaylistAgent.RepeatMode;
 import android.media.MediaPlaylistAgent.ShuffleMode;
-import android.media.SessionCommand2;
 import android.media.MediaSession2.CommandButton;
-import android.media.SessionCommandGroup2;
 import android.media.MediaSessionService2;
 import android.media.Rating2;
+import android.media.SessionCommand2;
+import android.media.SessionCommandGroup2;
 import android.media.SessionToken2;
 import android.media.update.MediaController2Provider;
 import android.net.Uri;
@@ -58,9 +58,10 @@ import android.os.Process;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.os.UserHandle;
-import android.support.annotation.GuardedBy;
 import android.text.TextUtils;
 import android.util.Log;
+
+import androidx.annotation.GuardedBy;
 
 import java.util.ArrayList;
 import java.util.List;

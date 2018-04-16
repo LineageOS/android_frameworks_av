@@ -20,7 +20,6 @@ import static android.content.Context.NOTIFICATION_SERVICE;
 
 import android.app.Notification;
 import android.app.NotificationManager;
-import android.content.Context;
 import android.content.Intent;
 import android.media.MediaPlayerBase;
 import android.media.MediaPlayerBase.PlayerEventCallback;
@@ -31,8 +30,9 @@ import android.media.SessionToken2;
 import android.media.SessionToken2.TokenType;
 import android.media.update.MediaSessionService2Provider;
 import android.os.IBinder;
-import android.support.annotation.GuardedBy;
 import android.util.Log;
+
+import androidx.annotation.GuardedBy;
 
 // TODO(jaewan): Need a test for session service itself.
 public class MediaSessionService2Impl implements MediaSessionService2Provider {

@@ -28,13 +28,14 @@ import android.graphics.Canvas;
 import android.graphics.drawable.AnimationDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
-import android.support.v4.graphics.drawable.DrawableCompat;
-import android.support.v7.widget.TooltipCompat;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
 import android.view.SoundEffectConstants;
 import android.view.View;
+
+import androidx.appcompat.widget.TooltipCompat;
+import androidx.core.graphics.drawable.DrawableCompat;
 
 import com.android.media.update.ApiHelper;
 import com.android.media.update.R;
@@ -70,7 +71,7 @@ import com.android.support.mediarouter.media.MediaRouter;
  * <h3>Prerequisites</h3>
  * <p>
  * To use the media route button, the activity must be a subclass of
- * {@link FragmentActivity} from the <code>android.support.v4</code>
+ * {@link FragmentActivity} from the <code>androidx.core./code>
  * support library.  Refer to support library documentation for details.
  * </p>
  *
@@ -81,9 +82,9 @@ public class MediaRouteButton extends View {
     private static final String TAG = "MediaRouteButton";
 
     private static final String CHOOSER_FRAGMENT_TAG =
-            "android.support.v7.mediarouter:MediaRouteChooserDialogFragment";
+            "androidx.mediarouter.media.outer:MediaRouteChooserDialogFragment";
     private static final String CONTROLLER_FRAGMENT_TAG =
-            "android.support.v7.mediarouter:MediaRouteControllerDialogFragment";
+            "androidx.mediarouter.media.outer:MediaRouteControllerDialogFragment";
 
     private final MediaRouter mRouter;
     private final MediaRouterCallback mCallback;
