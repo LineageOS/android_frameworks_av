@@ -8381,7 +8381,9 @@ status_t AudioFlinger::MmapThread::createAudioPatch_l(const struct audio_patch *
         sendIoConfigEvent_l(AUDIO_OUTPUT_CONFIG_CHANGED);
         sp<MmapStreamCallback> callback = mCallback.promote();
         if (mDeviceId != deviceId && callback != 0) {
+            mLock.unlock();
             callback->onRoutingChanged(deviceId);
+            mLock.lock();
         }
         mDeviceId = deviceId;
     }
@@ -8390,7 +8392,9 @@ status_t AudioFlinger::MmapThread::createAudioPatch_l(const struct audio_patch *
         sendIoConfigEvent_l(AUDIO_INPUT_CONFIG_CHANGED);
         sp<MmapStreamCallback> callback = mCallback.promote();
         if (mDeviceId != deviceId && callback != 0) {
+            mLock.unlock();
             callback->onRoutingChanged(deviceId);
+            mLock.lock();
         }
         mDeviceId = deviceId;
     }
@@ -8556,7 +8560,9 @@ void AudioFlinger::MmapThread::checkInvalidTracks_l()
         if (track->isInvalid()) {
             sp<MmapStreamCallback> callback = mCallback.promote();
             if (callback != 0) {
+                mLock.unlock();
                 callback->onTearDown(track->portId());
+                mLock.lock();
             } else if (mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
                 ALOGW("Could not notify MMAP stream tear down: no onTearDown callback!");
                 mNoCallbackWarningCount++;
@@ -8751,9 +8757,11 @@ void AudioFlinger::MmapPlaybackThread::processVolume_l()
                 for (int i = 0; i < channelCount; i++) {
                     values.add(volume);
                 }
-                callback->onVolumeChanged(mChannelMask, values);
                 mHalVolFloat = volume; // SW volume control worked, so update value.
                 mNoCallbackWarningCount = 0;
+                mLock.unlock();
+                callback->onVolumeChanged(mChannelMask, values);
+                mLock.lock();
             } else {
                 if (mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
                     ALOGW("Could not set MMAP stream volume: no volume callback!");
