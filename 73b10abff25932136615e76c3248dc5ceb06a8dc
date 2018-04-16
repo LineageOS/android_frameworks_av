@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b145d7f8_28e7dc6b",
+        "filename": "media/libstagefright/omx/OMXNodeInstance.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 470,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-04-16T23:50:33Z",
+      "side": 1,
+      "message": "Does it make sense for this to be removed then?",
+      "range": {
+        "startLine": 470,
+        "startChar": 12,
+        "endLine": 470,
+        "endChar": 32
+      },
+      "revId": "73b10abff25932136615e76c3248dc5ceb06a8dc",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
