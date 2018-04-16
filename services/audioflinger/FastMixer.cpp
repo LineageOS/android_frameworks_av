@@ -216,11 +216,6 @@ void FastMixer::onStateChange()
             mWarmupNsMax = LONG_MAX;
         }
         mMixerBufferState = UNDEFINED;
-#if !LOG_NDEBUG
-        for (unsigned i = 0; i < FastMixerState::sMaxFastTracks; ++i) {
-            mFastTrackNames[i] = -1;
-        }
-#endif
         // we need to reconfigure all active tracks
         previousTrackMask = 0;
         mFastTracksGen = current->mFastTracksGen - 1;
@@ -245,9 +240,6 @@ void FastMixer::onStateChange()
             if (mMixer != NULL) {
                 mMixer->destroy(i);
             }
-#if !LOG_NDEBUG
-            mFastTrackNames[i] = -1;
-#endif
             // don't reset track dump state, since other side is ignoring it
             mGenerations[i] = fastTrack->mGeneration;
         }
@@ -259,7 +251,6 @@ void FastMixer::onStateChange()
             addedTracks &= ~(1 << i);
             const FastTrack* fastTrack = &current->mFastTracks[i];
             AudioBufferProvider *bufferProvider = fastTrack->mBufferProvider;
-            ALOG_ASSERT(bufferProvider != NULL && mFastTrackNames[i] == -1);
             if (mMixer != NULL) {
                 const int name = i; // for clarity, choose name as fast track index.
                 status_t status = mMixer->create(
