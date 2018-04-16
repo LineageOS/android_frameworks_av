@@ -838,7 +838,7 @@ status_t BnAudioPolicyService::onTransact(
             audio_output_flags_t flags =
                     static_cast <audio_output_flags_t>(data.readInt32());
             bool hasOffloadInfo = data.readInt32() != 0;
-            audio_offload_info_t offloadInfo;
+            audio_offload_info_t offloadInfo = {};
             if (hasOffloadInfo) {
                 data.read(&offloadInfo, sizeof(audio_offload_info_t));
             }
@@ -854,7 +854,7 @@ status_t BnAudioPolicyService::onTransact(
 
         case GET_OUTPUT_FOR_ATTR: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            audio_attributes_t attr;
+            audio_attributes_t attr = {};
             bool hasAttributes = data.readInt32() != 0;
             if (hasAttributes) {
                 data.read(&attr, sizeof(audio_attributes_t));
@@ -874,7 +874,7 @@ status_t BnAudioPolicyService::onTransact(
                     static_cast <audio_output_flags_t>(data.readInt32());
             audio_port_handle_t selectedDeviceId = data.readInt32();
             bool hasOffloadInfo = data.readInt32() != 0;
-            audio_offload_info_t offloadInfo;
+            audio_offload_info_t offloadInfo = {};
             if (hasOffloadInfo) {
                 data.read(&offloadInfo, sizeof(audio_offload_info_t));
             }
@@ -924,7 +924,7 @@ status_t BnAudioPolicyService::onTransact(
 
         case GET_INPUT_FOR_ATTR: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            audio_attributes_t attr;
+            audio_attributes_t attr = {};
             data.read(&attr, sizeof(audio_attributes_t));
             sanetizeAudioAttributes(&attr);
             audio_session_t session = (audio_session_t)data.readInt32();
@@ -1021,8 +1021,11 @@ status_t BnAudioPolicyService::onTransact(
 
         case GET_OUTPUT_FOR_EFFECT: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            effect_descriptor_t desc;
-            data.read(&desc, sizeof(effect_descriptor_t));
+            effect_descriptor_t desc = {};
+            if (data.read(&desc, sizeof(desc)) != NO_ERROR) {
+                android_errorWriteLog(0x534e4554, "73126106");
+            }
+            (void)sanitizeEffectDescriptor(&desc);
             audio_io_handle_t output = getOutputForEffect(&desc);
             reply->writeInt32(static_cast <int>(output));
             return NO_ERROR;
@@ -1030,8 +1033,11 @@ status_t BnAudioPolicyService::onTransact(
 
         case REGISTER_EFFECT: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            effect_descriptor_t desc;
-            data.read(&desc, sizeof(effect_descriptor_t));
+            effect_descriptor_t desc = {};
+            if (data.read(&desc, sizeof(desc)) != NO_ERROR) {
+                android_errorWriteLog(0x534e4554, "73126106");
+            }
+            (void)sanitizeEffectDescriptor(&desc);
             audio_io_handle_t io = data.readInt32();
             uint32_t strategy = data.readInt32();
             int session = data.readInt32();
@@ -1090,7 +1096,7 @@ status_t BnAudioPolicyService::onTransact(
                 count = AudioEffect::kMaxPreProcessing;
             }
             uint32_t retCount = count;
-            effect_descriptor_t *descriptors = new effect_descriptor_t[count];
+            effect_descriptor_t *descriptors = new effect_descriptor_t[count]{};
             status_t status = queryDefaultPreProcessing(audioSession, descriptors, &retCount);
             reply->writeInt32(status);
             if (status != NO_ERROR && status != NO_MEMORY) {
@@ -1109,7 +1115,7 @@ status_t BnAudioPolicyService::onTransact(
 
         case IS_OFFLOAD_SUPPORTED: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            audio_offload_info_t info;
+            audio_offload_info_t info = {};
             data.read(&info, sizeof(audio_offload_info_t));
             bool isSupported = isOffloadSupported(info);
             reply->writeInt32(isSupported);
@@ -1164,7 +1170,7 @@ status_t BnAudioPolicyService::onTransact(
 
         case CREATE_AUDIO_PATCH: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            struct audio_patch patch;
+            struct audio_patch patch = {};
             data.read(&patch, sizeof(struct audio_patch));
             audio_patch_handle_t handle = {};
             if (data.read(&handle, sizeof(audio_patch_handle_t)) != NO_ERROR) {
@@ -1180,7 +1186,7 @@ status_t BnAudioPolicyService::onTransact(
 
         case RELEASE_AUDIO_PATCH: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            audio_patch_handle_t handle;
+            audio_patch_handle_t handle = {};
             data.read(&handle, sizeof(audio_patch_handle_t));
             status_t status = releaseAudioPatch(handle);
             reply->writeInt32(status);
@@ -1219,8 +1225,9 @@ status_t BnAudioPolicyService::onTransact(
 
         case SET_AUDIO_PORT_CONFIG: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            struct audio_port_config config;
+            struct audio_port_config config = {};
             data.read(&config, sizeof(struct audio_port_config));
+            (void)sanitizeAudioPortConfig(&config);
             status_t status = setAudioPortConfig(&config);
             reply->writeInt32(status);
             return NO_ERROR;
@@ -1294,9 +1301,10 @@ status_t BnAudioPolicyService::onTransact(
 
         case START_AUDIO_SOURCE: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            struct audio_port_config source;
+            struct audio_port_config source = {};
             data.read(&source, sizeof(struct audio_port_config));
-            audio_attributes_t attributes;
+            (void)sanitizeAudioPortConfig(&source);
+            audio_attributes_t attributes = {};
             data.read(&attributes, sizeof(audio_attributes_t));
             sanetizeAudioAttributes(&attributes);
             audio_io_handle_t handle = {};
@@ -1319,6 +1327,14 @@ status_t BnAudioPolicyService::onTransact(
     }
 }
 
+/** returns true if string overflow was prevented by zero termination */
+template <size_t size>
+static bool preventStringOverflow(char (&s)[size]) {
+    if (strnlen(s, size) < size) return false;
+    s[size - 1] = '\0';
+    return true;
+}
+
 void BnAudioPolicyService::sanetizeAudioAttributes(audio_attributes_t* attr)
 {
     const size_t tagsMaxSize = AUDIO_ATTRIBUTES_TAGS_MAX_SIZE;
@@ -1326,6 +1342,27 @@ void BnAudioPolicyService::sanetizeAudioAttributes(audio_attributes_t* attr)
         android_errorWriteLog(0x534e4554, "68953950"); // SafetyNet logging
     }
     attr->tags[tagsMaxSize - 1] = '\0';
+}
+
+/** returns BAD_VALUE if sanitization was required. */
+status_t BnAudioPolicyService::sanitizeEffectDescriptor(effect_descriptor_t* desc)
+{
+    if (preventStringOverflow(desc->name)
+        | /* always */ preventStringOverflow(desc->implementor)) {
+        android_errorWriteLog(0x534e4554, "73126106"); // SafetyNet logging
+        return BAD_VALUE;
+    }
+    return NO_ERROR;
+}
+
+/** returns BAD_VALUE if sanitization was required. */
+status_t BnAudioPolicyService::sanitizeAudioPortConfig(struct audio_port_config* config)
+{
+    if (config->type == AUDIO_PORT_TYPE_DEVICE &&
+        preventStringOverflow(config->ext.device.address)) {
+        return BAD_VALUE;
+    }
+    return NO_ERROR;
 }
 
 // ----------------------------------------------------------------------------
