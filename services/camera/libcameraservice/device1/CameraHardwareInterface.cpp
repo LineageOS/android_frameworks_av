@@ -612,12 +612,16 @@ void CameraHardwareInterface::releaseRecordingFrame(const sp<IMemory>& mem)
             //       Either document why it is safe in this case or address the
             //       issue (e.g. by copying).
             VideoNativeHandleMetadata* md = (VideoNativeHandleMetadata*) mem->unsecurePointer();
-            // Caching the handle here because md->pHandle will be subject to HAL's edit
-            native_handle_t* nh = md->pHandle;
-            hidl_handle frame = nh;
-            mHidlDevice->releaseRecordingFrameHandle(heapId, bufferIndex, frame);
-            native_handle_close(nh);
-            native_handle_delete(nh);
+            if (md->eType == kMetadataBufferTypeNativeHandleSource) {
+                // Caching the handle here because md->pHandle will be subject to HAL's edit
+                native_handle_t* nh = md->pHandle;
+                hidl_handle frame = nh;
+                mHidlDevice->releaseRecordingFrameHandle(heapId, bufferIndex, frame);
+                native_handle_close(nh);
+                native_handle_delete(nh);
+            } else {
+                mHidlDevice->releaseRecordingFrame(heapId, bufferIndex);
+            }
         } else {
             mHidlDevice->releaseRecordingFrame(heapId, bufferIndex);
         }
