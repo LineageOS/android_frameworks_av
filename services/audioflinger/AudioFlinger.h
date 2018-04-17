@@ -798,6 +798,8 @@ private:
 
     status_t    checkStreamType(audio_stream_type_t stream) const;
 
+    void        filterReservedParameters(String8& keyValuePairs, uid_t callingUid);
+
 #ifdef TEE_SINK
     // all record threads serially share a common tee sink, which is re-created on format change
     sp<NBAIO_Sink>   mRecordTeeSink;
