@@ -14,6 +14,15 @@
  * limitations under the License.
  */
 
+/**
+ * @addtogroup Media
+ * @{
+ */
+
+/**
+ * @file NdkMediaDrm.h
+ */
+
 /*
  * This file defines an NDK API.
  * Do not remove methods.
@@ -451,3 +460,5 @@ media_status_t AMediaDrm_verify(AMediaDrm *, const AMediaDrmSessionId *sessionId
 __END_DECLS
 
 #endif //_NDK_MEDIA_DRM_H
+
+/** @} */

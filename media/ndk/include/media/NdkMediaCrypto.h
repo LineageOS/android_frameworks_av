@@ -14,6 +14,14 @@
  * limitations under the License.
  */
 
+/**
+ * @addtogroup Media
+ * @{
+ */
+
+/**
+ * @file NdkMediaCrypto.h
+ */
 
 /*
  * This file defines an NDK API.
@@ -54,3 +62,5 @@ void AMediaCrypto_delete(AMediaCrypto* crypto);
 __END_DECLS
 
 #endif // _NDK_MEDIA_CRYPTO_H
+
+/** @} */

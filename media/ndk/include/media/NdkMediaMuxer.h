@@ -14,6 +14,14 @@
  * limitations under the License.
  */
 
+/**
+ * @addtogroup Media
+ * @{
+ */
+
+/**
+ * @file NdkMediaMuxer.h
+ */
 
 /*
  * This file defines an NDK API.
@@ -118,3 +126,5 @@ media_status_t AMediaMuxer_writeSampleData(AMediaMuxer *muxer,
 __END_DECLS
 
 #endif // _NDK_MEDIA_MUXER_H
+
+/** @} */
