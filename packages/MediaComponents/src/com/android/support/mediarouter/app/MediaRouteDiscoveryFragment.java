@@ -17,10 +17,11 @@
 package com.android.support.mediarouter.app;
 
 import android.os.Bundle;
-import android.support.v4.app.Fragment;
 
-import com.android.support.mediarouter.media.MediaRouter;
+import androidx.fragment.app.Fragment;
+
 import com.android.support.mediarouter.media.MediaRouteSelector;
+import com.android.support.mediarouter.media.MediaRouter;
 
 /**
  * Media route discovery fragment.
@@ -34,7 +35,7 @@ import com.android.support.mediarouter.media.MediaRouteSelector;
  * provide the {@link MediaRouter} callback to register.
  * </p><p>
  * Note that the discovery callback makes the application be connected with all the
- * {@link android.support.v7.media.MediaRouteProviderService media route provider services}
+ * {@link androidx.mediarouter.media.MediaRouteProviderService media route provider services}
  * while it is registered.
  * </p>
  */
@@ -114,7 +115,7 @@ public class MediaRouteDiscoveryFragment extends Fragment {
     }
 
     /**
-     * Called to create the {@link android.support.v7.media.MediaRouter.Callback callback}
+     * Called to create the {@link androidx.mediarouter.media.MediaRouter.Callback callback}
      * that will be registered.
      * <p>
      * The default callback does nothing.  The application may override this method to
@@ -129,7 +130,7 @@ public class MediaRouteDiscoveryFragment extends Fragment {
 
     /**
      * Called to prepare the callback flags that will be used when the
-     * {@link android.support.v7.media.MediaRouter.Callback callback} is registered.
+     * {@link androidx.mediarouter.media.MediaRouter.Callback callback} is registered.
      * <p>
      * The default implementation returns {@link MediaRouter#CALLBACK_FLAG_REQUEST_DISCOVERY}.
      * </p>

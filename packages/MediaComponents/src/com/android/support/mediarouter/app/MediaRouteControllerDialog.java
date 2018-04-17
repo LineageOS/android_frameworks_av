@@ -40,9 +40,6 @@ import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
-import android.support.v4.util.ObjectsCompat;
-import android.support.v4.view.accessibility.AccessibilityEventCompat;
-import android.support.v7.graphics.Palette;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.ContextThemeWrapper;
@@ -72,11 +69,15 @@ import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
+import androidx.core.util.ObjectsCompat;
+import androidx.core.view.accessibility.AccessibilityEventCompat;
+import androidx.palette.graphics.Palette;
+
 import com.android.media.update.ApiHelper;
 import com.android.media.update.R;
+import com.android.support.mediarouter.app.OverlayListView.OverlayObject;
 import com.android.support.mediarouter.media.MediaRouteSelector;
 import com.android.support.mediarouter.media.MediaRouter;
-import com.android.support.mediarouter.app.OverlayListView.OverlayObject;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;

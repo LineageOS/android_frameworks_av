@@ -24,7 +24,6 @@ import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.media.AudioManager;
 import android.os.Build;
-import android.support.annotation.RequiresApi;
 import android.view.Display;
 
 import com.android.media.update.ApiHelper;

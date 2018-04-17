@@ -18,20 +18,20 @@ package com.android.media.update;
 
 import android.annotation.Nullable;
 import android.content.Context;
-import android.content.ContextWrapper;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
 import android.content.res.XmlResourceParser;
-import android.support.annotation.GuardedBy;
-import android.support.v4.widget.Space;
-import android.support.v7.widget.ButtonBarLayout;
 import android.util.AttributeSet;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+
+import androidx.annotation.GuardedBy;
+import androidx.appcompat.widget.ButtonBarLayout;
+import androidx.legacy.widget.Space;
 
 import com.android.support.mediarouter.app.MediaRouteButton;
 import com.android.support.mediarouter.app.MediaRouteExpandCollapseButton;

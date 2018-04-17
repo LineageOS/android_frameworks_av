@@ -16,17 +16,18 @@
 
 package com.android.widget;
 
+import static android.widget.VideoView2.VIEW_TYPE_SURFACEVIEW;
+
 import android.content.Context;
 import android.graphics.Rect;
 import android.media.MediaPlayer2;
-import android.support.annotation.NonNull;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 
-import static android.widget.VideoView2.VIEW_TYPE_SURFACEVIEW;
+import androidx.annotation.NonNull;
 
 class VideoSurfaceView extends SurfaceView implements VideoViewInterface, SurfaceHolder.Callback {
     private static final String TAG = "VideoSurfaceView";

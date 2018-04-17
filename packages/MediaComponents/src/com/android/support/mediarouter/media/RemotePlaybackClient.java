@@ -22,8 +22,9 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.v4.util.ObjectsCompat;
 import android.util.Log;
+
+import androidx.core.util.ObjectsCompat;
 
 /**
  * A helper class for playing media on remote routes using the remote playback protocol
@@ -867,11 +868,11 @@ public class RemotePlaybackClient {
 
     private final class ActionReceiver extends BroadcastReceiver {
         public static final String ACTION_ITEM_STATUS_CHANGED =
-                "android.support.v7.media.actions.ACTION_ITEM_STATUS_CHANGED";
+                "androidx.mediarouter.media.actions.ACTION_ITEM_STATUS_CHANGED";
         public static final String ACTION_SESSION_STATUS_CHANGED =
-                "android.support.v7.media.actions.ACTION_SESSION_STATUS_CHANGED";
+                "androidx.mediarouter.media.actions.ACTION_SESSION_STATUS_CHANGED";
         public static final String ACTION_MESSAGE_RECEIVED =
-                "android.support.v7.media.actions.ACTION_MESSAGE_RECEIVED";
+                "androidx.mediarouter.media.actions.ACTION_MESSAGE_RECEIVED";
 
         ActionReceiver() {
         }

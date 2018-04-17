@@ -16,12 +16,8 @@
 
 package com.android.media.subtitle;
 
-import java.util.Locale;
-import java.util.Vector;
-
 import android.content.Context;
 import android.media.MediaFormat;
-import android.media.MediaPlayer2;
 import android.media.MediaPlayer2.TrackInfo;
 import android.os.Handler;
 import android.os.Looper;
@@ -29,6 +25,9 @@ import android.os.Message;
 import android.view.accessibility.CaptioningManager;
 
 import com.android.media.subtitle.SubtitleTrack.RenderingWidget;
+
+import java.util.Locale;
+import java.util.Vector;
 
 // Note: This is forked from android.media.SubtitleController since P
 /**

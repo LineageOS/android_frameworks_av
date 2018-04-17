@@ -19,7 +19,6 @@ package com.android.media;
 import android.content.Context;
 import android.media.MediaBrowser2;
 import android.media.MediaBrowser2.BrowserCallback;
-import android.media.MediaController2;
 import android.media.MediaItem2;
 import android.media.SessionToken2;
 import android.media.update.MediaBrowser2Provider;
