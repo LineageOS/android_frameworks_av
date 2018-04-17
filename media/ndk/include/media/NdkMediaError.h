@@ -14,6 +14,14 @@
  * limitations under the License.
  */
 
+/**
+ * @addtogroup Media
+ * @{
+ */
+
+/**
+ * @file NdkMediaError.h
+ */
 
 /*
  * This file defines an NDK API.
@@ -79,3 +87,5 @@ typedef enum {
 __END_DECLS
 
 #endif // _NDK_MEDIA_ERROR_H
+
+/** @} */

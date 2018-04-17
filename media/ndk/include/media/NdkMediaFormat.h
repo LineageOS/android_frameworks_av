@@ -14,6 +14,15 @@
  * limitations under the License.
  */
 
+/**
+ * @addtogroup Media
+ * @{
+ */
+
+/**
+ * @file NdkMediaFormat.h
+ */
+
 /*
  * This file defines an NDK API.
  * Do not remove methods.
@@ -164,3 +173,5 @@ void AMediaFormat_setRect(AMediaFormat*, const char* name,
 __END_DECLS
 
 #endif // _NDK_MEDIA_FORMAT_H
+
+/** @} */
