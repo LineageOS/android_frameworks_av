@@ -317,8 +317,13 @@ static const char *FourCC2MIME(uint32_t fourcc) {
         case FOURCC('h', 'e', 'v', '1'):
             return MEDIA_MIMETYPE_VIDEO_HEVC;
         default:
-            CHECK(!"should not be here.");
-            return NULL;
+            ALOGW("Unknown fourcc: %c%c%c%c",
+                   (fourcc >> 24) & 0xff,
+                   (fourcc >> 16) & 0xff,
+                   (fourcc >> 8) & 0xff,
+                   fourcc & 0xff
+                   );
+            return "application/octet-stream";
     }
 }
 
