@@ -344,8 +344,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::getTimestamp(int64_t *positionFrames,
 }
 
 
-void AAudioServiceEndpointMMAP::onTearDown() {
+void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t handle __unused) {
     ALOGD("%s(%p) called", __func__, this);
+    //TODO: disconnect only stream corresponding to handle received
     disconnectRegisteredStreams();
 };
 

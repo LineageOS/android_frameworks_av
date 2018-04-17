@@ -1589,6 +1589,7 @@ class MmapThread : public ThreadBase
     virtual     void        threadLoop_exit();
     virtual     void        threadLoop_standby();
     virtual     bool        shouldStandby_l() { return false; }
+    virtual     status_t    exitStandby();
 
     virtual     status_t    initCheck() const { return (mHalStream == 0) ? NO_INIT : NO_ERROR; }
     virtual     size_t      frameCount() const { return mFrameCount; }
@@ -1621,6 +1622,9 @@ class MmapThread : public ThreadBase
 
     virtual     void        invalidateTracks(audio_stream_type_t streamType __unused) {}
 
+                // Sets the UID records silence
+    virtual     void        setRecordSilenced(uid_t uid __unused, bool silenced __unused) {}
+
                 void        dump(int fd, const Vector<String16>& args);
     virtual     void        dumpInternals(int fd, const Vector<String16>& args);
                 void        dumpTracks(int fd, const Vector<String16>& args);
@@ -1637,6 +1641,9 @@ class MmapThread : public ThreadBase
                 sp<DeviceHalInterface>  mHalDevice;
                 AudioHwDevice* const    mAudioHwDev;
                 ActiveTracks<MmapTrack> mActiveTracks;
+
+                int32_t                 mNoCallbackWarningCount;
+     static     constexpr int32_t       kMaxNoCallbackWarnings = 5;
 };
 
 class MmapPlaybackThread : public MmapThread, public VolumeInterface
@@ -1670,7 +1677,7 @@ public:
 
     virtual     audio_stream_type_t streamType() { return mStreamType; }
     virtual     void        checkSilentMode_l();
-    virtual     void        processVolume_l();
+                void        processVolume_l() override;
 
     virtual     void        dumpInternals(int fd, const Vector<String16>& args);
 
@@ -1686,8 +1693,6 @@ protected:
                 bool                        mMasterMute;
                 bool                        mStreamMute;
                 float                       mHalVolFloat;
-                int32_t                     mNoCallbackWarningCount;
-     static     constexpr int32_t           kMaxNoCallbackWarnings = 5;
                 AudioStreamOut*             mOutput;
 };
 
@@ -1702,9 +1707,12 @@ public:
 
                 AudioStreamIn* clearInput();
 
+                status_t       exitStandby() override;
     virtual     bool           isOutput() const override { return false; }
 
                 void           updateMetadata_l() override;
+                void           processVolume_l() override;
+                void           setRecordSilenced(uid_t uid, bool silenced) override;
 
 protected:
 
