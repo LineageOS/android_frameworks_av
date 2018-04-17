@@ -1468,19 +1468,14 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         }
         // For MMAP mode, the first call to getInputForAttr() is made on behalf of audioflinger.
         // The second call is for the first active client and sets the UID. Any further call
-        // corresponds to a new client and is only permitted from the same UID.
-        // If the first UID is silenced, allow a new UID connection and replace with new UID
+        // corresponds to a new client and is only permitted from the same UId.
         if (audioSession->openCount() == 1) {
             audioSession->setUid(uid);
         } else if (audioSession->uid() != uid) {
-            if (!audioSession->isSilenced()) {
-                ALOGW("getInputForAttr() bad uid %d for session %d uid %d",
-                      uid, session, audioSession->uid());
-                status = INVALID_OPERATION;
-                goto error;
-            }
-            audioSession->setUid(uid);
-            audioSession->setSilenced(false);
+            ALOGW("getInputForAttr() bad uid %d for session %d uid %d",
+                  uid, session, audioSession->uid());
+            status = INVALID_OPERATION;
+            goto error;
         }
         audioSession->changeOpenCount(1);
         *inputType = API_INPUT_LEGACY;

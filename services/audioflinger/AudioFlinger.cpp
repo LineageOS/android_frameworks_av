@@ -1000,12 +1000,14 @@ void AudioFlinger::setRecordSilenced(uid_t uid, bool silenced)
 {
     ALOGV("AudioFlinger::setRecordSilenced(uid:%d, silenced:%d)", uid, silenced);
 
+    // TODO: Notify MmapThreads
+
     AutoMutex lock(mLock);
     for (size_t i = 0; i < mRecordThreads.size(); i++) {
-        mRecordThreads[i]->setRecordSilenced(uid, silenced);
-    }
-    for (size_t i = 0; i < mMmapThreads.size(); i++) {
-        mMmapThreads[i]->setRecordSilenced(uid, silenced);
+        sp<RecordThread> thread = mRecordThreads.valueAt(i);
+        if (thread != 0) {
+            thread->setRecordSilenced(uid, silenced);
+        }
     }
 }
 

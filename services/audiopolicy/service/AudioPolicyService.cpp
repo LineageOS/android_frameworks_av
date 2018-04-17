@@ -151,6 +151,7 @@ void AudioPolicyService::removeNotificationClient(uid_t uid)
     {
         Mutex::Autolock _l(mLock);
         if (mAudioPolicyManager) {
+            // called from binder death notification: no need to clear caller identity
             mAudioPolicyManager->releaseResourcesForUid(uid);
         }
     }
@@ -335,6 +336,7 @@ void AudioPolicyService::setRecordSilenced(uid_t uid, bool silenced)
     {
         Mutex::Autolock _l(mLock);
         if (mAudioPolicyManager) {
+            AutoCallerClear acc;
             mAudioPolicyManager->setRecordSilenced(uid, silenced);
         }
     }
