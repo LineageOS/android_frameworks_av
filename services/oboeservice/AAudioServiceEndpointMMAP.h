@@ -68,7 +68,7 @@ public:
     aaudio_result_t getTimestamp(int64_t *positionFrames, int64_t *timeNanos) override;
 
     // -------------- Callback functions for MmapStreamCallback ---------------------
-    void onTearDown(audio_port_handle_t handle) override;
+    void onTearDown() override;
 
     void onVolumeChanged(audio_channel_mask_t channels,
                          android::Vector<float> values) override;
