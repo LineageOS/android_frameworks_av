@@ -15,13 +15,13 @@ cc_defaults {
     shared_libs: [
         "liblog",
         "libmediaextractor",
-        "libstagefright_foundation",
-        "libutils",
     ],
 
     static_libs: [
         "libstagefright_esds",
+        "libstagefright_foundation",
         "libstagefright_id3",
+        "libutils",
     ],
 
     cflags: [

@@ -14,10 +14,10 @@ cc_library_shared {
         "liblog",
         "libmediaextractor",
         "libstagefright_foundation",
-        "libutils",
     ],
 
     static_libs: [
+        "libutils",
         "libstagefright_id3",
     ],
 

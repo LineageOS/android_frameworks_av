@@ -12,14 +12,14 @@ cc_library_shared {
     shared_libs: [
         "liblog",
         "libmediaextractor",
-        "libstagefright_foundation",
-        "libutils",
     ],
 
     static_libs: [
         "libstagefright_flacdec",
+        "libstagefright_foundation",
         "libstagefright_metadatautils",
         "libwebm",
+        "libutils",
     ],
 
     name: "libmkvextractor",
