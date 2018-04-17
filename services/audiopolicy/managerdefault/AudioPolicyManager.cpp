@@ -1597,10 +1597,11 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
     // sampling rate and flags may be updated by getInputProfile
     uint32_t profileSamplingRate = (config->sample_rate == 0) ?
             SAMPLE_RATE_HZ_DEFAULT : config->sample_rate;
-    audio_format_t profileFormat = config->format;
+    audio_format_t profileFormat;
     audio_channel_mask_t profileChannelMask = config->channel_mask;
     audio_input_flags_t profileFlags = flags;
     for (;;) {
+        profileFormat = config->format; // reset each time through loop, in case it is updated
         profile = getInputProfile(device, address,
                                   profileSamplingRate, profileFormat, profileChannelMask,
                                   profileFlags);
@@ -5052,20 +5053,45 @@ sp<IOProfile> AudioPolicyManager::getInputProfile(audio_devices_t device,
     // TODO: perhaps isCompatibleProfile should return a "matching" score so we can return
     // the best matching profile, not the first one.
 
+    sp<IOProfile> firstInexact;
+    uint32_t updatedSamplingRate = 0;
+    audio_format_t updatedFormat = AUDIO_FORMAT_INVALID;
+    audio_channel_mask_t updatedChannelMask = AUDIO_CHANNEL_INVALID;
     for (const auto& hwModule : mHwModules) {
         for (const auto& profile : hwModule->getInputProfiles()) {
             // profile->log();
+            //updatedFormat = format;
             if (profile->isCompatibleProfile(device, address, samplingRate,
-                                             &samplingRate /*updatedSamplingRate*/,
+                                             &samplingRate  /*updatedSamplingRate*/,
                                              format,
-                                             &format /*updatedFormat*/,
+                                             &format,       /*updatedFormat*/
                                              channelMask,
-                                             &channelMask /*updatedChannelMask*/,
-                                             (audio_output_flags_t) flags)) {
-
+                                             &channelMask   /*updatedChannelMask*/,
+                                             // FIXME ugly cast
+                                             (audio_output_flags_t) flags,
+                                             true /*exactMatchRequiredForInputFlags*/)) {
                 return profile;
             }
+            if (firstInexact == nullptr && profile->isCompatibleProfile(device, address,
+                                             samplingRate,
+                                             &updatedSamplingRate,
+                                             format,
+                                             &updatedFormat,
+                                             channelMask,
+                                             &updatedChannelMask,
+                                             // FIXME ugly cast
+                                             (audio_output_flags_t) flags,
+                                             false /*exactMatchRequiredForInputFlags*/)) {
+                firstInexact = profile;
+            }
+
         }
+    }
+    if (firstInexact != nullptr) {
+        samplingRate = updatedSamplingRate;
+        format = updatedFormat;
+        channelMask = updatedChannelMask;
+        return firstInexact;
     }
     return NULL;
 }
