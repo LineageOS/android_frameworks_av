@@ -14,6 +14,14 @@
  * limitations under the License.
  */
 
+/**
+ * @addtogroup Media
+ * @{
+ */
+
+/**
+ * @file NdkMediaExtractor.h
+ */
 
 /*
  * This file defines an NDK API.
@@ -163,3 +171,5 @@ enum {
 __END_DECLS
 
 #endif // _NDK_MEDIA_EXTRACTOR_H
+
+/** @} */
