@@ -17,6 +17,7 @@
 #define LOG_TAG "APM::Devices"
 //#define LOG_NDEBUG 0
 
+#include <audio_utils/string.h>
 #include "DeviceDescriptor.h"
 #include "TypeConverter.h"
 #include "AudioGain.h"
@@ -247,7 +248,7 @@ void DeviceDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
     // ALOG_ASSERT(mModule != NULL);
     dstConfig->ext.device.hw_module =
             mModule != 0 ? mModule->getHandle() : AUDIO_MODULE_HANDLE_NONE;
-    strncpy(dstConfig->ext.device.address, mAddress.string(), AUDIO_DEVICE_MAX_ADDRESS_LEN);
+    (void)audio_utils_strlcpy_zerofill(dstConfig->ext.device.address, mAddress.string());
 }
 
 void DeviceDescriptor::toAudioPort(struct audio_port *port) const
@@ -258,7 +259,7 @@ void DeviceDescriptor::toAudioPort(struct audio_port *port) const
     toAudioPortConfig(&port->active_config);
     port->ext.device.type = mDeviceType;
     port->ext.device.hw_module = mModule->getHandle();
-    strncpy(port->ext.device.address, mAddress.string(), AUDIO_DEVICE_MAX_ADDRESS_LEN);
+    (void)audio_utils_strlcpy_zerofill(port->ext.device.address, mAddress.string());
 }
 
 void DeviceDescriptor::importAudioPort(const sp<AudioPort>& port, bool force) {
