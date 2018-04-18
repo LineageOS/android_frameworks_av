@@ -9,11 +9,11 @@ cc_library_shared {
     shared_libs: [
         "liblog",
         "libmediaextractor",
-        "libstagefright_foundation",
     ],
 
     static_libs: [
         "libfifo",
+        "libstagefright_foundation",
     ],
 
     name: "libwavextractor",

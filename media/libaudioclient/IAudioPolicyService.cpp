@@ -24,7 +24,7 @@
 
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
-
+#include <cutils/multiuser.h>
 #include <media/AudioEffect.h>
 #include <media/IAudioPolicyService.h>
 #include <media/TimeCheck.h>
@@ -875,8 +875,7 @@ status_t BnAudioPolicyService::onTransact(
         case SET_MASTER_MONO:
         case START_AUDIO_SOURCE:
         case STOP_AUDIO_SOURCE: {
-            uid_t multiUserClientUid = IPCThreadState::self()->getCallingUid() % AID_USER_OFFSET;
-            if (multiUserClientUid >= AID_APP_START) {
+            if (multiuser_get_app_id(IPCThreadState::self()->getCallingUid()) >= AID_APP_START) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
                       IPCThreadState::self()->getCallingUid());

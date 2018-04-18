@@ -43,6 +43,20 @@ public:
     // For a Profile aka MixPort, tag name and name are equivalent.
     virtual const String8 getTagName() const { return getName(); }
 
+    // FIXME: this is needed because shared MMAP stream clients use the same audio session.
+    // Once capture clients are tracked individually and not per session this can be removed
+    // MMAP no IRQ input streams do not have the default limitation of one active client
+    // max as they can be used in shared mode by the same application.
+    // NOTE: this works for explicit values set in audio_policy_configuration.xml because
+    // flags are parsed before maxActiveCount by the serializer.
+    void setFlags(uint32_t flags) override
+    {
+        AudioPort::setFlags(flags);
+        if (getRole() == AUDIO_PORT_ROLE_SINK && (flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
+            maxActiveCount = 0;
+        }
+    }
+
     // This method is used for input and direct output, and is not used for other output.
     // If parameter updatedSamplingRate is non-NULL, it is assigned the actual sample rate.
     // For input, flags is interpreted as audio_input_flags_t.
@@ -55,7 +69,9 @@ public:
                              audio_format_t *updatedFormat,
                              audio_channel_mask_t channelMask,
                              audio_channel_mask_t *updatedChannelMask,
-                             uint32_t flags) const;
+                             // FIXME parameter type
+                             uint32_t flags,
+                             bool exactMatchRequiredForInputFlags = false) const;
 
     void dump(int fd);
     void log();

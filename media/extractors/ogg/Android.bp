@@ -10,11 +10,11 @@ cc_library_shared {
     shared_libs: [
         "liblog",
         "libmediaextractor",
-        "libstagefright_foundation",
-        "libutils",
     ],
 
     static_libs: [
+        "libstagefright_foundation",
+        "libutils",
         "libvorbisidec",
     ],
 
