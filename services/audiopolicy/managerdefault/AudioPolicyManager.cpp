@@ -2570,42 +2570,24 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
 
 status_t AudioPolicyManager::dump(int fd)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
     String8 result;
-
-    snprintf(buffer, SIZE, "\nAudioPolicyManager Dump: %p\n", this);
-    result.append(buffer);
-
-    snprintf(buffer, SIZE, " Primary Output: %d\n",
+    result.appendFormat("\nAudioPolicyManager Dump: %p\n", this);
+    result.appendFormat(" Primary Output: %d\n",
              hasPrimaryOutput() ? mPrimaryOutput->mIoHandle : AUDIO_IO_HANDLE_NONE);
-    result.append(buffer);
     std::string stateLiteral;
     AudioModeConverter::toString(mEngine->getPhoneState(), stateLiteral);
-    snprintf(buffer, SIZE, " Phone state: %s\n", stateLiteral.c_str());
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Force use for communications %d\n",
-             mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION));
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Force use for media %d\n", mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA));
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Force use for record %d\n", mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_RECORD));
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Force use for dock %d\n", mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_DOCK));
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Force use for system %d\n", mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM));
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Force use for hdmi system audio %d\n",
-            mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_HDMI_SYSTEM_AUDIO));
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Force use for encoded surround output %d\n",
-            mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND));
-    result.append(buffer);
-    snprintf(buffer, SIZE, " TTS output %s\n", mTtsOutputAvailable ? "available" : "not available");
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Master mono: %s\n", mMasterMono ? "on" : "off");
-    result.append(buffer);
-
+    result.appendFormat(" Phone state: %s\n", stateLiteral.c_str());
+    const char* forceUses[AUDIO_POLICY_FORCE_USE_CNT] = {
+        "communications", "media", "record", "dock", "system",
+        "HDMI system audio", "encoded surround output", "vibrate ringing" };
+    for (audio_policy_force_use_t i = AUDIO_POLICY_FORCE_FOR_COMMUNICATION;
+         i < AUDIO_POLICY_FORCE_USE_CNT; i = (audio_policy_force_use_t)((int)i + 1)) {
+        result.appendFormat(" Force use for %s: %d\n",
+                forceUses[i], mEngine->getForceUse(i));
+    }
+    result.appendFormat(" TTS output %savailable\n", mTtsOutputAvailable ? "" : "not ");
+    result.appendFormat(" Master mono: %s\n", mMasterMono ? "on" : "off");
+    result.appendFormat(" Config source: %s\n", getConfig().getSource().c_str());
     write(fd, result.string(), result.size());
 
     mAvailableOutputDevices.dump(fd, String8("Available output"));
@@ -3555,6 +3537,7 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
                      "%s/%s", kConfigLocationList[i], fileName);
             ret = serializer.deserialize(audioPolicyXmlConfigFile, config);
             if (ret == NO_ERROR) {
+                config.setSource(audioPolicyXmlConfigFile);
                 return ret;
             }
         }
