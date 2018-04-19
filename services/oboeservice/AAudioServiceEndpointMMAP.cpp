@@ -48,8 +48,10 @@
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
 
-AAudioServiceEndpointMMAP::AAudioServiceEndpointMMAP()
-        :  mMmapStream(nullptr) {}
+
+AAudioServiceEndpointMMAP::AAudioServiceEndpointMMAP(AAudioService &audioService)
+        : mMmapStream(nullptr)
+        , mAAudioService(audioService) {}
 
 AAudioServiceEndpointMMAP::~AAudioServiceEndpointMMAP() {}
 
@@ -277,14 +279,21 @@ aaudio_result_t AAudioServiceEndpointMMAP::close() {
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::startStream(sp<AAudioServiceStreamBase> stream,
-                                                   audio_port_handle_t *clientHandle) {
+                                                   audio_port_handle_t *clientHandle __unused) {
     // Start the client on behalf of the AAudio service.
     // Use the port handle that was provided by openMmapStream().
-    return startClient(mMmapClient, &mPortHandle);
+    audio_port_handle_t tempHandle = mPortHandle;
+    aaudio_result_t result = startClient(mMmapClient, &tempHandle);
+    // When AudioFlinger is passed a valid port handle then it should not change it.
+    LOG_ALWAYS_FATAL_IF(tempHandle != mPortHandle,
+                        "%s() port handle not expected to change from %d to %d",
+                        __func__, mPortHandle, tempHandle);
+    ALOGV("%s(%p) mPortHandle = %d", __func__, stream.get(), mPortHandle);
+    return result;
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase> stream,
-                                                  audio_port_handle_t clientHandle) {
+                                                  audio_port_handle_t clientHandle __unused) {
     mFramesTransferred.reset32();
 
     // Round 64-bit counter up to a multiple of the buffer capacity.
@@ -293,24 +302,27 @@ aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase
     // when the stream is stopped.
     mFramesTransferred.roundUp64(getBufferCapacity());
 
+    // Use the port handle that was provided by openMmapStream().
+    ALOGV("%s(%p) mPortHandle = %d", __func__, stream.get(), mPortHandle);
     return stopClient(mPortHandle);
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::startClient(const android::AudioClient& client,
                                                        audio_port_handle_t *clientHandle) {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
-    ALOGV("%s(%p(uid=%d, pid=%d))", __func__, &client, client.clientUid, client.clientPid);
+    ALOGD("%s(%p(uid=%d, pid=%d))", __func__, &client, client.clientUid, client.clientPid);
     audio_port_handle_t originalHandle =  *clientHandle;
     status_t status = mMmapStream->start(client, clientHandle);
     aaudio_result_t result = AAudioConvert_androidToAAudioResult(status);
-    ALOGV("%s() , %d => %d returns %d", __func__, originalHandle, *clientHandle, result);
+    ALOGD("%s() , portHandle %d => %d, returns %d", __func__, originalHandle, *clientHandle, result);
     return result;
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::stopClient(audio_port_handle_t clientHandle) {
+    ALOGD("%s(portHandle = %d), called", __func__, clientHandle);
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
     aaudio_result_t result = AAudioConvert_androidToAAudioResult(mMmapStream->stop(clientHandle));
-    ALOGV("%s(%d) returns %d", __func__, clientHandle, result);
+    ALOGD("%s(portHandle = %d), returns %d", __func__, clientHandle, result);
     return result;
 }
 
@@ -343,11 +355,19 @@ aaudio_result_t AAudioServiceEndpointMMAP::getTimestamp(int64_t *positionFrames,
     return 0; // TODO
 }
 
-
-void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t handle __unused) {
-    ALOGD("%s(%p) called", __func__, this);
-    //TODO: disconnect only stream corresponding to handle received
-    disconnectRegisteredStreams();
+// This is called by AudioFlinger when it wants to destroy a stream.
+void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t portHandle) {
+    ALOGD("%s(portHandle = %d) called", __func__, portHandle);
+    // Are we tearing down the EXCLUSIVE MMAP stream?
+    if (isStreamRegistered(portHandle)) {
+        ALOGD("%s(%d) tearing down this entire MMAP endpoint", __func__, portHandle);
+        disconnectRegisteredStreams();
+    } else {
+        // Must be a SHARED stream?
+        ALOGD("%s(%d) disconnect a specific stream", __func__, portHandle);
+        aaudio_result_t result = mAAudioService.disconnectStreamByPortHandle(portHandle);
+        ALOGD("%s(%d) disconnectStreamByPortHandle returned %d", __func__, portHandle, result);
+    }
 };
 
 void AAudioServiceEndpointMMAP::onVolumeChanged(audio_channel_mask_t channels,

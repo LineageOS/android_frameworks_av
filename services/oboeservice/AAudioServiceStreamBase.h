@@ -180,6 +180,10 @@ public:
         mHandle = handle;
     }
 
+    audio_port_handle_t getPortHandle() const {
+        return mClientHandle;
+    }
+
     aaudio_stream_state_t getState() const {
         return mState;
     }
@@ -269,6 +273,7 @@ protected:
 
     int32_t                 mFramesPerBurst = 0;
     android::AudioClient    mMmapClient; // set in open, used in MMAP start()
+    // TODO rename mClientHandle to mPortHandle to be more consistent with AudioFlinger.
     audio_port_handle_t     mClientHandle = AUDIO_PORT_HANDLE_NONE;
 
     SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
