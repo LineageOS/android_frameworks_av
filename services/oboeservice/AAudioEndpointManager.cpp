@@ -150,7 +150,7 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openEndpoint(AAudioService &aud
 }
 
 sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
-        AAudioService &aaudioService __unused,
+        AAudioService &aaudioService,
         const aaudio::AAudioStreamRequest &request) {
 
     std::lock_guard<std::mutex> lock(mExclusiveLock);
@@ -166,13 +166,14 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
         // Already open so do not allow a second stream.
         return nullptr;
     } else {
-        sp<AAudioServiceEndpointMMAP> endpointMMap = new AAudioServiceEndpointMMAP();
+        sp<AAudioServiceEndpointMMAP> endpointMMap = new AAudioServiceEndpointMMAP(aaudioService);
         ALOGV("openExclusiveEndpoint(), no match so try to open MMAP %p for dev %d",
               endpointMMap.get(), configuration.getDeviceId());
         endpoint = endpointMMap;
 
         aaudio_result_t result = endpoint->open(request);
         if (result != AAUDIO_OK) {
+            ALOGE("openExclusiveEndpoint(), open failed");
             endpoint.clear();
         } else {
             mExclusiveStreams.push_back(endpointMMap);
