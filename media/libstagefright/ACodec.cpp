@@ -6777,9 +6777,14 @@ void ACodec::LoadedState::onSetInputSurface(const sp<AMessage> &msg) {
 
     sp<RefBase> obj;
     CHECK(msg->findObject("input-surface", &obj));
+    if (obj == NULL) {
+        ALOGE("[%s] NULL input surface", mCodec->mComponentName.c_str());
+        mCodec->mCallback->onInputSurfaceDeclined(BAD_VALUE);
+        return;
+    }
+
     sp<PersistentSurface> surface = static_cast<PersistentSurface *>(obj.get());
     mCodec->mGraphicBufferSource = surface->getBufferSource();
-
     status_t err = setupInputSurface();
 
     if (err == OK) {
