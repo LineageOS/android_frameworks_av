@@ -59,4 +59,31 @@ int requestPriority(pid_t pid, pid_t tid, int32_t prio, bool isForApp, bool asyn
     return ret;
 }
 
+int requestCpusetBoost(bool enable, const sp<IInterface> &client)
+{
+    int ret;
+    sMutex.lock();
+    sp<ISchedulingPolicyService> sps = sSchedulingPolicyService;
+    sMutex.unlock();
+    if (sps == 0) {
+        sp<IBinder> binder = defaultServiceManager()->checkService(_scheduling_policy);
+        if (binder == 0) {
+            return DEAD_OBJECT;
+        }
+        sps = interface_cast<ISchedulingPolicyService>(binder);
+        sMutex.lock();
+        sSchedulingPolicyService = sps;
+        sMutex.unlock();
+    }
+    ret = sps->requestCpusetBoost(enable, client);
+    if (ret != DEAD_OBJECT) {
+        return ret;
+    }
+    ALOGW("SchedulingPolicyService died");
+    sMutex.lock();
+    sSchedulingPolicyService.clear();
+    sMutex.unlock();
+    return ret;
+}
+
 }   // namespace android

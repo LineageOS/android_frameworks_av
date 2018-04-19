@@ -17,14 +17,25 @@
 #ifndef _ANDROID_SCHEDULING_POLICY_SERVICE_H
 #define _ANDROID_SCHEDULING_POLICY_SERVICE_H
 
+#include <utils/RefBase.h>
+
 namespace android {
 
+class IInterface;
 // Request elevated priority for thread tid, whose thread group leader must be pid.
 // The priority parameter is currently restricted to either 1 or 2.
 // The asynchronous parameter should be 'true' to return immediately,
 // after the request is enqueued but not necessarily executed.
 // The default value 'false' means to return after request has been enqueued and executed.
 int requestPriority(pid_t pid, pid_t tid, int32_t prio, bool isForApp, bool asynchronous = false);
+
+// Request to move media.codec process between SP_FOREGROUND and SP_TOP_APP.
+// When 'enable' is 'true', server will attempt to move media.codec process
+// from SP_FOREGROUND into SP_TOP_APP cpuset. A valid 'client' must be provided
+// for the server to receive death notifications. When 'enable' is 'false', server
+// will attempt to move media.codec process back to the original cpuset, and
+// 'client' is ignored in this case.
+int requestCpusetBoost(bool enable, const sp<IInterface> &client);
 
 }   // namespace android
 
