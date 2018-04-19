@@ -46,6 +46,14 @@ public:
     android::sp<aaudio::AAudioServiceStreamBase> getStreamByHandle(aaudio_handle_t streamHandle);
 
     /**
+     * Look up a stream based on the AudioPolicy portHandle.
+     * @param portHandle
+     * @return strong pointer to the stream if found or to nullptr
+     */
+    android::sp<aaudio::AAudioServiceStreamBase> findStreamByPortHandle(
+            audio_port_handle_t portHandle);
+
+    /**
      * Store a strong pointer to the stream and return a unique handle for future reference.
      * The handle is guaranteed not to collide with an existing stream.
      * @param serviceStream

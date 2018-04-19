@@ -30,7 +30,7 @@
 namespace aaudio {
 
 /**
- * This manages an internal stream that is shared by multiple Client streams.
+ * This manages an AudioStreamInternal that is shared by multiple Client streams.
  */
 class AAudioServiceEndpointShared : public AAudioServiceEndpoint {
 
