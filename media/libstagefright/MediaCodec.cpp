@@ -523,6 +523,7 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
       mDequeueOutputReplyID(0),
       mHaveInputSurface(false),
       mHavePendingInputBuffers(false),
+      mCpuBoostRequested(false),
       mLatencyUnknown(0) {
     if (uid == kNoUid) {
         mUid = IPCThreadState::self()->getCallingUid();
@@ -1638,6 +1639,31 @@ void MediaCodec::requestActivityNotification(const sp<AMessage> &notify) {
     msg->post();
 }
 
+void MediaCodec::requestCpuBoostIfNeeded() {
+    if (mCpuBoostRequested) {
+        return;
+    }
+    int32_t colorFormat;
+    if (mSoftRenderer != NULL
+            && mOutputFormat->contains("hdr-static-info")
+            && mOutputFormat->findInt32("color-format", &colorFormat)
+            && (colorFormat == OMX_COLOR_FormatYUV420Planar16)) {
+        int32_t left, top, right, bottom, width, height;
+        int64_t totalPixel = 0;
+        if (mOutputFormat->findRect("crop", &left, &top, &right, &bottom)) {
+            totalPixel = (right - left + 1) * (bottom - top + 1);
+        } else if (mOutputFormat->findInt32("width", &width)
+                && mOutputFormat->findInt32("height", &height)) {
+            totalPixel = width * height;
+        }
+        if (totalPixel >= 1920 * 1080) {
+            addResource(MediaResource::kCpuBoost,
+                    MediaResource::kUnspecifiedSubType, 1);
+            mCpuBoostRequested = true;
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 void MediaCodec::cancelPendingDequeueOperations() {
@@ -2159,6 +2185,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                 mSoftRenderer = new SoftwareRenderer(mSurface, mRotationDegrees);
                             }
                         }
+
+                        requestCpuBoostIfNeeded();
 
                         if (mFlags & kFlagIsEncoder) {
                             // Before we announce the format change we should
