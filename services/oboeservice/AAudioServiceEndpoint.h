@@ -102,6 +102,13 @@ public:
     }
 
 protected:
+
+    /**
+     * @param portHandle
+     * @return return true if a stream with the given portHandle is registered
+     */
+    bool                     isStreamRegistered(audio_port_handle_t portHandle);
+
     void                     disconnectRegisteredStreams();
 
     mutable std::mutex       mLockStreams;
@@ -116,7 +123,6 @@ protected:
     int32_t                  mRequestedDeviceId = 0;
 
     std::atomic<bool>        mConnected{true};
-
 };
 
 } /* namespace aaudio */

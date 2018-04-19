@@ -392,19 +392,25 @@ aaudio_result_t AudioStreamInternal::unregisterThread() {
 }
 
 aaudio_result_t AudioStreamInternal::startClient(const android::AudioClient& client,
-                                                 audio_port_handle_t *clientHandle) {
+                                                 audio_port_handle_t *portHandle) {
+    ALOGV("%s() called", __func__);
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
-
-    return mServiceInterface.startClient(mServiceStreamHandle, client, clientHandle);
+    aaudio_result_t result =  mServiceInterface.startClient(mServiceStreamHandle,
+                                                            client, portHandle);
+    ALOGV("%s(%d) returning %d", __func__, *portHandle, result);
+    return result;
 }
 
-aaudio_result_t AudioStreamInternal::stopClient(audio_port_handle_t clientHandle) {
+aaudio_result_t AudioStreamInternal::stopClient(audio_port_handle_t portHandle) {
+    ALOGV("%s(%d) called", __func__, portHandle);
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    return mServiceInterface.stopClient(mServiceStreamHandle, clientHandle);
+    aaudio_result_t result = mServiceInterface.stopClient(mServiceStreamHandle, portHandle);
+    ALOGV("%s(%d) returning %d", __func__, portHandle, result);
+    return result;
 }
 
 aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t clockId,
