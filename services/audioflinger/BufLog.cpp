@@ -24,6 +24,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
+#include <audio_utils/string.h>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -117,7 +118,7 @@ BufLogStream::BufLogStream(unsigned int id,
     mByteCount = 0l;
     mPaused = false;
     if (tag != NULL) {
-        strncpy(mTag, tag, BUFLOGSTREAM_MAX_TAGSIZE);
+        (void)audio_utils_strlcpy(mTag, tag);
     } else {
         mTag[0] = 0;
     }

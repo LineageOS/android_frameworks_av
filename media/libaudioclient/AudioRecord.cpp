@@ -1231,6 +1231,14 @@ status_t AudioRecord::restoreRecord_l(const char *from)
     ALOGW("dead IAudioRecord, creating a new one from %s()", from);
     ++mSequence;
 
+    const int INITIAL_RETRIES = 3;
+    int retries = INITIAL_RETRIES;
+retry:
+    if (retries < INITIAL_RETRIES) {
+        // refresh the audio configuration cache in this process to make sure we get new
+        // input parameters and new IAudioRecord in createRecord_l()
+        AudioSystem::clearAudioConfigCache();
+    }
     mFlags = mOrigFlags;
 
     // if the new IAudioRecord is created, createRecord_l() will modify the
@@ -1239,7 +1247,11 @@ status_t AudioRecord::restoreRecord_l(const char *from)
     Modulo<uint32_t> position(mProxy->getPosition());
     mNewPosition = position + mUpdatePeriod;
     status_t result = createRecord_l(position, mOpPackageName);
-    if (result == NO_ERROR) {
+
+    if (result != NO_ERROR) {
+        ALOGW("%s(): createRecord_l failed, do not retry", __func__);
+        retries = 0;
+    } else {
         if (mActive) {
             // callback thread or sync event hasn't changed
             // FIXME this fails if we have a new AudioFlinger instance
@@ -1248,6 +1260,14 @@ status_t AudioRecord::restoreRecord_l(const char *from)
         }
         mFramesReadServerOffset = mFramesRead; // server resets to zero so we need an offset.
     }
+
+    if (result != NO_ERROR) {
+        ALOGW("%s() failed status %d, retries %d", __func__, result, retries);
+        if (--retries > 0) {
+            goto retry;
+        }
+    }
+
     if (result != NO_ERROR) {
         ALOGW("restoreRecord_l() failed status %d", result);
         mActive = false;

@@ -288,11 +288,11 @@ aaudio_result_t AAudioService::unregisterAudioThread(aaudio_handle_t streamHandl
     aaudio_result_t result = AAUDIO_OK;
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
-        ALOGE("unregisterAudioThread(), illegal stream handle = 0x%0x", streamHandle);
+        ALOGE("%s(), illegal stream handle = 0x%0x", __func__, streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
     if (serviceStream->getRegisteredThread() != clientThreadId) {
-        ALOGE("AAudioService::unregisterAudioThread(), wrong thread");
+        ALOGE("%s(), wrong thread", __func__);
         result = AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     } else {
         serviceStream->setRegisteredThread(0);
@@ -305,7 +305,7 @@ aaudio_result_t AAudioService::startClient(aaudio_handle_t streamHandle,
                                   audio_port_handle_t *clientHandle) {
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
-        ALOGE("startClient(), illegal stream handle = 0x%0x", streamHandle);
+        ALOGE("%s(), illegal stream handle = 0x%0x", __func__, streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
     aaudio_result_t result = serviceStream->startClient(client, clientHandle);
@@ -313,12 +313,28 @@ aaudio_result_t AAudioService::startClient(aaudio_handle_t streamHandle,
 }
 
 aaudio_result_t AAudioService::stopClient(aaudio_handle_t streamHandle,
-                                          audio_port_handle_t clientHandle) {
+                                          audio_port_handle_t portHandle) {
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
-        ALOGE("stopClient(), illegal stream handle = 0x%0x", streamHandle);
+        ALOGE("%s(), illegal stream handle = 0x%0x", __func__, streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
-    aaudio_result_t result = serviceStream->stopClient(clientHandle);
+    aaudio_result_t result = serviceStream->stopClient(portHandle);
+    return checkForPendingClose(serviceStream, result);
+}
+
+// This is only called internally when AudioFlinger wants to tear down a stream.
+// So we do not have to check permissions.
+aaudio_result_t AAudioService::disconnectStreamByPortHandle(audio_port_handle_t portHandle) {
+    ALOGD("%s(%d) called", __func__, portHandle);
+    sp<AAudioServiceStreamBase> serviceStream =
+            mStreamTracker.findStreamByPortHandle(portHandle);
+    if (serviceStream.get() == nullptr) {
+        ALOGE("%s(), could not find stream with portHandle = %d", __func__, portHandle);
+        return AAUDIO_ERROR_INVALID_HANDLE;
+    }
+    serviceStream->incrementServiceReferenceCount();
+    aaudio_result_t result = serviceStream->stop();
+    serviceStream->disconnect();
     return checkForPendingClose(serviceStream, result);
 }

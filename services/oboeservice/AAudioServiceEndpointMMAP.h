@@ -42,7 +42,7 @@ class AAudioServiceEndpointMMAP
         , public android::MmapStreamCallback {
 
 public:
-    AAudioServiceEndpointMMAP();
+    explicit AAudioServiceEndpointMMAP(android::AAudioService &audioService);
 
     virtual ~AAudioServiceEndpointMMAP();
 
@@ -68,7 +68,7 @@ public:
     aaudio_result_t getTimestamp(int64_t *positionFrames, int64_t *timeNanos) override;
 
     // -------------- Callback functions for MmapStreamCallback ---------------------
-    void onTearDown() override;
+    void onTearDown(audio_port_handle_t handle) override;
 
     void onVolumeChanged(audio_channel_mask_t channels,
                          android::Vector<float> values) override;
@@ -88,7 +88,11 @@ private:
     // Interface to the AudioFlinger MMAP support.
     android::sp<android::MmapStreamInterface> mMmapStream;
     struct audio_mmap_buffer_info             mMmapBufferinfo;
+
+    // There is only one port associated with an MMAP endpoint.
     audio_port_handle_t                       mPortHandle = AUDIO_PORT_HANDLE_NONE;
+
+    android::AAudioService                    &mAAudioService;
 
     android::base::unique_fd                  mAudioDataFileDescriptor;
 

@@ -29,7 +29,8 @@ public:
         kUnspecified = 0,
         kSecureCodec,
         kNonSecureCodec,
-        kGraphicMemory
+        kGraphicMemory,
+        kCpuBoost,
     };
 
     enum SubType {

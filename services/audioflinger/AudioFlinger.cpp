@@ -28,6 +28,7 @@
 
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
+#include <cutils/multiuser.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include <binder/Parcel.h>
@@ -1000,14 +1001,12 @@ void AudioFlinger::setRecordSilenced(uid_t uid, bool silenced)
 {
     ALOGV("AudioFlinger::setRecordSilenced(uid:%d, silenced:%d)", uid, silenced);
 
-    // TODO: Notify MmapThreads
-
     AutoMutex lock(mLock);
     for (size_t i = 0; i < mRecordThreads.size(); i++) {
-        sp<RecordThread> thread = mRecordThreads.valueAt(i);
-        if (thread != 0) {
-            thread->setRecordSilenced(uid, silenced);
-        }
+        mRecordThreads[i]->setRecordSilenced(uid, silenced);
+    }
+    for (size_t i = 0; i < mMmapThreads.size(); i++) {
+        mMmapThreads[i]->setRecordSilenced(uid, silenced);
     }
 }
 
@@ -1180,15 +1179,58 @@ void AudioFlinger::broacastParametersToRecordThreads_l(const String8& keyValuePa
     }
 }
 
+// Filter reserved keys from setParameters() before forwarding to audio HAL or acting upon.
+// Some keys are used for audio routing and audio path configuration and should be reserved for use
+// by audio policy and audio flinger for functional, privacy and security reasons.
+void AudioFlinger::filterReservedParameters(String8& keyValuePairs, uid_t callingUid)
+{
+    static const String8 kReservedParameters[] = {
+        String8(AudioParameter::keyRouting),
+        String8(AudioParameter::keySamplingRate),
+        String8(AudioParameter::keyFormat),
+        String8(AudioParameter::keyChannels),
+        String8(AudioParameter::keyFrameCount),
+        String8(AudioParameter::keyInputSource),
+        String8(AudioParameter::keyMonoOutput),
+        String8(AudioParameter::keyStreamConnect),
+        String8(AudioParameter::keyStreamDisconnect),
+        String8(AudioParameter::keyStreamSupportedFormats),
+        String8(AudioParameter::keyStreamSupportedChannels),
+        String8(AudioParameter::keyStreamSupportedSamplingRates),
+    };
+
+    // multiuser friendly app ID check for requests coming from audioserver
+    if (multiuser_get_app_id(callingUid) == AID_AUDIOSERVER) {
+        return;
+    }
+
+    AudioParameter param = AudioParameter(keyValuePairs);
+    String8 value;
+    for (auto& key : kReservedParameters) {
+        if (param.get(key, value) == NO_ERROR) {
+            ALOGW("%s: filtering key %s value %s from uid %d",
+                  __func__, key.string(), value.string(), callingUid);
+            param.remove(key);
+        }
+    }
+    keyValuePairs = param.toString();
+}
+
 status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs)
 {
-    ALOGV("setParameters(): io %d, keyvalue %s, calling pid %d",
-            ioHandle, keyValuePairs.string(), IPCThreadState::self()->getCallingPid());
+    ALOGV("setParameters(): io %d, keyvalue %s, calling pid %d calling uid %d",
+            ioHandle, keyValuePairs.string(),
+            IPCThreadState::self()->getCallingPid(), IPCThreadState::self()->getCallingUid());
 
     // check calling permissions
     if (!settingsAllowed()) {
         return PERMISSION_DENIED;
     }
+
+    String8 filteredKeyValuePairs = keyValuePairs;
+    filterReservedParameters(filteredKeyValuePairs, IPCThreadState::self()->getCallingUid());
+
+    ALOGV("%s: filtered keyvalue %s", __func__, filteredKeyValuePairs.string());
 
     // AUDIO_IO_HANDLE_NONE means the parameters are global to the audio hardware interface
     if (ioHandle == AUDIO_IO_HANDLE_NONE) {
@@ -1200,7 +1242,7 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
             mHardwareStatus = AUDIO_HW_SET_PARAMETER;
             for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
                 sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
-                status_t result = dev->setParameters(keyValuePairs);
+                status_t result = dev->setParameters(filteredKeyValuePairs);
                 // return success if at least one audio device accepts the parameters as not all
                 // HALs are requested to support all parameters. If no audio device supports the
                 // requested parameters, the last error is reported.
@@ -1211,7 +1253,7 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
             mHardwareStatus = AUDIO_HW_IDLE;
         }
         // disable AEC and NS if the device is a BT SCO headset supporting those pre processings
-        AudioParameter param = AudioParameter(keyValuePairs);
+        AudioParameter param = AudioParameter(filteredKeyValuePairs);
         String8 value;
         if (param.get(String8(AudioParameter::keyBtNrec), value) == NO_ERROR) {
             bool btNrecIsOff = (value == AudioParameter::valueOff);
@@ -1244,16 +1286,16 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
             }
         } else if (thread == primaryPlaybackThread_l()) {
             // indicate output device change to all input threads for pre processing
-            AudioParameter param = AudioParameter(keyValuePairs);
+            AudioParameter param = AudioParameter(filteredKeyValuePairs);
             int value;
             if ((param.getInt(String8(AudioParameter::keyRouting), value) == NO_ERROR) &&
                     (value != 0)) {
-                broacastParametersToRecordThreads_l(keyValuePairs);
+                broacastParametersToRecordThreads_l(filteredKeyValuePairs);
             }
         }
     }
     if (thread != 0) {
-        return thread->setParameters(keyValuePairs);
+        return thread->setParameters(filteredKeyValuePairs);
     }
     return BAD_VALUE;
 }

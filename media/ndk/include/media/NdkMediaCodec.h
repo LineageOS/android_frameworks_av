@@ -14,6 +14,15 @@
  * limitations under the License.
  */
 
+/**
+ * @addtogroup Media
+ * @{
+ */
+
+/**
+ * @file NdkMediaCodec.h
+ */
+
 /*
  * This file defines an NDK API.
  * Do not remove methods.
@@ -489,3 +498,5 @@ media_status_t AMediaCodecCryptoInfo_getEncryptedBytes(AMediaCodecCryptoInfo*, s
 __END_DECLS
 
 #endif //_NDK_MEDIA_CODEC_H
+
+/** @} */

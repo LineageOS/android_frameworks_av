@@ -9,6 +9,9 @@ cc_library_shared {
     shared_libs: [
         "liblog",
         "libmediaextractor",
+    ],
+
+    static_libs: [
         "libstagefright_foundation",
     ],
 

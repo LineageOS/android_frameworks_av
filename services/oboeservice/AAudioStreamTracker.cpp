@@ -53,6 +53,26 @@ sp<AAudioServiceStreamBase> AAudioStreamTracker::getStreamByHandle(
     return serviceStream;
 }
 
+
+// The port handle is only available when the stream is started.
+// So we have to iterate over all the streams.
+// Luckily this rarely happens.
+sp<AAudioServiceStreamBase> AAudioStreamTracker::findStreamByPortHandle(
+        audio_port_handle_t portHandle) {
+    std::lock_guard<std::mutex> lock(mHandleLock);
+    sp<AAudioServiceStreamBase> serviceStream;
+    auto it = mStreamsByHandle.begin();
+    while (it != mStreamsByHandle.end()) {
+        auto candidate = it->second;
+        if (candidate->getPortHandle() == portHandle) {
+            serviceStream = candidate;
+            break;
+        }
+        it++;
+    }
+    return serviceStream;
+}
+
 // advance to next legal handle value
 __attribute__((no_sanitize("integer")))
 aaudio_handle_t AAudioStreamTracker::bumpHandle(aaudio_handle_t handle) {
