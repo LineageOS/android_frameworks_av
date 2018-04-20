@@ -26,7 +26,8 @@
 
 #define AUDIO_POLICY_XML_CONFIG_FILE_PATH_MAX_LENGTH 128
 #define AUDIO_POLICY_XML_CONFIG_FILE_NAME "audio_policy_configuration.xml"
-#define AUDIO_POLICY_A2DP_OFFLOAD_XML_CONFIG_FILE_NAME "audio_policy_a2dp_offload_configuration.xml"
+#define AUDIO_POLICY_A2DP_OFFLOAD_DISABLED_XML_CONFIG_FILE_NAME \
+        "audio_policy_configuration_a2dp_offload_disabled.xml"
 
 #include <inttypes.h>
 #include <math.h>
@@ -3573,21 +3574,25 @@ static const int kConfigLocationListSize =
 
 static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
     char audioPolicyXmlConfigFile[AUDIO_POLICY_XML_CONFIG_FILE_PATH_MAX_LENGTH];
+    std::vector<const char*> fileNames;
     status_t ret;
 
-    for (int i = 0; i < kConfigLocationListSize; i++) {
-        PolicySerializer serializer;
-        bool use_a2dp_offload_config =
-                 property_get_bool("persist.bluetooth.a2dp_offload.enable", false);
-        snprintf(audioPolicyXmlConfigFile,
-                 sizeof(audioPolicyXmlConfigFile),
-                 "%s/%s",
-                 kConfigLocationList[i],
-                 use_a2dp_offload_config ? AUDIO_POLICY_A2DP_OFFLOAD_XML_CONFIG_FILE_NAME :
-                     AUDIO_POLICY_XML_CONFIG_FILE_NAME);
-        ret = serializer.deserialize(audioPolicyXmlConfigFile, config);
-        if (ret == NO_ERROR) {
-            break;
+    if (property_get_bool("ro.bluetooth.a2dp_offload.supported", false) &&
+        property_get_bool("persist.bluetooth.a2dp_offload.disabled", false)) {
+        // A2DP offload supported but disabled: try to use special XML file
+        fileNames.push_back(AUDIO_POLICY_A2DP_OFFLOAD_DISABLED_XML_CONFIG_FILE_NAME);
+    }
+    fileNames.push_back(AUDIO_POLICY_XML_CONFIG_FILE_NAME);
+
+    for (const char* fileName : fileNames) {
+        for (int i = 0; i < kConfigLocationListSize; i++) {
+            PolicySerializer serializer;
+            snprintf(audioPolicyXmlConfigFile, sizeof(audioPolicyXmlConfigFile),
+                     "%s/%s", kConfigLocationList[i], fileName);
+            ret = serializer.deserialize(audioPolicyXmlConfigFile, config);
+            if (ret == NO_ERROR) {
+                return ret;
+            }
         }
     }
     return ret;
