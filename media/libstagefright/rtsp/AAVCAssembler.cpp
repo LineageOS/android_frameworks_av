@@ -338,6 +338,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
     unit->data()[0] = (nri << 5) | nalType;
 
     size_t offset = 1;
+    int32_t cvo = -1;
     List<sp<ABuffer> >::iterator it = queue->begin();
     for (size_t i = 0; i < totalCount; ++i) {
         const sp<ABuffer> &buffer = *it;
@@ -348,12 +349,18 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
 #endif
 
         memcpy(unit->data() + offset, buffer->data() + 2, buffer->size() - 2);
+
+        buffer->meta()->findInt32("cvo", &cvo);
         offset += buffer->size() - 2;
 
         it = queue->erase(it);
     }
 
     unit->setRange(0, totalSize);
+
+    if (cvo >= 0) {
+        unit->meta()->setInt32("cvo", cvo);
+    }
 
     addSingleNALUnit(unit);
 
@@ -375,6 +382,7 @@ void AAVCAssembler::submitAccessUnit() {
 
     sp<ABuffer> accessUnit = new ABuffer(totalSize);
     size_t offset = 0;
+    int32_t cvo = -1;
     for (List<sp<ABuffer> >::iterator it = mNALUnits.begin();
          it != mNALUnits.end(); ++it) {
         memcpy(accessUnit->data() + offset, "\x00\x00\x00\x01", 4);
@@ -383,6 +391,8 @@ void AAVCAssembler::submitAccessUnit() {
         sp<ABuffer> nal = *it;
         memcpy(accessUnit->data() + offset, nal->data(), nal->size());
         offset += nal->size();
+
+        nal->meta()->findInt32("cvo", &cvo);
     }
 
     CopyTimes(accessUnit, *mNALUnits.begin());
@@ -391,6 +401,9 @@ void AAVCAssembler::submitAccessUnit() {
     printf(mAccessUnitDamaged ? "X" : ".");
     fflush(stdout);
 #endif
+    if (cvo >= 0) {
+        accessUnit->meta()->setInt32("cvo", cvo);
+    }
 
     if (mAccessUnitDamaged) {
         accessUnit->meta()->setInt32("damaged", true);

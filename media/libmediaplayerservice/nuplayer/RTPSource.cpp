@@ -44,7 +44,8 @@ NuPlayer::RTPSource::RTPSource(
       mInPreparationPhase(true),
       mRTPConn(new ARTPConnection),
       mEOSTimeoutAudio(0),
-      mEOSTimeoutVideo(0) {
+      mEOSTimeoutVideo(0),
+      mLastCVOUpdated(-1) {
       ALOGD("RTPSource initialized with rtpParams=%s", rtpParams.string());
 }
 
@@ -92,7 +93,7 @@ void NuPlayer::RTPSource::prepareAsync() {
         AString sdp;
         ASessionDescription::SDPStringFactory(sdp, info->mLocalIp,
                 info->mIsAudio, info->mLocalPort, info->mPayloadType, info->mAS, info->mCodecName,
-                NULL, info->mWidth, info->mHeight);
+                NULL, info->mWidth, info->mHeight, info->mCVOExtMap);
         ALOGD("RTPSource SDP =>\n%s", sdp.c_str());
 
         sp<ASessionDescription> desc = new ASessionDescription;
@@ -273,7 +274,29 @@ status_t NuPlayer::RTPSource::dequeueAccessUnit(
 
     setEOSTimeout(audio, 0);
 
-    return source->dequeueAccessUnit(accessUnit);
+    finalResult = source->dequeueAccessUnit(accessUnit);
+    if (finalResult != OK) {
+        return finalResult;
+    }
+
+    int32_t cvo;
+    if ((*accessUnit) != NULL && (*accessUnit)->meta()->findInt32("cvo", &cvo)) {
+        if (cvo != mLastCVOUpdated) {
+            sp<AMessage> msg = new AMessage();
+            msg->setInt32("payload-type", NuPlayer::RTPSource::RTP_CVO);
+            msg->setInt32("cvo", cvo);
+
+            sp<AMessage> notify = dupNotify();
+            notify->setInt32("what", kWhatIMSRxNotice);
+            notify->setMessage("message", msg);
+            notify->post();
+
+            ALOGV("notify cvo updated (%d)->(%d) to upper layer", mLastCVOUpdated, cvo);
+            mLastCVOUpdated = cvo;
+        }
+    }
+
+    return finalResult;
 }
 
 sp<AnotherPacketSource> NuPlayer::RTPSource::getSource(bool audio) {
@@ -666,6 +689,8 @@ status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &va
     } else if (key == "rtp-param-time-scale") {
     } else if (key == "rtp-param-self-id") {
         info->mSelfID = atoi(value);
+    } else if (key == "rtp-param-ext-cvo-extmap") {
+        info->mCVOExtMap = atoi(value);
     }
 
     return OK;

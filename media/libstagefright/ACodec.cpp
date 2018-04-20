@@ -6064,6 +6064,13 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
         return;
     }
 
+    int32_t cvo;
+    if (mCodec->mNativeWindow != NULL && buffer != NULL &&
+            buffer->meta()->findInt32("cvo", &cvo)) {
+        ALOGV("cvo(%d) found in buffer #%u", cvo, bufferID);
+        setNativeWindowRotation(mCodec->mNativeWindow.get(), cvo);
+    }
+
     info->mStatus = BufferInfo::OWNED_BY_US;
     info->mData = buffer;
 

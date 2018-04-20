@@ -165,6 +165,22 @@ void setNativeWindowHdrMetadata(ANativeWindow *nativeWindow, HDRStaticInfo *info
     ALOGW_IF(err != 0, "failed to set cta861_3 metadata on surface (%d)", err);
 }
 
+status_t setNativeWindowRotation(
+        ANativeWindow *nativeWindow /* nonnull */, int rotation) {
+
+    int transform = 0;
+    if ((rotation % 90) == 0) {
+        switch ((rotation / 90) & 3) {
+            case 1:  transform = HAL_TRANSFORM_ROT_90;  break;
+            case 2:  transform = HAL_TRANSFORM_ROT_180; break;
+            case 3:  transform = HAL_TRANSFORM_ROT_270; break;
+            default: transform = 0;                     break;
+        }
+    }
+
+    return native_window_set_buffers_transform(nativeWindow, transform);
+}
+
 status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull */) {
     status_t err = NO_ERROR;
     ANativeWindowBuffer* anb = NULL;

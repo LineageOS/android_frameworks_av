@@ -53,6 +53,12 @@ struct NuPlayer::RTPSource : public NuPlayer::Source {
             const sp<AMessage> &notify,
             const String8& rtpParams);
 
+    enum {
+        RTCP_TSFB = 205,
+        RTCP_PSFB = 206,
+        RTP_CVO = 300,
+    };
+
     virtual status_t getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) override;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
@@ -116,6 +122,8 @@ private:
 
         /* Unique ID indicates itself */
         uint32_t mSelfID;
+        /* extmap:<value> for CVO will be set to here */
+        int32_t mCVOExtMap;
 
         /* a copy of TrackInfo in RTSPSource */
         sp<AnotherPacketSource> mSource;
@@ -168,6 +176,7 @@ private:
     int64_t mMediaAnchorUs;
     int64_t mLastMediaTimeUs;
     int64_t mNumAccessUnitsReceived;
+    int32_t mLastCVOUpdated;
     bool mReceivedFirstRTCPPacket;
     bool mReceivedFirstRTPPacket;
     bool mPausing;

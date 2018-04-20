@@ -67,6 +67,9 @@ struct ARTPConnection::StreamInfo {
     struct sockaddr_in6 mRemoteRTCPAddr6;
 
     bool mIsInjected;
+
+    // RTCP Extension for CVO
+    int mCVOExtMap; // will be set to 0 if cvo is not negotiated in sdp
 };
 
 ARTPConnection::ARTPConnection(uint32_t flags)
@@ -303,6 +306,18 @@ void ARTPConnection::onAddStream(const sp<AMessage> &msg) {
     info->mNumRTPPacketsReceived = 0;
     memset(&info->mRemoteRTCPAddr, 0, sizeof(info->mRemoteRTCPAddr));
     memset(&info->mRemoteRTCPAddr6, 0, sizeof(info->mRemoteRTCPAddr6));
+
+    sp<ASessionDescription> sessionDesc = info->mSessionDesc;
+    info->mCVOExtMap = 0;
+    for (size_t i = 1; i < sessionDesc->countTracks(); ++i) {
+        int32_t cvoExtMap;
+        if (sessionDesc->getCvoExtMap(i, &cvoExtMap)) {
+            info->mCVOExtMap = cvoExtMap;
+            ALOGI("urn:3gpp:video-orientation(cvo) found as extmap:%d", info->mCVOExtMap);
+        } else {
+            ALOGI("urn:3gpp:video-orientation(cvo) not found :%d", info->mCVOExtMap);
+        }
+    }
 
     if (!injected) {
         postPollEvent();
@@ -576,6 +591,7 @@ status_t ARTPConnection::parseRTP(StreamInfo *s, const sp<ABuffer> &buffer) {
         return -1;
     }
 
+    int32_t cvoDegrees = -1;
     if (data[0] & 0x10) {
         // Header eXtension present.
 
@@ -595,6 +611,7 @@ status_t ARTPConnection::parseRTP(StreamInfo *s, const sp<ABuffer> &buffer) {
             return -1;
         }
 
+        parseRTPExt(s, (const uint8_t *)extensionData, extensionLength, &cvoDegrees);
         payloadOffset += 4 + extensionLength;
     }
 
@@ -609,6 +626,8 @@ status_t ARTPConnection::parseRTP(StreamInfo *s, const sp<ABuffer> &buffer) {
     meta->setInt32("rtp-time", rtpTime);
     meta->setInt32("PT", data[1] & 0x7f);
     meta->setInt32("M", data[1] >> 7);
+    if (cvoDegrees >= 0)
+        meta->setInt32("cvo", cvoDegrees);
 
     buffer->setInt32Data(u16at(&data[2]));
     buffer->setRange(payloadOffset, size - payloadOffset);
@@ -616,6 +635,51 @@ status_t ARTPConnection::parseRTP(StreamInfo *s, const sp<ABuffer> &buffer) {
     source->processRTPPacket(buffer);
 
     return OK;
+}
+
+status_t ARTPConnection::parseRTPExt(StreamInfo *s,
+        const uint8_t *extHeader, size_t extLen, int32_t *cvoDegrees) {
+    if (extLen < 4)
+        return -1;
+
+    uint16_t header = (extHeader[0] << 8) | (extHeader[1]);
+    bool isOnebyteHeader = false;
+
+    if (header == 0xBEDE) {
+        isOnebyteHeader = true;
+    } else if (header == 0x1000) {
+        ALOGW("parseRTPExt: two-byte header is not implemented yet");
+        return -1;
+    } else {
+        ALOGW("parseRTPExt: can not recognize header");
+        return -1;
+    }
+
+    const uint8_t *extPayload = extHeader + 4;
+    size_t offset = 0; //start from first payload of rtp extension.
+    // one-byte header parser
+    while (isOnebyteHeader && offset < extLen) {
+        uint8_t extmapId = extPayload[offset] >> 4;
+        uint8_t length = (extPayload[offset] & 0xF) + 1;
+        offset++;
+
+        // padding case
+        if(extmapId == 0)
+            continue;
+
+        uint8_t data[length];
+        for (uint8_t j = 0; j < length; j++)
+            data[j] = extPayload[offset + j];
+
+        offset += length;
+
+        if (extmapId == s->mCVOExtMap) {
+            *cvoDegrees = (int32_t)data[0];
+            return OK;
+        }
+    }
+
+    return BAD_VALUE;
 }
 
 status_t ARTPConnection::parseRTCP(StreamInfo *s, const sp<ABuffer> &buffer) {
