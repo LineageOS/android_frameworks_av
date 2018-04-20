@@ -725,12 +725,13 @@ int32_t AudioTrackServerProxy::getRear() const
         const size_t mask = overflowBit - 1;
         int32_t newRear = (rear & ~mask) | (stop & mask);
         ssize_t filled = newRear - front;
-        if (filled < 0) {
+        // overflowBit is unsigned, so cast to signed for comparison.
+        if (filled >= (ssize_t)overflowBit) {
             // front and rear offsets span the overflow bit of the p2 mask
-            // so rebasing newrear.
+            // so rebasing newRear on the rear offset is off by the overflow bit.
             ALOGV("stop wrap: filled %zx >= overflowBit %zx", filled, overflowBit);
-            newRear += overflowBit;
-            filled += overflowBit;
+            newRear -= overflowBit;
+            filled -= overflowBit;
         }
         if (0 <= filled && (size_t) filled <= mFrameCount) {
             // we're stopped, return the stop level as newRear
