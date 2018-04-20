@@ -13,7 +13,8 @@ LOCAL_SRC_FILES:=               \
     PatchPanel.cpp              \
     StateQueue.cpp              \
     BufLog.cpp                  \
-    TypedLogger.cpp
+    TypedLogger.cpp             \
+    NBAIO_Tee.cpp               \
 
 LOCAL_C_INCLUDES := \
     frameworks/av/services/audiopolicy \
@@ -41,6 +42,7 @@ LOCAL_SHARED_LIBRARIES := \
 
 LOCAL_STATIC_LIBRARIES := \
     libcpustats \
+    libsndfile \
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 

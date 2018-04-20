@@ -210,22 +210,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mBufferSize = bufferSize;
 
 #ifdef TEE_SINK
-        if (mTeeSinkTrackEnabled) {
-            NBAIO_Format pipeFormat = Format_from_SR_C(mSampleRate, mChannelCount, mFormat);
-            if (Format_isValid(pipeFormat)) {
-                Pipe *pipe = new Pipe(mTeeSinkTrackFrames, pipeFormat);
-                size_t numCounterOffers = 0;
-                const NBAIO_Format offers[1] = {pipeFormat};
-                ssize_t index = pipe->negotiate(offers, 1, NULL, numCounterOffers);
-                ALOG_ASSERT(index == 0);
-                PipeReader *pipeReader = new PipeReader(*pipe);
-                numCounterOffers = 0;
-                index = pipeReader->negotiate(offers, 1, NULL, numCounterOffers);
-                ALOG_ASSERT(index == 0);
-                mTeeSink = pipe;
-                mTeeSource = pipeReader;
-            }
-        }
+        mTee.set(sampleRate, mChannelCount, format, NBAIO_Tee::TEE_FLAG_TRACK);
 #endif
 
     }
@@ -244,9 +229,6 @@ status_t AudioFlinger::ThreadBase::TrackBase::initCheck() const
 
 AudioFlinger::ThreadBase::TrackBase::~TrackBase()
 {
-#ifdef TEE_SINK
-    dumpTee(-1, mTeeSource, mId, 'T');
-#endif
     // delete the proxy before deleting the shared memory it refers to, to avoid dangling reference
     mServerProxy.clear();
     if (mCblk != NULL) {
@@ -274,9 +256,7 @@ AudioFlinger::ThreadBase::TrackBase::~TrackBase()
 void AudioFlinger::ThreadBase::TrackBase::releaseBuffer(AudioBufferProvider::Buffer* buffer)
 {
 #ifdef TEE_SINK
-    if (mTeeSink != 0) {
-        (void) mTeeSink->write(buffer->raw, buffer->frameCount);
-    }
+    mTee.write(buffer->raw, buffer->frameCount);
 #endif
 
     ServerProxy::Buffer buf;
@@ -454,6 +434,12 @@ AudioFlinger::PlaybackThread::Track::Track(
         thread->mFastTrackAvailMask &= ~(1 << i);
     }
     mName = TRACK_NAME_PENDING;
+
+#ifdef TEE_SINK
+    mTee.setId(std::string("_") + std::to_string(mThreadIoHandle)
+            + "_" + std::to_string(mId) +
+            + "_PEND_T");
+#endif
 }
 
 AudioFlinger::PlaybackThread::Track::~Track()
@@ -1695,6 +1681,11 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
         ALOG_ASSERT(thread->mFastTrackAvail);
         thread->mFastTrackAvail = false;
     }
+#ifdef TEE_SINK
+    mTee.setId(std::string("_") + std::to_string(mThreadIoHandle)
+            + "_" + std::to_string(mId)
+            + "_R");
+#endif
 }
 
 AudioFlinger::RecordThread::RecordTrack::~RecordTrack()

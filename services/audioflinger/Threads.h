@@ -497,6 +497,9 @@ protected:
                 // we must not wait for async write callback in the thread loop before evaluating it
                 bool                    mSignalPending;
 
+#ifdef TEE_SINK
+                NBAIO_Tee               mTee;
+#endif
                 // ActiveTracks is a sorted vector of track type T representing the
                 // active tracks of threadLoop() to be considered by the locked prepare portion.
                 // ActiveTracks should be accessed with the ThreadBase lock held.
@@ -1054,11 +1057,6 @@ private:
     sp<NBAIO_Sink>          mPipeSink;
     // The current sink for the normal mixer to write it's (sub)mix, mOutputSink or mPipeSink
     sp<NBAIO_Sink>          mNormalSink;
-#ifdef TEE_SINK
-    // For dumpsys
-    sp<NBAIO_Sink>          mTeeSink;
-    sp<NBAIO_Source>        mTeeSource;
-#endif
     uint32_t                mScreenState;   // cached copy of gScreenState
     // TODO: add comment and adjust size as needed
     static const size_t     kFastMixerLogSize = 8 * 1024;
@@ -1374,9 +1372,6 @@ public:
                     audio_devices_t outDevice,
                     audio_devices_t inDevice,
                     bool systemReady
-#ifdef TEE_SINK
-                    , const sp<NBAIO_Sink>& teeSink
-#endif
                     );
             virtual     ~RecordThread();
 
@@ -1506,8 +1501,6 @@ private:
             int32_t                             mRsmpInRear;    // last filled frame + 1
 
             // For dumpsys
-            const sp<NBAIO_Sink>                mTeeSink;
-
             const sp<MemoryDealer>              mReadOnlyHeap;
 
             // one-time initialization, no locks required
