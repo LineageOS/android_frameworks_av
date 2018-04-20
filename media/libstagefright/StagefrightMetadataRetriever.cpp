@@ -48,8 +48,8 @@
 
 namespace android {
 
-static const int64_t kBufferTimeOutUs = 30000ll; // 30 msec
-static const size_t kRetryCount = 20; // must be >0
+static const int64_t kBufferTimeOutUs = 10000ll; // 10 msec
+static const size_t kRetryCount = 50; // must be >0
 
 StagefrightMetadataRetriever::StagefrightMetadataRetriever()
     : mParsedMetaData(false),
@@ -403,10 +403,13 @@ static VideoFrame *extractVideoFrame(
         uint32_t flags = 0;
         sp<MediaCodecBuffer> codecBuffer = NULL;
 
+        // Queue as many inputs as we possibly can, then block on dequeuing
+        // outputs. After getting each output, come back and queue the inputs
+        // again to keep the decoder busy.
         while (haveMoreInputs) {
-            err = decoder->dequeueInputBuffer(&inputIndex, kBufferTimeOutUs);
+            err = decoder->dequeueInputBuffer(&inputIndex, 0);
             if (err != OK) {
-                ALOGW("Timed out waiting for input");
+                ALOGV("Timed out waiting for input");
                 if (retriesLeft) {
                     err = OK;
                 }
@@ -447,29 +450,27 @@ static VideoFrame *extractVideoFrame(
             }
 
             mediaBuffer->release();
-            break;
-        }
 
-        if (haveMoreInputs && inputIndex < inputBuffers.size()) {
-            if (isAvcOrHevc && IsIDR(codecBuffer) && decodeSingleFrame) {
-                // Only need to decode one IDR frame, unless we're seeking with CLOSEST
-                // option, in which case we need to actually decode to targetTimeUs.
-                haveMoreInputs = false;
-                flags |= MediaCodec::BUFFER_FLAG_EOS;
-            }
+            if (haveMoreInputs && inputIndex < inputBuffers.size()) {
+                if (isAvcOrHevc && IsIDR(codecBuffer) && decodeSingleFrame) {
+                    // Only need to decode one IDR frame, unless we're seeking with CLOSEST
+                    // option, in which case we need to actually decode to targetTimeUs.
+                    haveMoreInputs = false;
+                    flags |= MediaCodec::BUFFER_FLAG_EOS;
+                }
 
-            ALOGV("QueueInput: size=%zu ts=%" PRId64 " us flags=%x",
-                    codecBuffer->size(), ptsUs, flags);
-            err = decoder->queueInputBuffer(
-                    inputIndex,
-                    codecBuffer->offset(),
-                    codecBuffer->size(),
-                    ptsUs,
-                    flags);
+                ALOGV("QueueInput: size=%zu ts=%" PRId64 " us flags=%x",
+                        codecBuffer->size(), ptsUs, flags);
 
-            // we don't expect an output from codec config buffer
-            if (flags & MediaCodec::BUFFER_FLAG_CODECCONFIG) {
-                continue;
+                err = decoder->queueInputBuffer(
+                        inputIndex,
+                        codecBuffer->offset(),
+                        codecBuffer->size(),
+                        ptsUs,
+                        flags);
+                if (flags & MediaCodec::BUFFER_FLAG_EOS) {
+                    haveMoreInputs = false;
+                }
             }
         }
 

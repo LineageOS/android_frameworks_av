@@ -577,7 +577,7 @@ status_t MPEG4Extractor::readMetaData() {
         track->meta->setInt32(kKeyTrackID, 0);
         track->includes_expensive_metadata = false;
         track->skipTrack = false;
-        track->timescale = 0;
+        track->timescale = 1000000;
     }
 
     return mInitCheck;
