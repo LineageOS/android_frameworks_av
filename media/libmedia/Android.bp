@@ -127,6 +127,7 @@ cc_library_shared {
     vndk: {
         enabled: true,
     },
+    double_loadable: true,
 
     defaults: ["libmedia_omx_defaults"],
 }
