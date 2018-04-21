@@ -590,6 +590,16 @@ void AudioPolicyManager::setPhoneState(audio_mode_t state)
             setOutputDevice(mPrimaryOutput, rxDevice, force, 0);
         }
     }
+
+    // reevaluate routing on all outputs in case tracks have been started during the call
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+        sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
+        audio_devices_t newDevice = getNewOutputDevice(desc, true /*fromCache*/);
+        if (state != AUDIO_MODE_IN_CALL || desc != mPrimaryOutput) {
+            setOutputDevice(desc, newDevice, (newDevice != AUDIO_DEVICE_NONE), delayMs);
+        }
+    }
+
     // if entering in call state, handle special case of active streams
     // pertaining to sonification strategy see handleIncallSonification()
     if (isStateInCall(state)) {
