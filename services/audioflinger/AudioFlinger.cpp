@@ -3388,8 +3388,7 @@ void AudioFlinger::dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_hand
         // They would both traverse the directory, but the result would simply be
         // failures at unlink() which are ignored.  It's also unlikely since
         // normally dumpsys is only done by bugreport or from the command line.
-        char teePath[32+256];
-        strcpy(teePath, "/data/misc/audioserver");
+        char teePath[PATH_MAX] = "/data/misc/audioserver";
         size_t teePathLen = strlen(teePath);
         DIR *dir = opendir(teePath);
         teePath[teePathLen++] = '/';
@@ -3399,27 +3398,19 @@ void AudioFlinger::dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_hand
             struct Entry entries[TEE_MAX_SORT];
             size_t entryCount = 0;
             while (entryCount < TEE_MAX_SORT) {
-                struct dirent de;
-                struct dirent *result = NULL;
-                int rc = readdir_r(dir, &de, &result);
-                if (rc != 0) {
-                    ALOGW("readdir_r failed %d", rc);
-                    break;
-                }
-                if (result == NULL) {
-                    break;
-                }
-                if (result != &de) {
-                    ALOGW("readdir_r returned unexpected result %p != %p", result, &de);
+                errno = 0; // clear errno before readdir() to track potential errors.
+                const struct dirent *result = readdir(dir);
+                if (result == nullptr) {
+                    ALOGW_IF(errno != 0, "tee readdir() failure %s", strerror(errno));
                     break;
                 }
                 // ignore non .wav file entries
-                size_t nameLen = strlen(de.d_name);
+                const size_t nameLen = strlen(result->d_name);
                 if (nameLen <= 4 || nameLen >= TEE_MAX_FILENAME ||
-                        strcmp(&de.d_name[nameLen - 4], ".wav")) {
+                        strcmp(&result->d_name[nameLen - 4], ".wav")) {
                     continue;
                 }
-                strcpy(entries[entryCount++].mFileName, de.d_name);
+                (void)audio_utils_strlcpy(entries[entryCount++].mFileName, result->d_name);
             }
             (void) closedir(dir);
             if (entryCount > TEE_MAX_KEEP) {
@@ -3490,8 +3481,13 @@ void AudioFlinger::dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_hand
             // FIXME not big-endian safe
             write(teeFd, &temp, sizeof(temp));
             close(teeFd);
-            if (fd >= 0) {
-                dprintf(fd, "tee copied to %s\n", teePath);
+            // TODO Should create file with temporary name and then rename to final if non-empty.
+            if (total > 0) {
+                if (fd >= 0) {
+                    dprintf(fd, "tee copied to %s\n", teePath);
+                }
+            } else {
+                unlink(teePath);
             }
         } else {
             if (fd >= 0) {
