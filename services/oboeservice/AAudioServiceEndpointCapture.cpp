@@ -102,7 +102,7 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
                             streamShared->setTimestampPositionOffset(positionOffset);
 
                             // Is the buffer too full to write a burst?
-                            if (fifo->getFifoControllerBase()->getEmptyFramesAvailable() <
+                            if (fifo->getEmptyFramesAvailable() <
                                     getFramesPerBurst()) {
                                 streamShared->incrementXRunCount();
                             } else {

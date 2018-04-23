@@ -96,14 +96,14 @@ public:
     void checkWrappingBuffer() {
         WrappingBuffer wrappingBuffer;
         fifo_frames_t framesAvailable =
-                mFifoBuffer.getFifoControllerBase()->getEmptyFramesAvailable();
+                mFifoBuffer.getEmptyFramesAvailable();
         fifo_frames_t wrapAvailable = mFifoBuffer.getEmptyRoomAvailable(&wrappingBuffer);
         EXPECT_EQ(framesAvailable, wrapAvailable);
         fifo_frames_t bothAvailable = wrappingBuffer.numFrames[0] + wrappingBuffer.numFrames[1];
         EXPECT_EQ(framesAvailable, bothAvailable);
 
         framesAvailable =
-                mFifoBuffer.getFifoControllerBase()->getFullFramesAvailable();
+                mFifoBuffer.getFullFramesAvailable();
         wrapAvailable = mFifoBuffer.getFullDataAvailable(&wrappingBuffer);
         EXPECT_EQ(framesAvailable, wrapAvailable);
         bothAvailable = wrappingBuffer.numFrames[0] + wrappingBuffer.numFrames[1];
@@ -113,7 +113,7 @@ public:
     // Write data but do not overflow.
     void writeData(fifo_frames_t numFrames) {
         fifo_frames_t framesAvailable =
-                mFifoBuffer.getFifoControllerBase()->getEmptyFramesAvailable();
+                mFifoBuffer.getEmptyFramesAvailable();
         fifo_frames_t framesToWrite = std::min(framesAvailable, numFrames);
         for (int i = 0; i < framesToWrite; i++) {
             mData[i] = mNextWriteIndex++;
@@ -125,7 +125,7 @@ public:
     // Read data but do not underflow.
     void verifyData(fifo_frames_t numFrames) {
         fifo_frames_t framesAvailable =
-                mFifoBuffer.getFifoControllerBase()->getFullFramesAvailable();
+                mFifoBuffer.getFullFramesAvailable();
         fifo_frames_t framesToRead = std::min(framesAvailable, numFrames);
         fifo_frames_t actual = mFifoBuffer.read(mData, framesToRead);
         ASSERT_EQ(framesToRead, actual);
@@ -178,12 +178,12 @@ public:
     void checkRandomWriteRead() {
         for (int i = 0; i < 20; i++) {
             fifo_frames_t framesEmpty =
-                    mFifoBuffer.getFifoControllerBase()->getEmptyFramesAvailable();
+                    mFifoBuffer.getEmptyFramesAvailable();
             fifo_frames_t numFrames = (fifo_frames_t)(drand48() * framesEmpty);
             writeData(numFrames);
 
             fifo_frames_t framesFull =
-                    mFifoBuffer.getFifoControllerBase()->getFullFramesAvailable();
+                    mFifoBuffer.getFullFramesAvailable();
             numFrames = (fifo_frames_t)(drand48() * framesFull);
             verifyData(numFrames);
         }
