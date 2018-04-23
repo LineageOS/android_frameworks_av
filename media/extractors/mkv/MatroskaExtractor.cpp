@@ -37,7 +37,9 @@
 #include <media/stagefright/MetaDataUtils.h>
 #include <utils/String8.h>
 
+#include <arpa/inet.h>
 #include <inttypes.h>
+#include <vector>
 
 namespace android {
 
@@ -584,31 +586,15 @@ status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferBase *mbuf) {
     }
 
     const uint8_t *data = (const uint8_t *)mbuf->data() + mbuf->range_offset();
-    bool blockEncrypted = data[0] & 0x1;
-    if (blockEncrypted && mbuf->range_length() < 9) {
+    bool encrypted = data[0] & 0x1;
+    bool partitioned = data[0] & 0x2;
+    if (encrypted && mbuf->range_length() < 9) {
         // 1-byte signal + 8-byte IV
         return ERROR_MALFORMED;
     }
 
     MetaDataBase &meta = mbuf->meta_data();
-    if (blockEncrypted) {
-        /*
-         *  0                   1                   2                   3
-         *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-         *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-         *  |  Signal Byte  |                                               |
-         *  +-+-+-+-+-+-+-+-+             IV                                |
-         *  |                                                               |
-         *  |               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-         *  |               |                                               |
-         *  |-+-+-+-+-+-+-+-+                                               |
-         *  :               Bytes 1..N of encrypted frame                   :
-         *  |                                                               |
-         *  |                                                               |
-         *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-         */
-        int32_t plainSizes[] = { 0 };
-        int32_t encryptedSizes[] = { static_cast<int32_t>(mbuf->range_length() - 9) };
+    if (encrypted) {
         uint8_t ctrCounter[16] = { 0 };
         uint32_t type;
         const uint8_t *keyId;
@@ -618,9 +604,83 @@ status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferBase *mbuf) {
         meta.setData(kKeyCryptoKey, 0, keyId, keyIdSize);
         memcpy(ctrCounter, data + 1, 8);
         meta.setData(kKeyCryptoIV, 0, ctrCounter, 16);
-        meta.setData(kKeyPlainSizes, 0, plainSizes, sizeof(plainSizes));
-        meta.setData(kKeyEncryptedSizes, 0, encryptedSizes, sizeof(encryptedSizes));
-        mbuf->set_range(9, mbuf->range_length() - 9);
+        if (partitioned) {
+            /*  0                   1                   2                   3
+             *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+             * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+             * |  Signal Byte  |                                               |
+             * +-+-+-+-+-+-+-+-+             IV                                |
+             * |                                                               |
+             * |               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+             * |               | num_partition |     Partition 0 offset ->     |
+             * |-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-|
+             * |     -> Partition 0 offset     |              ...              |
+             * |-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-|
+             * |             ...               |     Partition n-1 offset ->   |
+             * |-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-|
+             * |     -> Partition n-1 offset   |                               |
+             * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+                               |
+             * |                    Clear/encrypted sample data                |
+             * |                                                               |
+             * |                                                               |
+             * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+             */
+            if (mbuf->range_length() < 10) {
+                return ERROR_MALFORMED;
+            }
+            uint8_t numPartitions = data[9];
+            if (mbuf->range_length() - 10 < numPartitions * sizeof(uint32_t)) {
+                return ERROR_MALFORMED;
+            }
+            std::vector<uint32_t> plainSizes, encryptedSizes;
+            uint32_t prev = 0;
+            uint32_t frameOffset = 10 + numPartitions * sizeof(uint32_t);
+            const uint32_t *partitions = reinterpret_cast<const uint32_t*>(data + 10);
+            for (uint32_t i = 0; i <= numPartitions; ++i) {
+                uint32_t p_i = i < numPartitions
+                        ? ntohl(partitions[i])
+                        : (mbuf->range_length() - frameOffset);
+                if (p_i < prev) {
+                    return ERROR_MALFORMED;
+                }
+                uint32_t size = p_i - prev;
+                prev = p_i;
+                if (i % 2) {
+                    encryptedSizes.push_back(size);
+                } else {
+                    plainSizes.push_back(size);
+                }
+            }
+            if (plainSizes.size() > encryptedSizes.size()) {
+                encryptedSizes.push_back(0);
+            }
+            uint32_t sizeofPlainSizes = sizeof(uint32_t) * plainSizes.size();
+            uint32_t sizeofEncryptedSizes = sizeof(uint32_t) * encryptedSizes.size();
+            meta.setData(kKeyPlainSizes, 0, plainSizes.data(), sizeofPlainSizes);
+            meta.setData(kKeyEncryptedSizes, 0, encryptedSizes.data(), sizeofEncryptedSizes);
+            mbuf->set_range(frameOffset, mbuf->range_length() - frameOffset);
+        } else {
+            /*
+             *  0                   1                   2                   3
+             *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+             *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+             *  |  Signal Byte  |                                               |
+             *  +-+-+-+-+-+-+-+-+             IV                                |
+             *  |                                                               |
+             *  |               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+             *  |               |                                               |
+             *  |-+-+-+-+-+-+-+-+                                               |
+             *  :               Bytes 1..N of encrypted frame                   :
+             *  |                                                               |
+             *  |                                                               |
+             *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+             */
+            int32_t plainSizes[] = { 0 };
+            int32_t encryptedSizes[] = { static_cast<int32_t>(mbuf->range_length() - 9) };
+            meta.setData(kKeyPlainSizes, 0, plainSizes, sizeof(plainSizes));
+            meta.setData(kKeyEncryptedSizes, 0, encryptedSizes, sizeof(encryptedSizes));
+            mbuf->set_range(9, mbuf->range_length() - 9);
+        }
     } else {
         /*
          *  0                   1                   2                   3
