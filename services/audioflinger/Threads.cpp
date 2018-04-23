@@ -7898,7 +7898,9 @@ AudioFlinger::MmapThread::MmapThread(
       mSessionId(AUDIO_SESSION_NONE),
       mDeviceId(AUDIO_PORT_HANDLE_NONE), mPortId(AUDIO_PORT_HANDLE_NONE),
       mHalStream(stream), mHalDevice(hwDev->hwDevice()), mAudioHwDev(hwDev),
-      mActiveTracks(&this->mLocalLog), mNoCallbackWarningCount(0)
+      mActiveTracks(&this->mLocalLog),
+      mHalVolFloat(-1.0f), // Initialize to illegal value so it always gets set properly later.
+      mNoCallbackWarningCount(0)
 {
     mStandby = true;
     readHalParameters_l();
@@ -8065,7 +8067,10 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         return PERMISSION_DENIED;
     }
 
-    if (!isOutput() && !silenced) {
+    if (isOutput()) {
+        // force volume update when a new track is added
+        mHalVolFloat = -1.0f;
+    } else if (!silenced) {
         for (const sp<MmapTrack> &track : mActiveTracks) {
             if (track->isSilenced_l() && track->uid() != client.clientUid)
                 track->invalidate();
@@ -8620,7 +8625,6 @@ AudioFlinger::MmapPlaybackThread::MmapPlaybackThread(
       mStreamType(AUDIO_STREAM_MUSIC),
       mStreamVolume(1.0),
       mStreamMute(false),
-      mHalVolFloat(-1.0f), // Initialize to illegal value so it always gets set properly later.
       mOutput(output)
 {
     snprintf(mThreadName, kThreadNameLength, "AudioMmapOut_%X", id);
