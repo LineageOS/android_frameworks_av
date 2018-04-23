@@ -1055,8 +1055,16 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
             return BAD_VALUE;
         }
 
+        std::string cameraName;
+        err = mCameraProviderManager->getCameraDeviceName(
+                std::string(cameraId.c_str()), cameraName);
+        if (err != OK) {
+            ALOGE("%s: Failed to find camera device name for id %s: %d",
+                  __FUNCTION__, cameraId.c_str(), err);
+            return err;
+        }
         // Make descriptor for incoming client
-        clientDescriptor = CameraClientManager::makeClientDescriptor(cameraId,
+        clientDescriptor = CameraClientManager::makeClientDescriptor(String8(cameraName.c_str()),
                 sp<BasicClient>{nullptr}, static_cast<int32_t>(state->getCost()),
                 state->getConflicting(),
                 priorityScores[priorityScores.size() - 1],
