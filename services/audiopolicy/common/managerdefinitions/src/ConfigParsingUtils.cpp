@@ -412,6 +412,7 @@ status_t ConfigParsingUtils::loadConfig(const char *path, AudioPolicyConfig &con
     free(data);
 
     ALOGI("loadAudioPolicyConfig() loaded %s\n", path);
+    config.setSource(path);
 
     return NO_ERROR;
 }
