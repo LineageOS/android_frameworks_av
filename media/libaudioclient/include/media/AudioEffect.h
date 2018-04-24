@@ -90,27 +90,34 @@ public:
      */
     static status_t queryEffect(uint32_t index, effect_descriptor_t *descriptor);
 
-
     /*
-     * Returns the descriptor for the specified effect uuid.
+     * Returns a descriptor for the specified effect uuid or type.
+     *
+     * Lookup an effect by uuid, or if that's unspecified (EFFECT_UUID_NULL),
+     * do so by type and preferred flags instead.
      *
      * Parameters:
      *      uuid:       pointer to effect uuid.
+     *      type:       pointer to effect type uuid.
+     *      preferredTypeFlags: if multiple effects of the given type exist,
+     *                  one with a matching type flag will be chosen over one without.
+     *                  Use EFFECT_FLAG_TYPE_MASK to indicate no preference.
      *      descriptor: address where the effect descriptor should be returned.
      *
      * Returned status (from utils/Errors.h) can be:
      *      NO_ERROR        successful operation.
      *      PERMISSION_DENIED could not get AudioFlinger interface
      *      NO_INIT         effect library failed to initialize
-     *      BAD_VALUE       invalid uuid or descriptor pointers
+     *      BAD_VALUE       invalid type or descriptor pointers
      *      NAME_NOT_FOUND  no effect with this uuid found
      *
      * Returned value
      *   *descriptor updated with effect descriptor
      */
     static status_t getEffectDescriptor(const effect_uuid_t *uuid,
-                                        effect_descriptor_t *descriptor) /*const*/;
-
+                                        const effect_uuid_t *type,
+                                        uint32_t preferredTypeFlag,
+                                        effect_descriptor_t *descriptor);
 
     /*
      * Returns a list of descriptors corresponding to the pre processings enabled by default
