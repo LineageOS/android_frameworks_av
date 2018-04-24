@@ -48,6 +48,14 @@ public:
           mIsSpeakerDrcEnabled(false)
     {}
 
+    const std::string& getSource() const {
+        return mSource;
+    }
+
+    void setSource(const std::string& file) {
+        mSource = file;
+    }
+
     void setVolumes(const VolumeCurvesCollection &volumes)
     {
         if (mVolumeCurves != nullptr) {
@@ -107,6 +115,7 @@ public:
 
     void setDefault(void)
     {
+        mSource = "AudioPolicyConfig::setDefault";
         mDefaultOutputDevices = new DeviceDescriptor(AUDIO_DEVICE_OUT_SPEAKER);
         sp<HwModule> module;
         sp<DeviceDescriptor> defaultInputDevice = new DeviceDescriptor(AUDIO_DEVICE_IN_BUILTIN_MIC);
@@ -136,6 +145,7 @@ public:
     }
 
 private:
+    std::string mSource;
     HwModuleCollection &mHwModules; /**< Collection of Module, with Profiles, i.e. Mix Ports. */
     DeviceVector &mAvailableOutputDevices;
     DeviceVector &mAvailableInputDevices;
