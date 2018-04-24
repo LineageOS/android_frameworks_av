@@ -123,4 +123,21 @@ void stream_type_to_audio_attributes(audio_stream_type_t streamType,
     }
 }
 
+// Convert flags sent from Java AudioAttributes.getFlags() method to audio_output_flags_t
+static inline
+void audio_attributes_flags_to_audio_output_flags(const audio_flags_mask_t audioAttributeFlags,
+            audio_output_flags_t &flags) {
+    if ((audioAttributeFlags & AUDIO_FLAG_HW_AV_SYNC) != 0) {
+        flags = static_cast<audio_output_flags_t>(flags |
+            AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_DIRECT);
+    }
+    if ((audioAttributeFlags & AUDIO_FLAG_LOW_LATENCY) != 0) {
+        flags = static_cast<audio_output_flags_t>(flags | AUDIO_OUTPUT_FLAG_FAST);
+    }
+    // check deep buffer after flags have been modified above
+    if (flags == AUDIO_OUTPUT_FLAG_NONE && (audioAttributeFlags & AUDIO_FLAG_DEEP_BUFFER) != 0) {
+        flags = AUDIO_OUTPUT_FLAG_DEEP_BUFFER;
+    }
+}
+
 #endif //AUDIO_POLICY_HELPER_H_

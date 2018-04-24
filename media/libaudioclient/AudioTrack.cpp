@@ -30,9 +30,11 @@
 #include <utils/Log.h>
 #include <private/media/AudioTrackShared.h>
 #include <media/IAudioFlinger.h>
+#include <media/IAudioPolicyService.h>
 #include <media/AudioParameter.h>
 #include <media/AudioPolicyHelper.h>
 #include <media/AudioResamplerPublic.h>
+#include <media/AudioSystem.h>
 #include <media/MediaAnalyticsItem.h>
 #include <media/TypeConverter.h>
 
@@ -155,6 +157,15 @@ status_t AudioTrack::getMinFrameCount(
     ALOGV("%s(): getMinFrameCount=%zu: afFrameCount=%zu, afSampleRate=%u, afLatency=%u",
             __func__, *frameCount, afFrameCount, afSampleRate, afLatency);
     return NO_ERROR;
+}
+
+// static
+bool AudioTrack::isDirectOutputSupported(const audio_config_base_t& config,
+                                         const audio_attributes_t& attributes) {
+    ALOGV("%s()", __FUNCTION__);
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return false;
+    return aps->isDirectOutputSupported(config, attributes);
 }
 
 // ---------------------------------------------------------------------------
@@ -465,16 +476,7 @@ status_t AudioTrack::set(
                 __func__,
                  mAttributes.usage, mAttributes.content_type, mAttributes.flags, mAttributes.tags);
         mStreamType = AUDIO_STREAM_DEFAULT;
-        if ((mAttributes.flags & AUDIO_FLAG_HW_AV_SYNC) != 0) {
-            flags = (audio_output_flags_t)(flags | AUDIO_OUTPUT_FLAG_HW_AV_SYNC);
-        }
-        if ((mAttributes.flags & AUDIO_FLAG_LOW_LATENCY) != 0) {
-            flags = (audio_output_flags_t) (flags | AUDIO_OUTPUT_FLAG_FAST);
-        }
-        // check deep buffer after flags have been modified above
-        if (flags == AUDIO_OUTPUT_FLAG_NONE && (mAttributes.flags & AUDIO_FLAG_DEEP_BUFFER) != 0) {
-            flags = AUDIO_OUTPUT_FLAG_DEEP_BUFFER;
-        }
+        audio_attributes_flags_to_audio_output_flags(mAttributes.flags, flags);
     }
 
     // these below should probably come from the audioFlinger too...

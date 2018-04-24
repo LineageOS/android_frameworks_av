@@ -692,22 +692,25 @@ void AudioPolicyManager::setSystemProperty(const char* property, const char* val
     ALOGV("setSystemProperty() property %s, value %s", property, value);
 }
 
-// Find a direct output profile compatible with the parameters passed, even if the input flags do
-// not explicitly request a direct output
-sp<IOProfile> AudioPolicyManager::getProfileForDirectOutput(
-                                                               audio_devices_t device,
-                                                               uint32_t samplingRate,
-                                                               audio_format_t format,
-                                                               audio_channel_mask_t channelMask,
-                                                               audio_output_flags_t flags)
+// Find an output profile compatible with the parameters passed. When "directOnly" is set, restrict
+// search to profiles for direct outputs.
+sp<IOProfile> AudioPolicyManager::getProfileForOutput(
+                                                   audio_devices_t device,
+                                                   uint32_t samplingRate,
+                                                   audio_format_t format,
+                                                   audio_channel_mask_t channelMask,
+                                                   audio_output_flags_t flags,
+                                                   bool directOnly)
 {
-    // only retain flags that will drive the direct output profile selection
-    // if explicitly requested
-    static const uint32_t kRelevantFlags =
-            (AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD |
-             AUDIO_OUTPUT_FLAG_VOIP_RX);
-    flags =
-        (audio_output_flags_t)((flags & kRelevantFlags) | AUDIO_OUTPUT_FLAG_DIRECT);
+    if (directOnly) {
+        // only retain flags that will drive the direct output profile selection
+        // if explicitly requested
+        static const uint32_t kRelevantFlags =
+                (AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD |
+                 AUDIO_OUTPUT_FLAG_VOIP_RX);
+        flags =
+            (audio_output_flags_t)((flags & kRelevantFlags) | AUDIO_OUTPUT_FLAG_DIRECT);
+    }
 
     sp<IOProfile> profile;
 
@@ -724,7 +727,9 @@ sp<IOProfile> AudioPolicyManager::getProfileForDirectOutput(
             if ((mAvailableOutputDevices.types() & curProfile->getSupportedDevicesType()) == 0) {
                 continue;
             }
-            // if several profiles are compatible, give priority to one with offload capability
+            if (!directOnly) return curProfile;
+            // when searching for direct outputs, if several profiles are compatible, give priority
+            // to one with offload capability
             if (profile != 0 && ((curProfile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == 0)) {
                 continue;
             }
@@ -959,11 +964,12 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
 
     if (((*flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == 0) ||
             !(mEffects.isNonOffloadableEffectEnabled() || mMasterMono)) {
-        profile = getProfileForDirectOutput(device,
-                                           config->sample_rate,
-                                           config->format,
-                                           config->channel_mask,
-                                           (audio_output_flags_t)*flags);
+        profile = getProfileForOutput(device,
+                                   config->sample_rate,
+                                   config->format,
+                                   config->channel_mask,
+                                   (audio_output_flags_t)*flags,
+                                   true /* directOnly */);
     }
 
     if (profile != 0) {
@@ -2781,12 +2787,31 @@ bool AudioPolicyManager::isOffloadSupported(const audio_offload_info_t& offloadI
 
     // See if there is a profile to support this.
     // AUDIO_DEVICE_NONE
-    sp<IOProfile> profile = getProfileForDirectOutput(AUDIO_DEVICE_NONE /*ignore device */,
+    sp<IOProfile> profile = getProfileForOutput(AUDIO_DEVICE_NONE /*ignore device */,
                                             offloadInfo.sample_rate,
                                             offloadInfo.format,
                                             offloadInfo.channel_mask,
-                                            AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD);
+                                            AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD,
+                                            true /* directOnly */);
     ALOGV("isOffloadSupported() profile %sfound", profile != 0 ? "" : "NOT ");
+    return (profile != 0);
+}
+
+bool AudioPolicyManager::isDirectOutputSupported(const audio_config_base_t& config,
+                                                 const audio_attributes_t& attributes) {
+    audio_output_flags_t output_flags = AUDIO_OUTPUT_FLAG_NONE;
+    audio_attributes_flags_to_audio_output_flags(attributes.flags, output_flags);
+    sp<IOProfile> profile = getProfileForOutput(AUDIO_DEVICE_NONE /*ignore device */,
+                                            config.sample_rate,
+                                            config.format,
+                                            config.channel_mask,
+                                            output_flags,
+                                            true /* directOnly */);
+    ALOGV("%s() profile %sfound with name: %s, "
+        "sample rate: %u, format: 0x%x, channel_mask: 0x%x, output flags: 0x%x",
+        __FUNCTION__, profile != 0 ? "" : "NOT ",
+        (profile != 0 ? profile->getTagName().string() : "null"),
+        config.sample_rate, config.format, config.channel_mask, output_flags);
     return (profile != 0);
 }
 

@@ -936,6 +936,17 @@ bool AudioPolicyService::isOffloadSupported(const audio_offload_info_t& info)
     return mAudioPolicyManager->isOffloadSupported(info);
 }
 
+bool AudioPolicyService::isDirectOutputSupported(const audio_config_base_t& config,
+                                                 const audio_attributes_t& attributes) {
+    if (mAudioPolicyManager == NULL) {
+        ALOGV("mAudioPolicyManager == NULL");
+        return false;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->isDirectOutputSupported(config, attributes);
+}
+
+
 status_t AudioPolicyService::listAudioPorts(audio_port_role_t role,
                                             audio_port_type_t type,
                                             unsigned int *num_ports,

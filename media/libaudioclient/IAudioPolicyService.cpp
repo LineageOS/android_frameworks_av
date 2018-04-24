@@ -62,6 +62,7 @@ enum {
     SET_EFFECT_ENABLED,
     IS_STREAM_ACTIVE_REMOTELY,
     IS_OFFLOAD_SUPPORTED,
+    IS_DIRECT_OUTPUT_SUPPORTED,
     LIST_AUDIO_PORTS,
     GET_AUDIO_PORT,
     CREATE_AUDIO_PATCH,
@@ -524,6 +525,16 @@ public:
         data.write(&info, sizeof(audio_offload_info_t));
         remote()->transact(IS_OFFLOAD_SUPPORTED, data, &reply);
         return reply.readInt32();
+    }
+
+    virtual bool isDirectOutputSupported(const audio_config_base_t& config,
+                                         const audio_attributes_t& attributes) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.write(&config, sizeof(audio_config_base_t));
+        data.write(&attributes, sizeof(audio_attributes_t));
+        status_t status = remote()->transact(IS_DIRECT_OUTPUT_SUPPORTED, data, &reply);
+        return status == NO_ERROR ? static_cast<bool>(reply.readInt32()) : false;
     }
 
     virtual status_t listAudioPorts(audio_port_role_t role,
@@ -1390,6 +1401,18 @@ status_t BnAudioPolicyService::onTransact(
             data.read(&info, sizeof(audio_offload_info_t));
             bool isSupported = isOffloadSupported(info);
             reply->writeInt32(isSupported);
+            return NO_ERROR;
+        }
+
+        case IS_DIRECT_OUTPUT_SUPPORTED: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            audio_config_base_t config = {};
+            audio_attributes_t attributes = {};
+            status_t status = data.read(&config, sizeof(audio_config_base_t));
+            if (status != NO_ERROR) return status;
+            status = data.read(&attributes, sizeof(audio_attributes_t));
+            if (status != NO_ERROR) return status;
+            reply->writeInt32(isDirectOutputSupported(config, attributes));
             return NO_ERROR;
         }
 
