@@ -7615,8 +7615,10 @@ status_t ACodec::setVendorParameters(const sp<AMessage> &params) {
                 config->param[paramIndex].bSet =
                     (OMX_BOOL)params->findString(existingKey->second.c_str(), &value);
                 if (config->param[paramIndex].bSet) {
-                    strncpy((char *)config->param[paramIndex].cString, value.c_str(),
-                            sizeof(OMX_CONFIG_ANDROID_VENDOR_PARAMTYPE::cString));
+                    size_t dstSize = sizeof(config->param[paramIndex].cString);
+                    strncpy((char *)config->param[paramIndex].cString, value.c_str(), dstSize - 1);
+                    // null terminate value
+                    config->param[paramIndex].cString[dstSize - 1] = '\0';
                 }
                 break;
             }
