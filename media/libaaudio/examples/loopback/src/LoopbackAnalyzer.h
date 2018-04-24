@@ -684,7 +684,7 @@ public:
     }
 
     void printStatus() override {
-        printf("  state = %d, glitches = %d,", mState, mGlitchCount);
+        printf("  state = %d, glitches = %3d,", mState, mGlitchCount);
     }
 
     double calculateMagnitude(double *phasePtr = NULL) {
