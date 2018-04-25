@@ -160,3 +160,10 @@ cc_test {
         "libutils",
     ],
 }
+
+cc_test {
+    name: "test_atomic_fifo",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_atomic_fifo.cpp"],
+    shared_libs: ["libaaudio"],
+}
