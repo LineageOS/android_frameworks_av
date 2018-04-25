@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "563701ba_9d93bccb",
+        "filename": "services/camera/libcameraservice/api1/CameraClient.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 980,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-04-25T04:18:57Z",
+      "side": 1,
+      "message": "Why does this have extra spaces?",
+      "range": {
+        "startLine": 980,
+        "startChar": 8,
+        "endLine": 980,
+        "endChar": 27
+      },
+      "revId": "7a1f12818fd332138a29b5038ac8430c0ecda423",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
