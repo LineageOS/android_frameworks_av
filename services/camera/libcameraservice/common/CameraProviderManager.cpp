@@ -391,16 +391,6 @@ metadata_vendor_id_t CameraProviderManager::getProviderTagIdLocked(
     return ret;
 }
 
-status_t CameraProviderManager::getCameraDeviceName(const std::string& id, std::string& name) {
-    std::lock_guard<std::mutex> lock(mInterfaceMutex);
-
-    auto deviceInfo = findDeviceInfoLocked(id);
-    if (deviceInfo == nullptr) return NAME_NOT_FOUND;
-
-    name = deviceInfo->mName;
-    return OK;
-}
-
 status_t CameraProviderManager::addProviderLocked(const std::string& newProvider, bool expected) {
     for (const auto& providerInfo : mProviders) {
         if (providerInfo->mProviderName == newProvider) {
