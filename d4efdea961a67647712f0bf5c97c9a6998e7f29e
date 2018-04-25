@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "cb7d9b51_7dba8734",
+        "filename": "camera/ICameraClient.cpp",
+        "patchSetId": 8
+      },
+      "lineNbr": 136,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-04-25T04:17:31Z",
+      "side": 1,
+      "message": "This line didn\u0027t need to change.",
+      "range": {
+        "startLine": 136,
+        "startChar": 11,
+        "endLine": 136,
+        "endChar": 47
+      },
+      "revId": "d4efdea961a67647712f0bf5c97c9a6998e7f29e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
