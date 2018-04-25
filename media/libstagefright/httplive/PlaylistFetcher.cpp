@@ -33,6 +33,7 @@
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/foundation/MediaKeys.h>
 #include <media/stagefright/foundation/avc_utils.h>
+#include <media/stagefright/DataURISource.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MetaDataUtils.h>
@@ -347,6 +348,16 @@ status_t PlaylistFetcher::decryptBuffer(
     sp<ABuffer> key;
     if (index >= 0) {
         key = mAESKeyForURI.valueAt(index);
+    } else if (keyURI.startsWith("data:")) {
+        sp<DataSource> keySrc = DataURISource::Create(keyURI.c_str());
+        off64_t keyLen;
+        if (keySrc == NULL || keySrc->getSize(&keyLen) != OK || keyLen < 0) {
+            ALOGE("Malformed cipher key data uri.");
+            return ERROR_MALFORMED;
+        }
+        key = new ABuffer(keyLen);
+        keySrc->readAt(0, key->data(), keyLen);
+        key->setRange(0, keyLen);
     } else {
         ssize_t err = mHTTPDownloader->fetchFile(keyURI.c_str(), &key);
 
