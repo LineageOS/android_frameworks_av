@@ -181,6 +181,9 @@ enum {
     kKeyCASystemID        = 'caid',  // int32_t
     kKeyCASessionID       = 'seid',  // raw data
 
+    kKeyEncryptedByteBlock = 'cblk',  // uint8_t
+    kKeySkipByteBlock     = 'sblk',  // uint8_t
+
     // Please see MediaFormat.KEY_IS_AUTOSELECT.
     kKeyTrackIsAutoselect = 'auto', // bool (int32_t)
     // Please see MediaFormat.KEY_IS_DEFAULT.
@@ -227,6 +230,12 @@ enum {
     kTypeAVCC        = 'avcc',
     kTypeHVCC        = 'hvcc',
     kTypeD263        = 'd263',
+};
+
+enum {
+    kCryptoModeUnencrypted = 0,
+    kCryptoModeAesCtr      = 1,
+    kCryptoModeAesCbc      = 2,
 };
 
 class Parcel;
