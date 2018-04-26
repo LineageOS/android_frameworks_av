@@ -40,7 +40,7 @@ bool SessionRouteMap::hasRoute(audio_session_t session)
     return indexOfKey(session) >= 0 && valueFor(session)->mDeviceDescriptor != 0;
 }
 
-bool SessionRouteMap::hasRouteChanged(audio_session_t session)
+bool SessionRouteMap::getAndClearRouteChanged(audio_session_t session)
 {
     if (indexOfKey(session) >= 0) {
         if (valueFor(session)->mChanged) {
@@ -104,9 +104,7 @@ void SessionRouteMap::addRoute(audio_session_t session,
     sp<SessionRoute> route = indexOfKey(session) >= 0 ? valueFor(session) : 0;
 
     if (route != 0) {
-        if (((route->mDeviceDescriptor == 0) && (descriptor != 0)) ||
-                ((route->mDeviceDescriptor != 0) &&
-                 ((descriptor == 0) || (!route->mDeviceDescriptor->equals(descriptor))))) {
+        if (descriptor != 0 || route->mDeviceDescriptor != 0) {
             route->mChanged = true;
         }
         route->mRefCount++;
@@ -114,10 +112,10 @@ void SessionRouteMap::addRoute(audio_session_t session,
     } else {
         route = new SessionRoute(session, streamType, source, descriptor, uid);
         route->mRefCount++;
-        add(session, route);
         if (descriptor != 0) {
             route->mChanged = true;
         }
+        add(session, route);
     }
 }
 
