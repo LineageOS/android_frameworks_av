@@ -764,7 +764,7 @@ void MediaCodec::statsBufferReceived(int64_t presentationUs) {
 
     // ignore stuff with no presentation time
     if (presentationUs <= 0) {
-        ALOGD("-- returned buffer has bad timestamp %" PRId64 ", ignore it", presentationUs);
+        ALOGV("-- returned buffer timestamp %" PRId64 " <= 0, ignore it", presentationUs);
         mLatencyUnknown++;
         return;
     }
