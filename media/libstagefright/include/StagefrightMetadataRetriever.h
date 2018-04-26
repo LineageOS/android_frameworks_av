@@ -40,12 +40,12 @@ struct StagefrightMetadataRetriever : public MediaMetadataRetrieverInterface {
     virtual status_t setDataSource(int fd, int64_t offset, int64_t length);
     virtual status_t setDataSource(const sp<DataSource>& source, const char *mime);
 
-    virtual VideoFrame* getFrameAtTime(
+    virtual sp<IMemory> getFrameAtTime(
             int64_t timeUs, int option, int colorFormat, bool metaOnly);
-    virtual VideoFrame* getImageAtIndex(
+    virtual sp<IMemory> getImageAtIndex(
             int index, int colorFormat, bool metaOnly, bool thumbnail);
     virtual status_t getFrameAtIndex(
-            std::vector<VideoFrame*>* frames,
+            std::vector<sp<IMemory> >* frames,
             int frameIndex, int numFrames, int colorFormat, bool metaOnly);
 
     virtual MediaAlbumArt *extractAlbumArt();
@@ -65,7 +65,7 @@ private:
 
     status_t getFrameInternal(
             int64_t timeUs, int numFrames, int option, int colorFormat, bool metaOnly,
-            VideoFrame **outFrame, std::vector<VideoFrame*>* outFrames);
+            sp<IMemory>* outFrame, std::vector<sp<IMemory> >* outFrames);
 
     StagefrightMetadataRetriever(const StagefrightMetadataRetriever &);
 
