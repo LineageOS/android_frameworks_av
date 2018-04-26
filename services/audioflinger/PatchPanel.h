@@ -19,13 +19,10 @@
     #error This header file should only be included from AudioFlinger.h
 #endif
 
-class PatchPanel : public RefBase {
+// PatchPanel is concealed within AudioFlinger, their lifetimes are the same.
+class PatchPanel {
 public:
-
-    class Patch;
-
-    explicit PatchPanel(const sp<AudioFlinger>& audioFlinger);
-    virtual ~PatchPanel();
+    explicit PatchPanel(AudioFlinger* audioFlinger) : mAudioFlinger(*audioFlinger) {}
 
     /* List connected audio ports and their attributes */
     status_t listAudioPorts(unsigned int *num_ports,
@@ -45,46 +42,33 @@ public:
     status_t listAudioPatches(unsigned int *num_patches,
                                       struct audio_patch *patches);
 
-    /* Set audio port configuration */
-    status_t setAudioPortConfig(const struct audio_port_config *config);
-
-    status_t createPatchConnections(Patch *patch,
-                                    const struct audio_patch *audioPatch);
-    void clearPatchConnections(Patch *patch);
-
+private:
     class Patch {
     public:
-        explicit Patch(const struct audio_patch *patch) :
-            mAudioPatch(*patch), mHandle(AUDIO_PATCH_HANDLE_NONE),
-            mHalHandle(AUDIO_PATCH_HANDLE_NONE), mRecordPatchHandle(AUDIO_PATCH_HANDLE_NONE),
-            mPlaybackPatchHandle(AUDIO_PATCH_HANDLE_NONE) {}
-        ~Patch() {}
+        explicit Patch(const struct audio_patch &patch) : mAudioPatch(patch) {}
 
+        status_t createConnections(PatchPanel *panel);
+        void clearConnections(PatchPanel *panel);
+
+        // Note that audio_patch::id is only unique within a HAL module
         struct audio_patch              mAudioPatch;
-        audio_patch_handle_t            mHandle;
         // handle for audio HAL patch handle present only when the audio HAL version is >= 3.0
-        audio_patch_handle_t            mHalHandle;
+        audio_patch_handle_t            mHalHandle = AUDIO_PATCH_HANDLE_NONE;
         // below members are used by a software audio patch connecting a source device from a
         // given audio HW module to a sink device on an other audio HW module.
-        // playback thread created by createAudioPatch() and released by clearPatchConnections() if
-        // no existing playback thread can be used by the software patch
+        // the objects are created by createConnections() and released by clearConnections()
+        // playback thread is created if no existing playback thread can be used
         sp<PlaybackThread>              mPlaybackThread;
-        // audio track created by createPatchConnections() and released by clearPatchConnections()
         sp<PlaybackThread::PatchTrack>  mPatchTrack;
-        // record thread created by createAudioPatch() and released by clearPatchConnections()
         sp<RecordThread>                mRecordThread;
-        // audio record created by createPatchConnections() and released by clearPatchConnections()
         sp<RecordThread::PatchRecord>   mPatchRecord;
         // handle for audio patch connecting source device to record thread input.
-        // created by createPatchConnections() and released by clearPatchConnections()
-        audio_patch_handle_t            mRecordPatchHandle;
+        audio_patch_handle_t            mRecordPatchHandle = AUDIO_PATCH_HANDLE_NONE;
         // handle for audio patch connecting playback thread output to sink device
-        // created by createPatchConnections() and released by clearPatchConnections()
-        audio_patch_handle_t            mPlaybackPatchHandle;
+        audio_patch_handle_t            mPlaybackPatchHandle = AUDIO_PATCH_HANDLE_NONE;
 
     };
 
-private:
-    const wp<AudioFlinger>      mAudioFlinger;
-    SortedVector <Patch *>      mPatches;
+    AudioFlinger &mAudioFlinger;
+    std::map<audio_patch_handle_t, Patch> mPatches;
 };

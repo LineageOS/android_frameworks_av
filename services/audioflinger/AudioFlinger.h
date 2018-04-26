@@ -843,7 +843,8 @@ private:
 
     nsecs_t mGlobalEffectEnableTime;  // when a global effect was last enabled
 
-    sp<PatchPanel> mPatchPanel;
+    // protected by mLock
+    PatchPanel mPatchPanel;
     sp<EffectsFactoryHalInterface> mEffectsFactoryHal;
 
     bool        mSystemReady;
