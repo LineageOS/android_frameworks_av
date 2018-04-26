@@ -3102,9 +3102,13 @@ sp<IEffect> AudioFlinger::createEffect(
             }
             // look for the thread where the specified audio session is present
             for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-                if (mPlaybackThreads.valueAt(i)->hasAudioSession(sessionId) != 0) {
+                uint32_t sessionType = mPlaybackThreads.valueAt(i)->hasAudioSession(sessionId);
+                if (sessionType != 0) {
                     io = mPlaybackThreads.keyAt(i);
-                    break;
+                    // thread with same effect session is preferable
+                    if ((sessionType & ThreadBase::EFFECT_SESSION) != 0) {
+                        break;
+                    }
                 }
             }
             if (io == AUDIO_IO_HANDLE_NONE) {
