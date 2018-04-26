@@ -54,7 +54,7 @@ public:
 
     void log(const char* prefix);
 
-    bool isActive() {
+    bool isActiveOrChanged() {
         return (mDeviceDescriptor != 0) && (mChanged || (mActivityCount > 0));
     }
 
@@ -96,7 +96,7 @@ public:
 
     int incRouteActivity(audio_session_t session);
     int decRouteActivity(audio_session_t session);
-    bool hasRouteChanged(audio_session_t session); // also clears the changed flag
+    bool getAndClearRouteChanged(audio_session_t session); // also clears the changed flag
     void log(const char* caption);
 
     // Specify an Output(Sink) route by passing SessionRoute::SOURCE_TYPE_NA in the
