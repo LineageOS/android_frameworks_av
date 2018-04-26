@@ -431,6 +431,7 @@ private:
 
         int addAudioPortCallback(const sp<AudioPortCallback>& callback);
         int removeAudioPortCallback(const sp<AudioPortCallback>& callback);
+        bool isAudioPortCbEnabled() const { return (mAudioPortCallbacks.size() != 0); }
 
         // DeathRecipient
         virtual void binderDied(const wp<IBinder>& who);
