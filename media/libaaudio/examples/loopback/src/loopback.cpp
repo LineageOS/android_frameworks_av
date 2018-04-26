@@ -38,21 +38,25 @@
 // Tag for machine readable results as property = value pairs
 #define RESULT_TAG              "RESULT: "
 #define NUM_SECONDS             5
+#define PERIOD_MILLIS           1000
 #define NUM_INPUT_CHANNELS      1
 #define FILENAME_ALL            "/data/loopback_all.wav"
 #define FILENAME_ECHOS          "/data/loopback_echos.wav"
-#define APP_VERSION             "0.2.01"
+#define APP_VERSION             "0.2.03"
+
+constexpr int kNumCallbacksToDrain   = 20;
+constexpr int kNumCallbacksToDiscard = 20;
 
 struct LoopbackData {
     AAudioStream      *inputStream = nullptr;
     int32_t            inputFramesMaximum = 0;
     int16_t           *inputShortData = nullptr;
     float             *inputFloatData = nullptr;
-    int16_t            peakShort = 0;
     aaudio_format_t    actualInputFormat = AAUDIO_FORMAT_INVALID;
     int32_t            actualInputChannelCount = 0;
     int32_t            actualOutputChannelCount = 0;
-    int32_t            inputBuffersToDiscard = 10;
+    int32_t            numCallbacksToDrain = kNumCallbacksToDrain;
+    int32_t            numCallbacksToDiscard = kNumCallbacksToDiscard;
     int32_t            minNumFrames = INT32_MAX;
     int32_t            maxNumFrames = 0;
     int32_t            insufficientReadCount = 0;
@@ -131,23 +135,32 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
         myData->minNumFrames = numFrames;
     }
 
-    if (myData->inputBuffersToDiscard > 0) {
+    // Silence the output.
+    int32_t numBytes = numFrames * myData->actualOutputChannelCount * sizeof(float);
+    memset(audioData, 0 /* value */, numBytes);
+
+    if (myData->numCallbacksToDrain > 0) {
         // Drain the input.
         do {
             framesRead = readFormattedData(myData, numFrames);
-            if (framesRead < 0) {
-                result = AAUDIO_CALLBACK_RESULT_STOP;
-            } else if (framesRead > 0) {
-                myData->inputBuffersToDiscard--;
-            }
+            // Ignore errors because input stream may not be started yet.
         } while (framesRead > 0);
+        myData->numCallbacksToDrain--;
 
-        // Silence the output.
-        int32_t numBytes = numFrames * myData->actualOutputChannelCount * sizeof(float);
-        memset(audioData, 0 /* value */, numBytes);
+    } else if (myData->numCallbacksToDiscard > 0) {
+        // Ignore. Allow the input to fill back up to equilibrium with the output.
+        framesRead = readFormattedData(myData, numFrames);
+        if (framesRead < 0) {
+            result = AAUDIO_CALLBACK_RESULT_STOP;
+        }
+        myData->numCallbacksToDiscard--;
 
     } else {
 
+        int32_t numInputBytes = numFrames * myData->actualInputChannelCount * sizeof(float);
+        memset(myData->inputFloatData, 0 /* value */, numInputBytes);
+
+        // Process data after equilibrium.
         int64_t inputFramesWritten = AAudioStream_getFramesWritten(myData->inputStream);
         int64_t inputFramesRead = AAudioStream_getFramesRead(myData->inputStream);
         int64_t framesAvailable = inputFramesWritten - inputFramesRead;
@@ -155,6 +168,7 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
         if (framesRead < 0) {
             result = AAUDIO_CALLBACK_RESULT_STOP;
         } else {
+
             if (framesRead < numFrames) {
                 if(framesRead < (int32_t) framesAvailable) {
                     printf("insufficient but numFrames = %d, framesRead = %d, available = %d\n",
@@ -172,13 +186,13 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
             // Save for later.
             myData->audioRecording.write(myData->inputFloatData,
                                          myData->actualInputChannelCount,
-                                         framesRead);
+                                         numFrames);
             // Analyze the data.
             myData->loopbackProcessor->process(myData->inputFloatData,
                                                myData->actualInputChannelCount,
                                                outputData,
                                                myData->actualOutputChannelCount,
-                                               framesRead);
+                                               numFrames);
             myData->isDone = myData->loopbackProcessor->isDone();
             if (myData->isDone) {
                 result = AAUDIO_CALLBACK_RESULT_STOP;
@@ -366,7 +380,9 @@ int main(int argc, const char **argv)
     }
 
     int32_t requestedDuration = argParser.getDurationSeconds();
-    int32_t recordingDuration = std::min(60, requestedDuration);
+    int32_t requestedDurationMillis = requestedDuration * MILLIS_PER_SECOND;
+    int32_t timeMillis = 0;
+    int32_t recordingDuration = std::min(60 * 5, requestedDuration);
 
     switch(testMode) {
         case TEST_SINE_MAGNITUDE:
@@ -449,7 +465,6 @@ int main(int argc, const char **argv)
 
     // Allocate a buffer for the audio data.
     loopbackData.inputFramesMaximum = 32 * AAudioStream_getFramesPerBurst(inputStream);
-    loopbackData.inputBuffersToDiscard = 200;
 
     if (loopbackData.actualInputFormat == AAUDIO_FORMAT_PCM_I16) {
         loopbackData.inputShortData = new int16_t[loopbackData.inputFramesMaximum
@@ -460,13 +475,7 @@ int main(int argc, const char **argv)
 
     loopbackData.loopbackProcessor->reset();
 
-    result = recorder.start();
-    if (result != AAUDIO_OK) {
-        printf("ERROR - AAudioStream_requestStart(input) returned %d = %s\n",
-               result, AAudio_convertResultToText(result));
-        goto finish;
-    }
-
+    // Start OUTPUT first so INPUT does not overflow.
     result = player.start();
     if (result != AAUDIO_OK) {
         printf("ERROR - AAudioStream_requestStart(output) returned %d = %s\n",
@@ -474,9 +483,15 @@ int main(int argc, const char **argv)
         goto finish;
     }
 
-    printf("------- sleep while the callback runs --------------\n");
-    fflush(stdout);
-    for (int i = requestedDuration; i > 0 ; i--) {
+    result = recorder.start();
+    if (result != AAUDIO_OK) {
+        printf("ERROR - AAudioStream_requestStart(input) returned %d = %s\n",
+               result, AAudio_convertResultToText(result));
+        goto finish;
+    }
+
+    printf("------- sleep and log while the callback runs --------------\n");
+    while (timeMillis <= requestedDurationMillis) {
         if (loopbackData.inputError != AAUDIO_OK) {
             printf("  ERROR on input stream\n");
             break;
@@ -487,10 +502,9 @@ int main(int argc, const char **argv)
                 printf("  test says it is done!\n");
                 break;
         } else {
-            sleep(1);
-            printf("%4d: ", i);
+            // Log a line of stream data.
+            printf("%7.3f: ", 0.001 * timeMillis); // display in seconds
             loopbackData.loopbackProcessor->printStatus();
-
             printf(" insf %3d,", (int) loopbackData.insufficientReadCount);
 
             int64_t inputFramesWritten = AAudioStream_getFramesWritten(inputStream);
@@ -498,7 +512,7 @@ int main(int argc, const char **argv)
             int64_t outputFramesWritten = AAudioStream_getFramesWritten(outputStream);
             int64_t outputFramesRead = AAudioStream_getFramesRead(outputStream);
             static const int textOffset = strlen("AAUDIO_STREAM_STATE_"); // strip this off
-            printf(" INPUT: wr %7lld - rd %7lld = %5lld, state %s, oruns %3d | ",
+            printf(" | INPUT: wr %7lld - rd %7lld = %5lld, st %8s, oruns %3d",
                    (long long) inputFramesWritten,
                    (long long) inputFramesRead,
                    (long long) (inputFramesWritten - inputFramesRead),
@@ -506,7 +520,7 @@ int main(int argc, const char **argv)
                            AAudioStream_getState(inputStream))[textOffset],
                    AAudioStream_getXRunCount(inputStream));
 
-            printf(" OUTPUT: wr %7lld - rd %7lld = %5lld, state %s, uruns %3d\n",
+            printf(" | OUTPUT: wr %7lld - rd %7lld = %5lld, st %8s, uruns %3d\n",
                    (long long) outputFramesWritten,
                    (long long) outputFramesRead,
                     (long long) (outputFramesWritten - outputFramesRead),
@@ -515,6 +529,9 @@ int main(int argc, const char **argv)
                    AAudioStream_getXRunCount(outputStream)
             );
         }
+        int32_t periodMillis = (timeMillis < 2000) ? PERIOD_MILLIS / 4 : PERIOD_MILLIS;
+        usleep(periodMillis * 1000);
+        timeMillis += periodMillis;
     }
 
     result = player.stop();
