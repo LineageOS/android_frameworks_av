@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
+#include <binder/IPCThreadState.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/IAudioFlinger.h>
@@ -75,7 +76,9 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
         af = gAudioFlinger;
     }
     if (afc != 0) {
+        int64_t token = IPCThreadState::self()->clearCallingIdentity();
         af->registerClient(afc);
+        IPCThreadState::self()->restoreCallingIdentity(token);
     }
     return af;
 }
@@ -767,7 +770,10 @@ const sp<IAudioPolicyService> AudioSystem::get_audio_policy_service()
         ap = gAudioPolicyService;
     }
     if (apc != 0) {
+        int64_t token = IPCThreadState::self()->clearCallingIdentity();
         ap->registerClient(apc);
+        ap->setAudioPortCallbacksEnabled(apc->isAudioPortCbEnabled());
+        IPCThreadState::self()->restoreCallingIdentity(token);
     }
 
     return ap;
