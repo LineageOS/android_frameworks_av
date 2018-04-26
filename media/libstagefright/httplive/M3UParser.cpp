@@ -484,6 +484,9 @@ static bool MakeURL(const char *baseURL, const char *url, AString *out) {
         // Base URL must be absolute
         return false;
     }
+    if (!strncasecmp("data:", url, 5)) {
+        return false;
+    }
     const size_t schemeEnd = (strstr(baseURL, "//") - baseURL) + 2;
     CHECK(schemeEnd == 7 || schemeEnd == 8);
 
