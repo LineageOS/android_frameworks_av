@@ -1116,7 +1116,7 @@ status_t AudioPolicyManager::startOutput(audio_io_handle_t output,
         } else {
             newDevice = AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
         }
-    } else if (mOutputRoutes.hasRouteChanged(session)) {
+    } else if (mOutputRoutes.getAndClearRouteChanged(session)) {
         newDevice = getNewOutputDevice(outputDesc, false /*fromCache*/);
         checkStrategyRoute(getStrategy(stream), output);
     } else {
@@ -1985,7 +1985,7 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
     // Routing?
     mInputRoutes.incRouteActivity(session);
 
-    if (audioSession->activeCount() == 1 || mInputRoutes.hasRouteChanged(session)) {
+    if (audioSession->activeCount() == 1 || mInputRoutes.getAndClearRouteChanged(session)) {
         // indicate active capture to sound trigger service if starting capture from a mic on
         // primary HW module
         audio_devices_t device = getNewInputDevice(inputDesc);
@@ -4695,7 +4695,7 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
     for (size_t routeIndex = 0; routeIndex < mOutputRoutes.size(); routeIndex++) {
         sp<SessionRoute> route = mOutputRoutes.valueAt(routeIndex);
         routing_strategy routeStrategy = getStrategy(route->mStreamType);
-        if ((routeStrategy == strategy) && route->isActive() &&
+        if ((routeStrategy == strategy) && route->isActiveOrChanged() &&
                 (mAvailableOutputDevices.indexOf(route->mDeviceDescriptor) >= 0)) {
             return route->mDeviceDescriptor->type();
         }
@@ -5127,7 +5127,7 @@ audio_devices_t AudioPolicyManager::getDeviceForInputSource(audio_source_t input
     // then select this device.
     for (size_t routeIndex = 0; routeIndex < mInputRoutes.size(); routeIndex++) {
          sp<SessionRoute> route = mInputRoutes.valueAt(routeIndex);
-         if ((inputSource == route->mSource) && route->isActive() &&
+         if ((inputSource == route->mSource) && route->isActiveOrChanged() &&
                  (mAvailableInputDevices.indexOf(route->mDeviceDescriptor) >= 0)) {
              return route->mDeviceDescriptor->type();
          }
