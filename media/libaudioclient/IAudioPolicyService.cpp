@@ -857,7 +857,16 @@ status_t BnAudioPolicyService::onTransact(
         case RELEASE_SOUNDTRIGGER_SESSION:
             ALOGW("%s: transaction %d received from PID %d",
                   __func__, code, IPCThreadState::self()->getCallingPid());
-            return INVALID_OPERATION;
+            // return status only for non void methods
+            switch (code) {
+                case RELEASE_OUTPUT:
+                case RELEASE_INPUT:
+                    break;
+                default:
+                    reply->writeInt32(static_cast<int32_t> (INVALID_OPERATION));
+                    break;
+            }
+            return OK;
         default:
             break;
     }
@@ -867,7 +876,6 @@ status_t BnAudioPolicyService::onTransact(
         case SET_DEVICE_CONNECTION_STATE:
         case HANDLE_DEVICE_CONFIG_CHANGE:
         case SET_PHONE_STATE:
-        case SET_RINGER_MODE:
         case SET_FORCE_USE:
         case INIT_STREAM_VOLUME:
         case SET_STREAM_VOLUME:
@@ -879,7 +887,8 @@ status_t BnAudioPolicyService::onTransact(
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
                       IPCThreadState::self()->getCallingUid());
-                return INVALID_OPERATION;
+                reply->writeInt32(static_cast<int32_t> (INVALID_OPERATION));
+                return OK;
             }
         } break;
         default:
