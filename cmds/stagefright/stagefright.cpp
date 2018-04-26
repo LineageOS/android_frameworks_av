@@ -893,7 +893,7 @@ int main(int argc, char **argv) {
                 VideoFrame *frame = (VideoFrame *)mem->pointer();
 
                 CHECK_EQ(writeJpegFile("/sdcard/out.jpg",
-                            (uint8_t *)frame + sizeof(VideoFrame),
+                            frame->getFlattenedData(),
                             frame->mWidth, frame->mHeight), 0);
             }
 

@@ -43,12 +43,12 @@ public:
 
     virtual status_t    setDataSource(int fd, int64_t offset, int64_t length) = 0;
     virtual status_t    setDataSource(const sp<DataSource>& source, const char *mime) = 0;
-    virtual VideoFrame* getFrameAtTime(
+    virtual sp<IMemory> getFrameAtTime(
             int64_t timeUs, int option, int colorFormat, bool metaOnly) = 0;
-    virtual VideoFrame* getImageAtIndex(
+    virtual sp<IMemory> getImageAtIndex(
             int index, int colorFormat, bool metaOnly, bool thumbnail) = 0;
     virtual status_t getFrameAtIndex(
-            std::vector<VideoFrame*>* frames,
+            std::vector<sp<IMemory> >* frames,
             int frameIndex, int numFrames, int colorFormat, bool metaOnly) = 0;
     virtual MediaAlbumArt* extractAlbumArt() = 0;
     virtual const char* extractMetadata(int keyCode) = 0;
@@ -61,14 +61,14 @@ public:
     MediaMetadataRetrieverInterface() {}
 
     virtual             ~MediaMetadataRetrieverInterface() {}
-    virtual VideoFrame* getFrameAtTime(
+    virtual sp<IMemory> getFrameAtTime(
             int64_t /*timeUs*/, int /*option*/, int /*colorFormat*/, bool /*metaOnly*/)
     { return NULL; }
-    virtual VideoFrame* getImageAtIndex(
+    virtual sp<IMemory> getImageAtIndex(
             int /*index*/, int /*colorFormat*/, bool /*metaOnly*/, bool /*thumbnail*/)
     { return NULL; }
     virtual status_t getFrameAtIndex(
-            std::vector<VideoFrame*>* /*frames*/,
+            std::vector<sp<IMemory> >* /*frames*/,
             int /*frameIndex*/, int /*numFrames*/, int /*colorFormat*/, bool /*metaOnly*/)
     { return ERROR_UNSUPPORTED; }
     virtual MediaAlbumArt* extractAlbumArt() { return NULL; }

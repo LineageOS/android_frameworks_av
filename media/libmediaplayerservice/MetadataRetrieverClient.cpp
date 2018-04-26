@@ -194,25 +194,6 @@ status_t MetadataRetrieverClient::setDataSource(
 
 Mutex MetadataRetrieverClient::sLock;
 
-static sp<IMemory> getThumbnail(VideoFrame* frame) {
-    std::unique_ptr<VideoFrame> frameDeleter(frame);
-
-    size_t size = frame->getFlattenedSize();
-    sp<MemoryHeapBase> heap = new MemoryHeapBase(size, 0, "MetadataRetrieverClient");
-    if (heap == NULL) {
-        ALOGE("failed to create MemoryDealer");
-        return NULL;
-    }
-    sp<IMemory> thrumbnail = new MemoryBase(heap, 0, size);
-    if (thrumbnail == NULL) {
-        ALOGE("not enough memory for VideoFrame size=%zu", size);
-        return NULL;
-    }
-    VideoFrame *frameCopy = static_cast<VideoFrame *>(thrumbnail->pointer());
-    frameCopy->copyFlattened(*frame);
-    return thrumbnail;
-}
-
 sp<IMemory> MetadataRetrieverClient::getFrameAtTime(
         int64_t timeUs, int option, int colorFormat, bool metaOnly)
 {
@@ -225,12 +206,12 @@ sp<IMemory> MetadataRetrieverClient::getFrameAtTime(
         ALOGE("retriever is not initialized");
         return NULL;
     }
-    VideoFrame *frame = mRetriever->getFrameAtTime(timeUs, option, colorFormat, metaOnly);
+    sp<IMemory> frame = mRetriever->getFrameAtTime(timeUs, option, colorFormat, metaOnly);
     if (frame == NULL) {
         ALOGE("failed to capture a video frame");
         return NULL;
     }
-    return getThumbnail(frame);
+    return frame;
 }
 
 sp<IMemory> MetadataRetrieverClient::getImageAtIndex(
@@ -244,12 +225,12 @@ sp<IMemory> MetadataRetrieverClient::getImageAtIndex(
         ALOGE("retriever is not initialized");
         return NULL;
     }
-    VideoFrame *frame = mRetriever->getImageAtIndex(index, colorFormat, metaOnly, thumbnail);
+    sp<IMemory> frame = mRetriever->getImageAtIndex(index, colorFormat, metaOnly, thumbnail);
     if (frame == NULL) {
         ALOGE("failed to extract image");
         return NULL;
     }
-    return getThumbnail(frame);
+    return frame;
 }
 
 status_t MetadataRetrieverClient::getFrameAtIndex(
@@ -264,14 +245,11 @@ status_t MetadataRetrieverClient::getFrameAtIndex(
         return INVALID_OPERATION;
     }
 
-    std::vector<VideoFrame*> videoFrames;
     status_t err = mRetriever->getFrameAtIndex(
-            &videoFrames, frameIndex, numFrames, colorFormat, metaOnly);
+            frames, frameIndex, numFrames, colorFormat, metaOnly);
     if (err != OK) {
+        frames->clear();
         return err;
-    }
-    for (size_t i = 0; i < videoFrames.size(); i++) {
-        frames->push_back(getThumbnail(videoFrames[i]));
     }
     return OK;
 }
