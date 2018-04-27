@@ -38,6 +38,7 @@
 #include <android/native_window.h>
 #include "NdkCameraError.h"
 #include "NdkCameraMetadata.h"
+#include "NdkCaptureRequest.h"
 
 #ifndef _NDK_CAMERA_CAPTURE_SESSION_H
 #define _NDK_CAMERA_CAPTURE_SESSION_H
