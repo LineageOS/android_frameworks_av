@@ -230,11 +230,6 @@ public:
             hardware::hidl_version minVersion = hardware::hidl_version{0,0},
             hardware::hidl_version maxVersion = hardware::hidl_version{1000,0}) const;
 
-    /*
-     * Get device name for a particular camera Id
-     */
-    status_t getCameraDeviceName(const std::string& id, std::string& name);
-
 private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
     mutable std::mutex mInterfaceMutex;

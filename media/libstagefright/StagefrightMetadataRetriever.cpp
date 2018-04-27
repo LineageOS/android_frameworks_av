@@ -124,7 +124,7 @@ status_t StagefrightMetadataRetriever::setDataSource(
     return OK;
 }
 
-VideoFrame* StagefrightMetadataRetriever::getImageAtIndex(
+sp<IMemory> StagefrightMetadataRetriever::getImageAtIndex(
         int index, int colorFormat, bool metaOnly, bool thumbnail) {
 
     ALOGV("getImageAtIndex: index(%d) colorFormat(%d) metaOnly(%d) thumbnail(%d)",
@@ -193,7 +193,7 @@ VideoFrame* StagefrightMetadataRetriever::getImageAtIndex(
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
         const AString &componentName = matchingCodecs[i];
         ImageDecoder decoder(componentName, trackMeta, source);
-        VideoFrame* frame = decoder.extractFrame(
+        sp<IMemory> frame = decoder.extractFrame(
                 thumbnail ? -1 : 0 /*frameTimeUs*/, 0 /*seekMode*/, colorFormat);
 
         if (frame != NULL) {
@@ -205,19 +205,19 @@ VideoFrame* StagefrightMetadataRetriever::getImageAtIndex(
     return NULL;
 }
 
-VideoFrame* StagefrightMetadataRetriever::getFrameAtTime(
+sp<IMemory> StagefrightMetadataRetriever::getFrameAtTime(
         int64_t timeUs, int option, int colorFormat, bool metaOnly) {
     ALOGV("getFrameAtTime: %" PRId64 " us option: %d colorFormat: %d, metaOnly: %d",
             timeUs, option, colorFormat, metaOnly);
 
-    VideoFrame *frame;
+    sp<IMemory> frame;
     status_t err = getFrameInternal(
             timeUs, 1, option, colorFormat, metaOnly, &frame, NULL /*outFrames*/);
     return (err == OK) ? frame : NULL;
 }
 
 status_t StagefrightMetadataRetriever::getFrameAtIndex(
-        std::vector<VideoFrame*>* frames,
+        std::vector<sp<IMemory> >* frames,
         int frameIndex, int numFrames, int colorFormat, bool metaOnly) {
     ALOGV("getFrameAtIndex: frameIndex %d, numFrames %d, colorFormat: %d, metaOnly: %d",
             frameIndex, numFrames, colorFormat, metaOnly);
@@ -229,7 +229,7 @@ status_t StagefrightMetadataRetriever::getFrameAtIndex(
 
 status_t StagefrightMetadataRetriever::getFrameInternal(
         int64_t timeUs, int numFrames, int option, int colorFormat, bool metaOnly,
-        VideoFrame **outFrame, std::vector<VideoFrame*>* outFrames) {
+        sp<IMemory>* outFrame, std::vector<sp<IMemory> >* outFrames) {
     if (mExtractor.get() == NULL) {
         ALOGE("no extractor.");
         return NO_INIT;

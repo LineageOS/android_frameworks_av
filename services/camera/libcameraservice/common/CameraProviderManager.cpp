@@ -391,16 +391,6 @@ metadata_vendor_id_t CameraProviderManager::getProviderTagIdLocked(
     return ret;
 }
 
-status_t CameraProviderManager::getCameraDeviceName(const std::string& id, std::string& name) {
-    std::lock_guard<std::mutex> lock(mInterfaceMutex);
-
-    auto deviceInfo = findDeviceInfoLocked(id);
-    if (deviceInfo == nullptr) return NAME_NOT_FOUND;
-
-    name = deviceInfo->mName;
-    return OK;
-}
-
 status_t CameraProviderManager::addProviderLocked(const std::string& newProvider, bool expected) {
     for (const auto& providerInfo : mProviders) {
         if (providerInfo->mProviderName == newProvider) {
@@ -793,6 +783,18 @@ std::unique_ptr<CameraProviderManager::ProviderInfo::DeviceInfo>
                 name.c_str(), statusToString(status));
         return nullptr;
     }
+
+    for (auto& conflictName : resourceCost.conflictingDevices) {
+        uint16_t major, minor;
+        std::string type, id;
+        status_t res = parseDeviceName(conflictName, &major, &minor, &type, &id);
+        if (res != OK) {
+            ALOGE("%s: Failed to parse conflicting device %s", __FUNCTION__, conflictName.c_str());
+            return nullptr;
+        }
+        conflictName = id;
+    }
+
     return std::unique_ptr<DeviceInfo>(
         new DeviceInfoT(name, tagId, id, minorVersion, resourceCost,
                 cameraInterface));
