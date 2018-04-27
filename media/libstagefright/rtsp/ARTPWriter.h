@@ -45,6 +45,7 @@ struct ARTPWriter : public MediaWriter {
     virtual status_t stop();
     virtual status_t pause();
     void updateCVODegrees(int32_t cvoDegrees);
+    void updatePayloadType(int32_t payloadType);
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
     virtual void setTMMBNInfo(uint32_t opponentID, uint32_t bitrate);

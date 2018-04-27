@@ -832,9 +832,14 @@ status_t StagefrightRecorder::setParamVideoOpponentID(int32_t opponentID) {
 }
 
 status_t StagefrightRecorder::setParamPayloadType(int32_t payloadType) {
-    ALOGV("setParamPayloadType: %x", payloadType);
+    ALOGV("setParamPayloadType: %d", payloadType);
 
     mPayloadType = payloadType;
+
+    if (mStarted && mOutputFormat == OUTPUT_FORMAT_RTP_AVP) {
+        mWriter->updatePayloadType(mPayloadType);
+    }
+
     return OK;
 }
 
