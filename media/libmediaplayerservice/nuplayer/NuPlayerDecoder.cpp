@@ -744,6 +744,7 @@ bool NuPlayer::Decoder::handleAnOutputBuffer(
     sp<AMessage> reply = new AMessage(kWhatRenderBuffer, this);
     reply->setSize("buffer-ix", index);
     reply->setInt32("generation", mBufferGeneration);
+    reply->setSize("size", size);
 
     if (eos) {
         ALOGI("[%s] saw output EOS", mIsAudio ? "audio" : "video");
@@ -1116,6 +1117,7 @@ void NuPlayer::Decoder::onRenderBuffer(const sp<AMessage> &msg) {
     int32_t render;
     size_t bufferIx;
     int32_t eos;
+    size_t size;
     CHECK(msg->findSize("buffer-ix", &bufferIx));
 
     if (!mIsAudio) {
@@ -1135,7 +1137,10 @@ void NuPlayer::Decoder::onRenderBuffer(const sp<AMessage> &msg) {
         CHECK(msg->findInt64("timestampNs", &timestampNs));
         err = mCodec->renderOutputBufferAndRelease(bufferIx, timestampNs);
     } else {
-        mNumOutputFramesDropped += !mIsAudio;
+        if (!msg->findInt32("eos", &eos) || !eos ||
+                !msg->findSize("size", &size) || size) {
+            mNumOutputFramesDropped += !mIsAudio;
+        }
         err = mCodec->releaseOutputBuffer(bufferIx);
     }
     if (err != OK) {
