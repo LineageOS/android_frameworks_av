@@ -22,7 +22,6 @@
 #include <android/hidl/manager/1.0/IServiceManager.h>
 
 #include <binder/IMemory.h>
-#include <cutils/native_handle.h>
 #include <hidlmemory/FrameworkUtils.h>
 #include <media/hardware/CryptoAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -243,11 +242,6 @@ int32_t CryptoHal::setHeapBase(const sp<IMemoryHeap>& heap) {
 
     if (heap == NULL) {
         ALOGE("setHeapBase(): heap is NULL");
-        return -1;
-    }
-    native_handle_t* nativeHandle = native_handle_create(1, 0);
-    if (!nativeHandle) {
-        ALOGE("setHeapBase(), failed to create native handle");
         return -1;
     }
 
