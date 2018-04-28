@@ -59,10 +59,15 @@ static inline int16_t clamp16_from_float(float f) {
     return (int16_t) roundf(fmaxf(fminf(f * scale, scale - 1.f), -scale));
 }
 
+// Clip to valid range of a float sample to prevent excessive volume.
+// By using fmin and fmax we also protect against NaN.
+static float clipToMinMaxHeadroom(float input) {
+    return fmin(MAX_HEADROOM, fmax(MIN_HEADROOM, input));
+}
+
 static float clipAndClampFloatToPcm16(float sample, float scaler) {
     // Clip to valid range of a float sample to prevent excessive volume.
-    if (sample > MAX_HEADROOM) sample = MAX_HEADROOM;
-    else if (sample < MIN_HEADROOM) sample = MIN_HEADROOM;
+    sample = clipToMinMaxHeadroom(sample);
 
     // Scale and convert to a short.
     float fval = sample * scaler;
@@ -127,6 +132,7 @@ void AAudioConvert_pcm16ToFloat(const int16_t *source,
     }
 }
 
+
 // This code assumes amplitude1 and amplitude2 are between 0.0 and 1.0
 void AAudio_linearRamp(const float *source,
                        float *destination,
@@ -139,10 +145,8 @@ void AAudio_linearRamp(const float *source,
     for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
         for (int sampleIndex = 0; sampleIndex < samplesPerFrame; sampleIndex++) {
             float sample = *source++;
-
             // Clip to valid range of a float sample to prevent excessive volume.
-            if (sample > MAX_HEADROOM) sample = MAX_HEADROOM;
-            else if (sample < MIN_HEADROOM) sample = MIN_HEADROOM;
+            sample = clipToMinMaxHeadroom(sample);
 
             *destination++ = sample * scaler;
         }
@@ -240,8 +244,7 @@ void AAudio_linearRampMonoToStereo(const float *source,
         float sample = *source++;
 
         // Clip to valid range of a float sample to prevent excessive volume.
-        if (sample > MAX_HEADROOM) sample = MAX_HEADROOM;
-        else if (sample < MIN_HEADROOM) sample = MIN_HEADROOM;
+        sample = clipToMinMaxHeadroom(sample);
 
         const float scaler = amplitude1 + (frameIndex * delta);
         float sampleScaled = sample * scaler;
