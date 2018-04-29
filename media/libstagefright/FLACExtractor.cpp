@@ -585,6 +585,8 @@ status_t FLACParser::init()
         case 48000:
         case 88200:
         case 96000:
+        case 176400:
+        case 192000:
             break;
         default:
             ALOGE("unsupported sample rate %u", getSampleRate());
