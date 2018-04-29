@@ -17,12 +17,11 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "FrameDecoder"
 
-#include <inttypes.h>
-
-#include <utils/Log.h>
-#include <gui/Surface.h>
-
 #include "include/FrameDecoder.h"
+#include <binder/MemoryBase.h>
+#include <binder/MemoryHeapBase.h>
+#include <gui/Surface.h>
+#include <inttypes.h>
 #include <media/ICrypto.h>
 #include <media/IMediaSource.h>
 #include <media/MediaCodecBuffer.h>
@@ -36,14 +35,15 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/Utils.h>
 #include <private/media/VideoFrame.h>
+#include <utils/Log.h>
 
 namespace android {
 
-static const int64_t kBufferTimeOutUs = 30000ll; // 30 msec
-static const size_t kRetryCount = 20; // must be >0
+static const int64_t kBufferTimeOutUs = 10000ll; // 10 msec
+static const size_t kRetryCount = 50; // must be >0
 
 //static
-VideoFrame *allocVideoFrame(const sp<MetaData> &trackMeta,
+sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         int32_t width, int32_t height, int32_t dstBpp, bool metaOnly = false) {
     int32_t rotationAngle;
     if (!trackMeta->findInt32(kKeyRotation, &rotationAngle)) {
@@ -74,8 +74,24 @@ VideoFrame *allocVideoFrame(const sp<MetaData> &trackMeta,
         displayHeight = height;
     }
 
-    return new VideoFrame(width, height, displayWidth, displayHeight,
-            rotationAngle, dstBpp, !metaOnly, iccData, iccSize);
+    VideoFrame frame(width, height, displayWidth, displayHeight,
+            rotationAngle, dstBpp, !metaOnly, iccSize);
+
+    size_t size = frame.getFlattenedSize();
+    sp<MemoryHeapBase> heap = new MemoryHeapBase(size, 0, "MetadataRetrieverClient");
+    if (heap == NULL) {
+        ALOGE("failed to create MemoryDealer");
+        return NULL;
+    }
+    sp<IMemory> frameMem = new MemoryBase(heap, 0, size);
+    if (frameMem == NULL) {
+        ALOGE("not enough memory for VideoFrame size=%zu", size);
+        return NULL;
+    }
+    VideoFrame* frameCopy = static_cast<VideoFrame*>(frameMem->pointer());
+    frameCopy->init(frame, iccData, iccSize);
+
+    return frameMem;
 }
 
 //static
@@ -92,7 +108,7 @@ bool findThumbnailInfo(
 }
 
 //static
-VideoFrame* FrameDecoder::getMetadataOnly(
+sp<IMemory> FrameDecoder::getMetadataOnly(
         const sp<MetaData> &trackMeta, int colorFormat, bool thumbnail) {
     OMX_COLOR_FORMATTYPE dstFormat;
     int32_t dstBpp;
@@ -146,7 +162,7 @@ bool FrameDecoder::getDstColorFormat(
     return false;
 }
 
-VideoFrame* FrameDecoder::extractFrame(
+sp<IMemory> FrameDecoder::extractFrame(
         int64_t frameTimeUs, int option, int colorFormat) {
     if (!getDstColorFormat(
             (android_pixel_format_t)colorFormat, &mDstFormat, &mDstBpp)) {
@@ -158,12 +174,12 @@ VideoFrame* FrameDecoder::extractFrame(
         return NULL;
     }
 
-    return mFrames.size() > 0 ? mFrames[0].release() : NULL;
+    return mFrames.size() > 0 ? mFrames[0] : NULL;
 }
 
 status_t FrameDecoder::extractFrames(
         int64_t frameTimeUs, size_t numFrames, int option, int colorFormat,
-        std::vector<VideoFrame*>* frames) {
+        std::vector<sp<IMemory> >* frames) {
     if (!getDstColorFormat(
             (android_pixel_format_t)colorFormat, &mDstFormat, &mDstBpp)) {
         return ERROR_UNSUPPORTED;
@@ -175,7 +191,7 @@ status_t FrameDecoder::extractFrames(
     }
 
     for (size_t i = 0; i < mFrames.size(); i++) {
-        frames->push_back(mFrames[i].release());
+        frames->push_back(mFrames[i]);
     }
     return OK;
 }
@@ -253,10 +269,13 @@ status_t FrameDecoder::extractInternal(
         uint32_t flags = 0;
         sp<MediaCodecBuffer> codecBuffer = NULL;
 
+        // Queue as many inputs as we possibly can, then block on dequeuing
+        // outputs. After getting each output, come back and queue the inputs
+        // again to keep the decoder busy.
         while (haveMoreInputs) {
-            err = decoder->dequeueInputBuffer(&inputIndex, kBufferTimeOutUs);
+            err = decoder->dequeueInputBuffer(&inputIndex, 0);
             if (err != OK) {
-                ALOGW("Timed out waiting for input");
+                ALOGV("Timed out waiting for input");
                 if (retriesLeft) {
                     err = OK;
                 }
@@ -295,27 +314,21 @@ status_t FrameDecoder::extractInternal(
             }
 
             mediaBuffer->release();
-            break;
-        }
 
-        if (haveMoreInputs && inputIndex < inputBuffers.size()) {
-            ALOGV("QueueInput: size=%zu ts=%" PRId64 " us flags=%x",
-                    codecBuffer->size(), ptsUs, flags);
+            if (haveMoreInputs && inputIndex < inputBuffers.size()) {
+                ALOGV("QueueInput: size=%zu ts=%" PRId64 " us flags=%x",
+                        codecBuffer->size(), ptsUs, flags);
 
-            err = decoder->queueInputBuffer(
-                    inputIndex,
-                    codecBuffer->offset(),
-                    codecBuffer->size(),
-                    ptsUs,
-                    flags);
+                err = decoder->queueInputBuffer(
+                        inputIndex,
+                        codecBuffer->offset(),
+                        codecBuffer->size(),
+                        ptsUs,
+                        flags);
 
-            if (flags & MediaCodec::BUFFER_FLAG_EOS) {
-                haveMoreInputs = false;
-            }
-
-            // we don't expect an output from codec config buffer
-            if (flags & MediaCodec::BUFFER_FLAG_CODECCONFIG) {
-                continue;
+                if (flags & MediaCodec::BUFFER_FLAG_EOS) {
+                    haveMoreInputs = false;
+                }
             }
         }
 
@@ -468,12 +481,13 @@ status_t VideoFrameDecoder::onOutputReceived(
         crop_bottom = height - 1;
     }
 
-    VideoFrame *frame = allocVideoFrame(
+    sp<IMemory> frameMem = allocVideoFrame(
             trackMeta(),
             (crop_right - crop_left + 1),
             (crop_bottom - crop_top + 1),
             dstBpp());
-    addFrame(frame);
+    addFrame(frameMem);
+    VideoFrame* frame = static_cast<VideoFrame*>(frameMem->pointer());
 
     int32_t srcFormat;
     CHECK(outputFormat->findInt32("color-format", &srcFormat));
@@ -485,7 +499,7 @@ status_t VideoFrameDecoder::onOutputReceived(
                 (const uint8_t *)videoFrameBuffer->data(),
                 width, height,
                 crop_left, crop_top, crop_right, crop_bottom,
-                frame->mData,
+                frame->getFlattenedData(),
                 frame->mWidth,
                 frame->mHeight,
                 crop_left, crop_top, crop_right, crop_bottom);
@@ -596,9 +610,10 @@ status_t ImageDecoder::onOutputReceived(
     }
 
     if (mFrame == NULL) {
-        mFrame = allocVideoFrame(trackMeta(), imageWidth, imageHeight, dstBpp());
+        sp<IMemory> frameMem = allocVideoFrame(trackMeta(), imageWidth, imageHeight, dstBpp());
+        mFrame = static_cast<VideoFrame*>(frameMem->pointer());
 
-        addFrame(mFrame);
+        addFrame(frameMem);
     }
 
     int32_t srcFormat;
@@ -639,7 +654,7 @@ status_t ImageDecoder::onOutputReceived(
                 (const uint8_t *)videoFrameBuffer->data(),
                 width, height,
                 crop_left, crop_top, crop_right, crop_bottom,
-                mFrame->mData,
+                mFrame->getFlattenedData(),
                 mFrame->mWidth,
                 mFrame->mHeight,
                 dstLeft, dstTop, dstRight, dstBottom);
