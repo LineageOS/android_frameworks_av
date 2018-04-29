@@ -91,6 +91,30 @@
       "revId": "5220ad5accc2101fd8efc9d3062fb041e56bcf16",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "407646f8_5be43207",
+        "filename": "media/libstagefright/FLACExtractor.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 592,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2018-04-29T21:44:10Z",
+      "side": 1,
+      "message": "This is legit, I\u0027ve seen it in the wild",
+      "parentUuid": "f54cd40b_0fdd5951",
+      "range": {
+        "startLine": 592,
+        "startChar": 13,
+        "endLine": 592,
+        "endChar": 19
+      },
+      "revId": "5220ad5accc2101fd8efc9d3062fb041e56bcf16",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
