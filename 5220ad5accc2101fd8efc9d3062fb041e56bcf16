@@ -133,6 +133,24 @@
       "revId": "5220ad5accc2101fd8efc9d3062fb041e56bcf16",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "132064c7_1bd18bc1",
+        "filename": "media/libstagefright/FLACExtractor.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 592,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2018-04-29T21:47:21Z",
+      "side": 1,
+      "message": "It\u0027s legit: https://www.head-fi.org/threads/96-192khz-better-than-88-2-176-4khz.138327/",
+      "parentUuid": "6acefc33_bc36b526",
+      "revId": "5220ad5accc2101fd8efc9d3062fb041e56bcf16",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
