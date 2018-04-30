@@ -941,6 +941,20 @@ status_t ARTPConnection::parsePSFB(
             ALOGI("PLI detected.");
             break;
         }
+        case 4:     // Full Intra Request (FIR)
+        {
+            uint32_t requestedId = u32at(&data[12]);
+            if (requestedId == (uint32_t)mSelfID) {
+                sp<AMessage> notify = s->mNotifyMsg->dup();
+                notify->setInt32("IMS-Rx-notice", 1);
+                notify->setInt32("payload-type", 206);
+                notify->setInt32("feedback-type", msgType);
+                notify->setInt32("sender", id);
+                notify->post();
+                ALOGI("FIR detected.");
+            }
+            break;
+        }
         default:
         {
             ALOGI("Not supported PSFB type %d", msgType);

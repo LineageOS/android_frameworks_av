@@ -448,6 +448,16 @@ status_t MediaCodecSource::setEncodingBitrate(int32_t bitRate) {
     return mEncoder->setParameters(params);
 }
 
+status_t MediaCodecSource::requestIDRFrame() {
+    if (mEncoder == NULL) {
+        ALOGW("requestIDRFrame : mEncoder is null");
+        return BAD_VALUE;
+    } else {
+        mEncoder->requestIDRFrame();
+        return OK;
+    }
+}
+
 MediaCodecSource::MediaCodecSource(
         const sp<ALooper> &looper,
         const sp<AMessage> &outputFormat,

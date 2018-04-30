@@ -858,6 +858,16 @@ status_t StagefrightRecorder::setRTPCVODegrees(int32_t cvoDegrees) {
     return OK;
 }
 
+status_t StagefrightRecorder::requestIDRFrame() {
+    status_t ret = BAD_VALUE;
+    if (mVideoEncoderSource != NULL) {
+        ret = mVideoEncoderSource->requestIDRFrame();
+    } else {
+        ALOGV("requestIDRFrame: Encoder not ready");
+    }
+    return ret;
+}
+
 status_t StagefrightRecorder::setParameter(
         const String8 &key, const String8 &value) {
     ALOGV("setParameter: key (%s) => value (%s)", key.string(), value.string());
@@ -1002,6 +1012,8 @@ status_t StagefrightRecorder::setParameter(
         if (safe_strtoi32(value.string(), &degrees)) {
             return setRTPCVODegrees(degrees);
         }
+    } else if (key == "video-param-request-i-frame") {
+        return requestIDRFrame();
     } else {
         ALOGE("setParameter: failed to find key %s", key.string());
     }

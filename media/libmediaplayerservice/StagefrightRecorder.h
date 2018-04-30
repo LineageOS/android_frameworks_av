@@ -237,6 +237,7 @@ private:
     status_t setParamPayloadType(int32_t payloadType);
     status_t setRTPCVOExtMap(int32_t extmap);
     status_t setRTPCVODegrees(int32_t cvoDegrees);
+    status_t requestIDRFrame();
     void clipVideoBitRate();
     void clipVideoFrameRate();
     void clipVideoFrameWidth();

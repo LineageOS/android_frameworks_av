@@ -71,6 +71,8 @@ struct MediaCodecSource : public MediaSource,
 
 
 
+    status_t requestIDRFrame();
+
 protected:
     virtual ~MediaCodecSource();
 
