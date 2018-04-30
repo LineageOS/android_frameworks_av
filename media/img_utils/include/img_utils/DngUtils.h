@@ -39,11 +39,16 @@ namespace img_utils {
  */
 class ANDROID_API OpcodeListBuilder : public LightRefBase<OpcodeListBuilder> {
     public:
+        // Note that the Adobe DNG 1.4 spec for Bayer phase (defined for the
+        // FixBadPixelsConstant and FixBadPixelsList opcodes) is incorrect. It's
+        // inconsistent with the DNG SDK (cf. dng_negative::SetBayerMosaic and
+        // dng_opcode_FixBadPixelsList::IsGreen), and Adobe confirms that the
+        // spec should be updated to match the SDK.
         enum CfaLayout {
-            CFA_RGGB = 0,
-            CFA_GRBG,
-            CFA_GBRG,
+            CFA_GRBG = 0,
+            CFA_RGGB,
             CFA_BGGR,
+            CFA_GBRG,
         };
 
         OpcodeListBuilder();
