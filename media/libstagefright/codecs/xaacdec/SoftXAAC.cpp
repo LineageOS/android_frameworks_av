@@ -838,17 +838,17 @@ void SoftXAAC::configflushDecode() {
                                 IA_API_CMD_SET_INPUT_BYTES,
                                 0,
                                 &inBufferLength);
-    
+
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_INIT,
                                 IA_CMD_TYPE_FLUSH_MEM,
                                 NULL);
-    
+
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_INIT,
                                 IA_CMD_TYPE_INIT_DONE_QUERY,
                                 &ui_init_done);
-    
+
     ALOGV("Flush called");
 
     if (ui_init_done) {
@@ -918,7 +918,6 @@ int SoftXAAC::initXAACDecoder() {
     /* Get memory information and allocate memory        */
 
     /* Memory variables */
-    UWORD32 n_mems, ui_rem;
     UWORD32 ui_proc_mem_tabs_size;
     /* API size */
     UWORD32 pui_ap_isize;
@@ -999,15 +998,9 @@ int SoftXAAC::initXAACDecoder() {
     /* ******************************************************************/
     /* Allocate Memory with info from library                           */
     /* ******************************************************************/
-
-    /* Get number of memory tables required */
-    err_code = ixheaacd_dec_api(mXheaacCodecHandle,
-                                IA_API_CMD_GET_N_MEMTABS,
-                                0,
-                                &n_mems);
-    ALOGV("return code of IA_API_CMD_GET_N_MEMTABS: %d",err_code);
-
-    for(i = 0; i < (WORD32)n_mems; i++) {
+    /* There are four different types of memories, that needs to be allocated */
+    /* persistent,scratch,input and output */
+    for(i = 0; i < 4; i++) {
         int ui_size = 0, ui_alignment = 0, ui_type = 0;
         pVOID pv_alloc_ptr;
 
