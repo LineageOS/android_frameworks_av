@@ -495,7 +495,7 @@ public:
     }
 
     void printStatus() override {
-        printf("state = %d, echo gain = %f ", mState, mEchoGain);
+        printf("st = %d, echo gain = %f ", mState, mEchoGain);
     }
 
     static void sendImpulse(float *outputData, int outputChannelCount) {
@@ -670,7 +670,7 @@ public:
         printf(LOOPBACK_RESULT_TAG "phase.offset       = %7.5f\n", mPhaseOffset);
         printf(LOOPBACK_RESULT_TAG "ref.phase          = %7.5f\n", mPhase);
         printf(LOOPBACK_RESULT_TAG "frames.accumulated = %6d\n", mFramesAccumulated);
-        printf(LOOPBACK_RESULT_TAG "sine.period        = %6d\n", mPeriod);
+        printf(LOOPBACK_RESULT_TAG "sine.period        = %6d\n", mSinePeriod);
         printf(LOOPBACK_RESULT_TAG "test.state         = %6d\n", mState);
         printf(LOOPBACK_RESULT_TAG "frame.count        = %6d\n", mFrameCounter);
         // Did we ever get a lock?
@@ -684,7 +684,7 @@ public:
     }
 
     void printStatus() override {
-        printf("  state = %d, glitches = %3d,", mState, mGlitchCount);
+        printf("st = %d, #gl = %3d,", mState, mGlitchCount);
     }
 
     double calculateMagnitude(double *phasePtr = NULL) {
@@ -709,6 +709,8 @@ public:
     void process(float *inputData, int inputChannelCount,
                  float *outputData, int outputChannelCount,
                  int numFrames) override {
+        mProcessCount++;
+
         float peak = measurePeakAmplitude(inputData, inputChannelCount, numFrames);
         if (peak > mPeakAmplitude) {
             mPeakAmplitude = peak;
@@ -720,6 +722,7 @@ public:
             float sinOut = sinf(mPhase);
 
             switch (mState) {
+                case STATE_IDLE:
                 case STATE_IMMUNE:
                 case STATE_WAITING_FOR_SIGNAL:
                     break;
@@ -728,7 +731,7 @@ public:
                     mCosAccumulator += sample * cosf(mPhase);
                     mFramesAccumulated++;
                     // Must be a multiple of the period or the calculation will not be accurate.
-                    if (mFramesAccumulated == mPeriod * 4) {
+                    if (mFramesAccumulated == mSinePeriod * PERIODS_NEEDED_FOR_LOCK) {
                         mPhaseOffset = 0.0;
                         mMagnitude = calculateMagnitude(&mPhaseOffset);
                         if (mMagnitude > mThreshold) {
@@ -754,7 +757,22 @@ public:
                         //       mFrameCounter, mGlitchCount, predicted, sample);
                         mState = STATE_IMMUNE;
                         //printf("%5d: switch to STATE_IMMUNE\n", mFrameCounter);
-                        mDownCounter = mPeriod;  // Set duration of IMMUNE state.
+                        mDownCounter = mSinePeriod;  // Set duration of IMMUNE state.
+                    }
+
+                    // Track incoming signal and slowly adjust magnitude to account
+                    // for drift in the DRC or AGC.
+                    mSinAccumulator += sample * sinOut;
+                    mCosAccumulator += sample * cosf(mPhase);
+                    mFramesAccumulated++;
+                    // Must be a multiple of the period or the calculation will not be accurate.
+                    if (mFramesAccumulated == mSinePeriod) {
+                        const double coefficient = 0.1;
+                        double phaseOffset = 0.0;
+                        double magnitude = calculateMagnitude(&phaseOffset);
+                        // One pole averaging filter.
+                        mMagnitude = (mMagnitude * (1.0 - coefficient)) + (magnitude * coefficient);
+                        resetAccumulator();
                     }
                 } break;
             }
@@ -775,6 +793,9 @@ public:
 
         // Do these once per buffer.
         switch (mState) {
+            case STATE_IDLE:
+                mState = STATE_IMMUNE; // so we can tell when
+                break;
             case STATE_IMMUNE:
                 mDownCounter -= numFrames;
                 if (mDownCounter <= 0) {
@@ -805,21 +826,29 @@ public:
     void reset() override {
         mGlitchCount = 0;
         mState = STATE_IMMUNE;
-        mPhaseIncrement = 2.0 * M_PI / mPeriod;
-        printf("phaseInc = %f for period %d\n", mPhaseIncrement, mPeriod);
+        mDownCounter = IMMUNE_FRAME_COUNT;
+        mPhaseIncrement = 2.0 * M_PI / mSinePeriod;
+        printf("phaseInc = %f for period %d\n", mPhaseIncrement, mSinePeriod);
         resetAccumulator();
+        mProcessCount = 0;
     }
 
 private:
 
     enum sine_state_t {
+        STATE_IDLE,
         STATE_IMMUNE,
         STATE_WAITING_FOR_SIGNAL,
         STATE_WAITING_FOR_LOCK,
         STATE_LOCKED
     };
 
-    int     mPeriod = 79;
+    enum constants {
+        IMMUNE_FRAME_COUNT = 48 * 500,
+        PERIODS_NEEDED_FOR_LOCK = 8
+    };
+
+    int     mSinePeriod = 79;
     double  mPhaseIncrement = 0.0;
     double  mPhase = 0.0;
     double  mPhaseOffset = 0.0;
@@ -828,18 +857,19 @@ private:
     double  mThreshold = 0.005;
     double  mTolerance = 0.01;
     int32_t mFramesAccumulated = 0;
+    int32_t mProcessCount = 0;
     double  mSinAccumulator = 0.0;
     double  mCosAccumulator = 0.0;
     int32_t mGlitchCount = 0;
     double  mPeakAmplitude = 0.0;
-    int     mDownCounter = 4000;
+    int     mDownCounter = IMMUNE_FRAME_COUNT;
     int32_t mFrameCounter = 0;
     float   mOutputAmplitude = 0.75;
 
     PseudoRandom  mWhiteNoise;
     float   mNoiseAmplitude = 0.00; // Used to experiment with warbling caused by DRC.
 
-    sine_state_t  mState = STATE_IMMUNE;
+    sine_state_t  mState = STATE_IDLE;
 };
 
 
