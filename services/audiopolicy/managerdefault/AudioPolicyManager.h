@@ -628,7 +628,6 @@ private:
                 audio_devices_t device,
                 audio_session_t session,
                 audio_stream_type_t stream,
-                audio_io_handle_t originalOutput,
                 const audio_config_t *config,
                 audio_output_flags_t *flags);
         // internal method to return the input handle for the given device and format

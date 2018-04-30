@@ -822,7 +822,7 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
           "flags %#x",
           device, config->sample_rate, config->format, config->channel_mask, *flags);
 
-    *output = getOutputForDevice(device, session, *stream, *output, config, flags);
+    *output = getOutputForDevice(device, session, *stream, config, flags);
     if (*output == AUDIO_IO_HANDLE_NONE) {
         mOutputRoutes.removeRoute(session);
         return INVALID_OPERATION;
@@ -841,11 +841,10 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
         audio_devices_t device,
         audio_session_t session,
         audio_stream_type_t stream,
-        audio_io_handle_t originalOutput,
         const audio_config_t *config,
         audio_output_flags_t *flags)
 {
-    audio_io_handle_t output = originalOutput;
+    audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
     status_t status;
 
     // open a direct output if required by specified parameters
@@ -909,22 +908,20 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
     }
 
     if (profile != 0) {
-        // exclude MMAP streams
-        if ((*flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) == 0 || output != AUDIO_IO_HANDLE_NONE) {
-            for (size_t i = 0; i < mOutputs.size(); i++) {
-                sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
-                if (!desc->isDuplicated() && (profile == desc->mProfile)) {
-                    // reuse direct output if currently open by the same client
-                    // and configured with same parameters
-                    if ((config->sample_rate == desc->mSamplingRate) &&
-                        audio_formats_match(config->format, desc->mFormat) &&
-                        (config->channel_mask == desc->mChannelMask) &&
-                        (session == desc->mDirectClientSession)) {
-                        desc->mDirectOpenCount++;
-                        ALOGI("getOutputForDevice() reusing direct output %d for session %d",
-                              mOutputs.keyAt(i), session);
-                        return mOutputs.keyAt(i);
-                    }
+        // exclusive outputs for MMAP and Offload are enforced by different session ids.
+        for (size_t i = 0; i < mOutputs.size(); i++) {
+            sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
+            if (!desc->isDuplicated() && (profile == desc->mProfile)) {
+                // reuse direct output if currently open by the same client
+                // and configured with same parameters
+                if ((config->sample_rate == desc->mSamplingRate) &&
+                    audio_formats_match(config->format, desc->mFormat) &&
+                    (config->channel_mask == desc->mChannelMask) &&
+                    (session == desc->mDirectClientSession)) {
+                    desc->mDirectOpenCount++;
+                    ALOGI("getOutputForDevice() reusing direct output %d for session %d",
+                        mOutputs.keyAt(i), session);
+                    return mOutputs.keyAt(i);
                 }
             }
         }
