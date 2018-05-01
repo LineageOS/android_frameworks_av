@@ -49,9 +49,9 @@ public:
 
     virtual aaudio_result_t close() = 0;
 
-    virtual aaudio_result_t registerStream(android::sp<AAudioServiceStreamBase> stream);
+    aaudio_result_t registerStream(android::sp<AAudioServiceStreamBase> stream);
 
-    virtual aaudio_result_t unregisterStream(android::sp<AAudioServiceStreamBase> stream);
+    aaudio_result_t unregisterStream(android::sp<AAudioServiceStreamBase> stream);
 
     virtual aaudio_result_t startStream(android::sp<AAudioServiceStreamBase> stream,
                                         audio_port_handle_t *clientHandle) = 0;
