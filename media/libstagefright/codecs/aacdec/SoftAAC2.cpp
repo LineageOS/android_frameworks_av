@@ -36,6 +36,7 @@
 #define DRC_DEFAULT_MOBILE_DRC_CUT   127 /* maximum compression of dynamic range for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_BOOST 127 /* maximum compression of dynamic range for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_HEAVY 1   /* switch for heavy compression for mobile conf */
+#define DRC_DEFAULT_MOBILE_DRC_EFFECT 3  /* MPEG-D DRC effect type; 3 => Limited playback range */
 #define DRC_DEFAULT_MOBILE_ENC_LEVEL (-1) /* encoder target level; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
 #define MAX_CHANNEL_COUNT            8  /* maximum number of audio channels that can be decoded */
 // names of properties that can be used to override the default DRC settings
@@ -44,6 +45,7 @@
 #define PROP_DRC_OVERRIDE_BOOST      "aac_drc_boost"
 #define PROP_DRC_OVERRIDE_HEAVY      "aac_drc_heavy"
 #define PROP_DRC_OVERRIDE_ENC_LEVEL "aac_drc_enc_target_level"
+#define PROP_DRC_OVERRIDE_EFFECT     "aac_drc_effect_type"
 
 namespace android {
 
@@ -207,6 +209,17 @@ status_t SoftAAC2::initDecoder() {
     } else {
         mDrcWrap.setParam(DRC_PRES_MODE_WRAP_ENCODER_TARGET, DRC_DEFAULT_MOBILE_ENC_LEVEL);
     }
+    // AAC_UNIDRC_SET_EFFECT
+    int32_t effectType = DRC_DEFAULT_MOBILE_DRC_EFFECT;
+    // FIXME can't read default property for DRC effect type
+    //int32_t effectType =
+    //        property_get_int32(PROP_DRC_OVERRIDE_EFFECT, DRC_DEFAULT_MOBILE_DRC_EFFECT);
+    if (effectType < -1 || effectType > 8) {
+        effectType = DRC_DEFAULT_MOBILE_DRC_EFFECT;
+    }
+    ALOGV("AAC decoder using MPEG-D DRC effect type %d (default=%d)",
+            effectType, DRC_DEFAULT_MOBILE_DRC_EFFECT);
+    aacDecoder_SetParam(mAACDecoder, AAC_UNIDRC_SET_EFFECT, effectType);
 
     // By default, the decoder creates a 5.1 channel downmix signal.
     // For seven and eight channel input streams, enable 6.1 and 7.1 channel output
@@ -414,10 +427,10 @@ OMX_ERRORTYPE SoftAAC2::internalSetParameter(
             return OMX_ErrorNone;
         }
 
-        case OMX_IndexParamAudioAndroidAacPresentation:
+        case OMX_IndexParamAudioAndroidAacDrcPresentation:
         {
-            const OMX_AUDIO_PARAM_ANDROID_AACPRESENTATIONTYPE *aacPresParams =
-                    (const OMX_AUDIO_PARAM_ANDROID_AACPRESENTATIONTYPE *)params;
+            const OMX_AUDIO_PARAM_ANDROID_AACDRCPRESENTATIONTYPE *aacPresParams =
+                    (const OMX_AUDIO_PARAM_ANDROID_AACDRCPRESENTATIONTYPE *)params;
 
             if (!isValidOMXParam(aacPresParams)) {
                 return OMX_ErrorBadParameter;
@@ -442,6 +455,10 @@ OMX_ERRORTYPE SoftAAC2::internalSetParameter(
                 }
                 ALOGV("set nMaxOutputChannels=%d", max);
                 aacDecoder_SetParam(mAACDecoder, AAC_PCM_MAX_OUTPUT_CHANNELS, max);
+            }
+            if (aacPresParams->nDrcEffectType >= -1) {
+                ALOGV("set nDrcEffectType=%d", aacPresParams->nDrcEffectType);
+                aacDecoder_SetParam(mAACDecoder, AAC_UNIDRC_SET_EFFECT, aacPresParams->nDrcEffectType);
             }
             bool updateDrcWrapper = false;
             if (aacPresParams->nDrcBoost >= 0) {
