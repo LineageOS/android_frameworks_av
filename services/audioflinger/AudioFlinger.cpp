@@ -159,6 +159,7 @@ AudioFlinger::AudioFlinger()
       mTotalMemory(0),
       mClientSharedHeapSize(kMinimumClientSharedHeapSizeBytes),
       mGlobalEffectEnableTime(0),
+      mPatchPanel(this),
       mSystemReady(false)
 {
     // unsigned instead of audio_unique_id_use_t, because ++ operator is unavailable for enum
@@ -224,8 +225,6 @@ void AudioFlinger::onFirstRef()
                     (uint32_t)(mStandbyTimeInNsecs / 1000000));
         }
     }
-
-    mPatchPanel = new PatchPanel(this);
 
     mMode = AUDIO_MODE_NORMAL;
 
@@ -1926,6 +1925,28 @@ size_t AudioFlinger::getClientSharedHeapSize() const
         return heapSizeInBytes;
     }
     return mClientSharedHeapSize;
+}
+
+status_t AudioFlinger::setAudioPortConfig(const struct audio_port_config *config)
+{
+    ALOGV(__func__);
+
+    audio_module_handle_t module;
+    if (config->type == AUDIO_PORT_TYPE_DEVICE) {
+        module = config->ext.device.hw_module;
+    } else {
+        module = config->ext.mix.hw_module;
+    }
+
+    Mutex::Autolock _l(mLock);
+    ssize_t index = mAudioHwDevs.indexOfKey(module);
+    if (index < 0) {
+        ALOGW("%s() bad hw module %d", __func__, module);
+        return BAD_VALUE;
+    }
+
+    AudioHwDevice *audioHwDevice = mAudioHwDevs.valueAt(index);
+    return audioHwDevice->hwDevice()->setAudioPortConfig(config);
 }
 
 audio_hw_sync_t AudioFlinger::getAudioHwSyncForSession(audio_session_t sessionId)
