@@ -915,7 +915,7 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
                 // reuse direct output if currently open by the same client
                 // and configured with same parameters
                 if ((config->sample_rate == desc->mSamplingRate) &&
-                    audio_formats_match(config->format, desc->mFormat) &&
+                    (config->format == desc->mFormat) &&
                     (config->channel_mask == desc->mChannelMask) &&
                     (session == desc->mDirectClientSession)) {
                     desc->mDirectOpenCount++;
@@ -942,8 +942,7 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
         // only accept an output with the requested parameters
         if (status != NO_ERROR ||
             (config->sample_rate != 0 && config->sample_rate != outputDesc->mSamplingRate) ||
-            (config->format != AUDIO_FORMAT_DEFAULT &&
-                    !audio_formats_match(config->format, outputDesc->mFormat)) ||
+            (config->format != AUDIO_FORMAT_DEFAULT && config->format != outputDesc->mFormat) ||
             (config->channel_mask != 0 && config->channel_mask != outputDesc->mChannelMask)) {
             ALOGV("getOutputForDevice() failed opening direct output: output %d sample rate %d %d,"
                     "format %d %d, channel mask %04x %04x", output, config->sample_rate,
@@ -1032,7 +1031,7 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
             // if a valid format is specified, skip output if not compatible
             if (format != AUDIO_FORMAT_INVALID) {
                 if (outputDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) {
-                    if (!audio_formats_match(format, outputDesc->mFormat)) {
+                    if (format != outputDesc->mFormat) {
                         continue;
                     }
                 } else if (!audio_is_linear_pcm(format)) {
