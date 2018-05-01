@@ -128,6 +128,11 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
 
     const AAudioStreamConfiguration &configurationInput = request.getConstantConfiguration();
 
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        result = AAUDIO_ERROR_INVALID_STATE;
+        goto error;
+    }
 
     // Is the request compatible with the shared endpoint?
     setFormat(configurationInput.getFormat());
@@ -141,20 +146,20 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
 
     setSampleRate(configurationInput.getSampleRate());
     if (getSampleRate() == AAUDIO_UNSPECIFIED) {
-        setSampleRate(mServiceEndpoint->getSampleRate());
-    } else if (getSampleRate() != mServiceEndpoint->getSampleRate()) {
+        setSampleRate(endpoint->getSampleRate());
+    } else if (getSampleRate() != endpoint->getSampleRate()) {
         ALOGE("AAudioServiceStreamShared::open() mSampleRate = %d, need %d",
-              getSampleRate(), mServiceEndpoint->getSampleRate());
+              getSampleRate(), endpoint->getSampleRate());
         result = AAUDIO_ERROR_INVALID_RATE;
         goto error;
     }
 
     setSamplesPerFrame(configurationInput.getSamplesPerFrame());
     if (getSamplesPerFrame() == AAUDIO_UNSPECIFIED) {
-        setSamplesPerFrame(mServiceEndpoint->getSamplesPerFrame());
-    } else if (getSamplesPerFrame() != mServiceEndpoint->getSamplesPerFrame()) {
+        setSamplesPerFrame(endpoint->getSamplesPerFrame());
+    } else if (getSamplesPerFrame() != endpoint->getSamplesPerFrame()) {
         ALOGE("AAudioServiceStreamShared::open() mSamplesPerFrame = %d, need %d",
-              getSamplesPerFrame(), mServiceEndpoint->getSamplesPerFrame());
+              getSamplesPerFrame(), endpoint->getSamplesPerFrame());
         result = AAUDIO_ERROR_OUT_OF_RANGE;
         goto error;
     }
@@ -181,9 +186,9 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     }
 
     ALOGD("AAudioServiceStreamShared::open() actual rate = %d, channels = %d, deviceId = %d",
-          getSampleRate(), getSamplesPerFrame(), mServiceEndpoint->getDeviceId());
+          getSampleRate(), getSamplesPerFrame(), endpoint->getDeviceId());
 
-    result = mServiceEndpoint->registerStream(keep);
+    result = endpoint->registerStream(keep);
     if (result != AAUDIO_OK) {
         goto error;
     }
@@ -250,7 +255,13 @@ aaudio_result_t AAudioServiceStreamShared::getHardwareTimestamp(int64_t *positio
                                                                 int64_t *timeNanos) {
 
     int64_t position = 0;
-    aaudio_result_t result = mServiceEndpoint->getTimestamp(&position, timeNanos);
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        ALOGE("%s() has no endpoint", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+
+    aaudio_result_t result = endpoint->getTimestamp(&position, timeNanos);
     if (result == AAUDIO_OK) {
         int64_t offset = mTimestampPositionOffset.load();
         // TODO, do not go below starting value

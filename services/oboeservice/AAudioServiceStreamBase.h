@@ -233,7 +233,12 @@ protected:
     SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
 
     android::AAudioService &mAudioService;
+
+    // The mServiceEndpoint variable can be accessed by multiple threads.
+    // So we access it by locally promoting a weak pointer to a smart pointer,
+    // which is thread-safe.
     android::sp<AAudioServiceEndpoint> mServiceEndpoint;
+    android::wp<AAudioServiceEndpoint> mServiceEndpointWeak;
 
 private:
     aaudio_handle_t         mHandle = -1;
