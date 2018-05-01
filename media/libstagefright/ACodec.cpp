@@ -2144,6 +2144,10 @@ status_t ACodec::configureCodec(
                 // value is unknown
                 drc.targetRefLevel = -1;
             }
+            if (!msg->findInt32("aac-drc-effect-type", &drc.effectType)) {
+                // value is unknown
+                drc.effectType = -2; // valid values are -1 and over
+            }
 
             err = setupAACCodec(
                     encoder, numChannels, sampleRate, bitrate, aacProfile,
@@ -2778,7 +2782,7 @@ status_t ACodec::setupAACCodec(
             ? OMX_AUDIO_AACStreamFormatMP4ADTS
             : OMX_AUDIO_AACStreamFormatMP4FF;
 
-    OMX_AUDIO_PARAM_ANDROID_AACPRESENTATIONTYPE presentation;
+    OMX_AUDIO_PARAM_ANDROID_AACDRCPRESENTATIONTYPE presentation;
     InitOMXParams(&presentation);
     presentation.nMaxOutputChannels = maxOutputChannelCount;
     presentation.nDrcCut = drc.drcCut;
@@ -2787,14 +2791,29 @@ status_t ACodec::setupAACCodec(
     presentation.nTargetReferenceLevel = drc.targetRefLevel;
     presentation.nEncodedTargetLevel = drc.encodedTargetLevel;
     presentation.nPCMLimiterEnable = pcmLimiterEnable;
+    presentation.nDrcEffectType = drc.effectType;
 
     status_t res = mOMXNode->setParameter(
             OMX_IndexParamAudioAac, &profile, sizeof(profile));
     if (res == OK) {
         // optional parameters, will not cause configuration failure
-        mOMXNode->setParameter(
+        if (mOMXNode->setParameter(
+                (OMX_INDEXTYPE)OMX_IndexParamAudioAndroidAacDrcPresentation,
+                &presentation, sizeof(presentation)) == ERROR_UNSUPPORTED) {
+            // prior to 9.0 we used a different config structure and index
+            OMX_AUDIO_PARAM_ANDROID_AACPRESENTATIONTYPE presentation8;
+            InitOMXParams(&presentation8);
+            presentation8.nMaxOutputChannels = presentation.nMaxOutputChannels;
+            presentation8.nDrcCut = presentation.nDrcCut;
+            presentation8.nDrcBoost = presentation.nDrcBoost;
+            presentation8.nHeavyCompression = presentation.nHeavyCompression;
+            presentation8.nTargetReferenceLevel = presentation.nTargetReferenceLevel;
+            presentation8.nEncodedTargetLevel = presentation.nEncodedTargetLevel;
+            presentation8.nPCMLimiterEnable = presentation.nPCMLimiterEnable;
+            (void)mOMXNode->setParameter(
                 (OMX_INDEXTYPE)OMX_IndexParamAudioAndroidAacPresentation,
-                &presentation, sizeof(presentation));
+                &presentation8, sizeof(presentation8));
+        }
     } else {
         ALOGW("did not set AudioAndroidAacPresentation due to error %d when setting AudioAac", res);
     }
