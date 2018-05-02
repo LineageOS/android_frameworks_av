@@ -44,7 +44,7 @@ LOCAL_CFLAGS := -Wall -Werror
 include $(BUILD_EXECUTABLE)
 
 # service seccomp filter
-ifeq ($(TARGET_ARCH), $(filter $(TARGET_ARCH), arm arm64 x86))
+ifeq ($(TARGET_ARCH), $(filter $(TARGET_ARCH), arm arm64 x86 x86_64))
 include $(CLEAR_VARS)
 LOCAL_MODULE := mediaextractor.policy
 LOCAL_MODULE_CLASS := ETC
