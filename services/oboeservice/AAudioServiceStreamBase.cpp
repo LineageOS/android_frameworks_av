@@ -105,6 +105,9 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
             goto error;
         }
 
+        // This is not protected by a lock because the stream cannot be
+        // referenced until the service returns a handle to the client.
+        // So only one thread can open a stream.
         mServiceEndpoint = mEndpointManager.openEndpoint(mAudioService,
                                                          request,
                                                          sharingMode);
@@ -113,6 +116,9 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
             result = AAUDIO_ERROR_UNAVAILABLE;
             goto error;
         }
+        // Save a weak pointer that we will use to access the endpoint.
+        mServiceEndpointWeak = mServiceEndpoint;
+
         mFramesPerBurst = mServiceEndpoint->getFramesPerBurst();
         copyFrom(*mServiceEndpoint);
     }
@@ -131,13 +137,16 @@ aaudio_result_t AAudioServiceStreamBase::close() {
 
     stop();
 
-    if (mServiceEndpoint == nullptr) {
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
         result = AAUDIO_ERROR_INVALID_STATE;
     } else {
-        mServiceEndpoint->unregisterStream(this);
-        AAudioEndpointManager &mEndpointManager = AAudioEndpointManager::getInstance();
-        mEndpointManager.closeEndpoint(mServiceEndpoint);
-        mServiceEndpoint.clear();
+        endpoint->unregisterStream(this);
+        AAudioEndpointManager &endpointManager = AAudioEndpointManager::getInstance();
+        endpointManager.closeEndpoint(endpoint);
+
+        // AAudioService::closeStream() prevents two threads from closing at the same time.
+        mServiceEndpoint.clear(); // endpoint will hold the pointer until this method returns.
     }
 
     {
@@ -153,7 +162,12 @@ aaudio_result_t AAudioServiceStreamBase::close() {
 
 aaudio_result_t AAudioServiceStreamBase::startDevice() {
     mClientHandle = AUDIO_PORT_HANDLE_NONE;
-    return mServiceEndpoint->startStream(this, &mClientHandle);
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        ALOGE("%s() has no endpoint", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    return endpoint->startStream(this, &mClientHandle);
 }
 
 /**
@@ -163,14 +177,9 @@ aaudio_result_t AAudioServiceStreamBase::startDevice() {
  */
 aaudio_result_t AAudioServiceStreamBase::start() {
     aaudio_result_t result = AAUDIO_OK;
+
     if (isRunning()) {
         return AAUDIO_OK;
-    }
-
-    if (mServiceEndpoint == nullptr) {
-        ALOGE("%s() missing endpoint", __func__);
-        result = AAUDIO_ERROR_INVALID_STATE;
-        goto error;
     }
 
     setFlowing(false);
@@ -201,10 +210,6 @@ aaudio_result_t AAudioServiceStreamBase::pause() {
     if (!isRunning()) {
         return result;
     }
-    if (mServiceEndpoint == nullptr) {
-        ALOGE("%s() missing endpoint", __func__);
-        return AAUDIO_ERROR_INVALID_STATE;
-    }
 
     // Send it now because the timestamp gets rounded up when stopStream() is called below.
     // Also we don't need the timestamps while we are shutting down.
@@ -216,7 +221,12 @@ aaudio_result_t AAudioServiceStreamBase::pause() {
         return result;
     }
 
-    result = mServiceEndpoint->stopStream(this, mClientHandle);
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        ALOGE("%s() has no endpoint", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    result = endpoint->stopStream(this, mClientHandle);
     if (result != AAUDIO_OK) {
         ALOGE("%s() mServiceEndpoint returned %d, %s", __func__, result, getTypeText());
         disconnect(); // TODO should we return or pause Base first?
@@ -233,11 +243,6 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
         return result;
     }
 
-    if (mServiceEndpoint == nullptr) {
-        ALOGE("%s() missing endpoint", __func__);
-        return AAUDIO_ERROR_INVALID_STATE;
-    }
-
     setState(AAUDIO_STREAM_STATE_STOPPING);
 
     // Send it now because the timestamp gets rounded up when stopStream() is called below.
@@ -249,10 +254,15 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
         return result;
     }
 
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        ALOGE("%s() has no endpoint", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
     // TODO wait for data to be played out
-    result = mServiceEndpoint->stopStream(this, mClientHandle);
+    result = endpoint->stopStream(this, mClientHandle);
     if (result != AAUDIO_OK) {
-        ALOGE("%s() mServiceEndpoint returned %d, %s", __func__, result, getTypeText());
+        ALOGE("%s() stopStream returned %d, %s", __func__, result, getTypeText());
         disconnect();
         // TODO what to do with result here?
     }
