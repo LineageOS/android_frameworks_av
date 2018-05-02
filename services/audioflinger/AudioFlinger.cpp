@@ -2293,7 +2293,7 @@ void AudioFlinger::closeOutputFinish(const sp<PlaybackThread>& thread)
     delete out;
 }
 
-void AudioFlinger::closeOutputInternal_l(const sp<PlaybackThread>& thread)
+void AudioFlinger::closeThreadInternal_l(const sp<PlaybackThread>& thread)
 {
     mPlaybackThreads.removeItem(thread->mId);
     thread->exit();
@@ -2586,7 +2586,7 @@ void AudioFlinger::closeInputFinish(const sp<RecordThread>& thread)
     delete in;
 }
 
-void AudioFlinger::closeInputInternal_l(const sp<RecordThread>& thread)
+void AudioFlinger::closeThreadInternal_l(const sp<RecordThread>& thread)
 {
     mRecordThreads.removeItem(thread->mId);
     closeInputFinish(thread);
