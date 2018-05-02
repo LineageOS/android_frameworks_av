@@ -32,32 +32,26 @@ struct AMessage;
 class MediaCodecBuffer;
 class IMediaSource;
 class VideoFrame;
+struct MediaCodec;
 
 struct FrameDecoder {
     FrameDecoder(
             const AString &componentName,
             const sp<MetaData> &trackMeta,
-            const sp<IMediaSource> &source) :
-                mComponentName(componentName),
-                mTrackMeta(trackMeta),
-                mSource(source),
-                mDstFormat(OMX_COLOR_Format16bitRGB565),
-                mDstBpp(2) {}
+            const sp<IMediaSource> &source);
 
-    sp<IMemory> extractFrame(int64_t frameTimeUs, int option, int colorFormat);
+    status_t init(
+            int64_t frameTimeUs, size_t numFrames, int option, int colorFormat);
 
-    status_t extractFrames(
-            int64_t frameTimeUs,
-            size_t numFrames,
-            int option,
-            int colorFormat,
-            std::vector<sp<IMemory> >* frames);
+    sp<IMemory> extractFrame();
+
+    status_t extractFrames(std::vector<sp<IMemory> >* frames);
 
     static sp<IMemory> getMetadataOnly(
             const sp<MetaData> &trackMeta, int colorFormat, bool thumbnail = false);
 
 protected:
-    virtual ~FrameDecoder() {}
+    virtual ~FrameDecoder();
 
     virtual sp<AMessage> onGetFormatAndSeekOptions(
             int64_t frameTimeUs,
@@ -92,13 +86,13 @@ private:
     OMX_COLOR_FORMATTYPE mDstFormat;
     int32_t mDstBpp;
     std::vector<sp<IMemory> > mFrames;
+    MediaSource::ReadOptions mReadOptions;
+    sp<MediaCodec> mDecoder;
+    sp<AMessage> mOutputFormat;
+    bool mHaveMoreInputs;
+    bool mFirstSample;
 
-    static bool getDstColorFormat(
-            android_pixel_format_t colorFormat,
-            OMX_COLOR_FORMATTYPE *dstFormat,
-            int32_t *dstBpp);
-
-    status_t extractInternal(int64_t frameTimeUs, size_t numFrames, int option);
+    status_t extractInternal();
 
     DISALLOW_EVIL_CONSTRUCTORS(FrameDecoder);
 };
@@ -107,13 +101,7 @@ struct VideoFrameDecoder : public FrameDecoder {
     VideoFrameDecoder(
             const AString &componentName,
             const sp<MetaData> &trackMeta,
-            const sp<IMediaSource> &source) :
-                FrameDecoder(componentName, trackMeta, source),
-                mIsAvcOrHevc(false),
-                mSeekMode(MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC),
-                mTargetTimeUs(-1ll),
-                mNumFrames(0),
-                mNumFramesDecoded(0) {}
+            const sp<IMediaSource> &source);
 
 protected:
     virtual sp<AMessage> onGetFormatAndSeekOptions(
@@ -146,10 +134,7 @@ struct ImageDecoder : public FrameDecoder {
     ImageDecoder(
             const AString &componentName,
             const sp<MetaData> &trackMeta,
-            const sp<IMediaSource> &source) :
-                FrameDecoder(componentName, trackMeta, source),
-                mFrame(NULL), mGridRows(1), mGridCols(1),
-                mTilesDecoded(0), mThumbnail(false) {}
+            const sp<IMediaSource> &source);
 
 protected:
     virtual sp<AMessage> onGetFormatAndSeekOptions(
@@ -172,10 +157,11 @@ protected:
 
 private:
     VideoFrame *mFrame;
+    int32_t mWidth;
+    int32_t mHeight;
     int32_t mGridRows;
     int32_t mGridCols;
     int32_t mTilesDecoded;
-    bool mThumbnail;
 };
 
 }  // namespace android
