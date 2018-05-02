@@ -68,10 +68,12 @@ constexpr char kEqualsSign[] = "=";
 
 template<typename T>
 std::string toBase64StringNoPad(const T* data, size_t size) {
-    if (size == 0) {
+    // Note that the base 64 conversion only works with arrays of single-byte
+    // values. If the source is empty or is not an array of single-byte values,
+    // return empty string.
+    if (size == 0 || sizeof(data[0]) != 1) {
       return "";
     }
-    CHECK(sizeof(data[0] == 1));
 
     android::AString outputString;
     encodeBase64(data, size, &outputString);
