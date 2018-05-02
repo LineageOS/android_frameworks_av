@@ -6603,8 +6603,17 @@ reacquire_wakelock:
         if (mPipeSource != 0) {
             size_t framesToRead = mBufferSize / mFrameSize;
             framesToRead = min(mRsmpInFramesOA - rear, mRsmpInFramesP2 / 2);
-            framesRead = mPipeSource->read((uint8_t*)mRsmpInBuffer + rear * mFrameSize,
-                    framesToRead);
+
+            // The audio fifo read() returns OVERRUN on overflow, and advances the read pointer
+            // to the full buffer point (clearing the overflow condition).  Upon OVERRUN error,
+            // we immediately retry the read() to get data and prevent another overflow.
+            for (int retries = 0; retries <= 2; ++retries) {
+                ALOGW_IF(retries > 0, "overrun on read from pipe, retry #%d", retries);
+                framesRead = mPipeSource->read((uint8_t*)mRsmpInBuffer + rear * mFrameSize,
+                        framesToRead);
+                if (framesRead != OVERRUN) break;
+            }
+
             // since pipe is non-blocking, simulate blocking input by waiting for 1/2 of
             // buffer size or at least for 20ms.
             size_t sleepFrames = max(
