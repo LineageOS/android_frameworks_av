@@ -64,7 +64,7 @@ public:
 
     virtual bool        isFastTrack() const { return (mFlags & AUDIO_INPUT_FLAG_FAST) != 0; }
 
-            void        setSilenced(bool silenced) { mSilenced = silenced; }
+            void        setSilenced(bool silenced) { if (!isPatchTrack()) mSilenced = silenced; }
             bool        isSilenced() const { return mSilenced; }
 
             status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
