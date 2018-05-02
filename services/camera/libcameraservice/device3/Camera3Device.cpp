@@ -4325,9 +4325,9 @@ bool Camera3Device::RequestThread::sendRequestsBatch() {
     uint32_t numRequestProcessed = 0;
     for (size_t i = 0; i < batchSize; i++) {
         requests[i] = &mNextRequests.editItemAt(i).halRequest;
+        ATRACE_ASYNC_BEGIN("frame capture", mNextRequests[i].halRequest.frame_number);
     }
 
-    ATRACE_ASYNC_BEGIN("batch frame capture", mNextRequests[0].halRequest.frame_number);
     res = mInterface->processBatchCaptureRequests(requests, &numRequestProcessed);
 
     bool triggerRemoveFailed = false;
