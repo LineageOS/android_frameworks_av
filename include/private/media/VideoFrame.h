@@ -37,9 +37,11 @@ public:
     // will calculate frame buffer size if |hasData| is set to true.
     VideoFrame(uint32_t width, uint32_t height,
             uint32_t displayWidth, uint32_t displayHeight,
+            uint32_t tileWidth, uint32_t tileHeight,
             uint32_t angle, uint32_t bpp, bool hasData, size_t iccSize):
         mWidth(width), mHeight(height),
         mDisplayWidth(displayWidth), mDisplayHeight(displayHeight),
+        mTileWidth(tileWidth), mTileHeight(tileHeight),
         mRotationAngle(angle), mBytesPerPixel(bpp), mRowBytes(bpp * width),
         mSize(hasData ? (bpp * width * height) : 0),
         mIccSize(iccSize), mReserved(0) {
@@ -74,6 +76,8 @@ public:
     uint32_t mHeight;          // Decoded image height before rotation
     uint32_t mDisplayWidth;    // Display width before rotation
     uint32_t mDisplayHeight;   // Display height before rotation
+    uint32_t mTileWidth;       // Tile width (0 if image doesn't have grid)
+    uint32_t mTileHeight;      // Tile height (0 if image doesn't have grid)
     int32_t  mRotationAngle;   // Rotation angle, clockwise, should be multiple of 90
     uint32_t mBytesPerPixel;   // Number of bytes per pixel
     uint32_t mRowBytes;        // Number of bytes per row before rotation

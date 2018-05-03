@@ -34,7 +34,11 @@ class IMediaSource;
 class VideoFrame;
 struct MediaCodec;
 
-struct FrameDecoder {
+struct FrameRect {
+    int32_t left, top, right, bottom;
+};
+
+struct FrameDecoder : public RefBase {
     FrameDecoder(
             const AString &componentName,
             const sp<MetaData> &trackMeta,
@@ -43,7 +47,7 @@ struct FrameDecoder {
     status_t init(
             int64_t frameTimeUs, size_t numFrames, int option, int colorFormat);
 
-    sp<IMemory> extractFrame();
+    sp<IMemory> extractFrame(FrameRect *rect = NULL);
 
     status_t extractFrames(std::vector<sp<IMemory> >* frames);
 
@@ -58,6 +62,8 @@ protected:
             size_t numFrames,
             int seekMode,
             MediaSource::ReadOptions *options) = 0;
+
+    virtual status_t onExtractRect(FrameRect *rect) = 0;
 
     virtual status_t onInputReceived(
             const sp<MediaCodecBuffer> &codecBuffer,
@@ -110,6 +116,11 @@ protected:
             int seekMode,
             MediaSource::ReadOptions *options) override;
 
+    virtual status_t onExtractRect(FrameRect *rect) override {
+        // Rect extraction for sequences is not supported for now.
+        return (rect == NULL) ? OK : ERROR_UNSUPPORTED;
+    }
+
     virtual status_t onInputReceived(
             const sp<MediaCodecBuffer> &codecBuffer,
             MetaDataBase &sampleMeta,
@@ -143,6 +154,8 @@ protected:
             int seekMode,
             MediaSource::ReadOptions *options) override;
 
+    virtual status_t onExtractRect(FrameRect *rect) override;
+
     virtual status_t onInputReceived(
             const sp<MediaCodecBuffer> &codecBuffer __unused,
             MetaDataBase &sampleMeta __unused,
@@ -161,7 +174,10 @@ private:
     int32_t mHeight;
     int32_t mGridRows;
     int32_t mGridCols;
+    int32_t mTileWidth;
+    int32_t mTileHeight;
     int32_t mTilesDecoded;
+    int32_t mTargetTiles;
 };
 
 }  // namespace android
