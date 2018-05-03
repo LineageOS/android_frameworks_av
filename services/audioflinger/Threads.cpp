@@ -6614,11 +6614,16 @@ reacquire_wakelock:
                 if (framesRead != OVERRUN) break;
             }
 
-            // since pipe is non-blocking, simulate blocking input by waiting for 1/2 of
-            // buffer size or at least for 20ms.
-            size_t sleepFrames = max(
-                    min(mPipeFramesP2, mRsmpInFramesP2) / 2, FMS_20 * mSampleRate / 1000);
-            if (framesRead <= (ssize_t) sleepFrames) {
+            const ssize_t availableToRead = mPipeSource->availableToRead();
+            if (availableToRead >= 0) {
+                // PipeSource is the master clock.  It is up to the AudioRecord client to keep up.
+                LOG_ALWAYS_FATAL_IF((size_t)availableToRead > mPipeFramesP2,
+                        "more frames to read than fifo size, %zd > %zu",
+                        availableToRead, mPipeFramesP2);
+                const size_t pipeFramesFree = mPipeFramesP2 - availableToRead;
+                const size_t sleepFrames = min(pipeFramesFree, mRsmpInFramesP2) / 2;
+                ALOGVV("mPipeFramesP2:%zu mRsmpInFramesP2:%zu sleepFrames:%zu availableToRead:%zd",
+                        mPipeFramesP2, mRsmpInFramesP2, sleepFrames, availableToRead);
                 sleepUs = (sleepFrames * 1000000LL) / mSampleRate;
             }
             if (framesRead < 0) {
