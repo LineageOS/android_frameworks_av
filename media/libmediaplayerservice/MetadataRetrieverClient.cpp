@@ -48,7 +48,6 @@ MetadataRetrieverClient::MetadataRetrieverClient(pid_t pid)
 {
     ALOGV("MetadataRetrieverClient constructor pid(%d)", pid);
     mPid = pid;
-    mThumbnail = NULL;
     mAlbumArt = NULL;
     mRetriever = NULL;
 }
@@ -77,7 +76,6 @@ void MetadataRetrieverClient::disconnect()
     ALOGV("disconnect from pid %d", mPid);
     Mutex::Autolock lock(mLock);
     mRetriever.clear();
-    mThumbnail.clear();
     mAlbumArt.clear();
     IPCThreadState::self()->flushCommands();
 }
@@ -201,7 +199,6 @@ sp<IMemory> MetadataRetrieverClient::getFrameAtTime(
             (long long)timeUs, option, colorFormat, metaOnly);
     Mutex::Autolock lock(mLock);
     Mutex::Autolock glock(sLock);
-    mThumbnail.clear();
     if (mRetriever == NULL) {
         ALOGE("retriever is not initialized");
         return NULL;
@@ -220,7 +217,6 @@ sp<IMemory> MetadataRetrieverClient::getImageAtIndex(
             index, colorFormat, metaOnly, thumbnail);
     Mutex::Autolock lock(mLock);
     Mutex::Autolock glock(sLock);
-    mThumbnail.clear();
     if (mRetriever == NULL) {
         ALOGE("retriever is not initialized");
         return NULL;
