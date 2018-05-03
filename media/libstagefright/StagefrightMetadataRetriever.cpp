@@ -193,11 +193,13 @@ sp<IMemory> StagefrightMetadataRetriever::getImageAtIndex(
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
         const AString &componentName = matchingCodecs[i];
         ImageDecoder decoder(componentName, trackMeta, source);
-        sp<IMemory> frame = decoder.extractFrame(
-                thumbnail ? -1 : 0 /*frameTimeUs*/, 0 /*seekMode*/, colorFormat);
+        int64_t frameTimeUs = thumbnail ? -1 : 0;
+        if (decoder.init(frameTimeUs, 1 /*numFrames*/, 0 /*option*/, colorFormat) == OK) {
+            sp<IMemory> frame = decoder.extractFrame();
 
-        if (frame != NULL) {
-            return frame;
+            if (frame != NULL) {
+                return frame;
+            }
         }
         ALOGV("%s failed to extract thumbnail, trying next decoder.", componentName.c_str());
     }
@@ -307,16 +309,17 @@ status_t StagefrightMetadataRetriever::getFrameInternal(
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
         const AString &componentName = matchingCodecs[i];
         VideoFrameDecoder decoder(componentName, trackMeta, source);
-        if (outFrame != NULL) {
-            *outFrame = decoder.extractFrame(timeUs, option, colorFormat);
-            if (*outFrame != NULL) {
-                return OK;
-            }
-        } else if (outFrames != NULL) {
-            status_t err = decoder.extractFrames(
-                    timeUs, numFrames, option, colorFormat, outFrames);
-            if (err == OK) {
-                return OK;
+        if (decoder.init(timeUs, numFrames, option, colorFormat) == OK) {
+            if (outFrame != NULL) {
+                *outFrame = decoder.extractFrame();
+                if (*outFrame != NULL) {
+                    return OK;
+                }
+            } else if (outFrames != NULL) {
+                status_t err = decoder.extractFrames(outFrames);
+                if (err == OK) {
+                    return OK;
+                }
             }
         }
         ALOGV("%s failed to extract frame, trying next decoder.", componentName.c_str());
