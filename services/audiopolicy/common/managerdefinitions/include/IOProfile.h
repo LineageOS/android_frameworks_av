@@ -88,7 +88,7 @@ public:
 
     bool supportDeviceAddress(const String8 &address) const
     {
-        return mSupportedDevices[0]->mAddress == address;
+        return mSupportedDevices[0]->address() == address;
     }
 
     // chose first device present in mSupportedDevices also part of deviceType

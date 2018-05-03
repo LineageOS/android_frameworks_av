@@ -116,6 +116,7 @@ public:
     audio_module_handle_t getModuleHandle() const;
     uint32_t getModuleVersionMajor() const;
     const char *getModuleName() const;
+    sp<HwModule> getModule() const { return mModule; }
 
     bool useInputChannelMask() const
     {
@@ -137,12 +138,12 @@ public:
     void log(const char* indent) const;
 
     AudioGainCollection mGains; // gain controllers
-    sp<HwModule> mModule;                 // audio HW module exposing this I/O stream
 
 private:
     void pickChannelMask(audio_channel_mask_t &channelMask, const ChannelsVector &channelMasks) const;
     void pickSamplingRate(uint32_t &rate,const SampleRateVector &samplingRates) const;
 
+    sp<HwModule> mModule;                 // audio HW module exposing this I/O stream
     String8  mName;
     audio_port_type_t mType;
     audio_port_role_t mRole;

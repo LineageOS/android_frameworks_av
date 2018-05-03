@@ -51,7 +51,7 @@ status_t HwModule::addOutputProfile(const String8& name, const audio_config_t *c
                                               config->sample_rate));
 
     sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device);
-    devDesc->mAddress = address;
+    devDesc->setAddress(address);
     profile->addSupportedDevice(devDesc);
 
     return addOutputProfile(profile);
@@ -113,7 +113,7 @@ status_t HwModule::addInputProfile(const String8& name, const audio_config_t *co
                                               config->sample_rate));
 
     sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device);
-    devDesc->mAddress = address;
+    devDesc->setAddress(address);
     profile->addSupportedDevice(devDesc);
 
     ALOGV("addInputProfile() name %s rate %d mask 0x%08x",
@@ -296,7 +296,7 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
 
     sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device);
     devDesc->setName(String8(device_name));
-    devDesc->mAddress = address;
+    devDesc->setAddress(address);
     return devDesc;
 }
 

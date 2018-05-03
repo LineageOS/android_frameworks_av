@@ -519,6 +519,19 @@ protected:
             return mAvailableInputDevices.getDeviceTypesFromHwModule(
                     mPrimaryOutput->getModuleHandle());
         }
+        /**
+         * @brief getFirstDeviceId of the Device Vector
+         * @return if the collection is not empty, it returns the first device Id,
+         *         otherwise AUDIO_PORT_HANDLE_NONE
+         */
+        audio_port_handle_t getFirstDeviceId(const DeviceVector &devices) const
+        {
+            return (devices.size() > 0) ? devices.itemAt(0)->getId() : AUDIO_PORT_HANDLE_NONE;
+        }
+        String8 getFirstDeviceAddress(const DeviceVector &devices) const
+        {
+            return (devices.size() > 0) ? devices.itemAt(0)->address() : String8("");
+        }
 
         uint32_t updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs = 0);
         sp<AudioPatch> createTelephonyPatch(bool isRx, audio_devices_t device, uint32_t delayMs);
