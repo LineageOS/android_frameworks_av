@@ -16,9 +16,9 @@
 
 #pragma once
 
+#include "AudioIODescriptorInterface.h"
 #include "AudioPort.h"
 #include "AudioSession.h"
-#include "AudioSessionInfoProvider.h"
 #include <utils/Errors.h>
 #include <system/audio.h>
 #include <utils/SortedVector.h>
@@ -31,7 +31,7 @@ class AudioMix;
 
 // descriptor for audio inputs. Used to maintain current configuration of each opened audio input
 // and keep track of the usage of this input.
-class AudioInputDescriptor: public AudioPortConfig, public AudioSessionInfoProvider
+class AudioInputDescriptor: public AudioPortConfig, public AudioIODescriptorInterface
 {
 public:
     explicit AudioInputDescriptor(const sp<IOProfile>& profile,
@@ -67,11 +67,10 @@ public:
     size_t getAudioSessionCount(bool activeOnly) const;
     audio_source_t getHighestPrioritySource(bool activeOnly) const;
 
-    // implementation of AudioSessionInfoProvider
-    virtual audio_config_base_t getConfig() const;
-    virtual audio_patch_handle_t getPatchHandle() const;
-
-    void setPatchHandle(audio_patch_handle_t handle);
+    // implementation of AudioIODescriptorInterface
+    audio_config_base_t getConfig() const override;
+    audio_patch_handle_t getPatchHandle() const override;
+    void setPatchHandle(audio_patch_handle_t handle) override;
 
     status_t open(const audio_config_t *config,
                   audio_devices_t device,

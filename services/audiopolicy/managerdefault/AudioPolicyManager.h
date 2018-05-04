@@ -491,8 +491,8 @@ protected:
 
         uint32_t updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs = 0);
         sp<AudioPatch> createTelephonyPatch(bool isRx, audio_devices_t device, uint32_t delayMs);
-        sp<DeviceDescriptor> fillAudioPortConfigForDevice(
-                const DeviceVector& devices, audio_devices_t device, audio_port_config *config);
+        sp<DeviceDescriptor> findDevice(
+                const DeviceVector& devices, audio_devices_t device);
 
         // if argument "device" is different from AUDIO_DEVICE_NONE,  startSource() will force
         // the re-evaluation of the output device.
@@ -664,6 +664,18 @@ private:
             param.addInt(String8(AudioParameter::keyMonoOutput), (int)mMasterMono);
             mpClientInterface->setParameters(output, param.toString());
         }
+        status_t installPatch(const char *caller,
+                audio_patch_handle_t *patchHandle,
+                AudioIODescriptorInterface *ioDescriptor,
+                const struct audio_patch *patch,
+                int delayMs);
+        status_t installPatch(const char *caller,
+                ssize_t index,
+                audio_patch_handle_t *patchHandle,
+                const struct audio_patch *patch,
+                int delayMs,
+                uid_t uid,
+                sp<AudioPatch> *patchDescPtr);
 
         bool soundTriggerSupportsConcurrentCapture();
         bool mSoundTriggerSupportsConcurrentCapture;

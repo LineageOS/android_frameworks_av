@@ -24,6 +24,7 @@
 #include <utils/Timers.h>
 #include <utils/KeyedVector.h>
 #include <system/audio.h>
+#include "AudioIODescriptorInterface.h"
 #include "AudioSourceDescriptor.h"
 
 namespace android {
@@ -35,7 +36,7 @@ class DeviceDescriptor;
 
 // descriptor for audio outputs. Used to maintain current configuration of each opened audio output
 // and keep track of the usage of this output by each audio stream type.
-class AudioOutputDescriptor: public AudioPortConfig
+class AudioOutputDescriptor: public AudioPortConfig, public AudioIODescriptorInterface
 {
 public:
     AudioOutputDescriptor(const sp<AudioPort>& port,
@@ -73,8 +74,10 @@ public:
 
     audio_module_handle_t getModuleHandle() const;
 
-    audio_patch_handle_t getPatchHandle() const { return mPatchHandle; };
-    void setPatchHandle(audio_patch_handle_t handle) { mPatchHandle = handle; };
+    // implementation of AudioIODescriptorInterface
+    audio_config_base_t getConfig() const override;
+    audio_patch_handle_t getPatchHandle() const override;
+    void setPatchHandle(audio_patch_handle_t handle) override;
 
     sp<AudioPort>       mPort;
     audio_devices_t mDevice;                   // current device this output is routed to
