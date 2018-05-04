@@ -6,7 +6,6 @@ LOCAL_C_INCLUDES := \
   frameworks/av/services/audiopolicy \
   frameworks/av/services/audiopolicy/common/include \
   frameworks/av/services/audiopolicy/engine/interface \
-  frameworks/av/services/audiopolicy/utilities
 
 LOCAL_SHARED_LIBRARIES := \
   libaudiopolicymanagerdefault \
