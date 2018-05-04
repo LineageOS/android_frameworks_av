@@ -287,7 +287,9 @@ const sp<AMessage> MediaCodecList::getGlobalSettings() const {
 //static
 bool MediaCodecList::isSoftwareCodec(const AString &componentName) {
     return componentName.startsWithIgnoreCase("OMX.google.")
-        || !componentName.startsWithIgnoreCase("OMX.");
+            || componentName.startsWithIgnoreCase("c2.android.")
+            || (!componentName.startsWithIgnoreCase("OMX.")
+                    && !componentName.startsWithIgnoreCase("c2."));
 }
 
 static int compareSoftwareCodecsFirst(const AString *name1, const AString *name2) {
@@ -298,7 +300,14 @@ static int compareSoftwareCodecsFirst(const AString *name1, const AString *name2
         return isSoftwareCodec2 - isSoftwareCodec1;
     }
 
-    // sort order 2: OMX codecs are first (lower)
+    // sort order 2: Codec 2.0 codecs are first (lower)
+    bool isC2_1 = name1->startsWithIgnoreCase("c2.");
+    bool isC2_2 = name2->startsWithIgnoreCase("c2.");
+    if (isC2_1 != isC2_2) {
+        return isC2_2 - isC2_1;
+    }
+
+    // sort order 3: OMX codecs are first (lower)
     bool isOMX1 = name1->startsWithIgnoreCase("OMX.");
     bool isOMX2 = name2->startsWithIgnoreCase("OMX.");
     return isOMX2 - isOMX1;
