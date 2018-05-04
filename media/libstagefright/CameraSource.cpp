@@ -243,6 +243,12 @@ status_t CameraSource::isCameraColorFormatSupported(
     return OK;
 }
 
+static int32_t getHighSpeedFrameRate(const CameraParameters& params) {
+    const char* hsr = params.get("video-hsr");
+    int32_t rate = (hsr != NULL && strncmp(hsr, "off", 3)) ? strtol(hsr, NULL, 10) : 0;
+    return std::min(rate, 240);
+}
+
 /*
  * Configure the camera to use the requested video size
  * (width and height) and/or frame rate. If both width and
@@ -290,11 +296,15 @@ status_t CameraSource::configureCamera(
     }
 
     if (frameRate != -1) {
-        CHECK(frameRate > 0 && frameRate <= 120);
+        CHECK(frameRate > 0 && frameRate <= 240);
         const char* supportedFrameRates =
                 params->get(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES);
         CHECK(supportedFrameRates != NULL);
         ALOGV("Supported frame rates: %s", supportedFrameRates);
+        if (getHighSpeedFrameRate(*params)) {
+            ALOGI("Use default 30fps for HighSpeed %dfps", frameRate);
+            frameRate = 30;
+        }
         char buf[4];
         snprintf(buf, 4, "%d", frameRate);
         if (strstr(supportedFrameRates, buf) == NULL) {
@@ -396,6 +406,8 @@ status_t CameraSource::checkFrameRate(
         ALOGE("Failed to retrieve preview frame rate (%d)", frameRateActual);
         return UNKNOWN_ERROR;
     }
+    int32_t highSpeedRate = getHighSpeedFrameRate(params);
+    frameRateActual = highSpeedRate ? highSpeedRate : frameRateActual;
 
     // Check the actual video frame rate against the target/requested
     // video frame rate.

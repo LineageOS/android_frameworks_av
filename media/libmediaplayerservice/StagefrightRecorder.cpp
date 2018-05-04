@@ -1885,7 +1885,7 @@ status_t StagefrightRecorder::setupCameraSource(
     pid_t pid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(mAttributionSource.pid));
     String16 clientName = VALUE_OR_RETURN_STATUS(
         aidl2legacy_string_view_String16(mAttributionSource.packageName.value_or("")));
-    if (mCaptureFpsEnable) {
+    if (mCaptureFpsEnable && mCaptureFps != mFrameRate) {
         if (!(mCaptureFps > 0.)) {
             ALOGE("Invalid mCaptureFps value: %lf", mCaptureFps);
             return BAD_VALUE;
@@ -2039,6 +2039,7 @@ status_t StagefrightRecorder::setupVideoEncoder(
             preferBFrames = false;
             tsLayers = 2; // use at least two layers as resulting video will likely be sped up
         } else if (mCaptureFps > maxPlaybackFps) { // slow-mo
+            format->setInt32("high-frame-rate", 1);
             maxPlaybackFps = mCaptureFps; // assume video will be played back at full capture speed
             preferBFrames = false;
         }
