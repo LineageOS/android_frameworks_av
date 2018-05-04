@@ -73,9 +73,8 @@ private:
     sp<MediaMetadataRetrieverBase>         mRetriever;
     pid_t                                  mPid;
 
-    // Keep the shared memory copy of album art and capture frame (for thumbnail)
+    // Keep the shared memory copy of album art
     sp<IMemory>                            mAlbumArt;
-    sp<IMemory>                            mThumbnail;
 };
 
 }; // namespace android
