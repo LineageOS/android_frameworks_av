@@ -113,7 +113,7 @@ ARTPWriter::ARTPWriter(int fd)
 }
 
 ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteIp,
-    int remotePort)
+    int remotePort, uint32_t seqNo)
     : mFlags(0),
       mFd(dup(fd)),
       mLooper(new ALooper),
@@ -128,6 +128,8 @@ ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteI
     makeSocketPairAndBind(localIp, localPort, remoteIp , remotePort);
     mSPSBuf = NULL;
     mPPSBuf = NULL;
+
+    mSeqNo = seqNo;
 
 #if LOG_TO_FILES
     mRTPFd = open(
@@ -192,7 +194,8 @@ status_t ARTPWriter::start(MetaData * params) {
     mFlags &= ~kFlagEOS;
     if (mSourceID == 0)
         mSourceID = rand();
-    mSeqNo = UniformRand(65536);
+    if (mSeqNo == 0)
+        mSeqNo = UniformRand(65536);
     mRTPTimeBase = 0;
     mNumRTPSent = 0;
     mNumRTPOctetsSent = 0;
@@ -336,7 +339,9 @@ void ARTPWriter::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatStart:
         {
-            CHECK_EQ(mSource->start(), (status_t)OK);
+            sp<MetaData> meta = new MetaData();
+            meta->setInt64(kKeyTime, 10ll);
+            CHECK_EQ(mSource->start(meta.get()), (status_t)OK);
 
 #if 0
             if (mMode == H264) {
@@ -1168,6 +1173,10 @@ void ARTPWriter::updateCVODegrees(int32_t cvoDegrees) {
 void ARTPWriter::updatePayloadType(int32_t payloadType) {
     Mutex::Autolock autoLock(mLock);
     mPayloadType = payloadType;
+}
+
+uint32_t ARTPWriter::getSequenceNum() {
+    return mSeqNo;
 }
 
 static size_t getFrameSize(bool isWide, unsigned FT) {

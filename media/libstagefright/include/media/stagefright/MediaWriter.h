@@ -57,6 +57,7 @@ struct MediaWriter : public RefBase {
     virtual status_t setNextFd(int /*fd*/) { return INVALID_OPERATION; }
     virtual void updateCVODegrees(int32_t /*cvoDegrees*/) {}
     virtual void updatePayloadType(int32_t /*payloadType*/) {}
+    virtual uint32_t getSequenceNum() { return 0; }
 
 protected:
     virtual ~MediaWriter() {}

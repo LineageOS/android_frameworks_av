@@ -147,6 +147,7 @@ private:
     int32_t mPayloadType;
     int32_t mRTPCVOExtMap;
     int32_t mRTPCVODegrees;
+    uint32_t mLastSeqNo;
 
     int64_t mDurationRecordedUs;
     int64_t mStartedRecordingUs;

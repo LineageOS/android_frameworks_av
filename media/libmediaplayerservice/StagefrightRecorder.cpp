@@ -119,6 +119,7 @@ StagefrightRecorder::StagefrightRecorder(const String16 &opPackageName)
       mVideoSource(VIDEO_SOURCE_LIST_END),
       mRTPCVOExtMap(-1),
       mRTPCVODegrees(0),
+      mLastSeqNo(0),
       mStarted(false),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mDeviceCallbackEnabled(false),
@@ -1471,7 +1472,7 @@ status_t StagefrightRecorder::setupRTPRecording() {
         mVideoEncoderSource = source;
     }
 
-    mWriter = new ARTPWriter(mOutputFd, mLocalIp, mLocalPort, mRemoteIp, mRemotePort);
+    mWriter = new ARTPWriter(mOutputFd, mLocalIp, mLocalPort, mRemoteIp, mRemotePort, mLastSeqNo);
     mWriter->addSource(source);
     mWriter->setListener(mListener);
 
@@ -2270,6 +2271,7 @@ status_t StagefrightRecorder::stop() {
 
     if (mWriter != NULL) {
         err = mWriter->stop();
+        mLastSeqNo = mWriter->getSequenceNum();
         mWriter.clear();
     }
 
