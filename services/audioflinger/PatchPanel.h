@@ -43,12 +43,61 @@ public:
                                       struct audio_patch *patches);
 
 private:
+    template<typename ThreadType, typename TrackType>
+    class Endpoint {
+    public:
+        status_t checkTrack(TrackType *trackOrNull) const {
+            if (trackOrNull == nullptr) return NO_MEMORY;
+            return trackOrNull->initCheck();
+        }
+        audio_patch_handle_t handle() const { return mHandle; }
+        sp<ThreadType> thread() { return mThread; }
+        sp<TrackType> track() { return mTrack; }
+
+        void closeConnections(PatchPanel *panel) {
+            if (mHandle != AUDIO_PATCH_HANDLE_NONE) {
+                panel->releaseAudioPatch(mHandle);
+                mHandle = AUDIO_PATCH_HANDLE_NONE;
+            }
+            if (mThread != 0) {
+                if (mTrack != 0) {
+                    mThread->deletePatchTrack(mTrack);
+                }
+                if (mCloseThread) {
+                    panel->mAudioFlinger.closeThreadInternal_l(mThread);
+                }
+            }
+        }
+        audio_patch_handle_t* handlePtr() { return &mHandle; }
+        void setThread(const sp<ThreadType>& thread, bool closeThread = true) {
+            mThread = thread;
+            mCloseThread = closeThread;
+        }
+        void setTrackAndPeer(const sp<TrackType>& track,
+                             ThreadBase::PatchProxyBufferProvider *peer) {
+            mTrack = track;
+            mThread->addPatchTrack(mTrack);
+            mTrack->setPeerProxy(peer);
+        }
+        void stopTrack() { if (mTrack) mTrack->stop(); }
+
+    private:
+        sp<ThreadType> mThread;
+        bool mCloseThread = true;
+        audio_patch_handle_t mHandle = AUDIO_PATCH_HANDLE_NONE;
+        sp<TrackType> mTrack;
+    };
+
     class Patch {
     public:
         explicit Patch(const struct audio_patch &patch) : mAudioPatch(patch) {}
+        ~Patch();
 
         status_t createConnections(PatchPanel *panel);
         void clearConnections(PatchPanel *panel);
+        bool isSoftware() const {
+            return mRecord.handle() != AUDIO_PATCH_HANDLE_NONE ||
+                    mPlayback.handle() != AUDIO_PATCH_HANDLE_NONE; }
 
         // Note that audio_patch::id is only unique within a HAL module
         struct audio_patch              mAudioPatch;
@@ -58,16 +107,13 @@ private:
         // given audio HW module to a sink device on an other audio HW module.
         // the objects are created by createConnections() and released by clearConnections()
         // playback thread is created if no existing playback thread can be used
-        sp<PlaybackThread>              mPlaybackThread;
-        sp<PlaybackThread::PatchTrack>  mPatchTrack;
-        sp<RecordThread>                mRecordThread;
-        sp<RecordThread::PatchRecord>   mPatchRecord;
-        // handle for audio patch connecting source device to record thread input.
-        audio_patch_handle_t            mRecordPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-        // handle for audio patch connecting playback thread output to sink device
-        audio_patch_handle_t            mPlaybackPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-
+        // connects playback thread output to sink device
+        Endpoint<PlaybackThread, PlaybackThread::PatchTrack> mPlayback;
+        // connects source device to record thread input
+        Endpoint<RecordThread, RecordThread::PatchRecord> mRecord;
     };
+
+    sp<DeviceHalInterface> findHwDeviceByModule(audio_module_handle_t module);
 
     AudioFlinger &mAudioFlinger;
     std::map<audio_patch_handle_t, Patch> mPatches;
