@@ -10,7 +10,6 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/include \
     frameworks/av/services/audiopolicy/engineconfigurable/include \
     frameworks/av/services/audiopolicy/engineconfigurable/interface \
-    frameworks/av/services/audiopolicy/utilities/convert \
 
 LOCAL_SRC_FILES:= ParameterManagerWrapper.cpp
 

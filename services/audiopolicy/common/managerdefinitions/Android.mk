@@ -35,8 +35,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/include \
     frameworks/av/services/audiopolicy/common/include \
     frameworks/av/services/audiopolicy \
-    frameworks/av/services/audiopolicy/utilities \
-    system/media/audio_utils/include \
+    $(call include-path-for, audio-utils) \
 
 ifeq ($(USE_XML_AUDIO_POLICY_CONF), 1)
 
