@@ -22,6 +22,8 @@
 
 #include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
+#include <utils/KeyedVector.h>
+#include <utils/Mutex.h>
 
 namespace android {
 
