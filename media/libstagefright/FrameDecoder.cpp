@@ -42,7 +42,6 @@ namespace android {
 static const int64_t kBufferTimeOutUs = 10000ll; // 10 msec
 static const size_t kRetryCount = 50; // must be >0
 
-//static
 sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         int32_t width, int32_t height, int32_t dstBpp, bool metaOnly = false) {
     int32_t rotationAngle;
@@ -94,7 +93,6 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
     return frameMem;
 }
 
-//static
 bool findThumbnailInfo(
         const sp<MetaData> &trackMeta, int32_t *width, int32_t *height,
         uint32_t *type = NULL, const void **data = NULL, size_t *size = NULL) {
@@ -107,30 +105,15 @@ bool findThumbnailInfo(
                 type ?: &dummyType, data ?: &dummyData, size ?: &dummySize);
 }
 
-//static
-sp<IMemory> FrameDecoder::getMetadataOnly(
-        const sp<MetaData> &trackMeta, int colorFormat, bool thumbnail) {
-    OMX_COLOR_FORMATTYPE dstFormat;
-    int32_t dstBpp;
-    if (!getDstColorFormat(
-            (android_pixel_format_t)colorFormat, &dstFormat, &dstBpp)) {
-        return NULL;
-    }
-
-    int32_t width, height;
-    if (thumbnail) {
-        if (!findThumbnailInfo(trackMeta, &width, &height)) {
-            return NULL;
-        }
-    } else {
-        CHECK(trackMeta->findInt32(kKeyWidth, &width));
-        CHECK(trackMeta->findInt32(kKeyHeight, &height));
-    }
-    return allocVideoFrame(trackMeta, width, height, dstBpp, true /*metaOnly*/);
+bool findGridInfo(const sp<MetaData> &trackMeta,
+        int32_t *tileWidth, int32_t *tileHeight, int32_t *gridRows, int32_t *gridCols) {
+    return trackMeta->findInt32(kKeyTileWidth, tileWidth) && (*tileWidth > 0)
+        && trackMeta->findInt32(kKeyTileHeight, tileHeight) && (*tileHeight > 0)
+        && trackMeta->findInt32(kKeyGridRows, gridRows) && (*gridRows > 0)
+        && trackMeta->findInt32(kKeyGridCols, gridCols) && (*gridCols > 0);
 }
 
-//static
-bool FrameDecoder::getDstColorFormat(
+bool getDstColorFormat(
         android_pixel_format_t colorFormat,
         OMX_COLOR_FORMATTYPE *dstFormat,
         int32_t *dstBpp) {
@@ -162,46 +145,57 @@ bool FrameDecoder::getDstColorFormat(
     return false;
 }
 
-sp<IMemory> FrameDecoder::extractFrame(
-        int64_t frameTimeUs, int option, int colorFormat) {
+//static
+sp<IMemory> FrameDecoder::getMetadataOnly(
+        const sp<MetaData> &trackMeta, int colorFormat, bool thumbnail) {
+    OMX_COLOR_FORMATTYPE dstFormat;
+    int32_t dstBpp;
     if (!getDstColorFormat(
-            (android_pixel_format_t)colorFormat, &mDstFormat, &mDstBpp)) {
+            (android_pixel_format_t)colorFormat, &dstFormat, &dstBpp)) {
         return NULL;
     }
 
-    status_t err = extractInternal(frameTimeUs, 1, option);
-    if (err != OK) {
-        return NULL;
+    int32_t width, height;
+    if (thumbnail) {
+        if (!findThumbnailInfo(trackMeta, &width, &height)) {
+            return NULL;
+        }
+    } else {
+        CHECK(trackMeta->findInt32(kKeyWidth, &width));
+        CHECK(trackMeta->findInt32(kKeyHeight, &height));
     }
-
-    return mFrames.size() > 0 ? mFrames[0] : NULL;
+    return allocVideoFrame(trackMeta, width, height, dstBpp, true /*metaOnly*/);
 }
 
-status_t FrameDecoder::extractFrames(
-        int64_t frameTimeUs, size_t numFrames, int option, int colorFormat,
-        std::vector<sp<IMemory> >* frames) {
+FrameDecoder::FrameDecoder(
+        const AString &componentName,
+        const sp<MetaData> &trackMeta,
+        const sp<IMediaSource> &source)
+    : mComponentName(componentName),
+      mTrackMeta(trackMeta),
+      mSource(source),
+      mDstFormat(OMX_COLOR_Format16bitRGB565),
+      mDstBpp(2),
+      mHaveMoreInputs(true),
+      mFirstSample(true) {
+}
+
+FrameDecoder::~FrameDecoder() {
+    if (mDecoder != NULL) {
+        mDecoder->release();
+        mSource->stop();
+    }
+}
+
+status_t FrameDecoder::init(
+        int64_t frameTimeUs, size_t numFrames, int option, int colorFormat) {
     if (!getDstColorFormat(
             (android_pixel_format_t)colorFormat, &mDstFormat, &mDstBpp)) {
         return ERROR_UNSUPPORTED;
     }
 
-    status_t err = extractInternal(frameTimeUs, numFrames, option);
-    if (err != OK) {
-        return err;
-    }
-
-    for (size_t i = 0; i < mFrames.size(); i++) {
-        frames->push_back(mFrames[i]);
-    }
-    return OK;
-}
-
-status_t FrameDecoder::extractInternal(
-        int64_t frameTimeUs, size_t numFrames, int option) {
-
-    MediaSource::ReadOptions options;
     sp<AMessage> videoFormat = onGetFormatAndSeekOptions(
-            frameTimeUs, numFrames, option, &options);
+            frameTimeUs, numFrames, option, &mReadOptions);
     if (videoFormat == NULL) {
         ALOGE("video format or seek mode not supported");
         return ERROR_UNSUPPORTED;
@@ -217,7 +211,8 @@ status_t FrameDecoder::extractInternal(
         return (decoder.get() == NULL) ? NO_MEMORY : err;
     }
 
-    err = decoder->configure(videoFormat, NULL /* surface */, NULL /* crypto */, 0 /* flags */);
+    err = decoder->configure(
+            videoFormat, NULL /* surface */, NULL /* crypto */, 0 /* flags */);
     if (err != OK) {
         ALOGW("configure returned error %d (%s)", err, asString(err));
         decoder->release();
@@ -237,43 +232,46 @@ status_t FrameDecoder::extractInternal(
         decoder->release();
         return err;
     }
+    mDecoder = decoder;
 
-    Vector<sp<MediaCodecBuffer> > inputBuffers;
-    err = decoder->getInputBuffers(&inputBuffers);
+    return OK;
+}
+
+sp<IMemory> FrameDecoder::extractFrame() {
+    status_t err = extractInternal();
     if (err != OK) {
-        ALOGW("failed to get input buffers: %d (%s)", err, asString(err));
-        decoder->release();
-        mSource->stop();
+        return NULL;
+    }
+
+    return mFrames.size() > 0 ? mFrames[0] : NULL;
+}
+
+status_t FrameDecoder::extractFrames(std::vector<sp<IMemory> >* frames) {
+    status_t err = extractInternal();
+    if (err != OK) {
         return err;
     }
 
-    Vector<sp<MediaCodecBuffer> > outputBuffers;
-    err = decoder->getOutputBuffers(&outputBuffers);
-    if (err != OK) {
-        ALOGW("failed to get output buffers: %d (%s)", err, asString(err));
-        decoder->release();
-        mSource->stop();
-        return err;
+    for (size_t i = 0; i < mFrames.size(); i++) {
+        frames->push_back(mFrames[i]);
     }
+    return OK;
+}
 
-    sp<AMessage> outputFormat = NULL;
-    bool haveMoreInputs = true;
-    size_t index, offset, size;
-    int64_t timeUs;
-    size_t retriesLeft = kRetryCount;
+status_t FrameDecoder::extractInternal() {
+    status_t err = OK;
     bool done = false;
-    bool firstSample = true;
+    size_t retriesLeft = kRetryCount;
     do {
-        size_t inputIndex = -1;
+        size_t index;
         int64_t ptsUs = 0ll;
         uint32_t flags = 0;
-        sp<MediaCodecBuffer> codecBuffer = NULL;
 
         // Queue as many inputs as we possibly can, then block on dequeuing
         // outputs. After getting each output, come back and queue the inputs
         // again to keep the decoder busy.
-        while (haveMoreInputs) {
-            err = decoder->dequeueInputBuffer(&inputIndex, 0);
+        while (mHaveMoreInputs) {
+            err = mDecoder->dequeueInputBuffer(&index, 0);
             if (err != OK) {
                 ALOGV("Timed out waiting for input");
                 if (retriesLeft) {
@@ -281,16 +279,21 @@ status_t FrameDecoder::extractInternal(
                 }
                 break;
             }
-            codecBuffer = inputBuffers[inputIndex];
+            sp<MediaCodecBuffer> codecBuffer;
+            err = mDecoder->getInputBuffer(index, &codecBuffer);
+            if (err != OK) {
+                ALOGE("failed to get input buffer %zu", index);
+                break;
+            }
 
             MediaBufferBase *mediaBuffer = NULL;
 
-            err = mSource->read(&mediaBuffer, &options);
-            options.clearSeekTo();
+            err = mSource->read(&mediaBuffer, &mReadOptions);
+            mReadOptions.clearSeekTo();
             if (err != OK) {
                 ALOGW("Input Error or EOS");
-                haveMoreInputs = false;
-                if (!firstSample && err == ERROR_END_OF_STREAM) {
+                mHaveMoreInputs = false;
+                if (!mFirstSample && err == ERROR_END_OF_STREAM) {
                     err = OK;
                 }
                 break;
@@ -299,7 +302,7 @@ status_t FrameDecoder::extractInternal(
             if (mediaBuffer->range_length() > codecBuffer->capacity()) {
                 ALOGE("buffer size (%zu) too large for codec input size (%zu)",
                         mediaBuffer->range_length(), codecBuffer->capacity());
-                haveMoreInputs = false;
+                mHaveMoreInputs = false;
                 err = BAD_VALUE;
             } else {
                 codecBuffer->setRange(0, mediaBuffer->range_length());
@@ -309,45 +312,46 @@ status_t FrameDecoder::extractInternal(
                         (const uint8_t*)mediaBuffer->data() + mediaBuffer->range_offset(),
                         mediaBuffer->range_length());
 
-                onInputReceived(codecBuffer, mediaBuffer->meta_data(), firstSample, &flags);
-                firstSample = false;
+                onInputReceived(codecBuffer, mediaBuffer->meta_data(), mFirstSample, &flags);
+                mFirstSample = false;
             }
 
             mediaBuffer->release();
 
-            if (haveMoreInputs && inputIndex < inputBuffers.size()) {
+            if (mHaveMoreInputs) {
                 ALOGV("QueueInput: size=%zu ts=%" PRId64 " us flags=%x",
                         codecBuffer->size(), ptsUs, flags);
 
-                err = decoder->queueInputBuffer(
-                        inputIndex,
+                err = mDecoder->queueInputBuffer(
+                        index,
                         codecBuffer->offset(),
                         codecBuffer->size(),
                         ptsUs,
                         flags);
 
                 if (flags & MediaCodec::BUFFER_FLAG_EOS) {
-                    haveMoreInputs = false;
+                    mHaveMoreInputs = false;
                 }
             }
         }
 
         while (err == OK) {
+            size_t offset, size;
             // wait for a decoded buffer
-            err = decoder->dequeueOutputBuffer(
+            err = mDecoder->dequeueOutputBuffer(
                     &index,
                     &offset,
                     &size,
-                    &timeUs,
+                    &ptsUs,
                     &flags,
                     kBufferTimeOutUs);
 
             if (err == INFO_FORMAT_CHANGED) {
                 ALOGV("Received format change");
-                err = decoder->getOutputFormat(&outputFormat);
+                err = mDecoder->getOutputFormat(&mOutputFormat);
             } else if (err == INFO_OUTPUT_BUFFERS_CHANGED) {
                 ALOGV("Output buffers changed");
-                err = decoder->getOutputBuffers(&outputBuffers);
+                err = OK;
             } else {
                 if (err == -EAGAIN /* INFO_TRY_AGAIN_LATER */ && --retriesLeft > 0) {
                     ALOGV("Timed-out waiting for output.. retries left = %zu", retriesLeft);
@@ -355,12 +359,15 @@ status_t FrameDecoder::extractInternal(
                 } else if (err == OK) {
                     // If we're seeking with CLOSEST option and obtained a valid targetTimeUs
                     // from the extractor, decode to the specified frame. Otherwise we're done.
-                    ALOGV("Received an output buffer, timeUs=%lld", (long long)timeUs);
-                    sp<MediaCodecBuffer> videoFrameBuffer = outputBuffers.itemAt(index);
-
-                    err = onOutputReceived(videoFrameBuffer, outputFormat, timeUs, &done);
-
-                    decoder->releaseOutputBuffer(index);
+                    ALOGV("Received an output buffer, timeUs=%lld", (long long)ptsUs);
+                    sp<MediaCodecBuffer> videoFrameBuffer;
+                    err = mDecoder->getOutputBuffer(index, &videoFrameBuffer);
+                    if (err != OK) {
+                        ALOGE("failed to get output buffer %zu", index);
+                        break;
+                    }
+                    err = onOutputReceived(videoFrameBuffer, mOutputFormat, ptsUs, &done);
+                    mDecoder->releaseOutputBuffer(index);
                 } else {
                     ALOGW("Received error %d (%s) instead of output", err, asString(err));
                     done = true;
@@ -370,14 +377,25 @@ status_t FrameDecoder::extractInternal(
         }
     } while (err == OK && !done);
 
-    mSource->stop();
-    decoder->release();
-
     if (err != OK) {
         ALOGE("failed to get video frame (err %d)", err);
     }
 
     return err;
+}
+
+//////////////////////////////////////////////////////////////////////
+
+VideoFrameDecoder::VideoFrameDecoder(
+        const AString &componentName,
+        const sp<MetaData> &trackMeta,
+        const sp<IMediaSource> &source)
+    : FrameDecoder(componentName, trackMeta, source),
+      mIsAvcOrHevc(false),
+      mSeekMode(MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC),
+      mTargetTimeUs(-1ll),
+      mNumFrames(0),
+      mNumFramesDecoded(0) {
 }
 
 sp<AMessage> VideoFrameDecoder::onGetFormatAndSeekOptions(
@@ -511,33 +529,47 @@ status_t VideoFrameDecoder::onOutputReceived(
     return ERROR_UNSUPPORTED;
 }
 
+////////////////////////////////////////////////////////////////////////
+
+ImageDecoder::ImageDecoder(
+        const AString &componentName,
+        const sp<MetaData> &trackMeta,
+        const sp<IMediaSource> &source)
+    : FrameDecoder(componentName, trackMeta, source),
+      mFrame(NULL),
+      mWidth(0),
+      mHeight(0),
+      mGridRows(1),
+      mGridCols(1),
+      mTilesDecoded(0) {
+}
+
 sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
         int64_t frameTimeUs, size_t /*numFrames*/,
         int /*seekMode*/, MediaSource::ReadOptions *options) {
     sp<MetaData> overrideMeta;
-    mThumbnail = false;
     if (frameTimeUs < 0) {
         uint32_t type;
         const void *data;
         size_t size;
-        int32_t thumbWidth, thumbHeight;
 
         // if we have a stand-alone thumbnail, set up the override meta,
         // and set seekTo time to -1.
-        if (!findThumbnailInfo(trackMeta(),
-                &thumbWidth, &thumbHeight, &type, &data, &size)) {
+        if (!findThumbnailInfo(trackMeta(), &mWidth, &mHeight, &type, &data, &size)) {
             ALOGE("Thumbnail not available");
             return NULL;
         }
         overrideMeta = new MetaData(*(trackMeta()));
         overrideMeta->remove(kKeyDisplayWidth);
         overrideMeta->remove(kKeyDisplayHeight);
-        overrideMeta->setInt32(kKeyWidth, thumbWidth);
-        overrideMeta->setInt32(kKeyHeight, thumbHeight);
+        overrideMeta->setInt32(kKeyWidth, mWidth);
+        overrideMeta->setInt32(kKeyHeight, mHeight);
         overrideMeta->setData(kKeyHVCC, type, data, size);
         options->setSeekTo(-1);
-        mThumbnail = true;
     } else {
+        CHECK(trackMeta()->findInt32(kKeyWidth, &mWidth));
+        CHECK(trackMeta()->findInt32(kKeyHeight, &mHeight));
+
         options->setSeekTo(frameTimeUs);
     }
 
@@ -545,17 +577,10 @@ sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
     if (overrideMeta == NULL) {
         // check if we're dealing with a tiled heif
         int32_t tileWidth, tileHeight, gridRows, gridCols;
-        if (trackMeta()->findInt32(kKeyTileWidth, &tileWidth) && tileWidth > 0
-         && trackMeta()->findInt32(kKeyTileHeight, &tileHeight) && tileHeight > 0
-         && trackMeta()->findInt32(kKeyGridRows, &gridRows) && gridRows > 0
-         && trackMeta()->findInt32(kKeyGridCols, &gridCols) && gridCols > 0) {
-            int32_t width, height;
-            CHECK(trackMeta()->findInt32(kKeyWidth, &width));
-            CHECK(trackMeta()->findInt32(kKeyHeight, &height));
-
-            if (width <= tileWidth * gridCols && height <= tileHeight * gridRows) {
+        if (findGridInfo(trackMeta(), &tileWidth, &tileHeight, &gridRows, &gridCols)) {
+            if (mWidth <= tileWidth * gridCols && mHeight <= tileHeight * gridRows) {
                 ALOGV("grid: %dx%d, tile size: %dx%d, picture size: %dx%d",
-                        gridCols, gridRows, tileWidth, tileHeight, width, height);
+                        gridCols, gridRows, tileWidth, tileHeight, mWidth, mHeight);
 
                 overrideMeta = new MetaData(*(trackMeta()));
                 overrideMeta->setInt32(kKeyWidth, tileWidth);
@@ -563,8 +588,8 @@ sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
                 mGridCols = gridCols;
                 mGridRows = gridRows;
             } else {
-                ALOGE("bad grid: %dx%d, tile size: %dx%d, picture size: %dx%d",
-                        gridCols, gridRows, tileWidth, tileHeight, width, height);
+                ALOGE("ignore bad grid: %dx%d, tile size: %dx%d, picture size: %dx%d",
+                        gridCols, gridRows, tileWidth, tileHeight, mWidth, mHeight);
             }
         }
         if (overrideMeta == NULL) {
@@ -600,17 +625,8 @@ status_t ImageDecoder::onOutputReceived(
     CHECK(outputFormat->findInt32("width", &width));
     CHECK(outputFormat->findInt32("height", &height));
 
-    int32_t imageWidth, imageHeight;
-    if (mThumbnail) {
-        CHECK(trackMeta()->findInt32(kKeyThumbnailWidth, &imageWidth));
-        CHECK(trackMeta()->findInt32(kKeyThumbnailHeight, &imageHeight));
-    } else {
-        CHECK(trackMeta()->findInt32(kKeyWidth, &imageWidth));
-        CHECK(trackMeta()->findInt32(kKeyHeight, &imageHeight));
-    }
-
     if (mFrame == NULL) {
-        sp<IMemory> frameMem = allocVideoFrame(trackMeta(), imageWidth, imageHeight, dstBpp());
+        sp<IMemory> frameMem = allocVideoFrame(trackMeta(), mWidth, mHeight, dstBpp());
         mFrame = static_cast<VideoFrame*>(frameMem->pointer());
 
         addFrame(frameMem);
@@ -638,12 +654,12 @@ status_t ImageDecoder::onOutputReceived(
 
     // apply crop on bottom-right
     // TODO: need to move this into the color converter itself.
-    if (dstRight >= imageWidth) {
-        crop_right = imageWidth - dstLeft - 1;
+    if (dstRight >= mWidth) {
+        crop_right = mWidth - dstLeft - 1;
         dstRight = dstLeft + crop_right;
     }
-    if (dstBottom >= imageHeight) {
-        crop_bottom = imageHeight - dstTop - 1;
+    if (dstBottom >= mHeight) {
+        crop_bottom = mHeight - dstTop - 1;
         dstBottom = dstTop + crop_bottom;
     }
 

@@ -6603,13 +6603,27 @@ reacquire_wakelock:
         if (mPipeSource != 0) {
             size_t framesToRead = mBufferSize / mFrameSize;
             framesToRead = min(mRsmpInFramesOA - rear, mRsmpInFramesP2 / 2);
-            framesRead = mPipeSource->read((uint8_t*)mRsmpInBuffer + rear * mFrameSize,
-                    framesToRead);
-            // since pipe is non-blocking, simulate blocking input by waiting for 1/2 of
-            // buffer size or at least for 20ms.
-            size_t sleepFrames = max(
-                    min(mPipeFramesP2, mRsmpInFramesP2) / 2, FMS_20 * mSampleRate / 1000);
-            if (framesRead <= (ssize_t) sleepFrames) {
+
+            // The audio fifo read() returns OVERRUN on overflow, and advances the read pointer
+            // to the full buffer point (clearing the overflow condition).  Upon OVERRUN error,
+            // we immediately retry the read() to get data and prevent another overflow.
+            for (int retries = 0; retries <= 2; ++retries) {
+                ALOGW_IF(retries > 0, "overrun on read from pipe, retry #%d", retries);
+                framesRead = mPipeSource->read((uint8_t*)mRsmpInBuffer + rear * mFrameSize,
+                        framesToRead);
+                if (framesRead != OVERRUN) break;
+            }
+
+            const ssize_t availableToRead = mPipeSource->availableToRead();
+            if (availableToRead >= 0) {
+                // PipeSource is the master clock.  It is up to the AudioRecord client to keep up.
+                LOG_ALWAYS_FATAL_IF((size_t)availableToRead > mPipeFramesP2,
+                        "more frames to read than fifo size, %zd > %zu",
+                        availableToRead, mPipeFramesP2);
+                const size_t pipeFramesFree = mPipeFramesP2 - availableToRead;
+                const size_t sleepFrames = min(pipeFramesFree, mRsmpInFramesP2) / 2;
+                ALOGVV("mPipeFramesP2:%zu mRsmpInFramesP2:%zu sleepFrames:%zu availableToRead:%zd",
+                        mPipeFramesP2, mRsmpInFramesP2, sleepFrames, availableToRead);
                 sleepUs = (sleepFrames * 1000000LL) / mSampleRate;
             }
             if (framesRead < 0) {
