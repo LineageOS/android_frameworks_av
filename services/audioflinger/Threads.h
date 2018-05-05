@@ -1437,8 +1437,8 @@ public:
                                            audio_patch_handle_t *handle);
     virtual status_t    releaseAudioPatch_l(const audio_patch_handle_t handle);
 
-            void        addPatchRecord(const sp<PatchRecord>& record);
-            void        deletePatchRecord(const sp<PatchRecord>& record);
+            void        addPatchTrack(const sp<PatchRecord>& record);
+            void        deletePatchTrack(const sp<PatchRecord>& record);
 
             void        readInputParameters_l();
     virtual uint32_t    getInputFramesLost();

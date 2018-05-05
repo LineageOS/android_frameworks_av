@@ -7840,13 +7840,13 @@ status_t AudioFlinger::RecordThread::releaseAudioPatch_l(const audio_patch_handl
     return status;
 }
 
-void AudioFlinger::RecordThread::addPatchRecord(const sp<PatchRecord>& record)
+void AudioFlinger::RecordThread::addPatchTrack(const sp<PatchRecord>& record)
 {
     Mutex::Autolock _l(mLock);
     mTracks.add(record);
 }
 
-void AudioFlinger::RecordThread::deletePatchRecord(const sp<PatchRecord>& record)
+void AudioFlinger::RecordThread::deletePatchTrack(const sp<PatchRecord>& record)
 {
     Mutex::Autolock _l(mLock);
     destroyTrack_l(record);
