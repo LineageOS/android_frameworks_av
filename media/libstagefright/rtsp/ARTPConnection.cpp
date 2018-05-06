@@ -590,6 +590,11 @@ status_t ARTPConnection::parseRTP(StreamInfo *s, const sp<ABuffer> &buffer) {
         return -1;
     }
 
+    if ((data[1] & 0x7f) == 20) {
+        // Unassigned payload type
+        return -1;
+    }
+
     if (data[0] & 0x20) {
         // Padding present.
 
