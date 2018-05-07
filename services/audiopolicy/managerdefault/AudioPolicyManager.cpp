@@ -1883,6 +1883,7 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
         if (mCallTxPatch != 0 &&
             inputDesc->getModuleHandle() == mCallTxPatch->mPatch.sources[0].ext.device.hw_module) {
             ALOGW("startInput(%d) failed: call in progress", input);
+            *concurrency |= API_INPUT_CONCURRENCY_CALL;
             return INVALID_OPERATION;
         }
 
@@ -1925,17 +1926,20 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
                         ALOGW("startInput(%d) failed for HOTWORD: "
                                 "other input %d already started for HOTWORD",
                               input, activeDesc->mIoHandle);
+                        *concurrency |= API_INPUT_CONCURRENCY_HOTWORD;
                         return INVALID_OPERATION;
                     }
                 } else {
                     ALOGV("startInput(%d) failed for HOTWORD: other input %d already started",
                           input, activeDesc->mIoHandle);
+                    *concurrency |= API_INPUT_CONCURRENCY_CAPTURE;
                     return INVALID_OPERATION;
                 }
             } else {
                 if (activeSource != AUDIO_SOURCE_HOTWORD) {
                     ALOGW("startInput(%d) failed: other input %d already started",
                           input, activeDesc->mIoHandle);
+                    *concurrency |= API_INPUT_CONCURRENCY_CAPTURE;
                     return INVALID_OPERATION;
                 }
             }
@@ -1960,6 +1964,7 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
                 audio_session_t activeSession = activeSessions.keyAt(0);
                 audio_io_handle_t activeHandle = activeDesc->mIoHandle;
                 SortedVector<audio_session_t> sessions = activeDesc->getPreemptedSessions();
+                *concurrency |= API_INPUT_CONCURRENCY_PREEMPT;
                 sessions.add(activeSession);
                 inputDesc->setPreemptedSessions(sessions);
                 stopInput(activeHandle, activeSession);
