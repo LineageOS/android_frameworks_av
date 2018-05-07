@@ -704,7 +704,10 @@ private:
 private:
     class MediaMetrics {
       public:
-        MediaMetrics() : mAnalyticsItem(new MediaAnalyticsItem("audiorecord")) {
+        MediaMetrics() : mAnalyticsItem(new MediaAnalyticsItem("audiorecord")),
+                         mCreatedNs(systemTime(SYSTEM_TIME_REALTIME)),
+                         mStartedNs(0), mDurationNs(0), mCount(0),
+                         mLastError(NO_ERROR) {
         }
         ~MediaMetrics() {
             // mAnalyticsItem alloc failure will be flagged in the constructor
@@ -715,8 +718,20 @@ private:
         }
         void gather(const AudioRecord *record);
         MediaAnalyticsItem *dup() { return mAnalyticsItem->dup(); }
+
+        void logStart(nsecs_t when) { mStartedNs = when; mCount++; }
+        void logStop(nsecs_t when) { mDurationNs += (when-mStartedNs); mStartedNs = 0;}
+        void markError(status_t errcode, const char *func)
+                 { mLastError = errcode; mLastErrorFunc = func;}
       private:
         std::unique_ptr<MediaAnalyticsItem> mAnalyticsItem;
+        nsecs_t mCreatedNs;     // XXX: perhaps not worth it in production
+        nsecs_t mStartedNs;
+        nsecs_t mDurationNs;
+        int32_t mCount;
+
+        status_t mLastError;
+        std::string mLastErrorFunc;
     };
     MediaMetrics mMediaMetrics;
 };

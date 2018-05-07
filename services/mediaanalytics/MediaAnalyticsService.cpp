@@ -481,6 +481,7 @@ void MediaAnalyticsService::saveItem(MediaAnalyticsItem * item)
 
 static std::string allowedKeys[] =
 {
+    "audiopolicy",
     "audiorecord",
     "audiotrack",
     "codec",

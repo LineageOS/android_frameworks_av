@@ -18,8 +18,11 @@
 //#define LOG_NDEBUG 0
 
 #include <utils/Log.h>
+#include <media/MediaAnalyticsItem.h>
+
 #include "AudioPolicyService.h"
 #include "ServiceUtilities.h"
+#include "TypeConverter.h"
 
 namespace android {
 
@@ -409,6 +412,35 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
     return NO_ERROR;
 }
 
+// this is replicated from frameworks/av/media/libaudioclient/AudioRecord.cpp
+// XXX -- figure out how to put it into a common, shared location
+
+static std::string audioSourceString(audio_source_t value) {
+    std::string source;
+    if (SourceTypeConverter::toString(value, source)) {
+        return source;
+    }
+    char rawbuffer[16];  // room for "%d"
+    snprintf(rawbuffer, sizeof(rawbuffer), "%d", value);
+    return rawbuffer;
+}
+
+static std::string audioConcurrencyString(AudioPolicyInterface::concurrency_type__mask_t concurrency)
+{
+    char buffer[64]; // oversized
+    if (concurrency & AudioPolicyInterface::API_INPUT_CONCURRENCY_ALL) {
+        snprintf(buffer, sizeof(buffer), "%s%s%s%s",
+            (concurrency & AudioPolicyInterface::API_INPUT_CONCURRENCY_CALL)? ",call":"",
+            (concurrency & AudioPolicyInterface::API_INPUT_CONCURRENCY_CAPTURE)? ",capture":"",
+            (concurrency & AudioPolicyInterface::API_INPUT_CONCURRENCY_HOTWORD)? ",hotword":"",
+            (concurrency & AudioPolicyInterface::API_INPUT_CONCURRENCY_PREEMPT)? ",preempt":"");
+    } else {
+        snprintf(buffer, sizeof(buffer), ",none");
+    }
+
+    return &buffer[1];
+}
+
 status_t AudioPolicyService::startInput(audio_port_handle_t portId, bool *silenced)
 {
     if (mAudioPolicyManager == NULL) {
@@ -444,6 +476,57 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId, bool *silenc
         AutoCallerClear acc;
         status = mAudioPolicyManager->startInput(
                     client->input, client->session, *silenced, &concurrency);
+
+    }
+
+    // XXX log them all for a while, during some dogfooding.
+    if (1 || status != NO_ERROR) {
+
+        static constexpr char kAudioPolicy[] = "audiopolicy";
+
+        static constexpr char kAudioPolicyReason[] = "android.media.audiopolicy.reason";
+        static constexpr char kAudioPolicyStatus[] = "android.media.audiopolicy.status";
+        static constexpr char kAudioPolicyRqstSrc[] = "android.media.audiopolicy.rqst.src";
+        static constexpr char kAudioPolicyRqstPkg[] = "android.media.audiopolicy.rqst.pkg";
+        static constexpr char kAudioPolicyRqstSession[] = "android.media.audiopolicy.rqst.session";
+        static constexpr char kAudioPolicyActiveSrc[] = "android.media.audiopolicy.active.src";
+        static constexpr char kAudioPolicyActivePkg[] = "android.media.audiopolicy.active.pkg";
+        static constexpr char kAudioPolicyActiveSession[] = "android.media.audiopolicy.active.session";
+
+        MediaAnalyticsItem *item = new MediaAnalyticsItem(kAudioPolicy);
+        if (item != NULL) {
+
+            item->setCString(kAudioPolicyReason, audioConcurrencyString(concurrency).c_str());
+            item->setInt32(kAudioPolicyStatus, status);
+
+            item->setCString(kAudioPolicyRqstSrc, audioSourceString(client->attributes.source).c_str());
+            item->setCString(kAudioPolicyRqstPkg, std::string(String8(client->opPackageName).string()).c_str());
+            item->setInt32(kAudioPolicyRqstSession, client->session);
+
+            // figure out who is active
+            // NB: might the other party have given up the microphone since then? how sure.
+            // perhaps could have given up on it.
+            // we hold mLock, so perhaps we're safe for this looping
+            if (concurrency != AudioPolicyInterface::API_INPUT_CONCURRENCY_NONE) {
+                int count = mAudioRecordClients.size();
+                for (int i = 0; i<count ; i++) {
+                    if (portId == mAudioRecordClients.keyAt(i)) {
+                        continue;
+                    }
+                    sp<AudioRecordClient> other = mAudioRecordClients.valueAt(i);
+                    if (other->active) {
+                        // keeps the last of the clients marked active
+                        item->setCString(kAudioPolicyActiveSrc,
+                                         audioSourceString(other->attributes.source).c_str());
+                        item->setCString(kAudioPolicyActivePkg, std::string(String8(other->opPackageName).string()).c_str());
+                        item->setInt32(kAudioPolicyActiveSession, other->session);
+                    }
+                }
+            }
+            item->selfrecord();
+            delete item;
+            item = NULL;
+        }
     }
 
     if (status == NO_ERROR) {
@@ -457,6 +540,8 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId, bool *silenc
         if (concurrency & AudioPolicyInterface::API_INPUT_CONCURRENCY_CAPTURE) {
             //TODO: check concurrent capture permission
         }
+
+        client->active = true;
     } else {
         finishRecording(client->opPackageName, client->uid);
     }
@@ -476,6 +561,8 @@ status_t AudioPolicyService::stopInput(audio_port_handle_t portId)
         return INVALID_OPERATION;
     }
     sp<AudioRecordClient> client = mAudioRecordClients.valueAt(index);
+
+    client->active = false;
 
     // finish the recording app op
     finishRecording(client->opPackageName, client->uid);
