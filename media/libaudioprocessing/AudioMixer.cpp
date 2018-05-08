@@ -204,15 +204,14 @@ bool AudioMixer::setChannelMasks(int name,
 
     // channel masks have changed, does this track need a downmixer?
     // update to try using our desired format (if we aren't already using it)
-    const audio_format_t prevDownmixerFormat = track->mDownmixRequiresFormat;
     const status_t status = track->prepareForDownmix();
     ALOGE_IF(status != OK,
             "prepareForDownmix error %d, track channel mask %#x, mixer channel mask %#x",
             status, track->channelMask, track->mMixerChannelMask);
 
-    if (prevDownmixerFormat != track->mDownmixRequiresFormat) {
-        track->prepareForReformat(); // because of downmixer, track format may change!
-    }
+    // always do reformat since channel mask changed,
+    // do it after downmix since track format may change!
+    track->prepareForReformat();
 
     if (track->mResampler.get() != nullptr && mixerChannelCountChanged) {
         // resampler channels may have changed.
