@@ -19,6 +19,8 @@
 
 #include "include/HeifDecoderAPI.h"
 #include <system/graphics.h>
+#include <utils/Condition.h>
+#include <utils/Mutex.h>
 #include <utils/RefBase.h>
 
 namespace android {
@@ -49,14 +51,30 @@ public:
     size_t skipScanlines(size_t count) override;
 
 private:
+    struct DecodeThread;
+
     sp<IDataSource> mDataSource;
     sp<MediaMetadataRetriever> mRetriever;
     sp<IMemory> mFrameMemory;
     android_pixel_format_t mOutputColor;
     size_t mCurScanline;
+    uint32_t mWidth;
+    uint32_t mHeight;
     bool mFrameDecoded;
     bool mHasImage;
     bool mHasVideo;
+
+    // Slice decoding only
+    Mutex mLock;
+    Condition mScanlineReady;
+    sp<DecodeThread> mThread;
+    size_t mAvailableLines;
+    size_t mNumSlices;
+    uint32_t mSliceHeight;
+    bool mAsyncDecodeDone;
+
+    bool decodeAsync();
+    bool getScanlineInner(uint8_t* dst);
 };
 
 } // namespace android
