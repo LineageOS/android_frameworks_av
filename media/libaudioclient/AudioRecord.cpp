@@ -99,6 +99,11 @@ void AudioRecord::MediaMetrics::gather(const AudioRecord *record)
     static constexpr char kAudioRecordLatency[] = "android.media.audiorecord.latency";
     static constexpr char kAudioRecordSampleRate[] = "android.media.audiorecord.samplerate";
     static constexpr char kAudioRecordChannelCount[] = "android.media.audiorecord.channels";
+    static constexpr char kAudioRecordCreated[] = "android.media.audiorecord.createdMs";
+    static constexpr char kAudioRecordDuration[] = "android.media.audiorecord.durationMs";
+    static constexpr char kAudioRecordCount[] = "android.media.audiorecord.n";
+    static constexpr char kAudioRecordError[] = "android.media.audiorecord.errcode";
+    static constexpr char kAudioRecordErrorFunction[] = "android.media.audiorecord.errfunc";
 
     // constructor guarantees mAnalyticsItem is valid
 
@@ -109,6 +114,24 @@ void AudioRecord::MediaMetrics::gather(const AudioRecord *record)
                                audioFormatTypeString(record->mFormat).c_str());
     mAnalyticsItem->setCString(kAudioRecordSource,
                                audioSourceString(record->mAttributes.source).c_str());
+
+    // log total duration recording, including anything currently running [and count].
+    nsecs_t active = 0;
+    if (mStartedNs != 0) {
+        active = systemTime() - mStartedNs;
+    }
+    mAnalyticsItem->setInt64(kAudioRecordDuration, (mDurationNs + active) / (1000 * 1000));
+    mAnalyticsItem->setInt32(kAudioRecordCount, mCount);
+
+    // XXX I don't know that this adds a lot of value, long term
+    if (mCreatedNs != 0) {
+        mAnalyticsItem->setInt64(kAudioRecordCreated, mCreatedNs / (1000 * 1000));
+    }
+
+    if (mLastError != NO_ERROR) {
+        mAnalyticsItem->setInt32(kAudioRecordError, mLastError);
+        mAnalyticsItem->setCString(kAudioRecordErrorFunction, mLastErrorFunc.c_str());
+    }
 }
 
 // hand the user a snapshot of the metrics.
@@ -354,6 +377,9 @@ status_t AudioRecord::set(
 
 exit:
     mStatus = status;
+    if (status != NO_ERROR) {
+        mMediaMetrics.markError(status, __FUNCTION__);
+    }
     return status;
 }
 
@@ -412,8 +438,14 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
             get_sched_policy(0, &mPreviousSchedulingGroup);
             androidSetThreadPriority(0, ANDROID_PRIORITY_AUDIO);
         }
+
+        // we've successfully started, log that time
+        mMediaMetrics.logStart(systemTime());
     }
 
+    if (status != NO_ERROR) {
+        mMediaMetrics.markError(status, __FUNCTION__);
+    }
     return status;
 }
 
@@ -438,6 +470,9 @@ void AudioRecord::stop()
         setpriority(PRIO_PROCESS, 0, mPreviousPriority);
         set_sched_policy(0, mPreviousSchedulingGroup);
     }
+
+    // we've successfully started, log that time
+    mMediaMetrics.logStop(systemTime());
 }
 
 bool AudioRecord::stopped() const
