@@ -43,7 +43,8 @@ static const int64_t kBufferTimeOutUs = 10000ll; // 10 msec
 static const size_t kRetryCount = 50; // must be >0
 
 sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
-        int32_t width, int32_t height, int32_t dstBpp, bool metaOnly = false) {
+        int32_t width, int32_t height, int32_t tileWidth, int32_t tileHeight,
+        int32_t dstBpp, bool metaOnly = false) {
     int32_t rotationAngle;
     if (!trackMeta->findInt32(kKeyRotation, &rotationAngle)) {
         rotationAngle = 0;  // By default, no rotation
@@ -74,7 +75,7 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
     }
 
     VideoFrame frame(width, height, displayWidth, displayHeight,
-            rotationAngle, dstBpp, !metaOnly, iccSize);
+            tileWidth, tileHeight, rotationAngle, dstBpp, !metaOnly, iccSize);
 
     size_t size = frame.getFlattenedSize();
     sp<MemoryHeapBase> heap = new MemoryHeapBase(size, 0, "MetadataRetrieverClient");
@@ -155,7 +156,7 @@ sp<IMemory> FrameDecoder::getMetadataOnly(
         return NULL;
     }
 
-    int32_t width, height;
+    int32_t width, height, tileWidth = 0, tileHeight = 0;
     if (thumbnail) {
         if (!findThumbnailInfo(trackMeta, &width, &height)) {
             return NULL;
@@ -163,8 +164,14 @@ sp<IMemory> FrameDecoder::getMetadataOnly(
     } else {
         CHECK(trackMeta->findInt32(kKeyWidth, &width));
         CHECK(trackMeta->findInt32(kKeyHeight, &height));
+
+        int32_t gridRows, gridCols;
+        if (!findGridInfo(trackMeta, &tileWidth, &tileHeight, &gridRows, &gridCols)) {
+            tileWidth = tileHeight = 0;
+        }
     }
-    return allocVideoFrame(trackMeta, width, height, dstBpp, true /*metaOnly*/);
+    return allocVideoFrame(trackMeta,
+            width, height, tileWidth, tileHeight, dstBpp, true /*metaOnly*/);
 }
 
 FrameDecoder::FrameDecoder(
@@ -237,8 +244,11 @@ status_t FrameDecoder::init(
     return OK;
 }
 
-sp<IMemory> FrameDecoder::extractFrame() {
-    status_t err = extractInternal();
+sp<IMemory> FrameDecoder::extractFrame(FrameRect *rect) {
+    status_t err = onExtractRect(rect);
+    if (err == OK) {
+        err = extractInternal();
+    }
     if (err != OK) {
         return NULL;
     }
@@ -503,6 +513,8 @@ status_t VideoFrameDecoder::onOutputReceived(
             trackMeta(),
             (crop_right - crop_left + 1),
             (crop_bottom - crop_top + 1),
+            0,
+            0,
             dstBpp());
     addFrame(frameMem);
     VideoFrame* frame = static_cast<VideoFrame*>(frameMem->pointer());
@@ -541,7 +553,10 @@ ImageDecoder::ImageDecoder(
       mHeight(0),
       mGridRows(1),
       mGridCols(1),
-      mTilesDecoded(0) {
+      mTileWidth(0),
+      mTileHeight(0),
+      mTilesDecoded(0),
+      mTargetTiles(0) {
 }
 
 sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
@@ -585,10 +600,12 @@ sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
                 overrideMeta = new MetaData(*(trackMeta()));
                 overrideMeta->setInt32(kKeyWidth, tileWidth);
                 overrideMeta->setInt32(kKeyHeight, tileHeight);
+                mTileWidth = tileWidth;
+                mTileHeight = tileHeight;
                 mGridCols = gridCols;
                 mGridRows = gridRows;
             } else {
-                ALOGE("ignore bad grid: %dx%d, tile size: %dx%d, picture size: %dx%d",
+                ALOGW("ignore bad grid: %dx%d, tile size: %dx%d, picture size: %dx%d",
                         gridCols, gridRows, tileWidth, tileHeight, mWidth, mHeight);
             }
         }
@@ -596,6 +613,7 @@ sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
             overrideMeta = trackMeta();
         }
     }
+    mTargetTiles = mGridCols * mGridRows;
 
     sp<AMessage> videoFormat;
     if (convertMetaDataToMessage(overrideMeta, &videoFormat) != OK) {
@@ -614,6 +632,45 @@ sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
     return videoFormat;
 }
 
+status_t ImageDecoder::onExtractRect(FrameRect *rect) {
+    // TODO:
+    // This callback is for verifying whether we can decode the rect,
+    // and if so, set up the internal variables for decoding.
+    // Currently, rect decoding is restricted to sequentially decoding one
+    // row of tiles at a time. We can't decode arbitrary rects, as the image
+    // track doesn't yet support seeking by tiles. So all we do here is to
+    // verify the rect against what we expect.
+    // When seeking by tile is supported, this code should be updated to
+    // set the seek parameters.
+    if (rect == NULL) {
+        if (mTilesDecoded > 0) {
+            return ERROR_UNSUPPORTED;
+        }
+        mTargetTiles = mGridRows * mGridCols;
+        return OK;
+    }
+
+    if (mTileWidth <= 0 || mTileHeight <=0) {
+        return ERROR_UNSUPPORTED;
+    }
+
+    int32_t row = mTilesDecoded / mGridCols;
+    int32_t expectedTop = row * mTileHeight;
+    int32_t expectedBot = (row + 1) * mTileHeight;
+    if (expectedBot > mHeight) {
+        expectedBot = mHeight;
+    }
+    if (rect->left != 0 || rect->top != expectedTop
+            || rect->right != mWidth || rect->bottom != expectedBot) {
+        ALOGE("currently only support sequential decoding of slices");
+        return ERROR_UNSUPPORTED;
+    }
+
+    // advance one row
+    mTargetTiles = mTilesDecoded + mGridCols;
+    return OK;
+}
+
 status_t ImageDecoder::onOutputReceived(
         const sp<MediaCodecBuffer> &videoFrameBuffer,
         const sp<AMessage> &outputFormat, int64_t /*timeUs*/, bool *done) {
@@ -626,7 +683,8 @@ status_t ImageDecoder::onOutputReceived(
     CHECK(outputFormat->findInt32("height", &height));
 
     if (mFrame == NULL) {
-        sp<IMemory> frameMem = allocVideoFrame(trackMeta(), mWidth, mHeight, dstBpp());
+        sp<IMemory> frameMem = allocVideoFrame(
+                trackMeta(), mWidth, mHeight, mTileWidth, mTileHeight, dstBpp());
         mFrame = static_cast<VideoFrame*>(frameMem->pointer());
 
         addFrame(frameMem);
@@ -638,8 +696,6 @@ status_t ImageDecoder::onOutputReceived(
     ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, dstFormat());
 
     int32_t dstLeft, dstTop, dstRight, dstBottom;
-    int32_t numTiles = mGridRows * mGridCols;
-
     dstLeft = mTilesDecoded % mGridCols * width;
     dstTop = mTilesDecoded / mGridCols * height;
     dstRight = dstLeft + width - 1;
@@ -663,7 +719,7 @@ status_t ImageDecoder::onOutputReceived(
         dstBottom = dstTop + crop_bottom;
     }
 
-    *done = (++mTilesDecoded >= numTiles);
+    *done = (++mTilesDecoded >= mTargetTiles);
 
     if (converter.isValid()) {
         converter.convert(

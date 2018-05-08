@@ -46,6 +46,8 @@ public:
             int64_t timeUs, int option, int colorFormat, bool metaOnly) = 0;
     virtual sp<IMemory>     getImageAtIndex(
             int index, int colorFormat, bool metaOnly, bool thumbnail) = 0;
+    virtual sp<IMemory>     getImageRectAtIndex(
+            int index, int colorFormat, int left, int top, int right, int bottom) = 0;
     virtual status_t        getFrameAtIndex(
             std::vector<sp<IMemory> > *frames,
             int frameIndex, int numFrames, int colorFormat, bool metaOnly) = 0;

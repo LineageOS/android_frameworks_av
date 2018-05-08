@@ -271,17 +271,43 @@ status_t HeifDataSource::getSize(off64_t* size) {
 
 /////////////////////////////////////////////////////////////////////////
 
+struct HeifDecoderImpl::DecodeThread : public Thread {
+    explicit DecodeThread(HeifDecoderImpl *decoder) : mDecoder(decoder) {}
+
+private:
+    HeifDecoderImpl* mDecoder;
+
+    bool threadLoop();
+
+    DISALLOW_EVIL_CONSTRUCTORS(DecodeThread);
+};
+
+bool HeifDecoderImpl::DecodeThread::threadLoop() {
+    return mDecoder->decodeAsync();
+}
+
+/////////////////////////////////////////////////////////////////////////
+
 HeifDecoderImpl::HeifDecoderImpl() :
     // output color format should always be set via setOutputColor(), in case
     // it's not, default to HAL_PIXEL_FORMAT_RGB_565.
     mOutputColor(HAL_PIXEL_FORMAT_RGB_565),
     mCurScanline(0),
+    mWidth(0),
+    mHeight(0),
     mFrameDecoded(false),
     mHasImage(false),
-    mHasVideo(false) {
+    mHasVideo(false),
+    mAvailableLines(0),
+    mNumSlices(1),
+    mSliceHeight(0),
+    mAsyncDecodeDone(false) {
 }
 
 HeifDecoderImpl::~HeifDecoderImpl() {
+    if (mThread != nullptr) {
+        mThread->join();
+    }
 }
 
 bool HeifDecoderImpl::init(HeifStream* stream, HeifFrameInfo* frameInfo) {
@@ -310,22 +336,23 @@ bool HeifDecoderImpl::init(HeifStream* stream, HeifFrameInfo* frameInfo) {
 
     mHasImage = hasImage && !strcasecmp(hasImage, "yes");
     mHasVideo = hasVideo && !strcasecmp(hasVideo, "yes");
+    sp<IMemory> sharedMem;
     if (mHasImage) {
         // image index < 0 to retrieve primary image
-        mFrameMemory = mRetriever->getImageAtIndex(
+        sharedMem = mRetriever->getImageAtIndex(
                 -1, mOutputColor, true /*metaOnly*/);
     } else if (mHasVideo) {
-        mFrameMemory = mRetriever->getFrameAtTime(0,
+        sharedMem = mRetriever->getFrameAtTime(0,
                 MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC,
                 mOutputColor, true /*metaOnly*/);
     }
 
-    if (mFrameMemory == nullptr || mFrameMemory->pointer() == nullptr) {
+    if (sharedMem == nullptr || sharedMem->pointer() == nullptr) {
         ALOGE("getFrameAtTime: videoFrame is a nullptr");
         return false;
     }
 
-    VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->pointer());
+    VideoFrame* videoFrame = static_cast<VideoFrame*>(sharedMem->pointer());
 
     ALOGV("Meta dimension %dx%d, display %dx%d, angle %d, iccSize %d",
             videoFrame->mWidth,
@@ -343,6 +370,14 @@ bool HeifDecoderImpl::init(HeifStream* stream, HeifFrameInfo* frameInfo) {
                 videoFrame->mBytesPerPixel,
                 videoFrame->mIccSize,
                 videoFrame->getFlattenedIccData());
+    }
+    mWidth = videoFrame->mWidth;
+    mHeight = videoFrame->mHeight;
+    if (mHasImage && videoFrame->mTileHeight >= 512 && mWidth >= 3000 && mHeight >= 2000 ) {
+        // Try decoding in slices only if the image has tiles and is big enough.
+        mSliceHeight = videoFrame->mTileHeight;
+        mNumSlices = (videoFrame->mHeight + mSliceHeight - 1) / mSliceHeight;
+        ALOGV("mSliceHeight %u, mNumSlices %zu", mSliceHeight, mNumSlices);
     }
     return true;
 }
@@ -376,12 +411,83 @@ bool HeifDecoderImpl::setOutputColor(HeifColorFormat heifColor) {
     return false;
 }
 
+bool HeifDecoderImpl::decodeAsync() {
+    for (size_t i = 1; i < mNumSlices; i++) {
+        ALOGV("decodeAsync(): decoding slice %zu", i);
+        size_t top = i * mSliceHeight;
+        size_t bottom = (i + 1) * mSliceHeight;
+        if (bottom > mHeight) {
+            bottom = mHeight;
+        }
+        sp<IMemory> frameMemory = mRetriever->getImageRectAtIndex(
+                -1, mOutputColor, 0, top, mWidth, bottom);
+        {
+            Mutex::Autolock autolock(mLock);
+
+            if (frameMemory == nullptr || frameMemory->pointer() == nullptr) {
+                mAsyncDecodeDone = true;
+                mScanlineReady.signal();
+                break;
+            }
+            mFrameMemory = frameMemory;
+            mAvailableLines = bottom;
+            ALOGV("decodeAsync(): available lines %zu", mAvailableLines);
+            mScanlineReady.signal();
+        }
+    }
+    // Aggressive clear to avoid holding on to resources
+    mRetriever.clear();
+    mDataSource.clear();
+    return false;
+}
+
 bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
     // reset scanline pointer
     mCurScanline = 0;
 
     if (mFrameDecoded) {
         return true;
+    }
+
+    // See if we want to decode in slices to allow client to start
+    // scanline processing in parallel with decode. If this fails
+    // we fallback to decoding the full frame.
+    if (mHasImage && mNumSlices > 1) {
+        // get first slice and metadata
+        sp<IMemory> frameMemory = mRetriever->getImageRectAtIndex(
+                -1, mOutputColor, 0, 0, mWidth, mSliceHeight);
+
+        if (frameMemory == nullptr || frameMemory->pointer() == nullptr) {
+            ALOGE("decode: metadata is a nullptr");
+            return false;
+        }
+
+        VideoFrame* videoFrame = static_cast<VideoFrame*>(frameMemory->pointer());
+
+        if (frameInfo != nullptr) {
+            frameInfo->set(
+                    videoFrame->mWidth,
+                    videoFrame->mHeight,
+                    videoFrame->mRotationAngle,
+                    videoFrame->mBytesPerPixel,
+                    videoFrame->mIccSize,
+                    videoFrame->getFlattenedIccData());
+        }
+
+        mFrameMemory = frameMemory;
+        mAvailableLines = mSliceHeight;
+        mThread = new DecodeThread(this);
+        if (mThread->run("HeifDecode", ANDROID_PRIORITY_FOREGROUND) == OK) {
+            mFrameDecoded = true;
+            return true;
+        }
+
+        // Fallback to decode without slicing
+        mThread.clear();
+        mNumSlices = 1;
+        mSliceHeight = 0;
+        mAvailableLines = 0;
+        mFrameMemory.clear();
     }
 
     if (mHasImage) {
@@ -393,14 +499,14 @@ bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
     }
 
     if (mFrameMemory == nullptr || mFrameMemory->pointer() == nullptr) {
-        ALOGE("getFrameAtTime: videoFrame is a nullptr");
+        ALOGE("decode: videoFrame is a nullptr");
         return false;
     }
 
     VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->pointer());
     if (videoFrame->mSize == 0 ||
             mFrameMemory->size() < videoFrame->getFlattenedSize()) {
-        ALOGE("getFrameAtTime: videoFrame size is invalid");
+        ALOGE("decode: videoFrame size is invalid");
         return false;
     }
 
@@ -424,36 +530,45 @@ bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
     }
     mFrameDecoded = true;
 
-    // Aggressive clear to avoid holding on to resources
+    // Aggressively clear to avoid holding on to resources
     mRetriever.clear();
     mDataSource.clear();
     return true;
 }
 
-bool HeifDecoderImpl::getScanline(uint8_t* dst) {
+bool HeifDecoderImpl::getScanlineInner(uint8_t* dst) {
     if (mFrameMemory == nullptr || mFrameMemory->pointer() == nullptr) {
         return false;
     }
     VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->pointer());
-    if (mCurScanline >= videoFrame->mHeight) {
-        ALOGE("no more scanline available");
-        return false;
-    }
     uint8_t* src = videoFrame->getFlattenedData() + videoFrame->mRowBytes * mCurScanline++;
     memcpy(dst, src, videoFrame->mBytesPerPixel * videoFrame->mWidth);
     return true;
 }
 
-size_t HeifDecoderImpl::skipScanlines(size_t count) {
-    if (mFrameMemory == nullptr || mFrameMemory->pointer() == nullptr) {
-        return 0;
+bool HeifDecoderImpl::getScanline(uint8_t* dst) {
+    if (mCurScanline >= mHeight) {
+        ALOGE("no more scanline available");
+        return false;
     }
-    VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->pointer());
 
+    if (mNumSlices > 1) {
+        Mutex::Autolock autolock(mLock);
+
+        while (!mAsyncDecodeDone && mCurScanline >= mAvailableLines) {
+            mScanlineReady.wait(mLock);
+        }
+        return (mCurScanline < mAvailableLines) ? getScanlineInner(dst) : false;
+    }
+
+    return getScanlineInner(dst);
+}
+
+size_t HeifDecoderImpl::skipScanlines(size_t count) {
     uint32_t oldScanline = mCurScanline;
     mCurScanline += count;
-    if (mCurScanline > videoFrame->mHeight) {
-        mCurScanline = videoFrame->mHeight;
+    if (mCurScanline > mHeight) {
+        mCurScanline = mHeight;
     }
     return (mCurScanline > oldScanline) ? (mCurScanline - oldScanline) : 0;
 }
