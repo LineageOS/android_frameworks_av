@@ -213,7 +213,7 @@ sp<IMemory> MetadataRetrieverClient::getFrameAtTime(
 
 sp<IMemory> MetadataRetrieverClient::getImageAtIndex(
         int index, int colorFormat, bool metaOnly, bool thumbnail) {
-    ALOGV("getFrameAtTime: index(%d) colorFormat(%d), metaOnly(%d) thumbnail(%d)",
+    ALOGV("getImageAtIndex: index(%d) colorFormat(%d), metaOnly(%d) thumbnail(%d)",
             index, colorFormat, metaOnly, thumbnail);
     Mutex::Autolock lock(mLock);
     Mutex::Autolock glock(sLock);
@@ -222,6 +222,25 @@ sp<IMemory> MetadataRetrieverClient::getImageAtIndex(
         return NULL;
     }
     sp<IMemory> frame = mRetriever->getImageAtIndex(index, colorFormat, metaOnly, thumbnail);
+    if (frame == NULL) {
+        ALOGE("failed to extract image");
+        return NULL;
+    }
+    return frame;
+}
+
+sp<IMemory> MetadataRetrieverClient::getImageRectAtIndex(
+        int index, int colorFormat, int left, int top, int right, int bottom) {
+    ALOGV("getImageRectAtIndex: index(%d) colorFormat(%d), rect {%d, %d, %d, %d}",
+            index, colorFormat, left, top, right, bottom);
+    Mutex::Autolock lock(mLock);
+    Mutex::Autolock glock(sLock);
+    if (mRetriever == NULL) {
+        ALOGE("retriever is not initialized");
+        return NULL;
+    }
+    sp<IMemory> frame = mRetriever->getImageRectAtIndex(
+            index, colorFormat, left, top, right, bottom);
     if (frame == NULL) {
         ALOGE("failed to extract image");
         return NULL;

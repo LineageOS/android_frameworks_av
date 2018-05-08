@@ -166,6 +166,19 @@ sp<IMemory> MediaMetadataRetriever::getImageAtIndex(
     return mRetriever->getImageAtIndex(index, colorFormat, metaOnly, thumbnail);
 }
 
+sp<IMemory> MediaMetadataRetriever::getImageRectAtIndex(
+        int index, int colorFormat, int left, int top, int right, int bottom) {
+    ALOGV("getImageRectAtIndex: index(%d) colorFormat(%d) rect {%d, %d, %d, %d}",
+            index, colorFormat, left, top, right, bottom);
+    Mutex::Autolock _l(mLock);
+    if (mRetriever == 0) {
+        ALOGE("retriever is not initialized");
+        return NULL;
+    }
+    return mRetriever->getImageRectAtIndex(
+            index, colorFormat, left, top, right, bottom);
+}
+
 status_t MediaMetadataRetriever::getFrameAtIndex(
         std::vector<sp<IMemory> > *frames,
         int frameIndex, int numFrames, int colorFormat, bool metaOnly) {

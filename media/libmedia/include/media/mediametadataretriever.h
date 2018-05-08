@@ -91,6 +91,8 @@ public:
             int colorFormat = HAL_PIXEL_FORMAT_RGB_565, bool metaOnly = false);
     sp<IMemory> getImageAtIndex(int index,
             int colorFormat = HAL_PIXEL_FORMAT_RGB_565, bool metaOnly = false, bool thumbnail = false);
+    sp<IMemory> getImageRectAtIndex(
+            int index, int colorFormat, int left, int top, int right, int bottom);
     status_t getFrameAtIndex(
             std::vector<sp<IMemory> > *frames, int frameIndex, int numFrames = 1,
             int colorFormat = HAL_PIXEL_FORMAT_RGB_565, bool metaOnly = false);
