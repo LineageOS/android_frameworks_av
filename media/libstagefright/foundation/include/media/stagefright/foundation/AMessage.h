@@ -180,6 +180,10 @@ struct AMessage : public RefBase {
         kTypeBuffer,
     };
 
+    struct Rect {
+        int32_t mLeft, mTop, mRight, mBottom;
+    };
+
     size_t countEntries() const;
     const char *getEntryNameAt(size_t index, Type *type) const;
 
@@ -226,10 +230,6 @@ private:
 
     wp<AHandler> mHandler;
     wp<ALooper> mLooper;
-
-    struct Rect {
-        int32_t mLeft, mTop, mRight, mBottom;
-    };
 
     struct Item {
         union {
