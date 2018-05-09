@@ -2,8 +2,6 @@ cc_test {
 
     name: "DrmSessionManager_test",
 
-    tags: ["tests"],
-
     srcs: ["DrmSessionManager_test.cpp"],
 
     shared_libs: [
