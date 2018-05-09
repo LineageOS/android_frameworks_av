@@ -4169,16 +4169,31 @@ void AudioFlinger::MixerThread::threadLoop_sleepTime()
     // buffer size, then write 0s to the output
     if (mSleepTimeUs == 0) {
         if (mMixerStatus == MIXER_TRACKS_ENABLED) {
-            mSleepTimeUs = mActiveSleepTimeUs >> sleepTimeShift;
-            if (mSleepTimeUs < kMinThreadSleepTimeUs) {
-                mSleepTimeUs = kMinThreadSleepTimeUs;
-            }
-            // reduce sleep time in case of consecutive application underruns to avoid
-            // starving the audio HAL. As activeSleepTimeUs() is larger than a buffer
-            // duration we would end up writing less data than needed by the audio HAL if
-            // the condition persists.
-            if (sleepTimeShift < kMaxThreadSleepTimeShift) {
-                sleepTimeShift++;
+            if (mPipeSink.get() != nullptr && mPipeSink == mNormalSink) {
+                // Using the Monopipe availableToWrite, we estimate the
+                // sleep time to retry for more data (before we underrun).
+                MonoPipe *monoPipe = static_cast<MonoPipe *>(mPipeSink.get());
+                const ssize_t availableToWrite = mPipeSink->availableToWrite();
+                const size_t pipeFrames = monoPipe->maxFrames();
+                const size_t framesLeft = pipeFrames - max(availableToWrite, 0);
+                // HAL_framecount <= framesDelay ~ framesLeft / 2 <= Normal_Mixer_framecount
+                const size_t framesDelay = std::min(
+                        mNormalFrameCount, max(framesLeft / 2, mFrameCount));
+                ALOGV("pipeFrames:%zu framesLeft:%zu framesDelay:%zu",
+                        pipeFrames, framesLeft, framesDelay);
+                mSleepTimeUs = framesDelay * MICROS_PER_SECOND / mSampleRate;
+            } else {
+                mSleepTimeUs = mActiveSleepTimeUs >> sleepTimeShift;
+                if (mSleepTimeUs < kMinThreadSleepTimeUs) {
+                    mSleepTimeUs = kMinThreadSleepTimeUs;
+                }
+                // reduce sleep time in case of consecutive application underruns to avoid
+                // starving the audio HAL. As activeSleepTimeUs() is larger than a buffer
+                // duration we would end up writing less data than needed by the audio HAL if
+                // the condition persists.
+                if (sleepTimeShift < kMaxThreadSleepTimeShift) {
+                    sleepTimeShift++;
+                }
             }
         } else {
             mSleepTimeUs = mIdleSleepTimeUs;
