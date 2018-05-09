@@ -47,32 +47,13 @@ public:
             int64_t timeUs, int option, int colorFormat, bool metaOnly) = 0;
     virtual sp<IMemory> getImageAtIndex(
             int index, int colorFormat, bool metaOnly, bool thumbnail) = 0;
+    virtual sp<IMemory> getImageRectAtIndex(
+            int index, int colorFormat, int left, int top, int right, int bottom) = 0;
     virtual status_t getFrameAtIndex(
             std::vector<sp<IMemory> >* frames,
             int frameIndex, int numFrames, int colorFormat, bool metaOnly) = 0;
     virtual MediaAlbumArt* extractAlbumArt() = 0;
     virtual const char* extractMetadata(int keyCode) = 0;
-};
-
-// MediaMetadataRetrieverInterface
-class MediaMetadataRetrieverInterface : public MediaMetadataRetrieverBase
-{
-public:
-    MediaMetadataRetrieverInterface() {}
-
-    virtual             ~MediaMetadataRetrieverInterface() {}
-    virtual sp<IMemory> getFrameAtTime(
-            int64_t /*timeUs*/, int /*option*/, int /*colorFormat*/, bool /*metaOnly*/)
-    { return NULL; }
-    virtual sp<IMemory> getImageAtIndex(
-            int /*index*/, int /*colorFormat*/, bool /*metaOnly*/, bool /*thumbnail*/)
-    { return NULL; }
-    virtual status_t getFrameAtIndex(
-            std::vector<sp<IMemory> >* /*frames*/,
-            int /*frameIndex*/, int /*numFrames*/, int /*colorFormat*/, bool /*metaOnly*/)
-    { return ERROR_UNSUPPORTED; }
-    virtual MediaAlbumArt* extractAlbumArt() { return NULL; }
-    virtual const char* extractMetadata(int /*keyCode*/) { return NULL; }
 };
 
 }; // namespace android
