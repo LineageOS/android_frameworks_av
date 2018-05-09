@@ -944,6 +944,40 @@ const char *AMessage::getEntryNameAt(size_t index, Type *type) const {
     return mItems[index].mName;
 }
 
+AMessage::ItemData AMessage::getEntryAt(size_t index) const {
+    ItemData it;
+    if (index < mNumItems) {
+        switch (mItems[index].mType) {
+            case kTypeInt32:    it.set(mItems[index].u.int32Value); break;
+            case kTypeInt64:    it.set(mItems[index].u.int64Value); break;
+            case kTypeSize:     it.set(mItems[index].u.sizeValue); break;
+            case kTypeFloat:    it.set(mItems[index].u.floatValue); break;
+            case kTypeDouble:   it.set(mItems[index].u.doubleValue); break;
+            case kTypePointer:  it.set(mItems[index].u.ptrValue); break;
+            case kTypeRect:     it.set(mItems[index].u.rectValue); break;
+            case kTypeString:   it.set(*mItems[index].u.stringValue); break;
+            case kTypeObject: {
+                sp<RefBase> obj = mItems[index].u.refValue;
+                it.set(obj);
+                break;
+            }
+            case kTypeMessage: {
+                sp<AMessage> msg = static_cast<AMessage *>(mItems[index].u.refValue);
+                it.set(msg);
+                break;
+            }
+            case kTypeBuffer: {
+                sp<ABuffer> buf = static_cast<ABuffer *>(mItems[index].u.refValue);
+                it.set(buf);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+    return it;
+}
+
 status_t AMessage::setEntryNameAt(size_t index, const char *name) {
     if (index >= mNumItems) {
         return BAD_INDEX;
@@ -964,6 +998,60 @@ status_t AMessage::setEntryNameAt(size_t index, const char *name) {
     return OK;
 }
 
+status_t AMessage::setEntryAt(size_t index, const ItemData &item) {
+    AString stringValue;
+    sp<RefBase> refValue;
+    sp<AMessage> msgValue;
+    sp<ABuffer> bufValue;
+
+    if (index >= mNumItems) {
+        return BAD_INDEX;
+    }
+    if (!item.used()) {
+        return BAD_VALUE;
+    }
+    Item *dst = &mItems[index];
+    freeItemValue(dst);
+
+    // some values can be directly set with the getter. others need items to be allocated
+    if (item.find(&dst->u.int32Value)) {
+        dst->mType = kTypeInt32;
+    } else if (item.find(&dst->u.int64Value)) {
+        dst->mType = kTypeInt64;
+    } else if (item.find(&dst->u.sizeValue)) {
+        dst->mType = kTypeSize;
+    } else if (item.find(&dst->u.floatValue)) {
+        dst->mType = kTypeFloat;
+    } else if (item.find(&dst->u.doubleValue)) {
+        dst->mType = kTypeDouble;
+    } else if (item.find(&dst->u.ptrValue)) {
+        dst->mType = kTypePointer;
+    } else if (item.find(&dst->u.rectValue)) {
+        dst->mType = kTypeRect;
+    } else if (item.find(&stringValue)) {
+        dst->u.stringValue = new AString(stringValue);
+        dst->mType = kTypeString;
+    } else if (item.find(&refValue)) {
+        if (refValue != NULL) { refValue->incStrong(this); }
+        dst->u.refValue = refValue.get();
+        dst->mType = kTypeObject;
+    } else if (item.find(&msgValue)) {
+        if (msgValue != NULL) { msgValue->incStrong(this); }
+        dst->u.refValue = msgValue.get();
+        dst->mType = kTypeMessage;
+    } else if (item.find(&bufValue)) {
+        if (bufValue != NULL) { bufValue->incStrong(this); }
+        dst->u.refValue = bufValue.get();
+        dst->mType = kTypeBuffer;
+    } else {
+        // unsupported item - we should not be here.
+        dst->mType = kTypeInt32;
+        dst->u.int32Value = 0xDEADDEAD;
+        return BAD_TYPE;
+    }
+    return OK;
+}
+
 status_t AMessage::removeEntryAt(size_t index) {
     if (index >= mNumItems) {
         return BAD_INDEX;
@@ -981,6 +1069,34 @@ status_t AMessage::removeEntryAt(size_t index) {
         mItems[mNumItems].mType = kTypeInt32;
     }
     return OK;
+}
+
+void AMessage::setItem(const char *name, const ItemData &item) {
+    if (item.used()) {
+        Item *it = allocateItem(name);
+        if (it != nullptr) {
+            setEntryAt(it - mItems, item);
+        }
+    }
+}
+
+AMessage::ItemData AMessage::findItem(const char *name) const {
+    return getEntryAt(findEntryByName(name));
+}
+
+void AMessage::extend(const sp<AMessage> &other) {
+    // ignore null messages
+    if (other == nullptr) {
+        return;
+    }
+
+    for (size_t ix = 0; ix < other->mNumItems; ++ix) {
+        Item *it = allocateItem(other->mItems[ix].mName);
+        if (it != nullptr) {
+            ItemData data = other->getEntryAt(ix);
+            setEntryAt(it - mItems, data);
+        }
+    }
 }
 
 size_t AMessage::findEntryByName(const char *name) const {
