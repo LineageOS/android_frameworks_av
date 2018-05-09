@@ -231,63 +231,9 @@ status_t ZslProcessor::updateStream(const Parameters &params) {
         return INVALID_OPERATION;
     }
 
-    if ((mZslStreamId != NO_STREAM) || (mInputStreamId != NO_STREAM)) {
-        // Check if stream parameters have to change
-        CameraDeviceBase::StreamInfo streamInfo;
-        res = device->getStreamInfo(mZslStreamId, &streamInfo);
-        if (res != OK) {
-            ALOGE("%s: Camera %d: Error querying capture output stream info: "
-                    "%s (%d)", __FUNCTION__,
-                    client->getCameraId(), strerror(-res), res);
-            return res;
-        }
-        if (streamInfo.width != (uint32_t)params.fastInfo.arrayWidth ||
-                streamInfo.height != (uint32_t)params.fastInfo.arrayHeight) {
-            if (mZslStreamId != NO_STREAM) {
-                ALOGV("%s: Camera %d: Deleting stream %d since the buffer "
-                      "dimensions changed",
-                    __FUNCTION__, client->getCameraId(), mZslStreamId);
-                res = device->deleteStream(mZslStreamId);
-                if (res == -EBUSY) {
-                    ALOGV("%s: Camera %d: Device is busy, call updateStream again "
-                          " after it becomes idle", __FUNCTION__, mId);
-                    return res;
-                } else if(res != OK) {
-                    ALOGE("%s: Camera %d: Unable to delete old output stream "
-                            "for ZSL: %s (%d)", __FUNCTION__,
-                            client->getCameraId(), strerror(-res), res);
-                    return res;
-                }
-                mZslStreamId = NO_STREAM;
-            }
-
-            if (mInputStreamId != NO_STREAM) {
-                ALOGV("%s: Camera %d: Deleting stream %d since the buffer "
-                      "dimensions changed",
-                    __FUNCTION__, client->getCameraId(), mInputStreamId);
-                res = device->deleteStream(mInputStreamId);
-                if (res == -EBUSY) {
-                    ALOGV("%s: Camera %d: Device is busy, call updateStream again "
-                          " after it becomes idle", __FUNCTION__, mId);
-                    return res;
-                } else if(res != OK) {
-                    ALOGE("%s: Camera %d: Unable to delete old output stream "
-                            "for ZSL: %s (%d)", __FUNCTION__,
-                            client->getCameraId(), strerror(-res), res);
-                    return res;
-                }
-                mInputStreamId = NO_STREAM;
-            }
-            if (nullptr != mInputProducer.get()) {
-                mInputProducer->disconnect(NATIVE_WINDOW_API_CPU);
-                mInputProducer.clear();
-            }
-        }
-    }
-
     if (mInputStreamId == NO_STREAM) {
-        res = device->createInputStream(params.fastInfo.arrayWidth,
-            params.fastInfo.arrayHeight, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
+        res = device->createInputStream(params.fastInfo.maxZslSize.width,
+            params.fastInfo.maxZslSize.height, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
             &mInputStreamId);
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create input stream: "
@@ -309,8 +255,8 @@ status_t ZslProcessor::updateStream(const Parameters &params) {
         mProducer->setName(String8("Camera2-ZslRingBufferConsumer"));
         sp<Surface> outSurface = new Surface(producer);
 
-        res = device->createStream(outSurface, params.fastInfo.arrayWidth,
-            params.fastInfo.arrayHeight, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
+        res = device->createStream(outSurface, params.fastInfo.maxZslSize.width,
+            params.fastInfo.maxZslSize.height, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
             HAL_DATASPACE_UNKNOWN, CAMERA3_STREAM_ROTATION_0, &mZslStreamId,
             String8());
         if (res != OK) {
