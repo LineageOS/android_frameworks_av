@@ -876,7 +876,8 @@ status_t BnAudioPolicyService::onTransact(
         case SET_DEVICE_CONNECTION_STATE:
         case HANDLE_DEVICE_CONFIG_CHANGE:
         case SET_PHONE_STATE:
-        case SET_FORCE_USE:
+//FIXME: Allow SET_FORCE_USE calls from system apps until a better use case routing API is available
+//      case SET_FORCE_USE:
         case INIT_STREAM_VOLUME:
         case SET_STREAM_VOLUME:
         case REGISTER_POLICY_MIXES:
