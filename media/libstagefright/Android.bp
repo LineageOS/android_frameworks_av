@@ -162,7 +162,6 @@ cc_library_shared {
         "libmedia_helper",
         "libstagefright_codecbase",
         "libstagefright_foundation",
-        "libstagefright_omx",
         "libstagefright_omx_utils",
         "libstagefright_xmlparser",
         "libRScpp",
