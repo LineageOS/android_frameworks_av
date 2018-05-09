@@ -45,7 +45,7 @@
 #define PROP_DRC_OVERRIDE_BOOST      "aac_drc_boost"
 #define PROP_DRC_OVERRIDE_HEAVY      "aac_drc_heavy"
 #define PROP_DRC_OVERRIDE_ENC_LEVEL "aac_drc_enc_target_level"
-#define PROP_DRC_OVERRIDE_EFFECT     "aac_drc_effect_type"
+#define PROP_DRC_OVERRIDE_EFFECT     "ro.aac_drc_effect_type"
 
 namespace android {
 
@@ -210,10 +210,8 @@ status_t SoftAAC2::initDecoder() {
         mDrcWrap.setParam(DRC_PRES_MODE_WRAP_ENCODER_TARGET, DRC_DEFAULT_MOBILE_ENC_LEVEL);
     }
     // AAC_UNIDRC_SET_EFFECT
-    int32_t effectType = DRC_DEFAULT_MOBILE_DRC_EFFECT;
-    // FIXME can't read default property for DRC effect type
-    //int32_t effectType =
-    //        property_get_int32(PROP_DRC_OVERRIDE_EFFECT, DRC_DEFAULT_MOBILE_DRC_EFFECT);
+    int32_t effectType =
+            property_get_int32(PROP_DRC_OVERRIDE_EFFECT, DRC_DEFAULT_MOBILE_DRC_EFFECT);
     if (effectType < -1 || effectType > 8) {
         effectType = DRC_DEFAULT_MOBILE_DRC_EFFECT;
     }
