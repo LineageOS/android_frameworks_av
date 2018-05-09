@@ -328,12 +328,25 @@ struct id3_header {
 }
 
 void ID3::removeUnsynchronization() {
-    for (size_t i = 0; i + 1 < mSize; ++i) {
-        if (mData[i] == 0xff && mData[i + 1] == 0x00) {
-            memmove(&mData[i + 1], &mData[i + 2], mSize - i - 2);
-            --mSize;
+
+    // This file has "unsynchronization", so we have to replace occurrences
+    // of 0xff 0x00 with just 0xff in order to get the real data.
+
+    size_t writeOffset = 1;
+    for (size_t readOffset = 1; readOffset < mSize; ++readOffset) {
+        if (mData[readOffset - 1] == 0xff && mData[readOffset] == 0x00) {
+            continue;
         }
+        // Only move data if there's actually something to move.
+        // This handles the special case of the data being only [0xff, 0x00]
+        // which should be converted to just 0xff if unsynchronization is on.
+        mData[writeOffset++] = mData[readOffset];
     }
+
+    if (writeOffset < mSize) {
+        mSize = writeOffset;
+    }
+
 }
 
 static void WriteSyncsafeInteger(uint8_t *dst, size_t x) {
