@@ -79,13 +79,26 @@ void SoftwareRenderer::resetFormatIfChanged(
         cropBottomNew = heightNew - 1;
     }
 
+    // The native window buffer format for high-bitdepth content could
+    // depend on the dataspace also.
+    android_dataspace dataSpace;
+    bool dataSpaceChangedForPlanar16 = false;
+    if (colorFormatNew == OMX_COLOR_FormatYUV420Planar16
+            && format->findInt32("android._dataspace", (int32_t *)&dataSpace)
+            && dataSpace != mDataSpace) {
+        // Do not modify mDataSpace here, it's only modified at last
+        // when we do native_window_set_buffers_data_space().
+        dataSpaceChangedForPlanar16 = true;
+    }
+
     if (static_cast<int32_t>(mColorFormat) == colorFormatNew &&
         mWidth == widthNew &&
         mHeight == heightNew &&
         mCropLeft == cropLeftNew &&
         mCropTop == cropTopNew &&
         mCropRight == cropRightNew &&
-        mCropBottom == cropBottomNew) {
+        mCropBottom == cropBottomNew &&
+        !dataSpaceChangedForPlanar16) {
         // Nothing changed, no need to reset renderer.
         return;
     }
@@ -135,11 +148,16 @@ void SoftwareRenderer::resetFormatIfChanged(
             }
             case OMX_COLOR_FormatYUV420Planar16:
             {
-                // Here we would convert OMX_COLOR_FormatYUV420Planar16 into
-                // OMX_COLOR_FormatYUV444Y410, and put it inside a buffer with
-                // format HAL_PIXEL_FORMAT_RGBA_1010102. Surfaceflinger will
-                // use render engine to convert it to RGB if needed.
-                halFormat = HAL_PIXEL_FORMAT_RGBA_1010102;
+                if (((dataSpace & HAL_DATASPACE_STANDARD_MASK) == HAL_DATASPACE_STANDARD_BT2020)
+                 && ((dataSpace & HAL_DATASPACE_TRANSFER_MASK) == HAL_DATASPACE_TRANSFER_ST2084)) {
+                    // Here we would convert OMX_COLOR_FormatYUV420Planar16 into
+                    // OMX_COLOR_FormatYUV444Y410, and put it inside a buffer with
+                    // format HAL_PIXEL_FORMAT_RGBA_1010102. Surfaceflinger will
+                    // use render engine to convert it to RGB if needed.
+                    halFormat = HAL_PIXEL_FORMAT_RGBA_1010102;
+                } else {
+                    halFormat = HAL_PIXEL_FORMAT_YV12;
+                }
                 bufWidth = (mCropWidth + 1) & ~1;
                 bufHeight = (mCropHeight + 1) & ~1;
                 break;
@@ -155,7 +173,7 @@ void SoftwareRenderer::resetFormatIfChanged(
         mConverter = new ColorConverter(
                 mColorFormat, OMX_COLOR_Format16bitRGB565);
         CHECK(mConverter->isValid());
-    } else if (mColorFormat == OMX_COLOR_FormatYUV420Planar16) {
+    } else if (halFormat == HAL_PIXEL_FORMAT_RGBA_1010102) {
         mConverter = new ColorConverter(
                 mColorFormat, OMX_COLOR_FormatYUV444Y410);
         CHECK(mConverter->isValid());
@@ -294,6 +312,46 @@ std::list<FrameRenderTracker::Info> SoftwareRenderer::render(
         for (int y = 0; y < (mCropHeight + 1) / 2; ++y) {
             memcpy(dst_u, src_u, (mCropWidth + 1) / 2);
             memcpy(dst_v, src_v, (mCropWidth + 1) / 2);
+
+            src_u += mWidth / 2;
+            src_v += mWidth / 2;
+            dst_u += dst_c_stride;
+            dst_v += dst_c_stride;
+        }
+    } else if (mColorFormat == OMX_COLOR_FormatYUV420Planar16) {
+        const uint16_t *src_y = (const uint16_t *)data;
+        const uint16_t *src_u = (const uint16_t *)data + mWidth * mHeight;
+        const uint16_t *src_v = src_u + (mWidth / 2 * mHeight / 2);
+
+        src_y += mCropLeft + mCropTop * mWidth;
+        src_u += (mCropLeft + mCropTop * mWidth / 2) / 2;
+        src_v += (mCropLeft + mCropTop * mWidth / 2) / 2;
+
+        uint8_t *dst_y = (uint8_t *)dst;
+        size_t dst_y_size = buf->stride * buf->height;
+        size_t dst_c_stride = ALIGN(buf->stride / 2, 16);
+        size_t dst_c_size = dst_c_stride * buf->height / 2;
+        uint8_t *dst_v = dst_y + dst_y_size;
+        uint8_t *dst_u = dst_v + dst_c_size;
+
+        dst_y += mCropTop * buf->stride + mCropLeft;
+        dst_v += (mCropTop / 2) * dst_c_stride + mCropLeft / 2;
+        dst_u += (mCropTop / 2) * dst_c_stride + mCropLeft / 2;
+
+        for (int y = 0; y < mCropHeight; ++y) {
+            for (int x = 0; x < mCropWidth; ++x) {
+                dst_y[x] = (uint8_t)(src_y[x] >> 2);
+            }
+
+            src_y += mWidth;
+            dst_y += buf->stride;
+        }
+
+        for (int y = 0; y < (mCropHeight + 1) / 2; ++y) {
+            for (int x = 0; x < (mCropWidth + 1) / 2; ++x) {
+                dst_u[x] = (uint8_t)(src_u[x] >> 2);
+                dst_v[x] = (uint8_t)(src_v[x] >> 2);
+            }
 
             src_u += mWidth / 2;
             src_v += mWidth / 2;
