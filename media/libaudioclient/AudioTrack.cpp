@@ -806,7 +806,7 @@ void AudioTrack::flush()
         return;
     }
     AutoMutex lock(mLock);
-    if (mState == STATE_ACTIVE || mState == STATE_FLUSHED) {
+    if (mState == STATE_ACTIVE) {
         return;
     }
     flush_l();

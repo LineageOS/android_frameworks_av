@@ -223,10 +223,14 @@ bool CryptoHal::requiresSecureDecoderComponent(const char *mime) const {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
-        return mInitCheck;
+        return false;
     }
 
-    return mPlugin->requiresSecureDecoderComponent(hidl_string(mime));
+    Return<bool> hResult = mPlugin->requiresSecureDecoderComponent(hidl_string(mime));
+    if (!hResult.isOk()) {
+        return false;
+    }
+    return hResult;
 }
 
 
