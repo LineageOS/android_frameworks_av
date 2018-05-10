@@ -46,6 +46,16 @@ private:
     template<typename ThreadType, typename TrackType>
     class Endpoint {
     public:
+        Endpoint() = default;
+        Endpoint(Endpoint&& other) { *this = std::move(other); }
+        Endpoint& operator=(Endpoint&& other) {
+            ALOGE_IF(mHandle != AUDIO_PATCH_HANDLE_NONE,
+                    "A non empty Patch Endpoint leaked, handle %d", mHandle);
+            *this = other;
+            other.mHandle = AUDIO_PATCH_HANDLE_NONE;
+            return *this;
+        }
+
         status_t checkTrack(TrackType *trackOrNull) const {
             if (trackOrNull == nullptr) return NO_MEMORY;
             return trackOrNull->initCheck();
@@ -82,6 +92,9 @@ private:
         void stopTrack() { if (mTrack) mTrack->stop(); }
 
     private:
+        Endpoint(const Endpoint&) = default;
+        Endpoint& operator=(const Endpoint&) = default;
+
         sp<ThreadType> mThread;
         bool mCloseThread = true;
         audio_patch_handle_t mHandle = AUDIO_PATCH_HANDLE_NONE;
@@ -92,6 +105,10 @@ private:
     public:
         explicit Patch(const struct audio_patch &patch) : mAudioPatch(patch) {}
         ~Patch();
+        Patch(const Patch&) = delete;
+        Patch(Patch&&) = default;
+        Patch& operator=(const Patch&) = delete;
+        Patch& operator=(Patch&&) = default;
 
         status_t createConnections(PatchPanel *panel);
         void clearConnections(PatchPanel *panel);
