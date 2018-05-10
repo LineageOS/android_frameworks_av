@@ -29,6 +29,7 @@
 using ::android::String16;
 using ::android::String8;
 using ::android::drm_metrics::DrmFrameworkMetrics;
+using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::drm::V1_0::EventType;
 using ::android::hardware::drm::V1_0::KeyStatusType;
@@ -190,6 +191,13 @@ void SetValue(const String16 &name, DrmMetricGroup::ValueType type,
     default:
         ALOGE("Unexpected value type: %hhu", type);
     }
+}
+
+inline String16 MakeIndexString(unsigned int index) {
+  std::string str("[");
+  str.append(std::to_string(index));
+  str.append("]");
+  return String16(str.c_str());
 }
 
 } // namespace
@@ -370,9 +378,11 @@ status_t MediaDrmMetrics::HidlMetricsToBundle(
     }
 
     int groupIndex = 0;
+    std::map<String16, int> indexMap;
     for (const auto &hidlMetricGroup : hidlMetricGroups) {
         PersistableBundle bundleMetricGroup;
         for (const auto &hidlMetric : hidlMetricGroup.metrics) {
+            String16 metricName(hidlMetric.name.c_str());
             PersistableBundle bundleMetric;
             // Add metric component values.
             for (const auto &value : hidlMetric.values) {
@@ -388,14 +398,22 @@ status_t MediaDrmMetrics::HidlMetricsToBundle(
             // Add attributes to the bundle metric.
             bundleMetric.putPersistableBundle(String16("attributes"),
                                               bundleMetricAttributes);
+            // Add one layer of indirection, allowing for repeated metric names.
+            PersistableBundle repeatedMetrics;
+            bundleMetricGroup.getPersistableBundle(metricName,
+                                                   &repeatedMetrics);
+            int index = indexMap[metricName];
+            repeatedMetrics.putPersistableBundle(MakeIndexString(index),
+                                                 bundleMetric);
+            indexMap[metricName] = ++index;
+
             // Add the bundle metric to the group of metrics.
-            bundleMetricGroup.putPersistableBundle(
-                String16(hidlMetric.name.c_str()), bundleMetric);
+            bundleMetricGroup.putPersistableBundle(metricName,
+                                                   repeatedMetrics);
         }
         // Add the bundle metric group to the collection of groups.
-        bundleMetricGroups->putPersistableBundle(
-            String16(std::to_string(groupIndex).c_str()), bundleMetricGroup);
-        groupIndex++;
+        bundleMetricGroups->putPersistableBundle(MakeIndexString(groupIndex++),
+                                                 bundleMetricGroup);
     }
 
     return OK;
