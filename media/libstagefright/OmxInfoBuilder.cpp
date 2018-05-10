@@ -108,24 +108,6 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
     if (!transStatus.isOk()) {
         ALOGE("Fail to obtain codec roles from IOmxStore.");
         return NO_INIT;
-    } else if (roles.size() == 0) {
-        ALOGW("IOmxStore has empty implementation. "
-                "Creating a local default instance...");
-        omxStore = new implementation::OmxStore();
-        if (omxStore == nullptr) {
-            ALOGE("Cannot create a local default instance.");
-            return NO_INIT;
-        }
-        ALOGI("IOmxStore local default instance created.");
-        transStatus = omxStore->listRoles(
-                [&roles] (
-                const hidl_vec<IOmxStore::RoleInfo>& inRoleList) {
-                    roles = inRoleList;
-                });
-        if (!transStatus.isOk()) {
-            ALOGE("Fail to obtain codec roles from local IOmxStore.");
-            return NO_INIT;
-        }
     }
 
     hidl_vec<IOmxStore::ServiceAttribute> serviceAttributes;
