@@ -1215,6 +1215,35 @@ status_t Parameters::buildFastInfo() {
 
     fastInfo.maxJpegSize = getMaxSize(getAvailableJpegSizes());
 
+    isZslReprocessPresent = false;
+    camera_metadata_ro_entry_t availableCapabilities =
+        staticInfo(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    if (0 < availableCapabilities.count) {
+        const uint8_t *caps = availableCapabilities.data.u8;
+        for (size_t i = 0; i < availableCapabilities.count; i++) {
+            if (ANDROID_REQUEST_AVAILABLE_CAPABILITIES_PRIVATE_REPROCESSING ==
+                caps[i]) {
+                isZslReprocessPresent = true;
+                break;
+            }
+        }
+    }
+    if (isZslReprocessPresent) {
+        Vector<StreamConfiguration> scs = getStreamConfigurations();
+        Size maxPrivInputSize = {0, 0};
+        for (const auto& sc : scs) {
+            if (sc.isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_INPUT &&
+                    sc.format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+                if (sc.width * sc.height > maxPrivInputSize.width * maxPrivInputSize.height) {
+                    maxPrivInputSize = {sc.width, sc.height};
+                }
+            }
+        }
+        fastInfo.maxZslSize = maxPrivInputSize;
+    } else {
+        fastInfo.maxZslSize = {0, 0};
+    }
+
     return OK;
 }
 
