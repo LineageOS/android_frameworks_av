@@ -342,6 +342,13 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
         return PERMISSION_DENIED;
     }
 
+    if ((attr->source == AUDIO_SOURCE_VOICE_UPLINK ||
+        attr->source == AUDIO_SOURCE_VOICE_DOWNLINK ||
+        attr->source == AUDIO_SOURCE_VOICE_CALL) &&
+        !captureAudioOutputAllowed(pid, uid)) {
+        return PERMISSION_DENIED;
+    }
+
     if ((attr->source == AUDIO_SOURCE_HOTWORD) && !captureHotwordAllowed(pid, uid)) {
         return BAD_VALUE;
     }
