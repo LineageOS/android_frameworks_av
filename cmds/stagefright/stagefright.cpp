@@ -46,6 +46,7 @@
 #include <media/stagefright/JPEGSource.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaCodec.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
@@ -628,7 +629,7 @@ static void usage(const char *me) {
     fprintf(stderr, "       -l(ist) components\n");
     fprintf(stderr, "       -m max-number-of-frames-to-decode in each pass\n");
     fprintf(stderr, "       -b bug to reproduce\n");
-    fprintf(stderr, "       -p(rofiles) dump decoder profiles supported\n");
+    fprintf(stderr, "       -i(nfo) dump codec info (profiles and color formats supported, details)\n");
     fprintf(stderr, "       -t(humbnail) extract video thumbnail or album art\n");
     fprintf(stderr, "       -s(oftware) prefer software codec\n");
     fprintf(stderr, "       -r(hardware) force to use hardware codec\n");
@@ -646,55 +647,131 @@ static void usage(const char *me) {
     fprintf(stderr, "       -v be more verbose\n");
 }
 
-static void dumpCodecProfiles(bool queryDecoders) {
-    const char *kMimeTypes[] = {
-        MEDIA_MIMETYPE_VIDEO_AVC, MEDIA_MIMETYPE_VIDEO_MPEG4,
-        MEDIA_MIMETYPE_VIDEO_H263, MEDIA_MIMETYPE_AUDIO_AAC,
-        MEDIA_MIMETYPE_AUDIO_AMR_NB, MEDIA_MIMETYPE_AUDIO_AMR_WB,
-        MEDIA_MIMETYPE_AUDIO_MPEG, MEDIA_MIMETYPE_AUDIO_G711_MLAW,
-        MEDIA_MIMETYPE_AUDIO_G711_ALAW, MEDIA_MIMETYPE_AUDIO_VORBIS,
-        MEDIA_MIMETYPE_VIDEO_VP8, MEDIA_MIMETYPE_VIDEO_VP9,
-        MEDIA_MIMETYPE_VIDEO_DOLBY_VISION, MEDIA_MIMETYPE_VIDEO_HEVC,
-        MEDIA_MIMETYPE_AUDIO_EAC3, MEDIA_MIMETYPE_AUDIO_AC4,
-        MEDIA_MIMETYPE_VIDEO_AV1
-    };
-
-    const char *codecType = queryDecoders? "decoder" : "encoder";
-    printf("%s profiles:\n", codecType);
+static void dumpCodecDetails(bool queryDecoders) {
+    const char *codecType = queryDecoders? "Decoder" : "Encoder";
+    printf("\n%s infos by media types:\n"
+           "=============================\n", codecType);
 
     sp<IMediaCodecList> list = MediaCodecList::getInstance();
     size_t numCodecs = list->countCodecs();
 
-    for (size_t k = 0; k < sizeof(kMimeTypes) / sizeof(kMimeTypes[0]); ++k) {
-        printf("type '%s':\n", kMimeTypes[k]);
+    // gather all media types supported by codec class, and link to codecs that support them
+    KeyedVector<AString, Vector<sp<MediaCodecInfo>>> allMediaTypes;
+    for (size_t codec_ix = 0; codec_ix < numCodecs; ++codec_ix) {
+        sp<MediaCodecInfo> info = list->getCodecInfo(codec_ix);
+        if (info->isEncoder() == !queryDecoders) {
+            Vector<AString> supportedMediaTypes;
+            info->getSupportedMediaTypes(&supportedMediaTypes);
+            if (!supportedMediaTypes.size()) {
+                printf("warning: %s does not support any media types\n",
+                        info->getCodecName());
+            } else {
+                for (const AString &mediaType : supportedMediaTypes) {
+                    if (allMediaTypes.indexOfKey(mediaType) < 0) {
+                        allMediaTypes.add(mediaType, Vector<sp<MediaCodecInfo>>());
+                    }
+                    allMediaTypes.editValueFor(mediaType).add(info);
+                }
+            }
+        }
+    }
 
-        for (size_t index = 0; index < numCodecs; ++index) {
-            sp<MediaCodecInfo> info = list->getCodecInfo(index);
-            if (info == NULL || info->isEncoder() != !queryDecoders) {
-                continue;
-            }
-            sp<MediaCodecInfo::Capabilities> caps = info->getCapabilitiesFor(kMimeTypes[k]);
+    KeyedVector<AString, bool> visitedCodecs;
+    for (size_t type_ix = 0; type_ix < allMediaTypes.size(); ++type_ix) {
+        const AString &mediaType = allMediaTypes.keyAt(type_ix);
+        printf("\nMedia type '%s':\n", mediaType.c_str());
+
+        for (const sp<MediaCodecInfo> &info : allMediaTypes.valueAt(type_ix)) {
+            sp<MediaCodecInfo::Capabilities> caps = info->getCapabilitiesFor(mediaType.c_str());
             if (caps == NULL) {
+                printf("warning: %s does not have capabilities for type %s\n",
+                        info->getCodecName(), mediaType.c_str());
                 continue;
             }
-            printf("  %s '%s' supports ",
+            printf("  %s \"%s\" supports\n",
                        codecType, info->getCodecName());
 
-            Vector<MediaCodecInfo::ProfileLevel> profileLevels;
-            caps->getSupportedProfileLevels(&profileLevels);
-            if (profileLevels.size() == 0) {
-                printf("NOTHING.\n");
-                continue;
+            auto printList = [](const char *type, const Vector<AString> &values){
+                printf("    %s: [", type);
+                for (size_t j = 0; j < values.size(); ++j) {
+                    printf("\n      %s%s", values[j].c_str(),
+                            j == values.size() - 1 ? " " : ",");
+                }
+                printf("]\n");
+            };
+
+            if (visitedCodecs.indexOfKey(info->getCodecName()) < 0) {
+                visitedCodecs.add(info->getCodecName(), true);
+                {
+                    Vector<AString> aliases;
+                    info->getAliases(&aliases);
+                    // quote alias
+                    for (AString &alias : aliases) {
+                        alias.insert("\"", 1, 0);
+                        alias.append('"');
+                    }
+                    printList("aliases", aliases);
+                }
+                {
+                    uint32_t attrs = info->getAttributes();
+                    Vector<AString> list;
+                    list.add(AStringPrintf("encoder: %d", !!(attrs & MediaCodecInfo::kFlagIsEncoder)));
+                    list.add(AStringPrintf("vendor: %d", !!(attrs & MediaCodecInfo::kFlagIsVendor)));
+                    list.add(AStringPrintf("software-only: %d", !!(attrs & MediaCodecInfo::kFlagIsSoftwareOnly)));
+                    list.add(AStringPrintf("hw-accelerated: %d", !!(attrs & MediaCodecInfo::kFlagIsHardwareAccelerated)));
+                    printList(AStringPrintf("attributes: %#x", attrs).c_str(), list);
+                }
+
+                printf("    owner: \"%s\"\n", info->getOwnerName());
+                printf("    rank: %u\n", info->getRank());
+            } else {
+                printf("    aliases, attributes, owner, rank: see above\n");
             }
 
-            for (size_t j = 0; j < profileLevels.size(); ++j) {
-                const MediaCodecInfo::ProfileLevel &profileLevel = profileLevels[j];
+            {
+                Vector<AString> list;
+                Vector<MediaCodecInfo::ProfileLevel> profileLevels;
+                caps->getSupportedProfileLevels(&profileLevels);
+                for (const MediaCodecInfo::ProfileLevel &pl : profileLevels) {
+                    const char *niceProfile =
+                        mediaType.equalsIgnoreCase(MIMETYPE_AUDIO_AAC)   ? asString_AACObject(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_MPEG2) ? asString_MPEG2Profile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_H263)  ? asString_H263Profile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_MPEG4) ? asString_MPEG4Profile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_AVC)   ? asString_AVCProfile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_VP8)   ? asString_VP8Profile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_HEVC)  ? asString_HEVCProfile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_VP9)   ? asString_VP9Profile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_AV1)   ? asString_AV1Profile(pl.mProfile) :"??";
+                    const char *niceLevel =
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_MPEG2) ? asString_MPEG2Level(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_H263)  ? asString_H263Level(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_MPEG4) ? asString_MPEG4Level(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_AVC)   ? asString_AVCLevel(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_VP8)   ? asString_VP8Level(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_HEVC)  ? asString_HEVCTierLevel(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_VP9)   ? asString_VP9Level(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_AV1)   ? asString_AV1Level(pl.mLevel) :
+                        "??";
 
-                printf("%s%u/%u", j > 0 ? ", " : "",
-                        profileLevel.mProfile, profileLevel.mLevel);
+                    list.add(AStringPrintf("% 5u/% 5u (%s/%s)",
+                            pl.mProfile, pl.mLevel, niceProfile, niceLevel));
+                }
+                printList("profile/levels", list);
             }
 
-            printf("\n");
+            {
+                Vector<AString> list;
+                Vector<uint32_t> colors;
+                caps->getSupportedColorFormats(&colors);
+                for (uint32_t color : colors) {
+                    list.add(AStringPrintf("%#x (%s)", color,
+                            asString_ColorFormat((int32_t)color)));
+                }
+                printList("colors", list);
+            }
+
+            printf("    details: %s\n", caps->getDetails()->debugString(6).c_str());
         }
     }
 }
@@ -704,7 +781,7 @@ int main(int argc, char **argv) {
 
     bool audioOnly = false;
     bool listComponents = false;
-    bool dumpProfiles = false;
+    bool dumpCodecInfo = false;
     bool extractThumbnail = false;
     bool seekTest = false;
     bool useSurfaceAlloc = false;
@@ -724,7 +801,7 @@ int main(int argc, char **argv) {
     sp<android::ALooper> looper;
 
     int res;
-    while ((res = getopt(argc, argv, "vhaqn:lm:b:ptsrow:kN:xSTd:D:")) >= 0) {
+    while ((res = getopt(argc, argv, "vhaqn:lm:b:itsrow:kN:xSTd:D:")) >= 0) {
         switch (res) {
             case 'a':
             {
@@ -794,9 +871,9 @@ int main(int argc, char **argv) {
                 break;
             }
 
-            case 'p':
+            case 'i':
             {
-                dumpProfiles = true;
+                dumpCodecInfo = true;
                 break;
             }
 
@@ -937,9 +1014,9 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    if (dumpProfiles) {
-        dumpCodecProfiles(true /* queryDecoders */);
-        dumpCodecProfiles(false /* queryDecoders */);
+    if (dumpCodecInfo) {
+        dumpCodecDetails(true /* queryDecoders */);
+        dumpCodecDetails(false /* queryDecoders */);
     }
 
     if (listComponents) {
