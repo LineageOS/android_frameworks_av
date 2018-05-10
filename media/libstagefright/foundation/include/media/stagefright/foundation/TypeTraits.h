@@ -19,6 +19,9 @@
 
 #include <type_traits>
 
+#undef HIDE
+#define HIDE __attribute__((visibility("hidden")))
+
 namespace android {
 
 /**
@@ -31,7 +34,7 @@ namespace android {
  * Type support utility class to check if a type is an integral type or an enum.
  */
 template<typename T>
-struct is_integral_or_enum
+struct HIDE is_integral_or_enum
     : std::integral_constant<bool, std::is_integral<T>::value || std::is_enum<T>::value> { };
 
 /**
@@ -46,7 +49,7 @@ template<typename T,
         typename U=typename std::enable_if<is_integral_or_enum<T>::value>::type,
         bool=std::is_enum<T>::value,
         bool=std::is_integral<T>::value>
-struct underlying_integral_type {
+struct HIDE underlying_integral_type {
     static_assert(!std::is_enum<T>::value, "T should not be enum here");
     static_assert(!std::is_integral<T>::value, "T should not be integral here");
     typedef U type;
@@ -54,7 +57,7 @@ struct underlying_integral_type {
 
 /** Specialization for enums. */
 template<typename T, typename U>
-struct underlying_integral_type<T, U, true, false> {
+struct HIDE underlying_integral_type<T, U, true, false> {
     static_assert(std::is_enum<T>::value, "T should be enum here");
     static_assert(!std::is_integral<T>::value, "T should not be integral here");
     typedef typename std::underlying_type<T>::type type;
@@ -62,7 +65,7 @@ struct underlying_integral_type<T, U, true, false> {
 
 /** Specialization for non-enum std-integral types. */
 template<typename T, typename U>
-struct underlying_integral_type<T, U, false, true> {
+struct HIDE underlying_integral_type<T, U, false, true> {
     static_assert(!std::is_enum<T>::value, "T should not be enum here");
     static_assert(std::is_integral<T>::value, "T should be integral here");
     typedef T type;
@@ -72,7 +75,7 @@ struct underlying_integral_type<T, U, false, true> {
  * Type support utility class to check if the underlying integral type is signed.
  */
 template<typename T>
-struct is_signed_integral
+struct HIDE is_signed_integral
     : std::integral_constant<bool, std::is_signed<
             typename underlying_integral_type<T, unsigned>::type>::value> { };
 
@@ -80,7 +83,7 @@ struct is_signed_integral
  * Type support utility class to check if the underlying integral type is unsigned.
  */
 template<typename T>
-struct is_unsigned_integral
+struct HIDE is_unsigned_integral
     : std::integral_constant<bool, std::is_unsigned<
             typename underlying_integral_type<T, signed>::type>::value> {
 };
@@ -92,26 +95,26 @@ struct is_unsigned_integral
  * member constant |value| equal to true. Otherwise value is false.
  */
 template<typename T, typename ...Us>
-struct is_one_of;
+struct HIDE is_one_of;
 
 /// \if 0
 /**
  * Template specialization when first type matches the searched type.
  */
 template<typename T, typename ...Us>
-struct is_one_of<T, T, Us...> : std::true_type {};
+struct HIDE is_one_of<T, T, Us...> : std::true_type {};
 
 /**
  * Template specialization when first type does not match the searched type.
  */
 template<typename T, typename U, typename ...Us>
-struct is_one_of<T, U, Us...> : is_one_of<T, Us...> {};
+struct HIDE is_one_of<T, U, Us...> : is_one_of<T, Us...> {};
 
 /**
  * Template specialization when there are no types to search.
  */
 template<typename T>
-struct is_one_of<T> : std::false_type {};
+struct HIDE is_one_of<T> : std::false_type {};
 /// \endif
 
 /**
@@ -121,44 +124,44 @@ struct is_one_of<T> : std::false_type {};
  * Otherwise value is false.
  */
 template<typename ...Us>
-struct are_unique;
+struct HIDE are_unique;
 
 /// \if 0
 /**
  * Template specialization when there are no types.
  */
 template<>
-struct are_unique<> : std::true_type {};
+struct HIDE are_unique<> : std::true_type {};
 
 /**
  * Template specialization when there is at least one type to check.
  */
 template<typename T, typename ...Us>
-struct are_unique<T, Us...>
+struct HIDE are_unique<T, Us...>
     : std::integral_constant<bool, are_unique<Us...>::value && !is_one_of<T, Us...>::value> {};
 /// \endif
 
 /// \if 0
 template<size_t Base, typename T, typename ...Us>
-struct _find_first_impl;
+struct HIDE _find_first_impl;
 
 /**
  * Template specialization when there are no types to search.
  */
 template<size_t Base, typename T>
-struct _find_first_impl<Base, T> : std::integral_constant<size_t, 0> {};
+struct HIDE _find_first_impl<Base, T> : std::integral_constant<size_t, 0> {};
 
 /**
  * Template specialization when T is the first type in Us.
  */
 template<size_t Base, typename T, typename ...Us>
-struct _find_first_impl<Base, T, T, Us...> : std::integral_constant<size_t, Base> {};
+struct HIDE _find_first_impl<Base, T, T, Us...> : std::integral_constant<size_t, Base> {};
 
 /**
  * Template specialization when T is not the first type in Us.
  */
 template<size_t Base, typename T, typename U, typename ...Us>
-struct _find_first_impl<Base, T, U, Us...>
+struct HIDE _find_first_impl<Base, T, U, Us...>
     : std::integral_constant<size_t, _find_first_impl<Base + 1, T, Us...>::value> {};
 
 /// \endif
@@ -169,7 +172,7 @@ struct _find_first_impl<Base, T, U, Us...>
  * If T occurs in Us, index is the 1-based left-most index of T in Us. Otherwise, index is 0.
  */
 template<typename T, typename ...Us>
-struct find_first {
+struct HIDE find_first {
     static constexpr size_t index = _find_first_impl<1, T, Us...>::value;
 };
 
@@ -180,13 +183,13 @@ struct find_first {
  * Adds a base index.
  */
 template<size_t Base, typename T, typename ...Us>
-struct _find_first_convertible_to_helper;
+struct HIDE _find_first_convertible_to_helper;
 
 /**
  * Template specialization for when there are more types to consider
  */
 template<size_t Base, typename T, typename U, typename ...Us>
-struct _find_first_convertible_to_helper<Base, T, U, Us...> {
+struct HIDE _find_first_convertible_to_helper<Base, T, U, Us...> {
     static constexpr size_t index =
         std::is_convertible<T, U>::value ? Base :
                 _find_first_convertible_to_helper<Base + 1, T, Us...>::index;
@@ -199,7 +202,7 @@ struct _find_first_convertible_to_helper<Base, T, U, Us...> {
  * Template specialization for when there are no more types to consider
  */
 template<size_t Base, typename T>
-struct _find_first_convertible_to_helper<Base, T> {
+struct HIDE _find_first_convertible_to_helper<Base, T> {
     static constexpr size_t index = 0;
     typedef void type;
 };
@@ -216,7 +219,7 @@ struct _find_first_convertible_to_helper<Base, T> {
  * \param Us types into which the conversion is considered
  */
 template<typename T, typename ...Us>
-struct find_first_convertible_to : public _find_first_convertible_to_helper<1, T, Us...> { };
+struct HIDE find_first_convertible_to : public _find_first_convertible_to_helper<1, T, Us...> { };
 
 }  // namespace android
 
