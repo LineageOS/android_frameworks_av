@@ -27,8 +27,10 @@ namespace android {
 
 class DataSource;
 class MediaExtractor;
+struct ImageDecoder;
+struct FrameRect;
 
-struct StagefrightMetadataRetriever : public MediaMetadataRetrieverInterface {
+struct StagefrightMetadataRetriever : public MediaMetadataRetrieverBase {
     StagefrightMetadataRetriever();
     virtual ~StagefrightMetadataRetriever();
 
@@ -44,6 +46,8 @@ struct StagefrightMetadataRetriever : public MediaMetadataRetrieverInterface {
             int64_t timeUs, int option, int colorFormat, bool metaOnly);
     virtual sp<IMemory> getImageAtIndex(
             int index, int colorFormat, bool metaOnly, bool thumbnail);
+    virtual sp<IMemory> getImageRectAtIndex(
+            int index, int colorFormat, int left, int top, int right, int bottom);
     virtual status_t getFrameAtIndex(
             std::vector<sp<IMemory> >* frames,
             int frameIndex, int numFrames, int colorFormat, bool metaOnly);
@@ -59,6 +63,8 @@ private:
     KeyedVector<int, String8> mMetaData;
     MediaAlbumArt *mAlbumArt;
 
+    sp<ImageDecoder> mImageDecoder;
+    int mLastImageIndex;
     void parseMetaData();
     // Delete album art and clear metadata.
     void clearMetadata();
@@ -66,6 +72,8 @@ private:
     status_t getFrameInternal(
             int64_t timeUs, int numFrames, int option, int colorFormat, bool metaOnly,
             sp<IMemory>* outFrame, std::vector<sp<IMemory> >* outFrames);
+    virtual sp<IMemory> getImageInternal(
+            int index, int colorFormat, bool metaOnly, bool thumbnail, FrameRect* rect);
 
     StagefrightMetadataRetriever(const StagefrightMetadataRetriever &);
 

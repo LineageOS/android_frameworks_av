@@ -350,7 +350,7 @@ aaudio_result_t AudioStreamRecord::requestStop() {
     mTimestampPosition.set(getFramesRead());
     mAudioRecord->stop();
     mCallbackEnabled.store(false);
-    mFramesRead.reset32();
+    mFramesWritten.reset32(); // service writes frames, service position reset on flush
     mTimestampPosition.reset32();
     // Pass false to prevent errorCallback from being called after disconnect
     // when app has already requested a stop().

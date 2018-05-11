@@ -19,6 +19,7 @@
 #define A_MESSAGE_H_
 
 #include <media/stagefright/foundation/ABase.h>
+#include <media/stagefright/foundation/AData.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
@@ -155,6 +156,9 @@ struct AMessage : public RefBase {
     // their refcount incremented.
     sp<AMessage> dup() const;
 
+    // Adds all items from other into this.
+    void extend(const sp<AMessage> &other);
+
     // Performs a shallow or deep comparison of |this| and |other| and returns
     // an AMessage with the differences.
     // Warning: RefBase items, i.e. "objects" are _not_ copied but only have
@@ -180,8 +184,37 @@ struct AMessage : public RefBase {
         kTypeBuffer,
     };
 
+    struct Rect {
+        int32_t mLeft, mTop, mRight, mBottom;
+    };
+
     size_t countEntries() const;
     const char *getEntryNameAt(size_t index, Type *type) const;
+
+    /**
+     * Retrieves the item at a specific index.
+     */
+    typedef AData<
+        int32_t, int64_t, size_t, float, double, Rect, AString,
+        void *, sp<AMessage>, sp<ABuffer>, sp<RefBase>>::Basic ItemData;
+
+    /**
+     * Finds an item by name. This can be used if the type is unknown.
+     *
+     * \param name name of the item
+     * Returns an empty item if no item is present with that name.
+     */
+    ItemData findItem(const char *name) const;
+
+    /**
+     * Sets an item of arbitrary type. Does nothing if the item value is empty.
+     *
+     * \param name name of the item
+     * \param item value of the item
+     */
+    void setItem(const char *name, const ItemData &item);
+
+    ItemData getEntryAt(size_t index) const;
 
     /**
      * Finds an entry by name and returns its index.
@@ -202,6 +235,19 @@ struct AMessage : public RefBase {
      * \retval ALREADY_EXISTS name is already used by another entry
      */
     status_t setEntryNameAt(size_t index, const char *name);
+
+    /**
+     * Sets the item of an entry based on index.
+     *
+     * \param index index of the entry
+     * \param item new item of the entry
+     *
+     * \retval OK the item was set successfully
+     * \retval BAD_INDEX invalid index
+     * \retval BAD_VALUE item is invalid (null)
+     * \retval BAD_TYPE type is unsupported (should not happen)
+     */
+    status_t setEntryAt(size_t index, const ItemData &item);
 
     /**
      * Removes an entry based on index.
@@ -226,10 +272,6 @@ private:
 
     wp<AHandler> mHandler;
     wp<ALooper> mLooper;
-
-    struct Rect {
-        int32_t mLeft, mTop, mRight, mBottom;
-    };
 
     struct Item {
         union {

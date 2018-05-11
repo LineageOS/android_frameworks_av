@@ -429,7 +429,8 @@ TEST_F(MediaDrmMetricsTest, HidlToBundleMetricsMultiple) {
   DrmMetricGroup hidlMetricGroup =
       { { {
               "open_session_ok",
-              { { "status", DrmMetricGroup::ValueType::INT64_TYPE, (int64_t) Status::OK, 0.0, "" } },
+              { { "status", DrmMetricGroup::ValueType::INT64_TYPE,
+                  (int64_t) Status::OK, 0.0, "" } },
               { { "count", DrmMetricGroup::ValueType::INT64_TYPE, 3, 0.0, "" } }
           },
           {
@@ -444,25 +445,28 @@ TEST_F(MediaDrmMetricsTest, HidlToBundleMetricsMultiple) {
                                                      &bundleMetricGroups));
   ASSERT_EQ(1U, bundleMetricGroups.size());
   PersistableBundle bundleMetricGroup;
-  ASSERT_TRUE(bundleMetricGroups.getPersistableBundle(String16("0"), &bundleMetricGroup));
+  ASSERT_TRUE(bundleMetricGroups.getPersistableBundle(String16("[0]"), &bundleMetricGroup));
   ASSERT_EQ(2U, bundleMetricGroup.size());
 
   // Verify each metric.
   PersistableBundle metric;
   ASSERT_TRUE(bundleMetricGroup.getPersistableBundle(String16("open_session_ok"), &metric));
+  PersistableBundle metricInstance;
+  ASSERT_TRUE(metric.getPersistableBundle(String16("[0]"), &metricInstance));
   int64_t value = 0;
-  ASSERT_TRUE(metric.getLong(String16("count"), &value));
+  ASSERT_TRUE(metricInstance.getLong(String16("count"), &value));
   ASSERT_EQ(3, value);
   PersistableBundle attributeBundle;
-  ASSERT_TRUE(metric.getPersistableBundle(String16("attributes"), &attributeBundle));
+  ASSERT_TRUE(metricInstance.getPersistableBundle(String16("attributes"), &attributeBundle));
   ASSERT_TRUE(attributeBundle.getLong(String16("status"), &value));
   ASSERT_EQ((int64_t) Status::OK, value);
 
   ASSERT_TRUE(bundleMetricGroup.getPersistableBundle(String16("close_session_not_opened"),
                                                      &metric));
-  ASSERT_TRUE(metric.getLong(String16("count"), &value));
+  ASSERT_TRUE(metric.getPersistableBundle(String16("[0]"), &metricInstance));
+  ASSERT_TRUE(metricInstance.getLong(String16("count"), &value));
   ASSERT_EQ(7, value);
-  ASSERT_TRUE(metric.getPersistableBundle(String16("attributes"), &attributeBundle));
+  ASSERT_TRUE(metricInstance.getPersistableBundle(String16("attributes"), &attributeBundle));
   value = 0;
   ASSERT_TRUE(attributeBundle.getLong(String16("status"), &value));
   ASSERT_EQ((int64_t) Status::ERROR_DRM_SESSION_NOT_OPENED, value);

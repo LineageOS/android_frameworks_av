@@ -242,6 +242,7 @@ struct Parameters {
         float minFocalLength;
         bool useFlexibleYuv;
         Size maxJpegSize;
+        Size maxZslSize;
     } fastInfo;
 
     // Quirks information; these are short-lived flags to enable workarounds for

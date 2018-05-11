@@ -121,9 +121,11 @@ status_t AudioPolicyService::setForceUse(audio_policy_force_use_t usage,
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
-    if (!settingsAllowed()) {
+
+    if (!modifyAudioRoutingAllowed()) {
         return PERMISSION_DENIED;
     }
+
     if (usage < 0 || usage >= AUDIO_POLICY_FORCE_USE_CNT) {
         return BAD_VALUE;
     }
@@ -337,6 +339,13 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
     if (!recordingAllowed(opPackageName, pid, uid)) {
         ALOGE("%s permission denied: recording not allowed for uid %d pid %d",
                 __func__, uid, pid);
+        return PERMISSION_DENIED;
+    }
+
+    if ((attr->source == AUDIO_SOURCE_VOICE_UPLINK ||
+        attr->source == AUDIO_SOURCE_VOICE_DOWNLINK ||
+        attr->source == AUDIO_SOURCE_VOICE_CALL) &&
+        !captureAudioOutputAllowed(pid, uid)) {
         return PERMISSION_DENIED;
     }
 

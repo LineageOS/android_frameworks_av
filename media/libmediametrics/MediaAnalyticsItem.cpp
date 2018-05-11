@@ -248,12 +248,17 @@ MediaAnalyticsItem::Prop *MediaAnalyticsItem::findProp(const char *name) {
 }
 
 void MediaAnalyticsItem::Prop::setName(const char *name, size_t len) {
-    mNameLen = len;
+    free((void *)mName);
     mName = (const char *) malloc(len+1);
+    LOG_ALWAYS_FATAL_IF(mName == NULL,
+                        "failed malloc() for property '%s' (len %zu)",
+                        name, len);
     memcpy ((void *)mName, name, len+1);
+    mNameLen = len;
 }
 
-// used only as part of a storing operation
+// consider this "find-or-allocate".
+// caller validates type and uses clearPropValue() accordingly
 MediaAnalyticsItem::Prop *MediaAnalyticsItem::allocateProp(const char *name) {
     size_t len = strlen(name);
     size_t i = findPropIndex(name, len);
@@ -271,7 +276,6 @@ MediaAnalyticsItem::Prop *MediaAnalyticsItem::allocateProp(const char *name) {
         i = mPropCount++;
         prop = &mProps[i];
         prop->setName(name, len);
-        prop->mType = kTypeNone;        // make caller set type info
     }
 
     return prop;
@@ -299,6 +303,7 @@ bool MediaAnalyticsItem::removeProp(const char *name) {
 void MediaAnalyticsItem::setInt32(MediaAnalyticsItem::Attr name, int32_t value) {
     Prop *prop = allocateProp(name);
     if (prop != NULL) {
+        clearPropValue(prop);
         prop->mType = kTypeInt32;
         prop->u.int32Value = value;
     }
@@ -307,6 +312,7 @@ void MediaAnalyticsItem::setInt32(MediaAnalyticsItem::Attr name, int32_t value) 
 void MediaAnalyticsItem::setInt64(MediaAnalyticsItem::Attr name, int64_t value) {
     Prop *prop = allocateProp(name);
     if (prop != NULL) {
+        clearPropValue(prop);
         prop->mType = kTypeInt64;
         prop->u.int64Value = value;
     }
@@ -315,6 +321,7 @@ void MediaAnalyticsItem::setInt64(MediaAnalyticsItem::Attr name, int64_t value) 
 void MediaAnalyticsItem::setDouble(MediaAnalyticsItem::Attr name, double value) {
     Prop *prop = allocateProp(name);
     if (prop != NULL) {
+        clearPropValue(prop);
         prop->mType = kTypeDouble;
         prop->u.doubleValue = value;
     }
@@ -325,6 +332,7 @@ void MediaAnalyticsItem::setCString(MediaAnalyticsItem::Attr name, const char *v
     Prop *prop = allocateProp(name);
     // any old value will be gone
     if (prop != NULL) {
+        clearPropValue(prop);
         prop->mType = kTypeCString;
         prop->u.CStringValue = strdup(value);
     }
@@ -333,6 +341,7 @@ void MediaAnalyticsItem::setCString(MediaAnalyticsItem::Attr name, const char *v
 void MediaAnalyticsItem::setRate(MediaAnalyticsItem::Attr name, int64_t count, int64_t duration) {
     Prop *prop = allocateProp(name);
     if (prop != NULL) {
+        clearPropValue(prop);
         prop->mType = kTypeRate;
         prop->u.rate.count = count;
         prop->u.rate.duration = duration;
@@ -585,6 +594,9 @@ void MediaAnalyticsItem::copyProp(Prop *dst, const Prop *src)
     // fix any pointers that we blindly copied, so we have our own copies
     if (dst->mName) {
         void *p =  malloc(dst->mNameLen + 1);
+        LOG_ALWAYS_FATAL_IF(p == NULL,
+                            "failed malloc() duping property '%s' (len %zu)",
+                            dst->mName, dst->mNameLen);
         memcpy (p, src->mName, dst->mNameLen + 1);
         dst->mName = (const char *) p;
     }

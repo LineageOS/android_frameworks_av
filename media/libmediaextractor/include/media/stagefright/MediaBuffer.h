@@ -86,12 +86,14 @@ public:
     virtual MediaBufferBase *clone();
 
     // sum of localRefcount() and remoteRefcount()
+    // Result should be treated as approximate unless the result precludes concurrent accesses.
     virtual int refcount() const {
         return localRefcount() + remoteRefcount();
     }
 
+    // Result should be treated as approximate unless the result precludes concurrent accesses.
     virtual int localRefcount() const {
-        return mRefCount;
+        return mRefCount.load(std::memory_order_relaxed);
     }
 
     virtual int remoteRefcount() const {
@@ -146,7 +148,7 @@ private:
     void claim();
 
     MediaBufferObserver *mObserver;
-    int mRefCount;
+    std::atomic<int> mRefCount;
 
     void *mData;
     size_t mSize, mRangeOffset, mRangeLength;
