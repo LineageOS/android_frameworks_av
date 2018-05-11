@@ -310,7 +310,7 @@ aaudio_result_t AudioStreamTrack::requestFlush() {
     setState(AAUDIO_STREAM_STATE_FLUSHING);
     incrementFramesRead(getFramesWritten() - getFramesRead());
     mAudioTrack->flush();
-    mFramesWritten.reset32();
+    mFramesRead.reset32(); // service reads frames, service position reset on flush
     mTimestampPosition.reset32();
     return AAUDIO_OK;
 }
@@ -324,7 +324,7 @@ aaudio_result_t AudioStreamTrack::requestStop() {
     setState(AAUDIO_STREAM_STATE_STOPPING);
     incrementFramesRead(getFramesWritten() - getFramesRead()); // TODO review
     mTimestampPosition.set(getFramesWritten());
-    mFramesWritten.reset32();
+    mFramesRead.reset32(); // service reads frames, service position reset on stop
     mTimestampPosition.reset32();
     mAudioTrack->stop();
     mCallbackEnabled.store(false);
