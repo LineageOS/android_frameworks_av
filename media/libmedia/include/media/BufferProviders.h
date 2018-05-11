@@ -161,6 +161,17 @@ protected:
     const audio_format_t mOutputFormat;
 };
 
+// ClampFloatBufferProvider derives from CopyBufferProvider to clamp floats inside -3db
+class ClampFloatBufferProvider : public CopyBufferProvider {
+public:
+    ClampFloatBufferProvider(int32_t channelCount,
+            size_t bufferFrameCount);
+    virtual void copyFrames(void *dst, const void *src, size_t frames);
+
+protected:
+    const uint32_t       mChannelCount;
+};
+
 // TimestretchBufferProvider derives from PassthruBufferProvider for time stretching
 class TimestretchBufferProvider : public PassthruBufferProvider {
 public:

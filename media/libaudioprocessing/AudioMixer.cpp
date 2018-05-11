@@ -313,6 +313,14 @@ status_t AudioMixer::Track::prepareForReformat()
                 targetFormat,
                 kCopyBufferFrameCount));
         requiresReconfigure = true;
+    } else if (mFormat == AUDIO_FORMAT_PCM_FLOAT) {
+        // Input and output are floats, make sure application did not provide > 3db samples
+        // that would break volume application (b/68099072)
+        // TODO: add a trusted source flag to avoid the overhead
+        mReformatBufferProvider.reset(new ClampFloatBufferProvider(
+                audio_channel_count_from_out_mask(channelMask),
+                kCopyBufferFrameCount));
+        requiresReconfigure = true;
     }
     if (targetFormat != mMixerInFormat) {
         mPostDownmixReformatBufferProvider.reset(new ReformatBufferProvider(
