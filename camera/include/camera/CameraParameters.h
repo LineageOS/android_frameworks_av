@@ -19,6 +19,7 @@
 
 #include <utils/KeyedVector.h>
 #include <utils/String8.h>
+#include <camera/CameraParameters_EXT.h>
 
 namespace android {
 
@@ -37,7 +38,7 @@ struct Size {
     }
 };
 
-class CameraParameters
+class CameraParameters : public CameraParameters_EXT
 {
 public:
     CameraParameters();
@@ -683,12 +684,27 @@ public:
     // High-dynamic range mode
     static const char LIGHTFX_HDR[];
 
+    // HTC values
+    static const char CONTI_BURST_CAPTURING[];
+    static const char CONTI_BURST_CAPTURE_DONE[];
+    static const char KEY_CONTI_BURST_STATE[];
+    static const char KEY_FORCE_USE_AUDIO_ENABLED[];
+    static const char KEY_GPU_EFFECT[];
+    static const char KEY_GPU_EFFECT_PARAM_0[];
+    static const char KEY_GPU_EFFECT_PARAM_1[];
+    static const char KEY_GPU_EFFECT_PARAM_2[];
+    static const char KEY_GPU_EFFECT_PARAM_3[];
+    static const char KEY_SMILEINFO_BYFACE_SUPPORTED[];
+
     /**
      * Returns the the supported preview formats as an enum given in graphics.h
      * corrsponding to the format given in the input string or -1 if no such
      * conversion exists.
      */
     static int previewFormatToEnum(const char* format);
+
+    int getBrightnessLumaTargetSet(int *brightness, int *luma) const;
+    void getRawSize(int *x, int *y) const;
 
 private:
     DefaultKeyedVector<String8,String8>    mMap;

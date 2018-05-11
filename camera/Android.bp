@@ -78,6 +78,7 @@ cc_library_shared {
             uses_generic_camera_parameter_library: {
                 srcs: [
                     "CameraParameters.cpp",
+                    "CameraParameters_EXT.cpp",
                 ],
             },
         },
