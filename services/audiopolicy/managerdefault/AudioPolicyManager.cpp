@@ -4382,14 +4382,23 @@ void AudioPolicyManager::checkOutputForStrategy(routing_strategy strategy)
     }
 
     if (!vectorsEqual(srcOutputs,dstOutputs)) {
+        // get maximum latency of all source outputs to determine the minimum mute time guaranteeing
+        // audio from invalidated tracks will be rendered when unmuting
+        uint32_t maxLatency = 0;
+        for (audio_io_handle_t srcOut : srcOutputs) {
+            sp<SwAudioOutputDescriptor> desc = mPreviousOutputs.valueFor(srcOut);
+            if (desc != 0 && maxLatency < desc->latency()) {
+                maxLatency = desc->latency();
+            }
+        }
         ALOGV("checkOutputForStrategy() strategy %d, moving from output %d to output %d",
               strategy, srcOutputs[0], dstOutputs[0]);
         // mute strategy while moving tracks from one output to another
         for (audio_io_handle_t srcOut : srcOutputs) {
-            sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(srcOut);
-            if (isStrategyActive(desc, strategy)) {
+            sp<SwAudioOutputDescriptor> desc = mPreviousOutputs.valueFor(srcOut);
+            if (desc != 0 && isStrategyActive(desc, strategy)) {
                 setStrategyMute(strategy, true, desc);
-                setStrategyMute(strategy, false, desc, MUTE_TIME_MS, newDevice);
+                setStrategyMute(strategy, false, desc, maxLatency * LATENCY_MUTE_FACTOR, newDevice);
             }
             sp<AudioSourceDescriptor> source =
                     getSourceForStrategyOnOutput(srcOut, strategy);
