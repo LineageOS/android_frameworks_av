@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_DEVICE_HAL_HIDL_4_0_H
-#define ANDROID_HARDWARE_DEVICE_HAL_HIDL_4_0_H
+#ifndef ANDROID_HARDWARE_DEVICE_HAL_HIDL_H
+#define ANDROID_HARDWARE_DEVICE_HAL_HIDL_H
 
 #include <android/hardware/audio/4.0/IDevice.h>
 #include <android/hardware/audio/4.0/IPrimaryDevice.h>
@@ -128,4 +128,4 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
 } // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_DEVICE_HAL_HIDL_4_0_H
+#endif // ANDROID_HARDWARE_DEVICE_HAL_HIDL_H

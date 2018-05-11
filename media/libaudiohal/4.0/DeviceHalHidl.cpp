@@ -287,13 +287,13 @@ status_t DeviceHalHidl::openInputStream(
     Result retval = Result::NOT_INITIALIZED;
     // TODO: correctly propagate the tracks sources and volume
     //       for now, only send the main source at 1dbfs
-    SinkMetadata metadata = {{{AudioSource(source), 1}}};
+    SinkMetadata sourceMetadata = {{{AudioSource(source), 1}}};
     Return<void> ret = mDevice->openInputStream(
             handle,
             hidlDevice,
             hidlConfig,
-            flags,
-            metadata,
+            mkEnumConverter<AudioInputFlag>(flags),
+            sourceMetadata,
             [&](Result r, const sp<IStreamIn>& result, const AudioConfig& suggestedConfig) {
                 retval = r;
                 if (retval == Result::OK) {

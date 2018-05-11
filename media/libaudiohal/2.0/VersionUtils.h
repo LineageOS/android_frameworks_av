@@ -17,33 +17,33 @@
 #ifndef ANDROID_HARDWARE_VERSION_UTILS_H
 #define ANDROID_HARDWARE_VERSION_UTILS_H
 
-#include <android/hardware/audio/4.0/types.h>
+#include <android/hardware/audio/2.0/types.h>
 #include <hidl/HidlSupport.h>
 
-using ::android::hardware::audio::V4_0::ParameterValue;
-using ::android::hardware::audio::V4_0::Result;
+using ::android::hardware::audio::V2_0::ParameterValue;
+using ::android::hardware::audio::V2_0::Result;
 using ::android::hardware::Return;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::hidl_string;
 
 namespace android {
-namespace V4_0 {
+namespace V2_0 {
 namespace utils {
 
 template <class T, class Callback>
-Return<void> getParameters(T& object, hidl_vec<ParameterValue> context,
+Return<void> getParameters(T& object, hidl_vec<ParameterValue> /*context*/,
                            hidl_vec<hidl_string> keys, Callback callback) {
-    return object->getParameters(context, keys, callback);
+    return object->getParameters(keys, callback);
 }
 
 template <class T>
-Return<Result> setParameters(T& object, hidl_vec<ParameterValue> context,
+Return<Result> setParameters(T& object, hidl_vec<ParameterValue> /*context*/,
                              hidl_vec<ParameterValue> keys) {
-    return object->setParameters(context, keys);
+    return object->setParameters(keys);
 }
 
 } // namespace utils
-} // namespace V4_0
+} // namespace V2_0
 } // namespace android
 
 #endif // ANDROID_HARDWARE_VERSION_UTILS_H

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_4_0_H
-#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_4_0_H
+#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_H
+#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_H
 
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <utils/Errors.h>
@@ -27,23 +27,22 @@ namespace V4_0 {
 class DevicesFactoryHalHybrid : public DevicesFactoryHalInterface
 {
   public:
+    DevicesFactoryHalHybrid();
+
     // Opens a device with the specified name. To close the device, it is
     // necessary to release references to the returned object.
     virtual status_t openDevice(const char *name, sp<DeviceHalInterface> *device);
 
   private:
-    friend class DevicesFactoryHalInterface;
-
-    // Can not be constructed directly by clients.
-    DevicesFactoryHalHybrid();
-
-    virtual ~DevicesFactoryHalHybrid();
-
     sp<DevicesFactoryHalInterface> mLocalFactory;
     sp<DevicesFactoryHalInterface> mHidlFactory;
 };
 
+sp<DevicesFactoryHalInterface> createDevicesFactoryHal() {
+    return new DevicesFactoryHalHybrid();
+}
+
 } // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_4_0_H
+#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HYBRID_H

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_DEVICE_HAL_LOCAL_4_0_H
-#define ANDROID_HARDWARE_DEVICE_HAL_LOCAL_4_0_H
+#ifndef ANDROID_HARDWARE_DEVICE_HAL_LOCAL_H
+#define ANDROID_HARDWARE_DEVICE_HAL_LOCAL_H
 
 #include <hardware/audio.h>
 #include <media/audiohal/DeviceHalInterface.h>
@@ -126,4 +126,4 @@ class DeviceHalLocal : public DeviceHalInterface
 } // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_DEVICE_HAL_LOCAL_4_0_H
+#endif // ANDROID_HARDWARE_DEVICE_HAL_LOCAL_H

@@ -24,6 +24,7 @@
 #include "DeviceHalLocal.h"
 
 namespace android {
+namespace V2_0 {
 
 class DevicesFactoryHalLocal : public DevicesFactoryHalInterface
 {
@@ -41,6 +42,7 @@ class DevicesFactoryHalLocal : public DevicesFactoryHalInterface
     virtual ~DevicesFactoryHalLocal() {}
 };
 
+} // namespace V2_0
 } // namespace android
 
 #endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_LOCAL_H

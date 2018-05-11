@@ -21,6 +21,7 @@
 #include "StreamPowerLog.h"
 
 namespace android {
+namespace V2_0 {
 
 class DeviceHalLocal;
 
@@ -214,6 +215,7 @@ class StreamInHalLocal : public StreamInHalInterface, public StreamHalLocal {
     virtual ~StreamInHalLocal();
 };
 
+} // namespace V2_0
 } // namespace android
 
 #endif // ANDROID_HARDWARE_STREAM_HAL_LOCAL_H

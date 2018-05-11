@@ -24,9 +24,12 @@
 #include <hwbinder/IPCThreadState.h>
 #include <utils/Log.h>
 
+#include <common/all-versions/VersionUtils.h>
+
 #include "DeviceHalHidl.h"
 #include "HidlUtils.h"
 #include "StreamHalHidl.h"
+#include "VersionUtils.h"
 
 using ::android::hardware::audio::common::V2_0::AudioConfig;
 using ::android::hardware::audio::common::V2_0::AudioDevice;
@@ -38,6 +41,7 @@ using ::android::hardware::audio::common::V2_0::AudioPortConfig;
 using ::android::hardware::audio::common::V2_0::AudioMode;
 using ::android::hardware::audio::common::V2_0::AudioSource;
 using ::android::hardware::audio::common::V2_0::HidlUtils;
+using ::android::hardware::audio::common::utils::mkEnumConverter;
 using ::android::hardware::audio::V2_0::DeviceAddress;
 using ::android::hardware::audio::V2_0::IPrimaryDevice;
 using ::android::hardware::audio::V2_0::ParameterValue;
@@ -46,6 +50,7 @@ using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 
 namespace android {
+namespace V2_0 {
 
 namespace {
 
@@ -193,7 +198,9 @@ status_t DeviceHalHidl::setParameters(const String8& kvPairs) {
     hidl_vec<ParameterValue> hidlParams;
     status_t status = parametersFromHal(kvPairs, &hidlParams);
     if (status != OK) return status;
-    return processReturn("setParameters", mDevice->setParameters(hidlParams));
+    // TODO: change the API so that context and kvPairs are separated
+    return processReturn("setParameters",
+                         utils::setParameters(mDevice, {} /* context */, hidlParams));
 }
 
 status_t DeviceHalHidl::getParameters(const String8& keys, String8 *values) {
@@ -203,7 +210,8 @@ status_t DeviceHalHidl::getParameters(const String8& keys, String8 *values) {
     status_t status = keysFromHal(keys, &hidlKeys);
     if (status != OK) return status;
     Result retval;
-    Return<void> ret = mDevice->getParameters(
+    Return<void> ret = utils::getParameters(mDevice,
+            {} /* context */,
             hidlKeys,
             [&](Result r, const hidl_vec<ParameterValue>& parameters) {
                 retval = r;
@@ -249,7 +257,7 @@ status_t DeviceHalHidl::openOutputStream(
             handle,
             hidlDevice,
             hidlConfig,
-            AudioOutputFlag(flags),
+            mkEnumConverter<AudioOutputFlag>(flags),
             [&](Result r, const sp<IStreamOut>& result, const AudioConfig& suggestedConfig) {
                 retval = r;
                 if (retval == Result::OK) {
@@ -275,12 +283,13 @@ status_t DeviceHalHidl::openInputStream(
     AudioConfig hidlConfig;
     HidlUtils::audioConfigFromHal(*config, &hidlConfig);
     Result retval = Result::NOT_INITIALIZED;
+    auto sourceMetadata = AudioSource(source);
     Return<void> ret = mDevice->openInputStream(
             handle,
             hidlDevice,
             hidlConfig,
-            AudioInputFlag(flags),
-            AudioSource(source),
+            mkEnumConverter<AudioInputFlag>(flags),
+            sourceMetadata,
             [&](Result r, const sp<IStreamIn>& result, const AudioConfig& suggestedConfig) {
                 retval = r;
                 if (retval == Result::OK) {
@@ -356,9 +365,10 @@ status_t DeviceHalHidl::dump(int fd) {
     if (mDevice == 0) return NO_INIT;
     native_handle_t* hidlHandle = native_handle_create(1, 0);
     hidlHandle->data[0] = fd;
-    Return<void> ret = mDevice->debugDump(hidlHandle);
+    Return<void> ret = mDevice->debug(hidlHandle, {} /* options */);
     native_handle_delete(hidlHandle);
     return processReturn("dump", ret);
 }
 
+} // namespace V2_0
 } // namespace android

@@ -15,6 +15,7 @@
  */
 
 #include <string.h>
+#include <vector>
 
 #define LOG_TAG "DevicesFactoryHalHidl"
 //#define LOG_NDEBUG 0
@@ -32,64 +33,69 @@ using ::android::hardware::audio::V2_0::Result;
 using ::android::hardware::Return;
 
 namespace android {
+namespace V2_0 {
 
 DevicesFactoryHalHidl::DevicesFactoryHalHidl() {
-    mDevicesFactory = IDevicesFactory::getService();
-    if (mDevicesFactory != 0) {
-        // It is assumed that DevicesFactory is owned by AudioFlinger
-        // and thus have the same lifespan.
-        mDevicesFactory->linkToDeath(HalDeathHandler::getInstance(), 0 /*cookie*/);
-    } else {
-        ALOGE("Failed to obtain IDevicesFactory service, terminating process.");
+    sp<IDevicesFactory> defaultFactory{IDevicesFactory::getService()};
+    if (!defaultFactory) {
+        ALOGE("Failed to obtain IDevicesFactory/default service, terminating process.");
         exit(1);
     }
+    mDeviceFactories.push_back(defaultFactory);
+    for (const auto& factory : mDeviceFactories) {
+        // It is assumed that the DevicesFactoryHalInterface instance is owned
+        // by AudioFlinger and thus have the same lifespan.
+        factory->linkToDeath(HalDeathHandler::getInstance(), 0 /*cookie*/);
+    }
 }
 
-DevicesFactoryHalHidl::~DevicesFactoryHalHidl() {
-}
 
-// static
-status_t DevicesFactoryHalHidl::nameFromHal(const char *name, IDevicesFactory::Device *device) {
+static IDevicesFactory::Device idFromHal(const char *name, status_t* status) {
+    *status = OK;
     if (strcmp(name, AUDIO_HARDWARE_MODULE_ID_PRIMARY) == 0) {
-        *device = IDevicesFactory::Device::PRIMARY;
-        return OK;
+        return IDevicesFactory::Device::PRIMARY;
     } else if(strcmp(name, AUDIO_HARDWARE_MODULE_ID_A2DP) == 0) {
-        *device = IDevicesFactory::Device::A2DP;
-        return OK;
+        return IDevicesFactory::Device::A2DP;
     } else if(strcmp(name, AUDIO_HARDWARE_MODULE_ID_USB) == 0) {
-        *device = IDevicesFactory::Device::USB;
-        return OK;
+        return IDevicesFactory::Device::USB;
     } else if(strcmp(name, AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX) == 0) {
-        *device = IDevicesFactory::Device::R_SUBMIX;
-        return OK;
+        return IDevicesFactory::Device::R_SUBMIX;
     } else if(strcmp(name, AUDIO_HARDWARE_MODULE_ID_STUB) == 0) {
-        *device = IDevicesFactory::Device::STUB;
-        return OK;
+        return IDevicesFactory::Device::STUB;
     }
     ALOGE("Invalid device name %s", name);
-    return BAD_VALUE;
+    *status = BAD_VALUE;
+    return {};
 }
 
 status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterface> *device) {
-    if (mDevicesFactory == 0) return NO_INIT;
-    IDevicesFactory::Device hidlDevice;
-    status_t status = nameFromHal(name, &hidlDevice);
+    if (mDeviceFactories.empty()) return NO_INIT;
+    status_t status;
+    auto hidlId = idFromHal(name, &status);
     if (status != OK) return status;
     Result retval = Result::NOT_INITIALIZED;
-    Return<void> ret = mDevicesFactory->openDevice(
-            hidlDevice,
-            [&](Result r, const sp<IDevice>& result) {
-                retval = r;
-                if (retval == Result::OK) {
-                    *device = new DeviceHalHidl(result);
-                }
-            });
-    if (ret.isOk()) {
-        if (retval == Result::OK) return OK;
-        else if (retval == Result::INVALID_ARGUMENTS) return BAD_VALUE;
-        else return NO_INIT;
+    for (const auto& factory : mDeviceFactories) {
+        Return<void> ret = factory->openDevice(
+                hidlId,
+                [&](Result r, const sp<IDevice>& result) {
+                    retval = r;
+                    if (retval == Result::OK) {
+                        *device = new DeviceHalHidl(result);
+                    }
+                });
+        if (!ret.isOk()) return FAILED_TRANSACTION;
+        switch (retval) {
+            // Device was found and was initialized successfully.
+            case Result::OK: return OK;
+            // Device was found but failed to initalize.
+            case Result::NOT_INITIALIZED: return NO_INIT;
+            // Otherwise continue iterating.
+            default: ;
+        }
     }
-    return FAILED_TRANSACTION;
+    ALOGW("The specified device name is not recognized: \"%s\"", name);
+    return BAD_VALUE;
 }
 
+} // namespace V2_0
 } // namespace android

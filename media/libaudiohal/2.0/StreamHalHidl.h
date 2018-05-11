@@ -41,6 +41,7 @@ using WriteCommand = ::android::hardware::audio::V2_0::IStreamOut::WriteCommand;
 using WriteStatus = ::android::hardware::audio::V2_0::IStreamOut::WriteStatus;
 
 namespace android {
+namespace V2_0 {
 
 class DeviceHalHidl;
 
@@ -243,6 +244,7 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
     status_t prepareForReading(size_t bufferSize);
 };
 
+} // namespace V2_0
 } // namespace android
 
 #endif // ANDROID_HARDWARE_STREAM_HAL_HIDL_H

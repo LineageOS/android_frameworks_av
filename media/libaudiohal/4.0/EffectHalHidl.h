@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_EFFECT_HAL_HIDL_4_0_H
-#define ANDROID_HARDWARE_EFFECT_HAL_HIDL_4_0_H
+#ifndef ANDROID_HARDWARE_EFFECT_HAL_HIDL_H
+#define ANDROID_HARDWARE_EFFECT_HAL_HIDL_H
 
 #include <android/hardware/audio/effect/4.0/IEffect.h>
 #include <media/audiohal/EffectHalInterface.h>
@@ -27,6 +27,7 @@ using ::android::hardware::audio::effect::V4_0::EffectBufferConfig;
 using ::android::hardware::audio::effect::V4_0::EffectConfig;
 using ::android::hardware::audio::effect::V4_0::EffectDescriptor;
 using ::android::hardware::audio::effect::V4_0::IEffect;
+using EffectResult = ::android::hardware::audio::effect::V4_0::Result;
 using ::android::hardware::EventFlag;
 using ::android::hardware::MessageQueue;
 
@@ -69,8 +70,7 @@ class EffectHalHidl : public EffectHalInterface
 
   private:
     friend class EffectsFactoryHalHidl;
-    typedef MessageQueue<
-        hardware::audio::effect::V4_0::Result, hardware::kSynchronizedReadWrite> StatusMQ;
+    typedef MessageQueue<EffectResult, hardware::kSynchronizedReadWrite> StatusMQ;
 
     sp<IEffect> mEffect;
     const uint64_t mEffectId;
@@ -80,7 +80,7 @@ class EffectHalHidl : public EffectHalInterface
     std::unique_ptr<StatusMQ> mStatusMQ;
     EventFlag* mEfGroup;
 
-    static status_t analyzeResult(const hardware::audio::effect::V4_0::Result& result);
+    static status_t analyzeResult(const EffectResult& result);
     static void effectBufferConfigFromHal(
             const buffer_config_t& halConfig, EffectBufferConfig* config);
     static void effectBufferConfigToHal(
@@ -107,4 +107,4 @@ class EffectHalHidl : public EffectHalInterface
 } // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_EFFECT_HAL_HIDL_4_0_H
+#endif // ANDROID_HARDWARE_EFFECT_HAL_HIDL_H

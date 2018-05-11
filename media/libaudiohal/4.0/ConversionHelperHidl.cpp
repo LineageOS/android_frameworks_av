@@ -107,7 +107,7 @@ void ConversionHelperHidl::emitError(const char* funcName, const char* descripti
 }
 
 // TODO: Use the same implementation in the hal when it moves to a util library.
-std::string deviceAddressToHal(const DeviceAddress& address) {
+static std::string deviceAddressToHal(const DeviceAddress& address) {
     // HAL assumes that the address is NUL-terminated.
     char halAddress[AUDIO_DEVICE_MAX_ADDRESS_LEN];
     memset(halAddress, 0, sizeof(halAddress));
@@ -141,7 +141,7 @@ std::string deviceAddressToHal(const DeviceAddress& address) {
 
 //local conversion helpers
 
-audio_microphone_channel_mapping_t  channelMappingToHal(AudioMicrophoneChannelMapping mapping) {
+static audio_microphone_channel_mapping_t  channelMappingToHal(AudioMicrophoneChannelMapping mapping) {
     switch (mapping) {
         case AudioMicrophoneChannelMapping::UNUSED:
             return AUDIO_MICROPHONE_CHANNEL_MAPPING_UNUSED;
@@ -154,7 +154,7 @@ audio_microphone_channel_mapping_t  channelMappingToHal(AudioMicrophoneChannelMa
     }
 }
 
-audio_microphone_location_t locationToHal(AudioMicrophoneLocation location) {
+static audio_microphone_location_t locationToHal(AudioMicrophoneLocation location) {
     switch (location) {
         case AudioMicrophoneLocation::UNKNOWN:
             return AUDIO_MICROPHONE_LOCATION_UNKNOWN;
@@ -168,7 +168,7 @@ audio_microphone_location_t locationToHal(AudioMicrophoneLocation location) {
             LOG_ALWAYS_FATAL("Unknown locationToHal conversion %d", location);
     }
 }
-audio_microphone_directionality_t directionalityToHal(AudioMicrophoneDirectionality dir) {
+static audio_microphone_directionality_t directionalityToHal(AudioMicrophoneDirectionality dir) {
     switch (dir) {
         case AudioMicrophoneDirectionality::UNKNOWN:
             return AUDIO_MICROPHONE_DIRECTIONALITY_UNKNOWN;

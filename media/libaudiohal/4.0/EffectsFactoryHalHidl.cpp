@@ -18,8 +18,8 @@
 //#define LOG_NDEBUG 0
 
 #include <cutils/native_handle.h>
-#include <libaudiohal/4.0/EffectsFactoryHalHidl.h>
 
+#include "EffectsFactoryHalHidl.h"
 #include "ConversionHelperHidl.h"
 #include "EffectBufferHalHidl.h"
 #include "EffectHalHidl.h"
@@ -40,9 +40,6 @@ EffectsFactoryHalHidl::EffectsFactoryHalHidl() : ConversionHelperHidl("EffectsFa
         ALOGE("Failed to obtain IEffectsFactory service, terminating process.");
         exit(1);
     }
-}
-
-EffectsFactoryHalHidl::~EffectsFactoryHalHidl() {
 }
 
 status_t EffectsFactoryHalHidl::queryAllDescriptors() {

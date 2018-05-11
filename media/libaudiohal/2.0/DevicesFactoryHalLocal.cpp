@@ -26,6 +26,7 @@
 #include "DevicesFactoryHalLocal.h"
 
 namespace android {
+namespace V2_0 {
 
 static status_t load_audio_interface(const char *if_name, audio_hw_device_t **dev)
 {
@@ -66,4 +67,5 @@ status_t DevicesFactoryHalLocal::openDevice(const char *name, sp<DeviceHalInterf
     return rc;
 }
 
+} // namespace V2_0
 } // namespace android

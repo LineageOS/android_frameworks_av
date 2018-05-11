@@ -17,7 +17,7 @@
 #define LOG_TAG "DevicesFactoryHalHybrid"
 //#define LOG_NDEBUG 0
 
-#include <libaudiohal/4.0/DevicesFactoryHalHybrid.h>
+#include "DevicesFactoryHalHybrid.h"
 #include "DevicesFactoryHalLocal.h"
 #include "DevicesFactoryHalHidl.h"
 
@@ -27,9 +27,6 @@ namespace V4_0 {
 DevicesFactoryHalHybrid::DevicesFactoryHalHybrid()
         : mLocalFactory(new DevicesFactoryHalLocal()),
           mHidlFactory(new DevicesFactoryHalHidl()) {
-}
-
-DevicesFactoryHalHybrid::~DevicesFactoryHalHybrid() {
 }
 
 status_t DevicesFactoryHalHybrid::openDevice(const char *name, sp<DeviceHalInterface> *device) {

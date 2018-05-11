@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_4_0_H
-#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_4_0_H
+#ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_H
+#define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_H
 
 #include <android/hardware/audio/4.0/IDevicesFactory.h>
 #include <media/audiohal/DevicesFactoryHalInterface.h>
@@ -50,4 +50,4 @@ class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
 } // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_4_0_H
+#endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_H

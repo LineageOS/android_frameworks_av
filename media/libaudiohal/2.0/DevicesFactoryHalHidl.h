@@ -27,6 +27,7 @@
 using ::android::hardware::audio::V2_0::IDevicesFactory;
 
 namespace android {
+namespace V2_0 {
 
 class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
 {
@@ -38,16 +39,15 @@ class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
   private:
     friend class DevicesFactoryHalHybrid;
 
-    sp<IDevicesFactory> mDevicesFactory;
-
-    static status_t nameFromHal(const char *name, IDevicesFactory::Device *device);
+    std::vector<sp<IDevicesFactory>> mDeviceFactories;
 
     // Can not be constructed directly by clients.
     DevicesFactoryHalHidl();
 
-    virtual ~DevicesFactoryHalHidl();
+    virtual ~DevicesFactoryHalHidl() = default;
 };
 
+} // namespace V2_0
 } // namespace android
 
 #endif // ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_H

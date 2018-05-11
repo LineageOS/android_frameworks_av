@@ -28,26 +28,27 @@
 #include "VersionUtils.h"
 
 using ::android::hardware::audio::common::V4_0::AudioChannelMask;
-using ::android::hardware::audio::common::V4_0::AudioContentType;
 using ::android::hardware::audio::common::V4_0::AudioFormat;
-using ::android::hardware::audio::common::V4_0::AudioSource;
-using ::android::hardware::audio::common::V4_0::AudioUsage;
 using ::android::hardware::audio::common::V4_0::ThreadInfo;
 using ::android::hardware::audio::V4_0::AudioDrain;
 using ::android::hardware::audio::V4_0::IStreamOutCallback;
 using ::android::hardware::audio::V4_0::MessageQueueFlagBits;
-using ::android::hardware::audio::V4_0::MicrophoneInfo;
 using ::android::hardware::audio::V4_0::MmapBufferInfo;
 using ::android::hardware::audio::V4_0::MmapPosition;
 using ::android::hardware::audio::V4_0::ParameterValue;
-using ::android::hardware::audio::V4_0::PlaybackTrackMetadata;
-using ::android::hardware::audio::V4_0::RecordTrackMetadata;
 using ::android::hardware::audio::V4_0::Result;
 using ::android::hardware::audio::V4_0::TimeSpec;
 using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ReadCommand = ::android::hardware::audio::V4_0::IStreamIn::ReadCommand;
+
+using ::android::hardware::audio::common::V4_0::AudioContentType;
+using ::android::hardware::audio::common::V4_0::AudioSource;
+using ::android::hardware::audio::common::V4_0::AudioUsage;
+using ::android::hardware::audio::V4_0::MicrophoneInfo;
+using ::android::hardware::audio::V4_0::PlaybackTrackMetadata;
+using ::android::hardware::audio::V4_0::RecordTrackMetadata;
 
 namespace android {
 namespace V4_0 {
@@ -781,7 +782,6 @@ status_t StreamInHalHidl::getCapturePosition(int64_t *frames, int64_t *time) {
         return processReturn("getCapturePosition", ret, retval);
     }
 }
-
 
 status_t StreamInHalHidl::getActiveMicrophones(
         std::vector<media::MicrophoneInfo> *microphonesInfo) {

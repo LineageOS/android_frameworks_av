@@ -30,6 +30,7 @@ using ::android::hardware::Return;
 using ::android::hidl::allocator::V1_0::IAllocator;
 
 namespace android {
+namespace V2_0 {
 
 // static
 uint64_t EffectBufferHalHidl::makeUniqueId() {
@@ -141,4 +142,5 @@ void EffectBufferHalHidl::commit(size_t size) {
     memcpy(mExternalData, mAudioBuffer.raw, size);
 }
 
+} // namespace V2_0
 } // namespace android

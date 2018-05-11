@@ -23,6 +23,7 @@
 #include <system/audio.h>
 
 namespace android {
+namespace V2_0 {
 
 class StreamPowerLog {
 public:
@@ -97,6 +98,7 @@ private:
     size_t mFrameSize;
 };
 
+} // namespace V2_0
 } // namespace android
 
 #endif // ANDROID_HARDWARE_STREAM_POWER_LOG_H

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,23 +14,23 @@
  * limitations under the License.
  */
 
-#include <android/hardware/audio/2.0/IDevicesFactory.h>
-#include <android/hardware/audio/4.0/IDevicesFactory.h>
+#ifndef ANDROID_HARDWARE_FACTORY_HAL_HIDL_V2_0_H
+#define ANDROID_HARDWARE_FACTORY_HAL_HIDL_V2_0_H
 
-#include <libaudiohal/2.0/FactoryHalHidl.h>
-#include <libaudiohal/4.0/FactoryHalHidl.h>
+/** @file Library entry points to create the HAL factories. */
+
+#include <media/audiohal/DevicesFactoryHalInterface.h>
+#include <media/audiohal/EffectsFactoryHalInterface.h>
+#include <utils/StrongPointer.h>
 
 namespace android {
+namespace V2_0 {
 
-// static
-sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
-    if (hardware::audio::V4_0::IDevicesFactory::getService() != nullptr) {
-        return V4_0::createDevicesFactoryHal();
-    }
-    if (hardware::audio::V2_0::IDevicesFactory::getService() != nullptr) {
-        return V2_0::createDevicesFactoryHal();
-    }
-    return nullptr;
-}
+sp<EffectsFactoryHalInterface> createEffectsFactoryHal();
 
+sp<DevicesFactoryHalInterface> createDevicesFactoryHal();
+
+} // namespace V2_0
 } // namespace android
+
+#endif // ANDROID_HARDWARE_FACTORY_HAL_HIDL_V2_0_H

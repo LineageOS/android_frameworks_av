@@ -25,6 +25,7 @@
 using ::android::hardware::audio::V2_0::Result;
 
 namespace android {
+namespace V2_0 {
 
 // static
 status_t ConversionHelperHidl::keysFromHal(const String8& keys, hidl_vec<hidl_string> *hidlKeys) {
@@ -100,4 +101,5 @@ void ConversionHelperHidl::emitError(const char* funcName, const char* descripti
     ALOGE("%s %p %s: %s (from rpc)", mClassName, this, funcName, description);
 }
 
+}  // namespace V2_0
 }  // namespace android

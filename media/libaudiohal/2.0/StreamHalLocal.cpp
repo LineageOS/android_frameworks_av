@@ -22,8 +22,10 @@
 
 #include "DeviceHalLocal.h"
 #include "StreamHalLocal.h"
+#include "VersionUtils.h"
 
 namespace android {
+namespace V2_0 {
 
 StreamHalLocal::StreamHalLocal(audio_stream_t *stream, sp<DeviceHalLocal> device)
         : mDevice(device),
@@ -344,4 +346,5 @@ status_t StreamInHalLocal::getActiveMicrophones(
     return INVALID_OPERATION;
 }
 
+} // namespace V2_0
 } // namespace android

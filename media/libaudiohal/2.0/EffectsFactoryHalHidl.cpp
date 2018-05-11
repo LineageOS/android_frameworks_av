@@ -19,10 +19,10 @@
 
 #include <cutils/native_handle.h>
 
+#include "EffectsFactoryHalHidl.h"
 #include "ConversionHelperHidl.h"
 #include "EffectBufferHalHidl.h"
 #include "EffectHalHidl.h"
-#include "EffectsFactoryHalHidl.h"
 #include "HidlUtils.h"
 
 using ::android::hardware::audio::common::V2_0::HidlUtils;
@@ -32,6 +32,7 @@ using ::android::hardware::audio::effect::V2_0::Result;
 using ::android::hardware::Return;
 
 namespace android {
+namespace V2_0 {
 
 EffectsFactoryHalHidl::EffectsFactoryHalHidl() : ConversionHelperHidl("EffectsFactory") {
     mEffectsFactory = IEffectsFactory::getService();
@@ -39,9 +40,6 @@ EffectsFactoryHalHidl::EffectsFactoryHalHidl() : ConversionHelperHidl("EffectsFa
         ALOGE("Failed to obtain IEffectsFactory service, terminating process.");
         exit(1);
     }
-}
-
-EffectsFactoryHalHidl::~EffectsFactoryHalHidl() {
 }
 
 status_t EffectsFactoryHalHidl::queryAllDescriptors() {
@@ -132,7 +130,7 @@ status_t EffectsFactoryHalHidl::dumpEffects(int fd) {
     if (mEffectsFactory == 0) return NO_INIT;
     native_handle_t* hidlHandle = native_handle_create(1, 0);
     hidlHandle->data[0] = fd;
-    Return<void> ret = mEffectsFactory->debugDump(hidlHandle);
+    Return<void> ret = mEffectsFactory->debug(hidlHandle, {} /* options */);
     native_handle_delete(hidlHandle);
     return processReturn(__FUNCTION__, ret);
 }
@@ -147,4 +145,5 @@ status_t EffectsFactoryHalHidl::mirrorBuffer(void* external, size_t size,
 }
 
 
+} // namespace V2_0
 } // namespace android

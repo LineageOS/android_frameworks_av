@@ -28,6 +28,7 @@ using ::android::hardware::audio::V2_0::IPrimaryDevice;
 using ::android::hardware::Return;
 
 namespace android {
+namespace V2_0 {
 
 class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
 {
@@ -124,6 +125,7 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
     virtual ~DeviceHalHidl();
 };
 
+} // namespace V2_0
 } // namespace android
 
 #endif // ANDROID_HARDWARE_DEVICE_HAL_HIDL_H

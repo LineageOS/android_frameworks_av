@@ -21,6 +21,7 @@
 #include <media/audiohal/DeviceHalInterface.h>
 
 namespace android {
+namespace V2_0 {
 
 class DeviceHalLocal : public DeviceHalInterface
 {
@@ -122,6 +123,7 @@ class DeviceHalLocal : public DeviceHalInterface
     uint32_t version() const { return mDev->common.version; }
 };
 
+} // namespace V2_0
 } // namespace android
 
 #endif // ANDROID_HARDWARE_DEVICE_HAL_LOCAL_H

@@ -17,19 +17,18 @@
 #include <android/hardware/audio/effect/2.0/IEffectsFactory.h>
 #include <android/hardware/audio/effect/4.0/IEffectsFactory.h>
 
-#include <EffectsFactoryHalHidl.h>
-#include <libaudiohal/4.0/EffectsFactoryHalHidl.h>
-
+#include <libaudiohal/2.0/FactoryHalHidl.h>
+#include <libaudiohal/4.0/FactoryHalHidl.h>
 
 namespace android {
 
 // static
 sp<EffectsFactoryHalInterface> EffectsFactoryHalInterface::create() {
     if (hardware::audio::effect::V4_0::IEffectsFactory::getService() != nullptr) {
-        return new V4_0::EffectsFactoryHalHidl();
+        return V4_0::createEffectsFactoryHal();
     }
     if (hardware::audio::effect::V2_0::IEffectsFactory::getService() != nullptr) {
-        return new EffectsFactoryHalHidl();
+        return V2_0::createEffectsFactoryHal();
     }
     return nullptr;
 }

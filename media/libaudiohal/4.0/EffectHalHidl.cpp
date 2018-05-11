@@ -22,7 +22,6 @@
 #include <media/EffectsFactoryApi.h>
 #include <utils/Log.h>
 
-#include "ConversionHelperHidl.h"
 #include "EffectBufferHalHidl.h"
 #include "EffectHalHidl.h"
 #include "HidlUtils.h"

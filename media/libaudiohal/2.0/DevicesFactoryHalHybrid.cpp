@@ -22,13 +22,11 @@
 #include "DevicesFactoryHalHidl.h"
 
 namespace android {
+namespace V2_0 {
 
 DevicesFactoryHalHybrid::DevicesFactoryHalHybrid()
         : mLocalFactory(new DevicesFactoryHalLocal()),
           mHidlFactory(new DevicesFactoryHalHidl()) {
-}
-
-DevicesFactoryHalHybrid::~DevicesFactoryHalHybrid() {
 }
 
 status_t DevicesFactoryHalHybrid::openDevice(const char *name, sp<DeviceHalInterface> *device) {
@@ -39,4 +37,5 @@ status_t DevicesFactoryHalHybrid::openDevice(const char *name, sp<DeviceHalInter
     return mLocalFactory->openDevice(name, device);
 }
 
+} // namespace V2_0
 } // namespace android

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_STREAM_POWER_LOG_4_0_H
-#define ANDROID_HARDWARE_STREAM_POWER_LOG_4_0_H
+#ifndef ANDROID_HARDWARE_STREAM_POWER_LOG_H
+#define ANDROID_HARDWARE_STREAM_POWER_LOG_H
 
 #include <audio_utils/clock.h>
 #include <audio_utils/PowerLog.h>
@@ -101,4 +101,4 @@ private:
 } // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_STREAM_POWER_LOG_4_0_H
+#endif // ANDROID_HARDWARE_STREAM_POWER_LOG_H

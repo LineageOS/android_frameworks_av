@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_STREAM_HAL_HIDL_4_0_H
-#define ANDROID_HARDWARE_STREAM_HAL_HIDL_4_0_H
+#ifndef ANDROID_HARDWARE_STREAM_HAL_HIDL_H
+#define ANDROID_HARDWARE_STREAM_HAL_HIDL_H
 
 #include <atomic>
 
@@ -247,4 +247,4 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
 } // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_STREAM_HAL_HIDL_4_0_H
+#endif // ANDROID_HARDWARE_STREAM_HAL_HIDL_H

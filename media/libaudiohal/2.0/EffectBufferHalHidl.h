@@ -28,6 +28,7 @@ using android::hardware::hidl_memory;
 using android::hidl::memory::V1_0::IMemory;
 
 namespace android {
+namespace V2_0 {
 
 class EffectBufferHalHidl : public EffectBufferHalInterface
 {
@@ -71,6 +72,7 @@ class EffectBufferHalHidl : public EffectBufferHalInterface
     status_t init();
 };
 
+} // namespace V2_0
 } // namespace android
 
 #endif // ANDROID_HARDWARE_EFFECT_BUFFER_HAL_HIDL_H

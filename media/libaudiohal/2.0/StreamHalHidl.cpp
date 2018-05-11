@@ -25,6 +25,7 @@
 #include "DeviceHalHidl.h"
 #include "EffectHalHidl.h"
 #include "StreamHalHidl.h"
+#include "VersionUtils.h"
 
 using ::android::hardware::audio::common::V2_0::AudioChannelMask;
 using ::android::hardware::audio::common::V2_0::AudioFormat;
@@ -43,6 +44,7 @@ using ::android::hardware::Void;
 using ReadCommand = ::android::hardware::audio::V2_0::IStreamIn::ReadCommand;
 
 namespace android {
+namespace V2_0 {
 
 StreamHalHidl::StreamHalHidl(IStream *stream)
         : ConversionHelperHidl("Stream"),
@@ -55,7 +57,7 @@ StreamHalHidl::StreamHalHidl(IStream *stream)
     if (mStream != nullptr && mStreamPowerLog.isUserDebugOrEngBuild()) {
         // Obtain audio properties (see StreamHalHidl::getAudioProperties() below).
         Return<void> ret = mStream->getAudioProperties(
-                [&](uint32_t sr, AudioChannelMask m, AudioFormat f) {
+                [&](auto sr, auto m, auto f) {
                 mStreamPowerLog.init(sr,
                         static_cast<audio_channel_mask_t>(m),
                         static_cast<audio_format_t>(f));
@@ -95,7 +97,7 @@ status_t StreamHalHidl::getAudioProperties(
         uint32_t *sampleRate, audio_channel_mask_t *mask, audio_format_t *format) {
     if (!mStream) return NO_INIT;
     Return<void> ret = mStream->getAudioProperties(
-            [&](uint32_t sr, AudioChannelMask m, AudioFormat f) {
+            [&](uint32_t sr, auto m, auto f) {
                 *sampleRate = sr;
                 *mask = static_cast<audio_channel_mask_t>(m);
                 *format = static_cast<audio_format_t>(f);
@@ -108,7 +110,8 @@ status_t StreamHalHidl::setParameters(const String8& kvPairs) {
     hidl_vec<ParameterValue> hidlParams;
     status_t status = parametersFromHal(kvPairs, &hidlParams);
     if (status != OK) return status;
-    return processReturn("setParameters", mStream->setParameters(hidlParams));
+    return processReturn("setParameters",
+                         utils::setParameters(mStream, hidlParams, {} /* options */));
 }
 
 status_t StreamHalHidl::getParameters(const String8& keys, String8 *values) {
@@ -118,7 +121,9 @@ status_t StreamHalHidl::getParameters(const String8& keys, String8 *values) {
     status_t status = keysFromHal(keys, &hidlKeys);
     if (status != OK) return status;
     Result retval;
-    Return<void> ret = mStream->getParameters(
+    Return<void> ret = utils::getParameters(
+            mStream,
+            {} /* context */,
             hidlKeys,
             [&](Result r, const hidl_vec<ParameterValue>& parameters) {
                 retval = r;
@@ -150,7 +155,7 @@ status_t StreamHalHidl::dump(int fd) {
     if (!mStream) return NO_INIT;
     native_handle_t* hidlHandle = native_handle_create(1, 0);
     hidlHandle->data[0] = fd;
-    Return<void> ret = mStream->debugDump(hidlHandle);
+    Return<void> ret = mStream->debug(hidlHandle, {} /* options */);
     native_handle_delete(hidlHandle);
     mStreamPowerLog.dump(fd);
     return processReturn("dump", ret);
@@ -765,4 +770,5 @@ status_t StreamInHalHidl::updateSinkMetadata(const SinkMetadata& /* sinkMetadata
     return INVALID_OPERATION;
 }
 
+} // namespace V2_0
 } // namespace android

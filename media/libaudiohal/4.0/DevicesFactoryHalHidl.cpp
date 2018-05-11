@@ -54,12 +54,21 @@ DevicesFactoryHalHidl::DevicesFactoryHalHidl() {
     }
 }
 
+
+static const char* idFromHal(const char *name, status_t* status) {
+    *status = OK;
+    return name;
+}
+
 status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterface> *device) {
     if (mDeviceFactories.empty()) return NO_INIT;
+    status_t status;
+    auto hidlId = idFromHal(name, &status);
+    if (status != OK) return status;
     Result retval = Result::NOT_INITIALIZED;
     for (const auto& factory : mDeviceFactories) {
         Return<void> ret = factory->openDevice(
-                name,
+                hidlId,
                 [&](Result r, const sp<IDevice>& result) {
                     retval = r;
                     if (retval == Result::OK) {

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_4_0_H
-#define ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_4_0_H
+#ifndef ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_H
+#define ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_H
 
 #include <android/hardware/audio/effect/4.0/IEffectsFactory.h>
 #include <android/hardware/audio/effect/4.0/types.h>
@@ -33,6 +33,8 @@ using ::android::hardware::hidl_vec;
 class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public ConversionHelperHidl
 {
   public:
+    EffectsFactoryHalHidl();
+
     // Returns the number of different effects in all loaded libraries.
     virtual status_t queryNumberEffects(uint32_t *pNumEffects);
 
@@ -57,19 +59,17 @@ class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public Conversi
                           sp<EffectBufferHalInterface>* buffer) override;
 
   private:
-    friend class EffectsFactoryHalInterface;
-
     sp<IEffectsFactory> mEffectsFactory;
     hidl_vec<EffectDescriptor> mLastDescriptors;
-
-    // Can not be constructed directly by clients.
-    EffectsFactoryHalHidl();
-    virtual ~EffectsFactoryHalHidl();
 
     status_t queryAllDescriptors();
 };
 
+sp<EffectsFactoryHalInterface> createEffectsFactoryHal() {
+    return new EffectsFactoryHalHidl();
+}
+
 } // namespace V4_0
 } // namespace android
 
-#endif // ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_4_0_H
+#endif // ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_H
