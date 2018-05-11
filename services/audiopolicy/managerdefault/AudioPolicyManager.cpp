@@ -596,7 +596,7 @@ void AudioPolicyManager::setPhoneState(audio_mode_t state)
         sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
         audio_devices_t newDevice = getNewOutputDevice(desc, true /*fromCache*/);
         if (state != AUDIO_MODE_IN_CALL || desc != mPrimaryOutput) {
-            setOutputDevice(desc, newDevice, (newDevice != AUDIO_DEVICE_NONE), delayMs);
+            setOutputDevice(desc, newDevice, (newDevice != AUDIO_DEVICE_NONE), 0 /*delayMs*/);
         }
     }
 
