@@ -56,6 +56,7 @@
 #include <system/audio_effects/effect_aec.h>
 
 #include <audio_utils/primitives.h>
+#include <audio_utils/string.h>
 
 #include <powermanager/PowerManager.h>
 
