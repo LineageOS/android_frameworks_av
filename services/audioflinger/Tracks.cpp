@@ -493,11 +493,12 @@ void AudioFlinger::PlaybackThread::Track::destroy()
 void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
 {
     result.appendFormat("T Name Active Client Session S  Flags "
-                  "  Format Chn mask  SRate "
-                  "ST  L dB  R dB  VS dB "
-                  "  Server FrmCnt  FrmRdy F Underruns  Flushed"
-                  "%s\n",
-                  isServerLatencySupported() ? "   Latency" : "");
+                        "  Format Chn mask  SRate "
+                        "ST Usg CT "
+                        " G db  L dB  R dB  VS dB "
+                        "  Server FrmCnt  FrmRdy F Underruns  Flushed"
+                        "%s\n",
+                        isServerLatencySupported() ? "   Latency" : "");
 }
 
 void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool active)
@@ -582,9 +583,10 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
                     ? 'e' /* error */ : ' ' /* identical */;
 
     result.appendFormat("%7s %6u %7u %2s 0x%03X "
-                           "%08X %08X %6u "
-                           "%2u %5.2g %5.2g %5.2g%c "
-                           "%08X %6zu%c %6zu %c %9u%c %7u",
+                        "%08X %08X %6u "
+                        "%2u %3x %2x "
+                        "%5.2g %5.2g %5.2g %5.2g%c "
+                        "%08X %6zu%c %6zu %c %9u%c %7u",
             active ? "yes" : "no",
             (mClient == 0) ? getpid() : mClient->pid(),
             mSessionId,
@@ -596,6 +598,10 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
             sampleRate(),
 
             mStreamType,
+            mAttr.usage,
+            mAttr.content_type,
+
+            20.0 * log10(mFinalVolume),
             20.0 * log10(float_from_gain(gain_minifloat_unpack_left(vlr))),
             20.0 * log10(float_from_gain(gain_minifloat_unpack_right(vlr))),
             20.0 * log10(vsVolume.first), // VolumeShaper(s) total volume
@@ -989,7 +995,7 @@ VolumeShaper::Status AudioFlinger::PlaybackThread::Track::applyVolumeShaper(
         // Signal thread to fetch new volume.
         sp<ThreadBase> thread = mThread.promote();
         if (thread != 0) {
-             Mutex::Autolock _l(thread->mLock);
+            Mutex::Autolock _l(thread->mLock);
             thread->broadcast_l();
         }
     }
@@ -1540,7 +1546,7 @@ AudioFlinger::PlaybackThread::PatchTrack::~PatchTrack()
 }
 
 status_t AudioFlinger::PlaybackThread::PatchTrack::start(AudioSystem::sync_event_t event,
-                                                          audio_session_t triggerSession)
+                                                         audio_session_t triggerSession)
 {
     status_t status = Track::start(event, triggerSession);
     if (status != NO_ERROR) {
@@ -1805,14 +1811,16 @@ void AudioFlinger::RecordThread::RecordTrack::invalidate()
 
 void AudioFlinger::RecordThread::RecordTrack::appendDumpHeader(String8& result)
 {
-    result.appendFormat("Active Client Session S  Flags   Format Chn mask  SRate   Server"
-            " FrmCnt FrmRdy Sil%s\n", isServerLatencySupported() ? "   Latency" : "");
+    result.appendFormat("Active Client Session S  Flags  "
+                        " Format Chn mask  SRate Source "
+                        " Server FrmCnt FrmRdy Sil%s\n",
+                        isServerLatencySupported() ? "   Latency" : "");
 }
 
 void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool active)
 {
     result.appendFormat("%c%5s %6u %7u %2s 0x%03X "
-            "%08X %08X %6u "
+            "%08X %08X %6u %6X "
             "%08X %6zu %6zu %3c",
             isFastTrack() ? 'F' : ' ',
             active ? "yes" : "no",
@@ -1824,6 +1832,7 @@ void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool a
             mFormat,
             mChannelMask,
             mSampleRate,
+            mAttr.source,
 
             mCblk->mServer,
             mFrameCount,
@@ -1984,13 +1993,14 @@ AudioFlinger::MmapThread::MmapTrack::MmapTrack(ThreadBase *thread,
         audio_format_t format,
         audio_channel_mask_t channelMask,
         audio_session_t sessionId,
+        bool isOut,
         uid_t uid,
         pid_t pid,
         audio_port_handle_t portId)
     :   TrackBase(thread, NULL, attr, sampleRate, format,
                   channelMask, (size_t)0 /* frameCount */,
                   nullptr /* buffer */, (size_t)0 /* bufferSize */,
-                  sessionId, uid, false /* isOut */,
+                  sessionId, uid, isOut,
                   ALLOC_NONE,
                   TYPE_DEFAULT, portId),
         mPid(pid), mSilenced(false), mSilencedNotified(false)
@@ -2007,7 +2017,7 @@ status_t AudioFlinger::MmapThread::MmapTrack::initCheck() const
 }
 
 status_t AudioFlinger::MmapThread::MmapTrack::start(AudioSystem::sync_event_t event __unused,
-                                                        audio_session_t triggerSession __unused)
+                                                    audio_session_t triggerSession __unused)
 {
     return NO_ERROR;
 }
@@ -2038,19 +2048,27 @@ void AudioFlinger::MmapThread::MmapTrack::onTimestamp(const ExtendedTimestamp &t
 {
 }
 
-/*static*/ void AudioFlinger::MmapThread::MmapTrack::appendDumpHeader(String8& result)
+void AudioFlinger::MmapThread::MmapTrack::appendDumpHeader(String8& result)
 {
-    result.append("Client Session   Format Chn mask  SRate\n");
+    result.appendFormat("Client Session   Format Chn mask  SRate Flags %s\n",
+                        isOut() ? "Usg CT": "Source");
 }
 
 void AudioFlinger::MmapThread::MmapTrack::appendDump(String8& result, bool active __unused)
 {
-    result.appendFormat("%6u %7u %08X %08X %6u\n",
+    result.appendFormat("%6u %7u %08X %08X %6u 0x%03X ",
             mPid,
             mSessionId,
             mFormat,
             mChannelMask,
-            mSampleRate);
+            mSampleRate,
+            mAttr.flags);
+    if (isOut()) {
+        result.appendFormat("%3x %2x", mAttr.usage, mAttr.content_type);
+    } else {
+        result.appendFormat("%6x", mAttr.source);
+    }
+    result.append("\n");
 }
 
 } // namespace android
