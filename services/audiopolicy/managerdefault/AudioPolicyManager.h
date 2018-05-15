@@ -67,6 +67,10 @@ namespace android {
 // is switched
 #define MUTE_TIME_MS 2000
 
+// multiplication factor applied to output latency when calculating a safe mute delay when
+// invalidating tracks
+#define LATENCY_MUTE_FACTOR 4
+
 #define NUM_TEST_OUTPUTS 5
 
 #define NUM_VOL_CURVE_KNEES 2
