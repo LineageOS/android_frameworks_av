@@ -437,6 +437,94 @@ struct HIDE _AData_deleter<Flagger, U> {
 };
 
 /**
+ * Helper template that copy assigns an object of a specific type (member) in an
+ * AUnion.
+ *
+ * \param Flagger type flagger class (see AData)
+ * \param U AUnion object in which the member should be copy assigned
+ * \param Ts types to consider for the member
+ */
+template<typename Flagger, typename U, typename ...Ts>
+struct HIDE _AData_copy_assigner;
+
+/**
+ * Template specialization when there are still types to consider (T and rest)
+ */
+template<typename Flagger, typename U, typename T, typename ...Ts>
+struct HIDE _AData_copy_assigner<Flagger, U, T, Ts...> {
+    static bool assign(typename Flagger::type flags, U &dst, const U &src) {
+        static_assert(std::is_copy_constructible<T>::value, "T must be copy constructible");
+        // if we can delete as, we can also assign as
+        if (Flagger::canDeleteAs(flags, Flagger::flagFor((T*)0))) {
+            dst.template emplace<T>(src.template get<T>());
+            return true;
+        }
+        return _AData_copy_assigner<Flagger, U, Ts...>::assign(flags, dst, src);
+    }
+};
+
+/**
+ * Template specialization when there are no more types to consider.
+ */
+template<typename Flagger, typename U>
+struct HIDE _AData_copy_assigner<Flagger, U> {
+    inline static bool assign(typename Flagger::type, U &, const U &) {
+        return false;
+    }
+};
+
+/**
+ * Helper template that move assigns an object of a specific type (member) in an
+ * AUnion.
+ *
+ * \param Flagger type flagger class (see AData)
+ * \param U AUnion object in which the member should be copy assigned
+ * \param Ts types to consider for the member
+ */
+template<typename Flagger, typename U, typename ...Ts>
+struct HIDE _AData_move_assigner;
+
+/**
+ * Template specialization when there are still types to consider (T and rest)
+ */
+template<typename Flagger, typename U, typename T, typename ...Ts>
+struct HIDE _AData_move_assigner<Flagger, U, T, Ts...> {
+    template<typename V = T>
+    static typename std::enable_if<std::is_move_constructible<V>::value, bool>::type
+    assign(typename Flagger::type flags, U &dst, U &src) {
+        // if we can delete as, we can also assign as
+        if (Flagger::canDeleteAs(flags, Flagger::flagFor((T*)0))) {
+            dst.template emplace<T>(std::move(src.template get<T>()));
+            return true;
+        }
+        return _AData_move_assigner<Flagger, U, Ts...>::assign(flags, dst, src);
+    }
+
+    // Fall back to copy construction if T is not move constructible
+    template<typename V = T>
+    static typename std::enable_if<!std::is_move_constructible<V>::value, bool>::type
+    assign(typename Flagger::type flags, U &dst, U &src) {
+        static_assert(std::is_copy_constructible<T>::value, "T must be copy constructible");
+        // if we can delete as, we can also assign as
+        if (Flagger::canDeleteAs(flags, Flagger::flagFor((T*)0))) {
+            dst.template emplace<T>(src.template get<T>());
+            return true;
+        }
+        return _AData_move_assigner<Flagger, U, Ts...>::assign(flags, dst, src);
+    }
+};
+
+/**
+ * Template specialization when there are no more types to consider.
+ */
+template<typename Flagger, typename U>
+struct HIDE _AData_move_assigner<Flagger, U> {
+    inline static bool assign(typename Flagger::type, U &, U &) {
+        return false;
+    }
+};
+
+/**
  * Container that can store an arbitrary object of a set of specified types.
  *
  * This struct is an outer class that contains various inner classes based on desired type
@@ -655,6 +743,61 @@ public:
          * Constructor. Initializes this to a container that does not contain any object.
          */
         Custom() : base_t(Flagger::flagFor((void*)0)) { }
+
+        /**
+         * Copy assignment operator.
+         */
+        Custom& operator=(const Custom &o) {
+            if (&o != this) {
+                if (this->used() && !this->clear()) {
+                    __builtin_trap();
+                }
+                if (o.used()) {
+                    if (_AData_copy_assigner<Flagger, data_t, Ts...>::assign(
+                            o.flags(), this->get(), o.get())) {
+                        this->setFlags(o.flags());
+                    } else {
+                        __builtin_trap();
+                    }
+                }
+            }
+            return *this;
+        }
+
+        /**
+         * Copy constructor.
+         */
+        Custom(const Custom &o) : Custom() {
+            *this = o;
+        }
+
+        /**
+         * Move assignment operator.
+         */
+        Custom& operator=(Custom &&o) {
+            if (&o != this) {
+                if (this->used() && !this->clear()) {
+                    __builtin_trap();
+                }
+                if (o.used()) {
+                    if (_AData_move_assigner<Flagger, data_t, Ts...>::assign(
+                            o.flags(), this->get(), o.get())) {
+                        this->setFlags(o.flags());
+                        o.clear();
+                    } else {
+                        __builtin_trap();
+                    }
+                }
+            }
+            return *this;
+        }
+
+        /**
+         * Move constructor.
+         */
+        Custom(Custom &&o) : Custom() {
+            *this = std::move(o);
+        }
 
         /**
          * Removes the contained object, if any.
