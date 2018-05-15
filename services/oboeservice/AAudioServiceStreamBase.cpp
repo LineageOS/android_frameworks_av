@@ -414,12 +414,13 @@ void AAudioServiceStreamBase::onVolumeChanged(float volume) {
     sendServiceEvent(AAUDIO_SERVICE_EVENT_VOLUME, volume);
 }
 
-int32_t AAudioServiceStreamBase::incrementServiceReferenceCount() {
-    std::lock_guard<std::mutex> lock(mCallingCountLock);
+int32_t AAudioServiceStreamBase::incrementServiceReferenceCount_l() {
     return ++mCallingCount;
 }
 
-int32_t AAudioServiceStreamBase::decrementServiceReferenceCount() {
-    std::lock_guard<std::mutex> lock(mCallingCountLock);
-    return --mCallingCount;
+int32_t AAudioServiceStreamBase::decrementServiceReferenceCount_l() {
+    int32_t count = --mCallingCount;
+    // Each call to increment should be balanced with one call to decrement.
+    assert(count >= 0);
+    return count;
 }
