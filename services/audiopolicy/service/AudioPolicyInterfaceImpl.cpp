@@ -986,5 +986,28 @@ float AudioPolicyService::getStreamVolumeDB(
     return mAudioPolicyManager->getStreamVolumeDB(stream, index, device);
 }
 
+status_t AudioPolicyService::getSurroundFormats(unsigned int *numSurroundFormats,
+                                                audio_format_t *surroundFormats,
+                                                bool *surroundFormatsEnabled,
+                                                bool reported)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    return mAudioPolicyManager->getSurroundFormats(numSurroundFormats, surroundFormats,
+                                                   surroundFormatsEnabled, reported);
+}
+
+status_t AudioPolicyService::setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    return mAudioPolicyManager->setSurroundFormatEnabled(audioFormat, enabled);
+}
 
 } // namespace android
