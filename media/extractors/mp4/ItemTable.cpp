@@ -506,7 +506,7 @@ void ItemReference::apply(
 
         ImageItem &derivedImage = itemIdToItemMap.editValueAt(itemIndex);
         if (!derivedImage.dimgRefs.empty()) {
-            ALOGW("dimgRefs if not clean!");
+            ALOGW("dimgRefs not clean!");
         }
         derivedImage.dimgRefs.appendVector(mRefs);
 
@@ -1490,6 +1490,17 @@ sp<MetaData> ItemTable::getImageMeta(const uint32_t imageIndex) {
 
     const ImageItem *image = &mItemIdToItemMap[itemIndex];
 
+    ssize_t tileItemIndex = -1;
+    if (image->isGrid()) {
+        if (image->dimgRefs.empty()) {
+            return NULL;
+        }
+        tileItemIndex = mItemIdToItemMap.indexOfKey(image->dimgRefs[0]);
+        if (tileItemIndex < 0) {
+            return NULL;
+        }
+    }
+
     sp<MetaData> meta = new MetaData;
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC);
 
@@ -1530,10 +1541,6 @@ sp<MetaData> ItemTable::getImageMeta(const uint32_t imageIndex) {
     }
 
     if (image->isGrid()) {
-        ssize_t tileItemIndex = mItemIdToItemMap.indexOfKey(image->dimgRefs[0]);
-        if (tileItemIndex < 0) {
-            return NULL;
-        }
         meta->setInt32(kKeyGridRows, image->rows);
         meta->setInt32(kKeyGridCols, image->columns);
 
