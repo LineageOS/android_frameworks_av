@@ -31,7 +31,7 @@
 namespace android {
 
 // static
-const char *AString::kEmptyString = "";
+constexpr const char *AString::kEmptyString;
 
 AString::AString()
     : mData((char *)kEmptyString),
