@@ -809,7 +809,7 @@ MtpResponseCode MtpServer::doGetObject() {
     uint64_t finalsize = sstat.st_size;
     ALOGV("Sent a file over MTP. Time: %f s, Size: %" PRIu64 ", Rate: %f bytes/s",
             diff.count(), finalsize, ((double) finalsize) / diff.count());
-    close(mfr.fd);
+    closeObjFd(mfr.fd, filePath);
     return result;
 }
 
@@ -887,7 +887,7 @@ MtpResponseCode MtpServer::doGetPartialObject(MtpOperationCode operation) {
         else
             result = MTP_RESPONSE_GENERAL_ERROR;
     }
-    close(mfr.fd);
+    closeObjFd(mfr.fd, filePath);
     return result;
 }
 
@@ -1043,7 +1043,7 @@ MtpResponseCode MtpServer::doMoveObject() {
 
     if (info.mStorageID == storageID) {
         ALOGV("Moving file from %s to %s", (const char*)fromPath, (const char*)path);
-        if (rename(fromPath, path)) {
+        if (renameTo(fromPath, path)) {
             PLOG(ERROR) << "rename() failed from " << fromPath << " to " << path;
             result = MTP_RESPONSE_GENERAL_ERROR;
         }
@@ -1226,7 +1226,7 @@ MtpResponseCode MtpServer::doSendObject() {
     }
 
     fstat(mfr.fd, &sstat);
-    close(mfr.fd);
+    closeObjFd(mfr.fd, mSendObjectFilePath);
 
     if (ret < 0) {
         ALOGE("Mtp receive file got error %s", strerror(errno));
