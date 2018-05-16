@@ -116,6 +116,7 @@ void AMessage::freeItemValue(Item *item) {
         default:
             break;
     }
+    item->mType = kTypeInt32; // clear type
 }
 
 #ifdef DUMP_STATS
