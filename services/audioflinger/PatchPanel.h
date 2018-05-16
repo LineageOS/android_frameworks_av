@@ -42,6 +42,8 @@ public:
     status_t listAudioPatches(unsigned int *num_patches,
                                       struct audio_patch *patches);
 
+    void dump(int fd);
+
 private:
     template<typename ThreadType, typename TrackType>
     class Endpoint {
@@ -115,6 +117,8 @@ private:
         bool isSoftware() const {
             return mRecord.handle() != AUDIO_PATCH_HANDLE_NONE ||
                     mPlayback.handle() != AUDIO_PATCH_HANDLE_NONE; }
+
+        String8 dump(audio_patch_handle_t myHandle);
 
         // Note that audio_patch::id is only unique within a HAL module
         struct audio_patch              mAudioPatch;

@@ -533,6 +533,8 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
             dev->dump(fd);
         }
 
+        mPatchPanel.dump(fd);
+
 #ifdef TEE_SINK
         // dump the serially shared record tee sink
         if (mRecordTeeSource != 0) {
