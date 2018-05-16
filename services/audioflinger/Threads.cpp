@@ -1527,7 +1527,7 @@ void AudioFlinger::ThreadBase::setMode(audio_mode_t mode)
     }
 }
 
-void AudioFlinger::ThreadBase::getAudioPortConfig(struct audio_port_config *config)
+void AudioFlinger::ThreadBase::toAudioPortConfig(struct audio_port_config *config)
 {
     config->type = AUDIO_PORT_TYPE_MIX;
     config->ext.mix.handle = mId;
@@ -3780,9 +3780,9 @@ void AudioFlinger::PlaybackThread::deletePatchTrack(const sp<PatchTrack>& track)
     destroyTrack_l(track);
 }
 
-void AudioFlinger::PlaybackThread::getAudioPortConfig(struct audio_port_config *config)
+void AudioFlinger::PlaybackThread::toAudioPortConfig(struct audio_port_config *config)
 {
-    ThreadBase::getAudioPortConfig(config);
+    ThreadBase::toAudioPortConfig(config);
     config->role = AUDIO_PORT_ROLE_SOURCE;
     config->ext.mix.hw_module = mOutput->audioHwDev->handle();
     config->ext.mix.usecase.stream = AUDIO_STREAM_DEFAULT;
@@ -7875,9 +7875,9 @@ void AudioFlinger::RecordThread::deletePatchTrack(const sp<PatchRecord>& record)
     destroyTrack_l(record);
 }
 
-void AudioFlinger::RecordThread::getAudioPortConfig(struct audio_port_config *config)
+void AudioFlinger::RecordThread::toAudioPortConfig(struct audio_port_config *config)
 {
-    ThreadBase::getAudioPortConfig(config);
+    ThreadBase::toAudioPortConfig(config);
     config->role = AUDIO_PORT_ROLE_SINK;
     config->ext.mix.hw_module = mInput->audioHwDev->handle();
     config->ext.mix.usecase.source = mAudioSource;
@@ -8462,9 +8462,9 @@ status_t AudioFlinger::MmapThread::releaseAudioPatch_l(const audio_patch_handle_
     return status;
 }
 
-void AudioFlinger::MmapThread::getAudioPortConfig(struct audio_port_config *config)
+void AudioFlinger::MmapThread::toAudioPortConfig(struct audio_port_config *config)
 {
-    ThreadBase::getAudioPortConfig(config);
+    ThreadBase::toAudioPortConfig(config);
     if (isOutput()) {
         config->role = AUDIO_PORT_ROLE_SOURCE;
         config->ext.mix.hw_module = mAudioHwDev->handle();

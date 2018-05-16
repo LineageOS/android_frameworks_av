@@ -23,13 +23,13 @@
 #include <utils/KeyedVector.h>
 #include <media/AudioPolicy.h>
 #include <media/IAudioPolicyServiceClient.h>
-#include "AudioSessionInfoProvider.h"
+#include "AudioIODescriptorInterface.h"
 
 namespace android {
 
 class AudioPolicyClientInterface;
 
-class AudioSession : public RefBase, public AudioSessionInfoUpdateListener
+class AudioSession : public RefBase, public AudioIODescriptorUpdateListener
 {
 public:
     AudioSession(audio_session_t session,
@@ -63,9 +63,9 @@ public:
     uint32_t changeOpenCount(int delta);
     uint32_t changeActiveCount(int delta);
 
-    void setInfoProvider(AudioSessionInfoProvider *provider);
-    // implementation of AudioSessionInfoUpdateListener
-    virtual void onSessionInfoUpdate() const;
+    void setInfoProvider(AudioIODescriptorInterface *provider);
+    // implementation of AudioIODescriptorUpdateListener
+    virtual void onIODescriptorUpdate() const;
 
 private:
     record_client_info_t mRecordClientInfo;
@@ -77,17 +77,17 @@ private:
     uint32_t  mActiveCount;
     AudioMix* mPolicyMix; // non NULL when used by a dynamic policy
     AudioPolicyClientInterface* mClientInterface;
-    const AudioSessionInfoProvider* mInfoProvider;
+    const AudioIODescriptorInterface* mInfoProvider;
 };
 
 class AudioSessionCollection :
     public DefaultKeyedVector<audio_session_t, sp<AudioSession> >,
-    public AudioSessionInfoUpdateListener
+    public AudioIODescriptorUpdateListener
 {
 public:
     status_t addSession(audio_session_t session,
                              const sp<AudioSession>& audioSession,
-                             AudioSessionInfoProvider *provider);
+                             AudioIODescriptorInterface *provider);
 
     status_t removeSession(audio_session_t session);
 
@@ -99,8 +99,8 @@ public:
     bool isSourceActive(audio_source_t source) const;
     audio_source_t getHighestPrioritySource(bool activeOnly) const;
 
-    // implementation of AudioSessionInfoUpdateListener
-    virtual void onSessionInfoUpdate() const;
+    // implementation of AudioIODescriptorUpdateListener
+    virtual void onIODescriptorUpdate() const;
 
     status_t dump(int fd, int spaces) const;
 };

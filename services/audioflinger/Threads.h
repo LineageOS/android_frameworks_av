@@ -281,7 +281,7 @@ public:
     virtual     status_t    createAudioPatch_l(const struct audio_patch *patch,
                                                audio_patch_handle_t *handle) = 0;
     virtual     status_t    releaseAudioPatch_l(const audio_patch_handle_t handle) = 0;
-    virtual     void        getAudioPortConfig(struct audio_port_config *config) = 0;
+    virtual     void        toAudioPortConfig(struct audio_port_config *config) = 0;
 
 
                 // see note at declaration of mStandby, mOutDevice and mInDevice
@@ -782,7 +782,7 @@ public:
                 void        addPatchTrack(const sp<PatchTrack>& track);
                 void        deletePatchTrack(const sp<PatchTrack>& track);
 
-    virtual     void        getAudioPortConfig(struct audio_port_config *config);
+    virtual     void        toAudioPortConfig(struct audio_port_config *config);
 
                 // Return the asynchronous signal wait time.
     virtual     int64_t     computeWaitTimeNs_l() const { return INT64_MAX; }
@@ -1459,7 +1459,7 @@ public:
 
     virtual size_t      frameCount() const { return mFrameCount; }
             bool        hasFastCapture() const { return mFastCapture != 0; }
-    virtual void        getAudioPortConfig(struct audio_port_config *config);
+    virtual void        toAudioPortConfig(struct audio_port_config *config);
 
     virtual status_t    checkEffectCompatibility_l(const effect_descriptor_t *desc,
                                                    audio_session_t sessionId);
@@ -1602,7 +1602,7 @@ class MmapThread : public ThreadBase
     virtual     status_t    createAudioPatch_l(const struct audio_patch *patch,
                                                audio_patch_handle_t *handle);
     virtual     status_t    releaseAudioPatch_l(const audio_patch_handle_t handle);
-    virtual     void        getAudioPortConfig(struct audio_port_config *config);
+    virtual     void        toAudioPortConfig(struct audio_port_config *config);
 
     virtual     sp<StreamHalInterface> stream() const { return mHalStream; }
     virtual     status_t    addEffectChain_l(const sp<EffectChain>& chain);

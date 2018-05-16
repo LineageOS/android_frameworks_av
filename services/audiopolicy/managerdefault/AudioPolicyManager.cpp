@@ -38,6 +38,7 @@
 #include <utils/Log.h>
 #include <media/AudioParameter.h>
 #include <media/AudioPolicyHelper.h>
+#include <media/PatchBuilder.h>
 #include <soundtrigger/SoundTrigger.h>
 #include <system/audio.h>
 #include <audio_policy_conf.h>
@@ -453,20 +454,15 @@ uint32_t AudioPolicyManager::updateCallRouting(audio_devices_t rxDevice, uint32_
 
 sp<AudioPatch> AudioPolicyManager::createTelephonyPatch(
         bool isRx, audio_devices_t device, uint32_t delayMs) {
-    struct audio_patch patch;
-    patch.num_sources = 1;
-    patch.num_sinks = 1;
+    PatchBuilder patchBuilder;
 
     sp<DeviceDescriptor> txSourceDeviceDesc;
     if (isRx) {
-        fillAudioPortConfigForDevice(mAvailableOutputDevices, device, &patch.sinks[0]);
-        fillAudioPortConfigForDevice(
-                mAvailableInputDevices, AUDIO_DEVICE_IN_TELEPHONY_RX, &patch.sources[0]);
+        patchBuilder.addSink(findDevice(mAvailableOutputDevices, device)).
+                addSource(findDevice(mAvailableInputDevices, AUDIO_DEVICE_IN_TELEPHONY_RX));
     } else {
-        txSourceDeviceDesc = fillAudioPortConfigForDevice(
-                mAvailableInputDevices, device, &patch.sources[0]);
-        fillAudioPortConfigForDevice(
-                mAvailableOutputDevices, AUDIO_DEVICE_OUT_TELEPHONY_TX, &patch.sinks[0]);
+        patchBuilder.addSource(txSourceDeviceDesc = findDevice(mAvailableInputDevices, device)).
+                addSink(findDevice(mAvailableOutputDevices, AUDIO_DEVICE_OUT_TELEPHONY_TX));
     }
 
     audio_devices_t outputDevice = isRx ? device : AUDIO_DEVICE_OUT_TELEPHONY_TX;
@@ -477,9 +473,7 @@ sp<AudioPatch> AudioPolicyManager::createTelephonyPatch(
         sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
         ALOG_ASSERT(!outputDesc->isDuplicated(),
                 "%s() %#x device output %d is duplicated", __func__, outputDevice, output);
-        outputDesc->toAudioPortConfig(&patch.sources[1]);
-        patch.sources[1].ext.mix.usecase.stream = AUDIO_STREAM_PATCH;
-        patch.num_sources = 2;
+        patchBuilder.addSource(outputDesc, { .stream = AUDIO_STREAM_PATCH });
     }
 
     if (!isRx) {
@@ -501,26 +495,25 @@ sp<AudioPatch> AudioPolicyManager::createTelephonyPatch(
     }
 
     audio_patch_handle_t afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-    status_t status = mpClientInterface->createAudioPatch(&patch, &afPatchHandle, delayMs);
+    status_t status = mpClientInterface->createAudioPatch(
+            patchBuilder.patch(), &afPatchHandle, delayMs);
     ALOGW_IF(status != NO_ERROR,
             "%s() error %d creating %s audio patch", __func__, status, isRx ? "RX" : "TX");
     sp<AudioPatch> audioPatch;
     if (status == NO_ERROR) {
-        audioPatch = new AudioPatch(&patch, mUidCached);
+        audioPatch = new AudioPatch(patchBuilder.patch(), mUidCached);
         audioPatch->mAfPatchHandle = afPatchHandle;
         audioPatch->mUid = mUidCached;
     }
     return audioPatch;
 }
 
-sp<DeviceDescriptor> AudioPolicyManager::fillAudioPortConfigForDevice(
-        const DeviceVector& devices, audio_devices_t device, audio_port_config *config) {
+sp<DeviceDescriptor> AudioPolicyManager::findDevice(
+        const DeviceVector& devices, audio_devices_t device) {
     DeviceVector deviceList = devices.getDevicesFromType(device);
     ALOG_ASSERT(!deviceList.isEmpty(),
             "%s() selected device type %#x is not in devices list", __func__, device);
-    sp<DeviceDescriptor> deviceDesc = deviceList.itemAt(0);
-    deviceDesc->toAudioPortConfig(config);
-    return deviceDesc;
+    return deviceList.itemAt(0);
 }
 
 void AudioPolicyManager::setPhoneState(audio_mode_t state)
@@ -3011,28 +3004,8 @@ status_t AudioPolicyManager::createAudioPatch(const struct audio_patch *patch,
             }
             // TODO: check from routing capabilities in config file and other conflicting patches
 
-            audio_patch_handle_t afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-            if (index >= 0) {
-                afPatchHandle = patchDesc->mAfPatchHandle;
-            }
-
-            status_t status = mpClientInterface->createAudioPatch(&newPatch,
-                                                                  &afPatchHandle,
-                                                                  0);
-            ALOGV("createAudioPatch() patch panel returned %d patchHandle %d",
-                                                                  status, afPatchHandle);
-            if (status == NO_ERROR) {
-                if (index < 0) {
-                    patchDesc = new AudioPatch(&newPatch, uid);
-                    addAudioPatch(patchDesc->mHandle, patchDesc);
-                } else {
-                    patchDesc->mPatch = newPatch;
-                }
-                patchDesc->mAfPatchHandle = afPatchHandle;
-                *handle = patchDesc->mHandle;
-                nextAudioPortGeneration();
-                mpClientInterface->onAudioPatchListUpdate();
-            } else {
+            status_t status = installPatch(__func__, index, handle, &newPatch, 0, uid, &patchDesc);
+            if (status != NO_ERROR) {
                 ALOGW("createAudioPatch() patch panel could not connect device patch, error %d",
                 status);
                 return INVALID_OPERATION;
@@ -3344,7 +3317,6 @@ status_t AudioPolicyManager::connectAudioSource(const sp<AudioSourceDescriptor>&
             mAvailableOutputDevices.getDevice(sinkDevice, String8(""));
 
     audio_patch_handle_t afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-    struct audio_patch *patch = &sourceDesc->mPatchDesc->mPatch;
 
     if (srcDeviceDesc->getAudioPort()->mModule->getHandle() ==
             sinkDeviceDesc->getAudioPort()->mModule->getHandle() &&
@@ -3376,16 +3348,14 @@ status_t AudioPolicyManager::connectAudioSource(const sp<AudioSourceDescriptor>&
         // be connected as well as the stream type for volume control
         // - the sink is defined by whatever output device is currently selected for the output
         // though which this patch is routed.
-        patch->num_sinks = 0;
-        patch->num_sources = 2;
-        srcDeviceDesc->toAudioPortConfig(&patch->sources[0], NULL);
-        outputDesc->toAudioPortConfig(&patch->sources[1], NULL);
-        patch->sources[1].ext.mix.usecase.stream = stream;
-        status = mpClientInterface->createAudioPatch(patch,
+        PatchBuilder patchBuilder;
+        patchBuilder.addSource(srcDeviceDesc).addSource(outputDesc, { .stream = stream });
+        status = mpClientInterface->createAudioPatch(patchBuilder.patch(),
                                                               &afPatchHandle,
                                                               0);
         ALOGV("%s patch panel returned %d patchHandle %d", __FUNCTION__,
                                                               status, afPatchHandle);
+        sourceDesc->mPatchDesc->mPatch = *patchBuilder.patch();
         if (status != NO_ERROR) {
             ALOGW("%s patch panel could not connect device patch, error %d",
                   __FUNCTION__, status);
@@ -5174,48 +5144,12 @@ uint32_t AudioPolicyManager::setOutputDevice(const sp<AudioOutputDescriptor>& ou
         }
 
         if (!deviceList.isEmpty()) {
-            struct audio_patch patch;
-            outputDesc->toAudioPortConfig(&patch.sources[0]);
-            patch.num_sources = 1;
-            patch.num_sinks = 0;
+            PatchBuilder patchBuilder;
+            patchBuilder.addSource(outputDesc);
             for (size_t i = 0; i < deviceList.size() && i < AUDIO_PATCH_PORTS_MAX; i++) {
-                deviceList.itemAt(i)->toAudioPortConfig(&patch.sinks[i]);
-                patch.num_sinks++;
+                patchBuilder.addSink(deviceList.itemAt(i));
             }
-            ssize_t index;
-            if (patchHandle && *patchHandle != AUDIO_PATCH_HANDLE_NONE) {
-                index = mAudioPatches.indexOfKey(*patchHandle);
-            } else {
-                index = mAudioPatches.indexOfKey(outputDesc->getPatchHandle());
-            }
-            sp< AudioPatch> patchDesc;
-            audio_patch_handle_t afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-            if (index >= 0) {
-                patchDesc = mAudioPatches.valueAt(index);
-                afPatchHandle = patchDesc->mAfPatchHandle;
-            }
-
-            status_t status = mpClientInterface->createAudioPatch(&patch,
-                                                                   &afPatchHandle,
-                                                                   delayMs);
-            ALOGV("setOutputDevice() createAudioPatch returned %d patchHandle %d"
-                    "num_sources %d num_sinks %d",
-                                       status, afPatchHandle, patch.num_sources, patch.num_sinks);
-            if (status == NO_ERROR) {
-                if (index < 0) {
-                    patchDesc = new AudioPatch(&patch, mUidCached);
-                    addAudioPatch(patchDesc->mHandle, patchDesc);
-                } else {
-                    patchDesc->mPatch = patch;
-                }
-                patchDesc->mAfPatchHandle = afPatchHandle;
-                if (patchHandle) {
-                    *patchHandle = patchDesc->mHandle;
-                }
-                outputDesc->setPatchHandle(patchDesc->mHandle);
-                nextAudioPortGeneration();
-                mpClientInterface->onAudioPatchListUpdate();
-            }
+            installPatch(__func__, patchHandle, outputDesc.get(), patchBuilder.patch(), delayMs);
         }
 
         // inform all input as well
@@ -5275,51 +5209,19 @@ status_t AudioPolicyManager::setInputDevice(audio_io_handle_t input,
 
         DeviceVector deviceList = mAvailableInputDevices.getDevicesFromType(device);
         if (!deviceList.isEmpty()) {
-            struct audio_patch patch;
-            inputDesc->toAudioPortConfig(&patch.sinks[0]);
+            PatchBuilder patchBuilder;
+            patchBuilder.addSink(inputDesc,
             // AUDIO_SOURCE_HOTWORD is for internal use only:
             // handled as AUDIO_SOURCE_VOICE_RECOGNITION by the audio HAL
-            if (patch.sinks[0].ext.mix.usecase.source == AUDIO_SOURCE_HOTWORD &&
-                    !inputDesc->isSoundTrigger()) {
-                patch.sinks[0].ext.mix.usecase.source = AUDIO_SOURCE_VOICE_RECOGNITION;
-            }
-            patch.num_sinks = 1;
+                    [inputDesc](const PatchBuilder::mix_usecase_t& usecase) {
+                        auto result = usecase;
+                        if (result.source == AUDIO_SOURCE_HOTWORD && !inputDesc->isSoundTrigger()) {
+                            result.source = AUDIO_SOURCE_VOICE_RECOGNITION;
+                        }
+                        return result; }).
             //only one input device for now
-            deviceList.itemAt(0)->toAudioPortConfig(&patch.sources[0]);
-            patch.num_sources = 1;
-            ssize_t index;
-            if (patchHandle && *patchHandle != AUDIO_PATCH_HANDLE_NONE) {
-                index = mAudioPatches.indexOfKey(*patchHandle);
-            } else {
-                index = mAudioPatches.indexOfKey(inputDesc->getPatchHandle());
-            }
-            sp< AudioPatch> patchDesc;
-            audio_patch_handle_t afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-            if (index >= 0) {
-                patchDesc = mAudioPatches.valueAt(index);
-                afPatchHandle = patchDesc->mAfPatchHandle;
-            }
-
-            status_t status = mpClientInterface->createAudioPatch(&patch,
-                                                                  &afPatchHandle,
-                                                                  0);
-            ALOGV("setInputDevice() createAudioPatch returned %d patchHandle %d",
-                                                                          status, afPatchHandle);
-            if (status == NO_ERROR) {
-                if (index < 0) {
-                    patchDesc = new AudioPatch(&patch, mUidCached);
-                    addAudioPatch(patchDesc->mHandle, patchDesc);
-                } else {
-                    patchDesc->mPatch = patch;
-                }
-                patchDesc->mAfPatchHandle = afPatchHandle;
-                if (patchHandle) {
-                    *patchHandle = patchDesc->mHandle;
-                }
-                inputDesc->setPatchHandle(patchDesc->mHandle);
-                nextAudioPortGeneration();
-                mpClientInterface->onAudioPatchListUpdate();
-            }
+                    addSource(deviceList.itemAt(0));
+            status = installPatch(__func__, patchHandle, inputDesc.get(), patchBuilder.patch(), 0);
         }
     }
     return status;
@@ -6070,6 +5972,60 @@ void AudioPolicyManager::updateAudioProfiles(audio_devices_t device,
         }
         profiles.addProfileFromHal(new AudioProfile(format, channelMasks, samplingRates));
     }
+}
+
+status_t AudioPolicyManager::installPatch(const char *caller,
+                                          audio_patch_handle_t *patchHandle,
+                                          AudioIODescriptorInterface *ioDescriptor,
+                                          const struct audio_patch *patch,
+                                          int delayMs)
+{
+    ssize_t index = mAudioPatches.indexOfKey(
+            patchHandle && *patchHandle != AUDIO_PATCH_HANDLE_NONE ?
+            *patchHandle : ioDescriptor->getPatchHandle());
+    sp<AudioPatch> patchDesc;
+    status_t status = installPatch(
+            caller, index, patchHandle, patch, delayMs, mUidCached, &patchDesc);
+    if (status == NO_ERROR) {
+        ioDescriptor->setPatchHandle(patchDesc->mHandle);
+    }
+    return status;
+}
+
+status_t AudioPolicyManager::installPatch(const char *caller,
+                                          ssize_t index,
+                                          audio_patch_handle_t *patchHandle,
+                                          const struct audio_patch *patch,
+                                          int delayMs,
+                                          uid_t uid,
+                                          sp<AudioPatch> *patchDescPtr)
+{
+    sp<AudioPatch> patchDesc;
+    audio_patch_handle_t afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
+    if (index >= 0) {
+        patchDesc = mAudioPatches.valueAt(index);
+        afPatchHandle = patchDesc->mAfPatchHandle;
+    }
+
+    status_t status = mpClientInterface->createAudioPatch(patch, &afPatchHandle, delayMs);
+    ALOGV("%s() AF::createAudioPatch returned %d patchHandle %d num_sources %d num_sinks %d",
+            caller, status, afPatchHandle, patch->num_sources, patch->num_sinks);
+    if (status == NO_ERROR) {
+        if (index < 0) {
+            patchDesc = new AudioPatch(patch, uid);
+            addAudioPatch(patchDesc->mHandle, patchDesc);
+        } else {
+            patchDesc->mPatch = *patch;
+        }
+        patchDesc->mAfPatchHandle = afPatchHandle;
+        if (patchHandle) {
+            *patchHandle = patchDesc->mHandle;
+        }
+        nextAudioPortGeneration();
+        mpClientInterface->onAudioPatchListUpdate();
+    }
+    if (patchDescPtr) *patchDescPtr = patchDesc;
+    return status;
 }
 
 } // namespace android

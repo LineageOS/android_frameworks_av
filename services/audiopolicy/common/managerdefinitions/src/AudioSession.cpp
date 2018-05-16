@@ -86,7 +86,7 @@ uint32_t AudioSession::changeActiveCount(int delta)
         }
 
         // Recording configuration callback:
-        const AudioSessionInfoProvider* provider = mInfoProvider;
+        const AudioIODescriptorInterface* provider = mInfoProvider;
         const audio_config_base_t deviceConfig = (provider != NULL) ? provider->getConfig() :
                 AUDIO_CONFIG_BASE_INITIALIZER;
         const audio_patch_handle_t patchHandle = (provider != NULL) ? provider->getPatchHandle() :
@@ -114,16 +114,16 @@ bool AudioSession::matches(const sp<AudioSession> &other) const
     return false;
 }
 
-void AudioSession::setInfoProvider(AudioSessionInfoProvider *provider)
+void AudioSession::setInfoProvider(AudioIODescriptorInterface *provider)
 {
     mInfoProvider = provider;
 }
 
-void AudioSession::onSessionInfoUpdate() const
+void AudioSession::onIODescriptorUpdate() const
 {
     if (mActiveCount > 0) {
         // resend the callback after requerying the informations from the info provider
-        const AudioSessionInfoProvider* provider = mInfoProvider;
+        const AudioIODescriptorInterface* provider = mInfoProvider;
         const audio_config_base_t deviceConfig = (provider != NULL) ? provider->getConfig() :
                 AUDIO_CONFIG_BASE_INITIALIZER;
         const audio_patch_handle_t patchHandle = (provider != NULL) ? provider->getPatchHandle() :
@@ -170,7 +170,7 @@ status_t AudioSession::dump(int fd, int spaces, int index) const
 
 status_t AudioSessionCollection::addSession(audio_session_t session,
                                          const sp<AudioSession>& audioSession,
-                                         AudioSessionInfoProvider *provider)
+                                         AudioIODescriptorInterface *provider)
 {
     ssize_t index = indexOfKey(session);
 
@@ -271,10 +271,10 @@ audio_source_t AudioSessionCollection::getHighestPrioritySource(bool activeOnly)
     return source;
 }
 
-void AudioSessionCollection::onSessionInfoUpdate() const
+void AudioSessionCollection::onIODescriptorUpdate() const
 {
     for (size_t i = 0; i < size(); i++) {
-        valueAt(i)->onSessionInfoUpdate();
+        valueAt(i)->onIODescriptorUpdate();
     }
 }
 

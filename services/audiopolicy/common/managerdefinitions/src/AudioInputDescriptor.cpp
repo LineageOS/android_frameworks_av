@@ -164,7 +164,7 @@ size_t AudioInputDescriptor::getAudioSessionCount(bool activeOnly) const
 
 status_t AudioInputDescriptor::addAudioSession(audio_session_t session,
                          const sp<AudioSession>& audioSession) {
-    return mSessions.addSession(session, audioSession, /*AudioSessionInfoProvider*/this);
+    return mSessions.addSession(session, audioSession, /*AudioIODescriptorInterface*/this);
 }
 
 status_t AudioInputDescriptor::removeAudioSession(audio_session_t session) {
@@ -179,7 +179,7 @@ audio_patch_handle_t AudioInputDescriptor::getPatchHandle() const
 void AudioInputDescriptor::setPatchHandle(audio_patch_handle_t handle)
 {
     mPatchHandle = handle;
-    mSessions.onSessionInfoUpdate();
+    mSessions.onIODescriptorUpdate();
 }
 
 audio_config_base_t AudioInputDescriptor::getConfig() const

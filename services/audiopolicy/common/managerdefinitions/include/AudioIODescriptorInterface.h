@@ -19,26 +19,27 @@
 namespace android {
 
 /**
- * Interface for input descriptors to implement so dependent audio sessions can query information
- * about their context
+ * Interface for I/O descriptors to implement so information about their context
+ * can be queried and updated.
  */
-class AudioSessionInfoProvider
+class AudioIODescriptorInterface
 {
 public:
-    virtual ~AudioSessionInfoProvider() {};
+    virtual ~AudioIODescriptorInterface() {};
 
     virtual audio_config_base_t getConfig() const = 0;
 
     virtual audio_patch_handle_t getPatchHandle() const = 0;
 
+    virtual void setPatchHandle(audio_patch_handle_t handle) = 0;
 };
 
-class AudioSessionInfoUpdateListener
+class AudioIODescriptorUpdateListener
 {
 public:
-    virtual ~AudioSessionInfoUpdateListener() {};
+    virtual ~AudioIODescriptorUpdateListener() {};
 
-    virtual void onSessionInfoUpdate() const = 0;;
+    virtual void onIODescriptorUpdate() const = 0;
 };
 
 } // namespace android
