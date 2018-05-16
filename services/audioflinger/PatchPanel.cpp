@@ -178,8 +178,10 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
             for (unsigned int i = 0; i < patch->num_sinks; i++) {
                 // support only one sink if connection to a mix or across HW modules
                 if ((patch->sinks[i].type == AUDIO_PORT_TYPE_MIX ||
-                        patch->sinks[i].ext.mix.hw_module != srcModule) &&
+                                (patch->sinks[i].type == AUDIO_PORT_TYPE_DEVICE &&
+                                        patch->sinks[i].ext.device.hw_module != srcModule)) &&
                         patch->num_sinks > 1) {
+                    ALOGW("%s() multiple sinks for mix or across modules not supported", __func__);
                     status = INVALID_OPERATION;
                     goto exit;
                 }
