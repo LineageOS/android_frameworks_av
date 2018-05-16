@@ -1286,6 +1286,24 @@ status_t AudioSystem::getMicrophones(std::vector<media::MicrophoneInfo> *microph
     return af->getMicrophones(microphones);
 }
 
+status_t AudioSystem::getSurroundFormats(unsigned int *numSurroundFormats,
+                                         audio_format_t *surroundFormats,
+                                         bool *surroundFormatsEnabled,
+                                         bool reported)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->getSurroundFormats(
+            numSurroundFormats, surroundFormats, surroundFormatsEnabled, reported);
+}
+
+status_t AudioSystem::setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->setSurroundFormatEnabled(audioFormat, enabled);
+}
+
 // ---------------------------------------------------------------------------
 
 int AudioSystem::AudioPolicyServiceClient::addAudioPortCallback(

@@ -127,27 +127,45 @@ void MtpFfsHandle::closeConfig() {
     mControl.reset();
 }
 
-int MtpFfsHandle::doAsync(void* data, size_t len, bool read) {
-    struct io_event ioevs[1];
-    if (len > AIO_BUF_LEN) {
-        LOG(ERROR) << "Mtp read/write too large " << len;
-        errno = EINVAL;
-        return -1;
+int MtpFfsHandle::doAsync(void* data, size_t len, bool read, bool zero_packet) {
+    struct io_event ioevs[AIO_BUFS_MAX];
+    size_t total = 0;
+
+    while (total < len) {
+        size_t this_len = std::min(len - total, static_cast<size_t>(AIO_BUF_LEN * AIO_BUFS_MAX));
+        int num_bufs = this_len / AIO_BUF_LEN + (this_len % AIO_BUF_LEN == 0 ? 0 : 1);
+        for (int i = 0; i < num_bufs; i++) {
+            mIobuf[0].buf[i] = reinterpret_cast<unsigned char*>(data) + total + i * AIO_BUF_LEN;
+        }
+        int ret = iobufSubmit(&mIobuf[0], read ? mBulkOut : mBulkIn, this_len, read);
+        if (ret < 0) return -1;
+        ret = waitEvents(&mIobuf[0], ret, ioevs, nullptr);
+        if (ret < 0) return -1;
+        total += ret;
+        if (static_cast<size_t>(ret) < this_len) break;
     }
-    mIobuf[0].buf[0] = reinterpret_cast<unsigned char*>(data);
-    if (iobufSubmit(&mIobuf[0], read ? mBulkOut : mBulkIn, len, read) == -1)
-        return -1;
-    int ret = waitEvents(&mIobuf[0], 1, ioevs, nullptr);
-    mIobuf[0].buf[0] = mIobuf[0].bufs.data();
-    return ret;
+
+    int packet_size = getPacketSize(read ? mBulkOut : mBulkIn);
+    if (len % packet_size == 0 && zero_packet) {
+        int ret = iobufSubmit(&mIobuf[0], read ? mBulkOut : mBulkIn, 0, read);
+        if (ret < 0) return -1;
+        ret = waitEvents(&mIobuf[0], ret, ioevs, nullptr);
+        if (ret < 0) return -1;
+    }
+
+    for (unsigned i = 0; i < AIO_BUFS_MAX; i++) {
+        mIobuf[0].buf[i] = mIobuf[0].bufs.data() + i * AIO_BUF_LEN;
+    }
+    return total;
 }
 
 int MtpFfsHandle::read(void* data, size_t len) {
-    return doAsync(data, len, true);
+    // Zero packets are handled by receiveFile()
+    return doAsync(data, len, true, false);
 }
 
 int MtpFfsHandle::write(const void* data, size_t len) {
-    return doAsync(const_cast<void*>(data), len, false);
+    return doAsync(const_cast<void*>(data), len, false, true);
 }
 
 int MtpFfsHandle::handleEvent() {
@@ -570,7 +588,8 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
     if (TEMP_FAILURE_RETRY(pread(mfr.fd, mIobuf[0].bufs.data() +
                     sizeof(mtp_data_header), init_read_len, offset))
             != init_read_len) return -1;
-    if (write(mIobuf[0].bufs.data(), sizeof(mtp_data_header) + init_read_len) == -1)
+    if (doAsync(mIobuf[0].bufs.data(), sizeof(mtp_data_header) + init_read_len,
+                false, false /* zlps are handled below */) == -1)
         return -1;
     file_length -= init_read_len;
     offset += init_read_len;

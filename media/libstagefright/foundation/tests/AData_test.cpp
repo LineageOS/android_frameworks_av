@@ -978,4 +978,63 @@ TEST_F(ADataTest, AData_RelaxedAndroidSpTest) {
     }
 };
 
+TEST_F(ADataTest, AData_AssignmentTest) {
+    typedef AData<sp<ABuffer>, int32_t>::Basic Data;
+
+    sp<ABuffer> buf1 = new ABuffer((void *)"hello", 6);
+    wp<ABuffer> buf1w = buf1;
+
+    Data obj1;
+    obj1.set(buf1);
+    EXPECT_NE(buf1w.promote(), nullptr);
+    buf1.clear();
+    EXPECT_NE(buf1w.promote(), nullptr);
+    obj1.clear();
+    EXPECT_EQ(buf1w.promote(), nullptr);
+
+    buf1 = new ABuffer((void *)"again", 6);
+    buf1w = buf1;
+
+    obj1.set(buf1);
+    EXPECT_TRUE(obj1.used());
+    Data obj2 = obj1;
+
+    sp<ABuffer> buf2;
+    EXPECT_TRUE(obj2.find(&buf2));
+    EXPECT_EQ(buf2, buf1);
+    buf1.clear();
+    buf2.clear();
+    EXPECT_NE(buf1w.promote(), nullptr);
+    obj1.clear();
+    EXPECT_NE(buf1w.promote(), nullptr);
+    obj2.clear();
+    EXPECT_EQ(buf1w.promote(), nullptr);
+
+    buf1 = new ABuffer((void *)"still", 6);
+    buf1w = buf1;
+
+    obj1.set(buf1);
+    EXPECT_TRUE(obj1.used());
+    obj2 = std::move(obj1);
+    EXPECT_FALSE(obj1.used());
+
+    EXPECT_TRUE(obj2.find(&buf2));
+    EXPECT_EQ(buf2, buf1);
+    buf1.clear();
+    buf2.clear();
+    EXPECT_NE(buf1w.promote(), nullptr);
+    obj2.clear();
+    EXPECT_EQ(buf1w.promote(), nullptr);
+
+    typedef AData<sp<ABuffer>, std::unique_ptr<int32_t>>::Basic Data2;
+    Data2 obj3, obj4;
+
+    buf1 = new ABuffer((void *)"hence", 6);
+    obj3.set(buf1);
+    obj4 = std::move(obj3);
+    EXPECT_FALSE(obj3.used());
+    EXPECT_TRUE(obj4.find(&buf2));
+    EXPECT_EQ(buf2, buf1);
+}
+
 } // namespace android

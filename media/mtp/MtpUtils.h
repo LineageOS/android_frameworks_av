@@ -34,7 +34,9 @@ int makeFolder(const char *path);
 int copyRecursive(const char *fromPath, const char *toPath);
 int copyFile(const char *fromPath, const char *toPath);
 bool deletePath(const char* path);
+int renameTo(const char *oldPath, const char *newPath);
 
+void closeObjFd(int fd, const char *path);
 }; // namespace android
 
 #endif // _MTP_UTILS_H

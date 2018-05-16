@@ -30,34 +30,40 @@
 using namespace android;
 using namespace aaudio;
 
-sp<AAudioServiceStreamBase> AAudioStreamTracker::removeStreamByHandle(
+sp<AAudioServiceStreamBase> AAudioStreamTracker::decrementAndRemoveStreamByHandle(
+        aaudio_handle_t streamHandle) {
+    std::lock_guard<std::mutex> lock(mHandleLock);
+    sp<AAudioServiceStreamBase> serviceStream;
+    auto it = mStreamsByHandle.find(streamHandle);
+    if (it != mStreamsByHandle.end()) {
+        sp<AAudioServiceStreamBase> tempStream = it->second;
+        // Does the caller need to close the stream?
+        // The reference count should never be negative.
+        // But it is safer to check for <= 0 than == 0.
+        if ((tempStream->decrementServiceReferenceCount_l() <= 0) && tempStream->isCloseNeeded()) {
+            serviceStream = tempStream; // Only return stream if ready to be closed.
+            mStreamsByHandle.erase(it);
+        }
+    }
+    return serviceStream;
+}
+
+sp<AAudioServiceStreamBase> AAudioStreamTracker::getStreamByHandleAndIncrement(
         aaudio_handle_t streamHandle) {
     std::lock_guard<std::mutex> lock(mHandleLock);
     sp<AAudioServiceStreamBase> serviceStream;
     auto it = mStreamsByHandle.find(streamHandle);
     if (it != mStreamsByHandle.end()) {
         serviceStream = it->second;
-        mStreamsByHandle.erase(it);
+        serviceStream->incrementServiceReferenceCount_l();
     }
     return serviceStream;
 }
-
-sp<AAudioServiceStreamBase> AAudioStreamTracker::getStreamByHandle(
-        aaudio_handle_t streamHandle) {
-    std::lock_guard<std::mutex> lock(mHandleLock);
-    sp<AAudioServiceStreamBase> serviceStream;
-    auto it = mStreamsByHandle.find(streamHandle);
-    if (it != mStreamsByHandle.end()) {
-        serviceStream = it->second;
-    }
-    return serviceStream;
-}
-
 
 // The port handle is only available when the stream is started.
 // So we have to iterate over all the streams.
 // Luckily this rarely happens.
-sp<AAudioServiceStreamBase> AAudioStreamTracker::findStreamByPortHandle(
+sp<AAudioServiceStreamBase> AAudioStreamTracker::findStreamByPortHandleAndIncrement(
         audio_port_handle_t portHandle) {
     std::lock_guard<std::mutex> lock(mHandleLock);
     sp<AAudioServiceStreamBase> serviceStream;
@@ -66,6 +72,7 @@ sp<AAudioServiceStreamBase> AAudioStreamTracker::findStreamByPortHandle(
         auto candidate = it->second;
         if (candidate->getPortHandle() == portHandle) {
             serviceStream = candidate;
+            serviceStream->incrementServiceReferenceCount_l();
             break;
         }
         it++;
@@ -86,7 +93,7 @@ aaudio_handle_t AAudioStreamTracker::bumpHandle(aaudio_handle_t handle) {
 
 aaudio_handle_t AAudioStreamTracker::addStreamForHandle(sp<AAudioServiceStreamBase> serviceStream) {
     std::lock_guard<std::mutex> lock(mHandleLock);
-    aaudio_handle_t handle = mPreviousHandle.load();
+    aaudio_handle_t handle = mPreviousHandle;
     // Assign a unique handle.
     while (true) {
         handle = bumpHandle(handle);
@@ -98,7 +105,7 @@ aaudio_handle_t AAudioStreamTracker::addStreamForHandle(sp<AAudioServiceStreamBa
             break;
         }
     }
-    mPreviousHandle.store(handle);
+    mPreviousHandle = handle;
     return handle;
 }
 

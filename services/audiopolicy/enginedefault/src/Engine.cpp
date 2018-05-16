@@ -148,7 +148,8 @@ status_t Engine::setForceUse(audio_policy_force_use_t usage, audio_policy_forced
     case AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND:
         if (config != AUDIO_POLICY_FORCE_NONE &&
                 config != AUDIO_POLICY_FORCE_ENCODED_SURROUND_NEVER &&
-                config != AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS) {
+                config != AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS &&
+                config != AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL) {
             ALOGW("setForceUse() invalid config %d for ENCODED_SURROUND", config);
             return BAD_VALUE;
         }
