@@ -453,6 +453,12 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
             }
             // Use both Bluetooth SCO and phone default output when ringing in normal mode
             if (mForceUse[AUDIO_POLICY_FORCE_FOR_COMMUNICATION] == AUDIO_POLICY_FORCE_BT_SCO) {
+                if ((strategy == STRATEGY_SONIFICATION) &&
+                        (device & AUDIO_DEVICE_OUT_SPEAKER) &&
+                        (availableOutputDevicesType & AUDIO_DEVICE_OUT_SPEAKER_SAFE)) {
+                    device |= AUDIO_DEVICE_OUT_SPEAKER_SAFE;
+                    device &= ~AUDIO_DEVICE_OUT_SPEAKER;
+                }
                 if (device2 != AUDIO_DEVICE_NONE) {
                     device |= device2;
                     break;
