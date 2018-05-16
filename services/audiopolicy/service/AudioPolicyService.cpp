@@ -35,10 +35,10 @@
 #include <utils/String16.h>
 #include <utils/threads.h>
 #include "AudioPolicyService.h"
-#include "ServiceUtilities.h"
 #include <hardware_legacy/power.h>
 #include <media/AudioEffect.h>
 #include <media/AudioParameter.h>
+#include <mediautils/ServiceUtilities.h>
 
 #include <system/audio.h>
 #include <system/audio_policy.h>

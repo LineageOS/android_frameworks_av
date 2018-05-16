@@ -24,6 +24,7 @@
 
 #include <aaudio/AAudio.h>
 #include <mediautils/SchedulingPolicyService.h>
+#include <mediautils/ServiceUtilities.h>
 #include <utils/String16.h>
 
 #include "binding/AAudioServiceMessage.h"
@@ -33,7 +34,6 @@
 #include "AAudioServiceStreamMMAP.h"
 #include "AAudioServiceStreamShared.h"
 #include "binding/IAAudioService.h"
-#include "ServiceUtilities.h"
 
 using namespace android;
 using namespace aaudio;

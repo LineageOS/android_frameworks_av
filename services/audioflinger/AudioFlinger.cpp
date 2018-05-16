@@ -47,7 +47,6 @@
 #include <system/audio.h>
 
 #include "AudioFlinger.h"
-#include "ServiceUtilities.h"
 
 #include <media/AudioResamplerPublic.h>
 
@@ -66,6 +65,7 @@
 #include <media/nbaio/PipeReader.h>
 #include <media/AudioParameter.h>
 #include <mediautils/BatteryNotifier.h>
+#include <mediautils/ServiceUtilities.h>
 #include <private/android_filesystem_config.h>
 
 //#define BUFLOG_NDEBUG 0

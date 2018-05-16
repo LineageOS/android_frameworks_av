@@ -21,7 +21,7 @@
 #include <media/MediaAnalyticsItem.h>
 
 #include "AudioPolicyService.h"
-#include "ServiceUtilities.h"
+#include <mediautils/ServiceUtilities.h>
 #include "TypeConverter.h"
 
 namespace android {
