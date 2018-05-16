@@ -28,7 +28,6 @@
 
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
-#include <cutils/multiuser.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include <binder/Parcel.h>
@@ -169,7 +168,6 @@ AudioFlinger::AudioFlinger()
         mNextUniqueIds[use] = AUDIO_UNIQUE_ID_USE_MAX;
     }
 
-    getpid_cached = getpid();
     const bool doLog = property_get_bool("ro.test_harness", false);
     if (doLog) {
         mLogMemoryDealer = new MemoryDealer(kLogMemorySize, "LogWriters",
@@ -665,7 +663,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
     bool updatePid = (input.clientInfo.clientPid == -1);
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     uid_t clientUid = input.clientInfo.clientUid;
-    if (!isTrustedCallingUid(callingUid)) {
+    if (!isAudioServerOrMediaServerUid(callingUid)) {
         ALOGW_IF(clientUid != callingUid,
                 "%s uid %d tried to pass itself off as %d",
                 __FUNCTION__, callingUid, clientUid);
@@ -1077,9 +1075,9 @@ status_t AudioFlinger::checkStreamType(audio_stream_type_t stream) const
         ALOGW("checkStreamType() invalid stream %d", stream);
         return BAD_VALUE;
     }
-    pid_t caller = IPCThreadState::self()->getCallingPid();
-    if (uint32_t(stream) >= AUDIO_STREAM_PUBLIC_CNT && caller != getpid_cached) {
-        ALOGW("checkStreamType() pid %d cannot use internal stream type %d", caller, stream);
+    const uid_t callerUid = IPCThreadState::self()->getCallingUid();
+    if (uint32_t(stream) >= AUDIO_STREAM_PUBLIC_CNT && !isAudioServerUid(callerUid)) {
+        ALOGW("checkStreamType() uid %d cannot use internal stream type %d", callerUid, stream);
         return PERMISSION_DENIED;
     }
 
@@ -1199,9 +1197,8 @@ void AudioFlinger::filterReservedParameters(String8& keyValuePairs, uid_t callin
         String8(AudioParameter::keyStreamSupportedSamplingRates),
     };
 
-    // multiuser friendly app ID check for requests coming from audioserver
-    if (multiuser_get_app_id(callingUid) == AID_AUDIOSERVER) {
-        return;
+    if (isAudioServerUid(callingUid)) {
+        return; // no need to filter if audioserver.
     }
 
     AudioParameter param = AudioParameter(keyValuePairs);
@@ -1635,7 +1632,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
     bool updatePid = (input.clientInfo.clientPid == -1);
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     uid_t clientUid = input.clientInfo.clientUid;
-    if (!isTrustedCallingUid(callingUid)) {
+    if (!isAudioServerOrMediaServerUid(callingUid)) {
         ALOGW_IF(clientUid != callingUid,
                 "%s uid %d tried to pass itself off as %d",
                 __FUNCTION__, callingUid, clientUid);
@@ -1883,7 +1880,7 @@ size_t AudioFlinger::getPrimaryOutputFrameCount()
 status_t AudioFlinger::setLowRamDevice(bool isLowRamDevice, int64_t totalMemory)
 {
     uid_t uid = IPCThreadState::self()->getCallingUid();
-    if (uid != AID_SYSTEM) {
+    if (!isAudioServerOrSystemServerUid(uid)) {
         return PERMISSION_DENIED;
     }
     Mutex::Autolock _l(mLock);
@@ -2625,7 +2622,8 @@ void AudioFlinger::acquireAudioSessionId(audio_session_t audioSession, pid_t pid
     Mutex::Autolock _l(mLock);
     pid_t caller = IPCThreadState::self()->getCallingPid();
     ALOGV("acquiring %d from %d, for %d", audioSession, caller, pid);
-    if (pid != -1 && (caller == getpid_cached)) {
+    const uid_t callerUid = IPCThreadState::self()->getCallingUid();
+    if (pid != -1 && isAudioServerUid(callerUid)) { // check must match releaseAudioSessionId()
         caller = pid;
     }
 
@@ -2659,7 +2657,8 @@ void AudioFlinger::releaseAudioSessionId(audio_session_t audioSession, pid_t pid
     Mutex::Autolock _l(mLock);
     pid_t caller = IPCThreadState::self()->getCallingPid();
     ALOGV("releasing %d from %d for %d", audioSession, caller, pid);
-    if (pid != -1 && (caller == getpid_cached)) {
+    const uid_t callerUid = IPCThreadState::self()->getCallingUid();
+    if (pid != -1 && isAudioServerUid(callerUid)) { // check must match acquireAudioSessionId()
         caller = pid;
     }
     size_t num = mAudioSessionRefs.size();
@@ -2676,9 +2675,10 @@ void AudioFlinger::releaseAudioSessionId(audio_session_t audioSession, pid_t pid
             return;
         }
     }
-    // If the caller is mediaserver it is likely that the session being released was acquired
+    // If the caller is audioserver it is likely that the session being released was acquired
     // on behalf of a process not in notification clients and we ignore the warning.
-    ALOGW_IF(caller != getpid_cached, "session id %d not found for pid %d", audioSession, caller);
+    ALOGW_IF(!isAudioServerUid(callerUid),
+            "session id %d not found for pid %d", audioSession, caller);
 }
 
 bool AudioFlinger::isSessionAcquired_l(audio_session_t audioSession)
@@ -2986,7 +2986,7 @@ sp<IEffect> AudioFlinger::createEffect(
     effect_descriptor_t desc;
 
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
-    if (pid == -1 || !isTrustedCallingUid(callingUid)) {
+    if (pid == -1 || !isAudioServerOrMediaServerUid(callingUid)) {
         const pid_t callingPid = IPCThreadState::self()->getCallingPid();
         ALOGW_IF(pid != -1 && pid != callingPid,
                  "%s uid %d pid %d tried to pass itself off as pid %d",
@@ -3009,8 +3009,8 @@ sp<IEffect> AudioFlinger::createEffect(
     }
 
     // Session AUDIO_SESSION_OUTPUT_STAGE is reserved for output stage effects
-    // that can only be created by audio policy manager (running in same process)
-    if (sessionId == AUDIO_SESSION_OUTPUT_STAGE && getpid_cached != pid) {
+    // that can only be created by audio policy manager
+    if (sessionId == AUDIO_SESSION_OUTPUT_STAGE && !isAudioServerUid(callingUid)) {
         lStatus = PERMISSION_DENIED;
         goto Exit;
     }

@@ -540,7 +540,7 @@ protected:
         static bool streamsMatchForvolume(audio_stream_type_t stream1,
                                           audio_stream_type_t stream2);
 
-        uid_t mUidCached;
+        const uid_t mUidCached;                         // AID_AUDIOSERVER
         AudioPolicyClientInterface *mpClientInterface;  // audio policy client interface
         sp<SwAudioOutputDescriptor> mPrimaryOutput;     // primary output descriptor
         // list of descriptors for outputs currently opened

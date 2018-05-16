@@ -18,7 +18,6 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/PermissionCache.h>
-#include <private/android_filesystem_config.h>
 #include "mediautils/ServiceUtilities.h"
 
 /* When performing permission checks we do not use permission cache for
@@ -31,24 +30,6 @@
 namespace android {
 
 static const String16 sAndroidPermissionRecordAudio("android.permission.RECORD_AUDIO");
-
-// Not valid until initialized by AudioFlinger constructor.  It would have to be
-// re-initialized if the process containing AudioFlinger service forks (which it doesn't).
-// This is often used to validate binder interface calls within audioserver
-// (e.g. AudioPolicyManager to AudioFlinger).
-pid_t getpid_cached;
-
-// A trusted calling UID may specify the client UID as part of a binder interface call.
-// otherwise the calling UID must be equal to the client UID.
-bool isTrustedCallingUid(uid_t uid) {
-    switch (uid) {
-    case AID_MEDIA:
-    case AID_AUDIOSERVER:
-        return true;
-    default:
-        return false;
-    }
-}
 
 static String16 resolveCallingPackage(PermissionController& permissionController,
         const String16& opPackageName, uid_t uid) {
@@ -71,16 +52,11 @@ static String16 resolveCallingPackage(PermissionController& permissionController
     return packages[0];
 }
 
-static inline bool isAudioServerOrRoot(uid_t uid) {
-    // AID_ROOT is OK for command-line tests.  Native unforked audioserver always OK.
-    return uid == AID_ROOT || uid == AID_AUDIOSERVER ;
-}
-
 static bool checkRecordingInternal(const String16& opPackageName, pid_t pid,
         uid_t uid, bool start) {
     // Okay to not track in app ops as audio server is us and if
     // device is rooted security model is considered compromised.
-    if (isAudioServerOrRoot(uid)) return true;
+    if (isAudioServerOrRootUid(uid)) return true;
 
     // We specify a pid and uid here as mediaserver (aka MediaRecorder or StageFrightRecorder)
     // may open a record track on behalf of a client.  Note that pid may be a tid.
@@ -127,7 +103,7 @@ bool startRecording(const String16& opPackageName, pid_t pid, uid_t uid) {
 void finishRecording(const String16& opPackageName, uid_t uid) {
     // Okay to not track in app ops as audio server is us and if
     // device is rooted security model is considered compromised.
-    if (isAudioServerOrRoot(uid)) return;
+    if (isAudioServerOrRootUid(uid)) return;
 
     PermissionController permissionController;
     String16 resolvedOpPackageName = resolveCallingPackage(
@@ -142,7 +118,7 @@ void finishRecording(const String16& opPackageName, uid_t uid) {
 }
 
 bool captureAudioOutputAllowed(pid_t pid, uid_t uid) {
-    if (getpid_cached == IPCThreadState::self()->getCallingPid()) return true;
+    if (isAudioServerOrRootUid(uid)) return true;
     static const String16 sCaptureAudioOutput("android.permission.CAPTURE_AUDIO_OUTPUT");
     bool ok = PermissionCache::checkPermission(sCaptureAudioOutput, pid, uid);
     if (!ok) ALOGE("Request requires android.permission.CAPTURE_AUDIO_OUTPUT");
@@ -163,7 +139,8 @@ bool captureHotwordAllowed(pid_t pid, uid_t uid) {
 }
 
 bool settingsAllowed() {
-    if (getpid_cached == IPCThreadState::self()->getCallingPid()) return true;
+    // given this is a permission check, could this be isAudioServerOrRootUid()?
+    if (isAudioServerUid(IPCThreadState::self()->getCallingUid())) return true;
     static const String16 sAudioSettings("android.permission.MODIFY_AUDIO_SETTINGS");
     // IMPORTANT: Use PermissionCache - not a runtime permission and may not change.
     bool ok = PermissionCache::checkCallingPermission(sAudioSettings);
@@ -180,7 +157,6 @@ bool modifyAudioRoutingAllowed() {
 }
 
 bool dumpAllowed() {
-    // don't optimize for same pid, since mediaserver never dumps itself
     static const String16 sDump("android.permission.DUMP");
     // IMPORTANT: Use PermissionCache - not a runtime permission and may not change.
     bool ok = PermissionCache::checkCallingPermission(sDump);

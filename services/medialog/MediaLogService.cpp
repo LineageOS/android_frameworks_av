@@ -21,7 +21,7 @@
 #include <utils/Log.h>
 #include <binder/PermissionCache.h>
 #include <media/nblog/NBLog.h>
-#include <private/android_filesystem_config.h>
+#include <mediautils/ServiceUtilities.h>
 #include "MediaLogService.h"
 
 namespace android {
@@ -53,7 +53,7 @@ MediaLogService::~MediaLogService()
 
 void MediaLogService::registerWriter(const sp<IMemory>& shared, size_t size, const char *name)
 {
-    if (IPCThreadState::self()->getCallingUid() != AID_AUDIOSERVER || shared == 0 ||
+    if (!isAudioServerOrMediaServerUid(IPCThreadState::self()->getCallingUid()) || shared == 0 ||
             size < kMinSize || size > kMaxSize || name == NULL ||
             shared->size() < NBLog::Timeline::sharedSize(size)) {
         return;
@@ -67,7 +67,7 @@ void MediaLogService::registerWriter(const sp<IMemory>& shared, size_t size, con
 
 void MediaLogService::unregisterWriter(const sp<IMemory>& shared)
 {
-    if (IPCThreadState::self()->getCallingUid() != AID_AUDIOSERVER || shared == 0) {
+    if (!isAudioServerOrMediaServerUid(IPCThreadState::self()->getCallingUid()) || shared == 0) {
         return;
     }
     Mutex::Autolock _l(mLock);
@@ -95,10 +95,8 @@ bool MediaLogService::dumpTryLock(Mutex& mutex)
 
 status_t MediaLogService::dump(int fd, const Vector<String16>& args __unused)
 {
-    // FIXME merge with similar but not identical code at services/audioflinger/ServiceUtilities.cpp
-    static const String16 sDump("android.permission.DUMP");
-    if (!(IPCThreadState::self()->getCallingUid() == AID_AUDIOSERVER ||
-            PermissionCache::checkCallingPermission(sDump))) {
+    if (!(isAudioServerOrMediaServerUid(IPCThreadState::self()->getCallingUid())
+            || dumpAllowed())) {
         dprintf(fd, "Permission Denial: can't dump media.log from pid=%d, uid=%d\n",
                 IPCThreadState::self()->getCallingPid(),
                 IPCThreadState::self()->getCallingUid());

@@ -39,6 +39,7 @@
 #include <media/AudioParameter.h>
 #include <media/AudioPolicyHelper.h>
 #include <media/PatchBuilder.h>
+#include <private/android_filesystem_config.h>
 #include <soundtrigger/SoundTrigger.h>
 #include <system/audio.h>
 #include <audio_policy_conf.h>
@@ -3819,7 +3820,7 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
 AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterface,
                                        bool /*forTesting*/)
     :
-    mUidCached(getuid()),
+    mUidCached(AID_AUDIOSERVER), // no need to call getuid(), there's only one of us running.
     mpClientInterface(clientInterface),
     mLimitRingtoneVolume(false), mLastVoiceVolume(-1.0f),
     mA2dpSuspended(false),

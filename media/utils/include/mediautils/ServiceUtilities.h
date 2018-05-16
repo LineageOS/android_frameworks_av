@@ -17,13 +17,49 @@
 #include <unistd.h>
 
 #include <binder/PermissionController.h>
+#include <cutils/multiuser.h>
+#include <private/android_filesystem_config.h>
 
 namespace android {
 
 // Audio permission utilities
 
-extern pid_t getpid_cached;
-bool isTrustedCallingUid(uid_t uid);
+// Used for calls that should originate from system services.
+// We allow that some services might have separate processes to
+// handle multiple users, e.g. u10_system, u10_bluetooth, u10_radio.
+static inline bool isServiceUid(uid_t uid) {
+    return multiuser_get_app_id(uid) < AID_APP_START;
+}
+
+// Used for calls that should originate from audioserver.
+static inline bool isAudioServerUid(uid_t uid) {
+    return uid == AID_AUDIOSERVER;
+}
+
+// Used for some permission checks.
+// AID_ROOT is OK for command-line tests.  Native audioserver always OK.
+static inline bool isAudioServerOrRootUid(uid_t uid) {
+    return uid == AID_AUDIOSERVER || uid == AID_ROOT;
+}
+
+// Used for calls that should come from system server or internal.
+// Note: system server is multiprocess for multiple users.  audioserver is not.
+static inline bool isAudioServerOrSystemServerUid(uid_t uid) {
+    return multiuser_get_app_id(uid) == AID_SYSTEM || uid == AID_AUDIOSERVER;
+}
+
+// Mediaserver may forward the client PID and UID as part of a binder interface call;
+// otherwise the calling UID must be equal to the client UID.
+static inline bool isAudioServerOrMediaServerUid(uid_t uid) {
+    switch (uid) {
+    case AID_MEDIA:
+    case AID_AUDIOSERVER:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool recordingAllowed(const String16& opPackageName, pid_t pid, uid_t uid);
 bool startRecording(const String16& opPackageName, pid_t pid, uid_t uid);
 void finishRecording(const String16& opPackageName, uid_t uid);
