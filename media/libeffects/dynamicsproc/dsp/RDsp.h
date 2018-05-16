@@ -20,7 +20,9 @@
 #include <complex>
 #include <log/log.h>
 #include <vector>
+#include <map>
 using FloatVec = std::vector<float>;
+using IntVec = std::vector<int>;
 using ComplexVec  = std::vector<std::complex<float>>;
 
 // =======
