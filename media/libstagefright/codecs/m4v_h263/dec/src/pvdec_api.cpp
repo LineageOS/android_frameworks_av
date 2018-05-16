@@ -107,6 +107,7 @@ OSCL_EXPORT_REF Bool PVInitVideoDecoder(VideoDecControls *decCtrl, uint8 *volbuf
 #else
         if ((size_t)nLayers > SIZE_MAX / sizeof(Vol *)) {
             status = PV_FALSE;
+            oscl_free(video);
             goto fail;
         }
 
@@ -115,7 +116,8 @@ OSCL_EXPORT_REF Bool PVInitVideoDecoder(VideoDecControls *decCtrl, uint8 *volbuf
         if (video->vol == NULL) status = PV_FALSE;
         video->memoryUsage += nLayers * sizeof(Vol *);
 
-
+        /* be sure not to leak any previous state */
+        PVCleanUpVideoDecoder(decCtrl);
         /* we need to setup this pointer for the application to */
         /*    pass it around.                                   */
         decCtrl->videoDecoderData = (void *) video;
