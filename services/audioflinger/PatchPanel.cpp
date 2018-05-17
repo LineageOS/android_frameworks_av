@@ -467,6 +467,14 @@ void AudioFlinger::PatchPanel::Patch::clearConnections(PatchPanel *panel)
     mPlayback.closeConnections(panel);
 }
 
+String8 AudioFlinger::PatchPanel::Patch::dump(audio_patch_handle_t myHandle)
+{
+    String8 result;
+    result.appendFormat("Patch %d: thread %p => thread %p\n",
+            myHandle, mRecord.thread().get(), mPlayback.thread().get());
+    return result;
+}
+
 /* Disconnect a patch */
 status_t AudioFlinger::PatchPanel::releaseAudioPatch(audio_patch_handle_t handle)
 {
@@ -553,6 +561,28 @@ sp<DeviceHalInterface> AudioFlinger::PatchPanel::findHwDeviceByModule(audio_modu
         return nullptr;
     }
     return mAudioFlinger.mAudioHwDevs.valueAt(index)->hwDevice();
+}
+
+void AudioFlinger::PatchPanel::dump(int fd)
+{
+    // Only dump software patches.
+    bool headerPrinted = false;
+    for (auto& iter : mPatches) {
+        if (iter.second.isSoftware()) {
+            if (!headerPrinted) {
+                String8 header("\nSoftware patches:\n");
+                write(fd, header.string(), header.size());
+                headerPrinted = true;
+            }
+            String8 patchDump("  ");
+            patchDump.append(iter.second.dump(iter.first));
+            write(fd, patchDump.string(), patchDump.size());
+        }
+    }
+    if (headerPrinted) {
+        String8 trailing("\n");
+        write(fd, trailing.string(), trailing.size());
+    }
 }
 
 } // namespace android
