@@ -1689,6 +1689,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
         recordTrack.clear();
         AudioSystem::releaseInput(portId);
         output.inputId = AUDIO_IO_HANDLE_NONE;
+        output.selectedDeviceId = input.selectedDeviceId;
         portId = AUDIO_PORT_HANDLE_NONE;
     }
     lStatus = AudioSystem::getInputForAttr(&input.attr, &output.inputId,
