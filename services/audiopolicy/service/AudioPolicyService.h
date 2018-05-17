@@ -263,6 +263,8 @@ private:
     // Prints the shell command help
     status_t printHelp(int out);
 
+    std::string getDeviceTypeStrForPortId(audio_port_handle_t portId);
+
     // If recording we need to make sure the UID is allowed to do that. If the UID is idle
     // then it cannot record and gets buffers with zeros - silence. As soon as the UID
     // transitions to an active state we will start reporting buffers with data. This approach
@@ -643,7 +645,8 @@ private:
         const audio_session_t session;       // audio session ID
         bool active;                   // Capture is active or inactive
         bool isConcurrent;             // is allowed to concurrent capture
-        bool isVirtualDevice;          // uses vitual device: updated by APM::getInputForAttr()
+        bool isVirtualDevice;          // uses virtual device: updated by APM::getInputForAttr()
+        audio_port_handle_t deviceId;  // selected input device port ID
     };
 
     // A class automatically clearing and restoring binder caller identity inside
