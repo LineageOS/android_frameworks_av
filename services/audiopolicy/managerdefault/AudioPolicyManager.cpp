@@ -368,6 +368,9 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
                                                       const char *device_name)
 {
     status_t status;
+    String8 reply;
+    AudioParameter param;
+    int isReconfigA2dpSupported = 0;
 
     ALOGV("handleDeviceConfigChange(() device: 0x%X, address %s name %s",
           device, device_address, device_name);
@@ -382,6 +385,26 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
     if (index < 0) {
         // Nothing to do: device is not connected
         return NO_ERROR;
+    }
+
+    // For offloaded A2DP, Hw modules may have the capability to
+    // configure codecs. Check if any of the loaded hw modules
+    // supports this.
+    // If supported, send a set parameter to configure A2DP codecs
+    // and return. No need to toggle device state.
+    if (device & AUDIO_DEVICE_OUT_ALL_A2DP) {
+        reply = mpClientInterface->getParameters(
+                    AUDIO_IO_HANDLE_NONE,
+                    String8(AudioParameter::keyReconfigA2dpSupported));
+        AudioParameter repliedParameters(reply);
+        repliedParameters.getInt(
+                String8(AudioParameter::keyReconfigA2dpSupported), isReconfigA2dpSupported);
+        if (isReconfigA2dpSupported) {
+            const String8 key(AudioParameter::keyReconfigA2dp);
+            param.add(key, String8("true"));
+            mpClientInterface->setParameters(AUDIO_IO_HANDLE_NONE, param.toString());
+            return NO_ERROR;
+        }
     }
 
     // Toggle the device state: UNAVAILABLE -> AVAILABLE
