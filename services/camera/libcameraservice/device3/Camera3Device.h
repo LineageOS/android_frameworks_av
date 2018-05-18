@@ -554,7 +554,7 @@ class Camera3Device :
     void processOneCaptureResultLocked(
             const hardware::camera::device::V3_2::CaptureResult& result,
             const hardware::hidl_vec<
-            hardware::camera::device::V3_4::PhysicalCameraMetadata> physicalCameraMetadatas);
+            hardware::camera::device::V3_4::PhysicalCameraMetadata> physicalCameraMetadata);
     status_t readOneCameraMetadataLocked(uint64_t fmqResultSize,
             hardware::camera::device::V3_2::CameraMetadata& resultMetadata,
             const hardware::camera::device::V3_2::CameraMetadata& result);
@@ -910,8 +910,8 @@ class Camera3Device :
         bool skipHFRTargetFPSUpdate(int32_t tag, const camera_metadata_ro_entry_t& newEntry,
                 const camera_metadata_entry_t& currentEntry);
 
-        // Re-configure camera using the latest session parameters.
-        bool reconfigureCamera();
+        // Update next request sent to HAL
+        void updateNextRequest(NextRequest& nextRequest);
 
         wp<Camera3Device>  mParent;
         wp<camera3::StatusTracker>  mStatusTracker;
@@ -955,6 +955,7 @@ class Camera3Device :
         // android.request.id for latest process_capture_request
         int32_t            mLatestRequestId;
         CameraMetadata     mLatestRequest;
+        std::unordered_map<std::string, CameraMetadata> mLatestPhysicalRequest;
 
         typedef KeyedVector<uint32_t/*tag*/, RequestTrigger> TriggerMap;
         Mutex              mTriggerMutex;
@@ -1263,7 +1264,8 @@ class Camera3Device :
     TagMonitor mTagMonitor;
 
     void monitorMetadata(TagMonitor::eventSource source, int64_t frameNumber,
-            nsecs_t timestamp, const CameraMetadata& metadata);
+            nsecs_t timestamp, const CameraMetadata& metadata,
+            const std::unordered_map<std::string, CameraMetadata>& physicalMetadata);
 
     metadata_vendor_id_t mVendorTagId;
 
