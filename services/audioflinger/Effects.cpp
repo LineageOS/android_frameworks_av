@@ -595,7 +595,8 @@ status_t AudioFlinger::EffectModule::configure()
             (mConfig.inputCfg.channels != AUDIO_CHANNEL_OUT_STEREO
                     || mConfig.outputCfg.channels != AUDIO_CHANNEL_OUT_STEREO)) {
         // Older effects may require exact STEREO position mask.
-        if (mConfig.inputCfg.channels != AUDIO_CHANNEL_OUT_STEREO) {
+        if (mConfig.inputCfg.channels != AUDIO_CHANNEL_OUT_STEREO
+                && (mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_AUXILIARY) {
             ALOGV("Overriding effect input channels %#x as STEREO", mConfig.inputCfg.channels);
             mConfig.inputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
         }
