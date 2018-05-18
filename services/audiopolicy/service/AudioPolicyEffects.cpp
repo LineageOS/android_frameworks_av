@@ -24,6 +24,7 @@
 #include <cutils/misc.h>
 #include <media/AudioEffect.h>
 #include <media/EffectsConfig.h>
+#include <mediautils/ServiceUtilities.h>
 #include <system/audio.h>
 #include <system/audio_effects/audio_effects_conf.h>
 #include <utils/Vector.h>
@@ -31,7 +32,6 @@
 #include <cutils/config_utils.h>
 #include <binder/IPCThreadState.h>
 #include "AudioPolicyEffects.h"
-#include "ServiceUtilities.h"
 
 namespace android {
 

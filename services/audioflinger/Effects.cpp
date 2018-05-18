@@ -31,9 +31,9 @@
 #include <media/AudioEffect.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
+#include <mediautils/ServiceUtilities.h>
 
 #include "AudioFlinger.h"
-#include "ServiceUtilities.h"
 
 // ----------------------------------------------------------------------------
 

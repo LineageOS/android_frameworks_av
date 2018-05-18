@@ -2,25 +2,6 @@ LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES := \
-    ServiceUtilities.cpp
-
-# FIXME Move this library to frameworks/native
-LOCAL_MODULE := libserviceutility
-
-LOCAL_SHARED_LIBRARIES := \
-    libcutils \
-    libutils \
-    liblog \
-    libbinder
-
-LOCAL_CFLAGS := -Wall -Werror
-LOCAL_SANITIZE := integer_overflow
-
-include $(BUILD_SHARED_LIBRARY)
-
-include $(CLEAR_VARS)
-
 LOCAL_SRC_FILES:=               \
     AudioFlinger.cpp            \
     Threads.cpp                 \
@@ -54,7 +35,6 @@ LOCAL_SHARED_LIBRARIES := \
     libnbaio \
     libnblog \
     libpowermanager \
-    libserviceutility \
     libmediautils \
     libmemunreachable \
     libmedia_helper

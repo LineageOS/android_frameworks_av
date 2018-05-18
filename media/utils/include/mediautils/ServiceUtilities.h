@@ -20,6 +20,8 @@
 
 namespace android {
 
+// Audio permission utilities
+
 extern pid_t getpid_cached;
 bool isTrustedCallingUid(uid_t uid);
 bool recordingAllowed(const String16& opPackageName, pid_t pid, uid_t uid);

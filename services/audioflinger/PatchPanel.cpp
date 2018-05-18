@@ -24,9 +24,9 @@
 #include <audio_utils/primitives.h>
 
 #include "AudioFlinger.h"
-#include "ServiceUtilities.h"
 #include <media/AudioParameter.h>
 #include <media/PatchBuilder.h>
+#include <mediautils/ServiceUtilities.h>
 
 // ----------------------------------------------------------------------------
 

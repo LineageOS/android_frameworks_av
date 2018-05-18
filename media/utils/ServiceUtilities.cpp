@@ -19,7 +19,7 @@
 #include <binder/IServiceManager.h>
 #include <binder/PermissionCache.h>
 #include <private/android_filesystem_config.h>
-#include "ServiceUtilities.h"
+#include "mediautils/ServiceUtilities.h"
 
 /* When performing permission checks we do not use permission cache for
  * runtime permissions (protection level dangerous) as they may change at

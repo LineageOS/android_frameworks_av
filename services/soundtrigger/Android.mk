@@ -34,8 +34,7 @@ LOCAL_SHARED_LIBRARIES:= \
     libhardware \
     libsoundtrigger \
     libaudioclient \
-    libserviceutility
-
+    libmediautils \
 
 ifeq ($(USE_LEGACY_LOCAL_AUDIO_HAL),true)
 # libhardware configuration

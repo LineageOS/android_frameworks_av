@@ -27,13 +27,13 @@
 #include <cutils/properties.h>
 #include <hardware/hardware.h>
 #include <media/AudioSystem.h>
+#include <mediautils/ServiceUtilities.h>
 #include <utils/Errors.h>
 #include <utils/Log.h>
 #include <binder/IServiceManager.h>
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
 #include <system/sound_trigger.h>
-#include <ServiceUtilities.h>
 #include "SoundTriggerHwService.h"
 
 #ifdef SOUND_TRIGGER_USE_STUB_MODULE

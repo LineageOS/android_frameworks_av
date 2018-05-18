@@ -62,8 +62,8 @@
 #include "AudioFlinger.h"
 #include "FastMixer.h"
 #include "FastCapture.h"
-#include "ServiceUtilities.h"
-#include "mediautils/SchedulingPolicyService.h"
+#include <mediautils/SchedulingPolicyService.h>
+#include <mediautils/ServiceUtilities.h>
 
 #ifdef ADD_BATTERY_DATA
 #include <media/IMediaPlayerService.h>
