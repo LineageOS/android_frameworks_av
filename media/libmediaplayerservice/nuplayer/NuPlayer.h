@@ -88,7 +88,7 @@ struct NuPlayer : public AHandler {
     status_t getSelectedTrack(int32_t type, Parcel* reply) const;
     status_t selectTrack(size_t trackIndex, bool select, int64_t timeUs);
     status_t getCurrentPosition(int64_t *mediaUs);
-    void getStats(Vector<sp<AMessage> > *mTrackStats);
+    void getStats(Vector<sp<AMessage> > *trackStats);
 
     sp<MetaData> getFileMeta();
     float getFrameRate();
@@ -159,6 +159,7 @@ private:
         kWhatPrepareDrm                 = 'pDrm',
         kWhatReleaseDrm                 = 'rDrm',
         kWhatMediaClockNotify           = 'mckN',
+        kWhatGetStats                   = 'gSts',
     };
 
     wp<NuPlayerDriver> mDriver;
