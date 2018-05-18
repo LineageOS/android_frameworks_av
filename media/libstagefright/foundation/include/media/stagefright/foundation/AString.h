@@ -93,7 +93,7 @@ struct AString {
     status_t writeToParcel(Parcel *parcel) const;
 
 private:
-    static const char *kEmptyString;
+    constexpr static const char *kEmptyString = "";
 
     char *mData;
     size_t mSize;
