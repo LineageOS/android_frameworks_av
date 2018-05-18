@@ -144,15 +144,14 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
 // If a close request is pending then close the stream
 bool AAudioService::releaseStream(const sp<AAudioServiceStreamBase> &serviceStream) {
     bool closed = false;
-    if ((serviceStream->decrementServiceReferenceCount() == 0) && serviceStream->isCloseNeeded()) {
-        // removeStreamByHandle() uses a lock so that if there are two simultaneous closes
-        // then only one will get the pointer and do the close.
-        sp<AAudioServiceStreamBase> foundStream = mStreamTracker.removeStreamByHandle(serviceStream->getHandle());
-        if (foundStream.get() != nullptr) {
-            foundStream->close();
-            pid_t pid = foundStream->getOwnerProcessId();
-            AAudioClientTracker::getInstance().unregisterClientStream(pid, foundStream);
-        }
+    // decrementAndRemoveStreamByHandle() uses a lock so that if there are two simultaneous closes
+    // then only one will get the pointer and do the close.
+    sp<AAudioServiceStreamBase> foundStream = mStreamTracker.decrementAndRemoveStreamByHandle(
+            serviceStream->getHandle());
+    if (foundStream.get() != nullptr) {
+        foundStream->close();
+        pid_t pid = foundStream->getOwnerProcessId();
+        AAudioClientTracker::getInstance().unregisterClientStream(pid, foundStream);
         closed = true;
     }
     return closed;
@@ -175,14 +174,15 @@ aaudio_result_t AAudioService::closeStream(aaudio_handle_t streamHandle) {
     pid_t pid = serviceStream->getOwnerProcessId();
     AAudioClientTracker::getInstance().unregisterClientStream(pid, serviceStream);
 
-    serviceStream->setCloseNeeded(true);
+    serviceStream->markCloseNeeded();
     (void) releaseStream(serviceStream);
     return AAUDIO_OK;
 }
 
 sp<AAudioServiceStreamBase> AAudioService::convertHandleToServiceStream(
         aaudio_handle_t streamHandle) {
-    sp<AAudioServiceStreamBase> serviceStream = mStreamTracker.getStreamByHandle(streamHandle);
+    sp<AAudioServiceStreamBase> serviceStream = mStreamTracker.getStreamByHandleAndIncrement(
+            streamHandle);
     if (serviceStream.get() != nullptr) {
         // Only allow owner or the aaudio service to access the stream.
         const uid_t callingUserId = IPCThreadState::self()->getCallingUid();
@@ -194,9 +194,9 @@ sp<AAudioServiceStreamBase> AAudioService::convertHandleToServiceStream(
         if (!allowed) {
             ALOGE("AAudioService: calling uid %d cannot access stream 0x%08X owned by %d",
                   callingUserId, streamHandle, ownerUserId);
+            // We incremented the reference count so we must check if it needs to be closed.
+            checkForPendingClose(serviceStream, AAUDIO_OK);
             serviceStream.clear();
-        } else {
-            serviceStream->incrementServiceReferenceCount();
         }
     }
     return serviceStream;
@@ -328,12 +328,11 @@ aaudio_result_t AAudioService::stopClient(aaudio_handle_t streamHandle,
 aaudio_result_t AAudioService::disconnectStreamByPortHandle(audio_port_handle_t portHandle) {
     ALOGD("%s(%d) called", __func__, portHandle);
     sp<AAudioServiceStreamBase> serviceStream =
-            mStreamTracker.findStreamByPortHandle(portHandle);
+            mStreamTracker.findStreamByPortHandleAndIncrement(portHandle);
     if (serviceStream.get() == nullptr) {
         ALOGE("%s(), could not find stream with portHandle = %d", __func__, portHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
-    serviceStream->incrementServiceReferenceCount();
     aaudio_result_t result = serviceStream->stop();
     serviceStream->disconnect();
     return checkForPendingClose(serviceStream, result);

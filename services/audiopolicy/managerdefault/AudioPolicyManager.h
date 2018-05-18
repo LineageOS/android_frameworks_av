@@ -18,6 +18,7 @@
 
 #include <atomic>
 #include <memory>
+#include <unordered_set>
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -66,6 +67,10 @@ namespace android {
 // Time in milliseconds during witch some streams are muted while the audio path
 // is switched
 #define MUTE_TIME_MS 2000
+
+// multiplication factor applied to output latency when calculating a safe mute delay when
+// invalidating tracks
+#define LATENCY_MUTE_FACTOR 4
 
 #define NUM_TEST_OUTPUTS 5
 
@@ -232,6 +237,12 @@ public:
         virtual status_t getMasterMono(bool *mono);
         virtual float    getStreamVolumeDB(
                     audio_stream_type_t stream, int index, audio_devices_t device);
+
+        virtual status_t getSurroundFormats(unsigned int *numSurroundFormats,
+                                            audio_format_t *surroundFormats,
+                                            bool *surroundFormatsEnabled,
+                                            bool reported);
+        virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
 
         // return the strategy corresponding to a given stream type
         routing_strategy getStrategy(audio_stream_type_t stream) const;
@@ -491,8 +502,8 @@ protected:
 
         uint32_t updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs = 0);
         sp<AudioPatch> createTelephonyPatch(bool isRx, audio_devices_t device, uint32_t delayMs);
-        sp<DeviceDescriptor> fillAudioPortConfigForDevice(
-                const DeviceVector& devices, audio_devices_t device, audio_port_config *config);
+        sp<DeviceDescriptor> findDevice(
+                const DeviceVector& devices, audio_devices_t device);
 
         // if argument "device" is different from AUDIO_DEVICE_NONE,  startSource() will force
         // the re-evaluation of the output device.
@@ -592,10 +603,15 @@ protected:
 
         // Audio Policy Engine Interface.
         AudioPolicyManagerInterface *mEngine;
+
+        // Surround formats that are enabled.
+        std::unordered_set<audio_format_t> mSurroundFormats;
 private:
         // Add or remove AC3 DTS encodings based on user preferences.
         void filterSurroundFormats(FormatVector *formatsPtr);
         void filterSurroundChannelMasks(ChannelsVector *channelMasksPtr);
+
+        status_t getSupportedFormats(audio_io_handle_t ioHandle, FormatVector& formats);
 
         // If any, resolve any "dynamic" fields of an Audio Profiles collection
         void updateAudioProfiles(audio_devices_t device, audio_io_handle_t ioHandle,
@@ -664,6 +680,18 @@ private:
             param.addInt(String8(AudioParameter::keyMonoOutput), (int)mMasterMono);
             mpClientInterface->setParameters(output, param.toString());
         }
+        status_t installPatch(const char *caller,
+                audio_patch_handle_t *patchHandle,
+                AudioIODescriptorInterface *ioDescriptor,
+                const struct audio_patch *patch,
+                int delayMs);
+        status_t installPatch(const char *caller,
+                ssize_t index,
+                audio_patch_handle_t *patchHandle,
+                const struct audio_patch *patch,
+                int delayMs,
+                uid_t uid,
+                sp<AudioPatch> *patchDescPtr);
 
         bool soundTriggerSupportsConcurrentCapture();
         bool mSoundTriggerSupportsConcurrentCapture;

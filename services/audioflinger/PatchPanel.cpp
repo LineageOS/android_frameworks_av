@@ -26,6 +26,7 @@
 #include "AudioFlinger.h"
 #include "ServiceUtilities.h"
 #include <media/AudioParameter.h>
+#include <media/PatchBuilder.h>
 
 // ----------------------------------------------------------------------------
 
@@ -373,15 +374,10 @@ AudioFlinger::PatchPanel::Patch::~Patch()
 status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
 {
     // create patch from source device to record thread input
-    struct audio_patch subPatch;
-    subPatch.num_sources = 1;
-    subPatch.sources[0] = mAudioPatch.sources[0];
-    subPatch.num_sinks = 1;
-
-    mRecord.thread()->getAudioPortConfig(&subPatch.sinks[0]);
-    subPatch.sinks[0].ext.mix.usecase.source = AUDIO_SOURCE_MIC;
-
-    status_t status = panel->createAudioPatch(&subPatch, mRecord.handlePtr());
+    status_t status = panel->createAudioPatch(
+            PatchBuilder().addSource(mAudioPatch.sources[0]).
+                addSink(mRecord.thread(), { .source = AUDIO_SOURCE_MIC }).patch(),
+            mRecord.handlePtr());
     if (status != NO_ERROR) {
         *mRecord.handlePtr() = AUDIO_PATCH_HANDLE_NONE;
         return status;
@@ -389,9 +385,9 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
 
     // create patch from playback thread output to sink device
     if (mAudioPatch.num_sinks != 0) {
-        mPlayback.thread()->getAudioPortConfig(&subPatch.sources[0]);
-        subPatch.sinks[0] = mAudioPatch.sinks[0];
-        status = panel->createAudioPatch(&subPatch, mPlayback.handlePtr());
+        status = panel->createAudioPatch(
+                PatchBuilder().addSource(mPlayback.thread()).addSink(mAudioPatch.sinks[0]).patch(),
+                mPlayback.handlePtr());
         if (status != NO_ERROR) {
             *mPlayback.handlePtr() = AUDIO_PATCH_HANDLE_NONE;
             return status;
@@ -469,6 +465,14 @@ void AudioFlinger::PatchPanel::Patch::clearConnections(PatchPanel *panel)
     mPlayback.stopTrack();
     mRecord.closeConnections(panel);
     mPlayback.closeConnections(panel);
+}
+
+String8 AudioFlinger::PatchPanel::Patch::dump(audio_patch_handle_t myHandle)
+{
+    String8 result;
+    result.appendFormat("Patch %d: thread %p => thread %p\n",
+            myHandle, mRecord.thread().get(), mPlayback.thread().get());
+    return result;
 }
 
 /* Disconnect a patch */
@@ -557,6 +561,28 @@ sp<DeviceHalInterface> AudioFlinger::PatchPanel::findHwDeviceByModule(audio_modu
         return nullptr;
     }
     return mAudioFlinger.mAudioHwDevs.valueAt(index)->hwDevice();
+}
+
+void AudioFlinger::PatchPanel::dump(int fd)
+{
+    // Only dump software patches.
+    bool headerPrinted = false;
+    for (auto& iter : mPatches) {
+        if (iter.second.isSoftware()) {
+            if (!headerPrinted) {
+                String8 header("\nSoftware patches:\n");
+                write(fd, header.string(), header.size());
+                headerPrinted = true;
+            }
+            String8 patchDump("  ");
+            patchDump.append(iter.second.dump(iter.first));
+            write(fd, patchDump.string(), patchDump.size());
+        }
+    }
+    if (headerPrinted) {
+        String8 trailing("\n");
+        write(fd, trailing.string(), trailing.size());
+    }
 }
 
 } // namespace android

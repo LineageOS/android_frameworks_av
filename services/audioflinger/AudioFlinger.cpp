@@ -533,6 +533,8 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
             dev->dump(fd);
         }
 
+        mPatchPanel.dump(fd);
+
 #ifdef TEE_SINK
         // dump the serially shared record tee sink
         if (mRecordTeeSource != 0) {
@@ -1689,6 +1691,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
         recordTrack.clear();
         AudioSystem::releaseInput(portId);
         output.inputId = AUDIO_IO_HANDLE_NONE;
+        output.selectedDeviceId = input.selectedDeviceId;
         portId = AUDIO_PORT_HANDLE_NONE;
     }
     lStatus = AudioSystem::getInputForAttr(&input.attr, &output.inputId,

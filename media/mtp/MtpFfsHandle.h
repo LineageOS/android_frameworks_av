@@ -48,7 +48,7 @@ protected:
     void closeEndpoints();
     void advise(int fd);
     int handleControlRequest(const struct usb_ctrlrequest *request);
-    int doAsync(void* data, size_t len, bool read);
+    int doAsync(void* data, size_t len, bool read, bool zero_packet);
     int handleEvent();
     void cancelTransaction();
     void doSendEvent(mtp_event me);

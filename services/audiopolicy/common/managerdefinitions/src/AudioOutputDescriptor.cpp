@@ -55,9 +55,26 @@ AudioOutputDescriptor::AudioOutputDescriptor(const sp<AudioPort>& port,
     }
 }
 
+audio_config_base_t AudioOutputDescriptor::getConfig() const
+{
+    const audio_config_base_t config = { .sample_rate = mSamplingRate, .channel_mask = mChannelMask,
+            .format = mFormat };
+    return config;
+}
+
 audio_module_handle_t AudioOutputDescriptor::getModuleHandle() const
 {
     return mPort.get() != nullptr ? mPort->getModuleHandle() : AUDIO_MODULE_HANDLE_NONE;
+}
+
+audio_patch_handle_t AudioOutputDescriptor::getPatchHandle() const
+{
+    return mPatchHandle;
+}
+
+void AudioOutputDescriptor::setPatchHandle(audio_patch_handle_t handle)
+{
+    mPatchHandle = handle;
 }
 
 audio_port_handle_t AudioOutputDescriptor::getId() const

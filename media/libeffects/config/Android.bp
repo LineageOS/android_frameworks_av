@@ -1,5 +1,5 @@
 // Effect configuration
-cc_library_shared {
+cc_library {
     name: "libeffectsconfig",
     vendor_available: true,
 
