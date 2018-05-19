@@ -53,14 +53,6 @@ template <> bool compareEquality<float>(float a, float b) {
 #define IS_CHANGED(c, a, b) { c |= !compareEquality(a,b); \
     (a) = (b); }
 
-float dBtoLinear(float valueDb) {
-    return pow (10, valueDb / 20.0);
-}
-
-float linearToDb(float value) {
-    return 20 * log10(value);
-}
-
 //ChannelBuffers helper
 void ChannelBuffer::initBuffers(unsigned int blockSize, unsigned int overlapSize,
         unsigned int halfFftSize, unsigned int samplingRate, DPBase &dpBase) {
@@ -376,6 +368,9 @@ void DPFrequency::updateParameters(ChannelBuffer &cb, int channelIndex) {
             mLinkedLimiters.update(cb.mLimiterParams.linkGroup, channelIndex);
         }
     }
+
+    //=== Output Gain
+    cb.outputGainDb = pChannel->getOutputGain();
 }
 
 size_t DPFrequency::processSamples(const float *in, float *out, size_t samples) {
@@ -651,16 +646,21 @@ void DPFrequency::processLinkedLimiters(CBufferVector &channelBuffers) {
 }
 
 size_t DPFrequency::processLastStages(ChannelBuffer &cb) {
+
+    float outputGainFactor = dBtoLinear(cb.outputGainDb);
     //== Limiter. last Pass
     if (cb.mLimiterInUse && cb.mLimiterEnabled) {
-        const size_t cSize = cb.complexTemp.size();
-        const size_t maxBin = std::min(cSize/2, mHalfFFTSize);
         //compute factor, with post-gain
         float factor = cb.mLimiterParams.linkFactor * dBtoLinear(cb.mLimiterParams.postGainDb);
+        outputGainFactor *= factor;
+    }
 
-        //apply to all
+    //apply to all if != 1.0
+    if (!compareEquality(outputGainFactor, 1.0f)) {
+        size_t cSize = cb.complexTemp.size();
+        size_t maxBin = std::min(cSize/2, mHalfFFTSize);
         for (size_t k = 0; k < maxBin; k++) {
-            cb.complexTemp[k] *= factor;
+            cb.complexTemp[k] *= outputGainFactor;
         }
     }
 

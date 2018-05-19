@@ -43,6 +43,7 @@ public:
 
     //Current parameters
     float inputGainDb;
+    float outputGainDb;
     struct BandParams {
         bool enabled;
         float freqCutoffHz;
