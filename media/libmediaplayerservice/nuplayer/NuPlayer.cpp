@@ -1447,6 +1447,29 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatGetStats:
+        {
+            ALOGV("kWhatGetStats");
+
+            Vector<sp<AMessage>> *trackStats;
+            CHECK(msg->findPointer("trackstats", (void**)&trackStats));
+
+            trackStats->clear();
+            if (mVideoDecoder != NULL) {
+                trackStats->push_back(mVideoDecoder->getStats());
+            }
+            if (mAudioDecoder != NULL) {
+                trackStats->push_back(mAudioDecoder->getStats());
+            }
+
+            // respond for synchronization
+            sp<AMessage> response = new AMessage;
+            sp<AReplyToken> replyID;
+            CHECK(msg->senderAwaitsResponse(&replyID));
+            response->postReply(replyID);
+            break;
+        }
+
         default:
             TRESPASS();
             break;
@@ -2210,16 +2233,16 @@ status_t NuPlayer::getCurrentPosition(int64_t *mediaUs) {
     return renderer->getCurrentPosition(mediaUs);
 }
 
-void NuPlayer::getStats(Vector<sp<AMessage> > *mTrackStats) {
-    CHECK(mTrackStats != NULL);
+void NuPlayer::getStats(Vector<sp<AMessage> > *trackStats) {
+    CHECK(trackStats != NULL);
 
-    mTrackStats->clear();
-    if (mVideoDecoder != NULL) {
-        mTrackStats->push_back(mVideoDecoder->getStats());
-    }
-    if (mAudioDecoder != NULL) {
-        mTrackStats->push_back(mAudioDecoder->getStats());
-    }
+    ALOGV("NuPlayer::getStats()");
+    sp<AMessage> msg = new AMessage(kWhatGetStats, this);
+    msg->setPointer("trackstats", trackStats);
+
+    sp<AMessage> response;
+    (void) msg->postAndAwaitResponse(&response);
+    // response is for synchronization, ignore contents
 }
 
 sp<MetaData> NuPlayer::getFileMeta() {
