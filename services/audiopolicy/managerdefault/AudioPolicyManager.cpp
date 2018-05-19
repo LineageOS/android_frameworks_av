@@ -2791,9 +2791,32 @@ status_t AudioPolicyManager::listAudioPorts(audio_port_role_t role,
     return NO_ERROR;
 }
 
-status_t AudioPolicyManager::getAudioPort(struct audio_port *port __unused)
+status_t AudioPolicyManager::getAudioPort(struct audio_port *port)
 {
-    return NO_ERROR;
+    if (port == nullptr || port->id == AUDIO_PORT_HANDLE_NONE) {
+        return BAD_VALUE;
+    }
+    sp<DeviceDescriptor> dev = mAvailableOutputDevices.getDeviceFromId(port->id);
+    if (dev != 0) {
+        dev->toAudioPort(port);
+        return NO_ERROR;
+    }
+    dev = mAvailableInputDevices.getDeviceFromId(port->id);
+    if (dev != 0) {
+        dev->toAudioPort(port);
+        return NO_ERROR;
+    }
+    sp<SwAudioOutputDescriptor> out = mOutputs.getOutputFromId(port->id);
+    if (out != 0) {
+        out->toAudioPort(port);
+        return NO_ERROR;
+    }
+    sp<AudioInputDescriptor> in = mInputs.getInputFromId(port->id);
+    if (in != 0) {
+        in->toAudioPort(port);
+        return NO_ERROR;
+    }
+    return BAD_VALUE;
 }
 
 status_t AudioPolicyManager::createAudioPatch(const struct audio_patch *patch,

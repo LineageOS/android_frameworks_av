@@ -21,10 +21,10 @@ LOCAL_SHARED_LIBRARIES := \
     libbinder \
     libaudioclient \
     libhardware_legacy \
-    libserviceutility \
     libaudiopolicymanager \
     libmedia_helper \
     libmediametrics \
+    libmediautils \
     libeffectsconfig
 
 LOCAL_STATIC_LIBRARIES := \
