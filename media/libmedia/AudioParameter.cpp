@@ -47,6 +47,8 @@ const char * const AudioParameter::keyStreamSupportedSamplingRates =
 const char * const AudioParameter::valueOn = AUDIO_PARAMETER_VALUE_ON;
 const char * const AudioParameter::valueOff = AUDIO_PARAMETER_VALUE_OFF;
 const char * const AudioParameter::valueListSeparator = AUDIO_PARAMETER_VALUE_LIST_SEPARATOR;
+const char * const AudioParameter::keyReconfigA2dp = AUDIO_PARAMETER_RECONFIG_A2DP;
+const char * const AudioParameter::keyReconfigA2dpSupported = AUDIO_PARAMETER_A2DP_RECONFIG_SUPPORTED;
 
 AudioParameter::AudioParameter(const String8& keyValuePairs)
 {

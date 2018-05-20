@@ -81,6 +81,11 @@ public:
 
     static const char * const valueListSeparator;
 
+    // keyReconfigA2dp: Ask HwModule to reconfigure A2DP offloaded codec
+    // keyReconfigA2dpSupported: Query if HwModule supports A2DP offload codec config
+    static const char * const keyReconfigA2dp;
+    static const char * const keyReconfigA2dpSupported;
+
     String8 toString() const { return toStringImpl(true); }
     String8 keysToString() const { return toStringImpl(false); }
 

@@ -4045,6 +4045,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mRepeatingLastFrameNumber(
             hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES),
         mPrepareVideoStream(false),
+        mConstrainedMode(false),
         mRequestLatency(kRequestLatencyBinSize),
         mSessionParamKeys(sessionParamKeys),
         mLatestSessionParams(sessionParamKeys.size()) {
@@ -4068,6 +4069,7 @@ void Camera3Device::RequestThread::configurationComplete(bool isConstrainedHighS
     mLatestSessionParams = sessionParams;
     // Prepare video stream for high speed recording.
     mPrepareVideoStream = isConstrainedHighSpeed;
+    mConstrainedMode = isConstrainedHighSpeed;
 }
 
 status_t Camera3Device::RequestThread::queueRequestList(
@@ -4482,6 +4484,17 @@ nsecs_t Camera3Device::RequestThread::calculateMaxExpectedDuration(const camera_
     return maxExpectedDuration;
 }
 
+bool Camera3Device::RequestThread::skipHFRTargetFPSUpdate(int32_t tag,
+        const camera_metadata_ro_entry_t& newEntry, const camera_metadata_entry_t& currentEntry) {
+    if (mConstrainedMode && (ANDROID_CONTROL_AE_TARGET_FPS_RANGE == tag) &&
+            (newEntry.count == currentEntry.count) && (currentEntry.count == 2) &&
+            (currentEntry.data.i32[1] == newEntry.data.i32[1])) {
+        return true;
+    }
+
+    return false;
+}
+
 bool Camera3Device::RequestThread::updateSessionParameters(const CameraMetadata& settings) {
     ATRACE_CALL();
     bool updatesDetected = false;
@@ -4514,8 +4527,10 @@ bool Camera3Device::RequestThread::updateSessionParameters(const CameraMetadata&
 
             if (isDifferent) {
                 ALOGV("%s: Session parameter tag id %d changed", __FUNCTION__, tag);
+                if (!skipHFRTargetFPSUpdate(tag, entry, lastEntry)) {
+                    updatesDetected = true;
+                }
                 mLatestSessionParams.update(entry);
-                updatesDetected = true;
             }
         } else if (lastEntry.count > 0) {
             // Value has been removed

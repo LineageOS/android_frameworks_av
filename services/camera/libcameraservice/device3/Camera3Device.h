@@ -861,6 +861,11 @@ class Camera3Device :
         // Check and update latest session parameters based on the current request settings.
         bool updateSessionParameters(const CameraMetadata& settings);
 
+        // Check whether FPS range session parameter re-configuration is needed in constrained
+        // high speed recording camera sessions.
+        bool skipHFRTargetFPSUpdate(int32_t tag, const camera_metadata_ro_entry_t& newEntry,
+                const camera_metadata_entry_t& currentEntry);
+
         // Re-configure camera using the latest session parameters.
         bool reconfigureCamera();
 
@@ -918,6 +923,8 @@ class Camera3Device :
 
         // Flag indicating if we should prepare video stream for video requests.
         bool               mPrepareVideoStream;
+
+        bool               mConstrainedMode;
 
         static const int32_t kRequestLatencyBinSize = 40; // in ms
         CameraLatencyHistogram mRequestLatency;
