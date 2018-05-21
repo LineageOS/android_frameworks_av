@@ -5225,13 +5225,13 @@ void ACodec::onDataSpaceChanged(android_dataspace dataSpace, const ColorAspects 
     convertCodecColorAspectsToPlatformAspects(aspects, &range, &standard, &transfer);
 
     // if some aspects are unspecified, use dataspace fields
-    if (range != 0) {
+    if (range == 0) {
         range = (dataSpace & HAL_DATASPACE_RANGE_MASK) >> HAL_DATASPACE_RANGE_SHIFT;
     }
-    if (standard != 0) {
+    if (standard == 0) {
         standard = (dataSpace & HAL_DATASPACE_STANDARD_MASK) >> HAL_DATASPACE_STANDARD_SHIFT;
     }
-    if (transfer != 0) {
+    if (transfer == 0) {
         transfer = (dataSpace & HAL_DATASPACE_TRANSFER_MASK) >> HAL_DATASPACE_TRANSFER_SHIFT;
     }
 
