@@ -624,11 +624,19 @@ binder::Status CameraDeviceClient::createStream(
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
     }
 
-    if (!checkPhysicalCameraId(physicalCameraId)) {
-        String8 msg = String8::format("Camera %s: Camera doesn't support physicalCameraId %s.",
+    if (physicalCameraId.size() > 0) {
+        std::vector<std::string> physicalCameraIds;
+        std::string physicalId(physicalCameraId.string());
+        bool logicalCamera =
+                CameraProviderManager::isLogicalCamera(mDevice->info(), &physicalCameraIds);
+        if (!logicalCamera ||
+                std::find(physicalCameraIds.begin(), physicalCameraIds.end(), physicalId) ==
+                physicalCameraIds.end()) {
+            String8 msg = String8::format("Camera %s: Camera doesn't support physicalCameraId %s.",
                     mCameraIdStr.string(), physicalCameraId.string());
-        ALOGE("%s: %s", __FUNCTION__, msg.string());
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+            ALOGE("%s: %s", __FUNCTION__, msg.string());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+        }
     }
     std::vector<sp<Surface>> surfaces;
     std::vector<sp<IBinder>> binders;
@@ -1142,43 +1150,6 @@ binder::Status CameraDeviceClient::createSurfaceFromGbp(
         }
     }
     return binder::Status::ok();
-}
-
-bool CameraDeviceClient::checkPhysicalCameraId(const String8& physicalCameraId) {
-    if (0 == physicalCameraId.size()) {
-        return true;
-    }
-
-    CameraMetadata staticInfo = mDevice->info();
-    camera_metadata_entry_t entryCap;
-    bool isLogicalCam = false;
-
-    entryCap = staticInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
-    for (size_t i = 0; i < entryCap.count; ++i) {
-        uint8_t capability = entryCap.data.u8[i];
-        if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA) {
-            isLogicalCam = true;
-        }
-    }
-    if (!isLogicalCam) {
-        return false;
-    }
-
-    camera_metadata_entry_t entryIds = staticInfo.find(ANDROID_LOGICAL_MULTI_CAMERA_PHYSICAL_IDS);
-    const uint8_t* ids = entryIds.data.u8;
-    size_t start = 0;
-    for (size_t i = 0; i < entryIds.count; ++i) {
-        if (ids[i] == '\0') {
-            if (start != i) {
-                String8 currentId((const char*)ids+start);
-                if (currentId == physicalCameraId) {
-                    return true;
-                }
-            }
-            start = i+1;
-        }
-    }
-    return false;
 }
 
 bool CameraDeviceClient::roundBufferDimensionNearest(int32_t width, int32_t height,
