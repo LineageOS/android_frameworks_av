@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "138eae9f_db7cb702",
+        "filename": "services/audioflinger/Threads.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1526,
+      "author": {
+        "id": 17868
+      },
+      "writtenOn": "2018-05-21T22:58:06Z",
+      "side": 0,
+      "message": "For the observed case, here the lStatus is -5 from LVVEFS_Create and effect remains NULL. Once it is registered in advance, on Exit it ultimately tries de-registering it.",
+      "range": {
+        "startLine": 1526,
+        "startChar": 16,
+        "endLine": 1526,
+        "endChar": 23
+      },
+      "revId": "565446909b70602e887b2ab464f1613c5fc75b69",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5e4ec9dc_0a412efd",
+        "filename": "services/audioflinger/Threads.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1557,
+      "author": {
+        "id": 17868
+      },
+      "writtenOn": "2018-05-21T22:58:06Z",
+      "side": 0,
+      "message": "The question is, why the \"effect-\u003eid()\" is referenced here instead of just \"id\" used to register the effect placeholder? If \"effect-\u003eid()\" can be replaced safely with \"id\", such a replacement will close an issue too. Otherwise, if replacement is not available or produces side-effects, then we have the only place to insert the NULL check.",
+      "range": {
+        "startLine": 1557,
+        "startChar": 42,
+        "endLine": 1557,
+        "endChar": 48
+      },
+      "revId": "565446909b70602e887b2ab464f1613c5fc75b69",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
