@@ -61,9 +61,11 @@ struct MediaCodec : public AHandler {
     };
 
     enum BufferFlags {
-        BUFFER_FLAG_SYNCFRAME   = 1,
-        BUFFER_FLAG_CODECCONFIG = 2,
-        BUFFER_FLAG_EOS         = 4,
+        BUFFER_FLAG_SYNCFRAME     = 1,
+        BUFFER_FLAG_CODECCONFIG   = 2,
+        BUFFER_FLAG_EOS           = 4,
+        BUFFER_FLAG_PARTIAL_FRAME = 8,
+        BUFFER_FLAG_MUXER_DATA    = 16,
     };
 
     enum {
