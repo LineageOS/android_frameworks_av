@@ -22,6 +22,7 @@
 #include "StateQueue.h"
 #include "FastMixerState.h"
 #include "FastMixerDumpState.h"
+#include "NBAIO_Tee.h"
 
 namespace android {
 
@@ -32,7 +33,9 @@ typedef StateQueue<FastMixerState> FastMixerStateQueue;
 class FastMixer : public FastThread {
 
 public:
-            FastMixer();
+    /** FastMixer constructor takes as param the parent MixerThread's io handle (id)
+        for purposes of identification. */
+    explicit FastMixer(audio_io_handle_t threadIoHandle);
     virtual ~FastMixer();
 
             FastMixerStateQueue* sq();
@@ -87,6 +90,11 @@ private:
     // accessed without lock between multiple threads.
     std::atomic_bool mMasterMono;
     std::atomic_int_fast64_t mBoottimeOffset;
+
+    const audio_io_handle_t mThreadIoHandle; // parent thread id for debugging purposes
+#ifdef TEE_SINK
+    NBAIO_Tee       mTee;
+#endif
 };  // class FastMixer
 
 }   // namespace android

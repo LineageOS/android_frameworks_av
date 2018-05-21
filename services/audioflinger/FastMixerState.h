@@ -77,9 +77,6 @@ struct FastMixerState : FastThreadState {
         WRITE = 0x10,           // write to output sink
         MIX_WRITE = 0x18;       // mix tracks and write to output sink
 
-    // This might be a one-time configuration rather than per-state
-    NBAIO_Sink* mTeeSink;       // if non-NULL, then duplicate write()s to this non-blocking sink
-
     // never returns NULL; asserts if command is invalid
     static const char *commandToString(Command command);
 

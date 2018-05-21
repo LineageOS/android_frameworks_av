@@ -47,7 +47,8 @@ namespace android {
 
 /*static*/ const FastMixerState FastMixer::sInitial;
 
-FastMixer::FastMixer() : FastThread("cycle_ms", "load_us"),
+FastMixer::FastMixer(audio_io_handle_t parentIoHandle)
+    : FastThread("cycle_ms", "load_us"),
     // mFastTrackNames
     // mGenerations
     mOutputSink(NULL),
@@ -66,8 +67,11 @@ FastMixer::FastMixer() : FastThread("cycle_ms", "load_us"),
     mTotalNativeFramesWritten(0),
     // timestamp
     mNativeFramesWrittenButNotPresented(0),   // the = 0 is to silence the compiler
-    mMasterMono(false)
+    mMasterMono(false),
+    mThreadIoHandle(parentIoHandle)
 {
+    (void)mThreadIoHandle; // prevent unused warning, see C++17 [[maybe_unused]]
+
     // FIXME pass sInitial as parameter to base class constructor, and make it static local
     mPrevious = &sInitial;
     mCurrent = &sInitial;
@@ -220,6 +224,10 @@ void FastMixer::onStateChange()
         previousTrackMask = 0;
         mFastTracksGen = current->mFastTracksGen - 1;
         dumpState->mFrameCount = frameCount;
+#ifdef TEE_SINK
+        mTee.set(mFormat, NBAIO_Tee::TEE_FLAG_OUTPUT_THREAD);
+        mTee.setId(std::string("_") + std::to_string(mThreadIoHandle) + "_F");
+#endif
     } else {
         previousTrackMask = previous->mTrackMask;
     }
@@ -446,10 +454,9 @@ void FastMixer::onWork()
                     frameCount * Format_channelCount(mFormat));
         }
         // if non-NULL, then duplicate write() to this non-blocking sink
-        NBAIO_Sink* teeSink;
-        if ((teeSink = current->mTeeSink) != NULL) {
-            (void) teeSink->write(buffer, frameCount);
-        }
+#ifdef TEE_SINK
+        mTee.write(buffer, frameCount);
+#endif
         // FIXME write() is non-blocking and lock-free for a properly implemented NBAIO sink,
         //       but this code should be modified to handle both non-blocking and blocking sinks
         dumpState->mWriteSequence++;

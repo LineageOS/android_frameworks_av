@@ -47,6 +47,7 @@
 #include <system/audio.h>
 
 #include "AudioFlinger.h"
+#include "NBAIO_Tee.h"
 
 #include <media/AudioResamplerPublic.h>
 
@@ -55,7 +56,6 @@
 #include <system/audio_effects/effect_aec.h>
 
 #include <audio_utils/primitives.h>
-#include <audio_utils/string.h>
 
 #include <powermanager/PowerManager.h>
 
@@ -99,17 +99,6 @@ static const char kNoEffectsFactory[] = "Effects Factory is absent\n";
 nsecs_t AudioFlinger::mStandbyTimeInNsecs = kDefaultStandbyTimeInNsecs;
 
 uint32_t AudioFlinger::mScreenState;
-
-
-#ifdef TEE_SINK
-bool AudioFlinger::mTeeSinkInputEnabled = false;
-bool AudioFlinger::mTeeSinkOutputEnabled = false;
-bool AudioFlinger::mTeeSinkTrackEnabled = false;
-
-size_t AudioFlinger::mTeeSinkInputFrames = kTeeSinkInputFramesDefault;
-size_t AudioFlinger::mTeeSinkOutputFrames = kTeeSinkOutputFramesDefault;
-size_t AudioFlinger::mTeeSinkTrackFrames = kTeeSinkTrackFramesDefault;
-#endif
 
 // In order to avoid invalidating offloaded tracks each time a Visualizer is turned on and off
 // we define a minimum time during which a global effect is considered enabled.
@@ -186,27 +175,6 @@ AudioFlinger::AudioFlinger()
     mEffectsFactoryHal = EffectsFactoryHalInterface::create();
 
     mMediaLogNotifier->run("MediaLogNotifier");
-
-#ifdef TEE_SINK
-    char value[PROPERTY_VALUE_MAX];
-    (void) property_get("ro.debuggable", value, "0");
-    int debuggable = atoi(value);
-    int teeEnabled = 0;
-    if (debuggable) {
-        (void) property_get("af.tee", value, "0");
-        teeEnabled = atoi(value);
-    }
-    // FIXME symbolic constants here
-    if (teeEnabled & 1) {
-        mTeeSinkInputEnabled = true;
-    }
-    if (teeEnabled & 2) {
-        mTeeSinkOutputEnabled = true;
-    }
-    if (teeEnabled & 4) {
-        mTeeSinkTrackEnabled = true;
-    }
-#endif
 }
 
 void AudioFlinger::onFirstRef()
@@ -535,19 +503,16 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
 
         mPatchPanel.dump(fd);
 
-#ifdef TEE_SINK
-        // dump the serially shared record tee sink
-        if (mRecordTeeSource != 0) {
-            dumpTee(fd, mRecordTeeSource, AUDIO_IO_HANDLE_NONE, 'C');
-        }
-#endif
-
         BUFLOG_RESET;
 
         if (locked) {
             mLock.unlock();
         }
 
+#ifdef TEE_SINK
+        // NBAIO_Tee dump is safe to call outside of AF lock.
+        NBAIO_Tee::dumpAll(fd, "_DUMP");
+#endif
         // append a copy of media.log here by forwarding fd to it, but don't attempt
         // to lookup the service if it's not running, as it will block for a second
         if (sMediaLogServiceAsBinder != 0) {
@@ -2430,55 +2395,6 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
                     thread.get());
             return thread;
         } else {
-#ifdef TEE_SINK
-            // Try to re-use most recently used Pipe to archive a copy of input for dumpsys,
-            // or (re-)create if current Pipe is idle and does not match the new format
-            sp<NBAIO_Sink> teeSink;
-            enum {
-                TEE_SINK_NO,    // don't copy input
-                TEE_SINK_NEW,   // copy input using a new pipe
-                TEE_SINK_OLD,   // copy input using an existing pipe
-            } kind;
-            NBAIO_Format format = Format_from_SR_C(halconfig.sample_rate,
-                    audio_channel_count_from_in_mask(halconfig.channel_mask), halconfig.format);
-            if (!mTeeSinkInputEnabled) {
-                kind = TEE_SINK_NO;
-            } else if (!Format_isValid(format)) {
-                kind = TEE_SINK_NO;
-            } else if (mRecordTeeSink == 0) {
-                kind = TEE_SINK_NEW;
-            } else if (mRecordTeeSink->getStrongCount() != 1) {
-                kind = TEE_SINK_NO;
-            } else if (Format_isEqual(format, mRecordTeeSink->format())) {
-                kind = TEE_SINK_OLD;
-            } else {
-                kind = TEE_SINK_NEW;
-            }
-            switch (kind) {
-            case TEE_SINK_NEW: {
-                Pipe *pipe = new Pipe(mTeeSinkInputFrames, format);
-                size_t numCounterOffers = 0;
-                const NBAIO_Format offers[1] = {format};
-                ssize_t index = pipe->negotiate(offers, 1, NULL, numCounterOffers);
-                ALOG_ASSERT(index == 0);
-                PipeReader *pipeReader = new PipeReader(*pipe);
-                numCounterOffers = 0;
-                index = pipeReader->negotiate(offers, 1, NULL, numCounterOffers);
-                ALOG_ASSERT(index == 0);
-                mRecordTeeSink = pipe;
-                mRecordTeeSource = pipeReader;
-                teeSink = pipe;
-                }
-                break;
-            case TEE_SINK_OLD:
-                teeSink = mRecordTeeSink;
-                break;
-            case TEE_SINK_NO:
-            default:
-                break;
-            }
-#endif
-
             // Start record thread
             // RecordThread requires both input and output device indication to forward to audio
             // pre processing modules
@@ -2488,9 +2404,6 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
                                       primaryOutputDevice_l(),
                                       devices,
                                       mSystemReady
-#ifdef TEE_SINK
-                                      , teeSink
-#endif
                                       );
             mRecordThreads.add(*input, thread);
             ALOGV("openInput_l() created record thread: ID %d thread %p", *input, thread.get());
@@ -3392,136 +3305,6 @@ bool AudioFlinger::updateOrphanEffectChains(const sp<AudioFlinger::EffectModule>
     return false;
 }
 
-
-struct Entry {
-#define TEE_MAX_FILENAME 32 // %Y%m%d%H%M%S_%d.wav = 4+2+2+2+2+2+1+1+4+1 = 21
-    char mFileName[TEE_MAX_FILENAME];
-};
-
-int comparEntry(const void *p1, const void *p2)
-{
-    return strcmp(((const Entry *) p1)->mFileName, ((const Entry *) p2)->mFileName);
-}
-
-#ifdef TEE_SINK
-void AudioFlinger::dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_handle_t id, char suffix)
-{
-    NBAIO_Source *teeSource = source.get();
-    if (teeSource != NULL) {
-        // .wav rotation
-        // There is a benign race condition if 2 threads call this simultaneously.
-        // They would both traverse the directory, but the result would simply be
-        // failures at unlink() which are ignored.  It's also unlikely since
-        // normally dumpsys is only done by bugreport or from the command line.
-        char teePath[PATH_MAX] = "/data/misc/audioserver";
-        size_t teePathLen = strlen(teePath);
-        DIR *dir = opendir(teePath);
-        teePath[teePathLen++] = '/';
-        if (dir != NULL) {
-#define TEE_MAX_SORT 20 // number of entries to sort
-#define TEE_MAX_KEEP 10 // number of entries to keep
-            struct Entry entries[TEE_MAX_SORT];
-            size_t entryCount = 0;
-            while (entryCount < TEE_MAX_SORT) {
-                errno = 0; // clear errno before readdir() to track potential errors.
-                const struct dirent *result = readdir(dir);
-                if (result == nullptr) {
-                    ALOGW_IF(errno != 0, "tee readdir() failure %s", strerror(errno));
-                    break;
-                }
-                // ignore non .wav file entries
-                const size_t nameLen = strlen(result->d_name);
-                if (nameLen <= 4 || nameLen >= TEE_MAX_FILENAME ||
-                        strcmp(&result->d_name[nameLen - 4], ".wav")) {
-                    continue;
-                }
-                (void)audio_utils_strlcpy(entries[entryCount++].mFileName, result->d_name);
-            }
-            (void) closedir(dir);
-            if (entryCount > TEE_MAX_KEEP) {
-                qsort(entries, entryCount, sizeof(Entry), comparEntry);
-                for (size_t i = 0; i < entryCount - TEE_MAX_KEEP; ++i) {
-                    strcpy(&teePath[teePathLen], entries[i].mFileName);
-                    (void) unlink(teePath);
-                }
-            }
-        } else {
-            if (fd >= 0) {
-                dprintf(fd, "unable to rotate tees in %.*s: %s\n", (int) teePathLen, teePath,
-                        strerror(errno));
-            }
-        }
-        char teeTime[16];
-        struct timeval tv;
-        gettimeofday(&tv, NULL);
-        struct tm tm;
-        localtime_r(&tv.tv_sec, &tm);
-        strftime(teeTime, sizeof(teeTime), "%Y%m%d%H%M%S", &tm);
-        snprintf(&teePath[teePathLen], sizeof(teePath) - teePathLen, "%s_%d_%c.wav", teeTime, id,
-                suffix);
-        // if 2 dumpsys are done within 1 second, and rotation didn't work, then discard 2nd
-        int teeFd = open(teePath, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, S_IRUSR | S_IWUSR);
-        if (teeFd >= 0) {
-            // FIXME use libsndfile
-            char wavHeader[44];
-            memcpy(wavHeader,
-                "RIFF\0\0\0\0WAVEfmt \20\0\0\0\1\0\2\0\104\254\0\0\0\0\0\0\4\0\20\0data\0\0\0\0",
-                sizeof(wavHeader));
-            NBAIO_Format format = teeSource->format();
-            unsigned channelCount = Format_channelCount(format);
-            uint32_t sampleRate = Format_sampleRate(format);
-            size_t frameSize = Format_frameSize(format);
-            wavHeader[22] = channelCount;       // number of channels
-            wavHeader[24] = sampleRate;         // sample rate
-            wavHeader[25] = sampleRate >> 8;
-            wavHeader[32] = frameSize;          // block alignment
-            wavHeader[33] = frameSize >> 8;
-            write(teeFd, wavHeader, sizeof(wavHeader));
-            size_t total = 0;
-            bool firstRead = true;
-#define TEE_SINK_READ 1024                      // frames per I/O operation
-            void *buffer = malloc(TEE_SINK_READ * frameSize);
-            for (;;) {
-                size_t count = TEE_SINK_READ;
-                ssize_t actual = teeSource->read(buffer, count);
-                bool wasFirstRead = firstRead;
-                firstRead = false;
-                if (actual <= 0) {
-                    if (actual == (ssize_t) OVERRUN && wasFirstRead) {
-                        continue;
-                    }
-                    break;
-                }
-                ALOG_ASSERT(actual <= (ssize_t)count);
-                write(teeFd, buffer, actual * frameSize);
-                total += actual;
-            }
-            free(buffer);
-            lseek(teeFd, (off_t) 4, SEEK_SET);
-            uint32_t temp = 44 + total * frameSize - 8;
-            // FIXME not big-endian safe
-            write(teeFd, &temp, sizeof(temp));
-            lseek(teeFd, (off_t) 40, SEEK_SET);
-            temp =  total * frameSize;
-            // FIXME not big-endian safe
-            write(teeFd, &temp, sizeof(temp));
-            close(teeFd);
-            // TODO Should create file with temporary name and then rename to final if non-empty.
-            if (total > 0) {
-                if (fd >= 0) {
-                    dprintf(fd, "tee copied to %s\n", teePath);
-                }
-            } else {
-                unlink(teePath);
-            }
-        } else {
-            if (fd >= 0) {
-                dprintf(fd, "unable to create tee %s: %s\n", teePath, strerror(errno));
-            }
-        }
-    }
-}
-#endif
 
 // ----------------------------------------------------------------------------
 

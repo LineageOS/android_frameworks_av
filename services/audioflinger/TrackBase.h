@@ -100,6 +100,12 @@ public:
 
     audio_attributes_t  attributes() const { return mAttr; }
 
+#ifdef TEE_SINK
+           void         dumpTee(int fd, const std::string &reason) const {
+                                mTee.dump(fd, reason);
+                        }
+#endif
+
 protected:
     DISALLOW_COPY_AND_ASSIGN(TrackBase);
 
@@ -208,8 +214,9 @@ protected:
     const bool          mIsOut;
     sp<ServerProxy>     mServerProxy;
     const int           mId;
-    sp<NBAIO_Sink>      mTeeSink;
-    sp<NBAIO_Source>    mTeeSource;
+#ifdef TEE_SINK
+    NBAIO_Tee           mTee;
+#endif
     bool                mTerminated;
     track_type          mType;      // must be one of TYPE_DEFAULT, TYPE_OUTPUT, TYPE_PATCH ...
     audio_io_handle_t   mThreadIoHandle; // I/O handle of the thread the track is attached to
