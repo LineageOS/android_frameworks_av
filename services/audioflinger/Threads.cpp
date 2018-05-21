@@ -1553,7 +1553,7 @@ Exit:
         if (effectCreated) {
             chain->removeEffect_l(effect);
         }
-        if (effectRegistered) {
+        if (effectRegistered && (effect != 0)) {
             AudioSystem::unregisterEffect(effect->id());
         }
         if (chainCreated) {
