@@ -1579,6 +1579,9 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::remove(const sp<T> &track) {
     --mBatteryCounter[track->uid()].second;
     // mLatestActiveTrack is not cleared even if is the same as track.
     mHasChanged = true;
+#ifdef TEE_SINK
+    track->dumpTee(-1 /* fd */, "_REMOVE");
+#endif
     return index;
 }
 
@@ -2853,6 +2856,9 @@ ssize_t AudioFlinger::PlaybackThread::threadLoop_write()
         ATRACE_END();
         if (framesWritten > 0) {
             bytesWritten = framesWritten * mFrameSize;
+#ifdef TEE_SINK
+            mTee.write((char *)mSinkBuffer + offset, framesWritten);
+#endif
         } else {
             bytesWritten = framesWritten;
         }
@@ -3866,9 +3872,7 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
 
         // create a MonoPipe to connect our submix to FastMixer
         NBAIO_Format format = mOutputSink->format();
-#ifdef TEE_SINK
-        NBAIO_Format origformat = format;
-#endif
+
         // adjust format to match that of the Fast Mixer
         ALOGV("format changed from %#x to %#x", format.mFormat, fastMixerFormat);
         format.mFormat = fastMixerFormat;
@@ -3880,7 +3884,7 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         MonoPipe *monoPipe = new MonoPipe(mNormalFrameCount * 4, format, true /*writeCanBlock*/);
         const NBAIO_Format offers[1] = {format};
         size_t numCounterOffers = 0;
-#if !LOG_NDEBUG || defined(TEE_SINK)
+#if !LOG_NDEBUG
         ssize_t index =
 #else
         (void)
@@ -3891,25 +3895,8 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
                 (monoPipe->maxFrames() * 7) / 8 : mNormalFrameCount * 2);
         mPipeSink = monoPipe;
 
-#ifdef TEE_SINK
-        if (mTeeSinkOutputEnabled) {
-            // create a Pipe to archive a copy of FastMixer's output for dumpsys
-            Pipe *teeSink = new Pipe(mTeeSinkOutputFrames, origformat);
-            const NBAIO_Format offers2[1] = {origformat};
-            numCounterOffers = 0;
-            index = teeSink->negotiate(offers2, 1, NULL, numCounterOffers);
-            ALOG_ASSERT(index == 0);
-            mTeeSink = teeSink;
-            PipeReader *teeSource = new PipeReader(*teeSink);
-            numCounterOffers = 0;
-            index = teeSource->negotiate(offers2, 1, NULL, numCounterOffers);
-            ALOG_ASSERT(index == 0);
-            mTeeSource = teeSource;
-        }
-#endif
-
         // create fast mixer and configure it initially with just one fast track for our submix
-        mFastMixer = new FastMixer();
+        mFastMixer = new FastMixer(mId);
         FastMixerStateQueue *sq = mFastMixer->sq();
 #ifdef STATE_QUEUE_DUMP
         sq->setObserverDump(&mStateQueueObserverDump);
@@ -3935,9 +3922,6 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         state->mColdFutexAddr = &mFastMixerFutex;
         state->mColdGen++;
         state->mDumpState = &mFastMixerDumpState;
-#ifdef TEE_SINK
-        state->mTeeSink = mTeeSink.get();
-#endif
         mFastMixerNBLogWriter = audioFlinger->newWriter_l(kFastMixerLogSize, "FastMixer");
         state->mNBLogWriter = mFastMixerNBLogWriter.get();
         sq->end();
@@ -3957,7 +3941,12 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         tid = mAudioWatchdog->getTid();
         sendPrioConfigEvent(getpid_cached, tid, kPriorityFastMixer, false /*forApp*/);
 #endif
-
+    } else {
+#ifdef TEE_SINK
+        // Only use the MixerThread tee if there is no FastMixer.
+        mTee.set(mOutputSink->format(), NBAIO_Tee::TEE_FLAG_OUTPUT_THREAD);
+        mTee.setId(std::string("_") + std::to_string(mId) + "_M");
+#endif
     }
 
     switch (kUseFastMixer) {
@@ -5064,12 +5053,6 @@ void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& ar
     } else {
         dprintf(fd, "  No FastMixer\n");
     }
-
-#ifdef TEE_SINK
-    // Write the tee output to a .wav file
-    dumpTee(fd, mTeeSource, mId, 'M');
-#endif
-
 }
 
 uint32_t AudioFlinger::MixerThread::idleSleepTimeUs() const
@@ -6235,9 +6218,6 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
                                          audio_devices_t outDevice,
                                          audio_devices_t inDevice,
                                          bool systemReady
-#ifdef TEE_SINK
-                                         , const sp<NBAIO_Sink>& teeSink
-#endif
                                          ) :
     ThreadBase(audioFlinger, id, outDevice, inDevice, RECORD, systemReady),
     mInput(input),
@@ -6245,9 +6225,6 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
     mRsmpInBuffer(NULL),
     // mRsmpInFrames, mRsmpInFramesP2, and mRsmpInFramesOA are set by readInputParameters_l()
     mRsmpInRear(0)
-#ifdef TEE_SINK
-    , mTeeSink(teeSink)
-#endif
     , mReadOnlyHeap(new MemoryDealer(kRecordThreadReadOnlyHeapSize,
             "RecordThreadRO", MemoryHeapBase::READ_ONLY))
     // mFastCapture below
@@ -6370,6 +6347,10 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
 
         mFastTrackAvail = true;
     }
+#ifdef TEE_SINK
+    mTee.set(mInputSource->format(), NBAIO_Tee::TEE_FLAG_INPUT_THREAD);
+    mTee.setId(std::string("_") + std::to_string(mId) + "_C");
+#endif
 failed: ;
 
     // FIXME mNormalSource
@@ -6712,9 +6693,9 @@ reacquire_wakelock:
         }
         ALOG_ASSERT(framesRead > 0);
 
-        if (mTeeSink != 0) {
-            (void) mTeeSink->write((uint8_t*)mRsmpInBuffer + rear * mFrameSize, framesRead);
-        }
+#ifdef TEE_SINK
+        (void)mTee.write((uint8_t*)mRsmpInBuffer + rear * mFrameSize, framesRead);
+#endif
         // If destination is non-contiguous, we now correct for reading past end of buffer.
         {
             size_t part1 = mRsmpInFramesP2 - rear;
