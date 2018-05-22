@@ -70,6 +70,7 @@ enum {
     kKeyWantsNALFragments = 'NALf',
     kKeyIsSyncFrame       = 'sync',  // int32_t (bool)
     kKeyIsCodecConfig     = 'conf',  // int32_t (bool)
+    kKeyIsMuxerData       = 'muxd',  // int32_t (bool)
     kKeyTime              = 'time',  // int64_t (usecs)
     kKeyDecodingTime      = 'decT',  // int64_t (decoding timestamp in usecs)
     kKeyNTPTime           = 'ntpT',  // uint64_t (ntp-timestamp)
@@ -220,6 +221,7 @@ enum {
     kKeyFrameCount       = 'nfrm', // int32_t, total number of frame in video track
     kKeyExifOffset       = 'exof', // int64_t, Exif data offset
     kKeyExifSize         = 'exsz', // int64_t, Exif data size
+    kKeyIsExif           = 'exif', // bool (int32_t) buffer contains exif data block
 };
 
 enum {

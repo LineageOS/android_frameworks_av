@@ -190,6 +190,10 @@ status_t MediaMuxer::writeSampleData(const sp<ABuffer> &buffer, size_t trackInde
         sampleMetaData.setInt32(kKeyIsSyncFrame, true);
     }
 
+    if (flags & MediaCodec::BUFFER_FLAG_MUXER_DATA) {
+        sampleMetaData.setInt32(kKeyIsMuxerData, 1);
+    }
+
     sp<MediaAdapter> currentTrack = mTrackList[trackIndex];
     // This pushBuffer will wait until the mediaBuffer is consumed.
     return currentTrack->pushBuffer(mediaBuffer);

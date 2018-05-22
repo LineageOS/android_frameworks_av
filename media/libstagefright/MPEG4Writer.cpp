@@ -83,6 +83,9 @@ static const char kMetaKey_CaptureFps[] = "com.android.capture.fps";
 static const char kMetaKey_TemporalLayerCount[] = "com.android.video.temporal_layers_count";
 
 static const int kTimestampDebugCount = 10;
+static const int kItemIdBase = 10000;
+static const char kExifHeader[] = {'E', 'x', 'i', 'f', '\0', '\0'};
+static const int32_t kTiffHeaderOffset = htonl(sizeof(kExifHeader));
 
 static const uint8_t kMandatoryHevcNalUnitTypes[3] = {
     kHevcNalUnitTypeVps,
@@ -112,7 +115,7 @@ public:
 
     int64_t getDurationUs() const;
     int64_t getEstimatedTrackSizeBytes() const;
-    int32_t getMetaSizeIncrease() const;
+    int32_t getMetaSizeIncrease(int32_t angle, int32_t trackCount) const;
     void writeTrackHeader(bool use32BitOffset = true);
     int64_t getMinCttsOffsetTimeUs();
     void bufferChunk(int64_t timestampUs);
@@ -122,8 +125,10 @@ public:
     bool isAudio() const { return mIsAudio; }
     bool isMPEG4() const { return mIsMPEG4; }
     bool usePrefix() const { return mIsAvc || mIsHevc || mIsHeic; }
+    bool isExifData(const MediaBufferBase *buffer) const;
     void addChunkOffset(off64_t offset);
-    void addItemOffsetAndSize(off64_t offset, size_t size);
+    void addItemOffsetAndSize(off64_t offset, size_t size, bool isExif);
+    void flushItemRefs();
     int32_t getTrackId() const { return mTrackId; }
     status_t dump(int fd, const Vector<String16>& args) const;
     static const char *getFourCCForMime(const char *mime);
@@ -355,7 +360,9 @@ private:
     int32_t mRotation;
 
     Vector<uint16_t> mProperties;
-    Vector<uint16_t> mDimgRefs;
+    ItemRefs mDimgRefs;
+    ItemRefs mCdscRefs;
+    uint16_t mImageItemId;
     int32_t mIsPrimary;
     int32_t mWidth, mHeight;
     int32_t mTileWidth, mTileHeight;
@@ -499,6 +506,7 @@ void MPEG4Writer::initInternal(int fd, bool isFirstSession) {
     mPrimaryItemId = 0;
     mAssociationEntryCount = 0;
     mNumGrids = 0;
+    mHasRefs = false;
 
     // Following variables only need to be set for the first recording session.
     // And they will stay the same for all the recording sessions.
@@ -680,7 +688,12 @@ void MPEG4Writer::addDeviceMeta() {
 #endif
 }
 
-int64_t MPEG4Writer::estimateFileLevelMetaSize() {
+int64_t MPEG4Writer::estimateFileLevelMetaSize(MetaData *params) {
+    int32_t rotation;
+    if (!params || !params->findInt32(kKeyRotation, &rotation)) {
+        rotation = 0;
+    }
+
     // base meta size
     int64_t metaSize =     12  // meta fullbox header
                          + 33  // hdlr box
@@ -695,7 +708,7 @@ int64_t MPEG4Writer::estimateFileLevelMetaSize() {
     for (List<Track *>::iterator it = mTracks.begin();
          it != mTracks.end(); ++it) {
         if ((*it)->isHeic()) {
-            metaSize += (*it)->getMetaSizeIncrease();
+            metaSize += (*it)->getMetaSizeIncrease(rotation, mTracks.size());
         }
     }
 
@@ -900,7 +913,7 @@ status_t MPEG4Writer::start(MetaData *param) {
     if (mInMemoryCacheSize == 0) {
         int32_t bitRate = -1;
         if (mHasFileLevelMeta) {
-            mInMemoryCacheSize += estimateFileLevelMetaSize();
+            mInMemoryCacheSize += estimateFileLevelMetaSize(param);
         }
         if (mHasMoovBox) {
             if (param) {
@@ -1344,12 +1357,17 @@ void MPEG4Writer::unlock() {
 }
 
 off64_t MPEG4Writer::addSample_l(
-        MediaBuffer *buffer, bool usePrefix, size_t *bytesWritten) {
+        MediaBuffer *buffer, bool usePrefix, bool isExif, size_t *bytesWritten) {
     off64_t old_offset = mOffset;
 
     if (usePrefix) {
         addMultipleLengthPrefixedSamples_l(buffer);
     } else {
+        if (isExif) {
+            ::write(mFd, &kTiffHeaderOffset, 4); // exif_tiff_header_offset field
+            mOffset += 4;
+        }
+
         ::write(mFd,
               (const uint8_t *)buffer->data() + buffer->range_offset(),
               buffer->range_length());
@@ -1767,6 +1785,9 @@ MPEG4Writer::Track::Track(
       mReachedEOS(false),
       mStartTimestampUs(-1),
       mRotation(0),
+      mDimgRefs("dimg"),
+      mCdscRefs("cdsc"),
+      mImageItemId(0),
       mIsPrimary(0),
       mWidth(0),
       mHeight(0),
@@ -1933,6 +1954,13 @@ status_t MPEG4Writer::setNextFd(int fd) {
     return OK;
 }
 
+bool MPEG4Writer::Track::isExifData(const MediaBufferBase *buffer) const {
+    return mIsHeic
+            && (buffer->range_length() > sizeof(kExifHeader))
+            && !memcmp((uint8_t *)buffer->data() + buffer->range_offset(),
+                    kExifHeader, sizeof(kExifHeader));
+}
+
 void MPEG4Writer::Track::addChunkOffset(off64_t offset) {
     CHECK(!mIsHeic);
     if (mOwner->use32BitFileOffset()) {
@@ -1943,7 +1971,7 @@ void MPEG4Writer::Track::addChunkOffset(off64_t offset) {
     }
 }
 
-void MPEG4Writer::Track::addItemOffsetAndSize(off64_t offset, size_t size) {
+void MPEG4Writer::Track::addItemOffsetAndSize(off64_t offset, size_t size, bool isExif) {
     CHECK(mIsHeic);
 
     if (offset > UINT32_MAX || size > UINT32_MAX) {
@@ -1954,6 +1982,18 @@ void MPEG4Writer::Track::addItemOffsetAndSize(off64_t offset, size_t size) {
     if (mIsMalformed) {
         return;
     }
+
+    if (isExif) {
+         mCdscRefs.value.push_back(mOwner->addItem_l({
+            .itemType = "Exif",
+            .isPrimary = false,
+            .isHidden = false,
+            .offset = (uint32_t)offset,
+            .size = (uint32_t)size,
+        }));
+        return;
+    }
+
     if (mTileIndex >= mNumTiles) {
         ALOGW("Ignoring excess tiles!");
         return;
@@ -1968,7 +2008,7 @@ void MPEG4Writer::Track::addItemOffsetAndSize(off64_t offset, size_t size) {
         default: break; // don't set if invalid
     }
 
-    bool hasGrid = (mNumTiles > 1);
+    bool hasGrid = (mTileWidth > 0);
 
     if (mProperties.empty()) {
         mProperties.push_back(mOwner->addProperty_l({
@@ -1990,18 +2030,16 @@ void MPEG4Writer::Track::addItemOffsetAndSize(off64_t offset, size_t size) {
         }
     }
 
-    uint16_t itemId = mOwner->addItem_l({
-        .itemType = "hvc1",
-        .isPrimary = hasGrid ? false : (mIsPrimary != 0),
-        .isHidden = hasGrid,
-        .offset = (uint32_t)offset,
-        .size = (uint32_t)size,
-        .properties = mProperties,
-    });
-
     mTileIndex++;
     if (hasGrid) {
-        mDimgRefs.push_back(itemId);
+        mDimgRefs.value.push_back(mOwner->addItem_l({
+            .itemType = "hvc1",
+            .isPrimary = false,
+            .isHidden = true,
+            .offset = (uint32_t)offset,
+            .size = (uint32_t)size,
+            .properties = mProperties,
+        }));
 
         if (mTileIndex == mNumTiles) {
             mProperties.clear();
@@ -2016,7 +2054,7 @@ void MPEG4Writer::Track::addItemOffsetAndSize(off64_t offset, size_t size) {
                     .rotation = heifRotation,
                 }));
             }
-            mOwner->addItem_l({
+            mImageItemId = mOwner->addItem_l({
                 .itemType = "grid",
                 .isPrimary = (mIsPrimary != 0),
                 .isHidden = false,
@@ -2025,9 +2063,31 @@ void MPEG4Writer::Track::addItemOffsetAndSize(off64_t offset, size_t size) {
                 .width = (uint32_t)mWidth,
                 .height = (uint32_t)mHeight,
                 .properties = mProperties,
-                .dimgRefs = mDimgRefs,
             });
         }
+    } else {
+        mImageItemId = mOwner->addItem_l({
+            .itemType = "hvc1",
+            .isPrimary = (mIsPrimary != 0),
+            .isHidden = false,
+            .offset = (uint32_t)offset,
+            .size = (uint32_t)size,
+            .properties = mProperties,
+        });
+    }
+}
+
+// Flush out the item refs for this track. Note that it must be called after the
+// writer thread has stopped, because there might be pending items in the last
+// few chunks written by the writer thread (as opposed to the track). In particular,
+// it affects the 'dimg' refs for tiled image, as we only have the refs after the
+// last tile sample is written.
+void MPEG4Writer::Track::flushItemRefs() {
+    CHECK(mIsHeic);
+
+    if (mImageItemId > 0) {
+        mOwner->addRefs_l(mImageItemId, mDimgRefs);
+        mOwner->addRefs_l(mImageItemId, mCdscRefs);
     }
 }
 
@@ -2174,15 +2234,20 @@ void MPEG4Writer::writeChunkToFile(Chunk* chunk) {
         chunk->mTimeStampUs, chunk->mTrack->getTrackType());
 
     int32_t isFirstSample = true;
-    bool usePrefix = chunk->mTrack->usePrefix();
     while (!chunk->mSamples.empty()) {
         List<MediaBuffer *>::iterator it = chunk->mSamples.begin();
 
+        int32_t isExif;
+        if (!(*it)->meta_data().findInt32(kKeyIsExif, &isExif)) {
+            isExif = 0;
+        }
+        bool usePrefix = chunk->mTrack->usePrefix() && !isExif;
+
         size_t bytesWritten;
-        off64_t offset = addSample_l(*it, usePrefix, &bytesWritten);
+        off64_t offset = addSample_l(*it, usePrefix, isExif, &bytesWritten);
 
         if (chunk->mTrack->isHeic()) {
-            chunk->mTrack->addItemOffsetAndSize(offset, bytesWritten);
+            chunk->mTrack->addItemOffsetAndSize(offset, bytesWritten, isExif);
         } else if (isFirstSample) {
             chunk->mTrack->addChunkOffset(offset);
             isFirstSample = false;
@@ -2904,6 +2969,19 @@ status_t MPEG4Writer::Track::threadEntry() {
             break;
         }
 
+        bool isExif = false;
+        int32_t isMuxerData;
+        if (buffer->meta_data().findInt32(kKeyIsMuxerData, &isMuxerData) && isMuxerData) {
+            // We only support one type of muxer data, which is Exif data block.
+            isExif = isExifData(buffer);
+            if (!isExif) {
+                ALOGW("Ignoring bad Exif data block");
+                buffer->release();
+                buffer = NULL;
+                continue;
+            }
+        }
+
         ++nActualFrames;
 
         // Make a deep copy of the MediaBuffer and Metadata and release
@@ -2916,10 +2994,15 @@ status_t MPEG4Writer::Track::threadEntry() {
         buffer->release();
         buffer = NULL;
 
-        if (usePrefix()) StripStartcode(copy);
+        if (isExif) {
+            copy->meta_data().setInt32(kKeyIsExif, 1);
+        }
+        bool usePrefix = this->usePrefix() && !isExif;
+
+        if (usePrefix) StripStartcode(copy);
 
         size_t sampleSize = copy->range_length();
-        if (usePrefix()) {
+        if (usePrefix) {
             if (mOwner->useNalLengthFour()) {
                 sampleSize += 4;
             } else {
@@ -3185,10 +3268,10 @@ status_t MPEG4Writer::Track::threadEntry() {
         }
         if (!hasMultipleTracks) {
             size_t bytesWritten;
-            off64_t offset = mOwner->addSample_l(copy, usePrefix(), &bytesWritten);
+            off64_t offset = mOwner->addSample_l(copy, usePrefix, isExif, &bytesWritten);
 
             if (mIsHeic) {
-                addItemOffsetAndSize(offset, bytesWritten);
+                addItemOffsetAndSize(offset, bytesWritten, isExif);
             } else {
                 uint32_t count = (mOwner->use32BitFileOffset()
                             ? mStcoTableEntries->count()
@@ -3450,10 +3533,12 @@ int64_t MPEG4Writer::Track::getEstimatedTrackSizeBytes() const {
     return mEstimatedTrackSizeBytes;
 }
 
-int32_t MPEG4Writer::Track::getMetaSizeIncrease() const {
+int32_t MPEG4Writer::Track::getMetaSizeIncrease(
+        int32_t angle, int32_t trackCount) const {
     CHECK(mIsHeic);
 
-    int32_t grid = (mNumTiles > 1);
+    int32_t grid = (mTileWidth > 0);
+    int32_t rotate = (angle > 0);
 
     // Note that the rotation angle is in the file meta, and we don't have
     // it until start, so here the calculation has to assume rotation.
@@ -3461,25 +3546,34 @@ int32_t MPEG4Writer::Track::getMetaSizeIncrease() const {
     // increase to ipco
     int32_t increase = 20 * (grid + 1)              // 'ispe' property
                      + (8 + mCodecSpecificDataSize) // 'hvcC' property
-                     + 9;                           // 'irot' property (worst case)
+                     ;
+
+    if (rotate) {
+        increase += 9;                              // 'irot' property (worst case)
+    }
 
     // increase to iref and idat
     if (grid) {
-        increase += (8 + 2 + 2 + mNumTiles * 2)  // 'dimg' in iref
-                  + 12;                          // ImageGrid in 'idat' (worst case)
+        increase += (12 + mNumTiles * 2)            // 'dimg' in iref
+                  + 12;                             // ImageGrid in 'idat' (worst case)
     }
 
-    // increase to iloc, iinf and ipma
-    increase += (16             // increase to 'iloc'
-              + 21              // increase to 'iinf'
-              + (3 + 2 * 2))    // increase to 'ipma' (worst case, 2 props x 2 bytes)
-              * (mNumTiles + grid);
+    increase += (12 + 2);                           // 'cdsc' in iref
 
-    // adjust to ipma:
-    // if rotation is present and only one tile, it could ref 3 properties
-    if (!grid) {
-        increase += 2;
-    }
+    // increase to iloc, iinf
+    increase += (16                                 // increase to 'iloc'
+              + 21)                                 // increase to 'iinf'
+              * (mNumTiles + grid + 1);             // "+1" is for 'Exif'
+
+    // When total # of properties is > 127, the properties id becomes 2-byte.
+    // We write 4 properties at most for each image (2x'ispe', 1x'hvcC', 1x'irot').
+    // Set the threshold to be 30.
+    int32_t propBytes = trackCount > 30 ? 2 : 1;
+
+    // increase to ipma
+    increase += (3 + 2 * propBytes) * mNumTiles     // 'ispe' + 'hvcC'
+             + grid * (3 + propBytes)               // 'ispe' for grid
+             + rotate * propBytes;                  // 'irot' (either on grid or tile)
 
     return increase;
 }
@@ -4239,7 +4333,7 @@ void MPEG4Writer::writeIinfBox() {
     writeInt16((uint16_t)itemCount);
     for (size_t i = 0; i < itemCount; i++) {
         writeInfeBox(mItems[i].itemId, mItems[i].itemType,
-                mItems[i].isHidden ? 1 : 0);
+                (mItems[i].isImage() && mItems[i].isHidden) ? 1 : 0);
     }
 
     endBox();
@@ -4274,21 +4368,21 @@ void MPEG4Writer::writeIrefBox() {
     writeInt32(0);          // Version = 0, Flags = 0
     {
         for (size_t i = 0; i < mItems.size(); i++) {
-            if (!mItems[i].isGrid()) {
-                continue;
+            for (size_t r = 0; r < mItems[i].refsList.size(); r++) {
+                const ItemRefs &refs = mItems[i].refsList[r];
+                beginBox(refs.key);
+                writeInt16(mItems[i].itemId);
+                size_t refCount = refs.value.size();
+                if (refCount > 65535) {
+                    ALOGW("too many entries in %s", refs.key);
+                    refCount = 65535;
+                }
+                writeInt16((uint16_t)refCount);
+                for (size_t refIndex = 0; refIndex < refCount; refIndex++) {
+                    writeInt16(refs.value[refIndex]);
+                }
+                endBox();
             }
-            beginBox("dimg");
-            writeInt16(mItems[i].itemId);
-            size_t refCount = mItems[i].dimgRefs.size();
-            if (refCount > 65535) {
-                ALOGW("too many entries in dimg");
-                refCount = 65535;
-            }
-            writeInt16((uint16_t)refCount);
-            for (size_t refIndex = 0; refIndex < refCount; refIndex++) {
-                writeInt16(mItems[i].dimgRefs[refIndex]);
-            }
-            endBox();
         }
     }
     endBox();
@@ -4384,32 +4478,45 @@ void MPEG4Writer::writeIprpBox() {
 }
 
 void MPEG4Writer::writeFileLevelMetaBox() {
-    if (mItems.empty()) {
-        ALOGE("no valid item was found");
-        return;
-    }
-
     // patch up the mPrimaryItemId and count items with prop associations
     uint16_t firstVisibleItemId = 0;
+    uint16_t firstImageItemId = 0;
     for (size_t index = 0; index < mItems.size(); index++) {
+        if (!mItems[index].isImage()) continue;
+
         if (mItems[index].isPrimary) {
             mPrimaryItemId = mItems[index].itemId;
-        } else if (!firstVisibleItemId && !mItems[index].isHidden) {
+        }
+        if (!firstImageItemId) {
+            firstImageItemId = mItems[index].itemId;
+        }
+        if (!firstVisibleItemId && !mItems[index].isHidden) {
             firstVisibleItemId = mItems[index].itemId;
         }
-
         if (!mItems[index].properties.empty()) {
             mAssociationEntryCount++;
         }
     }
 
+    if (!firstImageItemId) {
+        ALOGE("no valid image was found");
+        return;
+    }
+
     if (mPrimaryItemId == 0) {
         if (firstVisibleItemId > 0) {
-            ALOGW("didn't find primary, using first visible item");
+            ALOGW("didn't find primary, using first visible image");
             mPrimaryItemId = firstVisibleItemId;
         } else {
-            ALOGW("no primary and no visible item, using first item");
-            mPrimaryItemId = mItems[0].itemId;
+            ALOGW("no primary and no visible item, using first image");
+            mPrimaryItemId = firstImageItemId;
+        }
+    }
+
+    for (List<Track *>::iterator it = mTracks.begin();
+        it != mTracks.end(); ++it) {
+        if ((*it)->isHeic()) {
+            (*it)->flushItemRefs();
         }
     }
 
@@ -4422,6 +4529,8 @@ void MPEG4Writer::writeFileLevelMetaBox() {
     writeIprpBox();
     if (mNumGrids > 0) {
         writeIdatBox();
+    }
+    if (mHasRefs) {
         writeIrefBox();
     }
     endBox();
@@ -4445,8 +4554,8 @@ uint16_t MPEG4Writer::addItem_l(const ItemInfo &info) {
     size_t index = mItems.size();
     mItems.push_back(info);
 
-    // make the item id start at 10000
-    mItems.editItemAt(index).itemId = index + 10000;
+    // make the item id start at kItemIdBase
+    mItems.editItemAt(index).itemId = index + kItemIdBase;
 
 #if (LOG_NDEBUG==0)
     if (!info.properties.empty()) {
@@ -4462,6 +4571,20 @@ uint16_t MPEG4Writer::addItem_l(const ItemInfo &info) {
 #endif // (LOG_NDEBUG==0)
 
     return mItems[index].itemId;
+}
+
+void MPEG4Writer::addRefs_l(uint16_t itemId, const ItemRefs &refs) {
+    if (refs.value.empty()) {
+        return;
+    }
+    if (itemId < kItemIdBase) {
+        ALOGW("itemId shouldn't be smaller than kItemIdBase");
+        return;
+    }
+
+    size_t index = itemId - kItemIdBase;
+    mItems.editItemAt(index).refsList.push_back(refs);
+    mHasRefs = true;
 }
 
 /*
