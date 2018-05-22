@@ -51,7 +51,7 @@ const effect_descriptor_t gDPDescriptor = {
         {0x7261676f, 0x6d75, 0x7369, 0x6364, {0x28, 0xe2, 0xfd, 0x3a, 0xc3, 0x9e}}, // type
         {0xe0e6539b, 0x1781, 0x7261, 0x676f, {0x6d, 0x75, 0x73, 0x69, 0x63, 0x40}}, // uuid
         EFFECT_CONTROL_API_VERSION,
-        (EFFECT_FLAG_TYPE_INSERT | EFFECT_FLAG_INSERT_FIRST),
+        (EFFECT_FLAG_TYPE_INSERT | EFFECT_FLAG_INSERT_LAST | EFFECT_FLAG_VOLUME_CTRL),
         0, // TODO
         1,
         "Dynamics Processing",
@@ -367,6 +367,76 @@ int DP_process(effect_handle_t self, audio_buffer_t *inBuffer,
     return 0;
 }
 
+//helper function
+bool DP_checkSizesInt(uint32_t paramSize, uint32_t valueSize, uint32_t expectedParams,
+        uint32_t expectedValues) {
+    if (paramSize < expectedParams * sizeof(int32_t)) {
+        ALOGE("Invalid paramSize: %u expected %u", paramSize,
+                (uint32_t)(expectedParams * sizeof(int32_t)));
+        return false;
+    }
+    if (valueSize < expectedValues * sizeof(int32_t)) {
+        ALOGE("Invalid valueSize %u expected %u", valueSize,
+                (uint32_t)(expectedValues * sizeof(int32_t)));
+        return false;
+    }
+    return true;
+}
+
+static dp_fx::DPChannel* DP_getChannel(DynamicsProcessingContext *pContext,
+        int32_t channel) {
+    if (pContext->mPDynamics == NULL) {
+        return NULL;
+    }
+    dp_fx::DPChannel *pChannel = pContext->mPDynamics->getChannel(channel);
+    ALOGE_IF(pChannel == NULL, "DPChannel NULL. invalid channel %d", channel);
+    return pChannel;
+}
+
+static dp_fx::DPEq* DP_getEq(DynamicsProcessingContext *pContext, int32_t channel,
+        int32_t eqType) {
+    dp_fx::DPChannel *pChannel = DP_getChannel(pContext, channel);
+    if (pChannel == NULL) {
+        return NULL;
+    }
+    dp_fx::DPEq *pEq = (eqType == DP_PARAM_PRE_EQ ? pChannel->getPreEq() :
+            (eqType == DP_PARAM_POST_EQ ? pChannel->getPostEq() : NULL));
+    ALOGE_IF(pEq == NULL,"DPEq NULL invalid eq");
+    return pEq;
+}
+
+static dp_fx::DPEqBand* DP_getEqBand(DynamicsProcessingContext *pContext, int32_t channel,
+        int32_t eqType, int32_t band) {
+    dp_fx::DPEq *pEq = DP_getEq(pContext, channel, eqType);
+    if (pEq == NULL) {
+        return NULL;
+    }
+    dp_fx::DPEqBand *pEqBand = pEq->getBand(band);
+    ALOGE_IF(pEqBand == NULL, "DPEqBand NULL. invalid band %d", band);
+    return pEqBand;
+}
+
+static dp_fx::DPMbc* DP_getMbc(DynamicsProcessingContext *pContext, int32_t channel) {
+    dp_fx::DPChannel * pChannel = DP_getChannel(pContext, channel);
+    if (pChannel == NULL) {
+        return NULL;
+    }
+    dp_fx::DPMbc *pMbc = pChannel->getMbc();
+    ALOGE_IF(pMbc == NULL, "DPMbc NULL invalid MBC");
+    return pMbc;
+}
+
+static dp_fx::DPMbcBand* DP_getMbcBand(DynamicsProcessingContext *pContext, int32_t channel,
+        int32_t band) {
+    dp_fx::DPMbc *pMbc = DP_getMbc(pContext, channel);
+    if (pMbc == NULL) {
+        return NULL;
+    }
+    dp_fx::DPMbcBand *pMbcBand = pMbc->getBand(band);
+    ALOGE_IF(pMbcBand == NULL, "pMbcBand NULL. invalid band %d", band);
+    return pMbcBand;
+}
+
 int DP_command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSize,
         void *pCmdData, uint32_t *replySize, void *pReplyData) {
 
@@ -483,8 +553,49 @@ int DP_command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSize,
                 p->data + voffset);
         break;
     }
+    case EFFECT_CMD_SET_VOLUME: {
+        ALOGV("EFFECT_CMD_SET_VOLUME");
+        // if pReplyData is NULL, VOL_CTRL is delegated to another effect
+        if (pReplyData == NULL || replySize == NULL || *replySize < ((int)sizeof(int32_t) * 2)) {
+            ALOGV("no VOLUME data to return");
+            break;
+        }
+        if (pCmdData == NULL || cmdSize < ((int)sizeof(uint32_t) * 2)) {
+            ALOGE("\tLVM_ERROR : DynamicsProcessing EFFECT_CMD_SET_VOLUME ERROR");
+            return -EINVAL;
+        }
+
+        const int32_t unityGain = 1 << 24;
+        //channel count
+        int32_t channelCount = (int32_t)audio_channel_count_from_out_mask(
+                pContext->mConfig.inputCfg.channels);
+        for (int32_t ch = 0; ch < channelCount; ch++) {
+
+            dp_fx::DPChannel * pChannel = DP_getChannel(pContext, ch);
+            if (pChannel == NULL) {
+                ALOGE("%s EFFECT_CMD_SET_VOLUME invalid channel %d", __func__, ch);
+                return -EINVAL;
+                break;
+            }
+
+            int32_t offset = ch;
+            if (ch > 1) {
+                // FIXME: limited to 2 unique channels. If more channels present, use value for
+                // first channel
+                offset = 0;
+            }
+            const float gain = (float)*((uint32_t *)pCmdData + offset) / unityGain;
+            const float gainDb = linearToDb(gain);
+            ALOGVV("%s EFFECT_CMD_SET_VOLUME channel %d, engine outputlevel %f (%0.2f dB)",
+                    __func__, ch, gain, gainDb);
+            pChannel->setOutputGain(gainDb);
+        }
+
+        const int32_t  volRet[2] = {unityGain, unityGain}; // Apply no volume before effect.
+        memcpy(pReplyData, volRet, sizeof(volRet));
+        break;
+    }
     case EFFECT_CMD_SET_DEVICE:
-    case EFFECT_CMD_SET_VOLUME:
     case EFFECT_CMD_SET_AUDIO_MODE:
         break;
 
@@ -521,76 +632,6 @@ int DP_getParameterCmdSize(uint32_t paramSize,
         return (int)(sizeof(effect_param_t) + 3 * sizeof(uint32_t));
     }
     return 0;
-}
-
-//helper function
-bool DP_checkSizesInt(uint32_t paramSize, uint32_t valueSize, uint32_t expectedParams,
-        uint32_t expectedValues) {
-    if (paramSize < expectedParams * sizeof(int32_t)) {
-        ALOGE("Invalid paramSize: %u expected %u", paramSize,
-                (uint32_t) (expectedParams * sizeof(int32_t)));
-        return false;
-    }
-    if (valueSize < expectedValues * sizeof(int32_t)) {
-        ALOGE("Invalid valueSize %u expected %u", valueSize,
-                (uint32_t)(expectedValues * sizeof(int32_t)));
-        return false;
-    }
-    return true;
-}
-
-static dp_fx::DPChannel* DP_getChannel(DynamicsProcessingContext *pContext,
-        int32_t channel) {
-    if (pContext->mPDynamics == NULL) {
-        return NULL;
-    }
-    dp_fx::DPChannel *pChannel = pContext->mPDynamics->getChannel(channel);
-    ALOGE_IF(pChannel == NULL, "DPChannel NULL. invalid channel %d", channel);
-    return pChannel;
-}
-
-static dp_fx::DPEq* DP_getEq(DynamicsProcessingContext *pContext, int32_t channel,
-        int32_t eqType) {
-    dp_fx::DPChannel * pChannel = DP_getChannel(pContext, channel);
-    if (pChannel == NULL) {
-        return NULL;
-    }
-    dp_fx::DPEq *pEq = (eqType == DP_PARAM_PRE_EQ ? pChannel->getPreEq() :
-            (eqType == DP_PARAM_POST_EQ ? pChannel->getPostEq() : NULL));
-    ALOGE_IF(pEq == NULL,"DPEq NULL invalid eq");
-    return pEq;
-}
-
-static dp_fx::DPEqBand* DP_getEqBand(DynamicsProcessingContext *pContext, int32_t channel,
-        int32_t eqType, int32_t band) {
-    dp_fx::DPEq *pEq = DP_getEq(pContext, channel, eqType);
-    if (pEq == NULL) {
-        return NULL;
-    }
-    dp_fx::DPEqBand *pEqBand = pEq->getBand(band);
-    ALOGE_IF(pEqBand == NULL, "DPEqBand NULL. invalid band %d", band);
-    return pEqBand;
-}
-
-static dp_fx::DPMbc* DP_getMbc(DynamicsProcessingContext *pContext, int32_t channel) {
-    dp_fx::DPChannel * pChannel = DP_getChannel(pContext, channel);
-    if (pChannel == NULL) {
-        return NULL;
-    }
-    dp_fx::DPMbc *pMbc = pChannel->getMbc();
-    ALOGE_IF(pMbc == NULL, "DPMbc NULL invalid MBC");
-    return pMbc;
-}
-
-static dp_fx::DPMbcBand* DP_getMbcBand(DynamicsProcessingContext *pContext, int32_t channel,
-        int32_t band) {
-    dp_fx::DPMbc *pMbc = DP_getMbc(pContext, channel);
-    if (pMbc == NULL) {
-        return NULL;
-    }
-    dp_fx::DPMbcBand *pMbcBand = pMbc->getBand(band);
-    ALOGE_IF(pMbcBand == NULL, "pMbcBand NULL. invalid band %d", band);
-    return pMbcBand;
 }
 
 int DP_getParameter(DynamicsProcessingContext *pContext,
