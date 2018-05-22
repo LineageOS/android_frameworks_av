@@ -102,7 +102,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mIsInvalid(false)
 {
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
-    if (!isTrustedCallingUid(callingUid) || clientUid == AUDIO_UID_INVALID) {
+    if (!isAudioServerOrMediaServerUid(callingUid) || clientUid == AUDIO_UID_INVALID) {
         ALOGW_IF(clientUid != AUDIO_UID_INVALID && clientUid != callingUid,
                 "%s uid %d tried to pass itself off as %d", __FUNCTION__, callingUid, clientUid);
         clientUid = callingUid;
@@ -585,7 +585,7 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
                            "%08X %6zu%c %6zu %c %9u%c %7u "
                            "%08zX %08zX\n",
             active ? "yes" : "no",
-            (mClient == 0) ? getpid_cached : mClient->pid(),
+            (mClient == 0) ? getpid() : mClient->pid(),
             mSessionId,
             getTrackStateString(),
             mCblk->mFlags,
@@ -1495,7 +1495,7 @@ AudioFlinger::PlaybackThread::PatchTrack::PatchTrack(PlaybackThread *playbackThr
               audio_attributes_t{} /* currently unused for patch track */,
               sampleRate, format, channelMask, frameCount,
               buffer, bufferSize, nullptr /* sharedBuffer */,
-              AUDIO_SESSION_NONE, getuid(), flags, TYPE_PATCH),
+              AUDIO_SESSION_NONE, AID_AUDIOSERVER, flags, TYPE_PATCH),
               mProxy(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, true, true))
 {
     uint64_t mixBufferNs = ((uint64_t)2 * playbackThread->frameCount() * 1000000000) /
@@ -1786,7 +1786,7 @@ void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool a
             "%08X %6zu %3c\n",
             isFastTrack() ? 'F' : ' ',
             active ? "yes" : "no",
-            (mClient == 0) ? getpid_cached : mClient->pid(),
+            (mClient == 0) ? getpid() : mClient->pid(),
             mSessionId,
             getTrackStateString(),
             mCblk->mFlags,
@@ -1866,7 +1866,8 @@ AudioFlinger::RecordThread::PatchRecord::PatchRecord(RecordThread *recordThread,
     :   RecordTrack(recordThread, NULL,
                 audio_attributes_t{} /* currently unused for patch track */,
                 sampleRate, format, channelMask, frameCount,
-                buffer, bufferSize, AUDIO_SESSION_NONE, getuid(), flags, TYPE_PATCH),
+                buffer, bufferSize, AUDIO_SESSION_NONE, AID_AUDIOSERVER,
+                flags, TYPE_PATCH),
                 mProxy(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, false, true))
 {
     uint64_t mixBufferNs = ((uint64_t)2 * recordThread->frameCount() * 1000000000) /
