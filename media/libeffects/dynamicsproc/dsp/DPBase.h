@@ -272,6 +272,16 @@ public:
         mInputGainDb = gain;
     }
 
+    float getOutputGain() const {
+        if (!mInitialized) {
+            return 0;
+        }
+        return mOutputGainDb;
+    }
+    void setOutputGain(float gain) {
+        mOutputGainDb = gain;
+    }
+
     DPEq* getPreEq();
     DPMbc* getMbc();
     DPEq* getPostEq();
@@ -281,6 +291,7 @@ public:
 private:
     bool mInitialized;
     float mInputGainDb;
+    float mOutputGainDb;
 
     DPEq mPreEq;
     DPMbc mMbc;
