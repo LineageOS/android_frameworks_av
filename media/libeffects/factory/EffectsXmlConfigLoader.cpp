@@ -22,6 +22,9 @@
 #include <stdlib.h>
 #include <string>
 
+#include <stdarg.h>
+#include <cutils/properties.h>
+
 #include <log/log.h>
 
 #include <media/EffectsConfig.h>
@@ -39,6 +42,51 @@ using namespace effectsConfig;
 /////////////////////////////////////////////////
 
 namespace {
+
+/////////////////////////////////////////////////
+//    NXP LifeVibes (LVVE) Debug Wrappers
+/////////////////////////////////////////////////
+// log verbosity level
+static int nLvveTraceLogLevel = 0;
+// Debug wrapper prototype
+typedef int (*LVVEDEBUGFUNC)(int nSourceLine,
+                 char *szSourceFile,
+                 int nLogLevel,
+                 char *szFormat, ...);
+// Trace wrapper prototype
+typedef int (*LVVETRACEFUNC)(int nSourceLine,
+                 char *szSourceFile,
+                 int nLogLevel,
+                 char *szMsg);
+// Debug wrapper assigner prototype
+typedef int (*LVVEFSASSIGNDEBUG)(LVVEDEBUGFUNC LVVEDebugFunc);
+// Trace wrapper assigner prototype
+typedef int (*LVVEFSASSIGNTRACE)(LVVETRACEFUNC LVVETraceFunc,
+                 unsigned short nLogLevel);
+int LVVE_DebugWrapper(int nSourceLine,
+                 char *szSourceFile,
+                 int nLogLevel,
+                 char *szFormat,  ...)
+{
+    char szBuffer[512] = { 0 };
+    va_list va;
+    if (nLogLevel > nLvveTraceLogLevel)
+        return 0;
+    va_start(va, szFormat);
+    vsnprintf(szBuffer, 511, szFormat, va);
+    ALOGW("D(%d): (%s:%d): %s", nLogLevel, szSourceFile,
+            nSourceLine, szBuffer);
+    va_end(va);
+    return 0;
+}
+int LVVE_TraceWrapper(int nSourceLine,
+                 char *szSourceFile,
+                 int nLogLevel,
+                 char *szMsg)
+{
+    ALOGW("T(%d): (%s:%d): %s", nLogLevel, szSourceFile, nSourceLine, szMsg);
+    return 0;
+}
 
 /** Similarly to dlopen, looks for the provided path in LD_EFFECT_LIBRARY_PATH.
  * @return true if the library is found and set resolvedPath to its absolute path.
@@ -61,6 +109,8 @@ bool resolveLibrary(const std::string& path, std::string* resolvedPath) {
  * The caller MUST free the resources path (free) and handle (dlclose) if filled.
  */
 bool loadLibrary(const char* relativePath, lib_entry_t* libEntry) noexcept {
+    LVVEFSASSIGNDEBUG LVVEFS_AssignDebugFunc;
+    LVVEFSASSIGNTRACE LVVEFS_AssignTraceFunc;
 
     std::string absolutePath;
     if (!resolveLibrary(relativePath, &absolutePath)) {
@@ -99,6 +149,18 @@ bool loadLibrary(const char* relativePath, lib_entry_t* libEntry) noexcept {
         ALOGE("Unsupported major version %#08x, expected %#08x for library %s",
               majorVersion, expectedMajorVersion, path);
         return false;
+    }
+
+    // check the library is a NXP LifeVibes (LVVE) proprietary effect implementation
+    // if yes, direct the trace and debug messages to our handler
+    LVVEFS_AssignDebugFunc = (LVVEFSASSIGNDEBUG)dlsym(libHandle.get(), "LVVEFS_AssignDebug");
+    nLvveTraceLogLevel = property_get_int32("audioflinger.nxp.lvve.tracelvl", 0);
+    if (LVVEFS_AssignDebugFunc) {
+        LVVEFS_AssignDebugFunc(&LVVE_DebugWrapper);
+    }
+    LVVEFS_AssignTraceFunc = (LVVEFSASSIGNTRACE)dlsym(libHandle.get(), "LVVEFS_AssignTrace");
+    if (LVVEFS_AssignTraceFunc) {
+       LVVEFS_AssignTraceFunc(&LVVE_TraceWrapper, nLvveTraceLogLevel);
     }
 
     libEntry->handle = libHandle.release();
