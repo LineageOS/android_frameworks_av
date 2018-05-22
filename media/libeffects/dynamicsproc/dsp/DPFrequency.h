@@ -39,8 +39,11 @@ public:
     FloatVec output;    // time domain temp vector for output
     FloatVec outTail;   // time domain temp vector for output tail (for overlap-add method)
 
+    Eigen::VectorXcf complexTemp; // complex temp vector for frequency domain operations
+
     //Current parameters
     float inputGainDb;
+    float outputGainDb;
     struct BandParams {
         bool enabled;
         float freqCutoffHz;
@@ -64,6 +67,19 @@ public:
         //Historic values
         float previousEnvelope;
     };
+    struct LimiterParams {
+        int32_t linkGroup;
+        float attackTimeMs;
+        float releaseTimeMs;
+        float ratio;
+        float thresholdDb;
+        float postGainDb;
+
+        //Historic values
+        float previousEnvelope;
+        float newFactor;
+        float linkFactor;
+    };
 
     bool mPreEqInUse;
     bool mPreEqEnabled;
@@ -79,6 +95,7 @@ public:
 
     bool mLimiterInUse;
     bool mLimiterEnabled;
+    LimiterParams mLimiterParams;
     FloatVec mPreEqFactorVector; // temp pre-computed vector to shape spectrum at preEQ stage
     FloatVec mPostEqFactorVector; // temp pre-computed vector to shape spectrum at postEQ stage
 
@@ -89,6 +106,18 @@ private:
     unsigned int mSamplingRate;
     unsigned int mBlockSize;
 
+};
+
+using CBufferVector = std::vector<ChannelBuffer>;
+
+using GroupsMap = std::map<int32_t, IntVec>;
+
+class LinkedLimiters {
+public:
+    void reset();
+    void update(int32_t group, int index);
+    void remove(int index);
+    GroupsMap mGroupsMap;
 };
 
 class DPFrequency : public DPBase {
@@ -104,16 +133,25 @@ private:
     size_t processMono(ChannelBuffer &cb);
     size_t processOneVector(FloatVec &output, FloatVec &input, ChannelBuffer &cb);
 
+    size_t processChannelBuffers(CBufferVector &channelBuffers);
+    size_t processFirstStages(ChannelBuffer &cb);
+    size_t processLastStages(ChannelBuffer &cb);
+    void processLinkedLimiters(CBufferVector &channelBuffers);
+
     size_t mBlockSize;
     size_t mHalfFFTSize;
     size_t mOverlapSize;
     size_t mSamplingRate;
 
-    std::vector<ChannelBuffer> mChannelBuffers;
+    float mBlocksPerSecond;
+
+    CBufferVector mChannelBuffers;
+
+    LinkedLimiters mLinkedLimiters;
 
     //dsp
     FloatVec mVWindow;  //window class.
-    Eigen::VectorXcf mComplexTemp;
+    float mWindowRms;
     Eigen::FFT<float> mFftServer;
 };
 

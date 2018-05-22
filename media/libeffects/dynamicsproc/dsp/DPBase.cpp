@@ -174,8 +174,8 @@ void DPLimiter::init(bool inUse, bool enabled, uint32_t linkGroup, float attackT
 }
 
 //----
-DPChannel::DPChannel() : mInitialized(false), mInputGainDb(0), mPreEqInUse(false), mMbcInUse(false),
-        mPostEqInUse(false), mLimiterInUse(false) {
+DPChannel::DPChannel() : mInitialized(false), mInputGainDb(0), mOutputGainDb(0),
+        mPreEqInUse(false), mMbcInUse(false), mPostEqInUse(false), mLimiterInUse(false) {
 }
 
 void DPChannel::init(float inputGain, bool preEqInUse, uint32_t preEqBandCount,

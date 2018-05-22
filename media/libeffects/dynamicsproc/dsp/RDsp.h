@@ -20,8 +20,23 @@
 #include <complex>
 #include <log/log.h>
 #include <vector>
+#include <map>
 using FloatVec = std::vector<float>;
+using IntVec = std::vector<int>;
 using ComplexVec  = std::vector<std::complex<float>>;
+
+// =======
+// Helper Functions
+// =======
+template <class T>
+static T dBtoLinear(T valueDb) {
+    return pow (10, valueDb / 20.0);
+}
+
+template <class T>
+static T linearToDb(T value) {
+    return 20 * log10(value);
+}
 
 // =======
 // DSP window creation
