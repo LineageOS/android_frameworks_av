@@ -17,8 +17,7 @@
 #include <android/hardware/audio/2.0/IDevicesFactory.h>
 #include <android/hardware/audio/4.0/IDevicesFactory.h>
 
-#include <libaudiohal/2.0/FactoryHalHidl.h>
-#include <libaudiohal/4.0/FactoryHalHidl.h>
+#include <libaudiohal/FactoryHalHidl.h>
 
 namespace android {
 

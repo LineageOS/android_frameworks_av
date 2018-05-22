@@ -17,8 +17,7 @@
 #include <android/hardware/audio/effect/2.0/IEffectsFactory.h>
 #include <android/hardware/audio/effect/4.0/IEffectsFactory.h>
 
-#include <libaudiohal/2.0/FactoryHalHidl.h>
-#include <libaudiohal/4.0/FactoryHalHidl.h>
+#include <libaudiohal/FactoryHalHidl.h>
 
 namespace android {
 
