@@ -197,7 +197,6 @@ status_t FrameProcessor::processFaceDetect(const CameraMetadata &frame,
                                 faceRects[i*4 + 2], scalerCrop);
             face.rect[3] = l.mParameters.arrayYToNormalizedWithCrop(
                                 faceRects[i*4 + 3], scalerCrop);
-
             face.score = faceScores[i];
             if (faceDetectMode == ANDROID_STATISTICS_FACE_DETECT_MODE_FULL) {
                 face.id = faceIds[i];
