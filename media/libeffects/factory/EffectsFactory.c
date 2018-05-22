@@ -20,6 +20,7 @@
 #include "EffectsFactory.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <dlfcn.h>
 
 #include <cutils/misc.h>
@@ -71,6 +72,62 @@ static int findSubEffect(const effect_uuid_t *uuid,
 static void dumpEffectDescriptor(effect_descriptor_t *desc, char *str, size_t len, int indent);
 static int stringToUuid(const char *str, effect_uuid_t *uuid);
 static int uuidToString(const effect_uuid_t *uuid, char *str, size_t maxLen);
+
+/////////////////////////////////////////////////
+//    NXP LifeVibes (LVVE) Debug Wrappers
+/////////////////////////////////////////////////
+
+// log verbosity level
+static int nLvveTraceLogLevel = 0;
+
+// Debug wrapper prototype
+typedef int (*LVVEDEBUGFUNC)(int nSourceLine,
+                 char *szSourceFile,
+                 int nLogLevel,
+                 char *szFormat, ...);
+
+// Trace wrapper prototype
+typedef int (*LVVETRACEFUNC)(int nSourceLine,
+                 char *szSourceFile,
+                 int nLogLevel,
+                 char *szMsg);
+
+// Debug wrapper assigner prototype
+typedef int (*LVVEFSASSIGNDEBUG)(LVVEDEBUGFUNC LVVEDebugFunc);
+
+// Trace wrapper assigner prototype
+typedef int (*LVVEFSASSIGNTRACE)(LVVETRACEFUNC LVVETraceFunc,
+                 unsigned short nLogLevel);
+
+int LVVE_DebugWrapper(int nSourceLine,
+                 char *szSourceFile,
+                 int nLogLevel,
+                 char *szCondition,
+                 char *szFormat,  ...)
+{
+    char szBuffer[512] = { 0 };
+    va_list va;
+
+    if (nLogLevel > nLvveTraceLogLevel)
+        return 0;
+
+    va_start(va, szFormat);
+    vsnprintf(szBuffer, 511, szFormat, va);
+    ALOGW("D(%d): (%s:%d): %s: %s", nLogLevel, szSourceFile,
+            nSourceLine, szCondition, szBuffer);
+    va_end(va);
+
+    return 0;
+}
+
+int LVVE_TraceWrapper(int nSourceLine,
+                 char *szSourceFile,
+                 int nLogLevel,
+                 char *szMsg)
+{
+    ALOGW("T(%d): (%s:%d): %s", nLogLevel, szSourceFile, nSourceLine, szMsg);
+    return 0;
+}
 
 /////////////////////////////////////////////////
 //      Effect Control Interface functions
@@ -518,6 +575,9 @@ int loadLibrary(cnode *root, const char *name)
     char *str;
     size_t len;
 
+    LVVEFSASSIGNDEBUG LVVEFS_AssignDebugFunc;
+    LVVEFSASSIGNTRACE LVVEFS_AssignTraceFunc;
+
     node = config_find(root, PATH_TAG);
     if (node == NULL) {
         return -EINVAL;
@@ -557,6 +617,22 @@ int loadLibrary(cnode *root, const char *name)
             EFFECT_API_VERSION_MAJOR(EFFECT_LIBRARY_API_VERSION)) {
         ALOGW("loadLibrary() bad lib version %08x", desc->version);
         goto error;
+    }
+
+    // check the library is a NXP LifeVibes (LVVE) proprietary effect implementation
+    // if yes, direct the trace and debug messages to our handler
+    LVVEFS_AssignDebugFunc = (LVVEFSASSIGNDEBUG)dlsym(hdl, "LVVEFS_AssignDebug");
+
+    nLvveTraceLogLevel = property_get_int32("audioflinger.nxp.lvve.tracelvl", 0);
+
+    if (LVVEFS_AssignDebugFunc) {
+        LVVEFS_AssignDebugFunc(&LVVE_DebugWrapper);
+    }
+
+    LVVEFS_AssignTraceFunc = (LVVEFSASSIGNTRACE)dlsym(hdl, "LVVEFS_AssignTrace");
+
+    if (LVVEFS_AssignTraceFunc) {
+       LVVEFS_AssignTraceFunc(&LVVE_TraceWrapper, nLvveTraceLogLevel);
     }
 
     // add entry for library in gLibraryList
