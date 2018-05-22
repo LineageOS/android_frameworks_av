@@ -2006,7 +2006,8 @@ bool CameraService::evictClientIdByRemote(const wp<IBinder>& remote) {
                 ret = true;
             }
         }
-
+        //clear the evicted client list before acquring service lock again.
+        evicted.clear();
         // Reacquire mServiceLock
         mServiceLock.lock();
 
