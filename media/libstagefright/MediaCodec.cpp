@@ -854,8 +854,7 @@ static CodecBase *CreateCCodec() {
 
 //static
 sp<CodecBase> MediaCodec::GetCodecBase(const AString &name) {
-    static bool ccodecEnabled = property_get_bool("debug.stagefright.ccodec", false);
-    if (ccodecEnabled && name.startsWithIgnoreCase("c2.")) {
+    if (name.startsWithIgnoreCase("c2.")) {
         return CreateCCodec();
     } else if (name.startsWithIgnoreCase("omx.")) {
         // at this time only ACodec specifies a mime type.
