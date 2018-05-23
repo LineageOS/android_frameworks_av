@@ -34,13 +34,27 @@
 #define DRC_DEFAULT_MOBILE_DRC_BOOST 127 /* maximum compression of dynamic range for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_HEAVY 1   /* switch for heavy compression for mobile conf */
 #define DRC_DEFAULT_MOBILE_ENC_LEVEL (-1) /* encoder target level; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
+#define DRC_KEY_AAC_DRC_EFFECT_TYPE   (3)  /* Default Effect type is "Limited playback" */
+/* REF_LEVEL of 64 pairs well with EFFECT_TYPE of 3. */
+#define DRC_DEFAULT_MOBILE_LOUDNESS_LEVEL (64)  /* Default loudness value for MPEG-D DRC */
 
 #define PROP_DRC_OVERRIDE_REF_LEVEL  "aac_drc_reference_level"
 #define PROP_DRC_OVERRIDE_CUT        "aac_drc_cut"
 #define PROP_DRC_OVERRIDE_BOOST      "aac_drc_boost"
 #define PROP_DRC_OVERRIDE_HEAVY      "aac_drc_heavy"
 #define PROP_DRC_OVERRIDE_ENC_LEVEL "aac_drc_enc_target_level"
+#define PROP_DRC_OVERRIDE_EFFECT_TYPE "ro.aac_drc_effect_type"
+#define PROP_DRC_OVERRIDE_LOUDNESS_LEVEL "aac_drc_loudness_level"
+
 #define MAX_CHANNEL_COUNT            8  /* maximum number of audio channels that can be decoded */
+
+
+#define RETURN_IF_NE(returned, expected, retval, str) \
+        if ( returned != expected ) { \
+            ALOGE("Error in %s: Returned: %d Expected: %d", str, returned, expected); \
+            return retval; \
+        }
+
 
 namespace android {
 
@@ -76,6 +90,7 @@ SoftXAAC::SoftXAAC(
     mCurrentTimestamp(0),
     mOutputPortSettingsChange(NONE),
     mXheaacCodecHandle(NULL),
+    mMpegDDrcHandle(NULL),
     mInputBufferSize(0),
     mOutputFrameLength(1024),
     mInputBuffer(NULL),
@@ -85,7 +100,10 @@ SoftXAAC::SoftXAAC(
     mPcmWdSz(0),
     mChannelMask(0),
     mIsCodecInitialized(false),
-    mIsCodecConfigFlushRequired(false)
+    mIsCodecConfigFlushRequired(false),
+    mpegd_drc_present(0),
+    drc_flag(0)
+
 {
     initPorts();
     CHECK_EQ(initDecoder(), (status_t)OK);
@@ -145,11 +163,32 @@ void SoftXAAC::initPorts() {
 status_t SoftXAAC::initDecoder() {
     status_t status = UNKNOWN_ERROR;
 
-    unsigned int ui_drc_val;
+    int ui_drc_val;
     IA_ERRORCODE err_code = IA_NO_ERROR;
-    initXAACDecoder();
-    if (NULL == mXheaacCodecHandle) {
-        ALOGE("AAC decoder is null. initXAACDecoder Failed");
+    int loop = 0;
+
+    err_code = initXAACDecoder();
+    if(err_code != IA_NO_ERROR) {
+        if (NULL == mXheaacCodecHandle) {
+            ALOGE("AAC decoder handle is null");
+        }
+        if (NULL == mMpegDDrcHandle) {
+            ALOGE("MPEG-D DRC decoder handle is null");
+        }
+        for(loop= 1; loop < mMallocCount; loop++) {
+            if (mMemoryArray[loop] == NULL) {
+                ALOGE(" memory allocation error %d\n",loop);
+                break;
+            }
+        }
+        ALOGE("initXAACDecoder Failed");
+
+        for(loop = 0; loop < mMallocCount; loop++) {
+           if(mMemoryArray[loop])
+           free(mMemoryArray[loop]);
+        }
+        mMallocCount = 0;
+        return status;
     } else {
         status = OK;
     }
@@ -174,8 +213,30 @@ status_t SoftXAAC::initDecoder() {
                                 IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_TARGET_LEVEL,
                                 &ui_drc_val);
 
-    ALOGV("Error code returned after DRC Target level set_config is %d", err_code);
-    ALOGV("Setting IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_TARGET_LEVEL with value %d", ui_drc_val);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_TARGET_LEVEL");
+#ifdef     ENABLE_MPEG_D_DRC
+
+    if (property_get(PROP_DRC_OVERRIDE_LOUDNESS_LEVEL, value, NULL))
+    {
+        ui_drc_val = atoi(value);
+        ALOGV("AAC decoder using desired DRC target reference level of %d instead of %d",ui_drc_val,
+                DRC_DEFAULT_MOBILE_LOUDNESS_LEVEL);
+    }
+    else
+    {
+        ui_drc_val= DRC_DEFAULT_MOBILE_LOUDNESS_LEVEL;
+    }
+
+
+    err_code = ixheaacd_dec_api(mXheaacCodecHandle,
+                                IA_API_CMD_SET_CONFIG_PARAM,
+                                IA_ENHAACPLUS_DEC_DRC_TARGET_LOUDNESS,
+                                &ui_drc_val);
+
+
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_DRC_TARGET_LOUDNESS");
+#endif
+
 
     if (property_get(PROP_DRC_OVERRIDE_CUT, value, NULL))
     {
@@ -192,8 +253,8 @@ status_t SoftXAAC::initDecoder() {
                                 IA_API_CMD_SET_CONFIG_PARAM,
                                 IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_CUT,
                                 &ui_drc_val);
-    ALOGV("Error code returned after DRC cut factor set_config is %d", err_code);
-    ALOGV("Setting IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_CUT with value %d", ui_drc_val);
+
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_CUT");
 
     if (property_get(PROP_DRC_OVERRIDE_BOOST, value, NULL))
     {
@@ -210,13 +271,12 @@ status_t SoftXAAC::initDecoder() {
                                 IA_API_CMD_SET_CONFIG_PARAM,
                                 IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_BOOST,
                                 &ui_drc_val);
-    ALOGV("Error code returned after DRC boost factor set_config is %d", err_code);
-    ALOGV("Setting DRC_DEFAULT_MOBILE_DRC_BOOST with value %d", ui_drc_val);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_BOOST");
 
-    if (property_get(PROP_DRC_OVERRIDE_BOOST, value, NULL))
+    if (property_get(PROP_DRC_OVERRIDE_HEAVY, value, NULL))
     {
         ui_drc_val = atoi(value);
-        ALOGV("AAC decoder using desired DRC boost factor of %d instead of %d", ui_drc_val,
+        ALOGV("AAC decoder using desired Heavy compression factor of %d instead of %d", ui_drc_val,
                 DRC_DEFAULT_MOBILE_DRC_HEAVY);
     }
     else
@@ -228,9 +288,28 @@ status_t SoftXAAC::initDecoder() {
                                 IA_API_CMD_SET_CONFIG_PARAM,
                                 IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_HEAVY_COMP,
                                 &ui_drc_val);
-    ALOGV("Error code returned after DRC heavy set_config is %d", err_code);
-    ALOGV("Setting DRC_DEFAULT_MOBILE_DRC_HEAVY with value %d", ui_drc_val);
+   RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_HEAVY_COMP");
 
+#ifdef ENABLE_MPEG_D_DRC
+    if (property_get(PROP_DRC_OVERRIDE_EFFECT_TYPE, value, NULL))
+    {
+        ui_drc_val = atoi(value);
+        ALOGV("AAC decoder using desired DRC effect type of %d instead of %d", ui_drc_val,
+                DRC_KEY_AAC_DRC_EFFECT_TYPE);
+    }
+    else
+    {
+        ui_drc_val = DRC_KEY_AAC_DRC_EFFECT_TYPE;
+    }
+
+    err_code = ixheaacd_dec_api(mXheaacCodecHandle,
+                              IA_API_CMD_SET_CONFIG_PARAM,
+                              IA_ENHAACPLUS_DEC_DRC_EFFECT_TYPE,
+                              &ui_drc_val);
+
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_DRC_EFFECT_TYPE");
+
+#endif
     return status;
 }
 
@@ -436,10 +515,10 @@ OMX_ERRORTYPE SoftXAAC::internalSetParameter(
             return OMX_ErrorNone;
         }
 
-        case OMX_IndexParamAudioAndroidAacPresentation:
+        case OMX_IndexParamAudioAndroidAacDrcPresentation:
         {
-            const OMX_AUDIO_PARAM_ANDROID_AACPRESENTATIONTYPE *aacPresParams =
-                    (const OMX_AUDIO_PARAM_ANDROID_AACPRESENTATIONTYPE *)params;
+            const OMX_AUDIO_PARAM_ANDROID_AACDRCPRESENTATIONTYPE *aacPresParams =
+                    (const OMX_AUDIO_PARAM_ANDROID_AACDRCPRESENTATIONTYPE *)params;
 
             if (!isValidOMXParam(aacPresParams)) {
                 ALOGE("set OMX_ErrorBadParameter");
@@ -468,7 +547,11 @@ OMX_ERRORTYPE SoftXAAC::internalSetParameter(
             setXAACDRCInfo(aacPresParams->nDrcCut,
                            aacPresParams->nDrcBoost,
                            aacPresParams->nTargetReferenceLevel,
-                           aacPresParams->nHeavyCompression);
+                           aacPresParams->nHeavyCompression
+                          #ifdef ENABLE_MPEG_D_DRC
+                           ,aacPresParams->nDrcEffectType
+                          #endif
+                           );    // TOD0 : Revert this change
 
             return OMX_ErrorNone;
         }
@@ -774,7 +857,6 @@ void SoftXAAC::onQueueFilled(OMX_U32 /* portIndex */) {
                 outInfo->mOwnedByUs = false;
                 outQueue.erase(outQueue.begin());
                 outInfo = NULL;
-                ALOGV("out timestamp %lld / %d", outHeader->nTimeStamp, outHeader->nFilledLen);
                 notifyFillBufferDone(outHeader);
                 outHeader = NULL;
             }
@@ -831,31 +913,33 @@ void SoftXAAC::configflushDecode() {
                                 IA_API_CMD_INIT,
                                 IA_CMD_TYPE_FLUSH_MEM,
                                 NULL);
-    ALOGV("Codec initialized:%d",mIsCodecInitialized);
-    ALOGV("Error code from first flush %d",err_code);
 
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_SET_INPUT_BYTES,
                                 0,
                                 &inBufferLength);
-    
+
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_INIT,
                                 IA_CMD_TYPE_FLUSH_MEM,
                                 NULL);
-    
+
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_INIT,
                                 IA_CMD_TYPE_INIT_DONE_QUERY,
                                 &ui_init_done);
-    
-    ALOGV("Flush called");
+
 
     if (ui_init_done) {
         err_code = getXAACStreamInfo();
         ALOGV("Found Codec with below config---\nsampFreq %d\nnumChannels %d\npcmWdSz %d\nchannelMask %d\noutputFrameLength %d",
                                     mSampFreq,mNumChannels,mPcmWdSz,mChannelMask,mOutputFrameLength);
-        mIsCodecInitialized = true;
+        if(mNumChannels > MAX_CHANNEL_COUNT) {
+            ALOGE(" No of channels are more than max channels\n");
+            mIsCodecInitialized = false;
+        }
+        else
+            mIsCodecInitialized = true;
     }
 
 }
@@ -918,10 +1002,9 @@ int SoftXAAC::initXAACDecoder() {
     /* Get memory information and allocate memory        */
 
     /* Memory variables */
-    UWORD32 n_mems, ui_rem;
     UWORD32 ui_proc_mem_tabs_size;
     /* API size */
-    UWORD32 pui_ap_isize;
+    UWORD32 pui_api_size;
 
     mInputBufferSize = 0;
     mInputBuffer = 0;
@@ -937,12 +1020,14 @@ int SoftXAAC::initXAACDecoder() {
     err_code = ixheaacd_dec_api(NULL,
                                 IA_API_CMD_GET_API_SIZE,
                                 0,
-                                &pui_ap_isize);
-     ALOGV("return code of IA_API_CMD_GET_API_SIZE: %d",err_code);
+                                &pui_api_size);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_GET_API_SIZE");
+
     /* Allocate memory for API */
-    mMemoryArray[mMallocCount] = memalign(4, pui_ap_isize);
+    mMemoryArray[mMallocCount] = memalign(4, pui_api_size);
     if (mMemoryArray[mMallocCount] == NULL) {
-        ALOGE("malloc for pui_ap_isize + 4 >> %d Failed",pui_ap_isize + 4);
+        ALOGE("malloc for pui_api_size + 4 >> %d Failed",pui_api_size + 4);
+        return IA_FATAL_ERROR;
     }
     /* Set API object with the memory allocated */
     mXheaacCodecHandle =
@@ -954,7 +1039,38 @@ int SoftXAAC::initXAACDecoder() {
                                 IA_API_CMD_INIT,
                                 IA_CMD_TYPE_INIT_API_PRE_CONFIG_PARAMS,
                                 NULL);
-    ALOGV("return code of IA_CMD_TYPE_INIT_API_PRE_CONFIG_PARAMS: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_CMD_TYPE_INIT_API_PRE_CONFIG_PARAMS");
+#ifdef ENABLE_MPEG_D_DRC
+    /* Get the API size */
+    err_code = ia_drc_dec_api(NULL, IA_API_CMD_GET_API_SIZE, 0, &pui_api_size);
+
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_GET_API_SIZE");
+
+   /* Allocate memory for API */
+   mMemoryArray[mMallocCount] = memalign(4, pui_api_size);
+
+   if(mMemoryArray[mMallocCount] == NULL)
+   {
+       ALOGE("malloc for drc api structure Failed");
+       return IA_FATAL_ERROR;
+   }
+   memset(mMemoryArray[mMallocCount],0,pui_api_size);
+
+   /* Set API object with the memory allocated */
+   mMpegDDrcHandle =
+       (pVOID)((WORD8*)mMemoryArray[mMallocCount]);
+    mMallocCount++;
+
+
+    /* Set the config params to default values */
+    err_code = ia_drc_dec_api(
+       mMpegDDrcHandle,
+       IA_API_CMD_INIT,
+       IA_CMD_TYPE_INIT_API_PRE_CONFIG_PARAMS,
+       NULL);
+
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_CMD_TYPE_INIT_API_PRE_CONFIG_PARAMS");
+#endif
 
     /* ******************************************************************/
     /* Set config parameters                                            */
@@ -964,7 +1080,7 @@ int SoftXAAC::initXAACDecoder() {
                                 IA_API_CMD_SET_CONFIG_PARAM,
                                 IA_ENHAACPLUS_DEC_CONFIG_PARAM_ISMP4,
                                 &ui_mp4_flag);
-    ALOGV("return code of IA_ENHAACPLUS_DEC_CONFIG_PARAM_ISMP4: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_ISMP4");
 
     /* ******************************************************************/
     /* Initialize Memory info tables                                    */
@@ -975,10 +1091,11 @@ int SoftXAAC::initXAACDecoder() {
                                 IA_API_CMD_GET_MEMTABS_SIZE,
                                 0,
                                 &ui_proc_mem_tabs_size);
-    ALOGV("return code of IA_API_CMD_GET_MEMTABS_SIZE: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_GET_MEMTABS_SIZE");
     mMemoryArray[mMallocCount] = memalign(4, ui_proc_mem_tabs_size);
     if (mMemoryArray[mMallocCount] == NULL) {
         ALOGE("Malloc for size (ui_proc_mem_tabs_size + 4) = %d failed!",ui_proc_mem_tabs_size + 4);
+        return IA_FATAL_ERROR;
     }
 
     /* Set pointer for process memory tables    */
@@ -986,7 +1103,7 @@ int SoftXAAC::initXAACDecoder() {
                                 IA_API_CMD_SET_MEMTABS_PTR,
                                 0,
                                 (pVOID)((WORD8*)mMemoryArray[mMallocCount]));
-    ALOGV("return code of IA_API_CMD_SET_MEMTABS_PTR: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_SET_MEMTABS_PTR");
     mMallocCount++;
 
     /* initialize the API, post config, fill memory tables  */
@@ -994,20 +1111,14 @@ int SoftXAAC::initXAACDecoder() {
                                 IA_API_CMD_INIT,
                                 IA_CMD_TYPE_INIT_API_POST_CONFIG_PARAMS,
                                 NULL);
-    ALOGV("return code of IA_CMD_TYPE_INIT_API_POST_CONFIG_PARAMS: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_CMD_TYPE_INIT_API_POST_CONFIG_PARAMS");
 
     /* ******************************************************************/
     /* Allocate Memory with info from library                           */
     /* ******************************************************************/
-
-    /* Get number of memory tables required */
-    err_code = ixheaacd_dec_api(mXheaacCodecHandle,
-                                IA_API_CMD_GET_N_MEMTABS,
-                                0,
-                                &n_mems);
-    ALOGV("return code of IA_API_CMD_GET_N_MEMTABS: %d",err_code);
-
-    for(i = 0; i < (WORD32)n_mems; i++) {
+    /* There are four different types of memories, that needs to be allocated */
+    /* persistent,scratch,input and output */
+    for(i = 0; i < 4; i++) {
         int ui_size = 0, ui_alignment = 0, ui_type = 0;
         pVOID pv_alloc_ptr;
 
@@ -1016,26 +1127,27 @@ int SoftXAAC::initXAACDecoder() {
                                     IA_API_CMD_GET_MEM_INFO_SIZE,
                                     i,
                                     &ui_size);
-        ALOGV("return code of IA_API_CMD_GET_MEM_INFO_SIZE: %d",err_code);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_GET_MEM_INFO_SIZE");
 
         /* Get memory alignment */
         err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                     IA_API_CMD_GET_MEM_INFO_ALIGNMENT,
                                     i,
                                     &ui_alignment);
-        ALOGV("return code of IA_API_CMD_GET_MEM_INFO_ALIGNMENT: %d",err_code);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_GET_MEM_INFO_ALIGNMENT");
 
         /* Get memory type */
         err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                     IA_API_CMD_GET_MEM_INFO_TYPE,
                                     i,
                                     &ui_type);
-        ALOGV("return code of IA_API_CMD_GET_MEM_INFO_TYPE: %d",err_code);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_GET_MEM_INFO_TYPE");
 
         mMemoryArray[mMallocCount] =
             memalign(ui_alignment , ui_size);
         if (mMemoryArray[mMallocCount] == NULL) {
             ALOGE("Malloc for size (ui_size + ui_alignment) = %d failed!",ui_size + ui_alignment);
+            return IA_FATAL_ERROR;
         }
         pv_alloc_ptr =
             (pVOID )((WORD8*)mMemoryArray[mMallocCount]);
@@ -1046,7 +1158,7 @@ int SoftXAAC::initXAACDecoder() {
                                     IA_API_CMD_SET_MEM_PTR,
                                     i,
                                     pv_alloc_ptr);
-        ALOGV("return code of IA_API_CMD_SET_MEM_PTR: %d",err_code);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_SET_MEM_PTR");
         if (ui_type == IA_MEMTYPE_INPUT) {
             mInputBuffer = (pWORD8)pv_alloc_ptr;
             mInputBufferSize = ui_size;
@@ -1081,7 +1193,7 @@ int SoftXAAC::configXAACDecoder(uint8_t* inBuffer, uint32_t inBufferLength) {
                                              IA_API_CMD_SET_INPUT_BYTES,
                                              0,
                                              &inBufferLength);
-    ALOGV("return code of IA_API_CMD_SET_INPUT_BYTES: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_SET_INPUT_BYTES");
 
     if (mIsCodecConfigFlushRequired) {
         /* If codec is already initialized, then GA header is passed again */
@@ -1091,7 +1203,7 @@ int SoftXAAC::configXAACDecoder(uint8_t* inBuffer, uint32_t inBufferLength) {
                                     IA_API_CMD_INIT,
                                     IA_CMD_TYPE_GA_HDR,
                                     NULL);
-        ALOGV("return code of IA_CMD_TYPE_GA_HDR: %d",err_code);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_CMD_TYPE_GA_HDR");
     }
     else {
         /* Initialize the process */
@@ -1099,7 +1211,7 @@ int SoftXAAC::configXAACDecoder(uint8_t* inBuffer, uint32_t inBufferLength) {
                                     IA_API_CMD_INIT,
                                     IA_CMD_TYPE_INIT_PROCESS,
                                     NULL);
-        ALOGV("return code of IA_CMD_TYPE_INIT_PROCESS: %d",err_code);
+        ALOGV("IA_CMD_TYPE_INIT_PROCESS returned error_code = %d",err_code);
     }
 
     /* Checking for end of initialization */
@@ -1107,25 +1219,344 @@ int SoftXAAC::configXAACDecoder(uint8_t* inBuffer, uint32_t inBufferLength) {
                                 IA_API_CMD_INIT,
                                 IA_CMD_TYPE_INIT_DONE_QUERY,
                                 &ui_init_done);
-    ALOGV("return code of IA_CMD_TYPE_INIT_DONE_QUERY: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_CMD_TYPE_INIT_DONE_QUERY");
 
     /* How much buffer is used in input buffers */
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_GET_CURIDX_INPUT_BUF,
                                 0,
                                 &i_bytes_consumed);
-    ALOGV("return code of IA_API_CMD_GET_CURIDX_INPUT_BUF: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_GET_CURIDX_INPUT_BUF");
 
     if(ui_init_done){
         err_code = getXAACStreamInfo();
         ALOGI("Found Codec with below config---\nsampFreq %d\nnumChannels %d\npcmWdSz %d\nchannelMask %d\noutputFrameLength %d",
                                     mSampFreq,mNumChannels,mPcmWdSz,mChannelMask,mOutputFrameLength);
         mIsCodecInitialized = true;
+
+#ifdef ENABLE_MPEG_D_DRC
+        configMPEGDDrc();
+#endif
     }
 
     return err_code;
 }
+int SoftXAAC::configMPEGDDrc()
+{
+   IA_ERRORCODE err_code = IA_NO_ERROR;
+   int i_effect_type;
+   int i_loud_norm;
+   int i_target_loudness;
+   unsigned int i_sbr_mode;
+   int n_mems;
+   int i;
 
+#ifdef     ENABLE_MPEG_D_DRC
+    {
+
+    /* Sampling Frequency */
+    {
+      err_code =
+          ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+                         IA_DRC_DEC_CONFIG_PARAM_SAMP_FREQ, &mSampFreq);
+      RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_DRC_DEC_CONFIG_PARAM_SAMP_FREQ");
+    }
+    /* Total Number of Channels */
+    {
+      err_code =
+          ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+                         IA_DRC_DEC_CONFIG_PARAM_NUM_CHANNELS, &mNumChannels);
+      RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_DRC_DEC_CONFIG_PARAM_NUM_CHANNELS");
+    }
+
+    /* PCM word size  */
+    {
+      err_code =
+          ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+                         IA_DRC_DEC_CONFIG_PARAM_PCM_WDSZ, &mPcmWdSz);
+      RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_DRC_DEC_CONFIG_PARAM_PCM_WDSZ");
+    }
+
+    /*Set Effect Type*/
+
+    {
+        err_code = ixheaacd_dec_api(mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+            IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_EFFECT_TYPE, &i_effect_type);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_EFFECT_TYPE");
+
+
+        err_code =
+            ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+                IA_DRC_DEC_CONFIG_DRC_EFFECT_TYPE, &i_effect_type);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_DRC_DEC_CONFIG_DRC_EFFECT_TYPE");
+
+    }
+
+/*Set target loudness */
+
+    {
+        err_code = ixheaacd_dec_api(
+            mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+            IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_TARGET_LOUDNESS, &i_target_loudness);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_TARGET_LOUDNESS");
+
+
+        err_code =
+            ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+                IA_DRC_DEC_CONFIG_DRC_TARGET_LOUDNESS, &i_target_loudness);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_DRC_DEC_CONFIG_DRC_TARGET_LOUDNESS");
+
+    }
+
+    /*Set loud_norm_flag*/
+    {
+        err_code = ixheaacd_dec_api(
+            mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+            IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_LOUD_NORM, &i_loud_norm);
+        RETURN_IF_NE(err_code, IA_NO_ERROR , err_code,"IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_LOUD_NORM");
+
+
+        err_code =
+            ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+                IA_DRC_DEC_CONFIG_DRC_LOUD_NORM, &i_loud_norm);
+        RETURN_IF_NE(err_code, IA_NO_ERROR , err_code,"IA_DRC_DEC_CONFIG_DRC_LOUD_NORM");
+
+    }
+
+
+
+    err_code = ixheaacd_dec_api(
+        mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+        IA_ENHAACPLUS_DEC_CONFIG_PARAM_SBR_MODE, &i_sbr_mode);
+        RETURN_IF_NE(err_code, IA_NO_ERROR , err_code,"IA_ENHAACPLUS_DEC_CONFIG_PARAM_SBR_MODE");
+
+
+    if(i_sbr_mode!=0)
+    {
+        WORD32 frame_length;
+        if (i_sbr_mode==1)
+        {
+            frame_length=2048;
+        }
+        else if(i_sbr_mode==3)
+        {
+            frame_length=4096;
+        }
+        else
+        {
+            frame_length=1024;
+        }
+        err_code =
+            ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+                IA_DRC_DEC_CONFIG_PARAM_FRAME_SIZE, &frame_length);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_DRC_DEC_CONFIG_PARAM_FRAME_SIZE");
+
+    }
+
+
+    err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_INIT,
+                              IA_CMD_TYPE_INIT_API_POST_CONFIG_PARAMS, NULL);
+
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_CMD_TYPE_INIT_API_POST_CONFIG_PARAMS");
+
+
+
+    for (i = 0; i < (WORD32)2; i++) {
+      WORD32 ui_size, ui_alignment, ui_type;
+      pVOID pv_alloc_ptr;
+
+      /* Get memory size */
+      err_code = ia_drc_dec_api(mMpegDDrcHandle,
+                                IA_API_CMD_GET_MEM_INFO_SIZE, i, &ui_size);
+
+     RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_GET_MEM_INFO_SIZE");
+
+      /* Get memory alignment */
+      err_code =
+          ia_drc_dec_api(mMpegDDrcHandle,
+                         IA_API_CMD_GET_MEM_INFO_ALIGNMENT, i, &ui_alignment);
+
+      RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_GET_MEM_INFO_ALIGNMENT");
+
+      /* Get memory type */
+      err_code = ia_drc_dec_api(mMpegDDrcHandle,
+                                IA_API_CMD_GET_MEM_INFO_TYPE, i, &ui_type);
+
+     RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_GET_MEM_INFO_TYPE");
+
+
+      mMemoryArray[mMallocCount] = memalign(4, ui_size);
+      if (mMemoryArray[mMallocCount] == NULL) {
+        ALOGE(" Cannot create requested memory  %d",ui_size);
+        return IA_FATAL_ERROR;
+      }
+        pv_alloc_ptr =
+            (pVOID )((WORD8*)mMemoryArray[mMallocCount]);
+        mMallocCount++;
+
+           /* Set the buffer pointer */
+      err_code = ia_drc_dec_api(mMpegDDrcHandle,
+                                IA_API_CMD_SET_MEM_PTR, i, pv_alloc_ptr);
+
+      RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_SET_MEM_PTR");
+    }
+    {
+    WORD32 ui_size;
+    ui_size=8192*2;
+    mMemoryArray[mMallocCount]=memalign(4, ui_size);
+      if (mMemoryArray[mMallocCount] == NULL) {
+        ALOGE(" Cannot create requested memory  %d",ui_size);
+        return IA_FATAL_ERROR;
+      }
+
+    drc_ip_buf=(int8_t *)mMemoryArray[mMallocCount];
+    mMallocCount++;
+    err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_MEM_PTR,
+                              2, /*mOutputBuffer*/ drc_ip_buf);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_SET_MEM_PTR");
+
+    mMemoryArray[mMallocCount]=memalign(4, ui_size);
+      if (mMemoryArray[mMallocCount] == NULL) {
+        ALOGE(" Cannot create requested memory  %d",ui_size);
+        return IA_FATAL_ERROR;
+      }
+
+    drc_op_buf=(int8_t *)mMemoryArray[mMallocCount];
+    mMallocCount++;
+    err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_MEM_PTR,
+                              3, /*mOutputBuffer*/ drc_op_buf);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_SET_MEM_PTR");
+    }
+    /*ITTIAM: DRC buffers
+            buf[0] - contains extension element pay load loudness related
+            buf[1] - contains extension element pay load*/
+    {
+      VOID *p_array[2][16];
+      WORD32 ii;
+      WORD32 buf_sizes[2][16];
+      WORD32 num_elements;
+      WORD32 num_config_ext;
+      WORD32 bit_str_fmt = 1;
+
+
+
+      WORD32 uo_num_chan;
+
+      memset(buf_sizes, 0, 32 * sizeof(WORD32));
+
+      err_code = ixheaacd_dec_api(mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+          IA_ENHAACPLUS_DEC_CONFIG_EXT_ELE_BUF_SIZES, &buf_sizes[0][0]);
+
+
+      err_code = ixheaacd_dec_api(mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+          IA_ENHAACPLUS_DEC_CONFIG_EXT_ELE_PTR, &p_array);
+
+
+      err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_INIT,
+                                IA_CMD_TYPE_INIT_SET_BUFF_PTR, 0);
+
+
+
+      err_code = ixheaacd_dec_api(mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+          IA_ENHAACPLUS_DEC_CONFIG_NUM_ELE, &num_elements);
+
+      err_code = ixheaacd_dec_api(mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+          IA_ENHAACPLUS_DEC_CONFIG_NUM_CONFIG_EXT, &num_config_ext);
+
+      for (ii = 0; ii < num_config_ext; ii++) {
+        /*copy loudness bitstream*/
+        if (buf_sizes[0][ii] > 0) {
+          memcpy(drc_ip_buf, p_array[0][ii], buf_sizes[0][ii]);
+
+          /*Set bitstream_split_format */
+          err_code = ia_drc_dec_api(
+              mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+              IA_DRC_DEC_CONFIG_PARAM_BITS_FORMAT, &bit_str_fmt);
+
+          /* Set number of bytes to be processed */
+          err_code = ia_drc_dec_api(mMpegDDrcHandle,
+                                    IA_API_CMD_SET_INPUT_BYTES_IL_BS, 0,
+                                    &buf_sizes[0][ii]);
+
+
+
+          /* Execute process */
+          err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_INIT,
+                                    IA_CMD_TYPE_INIT_CPY_IL_BSF_BUFF, NULL);
+
+
+
+          drc_flag = 1;
+        }
+      }
+
+      for (ii = 0; ii < num_elements; ii++) {
+        /*copy config bitstream*/
+        if (buf_sizes[1][ii] > 0) {
+          memcpy(drc_ip_buf, p_array[1][ii], buf_sizes[1][ii]);
+          /* Set number of bytes to be processed */
+
+          /*Set bitstream_split_format */
+          err_code = ia_drc_dec_api(
+              mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+              IA_DRC_DEC_CONFIG_PARAM_BITS_FORMAT, &bit_str_fmt);
+
+          err_code = ia_drc_dec_api(mMpegDDrcHandle,
+                                    IA_API_CMD_SET_INPUT_BYTES_IC_BS, 0,
+                                    &buf_sizes[1][ii]);
+
+
+
+          /* Execute process */
+          err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_INIT,
+                                    IA_CMD_TYPE_INIT_CPY_IC_BSF_BUFF, NULL);
+
+
+
+          drc_flag = 1;
+        }
+      }
+
+      if (drc_flag == 1) {
+        mpegd_drc_present = 1;
+      } else {
+        mpegd_drc_present = 0;
+      }
+
+
+      /*Read interface buffer config file bitstream*/
+      if(mpegd_drc_present==1){
+
+        WORD32 interface_is_present = 1;
+
+
+        err_code = ia_drc_dec_api(
+            mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+            IA_DRC_DEC_CONFIG_PARAM_INT_PRESENT, &interface_is_present);
+
+
+
+        /* Execute process */
+        err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_INIT,
+                                  IA_CMD_TYPE_INIT_CPY_IN_BSF_BUFF, NULL);
+
+
+        err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_INIT,
+                                  IA_CMD_TYPE_INIT_PROCESS, NULL);
+
+
+        err_code = ia_drc_dec_api(
+            mMpegDDrcHandle, IA_API_CMD_GET_CONFIG_PARAM,
+            IA_DRC_DEC_CONFIG_PARAM_NUM_CHANNELS, &uo_num_chan);
+
+      }
+    }
+  }
+#endif
+
+return err_code;
+
+}
 int SoftXAAC::decodeXAACStream(uint8_t* inBuffer,
                                uint32_t inBufferLength,
                                int32_t *bytesConsumed,
@@ -1143,14 +1574,14 @@ int SoftXAAC::decodeXAACStream(uint8_t* inBuffer,
                                              IA_API_CMD_SET_INPUT_BYTES,
                                              0,
                                              &inBufferLength);
-    ALOGV("return code of IA_API_CMD_SET_INPUT_BYTES: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_SET_INPUT_BYTES");
 
     /* Execute process */
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_EXECUTE,
                                 IA_CMD_TYPE_DO_EXECUTE,
                                 NULL);
-    ALOGV("return code of IA_CMD_TYPE_DO_EXECUTE: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_CMD_TYPE_DO_EXECUTE");
 
     UWORD32 ui_exec_done;
     /* Checking for end of processing */
@@ -1158,22 +1589,78 @@ int SoftXAAC::decodeXAACStream(uint8_t* inBuffer,
                                 IA_API_CMD_EXECUTE,
                                 IA_CMD_TYPE_DONE_QUERY,
                                 &ui_exec_done);
-    ALOGV("return code of IA_CMD_TYPE_DONE_QUERY: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_CMD_TYPE_DONE_QUERY");
 
+#ifdef ENABLE_MPEG_D_DRC
+     {
+      if (ui_exec_done != 1) {
+        VOID *p_array;        // ITTIAM:buffer to handle gain payload
+        WORD32 buf_size = 0;  // ITTIAM:gain payload length
+        WORD32 bit_str_fmt = 1;
+        WORD32 gain_stream_flag = 1;
+
+        err_code = ixheaacd_dec_api(mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+            IA_ENHAACPLUS_DEC_CONFIG_GAIN_PAYLOAD_LEN, &buf_size);
+
+
+        err_code = ixheaacd_dec_api(mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+            IA_ENHAACPLUS_DEC_CONFIG_GAIN_PAYLOAD_BUF, &p_array);
+
+
+        if (buf_size > 0) {
+          /*Set bitstream_split_format */
+          err_code = ia_drc_dec_api(
+              mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+              IA_DRC_DEC_CONFIG_PARAM_BITS_FORMAT, &bit_str_fmt);
+
+          memcpy(drc_ip_buf, p_array, buf_size);
+          /* Set number of bytes to be processed */
+          err_code =
+              ia_drc_dec_api(mMpegDDrcHandle,
+                             IA_API_CMD_SET_INPUT_BYTES_BS, 0, &buf_size);
+
+          err_code = ia_drc_dec_api(
+              mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+              IA_DRC_DEC_CONFIG_GAIN_STREAM_FLAG, &gain_stream_flag);
+
+
+          /* Execute process */
+          err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_INIT,
+                                    IA_CMD_TYPE_INIT_CPY_BSF_BUFF, NULL);
+
+
+          mpegd_drc_present = 1;
+        }
+      }
+    }
+#endif
     /* How much buffer is used in input buffers */
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_GET_CURIDX_INPUT_BUF,
                                 0,
                                 bytesConsumed);
-    ALOGV("return code of IA_API_CMD_GET_CURIDX_INPUT_BUF: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_GET_CURIDX_INPUT_BUF");
 
     /* Get the output bytes */
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_GET_OUTPUT_BYTES,
                                 0,
                                 outBytes);
-    ALOGV("return code of IA_API_CMD_GET_OUTPUT_BYTES: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_GET_OUTPUT_BYTES");
+#ifdef ENABLE_MPEG_D_DRC
 
+    if (mpegd_drc_present == 1) {
+      memcpy(drc_ip_buf, mOutputBuffer, *outBytes);
+      err_code = ia_drc_dec_api(mMpegDDrcHandle,
+                                IA_API_CMD_SET_INPUT_BYTES, 0, outBytes);
+
+
+      err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_EXECUTE,
+                                IA_CMD_TYPE_DO_EXECUTE, NULL);
+
+      memcpy(mOutputBuffer, drc_op_buf, *outBytes);
+    }
+#endif
     return err_code;
 }
 
@@ -1185,7 +1672,7 @@ int SoftXAAC::deInitXAACDecoder() {
                                              IA_API_CMD_INPUT_OVER,
                                              0,
                                              NULL);
-    ALOGV("return code of IA_API_CMD_INPUT_OVER: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_API_CMD_INPUT_OVER");
 
     for(int i = 0; i < mMallocCount; i++)
     {
@@ -1205,28 +1692,28 @@ IA_ERRORCODE SoftXAAC::getXAACStreamInfo() {
                                 IA_API_CMD_GET_CONFIG_PARAM,
                                 IA_ENHAACPLUS_DEC_CONFIG_PARAM_SAMP_FREQ,
                                 &mSampFreq);
-    ALOGV("return code of IA_ENHAACPLUS_DEC_CONFIG_PARAM_SAMP_FREQ: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_SAMP_FREQ");
 
     /* Total Number of Channels */
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_GET_CONFIG_PARAM,
                                 IA_ENHAACPLUS_DEC_CONFIG_PARAM_NUM_CHANNELS,
                                 &mNumChannels);
-    ALOGV("return code of IA_ENHAACPLUS_DEC_CONFIG_PARAM_NUM_CHANNELS: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_NUM_CHANNELS");
 
     /* PCM word size */
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_GET_CONFIG_PARAM,
                                 IA_ENHAACPLUS_DEC_CONFIG_PARAM_PCM_WDSZ,
                                 &mPcmWdSz);
-    ALOGV("return code of IA_ENHAACPLUS_DEC_CONFIG_PARAM_PCM_WDSZ: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_PCM_WDSZ");
 
     /* channel mask to tell the arrangement of channels in bit stream */
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_GET_CONFIG_PARAM,
                                 IA_ENHAACPLUS_DEC_CONFIG_PARAM_CHANNEL_MASK,
                                 &mChannelMask);
-    ALOGV("return code of IA_ENHAACPLUS_DEC_CONFIG_PARAM_CHANNEL_MASK: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_CHANNEL_MASK");
 
     /* Channel mode to tell MONO/STEREO/DUAL-MONO/NONE_OF_THESE */
     UWORD32 ui_channel_mode;
@@ -1234,7 +1721,7 @@ IA_ERRORCODE SoftXAAC::getXAACStreamInfo() {
                                 IA_API_CMD_GET_CONFIG_PARAM,
                                 IA_ENHAACPLUS_DEC_CONFIG_PARAM_CHANNEL_MODE,
                                 &ui_channel_mode);
-    ALOGV("return code of IA_ENHAACPLUS_DEC_CONFIG_PARAM_CHANNEL_MODE: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_CHANNEL_MODE");
     if(ui_channel_mode == 0)
         ALOGV("Channel Mode: MONO_OR_PS\n");
     else if(ui_channel_mode == 1)
@@ -1250,7 +1737,7 @@ IA_ERRORCODE SoftXAAC::getXAACStreamInfo() {
                                 IA_API_CMD_GET_CONFIG_PARAM,
                                 IA_ENHAACPLUS_DEC_CONFIG_PARAM_SBR_MODE,
                                 &ui_sbr_mode);
-    ALOGV("return code of IA_ENHAACPLUS_DEC_CONFIG_PARAM_SBR_MODE: %d",err_code);
+    RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_SBR_MODE");
     if(ui_sbr_mode == 0)
         ALOGV("SBR Mode: NOT_PRESENT\n");
     else if(ui_sbr_mode == 1)
@@ -1271,50 +1758,115 @@ IA_ERRORCODE SoftXAAC::getXAACStreamInfo() {
 IA_ERRORCODE SoftXAAC::setXAACDRCInfo(int32_t drcCut,
                                       int32_t drcBoost,
                                       int32_t drcRefLevel,
-                                      int32_t drcHeavyCompression) {
+                                      int32_t drcHeavyCompression
+                                #ifdef ENABLE_MPEG_D_DRC
+                                      ,int32_t drEffectType
+                                #endif
+                                      ) {
     IA_ERRORCODE err_code = IA_NO_ERROR;
 
     int32_t ui_drc_enable = 1;
+    int32_t i_effect_type, i_target_loudness, i_loud_norm;
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_SET_CONFIG_PARAM,
                                 IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_ENABLE,
                                 &ui_drc_enable);
-     ALOGV("return code of IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_ENABLE: %d",err_code);
+     RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_ENABLE");
     if (drcCut !=-1) {
-        ALOGI("set drcCut=%d", drcCut);
         err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                     IA_API_CMD_SET_CONFIG_PARAM,
                                     IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_CUT,
                                     &drcCut);
-         ALOGV("return code of IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_CUT: %d",err_code);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_CUT");
     }
 
     if (drcBoost !=-1) {
-        ALOGI("set drcBoost=%d", drcBoost);
         err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                     IA_API_CMD_SET_CONFIG_PARAM,
                                     IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_BOOST,
                                     &drcBoost);
-         ALOGV("return code of IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_BOOST: %d",err_code);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_BOOST");
     }
 
     if (drcRefLevel != -1) {
-        ALOGI("set drcRefLevel=%d", drcRefLevel);
         err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                     IA_API_CMD_SET_CONFIG_PARAM,
                                     IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_TARGET_LEVEL,
                                     &drcRefLevel);
-         ALOGV("return code of IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_TARGET_LEVEL: %d",err_code);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_TARGET_LEVEL");
     }
-
+#ifdef ENABLE_MPEG_D_DRC
+    if (drcRefLevel != -1) {
+        err_code = ixheaacd_dec_api(mXheaacCodecHandle,
+                                    IA_API_CMD_SET_CONFIG_PARAM,
+                                    IA_ENHAACPLUS_DEC_DRC_TARGET_LOUDNESS,
+                                    &drcRefLevel);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_DRC_TARGET_LOUDNESS");
+    }
+#endif
     if (drcHeavyCompression != -1) {
-        ALOGI("set drcHeavyCompression=%d", drcHeavyCompression);
         err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                     IA_API_CMD_SET_CONFIG_PARAM,
                                     IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_HEAVY_COMP,
                                     &drcHeavyCompression);
-         ALOGV("return code of IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_HEAVY_COMP: %d",err_code);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_HEAVY_COMP");
     }
+
+#ifdef ENABLE_MPEG_D_DRC
+        err_code = ixheaacd_dec_api(mXheaacCodecHandle,
+                                    IA_API_CMD_SET_CONFIG_PARAM,
+                                    IA_ENHAACPLUS_DEC_DRC_EFFECT_TYPE,
+                                    &drEffectType);
+
+#endif
+
+#ifdef ENABLE_MPEG_D_DRC
+    /*Set Effect Type*/
+
+    {
+        err_code = ixheaacd_dec_api(mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+            IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_EFFECT_TYPE, &i_effect_type);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_EFFECT_TYPE");
+
+        err_code =
+            ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+                IA_DRC_DEC_CONFIG_DRC_EFFECT_TYPE, &i_effect_type);
+
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_DRC_DEC_CONFIG_DRC_EFFECT_TYPE");
+
+    }
+
+/*Set target loudness */
+
+    {
+        err_code = ixheaacd_dec_api(
+            mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+            IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_TARGET_LOUDNESS, &i_target_loudness);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_TARGET_LOUDNESS");
+
+        err_code =
+            ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+                IA_DRC_DEC_CONFIG_DRC_TARGET_LOUDNESS, &i_target_loudness);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_DRC_DEC_CONFIG_DRC_TARGET_LOUDNESS");
+
+    }
+    /*Set loud_norm_flag*/
+    {
+        err_code = ixheaacd_dec_api(
+            mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+            IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_LOUD_NORM, &i_loud_norm);
+        RETURN_IF_NE(err_code, IA_NO_ERROR , err_code,"IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_LOUD_NORM");
+
+        err_code =
+            ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+                IA_DRC_DEC_CONFIG_DRC_LOUD_NORM, &i_loud_norm);
+
+        RETURN_IF_NE(err_code, IA_NO_ERROR , err_code,"IA_DRC_DEC_CONFIG_DRC_LOUD_NORM");
+
+    }
+
+#endif
+
 
     return IA_NO_ERROR;
 }
