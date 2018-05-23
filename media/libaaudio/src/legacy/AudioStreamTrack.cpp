@@ -59,18 +59,25 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
         return result;
     }
 
+    const aaudio_session_id_t requestedSessionId = builder.getSessionId();
+    const audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
+
     // Try to create an AudioTrack
     // Use stereo if unspecified.
     int32_t samplesPerFrame = (getSamplesPerFrame() == AAUDIO_UNSPECIFIED)
                               ? 2 : getSamplesPerFrame();
     audio_channel_mask_t channelMask = audio_channel_out_mask_from_count(samplesPerFrame);
 
-    audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE;
+    audio_output_flags_t flags;
     aaudio_performance_mode_t perfMode = getPerformanceMode();
     switch(perfMode) {
         case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY:
             // Bypass the normal mixer and go straight to the FAST mixer.
-            flags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_RAW);
+            // If the app asks for a sessionId then it means they want to use effects.
+            // So don't use RAW flag.
+            flags = (audio_output_flags_t) ((requestedSessionId == AAUDIO_SESSION_ID_NONE)
+                    ? (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_RAW)
+                    : (AUDIO_OUTPUT_FLAG_FAST));
             break;
 
         case AAUDIO_PERFORMANCE_MODE_POWER_SAVING:
@@ -81,6 +88,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
         case AAUDIO_PERFORMANCE_MODE_NONE:
         default:
             // No flags. Use a normal mixer in front of the FAST mixer.
+            flags = AUDIO_OUTPUT_FLAG_NONE;
             break;
     }
 
@@ -134,11 +142,6 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             .flags = AUDIO_FLAG_NONE, // Different than the AUDIO_OUTPUT_FLAGS
             .tags = ""
     };
-
-    static_assert(AAUDIO_UNSPECIFIED == AUDIO_SESSION_ALLOCATE, "Session IDs should match");
-
-    aaudio_session_id_t requestedSessionId = builder.getSessionId();
-    audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
 
     mAudioTrack = new AudioTrack();
     mAudioTrack->set(

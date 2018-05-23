@@ -57,6 +57,9 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
 
     // Try to create an AudioRecord
 
+    const aaudio_session_id_t requestedSessionId = builder.getSessionId();
+    const audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
+
     // TODO Support UNSPECIFIED in AudioRecord. For now, use stereo if unspecified.
     int32_t samplesPerFrame = (getSamplesPerFrame() == AAUDIO_UNSPECIFIED)
                               ? 2 : getSamplesPerFrame();
@@ -66,17 +69,21 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
                         : builder.getBufferCapacity();
 
 
-    audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE;
+    audio_input_flags_t flags;
     aaudio_performance_mode_t perfMode = getPerformanceMode();
     switch (perfMode) {
         case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY:
-            flags = (audio_input_flags_t) (AUDIO_INPUT_FLAG_FAST | AUDIO_INPUT_FLAG_RAW);
+            // If the app asks for a sessionId then it means they want to use effects.
+            // So don't use RAW flag.
+            flags = (audio_input_flags_t) ((requestedSessionId == AAUDIO_SESSION_ID_NONE)
+                    ? (AUDIO_INPUT_FLAG_FAST | AUDIO_INPUT_FLAG_RAW)
+                    : (AUDIO_INPUT_FLAG_FAST));
             break;
 
         case AAUDIO_PERFORMANCE_MODE_POWER_SAVING:
         case AAUDIO_PERFORMANCE_MODE_NONE:
         default:
-            // No flags.
+            flags = AUDIO_INPUT_FLAG_NONE;
             break;
     }
 
@@ -140,9 +147,6 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             .flags = AUDIO_FLAG_NONE, // Different than the AUDIO_INPUT_FLAGS
             .tags = ""
     };
-
-    aaudio_session_id_t requestedSessionId = builder.getSessionId();
-    audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
 
     // ----------- open the AudioRecord ---------------------
     // Might retry, but never more than once.
