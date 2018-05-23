@@ -398,10 +398,9 @@ AudioPortConfig::AudioPortConfig()
 status_t AudioPortConfig::applyAudioPortConfig(const struct audio_port_config *config,
                                                struct audio_port_config *backupConfig)
 {
-    struct audio_port_config localBackupConfig;
+    struct audio_port_config localBackupConfig = { .config_mask = config->config_mask };
     status_t status = NO_ERROR;
 
-    localBackupConfig.config_mask = config->config_mask;
     toAudioPortConfig(&localBackupConfig);
 
     sp<AudioPort> audioport = getAudioPort();

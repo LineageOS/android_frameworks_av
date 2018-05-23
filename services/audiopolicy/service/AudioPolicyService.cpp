@@ -1205,6 +1205,7 @@ void AudioPolicyService::AudioCommandThread::insertCommand_l(sp<AudioCommand>& c
                 patch = ((CreateAudioPatchData *)command->mParam.get())->mPatch;
             } else {
                 handle = ((ReleaseAudioPatchData *)command->mParam.get())->mHandle;
+                memset(&patch, 0, sizeof(patch));
             }
             audio_patch_handle_t handle2;
             struct audio_patch patch2;

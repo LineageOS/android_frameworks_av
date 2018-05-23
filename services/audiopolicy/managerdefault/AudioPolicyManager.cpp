@@ -3185,10 +3185,10 @@ status_t AudioPolicyManager::setAudioPortConfig(const struct audio_port_config *
         return BAD_VALUE;
     }
 
-    struct audio_port_config backupConfig;
+    struct audio_port_config backupConfig = {};
     status_t status = audioPortConfig->applyAudioPortConfig(config, &backupConfig);
     if (status == NO_ERROR) {
-        struct audio_port_config newConfig;
+        struct audio_port_config newConfig = {};
         audioPortConfig->toAudioPortConfig(&newConfig, config);
         status = mpClientInterface->setAudioPortConfig(&newConfig, 0);
     }
@@ -3336,7 +3336,7 @@ status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *so
     sp<AudioSourceDescriptor> sourceDesc =
             new AudioSourceDescriptor(srcDeviceDesc, attributes, uid);
 
-    struct audio_patch dummyPatch;
+    struct audio_patch dummyPatch = {};
     sp<AudioPatch> patchDesc = new AudioPatch(&dummyPatch, uid);
     sourceDesc->mPatchDesc = patchDesc;
 
