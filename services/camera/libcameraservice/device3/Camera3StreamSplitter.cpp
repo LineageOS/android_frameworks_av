@@ -212,7 +212,11 @@ status_t Camera3StreamSplitter::addOutputLocked(size_t surfaceId, const sp<Surfa
 
     SP_LOGV("%s: Consumer wants %d buffers, Producer wants %zu", __FUNCTION__,
             maxConsumerBuffers, mMaxHalBuffers);
-    size_t totalBufferCount = maxConsumerBuffers + mMaxHalBuffers;
+    // The output slot count requirement can change depending on the current amount
+    // of outputs and incoming buffer consumption rate. To avoid any issues with
+    // insufficient slots, set their count to the maximum supported. The output
+    // surface buffer allocation is disabled so no real buffers will get allocated.
+    size_t totalBufferCount = BufferQueue::NUM_BUFFER_SLOTS;
     res = native_window_set_buffer_count(outputQueue.get(),
             totalBufferCount);
     if (res != OK) {
