@@ -192,7 +192,6 @@ bool AudioMixer::setChannelMasks(int name,
     // always recompute for both channel masks even if only one has changed.
     const uint32_t trackChannelCount = audio_channel_count_from_out_mask(trackChannelMask);
     const uint32_t mixerChannelCount = audio_channel_count_from_out_mask(mixerChannelMask);
-    const bool mixerChannelCountChanged = track->mMixerChannelCount != mixerChannelCount;
 
     ALOG_ASSERT((trackChannelCount <= MAX_NUM_CHANNELS_TO_DOWNMIX)
             && trackChannelCount
@@ -213,7 +212,7 @@ bool AudioMixer::setChannelMasks(int name,
     // do it after downmix since track format may change!
     track->prepareForReformat();
 
-    if (track->mResampler.get() != nullptr && mixerChannelCountChanged) {
+    if (track->mResampler.get() != nullptr) {
         // resampler channels may have changed.
         const uint32_t resetToSampleRate = track->sampleRate;
         track->mResampler.reset(nullptr);
