@@ -155,7 +155,9 @@ sp<AMessage> NuPlayer::CCDecoder::getTrackInfo(size_t index) const {
             break;
         default:
             ALOGE("Unknown track type: %d", track.mTrackType);
-            return NULL;
+            format->setInt32("type", MEDIA_TRACK_TYPE_UNKNOWN);
+            format->setString("mime", "application/octet-stream");
+            return format;
     }
 
     // For CEA-608 CC1, field 0 channel 0
