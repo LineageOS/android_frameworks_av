@@ -93,9 +93,7 @@ MediaCodecListBuilderBase *GetCodec2InfoBuilder() {
 
 std::vector<MediaCodecListBuilderBase *> GetBuilders() {
     std::vector<MediaCodecListBuilderBase *> builders {&sOmxInfoBuilder};
-    if (property_get_bool("debug.stagefright.ccodec", false)) {
-        builders.push_back(GetCodec2InfoBuilder());
-    }
+    builders.push_back(GetCodec2InfoBuilder());
     return builders;
 }
 
