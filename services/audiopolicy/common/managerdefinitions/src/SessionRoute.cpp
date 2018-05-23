@@ -82,7 +82,7 @@ int SessionRouteMap::decRouteActivity(audio_session_t session)
 void SessionRouteMap::log(const char* caption)
 {
     ALOGI("%s ----", caption);
-    for(size_t index = 0; index < size(); index++) {
+    for (size_t index = 0; index < size(); index++) {
         valueAt(index)->log("  ");
     }
 }
@@ -117,6 +117,24 @@ void SessionRouteMap::addRoute(audio_session_t session,
         }
         add(session, route);
     }
+}
+
+audio_devices_t SessionRouteMap::getActiveDeviceForStream(audio_stream_type_t streamType,
+                                                          const DeviceVector& availableDevices)
+{
+    audio_devices_t device = AUDIO_DEVICE_NONE;
+
+    for (size_t index = 0; index < size(); index++) {
+        sp<SessionRoute> route = valueAt(index);
+        if (streamType == route->mStreamType && route->isActiveOrChanged()
+                && route->mDeviceDescriptor != 0) {
+            device = route->mDeviceDescriptor->type();
+            if (!availableDevices.getDevicesFromType(device).isEmpty()) {
+                break;
+            }
+        }
+    }
+    return device;
 }
 
 } // namespace android
