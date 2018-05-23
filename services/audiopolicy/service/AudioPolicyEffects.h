@@ -163,7 +163,7 @@ private:
     };
 
 
-    static const char * const kInputSourceNames[AUDIO_SOURCE_CNT -1];
+    static const char * const kInputSourceNames[AUDIO_SOURCE_CNT];
     static audio_source_t inputSourceNameToEnum(const char *name);
 
     static const char *kStreamNames[AUDIO_STREAM_PUBLIC_CNT+1]; //+1 required as streams start from -1
