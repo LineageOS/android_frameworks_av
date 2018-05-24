@@ -24,6 +24,7 @@
 namespace android {
 
 class DeviceDescriptor;
+class DeviceVector;
 
 class SessionRoute : public RefBase
 {
@@ -98,7 +99,8 @@ public:
     int decRouteActivity(audio_session_t session);
     bool getAndClearRouteChanged(audio_session_t session); // also clears the changed flag
     void log(const char* caption);
-
+    audio_devices_t getActiveDeviceForStream(audio_stream_type_t streamType,
+                                             const DeviceVector& availableDevices);
     // Specify an Output(Sink) route by passing SessionRoute::SOURCE_TYPE_NA in the
     // source argument.
     // Specify an Input(Source) rout by passing SessionRoute::AUDIO_STREAM_DEFAULT
