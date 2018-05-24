@@ -22,6 +22,30 @@
       "revId": "c625727fedf5b1fde7e3deb9008b2a82353c5ef5",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "f2af0d0e_968cd1a4",
+        "filename": "media/libstagefright/omx/SoftOMXPlugin.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 123,
+      "author": {
+        "id": 11801
+      },
+      "writtenOn": "2018-05-24T12:10:49Z",
+      "side": 1,
+      "message": "I\u0027ll strip this file of changes tonight. I\u0027m not sure why this file was touched in the first place, but I just picked the changes \u0027verbatim\u0027 from 14.1",
+      "parentUuid": "5df56497_a1d75344",
+      "range": {
+        "startLine": 123,
+        "startChar": 12,
+        "endLine": 123,
+        "endChar": 41
+      },
+      "revId": "c625727fedf5b1fde7e3deb9008b2a82353c5ef5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
