@@ -1191,9 +1191,6 @@ class Camera3Device :
 
     metadata_vendor_id_t mVendorTagId;
 
-    // Cached last requested template id
-    int mLastTemplateId;
-
     /**
      * Static callback forwarding methods from HAL to instance
      */
