@@ -533,41 +533,45 @@ size_t DPFrequency::processFirstStages(ChannelBuffer &cb) {
                 fTheta = exp(-1.0 / (fFRelSec * mBlocksPerSecond));
             }
 
-
             float fEnv = (1.0 - fTheta) * fEnergySum + fTheta * pMbcBandParams->previousEnvelope;
             //preserve for next iteration
             pMbcBandParams->previousEnvelope = fEnv;
 
-            float fThreshold = dBtoLinear(pMbcBandParams->thresholdDb);
-            float fNoiseGateThreshold = dBtoLinear(pMbcBandParams->noiseGateThresholdDb);
-
-            float fNewFactor = 1.0;
-
-            if (fEnv > fThreshold) {
-                float fDbAbove = linearToDb(fThreshold / fEnv);
-                float fDbTarget = fDbAbove / pMbcBandParams->ratio;
-                float fDbChange = fDbAbove - fDbTarget;
-                fNewFactor = dBtoLinear(fDbChange);
-            } else if (fEnv < fNoiseGateThreshold) {
-                if (fEnv < MIN_ENVELOPE) {
-                    fEnv = MIN_ENVELOPE;
-                }
-                float fDbBelow = linearToDb(fNoiseGateThreshold / fEnv);
-                float fDbTarget = fDbBelow / pMbcBandParams->expanderRatio;
-                float fDbChange = fDbBelow - fDbTarget;
-                fNewFactor = dBtoLinear(fDbChange);
+            if (fEnv < MIN_ENVELOPE) {
+                fEnv = MIN_ENVELOPE;
             }
+            const float envDb = linearToDb(fEnv);
+            float newLevelDb = envDb;
+            //using shorter variables for code clarity
+            const float thresholdDb = pMbcBandParams->thresholdDb;
+            const float ratio = pMbcBandParams->ratio;
+            const float kneeWidthDbHalf = pMbcBandParams->kneeWidthDb / 2;
+            const float noiseGateThresholdDb = pMbcBandParams->noiseGateThresholdDb;
+            const float expanderRatio = pMbcBandParams->expanderRatio;
+
+            //find segment
+            if (envDb > thresholdDb + kneeWidthDbHalf) {
+                //compression segment
+                newLevelDb = envDb + ((1 / ratio) - 1) * (envDb - thresholdDb);
+            } else if (envDb > thresholdDb - kneeWidthDbHalf) {
+                //knee-compression segment
+                float temp = (envDb - thresholdDb + kneeWidthDbHalf);
+                newLevelDb = envDb + ((1 / ratio) - 1) *
+                        temp * temp / (kneeWidthDbHalf * 4);
+            } else if (envDb < noiseGateThresholdDb) {
+                //expander segment
+                newLevelDb = noiseGateThresholdDb -
+                        expanderRatio * (noiseGateThresholdDb - envDb);
+            }
+
+            float newFactor = dBtoLinear(newLevelDb - envDb);
 
             //apply post gain.
-            fNewFactor *= dBtoLinear(pMbcBandParams->gainPostDb);
-
-            if (fNewFactor < 0) {
-                fNewFactor = 0;
-            }
+            newFactor *= dBtoLinear(pMbcBandParams->gainPostDb);
 
             //apply to this band
             for (size_t k = pMbcBandParams->binStart; k <= pMbcBandParams->binStop; k++) {
-                cb.complexTemp[k] *= fNewFactor;
+                cb.complexTemp[k] *= newFactor;
             }
 
         } //end per band process
@@ -604,22 +608,20 @@ size_t DPFrequency::processFirstStages(ChannelBuffer &cb) {
         //preserve for next iteration
         cb.mLimiterParams.previousEnvelope = fEnv;
 
-        float fThreshold = dBtoLinear(cb.mLimiterParams.thresholdDb);
+        const float envDb = linearToDb(fEnv);
+        float newFactorDb = 0;
+        //using shorter variables for code clarity
+        const float thresholdDb = cb.mLimiterParams.thresholdDb;
+        const float ratio = cb.mLimiterParams.ratio;
 
-        float fNewFactor = 1.0;
-
-        if (fEnv > fThreshold) {
-            float fDbAbove = linearToDb(fThreshold / fEnv);
-            float fDbTarget = fDbAbove / cb.mLimiterParams.ratio;
-            float fDbChange = fDbAbove - fDbTarget;
-            fNewFactor = dBtoLinear(fDbChange);
+        if (envDb > thresholdDb) {
+            //limiter segment
+            newFactorDb = ((1 / ratio) - 1) * (envDb - thresholdDb);
         }
 
-        if (fNewFactor < 0) {
-            fNewFactor = 0;
-        }
+        float newFactor = dBtoLinear(newFactorDb);
 
-        cb.mLimiterParams.newFactor = fNewFactor;
+        cb.mLimiterParams.newFactor = newFactor;
 
     } //end Limiter
     return mBlockSize;
