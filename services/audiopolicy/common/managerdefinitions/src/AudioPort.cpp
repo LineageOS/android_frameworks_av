@@ -386,15 +386,6 @@ void AudioPort::log(const char* indent) const
 
 // --- AudioPortConfig class implementation
 
-AudioPortConfig::AudioPortConfig()
-{
-    mSamplingRate = 0;
-    mChannelMask = AUDIO_CHANNEL_NONE;
-    mFormat = AUDIO_FORMAT_INVALID;
-    memset(&mGain, 0, sizeof(struct audio_gain_config));
-    mGain.index = -1;
-}
-
 status_t AudioPortConfig::applyAudioPortConfig(const struct audio_port_config *config,
                                                struct audio_port_config *backupConfig)
 {
@@ -424,6 +415,9 @@ status_t AudioPortConfig::applyAudioPortConfig(const struct audio_port_config *c
     if (config->config_mask & AUDIO_PORT_CONFIG_GAIN) {
         mGain = config->gain;
     }
+    if (config->config_mask & AUDIO_PORT_CONFIG_FLAGS) {
+        mFlags = config->flags;
+    }
 
 exit:
     if (status != NO_ERROR) {
@@ -435,33 +429,38 @@ exit:
     return status;
 }
 
+namespace {
+
+template<typename T>
+void updateField(
+        const T& portConfigField, T audio_port_config::*port_config_field,
+        struct audio_port_config *dstConfig, const struct audio_port_config *srcConfig,
+        unsigned int configMask, T defaultValue)
+{
+    if (dstConfig->config_mask & configMask) {
+        if ((srcConfig != nullptr) && (srcConfig->config_mask & configMask)) {
+            dstConfig->*port_config_field = srcConfig->*port_config_field;
+        } else {
+            dstConfig->*port_config_field = portConfigField;
+        }
+    } else {
+        dstConfig->*port_config_field = defaultValue;
+    }
+}
+
+} // namespace
+
 void AudioPortConfig::toAudioPortConfig(struct audio_port_config *dstConfig,
                                         const struct audio_port_config *srcConfig) const
 {
-    if (dstConfig->config_mask & AUDIO_PORT_CONFIG_SAMPLE_RATE) {
-        dstConfig->sample_rate = mSamplingRate;
-        if ((srcConfig != NULL) && (srcConfig->config_mask & AUDIO_PORT_CONFIG_SAMPLE_RATE)) {
-            dstConfig->sample_rate = srcConfig->sample_rate;
-        }
-    } else {
-        dstConfig->sample_rate = 0;
-    }
-    if (dstConfig->config_mask & AUDIO_PORT_CONFIG_CHANNEL_MASK) {
-        dstConfig->channel_mask = mChannelMask;
-        if ((srcConfig != NULL) && (srcConfig->config_mask & AUDIO_PORT_CONFIG_CHANNEL_MASK)) {
-            dstConfig->channel_mask = srcConfig->channel_mask;
-        }
-    } else {
-        dstConfig->channel_mask = AUDIO_CHANNEL_NONE;
-    }
-    if (dstConfig->config_mask & AUDIO_PORT_CONFIG_FORMAT) {
-        dstConfig->format = mFormat;
-        if ((srcConfig != NULL) && (srcConfig->config_mask & AUDIO_PORT_CONFIG_FORMAT)) {
-            dstConfig->format = srcConfig->format;
-        }
-    } else {
-        dstConfig->format = AUDIO_FORMAT_INVALID;
-    }
+    updateField(mSamplingRate, &audio_port_config::sample_rate,
+            dstConfig, srcConfig, AUDIO_PORT_CONFIG_SAMPLE_RATE, 0u);
+    updateField(mChannelMask, &audio_port_config::channel_mask,
+            dstConfig, srcConfig, AUDIO_PORT_CONFIG_CHANNEL_MASK,
+            (audio_channel_mask_t)AUDIO_CHANNEL_NONE);
+    updateField(mFormat, &audio_port_config::format,
+            dstConfig, srcConfig, AUDIO_PORT_CONFIG_FORMAT, AUDIO_FORMAT_INVALID);
+
     sp<AudioPort> audioport = getAudioPort();
     if ((dstConfig->config_mask & AUDIO_PORT_CONFIG_GAIN) && audioport != NULL) {
         dstConfig->gain = mGain;
@@ -477,6 +476,9 @@ void AudioPortConfig::toAudioPortConfig(struct audio_port_config *dstConfig,
     } else {
         dstConfig->config_mask &= ~AUDIO_PORT_CONFIG_GAIN;
     }
+
+    updateField(mFlags, &audio_port_config::flags,
+            dstConfig, srcConfig, AUDIO_PORT_CONFIG_FLAGS, { AUDIO_INPUT_FLAG_NONE });
 }
 
 } // namespace android

@@ -3792,6 +3792,10 @@ void AudioFlinger::PlaybackThread::toAudioPortConfig(struct audio_port_config *c
     config->role = AUDIO_PORT_ROLE_SOURCE;
     config->ext.mix.hw_module = mOutput->audioHwDev->handle();
     config->ext.mix.usecase.stream = AUDIO_STREAM_DEFAULT;
+    if (mOutput && mOutput->flags != AUDIO_OUTPUT_FLAG_NONE) {
+        config->config_mask |= AUDIO_PORT_CONFIG_FLAGS;
+        config->flags.output = mOutput->flags;
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -7894,6 +7898,10 @@ void AudioFlinger::RecordThread::toAudioPortConfig(struct audio_port_config *con
     config->role = AUDIO_PORT_ROLE_SINK;
     config->ext.mix.hw_module = mInput->audioHwDev->handle();
     config->ext.mix.usecase.source = mAudioSource;
+    if (mInput && mInput->flags != AUDIO_INPUT_FLAG_NONE) {
+        config->config_mask |= AUDIO_PORT_CONFIG_FLAGS;
+        config->flags.input = mInput->flags;
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -8861,6 +8869,15 @@ void AudioFlinger::MmapPlaybackThread::checkSilentMode_l()
     }
 }
 
+void AudioFlinger::MmapPlaybackThread::toAudioPortConfig(struct audio_port_config *config)
+{
+    MmapThread::toAudioPortConfig(config);
+    if (mOutput && mOutput->flags != AUDIO_OUTPUT_FLAG_NONE) {
+        config->config_mask |= AUDIO_PORT_CONFIG_FLAGS;
+        config->flags.output = mOutput->flags;
+    }
+}
+
 void AudioFlinger::MmapPlaybackThread::dumpInternals(int fd, const Vector<String16>& args)
 {
     MmapThread::dumpInternals(fd, args);
@@ -8948,6 +8965,15 @@ void AudioFlinger::MmapCaptureThread::setRecordSilenced(uid_t uid, bool silenced
             mActiveTracks[i]->setSilenced_l(silenced);
             broadcast_l();
         }
+    }
+}
+
+void AudioFlinger::MmapCaptureThread::toAudioPortConfig(struct audio_port_config *config)
+{
+    MmapThread::toAudioPortConfig(config);
+    if (mInput && mInput->flags != AUDIO_INPUT_FLAG_NONE) {
+        config->config_mask |= AUDIO_PORT_CONFIG_FLAGS;
+        config->flags.input = mInput->flags;
     }
 }
 
