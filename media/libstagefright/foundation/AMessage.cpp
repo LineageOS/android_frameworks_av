@@ -197,6 +197,7 @@ AMessage::Item *AMessage::allocateItem(const char *name) {
         CHECK(mNumItems < kMaxNumItems);
         i = mNumItems++;
         item = &mItems[i];
+        item->mType = kTypeInt32;
         item->setName(name, len);
     }
 
