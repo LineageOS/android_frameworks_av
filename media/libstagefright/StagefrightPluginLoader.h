@@ -20,6 +20,7 @@
 
 #include <media/stagefright/CodecBase.h>
 #include <media/stagefright/MediaCodecListWriter.h>
+#include <media/stagefright/PersistentSurface.h>
 #include <utils/Mutex.h>
 
 namespace android {
@@ -31,6 +32,8 @@ public:
 
     CodecBase *createCodec();
     MediaCodecListBuilderBase *createBuilder();
+    PersistentSurface *createInputSurface();
+
 private:
     explicit StagefrightPluginLoader(const char *libPath);
 
@@ -40,6 +43,7 @@ private:
     void *mLibHandle;
     CodecBase::CreateCodecFunc mCreateCodec;
     MediaCodecListBuilderBase::CreateBuilderFunc mCreateBuilder;
+    CodecBase::CreateInputSurfaceFunc mCreateInputSurface;
 };
 
 }  // namespace android

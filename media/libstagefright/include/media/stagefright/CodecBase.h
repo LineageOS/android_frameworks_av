@@ -223,6 +223,7 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
     virtual void signalEndOfInputStream() = 0;
 
     typedef CodecBase *(*CreateCodecFunc)(void);
+    typedef PersistentSurface *(*CreateInputSurfaceFunc)(void);
 
 protected:
     CodecBase() = default;

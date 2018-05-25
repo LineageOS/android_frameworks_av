@@ -479,6 +479,13 @@ sp<MediaCodec> MediaCodec::CreateByComponentName(
 
 // static
 sp<PersistentSurface> MediaCodec::CreatePersistentInputSurface() {
+    // allow plugin to create surface
+    sp<PersistentSurface> pluginSurface =
+        StagefrightPluginLoader::GetCCodecInstance()->createInputSurface();
+    if (pluginSurface != nullptr) {
+        return pluginSurface;
+    }
+
     OMXClient client;
     if (client.connect() != OK) {
         ALOGE("Failed to connect to OMX to create persistent input surface.");
