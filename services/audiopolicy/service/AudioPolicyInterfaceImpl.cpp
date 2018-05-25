@@ -501,8 +501,8 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId, bool *silenc
 
     }
 
-    // XXX log them all for a while, during some dogfooding.
-    if (1 || status != NO_ERROR) {
+    // including successes gets very verbose
+    if (status != NO_ERROR) {
 
         static constexpr char kAudioPolicy[] = "audiopolicy";
 
