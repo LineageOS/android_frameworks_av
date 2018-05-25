@@ -786,10 +786,16 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
                 static_cast<long long>(mPrevFrameUs));
     } else {
         if (timeUs <= mPrevFrameUs) {
-            // Drop the frame if it's going backward in time. Bad timestamp
-            // could disrupt encoder's rate control completely.
-            ALOGW("Dropping frame that's going backward in time");
-            return false;
+            if (mFrameDropper != NULL && mFrameDropper->disabled()) {
+                // Warn only, client has disabled frame drop logic possibly for image
+                // encoding cases where camera's ZSL mode could send out of order frames.
+                ALOGW("Received frame that's going backward in time");
+            } else {
+                // Drop the frame if it's going backward in time. Bad timestamp
+                // could disrupt encoder's rate control completely.
+                ALOGW("Dropping frame that's going backward in time");
+                return false;
+            }
         }
 
         mPrevFrameUs = timeUs;
@@ -1110,6 +1116,7 @@ status_t GraphicBufferSource::configure(
         mEndOfStream = false;
         mEndOfStreamSent = false;
         mSkipFramesBeforeNs = -1ll;
+        mFrameDropper.clear();
         mFrameRepeatIntervalUs = -1ll;
         mRepeatLastFrameGeneration = 0;
         mOutstandingFrameRepeatCount = 0;
