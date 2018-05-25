@@ -99,6 +99,13 @@ private:
             return mShared->mAck - sequence >= 0;
         }
 
+        // returns the last value written (or the contents of the shared buffer after initialization
+        // if no value was written).
+        T last() const
+        {   // assume no sequence check required - we are the writer.
+            return mShared->mValue;
+        }
+
     private:
         int32_t     mSequence;
         Shared * const mShared;
