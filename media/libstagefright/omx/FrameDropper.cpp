@@ -34,7 +34,12 @@ FrameDropper::~FrameDropper() {
 }
 
 status_t FrameDropper::setMaxFrameRate(float maxFrameRate) {
-    if (maxFrameRate <= 0) {
+    if (maxFrameRate < 0) {
+        mMinIntervalUs = -1ll;
+        return OK;
+    }
+
+    if (maxFrameRate == 0) {
         ALOGE("framerate should be positive but got %f.", maxFrameRate);
         return BAD_VALUE;
     }
