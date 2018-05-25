@@ -13,6 +13,7 @@ cc_library_shared {
 
     cflags: [
         "-Werror",
+        "-DENABLE_MPEG_D_DRC"
     ],
 
     sanitize: {
