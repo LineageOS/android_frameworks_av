@@ -44,6 +44,11 @@ StagefrightPluginLoader::StagefrightPluginLoader(const char *libPath)
     if (mCreateBuilder == nullptr) {
         ALOGD("Failed to find symbol: CreateBuilder (%s)", dlerror());
     }
+    mCreateInputSurface = (CodecBase::CreateInputSurfaceFunc)dlsym(
+            mLibHandle, "CreateInputSurface");
+    if (mCreateBuilder == nullptr) {
+        ALOGD("Failed to find symbol: CreateInputSurface (%s)", dlerror());
+    }
 }
 
 StagefrightPluginLoader::~StagefrightPluginLoader() {
@@ -67,6 +72,14 @@ MediaCodecListBuilderBase *StagefrightPluginLoader::createBuilder() {
         return nullptr;
     }
     return mCreateBuilder();
+}
+
+PersistentSurface *StagefrightPluginLoader::createInputSurface() {
+    if (mLibHandle == nullptr || mCreateInputSurface == nullptr) {
+        ALOGD("Handle or CreateInputSurface symbol is null");
+        return nullptr;
+    }
+    return mCreateInputSurface();
 }
 
 //static

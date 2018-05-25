@@ -293,7 +293,6 @@ private:
         void removeOverrideUid(uid_t uid) { updateOverrideUid(uid, false, false); }
 
     private:
-        bool isServiceUid(uid_t uid) const;
         void notifyService(uid_t uid, bool active);
         void updateOverrideUid(uid_t uid, bool active, bool insert);
         void updateUidCache(uid_t uid, bool active, bool insert);

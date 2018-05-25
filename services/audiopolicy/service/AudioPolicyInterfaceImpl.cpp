@@ -183,7 +183,7 @@ status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *attr,
     Mutex::Autolock _l(mLock);
 
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
-    if (!isTrustedCallingUid(callingUid) || uid == (uid_t)-1) {
+    if (!isAudioServerOrMediaServerUid(callingUid) || uid == (uid_t)-1) {
         ALOGW_IF(uid != (uid_t)-1 && uid != callingUid,
                 "%s uid %d tried to pass itself off as %d", __FUNCTION__, callingUid, uid);
         uid = callingUid;
@@ -320,7 +320,7 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
 
     bool updatePid = (pid == -1);
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
-    if (!isTrustedCallingUid(callingUid)) {
+    if (!isAudioServerOrMediaServerUid(callingUid)) {
         ALOGW_IF(uid != (uid_t)-1 && uid != callingUid,
                 "%s uid %d tried to pass itself off as %d", __FUNCTION__, callingUid, uid);
         uid = callingUid;
@@ -501,8 +501,8 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId, bool *silenc
 
     }
 
-    // XXX log them all for a while, during some dogfooding.
-    if (1 || status != NO_ERROR) {
+    // including successes gets very verbose
+    if (status != NO_ERROR) {
 
         static constexpr char kAudioPolicy[] = "audiopolicy";
 

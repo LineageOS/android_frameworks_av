@@ -39,6 +39,7 @@
 #include <media/AudioParameter.h>
 #include <media/AudioPolicyHelper.h>
 #include <media/PatchBuilder.h>
+#include <private/android_filesystem_config.h>
 #include <soundtrigger/SoundTrigger.h>
 #include <system/audio.h>
 #include <audio_policy_conf.h>
@@ -1150,7 +1151,9 @@ status_t AudioPolicyManager::startOutput(audio_io_handle_t output,
         }
     } else if (mOutputRoutes.getAndClearRouteChanged(session)) {
         newDevice = getNewOutputDevice(outputDesc, false /*fromCache*/);
-        checkStrategyRoute(getStrategy(stream), output);
+        if (newDevice != outputDesc->device()) {
+            checkStrategyRoute(getStrategy(stream), output);
+        }
     } else {
         newDevice = AUDIO_DEVICE_NONE;
     }
@@ -1406,6 +1409,7 @@ status_t AudioPolicyManager::stopSource(const sp<AudioOutputDescriptor>& outputD
                         (newDevice != desc->device())) {
                     audio_devices_t newDevice2 = getNewOutputDevice(desc, false /*fromCache*/);
                     bool force = desc->device() != newDevice2;
+
                     setOutputDevice(desc,
                                     newDevice2,
                                     force,
@@ -3184,10 +3188,10 @@ status_t AudioPolicyManager::setAudioPortConfig(const struct audio_port_config *
         return BAD_VALUE;
     }
 
-    struct audio_port_config backupConfig;
+    struct audio_port_config backupConfig = {};
     status_t status = audioPortConfig->applyAudioPortConfig(config, &backupConfig);
     if (status == NO_ERROR) {
-        struct audio_port_config newConfig;
+        struct audio_port_config newConfig = {};
         audioPortConfig->toAudioPortConfig(&newConfig, config);
         status = mpClientInterface->setAudioPortConfig(&newConfig, 0);
     }
@@ -3335,7 +3339,7 @@ status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *so
     sp<AudioSourceDescriptor> sourceDesc =
             new AudioSourceDescriptor(srcDeviceDesc, attributes, uid);
 
-    struct audio_patch dummyPatch;
+    struct audio_patch dummyPatch = {};
     sp<AudioPatch> patchDesc = new AudioPatch(&dummyPatch, uid);
     sourceDesc->mPatchDesc = patchDesc;
 
@@ -3865,7 +3869,7 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
 AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterface,
                                        bool /*forTesting*/)
     :
-    mUidCached(getuid()),
+    mUidCached(AID_AUDIOSERVER), // no need to call getuid(), there's only one of us running.
     mpClientInterface(clientInterface),
     mLimitRingtoneVolume(false), mLastVoiceVolume(-1.0f),
     mA2dpSuspended(false),
@@ -4794,6 +4798,20 @@ audio_devices_t AudioPolicyManager::getNewOutputDevice(const sp<AudioOutputDescr
         }
     }
 
+    // Check if an explicit routing request exists for an active stream on this output and
+    // use it in priority before any other rule
+    for (int stream = 0; stream < AUDIO_STREAM_FOR_POLICY_CNT; stream++) {
+        if (outputDesc->isStreamActive((audio_stream_type_t)stream)) {
+            audio_devices_t forcedDevice =
+                    mOutputRoutes.getActiveDeviceForStream(
+                            (audio_stream_type_t)stream, mAvailableOutputDevices);
+
+            if (forcedDevice != AUDIO_DEVICE_NONE) {
+                return forcedDevice;
+            }
+        }
+    }
+
     // check the following by order of priority to request a routing change if necessary:
     // 1: the strategy enforced audible is active and enforced on the output:
     //      use device for strategy enforced audible
@@ -5001,19 +5019,16 @@ uint32_t AudioPolicyManager::setBeaconMute(bool mute) {
 audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strategy,
                                                          bool fromCache)
 {
-    // Routing
-    // see if we have an explicit route
-    // scan the whole RouteMap, for each entry, convert the stream type to a strategy
-    // (getStrategy(stream)).
-    // if the strategy from the stream type in the RouteMap is the same as the argument above,
-    // and activity count is non-zero and the device in the route descriptor is available
-    // then select this device.
-    for (size_t routeIndex = 0; routeIndex < mOutputRoutes.size(); routeIndex++) {
-        sp<SessionRoute> route = mOutputRoutes.valueAt(routeIndex);
-        routing_strategy routeStrategy = getStrategy(route->mStreamType);
-        if ((routeStrategy == strategy) && route->isActiveOrChanged() &&
-                (mAvailableOutputDevices.indexOf(route->mDeviceDescriptor) >= 0)) {
-            return route->mDeviceDescriptor->type();
+    // Check if an explicit routing request exists for a stream type corresponding to the
+    // specified strategy and use it in priority over default routing rules.
+    for (int stream = 0; stream < AUDIO_STREAM_FOR_POLICY_CNT; stream++) {
+        if (getStrategy((audio_stream_type_t)stream) == strategy) {
+            audio_devices_t forcedDevice =
+                    mOutputRoutes.getActiveDeviceForStream(
+                            (audio_stream_type_t)stream, mAvailableOutputDevices);
+            if (forcedDevice != AUDIO_DEVICE_NONE) {
+                return forcedDevice;
+            }
         }
     }
 
@@ -5515,7 +5530,10 @@ status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
     }
 
     float volumeDb = computeVolume(stream, index, device);
-    if (outputDesc->isFixedVolume(device)) {
+    if (outputDesc->isFixedVolume(device) ||
+            // Force VoIP volume to max for bluetooth SCO
+            ((stream == AUDIO_STREAM_VOICE_CALL || stream == AUDIO_STREAM_BLUETOOTH_SCO) &&
+             (device & AUDIO_DEVICE_OUT_ALL_SCO) != 0)) {
         volumeDb = 0.0f;
     }
 

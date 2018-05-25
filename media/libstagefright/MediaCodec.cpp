@@ -479,6 +479,13 @@ sp<MediaCodec> MediaCodec::CreateByComponentName(
 
 // static
 sp<PersistentSurface> MediaCodec::CreatePersistentInputSurface() {
+    // allow plugin to create surface
+    sp<PersistentSurface> pluginSurface =
+        StagefrightPluginLoader::GetCCodecInstance()->createInputSurface();
+    if (pluginSurface != nullptr) {
+        return pluginSurface;
+    }
+
     OMXClient client;
     if (client.connect() != OK) {
         ALOGE("Failed to connect to OMX to create persistent input surface.");
@@ -854,8 +861,7 @@ static CodecBase *CreateCCodec() {
 
 //static
 sp<CodecBase> MediaCodec::GetCodecBase(const AString &name) {
-    static bool ccodecEnabled = property_get_bool("debug.stagefright.ccodec", false);
-    if (ccodecEnabled && name.startsWithIgnoreCase("c2.")) {
+    if (name.startsWithIgnoreCase("c2.")) {
         return CreateCCodec();
     } else if (name.startsWithIgnoreCase("omx.")) {
         // at this time only ACodec specifies a mime type.

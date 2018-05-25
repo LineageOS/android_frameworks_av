@@ -302,29 +302,14 @@ status_t OpcodeListBuilder::addWarpRectilinearForMetadata(const float* kCoeffs,
     normalizedOCX = CLAMP(normalizedOCX, 0, 1);
     normalizedOCY = CLAMP(normalizedOCY, 0, 1);
 
-    // Conversion factors from Camera2 K factors to DNG spec. K factors:
-    //
-    //      Note: these are necessary because our unit system assumes a
-    //      normalized max radius of sqrt(2), whereas the DNG spec's
-    //      WarpRectilinear opcode assumes a normalized max radius of 1.
-    //      Thus, each K coefficient must include the domain scaling
-    //      factor (the DNG domain is scaled by sqrt(2) to emulate the
-    //      domain used by the Camera2 specification).
-
-    const double c_0 = sqrt(2);
-    const double c_1 = 2 * sqrt(2);
-    const double c_2 = 4 * sqrt(2);
-    const double c_3 = 8 * sqrt(2);
-    const double c_4 = 2;
-    const double c_5 = 2;
-
-    const double coeffs[] = { c_0 * kCoeffs[0],
-                              c_1 * kCoeffs[1],
-                              c_2 * kCoeffs[2],
-                              c_3 * kCoeffs[3],
-                              c_4 * kCoeffs[4],
-                              c_5 * kCoeffs[5] };
-
+    double coeffs[6] = {
+        kCoeffs[0],
+        kCoeffs[1],
+        kCoeffs[2],
+        kCoeffs[3],
+        kCoeffs[4],
+        kCoeffs[5]
+    };
 
     return addWarpRectilinear(/*numPlanes*/1,
                               /*opticalCenterX*/normalizedOCX,

@@ -9,7 +9,9 @@ cc_library_shared {
     shared_libs: [
         "libaudioutils",
         "libbinder",
+        "libcutils",
         "liblog",
+        "libmediautils",
         "libnbaio",
         "libnblog",
         "libutils",

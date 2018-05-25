@@ -92,10 +92,15 @@ MediaCodecListBuilderBase *GetCodec2InfoBuilder() {
 }
 
 std::vector<MediaCodecListBuilderBase *> GetBuilders() {
-    std::vector<MediaCodecListBuilderBase *> builders {&sOmxInfoBuilder};
-    if (property_get_bool("debug.stagefright.ccodec", false)) {
-        builders.push_back(GetCodec2InfoBuilder());
+    std::vector<MediaCodecListBuilderBase *> builders;
+    // if plugin provides the input surface, we cannot use OMX video encoders.
+    // In this case, rely on plugin to provide list of OMX codecs that are usable.
+    sp<PersistentSurface> surfaceTest =
+        StagefrightPluginLoader::GetCCodecInstance()->createInputSurface();
+    if (surfaceTest == nullptr) {
+        builders.push_back(&sOmxInfoBuilder);
     }
+    builders.push_back(GetCodec2InfoBuilder());
     return builders;
 }
 

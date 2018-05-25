@@ -934,7 +934,11 @@ sp<AMessage> NuPlayer::GenericSource::getTrackInfo(size_t trackIndex) const {
     sp<MetaData> meta = mSources.itemAt(trackIndex)->getFormat();
     if (meta == NULL) {
         ALOGE("no metadata for track %zu", trackIndex);
-        return NULL;
+        format->setInt32("type", MEDIA_TRACK_TYPE_UNKNOWN);
+        format->setString("mime", "application/octet-stream");
+        format->setString("language", "und");
+
+        return format;
     }
 
     const char *mime;

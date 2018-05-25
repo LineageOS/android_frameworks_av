@@ -26,7 +26,6 @@
 #include <sys/time.h>
 #include <binder/IServiceManager.h>
 #include <utils/Log.h>
-#include <cutils/multiuser.h>
 #include <cutils/properties.h>
 #include <binder/IPCThreadState.h>
 #include <binder/ActivityManager.h>
@@ -42,8 +41,6 @@
 
 #include <system/audio.h>
 #include <system/audio_policy.h>
-
-#include <private/android_filesystem_config.h>
 
 namespace android {
 
@@ -275,7 +272,7 @@ void AudioPolicyService::NotificationClient::onAudioPatchListUpdate()
 void AudioPolicyService::NotificationClient::onDynamicPolicyMixStateUpdate(
         const String8& regId, int32_t state)
 {
-    if (mAudioPolicyServiceClient != 0 && multiuser_get_app_id(mUid) < AID_APP_START) {
+    if (mAudioPolicyServiceClient != 0 && isServiceUid(mUid)) {
         mAudioPolicyServiceClient->onDynamicPolicyMixStateUpdate(regId, state);
     }
 }
@@ -285,7 +282,7 @@ void AudioPolicyService::NotificationClient::onRecordingConfigurationUpdate(
         const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
         audio_patch_handle_t patchHandle)
 {
-    if (mAudioPolicyServiceClient != 0 && multiuser_get_app_id(mUid) < AID_APP_START) {
+    if (mAudioPolicyServiceClient != 0 && isServiceUid(mUid)) {
         mAudioPolicyServiceClient->onRecordingConfigurationUpdate(event, clientInfo,
                 clientConfig, deviceConfig, patchHandle);
     }
@@ -575,10 +572,6 @@ void AudioPolicyService::UidPolicy::onUidGone(uid_t uid, __unused bool disabled)
 
 void AudioPolicyService::UidPolicy::onUidIdle(uid_t uid, __unused bool disabled) {
     updateUidCache(uid, false, true);
-}
-
-bool AudioPolicyService::UidPolicy::isServiceUid(uid_t uid) const {
-    return multiuser_get_app_id(uid) < AID_APP_START;
 }
 
 void AudioPolicyService::UidPolicy::notifyService(uid_t uid, bool active) {
@@ -1212,6 +1205,7 @@ void AudioPolicyService::AudioCommandThread::insertCommand_l(sp<AudioCommand>& c
                 patch = ((CreateAudioPatchData *)command->mParam.get())->mPatch;
             } else {
                 handle = ((ReleaseAudioPatchData *)command->mParam.get())->mHandle;
+                memset(&patch, 0, sizeof(patch));
             }
             audio_patch_handle_t handle2;
             struct audio_patch patch2;

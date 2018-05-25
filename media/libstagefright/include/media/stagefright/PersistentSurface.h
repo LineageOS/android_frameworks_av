@@ -18,21 +18,32 @@
 
 #define PERSISTENT_SURFACE_H_
 
-#include <gui/IGraphicBufferProducer.h>
 #include <android/IGraphicBufferSource.h>
-#include <media/stagefright/foundation/ABase.h>
 #include <binder/Parcel.h>
+#include <hidl/HidlSupport.h>
+#include <gui/IGraphicBufferProducer.h>
+#include <media/stagefright/foundation/ABase.h>
+
+using android::hidl::base::V1_0::IBase;
 
 namespace android {
 
 struct PersistentSurface : public RefBase {
     PersistentSurface() {}
 
+    // create an OMX persistent surface
     PersistentSurface(
             const sp<IGraphicBufferProducer>& bufferProducer,
             const sp<IGraphicBufferSource>& bufferSource) :
         mBufferProducer(bufferProducer),
         mBufferSource(bufferSource) { }
+
+    // create a HIDL persistent surface
+    PersistentSurface(
+            const sp<IGraphicBufferProducer>& bufferProducer,
+            const sp<IBase>& hidlTarget) :
+        mBufferProducer(bufferProducer),
+        mHidlTarget(hidlTarget) { }
 
     sp<IGraphicBufferProducer> getBufferProducer() const {
         return mBufferProducer;
@@ -40,6 +51,10 @@ struct PersistentSurface : public RefBase {
 
     sp<IGraphicBufferSource> getBufferSource() const {
         return mBufferSource;
+    }
+
+    sp<IBase> getHidlTarget() const {
+        return mHidlTarget;
     }
 
     status_t writeToParcel(Parcel *parcel) const {
@@ -59,6 +74,7 @@ struct PersistentSurface : public RefBase {
 private:
     sp<IGraphicBufferProducer> mBufferProducer;
     sp<IGraphicBufferSource> mBufferSource;
+    sp<IBase> mHidlTarget;
 
     DISALLOW_EVIL_CONSTRUCTORS(PersistentSurface);
 };

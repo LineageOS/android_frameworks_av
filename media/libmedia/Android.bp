@@ -32,6 +32,9 @@ cc_library {
         "libaudioclient_headers",
         "libaudio_system_headers",
     ],
+    export_header_lib_headers: [
+        "libmedia_headers",
+    ],
     clang: true,
 }
 

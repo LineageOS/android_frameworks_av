@@ -29,7 +29,7 @@ using Eigen::MatrixXd;
 
 #define CIRCULAR_BUFFER_UPSAMPLE 4  //4 times buffer size
 
-static constexpr float MIN_ENVELOPE = 0.000001f;
+static constexpr float MIN_ENVELOPE = 1e-6f; //-120 dB
 //helper functionS
 static inline bool isPowerOf2(unsigned long n) {
     return (n & (n - 1)) == 0;
@@ -53,14 +53,6 @@ template <> bool compareEquality<float>(float a, float b) {
 #define IS_CHANGED(c, a, b) { c |= !compareEquality(a,b); \
     (a) = (b); }
 
-float dBtoLinear(float valueDb) {
-    return  pow (10, valueDb / 20.0);
-}
-
-float linearToDb(float value) {
-    return 20 * log10(value);
-}
-
 //ChannelBuffers helper
 void ChannelBuffer::initBuffers(unsigned int blockSize, unsigned int overlapSize,
         unsigned int halfFftSize, unsigned int samplingRate, DPBase &dpBase) {
@@ -74,7 +66,7 @@ void ChannelBuffer::initBuffers(unsigned int blockSize, unsigned int overlapSize
     cBOutput.resize(mBlockSize * CIRCULAR_BUFFER_UPSAMPLE);
 
     //fill input with half block size...
-    for (unsigned int k = 0;  k < mBlockSize/2; k++) {
+    for (unsigned int k = 0; k < mBlockSize/2; k++) {
         cBInput.write(0);
     }
 
@@ -94,12 +86,14 @@ void ChannelBuffer::initBuffers(unsigned int blockSize, unsigned int overlapSize
             mMbcBands.size(), mPostEqBands.size());
 
     DPChannel *pChannel = dpBase.getChannel(0);
-    if (pChannel != NULL) {
+    if (pChannel != nullptr) {
         mPreEqInUse = pChannel->getPreEq()->isInUse();
         mMbcInUse = pChannel->getMbc()->isInUse();
         mPostEqInUse = pChannel->getPostEq()->isInUse();
         mLimiterInUse = pChannel->getLimiter()->isInUse();
     }
+
+    mLimiterParams.linkGroup = -1; //no group.
 }
 
 void ChannelBuffer::computeBinStartStop(BandParams &bp, size_t binStart) {
@@ -108,8 +102,35 @@ void ChannelBuffer::computeBinStartStop(BandParams &bp, size_t binStart) {
     bp.binStop = (int)(0.5 + bp.freqCutoffHz * mBlockSize / mSamplingRate);
 }
 
-//== DPFrequency
+//== LinkedLimiters Helper
+void LinkedLimiters::reset() {
+    mGroupsMap.clear();
+}
 
+void LinkedLimiters::update(int32_t group, int index) {
+    mGroupsMap[group].push_back(index);
+}
+
+void LinkedLimiters::remove(int index) {
+    //check all groups and if index is found, remove it.
+    //if group is empty afterwards, remove it.
+    for (auto it = mGroupsMap.begin(); it != mGroupsMap.end(); ) {
+        for (auto itIndex = it->second.begin(); itIndex != it->second.end(); ) {
+            if (*itIndex == index) {
+                itIndex = it->second.erase(itIndex);
+            } else {
+                ++itIndex;
+            }
+        }
+        if (it->second.size() == 0) {
+            it = mGroupsMap.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+//== DPFrequency
 void DPFrequency::reset() {
 }
 
@@ -147,14 +168,25 @@ void DPFrequency::configure(size_t blockSize, size_t overlapSize,
                 mSamplingRate, *this);
     }
 
-    //dsp
+    //effective number of frames processed per second
+    mBlocksPerSecond = (float)mSamplingRate / (mBlockSize - mOverlapSize);
+
     fill_window(mVWindow, RDSP_WINDOW_HANNING_FLAT_TOP, mBlockSize, mOverlapSize);
+
+    //compute window rms for energy compensation
+    mWindowRms = 0;
+    for (size_t i = 0; i < mVWindow.size(); i++) {
+        mWindowRms += mVWindow[i] * mVWindow[i];
+    }
+
+    //Making sure window rms is not zero.
+    mWindowRms = std::max(sqrt(mWindowRms / mVWindow.size()), MIN_ENVELOPE);
 }
 
 void DPFrequency::updateParameters(ChannelBuffer &cb, int channelIndex) {
     DPChannel *pChannel = getChannel(channelIndex);
 
-    if (pChannel == NULL) {
+    if (pChannel == nullptr) {
         ALOGE("Error: updateParameters null DPChannel %d", channelIndex);
         return;
     }
@@ -166,7 +198,7 @@ void DPFrequency::updateParameters(ChannelBuffer &cb, int channelIndex) {
         //===EqPre
         if (cb.mPreEqInUse) {
             DPEq *pPreEq = pChannel->getPreEq();
-            if (pPreEq == NULL) {
+            if (pPreEq == nullptr) {
                 ALOGE("Error: updateParameters null PreEq for channel: %d", channelIndex);
                 return;
             }
@@ -174,7 +206,7 @@ void DPFrequency::updateParameters(ChannelBuffer &cb, int channelIndex) {
             if (cb.mPreEqEnabled) {
                 for (unsigned int b = 0; b < getPreEqBandCount(); b++) {
                     DPEqBand *pEqBand = pPreEq->getBand(b);
-                    if (pEqBand == NULL) {
+                    if (pEqBand == nullptr) {
                         ALOGE("Error: updateParameters null PreEqBand for band %d", b);
                         return; //failed.
                     }
@@ -222,7 +254,7 @@ void DPFrequency::updateParameters(ChannelBuffer &cb, int channelIndex) {
         bool changed = false;
 
         DPEq *pPostEq = pChannel->getPostEq();
-        if (pPostEq == NULL) {
+        if (pPostEq == nullptr) {
             ALOGE("Error: updateParameters null postEq for channel: %d", channelIndex);
             return; //failed.
         }
@@ -230,7 +262,7 @@ void DPFrequency::updateParameters(ChannelBuffer &cb, int channelIndex) {
         if (cb.mPostEqEnabled) {
             for (unsigned int b = 0; b < getPostEqBandCount(); b++) {
                 DPEqBand *pEqBand = pPostEq->getBand(b);
-                if (pEqBand == NULL) {
+                if (pEqBand == nullptr) {
                     ALOGE("Error: updateParameters PostEqBand NULL for band %d", b);
                     return; //failed.
                 }
@@ -265,7 +297,7 @@ void DPFrequency::updateParameters(ChannelBuffer &cb, int channelIndex) {
     //===MBC
     if (cb.mMbcInUse) {
         DPMbc *pMbc = pChannel->getMbc();
-        if (pMbc == NULL) {
+        if (pMbc == nullptr) {
             ALOGE("Error: updateParameters Mbc NULL for channel: %d", channelIndex);
             return;
         }
@@ -274,7 +306,7 @@ void DPFrequency::updateParameters(ChannelBuffer &cb, int channelIndex) {
             bool changed = false;
             for (unsigned int b = 0; b < getMbcBandCount(); b++) {
                 DPMbcBand *pMbcBand = pMbc->getBand(b);
-                if (pMbcBand == NULL) {
+                if (pMbcBand == nullptr) {
                     ALOGE("Error: updateParameters MbcBand NULL for band %d", b);
                     return; //failed.
                 }
@@ -307,11 +339,38 @@ void DPFrequency::updateParameters(ChannelBuffer &cb, int channelIndex) {
                     cb.computeBinStartStop(*pMbcBandParams, binNext);
                     binNext = pMbcBandParams->binStop + 1;
                 }
-
             }
-
         }
     }
+
+    //===Limiter
+    if (cb.mLimiterInUse) {
+        bool changed = false;
+        DPLimiter *pLimiter = pChannel->getLimiter();
+        if (pLimiter == nullptr) {
+            ALOGE("Error: updateParameters Limiter NULL for channel: %d", channelIndex);
+            return;
+        }
+        cb.mLimiterEnabled = pLimiter->isEnabled();
+        if (cb.mLimiterEnabled) {
+            IS_CHANGED(changed, cb.mLimiterParams.linkGroup ,
+                    (int32_t)pLimiter->getLinkGroup());
+            cb.mLimiterParams.attackTimeMs = pLimiter->getAttackTime();
+            cb.mLimiterParams.releaseTimeMs = pLimiter->getReleaseTime();
+            cb.mLimiterParams.ratio = pLimiter->getRatio();
+            cb.mLimiterParams.thresholdDb = pLimiter->getThreshold();
+            cb.mLimiterParams.postGainDb = pLimiter->getPostGain();
+        }
+
+        if (changed) {
+            ALOGV("limiter changed, recomputing linkGroups for %d", channelIndex);
+            mLinkedLimiters.remove(channelIndex); //in case it was already there.
+            mLinkedLimiters.update(cb.mLimiterParams.linkGroup, channelIndex);
+        }
+    }
+
+    //=== Output Gain
+    cb.outputGainDb = pChannel->getOutputGain();
 }
 
 size_t DPFrequency::processSamples(const float *in, float *out, size_t samples) {
@@ -336,12 +395,8 @@ size_t DPFrequency::processSamples(const float *in, float *out, size_t samples) 
            }
        }
 
-       //TODO: lookahead limiters
-       //TODO: apply linked limiters to all channels.
-       //**Process each Channel
-       for (int ch = 0; ch < channelCount; ch++) {
-           processMono(mChannelBuffers[ch]);
-       }
+       //**process all channelBuffers
+       processChannelBuffers(mChannelBuffers);
 
        //** estimate how much data is available in ALL channels
        size_t available = mChannelBuffers[0].cBOutput.availableToRead();
@@ -370,62 +425,78 @@ size_t DPFrequency::processSamples(const float *in, float *out, size_t samples) 
        return samples;
 }
 
-size_t DPFrequency::processMono(ChannelBuffer &cb) {
-
+size_t DPFrequency::processChannelBuffers(CBufferVector &channelBuffers) {
+    const int channelCount = channelBuffers.size();
     size_t processedSamples = 0;
+    size_t processFrames = mBlockSize - mOverlapSize;
 
-    size_t available = cb.cBInput.availableToRead();
-    while (available >= mBlockSize - mOverlapSize) {
-
-        //move tail of previous
-        for (unsigned int k = 0; k < mOverlapSize; ++k) {
-            cb.input[k] = cb.input[mBlockSize - mOverlapSize + k];
-        }
-
-        //read new available data
-        for (unsigned int k = 0; k < mBlockSize - mOverlapSize; k++) {
-            cb.input[mOverlapSize + k] = cb.cBInput.read();
-        }
-
-        //## Actual process
-        processOneVector(cb.output, cb.input, cb);
-        //##End of Process
-
-        //mix tail (and capture new tail
-        for (unsigned int k = 0; k < mOverlapSize; k++) {
-            cb.output[k] += cb.outTail[k];
-            cb.outTail[k] = cb.output[mBlockSize - mOverlapSize + k]; //new tail
-        }
-
-        //output data
-        for (unsigned int k = 0; k < mBlockSize - mOverlapSize; k++) {
-            cb.cBOutput.write(cb.output[k]);
-        }
-
-        available = cb.cBInput.availableToRead();
+    size_t available = channelBuffers[0].cBInput.availableToRead();
+    for (int ch = 1; ch < channelCount; ch++) {
+        available = std::min(available, channelBuffers[ch].cBInput.availableToRead());
     }
 
+    while (available >= processFrames) {
+        //First pass
+        for (int ch = 0; ch < channelCount; ch++) {
+            ChannelBuffer * pCb = &channelBuffers[ch];
+            //move tail of previous
+            std::copy(pCb->input.begin() + processFrames,
+                    pCb->input.end(),
+                    pCb->input.begin());
+
+            //read new available data
+            for (unsigned int k = 0; k < processFrames; k++) {
+                pCb->input[mOverlapSize + k] = pCb->cBInput.read();
+            }
+            //first stages: fft, preEq, mbc, postEq and start of Limiter
+            processedSamples += processFirstStages(*pCb);
+        }
+
+        //**compute linked limiters and update levels if needed
+        processLinkedLimiters(channelBuffers);
+
+        //final pass.
+        for (int ch = 0; ch < channelCount; ch++) {
+            ChannelBuffer * pCb = &channelBuffers[ch];
+
+            //linked limiter and ifft
+            processLastStages(*pCb);
+
+            //mix tail (and capture new tail
+            for (unsigned int k = 0; k < mOverlapSize; k++) {
+                pCb->output[k] += pCb->outTail[k];
+                pCb->outTail[k] = pCb->output[processFrames + k]; //new tail
+            }
+
+            //output data
+            for (unsigned int k = 0; k < processFrames; k++) {
+                pCb->cBOutput.write(pCb->output[k]);
+            }
+        }
+        available -= processFrames;
+    }
     return processedSamples;
 }
-
-size_t DPFrequency::processOneVector(FloatVec & output, FloatVec & input,
-        ChannelBuffer &cb) {
+size_t DPFrequency::processFirstStages(ChannelBuffer &cb) {
 
     //##apply window
     Eigen::Map<Eigen::VectorXf> eWindow(&mVWindow[0], mVWindow.size());
-    Eigen::Map<Eigen::VectorXf> eInput(&input[0], input.size());
+    Eigen::Map<Eigen::VectorXf> eInput(&cb.input[0], cb.input.size());
 
     Eigen::VectorXf eWin = eInput.cwiseProduct(eWindow); //apply window
 
-    //##fft //TODO: refactor frequency transformations away from other stages.
-    mFftServer.fwd(mComplexTemp, eWin);
+    //##fft
+    //Note: we are using eigen with the default scaling, which ensures that
+    //  IFFT( FFT(x) ) = x.
+    // TODO: optimize by using the noscale option, and compensate with dB scale offsets
+    mFftServer.fwd(cb.complexTemp, eWin);
 
-    size_t cSize = mComplexTemp.size();
+    size_t cSize = cb.complexTemp.size();
     size_t maxBin = std::min(cSize/2, mHalfFFTSize);
 
     //== EqPre (always runs)
     for (size_t k = 0; k < maxBin; k++) {
-        mComplexTemp[k] *= cb.mPreEqFactorVector[k];
+        cb.complexTemp[k] *= cb.mPreEqFactorVector[k];
     }
 
     //== MBC
@@ -439,62 +510,68 @@ size_t DPFrequency::processOneVector(FloatVec & output, FloatVec & input,
             float preGainSquared = preGainFactor * preGainFactor;
 
             for (size_t k = pMbcBandParams->binStart; k <= pMbcBandParams->binStop; k++) {
-                float fReal = mComplexTemp[k].real();
-                float fImag = mComplexTemp[k].imag();
-                float fSquare = (fReal * fReal + fImag * fImag) * preGainSquared;
-
-                fEnergySum += fSquare;
+                fEnergySum += std::norm(cb.complexTemp[k]) * preGainSquared; //mag squared
             }
 
-            fEnergySum = sqrt(fEnergySum /2.0);
+            //Eigen FFT is full spectrum, even if the source was real data.
+            // Each half spectrum has half the energy. This is taken into account with the * 2
+            // factor in the energy computations.
+            // energy = sqrt(sum_components_squared) number_points
+            // in here, the fEnergySum is duplicated to account for the second half spectrum,
+            // and the windowRms is used to normalize by the expected energy reduction
+            // caused by the window used (expected for steady state signals)
+            fEnergySum = sqrt(fEnergySum * 2) / (mBlockSize * mWindowRms);
+
+            // updates computed per frame advance.
             float fTheta = 0.0;
-            float fFAtt = pMbcBandParams->attackTimeMs;
-            float fFRel = pMbcBandParams->releaseTimeMs;
-
-            float fUpdatesPerSecond = 10; //TODO: compute from framerate
-
+            float fFAttSec = pMbcBandParams->attackTimeMs / 1000; //in seconds
+            float fFRelSec = pMbcBandParams->releaseTimeMs / 1000; //in seconds
 
             if (fEnergySum > pMbcBandParams->previousEnvelope) {
-                fTheta = exp(-1.0 / (fFAtt * fUpdatesPerSecond));
+                fTheta = exp(-1.0 / (fFAttSec * mBlocksPerSecond));
             } else {
-                fTheta = exp(-1.0 / (fFRel * fUpdatesPerSecond));
+                fTheta = exp(-1.0 / (fFRelSec * mBlocksPerSecond));
             }
 
             float fEnv = (1.0 - fTheta) * fEnergySum + fTheta * pMbcBandParams->previousEnvelope;
-
             //preserve for next iteration
             pMbcBandParams->previousEnvelope = fEnv;
 
-            float fThreshold = dBtoLinear(pMbcBandParams->thresholdDb);
-            float fNoiseGateThreshold = dBtoLinear(pMbcBandParams->noiseGateThresholdDb);
-
-            float fNewFactor = 1.0;
-
-            if (fEnv > fThreshold) {
-                float fDbAbove = linearToDb(fThreshold / fEnv);
-                float fDbTarget = fDbAbove / pMbcBandParams->ratio;
-                float fDbChange = fDbAbove - fDbTarget;
-                fNewFactor = dBtoLinear(fDbChange);
-            } else if (fEnv < fNoiseGateThreshold) {
-                if (fEnv < MIN_ENVELOPE) {
-                    fEnv = MIN_ENVELOPE;
-                }
-                float fDbBelow = linearToDb(fNoiseGateThreshold / fEnv);
-                float fDbTarget = fDbBelow / pMbcBandParams->expanderRatio;
-                float fDbChange = fDbBelow - fDbTarget;
-                fNewFactor = dBtoLinear(fDbChange);
+            if (fEnv < MIN_ENVELOPE) {
+                fEnv = MIN_ENVELOPE;
             }
+            const float envDb = linearToDb(fEnv);
+            float newLevelDb = envDb;
+            //using shorter variables for code clarity
+            const float thresholdDb = pMbcBandParams->thresholdDb;
+            const float ratio = pMbcBandParams->ratio;
+            const float kneeWidthDbHalf = pMbcBandParams->kneeWidthDb / 2;
+            const float noiseGateThresholdDb = pMbcBandParams->noiseGateThresholdDb;
+            const float expanderRatio = pMbcBandParams->expanderRatio;
+
+            //find segment
+            if (envDb > thresholdDb + kneeWidthDbHalf) {
+                //compression segment
+                newLevelDb = envDb + ((1 / ratio) - 1) * (envDb - thresholdDb);
+            } else if (envDb > thresholdDb - kneeWidthDbHalf) {
+                //knee-compression segment
+                float temp = (envDb - thresholdDb + kneeWidthDbHalf);
+                newLevelDb = envDb + ((1 / ratio) - 1) *
+                        temp * temp / (kneeWidthDbHalf * 4);
+            } else if (envDb < noiseGateThresholdDb) {
+                //expander segment
+                newLevelDb = noiseGateThresholdDb -
+                        expanderRatio * (noiseGateThresholdDb - envDb);
+            }
+
+            float newFactor = dBtoLinear(newLevelDb - envDb);
 
             //apply post gain.
-            fNewFactor *= dBtoLinear(pMbcBandParams->gainPostDb);
-
-            if (fNewFactor < 0) {
-                fNewFactor = 0;
-            }
+            newFactor *= dBtoLinear(pMbcBandParams->gainPostDb);
 
             //apply to this band
             for (size_t k = pMbcBandParams->binStart; k <= pMbcBandParams->binStop; k++) {
-                mComplexTemp[k] *= fNewFactor;
+                cb.complexTemp[k] *= newFactor;
             }
 
         } //end per band process
@@ -504,14 +581,94 @@ size_t DPFrequency::processOneVector(FloatVec & output, FloatVec & input,
     //== EqPost
     if (cb.mPostEqInUse && cb.mPostEqEnabled) {
         for (size_t k = 0; k < maxBin; k++) {
-            mComplexTemp[k] *= cb.mPostEqFactorVector[k];
+            cb.complexTemp[k] *= cb.mPostEqFactorVector[k];
+        }
+    }
+
+    //== Limiter. First Pass
+    if (cb.mLimiterInUse && cb.mLimiterEnabled) {
+        float fEnergySum = 0;
+        for (size_t k = 0; k < maxBin; k++) {
+            fEnergySum += std::norm(cb.complexTemp[k]);
+        }
+
+        //see explanation above for energy computation logic
+        fEnergySum = sqrt(fEnergySum * 2) / (mBlockSize * mWindowRms);
+        float fTheta = 0.0;
+        float fFAttSec = cb.mLimiterParams.attackTimeMs / 1000; //in seconds
+        float fFRelSec = cb.mLimiterParams.releaseTimeMs / 1000; //in seconds
+
+        if (fEnergySum > cb.mLimiterParams.previousEnvelope) {
+            fTheta = exp(-1.0 / (fFAttSec * mBlocksPerSecond));
+        } else {
+            fTheta = exp(-1.0 / (fFRelSec * mBlocksPerSecond));
+        }
+
+        float fEnv = (1.0 - fTheta) * fEnergySum + fTheta * cb.mLimiterParams.previousEnvelope;
+        //preserve for next iteration
+        cb.mLimiterParams.previousEnvelope = fEnv;
+
+        const float envDb = linearToDb(fEnv);
+        float newFactorDb = 0;
+        //using shorter variables for code clarity
+        const float thresholdDb = cb.mLimiterParams.thresholdDb;
+        const float ratio = cb.mLimiterParams.ratio;
+
+        if (envDb > thresholdDb) {
+            //limiter segment
+            newFactorDb = ((1 / ratio) - 1) * (envDb - thresholdDb);
+        }
+
+        float newFactor = dBtoLinear(newFactorDb);
+
+        cb.mLimiterParams.newFactor = newFactor;
+
+    } //end Limiter
+    return mBlockSize;
+}
+
+void DPFrequency::processLinkedLimiters(CBufferVector &channelBuffers) {
+
+    const int channelCount = channelBuffers.size();
+    for (auto &groupPair : mLinkedLimiters.mGroupsMap) {
+        float minFactor = 1.0;
+        //estimate minfactor for all linked
+        for(int index : groupPair.second) {
+            if (index >= 0 && index < channelCount) {
+                minFactor = std::min(channelBuffers[index].mLimiterParams.newFactor, minFactor);
+            }
+        }
+        //apply minFactor
+        for(int index : groupPair.second) {
+            if (index >= 0 && index < channelCount) {
+                channelBuffers[index].mLimiterParams.linkFactor = minFactor;
+            }
+        }
+    }
+}
+
+size_t DPFrequency::processLastStages(ChannelBuffer &cb) {
+
+    float outputGainFactor = dBtoLinear(cb.outputGainDb);
+    //== Limiter. last Pass
+    if (cb.mLimiterInUse && cb.mLimiterEnabled) {
+        //compute factor, with post-gain
+        float factor = cb.mLimiterParams.linkFactor * dBtoLinear(cb.mLimiterParams.postGainDb);
+        outputGainFactor *= factor;
+    }
+
+    //apply to all if != 1.0
+    if (!compareEquality(outputGainFactor, 1.0f)) {
+        size_t cSize = cb.complexTemp.size();
+        size_t maxBin = std::min(cSize/2, mHalfFFTSize);
+        for (size_t k = 0; k < maxBin; k++) {
+            cb.complexTemp[k] *= outputGainFactor;
         }
     }
 
     //##ifft directly to output.
-    Eigen::Map<Eigen::VectorXf> eOutput(&output[0], output.size());
-    mFftServer.inv(eOutput, mComplexTemp);
-
+    Eigen::Map<Eigen::VectorXf> eOutput(&cb.output[0], cb.output.size());
+    mFftServer.inv(eOutput, cb.complexTemp);
     return mBlockSize;
 }
 
