@@ -855,7 +855,12 @@ void SoftXAAC::configflushDecode() {
         err_code = getXAACStreamInfo();
         ALOGV("Found Codec with below config---\nsampFreq %d\nnumChannels %d\npcmWdSz %d\nchannelMask %d\noutputFrameLength %d",
                                     mSampFreq,mNumChannels,mPcmWdSz,mChannelMask,mOutputFrameLength);
-        mIsCodecInitialized = true;
+        if(mNumChannels > MAX_CHANNEL_COUNT) {
+            ALOGE(" No of channels are more than max channels\n");
+            mIsCodecInitialized = false;
+        }
+        else
+            mIsCodecInitialized = true;
     }
 
 }
