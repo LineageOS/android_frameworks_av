@@ -435,6 +435,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     }
     mName = TRACK_NAME_PENDING;
 
+    mDumpLatency = thread->type() == ThreadBase::MIXER;
 #ifdef TEE_SINK
     mTee.setId(std::string("_") + std::to_string(mThreadIoHandle)
             + "_" + std::to_string(mId) +
@@ -489,13 +490,14 @@ void AudioFlinger::PlaybackThread::Track::destroy()
     }
 }
 
-/*static*/ void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
+void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
 {
-    result.append("T Name Active Client Session S  Flags "
+    result.appendFormat("T Name Active Client Session S  Flags "
                   "  Format Chn mask  SRate "
                   "ST  L dB  R dB  VS dB "
-                  "  Server FrmCnt  FrmRdy F Underruns  Flushed "
-                  "Main Buf  Aux Buf\n");
+                  "  Server FrmCnt  FrmRdy F Underruns  Flushed"
+                  "%s\n",
+                  mDumpLatency ? " Latency" : "");
 }
 
 void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool active)
@@ -504,7 +506,7 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
     switch (mType) {
     case TYPE_DEFAULT:
     case TYPE_OUTPUT:
-        if (mSharedBuffer.get() != nullptr) {
+        if (isStatic()) {
             trackType = 'S'; // static
         } else {
             trackType = ' '; // normal
@@ -582,8 +584,7 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
     result.appendFormat("%7s %6u %7u %2s 0x%03X "
                            "%08X %08X %6u "
                            "%2u %5.2g %5.2g %5.2g%c "
-                           "%08X %6zu%c %6zu %c %9u%c %7u "
-                           "%08zX %08zX\n",
+                           "%08X %6zu%c %6zu %c %9u%c %7u",
             active ? "yes" : "no",
             (mClient == 0) ? getpid() : mClient->pid(),
             mSessionId,
@@ -607,11 +608,19 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
             fillingStatus,
             mAudioTrackServerProxy->getUnderrunFrames(),
             nowInUnderrun,
-            (unsigned)mAudioTrackServerProxy->framesFlushed() % 10000000,
-
-            (size_t)mMainBuffer, // use %zX as %p appends 0x
-            (size_t)mAuxBuffer   // use %zX as %p appends 0x
+            (unsigned)mAudioTrackServerProxy->framesFlushed() % 10000000
             );
+    if (mDumpLatency) {
+        double latencyMs =
+                mAudioTrackServerProxy->getTimestamp().getOutputServerLatencyMs(mSampleRate);
+        if (latencyMs > 0.) {
+            latencyMs += bufferLatencyMs();
+            result.appendFormat(" %7.3f", latencyMs);
+        } else {
+            result.appendFormat(" Unknown");
+        }
+    }
+    result.append("\n");
 }
 
 uint32_t AudioFlinger::PlaybackThread::Track::sampleRate() const {

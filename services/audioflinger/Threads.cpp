@@ -1784,7 +1784,7 @@ void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& ar
     if (numtracks) {
         dprintf(fd, " of which %zu are active\n", numactive);
         result.append(prefix);
-        Track::appendDumpHeader(result);
+        mTracks[0]->appendDumpHeader(result);
         for (size_t i = 0; i < numtracks; ++i) {
             sp<Track> track = mTracks[i];
             if (track != 0) {
@@ -1804,7 +1804,7 @@ void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& ar
         result.append("  The following tracks are in the active list but"
                 " not in the track list\n");
         result.append(prefix);
-        Track::appendDumpHeader(result);
+        mActiveTracks[0]->appendDumpHeader(result);
         for (size_t i = 0; i < numactive; ++i) {
             sp<Track> track = mActiveTracks[i];
             if (mTracks.indexOf(track) < 0) {
@@ -5054,6 +5054,10 @@ void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& ar
     dprintf(fd, "  Thread throttle time (msecs): %u\n", mThreadThrottleTimeMs);
     dprintf(fd, "  AudioMixer tracks: %s\n", mAudioMixer->trackNames().c_str());
     dprintf(fd, "  Master mono: %s\n", mMasterMono ? "on" : "off");
+    const double latencyMs = mTimestamp.getOutputServerLatencyMs(mSampleRate);
+    if (latencyMs > 0.) {
+        dprintf(fd, "  NormalMixer latency ms: %.2lf\n", latencyMs);
+    }
 
     if (hasFastMixer()) {
         dprintf(fd, "  FastMixer thread %p tid=%d", mFastMixer.get(), mFastMixer->getTid());

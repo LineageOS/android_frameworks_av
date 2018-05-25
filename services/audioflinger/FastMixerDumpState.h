@@ -66,6 +66,7 @@ struct FastMixerDumpState : FastThreadDumpState {
 
     void dump(int fd) const;    // should only be called on a stable copy, not the original
 
+    double   mLatencyMs = 0.;   // measured latency, default of 0 if no valid timestamp read.
     uint32_t mWriteSequence;    // incremented before and after each write()
     uint32_t mFramesWritten;    // total number of frames written successfully
     uint32_t mNumTracks;        // total number of active fast tracks

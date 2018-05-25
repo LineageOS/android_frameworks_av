@@ -538,6 +538,10 @@ public:
         mTimestampMutator.push(timestamp);
     }
 
+    virtual ExtendedTimestamp getTimestamp() const {
+        return mTimestampMutator.last();
+    }
+
     // Flushes the shared ring buffer if the client had requested it using mStreaming.mFlush.
     // If flush occurs then:
     //   cblk->u.mStreaming.mFront, ServerProxy::mFlush and ServerProxy::mFlushed will be modified
