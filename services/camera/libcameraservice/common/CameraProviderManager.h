@@ -230,6 +230,13 @@ public:
             hardware::hidl_version minVersion = hardware::hidl_version{0,0},
             hardware::hidl_version maxVersion = hardware::hidl_version{1000,0}) const;
 
+    /*
+     * Check if a camera with staticInfo is a logical camera. And if yes, return
+     * the physical camera ids.
+     */
+    static bool isLogicalCamera(const CameraMetadata& staticInfo,
+            std::vector<std::string>* physicalCameraIds);
+
 private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
     mutable std::mutex mInterfaceMutex;
@@ -314,7 +321,7 @@ private:
         std::vector<std::unique_ptr<DeviceInfo>> mDevices;
         std::unordered_set<std::string> mUniqueCameraIds;
         int mUniqueDeviceCount;
-        std::unordered_set<std::string> mUniqueAPI1CompatibleCameraIds;
+        std::vector<std::string> mUniqueAPI1CompatibleCameraIds;
 
         // HALv1-specific camera fields, including the actual device interface
         struct DeviceInfo1 : public DeviceInfo {
@@ -414,6 +421,9 @@ private:
     static const char* torchStatusToString(
         const hardware::camera::common::V1_0::TorchModeStatus&);
 
+    status_t getCameraCharacteristicsLocked(const std::string &id,
+            CameraMetadata* characteristics) const;
+    void filterLogicalCameraIdsLocked(std::vector<std::string>& deviceIds) const;
 };
 
 } // namespace android
