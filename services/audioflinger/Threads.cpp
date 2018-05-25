@@ -4262,6 +4262,37 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
     mMixerBufferValid = false;  // mMixerBuffer has no valid data until appropriate tracks found.
     mEffectBufferValid = false; // mEffectBuffer has no valid data until tracks found.
 
+    // DeferredOperations handles statistics after setting mixerStatus.
+    class DeferredOperations {
+    public:
+        DeferredOperations(mixer_state *mixerStatus)
+            : mMixerStatus(mixerStatus) { }
+
+        // when leaving scope, tally frames properly.
+        ~DeferredOperations() {
+            // Tally underrun frames only if we are actually mixing (MIXER_TRACKS_READY)
+            // because that is when the underrun occurs.
+            // We do not distinguish between FastTracks and NormalTracks here.
+            if (*mMixerStatus == MIXER_TRACKS_READY) {
+                for (const auto &underrun : mUnderrunFrames) {
+                    underrun.first->mAudioTrackServerProxy->tallyUnderrunFrames(
+                            underrun.second);
+                }
+            }
+        }
+
+        // tallyUnderrunFrames() is called to update the track counters
+        // with the number of underrun frames for a particular mixer period.
+        // We defer tallying until we know the final mixer status.
+        void tallyUnderrunFrames(sp<Track> track, size_t underrunFrames) {
+            mUnderrunFrames.emplace_back(track, underrunFrames);
+        }
+
+    private:
+        const mixer_state * const mMixerStatus;
+        std::vector<std::pair<sp<Track>, size_t>> mUnderrunFrames;
+    } deferredOperations(&mixerStatus); // implicit nested scope for variable capture
+
     for (size_t i=0 ; i<count ; i++) {
         const sp<Track> t = mActiveTracks[i];
 
@@ -4296,13 +4327,14 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
             track->mObservedUnderruns = underruns;
             // don't count underruns that occur while stopping or pausing
             // or stopped which can occur when flush() is called while active
+            size_t underrunFrames = 0;
             if (!(track->isStopping() || track->isPausing() || track->isStopped()) &&
                     recentUnderruns > 0) {
                 // FIXME fast mixer will pull & mix partial buffers, but we count as a full underrun
-                track->mAudioTrackServerProxy->tallyUnderrunFrames(recentUnderruns * mFrameCount);
-            } else {
-                track->mAudioTrackServerProxy->tallyUnderrunFrames(0);
+                underrunFrames = recentUnderruns * mFrameCount;
             }
+            // Immediately account for FastTrack underruns.
+            track->mAudioTrackServerProxy->tallyUnderrunFrames(underrunFrames);
 
             // This is similar to the state machine for normal tracks,
             // with a few modifications for fast tracks.
@@ -4717,13 +4749,13 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 mixerStatus = MIXER_TRACKS_READY;
             }
         } else {
+            size_t underrunFrames = 0;
             if (framesReady < desiredFrames && !track->isStopped() && !track->isPaused()) {
                 ALOGV("track(%p) underrun,  framesReady(%zu) < framesDesired(%zd)",
                         track, framesReady, desiredFrames);
-                track->mAudioTrackServerProxy->tallyUnderrunFrames(desiredFrames);
-            } else {
-                track->mAudioTrackServerProxy->tallyUnderrunFrames(0);
+                underrunFrames = desiredFrames;
             }
+            deferredOperations.tallyUnderrunFrames(track, underrunFrames);
 
             // clear effect chain input buffer if an active track underruns to avoid sending
             // previous audio buffer again to effects
