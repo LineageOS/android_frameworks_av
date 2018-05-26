@@ -7050,6 +7050,10 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
     /**
      * <p>The camera device is a logical camera backed by two or more physical cameras that are
      * also exposed to the application.</p>
+     * <p>Camera application shouldn't assume that there are at most 1 rear camera and 1 front
+     * camera in the system. For an application that switches between front and back cameras,
+     * the recommendation is to switch between the first rear camera and the first front
+     * camera in the list of supported camera devices.</p>
      * <p>This capability requires the camera device to support the following:</p>
      * <ul>
      * <li>This camera device must list the following static metadata entries in <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html">CameraCharacteristics</a>:<ul>

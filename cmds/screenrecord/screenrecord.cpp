@@ -135,6 +135,7 @@ static status_t configureSignals() {
                 strerror(errno));
         return err;
     }
+    signal(SIGPIPE, SIG_IGN);
     return NO_ERROR;
 }
 
