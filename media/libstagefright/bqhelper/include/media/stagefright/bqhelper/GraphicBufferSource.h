@@ -149,7 +149,21 @@ public:
     // When set, the sample's timestamp will be adjusted with the timeOffsetUs.
     status_t setTimeOffsetUs(int64_t timeOffsetUs);
 
-    // When set, the max frame rate fed to the encoder will be capped at maxFps.
+    /*
+     * Set the maximum frame rate on the source.
+     *
+     * When maxFps is a positive number, it indicates the maximum rate at which
+     * the buffers from this source will be sent to the encoder. Excessive
+     * frames will be dropped to meet the frame rate requirement.
+     *
+     * When maxFps is a negative number, any frame drop logic will be disabled
+     * and all frames from this source will be sent to the encoder, even when
+     * the timestamp goes backwards. Note that some components may still drop
+     * out-of-order frames silently, so this usually has to be used in
+     * conjunction with OMXNodeInstance::setMaxPtsGapUs() workaround.
+     *
+     * When maxFps is 0, this call will fail with BAD_VALUE.
+     */
     status_t setMaxFps(float maxFps);
 
     // Sets the time lapse (or slow motion) parameters.
