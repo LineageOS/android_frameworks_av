@@ -1,0 +1,96 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "6d7940e7_799db288",
+        "filename": "media/libstagefright/omx/OMXMaster.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 78,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-05-27T17:56:50Z",
+      "side": 1,
+      "message": "You could probably make this a shared_ptr and use a custom deleter that calls destroyOMXPlugin.",
+      "range": {
+        "startLine": 78,
+        "startChar": 4,
+        "endLine": 78,
+        "endChar": 45
+      },
+      "revId": "a033f4543405a319f9934f01b994bd380459ca53",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "306cd26f_0e2b1a93",
+        "filename": "media/libstagefright/omx/OMXMaster.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 98,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-05-27T17:56:50Z",
+      "side": 1,
+      "message": "compare against nullptr",
+      "range": {
+        "startLine": 98,
+        "startChar": 18,
+        "endLine": 98,
+        "endChar": 19
+      },
+      "revId": "a033f4543405a319f9934f01b994bd380459ca53",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "59377025_66a9ae7b",
+        "filename": "media/libstagefright/omx/OMXMaster.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 134,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-05-27T17:56:50Z",
+      "side": 1,
+      "message": "Can\u0027t you do a range based loop here?",
+      "range": {
+        "startLine": 134,
+        "startChar": 9,
+        "endLine": 134,
+        "endChar": 53
+      },
+      "revId": "a033f4543405a319f9934f01b994bd380459ca53",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "497fc151_edb309d9",
+        "filename": "media/libstagefright/omx/SoftOMXPlugin.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 110,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-05-27T17:56:50Z",
+      "side": 1,
+      "message": "probably unnecessary if all you are doing is adding logging",
+      "range": {
+        "startLine": 110,
+        "startChar": 8,
+        "endLine": 110,
+        "endChar": 65
+      },
+      "revId": "a033f4543405a319f9934f01b994bd380459ca53",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
