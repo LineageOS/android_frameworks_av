@@ -35,6 +35,9 @@ struct FrameDropper : public RefBase {
     // Returns false if max frame rate has not been set via setMaxFrameRate.
     bool shouldDrop(int64_t timeUs);
 
+    // Returns true if all frame drop logic should be disabled.
+    bool disabled() { return (mMinIntervalUs == -1ll); }
+
 protected:
     virtual ~FrameDropper();
 

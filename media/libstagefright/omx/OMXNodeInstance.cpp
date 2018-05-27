@@ -354,7 +354,7 @@ OMXNodeInstance::OMXNodeInstance(
       mQuirks(0),
       mBufferIDCount(0),
       mRestorePtsFailed(false),
-      mMaxTimestampGapUs(-1ll),
+      mMaxTimestampGapUs(0ll),
       mPrevOriginalTimeUs(-1ll),
       mPrevModifiedTimeUs(-1ll)
 {
@@ -1879,7 +1879,9 @@ status_t OMXNodeInstance::setMaxPtsGapUs(const void *params, size_t size) {
         return BAD_VALUE;
     }
 
-    mMaxTimestampGapUs = (int64_t)((OMX_PARAM_U32TYPE*)params)->nU32;
+    // The incoming number is an int32_t contained in OMX_U32.
+    // Cast to int32_t first then int64_t.
+    mMaxTimestampGapUs = (int32_t)((OMX_PARAM_U32TYPE*)params)->nU32;
 
     return OK;
 }
@@ -1903,12 +1905,26 @@ int64_t OMXNodeInstance::getCodecTimestamp(OMX_TICKS timestamp) {
         ALOGV("IN  timestamp: %lld -> %lld",
             static_cast<long long>(originalTimeUs),
             static_cast<long long>(timestamp));
+    } else if (mMaxTimestampGapUs < 0ll) {
+        /*
+         * Apply a fixed timestamp gap between adjacent frames.
+         *
+         * This is used by scenarios like still image capture where timestamps
+         * on frames could go forward or backward. Some encoders may silently
+         * drop frames when it goes backward (or even stay unchanged).
+         */
+        if (mPrevOriginalTimeUs >= 0ll) {
+            timestamp = mPrevModifiedTimeUs - mMaxTimestampGapUs;
+        }
+        ALOGV("IN  timestamp: %lld -> %lld",
+            static_cast<long long>(originalTimeUs),
+            static_cast<long long>(timestamp));
     }
 
     mPrevOriginalTimeUs = originalTimeUs;
     mPrevModifiedTimeUs = timestamp;
 
-    if (mMaxTimestampGapUs > 0ll && !mRestorePtsFailed) {
+    if (mMaxTimestampGapUs != 0ll && !mRestorePtsFailed) {
         mOriginalTimeUs.add(timestamp, originalTimeUs);
     }
 
@@ -1941,7 +1957,7 @@ status_t OMXNodeInstance::emptyNativeHandleBuffer_l(
 void OMXNodeInstance::codecBufferFilled(omx_message &msg) {
     Mutex::Autolock autoLock(mLock);
 
-    if (mMaxTimestampGapUs <= 0ll || mRestorePtsFailed) {
+    if (mMaxTimestampGapUs == 0ll || mRestorePtsFailed) {
         return;
     }
 
