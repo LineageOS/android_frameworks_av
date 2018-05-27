@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "a20fb696_3f6da713",
+        "filename": "media/libstagefright/omx/OMXMaster.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 78,
+      "author": {
+        "id": 11801
+      },
+      "writtenOn": "2018-05-27T18:45:47Z",
+      "side": 1,
+      "message": "I don\u0027t know how to do that, got an example?",
+      "parentUuid": "6d7940e7_799db288",
+      "range": {
+        "startLine": 78,
+        "startChar": 4,
+        "endLine": 78,
+        "endChar": 45
+      },
+      "revId": "a033f4543405a319f9934f01b994bd380459ca53",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "306cd26f_0e2b1a93",
         "filename": "media/libstagefright/omx/OMXMaster.cpp",
         "patchSetId": 2
@@ -71,6 +95,30 @@
     },
     {
       "key": {
+        "uuid": "404e62ab_59f75f91",
+        "filename": "media/libstagefright/omx/OMXMaster.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 134,
+      "author": {
+        "id": 11801
+      },
+      "writtenOn": "2018-05-27T18:45:47Z",
+      "side": 1,
+      "message": "I don\u0027t know what that is.",
+      "parentUuid": "59377025_66a9ae7b",
+      "range": {
+        "startLine": 134,
+        "startChar": 9,
+        "endLine": 134,
+        "endChar": 53
+      },
+      "revId": "a033f4543405a319f9934f01b994bd380459ca53",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "497fc151_edb309d9",
         "filename": "media/libstagefright/omx/SoftOMXPlugin.cpp",
         "patchSetId": 2
@@ -82,6 +130,30 @@
       "writtenOn": "2018-05-27T17:56:50Z",
       "side": 1,
       "message": "probably unnecessary if all you are doing is adding logging",
+      "range": {
+        "startLine": 110,
+        "startChar": 8,
+        "endLine": 110,
+        "endChar": 65
+      },
+      "revId": "a033f4543405a319f9934f01b994bd380459ca53",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "97cf2e7e_9d491f92",
+        "filename": "media/libstagefright/omx/SoftOMXPlugin.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 110,
+      "author": {
+        "id": 11801
+      },
+      "writtenOn": "2018-05-27T18:45:47Z",
+      "side": 1,
+      "message": "Ugh, meant to remove this",
+      "parentUuid": "497fc151_edb309d9",
       "range": {
         "startLine": 110,
         "startChar": 8,
