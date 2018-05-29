@@ -3430,14 +3430,14 @@ status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>
 
     audio_patch_handle_t afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
 
-    if (srcDeviceDesc->getAudioPort()->mModule->getHandle() ==
-            sinkDeviceDesc->getAudioPort()->mModule->getHandle() &&
+    if (srcDeviceDesc->hasSameHwModuleAs(sinkDeviceDesc) &&
             srcDeviceDesc->getAudioPort()->mModule->getHalVersionMajor() >= 3 &&
+            sinkDeviceDesc->mModule->supportsPatch(srcDeviceDesc, sinkDeviceDesc) &&
             srcDeviceDesc->getAudioPort()->mGains.size() > 0) {
-        ALOGV("%s AUDIO_DEVICE_API_VERSION_3_0", __FUNCTION__);
+        ALOGV("%s Device to Device route supported by >=3.0 HAL", __FUNCTION__);
         // TODO: may explicitly specify whether we should use HW or SW patch
-        // create patch between src device and output device
-        // create Hwoutput and add to mHwOutputs
+        //   create patch between src device and output device
+        //   create Hwoutput and add to mHwOutputs
     } else {
         audio_attributes_t resultAttr;
         audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
