@@ -1015,7 +1015,8 @@ void PlaylistFetcher::initSeqNumberForLiveStream(
     sp<AMessage> itemMeta;
     int64_t itemDurationUs;
     int32_t targetDuration;
-    if (mPlaylist->meta()->findInt32("target-duration", &targetDuration)) {
+    if (mPlaylist->meta() != NULL
+            && mPlaylist->meta()->findInt32("target-duration", &targetDuration)) {
         do {
             --index;
             if (!mPlaylist->itemAt(index, NULL /* uri */, &itemMeta)
