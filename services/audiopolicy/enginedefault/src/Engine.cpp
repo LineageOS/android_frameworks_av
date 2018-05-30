@@ -482,7 +482,7 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
                 }
             }
             availableOutputDevices =
-                    availableOutputDevices.getDevicesFromType(availableOutputDevicesType);
+                    availableOutputDevices.getDevicesFromTypeMask(availableOutputDevicesType);
             if (outputs.isStreamActive(AUDIO_STREAM_RING) ||
                     outputs.isStreamActive(AUDIO_STREAM_ALARM)) {
                 return getDeviceForStrategyInt(

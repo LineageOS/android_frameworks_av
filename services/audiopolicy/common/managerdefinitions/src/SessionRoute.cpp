@@ -129,7 +129,7 @@ audio_devices_t SessionRouteMap::getActiveDeviceForStream(audio_stream_type_t st
         if (streamType == route->mStreamType && route->isActiveOrChanged()
                 && route->mDeviceDescriptor != 0) {
             device = route->mDeviceDescriptor->type();
-            if (!availableDevices.getDevicesFromType(device).isEmpty()) {
+            if (!availableDevices.getDevicesFromTypeMask(device).isEmpty()) {
                 break;
             }
         }

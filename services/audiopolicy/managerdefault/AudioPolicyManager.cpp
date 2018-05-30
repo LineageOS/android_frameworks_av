@@ -534,7 +534,7 @@ sp<AudioPatch> AudioPolicyManager::createTelephonyPatch(
 
 sp<DeviceDescriptor> AudioPolicyManager::findDevice(
         const DeviceVector& devices, audio_devices_t device) {
-    DeviceVector deviceList = devices.getDevicesFromType(device);
+    DeviceVector deviceList = devices.getDevicesFromTypeMask(device);
     ALOG_ASSERT(!deviceList.isEmpty(),
             "%s() selected device type %#x is not in devices list", __func__, device);
     return deviceList.itemAt(0);
@@ -865,7 +865,7 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
         return INVALID_OPERATION;
     }
 
-    DeviceVector outputDevices = mAvailableOutputDevices.getDevicesFromType(device);
+    DeviceVector outputDevices = mAvailableOutputDevices.getDevicesFromTypeMask(device);
     *selectedDeviceId = outputDevices.size() > 0 ? outputDevices.itemAt(0)->getId()
             : AUDIO_PORT_HANDLE_NONE;
 
@@ -970,7 +970,7 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
         sp<SwAudioOutputDescriptor> outputDesc =
                 new SwAudioOutputDescriptor(profile, mpClientInterface);
 
-        DeviceVector outputDevices = mAvailableOutputDevices.getDevicesFromType(device);
+        DeviceVector outputDevices = mAvailableOutputDevices.getDevicesFromTypeMask(device);
         String8 address = outputDevices.size() > 0 ? outputDevices.itemAt(0)->mAddress
                 : String8("");
 
@@ -1539,7 +1539,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         if (*portId == AUDIO_PORT_HANDLE_NONE) {
             *portId = AudioPort::getNextUniqueId();
         }
-        inputDevices = mAvailableInputDevices.getDevicesFromType(inputDesc->mDevice);
+        inputDevices = mAvailableInputDevices.getDevicesFromTypeMask(inputDesc->mDevice);
         *selectedDeviceId = inputDevices.size() > 0 ? inputDevices.itemAt(0)->getId()
                 : AUDIO_PORT_HANDLE_NONE;
         ALOGI("%s reusing MMAP input %d for session %d", __FUNCTION__, *input, session);
@@ -1606,7 +1606,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         goto error;
     }
 
-    inputDevices = mAvailableInputDevices.getDevicesFromType(device);
+    inputDevices = mAvailableInputDevices.getDevicesFromTypeMask(device);
     *selectedDeviceId = inputDevices.size() > 0 ? inputDevices.itemAt(0)->getId()
             : AUDIO_PORT_HANDLE_NONE;
 
@@ -1774,7 +1774,7 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
     lConfig.format = profileFormat;
 
     if (address == "") {
-        DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromType(device);
+        DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromTypeMask(device);
         // the inputs vector must be of size >= 1, but we don't want to crash here
         address = inputDevices.size() > 0 ? inputDevices.itemAt(0)->mAddress : String8("");
     }
@@ -3568,7 +3568,7 @@ status_t AudioPolicyManager::getSurroundFormats(unsigned int *numSurroundFormats
             }
         }
         // Open an output to query dynamic parameters.
-        DeviceVector hdmiOutputDevices = mAvailableOutputDevices.getDevicesFromType(
+        DeviceVector hdmiOutputDevices = mAvailableOutputDevices.getDevicesFromTypeMask(
                 AUDIO_DEVICE_OUT_HDMI);
         for (size_t i = 0; i < hdmiOutputDevices.size(); i++) {
             String8 address = hdmiOutputDevices[i]->mAddress;
@@ -3694,7 +3694,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
 
     sp<SwAudioOutputDescriptor> outputDesc;
     bool profileUpdated = false;
-    DeviceVector hdmiOutputDevices = mAvailableOutputDevices.getDevicesFromType(
+    DeviceVector hdmiOutputDevices = mAvailableOutputDevices.getDevicesFromTypeMask(
             AUDIO_DEVICE_OUT_HDMI);
     for (size_t i = 0; i < hdmiOutputDevices.size(); i++) {
         // Simulate reconnection to update enabled surround sound formats.
@@ -3713,7 +3713,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
                                              name.c_str());
         profileUpdated |= (status == NO_ERROR);
     }
-    DeviceVector hdmiInputDevices = mAvailableInputDevices.getDevicesFromType(
+    DeviceVector hdmiInputDevices = mAvailableInputDevices.getDevicesFromTypeMask(
                 AUDIO_DEVICE_IN_HDMI);
     for (size_t i = 0; i < hdmiInputDevices.size(); i++) {
         // Simulate reconnection to update enabled surround sound formats.
@@ -3980,7 +3980,8 @@ status_t AudioPolicyManager::initialize() {
             sp<SwAudioOutputDescriptor> outputDesc = new SwAudioOutputDescriptor(outProfile,
                                                                                  mpClientInterface);
             const DeviceVector &supportedDevices = outProfile->getSupportedDevices();
-            const DeviceVector &devicesForType = supportedDevices.getDevicesFromType(profileType);
+            const DeviceVector &devicesForType = supportedDevices.getDevicesFromTypeMask(
+                    profileType);
             String8 address = devicesForType.size() > 0 ? devicesForType.itemAt(0)->mAddress
                     : String8("");
             audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
@@ -4034,7 +4035,7 @@ status_t AudioPolicyManager::initialize() {
             sp<AudioInputDescriptor> inputDesc =
                     new AudioInputDescriptor(inProfile, mpClientInterface);
 
-            DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromType(profileType);
+            DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromTypeMask(profileType);
             //   the inputs vector must be of size >= 1, but we don't want to crash here
             String8 address = inputDevices.size() > 0 ? inputDevices.itemAt(0)->mAddress
                     : String8("");
@@ -5199,9 +5200,11 @@ uint32_t AudioPolicyManager::setOutputDevice(const sp<AudioOutputDescriptor>& ou
     } else {
         DeviceVector deviceList;
         if ((address == NULL) || (strlen(address) == 0)) {
-            deviceList = mAvailableOutputDevices.getDevicesFromType(device);
+            deviceList = mAvailableOutputDevices.getDevicesFromTypeMask(device);
         } else {
-            deviceList = mAvailableOutputDevices.getDevicesFromTypeAddr(device, String8(address));
+            sp<DeviceDescriptor> deviceDesc = mAvailableOutputDevices.getDevice(
+                    device, String8(address));
+            if (deviceDesc) deviceList.add(deviceDesc);
         }
 
         if (!deviceList.isEmpty()) {
@@ -5268,7 +5271,7 @@ status_t AudioPolicyManager::setInputDevice(audio_io_handle_t input,
     if ((device != AUDIO_DEVICE_NONE) && ((device != inputDesc->mDevice) || force)) {
         inputDesc->mDevice = device;
 
-        DeviceVector deviceList = mAvailableInputDevices.getDevicesFromType(device);
+        DeviceVector deviceList = mAvailableInputDevices.getDevicesFromTypeMask(device);
         if (!deviceList.isEmpty()) {
             PatchBuilder patchBuilder;
             patchBuilder.addSink(inputDesc,
