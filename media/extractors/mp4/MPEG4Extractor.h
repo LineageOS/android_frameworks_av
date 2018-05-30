@@ -85,6 +85,7 @@ private:
         bool has_elst;
         int64_t elst_media_time;
         uint64_t elst_segment_duration;
+        bool subsample_encryption;
     };
 
     Vector<SidxEntry> mSidxEntries;
