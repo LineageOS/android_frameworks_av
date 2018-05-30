@@ -51,7 +51,7 @@ private:
     ColorConverter *mConverter;
     YUVMode mYUVMode;
     sp<ANativeWindow> mNativeWindow;
-    int32_t mWidth, mHeight;
+    int32_t mWidth, mHeight, mStride;
     int32_t mCropLeft, mCropTop, mCropRight, mCropBottom;
     int32_t mCropWidth, mCropHeight;
     int32_t mRotationDegrees;
