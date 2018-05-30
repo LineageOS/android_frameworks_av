@@ -29,12 +29,21 @@
 #include "ixheaacd_apicmd_standards.h"
 #include "ixheaacd_memory_standards.h"
 #include "ixheaacd_aac_config.h"
-//#include "ixheaacd_aac_dec_error.h"
+
+#include "impd_apicmd_standards.h"
+#include "impd_drc_config_params.h"
 
 #define MAX_MEM_ALLOCS 100
 
 extern "C" IA_ERRORCODE ixheaacd_dec_api(pVOID p_ia_module_obj,
                         WORD32 i_cmd, WORD32 i_idx, pVOID pv_value);
+extern "C" IA_ERRORCODE ia_drc_dec_api(pVOID p_ia_module_obj,
+                        WORD32 i_cmd, WORD32 i_idx, pVOID pv_value);
+extern "C"  IA_ERRORCODE ixheaacd_get_config_param(pVOID p_ia_process_api_obj,
+                                       pWORD32 pi_samp_freq,
+                                       pWORD32 pi_num_chan,
+                                       pWORD32 pi_pcm_wd_sz,
+                                       pWORD32 pi_channel_mask);
 
 namespace android {
 
@@ -88,6 +97,7 @@ private:
     int deInitXAACDecoder();
 
     int configXAACDecoder(uint8_t* inBuffer, uint32_t inBufferLength);
+    int configMPEGDDrc();
     int decodeXAACStream(uint8_t* inBuffer,
                          uint32_t inBufferLength,
                          int32_t *bytesConsumed,
@@ -98,12 +108,17 @@ private:
     IA_ERRORCODE setXAACDRCInfo(int32_t drcCut,
                                 int32_t drcBoost,
                                 int32_t drcRefLevel,
-                                int32_t drcHeavyCompression);
+                                int32_t drcHeavyCompression
+#ifdef ENABLE_MPEG_D_DRC
+                                ,int32_t drEffectType
+#endif
+                               );
 
     bool mEndOfInput;
     bool mEndOfOutput;
 
     void*       mXheaacCodecHandle;
+    void*       mMpegDDrcHandle;
     uint32_t    mInputBufferSize;
     uint32_t    mOutputFrameLength;
     int8_t*     mInputBuffer;
@@ -114,6 +129,11 @@ private:
     int32_t     mChannelMask;
     bool        mIsCodecInitialized;
     bool        mIsCodecConfigFlushRequired;
+    int8_t *drc_ip_buf;
+    int8_t *drc_op_buf;
+    int32_t mpegd_drc_present;
+    int32_t drc_flag;
+//    int32_t is_drc_enabled;
 
     void*       mMemoryArray[MAX_MEM_ALLOCS];
     int32_t     mMallocCount;
