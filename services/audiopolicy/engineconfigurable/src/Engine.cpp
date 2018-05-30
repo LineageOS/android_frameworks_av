@@ -35,10 +35,9 @@
 using std::string;
 using std::map;
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
+
 template <>
 StrategyCollection &Engine::getCollection<routing_strategy>()
 {

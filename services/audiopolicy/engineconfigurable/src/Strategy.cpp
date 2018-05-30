@@ -20,10 +20,8 @@
 
 using std::string;
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 status_t Element<routing_strategy>::setIdentifier(routing_strategy identifier)
 {

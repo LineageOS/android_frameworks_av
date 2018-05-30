@@ -19,10 +19,8 @@
 #include "Element.h"
 #include <RoutingStrategy.h>
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 /**
  * @tparam routing_strategy: Applicable strategy for this usage.

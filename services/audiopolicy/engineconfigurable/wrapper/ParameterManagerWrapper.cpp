@@ -56,13 +56,12 @@ public:
     }
 };
 
-namespace android
-{
+namespace android {
 
 using utilities::convertTo;
 
-namespace audio_policy
-{
+namespace audio_policy {
+
 const char *const ParameterManagerWrapper::mPolicyPfwDefaultConfFileName =
     "/etc/parameter-framework/ParameterFrameworkConfigurationPolicy.xml";
 

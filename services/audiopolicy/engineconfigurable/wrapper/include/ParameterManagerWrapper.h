@@ -32,10 +32,8 @@ struct cnode;
 
 class ParameterMgrPlatformConnectorLogger;
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 class ParameterManagerWrapper
 {
