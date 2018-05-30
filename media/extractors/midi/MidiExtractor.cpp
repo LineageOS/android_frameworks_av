@@ -326,9 +326,9 @@ bool SniffMidi(DataSourceBase *source, float *confidence)
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("ef6cca0a-f8a2-43e6-ba5f-dfcd7c9a7ef2"),
         1,
         "MIDI Extractor",
@@ -336,12 +336,12 @@ MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
                 DataSourceBase *source,
                 float *confidence,
                 void **,
-                MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
+                FreeMetaFunc *) -> CreatorFunc {
             if (SniffMidi(source, confidence)) {
                 return [](
                         DataSourceBase *source,
-                        void *) -> MediaExtractor* {
-                    return new MidiExtractor(source);};
+                        void *) -> CMediaExtractor* {
+                    return wrap(new MidiExtractor(source));};
             }
             return NULL;
         }

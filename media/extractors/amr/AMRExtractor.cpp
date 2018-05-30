@@ -365,9 +365,9 @@ status_t AMRSource::read(
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("c86639c9-2f31-40ac-a715-fa01b4493aaf"),
         1,
         "AMR Extractor",
@@ -375,12 +375,12 @@ MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
                 DataSourceBase *source,
                 float *confidence,
                 void **,
-                MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
+                FreeMetaFunc *) -> CreatorFunc {
             if (SniffAMR(source, nullptr, confidence)) {
                 return [](
                         DataSourceBase *source,
-                        void *) -> MediaExtractor* {
-                    return new AMRExtractor(source);};
+                        void *) -> CMediaExtractor* {
+                    return wrap(new AMRExtractor(source));};
             }
             return NULL;
         }

@@ -19,7 +19,8 @@
 #define WAV_EXTRACTOR_H_
 
 #include <utils/Errors.h>
-#include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MetaDataBase.h>
 
 namespace android {
@@ -28,7 +29,7 @@ struct AMessage;
 class DataSourceBase;
 class String8;
 
-class WAVExtractor : public MediaExtractor {
+class WAVExtractor : public MediaExtractorPluginHelper {
 public:
     explicit WAVExtractor(DataSourceBase *source);
 

@@ -18,7 +18,8 @@
 #define MIDI_EXTRACTOR_H_
 
 #include <media/DataSourceBase.h>
-#include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MediaBufferBase.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MetaDataBase.h>
@@ -50,7 +51,7 @@ private:
     bool mIsInitialized;
 };
 
-class MidiExtractor : public MediaExtractor {
+class MidiExtractor : public MediaExtractorPluginHelper {
 
 public:
     explicit MidiExtractor(DataSourceBase *source);

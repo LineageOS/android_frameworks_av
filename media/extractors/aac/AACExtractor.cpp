@@ -323,16 +323,16 @@ status_t AACSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static MediaExtractor* CreateExtractor(
+static CMediaExtractor* CreateExtractor(
         DataSourceBase *source,
         void *meta) {
     off64_t offset = *static_cast<off64_t*>(meta);
-    return new AACExtractor(source, offset);
+    return wrap(new AACExtractor(source, offset));
 }
 
-static MediaExtractor::CreatorFunc Sniff(
+static CreatorFunc Sniff(
         DataSourceBase *source, float *confidence, void **meta,
-        MediaExtractor::FreeMetaFunc *freeMeta) {
+        FreeMetaFunc *freeMeta) {
     off64_t pos = 0;
 
     for (;;) {
@@ -387,9 +387,9 @@ static MediaExtractor::CreatorFunc Sniff(
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("4fd80eae-03d2-4d72-9eb9-48fa6bb54613"),
         1, // version
         "AAC Extractor",

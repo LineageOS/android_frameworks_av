@@ -19,7 +19,8 @@
 #define MPEG2_PS_EXTRACTOR_H_
 
 #include <media/stagefright/foundation/ABase.h>
-#include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MetaDataBase.h>
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
@@ -31,7 +32,7 @@ struct AMessage;
 struct Track;
 class String8;
 
-struct MPEG2PSExtractor : public MediaExtractor {
+struct MPEG2PSExtractor : public MediaExtractorPluginHelper {
     explicit MPEG2PSExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();

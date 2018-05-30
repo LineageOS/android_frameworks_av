@@ -859,9 +859,9 @@ bool SniffFLAC(DataSourceBase *source, float *confidence)
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
             UUID("1364b048-cc45-4fda-9934-327d0ebf9829"),
             1,
             "FLAC Extractor",
@@ -869,12 +869,12 @@ MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
                     DataSourceBase *source,
                     float *confidence,
                     void **,
-                    MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
+                    FreeMetaFunc *) -> CreatorFunc {
                 if (SniffFLAC(source, confidence)) {
                     return [](
                             DataSourceBase *source,
-                            void *) -> MediaExtractor* {
-                        return new FLACExtractor(source);};
+                            void *) -> CMediaExtractor* {
+                        return wrap(new FLACExtractor(source));};
                 }
                 return NULL;
             }

@@ -1638,9 +1638,9 @@ bool SniffMatroska(
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("abbedd92-38c4-4904-a4c1-b3f45f899980"),
         1,
         "Matroska Extractor",
@@ -1648,12 +1648,12 @@ MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
                 DataSourceBase *source,
                 float *confidence,
                 void **,
-                MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
+                FreeMetaFunc *) -> CreatorFunc {
             if (SniffMatroska(source, confidence)) {
                 return [](
                         DataSourceBase *source,
-                        void *) -> MediaExtractor* {
-                    return new MatroskaExtractor(source);};
+                        void *) -> CMediaExtractor* {
+                    return wrap(new MatroskaExtractor(source));};
             }
             return NULL;
         }

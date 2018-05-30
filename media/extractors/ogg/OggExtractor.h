@@ -19,7 +19,8 @@
 #define OGG_EXTRACTOR_H_
 
 #include <utils/Errors.h>
-#include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 
 namespace android {
 
@@ -30,7 +31,7 @@ class String8;
 struct MyOggExtractor;
 struct OggSource;
 
-struct OggExtractor : public MediaExtractor {
+struct OggExtractor : public MediaExtractorPluginHelper {
     explicit OggExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();

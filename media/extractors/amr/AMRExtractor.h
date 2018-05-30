@@ -19,7 +19,8 @@
 #define AMR_EXTRACTOR_H_
 
 #include <utils/Errors.h>
-#include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MetaDataBase.h>
 
 namespace android {
@@ -28,7 +29,7 @@ struct AMessage;
 class String8;
 #define OFFSET_TABLE_LEN    300
 
-class AMRExtractor : public MediaExtractor {
+class AMRExtractor : public MediaExtractorPluginHelper {
 public:
     explicit AMRExtractor(DataSourceBase *source);
 

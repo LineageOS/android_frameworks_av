@@ -544,17 +544,17 @@ status_t WAVSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static MediaExtractor* CreateExtractor(
+static CMediaExtractor* CreateExtractor(
         DataSourceBase *source,
         void *) {
-    return new WAVExtractor(source);
+    return wrap(new WAVExtractor(source));
 }
 
-static MediaExtractor::CreatorFunc Sniff(
+static CreatorFunc Sniff(
         DataSourceBase *source,
         float *confidence,
         void **,
-        MediaExtractor::FreeMetaFunc *) {
+        FreeMetaFunc *) {
     char header[12];
     if (source->readAt(0, header, sizeof(header)) < (ssize_t)sizeof(header)) {
         return NULL;
@@ -564,7 +564,7 @@ static MediaExtractor::CreatorFunc Sniff(
         return NULL;
     }
 
-    MediaExtractor *extractor = new WAVExtractor(source);
+    WAVExtractor *extractor = new WAVExtractor(source);
     int numTracks = extractor->countTracks();
     delete extractor;
     if (numTracks == 0) {
@@ -579,9 +579,9 @@ static MediaExtractor::CreatorFunc Sniff(
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("7d613858-5837-4a38-84c5-332d1cddee27"),
         1, // version
         "WAV Extractor",

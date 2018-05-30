@@ -27,9 +27,9 @@ namespace android {
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("3d1dcfeb-e40a-436d-a574-c2438a555e5f"),
         1,
         "MPEG2-PS/TS Extractor",
@@ -37,17 +37,17 @@ MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
                 DataSourceBase *source,
                 float *confidence,
                 void **,
-                MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
+                FreeMetaFunc *) -> CreatorFunc {
             if (SniffMPEG2TS(source, confidence)) {
                 return [](
                         DataSourceBase *source,
-                        void *) -> MediaExtractor* {
-                    return new MPEG2TSExtractor(source);};
+                        void *) -> CMediaExtractor* {
+                    return wrap(new MPEG2TSExtractor(source));};
             } else if (SniffMPEG2PS(source, confidence)) {
                         return [](
                                 DataSourceBase *source,
-                                void *) -> MediaExtractor* {
-                            return new MPEG2PSExtractor(source);};
+                                void *) -> CMediaExtractor* {
+                            return wrap(new MPEG2PSExtractor(source));};
             }
             return NULL;
         }

@@ -1248,17 +1248,17 @@ status_t OggExtractor::getMetaData(MetaDataBase &meta) {
     return mImpl->getFileMetaData(meta);
 }
 
-static MediaExtractor* CreateExtractor(
+static CMediaExtractor* CreateExtractor(
         DataSourceBase *source,
         void *) {
-    return new OggExtractor(source);
+    return wrap(new OggExtractor(source));
 }
 
-static MediaExtractor::CreatorFunc Sniff(
+static CreatorFunc Sniff(
         DataSourceBase *source,
         float *confidence,
         void **,
-        MediaExtractor::FreeMetaFunc *) {
+        FreeMetaFunc *) {
     char tmp[4];
     if (source->readAt(0, tmp, 4) < 4 || memcmp(tmp, "OggS", 4)) {
         return NULL;
@@ -1272,9 +1272,9 @@ static MediaExtractor::CreatorFunc Sniff(
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("8cc5cd06-f772-495e-8a62-cba9649374e9"),
         1, // version
         "Ogg Extractor",

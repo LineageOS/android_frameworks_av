@@ -18,7 +18,8 @@
 
 #define AAC_EXTRACTOR_H_
 
-#include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MetaDataBase.h>
 
 #include <utils/Vector.h>
@@ -28,7 +29,7 @@ namespace android {
 struct AMessage;
 class String8;
 
-class AACExtractor : public MediaExtractor {
+class AACExtractor : public MediaExtractorPluginHelper {
 public:
     AACExtractor(DataSourceBase *source, off64_t offset);
 

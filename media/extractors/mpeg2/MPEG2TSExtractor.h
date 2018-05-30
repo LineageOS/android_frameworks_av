@@ -20,7 +20,8 @@
 #define MPEG2_TS_EXTRACTOR_H_
 
 #include <media/stagefright/foundation/ABase.h>
-#include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/MediaTrack.h>
 #include <media/stagefright/MetaDataBase.h>
 #include <utils/threads.h>
@@ -38,7 +39,7 @@ class DataSourceBase;
 struct MPEG2TSSource;
 class String8;
 
-struct MPEG2TSExtractor : public MediaExtractor {
+struct MPEG2TSExtractor : public MediaExtractorPluginHelper {
     explicit MPEG2TSExtractor(DataSourceBase *source);
 
     virtual size_t countTracks();

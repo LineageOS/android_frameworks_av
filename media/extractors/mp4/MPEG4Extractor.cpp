@@ -5944,13 +5944,13 @@ static bool BetterSniffMPEG4(DataSourceBase *source, float *confidence) {
     return true;
 }
 
-static MediaExtractor* CreateExtractor(DataSourceBase *source, void *) {
-    return new MPEG4Extractor(source);
+static CMediaExtractor* CreateExtractor(DataSourceBase *source, void *) {
+    return wrap(new MPEG4Extractor(source));
 }
 
-static MediaExtractor::CreatorFunc Sniff(
+static CreatorFunc Sniff(
         DataSourceBase *source, float *confidence, void **,
-        MediaExtractor::FreeMetaFunc *) {
+        FreeMetaFunc *) {
     if (BetterSniffMPEG4(source, confidence)) {
         return CreateExtractor;
     }
@@ -5966,9 +5966,9 @@ static MediaExtractor::CreatorFunc Sniff(
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("27575c67-4417-4c54-8d3d-8e626985a164"),
         1, // version
         "MP4 Extractor",

@@ -669,16 +669,16 @@ status_t MP3Extractor::getMetaData(MetaDataBase &meta) {
     return OK;
 }
 
-static MediaExtractor* CreateExtractor(
+static CMediaExtractor* CreateExtractor(
         DataSourceBase *source,
         void *meta) {
     Mp3Meta *metaData = static_cast<Mp3Meta *>(meta);
-    return new MP3Extractor(source, metaData);
+    return wrap(new MP3Extractor(source, metaData));
 }
 
-static MediaExtractor::CreatorFunc Sniff(
+static CreatorFunc Sniff(
         DataSourceBase *source, float *confidence, void **meta,
-        MediaExtractor::FreeMetaFunc *freeMeta) {
+        FreeMetaFunc *freeMeta) {
     off64_t pos = 0;
     off64_t post_id3_pos;
     uint32_t header;
@@ -710,9 +710,9 @@ static MediaExtractor::CreatorFunc Sniff(
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("812a3f6c-c8cf-46de-b529-3774b14103d4"),
         1, // version
         "MP3 Extractor",

@@ -21,7 +21,8 @@
 #include <arpa/inet.h>
 
 #include <media/DataSourceBase.h>
-#include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MetaDataBase.h>
 #include <media/stagefright/foundation/AString.h>
 #include <utils/KeyedVector.h>
@@ -53,7 +54,7 @@ struct Trex {
     uint32_t default_sample_flags;
 };
 
-class MPEG4Extractor : public MediaExtractor {
+class MPEG4Extractor : public MediaExtractorPluginHelper {
 public:
     explicit MPEG4Extractor(DataSourceBase *source, const char *mime = NULL);
 

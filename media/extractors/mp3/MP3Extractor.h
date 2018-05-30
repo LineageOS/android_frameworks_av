@@ -19,7 +19,8 @@
 #define MP3_EXTRACTOR_H_
 
 #include <utils/Errors.h>
-#include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MetaDataBase.h>
 
 namespace android {
@@ -30,7 +31,7 @@ struct MP3Seeker;
 class String8;
 struct Mp3Meta;
 
-class MP3Extractor : public MediaExtractor {
+class MP3Extractor : public MediaExtractorPluginHelper {
 public:
     MP3Extractor(DataSourceBase *source, Mp3Meta *meta);
     ~MP3Extractor();
