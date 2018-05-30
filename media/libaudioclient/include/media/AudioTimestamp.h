@@ -151,7 +151,7 @@ struct alignas(8) /* bug 29096183, bug 29108507 */ ExtendedTimestamp {
     }
 
     // convert fields to a printable string
-    std::string toString() {
+    std::string toString() const {
         std::stringstream ss;
 
         ss << "BOOTTIME offset " << mTimebaseOffset[TIMEBASE_BOOTTIME] << "\n";
