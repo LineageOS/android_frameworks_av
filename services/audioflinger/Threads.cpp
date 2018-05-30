@@ -3203,12 +3203,10 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             // and associate with the sink frames written out.  We need
             // this to convert the sink timestamp to the track timestamp.
             bool kernelLocationUpdate = false;
-            if (mNormalSink != 0) {
-                // Note: The DuplicatingThread may not have a mNormalSink.
+            ExtendedTimestamp timestamp; // use private copy to fetch
+            if (threadloop_getHalTimestamp_l(&timestamp) == OK) {
                 // We always fetch the timestamp here because often the downstream
                 // sink will block while writing.
-                ExtendedTimestamp timestamp; // use private copy to fetch
-                (void) mNormalSink->getTimestamp(timestamp);
 
                 // We keep track of the last valid kernel position in case we are in underrun
                 // and the normal mixer period is the same as the fast mixer period, or there
@@ -6096,7 +6094,22 @@ void AudioFlinger::DuplicatingThread::threadLoop_sleepTime()
 ssize_t AudioFlinger::DuplicatingThread::threadLoop_write()
 {
     for (size_t i = 0; i < outputTracks.size(); i++) {
-        outputTracks[i]->write(mSinkBuffer, writeFrames);
+        const ssize_t actualWritten = outputTracks[i]->write(mSinkBuffer, writeFrames);
+
+        // Consider the first OutputTrack for timestamp and frame counting.
+
+        // The threadLoop() generally assumes writing a full sink buffer size at a time.
+        // Here, we correct for writeFrames of 0 (a stop) or underruns because
+        // we always claim success.
+        if (i == 0) {
+            const ssize_t correction = mSinkBufferSize / mFrameSize - actualWritten;
+            ALOGD_IF(correction != 0 && writeFrames != 0,
+                    "%s: writeFrames:%u  actualWritten:%zd  correction:%zd  mFramesWritten:%lld",
+                    __func__, writeFrames, actualWritten, correction, (long long)mFramesWritten);
+            mFramesWritten -= correction;
+        }
+
+        // TODO: Report correction for the other output tracks and show in the dump.
     }
     mStandby = false;
     return (ssize_t)mSinkBufferSize;
