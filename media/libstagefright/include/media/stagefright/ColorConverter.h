@@ -37,11 +37,11 @@ struct ColorConverter {
 
     status_t convert(
             const void *srcBits,
-            size_t srcWidth, size_t srcHeight,
+            size_t srcWidth, size_t srcHeight, size_t srcStride,
             size_t srcCropLeft, size_t srcCropTop,
             size_t srcCropRight, size_t srcCropBottom,
             void *dstBits,
-            size_t dstWidth, size_t dstHeight,
+            size_t dstWidth, size_t dstHeight, size_t dstStride,
             size_t dstCropLeft, size_t dstCropTop,
             size_t dstCropRight, size_t dstCropBottom);
 
@@ -49,7 +49,7 @@ private:
     struct BitmapParams {
         BitmapParams(
                 void *bits,
-                size_t width, size_t height,
+                size_t width, size_t height, size_t stride,
                 size_t cropLeft, size_t cropTop,
                 size_t cropRight, size_t cropBottom,
                 OMX_COLOR_FORMATTYPE colorFromat);
