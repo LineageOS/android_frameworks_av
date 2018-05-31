@@ -2479,11 +2479,11 @@ void dumpStruct(const C2StructDescriptor &sd) {
             for (const FD::named_value_type &p : f.namedValues()) {
                 cout << sep << p.first << "=";
                 switch (f.type()) {
-                case C2Value::INT32: cout << get(p.second, (int32_t *)0); break;
-                case C2Value::INT64: cout << get(p.second, (int64_t *)0); break;
-                case C2Value::UINT32: cout << get(p.second, (uint32_t *)0); break;
-                case C2Value::UINT64: cout << get(p.second, (uint64_t *)0); break;
-                case C2Value::FLOAT: cout << get(p.second, (float *)0); break;
+                case C2FieldDescriptor::INT32: cout << get(p.second, (int32_t *)0); break;
+                case C2FieldDescriptor::INT64: cout << get(p.second, (int64_t *)0); break;
+                case C2FieldDescriptor::UINT32: cout << get(p.second, (uint32_t *)0); break;
+                case C2FieldDescriptor::UINT64: cout << get(p.second, (uint64_t *)0); break;
+                case C2FieldDescriptor::FLOAT: cout << get(p.second, (float *)0); break;
                 default: cout << "???"; break;
                 }
                 sep = ",";
