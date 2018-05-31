@@ -153,9 +153,6 @@ private:
 class AudioPortConfig : public virtual RefBase
 {
 public:
-    AudioPortConfig();
-    virtual ~AudioPortConfig() {}
-
     status_t applyAudioPortConfig(const struct audio_port_config *config,
                                   struct audio_port_config *backupConfig = NULL);
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
@@ -165,10 +162,11 @@ public:
         return (other != 0) &&
                 (other->getAudioPort()->getModuleHandle() == getAudioPort()->getModuleHandle());
     }
-    uint32_t mSamplingRate;
-    audio_format_t mFormat;
-    audio_channel_mask_t mChannelMask;
-    struct audio_gain_config mGain;
+    unsigned int mSamplingRate = 0u;
+    audio_format_t mFormat = AUDIO_FORMAT_INVALID;
+    audio_channel_mask_t mChannelMask = AUDIO_CHANNEL_NONE;
+    struct audio_gain_config mGain = { .index = -1 };
+    union audio_io_flags mFlags = { AUDIO_INPUT_FLAG_NONE };
 };
 
 } // namespace android
