@@ -278,9 +278,10 @@ sp <HwModule> HwModuleCollection::getModuleForDevice(audio_devices_t device) con
 sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices_t device,
                                                              const char *device_address,
                                                              const char *device_name,
-                                                             bool matchAdress) const
+                                                             bool matchAddress) const
 {
-    String8 address = (device_address == nullptr) ? String8("") : String8(device_address);
+    String8 address = (device_address == nullptr || !matchAddress) ?
+            String8("") : String8(device_address);
     // handle legacy remote submix case where the address was not always specified
     if (device_distinguishes_on_address(device) && (address.length() == 0)) {
         address = String8("0");
@@ -288,15 +289,9 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
 
     for (const auto& hwModule : *this) {
         DeviceVector declaredDevices = hwModule->getDeclaredDevices();
-        DeviceVector deviceList = declaredDevices.getDevicesFromTypeAddr(device, address);
-        if (!deviceList.isEmpty()) {
-            return deviceList.itemAt(0);
-        }
-        if (!matchAdress) {
-            deviceList = declaredDevices.getDevicesFromType(device);
-            if (!deviceList.isEmpty()) {
-                return deviceList.itemAt(0);
-            }
+        sp<DeviceDescriptor> deviceDesc = declaredDevices.getDevice(device, address);
+        if (deviceDesc) {
+            return deviceDesc;
         }
     }
 

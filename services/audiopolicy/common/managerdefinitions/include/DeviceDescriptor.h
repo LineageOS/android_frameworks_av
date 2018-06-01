@@ -76,11 +76,12 @@ public:
 
     audio_devices_t types() const { return mDeviceTypes; }
 
-    sp<DeviceDescriptor> getDevice(audio_devices_t type, const String8& address) const;
-    DeviceVector getDevicesFromType(audio_devices_t types) const;
+    // If 'address' is empty, a device with a non-empty address may be returned
+    // if there is no device with the specified 'type' and empty address.
+    sp<DeviceDescriptor> getDevice(audio_devices_t type, const String8 &address) const;
+    DeviceVector getDevicesFromTypeMask(audio_devices_t types) const;
     sp<DeviceDescriptor> getDeviceFromId(audio_port_handle_t id) const;
     sp<DeviceDescriptor> getDeviceFromTagName(const String8 &tagName) const;
-    DeviceVector getDevicesFromTypeAddr(audio_devices_t type, const String8& address) const;
 
     audio_devices_t getDevicesFromHwModule(audio_module_handle_t moduleHandle) const;
 
