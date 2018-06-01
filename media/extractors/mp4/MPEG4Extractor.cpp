@@ -1710,7 +1710,10 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
                 const char *mime;
                 CHECK(mLastTrack->meta.findCString(kKeyMIMEType, &mime));
-                if (!strcmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)
+                if (!strncmp(mime, "audio/", 6)) {
+                    // for audio, use 128KB
+                    max_size = 1024 * 128;
+                } else if (!strcmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)
                         || !strcmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
                     // AVC & HEVC requires compression ratio of at least 2, and uses
                     // macroblocks
@@ -3963,9 +3966,10 @@ status_t MPEG4Source::start(MetaDataBase *params) {
     }
 
     // Allow up to kMaxBuffers, but not if the total exceeds kMaxBufferSize.
+    const size_t kInitialBuffers = 2;
     const size_t kMaxBuffers = 8;
-    const size_t buffers = min(kMaxBufferSize / max_size, kMaxBuffers);
-    mGroup = new MediaBufferGroup(buffers, max_size);
+    const size_t realMaxBuffers = min(kMaxBufferSize / max_size, kMaxBuffers);
+    mGroup = new MediaBufferGroup(kInitialBuffers, max_size, realMaxBuffers);
     mSrcBuffer = new (std::nothrow) uint8_t[max_size];
     if (mSrcBuffer == NULL) {
         // file probably specified a bad max size
