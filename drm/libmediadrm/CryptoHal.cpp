@@ -269,11 +269,15 @@ void CryptoHal::clearHeapBase(int32_t seqNum) {
      * TODO: Add a releaseSharedBuffer method in a future DRM HAL
      * API version to make this explicit.
      */
-    uint32_t bufferId = mHeapBases.valueFor(seqNum).getBufferId();
-    Return<void> hResult = mPlugin->setSharedBufferBase(hidl_memory(), bufferId);
-    ALOGE_IF(!hResult.isOk(), "setSharedBufferBase(): remote call failed");
-
-    mHeapBases.removeItem(seqNum);
+    ssize_t index = mHeapBases.indexOfKey(seqNum);
+    if (index >= 0) {
+        if (mPlugin != NULL) {
+            uint32_t bufferId = mHeapBases[index].getBufferId();
+            Return<void> hResult = mPlugin->setSharedBufferBase(hidl_memory(), bufferId);
+            ALOGE_IF(!hResult.isOk(), "setSharedBufferBase(): remote call failed");
+        }
+        mHeapBases.removeItem(seqNum);
+    }
 }
 
 status_t CryptoHal::toSharedBuffer(const sp<IMemory>& memory, int32_t seqNum, ::SharedBuffer* buffer) {
