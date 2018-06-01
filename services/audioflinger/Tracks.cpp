@@ -1706,6 +1706,9 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
     if (flags & AUDIO_INPUT_FLAG_FAST) {
         ALOG_ASSERT(thread->mFastTrackAvail);
         thread->mFastTrackAvail = false;
+    } else {
+        // TODO: only Normal Record has timestamps (Fast Record does not).
+        mServerLatencySupported = true;
     }
 #ifdef TEE_SINK
     mTee.setId(std::string("_") + std::to_string(mThreadIoHandle)
@@ -1800,16 +1803,17 @@ void AudioFlinger::RecordThread::RecordTrack::invalidate()
 }
 
 
-/*static*/ void AudioFlinger::RecordThread::RecordTrack::appendDumpHeader(String8& result)
+void AudioFlinger::RecordThread::RecordTrack::appendDumpHeader(String8& result)
 {
-    result.append("Active Client Session S  Flags   Format Chn mask  SRate   Server FrmCnt Sil\n");
+    result.appendFormat("Active Client Session S  Flags   Format Chn mask  SRate   Server"
+            " FrmCnt FrmRdy Sil%s\n", isServerLatencySupported() ? "   Latency" : "");
 }
 
 void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool active)
 {
     result.appendFormat("%c%5s %6u %7u %2s 0x%03X "
             "%08X %08X %6u "
-            "%08X %6zu %3c\n",
+            "%08X %6zu %6zu %3c",
             isFastTrack() ? 'F' : ' ',
             active ? "yes" : "no",
             (mClient == 0) ? getpid() : mClient->pid(),
@@ -1823,8 +1827,21 @@ void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool a
 
             mCblk->mServer,
             mFrameCount,
+            mServerProxy->framesReadySafe(),
             isSilenced() ? 's' : 'n'
             );
+    if (isServerLatencySupported()) {
+        double latencyMs;
+        bool fromTrack;
+        if (getTrackLatencyMs(&latencyMs, &fromTrack) == OK) {
+            // Show latency in msec, followed by 't' if from track timestamp (the most accurate)
+            // or 'k' if estimated from kernel (usually for debugging).
+            result.appendFormat(" %7.2lf %c", latencyMs, fromTrack ? 't' : 'k');
+        } else {
+            result.appendFormat("%10s", mCblk->mServer != 0 ? "unavail" : "new");
+        }
+    }
+    result.append("\n");
 }
 
 void AudioFlinger::RecordThread::RecordTrack::handleSyncStartEvent(const sp<SyncEvent>& event)
@@ -1867,6 +1884,15 @@ void AudioFlinger::RecordThread::RecordTrack::updateTrackFrameInfo(
         }
     }
     mServerProxy->setTimestamp(local);
+
+    // Compute latency info.
+    const bool useTrackTimestamp = true; // use track unless debugging.
+    const double latencyMs = - (useTrackTimestamp
+            ? local.getOutputServerLatencyMs(sampleRate())
+            : timestamp.getOutputServerLatencyMs(halSampleRate));
+
+    mServerLatencyFromTrack.store(useTrackTimestamp);
+    mServerLatencyMs.store(latencyMs);
 }
 
 status_t AudioFlinger::RecordThread::RecordTrack::getActiveMicrophones(
