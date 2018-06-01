@@ -1231,6 +1231,21 @@ int32_t StaticAudioTrackServerProxy::getRear() const
     return 0;
 }
 
+__attribute__((no_sanitize("integer")))
+size_t AudioRecordServerProxy::framesReadySafe() const
+{
+    if (mIsShutdown) {
+        return 0;
+    }
+    const int32_t front = android_atomic_acquire_load(&mCblk->u.mStreaming.mFront);
+    const int32_t rear = mCblk->u.mStreaming.mRear;
+    const ssize_t filled = rear - front;
+    if (!(0 <= filled && (size_t) filled <= mFrameCount)) {
+        return 0; // error condition, silently return 0.
+    }
+    return filled;
+}
+
 // ---------------------------------------------------------------------------
 
 }   // namespace android
