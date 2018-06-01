@@ -475,11 +475,48 @@ void AudioFlinger::PatchPanel::Patch::clearConnections(PatchPanel *panel)
     mPlayback.closeConnections(panel);
 }
 
+status_t AudioFlinger::PatchPanel::Patch::getLatencyMs(double *latencyMs) const
+{
+    if (!isSoftware()) return INVALID_OPERATION;
+
+    auto recordTrack = mRecord.const_track();
+    if (recordTrack.get() == nullptr) return INVALID_OPERATION;
+
+    auto playbackTrack = mPlayback.const_track();
+    if (playbackTrack.get() == nullptr) return INVALID_OPERATION;
+
+    // Latency information for tracks may be called without obtaining
+    // the underlying thread lock.
+    //
+    // We use record server latency + playback track latency (generally smaller than the
+    // reverse due to internal biases).
+    //
+    // TODO: is this stable enough? Consider a PatchTrack synchronized version of this.
+    double recordServerLatencyMs;
+    if (recordTrack->getServerLatencyMs(&recordServerLatencyMs) != OK) return INVALID_OPERATION;
+
+    double playbackTrackLatencyMs;
+    if (playbackTrack->getTrackLatencyMs(&playbackTrackLatencyMs) != OK) return INVALID_OPERATION;
+
+    *latencyMs = recordServerLatencyMs + playbackTrackLatencyMs;
+    return OK;
+}
+
 String8 AudioFlinger::PatchPanel::Patch::dump(audio_patch_handle_t myHandle)
 {
     String8 result;
-    result.appendFormat("Patch %d: thread %p => thread %p\n",
+
+    // TODO: Consider table dump form for patches, just like tracks.
+    result.appendFormat("Patch %d: thread %p => thread %p",
             myHandle, mRecord.thread().get(), mPlayback.thread().get());
+
+    // add latency if it exists
+    double latencyMs;
+    if (getLatencyMs(&latencyMs) == OK) {
+        result.appendFormat("  latency: %.2lf", latencyMs);
+    }
+
+    result.append("\n");
     return result;
 }
 
