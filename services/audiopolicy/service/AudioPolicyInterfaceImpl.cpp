@@ -528,10 +528,13 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId, bool *silenc
 
             item->setCString(kAudioPolicyRqstSrc,
                              audioSourceString(client->attributes.source).c_str());
-            item->setCString(kAudioPolicyRqstPkg,
-                             std::string(String8(client->opPackageName).string()).c_str());
             item->setInt32(kAudioPolicyRqstSession, client->session);
-
+            if (client->opPackageName.size() != 0) {
+                item->setCString(kAudioPolicyRqstPkg,
+                                 std::string(String8(client->opPackageName).string()).c_str());
+            } else {
+                item->setCString(kAudioPolicyRqstPkg, to_string(client->uid).c_str());
+            }
             item->setCString(
                     kAudioPolicyRqstDevice, getDeviceTypeStrForPortId(client->deviceId).c_str());
 
@@ -550,9 +553,13 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId, bool *silenc
                         // keeps the last of the clients marked active
                         item->setCString(kAudioPolicyActiveSrc,
                                          audioSourceString(other->attributes.source).c_str());
-                        item->setCString(kAudioPolicyActivePkg,
-                                     std::string(String8(other->opPackageName).string()).c_str());
                         item->setInt32(kAudioPolicyActiveSession, other->session);
+                        if (other->opPackageName.size() != 0) {
+                            item->setCString(kAudioPolicyActivePkg,
+                                 std::string(String8(other->opPackageName).string()).c_str());
+                        } else {
+                            item->setCString(kAudioPolicyRqstPkg, to_string(other->uid).c_str());
+                        }
                         item->setCString(kAudioPolicyActiveDevice,
                                          getDeviceTypeStrForPortId(other->deviceId).c_str());
                     }

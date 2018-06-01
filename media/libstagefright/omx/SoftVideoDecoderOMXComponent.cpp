@@ -154,12 +154,12 @@ void SoftVideoDecoderOMXComponent::updatePortDefinitions(bool updateCrop, bool u
     outDef->format.video.nFrameWidth = outputBufferWidth();
     outDef->format.video.nFrameHeight = outputBufferHeight();
     outDef->format.video.eColorFormat = mOutputFormat;
-    outDef->format.video.nStride = outDef->format.video.nFrameWidth;
     outDef->format.video.nSliceHeight = outDef->format.video.nFrameHeight;
 
     int32_t bpp = (mOutputFormat == OMX_COLOR_FormatYUV420Planar16) ? 2 : 1;
+    outDef->format.video.nStride = outDef->format.video.nFrameWidth * bpp;
     outDef->nBufferSize =
-        (outDef->format.video.nStride * outDef->format.video.nSliceHeight * bpp * 3) / 2;
+            (outDef->format.video.nStride * outDef->format.video.nSliceHeight * 3) / 2;
 
     OMX_PARAM_PORTDEFINITIONTYPE *inDef = &editPortInfo(kInputPortIndex)->mDef;
     inDef->format.video.nFrameWidth = mWidth;

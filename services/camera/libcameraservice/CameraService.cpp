@@ -2337,10 +2337,13 @@ void CameraService::BasicClient::block() {
 
 void CameraService::Client::notifyError(int32_t errorCode,
         const CaptureResultExtras& resultExtras) {
-    (void) errorCode;
     (void) resultExtras;
     if (mRemoteCallback != NULL) {
-        mRemoteCallback->notifyCallback(CAMERA_MSG_ERROR, CAMERA_ERROR_RELEASED, 0);
+        int32_t api1ErrorCode = CAMERA_ERROR_RELEASED;
+        if (errorCode == hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DISABLED) {
+            api1ErrorCode = CAMERA_ERROR_DISABLED;
+        }
+        mRemoteCallback->notifyCallback(CAMERA_MSG_ERROR, api1ErrorCode, 0);
     } else {
         ALOGE("mRemoteCallback is NULL!!");
     }

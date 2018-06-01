@@ -111,6 +111,8 @@ private:
     int32_t mCryptoMode;    // passed in from extractor
     int32_t mDefaultIVSize; // passed in from extractor
     uint8_t mCryptoKey[16]; // passed in from extractor
+    int32_t mDefaultEncryptedByteBlock;
+    int32_t mDefaultSkipByteBlock;
     uint32_t mCurrentAuxInfoType;
     uint32_t mCurrentAuxInfoTypeParameter;
     int32_t mCurrentDefaultSampleInfoSize;
@@ -144,6 +146,8 @@ private:
     status_t parseTrackFragmentRun(off64_t offset, off64_t size);
     status_t parseSampleAuxiliaryInformationSizes(off64_t offset, off64_t size);
     status_t parseSampleAuxiliaryInformationOffsets(off64_t offset, off64_t size);
+    status_t parseClearEncryptedSizes(off64_t offset, bool isSubsampleEncryption, uint32_t flags);
+    status_t parseSampleEncryption(off64_t offset);
 
     struct TrackFragmentHeaderInfo {
         enum Flags {
@@ -921,6 +925,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 track->timescale = 0;
                 track->meta.setCString(kKeyMIMEType, "application/octet-stream");
                 track->has_elst = false;
+                track->subsample_encryption = false;
             }
 
             off64_t stop_offset = *offset + chunk_size;
@@ -979,6 +984,49 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             }
             break;
         }
+
+        case FOURCC('s', 'c', 'h', 'm'):
+        {
+
+            *offset += chunk_size;
+            if (!mLastTrack) {
+                return ERROR_MALFORMED;
+            }
+
+            uint32_t scheme_type;
+            if (mDataSource->readAt(data_offset + 4, &scheme_type, 4) < 4) {
+                return ERROR_IO;
+            }
+            scheme_type = ntohl(scheme_type);
+            int32_t mode = kCryptoModeUnencrypted;
+            switch(scheme_type) {
+                case FOURCC('c', 'b', 'c', '1'):
+                {
+                    mode = kCryptoModeAesCbc;
+                    break;
+                }
+                case FOURCC('c', 'b', 'c', 's'):
+                {
+                    mode = kCryptoModeAesCbc;
+                    mLastTrack->subsample_encryption = true;
+                    break;
+                }
+                case FOURCC('c', 'e', 'n', 'c'):
+                {
+                    mode = kCryptoModeAesCtr;
+                    break;
+                }
+                case FOURCC('c', 'e', 'n', 's'):
+                {
+                    mode = kCryptoModeAesCtr;
+                    mLastTrack->subsample_encryption = true;
+                    break;
+                }
+            }
+            mLastTrack->meta.setInt32(kKeyCryptoMode, mode);
+            break;
+        }
+
 
         case FOURCC('e', 'l', 's', 't'):
         {
@@ -1071,15 +1119,40 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             // tenc box contains 1 byte version, 3 byte flags, 3 byte default algorithm id, one byte
             // default IV size, 16 bytes default KeyID
             // (ISO 23001-7)
-            char buf[4];
+
+            uint8_t version;
+            if (mDataSource->readAt(data_offset, &version, sizeof(version))
+                    < (ssize_t)sizeof(version)) {
+                return ERROR_IO;
+            }
+
+            uint8_t buf[4];
             memset(buf, 0, 4);
             if (mDataSource->readAt(data_offset + 4, buf + 1, 3) < 3) {
                 return ERROR_IO;
             }
-            uint32_t defaultAlgorithmId = ntohl(*((int32_t*)buf));
-            if (defaultAlgorithmId > 1) {
-                // only 0 (clear) and 1 (AES-128) are valid
+
+            if (mLastTrack == NULL) {
                 return ERROR_MALFORMED;
+            }
+
+            uint8_t defaultEncryptedByteBlock = 0;
+            uint8_t defaultSkipByteBlock = 0;
+            uint32_t defaultAlgorithmId = ntohl(*((int32_t*)buf));
+            if (version == 1) {
+                uint32_t pattern = buf[2];
+                defaultEncryptedByteBlock = pattern >> 4;
+                defaultSkipByteBlock = pattern & 0xf;
+                if (defaultEncryptedByteBlock == 0 && defaultSkipByteBlock == 0) {
+                    // use (1,0) to mean "encrypt everything"
+                    defaultEncryptedByteBlock = 1;
+                }
+            } else if (mLastTrack->subsample_encryption) {
+                ALOGW("subsample_encryption should be version 1");
+            } else if (defaultAlgorithmId > 1) {
+                // only 0 (clear) and 1 (AES-128) are valid
+                ALOGW("defaultAlgorithmId: %u is a reserved value", defaultAlgorithmId);
+                defaultAlgorithmId = 1;
             }
 
             memset(buf, 0, 4);
@@ -1088,14 +1161,12 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             }
             uint32_t defaultIVSize = ntohl(*((int32_t*)buf));
 
-            if ((defaultAlgorithmId == 0 && defaultIVSize != 0) ||
-                    (defaultAlgorithmId != 0 && defaultIVSize == 0)) {
+            if (defaultAlgorithmId == 0 && defaultIVSize != 0) {
                 // only unencrypted data must have 0 IV size
                 return ERROR_MALFORMED;
             } else if (defaultIVSize != 0 &&
                     defaultIVSize != 8 &&
                     defaultIVSize != 16) {
-                // only supported sizes are 0, 8 and 16
                 return ERROR_MALFORMED;
             }
 
@@ -1105,12 +1176,41 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 return ERROR_IO;
             }
 
-            if (mLastTrack == NULL)
-                return ERROR_MALFORMED;
+            sp<ABuffer> defaultConstantIv;
+            if (defaultAlgorithmId != 0 && defaultIVSize == 0) {
 
-            mLastTrack->meta.setInt32(kKeyCryptoMode, defaultAlgorithmId);
+                uint8_t ivlength;
+                if (mDataSource->readAt(data_offset + 24, &ivlength, sizeof(ivlength))
+                        < (ssize_t)sizeof(ivlength)) {
+                    return ERROR_IO;
+                }
+
+                if (ivlength != 8 && ivlength != 16) {
+                    ALOGW("unsupported IV length: %u", ivlength);
+                    return ERROR_MALFORMED;
+                }
+
+                defaultConstantIv = new ABuffer(ivlength);
+                if (mDataSource->readAt(data_offset + 25, defaultConstantIv->data(), ivlength)
+                        < (ssize_t)ivlength) {
+                    return ERROR_IO;
+                }
+
+                defaultConstantIv->setRange(0, ivlength);
+            }
+
+            int32_t tmpAlgorithmId;
+            if (!mLastTrack->meta.findInt32(kKeyCryptoMode, &tmpAlgorithmId)) {
+                mLastTrack->meta.setInt32(kKeyCryptoMode, defaultAlgorithmId);
+            }
+
             mLastTrack->meta.setInt32(kKeyCryptoDefaultIVSize, defaultIVSize);
             mLastTrack->meta.setData(kKeyCryptoKey, 'tenc', defaultKeyId, 16);
+            mLastTrack->meta.setInt32(kKeyEncryptedByteBlock, defaultEncryptedByteBlock);
+            mLastTrack->meta.setInt32(kKeySkipByteBlock, defaultSkipByteBlock);
+            if (defaultConstantIv != NULL) {
+                mLastTrack->meta.setData(kKeyCryptoIV, 'dciv', defaultConstantIv->data(), defaultConstantIv->size());
+            }
             break;
         }
 
@@ -3744,6 +3844,8 @@ MPEG4Source::MPEG4Source(
       mCurrentMoofOffset(firstMoofOffset),
       mNextMoofOffset(-1),
       mCurrentTime(0),
+      mDefaultEncryptedByteBlock(0),
+      mDefaultSkipByteBlock(0),
       mCurrentSampleInfoAllocSize(0),
       mCurrentSampleInfoSizes(NULL),
       mCurrentSampleInfoOffsetsAllocSize(0),
@@ -3772,6 +3874,9 @@ MPEG4Source::MPEG4Source(
         memset(mCryptoKey, 0, 16);
         memcpy(mCryptoKey, key, keysize);
     }
+
+    mFormat.findInt32(kKeyEncryptedByteBlock, &mDefaultEncryptedByteBlock);
+    mFormat.findInt32(kKeySkipByteBlock, &mDefaultSkipByteBlock);
 
     const char *mime;
     bool success = mFormat.findCString(kKeyMIMEType, &mime);
@@ -4018,6 +4123,15 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
             break;
         }
 
+        case FOURCC('s', 'e', 'n', 'c'): {
+            status_t err;
+            if ((err = parseSampleEncryption(data_offset)) != OK) {
+                return err;
+            }
+            *offset += chunk_size;
+            break;
+        }
+
         case FOURCC('m', 'd', 'a', 't'): {
             // parse DRM info if present
             ALOGV("MPEG4Source::parseChunk mdat");
@@ -4168,6 +4282,12 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationOffsets(
     off64_t drmoffset = mCurrentSampleInfoOffsets[0]; // from moof
 
     drmoffset += mCurrentMoofOffset;
+
+    return parseClearEncryptedSizes(drmoffset, false, 0);
+}
+
+status_t MPEG4Source::parseClearEncryptedSizes(off64_t offset, bool isSubsampleEncryption, uint32_t flags) {
+
     int ivlength;
     CHECK(mFormat.findInt32(kKeyCryptoDefaultIVSize, &ivlength));
 
@@ -4176,42 +4296,61 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationOffsets(
         ALOGW("unsupported IV length: %d", ivlength);
         return ERROR_MALFORMED;
     }
+
+    uint32_t sampleCount = mCurrentSampleInfoCount;
+    if (isSubsampleEncryption) {
+        if (!mDataSource->getUInt32(offset, &sampleCount)) {
+            return ERROR_IO;
+        }
+        offset += 4;
+    }
+
     // read CencSampleAuxiliaryDataFormats
-    for (size_t i = 0; i < mCurrentSampleInfoCount; i++) {
+    for (size_t i = 0; i < sampleCount; i++) {
         if (i >= mCurrentSamples.size()) {
             ALOGW("too few samples");
             break;
         }
         Sample *smpl = &mCurrentSamples.editItemAt(i);
+        if (!smpl->clearsizes.isEmpty()) {
+            continue;
+        }
 
         memset(smpl->iv, 0, 16);
-        if (mDataSource->readAt(drmoffset, smpl->iv, ivlength) != ivlength) {
+        if (mDataSource->readAt(offset, smpl->iv, ivlength) != ivlength) {
             return ERROR_IO;
         }
 
-        drmoffset += ivlength;
+        offset += ivlength;
 
-        int32_t smplinfosize = mCurrentDefaultSampleInfoSize;
-        if (smplinfosize == 0) {
-            smplinfosize = mCurrentSampleInfoSizes[i];
+        bool readSubsamples;
+        if (isSubsampleEncryption) {
+            readSubsamples = flags & 2;
+        } else {
+            int32_t smplinfosize = mCurrentDefaultSampleInfoSize;
+            if (smplinfosize == 0) {
+                smplinfosize = mCurrentSampleInfoSizes[i];
+            }
+            readSubsamples = smplinfosize > ivlength;
         }
-        if (smplinfosize > ivlength) {
+
+        if (readSubsamples) {
             uint16_t numsubsamples;
-            if (!mDataSource->getUInt16(drmoffset, &numsubsamples)) {
+            if (!mDataSource->getUInt16(offset, &numsubsamples)) {
                 return ERROR_IO;
             }
-            drmoffset += 2;
+            offset += 2;
             for (size_t j = 0; j < numsubsamples; j++) {
                 uint16_t numclear;
                 uint32_t numencrypted;
-                if (!mDataSource->getUInt16(drmoffset, &numclear)) {
+                if (!mDataSource->getUInt16(offset, &numclear)) {
                     return ERROR_IO;
                 }
-                drmoffset += 2;
-                if (!mDataSource->getUInt32(drmoffset, &numencrypted)) {
+                offset += 2;
+                if (!mDataSource->getUInt32(offset, &numencrypted)) {
                     return ERROR_IO;
                 }
-                drmoffset += 4;
+                offset += 4;
                 smpl->clearsizes.add(numclear);
                 smpl->encryptedsizes.add(numencrypted);
             }
@@ -4221,8 +4360,15 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationOffsets(
         }
     }
 
-
     return OK;
+}
+
+status_t MPEG4Source::parseSampleEncryption(off64_t offset) {
+    uint32_t flags;
+    if (!mDataSource->getUInt32(offset, &flags)) { // actually version + flags
+        return ERROR_MALFORMED;
+    }
+    return parseClearEncryptedSizes(offset + 4, true, flags);
 }
 
 status_t MPEG4Source::parseTrackFragmentHeader(off64_t offset, off64_t size) {
@@ -4476,6 +4622,7 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
         tmp.size = sampleSize;
         tmp.duration = sampleDuration;
         tmp.compositionOffset = sampleCtsOffset;
+        memset(tmp.iv, 0, sizeof(tmp.iv));
         mCurrentSamples.add(tmp);
 
         dataOffset += sampleSize;
@@ -4980,10 +5127,22 @@ status_t MPEG4Source::fragmentedRead(
                 smpl->clearsizes.array(), smpl->clearsizes.size() * 4);
         bufmeta.setData(kKeyEncryptedSizes, 0,
                 smpl->encryptedsizes.array(), smpl->encryptedsizes.size() * 4);
-        bufmeta.setData(kKeyCryptoIV, 0, smpl->iv, 16); // use 16 or the actual size?
         bufmeta.setInt32(kKeyCryptoDefaultIVSize, mDefaultIVSize);
         bufmeta.setInt32(kKeyCryptoMode, mCryptoMode);
         bufmeta.setData(kKeyCryptoKey, 0, mCryptoKey, 16);
+        bufmeta.setInt32(kKeyEncryptedByteBlock, mDefaultEncryptedByteBlock);
+        bufmeta.setInt32(kKeySkipByteBlock, mDefaultSkipByteBlock);
+
+        uint32_t type = 0;
+        const void *iv = NULL;
+        size_t ivlength = 0;
+        if (!mFormat.findData(
+                kKeyCryptoIV, &type, &iv, &ivlength)) {
+            iv = smpl->iv;
+            ivlength = 16; // use 16 or the actual size?
+        }
+        bufmeta.setData(kKeyCryptoIV, 0, iv, ivlength);
+
     }
 
     if ((!mIsAVC && !mIsHEVC)|| mWantsNALFragments) {

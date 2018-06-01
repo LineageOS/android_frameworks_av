@@ -41,7 +41,7 @@ public:
     virtual             ~Track();
     virtual status_t    initCheck() const;
 
-    static  void        appendDumpHeader(String8& result);
+            void        appendDumpHeader(String8& result);
             void        appendDump(String8& result, bool active);
     virtual status_t    start(AudioSystem::sync_event_t event =
                                     AudioSystem::SYNC_EVENT_NONE,
@@ -75,6 +75,7 @@ public:
             bool        isOffloadedOrDirect() const { return (mFlags
                             & (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD
                                     | AUDIO_OUTPUT_FLAG_DIRECT)) != 0; }
+            bool        isStatic() const { return  mSharedBuffer.get() != nullptr; }
 
             status_t    setParameters(const String8& keyValuePairs);
             status_t    attachAuxEffect(int EffectId);
@@ -92,6 +93,11 @@ public:
     virtual status_t    setSyncEvent(const sp<SyncEvent>& event);
 
     virtual bool        isFastTrack() const { return (mFlags & AUDIO_OUTPUT_FLAG_FAST) != 0; }
+
+    virtual double bufferLatencyMs() {
+        return isStatic() ? 0.
+                : (double)mAudioTrackServerProxy->framesReadySafe() * 1000 / sampleRate();
+    }
 
 // implement volume handling.
     media::VolumeShaper::Status applyVolumeShaper(
@@ -194,6 +200,7 @@ protected:
 
     sp<media::VolumeHandler>  mVolumeHandler; // handles multiple VolumeShaper configs and operations
 
+    bool               mDumpLatency = false; // true if track supports latency dumps.
 private:
     // The following fields are only for fast tracks, and should be in a subclass
     int                 mFastIndex; // index within FastMixerState::mFastTracks[];

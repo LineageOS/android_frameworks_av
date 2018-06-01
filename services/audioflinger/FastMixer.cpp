@@ -489,6 +489,10 @@ void FastMixer::onWork()
                         timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
                 mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] =
                         timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL];
+                // We don't compensate for server - kernel time difference and
+                // only update latency if we have valid info.
+                dumpState->mLatencyMs =
+                        (double)mNativeFramesWrittenButNotPresented * 1000 / mSampleRate;
             } else {
                 // HAL reported that more frames were presented than were written
                 mNativeFramesWrittenButNotPresented = 0;

@@ -498,9 +498,10 @@ status_t VideoFrameDecoder::onOutputReceived(
         return ERROR_MALFORMED;
     }
 
-    int32_t width, height;
+    int32_t width, height, stride;
     CHECK(outputFormat->findInt32("width", &width));
     CHECK(outputFormat->findInt32("height", &height));
+    CHECK(outputFormat->findInt32("stride", &stride));
 
     int32_t crop_left, crop_top, crop_right, crop_bottom;
     if (!outputFormat->findRect("crop", &crop_left, &crop_top, &crop_right, &crop_bottom)) {
@@ -527,11 +528,10 @@ status_t VideoFrameDecoder::onOutputReceived(
     if (converter.isValid()) {
         converter.convert(
                 (const uint8_t *)videoFrameBuffer->data(),
-                width, height,
+                width, height, stride,
                 crop_left, crop_top, crop_right, crop_bottom,
                 frame->getFlattenedData(),
-                frame->mWidth,
-                frame->mHeight,
+                frame->mWidth, frame->mHeight, frame->mRowBytes,
                 crop_left, crop_top, crop_right, crop_bottom);
         return OK;
     }
@@ -678,9 +678,10 @@ status_t ImageDecoder::onOutputReceived(
         return ERROR_MALFORMED;
     }
 
-    int32_t width, height;
+    int32_t width, height, stride;
     CHECK(outputFormat->findInt32("width", &width));
     CHECK(outputFormat->findInt32("height", &height));
+    CHECK(outputFormat->findInt32("stride", &stride));
 
     if (mFrame == NULL) {
         sp<IMemory> frameMem = allocVideoFrame(
@@ -724,11 +725,10 @@ status_t ImageDecoder::onOutputReceived(
     if (converter.isValid()) {
         converter.convert(
                 (const uint8_t *)videoFrameBuffer->data(),
-                width, height,
+                width, height, stride,
                 crop_left, crop_top, crop_right, crop_bottom,
                 mFrame->getFlattenedData(),
-                mFrame->mWidth,
-                mFrame->mHeight,
+                mFrame->mWidth, mFrame->mHeight, mFrame->mRowBytes,
                 dstLeft, dstTop, dstRight, dstBottom);
         return OK;
     }

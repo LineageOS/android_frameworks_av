@@ -85,9 +85,15 @@ bool ColorConverter::isDstRGB() const {
             || mDstFormat == OMX_COLOR_Format32bitBGRA8888;
 }
 
+/*
+ * If stride is non-zero, client's stride will be used. For planar
+ * or semi-planar YUV formats, stride must be even numbers.
+ * If stride is zero, it will be calculated based on width and bpp
+ * of the format, assuming no padding on the right edge.
+ */
 ColorConverter::BitmapParams::BitmapParams(
         void *bits,
-        size_t width, size_t height,
+        size_t width, size_t height, size_t stride,
         size_t cropLeft, size_t cropTop,
         size_t cropRight, size_t cropBottom,
         OMX_COLOR_FORMATTYPE colorFromat)
@@ -101,6 +107,8 @@ ColorConverter::BitmapParams::BitmapParams(
       mCropBottom(cropBottom) {
     switch(mColorFormat) {
     case OMX_COLOR_Format16bitRGB565:
+    case OMX_COLOR_FormatYUV420Planar16:
+    case OMX_COLOR_FormatCbYCrY:
         mBpp = 2;
         mStride = 2 * mWidth;
         break;
@@ -112,13 +120,7 @@ ColorConverter::BitmapParams::BitmapParams(
         mStride = 4 * mWidth;
         break;
 
-    case OMX_COLOR_FormatYUV420Planar16:
-        mBpp = 2;
-        mStride = 2 * mWidth;
-        break;
-
     case OMX_COLOR_FormatYUV420Planar:
-    case OMX_COLOR_FormatCbYCrY:
     case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
     case OMX_COLOR_FormatYUV420SemiPlanar:
     case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
@@ -132,6 +134,10 @@ ColorConverter::BitmapParams::BitmapParams(
         mStride = mWidth;
         break;
     }
+    // use client's stride if it's specified.
+    if (stride != 0) {
+        mStride = stride;
+    }
 }
 
 size_t ColorConverter::BitmapParams::cropWidth() const {
@@ -144,21 +150,21 @@ size_t ColorConverter::BitmapParams::cropHeight() const {
 
 status_t ColorConverter::convert(
         const void *srcBits,
-        size_t srcWidth, size_t srcHeight,
+        size_t srcWidth, size_t srcHeight, size_t srcStride,
         size_t srcCropLeft, size_t srcCropTop,
         size_t srcCropRight, size_t srcCropBottom,
         void *dstBits,
-        size_t dstWidth, size_t dstHeight,
+        size_t dstWidth, size_t dstHeight, size_t dstStride,
         size_t dstCropLeft, size_t dstCropTop,
         size_t dstCropRight, size_t dstCropBottom) {
     BitmapParams src(
             const_cast<void *>(srcBits),
-            srcWidth, srcHeight,
+            srcWidth, srcHeight, srcStride,
             srcCropLeft, srcCropTop, srcCropRight, srcCropBottom, mSrcFormat);
 
     BitmapParams dst(
             dstBits,
-            dstWidth, dstHeight,
+            dstWidth, dstHeight, dstStride,
             dstCropLeft, dstCropTop, dstCropRight, dstCropBottom, mDstFormat);
 
     if (!((src.mCropLeft & 1) == 0
@@ -792,15 +798,15 @@ status_t ColorConverter::convertYUV420SemiPlanar(
 
     uint8_t *kAdjustedClip = initClip();
 
-    uint16_t *dst_ptr = (uint16_t *)dst.mBits
-        + dst.mCropTop * dst.mWidth + dst.mCropLeft;
+    uint16_t *dst_ptr = (uint16_t *)((uint8_t *)
+            dst.mBits + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp);
 
     const uint8_t *src_y =
-        (const uint8_t *)src.mBits + src.mCropTop * src.mWidth + src.mCropLeft;
+        (const uint8_t *)src.mBits + src.mCropTop * src.mStride + src.mCropLeft;
 
     const uint8_t *src_u =
-        (const uint8_t *)src_y + src.mWidth * src.mHeight
-        + src.mCropTop * src.mWidth + src.mCropLeft;
+        (const uint8_t *)src.mBits + src.mHeight * src.mStride +
+        src.mCropTop * src.mStride / 2 + src.mCropLeft;
 
     for (size_t y = 0; y < src.cropHeight(); ++y) {
         for (size_t x = 0; x < src.cropWidth(); x += 2) {
@@ -842,13 +848,13 @@ status_t ColorConverter::convertYUV420SemiPlanar(
             }
         }
 
-        src_y += src.mWidth;
+        src_y += src.mStride;
 
         if (y & 1) {
-            src_u += src.mWidth;
+            src_u += src.mStride;
         }
 
-        dst_ptr += dst.mWidth;
+        dst_ptr = (uint16_t*)((uint8_t*)dst_ptr + dst.mStride);
     }
 
     return OK;

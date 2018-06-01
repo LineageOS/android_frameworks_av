@@ -1784,7 +1784,7 @@ void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& ar
     if (numtracks) {
         dprintf(fd, " of which %zu are active\n", numactive);
         result.append(prefix);
-        Track::appendDumpHeader(result);
+        mTracks[0]->appendDumpHeader(result);
         for (size_t i = 0; i < numtracks; ++i) {
             sp<Track> track = mTracks[i];
             if (track != 0) {
@@ -1804,7 +1804,7 @@ void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& ar
         result.append("  The following tracks are in the active list but"
                 " not in the track list\n");
         result.append(prefix);
-        Track::appendDumpHeader(result);
+        mActiveTracks[0]->appendDumpHeader(result);
         for (size_t i = 0; i < numactive; ++i) {
             sp<Track> track = mActiveTracks[i];
             if (mTracks.indexOf(track) < 0) {
@@ -3792,6 +3792,10 @@ void AudioFlinger::PlaybackThread::toAudioPortConfig(struct audio_port_config *c
     config->role = AUDIO_PORT_ROLE_SOURCE;
     config->ext.mix.hw_module = mOutput->audioHwDev->handle();
     config->ext.mix.usecase.stream = AUDIO_STREAM_DEFAULT;
+    if (mOutput && mOutput->flags != AUDIO_OUTPUT_FLAG_NONE) {
+        config->config_mask |= AUDIO_PORT_CONFIG_FLAGS;
+        config->flags.output = mOutput->flags;
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -5054,6 +5058,10 @@ void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& ar
     dprintf(fd, "  Thread throttle time (msecs): %u\n", mThreadThrottleTimeMs);
     dprintf(fd, "  AudioMixer tracks: %s\n", mAudioMixer->trackNames().c_str());
     dprintf(fd, "  Master mono: %s\n", mMasterMono ? "on" : "off");
+    const double latencyMs = mTimestamp.getOutputServerLatencyMs(mSampleRate);
+    if (latencyMs > 0.) {
+        dprintf(fd, "  NormalMixer latency ms: %.2lf\n", latencyMs);
+    }
 
     if (hasFastMixer()) {
         dprintf(fd, "  FastMixer thread %p tid=%d", mFastMixer.get(), mFastMixer->getTid());
@@ -7894,6 +7902,10 @@ void AudioFlinger::RecordThread::toAudioPortConfig(struct audio_port_config *con
     config->role = AUDIO_PORT_ROLE_SINK;
     config->ext.mix.hw_module = mInput->audioHwDev->handle();
     config->ext.mix.usecase.source = mAudioSource;
+    if (mInput && mInput->flags != AUDIO_INPUT_FLAG_NONE) {
+        config->config_mask |= AUDIO_PORT_CONFIG_FLAGS;
+        config->flags.input = mInput->flags;
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -8861,6 +8873,15 @@ void AudioFlinger::MmapPlaybackThread::checkSilentMode_l()
     }
 }
 
+void AudioFlinger::MmapPlaybackThread::toAudioPortConfig(struct audio_port_config *config)
+{
+    MmapThread::toAudioPortConfig(config);
+    if (mOutput && mOutput->flags != AUDIO_OUTPUT_FLAG_NONE) {
+        config->config_mask |= AUDIO_PORT_CONFIG_FLAGS;
+        config->flags.output = mOutput->flags;
+    }
+}
+
 void AudioFlinger::MmapPlaybackThread::dumpInternals(int fd, const Vector<String16>& args)
 {
     MmapThread::dumpInternals(fd, args);
@@ -8948,6 +8969,15 @@ void AudioFlinger::MmapCaptureThread::setRecordSilenced(uid_t uid, bool silenced
             mActiveTracks[i]->setSilenced_l(silenced);
             broadcast_l();
         }
+    }
+}
+
+void AudioFlinger::MmapCaptureThread::toAudioPortConfig(struct audio_port_config *config)
+{
+    MmapThread::toAudioPortConfig(config);
+    if (mInput && mInput->flags != AUDIO_INPUT_FLAG_NONE) {
+        config->config_mask |= AUDIO_PORT_CONFIG_FLAGS;
+        config->flags.input = mInput->flags;
     }
 }
 

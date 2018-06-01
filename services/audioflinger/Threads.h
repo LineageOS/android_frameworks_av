@@ -1679,6 +1679,8 @@ public:
 
                 void        updateMetadata_l() override;
 
+    virtual     void        toAudioPortConfig(struct audio_port_config *config);
+
 protected:
 
                 audio_stream_type_t         mStreamType;
@@ -1706,6 +1708,8 @@ public:
                 void           updateMetadata_l() override;
                 void           processVolume_l() override;
                 void           setRecordSilenced(uid_t uid, bool silenced) override;
+
+    virtual     void           toAudioPortConfig(struct audio_port_config *config);
 
 protected:
 

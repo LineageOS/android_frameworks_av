@@ -42,7 +42,7 @@
 #define NUM_INPUT_CHANNELS      1
 #define FILENAME_ALL            "/data/loopback_all.wav"
 #define FILENAME_ECHOS          "/data/loopback_echos.wav"
-#define APP_VERSION             "0.2.03"
+#define APP_VERSION             "0.2.04"
 
 constexpr int kNumCallbacksToDrain   = 20;
 constexpr int kNumCallbacksToDiscard = 20;
@@ -98,6 +98,9 @@ static int32_t readFormattedData(LoopbackData *myData, int32_t numFrames) {
         framesRead = AAudioStream_read(myData->inputStream, myData->inputFloatData,
                                        numFrames,
                                        0 /* timeoutNanoseconds */);
+    } else {
+        printf("ERROR actualInputFormat = %d\n", myData->actualInputFormat);
+        assert(false);
     }
     if (framesRead < 0) {
         myData->inputError = framesRead;
@@ -121,7 +124,7 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
     float  *outputData = (float  *) audioData;
 
     // Read audio data from the input stream.
-    int32_t framesRead;
+    int32_t actualFramesRead;
 
     if (numFrames > myData->inputFramesMaximum) {
         myData->inputError = AAUDIO_ERROR_OUT_OF_RANGE;
@@ -141,16 +144,23 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
 
     if (myData->numCallbacksToDrain > 0) {
         // Drain the input.
+        int32_t totalFramesRead = 0;
         do {
-            framesRead = readFormattedData(myData, numFrames);
+            actualFramesRead = readFormattedData(myData, numFrames);
+            if (actualFramesRead) {
+                totalFramesRead += actualFramesRead;
+            }
             // Ignore errors because input stream may not be started yet.
-        } while (framesRead > 0);
-        myData->numCallbacksToDrain--;
+        } while (actualFramesRead > 0);
+        // Only counts if we actually got some data.
+        if (totalFramesRead > 0) {
+            myData->numCallbacksToDrain--;
+        }
 
     } else if (myData->numCallbacksToDiscard > 0) {
         // Ignore. Allow the input to fill back up to equilibrium with the output.
-        framesRead = readFormattedData(myData, numFrames);
-        if (framesRead < 0) {
+        actualFramesRead = readFormattedData(myData, numFrames);
+        if (actualFramesRead < 0) {
             result = AAUDIO_CALLBACK_RESULT_STOP;
         }
         myData->numCallbacksToDiscard--;
@@ -164,21 +174,29 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
         int64_t inputFramesWritten = AAudioStream_getFramesWritten(myData->inputStream);
         int64_t inputFramesRead = AAudioStream_getFramesRead(myData->inputStream);
         int64_t framesAvailable = inputFramesWritten - inputFramesRead;
-        framesRead = readFormattedData(myData, numFrames);
-        if (framesRead < 0) {
+        actualFramesRead = readFormattedData(myData, numFrames);
+        if (actualFramesRead < 0) {
             result = AAUDIO_CALLBACK_RESULT_STOP;
         } else {
 
-            if (framesRead < numFrames) {
-                if(framesRead < (int32_t) framesAvailable) {
-                    printf("insufficient but numFrames = %d, framesRead = %d, available = %d\n",
-                           numFrames, framesRead, (int) framesAvailable);
+            if (actualFramesRead < numFrames) {
+                if(actualFramesRead < (int32_t) framesAvailable) {
+                    printf("insufficient but numFrames = %d"
+                                   ", actualFramesRead = %d"
+                                   ", inputFramesWritten = %d"
+                                   ", inputFramesRead = %d"
+                                   ", available = %d\n",
+                           numFrames,
+                           actualFramesRead,
+                           (int) inputFramesWritten,
+                           (int) inputFramesRead,
+                           (int) framesAvailable);
                 }
                 myData->insufficientReadCount++;
-                myData->insufficientReadFrames += numFrames - framesRead; // deficit
+                myData->insufficientReadFrames += numFrames - actualFramesRead; // deficit
             }
 
-            int32_t numSamples = framesRead * myData->actualInputChannelCount;
+            int32_t numSamples = actualFramesRead * myData->actualInputChannelCount;
 
             if (myData->actualInputFormat == AAUDIO_FORMAT_PCM_I16) {
                 convertPcm16ToFloat(myData->inputShortData, myData->inputFloatData, numSamples);
@@ -216,6 +234,7 @@ static void MyErrorCallbackProc(
 static void usage() {
     printf("Usage: aaudio_loopback [OPTION]...\n\n");
     AAudioArgsParser::usage();
+    printf("      -B{frames}        input capacity in frames\n");
     printf("      -C{channels}      number of input channels\n");
     printf("      -F{0,1,2}         input format, 1=I16, 2=FLOAT\n");
     printf("      -g{gain}          recirculating loopback gain\n");
@@ -312,15 +331,17 @@ int main(int argc, const char **argv)
     AAudioSimplePlayer    player;
     AAudioSimpleRecorder  recorder;
     LoopbackData          loopbackData;
-    AAudioStream         *inputStream               = nullptr;
+    AAudioStream         *inputStream                = nullptr;
     AAudioStream         *outputStream               = nullptr;
 
     aaudio_result_t       result = AAUDIO_OK;
     aaudio_sharing_mode_t requestedInputSharingMode  = AAUDIO_SHARING_MODE_SHARED;
     int                   requestedInputChannelCount = NUM_INPUT_CHANNELS;
     aaudio_format_t       requestedInputFormat       = AAUDIO_FORMAT_UNSPECIFIED;
-    const aaudio_format_t requestedOutputFormat      = AAUDIO_FORMAT_PCM_FLOAT;
+    int32_t               requestedInputCapacity     = -1;
     aaudio_performance_mode_t inputPerformanceLevel  = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
+
+    int32_t               outputFramesPerBurst = 0;
 
     aaudio_format_t       actualOutputFormat         = AAUDIO_FORMAT_INVALID;
     int32_t               actualSampleRate           = 0;
@@ -342,6 +363,9 @@ int main(int argc, const char **argv)
             if (arg[0] == '-') {
                 char option = arg[1];
                 switch (option) {
+                    case 'B':
+                        requestedInputCapacity = atoi(&arg[2]);
+                        break;
                     case 'C':
                         requestedInputChannelCount = atoi(&arg[2]);
                         break;
@@ -408,7 +432,6 @@ int main(int argc, const char **argv)
     }
 
     printf("OUTPUT stream ----------------------------------------\n");
-    argParser.setFormat(requestedOutputFormat);
     result = player.open(argParser, MyDataCallbackProc, MyErrorCallbackProc, &loopbackData);
     if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  player.open() returned %d\n", result);
@@ -417,11 +440,15 @@ int main(int argc, const char **argv)
     outputStream = player.getStream();
 
     actualOutputFormat = AAudioStream_getFormat(outputStream);
-    assert(actualOutputFormat == AAUDIO_FORMAT_PCM_FLOAT);
+    if (actualOutputFormat != AAUDIO_FORMAT_PCM_FLOAT) {
+        fprintf(stderr, "ERROR - only AAUDIO_FORMAT_PCM_FLOAT supported\n");
+        exit(1);
+    }
 
     actualSampleRate = AAudioStream_getSampleRate(outputStream);
     loopbackData.audioRecording.allocate(recordingDuration * actualSampleRate);
     loopbackData.audioRecording.setSampleRate(actualSampleRate);
+    outputFramesPerBurst = AAudioStream_getFramesPerBurst(outputStream);
 
     argParser.compareWithStream(outputStream);
 
@@ -435,8 +462,11 @@ int main(int argc, const char **argv)
 
     // Make sure the input buffer has plenty of capacity.
     // Extra capacity on input should not increase latency if we keep it drained.
-    int32_t outputBufferCapacity = AAudioStream_getBufferCapacityInFrames(outputStream);
-    int32_t inputBufferCapacity = 2 * outputBufferCapacity;
+    int32_t inputBufferCapacity = requestedInputCapacity;
+    if (inputBufferCapacity < 0) {
+        int32_t outputBufferCapacity = AAudioStream_getBufferCapacityInFrames(outputStream);
+        inputBufferCapacity = 2 * outputBufferCapacity;
+    }
     argParser.setBufferCapacity(inputBufferCapacity);
 
     result = recorder.open(argParser);
@@ -456,6 +486,15 @@ int main(int argc, const char **argv)
     }
 
     argParser.compareWithStream(inputStream);
+
+    // If the input stream is too small then we cannot satisfy the output callback.
+    {
+        int32_t actualCapacity = AAudioStream_getBufferCapacityInFrames(inputStream);
+        if (actualCapacity < 2 * outputFramesPerBurst) {
+            fprintf(stderr, "ERROR - input capacity < 2 * outputFramesPerBurst\n");
+            goto finish;
+        }
+    }
 
     // ------- Setup loopbackData -----------------------------
     loopbackData.actualInputFormat = AAudioStream_getFormat(inputStream);
@@ -499,7 +538,7 @@ int main(int argc, const char **argv)
                 printf("  ERROR on output stream\n");
                 break;
         } else if (loopbackData.isDone) {
-                printf("  test says it is done!\n");
+                printf("  Test says it is DONE!\n");
                 break;
         } else {
             // Log a line of stream data.
