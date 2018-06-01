@@ -3169,7 +3169,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             mMixerStatus = prepareTracks_l(&tracksToRemove);
 
             mActiveTracks.updatePowerState(this);
-            if (mMixerStatus == MIXER_IDLE) {
+            if (mMixerStatus == MIXER_IDLE && !mActiveTracks.size()) {
                 onIdleMixer();
             }
 
@@ -4014,7 +4014,6 @@ void AudioFlinger::MixerThread::threadLoop_sleepTime()
             }
         } else {
             mSleepTimeUs = mIdleSleepTimeUs + mIdleTimeOffsetUs;
-            mIdleTimeOffsetUs = 0;
         }
     } else if (mBytesWritten != 0 || (mMixerStatus == MIXER_TRACKS_ENABLED)) {
         // clear out mMixerBuffer or mSinkBuffer, to ensure buffers are cleared
@@ -4028,6 +4027,7 @@ void AudioFlinger::MixerThread::threadLoop_sleepTime()
         ALOGV_IF(mBytesWritten == 0 && (mMixerStatus == MIXER_TRACKS_ENABLED),
                 "anticipated start");
     }
+    mIdleTimeOffsetUs = 0;
     // TODO add standby time extension fct of effect tail
 }
 
