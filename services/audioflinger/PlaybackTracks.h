@@ -94,10 +94,9 @@ public:
 
     virtual bool        isFastTrack() const { return (mFlags & AUDIO_OUTPUT_FLAG_FAST) != 0; }
 
-    virtual double bufferLatencyMs() {
-        return isStatic() ? 0.
-                : (double)mAudioTrackServerProxy->framesReadySafe() * 1000 / sampleRate();
-    }
+            double      bufferLatencyMs() const override {
+                            return isStatic() ? 0. : TrackBase::bufferLatencyMs();
+                        }
 
 // implement volume handling.
     media::VolumeShaper::Status applyVolumeShaper(
@@ -152,7 +151,7 @@ protected:
     bool isResumePending();
     void resumeAck();
     void updateTrackFrameInfo(int64_t trackFramesReleased, int64_t sinkFramesWritten,
-            const ExtendedTimestamp &timeStamp);
+            uint32_t halSampleRate, const ExtendedTimestamp &timeStamp);
 
     sp<IMemory> sharedBuffer() const { return mSharedBuffer; }
 
@@ -200,7 +199,6 @@ protected:
 
     sp<media::VolumeHandler>  mVolumeHandler; // handles multiple VolumeShaper configs and operations
 
-    bool               mDumpLatency = false; // true if track supports latency dumps.
 private:
     // The following fields are only for fast tracks, and should be in a subclass
     int                 mFastIndex; // index within FastMixerState::mFastTracks[];
