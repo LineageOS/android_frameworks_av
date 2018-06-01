@@ -41,11 +41,15 @@
 #define MAX_ZEROTH_PARTIAL_BINS  40
 constexpr double MAX_ECHO_GAIN = 10.0; // based on experiments, otherwise autocorrelation too noisy
 
+// A narrow impulse seems to have better immunity against over estimating the
+// latency due to detecting subharmonics by the auto-correlator.
 static const float s_Impulse[] = {
-        0.0f, 0.0f, 0.0f, 0.0f, 0.2f, // silence on each side of the impulse
-        0.5f, 0.9999f, 0.0f, -0.9999, -0.5f, // bipolar
-        -0.2f, 0.0f, 0.0f, 0.0f, 0.0f
+        0.0f, 0.0f, 0.0f, 0.0f, 0.3f, // silence on each side of the impulse
+        0.99f, 0.0f, -0.99f, // bipolar with one zero crossing in middle
+        -0.3f, 0.0f, 0.0f, 0.0f, 0.0f
 };
+
+constexpr int32_t kImpulseSizeInFrames = (int32_t)(sizeof(s_Impulse) / sizeof(s_Impulse[0]));
 
 class PseudoRandom {
 public:
@@ -498,11 +502,21 @@ public:
         printf("st = %d, echo gain = %f ", mState, mEchoGain);
     }
 
-    static void sendImpulse(float *outputData, int outputChannelCount) {
-        for (float sample : s_Impulse) {
+    void sendImpulses(float *outputData, int outputChannelCount, int numFrames) {
+        while (numFrames-- > 0) {
+            float sample = s_Impulse[mSampleIndex++];
+            if (mSampleIndex >= kImpulseSizeInFrames) {
+                mSampleIndex = 0;
+            }
+
             *outputData = sample;
             outputData += outputChannelCount;
         }
+    }
+
+    void sendOneImpulse(float *outputData, int outputChannelCount) {
+        mSampleIndex = 0;
+        sendImpulses(outputData, outputChannelCount, kImpulseSizeInFrames);
     }
 
     void process(float *inputData, int inputChannelCount,
@@ -530,7 +544,7 @@ public:
                 break;
 
             case STATE_MEASURING_GAIN:
-                sendImpulse(outputData, outputChannelCount);
+                sendImpulses(outputData, outputChannelCount, numFrames);
                 peak = measurePeakAmplitude(inputData, inputChannelCount, numFrames);
                 // If we get several in a row then go to next state.
                 if (peak > mPulseThreshold) {
@@ -548,7 +562,7 @@ public:
                             nextState = STATE_WAITING_FOR_SILENCE;
                         }
                     }
-                } else {
+                } else if (numFrames > kImpulseSizeInFrames){ // ignore short callbacks
                     mDownCounter = 8;
                 }
                 break;
@@ -574,7 +588,7 @@ public:
 
             case STATE_SENDING_PULSE:
                 mAudioRecording.write(inputData, inputChannelCount, numFrames);
-                sendImpulse(outputData, outputChannelCount);
+                sendOneImpulse(outputData, outputChannelCount);
                 nextState = STATE_GATHERING_ECHOS;
                 //printf("%5d: switch to STATE_GATHERING_ECHOS\n", mLoopCounter);
                 break;
@@ -634,8 +648,9 @@ private:
         STATE_FAILED
     };
 
-    int             mDownCounter = 500;
-    int             mLoopCounter = 0;
+    int32_t         mDownCounter = 500;
+    int32_t         mLoopCounter = 0;
+    int32_t         mSampleIndex = 0;
     float           mPulseThreshold = 0.02f;
     float           mSilenceThreshold = 0.002f;
     float           mMeasuredLoopGain = 0.0f;
