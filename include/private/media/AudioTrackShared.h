@@ -555,6 +555,9 @@ public:
     // Total count of the number of flushed frames since creation (never reset).
     virtual int64_t     framesFlushed() const { return mFlushed; }
 
+    // Safe frames ready query with no side effects.
+    virtual size_t      framesReadySafe() const = 0;
+
     // Get dynamic buffer size from the shared control block.
     uint32_t            getBufferSizeInFrames() const {
         return android_atomic_acquire_load((int32_t *)&mCblk->mBufferSizeInFrames);
@@ -592,8 +595,7 @@ public:
     // which may include non-contiguous frames
     virtual size_t      framesReady();
 
-    // Safe frames ready query used by dump() - this has no side effects.
-    virtual size_t      framesReadySafe() const;
+    size_t              framesReadySafe() const override; // frames available to read by server.
 
     // Currently AudioFlinger will call framesReady() for a fast track from two threads:
     // FastMixer thread, and normal mixer thread.  This is dangerous, as the proxy is intended
@@ -696,6 +698,8 @@ public:
     int32_t getRear() const override {
         return mCblk->u.mStreaming.mRear; // For completeness only; mRear written by server.
     }
+
+    size_t framesReadySafe() const override; // frames available to read by client.
 
 protected:
     virtual ~AudioRecordServerProxy() { }
