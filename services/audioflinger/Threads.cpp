@@ -7333,6 +7333,13 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
         (void)input->stream->dump(fd);
     }
 
+    const double latencyMs = - mTimestamp.getOutputServerLatencyMs(mSampleRate);
+    if (latencyMs != 0.) {
+        dprintf(fd, "  NormalRecord latency ms: %.2lf\n", latencyMs);
+    } else {
+        dprintf(fd, "  NormalRecord latency ms: unavail\n");
+    }
+
     dprintf(fd, "  Fast capture thread: %s\n", hasFastCapture() ? "yes" : "no");
     dprintf(fd, "  Fast track available: %s\n", mFastTrackAvail ? "yes" : "no");
 

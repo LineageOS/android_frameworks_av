@@ -145,8 +145,8 @@ sp<DeviceDescriptor> DeviceVector::getDevice(audio_devices_t type, const String8
             }
         }
     }
-    ALOGV("DeviceVector::getDevice() for type %08x address %s found %p",
-          type, address.string(), device.get());
+    ALOGV("DeviceVector::%s() for type %08x address \"%s\" found %p",
+            __func__, type, address.string(), device.get());
     return device;
 }
 
@@ -160,7 +160,7 @@ sp<DeviceDescriptor> DeviceVector::getDeviceFromId(audio_port_handle_t id) const
     return nullptr;
 }
 
-DeviceVector DeviceVector::getDevicesFromType(audio_devices_t type) const
+DeviceVector DeviceVector::getDevicesFromTypeMask(audio_devices_t type) const
 {
     DeviceVector devices;
     bool isOutput = audio_is_output_devices(type);
@@ -171,20 +171,8 @@ DeviceVector DeviceVector::getDevicesFromType(audio_devices_t type) const
         if ((isOutput == curIsOutput) && ((type & curType) != 0)) {
             devices.add(itemAt(i));
             type &= ~curType;
-            ALOGV("DeviceVector::getDevicesFromType() for type %x found %p",
-                  itemAt(i)->type(), itemAt(i).get());
-        }
-    }
-    return devices;
-}
-
-DeviceVector DeviceVector::getDevicesFromTypeAddr(
-        audio_devices_t type, const String8& address) const
-{
-    DeviceVector devices;
-    for (const auto& device : *this) {
-        if (device->type() == type && device->mAddress == address) {
-            devices.add(device);
+            ALOGV("DeviceVector::%s() for type %08x found %p",
+                    __func__, itemAt(i)->type(), itemAt(i).get());
         }
     }
     return devices;
@@ -253,7 +241,7 @@ void DeviceDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
 
 void DeviceDescriptor::toAudioPort(struct audio_port *port) const
 {
-    ALOGV("DeviceDescriptor::toAudioPort() handle %d type %x", mId, mDeviceType);
+    ALOGV("DeviceDescriptor::toAudioPort() handle %d type %08x", mId, mDeviceType);
     AudioPort::toAudioPort(port);
     port->id = mId;
     toAudioPortConfig(&port->active_config);
@@ -305,7 +293,7 @@ void DeviceDescriptor::log() const
 {
     std::string device;
     deviceToString(mDeviceType, device);
-    ALOGI("Device id:%d type:0x%X:%s, addr:%s", mId,  mDeviceType, device.c_str(),
+    ALOGI("Device id:%d type:0x%08X:%s, addr:%s", mId,  mDeviceType, device.c_str(),
           mAddress.string());
 
     AudioPort::log("  ");

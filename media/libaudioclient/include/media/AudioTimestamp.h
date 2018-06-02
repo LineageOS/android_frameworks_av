@@ -140,7 +140,7 @@ struct alignas(8) /* bug 29096183, bug 29108507 */ ExtendedTimestamp {
     }
 
     double getLatencyMs(uint32_t sampleRate, Location location1, Location location2) const {
-        if (mTimeNs[location1] > 0 && mTimeNs[location2] > 0) {
+        if (sampleRate > 0 && mTimeNs[location1] > 0 && mTimeNs[location2] > 0) {
             const int64_t frameDifference =
                     mPosition[location1] - mPosition[location2];
             const int64_t timeDifferenceNs =
