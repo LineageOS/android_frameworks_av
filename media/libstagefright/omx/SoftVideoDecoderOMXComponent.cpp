@@ -651,7 +651,6 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::setConfig(
                 return OMX_ErrorBadPortIndex;
             }
 
-            mOutputFormat = OMX_COLOR_FormatYUV420Planar16;
             mHdrStaticInfo = hdrStaticInfoParams->sInfo;
             updatePortDefinitions(false);
 
