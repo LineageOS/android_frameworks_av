@@ -742,7 +742,7 @@ Return<VolumeTraits::Element> VolumeTraits::deserialize(const xmlNode *cur,
             }
             ALOGV("%s: %s=%s",
                     __func__, tag, reinterpret_cast<const char*>(pointDefinition.get()));
-            Vector<int32_t> point;
+            std::vector<int32_t> point;
             collectionFromString<DefaultTraits<int32_t>>(
                     reinterpret_cast<const char*>(pointDefinition.get()), point, ",");
             if (point.size() != 2) {

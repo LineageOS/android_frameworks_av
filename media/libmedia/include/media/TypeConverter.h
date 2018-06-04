@@ -20,6 +20,7 @@
 #include <string>
 #include <string.h>
 
+#include <vector>
 #include <system/audio.h>
 #include <utils/Log.h>
 #include <utils/Vector.h>
@@ -30,77 +31,55 @@
 
 namespace android {
 
-struct SampleRateTraits
-{
-    typedef uint32_t Type;
-    typedef SortedVector<Type> Collection;
-};
-struct DeviceTraits
-{
-    typedef audio_devices_t Type;
-    typedef Vector<Type> Collection;
-};
-struct OutputDeviceTraits : public DeviceTraits {};
-struct InputDeviceTraits : public DeviceTraits {};
-struct OutputFlagTraits
-{
-    typedef audio_output_flags_t Type;
-    typedef Vector<Type> Collection;
-};
-struct InputFlagTraits
-{
-    typedef audio_input_flags_t Type;
-    typedef Vector<Type> Collection;
-};
-struct FormatTraits
-{
-    typedef audio_format_t Type;
-    typedef Vector<Type> Collection;
-};
-struct ChannelTraits
-{
-    typedef audio_channel_mask_t Type;
-    typedef SortedVector<Type> Collection;
-};
-struct OutputChannelTraits : public ChannelTraits {};
-struct InputChannelTraits : public ChannelTraits {};
-struct ChannelIndexTraits : public ChannelTraits {};
-struct GainModeTraits
-{
-    typedef audio_gain_mode_t Type;
-    typedef Vector<Type> Collection;
-};
-struct StreamTraits
-{
-    typedef audio_stream_type_t Type;
-    typedef Vector<Type> Collection;
-};
-struct AudioModeTraits
-{
-    typedef audio_mode_t Type;
-    typedef Vector<Type> Collection;
-};
-struct AudioContentTraits
-{
-    typedef audio_content_type_t Type;
-    typedef Vector<Type> Collection;
-};
-struct UsageTraits
-{
-    typedef audio_usage_t Type;
-    typedef Vector<Type> Collection;
-};
-struct SourceTraits
-{
-    typedef audio_source_t Type;
-    typedef Vector<Type> Collection;
-};
 template <typename T>
 struct DefaultTraits
 {
     typedef T Type;
-    typedef Vector<Type> Collection;
+    typedef std::vector<Type> Collection;
+    static void add(Collection &collection, Type value)
+    {
+        collection.push_back(value);
+    }
 };
+template <typename T>
+struct VectorTraits
+{
+    typedef T Type;
+    typedef Vector<Type> Collection;
+    static void add(Collection &collection, Type value)
+    {
+        collection.add(value);
+    }
+};
+template <typename T>
+struct SortedVectorTraits
+{
+    typedef T Type;
+    typedef SortedVector<Type> Collection;
+    static void add(Collection &collection, Type value)
+    {
+        collection.add(value);
+    }
+};
+
+using SampleRateTraits = SortedVectorTraits<uint32_t>;
+using DeviceTraits = DefaultTraits<audio_devices_t>;
+struct OutputDeviceTraits : public DeviceTraits {};
+struct InputDeviceTraits : public DeviceTraits {};
+using ChannelTraits = SortedVectorTraits<audio_channel_mask_t>;
+struct OutputChannelTraits : public ChannelTraits {};
+struct InputChannelTraits : public ChannelTraits {};
+struct ChannelIndexTraits : public ChannelTraits {};
+using InputFlagTraits = DefaultTraits<audio_input_flags_t>;
+using OutputFlagTraits = DefaultTraits<audio_output_flags_t>;
+using FormatTraits = VectorTraits<audio_format_t>;
+using GainModeTraits = DefaultTraits<audio_gain_mode_t>;
+using StreamTraits = DefaultTraits<audio_stream_type_t>;
+using AudioModeTraits = DefaultTraits<audio_mode_t>;
+using AudioContentTraits = DefaultTraits<audio_content_type_t>;
+using UsageTraits = DefaultTraits<audio_usage_t>;
+using SourceTraits = DefaultTraits<audio_source_t>;
+struct AudioFlagTraits : public DefaultTraits<audio_flags_mask_t> {};
 
 template <class Traits>
 static void collectionFromString(const std::string &str, typename Traits::Collection &collection,
@@ -110,7 +89,7 @@ static void collectionFromString(const std::string &str, typename Traits::Collec
     for (const char *cstr = strtok(literal, del); cstr != NULL; cstr = strtok(NULL, del)) {
         typename Traits::Type value;
         if (utilities::convertTo<std::string, typename Traits::Type >(cstr, value)) {
-            collection.add(value);
+            Traits::add(collection, value);
         }
     }
     free(literal);
@@ -181,7 +160,7 @@ inline void TypeConverter<Traits>::collectionFromString(const std::string &str,
     for (const char *cstr = strtok(literal, del); cstr != NULL; cstr = strtok(NULL, del)) {
         typename Traits::Type value;
         if (fromString(cstr, value)) {
-            collection.add(value);
+            Traits::add(collection, value);
         }
     }
     free(literal);
@@ -234,6 +213,7 @@ typedef TypeConverter<AudioModeTraits> AudioModeConverter;
 typedef TypeConverter<AudioContentTraits> AudioContentTypeConverter;
 typedef TypeConverter<UsageTraits> UsageTypeConverter;
 typedef TypeConverter<SourceTraits> SourceTypeConverter;
+typedef TypeConverter<AudioFlagTraits> AudioFlagConverter;
 
 template<> const OutputDeviceConverter::Table OutputDeviceConverter::mTable[];
 template<> const InputDeviceConverter::Table InputDeviceConverter::mTable[];
@@ -249,6 +229,7 @@ template<> const AudioModeConverter::Table AudioModeConverter::mTable[];
 template<> const AudioContentTypeConverter::Table AudioContentTypeConverter::mTable[];
 template<> const UsageTypeConverter::Table UsageTypeConverter::mTable[];
 template<> const SourceTypeConverter::Table SourceTypeConverter::mTable[];
+template<> const AudioFlagConverter::Table AudioFlagConverter::mTable[];
 
 bool deviceFromString(const std::string& literalDevice, audio_devices_t& device);
 
@@ -273,6 +254,69 @@ InputChannelTraits::Collection inputChannelMasksFromString(
 
 OutputChannelTraits::Collection outputChannelMasksFromString(
         const std::string &outChannels, const char *del = AudioParameter::valueListSeparator);
+
+static inline std::string toString(audio_usage_t usage)
+{
+    std::string usageLiteral;
+    if (!android::UsageTypeConverter::toString(usage, usageLiteral)) {
+        ALOGV("failed to convert usage: %d", usage);
+        return "AUDIO_USAGE_UNKNOWN";
+    }
+    return usageLiteral;
+}
+
+static inline std::string toString(audio_content_type_t content)
+{
+    std::string contentLiteral;
+    if (!android::AudioContentTypeConverter::toString(content, contentLiteral)) {
+        ALOGV("failed to convert content type: %d", content);
+        return "AUDIO_CONTENT_TYPE_UNKNOWN";
+    }
+    return contentLiteral;
+}
+
+static inline std::string toString(audio_stream_type_t stream)
+{
+    std::string streamLiteral;
+    if (!android::StreamTypeConverter::toString(stream, streamLiteral)) {
+        ALOGV("failed to convert stream: %d", stream);
+        return "AUDIO_STREAM_DEFAULT";
+    }
+    return streamLiteral;
+}
+
+static inline std::string toString(audio_source_t source)
+{
+    std::string sourceLiteral;
+    if (!android::SourceTypeConverter::toString(source, sourceLiteral)) {
+        ALOGV("failed to convert source: %d", source);
+        return "AUDIO_SOURCE_DEFAULT";
+    }
+    return sourceLiteral;
+}
+
+static inline std::string toString(const audio_attributes_t &attributes)
+{
+    std::ostringstream result;
+    result << "{ Content type: " << toString(attributes.content_type)
+           << " Usage: " << toString(attributes.usage)
+           << " Source: " << toString(attributes.source)
+           << " Flags: " << attributes.flags
+           << " Tags: " << attributes.tags
+           << " }";
+
+    return result.str();
+}
+
+static inline std::string toString(audio_mode_t mode)
+{
+    std::string modeLiteral;
+    if (!android::AudioModeConverter::toString(mode, modeLiteral)) {
+        ALOGV("failed to convert mode: %d", mode);
+        return "AUDIO_MODE_INVALID";
+    }
+    return modeLiteral;
+}
 
 }; // namespace android
 
