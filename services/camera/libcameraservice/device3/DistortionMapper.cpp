@@ -195,6 +195,7 @@ status_t DistortionMapper::updateCalibration(const CameraMetadata &result) {
     }
 
     mValidMapping = true;
+    // Need to recalculate grid
     mValidGrids = false;
 
     return OK;

@@ -97,3 +97,8 @@ LOCAL_CFLAGS += -Wall -Wextra -Werror
 LOCAL_MODULE:= libcameraservice
 
 include $(BUILD_SHARED_LIBRARY)
+
+# Build tests too
+
+include $(LOCAL_PATH)/tests/Android.mk
+
