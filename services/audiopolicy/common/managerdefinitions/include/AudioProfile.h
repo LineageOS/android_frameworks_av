@@ -36,6 +36,8 @@ bool operator == (const SortedVector<T> &left, const SortedVector<T> &right);
 class AudioProfile : public virtual RefBase
 {
 public:
+    static sp<AudioProfile> createFullDynamic();
+
     AudioProfile(audio_format_t format,
                  audio_channel_mask_t channelMasks,
                  uint32_t samplingRate) :
