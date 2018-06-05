@@ -43,6 +43,7 @@
 #include "common/CameraDeviceBase.h"
 #include "device3/StatusTracker.h"
 #include "device3/Camera3BufferManager.h"
+#include "device3/DistortionMapper.h"
 #include "utils/TagMonitor.h"
 #include "utils/LatencyHistogram.h"
 #include <camera_metadata_hidden.h>
@@ -1178,6 +1179,12 @@ class Camera3Device :
     void flushInflightRequests();
 
     /**** End scope for mInFlightLock ****/
+
+    /**
+     * Distortion correction support
+     */
+
+    camera3::DistortionMapper mDistortionMapper;
 
     // Debug tracker for metadata tag value changes
     // - Enabled with the -m <taglist> option to dumpsys, such as
