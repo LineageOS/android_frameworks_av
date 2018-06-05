@@ -292,6 +292,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_COLOR_TRANSFER = "color-transfer";
 EXPORT const char* AMEDIAFORMAT_KEY_COMPILATION = "compilation";
 EXPORT const char* AMEDIAFORMAT_KEY_COMPLEXITY = "complexity";
 EXPORT const char* AMEDIAFORMAT_KEY_COMPOSER = "composer";
+EXPORT const char* AMEDIAFORMAT_KEY_CREATE_INPUT_SURFACE_SUSPENDED = "create-input-buffers-suspended";
 EXPORT const char* AMEDIAFORMAT_KEY_CRYPTO_DEFAULT_IV_SIZE = "crypto-default-iv-size";
 EXPORT const char* AMEDIAFORMAT_KEY_CRYPTO_ENCRYPTED_BYTE_BLOCK = "crypto-encrypted-byte-block";
 EXPORT const char* AMEDIAFORMAT_KEY_CRYPTO_ENCRYPTED_SIZES = "crypto-encrypted-sizes";
