@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b7e5d181_9be910bd",
+        "filename": "services/audioflinger/Threads.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 1557,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-06-05T03:51:10Z",
+      "side": 0,
+      "message": "I think I see what\u0027s going on here, you can get to effectRegistered \u003d true but effectCreated \u003d false if chain-\u003ecreateEffect_l fails. In this case effect-\u003eid() is not going to have good results.",
+      "range": {
+        "startLine": 1557,
+        "startChar": 42,
+        "endLine": 1557,
+        "endChar": 48
+      },
+      "revId": "565446909b70602e887b2ab464f1613c5fc75b69",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
