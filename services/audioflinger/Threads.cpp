@@ -7366,7 +7366,7 @@ void AudioFlinger::RecordThread::dumpTracks(int fd, const Vector<String16>& args
     if (numtracks) {
         dprintf(fd, " of which %zu are active\n", numactive);
         result.append(prefix);
-        RecordTrack::appendDumpHeader(result);
+        mTracks[0]->appendDumpHeader(result);
         for (size_t i = 0; i < numtracks ; ++i) {
             sp<RecordTrack> track = mTracks[i];
             if (track != 0) {
@@ -7386,7 +7386,7 @@ void AudioFlinger::RecordThread::dumpTracks(int fd, const Vector<String16>& args
         result.append("  The following tracks are in the active list but"
                 " not in the track list\n");
         result.append(prefix);
-        RecordTrack::appendDumpHeader(result);
+        mActiveTracks[0]->appendDumpHeader(result);
         for (size_t i = 0; i < numactive; ++i) {
             sp<RecordTrack> track = mActiveTracks[i];
             if (mTracks.indexOf(track) < 0) {
