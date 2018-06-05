@@ -276,6 +276,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_AUDIO_SESSION_ID = "audio-session-id";
 EXPORT const char* AMEDIAFORMAT_KEY_AUTHOR = "author";
 EXPORT const char* AMEDIAFORMAT_KEY_BITRATE_MODE = "bitrate-mode";
 EXPORT const char* AMEDIAFORMAT_KEY_BIT_RATE = "bitrate";
+EXPORT const char* AMEDIAFORMAT_KEY_BITS_PER_SAMPLE = "bits-per-sample";
 EXPORT const char* AMEDIAFORMAT_KEY_CAPTURE_RATE = "capture-rate";
 EXPORT const char* AMEDIAFORMAT_KEY_CDTRACKNUMBER = "cdtracknum";
 EXPORT const char* AMEDIAFORMAT_KEY_CHANNEL_COUNT = "channel-count";
