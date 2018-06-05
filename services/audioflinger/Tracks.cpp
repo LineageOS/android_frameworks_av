@@ -435,7 +435,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     }
     mName = TRACK_NAME_PENDING;
 
-    mDumpLatency = thread->type() == ThreadBase::MIXER;
+    mServerLatencySupported = thread->type() == ThreadBase::MIXER;
 #ifdef TEE_SINK
     mTee.setId(std::string("_") + std::to_string(mThreadIoHandle)
             + "_" + std::to_string(mId) +
@@ -497,7 +497,7 @@ void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
                   "ST  L dB  R dB  VS dB "
                   "  Server FrmCnt  FrmRdy F Underruns  Flushed"
                   "%s\n",
-                  mDumpLatency ? " Latency" : "");
+                  isServerLatencySupported() ? "   Latency" : "");
 }
 
 void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool active)
@@ -593,7 +593,7 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
 
             mFormat,
             mChannelMask,
-            mAudioTrackServerProxy->getSampleRate(),
+            sampleRate(),
 
             mStreamType,
             20.0 * log10(float_from_gain(gain_minifloat_unpack_left(vlr))),
@@ -610,14 +610,16 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
             nowInUnderrun,
             (unsigned)mAudioTrackServerProxy->framesFlushed() % 10000000
             );
-    if (mDumpLatency) {
-        double latencyMs =
-                mAudioTrackServerProxy->getTimestamp().getOutputServerLatencyMs(mSampleRate);
-        if (latencyMs > 0.) {
-            latencyMs += bufferLatencyMs();
-            result.appendFormat(" %7.3f", latencyMs);
+
+    if (isServerLatencySupported()) {
+        double latencyMs;
+        bool fromTrack;
+        if (getTrackLatencyMs(&latencyMs, &fromTrack) == OK) {
+            // Show latency in msec, followed by 't' if from track timestamp (the most accurate)
+            // or 'k' if estimated from kernel because track frames haven't been presented yet.
+            result.appendFormat(" %7.2lf %c", latencyMs, fromTrack ? 't' : 'k');
         } else {
-            result.appendFormat(" Unknown");
+            result.appendFormat("%10s", mCblk->mServer != 0 ? "unavail" : "new");
         }
     }
     result.append("\n");
@@ -677,6 +679,13 @@ void AudioFlinger::PlaybackThread::Track::onTimestamp(const ExtendedTimestamp &t
     mAudioTrackServerProxy->setTimestamp(timestamp);
 
     // We do not set drained here, as FastTrack timestamp may not go to very last frame.
+
+    // Compute latency.
+    // TODO: Consider whether the server latency may be passed in by FastMixer
+    // as a constant for all active FastTracks.
+    const double latencyMs = timestamp.getOutputServerLatencyMs(sampleRate());
+    mServerLatencyFromTrack.store(true);
+    mServerLatencyMs.store(latencyMs);
 }
 
 // Don't call for fast tracks; the framesReady() could result in priority inversion
@@ -1241,7 +1250,7 @@ void AudioFlinger::PlaybackThread::Track::resumeAck() {
 //To be called with thread lock held
 void AudioFlinger::PlaybackThread::Track::updateTrackFrameInfo(
         int64_t trackFramesReleased, int64_t sinkFramesWritten,
-        const ExtendedTimestamp &timeStamp) {
+        uint32_t halSampleRate, const ExtendedTimestamp &timeStamp) {
     //update frame map
     mFrameMap.push(trackFramesReleased, sinkFramesWritten);
 
@@ -1250,6 +1259,7 @@ void AudioFlinger::PlaybackThread::Track::updateTrackFrameInfo(
     // Our timestamps are only updated when the track is on the Thread active list.
     // We need to ensure that tracks are not removed before full drain.
     ExtendedTimestamp local = timeStamp;
+    bool drained = true; // default assume drained, if no server info found
     bool checked = false;
     for (int i = ExtendedTimestamp::LOCATION_MAX - 1;
             i >= ExtendedTimestamp::LOCATION_SERVER; --i) {
@@ -1258,18 +1268,25 @@ void AudioFlinger::PlaybackThread::Track::updateTrackFrameInfo(
             local.mPosition[i] = mFrameMap.findX(local.mPosition[i]);
             // check drain state from the latest stage in the pipeline.
             if (!checked && i <= ExtendedTimestamp::LOCATION_KERNEL) {
-                mAudioTrackServerProxy->setDrained(
-                        local.mPosition[i] >= mAudioTrackServerProxy->framesReleased());
+                drained = local.mPosition[i] >= mAudioTrackServerProxy->framesReleased();
                 checked = true;
             }
         }
     }
-    if (!checked) { // no server info, assume drained.
-        mAudioTrackServerProxy->setDrained(true);
-    }
+
+    mAudioTrackServerProxy->setDrained(drained);
     // Set correction for flushed frames that are not accounted for in released.
     local.mFlushed = mAudioTrackServerProxy->framesFlushed();
     mServerProxy->setTimestamp(local);
+
+    // Compute latency info.
+    const bool useTrackTimestamp = !drained;
+    const double latencyMs = useTrackTimestamp
+            ? local.getOutputServerLatencyMs(sampleRate())
+            : timeStamp.getOutputServerLatencyMs(halSampleRate);
+
+    mServerLatencyFromTrack.store(useTrackTimestamp);
+    mServerLatencyMs.store(latencyMs);
 }
 
 // ----------------------------------------------------------------------------

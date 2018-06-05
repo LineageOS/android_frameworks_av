@@ -3265,6 +3265,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                         t->updateTrackFrameInfo(
                                 t->mAudioTrackServerProxy->framesReleased(),
                                 mFramesWritten,
+                                mSampleRate,
                                 mTimestamp);
                     }
                 }
@@ -5059,8 +5060,10 @@ void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& ar
     dprintf(fd, "  AudioMixer tracks: %s\n", mAudioMixer->trackNames().c_str());
     dprintf(fd, "  Master mono: %s\n", mMasterMono ? "on" : "off");
     const double latencyMs = mTimestamp.getOutputServerLatencyMs(mSampleRate);
-    if (latencyMs > 0.) {
+    if (latencyMs != 0.) {
         dprintf(fd, "  NormalMixer latency ms: %.2lf\n", latencyMs);
+    } else {
+        dprintf(fd, "  NormalMixer latency ms: unavail\n");
     }
 
     if (hasFastMixer()) {
