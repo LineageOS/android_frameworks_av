@@ -44,7 +44,6 @@
 #define PROP_DRC_OVERRIDE_HEAVY      "aac_drc_heavy"
 #define PROP_DRC_OVERRIDE_ENC_LEVEL "aac_drc_enc_target_level"
 #define PROP_DRC_OVERRIDE_EFFECT_TYPE "ro.aac_drc_effect_type"
-#define PROP_DRC_OVERRIDE_LOUDNESS_LEVEL "aac_drc_loudness_level"
 
 #define MAX_CHANNEL_COUNT            8  /* maximum number of audio channels that can be decoded */
 
@@ -216,18 +215,8 @@ status_t SoftXAAC::initDecoder() {
     RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_DRC_TARGET_LEVEL");
 #ifdef     ENABLE_MPEG_D_DRC
 
-    if (property_get(PROP_DRC_OVERRIDE_LOUDNESS_LEVEL, value, NULL))
-    {
-        ui_drc_val = atoi(value);
-        ALOGV("AAC decoder using desired DRC target reference level of %d instead of %d",ui_drc_val,
-                DRC_DEFAULT_MOBILE_LOUDNESS_LEVEL);
-    }
-    else
-    {
-        ui_drc_val= DRC_DEFAULT_MOBILE_LOUDNESS_LEVEL;
-    }
-
-
+    /* Use ui_drc_val from PROP_DRC_OVERRIDE_REF_LEVEL or DRC_DEFAULT_MOBILE_REF_LEVEL
+     * for IA_ENHAACPLUS_DEC_DRC_TARGET_LOUDNESS too */
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
                                 IA_API_CMD_SET_CONFIG_PARAM,
                                 IA_ENHAACPLUS_DEC_DRC_TARGET_LOUDNESS,
@@ -1330,30 +1319,6 @@ int SoftXAAC::configMPEGDDrc()
         IA_ENHAACPLUS_DEC_CONFIG_PARAM_SBR_MODE, &i_sbr_mode);
         RETURN_IF_NE(err_code, IA_NO_ERROR , err_code,"IA_ENHAACPLUS_DEC_CONFIG_PARAM_SBR_MODE");
 
-
-    if(i_sbr_mode!=0)
-    {
-        WORD32 frame_length;
-        if (i_sbr_mode==1)
-        {
-            frame_length=2048;
-        }
-        else if(i_sbr_mode==3)
-        {
-            frame_length=4096;
-        }
-        else
-        {
-            frame_length=1024;
-        }
-        err_code =
-            ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
-                IA_DRC_DEC_CONFIG_PARAM_FRAME_SIZE, &frame_length);
-        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_DRC_DEC_CONFIG_PARAM_FRAME_SIZE");
-
-    }
-
-
     err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_INIT,
                               IA_CMD_TYPE_INIT_API_POST_CONFIG_PARAMS, NULL);
 
@@ -1528,6 +1493,33 @@ int SoftXAAC::configMPEGDDrc()
       if(mpegd_drc_present==1){
 
         WORD32 interface_is_present = 1;
+        WORD32 frame_length;
+
+        if(i_sbr_mode != 0)
+        {
+            if (i_sbr_mode == 1)
+            {
+                frame_length = 2048;
+            }
+            else if(i_sbr_mode == 3)
+            {
+                frame_length = 4096;
+            }
+            else
+            {
+                frame_length = 1024;
+            }
+        }
+        else
+        {
+            frame_length = 4096;
+        }
+
+        err_code =
+            ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+                IA_DRC_DEC_CONFIG_PARAM_FRAME_SIZE, &frame_length);
+        RETURN_IF_NE(err_code, IA_NO_ERROR, err_code, "IA_DRC_DEC_CONFIG_PARAM_FRAME_SIZE");
+
 
 
         err_code = ia_drc_dec_api(
