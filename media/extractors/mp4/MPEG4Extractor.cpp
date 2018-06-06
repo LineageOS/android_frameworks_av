@@ -1023,7 +1023,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     break;
                 }
             }
-            mLastTrack->meta.setInt32(kKeyCryptoMode, mode);
+            if (mode != kCryptoModeUnencrypted) {
+                mLastTrack->meta.setInt32(kKeyCryptoMode, mode);
+            }
             break;
         }
 
