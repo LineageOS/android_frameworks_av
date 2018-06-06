@@ -601,6 +601,7 @@ void SoftXAAC::onQueueFilled(OMX_U32 /* portIndex */) {
             BufferInfo *inInfo = *inQueue.begin();
             OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
 
+            /* No need to check inHeader != NULL, as inQueue is not empty */
             mEndOfInput = (inHeader->nFlags & OMX_BUFFERFLAG_EOS) != 0;
 
             if (mInputBufferCount == 0 && !(inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG)) {
@@ -608,9 +609,6 @@ void SoftXAAC::onQueueFilled(OMX_U32 /* portIndex */) {
                 inHeader->nFlags |= OMX_BUFFERFLAG_CODECCONFIG;
             }
             if ((inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG) != 0) {
-                BufferInfo *inInfo = *inQueue.begin();
-                OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
-
                 inBuffer = inHeader->pBuffer + inHeader->nOffset;
                 inBufferLength = inHeader->nFilledLen;
 
@@ -787,16 +785,12 @@ void SoftXAAC::onQueueFilled(OMX_U32 /* portIndex */) {
                 /* Clear buffer for output buffer is done inside XAAC codec */
                 /* TODO - Check if below memset is on top of reset inside codec */
                 memset(mOutputBuffer, 0, numOutBytes); // TODO: check for overflow, ASAN
-
                 // Discard input buffer.
-                if (inHeader) {
-                    inHeader->nFilledLen = 0;
-                }
-
+                inHeader->nFilledLen = 0;
                 // fall through
             }
 
-            if (inHeader && inHeader->nFilledLen == 0) {
+            if (inHeader->nFilledLen == 0) {
                 inInfo->mOwnedByUs = false;
                 mInputBufferCount++;
                 inQueue.erase(inQueue.begin());
@@ -805,7 +799,7 @@ void SoftXAAC::onQueueFilled(OMX_U32 /* portIndex */) {
                 notifyEmptyBufferDone(inHeader);
                 inHeader = NULL;
             } else {
-                ALOGV("inHeader->nFilledLen = %d", inHeader ? inHeader->nFilledLen : 0);
+                ALOGV("inHeader->nFilledLen = %d", inHeader->nFilledLen);
             }
 
             if (!outQueue.empty() && numOutBytes) {
