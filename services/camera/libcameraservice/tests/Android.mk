@@ -18,6 +18,7 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES:= $(call all-cpp-files-under, .)
 
 LOCAL_SHARED_LIBRARIES := \
+    libbase \
     libcutils \
     libcameraservice \
     libhidlbase \

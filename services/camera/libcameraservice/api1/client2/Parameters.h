@@ -177,6 +177,8 @@ struct Parameters {
     bool isZslReprocessPresent;
     // Whether the device supports enableZsl.
     bool isDeviceZslSupported;
+    // Whether the device supports geometric distortion correction
+    bool isDistortionCorrectionSupported;
 
     // Overall camera state
     enum State {

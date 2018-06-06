@@ -954,10 +954,21 @@ status_t Parameters::initialize(const CameraMetadata *info, int deviceVersion) {
         const uint8_t *caps = availableCapabilities.data.u8;
         for (size_t i = 0; i < availableCapabilities.count; i++) {
             if (ANDROID_REQUEST_AVAILABLE_CAPABILITIES_PRIVATE_REPROCESSING ==
-                caps[i]) {
+                    caps[i]) {
                 isZslReprocessPresent = true;
                 break;
             }
+        }
+    }
+
+    isDistortionCorrectionSupported = false;
+    camera_metadata_ro_entry_t distortionCorrectionModes =
+            staticInfo(ANDROID_DISTORTION_CORRECTION_AVAILABLE_MODES);
+    for (size_t i = 0; i < distortionCorrectionModes.count; i++) {
+        if (distortionCorrectionModes.data.u8[i] !=
+                ANDROID_DISTORTION_CORRECTION_MODE_OFF) {
+            isDistortionCorrectionSupported = true;
+            break;
         }
     }
 
@@ -1222,7 +1233,7 @@ status_t Parameters::buildFastInfo() {
         const uint8_t *caps = availableCapabilities.data.u8;
         for (size_t i = 0; i < availableCapabilities.count; i++) {
             if (ANDROID_REQUEST_AVAILABLE_CAPABILITIES_PRIVATE_REPROCESSING ==
-                caps[i]) {
+                    caps[i]) {
                 isZslReprocessPresent = true;
                 break;
             }
@@ -2097,14 +2108,23 @@ status_t Parameters::updateRequest(CameraMetadata *request) const {
 
     if (intent.count == 0) return BAD_VALUE;
 
+    uint8_t distortionMode = ANDROID_DISTORTION_CORRECTION_MODE_OFF;
     if (intent.data.u8[0] == ANDROID_CONTROL_CAPTURE_INTENT_STILL_CAPTURE) {
         res = request->update(ANDROID_CONTROL_AE_TARGET_FPS_RANGE,
                 fastInfo.bestStillCaptureFpsRange, 2);
+        distortionMode = ANDROID_DISTORTION_CORRECTION_MODE_HIGH_QUALITY;
     } else {
         res = request->update(ANDROID_CONTROL_AE_TARGET_FPS_RANGE,
                 previewFpsRange, 2);
+        distortionMode = ANDROID_DISTORTION_CORRECTION_MODE_FAST;
     }
     if (res != OK) return res;
+
+    if (isDistortionCorrectionSupported) {
+        res = request->update(ANDROID_DISTORTION_CORRECTION_MODE,
+                &distortionMode, 1);
+        if (res != OK) return res;
+    }
 
     if (autoWhiteBalanceLockAvailable) {
         uint8_t reqWbLock = autoWhiteBalanceLock ?
