@@ -435,7 +435,8 @@ AudioFlinger::PlaybackThread::Track::Track(
     }
     mName = TRACK_NAME_PENDING;
 
-    mServerLatencySupported = thread->type() == ThreadBase::MIXER;
+    mServerLatencySupported = thread->type() == ThreadBase::MIXER
+            || thread->type() == ThreadBase::DUPLICATING;
 #ifdef TEE_SINK
     mTee.setId(std::string("_") + std::to_string(mThreadIoHandle)
             + "_" + std::to_string(mId) +
@@ -1354,7 +1355,7 @@ void AudioFlinger::PlaybackThread::OutputTrack::stop()
     mActive = false;
 }
 
-bool AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t frames)
+ssize_t AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t frames)
 {
     Buffer *pInBuffer;
     Buffer inBuffer;
@@ -1443,9 +1444,12 @@ bool AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t frame
                 mBufferQueue.add(pInBuffer);
                 ALOGV("OutputTrack::write() %p thread %p adding overflow buffer %zu", this,
                         mThread.unsafe_get(), mBufferQueue.size());
+                // audio data is consumed (stored locally); set frameCount to 0.
+                inBuffer.frameCount = 0;
             } else {
                 ALOGW("OutputTrack::write() %p thread %p no more overflow buffers",
                         mThread.unsafe_get(), this);
+                // TODO: return error for this.
             }
         }
     }
@@ -1456,7 +1460,7 @@ bool AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t frame
         stop();
     }
 
-    return outputBufferFull;
+    return frames - inBuffer.frameCount;  // number of frames consumed.
 }
 
 void AudioFlinger::PlaybackThread::OutputTrack::copyMetadataTo(MetadataInserter& backInserter) const

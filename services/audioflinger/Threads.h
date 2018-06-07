@@ -434,6 +434,12 @@ protected:
     virtual     void        setMasterMono_l(bool mono __unused) { }
     virtual     bool        requireMonoBlend() { return false; }
 
+                            // called within the threadLoop to obtain timestamp from the HAL.
+    virtual     status_t    threadloop_getHalTimestamp_l(
+                                    ExtendedTimestamp *timestamp __unused) const {
+                                return INVALID_OPERATION;
+                            }
+
     friend class AudioFlinger;      // for mEffectChains
 
                 const type_t            mType;
@@ -1150,6 +1156,14 @@ public:
                               return mFastMixerDumpState.mTracks[fastIndex].mUnderruns;
                             }
 
+                status_t    threadloop_getHalTimestamp_l(
+                                    ExtendedTimestamp *timestamp) const override {
+                                if (mNormalSink.get() != nullptr) {
+                                    return mNormalSink->getTimestamp(*timestamp);
+                                }
+                                return INVALID_OPERATION;
+                            }
+
 protected:
     virtual     void       setMasterMono_l(bool mono) {
                                mMasterMono.store(mono);
@@ -1314,6 +1328,22 @@ private:
     SortedVector < sp<OutputTrack> >  mOutputTracks;
 public:
     virtual     bool        hasFastMixer() const { return false; }
+                status_t    threadloop_getHalTimestamp_l(
+                                    ExtendedTimestamp *timestamp) const override {
+        if (mOutputTracks.size() > 0) {
+            // forward the first OutputTrack's kernel information for timestamp.
+            const ExtendedTimestamp trackTimestamp =
+                    mOutputTracks[0]->getClientProxyTimestamp();
+            if (trackTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] > 0) {
+                timestamp->mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] =
+                        trackTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL];
+                timestamp->mPosition[ExtendedTimestamp::LOCATION_KERNEL] =
+                        trackTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
+                return OK;  // discard server timestamp - that's ignored.
+            }
+        }
+        return INVALID_OPERATION;
+    }
 };
 
 // record thread

@@ -244,7 +244,7 @@ public:
                                     AudioSystem::SYNC_EVENT_NONE,
                              audio_session_t triggerSession = AUDIO_SESSION_NONE);
     virtual void        stop();
-            bool        write(void* data, uint32_t frames);
+            ssize_t     write(void* data, uint32_t frames);
             bool        bufferQueueEmpty() const { return mBufferQueue.size() == 0; }
             bool        isActive() const { return mActive; }
     const wp<ThreadBase>& thread() const { return mThread; }
@@ -252,6 +252,18 @@ public:
             void        copyMetadataTo(MetadataInserter& backInserter) const override;
     /** Set the metadatas of the upstream tracks. Thread safe. */
             void        setMetadatas(const SourceMetadatas& metadatas);
+    /** returns client timestamp to the upstream duplicating thread. */
+    ExtendedTimestamp   getClientProxyTimestamp() const {
+                            // server - kernel difference is not true latency when drained
+                            // i.e. mServerProxy->isDrained().
+                            ExtendedTimestamp timestamp;
+                            (void) mClientProxy->getTimestamp(&timestamp);
+                            // On success, the timestamp LOCATION_SERVER and LOCATION_KERNEL
+                            // entries will be properly filled. If getTimestamp()
+                            // is unsuccessful, then a default initialized timestamp
+                            // (with mTimeNs[] filled with -1's) is returned.
+                            return timestamp;
+                        }
 
 private:
     status_t            obtainBuffer(AudioBufferProvider::Buffer* buffer,
@@ -268,6 +280,7 @@ private:
     bool                        mActive;
     DuplicatingThread* const    mSourceThread; // for waitTimeMs() in write()
     sp<AudioTrackClientProxy>   mClientProxy;
+
     /** Attributes of the source tracks.
      *
      * This member must be accessed with mTrackMetadatasMutex taken.
