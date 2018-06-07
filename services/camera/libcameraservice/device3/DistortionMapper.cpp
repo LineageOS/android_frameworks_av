@@ -43,13 +43,13 @@ constexpr std::array<uint32_t, 1> DistortionMapper::kRequestRectsToCorrect = {
 };
 
 // Only for capture result
-constexpr std::array<uint32_t, 2> DistortionMapper::kResultRectsToCorrect = {
+constexpr std::array<uint32_t, 1> DistortionMapper::kResultRectsToCorrect = {
     ANDROID_SCALER_CROP_REGION,
-    ANDROID_STATISTICS_FACE_RECTANGLES
 };
 
 // Only for capture result
-constexpr std::array<uint32_t, 1> DistortionMapper::kResultPointsToCorrect = {
+constexpr std::array<uint32_t, 2> DistortionMapper::kResultPointsToCorrect = {
+    ANDROID_STATISTICS_FACE_RECTANGLES, // Says rectangles, is really points
     ANDROID_STATISTICS_FACE_LANDMARKS,
 };
 
