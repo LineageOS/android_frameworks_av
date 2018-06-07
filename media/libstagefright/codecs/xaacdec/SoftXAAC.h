@@ -103,7 +103,7 @@ private:
                          int32_t *bytesConsumed,
                          int32_t *outBytes);
 
-    void configflushDecode();
+    int configflushDecode();
     IA_ERRORCODE getXAACStreamInfo();
     IA_ERRORCODE setXAACDRCInfo(int32_t drcCut,
                                 int32_t drcBoost,
@@ -129,11 +129,11 @@ private:
     int32_t     mChannelMask;
     bool        mIsCodecInitialized;
     bool        mIsCodecConfigFlushRequired;
-    int8_t *drc_ip_buf;
-    int8_t *drc_op_buf;
-    int32_t mpegd_drc_present;
-    int32_t drc_flag;
-//    int32_t is_drc_enabled;
+    int8_t *mDrcInBuf;
+    int8_t *mDrcOutBuf;
+    int32_t mMpegDDRCPresent;
+    int32_t mDRCFlag;
+
 
     void*       mMemoryArray[MAX_MEM_ALLOCS];
     int32_t     mMallocCount;
