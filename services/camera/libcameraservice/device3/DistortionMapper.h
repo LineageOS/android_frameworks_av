@@ -169,6 +169,8 @@ class DistortionMapper {
 
     // pre-correction active array dimensions
     int mArrayWidth, mArrayHeight;
+    // active array dimensions
+    int mActiveWidth, mActiveHeight;
 
     std::vector<GridQuad> mCorrectedGrid;
     std::vector<GridQuad> mDistortedGrid;

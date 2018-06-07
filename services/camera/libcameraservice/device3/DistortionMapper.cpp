@@ -18,6 +18,7 @@
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
 
+#include <algorithm>
 #include <cmath>
 
 #include "device3/DistortionMapper.h"
@@ -81,6 +82,10 @@ status_t DistortionMapper::setupStaticInfo(const CameraMetadata &deviceInfo) {
     mArrayWidth = array.data.i32[2];
     mArrayHeight = array.data.i32[3];
 
+    array = deviceInfo.find(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+    mActiveWidth = array.data.i32[2];
+    mActiveHeight = array.data.i32[3];
+
     return updateCalibration(deviceInfo);
 }
 
@@ -102,8 +107,21 @@ status_t DistortionMapper::correctCaptureRequest(CameraMetadata *request) {
         for (auto region : kMeteringRegionsToCorrect) {
             e = request->find(region);
             for (size_t j = 0; j < e.count; j += 5) {
+                int32_t weight = e.data.i32[j + 4];
+                if (weight == 0) {
+                    continue;
+                }
                 res = mapCorrectedToRaw(e.data.i32 + j, 2);
                 if (res != OK) return res;
+                for (size_t k = 0; k < 4; k+=2) {
+                    int32_t& x = e.data.i32[j + k];
+                    int32_t& y = e.data.i32[j + k + 1];
+                    // Clamp to within active array
+                    x = std::max(0, x);
+                    x = std::min(mActiveWidth - 1, x);
+                    y = std::max(0, y);
+                    y = std::min(mActiveHeight - 1, y);
+                }
             }
         }
         for (auto rect : kRequestRectsToCorrect) {
@@ -134,8 +152,21 @@ status_t DistortionMapper::correctCaptureResult(CameraMetadata *result) {
         for (auto region : kMeteringRegionsToCorrect) {
             e = result->find(region);
             for (size_t j = 0; j < e.count; j += 5) {
+                int32_t weight = e.data.i32[j + 4];
+                if (weight == 0) {
+                    continue;
+                }
                 res = mapRawToCorrected(e.data.i32 + j, 2);
                 if (res != OK) return res;
+                for (size_t k = 0; k < 4; k+=2) {
+                    int32_t& x = e.data.i32[j + k];
+                    int32_t& y = e.data.i32[j + k + 1];
+                    // Clamp to within active array
+                    x = std::max(0, x);
+                    x = std::min(mActiveWidth - 1, x);
+                    y = std::max(0, y);
+                    y = std::min(mActiveHeight - 1, y);
+                }
             }
         }
         for (auto rect : kResultRectsToCorrect) {
@@ -212,7 +243,8 @@ status_t DistortionMapper::mapRawToCorrected(int32_t *coordPairs, int coordCount
     for (int i = 0; i < coordCount * 2; i += 2) {
         const GridQuad *quad = findEnclosingQuad(coordPairs + i, mDistortedGrid);
         if (quad == nullptr) {
-            ALOGE("Raw to corrected mapping failure: No quad found");
+            ALOGE("Raw to corrected mapping failure: No quad found for (%d, %d)",
+                    *(coordPairs + i), *(coordPairs + i + 1));
             return INVALID_OPERATION;
         }
         ALOGV("src xy: %d, %d, enclosing quad: (%f, %f), (%f, %f), (%f, %f), (%f, %f)",
