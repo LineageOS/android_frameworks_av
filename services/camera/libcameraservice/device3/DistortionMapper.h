@@ -148,10 +148,10 @@ class DistortionMapper {
     static const std::array<uint32_t, 1> kRequestRectsToCorrect;
 
     // Only capture result
-    static const std::array<uint32_t, 2> kResultRectsToCorrect;
+    static const std::array<uint32_t, 1> kResultRectsToCorrect;
 
     // Only for capture results
-    static const std::array<uint32_t, 1> kResultPointsToCorrect;
+    static const std::array<uint32_t, 2> kResultPointsToCorrect;
 
     // Utility to create reverse mapping grids
     status_t buildGrids();
@@ -169,6 +169,8 @@ class DistortionMapper {
 
     // pre-correction active array dimensions
     int mArrayWidth, mArrayHeight;
+    // active array dimensions
+    int mActiveWidth, mActiveHeight;
 
     std::vector<GridQuad> mCorrectedGrid;
     std::vector<GridQuad> mDistortedGrid;
