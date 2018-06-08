@@ -1891,11 +1891,17 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
     status_t lStatus;
     audio_output_flags_t outputFlags = mOutput->flags;
     audio_output_flags_t requestedFlags = *flags;
+    uint32_t sampleRate;
+
+    if (sharedBuffer != 0 && checkIMemory(sharedBuffer) != NO_ERROR) {
+        lStatus = BAD_VALUE;
+        goto Exit;
+    }
 
     if (*pSampleRate == 0) {
         *pSampleRate = mSampleRate;
     }
-    uint32_t sampleRate = *pSampleRate;
+    sampleRate = *pSampleRate;
 
     // special case for FAST flag considered OK if fast mixer is present
     if (hasFastMixer()) {

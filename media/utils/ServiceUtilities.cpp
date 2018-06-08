@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "ServiceUtilities"
+
 #include <binder/AppOpsManager.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
@@ -170,6 +172,31 @@ bool modifyPhoneStateAllowed(pid_t pid, uid_t uid) {
     bool ok = PermissionCache::checkPermission(sModifyPhoneState, pid, uid);
     if (!ok) ALOGE("Request requires android.permission.MODIFY_PHONE_STATE");
     return ok;
+}
+
+status_t checkIMemory(const sp<IMemory>& iMemory)
+{
+    if (iMemory == 0) {
+        ALOGE("%s check failed: NULL IMemory pointer", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    sp<IMemoryHeap> heap = iMemory->getMemory();
+    if (heap == 0) {
+        ALOGE("%s check failed: NULL heap pointer", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    off_t size = lseek(heap->getHeapID(), 0, SEEK_END);
+    lseek(heap->getHeapID(), 0, SEEK_SET);
+
+    if (iMemory->pointer() == NULL || size < (off_t)iMemory->size()) {
+        ALOGE("%s check failed: pointer %p size %zu fd size %u",
+              __FUNCTION__, iMemory->pointer(), iMemory->size(), (uint32_t)size);
+        return BAD_VALUE;
+    }
+
+    return NO_ERROR;
 }
 
 } // namespace android
