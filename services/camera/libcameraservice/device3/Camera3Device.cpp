@@ -249,6 +249,14 @@ status_t Camera3Device::initializeCommonLocked() {
         }
     }
 
+    if (DistortionMapper::isDistortionSupported(mDeviceInfo)) {
+        res = mDistortionMapper.setupStaticInfo(mDeviceInfo);
+        if (res != OK) {
+            SET_ERR_L("Unable to read necessary calibration fields for distortion correction");
+            return res;
+        }
+    }
+
     return OK;
 }
 
@@ -2983,6 +2991,14 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
         }
     }
 
+    // Fix up some result metadata to account for HAL-level distortion correction
+    status_t res = mDistortionMapper.correctCaptureResult(&captureResult.mMetadata);
+    if (res != OK) {
+        SET_ERR("Unable to correct capture result metadata for frame %d: %s (%d)",
+                frameNumber, strerror(res), res);
+        return;
+    }
+
     mTagMonitor.monitorMetadata(TagMonitor::RESULT,
             frameNumber, timestamp.data.i64[0], captureResult.mMetadata);
 
@@ -4705,13 +4721,13 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
 
         // Insert any queued triggers (before metadata is locked)
         status_t res = insertTriggers(captureRequest);
-
         if (res < 0) {
             SET_ERR("RequestThread: Unable to insert triggers "
                     "(capture request %d, HAL device: %s (%d)",
                     halRequest->frame_number, strerror(-res), res);
             return INVALID_OPERATION;
         }
+
         int triggerCount = res;
         bool triggersMixedIn = (triggerCount > 0 || mPrevTriggers > 0);
         mPrevTriggers = triggerCount;
@@ -4729,6 +4745,21 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                         "(capture request %d, HAL device: %s (%d)",
                         halRequest->frame_number, strerror(-res), res);
                 return INVALID_OPERATION;
+            }
+
+            {
+                // Correct metadata regions for distortion correction if enabled
+                sp<Camera3Device> parent = mParent.promote();
+                if (parent != nullptr) {
+                    res = parent->mDistortionMapper.correctCaptureRequest(
+                        &(captureRequest->mSettingsList.begin()->metadata));
+                    if (res != OK) {
+                        SET_ERR("RequestThread: Unable to correct capture requests "
+                                "for lens distortion for request %d: %s (%d)",
+                                halRequest->frame_number, strerror(-res), res);
+                        return INVALID_OPERATION;
+                    }
+                }
             }
 
             /**

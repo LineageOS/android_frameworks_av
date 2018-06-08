@@ -65,6 +65,7 @@ private:
         audio_patch_handle_t handle() const { return mHandle; }
         sp<ThreadType> thread() { return mThread; }
         sp<TrackType> track() { return mTrack; }
+        sp<const TrackType> const_track() const { return mTrack; }
 
         void closeConnections(PatchPanel *panel) {
             if (mHandle != AUDIO_PATCH_HANDLE_NONE) {
@@ -117,6 +118,9 @@ private:
         bool isSoftware() const {
             return mRecord.handle() != AUDIO_PATCH_HANDLE_NONE ||
                     mPlayback.handle() != AUDIO_PATCH_HANDLE_NONE; }
+
+        // returns the latency of the patch (from record to playback).
+        status_t getLatencyMs(double *latencyMs) const;
 
         String8 dump(audio_patch_handle_t myHandle);
 

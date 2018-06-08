@@ -562,10 +562,7 @@ status_t SoundTriggerHwService::Module::loadSoundModel(const sp<IMemory>& modelM
     if (mHalInterface == 0) {
         return NO_INIT;
     }
-    if (modelMemory == 0 || modelMemory->pointer() == NULL) {
-        ALOGE("loadSoundModel() modelMemory is 0 or has NULL pointer()");
-        return BAD_VALUE;
-    }
+
     struct sound_trigger_sound_model *sound_model =
             (struct sound_trigger_sound_model *)modelMemory->pointer();
 
@@ -658,11 +655,6 @@ status_t SoundTriggerHwService::Module::startRecognition(sound_model_handle_t ha
     ALOGV("startRecognition() model handle %d", handle);
     if (mHalInterface == 0) {
         return NO_INIT;
-    }
-    if (dataMemory == 0 || dataMemory->pointer() == NULL) {
-        ALOGE("startRecognition() dataMemory is 0 or has NULL pointer()");
-        return BAD_VALUE;
-
     }
 
     struct sound_trigger_recognition_config *config =
@@ -966,6 +958,9 @@ status_t SoundTriggerHwService::ModuleClient::loadSoundModel(const sp<IMemory>& 
                                IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
     }
+    if (checkIMemory(modelMemory) != NO_ERROR) {
+        return BAD_VALUE;
+    }
 
     sp<Module> module = mModule.promote();
     if (module == 0) {
@@ -996,6 +991,9 @@ status_t SoundTriggerHwService::ModuleClient::startRecognition(sound_model_handl
     if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
                                IPCThreadState::self()->getCallingUid())) {
         return PERMISSION_DENIED;
+    }
+    if (checkIMemory(dataMemory) != NO_ERROR) {
+        return BAD_VALUE;
     }
 
     sp<Module> module = mModule.promote();

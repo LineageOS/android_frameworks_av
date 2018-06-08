@@ -1891,11 +1891,17 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
     status_t lStatus;
     audio_output_flags_t outputFlags = mOutput->flags;
     audio_output_flags_t requestedFlags = *flags;
+    uint32_t sampleRate;
+
+    if (sharedBuffer != 0 && checkIMemory(sharedBuffer) != NO_ERROR) {
+        lStatus = BAD_VALUE;
+        goto Exit;
+    }
 
     if (*pSampleRate == 0) {
         *pSampleRate = mSampleRate;
     }
-    uint32_t sampleRate = *pSampleRate;
+    sampleRate = *pSampleRate;
 
     // special case for FAST flag considered OK if fast mixer is present
     if (hasFastMixer()) {
@@ -3203,12 +3209,10 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             // and associate with the sink frames written out.  We need
             // this to convert the sink timestamp to the track timestamp.
             bool kernelLocationUpdate = false;
-            if (mNormalSink != 0) {
-                // Note: The DuplicatingThread may not have a mNormalSink.
+            ExtendedTimestamp timestamp; // use private copy to fetch
+            if (threadloop_getHalTimestamp_l(&timestamp) == OK) {
                 // We always fetch the timestamp here because often the downstream
                 // sink will block while writing.
-                ExtendedTimestamp timestamp; // use private copy to fetch
-                (void) mNormalSink->getTimestamp(timestamp);
 
                 // We keep track of the last valid kernel position in case we are in underrun
                 // and the normal mixer period is the same as the fast mixer period, or there
@@ -3265,6 +3269,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                         t->updateTrackFrameInfo(
                                 t->mAudioTrackServerProxy->framesReleased(),
                                 mFramesWritten,
+                                mSampleRate,
                                 mTimestamp);
                     }
                 }
@@ -5059,8 +5064,10 @@ void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& ar
     dprintf(fd, "  AudioMixer tracks: %s\n", mAudioMixer->trackNames().c_str());
     dprintf(fd, "  Master mono: %s\n", mMasterMono ? "on" : "off");
     const double latencyMs = mTimestamp.getOutputServerLatencyMs(mSampleRate);
-    if (latencyMs > 0.) {
+    if (latencyMs != 0.) {
         dprintf(fd, "  NormalMixer latency ms: %.2lf\n", latencyMs);
+    } else {
+        dprintf(fd, "  NormalMixer latency ms: unavail\n");
     }
 
     if (hasFastMixer()) {
@@ -6093,7 +6100,22 @@ void AudioFlinger::DuplicatingThread::threadLoop_sleepTime()
 ssize_t AudioFlinger::DuplicatingThread::threadLoop_write()
 {
     for (size_t i = 0; i < outputTracks.size(); i++) {
-        outputTracks[i]->write(mSinkBuffer, writeFrames);
+        const ssize_t actualWritten = outputTracks[i]->write(mSinkBuffer, writeFrames);
+
+        // Consider the first OutputTrack for timestamp and frame counting.
+
+        // The threadLoop() generally assumes writing a full sink buffer size at a time.
+        // Here, we correct for writeFrames of 0 (a stop) or underruns because
+        // we always claim success.
+        if (i == 0) {
+            const ssize_t correction = mSinkBufferSize / mFrameSize - actualWritten;
+            ALOGD_IF(correction != 0 && writeFrames != 0,
+                    "%s: writeFrames:%u  actualWritten:%zd  correction:%zd  mFramesWritten:%lld",
+                    __func__, writeFrames, actualWritten, correction, (long long)mFramesWritten);
+            mFramesWritten -= correction;
+        }
+
+        // TODO: Report correction for the other output tracks and show in the dump.
     }
     mStandby = false;
     return (ssize_t)mSinkBufferSize;
@@ -7363,7 +7385,7 @@ void AudioFlinger::RecordThread::dumpTracks(int fd, const Vector<String16>& args
     if (numtracks) {
         dprintf(fd, " of which %zu are active\n", numactive);
         result.append(prefix);
-        RecordTrack::appendDumpHeader(result);
+        mTracks[0]->appendDumpHeader(result);
         for (size_t i = 0; i < numtracks ; ++i) {
             sp<RecordTrack> track = mTracks[i];
             if (track != 0) {
@@ -7383,7 +7405,7 @@ void AudioFlinger::RecordThread::dumpTracks(int fd, const Vector<String16>& args
         result.append("  The following tracks are in the active list but"
                 " not in the track list\n");
         result.append(prefix);
-        RecordTrack::appendDumpHeader(result);
+        mActiveTracks[0]->appendDumpHeader(result);
         for (size_t i = 0; i < numactive; ++i) {
             sp<RecordTrack> track = mActiveTracks[i];
             if (mTracks.indexOf(track) < 0) {

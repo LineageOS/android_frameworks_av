@@ -94,10 +94,9 @@ public:
 
     virtual bool        isFastTrack() const { return (mFlags & AUDIO_OUTPUT_FLAG_FAST) != 0; }
 
-    virtual double bufferLatencyMs() {
-        return isStatic() ? 0.
-                : (double)mAudioTrackServerProxy->framesReadySafe() * 1000 / sampleRate();
-    }
+            double      bufferLatencyMs() const override {
+                            return isStatic() ? 0. : TrackBase::bufferLatencyMs();
+                        }
 
 // implement volume handling.
     media::VolumeShaper::Status applyVolumeShaper(
@@ -152,7 +151,7 @@ protected:
     bool isResumePending();
     void resumeAck();
     void updateTrackFrameInfo(int64_t trackFramesReleased, int64_t sinkFramesWritten,
-            const ExtendedTimestamp &timeStamp);
+            uint32_t halSampleRate, const ExtendedTimestamp &timeStamp);
 
     sp<IMemory> sharedBuffer() const { return mSharedBuffer; }
 
@@ -200,7 +199,6 @@ protected:
 
     sp<media::VolumeHandler>  mVolumeHandler; // handles multiple VolumeShaper configs and operations
 
-    bool               mDumpLatency = false; // true if track supports latency dumps.
 private:
     // The following fields are only for fast tracks, and should be in a subclass
     int                 mFastIndex; // index within FastMixerState::mFastTracks[];
@@ -246,7 +244,7 @@ public:
                                     AudioSystem::SYNC_EVENT_NONE,
                              audio_session_t triggerSession = AUDIO_SESSION_NONE);
     virtual void        stop();
-            bool        write(void* data, uint32_t frames);
+            ssize_t     write(void* data, uint32_t frames);
             bool        bufferQueueEmpty() const { return mBufferQueue.size() == 0; }
             bool        isActive() const { return mActive; }
     const wp<ThreadBase>& thread() const { return mThread; }
@@ -254,6 +252,18 @@ public:
             void        copyMetadataTo(MetadataInserter& backInserter) const override;
     /** Set the metadatas of the upstream tracks. Thread safe. */
             void        setMetadatas(const SourceMetadatas& metadatas);
+    /** returns client timestamp to the upstream duplicating thread. */
+    ExtendedTimestamp   getClientProxyTimestamp() const {
+                            // server - kernel difference is not true latency when drained
+                            // i.e. mServerProxy->isDrained().
+                            ExtendedTimestamp timestamp;
+                            (void) mClientProxy->getTimestamp(&timestamp);
+                            // On success, the timestamp LOCATION_SERVER and LOCATION_KERNEL
+                            // entries will be properly filled. If getTimestamp()
+                            // is unsuccessful, then a default initialized timestamp
+                            // (with mTimeNs[] filled with -1's) is returned.
+                            return timestamp;
+                        }
 
 private:
     status_t            obtainBuffer(AudioBufferProvider::Buffer* buffer,
@@ -270,6 +280,7 @@ private:
     bool                        mActive;
     DuplicatingThread* const    mSourceThread; // for waitTimeMs() in write()
     sp<AudioTrackClientProxy>   mClientProxy;
+
     /** Attributes of the source tracks.
      *
      * This member must be accessed with mTrackMetadatasMutex taken.

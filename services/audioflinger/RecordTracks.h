@@ -51,7 +51,7 @@ public:
             bool        setOverflow() { bool tmp = mOverflow; mOverflow = true;
                                                 return tmp; }
 
-    static  void        appendDumpHeader(String8& result);
+            void        appendDumpHeader(String8& result);
             void        appendDump(String8& result, bool active);
 
             void        handleSyncStartEvent(const sp<SyncEvent>& event);

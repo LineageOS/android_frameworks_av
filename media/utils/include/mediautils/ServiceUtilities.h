@@ -16,6 +16,7 @@
 
 #include <unistd.h>
 
+#include <binder/IMemory.h>
 #include <binder/PermissionController.h>
 #include <cutils/multiuser.h>
 #include <private/android_filesystem_config.h>
@@ -69,4 +70,5 @@ bool settingsAllowed();
 bool modifyAudioRoutingAllowed();
 bool dumpAllowed();
 bool modifyPhoneStateAllowed(pid_t pid, uid_t uid);
+status_t checkIMemory(const sp<IMemory>& iMemory);
 }
