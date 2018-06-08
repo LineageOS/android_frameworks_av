@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2016-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ public:
             uint32_t width, uint32_t height, int format,
             uint64_t consumerUsage, android_dataspace dataSpace,
             camera3_stream_rotation_t rotation, nsecs_t timestampOffset,
+            const String8& physicalCameraId,
             int setId = CAMERA3_STREAM_SET_ID_INVALID);
 
     virtual ~Camera3SharedOutputStream();
@@ -46,9 +47,24 @@ public:
 
     virtual status_t setConsumers(const std::vector<sp<Surface>>& consumers);
 
+    virtual ssize_t getSurfaceId(const sp<Surface> &surface);
+
+    virtual status_t updateStream(const std::vector<sp<Surface>> &outputSurfaces,
+            const std::vector<OutputStreamInfo> &outputInfo,
+            const std::vector<size_t> &removedSurfaceIds,
+            KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
+
 private:
-    // Surfaces passed in constructor from app
-    std::vector<sp<Surface> > mSurfaces;
+
+    static const size_t kMaxOutputs = 4;
+
+    // Map surfaceId -> output surfaces
+    sp<Surface> mSurfaces[kMaxOutputs];
+
+    ssize_t getNextSurfaceIdLocked();
+
+    status_t revertPartialUpdateLocked(const KeyedVector<sp<Surface>, size_t> &removedSurfaces,
+            const KeyedVector<sp<Surface>, size_t> &attachedSurfaces);
 
     /**
      * The Camera3StreamSplitter object this stream uses for stream

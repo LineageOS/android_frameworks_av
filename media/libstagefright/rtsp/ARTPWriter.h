@@ -37,7 +37,7 @@ class MediaBuffer;
 struct ARTPWriter : public MediaWriter {
     explicit ARTPWriter(int fd);
 
-    virtual status_t addSource(const sp<IMediaSource> &source);
+    virtual status_t addSource(const sp<MediaSource> &source);
     virtual bool reachedEOS();
     virtual status_t start(MetaData *params);
     virtual status_t stop();
@@ -72,7 +72,7 @@ private:
     int mRTCPFd;
 #endif
 
-    sp<IMediaSource> mSource;
+    sp<MediaSource> mSource;
     sp<ALooper> mLooper;
     sp<AHandlerReflector<ARTPWriter> > mReflector;
 
@@ -110,13 +110,13 @@ private:
     void addSR(const sp<ABuffer> &buffer);
     void addSDES(const sp<ABuffer> &buffer);
 
-    void makeH264SPropParamSets(MediaBuffer *buffer);
+    void makeH264SPropParamSets(MediaBufferBase *buffer);
     void dumpSessionDesc();
 
     void sendBye();
-    void sendAVCData(MediaBuffer *mediaBuf);
-    void sendH263Data(MediaBuffer *mediaBuf);
-    void sendAMRData(MediaBuffer *mediaBuf);
+    void sendAVCData(MediaBufferBase *mediaBuf);
+    void sendH263Data(MediaBufferBase *mediaBuf);
+    void sendAMRData(MediaBufferBase *mediaBuf);
 
     void send(const sp<ABuffer> &buffer, bool isRTCP);
 

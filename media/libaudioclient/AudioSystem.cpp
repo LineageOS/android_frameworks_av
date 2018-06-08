@@ -20,6 +20,8 @@
 #include <utils/Log.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
+#include <binder/IPCThreadState.h>
+#include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/IAudioFlinger.h>
 #include <media/IAudioPolicyService.h>
@@ -38,8 +40,7 @@ sp<IAudioFlinger> AudioSystem::gAudioFlinger;
 sp<AudioSystem::AudioFlingerClient> AudioSystem::gAudioFlingerClient;
 audio_error_callback AudioSystem::gAudioErrorCallback = NULL;
 dynamic_policy_callback AudioSystem::gDynPolicyCallback = NULL;
-record_config_callback  AudioSystem::gRecordConfigCallback = NULL;
-
+record_config_callback AudioSystem::gRecordConfigCallback = NULL;
 
 // establish binder interface to AudioFlinger service
 const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
@@ -75,7 +76,9 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
         af = gAudioFlinger;
     }
     if (afc != 0) {
+        int64_t token = IPCThreadState::self()->clearCallingIdentity();
         af->registerClient(afc);
+        IPCThreadState::self()->restoreCallingIdentity(token);
     }
     return af;
 }
@@ -252,6 +255,31 @@ int AudioSystem::logToLinear(float volume)
     // return v;
     return volume ? 100 - int(dBConvertInverse * log(volume) + 0.5) : 0;
 }
+
+/* static */ size_t AudioSystem::calculateMinFrameCount(
+        uint32_t afLatencyMs, uint32_t afFrameCount, uint32_t afSampleRate,
+        uint32_t sampleRate, float speed /*, uint32_t notificationsPerBufferReq*/)
+{
+    // Ensure that buffer depth covers at least audio hardware latency
+    uint32_t minBufCount = afLatencyMs / ((1000 * afFrameCount) / afSampleRate);
+    if (minBufCount < 2) {
+        minBufCount = 2;
+    }
+#if 0
+    // The notificationsPerBufferReq parameter is not yet used for non-fast tracks,
+    // but keeping the code here to make it easier to add later.
+    if (minBufCount < notificationsPerBufferReq) {
+        minBufCount = notificationsPerBufferReq;
+    }
+#endif
+    ALOGV("calculateMinFrameCount afLatency %u  afFrameCount %u  afSampleRate %u  "
+            "sampleRate %u  speed %f  minBufCount: %u" /*"  notificationsPerBufferReq %u"*/,
+            afLatencyMs, afFrameCount, afSampleRate, sampleRate, speed, minBufCount
+            /*, notificationsPerBufferReq*/);
+    return minBufCount * sourceFramesNeededWithTimestretch(
+            sampleRate, afFrameCount, afSampleRate, speed);
+}
+
 
 status_t AudioSystem::getOutputSamplingRate(uint32_t* samplingRate, audio_stream_type_t streamType)
 {
@@ -605,7 +633,7 @@ status_t AudioSystem::AudioFlingerClient::getInputBufferSize(
         || (channelMask != mInChannelMask)) {
         size_t inBuffSize = af->getInputBufferSize(sampleRate, format, channelMask);
         if (inBuffSize == 0) {
-            ALOGE("AudioSystem::getInputBufferSize failed sampleRate %d format %#x channelMask %x",
+            ALOGE("AudioSystem::getInputBufferSize failed sampleRate %d format %#x channelMask %#x",
                     sampleRate, format, channelMask);
             return BAD_VALUE;
         }
@@ -742,7 +770,10 @@ const sp<IAudioPolicyService> AudioSystem::get_audio_policy_service()
         ap = gAudioPolicyService;
     }
     if (apc != 0) {
+        int64_t token = IPCThreadState::self()->clearCallingIdentity();
         ap->registerClient(apc);
+        ap->setAudioPortCallbacksEnabled(apc->isAudioPortCbEnabled());
+        IPCThreadState::self()->restoreCallingIdentity(token);
     }
 
     return ap;
@@ -822,22 +853,18 @@ audio_policy_forced_cfg_t AudioSystem::getForceUse(audio_policy_force_use_t usag
 }
 
 
-audio_io_handle_t AudioSystem::getOutput(audio_stream_type_t stream,
-                                    uint32_t samplingRate,
-                                    audio_format_t format,
-                                    audio_channel_mask_t channelMask,
-                                    audio_output_flags_t flags,
-                                    const audio_offload_info_t *offloadInfo)
+audio_io_handle_t AudioSystem::getOutput(audio_stream_type_t stream)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return 0;
-    return aps->getOutput(stream, samplingRate, format, channelMask, flags, offloadInfo);
+    return aps->getOutput(stream);
 }
 
 status_t AudioSystem::getOutputForAttr(const audio_attributes_t *attr,
                                         audio_io_handle_t *output,
                                         audio_session_t session,
                                         audio_stream_type_t *stream,
+                                        pid_t pid,
                                         uid_t uid,
                                         const audio_config_t *config,
                                         audio_output_flags_t flags,
@@ -846,7 +873,7 @@ status_t AudioSystem::getOutputForAttr(const audio_attributes_t *attr,
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return NO_INIT;
-    return aps->getOutputForAttr(attr, output, session, stream, uid,
+    return aps->getOutputForAttr(attr, output, session, stream, pid, uid,
                                  config,
                                  flags, selectedDeviceId, portId);
 }
@@ -883,6 +910,7 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t *attr,
                                 audio_session_t session,
                                 pid_t pid,
                                 uid_t uid,
+                                const String16& opPackageName,
                                 const audio_config_base_t *config,
                                 audio_input_flags_t flags,
                                 audio_port_handle_t *selectedDeviceId,
@@ -891,32 +919,29 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t *attr,
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return NO_INIT;
     return aps->getInputForAttr(
-            attr, input, session, pid, uid,
+            attr, input, session, pid, uid, opPackageName,
             config, flags, selectedDeviceId, portId);
 }
 
-status_t AudioSystem::startInput(audio_io_handle_t input,
-                                 audio_session_t session)
+status_t AudioSystem::startInput(audio_port_handle_t portId, bool *silenced)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
-    return aps->startInput(input, session);
+    return aps->startInput(portId, silenced);
 }
 
-status_t AudioSystem::stopInput(audio_io_handle_t input,
-                                audio_session_t session)
+status_t AudioSystem::stopInput(audio_port_handle_t portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
-    return aps->stopInput(input, session);
+    return aps->stopInput(portId);
 }
 
-void AudioSystem::releaseInput(audio_io_handle_t input,
-                               audio_session_t session)
+void AudioSystem::releaseInput(audio_port_handle_t portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return;
-    aps->releaseInput(input, session);
+    aps->releaseInput(portId);
 }
 
 status_t AudioSystem::initStreamVolume(audio_stream_type_t stream,
@@ -1035,11 +1060,11 @@ size_t AudioSystem::getPrimaryOutputFrameCount()
     return af->getPrimaryOutputFrameCount();
 }
 
-status_t AudioSystem::setLowRamDevice(bool isLowRamDevice)
+status_t AudioSystem::setLowRamDevice(bool isLowRamDevice, int64_t totalMemory)
 {
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == 0) return PERMISSION_DENIED;
-    return af->setLowRamDevice(isLowRamDevice);
+    return af->setLowRamDevice(isLowRamDevice, totalMemory);
 }
 
 void AudioSystem::clearAudioConfigCache()
@@ -1252,6 +1277,31 @@ float AudioSystem::getStreamVolumeDB(audio_stream_type_t stream, int index, audi
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return NAN;
     return aps->getStreamVolumeDB(stream, index, device);
+}
+
+status_t AudioSystem::getMicrophones(std::vector<media::MicrophoneInfo> *microphones)
+{
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == 0) return PERMISSION_DENIED;
+    return af->getMicrophones(microphones);
+}
+
+status_t AudioSystem::getSurroundFormats(unsigned int *numSurroundFormats,
+                                         audio_format_t *surroundFormats,
+                                         bool *surroundFormatsEnabled,
+                                         bool reported)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->getSurroundFormats(
+            numSurroundFormats, surroundFormats, surroundFormatsEnabled, reported);
+}
+
+status_t AudioSystem::setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->setSurroundFormatEnabled(audioFormat, enabled);
 }
 
 // ---------------------------------------------------------------------------

@@ -91,7 +91,8 @@ public:
     Camera2Client(const sp<CameraService>& cameraService,
             const sp<hardware::ICameraClient>& cameraClient,
             const String16& clientPackageName,
-            int cameraId,
+            const String8& cameraDeviceId,
+            int api1CameraId,
             int cameraFacing,
             int clientPid,
             uid_t clientUid,
@@ -100,7 +101,8 @@ public:
 
     virtual ~Camera2Client();
 
-    virtual status_t initialize(sp<CameraProviderManager> manager) override;
+    virtual status_t initialize(sp<CameraProviderManager> manager,
+            const String8& monitorTags) override;
 
     virtual status_t dump(int fd, const Vector<String16>& args);
 
@@ -223,7 +225,7 @@ private:
     status_t overrideVideoSnapshotSize(Parameters &params);
 
     template<typename TProviderPtr>
-    status_t initializeImpl(TProviderPtr providerPtr);
+    status_t initializeImpl(TProviderPtr providerPtr, const String8& monitorTags);
 
     bool isZslEnabledInStillTemplate();
 };

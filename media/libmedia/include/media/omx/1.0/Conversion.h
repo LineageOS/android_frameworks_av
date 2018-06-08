@@ -20,11 +20,11 @@
 #include <vector>
 #include <list>
 
+#include <cinttypes>
 #include <unistd.h>
 
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
-#include <hidlmemory/mapping.h>
 
 #include <binder/Binder.h>
 #include <binder/Status.h>
@@ -35,8 +35,9 @@
 #include <media/OMXFenceParcelable.h>
 #include <media/OMXBuffer.h>
 #include <media/hardware/VideoAPI.h>
+#include <media/stagefright/MediaErrors.h>
+#include <gui/IGraphicBufferProducer.h>
 
-#include <android/hidl/memory/1.0/IMemory.h>
 #include <android/hardware/media/omx/1.0/types.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
@@ -199,26 +200,6 @@ inline ::android::binder::Status toBinderStatus(
 }
 
 /**
- * \brief Convert `Return<Status>` to `status_t`. This is for legacy binder
- * calls.
- *
- * \param[in] t The source `Return<Status>`.
- * \return The corresponding `status_t`.
- *
- * This function first check if \p t has a transport error. If it does, then the
- * return value is the transport error code. Otherwise, the return value is
- * converted from `Status` contained inside \p t.
- *
- * Note:
- * - This `Status` is omx-specific. It is defined in `types.hal`.
- * - The name of this function is not `convert`.
- */
-// convert: Status -> status_t
-inline status_t toStatusT(Return<Status> const& t) {
-    return t.isOk() ? static_cast<status_t>(static_cast<Status>(t)) : UNKNOWN_ERROR;
-}
-
-/**
  * \brief Convert `Return<void>` to `status_t`. This is for legacy binder calls.
  *
  * \param[in] t The source `Return<void>`.
@@ -237,7 +218,47 @@ inline status_t toStatusT(Return<void> const& t) {
  */
 // convert: Status -> status_t
 inline status_t toStatusT(Status const& t) {
-    return static_cast<status_t>(t);
+    switch (t) {
+    case Status::NO_ERROR:
+    case Status::NAME_NOT_FOUND:
+    case Status::WOULD_BLOCK:
+    case Status::NO_MEMORY:
+    case Status::ALREADY_EXISTS:
+    case Status::NO_INIT:
+    case Status::BAD_VALUE:
+    case Status::DEAD_OBJECT:
+    case Status::INVALID_OPERATION:
+    case Status::TIMED_OUT:
+    case Status::ERROR_UNSUPPORTED:
+    case Status::UNKNOWN_ERROR:
+    case Status::RELEASE_ALL_BUFFERS:
+        return static_cast<status_t>(t);
+    case Status::BUFFER_NEEDS_REALLOCATION:
+        return NOT_ENOUGH_DATA;
+    default:
+        ALOGW("Unrecognized status value: %" PRId32, static_cast<int32_t>(t));
+        return static_cast<status_t>(t);
+    }
+}
+
+/**
+ * \brief Convert `Return<Status>` to `status_t`. This is for legacy binder
+ * calls.
+ *
+ * \param[in] t The source `Return<Status>`.
+ * \return The corresponding `status_t`.
+ *
+ * This function first check if \p t has a transport error. If it does, then the
+ * return value is the transport error code. Otherwise, the return value is
+ * converted from `Status` contained inside \p t.
+ *
+ * Note:
+ * - This `Status` is omx-specific. It is defined in `types.hal`.
+ * - The name of this function is not `convert`.
+ */
+// convert: Status -> status_t
+inline status_t toStatusT(Return<Status> const& t) {
+    return t.isOk() ? toStatusT(static_cast<Status>(t)) : UNKNOWN_ERROR;
 }
 
 /**
@@ -248,7 +269,28 @@ inline status_t toStatusT(Status const& t) {
  */
 // convert: status_t -> Status
 inline Status toStatus(status_t l) {
-    return static_cast<Status>(l);
+    switch (l) {
+    case NO_ERROR:
+    case NAME_NOT_FOUND:
+    case WOULD_BLOCK:
+    case NO_MEMORY:
+    case ALREADY_EXISTS:
+    case NO_INIT:
+    case BAD_VALUE:
+    case DEAD_OBJECT:
+    case INVALID_OPERATION:
+    case TIMED_OUT:
+    case ERROR_UNSUPPORTED:
+    case UNKNOWN_ERROR:
+    case IGraphicBufferProducer::RELEASE_ALL_BUFFERS:
+    case IGraphicBufferProducer::BUFFER_NEEDS_REALLOCATION:
+        return static_cast<Status>(l);
+    case NOT_ENOUGH_DATA:
+        return Status::BUFFER_NEEDS_REALLOCATION;
+    default:
+        ALOGW("Unrecognized status value: %" PRId32, static_cast<int32_t>(l));
+        return static_cast<Status>(l);
+    }
 }
 
 /**

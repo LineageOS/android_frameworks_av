@@ -90,7 +90,7 @@ public:
     }
 
     virtual status_t read(
-            MediaBuffer **buffer, const MediaSource::ReadOptions *options __unused) {
+            MediaBufferBase **buffer, const MediaSource::ReadOptions *options __unused) {
 
         if (mNumFramesOutput % 10 == 0) {
             fprintf(stderr, ".");
@@ -114,8 +114,8 @@ public:
         x = x >= 0xa0 ? 0x60 : x + 1;
 #endif
         (*buffer)->set_range(0, mSize);
-        (*buffer)->meta_data()->clear();
-        (*buffer)->meta_data()->setInt64(
+        (*buffer)->meta_data().clear();
+        (*buffer)->meta_data().setInt64(
                 kKeyTime, (mNumFramesOutput * 1000000) / mFrameRate);
         ++mNumFramesOutput;
 
@@ -303,7 +303,7 @@ int main(int argc, char **argv) {
     looper->setName("recordvideo");
     looper->start();
 
-    sp<IMediaSource> encoder =
+    sp<MediaSource> encoder =
         MediaCodecSource::Create(
                 looper, enc_meta, source, NULL /* consumer */,
                 preferSoftwareCodec ? MediaCodecSource::FLAG_PREFER_SOFTWARE_CODEC : 0);

@@ -74,7 +74,7 @@ int32_t AAudioServiceStreamShared::calculateBufferCapacity(int32_t requestedCapa
                                                            int32_t framesPerBurst) {
 
     if (requestedCapacityFrames > MAX_FRAMES_PER_BUFFER) {
-        ALOGE("AAudioServiceStreamShared::calculateBufferCapacity() requested capacity %d > max %d",
+        ALOGE("calculateBufferCapacity() requested capacity %d > max %d",
               requestedCapacityFrames, MAX_FRAMES_PER_BUFFER);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
@@ -99,7 +99,7 @@ int32_t AAudioServiceStreamShared::calculateBufferCapacity(int32_t requestedCapa
     }
     // Check for numeric overflow.
     if (numBursts > 0x8000 || framesPerBurst > 0x8000) {
-        ALOGE("AAudioServiceStreamShared::calculateBufferCapacity() overflow, capacity = %d * %d",
+        ALOGE("calculateBufferCapacity() overflow, capacity = %d * %d",
               numBursts, framesPerBurst);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
@@ -107,11 +107,11 @@ int32_t AAudioServiceStreamShared::calculateBufferCapacity(int32_t requestedCapa
 
     // Final sanity check.
     if (capacityInFrames > MAX_FRAMES_PER_BUFFER) {
-        ALOGE("AAudioServiceStreamShared::calculateBufferCapacity() calc capacity %d > max %d",
+        ALOGE("calculateBufferCapacity() calc capacity %d > max %d",
               capacityInFrames, MAX_FRAMES_PER_BUFFER);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
-    ALOGD("AAudioServiceStreamShared::calculateBufferCapacity() requested %d frames, actual = %d",
+    ALOGD("calculateBufferCapacity() requested %d frames, actual = %d",
           requestedCapacityFrames, capacityInFrames);
     return capacityInFrames;
 }
@@ -122,39 +122,44 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
 
     aaudio_result_t result = AAudioServiceStreamBase::open(request, AAUDIO_SHARING_MODE_SHARED);
     if (result != AAUDIO_OK) {
-        ALOGE("AAudioServiceStreamBase open() returned %d", result);
+        ALOGE("%s() returned %d", __func__, result);
         return result;
     }
 
     const AAudioStreamConfiguration &configurationInput = request.getConstantConfiguration();
 
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        result = AAUDIO_ERROR_INVALID_STATE;
+        goto error;
+    }
 
     // Is the request compatible with the shared endpoint?
     setFormat(configurationInput.getFormat());
     if (getFormat() == AAUDIO_FORMAT_UNSPECIFIED) {
         setFormat(AAUDIO_FORMAT_PCM_FLOAT);
     } else if (getFormat() != AAUDIO_FORMAT_PCM_FLOAT) {
-        ALOGE("AAudioServiceStreamShared::open() mAudioFormat = %d, need FLOAT", getFormat());
+        ALOGD("%s() mAudioFormat = %d, need FLOAT", __func__, getFormat());
         result = AAUDIO_ERROR_INVALID_FORMAT;
         goto error;
     }
 
     setSampleRate(configurationInput.getSampleRate());
     if (getSampleRate() == AAUDIO_UNSPECIFIED) {
-        setSampleRate(mServiceEndpoint->getSampleRate());
-    } else if (getSampleRate() != mServiceEndpoint->getSampleRate()) {
-        ALOGE("AAudioServiceStreamShared::open() mSampleRate = %d, need %d",
-              getSampleRate(), mServiceEndpoint->getSampleRate());
+        setSampleRate(endpoint->getSampleRate());
+    } else if (getSampleRate() != endpoint->getSampleRate()) {
+        ALOGD("%s() mSampleRate = %d, need %d",
+              __func__, getSampleRate(), endpoint->getSampleRate());
         result = AAUDIO_ERROR_INVALID_RATE;
         goto error;
     }
 
     setSamplesPerFrame(configurationInput.getSamplesPerFrame());
     if (getSamplesPerFrame() == AAUDIO_UNSPECIFIED) {
-        setSamplesPerFrame(mServiceEndpoint->getSamplesPerFrame());
-    } else if (getSamplesPerFrame() != mServiceEndpoint->getSamplesPerFrame()) {
-        ALOGE("AAudioServiceStreamShared::open() mSamplesPerFrame = %d, need %d",
-              getSamplesPerFrame(), mServiceEndpoint->getSamplesPerFrame());
+        setSamplesPerFrame(endpoint->getSamplesPerFrame());
+    } else if (getSamplesPerFrame() != endpoint->getSamplesPerFrame()) {
+        ALOGD("%s() mSamplesPerFrame = %d, need %d",
+              __func__, getSamplesPerFrame(), endpoint->getSamplesPerFrame());
         result = AAUDIO_ERROR_OUT_OF_RANGE;
         goto error;
     }
@@ -173,17 +178,17 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
         mAudioDataQueue = new SharedRingBuffer();
         result = mAudioDataQueue->allocate(calculateBytesPerFrame(), getBufferCapacity());
         if (result != AAUDIO_OK) {
-            ALOGE("AAudioServiceStreamShared::open() could not allocate FIFO with %d frames",
-                  getBufferCapacity());
+            ALOGE("%s() could not allocate FIFO with %d frames",
+                  __func__, getBufferCapacity());
             result = AAUDIO_ERROR_NO_MEMORY;
             goto error;
         }
     }
 
     ALOGD("AAudioServiceStreamShared::open() actual rate = %d, channels = %d, deviceId = %d",
-          getSampleRate(), getSamplesPerFrame(), mServiceEndpoint->getDeviceId());
+          getSampleRate(), getSamplesPerFrame(), endpoint->getDeviceId());
 
-    result = mServiceEndpoint->registerStream(keep);
+    result = endpoint->registerStream(keep);
     if (result != AAUDIO_OK) {
         goto error;
     }
@@ -217,7 +222,7 @@ aaudio_result_t AAudioServiceStreamShared::getAudioDataDescription(
 {
     std::lock_guard<std::mutex> lock(mAudioDataQueueLock);
     if (mAudioDataQueue == nullptr) {
-        ALOGE("getAudioDataDescription(): mUpMessageQueue null! - stream not open");
+        ALOGE("%s(): mUpMessageQueue null! - stream not open", __func__);
         return AAUDIO_ERROR_NULL;
     }
     // Gather information on the data queue.
@@ -250,13 +255,19 @@ aaudio_result_t AAudioServiceStreamShared::getHardwareTimestamp(int64_t *positio
                                                                 int64_t *timeNanos) {
 
     int64_t position = 0;
-    aaudio_result_t result = mServiceEndpoint->getTimestamp(&position, timeNanos);
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        ALOGE("%s() has no endpoint", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+
+    aaudio_result_t result = endpoint->getTimestamp(&position, timeNanos);
     if (result == AAUDIO_OK) {
         int64_t offset = mTimestampPositionOffset.load();
         // TODO, do not go below starting value
         position -= offset; // Offset from shared MMAP stream
-        ALOGV("getHardwareTimestamp() %8lld = %8lld - %8lld",
-              (long long) position, (long long) (position + offset), (long long) offset);
+        ALOGV("%s() %8lld = %8lld - %8lld",
+              __func__, (long long) position, (long long) (position + offset), (long long) offset);
     }
     *positionFrames = position;
     return result;

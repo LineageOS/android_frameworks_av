@@ -29,6 +29,8 @@
 
 namespace android {
 
+// SharedMemoryBuffer
+
 SharedMemoryBuffer::SharedMemoryBuffer(const sp<AMessage> &format, const sp<IMemory> &mem)
     : MediaCodecBuffer(format, new ABuffer(mem->pointer(), mem->size())),
       mMemory(mem) {
@@ -38,6 +40,8 @@ SharedMemoryBuffer::SharedMemoryBuffer(const sp<AMessage> &format, const sp<TMem
     : MediaCodecBuffer(format, new ABuffer(mem->getPointer(), mem->getSize())),
       mTMemory(mem) {
 }
+
+// SecureBuffer
 
 SecureBuffer::SecureBuffer(const sp<AMessage> &format, const void *ptr, size_t size)
     : MediaCodecBuffer(format, new ABuffer(nullptr, size)),

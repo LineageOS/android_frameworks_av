@@ -62,11 +62,63 @@ typedef struct AMediaCodecBufferInfo AMediaCodecBufferInfo;
 typedef struct AMediaCodecCryptoInfo AMediaCodecCryptoInfo;
 
 enum {
+    AMEDIACODEC_BUFFER_FLAG_CODEC_CONFIG = 2,
     AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM = 4,
+    AMEDIACODEC_BUFFER_FLAG_PARTIAL_FRAME = 8,
+
     AMEDIACODEC_CONFIGURE_FLAG_ENCODE = 1,
     AMEDIACODEC_INFO_OUTPUT_BUFFERS_CHANGED = -3,
     AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED = -2,
-    AMEDIACODEC_INFO_TRY_AGAIN_LATER = -1
+    AMEDIACODEC_INFO_TRY_AGAIN_LATER = -1,
+};
+
+/**
+ * Called when an input buffer becomes available.
+ * The specified index is the index of the available input buffer.
+ */
+typedef void (*AMediaCodecOnAsyncInputAvailable)(
+        AMediaCodec *codec,
+        void *userdata,
+        int32_t index);
+/**
+ * Called when an output buffer becomes available.
+ * The specified index is the index of the available output buffer.
+ * The specified bufferInfo contains information regarding the available output buffer.
+ */
+typedef void (*AMediaCodecOnAsyncOutputAvailable)(
+        AMediaCodec *codec,
+        void *userdata,
+        int32_t index,
+        AMediaCodecBufferInfo *bufferInfo);
+/**
+ * Called when the output format has changed.
+ * The specified format contains the new output format.
+ */
+typedef void (*AMediaCodecOnAsyncFormatChanged)(
+        AMediaCodec *codec,
+        void *userdata,
+        AMediaFormat *format);
+/**
+ * Called when the MediaCodec encountered an error.
+ * The specified actionCode indicates the possible actions that client can take,
+ * and it can be checked by calling AMediaCodecActionCode_isRecoverable or
+ * AMediaCodecActionCode_isTransient. If both AMediaCodecActionCode_isRecoverable()
+ * and AMediaCodecActionCode_isTransient() return false, then the codec error is fatal
+ * and the codec must be deleted.
+ * The specified detail may contain more detailed messages about this error.
+ */
+typedef void (*AMediaCodecOnAsyncError)(
+        AMediaCodec *codec,
+        void *userdata,
+        media_status_t error,
+        int32_t actionCode,
+        const char *detail);
+
+struct AMediaCodecOnAsyncNotifyCallback {
+      AMediaCodecOnAsyncInputAvailable  onAsyncInputAvailable;
+      AMediaCodecOnAsyncOutputAvailable onAsyncOutputAvailable;
+      AMediaCodecOnAsyncFormatChanged   onAsyncFormatChanged;
+      AMediaCodecOnAsyncError           onAsyncError;
 };
 
 #if __ANDROID_API__ >= 21
@@ -189,6 +241,12 @@ ssize_t AMediaCodec_dequeueOutputBuffer(AMediaCodec*, AMediaCodecBufferInfo *inf
 AMediaFormat* AMediaCodec_getOutputFormat(AMediaCodec*);
 
 /**
+ * Get format of the buffer. The specified buffer index must have been previously obtained from
+ * dequeueOutputBuffer.
+ */
+AMediaFormat* AMediaCodec_getBufferFormat(AMediaCodec*, size_t index);
+
+/**
  * If you are done with a buffer, use this call to return the buffer to
  * the codec. If you previously specified a surface when configuring this
  * video decoder you can optionally render the buffer.
@@ -291,6 +349,71 @@ media_status_t AMediaCodec_setParameters(
 media_status_t AMediaCodec_signalEndOfInputStream(AMediaCodec *mData);
 
 #endif /* __ANDROID_API__ >= 26 */
+
+#if __ANDROID_API__ >= 28
+
+/**
+ * Get the component name. If the codec was created by createDecoderByType
+ * or createEncoderByType, what component is chosen is not known beforehand.
+ * Caller shall call AMediaCodec_releaseName to free the returned pointer.
+ */
+media_status_t AMediaCodec_getName(AMediaCodec*, char** out_name);
+
+/**
+ * Free the memory pointed by name which is returned by AMediaCodec_getName.
+ */
+void AMediaCodec_releaseName(AMediaCodec*, char* name);
+
+/**
+ * Set an asynchronous callback for actionable AMediaCodec events.
+ * When asynchronous callback is enabled, the client should not call
+ * AMediaCodec_getInputBuffers(), AMediaCodec_getOutputBuffers(),
+ * AMediaCodec_dequeueInputBuffer() or AMediaCodec_dequeueOutputBuffer().
+ *
+ * Also, AMediaCodec_flush() behaves differently in asynchronous mode.
+ * After calling AMediaCodec_flush(), you must call AMediaCodec_start() to
+ * "resume" receiving input buffers, even if an input surface was created.
+ *
+ * Refer to the definition of AMediaCodecOnAsyncNotifyCallback on how each
+ * callback function is called and what are specified.
+ * The specified userdata is the pointer used when those callback functions are
+ * called.
+ *
+ * All callbacks are fired on one NDK internal thread.
+ * AMediaCodec_setAsyncNotifyCallback should not be called on the callback thread.
+ * No heavy duty task should be performed on callback thread.
+ */
+media_status_t AMediaCodec_setAsyncNotifyCallback(
+        AMediaCodec*,
+        AMediaCodecOnAsyncNotifyCallback callback,
+        void *userdata);
+
+/**
+ * Release the crypto if applicable.
+ */
+media_status_t AMediaCodec_releaseCrypto(AMediaCodec*);
+
+/**
+ * Call this after AMediaCodec_configure() returns successfully to get the input
+ * format accepted by the codec. Do this to determine what optional configuration
+ * parameters were supported by the codec.
+ */
+AMediaFormat* AMediaCodec_getInputFormat(AMediaCodec*);
+
+/**
+ * Returns true if the codec cannot proceed further, but can be recovered by stopping,
+ * configuring, and starting again.
+ */
+bool AMediaCodecActionCode_isRecoverable(int32_t actionCode);
+
+/**
+ * Returns true if the codec error is a transient issue, perhaps due to
+ * resource constraints, and that the method (or encoding/decoding) may be
+ * retried at a later time.
+ */
+bool AMediaCodecActionCode_isTransient(int32_t actionCode);
+
+#endif /* __ANDROID_API__ >= 28 */
 
 typedef enum {
     AMEDIACODECRYPTOINFO_MODE_CLEAR = 0,

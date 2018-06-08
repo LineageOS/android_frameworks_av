@@ -21,12 +21,12 @@
 #include <utility>
 
 #include "include/HevcUtils.h"
-#include "include/avc_utils.h"
 
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/Utils.h>
 
@@ -162,6 +162,8 @@ status_t HevcParameterSets::parseVps(const uint8_t* data, size_t size) {
     reader.skipBits(1);
     // Skip vps_max_layers_minus_1
     reader.skipBits(6);
+    // Skip vps_max_sub_layers_minus1
+    reader.skipBits(3);
     // Skip vps_temporal_id_nesting_flags
     reader.skipBits(1);
     // Skip reserved
@@ -422,7 +424,7 @@ status_t HevcParameterSets::makeHvcc(uint8_t *hvcc, size_t *hvccSize,
 
     uint8_t *header = hvcc;
     header[0] = 1;
-    header[1] = (kGeneralProfileSpace << 6) | (kGeneralTierFlag << 5) | kGeneralProfileIdc;
+    header[1] = (generalProfileSpace << 6) | (generalTierFlag << 5) | generalProfileIdc;
     header[2] = (compatibilityFlags >> 24) & 0xff;
     header[3] = (compatibilityFlags >> 16) & 0xff;
     header[4] = (compatibilityFlags >> 8) & 0xff;

@@ -22,6 +22,8 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <algorithm>
+
 #include "FifoControllerBase.h"
 #include "FifoController.h"
 #include "FifoControllerIndirect.h"
@@ -43,7 +45,7 @@ FifoBuffer::FifoBuffer(int32_t bytesPerFrame, fifo_frames_t capacityInFrames)
     int32_t bytesPerBuffer = bytesPerFrame * capacityInFrames;
     mStorage = new uint8_t[bytesPerBuffer];
     mStorageOwned = true;
-    ALOGD("FifoBuffer: capacityInFrames = %d, bytesPerFrame = %d",
+    ALOGV("capacityInFrames = %d, bytesPerFrame = %d",
           capacityInFrames, bytesPerFrame);
 }
 
@@ -85,15 +87,14 @@ void FifoBuffer::fillWrappingBuffer(WrappingBuffer *wrappingBuffer,
     wrappingBuffer->data[1] = nullptr;
     wrappingBuffer->numFrames[1] = 0;
     if (framesAvailable > 0) {
-
         uint8_t *source = &mStorage[convertFramesToBytes(startIndex)];
         // Does the available data cross the end of the FIFO?
         if ((startIndex + framesAvailable) > mFrameCapacity) {
             wrappingBuffer->data[0] = source;
-            wrappingBuffer->numFrames[0] = mFrameCapacity - startIndex;
+            fifo_frames_t firstFrames = mFrameCapacity - startIndex;
+            wrappingBuffer->numFrames[0] = firstFrames;
             wrappingBuffer->data[1] = &mStorage[0];
-            wrappingBuffer->numFrames[1] = mFrameCapacity - startIndex;
-
+            wrappingBuffer->numFrames[1] = framesAvailable - firstFrames;
         } else {
             wrappingBuffer->data[0] = source;
             wrappingBuffer->numFrames[0] = framesAvailable;
@@ -102,18 +103,19 @@ void FifoBuffer::fillWrappingBuffer(WrappingBuffer *wrappingBuffer,
         wrappingBuffer->data[0] = nullptr;
         wrappingBuffer->numFrames[0] = 0;
     }
-
 }
 
 fifo_frames_t FifoBuffer::getFullDataAvailable(WrappingBuffer *wrappingBuffer) {
-    fifo_frames_t framesAvailable = mFifo->getFullFramesAvailable();
+    // The FIFO might be overfull so clip to capacity.
+    fifo_frames_t framesAvailable = std::min(mFifo->getFullFramesAvailable(), mFrameCapacity);
     fifo_frames_t startIndex = mFifo->getReadIndex();
     fillWrappingBuffer(wrappingBuffer, framesAvailable, startIndex);
     return framesAvailable;
 }
 
 fifo_frames_t FifoBuffer::getEmptyRoomAvailable(WrappingBuffer *wrappingBuffer) {
-    fifo_frames_t framesAvailable = mFifo->getEmptyFramesAvailable();
+    // The FIFO might have underrun so clip to capacity.
+    fifo_frames_t framesAvailable = std::min(mFifo->getEmptyFramesAvailable(), mFrameCapacity);
     fifo_frames_t startIndex = mFifo->getWriteIndex();
     fillWrappingBuffer(wrappingBuffer, framesAvailable, startIndex);
     return framesAvailable;

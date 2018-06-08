@@ -1,4 +1,4 @@
-cc_library_shared {
+cc_library {
     name: "libstagefright_flacdec",
     vendor_available: true,
     vndk: {
@@ -8,6 +8,8 @@ cc_library_shared {
     srcs: [
         "FLACDecoder.cpp",
     ],
+
+    export_include_dirs: [ "." ],
 
     include_dirs: [
         "external/flac/include",
@@ -27,10 +29,15 @@ cc_library_shared {
         },
     },
 
-    static_libs: ["libFLAC"],
+    static: {
+        whole_static_libs: ["libFLAC"],
+    },
+
+    shared: {
+        static_libs: ["libFLAC"],
+    },
 
     shared_libs: [
-        "libcutils",
         "liblog",
         "libstagefright_foundation",
         "libutils",

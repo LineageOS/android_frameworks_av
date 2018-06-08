@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2013-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -231,63 +231,9 @@ status_t ZslProcessor::updateStream(const Parameters &params) {
         return INVALID_OPERATION;
     }
 
-    if ((mZslStreamId != NO_STREAM) || (mInputStreamId != NO_STREAM)) {
-        // Check if stream parameters have to change
-        CameraDeviceBase::StreamInfo streamInfo;
-        res = device->getStreamInfo(mZslStreamId, &streamInfo);
-        if (res != OK) {
-            ALOGE("%s: Camera %d: Error querying capture output stream info: "
-                    "%s (%d)", __FUNCTION__,
-                    client->getCameraId(), strerror(-res), res);
-            return res;
-        }
-        if (streamInfo.width != (uint32_t)params.fastInfo.arrayWidth ||
-                streamInfo.height != (uint32_t)params.fastInfo.arrayHeight) {
-            if (mZslStreamId != NO_STREAM) {
-                ALOGV("%s: Camera %d: Deleting stream %d since the buffer "
-                      "dimensions changed",
-                    __FUNCTION__, client->getCameraId(), mZslStreamId);
-                res = device->deleteStream(mZslStreamId);
-                if (res == -EBUSY) {
-                    ALOGV("%s: Camera %d: Device is busy, call updateStream again "
-                          " after it becomes idle", __FUNCTION__, mId);
-                    return res;
-                } else if(res != OK) {
-                    ALOGE("%s: Camera %d: Unable to delete old output stream "
-                            "for ZSL: %s (%d)", __FUNCTION__,
-                            client->getCameraId(), strerror(-res), res);
-                    return res;
-                }
-                mZslStreamId = NO_STREAM;
-            }
-
-            if (mInputStreamId != NO_STREAM) {
-                ALOGV("%s: Camera %d: Deleting stream %d since the buffer "
-                      "dimensions changed",
-                    __FUNCTION__, client->getCameraId(), mInputStreamId);
-                res = device->deleteStream(mInputStreamId);
-                if (res == -EBUSY) {
-                    ALOGV("%s: Camera %d: Device is busy, call updateStream again "
-                          " after it becomes idle", __FUNCTION__, mId);
-                    return res;
-                } else if(res != OK) {
-                    ALOGE("%s: Camera %d: Unable to delete old output stream "
-                            "for ZSL: %s (%d)", __FUNCTION__,
-                            client->getCameraId(), strerror(-res), res);
-                    return res;
-                }
-                mInputStreamId = NO_STREAM;
-            }
-            if (nullptr != mInputProducer.get()) {
-                mInputProducer->disconnect(NATIVE_WINDOW_API_CPU);
-                mInputProducer.clear();
-            }
-        }
-    }
-
     if (mInputStreamId == NO_STREAM) {
-        res = device->createInputStream(params.fastInfo.arrayWidth,
-            params.fastInfo.arrayHeight, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
+        res = device->createInputStream(params.fastInfo.maxZslSize.width,
+            params.fastInfo.maxZslSize.height, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
             &mInputStreamId);
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create input stream: "
@@ -309,9 +255,10 @@ status_t ZslProcessor::updateStream(const Parameters &params) {
         mProducer->setName(String8("Camera2-ZslRingBufferConsumer"));
         sp<Surface> outSurface = new Surface(producer);
 
-        res = device->createStream(outSurface, params.fastInfo.arrayWidth,
-            params.fastInfo.arrayHeight, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
-            HAL_DATASPACE_UNKNOWN, CAMERA3_STREAM_ROTATION_0, &mZslStreamId);
+        res = device->createStream(outSurface, params.fastInfo.maxZslSize.width,
+            params.fastInfo.maxZslSize.height, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
+            HAL_DATASPACE_UNKNOWN, CAMERA3_STREAM_ROTATION_0, &mZslStreamId,
+            String8());
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create ZSL stream: "
                     "%s (%d)", __FUNCTION__, client->getCameraId(),
@@ -855,29 +802,25 @@ nsecs_t ZslProcessor::getCandidateTimestampLocked(size_t* metadataIdx) const {
                             __FUNCTION__);
                     continue;
                 }
-                uint8_t afMode = entry.data.u8[0];
-                if (afMode == ANDROID_CONTROL_AF_MODE_OFF) {
-                    // Skip all the ZSL buffer for manual AF mode, as we don't really
-                    // know the af state.
-                    continue;
-                }
-
                 // Check AF state if device has focuser and focus mode isn't fixed
-                if (mHasFocuser && !isFixedFocusMode(afMode)) {
-                    // Make sure the candidate frame has good focus.
-                    entry = frame.find(ANDROID_CONTROL_AF_STATE);
-                    if (entry.count == 0) {
-                        ALOGW("%s: ZSL queue frame has no AF state field!",
-                                __FUNCTION__);
-                        continue;
-                    }
-                    uint8_t afState = entry.data.u8[0];
-                    if (afState != ANDROID_CONTROL_AF_STATE_PASSIVE_FOCUSED &&
-                            afState != ANDROID_CONTROL_AF_STATE_FOCUSED_LOCKED &&
-                            afState != ANDROID_CONTROL_AF_STATE_NOT_FOCUSED_LOCKED) {
-                        ALOGVV("%s: ZSL queue frame AF state is %d is not good for capture, skip it",
-                                __FUNCTION__, afState);
-                        continue;
+                if (mHasFocuser) {
+                    uint8_t afMode = entry.data.u8[0];
+                    if (!isFixedFocusMode(afMode)) {
+                        // Make sure the candidate frame has good focus.
+                        entry = frame.find(ANDROID_CONTROL_AF_STATE);
+                        if (entry.count == 0) {
+                            ALOGW("%s: ZSL queue frame has no AF state field!",
+                                    __FUNCTION__);
+                            continue;
+                        }
+                        uint8_t afState = entry.data.u8[0];
+                        if (afState != ANDROID_CONTROL_AF_STATE_PASSIVE_FOCUSED &&
+                                afState != ANDROID_CONTROL_AF_STATE_FOCUSED_LOCKED &&
+                                afState != ANDROID_CONTROL_AF_STATE_NOT_FOCUSED_LOCKED) {
+                            ALOGVV("%s: ZSL queue frame AF state is %d is not good for capture,"
+                                    " skip it", __FUNCTION__, afState);
+                            continue;
+                        }
                     }
                 }
 

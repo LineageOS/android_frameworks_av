@@ -22,8 +22,8 @@
 
 #include "ASessionDescription.h"
 
-#include <media/IMediaHTTPConnection.h>
-#include <media/IMediaHTTPService.h>
+#include <media/MediaHTTPConnection.h>
+#include <media/MediaHTTPService.h>
 #include <media/stagefright/MediaHTTP.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -36,7 +36,7 @@ namespace android {
 SDPLoader::SDPLoader(
         const sp<AMessage> &notify,
         uint32_t flags,
-        const sp<IMediaHTTPService> &httpService)
+        const sp<MediaHTTPService> &httpService)
     : mNotify(notify),
       mFlags(flags),
       mNetLooper(new ALooper),

@@ -163,35 +163,14 @@
                        sources="primary output,deep_buffer,compressed_offload,BT SCO Headset Mic,Telephony Rx"/>
                 <route type="mix" sink="Wired Headphones"
                        sources="primary output,deep_buffer,compressed_offload,BT SCO Headset Mic,Telephony Rx"/>
-                <route type="mix" sink="Telephony Tx"
-                       sources="voice_tx"/>
                 <route type="mix" sink="primary input"
                        sources="Built-In Mic,Built-In Back Mic,Wired Headset Mic,BT SCO Headset Mic"/>
                 <route type="mix" sink="Telephony Tx"
-                       sources="Built-In Mic,Built-In Back Mic,Wired Headset Mic,BT SCO Headset Mic"/>
+                       sources="Built-In Mic,Built-In Back Mic,Wired Headset Mic,BT SCO Headset Mic, voice_tx"/>
                 <route type="mix" sink="voice_rx"
                        sources="Telephony Rx"/>
             </routes>
 
-        </module>
-
-        <!-- HDMI Audio HAL -->
-        <module description="HDMI Audio HAL" name="hdmi" version="2.0">
-            <mixPorts>
-                <mixPort name="hdmi output" role="source">
-                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT" samplingRates="48000"/>
-                </mixPort>
-            </mixPorts>
-            <devicePorts>
-                <devicePort tagName="HDMI Out" type="AUDIO_DEVICE_OUT_AUX_DIGITAL" role="sink">
-                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
-                             samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
-                </devicePort>
-            </devicePorts>
-            <routes>
-                <route type="mix" sink="HDMI Out"
-                       sources="hdmi output"/>
-            </routes>
         </module>
 
         <!-- A2dp Audio HAL -->
@@ -202,6 +181,9 @@
 
         <!-- Remote Submix Audio HAL -->
         <xi:include href="r_submix_audio_policy_configuration.xml"/>
+
+        <!-- Hearing aid Audio HAL -->
+        <xi:include href="hearing_aid_audio_policy_configuration.xml"/>
 
     </modules>
     <!-- End of Modules section -->

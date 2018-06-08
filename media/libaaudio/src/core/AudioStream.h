@@ -39,6 +39,8 @@ typedef void *(*aaudio_audio_thread_proc_t)(void *);
 
 class AudioStreamBuilder;
 
+constexpr pid_t        CALLBACK_THREAD_NONE = 0;
+
 /**
  * AAudio audio stream.
  */
@@ -49,13 +51,45 @@ public:
 
     virtual ~AudioStream();
 
+    /**
+     * Lock a mutex and make sure we are not calling from a callback function.
+     * @return result of requestStart();
+     */
+    aaudio_result_t safeStart();
+
+    aaudio_result_t safePause();
+
+    aaudio_result_t safeFlush();
+
+    aaudio_result_t safeStop();
+
+    aaudio_result_t safeClose();
 
     // =========== Begin ABSTRACT methods ===========================
+protected:
 
     /* Asynchronous requests.
      * Use waitForStateChange() to wait for completion.
      */
     virtual aaudio_result_t requestStart() = 0;
+
+    /**
+     * Check the state to see if Pause if currently legal.
+     *
+     * @param result pointer to return code
+     * @return true if OK to continue, if false then return result
+     */
+    bool checkPauseStateTransition(aaudio_result_t *result);
+
+    virtual bool isFlushSupported() const {
+        // Only implement FLUSH for OUTPUT streams.
+        return false;
+    }
+
+    virtual bool isPauseSupported() const {
+        // Only implement PAUSE for OUTPUT streams.
+        return false;
+    }
 
     virtual aaudio_result_t requestPause()
     {
@@ -70,6 +104,7 @@ public:
 
     virtual aaudio_result_t requestStop() = 0;
 
+public:
     virtual aaudio_result_t getTimestamp(clockid_t clockId,
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) = 0;
@@ -80,7 +115,6 @@ public:
      * @return
      */
     virtual aaudio_result_t updateStateMachine() = 0;
-
 
     // =========== End ABSTRACT methods ===========================
 
@@ -188,6 +222,22 @@ public:
 
     virtual aaudio_direction_t getDirection() const = 0;
 
+    aaudio_usage_t getUsage() const {
+        return mUsage;
+    }
+
+    aaudio_content_type_t getContentType() const {
+        return mContentType;
+    }
+
+    aaudio_input_preset_t getInputPreset() const {
+        return mInputPreset;
+    }
+
+    int32_t getSessionId() const {
+        return mSessionId;
+    }
+
     /**
      * This is only valid after setSamplesPerFrame() and setFormat() have been called.
      */
@@ -202,6 +252,20 @@ public:
         return AAudioConvert_formatToSizeInBytes(mFormat);
     }
 
+    /**
+     * This is only valid after setSamplesPerFrame() and setDeviceFormat() have been called.
+     */
+    int32_t getBytesPerDeviceFrame() const {
+        return mSamplesPerFrame * getBytesPerDeviceSample();
+    }
+
+    /**
+     * This is only valid after setDeviceFormat() has been called.
+     */
+    int32_t getBytesPerDeviceSample() const {
+        return AAudioConvert_formatToSizeInBytes(getDeviceFormat());
+    }
+
     virtual int64_t getFramesWritten() = 0;
 
     virtual int64_t getFramesRead() = 0;
@@ -209,13 +273,19 @@ public:
     AAudioStream_dataCallback getDataCallbackProc() const {
         return mDataCallbackProc;
     }
+
     AAudioStream_errorCallback getErrorCallbackProc() const {
         return mErrorCallbackProc;
     }
 
+    aaudio_data_callback_result_t maybeCallDataCallback(void *audioData, int32_t numFrames);
+
+    void maybeCallErrorCallback(aaudio_result_t result);
+
     void *getDataCallbackUserData() const {
         return mDataCallbackUserData;
     }
+
     void *getErrorCallbackUserData() const {
         return mErrorCallbackUserData;
     }
@@ -224,9 +294,24 @@ public:
         return mFramesPerDataCallback;
     }
 
-    bool isDataCallbackActive() {
-        return (mDataCallbackProc != nullptr) && isActive();
+    /**
+     * @return true if data callback has been specified
+     */
+    bool isDataCallbackSet() const {
+        return mDataCallbackProc != nullptr;
     }
+
+    /**
+     * @return true if data callback has been specified and stream is running
+     */
+    bool isDataCallbackActive() const {
+        return isDataCallbackSet() && isActive();
+    }
+
+    /**
+     * @return true if called from the same thread as the callback
+     */
+    bool collidesWithCallback() const;
 
     // ============== I/O ===========================
     // A Stream will only implement read() or write() depending on its direction.
@@ -243,12 +328,9 @@ public:
     }
 
     // This is used by the AudioManager to duck and mute the stream when changing audio focus.
-    void setDuckAndMuteVolume(float duckAndMuteVolume) {
-        mDuckAndMuteVolume = duckAndMuteVolume;
-        doSetVolume(); // apply this change
-    }
+    void setDuckAndMuteVolume(float duckAndMuteVolume);
 
-    float getDuckAndMuteVolume() {
+    float getDuckAndMuteVolume() const {
         return mDuckAndMuteVolume;
     }
 
@@ -288,11 +370,13 @@ public:
         return mPlayerBase->getResult();
     }
 
+    // Pass pause request through PlayerBase for tracking.
     aaudio_result_t systemPause() {
         mPlayerBase->pause();
         return mPlayerBase->getResult();
     }
 
+    // Pass stop request through PlayerBase for tracking.
     aaudio_result_t systemStop() {
         mPlayerBase->stop();
         return mPlayerBase->getResult();
@@ -331,17 +415,17 @@ protected:
 
         android::status_t playerStart() override {
             // mParent should NOT be null. So go ahead and crash if it is.
-            mResult = mParent->requestStart();
+            mResult = mParent->safeStart();
             return AAudioConvert_aaudioToAndroidStatus(mResult);
         }
 
         android::status_t playerPause() override {
-            mResult = mParent->requestPause();
+            mResult = mParent->safePause();
             return AAudioConvert_aaudioToAndroidStatus(mResult);
         }
 
         android::status_t playerStop() override {
-            mResult = mParent->requestStop();
+            mResult = mParent->safeStop();
             return AAudioConvert_aaudioToAndroidStatus(mResult);
         }
 
@@ -371,6 +455,7 @@ protected:
 
     /**
      * This should not be called after the open() call.
+     * TODO for multiple setters: assert(mState == AAUDIO_STREAM_STATE_UNINITIALIZED)
      */
     void setSampleRate(int32_t sampleRate) {
         mSampleRate = sampleRate;
@@ -397,21 +482,47 @@ protected:
         mFormat = format;
     }
 
-    void setState(aaudio_stream_state_t state) {
-        mState = state;
+    /**
+     * This should not be called after the open() call.
+     */
+    void setDeviceFormat(aaudio_format_t format) {
+        mDeviceFormat = format;
     }
+
+    aaudio_format_t getDeviceFormat() const {
+        return mDeviceFormat;
+    }
+
+    void setState(aaudio_stream_state_t state);
 
     void setDeviceId(int32_t deviceId) {
         mDeviceId = deviceId;
     }
 
-    std::mutex           mStreamMutex;
+    void setSessionId(int32_t sessionId) {
+        mSessionId = sessionId;
+    }
 
     std::atomic<bool>    mCallbackEnabled{false};
 
     float                mDuckAndMuteVolume = 1.0f;
 
 protected:
+
+    /**
+     * Either convert the data from device format to app format and return a pointer
+     * to the conversion buffer,
+     * OR just pass back the original pointer.
+     *
+     * Note that this is only used for the INPUT path.
+     *
+     * @param audioData
+     * @param numFrames
+     * @return original pointer or the conversion buffer
+     */
+    virtual const void * maybeConvertDeviceData(const void *audioData, int32_t numFrames) {
+        return audioData;
+    }
 
     void setPeriodNanoseconds(int64_t periodNanoseconds) {
         mPeriodNanoseconds.store(periodNanoseconds, std::memory_order_release);
@@ -421,40 +532,74 @@ protected:
         return mPeriodNanoseconds.load(std::memory_order_acquire);
     }
 
+    /**
+     * This should not be called after the open() call.
+     */
+    void setUsage(aaudio_usage_t usage) {
+        mUsage = usage;
+    }
+
+    /**
+     * This should not be called after the open() call.
+     */
+    void setContentType(aaudio_content_type_t contentType) {
+        mContentType = contentType;
+    }
+
+    /**
+     * This should not be called after the open() call.
+     */
+    void setInputPreset(aaudio_input_preset_t inputPreset) {
+        mInputPreset = inputPreset;
+    }
+
 private:
+
+    std::mutex                 mStreamLock;
+
     const android::sp<MyPlayerBase>   mPlayerBase;
 
     // These do not change after open().
-    int32_t                mSamplesPerFrame = AAUDIO_UNSPECIFIED;
-    int32_t                mSampleRate = AAUDIO_UNSPECIFIED;
-    int32_t                mDeviceId = AAUDIO_UNSPECIFIED;
-    aaudio_sharing_mode_t  mSharingMode = AAUDIO_SHARING_MODE_SHARED;
-    bool                   mSharingModeMatchRequired = false; // must match sharing mode requested
-    aaudio_format_t        mFormat = AAUDIO_FORMAT_UNSPECIFIED;
-    aaudio_stream_state_t  mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+    int32_t                     mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    int32_t                     mSampleRate = AAUDIO_UNSPECIFIED;
+    int32_t                     mDeviceId = AAUDIO_UNSPECIFIED;
+    aaudio_sharing_mode_t       mSharingMode = AAUDIO_SHARING_MODE_SHARED;
+    bool                        mSharingModeMatchRequired = false; // must match sharing mode requested
+    aaudio_format_t             mFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    aaudio_stream_state_t       mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+    aaudio_performance_mode_t   mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
 
-    aaudio_performance_mode_t mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
+    aaudio_usage_t              mUsage           = AAUDIO_UNSPECIFIED;
+    aaudio_content_type_t       mContentType     = AAUDIO_UNSPECIFIED;
+    aaudio_input_preset_t       mInputPreset     = AAUDIO_UNSPECIFIED;
+
+    int32_t                     mSessionId = AAUDIO_UNSPECIFIED;
+
+    // Sometimes the hardware is operating with a different format from the app.
+    // Then we require conversion in AAudio.
+    aaudio_format_t             mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
 
     // callback ----------------------------------
 
     AAudioStream_dataCallback   mDataCallbackProc = nullptr;  // external callback functions
     void                       *mDataCallbackUserData = nullptr;
     int32_t                     mFramesPerDataCallback = AAUDIO_UNSPECIFIED; // frames
+    std::atomic<pid_t>          mDataCallbackThread{CALLBACK_THREAD_NONE};
 
     AAudioStream_errorCallback  mErrorCallbackProc = nullptr;
     void                       *mErrorCallbackUserData = nullptr;
+    std::atomic<pid_t>          mErrorCallbackThread{CALLBACK_THREAD_NONE};
 
     // background thread ----------------------------------
-    bool                   mHasThread = false;
-    pthread_t              mThread; // initialized in constructor
+    bool                        mHasThread = false;
+    pthread_t                   mThread; // initialized in constructor
 
     // These are set by the application thread and then read by the audio pthread.
-    std::atomic<int64_t>   mPeriodNanoseconds; // for tuning SCHED_FIFO threads
+    std::atomic<int64_t>        mPeriodNanoseconds; // for tuning SCHED_FIFO threads
     // TODO make atomic?
-    aaudio_audio_thread_proc_t mThreadProc = nullptr;
-    void*                  mThreadArg = nullptr;
-    aaudio_result_t        mThreadRegistrationResult = AAUDIO_OK;
-
+    aaudio_audio_thread_proc_t  mThreadProc = nullptr;
+    void                       *mThreadArg = nullptr;
+    aaudio_result_t             mThreadRegistrationResult = AAUDIO_OK;
 
 };
 

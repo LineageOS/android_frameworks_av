@@ -48,7 +48,8 @@ namespace android {
         (IVD_CONTROL_API_COMMAND_TYPE_T)IHEVCD_CXA_CMD_CTL_SET_NUM_CORES
 
 static const CodecProfileLevel kProfileLevels[] = {
-    { OMX_VIDEO_HEVCProfileMain, OMX_VIDEO_HEVCMainTierLevel51 },
+    { OMX_VIDEO_HEVCProfileMain,      OMX_VIDEO_HEVCMainTierLevel51 },
+    { OMX_VIDEO_HEVCProfileMainStill, OMX_VIDEO_HEVCMainTierLevel51 },
 };
 
 SoftHEVC::SoftHEVC(
@@ -312,10 +313,6 @@ status_t SoftHEVC::initDecoder() {
 
         status = ivdec_api_function(mCodecCtx, (void *)&s_create_ip, (void *)&s_create_op);
 
-        mCodecCtx = (iv_obj_t*)s_create_op.s_ivd_create_op_t.pv_handle;
-        mCodecCtx->pv_fxns = dec_fxns;
-        mCodecCtx->u4_size = sizeof(iv_obj_t);
-
         if (status != IV_SUCCESS) {
             ALOGE("Error in create: 0x%x",
                     s_create_op.s_ivd_create_op_t.u4_error_code);
@@ -323,6 +320,10 @@ status_t SoftHEVC::initDecoder() {
             mCodecCtx = NULL;
             return UNKNOWN_ERROR;
         }
+
+        mCodecCtx = (iv_obj_t*)s_create_op.s_ivd_create_op_t.pv_handle;
+        mCodecCtx->pv_fxns = dec_fxns;
+        mCodecCtx->u4_size = sizeof(iv_obj_t);
     }
 
     /* Reset the plugin state */

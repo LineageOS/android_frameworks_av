@@ -31,9 +31,11 @@
 
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
+#include <media/DataSource.h>
+#include <media/MediaExtractor.h>
+#include <media/MediaSource.h>
 #include <media/ICrypto.h>
 #include <media/IMediaHTTPService.h>
-#include <media/IMediaCodecService.h>
 #include <media/IMediaPlayerService.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ALooper.h>
@@ -41,14 +43,14 @@
 #include <media/stagefright/foundation/AUtils.h>
 #include "include/NuCachedSource2.h"
 #include <media/stagefright/AudioPlayer.h>
-#include <media/stagefright/DataSource.h>
+#include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/JPEGSource.h>
+#include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaExtractor.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/SimpleDecodingSource.h>
 #include <media/stagefright/Utils.h>
@@ -65,7 +67,6 @@
 #include <gui/SurfaceComposerClient.h>
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
-#include <media/omx/1.0/WOmx.h>
 
 using namespace android;
 
@@ -79,6 +80,7 @@ static bool gWriteMP4;
 static bool gDisplayHistogram;
 static bool showProgress = true;
 static String8 gWriteMP4Filename;
+static String8 gComponentNameOverride;
 
 static sp<ANativeWindow> gSurface;
 
@@ -141,14 +143,14 @@ static void displayAVCProfileLevelIfPossible(const sp<MetaData>& meta) {
     }
 }
 
-static void dumpSource(const sp<IMediaSource> &source, const String8 &filename) {
+static void dumpSource(const sp<MediaSource> &source, const String8 &filename) {
     FILE *out = fopen(filename.string(), "wb");
 
     CHECK_EQ((status_t)OK, source->start());
 
     status_t err;
     for (;;) {
-        MediaBuffer *mbuf;
+        MediaBufferBase *mbuf;
         err = source->read(&mbuf);
 
         if (err == INFO_FORMAT_CHANGED) {
@@ -174,13 +176,13 @@ static void dumpSource(const sp<IMediaSource> &source, const String8 &filename) 
     out = NULL;
 }
 
-static void playSource(sp<IMediaSource> &source) {
+static void playSource(sp<MediaSource> &source) {
     sp<MetaData> meta = source->getFormat();
 
     const char *mime;
     CHECK(meta->findCString(kKeyMIMEType, &mime));
 
-    sp<IMediaSource> rawSource;
+    sp<MediaSource> rawSource;
     if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_RAW, mime)) {
         rawSource = source;
     } else {
@@ -192,7 +194,10 @@ static void playSource(sp<IMediaSource> &source) {
             CHECK(!gPreferSoftwareCodec);
             flags |= MediaCodecList::kHardwareCodecsOnly;
         }
-        rawSource = SimpleDecodingSource::Create(source, flags, gSurface);
+        rawSource = SimpleDecodingSource::Create(
+                source, flags, gSurface,
+                gComponentNameOverride.isEmpty() ? nullptr : gComponentNameOverride.c_str(),
+                !gComponentNameOverride.isEmpty());
         if (rawSource == NULL) {
             return;
         }
@@ -229,7 +234,7 @@ static void playSource(sp<IMediaSource> &source) {
         CHECK(meta->findInt64(kKeyDuration, &durationUs));
 
         status_t err;
-        MediaBuffer *buffer;
+        MediaBufferBase *buffer;
         MediaSource::ReadOptions options;
         int64_t seekTimeUs = -1;
         for (;;) {
@@ -248,7 +253,7 @@ static void playSource(sp<IMediaSource> &source) {
                 shouldSeek = true;
             } else {
                 int64_t timestampUs;
-                CHECK(buffer->meta_data()->findInt64(kKeyTime, &timestampUs));
+                CHECK(buffer->meta_data().findInt64(kKeyTime, &timestampUs));
 
                 bool failed = false;
 
@@ -316,7 +321,7 @@ static void playSource(sp<IMediaSource> &source) {
     while (numIterationsLeft-- > 0) {
         long numFrames = 0;
 
-        MediaBuffer *buffer;
+        MediaBufferBase *buffer;
 
         for (;;) {
             int64_t startDecodeUs = getNowUs();
@@ -404,14 +409,14 @@ static void playSource(sp<IMediaSource> &source) {
 ////////////////////////////////////////////////////////////////////////////////
 
 struct DetectSyncSource : public MediaSource {
-    explicit DetectSyncSource(const sp<IMediaSource> &source);
+    explicit DetectSyncSource(const sp<MediaSource> &source);
 
     virtual status_t start(MetaData *params = NULL);
     virtual status_t stop();
     virtual sp<MetaData> getFormat();
 
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options);
+            MediaBufferBase **buffer, const ReadOptions *options);
 
 private:
     enum StreamType {
@@ -421,14 +426,14 @@ private:
         OTHER,
     };
 
-    sp<IMediaSource> mSource;
+    sp<MediaSource> mSource;
     StreamType mStreamType;
     bool mSawFirstIDRFrame;
 
     DISALLOW_EVIL_CONSTRUCTORS(DetectSyncSource);
 };
 
-DetectSyncSource::DetectSyncSource(const sp<IMediaSource> &source)
+DetectSyncSource::DetectSyncSource(const sp<MediaSource> &source)
     : mSource(source),
       mStreamType(OTHER),
       mSawFirstIDRFrame(false) {
@@ -460,7 +465,7 @@ sp<MetaData> DetectSyncSource::getFormat() {
     return mSource->getFormat();
 }
 
-static bool isIDRFrame(MediaBuffer *buffer) {
+static bool isIDRFrame(MediaBufferBase *buffer) {
     const uint8_t *data =
         (const uint8_t *)buffer->data() + buffer->range_offset();
     size_t size = buffer->range_length();
@@ -477,7 +482,7 @@ static bool isIDRFrame(MediaBuffer *buffer) {
 }
 
 status_t DetectSyncSource::read(
-        MediaBuffer **buffer, const ReadOptions *options) {
+        MediaBufferBase **buffer, const ReadOptions *options) {
     for (;;) {
         status_t err = mSource->read(buffer, options);
 
@@ -487,12 +492,12 @@ status_t DetectSyncSource::read(
 
         if (mStreamType == AVC) {
             bool isIDR = isIDRFrame(*buffer);
-            (*buffer)->meta_data()->setInt32(kKeyIsSyncFrame, isIDR);
+            (*buffer)->meta_data().setInt32(kKeyIsSyncFrame, isIDR);
             if (isIDR) {
                 mSawFirstIDRFrame = true;
             }
         } else {
-            (*buffer)->meta_data()->setInt32(kKeyIsSyncFrame, true);
+            (*buffer)->meta_data().setInt32(kKeyIsSyncFrame, true);
         }
 
         if (mStreamType != AVC || mSawFirstIDRFrame) {
@@ -510,7 +515,7 @@ status_t DetectSyncSource::read(
 ////////////////////////////////////////////////////////////////////////////////
 
 static void writeSourcesToMP4(
-        Vector<sp<IMediaSource> > &sources, bool syncInfoPresent) {
+        Vector<sp<MediaSource> > &sources, bool syncInfoPresent) {
 #if 0
     sp<MPEG4Writer> writer =
         new MPEG4Writer(gWriteMP4Filename.string());
@@ -528,7 +533,7 @@ static void writeSourcesToMP4(
     writer->setMaxFileDuration(60000000ll);
 
     for (size_t i = 0; i < sources.size(); ++i) {
-        sp<IMediaSource> source = sources.editItemAt(i);
+        sp<MediaSource> source = sources.editItemAt(i);
 
         CHECK_EQ(writer->addSource(
                     syncInfoPresent ? source : new DetectSyncSource(source)),
@@ -545,7 +550,7 @@ static void writeSourcesToMP4(
     writer->stop();
 }
 
-static void performSeekTest(const sp<IMediaSource> &source) {
+static void performSeekTest(const sp<MediaSource> &source) {
     CHECK_EQ((status_t)OK, source->start());
 
     int64_t durationUs;
@@ -557,7 +562,7 @@ static void performSeekTest(const sp<IMediaSource> &source) {
         options.setSeekTo(
                 seekTimeUs, MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC);
 
-        MediaBuffer *buffer;
+        MediaBufferBase *buffer;
         status_t err;
         for (;;) {
             err = source->read(&buffer, &options);
@@ -586,7 +591,7 @@ static void performSeekTest(const sp<IMediaSource> &source) {
 
         if (err == OK) {
             int64_t timeUs;
-            CHECK(buffer->meta_data()->findInt64(kKeyTime, &timeUs));
+            CHECK(buffer->meta_data().findInt64(kKeyTime, &timeUs));
 
             printf("%" PRId64 "\t%" PRId64 "\t%" PRId64 "\n",
                    seekTimeUs, timeUs, seekTimeUs - timeUs);
@@ -617,6 +622,7 @@ static void usage(const char *me) {
     fprintf(stderr, "       -o playback audio\n");
     fprintf(stderr, "       -w(rite) filename (write to .mp4 file)\n");
     fprintf(stderr, "       -k seek test\n");
+    fprintf(stderr, "       -N(ame) of the component\n");
     fprintf(stderr, "       -x display a histogram of decoding times/fps "
                     "(video only)\n");
     fprintf(stderr, "       -q don't show progress indicator\n");
@@ -702,7 +708,7 @@ int main(int argc, char **argv) {
     sp<ALooper> looper;
 
     int res;
-    while ((res = getopt(argc, argv, "haqn:lm:b:ptsrow:kxSTd:D:")) >= 0) {
+    while ((res = getopt(argc, argv, "haqn:lm:b:ptsrow:kN:xSTd:D:")) >= 0) {
         switch (res) {
             case 'a':
             {
@@ -728,6 +734,12 @@ int main(int argc, char **argv) {
                 dumpPCMStream = true;
                 audioOnly = true;
                 dumpStreamFilename.setTo(optarg);
+                break;
+            }
+
+            case 'N':
+            {
+                gComponentNameOverride.setTo(optarg);
                 break;
             }
 
@@ -881,7 +893,7 @@ int main(int argc, char **argv) {
                 VideoFrame *frame = (VideoFrame *)mem->pointer();
 
                 CHECK_EQ(writeJpegFile("/sdcard/out.jpg",
-                            (uint8_t *)frame + sizeof(VideoFrame),
+                            frame->getFlattenedData(),
                             frame->mWidth, frame->mHeight), 0);
             }
 
@@ -909,37 +921,24 @@ int main(int argc, char **argv) {
     }
 
     if (listComponents) {
-        sp<IOMX> omx;
-        if (property_get_bool("persist.media.treble_omx", true)) {
-            using namespace ::android::hardware::media::omx::V1_0;
-            sp<IOmx> tOmx = IOmx::getService();
+        using ::android::hardware::hidl_vec;
+        using ::android::hardware::hidl_string;
+        using namespace ::android::hardware::media::omx::V1_0;
+        sp<IOmx> omx = IOmx::getService();
+        CHECK(omx.get() != nullptr);
 
-            CHECK(tOmx.get() != NULL);
-
-            omx = new utils::LWOmx(tOmx);
-        } else {
-            sp<IServiceManager> sm = defaultServiceManager();
-            sp<IBinder> binder = sm->getService(String16("media.codec"));
-            sp<IMediaCodecService> service = interface_cast<IMediaCodecService>(binder);
-
-            CHECK(service.get() != NULL);
-
-            omx = service->getOMX();
-        }
-        CHECK(omx.get() != NULL);
-
-        List<IOMX::ComponentInfo> list;
-        omx->listNodes(&list);
-
-        for (List<IOMX::ComponentInfo>::iterator it = list.begin();
-             it != list.end(); ++it) {
-            printf("%s\t Roles: ", (*it).mName.string());
-            for (List<String8>::iterator itRoles = (*it).mRoles.begin() ;
-                    itRoles != (*it).mRoles.end() ; ++itRoles) {
-                printf("%s\t", (*itRoles).string());
-            }
-            printf("\n");
-        }
+        hidl_vec<IOmx::ComponentInfo> nodeList;
+        auto transStatus = omx->listNodes([](
+                const auto& status, const auto& nodeList) {
+                    CHECK(status == Status::OK);
+                    for (const auto& info : nodeList) {
+                        printf("%s\t Roles: ", info.mName.c_str());
+                        for (const auto& role : info.mRoles) {
+                            printf("%s\t", role.c_str());
+                        }
+                    }
+                });
+        CHECK(transStatus.isOk());
     }
 
     sp<SurfaceComposerClient> composerClient;
@@ -960,10 +959,10 @@ int main(int argc, char **argv) {
             CHECK(control != NULL);
             CHECK(control->isValid());
 
-            SurfaceComposerClient::openGlobalTransaction();
-            CHECK_EQ(control->setLayer(INT_MAX), (status_t)OK);
-            CHECK_EQ(control->show(), (status_t)OK);
-            SurfaceComposerClient::closeGlobalTransaction();
+            SurfaceComposerClient::Transaction{}
+                    .setLayer(control, INT_MAX)
+                    .show(control)
+                    .apply();
 
             gSurface = control->getSurface();
             CHECK(gSurface != NULL);
@@ -988,7 +987,7 @@ int main(int argc, char **argv) {
         const char *filename = argv[k];
 
         sp<DataSource> dataSource =
-            DataSource::CreateFromURI(NULL /* httpService */, filename);
+            DataSourceFactory::CreateFromURI(NULL /* httpService */, filename);
 
         if (strncasecmp(filename, "sine:", 5) && dataSource == NULL) {
             fprintf(stderr, "Unable to create data source.\n");
@@ -1002,8 +1001,8 @@ int main(int argc, char **argv) {
             isJPEG = true;
         }
 
-        Vector<sp<IMediaSource> > mediaSources;
-        sp<IMediaSource> mediaSource;
+        Vector<sp<MediaSource> > mediaSources;
+        sp<MediaSource> mediaSource;
 
         if (isJPEG) {
             mediaSource = new JPEGSource(dataSource);
@@ -1022,7 +1021,7 @@ int main(int argc, char **argv) {
                 mediaSources.push(mediaSource);
             }
         } else {
-            sp<IMediaExtractor> extractor = MediaExtractor::Create(dataSource);
+            sp<IMediaExtractor> extractor = MediaExtractorFactory::Create(dataSource);
 
             if (extractor == NULL) {
                 fprintf(stderr, "could not create extractor.\n");
@@ -1049,7 +1048,8 @@ int main(int argc, char **argv) {
                 bool haveAudio = false;
                 bool haveVideo = false;
                 for (size_t i = 0; i < numTracks; ++i) {
-                    sp<IMediaSource> source = extractor->getTrack(i);
+                    sp<MediaSource> source = CreateMediaSourceFromIMediaSource(
+                            extractor->getTrack(i));
                     if (source == nullptr) {
                         fprintf(stderr, "skip NULL track %zu, track count %zu.\n", i, numTracks);
                         continue;
@@ -1084,7 +1084,7 @@ int main(int argc, char **argv) {
                             i, MediaExtractor::kIncludeExtensiveMetaData);
 
                     if (meta == NULL) {
-                        break;
+                        continue;
                     }
                     const char *mime;
                     meta->findCString(kKeyMIMEType, &mime);
@@ -1115,7 +1115,7 @@ int main(int argc, char **argv) {
                            thumbTimeUs, thumbTimeUs / 1E6);
                 }
 
-                mediaSource = extractor->getTrack(i);
+                mediaSource = CreateMediaSourceFromIMediaSource(extractor->getTrack(i));
                 if (mediaSource == nullptr) {
                     fprintf(stderr, "skip NULL track %zu, total tracks %zu.\n", i, numTracks);
                     return -1;
@@ -1128,7 +1128,7 @@ int main(int argc, char **argv) {
         } else if (dumpStream) {
             dumpSource(mediaSource, dumpStreamFilename);
         } else if (dumpPCMStream) {
-            sp<IMediaSource> decSource = SimpleDecodingSource::Create(mediaSource);
+            sp<MediaSource> decSource = SimpleDecodingSource::Create(mediaSource);
             dumpSource(decSource, dumpStreamFilename);
         } else if (seekTest) {
             performSeekTest(mediaSource);

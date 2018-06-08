@@ -1,4 +1,4 @@
-/*
+ /*
  * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,7 +43,7 @@ class SharedRingBuffer;
 class AAudioServiceStreamShared : public AAudioServiceStreamBase {
 
 public:
-    AAudioServiceStreamShared(android::AAudioService &aAudioService);
+    explicit AAudioServiceStreamShared(android::AAudioService &aAudioService);
     virtual ~AAudioServiceStreamShared() = default;
 
     static std::string dumpHeader();
@@ -80,12 +80,14 @@ public:
     }
 
     void incrementXRunCount() {
-        mXRunCount++;
+        sendXRunCount(++mXRunCount);
     }
 
     int32_t getXRunCount() const {
         return mXRunCount.load();
     }
+
+    const char *getTypeText() const override { return "Shared"; }
 
 protected:
 

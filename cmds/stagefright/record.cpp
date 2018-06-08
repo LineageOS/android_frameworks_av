@@ -17,6 +17,7 @@
 #include "SineSource.h"
 
 #include <binder/ProcessState.h>
+#include <media/MediaExtractor.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -27,7 +28,7 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaCodecSource.h>
 #include <media/stagefright/MetaData.h>
-#include <media/stagefright/MediaExtractor.h>
+#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MPEG4Writer.h>
 #include <media/stagefright/SimpleDecodingSource.h>
 #include <media/MediaPlayerInterface.h>
@@ -120,7 +121,7 @@ sp<MediaSource> createSource(const char *filename) {
     sp<MediaSource> source;
 
     sp<MediaExtractor> extractor =
-        MediaExtractor::Create(new FileSource(filename));
+        MediaExtractorFactory::Create(new FileSource(filename));
     if (extractor == NULL) {
         return NULL;
     }
@@ -320,14 +321,14 @@ int main(int /* argc */, char ** /* argv */) {
     looper->setName("record");
     looper->start();
 
-    sp<IMediaSource> encoder =
+    sp<MediaSource> encoder =
         MediaCodecSource::Create(looper, encMeta, audioSource);
 
     encoder->start();
 
     int32_t n = 0;
     status_t err;
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     while ((err = encoder->read(&buffer)) == OK) {
         printf(".");
         fflush(stdout);

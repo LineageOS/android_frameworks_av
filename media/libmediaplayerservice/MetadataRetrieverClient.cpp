@@ -31,10 +31,11 @@
 #include <binder/MemoryHeapBase.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
+#include <media/DataSource.h>
 #include <media/IMediaHTTPService.h>
 #include <media/MediaMetadataRetrieverInterface.h>
 #include <media/MediaPlayerInterface.h>
-#include <media/stagefright/DataSource.h>
+#include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/Utils.h>
 #include <private/media/VideoFrame.h>
 #include "MetadataRetrieverClient.h"
@@ -47,7 +48,6 @@ MetadataRetrieverClient::MetadataRetrieverClient(pid_t pid)
 {
     ALOGV("MetadataRetrieverClient constructor pid(%d)", pid);
     mPid = pid;
-    mThumbnail = NULL;
     mAlbumArt = NULL;
     mRetriever = NULL;
 }
@@ -76,7 +76,6 @@ void MetadataRetrieverClient::disconnect()
     ALOGV("disconnect from pid %d", mPid);
     Mutex::Autolock lock(mLock);
     mRetriever.clear();
-    mThumbnail.clear();
     mAlbumArt.clear();
     IPCThreadState::self()->flushCommands();
 }
@@ -180,7 +179,7 @@ status_t MetadataRetrieverClient::setDataSource(
     ALOGV("setDataSource(IDataSource)");
     Mutex::Autolock lock(mLock);
 
-    sp<DataSource> dataSource = DataSource::CreateFromIDataSource(source);
+    sp<DataSource> dataSource = CreateDataSourceFromIDataSource(source);
     player_type playerType =
         MediaPlayerFactory::getPlayerType(NULL /* client */, dataSource);
     ALOGV("player type = %d", playerType);
@@ -200,34 +199,74 @@ sp<IMemory> MetadataRetrieverClient::getFrameAtTime(
             (long long)timeUs, option, colorFormat, metaOnly);
     Mutex::Autolock lock(mLock);
     Mutex::Autolock glock(sLock);
-    mThumbnail.clear();
     if (mRetriever == NULL) {
         ALOGE("retriever is not initialized");
         return NULL;
     }
-    VideoFrame *frame = mRetriever->getFrameAtTime(
-            timeUs, option, colorFormat, metaOnly);
+    sp<IMemory> frame = mRetriever->getFrameAtTime(timeUs, option, colorFormat, metaOnly);
     if (frame == NULL) {
         ALOGE("failed to capture a video frame");
         return NULL;
     }
-    size_t size = frame->getFlattenedSize();
-    sp<MemoryHeapBase> heap = new MemoryHeapBase(size, 0, "MetadataRetrieverClient");
-    if (heap == NULL) {
-        ALOGE("failed to create MemoryDealer");
-        delete frame;
+    return frame;
+}
+
+sp<IMemory> MetadataRetrieverClient::getImageAtIndex(
+        int index, int colorFormat, bool metaOnly, bool thumbnail) {
+    ALOGV("getImageAtIndex: index(%d) colorFormat(%d), metaOnly(%d) thumbnail(%d)",
+            index, colorFormat, metaOnly, thumbnail);
+    Mutex::Autolock lock(mLock);
+    Mutex::Autolock glock(sLock);
+    if (mRetriever == NULL) {
+        ALOGE("retriever is not initialized");
         return NULL;
     }
-    mThumbnail = new MemoryBase(heap, 0, size);
-    if (mThumbnail == NULL) {
-        ALOGE("not enough memory for VideoFrame size=%zu", size);
-        delete frame;
+    sp<IMemory> frame = mRetriever->getImageAtIndex(index, colorFormat, metaOnly, thumbnail);
+    if (frame == NULL) {
+        ALOGE("failed to extract image");
         return NULL;
     }
-    VideoFrame *frameCopy = static_cast<VideoFrame *>(mThumbnail->pointer());
-    frameCopy->copyFlattened(*frame);
-    delete frame;  // Fix memory leakage
-    return mThumbnail;
+    return frame;
+}
+
+sp<IMemory> MetadataRetrieverClient::getImageRectAtIndex(
+        int index, int colorFormat, int left, int top, int right, int bottom) {
+    ALOGV("getImageRectAtIndex: index(%d) colorFormat(%d), rect {%d, %d, %d, %d}",
+            index, colorFormat, left, top, right, bottom);
+    Mutex::Autolock lock(mLock);
+    Mutex::Autolock glock(sLock);
+    if (mRetriever == NULL) {
+        ALOGE("retriever is not initialized");
+        return NULL;
+    }
+    sp<IMemory> frame = mRetriever->getImageRectAtIndex(
+            index, colorFormat, left, top, right, bottom);
+    if (frame == NULL) {
+        ALOGE("failed to extract image");
+        return NULL;
+    }
+    return frame;
+}
+
+status_t MetadataRetrieverClient::getFrameAtIndex(
+            std::vector<sp<IMemory> > *frames,
+            int frameIndex, int numFrames, int colorFormat, bool metaOnly) {
+    ALOGV("getFrameAtIndex: frameIndex(%d), numFrames(%d), colorFormat(%d), metaOnly(%d)",
+            frameIndex, numFrames, colorFormat, metaOnly);
+    Mutex::Autolock lock(mLock);
+    Mutex::Autolock glock(sLock);
+    if (mRetriever == NULL) {
+        ALOGE("retriever is not initialized");
+        return INVALID_OPERATION;
+    }
+
+    status_t err = mRetriever->getFrameAtIndex(
+            frames, frameIndex, numFrames, colorFormat, metaOnly);
+    if (err != OK) {
+        frames->clear();
+        return err;
+    }
+    return OK;
 }
 
 sp<IMemory> MetadataRetrieverClient::extractAlbumArt()

@@ -37,6 +37,7 @@ cc_library_shared {
     srcs: [
         "NdkMediaCodec.cpp",
         "NdkMediaCrypto.cpp",
+        "NdkMediaDataSource.cpp",
         "NdkMediaExtractor.cpp",
         "NdkMediaFormat.cpp",
         "NdkMediaMuxer.cpp",
@@ -67,9 +68,10 @@ cc_library_shared {
     shared_libs: [
         "libbinder",
         "libmedia",
+        "libmedia_omx",
         "libmedia_jni",
         "libmediadrm",
-        "libskia",
+        "libmediaextractor",
         "libstagefright",
         "libstagefright_foundation",
         "liblog",

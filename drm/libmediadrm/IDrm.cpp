@@ -19,10 +19,10 @@
 #include <utils/Log.h>
 
 #include <binder/Parcel.h>
-#include <media/IDrm.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
+#include <mediadrm/IDrm.h>
 
 namespace android {
 
@@ -46,6 +46,7 @@ enum {
     GET_PROPERTY_BYTE_ARRAY,
     SET_PROPERTY_STRING,
     SET_PROPERTY_BYTE_ARRAY,
+    GET_METRICS,
     SET_CIPHER_ALGORITHM,
     SET_MAC_ALGORITHM,
     ENCRYPT,
@@ -55,7 +56,12 @@ enum {
     VERIFY,
     SET_LISTENER,
     GET_SECURE_STOP,
-    RELEASE_ALL_SECURE_STOPS
+    REMOVE_ALL_SECURE_STOPS,
+    GET_HDCP_LEVELS,
+    GET_NUMBER_OF_SESSIONS,
+    GET_SECURITY_LEVEL,
+    REMOVE_SECURE_STOP,
+    GET_SECURE_STOP_IDS
 };
 
 struct BpDrm : public BpInterface<IDrm> {
@@ -114,9 +120,11 @@ struct BpDrm : public BpInterface<IDrm> {
         return reply.readInt32();
     }
 
-    virtual status_t openSession(Vector<uint8_t> &sessionId) {
+    virtual status_t openSession(DrmPlugin::SecurityLevel securityLevel,
+            Vector<uint8_t> &sessionId) {
         Parcel data, reply;
         data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+        data.writeInt32(securityLevel);
 
         status_t status = remote()->transact(OPEN_SESSION, data, &reply);
         if (status != OK) {
@@ -297,6 +305,25 @@ struct BpDrm : public BpInterface<IDrm> {
         return reply.readInt32();
     }
 
+    virtual status_t getSecureStopIds(List<Vector<uint8_t> > &secureStopIds) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(GET_SECURE_STOP_IDS, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
+        secureStopIds.clear();
+        uint32_t count = reply.readInt32();
+        for (size_t i = 0; i < count; i++) {
+            Vector<uint8_t> secureStopId;
+            readVector(reply, secureStopId);
+            secureStopIds.push_back(secureStopId);
+        }
+        return reply.readInt32();
+    }
+
     virtual status_t getSecureStop(Vector<uint8_t> const &ssid, Vector<uint8_t> &secureStop) {
         Parcel data, reply;
         data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
@@ -324,11 +351,24 @@ struct BpDrm : public BpInterface<IDrm> {
         return reply.readInt32();
     }
 
-    virtual status_t releaseAllSecureStops() {
+    virtual status_t removeSecureStop(Vector<uint8_t> const &ssid) {
         Parcel data, reply;
         data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
 
-        status_t status = remote()->transact(RELEASE_ALL_SECURE_STOPS, data, &reply);
+        writeVector(data, ssid);
+        status_t status = remote()->transact(REMOVE_SECURE_STOP, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
+        return reply.readInt32();
+    }
+
+    virtual status_t removeAllSecureStops() {
+        Parcel data, reply;
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(REMOVE_ALL_SECURE_STOPS, data, &reply);
         if (status != OK) {
             return status;
         }
@@ -347,6 +387,65 @@ struct BpDrm : public BpInterface<IDrm> {
         }
 
         value = reply.readString8();
+        return reply.readInt32();
+    }
+
+    virtual status_t getHdcpLevels(DrmPlugin::HdcpLevel *connected,
+            DrmPlugin::HdcpLevel *max) const {
+        Parcel data, reply;
+
+        if (connected == NULL || max == NULL) {
+            return BAD_VALUE;
+        }
+
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(GET_HDCP_LEVELS, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
+        *connected = static_cast<DrmPlugin::HdcpLevel>(reply.readInt32());
+        *max = static_cast<DrmPlugin::HdcpLevel>(reply.readInt32());
+        return reply.readInt32();
+    }
+
+    virtual status_t getNumberOfSessions(uint32_t *open, uint32_t *max) const {
+        Parcel data, reply;
+
+        if (open == NULL || max == NULL) {
+            return BAD_VALUE;
+        }
+
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(GET_NUMBER_OF_SESSIONS, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
+        *open = reply.readInt32();
+        *max = reply.readInt32();
+        return reply.readInt32();
+    }
+
+    virtual status_t getSecurityLevel(Vector<uint8_t> const &sessionId,
+            DrmPlugin::SecurityLevel *level) const {
+        Parcel data, reply;
+
+        if (level == NULL) {
+            return BAD_VALUE;
+        }
+
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        writeVector(data, sessionId);
+        status_t status = remote()->transact(GET_SECURITY_LEVEL, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
+        *level = static_cast<DrmPlugin::SecurityLevel>(reply.readInt32());
         return reply.readInt32();
     }
 
@@ -393,6 +492,35 @@ struct BpDrm : public BpInterface<IDrm> {
         return reply.readInt32();
     }
 
+    virtual status_t getMetrics(os::PersistableBundle *metrics) {
+        if (metrics == NULL) {
+            return BAD_VALUE;
+        }
+        Parcel data, reply;
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(GET_METRICS, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+        // The reply data is ordered as
+        // 1) 32 bit integer reply followed by
+        // 2) Serialized PersistableBundle containing metrics.
+        status_t reply_status;
+        if (reply.readInt32(&reply_status) != OK
+           || reply_status != OK) {
+          ALOGE("Failed to read getMetrics response code from parcel. %d",
+                reply_status);
+          return reply_status;
+        }
+
+        status = metrics->readFromParcel(&reply);
+        if (status != OK) {
+            ALOGE("Failed to read metrics from parcel. %d", status);
+            return status;
+        }
+        return reply_status;
+    }
 
     virtual status_t setCipherAlgorithm(Vector<uint8_t> const &sessionId,
                                         String8 const &algorithm) {
@@ -615,8 +743,10 @@ status_t BnDrm::onTransact(
         case OPEN_SESSION:
         {
             CHECK_INTERFACE(IDrm, data, reply);
+            DrmPlugin::SecurityLevel level =
+                    static_cast<DrmPlugin::SecurityLevel>(data.readInt32());
             Vector<uint8_t> sessionId;
-            status_t result = openSession(sessionId);
+            status_t result = openSession(level, sessionId);
             writeVector(reply, sessionId);
             reply->writeInt32(result);
             return OK;
@@ -761,6 +891,24 @@ status_t BnDrm::onTransact(
             return OK;
         }
 
+        case GET_SECURE_STOP_IDS:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            List<Vector<uint8_t> > secureStopIds;
+            status_t result = getSecureStopIds(secureStopIds);
+            size_t count = secureStopIds.size();
+            reply->writeInt32(count);
+            List<Vector<uint8_t> >::iterator iter = secureStopIds.begin();
+            while(iter != secureStopIds.end()) {
+                size_t size = iter->size();
+                reply->writeInt32(size);
+                reply->write(iter->array(), iter->size());
+                iter++;
+            }
+            reply->writeInt32(result);
+            return OK;
+        }
+
         case GET_SECURE_STOP:
         {
             CHECK_INTERFACE(IDrm, data, reply);
@@ -781,10 +929,54 @@ status_t BnDrm::onTransact(
             return OK;
         }
 
-        case RELEASE_ALL_SECURE_STOPS:
+        case REMOVE_SECURE_STOP:
         {
             CHECK_INTERFACE(IDrm, data, reply);
-            reply->writeInt32(releaseAllSecureStops());
+            Vector<uint8_t> ssid;
+            readVector(data, ssid);
+            reply->writeInt32(removeSecureStop(ssid));
+            return OK;
+        }
+
+        case REMOVE_ALL_SECURE_STOPS:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            reply->writeInt32(removeAllSecureStops());
+            return OK;
+        }
+
+        case GET_HDCP_LEVELS:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            DrmPlugin::HdcpLevel connected = DrmPlugin::kHdcpLevelUnknown;
+            DrmPlugin::HdcpLevel max = DrmPlugin::kHdcpLevelUnknown;
+            status_t result = getHdcpLevels(&connected, &max);
+            reply->writeInt32(connected);
+            reply->writeInt32(max);
+            reply->writeInt32(result);
+            return OK;
+        }
+
+        case GET_NUMBER_OF_SESSIONS:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            uint32_t open = 0, max = 0;
+            status_t result = getNumberOfSessions(&open, &max);
+            reply->writeInt32(open);
+            reply->writeInt32(max);
+            reply->writeInt32(result);
+            return OK;
+        }
+
+        case GET_SECURITY_LEVEL:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            Vector<uint8_t> sessionId;
+            readVector(data, sessionId);
+            DrmPlugin::SecurityLevel level = DrmPlugin::kSecurityLevelUnknown;
+            status_t result = getSecurityLevel(sessionId, &level);
+            reply->writeInt32(level);
+            reply->writeInt32(result);
             return OK;
         }
 
@@ -827,6 +1019,24 @@ status_t BnDrm::onTransact(
             readVector(data, value);
             reply->writeInt32(setPropertyByteArray(name, value));
             return OK;
+        }
+
+        case GET_METRICS:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+
+            os::PersistableBundle metrics;
+            status_t result = getMetrics(&metrics);
+            // The reply data is ordered as
+            // 1) 32 bit integer reply followed by
+            // 2) Serialized PersistableBundle containing metrics.
+            // Only write the metrics if the getMetrics result was
+            // OK and we successfully added the status to reply.
+            status_t parcel_result = reply->writeInt32(result);
+            if (result == OK && parcel_result == OK) {
+                parcel_result = metrics.writeToParcel(reply);
+            }
+            return parcel_result;
         }
 
         case SET_CIPHER_ALGORITHM:

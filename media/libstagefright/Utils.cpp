@@ -27,7 +27,6 @@
 #include "include/ESDS.h"
 #include "include/HevcUtils.h"
 
-#include <arpa/inet.h>
 #include <cutils/properties.h>
 #include <media/openmax/OMX_Audio.h>
 #include <media/openmax/OMX_Video.h>
@@ -37,6 +36,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALookup.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/AudioSystem.h>
@@ -46,39 +46,6 @@
 #include <system/audio.h>
 
 namespace android {
-
-uint16_t U16_AT(const uint8_t *ptr) {
-    return ptr[0] << 8 | ptr[1];
-}
-
-uint32_t U32_AT(const uint8_t *ptr) {
-    return ptr[0] << 24 | ptr[1] << 16 | ptr[2] << 8 | ptr[3];
-}
-
-uint64_t U64_AT(const uint8_t *ptr) {
-    return ((uint64_t)U32_AT(ptr)) << 32 | U32_AT(ptr + 4);
-}
-
-uint16_t U16LE_AT(const uint8_t *ptr) {
-    return ptr[0] | (ptr[1] << 8);
-}
-
-uint32_t U32LE_AT(const uint8_t *ptr) {
-    return ptr[3] << 24 | ptr[2] << 16 | ptr[1] << 8 | ptr[0];
-}
-
-uint64_t U64LE_AT(const uint8_t *ptr) {
-    return ((uint64_t)U32LE_AT(ptr + 4)) << 32 | U32LE_AT(ptr);
-}
-
-// XXX warning: these won't work on big-endian host.
-uint64_t ntoh64(uint64_t x) {
-    return ((uint64_t)ntohl(x & 0xffffffff) << 32) | ntohl(x >> 32);
-}
-
-uint64_t hton64(uint64_t x) {
-    return ((uint64_t)htonl(x & 0xffffffff) << 32) | htonl(x >> 32);
-}
 
 static status_t copyNALUToABuffer(sp<ABuffer> *buffer, const uint8_t *ptr, size_t length) {
     if (((*buffer)->size() + 4 + length) > ((*buffer)->capacity() - (*buffer)->offset())) {
@@ -187,6 +154,7 @@ static void parseAacProfileFromCsd(const sp<ABuffer> &csd, sp<AMessage> &format)
         { 23, OMX_AUDIO_AACObjectLD       },
         { 29, OMX_AUDIO_AACObjectHE_PS    },
         { 39, OMX_AUDIO_AACObjectELD      },
+        { 42, OMX_AUDIO_AACObjectXHE      },
     };
 
     OMX_AUDIO_AACPROFILETYPE profile;
@@ -336,6 +304,8 @@ static void parseHevcProfileLevelFromHvcc(const uint8_t *ptr, size_t size, sp<AM
     const static ALookup<uint8_t, OMX_VIDEO_HEVCPROFILETYPE> profiles {
         { 1, OMX_VIDEO_HEVCProfileMain   },
         { 2, OMX_VIDEO_HEVCProfileMain10 },
+        // use Main for Main Still Picture decoding
+        { 3, OMX_VIDEO_HEVCProfileMain },
     };
 
     // set profile & level if they are recognized
@@ -343,6 +313,7 @@ static void parseHevcProfileLevelFromHvcc(const uint8_t *ptr, size_t size, sp<AM
     OMX_VIDEO_HEVCLEVELTYPE codecLevel;
     if (!profiles.map(profile, &codecProfile)) {
         if (ptr[2] & 0x40 /* general compatibility flag 1 */) {
+            // Note that this case covers Main Still Picture too
             codecProfile = OMX_VIDEO_HEVCProfileMain;
         } else if (ptr[2] & 0x20 /* general compatibility flag 2 */) {
             codecProfile = OMX_VIDEO_HEVCProfileMain10;
@@ -672,7 +643,8 @@ status_t convertMetaDataToMessage(
         msg->setString("language", lang);
     }
 
-    if (!strncasecmp("video/", mime, 6)) {
+    if (!strncasecmp("video/", mime, 6) ||
+            !strncasecmp("image/", mime, 6)) {
         int32_t width, height;
         if (!meta->findInt32(kKeyWidth, &width)
                 || !meta->findInt32(kKeyHeight, &height)) {
@@ -694,6 +666,23 @@ status_t convertMetaDataToMessage(
                 && meta->findInt32(kKeySARHeight, &sarHeight)) {
             msg->setInt32("sar-width", sarWidth);
             msg->setInt32("sar-height", sarHeight);
+        }
+
+        if (!strncasecmp("image/", mime, 6)) {
+            int32_t tileWidth, tileHeight, gridRows, gridCols;
+            if (meta->findInt32(kKeyTileWidth, &tileWidth)
+                    && meta->findInt32(kKeyTileHeight, &tileHeight)
+                    && meta->findInt32(kKeyGridRows, &gridRows)
+                    && meta->findInt32(kKeyGridCols, &gridCols)) {
+                msg->setInt32("tile-width", tileWidth);
+                msg->setInt32("tile-height", tileHeight);
+                msg->setInt32("grid-rows", gridRows);
+                msg->setInt32("grid-cols", gridCols);
+            }
+            int32_t isPrimary;
+            if (meta->findInt32(kKeyTrackIsDefault, &isPrimary) && isPrimary) {
+                msg->setInt32("is-default", 1);
+            }
         }
 
         int32_t colorFormat;
@@ -1327,7 +1316,7 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         meta->setCString(kKeyMediaLanguage, lang.c_str());
     }
 
-    if (mime.startsWith("video/")) {
+    if (mime.startsWith("video/") || mime.startsWith("image/")) {
         int32_t width;
         int32_t height;
         if (msg->findInt32("width", &width) && msg->findInt32("height", &height)) {
@@ -1349,6 +1338,26 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
                 && msg->findInt32("display-height", &displayHeight)) {
             meta->setInt32(kKeyDisplayWidth, displayWidth);
             meta->setInt32(kKeyDisplayHeight, displayHeight);
+        }
+
+        if (mime.startsWith("image/")){
+            int32_t isPrimary;
+            if (msg->findInt32("is-default", &isPrimary) && isPrimary) {
+                meta->setInt32(kKeyTrackIsDefault, 1);
+            }
+            int32_t tileWidth, tileHeight, gridRows, gridCols;
+            if (msg->findInt32("tile-width", &tileWidth)) {
+                meta->setInt32(kKeyTileWidth, tileWidth);
+            }
+            if (msg->findInt32("tile-height", &tileHeight)) {
+                meta->setInt32(kKeyTileHeight, tileHeight);
+            }
+            if (msg->findInt32("grid-rows", &gridRows)) {
+                meta->setInt32(kKeyGridRows, gridRows);
+            }
+            if (msg->findInt32("grid-cols", &gridCols)) {
+                meta->setInt32(kKeyGridCols, gridCols);
+            }
         }
 
         int32_t colorFormat;
@@ -1467,7 +1476,8 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             // for transporting the CSD to muxers.
             reassembleESDS(csd0, esds.data());
             meta->setData(kKeyESDS, kKeyESDS, esds.data(), esds.size());
-        } else if (mime == MEDIA_MIMETYPE_VIDEO_HEVC) {
+        } else if (mime == MEDIA_MIMETYPE_VIDEO_HEVC ||
+                   mime == MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC) {
             std::vector<uint8_t> hvcc(csd0size + 1024);
             size_t outsize = reassembleHVCC(csd0, hvcc.data(), hvcc.size(), 4);
             meta->setData(kKeyHVCC, kKeyHVCC, hvcc.data(), outsize);
@@ -1601,6 +1611,7 @@ static const struct aac_format_conv_t profileLookup[] = {
     { OMX_AUDIO_AACObjectLD,          AUDIO_FORMAT_AAC_LD},
     { OMX_AUDIO_AACObjectHE_PS,       AUDIO_FORMAT_AAC_HE_V2},
     { OMX_AUDIO_AACObjectELD,         AUDIO_FORMAT_AAC_ELD},
+    { OMX_AUDIO_AACObjectXHE,         AUDIO_FORMAT_AAC_XHE},
     { OMX_AUDIO_AACObjectNull,        AUDIO_FORMAT_AAC},
 };
 
@@ -1809,41 +1820,17 @@ void readFromAMessage(
 }
 
 void writeToAMessage(const sp<AMessage> &msg, const BufferingSettings &buffering) {
-    msg->setInt32("init-mode", buffering.mInitialBufferingMode);
-    msg->setInt32("rebuffer-mode", buffering.mRebufferingMode);
-    msg->setInt32("init-ms", buffering.mInitialWatermarkMs);
-    msg->setInt32("init-kb", buffering.mInitialWatermarkKB);
-    msg->setInt32("rebuffer-low-ms", buffering.mRebufferingWatermarkLowMs);
-    msg->setInt32("rebuffer-high-ms", buffering.mRebufferingWatermarkHighMs);
-    msg->setInt32("rebuffer-low-kb", buffering.mRebufferingWatermarkLowKB);
-    msg->setInt32("rebuffer-high-kb", buffering.mRebufferingWatermarkHighKB);
+    msg->setInt32("init-ms", buffering.mInitialMarkMs);
+    msg->setInt32("resume-playback-ms", buffering.mResumePlaybackMarkMs);
 }
 
 void readFromAMessage(const sp<AMessage> &msg, BufferingSettings *buffering /* nonnull */) {
     int32_t value;
-    if (msg->findInt32("init-mode", &value)) {
-        buffering->mInitialBufferingMode = (BufferingMode)value;
-    }
-    if (msg->findInt32("rebuffer-mode", &value)) {
-        buffering->mRebufferingMode = (BufferingMode)value;
-    }
     if (msg->findInt32("init-ms", &value)) {
-        buffering->mInitialWatermarkMs = value;
+        buffering->mInitialMarkMs = value;
     }
-    if (msg->findInt32("init-kb", &value)) {
-        buffering->mInitialWatermarkKB = value;
-    }
-    if (msg->findInt32("rebuffer-low-ms", &value)) {
-        buffering->mRebufferingWatermarkLowMs = value;
-    }
-    if (msg->findInt32("rebuffer-high-ms", &value)) {
-        buffering->mRebufferingWatermarkHighMs = value;
-    }
-    if (msg->findInt32("rebuffer-low-kb", &value)) {
-        buffering->mRebufferingWatermarkLowKB = value;
-    }
-    if (msg->findInt32("rebuffer-high-kb", &value)) {
-        buffering->mRebufferingWatermarkHighKB = value;
+    if (msg->findInt32("resume-playback-ms", &value)) {
+        buffering->mResumePlaybackMarkMs = value;
     }
 }
 
@@ -1877,14 +1864,6 @@ AString nameForFd(int fd) {
         result.append(buffer);
     }
     return result;
-}
-
-void MakeFourCCString(uint32_t x, char *s) {
-    s[0] = x >> 24;
-    s[1] = (x >> 16) & 0xff;
-    s[2] = (x >> 8) & 0xff;
-    s[3] = x & 0xff;
-    s[4] = '\0';
 }
 
 }  // namespace android

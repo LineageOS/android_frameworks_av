@@ -15,7 +15,6 @@ cc_library_shared {
     static_libs: ["libvpx"],
 
     shared_libs: [
-        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",
@@ -23,6 +22,8 @@ cc_library_shared {
     ],
 
     cflags: ["-Werror"],
+
+    version_script: "exports.lds",
 
     sanitize: {
         misc_undefined: [

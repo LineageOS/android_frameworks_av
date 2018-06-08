@@ -72,7 +72,7 @@ void scanFile(const char *path) {
     sp<FileSource> file = new FileSource(path);
     CHECK_EQ(file->initCheck(), (status_t)OK);
 
-    ID3 tag(file);
+    ID3 tag(file.get());
     if (!tag.isValid()) {
         printf("FAIL %s\n", path);
     } else {

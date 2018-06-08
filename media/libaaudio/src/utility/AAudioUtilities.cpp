@@ -25,6 +25,9 @@
 
 #include "aaudio/AAudio.h"
 #include <aaudio/AAudioTesting.h>
+#include <math.h>
+#include <system/audio-base.h>
+#include <assert.h>
 
 #include "utility/AAudioUtilities.h"
 
@@ -50,50 +53,21 @@ int32_t AAudioConvert_formatToSizeInBytes(aaudio_format_t format) {
     return size;
 }
 
-
 // TODO expose and call clamp16_from_float function in primitives.h
 static inline int16_t clamp16_from_float(float f) {
-    /* Offset is used to expand the valid range of [-1.0, 1.0) into the 16 lsbs of the
-     * floating point significand. The normal shift is 3<<22, but the -15 offset
-     * is used to multiply by 32768.
-     */
-    static const float offset = (float)(3 << (22 - 15));
-    /* zero = (0x10f << 22) =  0x43c00000 (not directly used) */
-    static const int32_t limneg = (0x10f << 22) /*zero*/ - 32768; /* 0x43bf8000 */
-    static const int32_t limpos = (0x10f << 22) /*zero*/ + 32767; /* 0x43c07fff */
-
-    union {
-        float f;
-        int32_t i;
-    } u;
-
-    u.f = f + offset; /* recenter valid range */
-    /* Now the valid range is represented as integers between [limneg, limpos].
-     * Clamp using the fact that float representation (as an integer) is an ordered set.
-     */
-    if (u.i < limneg)
-        u.i = -32768;
-    else if (u.i > limpos)
-        u.i = 32767;
-    return u.i; /* Return lower 16 bits, the part of interest in the significand. */
+    static const float scale = 1 << 15;
+    return (int16_t) roundf(fmaxf(fminf(f * scale, scale - 1.f), -scale));
 }
 
-// Same but without clipping.
-// Convert -1.0f to +1.0f to -32768 to +32767
-static inline int16_t floatToInt16(float f) {
-    static const float offset = (float)(3 << (22 - 15));
-    union {
-        float f;
-        int32_t i;
-    } u;
-    u.f = f + offset; /* recenter valid range */
-    return u.i; /* Return lower 16 bits, the part of interest in the significand. */
+// Clip to valid range of a float sample to prevent excessive volume.
+// By using fmin and fmax we also protect against NaN.
+static float clipToMinMaxHeadroom(float input) {
+    return fmin(MAX_HEADROOM, fmax(MIN_HEADROOM, input));
 }
 
 static float clipAndClampFloatToPcm16(float sample, float scaler) {
     // Clip to valid range of a float sample to prevent excessive volume.
-    if (sample > MAX_HEADROOM) sample = MAX_HEADROOM;
-    else if (sample < MIN_HEADROOM) sample = MIN_HEADROOM;
+    sample = clipToMinMaxHeadroom(sample);
 
     // Scale and convert to a short.
     float fval = sample * scaler;
@@ -104,7 +78,7 @@ void AAudioConvert_floatToPcm16(const float *source,
                                 int16_t *destination,
                                 int32_t numSamples,
                                 float amplitude) {
-    float scaler = amplitude;
+    const float scaler = amplitude;
     for (int i = 0; i < numSamples; i++) {
         float sample = *source++;
         *destination++ = clipAndClampFloatToPcm16(sample, scaler);
@@ -135,7 +109,7 @@ void AAudioConvert_pcm16ToFloat(const int16_t *source,
                                 float *destination,
                                 int32_t numSamples,
                                 float amplitude) {
-    float scaler = amplitude / SHORT_SCALE;
+    const float scaler = amplitude / SHORT_SCALE;
     for (int i = 0; i < numSamples; i++) {
         destination[i] = source[i] * scaler;
     }
@@ -149,7 +123,7 @@ void AAudioConvert_pcm16ToFloat(const int16_t *source,
                                 float amplitude1,
                                 float amplitude2) {
     float scaler = amplitude1 / SHORT_SCALE;
-    float delta = (amplitude2 - amplitude1) / (SHORT_SCALE * (float) numFrames);
+    const float delta = (amplitude2 - amplitude1) / (SHORT_SCALE * (float) numFrames);
     for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
         for (int sampleIndex = 0; sampleIndex < samplesPerFrame; sampleIndex++) {
             *destination++ = *source++ * scaler;
@@ -157,6 +131,7 @@ void AAudioConvert_pcm16ToFloat(const int16_t *source,
         scaler += delta;
     }
 }
+
 
 // This code assumes amplitude1 and amplitude2 are between 0.0 and 1.0
 void AAudio_linearRamp(const float *source,
@@ -166,14 +141,12 @@ void AAudio_linearRamp(const float *source,
                        float amplitude1,
                        float amplitude2) {
     float scaler = amplitude1;
-    float delta = (amplitude2 - amplitude1) / numFrames;
+    const float delta = (amplitude2 - amplitude1) / numFrames;
     for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
         for (int sampleIndex = 0; sampleIndex < samplesPerFrame; sampleIndex++) {
             float sample = *source++;
-
             // Clip to valid range of a float sample to prevent excessive volume.
-            if (sample > MAX_HEADROOM) sample = MAX_HEADROOM;
-            else if (sample < MIN_HEADROOM) sample = MIN_HEADROOM;
+            sample = clipToMinMaxHeadroom(sample);
 
             *destination++ = sample * scaler;
         }
@@ -188,15 +161,264 @@ void AAudio_linearRamp(const int16_t *source,
                        int32_t samplesPerFrame,
                        float amplitude1,
                        float amplitude2) {
-    float scaler = amplitude1 / SHORT_SCALE;
-    float delta = (amplitude2 - amplitude1) / (SHORT_SCALE * (float) numFrames);
+    // Because we are converting from int16 to 1nt16, we do not have to scale by 1/32768.
+    float scaler = amplitude1;
+    const float delta = (amplitude2 - amplitude1) / numFrames;
     for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
         for (int sampleIndex = 0; sampleIndex < samplesPerFrame; sampleIndex++) {
             // No need to clip because int16_t range is inherently limited.
             float sample =  *source++ * scaler;
-            *destination++ =  floatToInt16(sample);
+            *destination++ = (int16_t) roundf(sample);
         }
         scaler += delta;
+    }
+}
+
+// *************************************************************************************
+// Convert Mono To Stereo at the same time as converting format.
+void AAudioConvert_formatMonoToStereo(const float *source,
+                                      int16_t *destination,
+                                      int32_t numFrames,
+                                      float amplitude) {
+    const float scaler = amplitude;
+    for (int i = 0; i < numFrames; i++) {
+        float sample = *source++;
+        int16_t sample16 = clipAndClampFloatToPcm16(sample, scaler);
+        *destination++ = sample16;
+        *destination++ = sample16;
+    }
+}
+
+void AAudioConvert_formatMonoToStereo(const float *source,
+                                      int16_t *destination,
+                                      int32_t numFrames,
+                                      float amplitude1,
+                                      float amplitude2) {
+    // divide by numFrames so that we almost reach amplitude2
+    const float delta = (amplitude2 - amplitude1) / numFrames;
+    for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
+        const float scaler = amplitude1 + (frameIndex * delta);
+        const float sample = *source++;
+        int16_t sample16 = clipAndClampFloatToPcm16(sample, scaler);
+        *destination++ = sample16;
+        *destination++ = sample16;
+    }
+}
+
+void AAudioConvert_formatMonoToStereo(const int16_t *source,
+                                      float *destination,
+                                      int32_t numFrames,
+                                      float amplitude) {
+    const float scaler = amplitude / SHORT_SCALE;
+    for (int i = 0; i < numFrames; i++) {
+        float sample = source[i] * scaler;
+        *destination++ = sample;
+        *destination++ = sample;
+    }
+}
+
+// This code assumes amplitude1 and amplitude2 are between 0.0 and 1.0
+void AAudioConvert_formatMonoToStereo(const int16_t *source,
+                                      float *destination,
+                                      int32_t numFrames,
+                                      float amplitude1,
+                                      float amplitude2) {
+    const float scaler1 = amplitude1 / SHORT_SCALE;
+    const float delta = (amplitude2 - amplitude1) / (SHORT_SCALE * (float) numFrames);
+    for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
+        float scaler = scaler1 + (frameIndex * delta);
+        float sample = source[frameIndex] * scaler;
+        *destination++ = sample;
+        *destination++ = sample;
+    }
+}
+
+// This code assumes amplitude1 and amplitude2 are between 0.0 and 1.0
+void AAudio_linearRampMonoToStereo(const float *source,
+                                   float *destination,
+                                   int32_t numFrames,
+                                   float amplitude1,
+                                   float amplitude2) {
+    const float delta = (amplitude2 - amplitude1) / numFrames;
+    for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
+        float sample = *source++;
+
+        // Clip to valid range of a float sample to prevent excessive volume.
+        sample = clipToMinMaxHeadroom(sample);
+
+        const float scaler = amplitude1 + (frameIndex * delta);
+        float sampleScaled = sample * scaler;
+        *destination++ = sampleScaled;
+        *destination++ = sampleScaled;
+    }
+}
+
+// This code assumes amplitude1 and amplitude2 are between 0.0 and 1.0
+void AAudio_linearRampMonoToStereo(const int16_t *source,
+                                   int16_t *destination,
+                                   int32_t numFrames,
+                                   float amplitude1,
+                                   float amplitude2) {
+    // Because we are converting from int16 to 1nt16, we do not have to scale by 1/32768.
+    const float delta = (amplitude2 - amplitude1) / numFrames;
+    for (int frameIndex = 0; frameIndex < numFrames; frameIndex++) {
+        const float scaler = amplitude1 + (frameIndex * delta);
+        // No need to clip because int16_t range is inherently limited.
+        const float sample =  *source++ * scaler;
+        int16_t sample16 = (int16_t) roundf(sample);
+        *destination++ = sample16;
+        *destination++ = sample16;
+    }
+}
+
+// *************************************************************************************
+void AAudioDataConverter::convert(
+        const FormattedData &source,
+        const FormattedData &destination,
+        int32_t numFrames,
+        float levelFrom,
+        float levelTo) {
+
+    if (source.channelCount == 1 && destination.channelCount == 2) {
+        convertMonoToStereo(source,
+                            destination,
+                            numFrames,
+                            levelFrom,
+                            levelTo);
+    } else {
+        // We only support mono to stereo conversion. Otherwise source and destination
+        // must match.
+        assert(source.channelCount == destination.channelCount);
+        convertChannelsMatch(source,
+                             destination,
+                             numFrames,
+                             levelFrom,
+                             levelTo);
+    }
+}
+
+void AAudioDataConverter::convertMonoToStereo(
+        const FormattedData &source,
+        const FormattedData &destination,
+        int32_t numFrames,
+        float levelFrom,
+        float levelTo) {
+
+    // The formats are validated when the stream is opened so we do not have to
+    // check for illegal combinations here.
+    if (source.format == AAUDIO_FORMAT_PCM_FLOAT) {
+        if (destination.format == AAUDIO_FORMAT_PCM_FLOAT) {
+            AAudio_linearRampMonoToStereo(
+                    (const float *) source.data,
+                    (float *) destination.data,
+                    numFrames,
+                    levelFrom,
+                    levelTo);
+        } else if (destination.format == AAUDIO_FORMAT_PCM_I16) {
+            if (levelFrom != levelTo) {
+                AAudioConvert_formatMonoToStereo(
+                        (const float *) source.data,
+                        (int16_t *) destination.data,
+                        numFrames,
+                        levelFrom,
+                        levelTo);
+            } else {
+                AAudioConvert_formatMonoToStereo(
+                        (const float *) source.data,
+                        (int16_t *) destination.data,
+                        numFrames,
+                        levelTo);
+            }
+        }
+    } else if (source.format == AAUDIO_FORMAT_PCM_I16) {
+        if (destination.format == AAUDIO_FORMAT_PCM_FLOAT) {
+            if (levelFrom != levelTo) {
+                AAudioConvert_formatMonoToStereo(
+                        (const int16_t *) source.data,
+                        (float *) destination.data,
+                        numFrames,
+                        levelFrom,
+                        levelTo);
+            } else {
+                AAudioConvert_formatMonoToStereo(
+                        (const int16_t *) source.data,
+                        (float *) destination.data,
+                        numFrames,
+                        levelTo);
+            }
+        } else if (destination.format == AAUDIO_FORMAT_PCM_I16) {
+            AAudio_linearRampMonoToStereo(
+                    (const int16_t *) source.data,
+                    (int16_t *) destination.data,
+                    numFrames,
+                    levelFrom,
+                    levelTo);
+        }
+    }
+}
+
+void AAudioDataConverter::convertChannelsMatch(
+        const FormattedData &source,
+        const FormattedData &destination,
+        int32_t numFrames,
+        float levelFrom,
+        float levelTo) {
+    const int32_t numSamples = numFrames * source.channelCount;
+
+    // The formats are validated when the stream is opened so we do not have to
+    // check for illegal combinations here.
+    if (source.format == AAUDIO_FORMAT_PCM_FLOAT) {
+        if (destination.format == AAUDIO_FORMAT_PCM_FLOAT) {
+            AAudio_linearRamp(
+                    (const float *) source.data,
+                    (float *) destination.data,
+                    numFrames,
+                    source.channelCount,
+                    levelFrom,
+                    levelTo);
+        } else if (destination.format == AAUDIO_FORMAT_PCM_I16) {
+            if (levelFrom != levelTo) {
+                AAudioConvert_floatToPcm16(
+                        (const float *) source.data,
+                        (int16_t *) destination.data,
+                        numFrames,
+                        source.channelCount,
+                        levelFrom,
+                        levelTo);
+            } else {
+                AAudioConvert_floatToPcm16(
+                        (const float *) source.data,
+                        (int16_t *) destination.data,
+                        numSamples,
+                        levelTo);
+            }
+        }
+    } else if (source.format == AAUDIO_FORMAT_PCM_I16) {
+        if (destination.format == AAUDIO_FORMAT_PCM_FLOAT) {
+            if (levelFrom != levelTo) {
+                AAudioConvert_pcm16ToFloat(
+                        (const int16_t *) source.data,
+                        (float *) destination.data,
+                        numFrames,
+                        source.channelCount,
+                        levelFrom,
+                        levelTo);
+            } else {
+                AAudioConvert_pcm16ToFloat(
+                        (const int16_t *) source.data,
+                        (float *) destination.data,
+                        numSamples,
+                        levelTo);
+            }
+        } else if (destination.format == AAUDIO_FORMAT_PCM_I16) {
+            AAudio_linearRamp(
+                    (const int16_t *) source.data,
+                    (int16_t *) destination.data,
+                    numFrames,
+                    source.channelCount,
+                    levelFrom,
+                    levelTo);
+        }
     }
 }
 
@@ -281,6 +503,13 @@ aaudio_result_t AAudioConvert_androidToAAudioResult(status_t status) {
     return result;
 }
 
+audio_session_t AAudioConvert_aaudioToAndroidSessionId(aaudio_session_id_t sessionId) {
+    // If not a regular sessionId then convert to a safe value of AUDIO_SESSION_ALLOCATE.
+    return (sessionId == AAUDIO_SESSION_ID_ALLOCATE || sessionId == AAUDIO_SESSION_ID_NONE)
+           ? AUDIO_SESSION_ALLOCATE
+           : (audio_session_t) sessionId;
+}
+
 audio_format_t AAudioConvert_aaudioToAndroidDataFormat(aaudio_format_t aaudioFormat) {
     audio_format_t androidFormat;
     switch (aaudioFormat) {
@@ -315,17 +544,77 @@ aaudio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t androidFo
     return aaudioFormat;
 }
 
+// Make a message string from the condition.
+#define STATIC_ASSERT(condition) static_assert(condition, #condition)
+
+audio_usage_t AAudioConvert_usageToInternal(aaudio_usage_t usage) {
+    // The public aaudio_content_type_t constants are supposed to have the same
+    // values as the internal audio_content_type_t values.
+    STATIC_ASSERT(AAUDIO_USAGE_MEDIA == AUDIO_USAGE_MEDIA);
+    STATIC_ASSERT(AAUDIO_USAGE_VOICE_COMMUNICATION == AUDIO_USAGE_VOICE_COMMUNICATION);
+    STATIC_ASSERT(AAUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING
+                  == AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING);
+    STATIC_ASSERT(AAUDIO_USAGE_ALARM == AUDIO_USAGE_ALARM);
+    STATIC_ASSERT(AAUDIO_USAGE_NOTIFICATION == AUDIO_USAGE_NOTIFICATION);
+    STATIC_ASSERT(AAUDIO_USAGE_NOTIFICATION_RINGTONE
+                  == AUDIO_USAGE_NOTIFICATION_TELEPHONY_RINGTONE);
+    STATIC_ASSERT(AAUDIO_USAGE_NOTIFICATION_EVENT == AUDIO_USAGE_NOTIFICATION_EVENT);
+    STATIC_ASSERT(AAUDIO_USAGE_ASSISTANCE_ACCESSIBILITY == AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY);
+    STATIC_ASSERT(AAUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE
+                  == AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE);
+    STATIC_ASSERT(AAUDIO_USAGE_ASSISTANCE_SONIFICATION == AUDIO_USAGE_ASSISTANCE_SONIFICATION);
+    STATIC_ASSERT(AAUDIO_USAGE_GAME == AUDIO_USAGE_GAME);
+    STATIC_ASSERT(AAUDIO_USAGE_ASSISTANT == AUDIO_USAGE_ASSISTANT);
+    if (usage == AAUDIO_UNSPECIFIED) {
+        usage = AAUDIO_USAGE_MEDIA;
+    }
+    return (audio_usage_t) usage; // same value
+}
+
+audio_content_type_t AAudioConvert_contentTypeToInternal(aaudio_content_type_t contentType) {
+    // The public aaudio_content_type_t constants are supposed to have the same
+    // values as the internal audio_content_type_t values.
+    STATIC_ASSERT(AAUDIO_CONTENT_TYPE_MUSIC == AUDIO_CONTENT_TYPE_MUSIC);
+    STATIC_ASSERT(AAUDIO_CONTENT_TYPE_SPEECH == AUDIO_CONTENT_TYPE_SPEECH);
+    STATIC_ASSERT(AAUDIO_CONTENT_TYPE_SONIFICATION == AUDIO_CONTENT_TYPE_SONIFICATION);
+    STATIC_ASSERT(AAUDIO_CONTENT_TYPE_MOVIE == AUDIO_CONTENT_TYPE_MOVIE);
+    if (contentType == AAUDIO_UNSPECIFIED) {
+        contentType = AAUDIO_CONTENT_TYPE_MUSIC;
+    }
+    return (audio_content_type_t) contentType; // same value
+}
+
+audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t preset) {
+    // The public aaudio_input_preset_t constants are supposed to have the same
+    // values as the internal audio_source_t values.
+    STATIC_ASSERT(AAUDIO_UNSPECIFIED == AUDIO_SOURCE_DEFAULT);
+    STATIC_ASSERT(AAUDIO_INPUT_PRESET_GENERIC == AUDIO_SOURCE_MIC);
+    STATIC_ASSERT(AAUDIO_INPUT_PRESET_CAMCORDER == AUDIO_SOURCE_CAMCORDER);
+    STATIC_ASSERT(AAUDIO_INPUT_PRESET_VOICE_RECOGNITION == AUDIO_SOURCE_VOICE_RECOGNITION);
+    STATIC_ASSERT(AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION == AUDIO_SOURCE_VOICE_COMMUNICATION);
+    STATIC_ASSERT(AAUDIO_INPUT_PRESET_UNPROCESSED == AUDIO_SOURCE_UNPROCESSED);
+    if (preset == AAUDIO_UNSPECIFIED) {
+        preset = AAUDIO_INPUT_PRESET_VOICE_RECOGNITION;
+    }
+    return (audio_source_t) preset; // same value
+}
+
 int32_t AAudioConvert_framesToBytes(int32_t numFrames,
-                                            int32_t bytesPerFrame,
-                                            int32_t *sizeInBytes) {
-    // TODO implement more elegantly
-    const int32_t maxChannels = 256; // ridiculously large
-    const int32_t maxBytesPerFrame = maxChannels * sizeof(float);
-    // Prevent overflow by limiting multiplicands.
-    if (bytesPerFrame > maxBytesPerFrame || numFrames > (0x3FFFFFFF / maxBytesPerFrame)) {
+                                    int32_t bytesPerFrame,
+                                    int32_t *sizeInBytes) {
+    *sizeInBytes = 0;
+
+    if (numFrames < 0 || bytesPerFrame < 0) {
+        ALOGE("negative size, numFrames = %d, frameSize = %d", numFrames, bytesPerFrame);
+        return AAUDIO_ERROR_OUT_OF_RANGE;
+    }
+
+    // Prevent numeric overflow.
+    if (numFrames > (INT32_MAX / bytesPerFrame)) {
         ALOGE("size overflow, numFrames = %d, frameSize = %d", numFrames, bytesPerFrame);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
+
     *sizeInBytes = numFrames * bytesPerFrame;
     return AAUDIO_OK;
 }
@@ -409,4 +698,32 @@ int32_t AAudioProperty_getHardwareBurstMinMicros() {
         prop = defaultMicros;
     }
     return prop;
+}
+
+aaudio_result_t AAudio_isFlushAllowed(aaudio_stream_state_t state) {
+    aaudio_result_t result = AAUDIO_OK;
+    switch (state) {
+// Proceed with flushing.
+        case AAUDIO_STREAM_STATE_OPEN:
+        case AAUDIO_STREAM_STATE_PAUSED:
+        case AAUDIO_STREAM_STATE_STOPPED:
+        case AAUDIO_STREAM_STATE_FLUSHED:
+            break;
+
+// Transition from one inactive state to another.
+        case AAUDIO_STREAM_STATE_STARTING:
+        case AAUDIO_STREAM_STATE_STARTED:
+        case AAUDIO_STREAM_STATE_STOPPING:
+        case AAUDIO_STREAM_STATE_PAUSING:
+        case AAUDIO_STREAM_STATE_FLUSHING:
+        case AAUDIO_STREAM_STATE_CLOSING:
+        case AAUDIO_STREAM_STATE_CLOSED:
+        case AAUDIO_STREAM_STATE_DISCONNECTED:
+        default:
+            ALOGE("can only flush stream when PAUSED, OPEN or STOPPED, state = %s",
+                  AAudio_convertStreamStateToText(state));
+            result =  AAUDIO_ERROR_INVALID_STATE;
+            break;
+    }
+    return result;
 }

@@ -18,7 +18,7 @@
 
 #define THROTTLED_SOURCE_H_
 
-#include <media/stagefright/DataSource.h>
+#include <media/DataSource.h>
 #include <utils/threads.h>
 
 namespace android {
@@ -57,10 +57,6 @@ struct ThrottledSource : public DataSource {
     virtual sp<DecryptHandle> DrmInitialization(const char *mime = NULL) {
         return mSource->DrmInitialization(mime);
     }
-
-    virtual void getDrmInfo(sp<DecryptHandle> &handle, DrmManagerClient **client) {
-        mSource->getDrmInfo(handle, client);
-    };
 
     virtual String8 getMIMEType() const {
         return mSource->getMIMEType();

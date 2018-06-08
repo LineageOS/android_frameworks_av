@@ -40,7 +40,7 @@ bool SessionRouteMap::hasRoute(audio_session_t session)
     return indexOfKey(session) >= 0 && valueFor(session)->mDeviceDescriptor != 0;
 }
 
-bool SessionRouteMap::hasRouteChanged(audio_session_t session)
+bool SessionRouteMap::getAndClearRouteChanged(audio_session_t session)
 {
     if (indexOfKey(session) >= 0) {
         if (valueFor(session)->mChanged) {
@@ -82,7 +82,7 @@ int SessionRouteMap::decRouteActivity(audio_session_t session)
 void SessionRouteMap::log(const char* caption)
 {
     ALOGI("%s ----", caption);
-    for(size_t index = 0; index < size(); index++) {
+    for (size_t index = 0; index < size(); index++) {
         valueAt(index)->log("  ");
     }
 }
@@ -104,9 +104,7 @@ void SessionRouteMap::addRoute(audio_session_t session,
     sp<SessionRoute> route = indexOfKey(session) >= 0 ? valueFor(session) : 0;
 
     if (route != 0) {
-        if (((route->mDeviceDescriptor == 0) && (descriptor != 0)) ||
-                ((route->mDeviceDescriptor != 0) &&
-                 ((descriptor == 0) || (!route->mDeviceDescriptor->equals(descriptor))))) {
+        if (descriptor != 0 || route->mDeviceDescriptor != 0) {
             route->mChanged = true;
         }
         route->mRefCount++;
@@ -114,11 +112,29 @@ void SessionRouteMap::addRoute(audio_session_t session,
     } else {
         route = new SessionRoute(session, streamType, source, descriptor, uid);
         route->mRefCount++;
-        add(session, route);
         if (descriptor != 0) {
             route->mChanged = true;
         }
+        add(session, route);
     }
+}
+
+audio_devices_t SessionRouteMap::getActiveDeviceForStream(audio_stream_type_t streamType,
+                                                          const DeviceVector& availableDevices)
+{
+    audio_devices_t device = AUDIO_DEVICE_NONE;
+
+    for (size_t index = 0; index < size(); index++) {
+        sp<SessionRoute> route = valueAt(index);
+        if (streamType == route->mStreamType && route->isActiveOrChanged()
+                && route->mDeviceDescriptor != 0) {
+            device = route->mDeviceDescriptor->type();
+            if (!availableDevices.getDevicesFromType(device).isEmpty()) {
+                break;
+            }
+        }
+    }
+    return device;
 }
 
 } // namespace android

@@ -135,7 +135,13 @@ public:
 
     float volIndexToDb(device_category deviceCat, int indexInUi) const
     {
-        return getCurvesFor(deviceCat)->volIndexToDb(indexInUi, mIndexMin, mIndexMax);
+        sp<VolumeCurve> vc = getCurvesFor(deviceCat);
+        if (vc != 0) {
+            return vc->volIndexToDb(indexInUi, mIndexMin, mIndexMax);
+        } else {
+            ALOGE("Invalid device category %d for Volume Curve", deviceCat);
+            return 0.0f;
+        }
     }
 
     void dump(int fd, int spaces, bool curvePoints = false) const;
@@ -230,4 +236,4 @@ public:
     }
 };
 
-}; // namespace android
+} // namespace android

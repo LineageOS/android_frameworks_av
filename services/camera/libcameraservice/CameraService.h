@@ -27,6 +27,7 @@
 #include <binder/AppOpsManager.h>
 #include <binder/BinderService.h>
 #include <binder/IAppOpsCallback.h>
+#include <binder/IUidObserver.h>
 #include <hardware/camera.h>
 
 #include <android/hardware/camera/common/1.0/types.h>
@@ -47,6 +48,8 @@
 #include <map>
 #include <memory>
 #include <utility>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace android {
 
@@ -59,7 +62,6 @@ class CameraService :
     public BinderService<CameraService>,
     public virtual ::android::hardware::BnCameraService,
     public virtual IBinder::DeathRecipient,
-    public camera_module_callbacks_t,
     public virtual CameraProviderManager::StatusListener
 {
     friend class BinderService<CameraService>;
@@ -163,6 +165,8 @@ public:
 
     virtual status_t    dump(int fd, const Vector<String16>& args);
 
+    virtual status_t    shellCommand(int in, int out, int err, const Vector<String16>& args);
+
     /////////////////////////////////////////////////////////////////////
     // Client functionality
 
@@ -185,7 +189,8 @@ public:
             int newState,
             const String8& cameraId,
             int facing,
-            const String16& clientName);
+            const String16& clientName,
+            int apiLevel);
 
     /////////////////////////////////////////////////////////////////////
     // CameraDeviceFactory functionality
@@ -200,7 +205,8 @@ public:
 
     class BasicClient : public virtual RefBase {
     public:
-        virtual status_t       initialize(sp<CameraProviderManager> manager) = 0;
+        virtual status_t       initialize(sp<CameraProviderManager> manager,
+                const String8& monitorTags) = 0;
         virtual binder::Status disconnect();
 
         // because we can't virtually inherit IInterface, which breaks
@@ -233,6 +239,9 @@ public:
         // Check what API level is used for this client. This is used to determine which
         // superclass this can be cast to.
         virtual bool canCastToApiClient(apiLevel level) const;
+
+        // Block the client form using the camera
+        virtual void block();
     protected:
         BasicClient(const sp<CameraService>& cameraService,
                 const sp<IBinder>& remoteCallback,
@@ -325,6 +334,7 @@ public:
                 const sp<hardware::ICameraClient>& cameraClient,
                 const String16& clientPackageName,
                 const String8& cameraIdStr,
+                int api1CameraId,
                 int cameraFacing,
                 int clientPid,
                 uid_t clientUid,
@@ -506,13 +516,48 @@ private:
         CameraParameters mShimParams;
     }; // class CameraState
 
+    // Observer for UID lifecycle enforcing that UIDs in idle
+    // state cannot use the camera to protect user privacy.
+    class UidPolicy : public BnUidObserver, public virtual IBinder::DeathRecipient {
+    public:
+        explicit UidPolicy(sp<CameraService> service)
+                : mRegistered(false), mService(service) {}
+
+        void registerSelf();
+        void unregisterSelf();
+
+        bool isUidActive(uid_t uid, String16 callingPackage);
+
+        void onUidGone(uid_t uid, bool disabled);
+        void onUidActive(uid_t uid);
+        void onUidIdle(uid_t uid, bool disabled);
+
+        void addOverrideUid(uid_t uid, String16 callingPackage, bool active);
+        void removeOverrideUid(uid_t uid, String16 callingPackage);
+
+        // IBinder::DeathRecipient implementation
+        virtual void binderDied(const wp<IBinder> &who);
+    private:
+        bool isUidActiveLocked(uid_t uid, String16 callingPackage);
+        void updateOverrideUid(uid_t uid, String16 callingPackage, bool active, bool insert);
+
+        Mutex mUidLock;
+        bool mRegistered;
+        wp<CameraService> mService;
+        std::unordered_set<uid_t> mActiveUids;
+        std::unordered_map<uid_t, bool> mOverrideUids;
+    }; // class UidPolicy
+
+    sp<UidPolicy> mUidPolicy;
+
     // Delay-load the Camera HAL module
     virtual void onFirstRef();
 
     // Eumerate all camera providers in the system
     status_t enumerateProviders();
 
-    // Add a new camera to camera and torch state lists or remove an unplugged one
+    // Add/remove a new camera to camera and torch state lists or remove an unplugged one
+    // Caller must not hold mServiceLock
     void addStates(const String8 id);
     void removeStates(const String8 id);
 
@@ -539,7 +584,7 @@ private:
     // Single implementation shared between the various connect calls
     template<class CALLBACK, class CLIENT>
     binder::Status connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
-            int halVersion, const String16& clientPackageName,
+            int api1CameraId, int halVersion, const String16& clientPackageName,
             int clientUid, int clientPid,
             apiLevel effectiveApiLevel, bool legacyMode, bool shimUpdateOnly,
             /*out*/sp<CLIENT>& device);
@@ -565,6 +610,9 @@ private:
     // Circular buffer for storing event logging for dumps
     RingBuffer<String8> mEventLog;
     Mutex mLogLock;
+
+    // The last monitored tags set by client
+    String8 mMonitorTags;
 
     // Currently allowed user IDs
     std::set<userid_t> mAllowedUsers;
@@ -601,9 +649,16 @@ private:
     void finishConnectLocked(const sp<BasicClient>& client, const DescriptorPtr& desc);
 
     /**
-     * Returns the integer corresponding to the given camera ID string, or -1 on failure.
+     * Returns the underlying camera Id string mapped to a camera id int
+     * Empty string is returned when the cameraIdInt is invalid.
      */
-    static int cameraIdToInt(const String8& cameraId);
+    String8 cameraIdIntToStr(int cameraIdInt);
+
+    /**
+     * Returns the underlying camera Id string mapped to a camera id int
+     * Empty string is returned when the cameraIdInt is invalid.
+     */
+    std::string cameraIdIntToStrLocked(int cameraIdInt);
 
     /**
      * Remove a single client corresponding to the given camera id from the list of active clients.
@@ -671,11 +726,17 @@ private:
      */
     void dumpEventLog(int fd);
 
+    /**
+     * This method will acquire mServiceLock
+     */
+    void updateCameraNumAndIds();
+
     int                 mNumberOfCameras;
-    int                 mNumberOfNormalCameras;
+
+    std::vector<std::string> mNormalDeviceIds;
 
     // sounds
-    MediaPlayer*        newMediaPlayer(const char *file);
+    sp<MediaPlayer>     newMediaPlayer(const char *file);
 
     Mutex               mSoundLock;
     sp<MediaPlayer>     mSoundPlayer[NUM_SOUNDS];
@@ -756,6 +817,21 @@ private:
      */
     binder::Status      getLegacyParametersLazy(int cameraId, /*out*/CameraParameters* parameters);
 
+    // Blocks all clients from the UID
+    void blockClientsForUid(uid_t uid);
+
+    // Overrides the UID state as if it is idle
+    status_t handleSetUidState(const Vector<String16>& args, int err);
+
+    // Clears the override for the UID state
+    status_t handleResetUidState(const Vector<String16>& args, int err);
+
+    // Gets the UID state
+    status_t handleGetUidState(const Vector<String16>& args, int out, int err);
+
+    // Prints the shell command help
+    status_t printHelp(int out);
+
     static int getCallingPid();
 
     static int getCallingUid();
@@ -767,8 +843,8 @@ private:
 
     static binder::Status makeClient(const sp<CameraService>& cameraService,
             const sp<IInterface>& cameraCb, const String16& packageName, const String8& cameraId,
-            int facing, int clientPid, uid_t clientUid, int servicePid, bool legacyMode,
-            int halVersion, int deviceVersion, apiLevel effectiveApiLevel,
+            int api1CameraId, int facing, int clientPid, uid_t clientUid, int servicePid,
+            bool legacyMode, int halVersion, int deviceVersion, apiLevel effectiveApiLevel,
             /*out*/sp<BasicClient>* client);
 
     status_t checkCameraAccess(const String16& opPackageName);

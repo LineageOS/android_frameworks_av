@@ -18,7 +18,9 @@
 #ifndef ANDROID_TYPED_LOGGER_H
 #define ANDROID_TYPED_LOGGER_H
 
-#include <media/nbaio/NBLog.h>
+// This is the client API for the typed logger.
+
+#include <media/nblog/NBLog.h>
 #include <algorithm>
 
 /*

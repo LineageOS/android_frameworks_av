@@ -34,6 +34,7 @@
 #include "AAudioServiceStreamShared.h"
 #include "AAudioServiceEndpointPlay.h"
 #include "AAudioServiceEndpointShared.h"
+#include "AAudioServiceStreamBase.h"
 
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
@@ -42,10 +43,12 @@ using namespace aaudio;   // TODO just import names needed
 
 AAudioServiceEndpointPlay::AAudioServiceEndpointPlay(AAudioService &audioService)
         : mStreamInternalPlay(audioService, true) {
+    ALOGD("%s(%p) created", __func__, this);
     mStreamInternal = &mStreamInternalPlay;
 }
 
 AAudioServiceEndpointPlay::~AAudioServiceEndpointPlay() {
+    ALOGD("%s(%p) destroyed", __func__, this);
 }
 
 aaudio_result_t AAudioServiceEndpointPlay::open(const aaudio::AAudioStreamRequest &request) {
@@ -67,6 +70,7 @@ aaudio_result_t AAudioServiceEndpointPlay::open(const aaudio::AAudioStreamReques
 
 // Mix data from each application stream and write result to the shared MMAP stream.
 void *AAudioServiceEndpointPlay::callbackLoop() {
+    ALOGD("%s() entering >>>>>>>>>>>>>>> MIXER", __func__);
     aaudio_result_t result = AAUDIO_OK;
     int64_t timeoutNanos = getStreamInternal()->calculateReasonableTimeout();
 
@@ -82,9 +86,13 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
             std::lock_guard <std::mutex> lock(mLockStreams);
             for (const auto clientStream : mRegisteredStreams) {
                 int64_t clientFramesRead = 0;
+                bool allowUnderflow = true;
 
-                if (!clientStream->isRunning()) {
-                    continue;
+                aaudio_stream_state_t state = clientStream->getState();
+                if (state == AAUDIO_STREAM_STATE_STOPPING) {
+                    allowUnderflow = false; // just read what is already in the FIFO
+                } else if (state != AAUDIO_STREAM_STATE_STARTED) {
+                    continue; // this stream is not running so skip it.
                 }
 
                 sp<AAudioServiceStreamShared> streamShared =
@@ -104,10 +112,19 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
                         int64_t positionOffset = mmapFramesWritten - clientFramesRead;
                         streamShared->setTimestampPositionOffset(positionOffset);
 
-                        float volume = 1.0; // to match legacy volume
-                        bool underflowed = mMixer.mix(index, fifo, volume);
-                        if (underflowed) {
-                            streamShared->incrementXRunCount();
+                        int32_t framesMixed = mMixer.mix(index, fifo, allowUnderflow);
+
+                        if (streamShared->isFlowing()) {
+                            // Consider it an underflow if we got less than a burst
+                            // after the data started flowing.
+                            bool underflowed = allowUnderflow
+                                               && framesMixed < mMixer.getFramesPerBurst();
+                            if (underflowed) {
+                                streamShared->incrementXRunCount();
+                            }
+                        } else if (framesMixed > 0) {
+                            // Mark beginning of data flow after a start.
+                            streamShared->setFlowing(true);
                         }
                         clientFramesRead = fifo->getReadCounter();
                     }
@@ -132,11 +149,13 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
             AAudioServiceEndpointShared::disconnectRegisteredStreams();
             break;
         } else if (result != getFramesPerBurst()) {
-            ALOGW("AAudioServiceEndpoint(): callbackLoop() wrote %d / %d",
+            ALOGW("callbackLoop() wrote %d / %d",
                   result, getFramesPerBurst());
             break;
         }
     }
 
+    ALOGD("%s() exiting, enabled = %d, state = %d, result = %d <<<<<<<<<<<<< MIXER",
+          __func__, mCallbackEnabled.load(), getStreamInternal()->getState(), result);
     return NULL; // TODO review
 }

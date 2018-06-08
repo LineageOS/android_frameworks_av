@@ -19,15 +19,15 @@
 
 #include <libsonivox/eas_types.h>
 
-#include "media/stagefright/DataSource.h"
+#include <media/DataSourceBase.h>
 
 namespace android {
 
-class MidiIoWrapper : public RefBase {
+class MidiIoWrapper {
 public:
-    MidiIoWrapper(const char *path);
-    MidiIoWrapper(int fd, off64_t offset, int64_t size);
-    MidiIoWrapper(const sp<DataSource> &source);
+    explicit MidiIoWrapper(const char *path);
+    explicit MidiIoWrapper(int fd, off64_t offset, int64_t size);
+    explicit MidiIoWrapper(DataSourceBase *source);
 
     ~MidiIoWrapper();
 
@@ -40,7 +40,7 @@ private:
     int mFd;
     off64_t mBase;
     int64_t  mLength;
-    sp<DataSource> mDataSource;
+    DataSourceBase *mDataSource;
     EAS_FILE mEasFile;
 };
 

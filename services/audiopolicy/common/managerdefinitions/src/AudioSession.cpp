@@ -290,4 +290,4 @@ status_t AudioSessionCollection::dump(int fd, int spaces) const
     return NO_ERROR;
 }
 
-}; // namespace android
+} // namespace android

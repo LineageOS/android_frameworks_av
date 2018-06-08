@@ -31,7 +31,8 @@
 
 #include "ResourceManagerService.h"
 #include "ServiceLog.h"
-
+#include "mediautils/SchedulingPolicyService.h"
+#include <cutils/sched_policy.h>
 namespace android {
 
 namespace {
@@ -111,6 +112,7 @@ static ResourceInfo& getResourceInfoForEdit(
     ResourceInfo info;
     info.clientId = clientId;
     info.client = client;
+    info.cpuBoost = false;
     infos.push_back(info);
     return infos.editItemAt(infos.size() - 1);
 }
@@ -201,7 +203,8 @@ ResourceManagerService::ResourceManagerService(sp<ProcessInfoInterface> processI
     : mProcessInfo(processInfo),
       mServiceLog(new ServiceLog()),
       mSupportsMultipleSecureCodecs(true),
-      mSupportsSecureWithNonSecureCodec(true) {}
+      mSupportsSecureWithNonSecureCodec(true),
+      mCpuBoostCount(0) {}
 
 ResourceManagerService::~ResourceManagerService() {}
 
@@ -239,6 +242,19 @@ void ResourceManagerService::addResource(
     ResourceInfo& info = getResourceInfoForEdit(clientId, client, infos);
     // TODO: do the merge instead of append.
     info.resources.appendVector(resources);
+
+    for (size_t i = 0; i < resources.size(); ++i) {
+        if (resources[i].mType == MediaResource::kCpuBoost && !info.cpuBoost) {
+            info.cpuBoost = true;
+            // Request it on every new instance of kCpuBoost, as the media.codec
+            // could have died, if we only do it the first time subsequent instances
+            // never gets the boost.
+            if (requestCpusetBoost(true, this) != OK) {
+                ALOGW("couldn't request cpuset boost");
+            }
+            mCpuBoostCount++;
+        }
+    }
     if (info.deathNotifier == nullptr) {
         info.deathNotifier = new DeathNotifier(this, pid, clientId);
         IInterface::asBinder(client)->linkToDeath(info.deathNotifier);
@@ -270,6 +286,11 @@ void ResourceManagerService::removeResource(int pid, int64_t clientId, bool chec
     ResourceInfos &infos = mMap.editValueAt(index);
     for (size_t j = 0; j < infos.size(); ++j) {
         if (infos[j].clientId == clientId) {
+            if (infos[j].cpuBoost && mCpuBoostCount > 0) {
+                if (--mCpuBoostCount == 0) {
+                    requestCpusetBoost(false, this);
+                }
+            }
             IInterface::asBinder(infos[j].client)->unlinkToDeath(infos[j].deathNotifier);
             j = infos.removeAt(j);
             found = true;

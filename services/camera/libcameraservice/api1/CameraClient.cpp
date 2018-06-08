@@ -42,7 +42,7 @@ CameraClient::CameraClient(const sp<CameraService>& cameraService,
         int clientPid, int clientUid,
         int servicePid, bool legacyMode):
         Client(cameraService, cameraClient, clientPackageName,
-                String8::format("%d", cameraId), cameraFacing, clientPid,
+                String8::format("%d", cameraId), cameraId, cameraFacing, clientPid,
                 clientUid, servicePid)
 {
     int callingPid = getCallingPid();
@@ -62,7 +62,8 @@ CameraClient::CameraClient(const sp<CameraService>& cameraService,
     LOG1("CameraClient::CameraClient X (pid %d, id %d)", callingPid, cameraId);
 }
 
-status_t CameraClient::initialize(sp<CameraProviderManager> manager) {
+status_t CameraClient::initialize(sp<CameraProviderManager> manager,
+        const String8& /*monitorTags*/) {
     int callingPid = getCallingPid();
     status_t res;
 
@@ -262,7 +263,8 @@ binder::Status CameraClient::disconnect() {
     mHardware->stopPreview();
     sCameraService->updateProxyDeviceState(
             hardware::ICameraServiceProxy::CAMERA_STATE_IDLE,
-            mCameraIdStr, mCameraFacing, mClientPackageName);
+            mCameraIdStr, mCameraFacing, mClientPackageName,
+            hardware::ICameraServiceProxy::CAMERA_API_LEVEL_1);
     mHardware->cancelPicture();
     // Release the hardware resources.
     mHardware->release();
@@ -424,7 +426,8 @@ status_t CameraClient::startPreviewMode() {
     if (result == NO_ERROR) {
         sCameraService->updateProxyDeviceState(
             hardware::ICameraServiceProxy::CAMERA_STATE_ACTIVE,
-            mCameraIdStr, mCameraFacing, mClientPackageName);
+            mCameraIdStr, mCameraFacing, mClientPackageName,
+            hardware::ICameraServiceProxy::CAMERA_API_LEVEL_1);
     }
     return result;
 }
@@ -467,7 +470,8 @@ void CameraClient::stopPreview() {
     mHardware->stopPreview();
     sCameraService->updateProxyDeviceState(
         hardware::ICameraServiceProxy::CAMERA_STATE_IDLE,
-        mCameraIdStr, mCameraFacing, mClientPackageName);
+        mCameraIdStr, mCameraFacing, mClientPackageName,
+        hardware::ICameraServiceProxy::CAMERA_API_LEVEL_1);
     mPreviewBuffer.clear();
 }
 
@@ -973,7 +977,8 @@ void CameraClient::handleShutter(void) {
     // idle now, until preview is restarted
     sCameraService->updateProxyDeviceState(
         hardware::ICameraServiceProxy::CAMERA_STATE_IDLE,
-        mCameraIdStr, mCameraFacing, mClientPackageName);
+        mCameraIdStr, mCameraFacing, mClientPackageName,
+        hardware::ICameraServiceProxy::CAMERA_API_LEVEL_1);
 
     mLock.unlock();
 }

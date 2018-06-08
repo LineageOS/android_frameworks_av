@@ -24,7 +24,6 @@ namespace android {
 
 struct AMessage;
 struct AString;
-class MetaData;
 
 struct AMPEG2TSAssembler : public ARTPAssembler {
     AMPEG2TSAssembler(

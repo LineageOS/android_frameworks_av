@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (C) 2015-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,6 +46,7 @@ public:
     int                        getHeight() const;
     bool                       isDeferred() const;
     bool                       isShared() const;
+    String16                   getPhysicalCameraId() const;
     /**
      * Keep impl up-to-date with OutputConfiguration.java in frameworks/base
      */
@@ -64,7 +65,7 @@ public:
     OutputConfiguration(const android::Parcel& parcel);
 
     OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int rotation,
-            int surfaceSetID = INVALID_SET_ID);
+            int surfaceSetID = INVALID_SET_ID, bool isShared = false);
 
     bool operator == (const OutputConfiguration& other) const {
         return ( mRotation == other.mRotation &&
@@ -74,7 +75,8 @@ public:
                 mHeight == other.mHeight &&
                 mIsDeferred == other.mIsDeferred &&
                 mIsShared == other.mIsShared &&
-                gbpsEqual(other));
+                gbpsEqual(other) &&
+                mPhysicalCameraId == other.mPhysicalCameraId );
     }
     bool operator != (const OutputConfiguration& other) const {
         return !(*this == other);
@@ -102,6 +104,9 @@ public:
         if (mIsShared != other.mIsShared) {
             return mIsShared < other.mIsShared;
         }
+        if (mPhysicalCameraId != other.mPhysicalCameraId) {
+            return mPhysicalCameraId < other.mPhysicalCameraId;
+        }
         return gbpsLessThan(other);
     }
     bool operator > (const OutputConfiguration& other) const {
@@ -110,6 +115,7 @@ public:
 
     bool gbpsEqual(const OutputConfiguration& other) const;
     bool gbpsLessThan(const OutputConfiguration& other) const;
+    void addGraphicProducer(sp<IGraphicBufferProducer> gbp) {mGbps.push_back(gbp);}
 private:
     std::vector<sp<IGraphicBufferProducer>> mGbps;
     int                        mRotation;
@@ -119,8 +125,7 @@ private:
     int                        mHeight;
     bool                       mIsDeferred;
     bool                       mIsShared;
-    // helper function
-    static String16 readMaybeEmptyString16(const android::Parcel* parcel);
+    String16                   mPhysicalCameraId;
 };
 } // namespace params
 } // namespace camera2

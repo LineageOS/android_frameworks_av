@@ -242,7 +242,9 @@ status_t Parameters::initialize(const CameraMetadata *info, int deviceVersion) {
                 HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED, availableFpsRanges.data.i32[i+1])) {
                 continue;
             }
-            if (i != 0) supportedPreviewFpsRange += ",";
+            if (supportedPreviewFpsRange.length() > 0) {
+                supportedPreviewFpsRange += ",";
+            }
             supportedPreviewFpsRange += String8::format("(%d,%d)",
                     availableFpsRanges.data.i32[i] * kFpsToApiScale,
                     availableFpsRanges.data.i32[i+1] * kFpsToApiScale);
@@ -759,12 +761,17 @@ status_t Parameters::initialize(const CameraMetadata *info, int deviceVersion) {
     focusingAreas.clear();
     focusingAreas.add(Parameters::Area(0,0,0,0,0));
 
-    camera_metadata_ro_entry_t availableFocalLengths =
-        staticInfo(ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS, 0, 0, false);
-    if (!availableFocalLengths.count) return NO_INIT;
+    if (fastInfo.isExternalCamera) {
+        params.setFloat(CameraParameters::KEY_FOCAL_LENGTH, -1.0);
+    } else {
+        camera_metadata_ro_entry_t availableFocalLengths =
+            staticInfo(ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS, 0, 0, false);
+        if (!availableFocalLengths.count) return NO_INIT;
 
-    float minFocalLength = availableFocalLengths.data.f[0];
-    params.setFloat(CameraParameters::KEY_FOCAL_LENGTH, minFocalLength);
+        float minFocalLength = availableFocalLengths.data.f[0];
+        params.setFloat(CameraParameters::KEY_FOCAL_LENGTH, minFocalLength);
+    }
+
 
     float horizFov, vertFov;
     res = calculatePictureFovs(&horizFov, &vertFov);
@@ -947,10 +954,21 @@ status_t Parameters::initialize(const CameraMetadata *info, int deviceVersion) {
         const uint8_t *caps = availableCapabilities.data.u8;
         for (size_t i = 0; i < availableCapabilities.count; i++) {
             if (ANDROID_REQUEST_AVAILABLE_CAPABILITIES_PRIVATE_REPROCESSING ==
-                caps[i]) {
+                    caps[i]) {
                 isZslReprocessPresent = true;
                 break;
             }
+        }
+    }
+
+    isDistortionCorrectionSupported = false;
+    camera_metadata_ro_entry_t distortionCorrectionModes =
+            staticInfo(ANDROID_DISTORTION_CORRECTION_AVAILABLE_MODES);
+    for (size_t i = 0; i < distortionCorrectionModes.count; i++) {
+        if (distortionCorrectionModes.data.u8[i] !=
+                ANDROID_DISTORTION_CORRECTION_MODE_OFF) {
+            isDistortionCorrectionSupported = true;
+            break;
         }
     }
 
@@ -1091,9 +1109,15 @@ status_t Parameters::buildFastInfo() {
             focusDistanceCalibration.data.u8[0] !=
             ANDROID_LENS_INFO_FOCUS_DISTANCE_CALIBRATION_UNCALIBRATED);
 
+
+    camera_metadata_ro_entry_t hwLevel = staticInfo(ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL);
+    if (!hwLevel.count) return NO_INIT;
+    fastInfo.isExternalCamera =
+            hwLevel.data.u8[0] == ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL;
+
     camera_metadata_ro_entry_t availableFocalLengths =
-        staticInfo(ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS);
-    if (!availableFocalLengths.count) return NO_INIT;
+        staticInfo(ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS, 0, 0, /*required*/false);
+    if (!availableFocalLengths.count && !fastInfo.isExternalCamera) return NO_INIT;
 
     SortedVector<int32_t> availableFormats = getAvailableOutputFormats();
     if (!availableFormats.size()) return NO_INIT;
@@ -1178,10 +1202,14 @@ status_t Parameters::buildFastInfo() {
 
     // Find smallest (widest-angle) focal length to use as basis of still
     // picture FOV reporting.
-    fastInfo.minFocalLength = availableFocalLengths.data.f[0];
-    for (size_t i = 1; i < availableFocalLengths.count; i++) {
-        if (fastInfo.minFocalLength > availableFocalLengths.data.f[i]) {
-            fastInfo.minFocalLength = availableFocalLengths.data.f[i];
+    if (fastInfo.isExternalCamera) {
+        fastInfo.minFocalLength = -1.0;
+    } else {
+        fastInfo.minFocalLength = availableFocalLengths.data.f[0];
+        for (size_t i = 1; i < availableFocalLengths.count; i++) {
+            if (fastInfo.minFocalLength > availableFocalLengths.data.f[i]) {
+                fastInfo.minFocalLength = availableFocalLengths.data.f[i];
+            }
         }
     }
 
@@ -1197,6 +1225,35 @@ status_t Parameters::buildFastInfo() {
             cameraId, fastInfo.useFlexibleYuv ? "is" : "is not");
 
     fastInfo.maxJpegSize = getMaxSize(getAvailableJpegSizes());
+
+    isZslReprocessPresent = false;
+    camera_metadata_ro_entry_t availableCapabilities =
+        staticInfo(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    if (0 < availableCapabilities.count) {
+        const uint8_t *caps = availableCapabilities.data.u8;
+        for (size_t i = 0; i < availableCapabilities.count; i++) {
+            if (ANDROID_REQUEST_AVAILABLE_CAPABILITIES_PRIVATE_REPROCESSING ==
+                    caps[i]) {
+                isZslReprocessPresent = true;
+                break;
+            }
+        }
+    }
+    if (isZslReprocessPresent) {
+        Vector<StreamConfiguration> scs = getStreamConfigurations();
+        Size maxPrivInputSize = {0, 0};
+        for (const auto& sc : scs) {
+            if (sc.isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_INPUT &&
+                    sc.format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+                if (sc.width * sc.height > maxPrivInputSize.width * maxPrivInputSize.height) {
+                    maxPrivInputSize = {sc.width, sc.height};
+                }
+            }
+        }
+        fastInfo.maxZslSize = maxPrivInputSize;
+    } else {
+        fastInfo.maxZslSize = {0, 0};
+    }
 
     return OK;
 }
@@ -2051,14 +2108,23 @@ status_t Parameters::updateRequest(CameraMetadata *request) const {
 
     if (intent.count == 0) return BAD_VALUE;
 
+    uint8_t distortionMode = ANDROID_DISTORTION_CORRECTION_MODE_OFF;
     if (intent.data.u8[0] == ANDROID_CONTROL_CAPTURE_INTENT_STILL_CAPTURE) {
         res = request->update(ANDROID_CONTROL_AE_TARGET_FPS_RANGE,
                 fastInfo.bestStillCaptureFpsRange, 2);
+        distortionMode = ANDROID_DISTORTION_CORRECTION_MODE_HIGH_QUALITY;
     } else {
         res = request->update(ANDROID_CONTROL_AE_TARGET_FPS_RANGE,
                 previewFpsRange, 2);
+        distortionMode = ANDROID_DISTORTION_CORRECTION_MODE_FAST;
     }
     if (res != OK) return res;
+
+    if (isDistortionCorrectionSupported) {
+        res = request->update(ANDROID_DISTORTION_CORRECTION_MODE,
+                &distortionMode, 1);
+        if (res != OK) return res;
+    }
 
     if (autoWhiteBalanceLockAvailable) {
         uint8_t reqWbLock = autoWhiteBalanceLock ?
@@ -2870,8 +2936,13 @@ status_t Parameters::getFilteredSizes(Size limit, Vector<Size> *sizes) {
         if (sc.isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT &&
                 sc.format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED &&
                 sc.width <= limit.width && sc.height <= limit.height) {
-            Size sz = {sc.width, sc.height};
-            sizes->push(sz);
+            int64_t minFrameDuration = getMinFrameDurationNs(
+                    {sc.width, sc.height}, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED);
+            if (minFrameDuration > MAX_PREVIEW_RECORD_DURATION_NS) {
+                // Filter slow sizes from preview/record
+                continue;
+            }
+            sizes->push({sc.width, sc.height});
         }
     }
 
@@ -3081,6 +3152,16 @@ Parameters::CropRegion Parameters::calculateCropRegion(bool previewOnly) const {
 
 status_t Parameters::calculatePictureFovs(float *horizFov, float *vertFov)
         const {
+    if (fastInfo.isExternalCamera) {
+        if (horizFov != NULL) {
+            *horizFov = -1.0;
+        }
+        if (vertFov != NULL) {
+            *vertFov = -1.0;
+        }
+        return OK;
+    }
+
     camera_metadata_ro_entry_t sensorSize =
             staticInfo(ANDROID_SENSOR_INFO_PHYSICAL_SIZE, 2, 2);
     if (!sensorSize.count) return NO_INIT;

@@ -18,9 +18,10 @@
 #define LOG_TAG "JPEGSource"
 #include <utils/Log.h>
 
+#include <media/DataSource.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/DataSource.h>
 #include <media/stagefright/JPEGSource.h>
+#include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
@@ -108,7 +109,7 @@ sp<MetaData> JPEGSource::getFormat() {
 }
 
 status_t JPEGSource::read(
-        MediaBuffer **out, const ReadOptions *options) {
+        MediaBufferBase **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -117,7 +118,7 @@ status_t JPEGSource::read(
         return UNKNOWN_ERROR;
     }
 
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     mGroup->acquire_buffer(&buffer);
 
     ssize_t n = mSource->readAt(mOffset, buffer->data(), mSize - mOffset);

@@ -38,6 +38,7 @@ struct ResourceInfo {
     sp<IResourceManagerClient> client;
     sp<IBinder::DeathRecipient> deathNotifier;
     Vector<MediaResource> resources;
+    bool cpuBoost;
 };
 
 typedef Vector<ResourceInfo> ResourceInfos;
@@ -112,6 +113,7 @@ private:
     PidResourceInfosMap mMap;
     bool mSupportsMultipleSecureCodecs;
     bool mSupportsSecureWithNonSecureCodec;
+    int32_t mCpuBoostCount;
 };
 
 // ----------------------------------------------------------------------------

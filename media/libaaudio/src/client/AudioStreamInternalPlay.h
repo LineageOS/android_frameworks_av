@@ -33,9 +33,21 @@ public:
     AudioStreamInternalPlay(AAudioServiceInterface  &serviceInterface, bool inService = false);
     virtual ~AudioStreamInternalPlay();
 
+    aaudio_result_t open(const AudioStreamBuilder &builder) override;
+
     aaudio_result_t requestPause() override;
 
     aaudio_result_t requestFlush() override;
+
+    bool isFlushSupported() const override {
+        // Only implement FLUSH for OUTPUT streams.
+        return true;
+    }
+
+    bool isPauseSupported() const override {
+        // Only implement PAUSE for OUTPUT streams.
+        return true;
+    }
 
     aaudio_result_t write(const void *buffer,
                           int32_t numFrames,
@@ -51,8 +63,6 @@ public:
     }
 
 protected:
-
-    aaudio_result_t requestPauseInternal();
 
     void advanceClientToMatchServerPosition() override;
 

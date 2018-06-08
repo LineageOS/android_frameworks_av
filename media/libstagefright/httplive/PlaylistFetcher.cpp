@@ -23,7 +23,6 @@
 #include "HTTPDownloader.h"
 #include "LiveSession.h"
 #include "M3UParser.h"
-#include "include/avc_utils.h"
 #include "include/ID3.h"
 #include "mpeg2ts/AnotherPacketSource.h"
 #include "mpeg2ts/HlsSampleDecryptor.h"
@@ -31,8 +30,13 @@
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/ByteUtils.h>
+#include <media/stagefright/foundation/MediaKeys.h>
+#include <media/stagefright/foundation/avc_utils.h>
+#include <media/stagefright/DataURISource.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/MetaDataUtils.h>
 #include <media/stagefright/Utils.h>
 
 #include <ctype.h>
@@ -344,6 +348,16 @@ status_t PlaylistFetcher::decryptBuffer(
     sp<ABuffer> key;
     if (index >= 0) {
         key = mAESKeyForURI.valueAt(index);
+    } else if (keyURI.startsWith("data:")) {
+        sp<DataSource> keySrc = DataURISource::Create(keyURI.c_str());
+        off64_t keyLen;
+        if (keySrc == NULL || keySrc->getSize(&keyLen) != OK || keyLen < 0) {
+            ALOGE("Malformed cipher key data uri.");
+            return ERROR_MALFORMED;
+        }
+        key = new ABuffer(keyLen);
+        keySrc->readAt(0, key->data(), keyLen);
+        key->setRange(0, keyLen);
     } else {
         ssize_t err = mHTTPDownloader->fetchFile(keyURI.c_str(), &key);
 
@@ -1015,7 +1029,8 @@ void PlaylistFetcher::initSeqNumberForLiveStream(
     sp<AMessage> itemMeta;
     int64_t itemDurationUs;
     int32_t targetDuration;
-    if (mPlaylist->meta()->findInt32("target-duration", &targetDuration)) {
+    if (mPlaylist->meta() != NULL
+            && mPlaylist->meta()->findInt32("target-duration", &targetDuration)) {
         do {
             --index;
             if (!mPlaylist->itemAt(index, NULL /* uri */, &itemMeta)
@@ -1692,12 +1707,12 @@ status_t PlaylistFetcher::extractAndQueueAccessUnitsFromTs(const sp<ABuffer> &bu
         sp<AMessage> extra = new AMessage;
         // Since we are using absolute timestamps, signal an offset of 0 to prevent
         // ATSParser from skewing the timestamps of access units.
-        extra->setInt64(IStreamListener::kKeyMediaTimeUs, 0);
+        extra->setInt64(kATSParserKeyMediaTimeUs, 0);
 
         // When adapting, signal a recent media time to the parser,
         // so that PTS wrap around is handled for the new variant.
         if (mStartTimeUs >= 0 && !mStartTimeUsRelative) {
-            extra->setInt64(IStreamListener::kKeyRecentMediaTimeUs, mStartTimeUs);
+            extra->setInt64(kATSParserKeyRecentMediaTimeUs, mStartTimeUs);
         }
 
         mTSParser->signalDiscontinuity(
@@ -1828,7 +1843,7 @@ status_t PlaylistFetcher::extractAndQueueAccessUnitsFromTs(const sp<ABuffer> &bu
                             (long long)timeUs - mStartTimeUs,
                             mIDRFound);
                     if (isAvc) {
-                        if (IsIDR(accessUnit)) {
+                        if (IsIDR(accessUnit->data(), accessUnit->size())) {
                             mVideoBuffer->clear();
                             FSLOGV(stream, "found IDR, clear mVideoBuffer");
                             mIDRFound = true;
@@ -2063,7 +2078,8 @@ status_t PlaylistFetcher::extractAndQueueAccessUnits(
         CHECK_NE(channel_configuration, 0u);
         bits.skipBits(2);  // original_copy, home
 
-        sp<MetaData> meta = MakeAACCodecSpecificData(
+        sp<MetaData> meta = new MetaData();
+        MakeAACCodecSpecificData(*meta,
                 profile, sampling_freq_index, channel_configuration);
 
         meta->setInt32(kKeyIsADTS, true);

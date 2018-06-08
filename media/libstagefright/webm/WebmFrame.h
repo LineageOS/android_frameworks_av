@@ -30,7 +30,7 @@ public:
     const bool mEos;
 
     WebmFrame();
-    WebmFrame(int type, bool key, uint64_t absTimecode, MediaBuffer *buf);
+    WebmFrame(int type, bool key, uint64_t absTimecode, MediaBufferBase *buf);
     ~WebmFrame() {}
 
     sp<WebmElement> SimpleBlock(uint64_t baseTimecode) const;

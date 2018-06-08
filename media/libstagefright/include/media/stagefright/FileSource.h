@@ -20,7 +20,7 @@
 
 #include <stdio.h>
 
-#include <media/stagefright/DataSource.h>
+#include <media/DataSource.h>
 #include <media/stagefright/MediaErrors.h>
 #include <utils/threads.h>
 #include <drm/DrmManagerClient.h>
@@ -44,8 +44,6 @@ public:
     }
 
     virtual sp<DecryptHandle> DrmInitialization(const char *mime);
-
-    virtual void getDrmInfo(sp<DecryptHandle> &handle, DrmManagerClient **client);
 
     virtual String8 toString() {
         return mName;

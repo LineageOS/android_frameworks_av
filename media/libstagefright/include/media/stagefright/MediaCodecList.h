@@ -18,8 +18,11 @@
 
 #define MEDIA_CODEC_LIST_H_
 
+#include <vector>
+
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AString.h>
+#include <media/stagefright/MediaCodecListWriter.h>
 #include <media/IMediaCodecList.h>
 #include <media/MediaCodecInfo.h>
 
@@ -34,8 +37,6 @@ namespace android {
 extern const char *kMaxEncoderInputBuffers;
 
 struct AMessage;
-
-struct MediaCodecListBuilderBase;
 
 struct MediaCodecList : public BnMediaCodecList {
     static sp<IMediaCodecList> getInstance();
@@ -72,8 +73,7 @@ struct MediaCodecList : public BnMediaCodecList {
             const char *mime,
             bool createEncoder,
             uint32_t flags,
-            Vector<AString> *matchingCodecs,
-            Vector<AString> *owners = nullptr);
+            Vector<AString> *matchingCodecs);
 
     static bool isSoftwareCodec(const AString &componentName);
 
@@ -94,9 +94,9 @@ private:
 
     /**
      * This constructor will call `buildMediaCodecList()` from the given
-     * `MediaCodecListBuilderBase` object.
+     * `MediaCodecListBuilderBase` objects.
      */
-    MediaCodecList(MediaCodecListBuilderBase* builder);
+    MediaCodecList(std::vector<MediaCodecListBuilderBase*> builders);
 
     ~MediaCodecList();
 
@@ -104,66 +104,6 @@ private:
 
     MediaCodecList(const MediaCodecList&) = delete;
     MediaCodecList& operator=(const MediaCodecList&) = delete;
-
-    friend MediaCodecListWriter;
-};
-
-/**
- * This class is to be used by a `MediaCodecListBuilderBase` instance to add
- * information to the associated `MediaCodecList` object.
- */
-struct MediaCodecListWriter {
-    /**
-     * Add a key-value pair to a `MediaCodecList`'s global settings.
-     *
-     * @param key Key.
-     * @param value Value.
-     */
-    void addGlobalSetting(const char* key, const char* value);
-    /**
-     * Create an add a new `MediaCodecInfo` object to a `MediaCodecList`, and
-     * return a `MediaCodecInfoWriter` object associated with the newly added
-     * `MediaCodecInfo`.
-     *
-     * @return The `MediaCodecInfoWriter` object associated with the newly
-     * added `MediaCodecInfo` object.
-     */
-    std::unique_ptr<MediaCodecInfoWriter> addMediaCodecInfo();
-private:
-    /**
-     * The associated `MediaCodecList` object.
-     */
-    MediaCodecList* mList;
-
-    /**
-     * Construct this writer object associated with the given `MediaCodecList`
-     * object.
-     *
-     * @param list The "base" `MediaCodecList` object.
-     */
-    MediaCodecListWriter(MediaCodecList* list);
-
-    friend MediaCodecList;
-};
-
-/**
- * This interface is to be used by `MediaCodecList` to fill its members with
- * appropriate information. `buildMediaCodecList()` will be called from a
- * `MediaCodecList` object during its construction.
- */
-struct MediaCodecListBuilderBase {
-    /**
-     * Build the `MediaCodecList` via the given `MediaCodecListWriter` interface.
-     *
-     * @param writer The writer interface.
-     * @return The status of the construction. `NO_ERROR` means success.
-     */
-    virtual status_t buildMediaCodecList(MediaCodecListWriter* writer) = 0;
-
-    /**
-     * The default destructor does nothing.
-     */
-    virtual ~MediaCodecListBuilderBase();
 };
 
 }  // namespace android

@@ -190,6 +190,7 @@ struct TestStatusListener : public CameraProviderManager::StatusListener {
             hardware::camera::common::V1_0::CameraDeviceStatus) override {}
     void onTorchStatusChanged(const String8 &,
             hardware::camera::common::V1_0::TorchModeStatus) override {}
+    void onNewProviderRegistered() override {}
 };
 
 TEST(CameraProviderManagerTest, InitializeTest) {

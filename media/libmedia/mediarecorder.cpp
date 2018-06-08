@@ -792,4 +792,52 @@ void MediaRecorder::died()
     notify(MEDIA_RECORDER_EVENT_ERROR, MEDIA_ERROR_SERVER_DIED, 0);
 }
 
+status_t MediaRecorder::setInputDevice(audio_port_handle_t deviceId)
+{
+    ALOGV("setInputDevice");
+
+    if (mMediaRecorder == NULL) {
+        ALOGE("media recorder is not initialized yet");
+        return INVALID_OPERATION;
+    }
+    return mMediaRecorder->setInputDevice(deviceId);
+}
+
+status_t MediaRecorder::getRoutedDeviceId(audio_port_handle_t* deviceId)
+{
+    ALOGV("getRoutedDeviceId");
+
+    if (mMediaRecorder == NULL) {
+        ALOGE("media recorder is not initialized yet");
+        return INVALID_OPERATION;
+    }
+    status_t status = mMediaRecorder->getRoutedDeviceId(deviceId);
+    if (status != NO_ERROR) {
+        *deviceId = AUDIO_PORT_HANDLE_NONE;
+    }
+    return status;
+}
+
+status_t MediaRecorder::enableAudioDeviceCallback(bool enabled)
+{
+    ALOGV("enableAudioDeviceCallback");
+
+    if (mMediaRecorder == NULL) {
+        ALOGE("media recorder is not initialized yet");
+        return INVALID_OPERATION;
+    }
+    return mMediaRecorder->enableAudioDeviceCallback(enabled);
+}
+
+status_t MediaRecorder::getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones)
+{
+    ALOGV("getActiveMicrophones");
+
+    if (mMediaRecorder == NULL) {
+        ALOGE("media recorder is not initialized yet");
+        return INVALID_OPERATION;
+    }
+    return mMediaRecorder->getActiveMicrophones(activeMicrophones);
+}
+
 } // namespace android

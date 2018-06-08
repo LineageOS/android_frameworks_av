@@ -17,10 +17,10 @@
 #ifndef MediaCodecSource_H_
 #define MediaCodecSource_H_
 
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AHandlerReflector.h>
 #include <media/stagefright/foundation/Mutexed.h>
-#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/PersistentSurface.h>
 
 namespace android {
@@ -30,7 +30,6 @@ struct AMessage;
 struct AReplyToken;
 class IGraphicBufferProducer;
 struct MediaCodec;
-class MetaData;
 
 struct MediaCodecSource : public MediaSource,
                           public MediaBufferObserver {
@@ -58,13 +57,13 @@ struct MediaCodecSource : public MediaSource,
     virtual status_t pause(MetaData *params);
     virtual sp<MetaData> getFormat();
     virtual status_t read(
-            MediaBuffer **buffer,
+            MediaBufferBase **buffer,
             const ReadOptions *options = NULL);
     virtual status_t setStopTimeUs(int64_t stopTimeUs);
 
 
     // MediaBufferObserver
-    virtual void signalBufferReturned(MediaBuffer *buffer);
+    virtual void signalBufferReturned(MediaBufferBase *buffer);
 
     // for AHandlerReflector
     void onMessageReceived(const sp<AMessage> &msg);
@@ -137,7 +136,7 @@ private:
     sp<AMessage> mEncoderActivityNotify;
     sp<IGraphicBufferProducer> mGraphicBufferProducer;
     sp<PersistentSurface> mPersistentSurface;
-    List<MediaBuffer *> mInputBufferQueue;
+    List<MediaBufferBase *> mInputBufferQueue;
     List<size_t> mAvailEncoderInputIndices;
     List<int64_t> mDecodingTimeQueue; // decoding time (us) for video
     int64_t mInputBufferTimeOffsetUs;
@@ -150,7 +149,7 @@ private:
 
     struct Output {
         Output();
-        List<MediaBuffer*> mBufferQueue;
+        List<MediaBufferBase*> mBufferQueue;
         bool mEncoderReachedEOS;
         status_t mErrorCode;
         Condition mCond;

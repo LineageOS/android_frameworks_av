@@ -24,6 +24,7 @@
 #include <utils/Vector.h>
 #include <utils/SortedVector.h>
 #include <binder/BinderService.h>
+#include <binder/IUidObserver.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
 #include <media/IAudioPolicyService.h>
@@ -33,8 +34,11 @@
 #include "AudioPolicyEffects.h"
 #include "managerdefault/AudioPolicyManager.h"
 
+#include <unordered_map>
 
 namespace android {
+
+using namespace std;
 
 // ----------------------------------------------------------------------------
 
@@ -68,17 +72,12 @@ public:
     virtual status_t setPhoneState(audio_mode_t state);
     virtual status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     virtual audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);
-    virtual audio_io_handle_t getOutput(audio_stream_type_t stream,
-                                        uint32_t samplingRate = 0,
-                                        audio_format_t format = AUDIO_FORMAT_DEFAULT,
-                                        audio_channel_mask_t channelMask = 0,
-                                        audio_output_flags_t flags =
-                                                AUDIO_OUTPUT_FLAG_NONE,
-                                        const audio_offload_info_t *offloadInfo = NULL);
+    virtual audio_io_handle_t getOutput(audio_stream_type_t stream);
     virtual status_t getOutputForAttr(const audio_attributes_t *attr,
                                       audio_io_handle_t *output,
                                       audio_session_t session,
                                       audio_stream_type_t *stream,
+                                      pid_t pid,
                                       uid_t uid,
                                       const audio_config_t *config,
                                       audio_output_flags_t flags,
@@ -98,16 +97,15 @@ public:
                                      audio_session_t session,
                                      pid_t pid,
                                      uid_t uid,
+                                     const String16& opPackageName,
                                      const audio_config_base_t *config,
                                      audio_input_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId = NULL,
                                      audio_port_handle_t *portId = NULL);
-    virtual status_t startInput(audio_io_handle_t input,
-                                audio_session_t session);
-    virtual status_t stopInput(audio_io_handle_t input,
-                               audio_session_t session);
-    virtual void releaseInput(audio_io_handle_t input,
-                              audio_session_t session);
+    virtual status_t startInput(audio_port_handle_t portId,
+                                bool *silenced);
+    virtual status_t stopInput(audio_port_handle_t portId);
+    virtual void releaseInput(audio_port_handle_t portId);
     virtual status_t initStreamVolume(audio_stream_type_t stream,
                                       int indexMin,
                                       int indexMax);
@@ -205,6 +203,12 @@ public:
     virtual float    getStreamVolumeDB(
                 audio_stream_type_t stream, int index, audio_devices_t device);
 
+    virtual status_t getSurroundFormats(unsigned int *numSurroundFormats,
+                                        audio_format_t *surroundFormats,
+                                        bool *surroundFormatsEnabled,
+                                        bool reported);
+    virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
+
             status_t doStopOutput(audio_io_handle_t output,
                                   audio_stream_type_t stream,
                                   audio_session_t session);
@@ -240,6 +244,68 @@ private:
     virtual             ~AudioPolicyService();
 
             status_t dumpInternals(int fd);
+
+    // Handles binder shell commands
+    virtual status_t shellCommand(int in, int out, int err, Vector<String16>& args);
+
+    // Sets whether the given UID records only silence
+    virtual void setRecordSilenced(uid_t uid, bool silenced);
+
+    // Overrides the UID state as if it is idle
+    status_t handleSetUidState(Vector<String16>& args, int err);
+
+    // Clears the override for the UID state
+    status_t handleResetUidState(Vector<String16>& args, int err);
+
+    // Gets the UID state
+    status_t handleGetUidState(Vector<String16>& args, int out, int err);
+
+    // Prints the shell command help
+    status_t printHelp(int out);
+
+    std::string getDeviceTypeStrForPortId(audio_port_handle_t portId);
+
+    // If recording we need to make sure the UID is allowed to do that. If the UID is idle
+    // then it cannot record and gets buffers with zeros - silence. As soon as the UID
+    // transitions to an active state we will start reporting buffers with data. This approach
+    // transparently handles recording while the UID transitions between idle/active state
+    // avoiding to get stuck in a state receiving non-empty buffers while idle or in a state
+    // receiving empty buffers while active.
+    class UidPolicy : public BnUidObserver, public virtual IBinder::DeathRecipient {
+    public:
+        explicit UidPolicy(wp<AudioPolicyService> service)
+                : mService(service), mObserverRegistered(false) {}
+
+        void registerSelf();
+        void unregisterSelf();
+
+        // IBinder::DeathRecipient implementation
+        void binderDied(const wp<IBinder> &who) override;
+
+        bool isUidActive(uid_t uid);
+
+        // BnUidObserver implementation
+        void onUidActive(uid_t uid) override;
+        void onUidGone(uid_t uid, bool disabled) override;
+        void onUidIdle(uid_t uid, bool disabled) override;
+
+        void addOverrideUid(uid_t uid, bool active) { updateOverrideUid(uid, active, true); }
+        void removeOverrideUid(uid_t uid) { updateOverrideUid(uid, false, false); }
+
+    private:
+        bool isServiceUid(uid_t uid) const;
+        void notifyService(uid_t uid, bool active);
+        void updateOverrideUid(uid_t uid, bool active, bool insert);
+        void updateUidCache(uid_t uid, bool active, bool insert);
+        void updateUidLocked(std::unordered_map<uid_t, bool> *uids,
+                uid_t uid, bool active, bool insert, bool *wasThere, bool *wasActive);
+
+        wp<AudioPolicyService> mService;
+        Mutex mLock;
+        bool mObserverRegistered;
+        std::unordered_map<uid_t, bool> mOverrideUids;
+        std::unordered_map<uid_t, bool> mCachedUids;
+    };
 
     // Thread used for tone playback and to send audio config commands to audio flinger
     // For tone playback, using a separate thread is necessary to avoid deadlock with mLock because
@@ -312,7 +378,6 @@ private:
                                                         const audio_config_base_t *deviceConfig,
                                                         audio_patch_handle_t patchHandle);
                     void        insertCommand_l(AudioCommand *command, int delayMs = 0);
-
     private:
         class AudioCommandData;
 
@@ -558,6 +623,48 @@ private:
               bool                          mAudioPortCallbacksEnabled;
     };
 
+    // --- AudioRecordClient ---
+    // Information about each registered AudioRecord client
+    // (between calls to getInputForAttr() and releaseInput())
+    class AudioRecordClient : public RefBase {
+    public:
+                AudioRecordClient(const audio_attributes_t attributes,
+                                  const audio_io_handle_t input, uid_t uid, pid_t pid,
+                                  const String16& opPackageName, const audio_session_t session) :
+                                      attributes(attributes),
+                                      input(input), uid(uid), pid(pid),
+                                      opPackageName(opPackageName), session(session),
+                                      active(false), isConcurrent(false), isVirtualDevice(false) {}
+        virtual ~AudioRecordClient() {}
+
+        const audio_attributes_t attributes; // source, flags ...
+        const audio_io_handle_t input;       // audio HAL input IO handle
+        const uid_t uid;                     // client UID
+        const pid_t pid;                     // client PID
+        const String16 opPackageName;        // client package name
+        const audio_session_t session;       // audio session ID
+        bool active;                   // Capture is active or inactive
+        bool isConcurrent;             // is allowed to concurrent capture
+        bool isVirtualDevice;          // uses virtual device: updated by APM::getInputForAttr()
+        audio_port_handle_t deviceId;  // selected input device port ID
+    };
+
+    // A class automatically clearing and restoring binder caller identity inside
+    // a code block (scoped variable)
+    // Declare one systematically before calling AudioPolicyManager methods so that they are
+    // executed with the same level of privilege as audioserver process.
+    class AutoCallerClear {
+    public:
+            AutoCallerClear() :
+                mToken(IPCThreadState::self()->clearCallingIdentity()) {}
+            ~AutoCallerClear() {
+                IPCThreadState::self()->restoreCallingIdentity(mToken);
+            }
+
+    private:
+        const   int64_t mToken;
+    };
+
     // Internal dump utilities.
     status_t dumpPermissionDenial(int fd);
 
@@ -581,8 +688,11 @@ private:
     // Manage all effects configured in audio_effects.conf
     sp<AudioPolicyEffects> mAudioPolicyEffects;
     audio_mode_t mPhoneState;
+
+    sp<UidPolicy> mUidPolicy;
+    DefaultKeyedVector< audio_port_handle_t, sp<AudioRecordClient> >   mAudioRecordClients;
 };
 
-}; // namespace android
+} // namespace android
 
 #endif // ANDROID_AUDIOPOLICYSERVICE_H

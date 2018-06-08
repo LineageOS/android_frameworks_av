@@ -553,6 +553,12 @@ CaptureSequencer::CaptureState CaptureSequencer::manageStandardCapture(
         return DONE;
     }
 
+    if (l.mParameters.isDeviceZslSupported) {
+        // If device ZSL is supported, drop all pending preview buffers to reduce the chance of
+        // rendering preview frames newer than the still frame.
+        client->getCameraDevice()->dropStreamBuffers(true, client->getPreviewStreamId());
+    }
+
     /**
      * Clear the streaming request for still-capture pictures
      *   (as opposed to i.e. video snapshots)

@@ -21,7 +21,7 @@
 #include "WebmFrameThread.h"
 #include "LinkedBlockingQueue.h"
 
-#include <media/stagefright/MediaSource.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/MediaWriter.h>
 
 #include <utils/Errors.h>
@@ -40,7 +40,7 @@ public:
     ~WebmWriter() { reset(); }
 
 
-    virtual status_t addSource(const sp<IMediaSource> &source);
+    virtual status_t addSource(const sp<MediaSource> &source);
     virtual status_t start(MetaData *param = NULL);
     virtual status_t stop();
     virtual status_t pause();
@@ -85,7 +85,7 @@ private:
         const char *mName;
         sp<WebmElement> (*mMakeTrack)(const sp<MetaData>&);
 
-        sp<IMediaSource> mSource;
+        sp<MediaSource> mSource;
         sp<WebmElement> mTrackEntry;
         sp<WebmFrameSourceThread> mThread;
         LinkedBlockingQueue<const sp<WebmFrame> > mSink;

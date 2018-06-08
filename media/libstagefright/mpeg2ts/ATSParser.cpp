@@ -21,19 +21,24 @@
 #include "AnotherPacketSource.h"
 #include "CasManager.h"
 #include "ESQueue.h"
-#include "include/avc_utils.h"
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
+#include <binder/IMemory.h>
+#include <binder/MemoryDealer.h>
 #include <cutils/native_handle.h>
+#include <hidlmemory/FrameworkUtils.h>
+#include <media/cas/DescramblerAPI.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/ByteUtils.h>
+#include <media/stagefright/foundation/MediaKeys.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
-#include <media/stagefright/Utils.h>
 #include <media/IStreamSource.h>
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
@@ -41,10 +46,10 @@
 #include <inttypes.h>
 
 namespace android {
-using hardware::hidl_handle;
-using hardware::hidl_memory;
+using hardware::fromHeap;
 using hardware::hidl_string;
 using hardware::hidl_vec;
+using hardware::HidlMemory;
 using namespace hardware::cas::V1_0;
 using namespace hardware::cas::native::V1_0;
 
@@ -76,7 +81,7 @@ struct ATSParser::Program : public RefBase {
 
     void signalEOS(status_t finalResult);
 
-    sp<MediaSource> getSource(SourceType type);
+    sp<AnotherPacketSource> getSource(SourceType type);
     bool hasSource(SourceType type) const;
 
     int64_t convertPTSToTimestamp(uint64_t PTS);
@@ -169,7 +174,7 @@ struct ATSParser::Stream : public RefBase {
     void signalEOS(status_t finalResult);
 
     SourceType getSourceType();
-    sp<MediaSource> getSource(SourceType type);
+    sp<AnotherPacketSource> getSource(SourceType type);
 
     bool isAudio() const;
     bool isVideo() const;
@@ -207,6 +212,7 @@ private:
     sp<AMessage> mSampleAesKeyItem;
     sp<IMemory> mMem;
     sp<MemoryDealer> mDealer;
+    sp<HidlMemory> mHidlMemory;
     hardware::cas::native::V1_0::SharedBuffer mDescramblerSrcBuffer;
     sp<ABuffer> mDescrambledBuffer;
     List<SubSampleInfo> mSubSamples;
@@ -273,7 +279,7 @@ private:
 ATSParser::SyncEvent::SyncEvent(off64_t offset)
     : mHasReturnedData(false), mOffset(offset), mTimeUs(0) {}
 
-void ATSParser::SyncEvent::init(off64_t offset, const sp<MediaSource> &source,
+void ATSParser::SyncEvent::init(off64_t offset, const sp<AnotherPacketSource> &source,
         int64_t timeUs, SourceType type) {
     mHasReturnedData = true;
     mOffset = offset;
@@ -341,7 +347,7 @@ void ATSParser::Program::signalDiscontinuity(
     if ((type & DISCONTINUITY_TIME)
             && extra != NULL
             && extra->findInt64(
-                IStreamListener::kKeyMediaTimeUs, &mediaTimeUs)) {
+                kATSParserKeyMediaTimeUs, &mediaTimeUs)) {
         mFirstPTSValid = false;
     }
 
@@ -640,9 +646,9 @@ int64_t ATSParser::Program::recoverPTS(uint64_t PTS_33bit) {
     return mLastRecoveredPTS;
 }
 
-sp<MediaSource> ATSParser::Program::getSource(SourceType type) {
+sp<AnotherPacketSource> ATSParser::Program::getSource(SourceType type) {
     for (size_t i = 0; i < mStreams.size(); ++i) {
-        sp<MediaSource> source = mStreams.editValueAt(i)->getSource(type);
+        sp<AnotherPacketSource> source = mStreams.editValueAt(i)->getSource(type);
         if (source != NULL) {
             return source;
         }
@@ -849,14 +855,9 @@ bool ATSParser::Stream::ensureBufferCapacity(size_t neededSize) {
         if (heap == NULL) {
             return false;
         }
-        native_handle_t* nativeHandle = native_handle_create(1, 0);
-        if (!nativeHandle) {
-            ALOGE("[stream %d] failed to create native handle", mElementaryPID);
-            return false;
-        }
-        nativeHandle->data[0] = heap->getHeapID();
-        mDescramblerSrcBuffer.heapBase = hidl_memory("ashmem",
-                hidl_handle(nativeHandle), heap->getSize());
+
+        mHidlMemory = fromHeap(heap);
+        mDescramblerSrcBuffer.heapBase = *mHidlMemory;
         mDescramblerSrcBuffer.offset = (uint64_t) offset;
         mDescramblerSrcBuffer.size = (uint64_t) size;
 
@@ -1032,7 +1033,7 @@ void ATSParser::Stream::signalDiscontinuity(
         uint64_t resumeAtPTS;
         if (extra != NULL
                 && extra->findInt64(
-                    IStreamListener::kKeyResumeAtPTS,
+                    kATSParserKeyResumeAtPTS,
                     (int64_t *)&resumeAtPTS)) {
             int64_t resumeAtMediaTimeUs =
                 mProgram->convertPTSToTimestamp(resumeAtPTS);
@@ -1387,6 +1388,9 @@ status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
 
     uint32_t sctrl = tsScramblingControl != 0 ?
             tsScramblingControl : pesScramblingControl;
+    if (mQueue->isScrambled()) {
+        sctrl |= DescramblerPlugin::kScrambling_Flag_PesHeader;
+    }
 
     // Perform the 1st pass descrambling if needed
     if (descrambleBytes > 0) {
@@ -1606,7 +1610,7 @@ ATSParser::SourceType ATSParser::Stream::getSourceType() {
     return NUM_SOURCE_TYPES;
 }
 
-sp<MediaSource> ATSParser::Stream::getSource(SourceType type) {
+sp<AnotherPacketSource> ATSParser::Stream::getSource(SourceType type) {
     switch (type) {
         case VIDEO:
         {
@@ -1694,12 +1698,12 @@ void ATSParser::signalDiscontinuity(
         DiscontinuityType type, const sp<AMessage> &extra) {
     int64_t mediaTimeUs;
     if ((type & DISCONTINUITY_TIME) && extra != NULL) {
-        if (extra->findInt64(IStreamListener::kKeyMediaTimeUs, &mediaTimeUs)) {
+        if (extra->findInt64(kATSParserKeyMediaTimeUs, &mediaTimeUs)) {
             mAbsoluteTimeAnchorUs = mediaTimeUs;
         }
         if ((mFlags & TS_TIMESTAMPS_ARE_ABSOLUTE)
                 && extra->findInt64(
-                    IStreamListener::kKeyRecentMediaTimeUs, &mediaTimeUs)) {
+                    kATSParserKeyRecentMediaTimeUs, &mediaTimeUs)) {
             if (mAbsoluteTimeAnchorUs >= 0ll) {
                 mediaTimeUs -= mAbsoluteTimeAnchorUs;
             }
@@ -2041,11 +2045,11 @@ status_t ATSParser::parseTS(ABitReader *br, SyncEvent *event) {
     return err;
 }
 
-sp<MediaSource> ATSParser::getSource(SourceType type) {
-    sp<MediaSource> firstSourceFound;
+sp<AnotherPacketSource> ATSParser::getSource(SourceType type) {
+    sp<AnotherPacketSource> firstSourceFound;
     for (size_t i = 0; i < mPrograms.size(); ++i) {
         const sp<Program> &program = mPrograms.editItemAt(i);
-        sp<MediaSource> source = program->getSource(type);
+        sp<AnotherPacketSource> source = program->getSource(type);
         if (source == NULL) {
             continue;
         }

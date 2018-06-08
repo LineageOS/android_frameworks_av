@@ -16,14 +16,14 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "ICrypto"
-#include <utils/Log.h>
-
 #include <binder/Parcel.h>
 #include <binder/IMemory.h>
-#include <media/ICrypto.h>
+#include <cutils/log.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
+#include <mediadrm/ICrypto.h>
+#include <utils/Log.h>
 
 namespace android {
 
@@ -341,10 +341,10 @@ status_t BnCrypto::onTransact(
                 return OK;
             }
 
-            CryptoPlugin::SubSample *subSamples =
-                    new CryptoPlugin::SubSample[numSubSamples];
+            std::unique_ptr<CryptoPlugin::SubSample[]> subSamples =
+                    std::make_unique<CryptoPlugin::SubSample[]>(numSubSamples);
 
-            data.read(subSamples,
+            data.read(subSamples.get(),
                     sizeof(CryptoPlugin::SubSample) * numSubSamples);
 
             DestinationBuffer destination;
@@ -362,6 +362,17 @@ status_t BnCrypto::onTransact(
                     reply->writeInt32(BAD_VALUE);
                     return OK;
                 }
+                sp<IMemory> dest = destination.mSharedMemory;
+                if (totalSize > dest->size() ||
+                        (size_t)dest->offset() > dest->size() - totalSize) {
+                    reply->writeInt32(BAD_VALUE);
+                    android_errorWriteLog(0x534e4554, "71389378");
+                    return OK;
+                }
+            } else {
+                reply->writeInt32(BAD_VALUE);
+                android_errorWriteLog(0x534e4554, "70526702");
+                return OK;
             }
 
             AString errorDetailMsg;
@@ -391,7 +402,7 @@ status_t BnCrypto::onTransact(
                 result = -EINVAL;
             } else {
                 result = decrypt(key, iv, mode, pattern, source, offset,
-                        subSamples, numSubSamples, destination, &errorDetailMsg);
+                        subSamples.get(), numSubSamples, destination, &errorDetailMsg);
             }
 
             reply->writeInt32(result);
@@ -410,9 +421,7 @@ status_t BnCrypto::onTransact(
                 }
             }
 
-            delete[] subSamples;
-            subSamples = NULL;
-
+            subSamples.reset();
             return OK;
         }
 

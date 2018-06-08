@@ -17,12 +17,18 @@
 #ifndef ANDROID_AUDIORECORD_H
 #define ANDROID_AUDIORECORD_H
 
+#include <binder/IMemory.h>
 #include <cutils/sched_policy.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTimestamp.h>
-#include <media/IAudioRecord.h>
+#include <media/MediaAnalyticsItem.h>
 #include <media/Modulo.h>
+#include <media/MicrophoneInfo.h>
+#include <utils/RefBase.h>
 #include <utils/threads.h>
+#include <vector>
+
+#include "android/media/IAudioRecord.h"
 
 namespace android {
 
@@ -182,7 +188,8 @@ public:
                                     audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE,
                                     uid_t uid = AUDIO_UID_INVALID,
                                     pid_t pid = -1,
-                                    const audio_attributes_t* pAttributes = NULL);
+                                    const audio_attributes_t* pAttributes = NULL,
+                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
 
     /* Terminates the AudioRecord and unregisters it from AudioFlinger.
      * Also destroys all resources associated with the AudioRecord.
@@ -220,7 +227,8 @@ public:
                             audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE,
                             uid_t uid = AUDIO_UID_INVALID,
                             pid_t pid = -1,
-                            const audio_attributes_t* pAttributes = NULL);
+                            const audio_attributes_t* pAttributes = NULL,
+                            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
 
     /* Result of constructing the AudioRecord. This must be checked for successful initialization
      * before using any AudioRecord API (except for set()), because using
@@ -249,6 +257,11 @@ public:
      * It can be modified if the AudioRecord is rerouted.
      */
             uint32_t    getNotificationPeriodInFrames() const { return mNotificationFramesAct; }
+
+    /*
+     * return metrics information for the current instance.
+     */
+            status_t getMetrics(MediaAnalyticsItem * &item);
 
     /* After it's created the track is not active. Call start() to
      * make it active. If set, the callback will start being called.
@@ -516,6 +529,16 @@ public:
     /* Get the flags */
             audio_input_flags_t getFlags() const { AutoMutex _l(mLock); return mFlags; }
 
+    /* Get active microphones. A empty vector of MicrophoneInfo will be passed as a parameter,
+     * the data will be filled when querying the hal.
+     */
+            status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+
+    /*
+     * Dumps the state of an audio record.
+     */
+            status_t    dump(int fd, const Vector<String16>& args) const;
+
 private:
     /* copying audio record objects is not allowed */
                         AudioRecord(const AudioRecord& other);
@@ -565,7 +588,7 @@ private:
 
             // caller must hold lock on mLock for all _l methods
 
-            status_t openRecord_l(const Modulo<uint32_t> &epoch, const String16& opPackageName);
+            status_t createRecord_l(const Modulo<uint32_t> &epoch, const String16& opPackageName);
 
             // FIXME enum is faster than strcmp() for parameter 'from'
             status_t restoreRecord_l(const char *from);
@@ -635,7 +658,7 @@ private:
 
     // Next 5 fields may be changed if IAudioRecord is re-created, but always != 0
     // provided the initial set() was successful
-    sp<IAudioRecord>        mAudioRecord;
+    sp<media::IAudioRecord> mAudioRecord;
     sp<IMemory>             mCblkMemory;
     audio_track_cblk_t*     mCblk;              // re-load after mLock.unlock()
     sp<IMemory>             mBufferMemory;
@@ -677,8 +700,40 @@ private:
                                               // May not match the app selection depending on other
                                               // activity and connected devices
     wp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
-    audio_port_handle_t    mPortId;  // unique ID allocated by audio policy
 
+private:
+    class MediaMetrics {
+      public:
+        MediaMetrics() : mAnalyticsItem(new MediaAnalyticsItem("audiorecord")),
+                         mCreatedNs(systemTime(SYSTEM_TIME_REALTIME)),
+                         mStartedNs(0), mDurationNs(0), mCount(0),
+                         mLastError(NO_ERROR) {
+        }
+        ~MediaMetrics() {
+            // mAnalyticsItem alloc failure will be flagged in the constructor
+            // don't log empty records
+            if (mAnalyticsItem->count() > 0) {
+                mAnalyticsItem->selfrecord();
+            }
+        }
+        void gather(const AudioRecord *record);
+        MediaAnalyticsItem *dup() { return mAnalyticsItem->dup(); }
+
+        void logStart(nsecs_t when) { mStartedNs = when; mCount++; }
+        void logStop(nsecs_t when) { mDurationNs += (when-mStartedNs); mStartedNs = 0;}
+        void markError(status_t errcode, const char *func)
+                 { mLastError = errcode; mLastErrorFunc = func;}
+      private:
+        std::unique_ptr<MediaAnalyticsItem> mAnalyticsItem;
+        nsecs_t mCreatedNs;     // XXX: perhaps not worth it in production
+        nsecs_t mStartedNs;
+        nsecs_t mDurationNs;
+        int32_t mCount;
+
+        status_t mLastError;
+        std::string mLastErrorFunc;
+    };
+    MediaMetrics mMediaMetrics;
 };
 
 }; // namespace android

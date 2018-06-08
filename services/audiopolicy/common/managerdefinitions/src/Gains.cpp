@@ -113,86 +113,104 @@ Gains::sFullScaleVolumeCurve[Volume::VOLCNT] = {
     {0, 0.0f}, {1, 0.0f}, {2, 0.0f}, {100, 0.0f}
 };
 
+const VolumeCurvePoint
+Gains::sHearingAidVolumeCurve[Volume::VOLCNT] = {
+    {1, -128.0f}, {20, -80.0f}, {60, -40.0f}, {100, 0.0f}
+};
+
 const VolumeCurvePoint *Gains::sVolumeProfiles[AUDIO_STREAM_CNT]
                                                   [DEVICE_CATEGORY_CNT] = {
     { // AUDIO_STREAM_VOICE_CALL
         Gains::sDefaultVoiceVolumeCurve, // DEVICE_CATEGORY_HEADSET
         Gains::sSpeakerVoiceVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         Gains::sSpeakerVoiceVolumeCurve, // DEVICE_CATEGORY_EARPIECE
-        Gains::sDefaultMediaVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sHearingAidVolumeCurve     // DEVICE_CATEGORY_HEARING_AID
     },
     { // AUDIO_STREAM_SYSTEM
         Gains::sHeadsetSystemVolumeCurve, // DEVICE_CATEGORY_HEADSET
         Gains::sDefaultSystemVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         Gains::sDefaultSystemVolumeCurve,  // DEVICE_CATEGORY_EARPIECE
-        Gains::sExtMediaSystemVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sExtMediaSystemVolumeCurve, // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sHearingAidVolumeCurve       // DEVICE_CATEGORY_HEARING_AID
     },
     { // AUDIO_STREAM_RING
         Gains::sDefaultVolumeCurve, // DEVICE_CATEGORY_HEADSET
         Gains::sSpeakerSonificationVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         Gains::sDefaultVolumeCurve,  // DEVICE_CATEGORY_EARPIECE
-        Gains::sExtMediaSystemVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sExtMediaSystemVolumeCurve, // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sHearingAidVolumeCurve // DEVICE_CATEGORY_HEARING_AID
     },
     { // AUDIO_STREAM_MUSIC
         Gains::sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_HEADSET
         Gains::sSpeakerMediaVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         Gains::sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_EARPIECE
-        Gains::sDefaultMediaVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sHearingAidVolumeCurve     // DEVICE_CATEGORY_HEARING_AID
     },
     { // AUDIO_STREAM_ALARM
         Gains::sDefaultVolumeCurve, // DEVICE_CATEGORY_HEADSET
         Gains::sSpeakerSonificationVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         Gains::sDefaultVolumeCurve,  // DEVICE_CATEGORY_EARPIECE
-        Gains::sExtMediaSystemVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sExtMediaSystemVolumeCurve, // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sHearingAidVolumeCurve // DEVICE_CATEGORY_HEARING_AID
     },
     { // AUDIO_STREAM_NOTIFICATION
         Gains::sDefaultVolumeCurve, // DEVICE_CATEGORY_HEADSET
         Gains::sSpeakerSonificationVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         Gains::sDefaultVolumeCurve,  // DEVICE_CATEGORY_EARPIECE
-        Gains::sExtMediaSystemVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sExtMediaSystemVolumeCurve, // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sHearingAidVolumeCurve // DEVICE_CATEGORY_HEARING_AID
     },
     { // AUDIO_STREAM_BLUETOOTH_SCO
         Gains::sDefaultVoiceVolumeCurve, // DEVICE_CATEGORY_HEADSET
         Gains::sSpeakerVoiceVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         Gains::sDefaultVoiceVolumeCurve, // DEVICE_CATEGORY_EARPIECE
-        Gains::sDefaultMediaVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sHearingAidVolumeCurve      // DEVICE_CATEGORY_HEARING_AID
     },
     { // AUDIO_STREAM_ENFORCED_AUDIBLE
         Gains::sHeadsetSystemVolumeCurve, // DEVICE_CATEGORY_HEADSET
         Gains::sDefaultSystemVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         Gains::sDefaultSystemVolumeCurve, // DEVICE_CATEGORY_EARPIECE
-        Gains::sExtMediaSystemVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sExtMediaSystemVolumeCurve, // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sHearingAidVolumeCurve       // DEVICE_CATEGORY_HEARING_AID
     },
     {  // AUDIO_STREAM_DTMF
         Gains::sHeadsetSystemVolumeCurve, // DEVICE_CATEGORY_HEADSET
         Gains::sDefaultSystemVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         Gains::sDefaultSystemVolumeCurve, // DEVICE_CATEGORY_EARPIECE
-        Gains::sExtMediaSystemVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sExtMediaSystemVolumeCurve, // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sHearingAidVolumeCurve       // DEVICE_CATEGORY_HEARING_AID
     },
     { // AUDIO_STREAM_TTS
       // "Transmitted Through Speaker": always silent except on DEVICE_CATEGORY_SPEAKER
         Gains::sSilentVolumeCurve,    // DEVICE_CATEGORY_HEADSET
         Gains::sFullScaleVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         Gains::sSilentVolumeCurve,    // DEVICE_CATEGORY_EARPIECE
-        Gains::sSilentVolumeCurve     // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sSilentVolumeCurve,    // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sHearingAidVolumeCurve  // DEVICE_CATEGORY_HEARING_AID
     },
     { // AUDIO_STREAM_ACCESSIBILITY
         Gains::sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_HEADSET
         Gains::sSpeakerMediaVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         Gains::sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_EARPIECE
-        Gains::sDefaultMediaVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sDefaultMediaVolumeCurve, // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sHearingAidVolumeCurve     // DEVICE_CATEGORY_HEARING_AID
     },
     { // AUDIO_STREAM_REROUTING
         Gains::sFullScaleVolumeCurve, // DEVICE_CATEGORY_HEADSET
         Gains::sFullScaleVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         Gains::sFullScaleVolumeCurve, // DEVICE_CATEGORY_EARPIECE
-        Gains::sFullScaleVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sFullScaleVolumeCurve, // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sFullScaleVolumeCurve  // DEVICE_CATEGORY_HEARING_AID
     },
     { // AUDIO_STREAM_PATCH
         Gains::sFullScaleVolumeCurve, // DEVICE_CATEGORY_HEADSET
         Gains::sFullScaleVolumeCurve, // DEVICE_CATEGORY_SPEAKER
         Gains::sFullScaleVolumeCurve, // DEVICE_CATEGORY_EARPIECE
-        Gains::sFullScaleVolumeCurve  // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sFullScaleVolumeCurve, // DEVICE_CATEGORY_EXT_MEDIA
+        Gains::sFullScaleVolumeCurve  // DEVICE_CATEGORY_HEARING_AID
     },
 };
 
@@ -235,4 +253,4 @@ float Gains::volIndexToDb(const VolumeCurvePoint *curve, int indexMin, int index
     return decibels;
 }
 
-}; // namespace android
+} // namespace android

@@ -12,7 +12,6 @@ cc_library_shared {
     shared_libs: [
         "liblog",
         "libutils",
-        "libbinder",
         "libandroid_runtime",
         "libmedia",
     ],

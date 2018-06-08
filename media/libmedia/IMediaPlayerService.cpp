@@ -20,7 +20,6 @@
 
 #include <binder/Parcel.h>
 #include <binder/IMemory.h>
-#include <media/IHDCP.h>
 #include <media/IMediaCodecList.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IMediaPlayerService.h>
@@ -39,8 +38,6 @@ enum {
     CREATE = IBinder::FIRST_CALL_TRANSACTION,
     CREATE_MEDIA_RECORDER,
     CREATE_METADATA_RETRIEVER,
-    GET_OMX,
-    MAKE_HDCP,
     ADD_BATTERY_DATA,
     PULL_BATTERY_DATA,
     LISTEN_FOR_REMOTE_DISPLAY,
@@ -81,21 +78,6 @@ public:
         data.writeString16(opPackageName);
         remote()->transact(CREATE_MEDIA_RECORDER, data, &reply);
         return interface_cast<IMediaRecorder>(reply.readStrongBinder());
-    }
-
-    virtual sp<IOMX> getOMX() {
-        Parcel data, reply;
-        data.writeInterfaceToken(IMediaPlayerService::getInterfaceDescriptor());
-        remote()->transact(GET_OMX, data, &reply);
-        return interface_cast<IOMX>(reply.readStrongBinder());
-    }
-
-    virtual sp<IHDCP> makeHDCP(bool createEncryptionModule) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IMediaPlayerService::getInterfaceDescriptor());
-        data.writeInt32(createEncryptionModule);
-        remote()->transact(MAKE_HDCP, data, &reply);
-        return interface_cast<IHDCP>(reply.readStrongBinder());
     }
 
     virtual void addBatteryData(uint32_t params) {
@@ -159,19 +141,6 @@ status_t BnMediaPlayerService::onTransact(
             CHECK_INTERFACE(IMediaPlayerService, data, reply);
             sp<IMediaMetadataRetriever> retriever = createMetadataRetriever();
             reply->writeStrongBinder(IInterface::asBinder(retriever));
-            return NO_ERROR;
-        } break;
-        case GET_OMX: {
-            CHECK_INTERFACE(IMediaPlayerService, data, reply);
-            sp<IOMX> omx = getOMX();
-            reply->writeStrongBinder(IInterface::asBinder(omx));
-            return NO_ERROR;
-        } break;
-        case MAKE_HDCP: {
-            CHECK_INTERFACE(IMediaPlayerService, data, reply);
-            bool createEncryptionModule = data.readInt32();
-            sp<IHDCP> hdcp = makeHDCP(createEncryptionModule);
-            reply->writeStrongBinder(IInterface::asBinder(hdcp));
             return NO_ERROR;
         } break;
         case ADD_BATTERY_DATA: {

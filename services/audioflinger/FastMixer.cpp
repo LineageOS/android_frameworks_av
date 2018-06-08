@@ -79,7 +79,6 @@ FastMixer::FastMixer() : FastThread("cycle_ms", "load_us"),
 
     unsigned i;
     for (i = 0; i < FastMixerState::sMaxFastTracks; ++i) {
-        mFastTrackNames[i] = -1;
         mGenerations[i] = 0;
     }
 #ifdef FAST_THREAD_STATISTICS
@@ -138,8 +137,6 @@ bool FastMixer::isSubClassCommand(FastThreadState::Command command)
 
 void FastMixer::onStateChange()
 {
-    // log that audio was turned on/off
-    LOG_AUDIO_STATE();
     const FastMixerState * const current = (const FastMixerState *) mCurrent;
     const FastMixerState * const previous = (const FastMixerState *) mPrevious;
     FastMixerDumpState * const dumpState = (FastMixerDumpState *) mDumpState;
@@ -192,7 +189,7 @@ void FastMixer::onStateChange()
             // FIXME new may block for unbounded time at internal mutex of the heap
             //       implementation; it would be better to have normal mixer allocate for us
             //       to avoid blocking here and to prevent possible priority inversion
-            mMixer = new AudioMixer(frameCount, mSampleRate, FastMixerState::sMaxFastTracks);
+            mMixer = new AudioMixer(frameCount, mSampleRate);
             // FIXME See the other FIXME at FastMixer::setNBLogWriter()
             const size_t mixerFrameSize = mSinkChannelCount
                     * audio_bytes_per_sample(mMixerBufferFormat);
@@ -219,11 +216,6 @@ void FastMixer::onStateChange()
             mWarmupNsMax = LONG_MAX;
         }
         mMixerBufferState = UNDEFINED;
-#if !LOG_NDEBUG
-        for (unsigned i = 0; i < FastMixerState::sMaxFastTracks; ++i) {
-            mFastTrackNames[i] = -1;
-        }
-#endif
         // we need to reconfigure all active tracks
         previousTrackMask = 0;
         mFastTracksGen = current->mFastTracksGen - 1;
@@ -237,7 +229,6 @@ void FastMixer::onStateChange()
     dumpState->mTrackMask = currentTrackMask;
     if (current->mFastTracksGen != mFastTracksGen) {
         ALOG_ASSERT(mMixerBuffer != NULL);
-        int name;
 
         // process removed tracks first to avoid running out of track names
         unsigned removedTracks = previousTrackMask & ~currentTrackMask;
@@ -247,13 +238,8 @@ void FastMixer::onStateChange()
             const FastTrack* fastTrack = &current->mFastTracks[i];
             ALOG_ASSERT(fastTrack->mBufferProvider == NULL);
             if (mMixer != NULL) {
-                name = mFastTrackNames[i];
-                ALOG_ASSERT(name >= 0);
-                mMixer->deleteTrackName(name);
+                mMixer->destroy(i);
             }
-#if !LOG_NDEBUG
-            mFastTrackNames[i] = -1;
-#endif
             // don't reset track dump state, since other side is ignoring it
             mGenerations[i] = fastTrack->mGeneration;
         }
@@ -265,12 +251,17 @@ void FastMixer::onStateChange()
             addedTracks &= ~(1 << i);
             const FastTrack* fastTrack = &current->mFastTracks[i];
             AudioBufferProvider *bufferProvider = fastTrack->mBufferProvider;
-            ALOG_ASSERT(bufferProvider != NULL && mFastTrackNames[i] == -1);
             if (mMixer != NULL) {
-                name = mMixer->getTrackName(fastTrack->mChannelMask,
+                const int name = i; // for clarity, choose name as fast track index.
+                status_t status = mMixer->create(
+                        name,
+                        fastTrack->mChannelMask,
                         fastTrack->mFormat, AUDIO_SESSION_OUTPUT_MIX);
-                ALOG_ASSERT(name >= 0);
-                mFastTrackNames[i] = name;
+                LOG_ALWAYS_FATAL_IF(status != NO_ERROR,
+                        "%s: cannot create track name"
+                        " %d, mask %#x, format %#x, sessionId %d in AudioMixer",
+                        __func__, name,
+                        fastTrack->mChannelMask, fastTrack->mFormat, AUDIO_SESSION_OUTPUT_MIX);
                 mMixer->setBufferProvider(name, bufferProvider);
                 mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::MAIN_BUFFER,
                         (void *)mMixerBuffer);
@@ -302,8 +293,7 @@ void FastMixer::onStateChange()
                 AudioBufferProvider *bufferProvider = fastTrack->mBufferProvider;
                 ALOG_ASSERT(bufferProvider != NULL);
                 if (mMixer != NULL) {
-                    name = mFastTrackNames[i];
-                    ALOG_ASSERT(name >= 0);
+                    const int name = i;
                     mMixer->setBufferProvider(name, bufferProvider);
                     if (fastTrack->mVolumeProvider == NULL) {
                         float f = AudioMixer::UNITY_GAIN_FLOAT;
@@ -336,7 +326,13 @@ void FastMixer::onStateChange()
 
 void FastMixer::onWork()
 {
-    LOG_HIST_TS();
+    // TODO: pass an ID parameter to indicate which time series we want to write to in NBLog.cpp
+    // Or: pass both of these into a single call with a boolean
+    if (mIsWarm) {
+        LOG_HIST_TS();
+    } else {
+        LOG_AUDIO_STATE();
+    }
     const FastMixerState * const current = (const FastMixerState *) mCurrent;
     FastMixerDumpState * const dumpState = (FastMixerDumpState *) mDumpState;
     const FastMixerState::Command command = mCommand;
@@ -374,8 +370,7 @@ void FastMixer::onWork()
             perTrackTimestamp.mPosition[ExtendedTimestamp::LOCATION_SERVER] = trackFramesWritten;
             fastTrack->mBufferProvider->onTimestamp(perTrackTimestamp);
 
-            int name = mFastTrackNames[i];
-            ALOG_ASSERT(name >= 0);
+            const int name = i;
             if (fastTrack->mVolumeProvider != NULL) {
                 gain_minifloat_packed_t vlr = fastTrack->mVolumeProvider->getVolumeLR();
                 float vlf = float_from_gain(gain_minifloat_unpack_left(vlr));

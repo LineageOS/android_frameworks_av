@@ -32,6 +32,7 @@
 #define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
 #define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * 1000)
 
+template <class T = aaudio_sharing_mode_t>
 const char *getSharingModeText(aaudio_sharing_mode_t mode) {
     const char *text = "unknown";
     switch (mode) {

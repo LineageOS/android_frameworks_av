@@ -19,6 +19,8 @@
 
 #include "MtpTypes.h"
 
+#include <string>
+
 namespace android {
 
 class MtpDataPacket;
@@ -97,7 +99,6 @@ public:
     void                setFormDateTime();
 
     void                print();
-    void                print(MtpPropertyValue& value, MtpString& buffer);
 
     inline bool         isDeviceProperty() const {
                             return (   ((mCode & 0xF000) == 0x5000)
@@ -110,6 +111,7 @@ private:
     MtpPropertyValue*   readArrayValues(MtpDataPacket& packet, uint32_t& length);
     void                writeArrayValues(MtpDataPacket& packet,
                                             MtpPropertyValue* values, uint32_t length);
+    void                print(MtpPropertyValue& value, std::string& buffer);
 };
 
 }; // namespace android

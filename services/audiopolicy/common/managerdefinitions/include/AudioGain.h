@@ -66,4 +66,4 @@ private:
     bool              mUseInChannelMask;
 };
 
-}; // namespace android
+} // namespace android

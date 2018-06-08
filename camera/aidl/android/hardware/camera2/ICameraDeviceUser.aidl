@@ -79,8 +79,9 @@ interface ICameraDeviceUser
      * <p>
      * @param operatingMode The kind of session to create; either NORMAL_MODE or
      *     CONSTRAINED_HIGH_SPEED_MODE. Must be a non-negative value.
+     * @param sessionParams Session wide camera parameters
      */
-    void endConfigure(int operatingMode);
+    void endConfigure(int operatingMode, in CameraMetadataNative sessionParams);
 
     void deleteStream(int streamId);
 
@@ -139,6 +140,8 @@ interface ICameraDeviceUser
     void tearDown(int streamId);
 
     void prepare2(int maxCount, int streamId);
+
+    void updateOutputConfiguration(int streamId, in OutputConfiguration outputConfiguration);
 
     void finalizeOutputConfigurations(int streamId, in OutputConfiguration outputConfiguration);
 }

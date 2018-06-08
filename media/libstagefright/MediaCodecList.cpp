@@ -19,28 +19,27 @@
 #include <utils/Log.h>
 
 #include "MediaCodecListOverrides.h"
+#include "StagefrightPluginLoader.h"
 
 #include <binder/IServiceManager.h>
 
 #include <media/IMediaCodecList.h>
 #include <media/IMediaPlayerService.h>
-#include <media/IMediaCodecService.h>
 #include <media/MediaCodecInfo.h>
-#include <media/MediaDefs.h>
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/OmxInfoBuilder.h>
 #include <media/stagefright/omx/OMXUtils.h>
-#include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
+#include <xmlparser/include/media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 
 #include <sys/stat.h>
 #include <utils/threads.h>
 
 #include <cutils/properties.h>
-#include <expat.h>
 
 #include <algorithm>
 
@@ -80,6 +79,31 @@ bool isProfilingNeeded() {
 
 OmxInfoBuilder sOmxInfoBuilder;
 
+Mutex sCodec2InfoBuilderMutex;
+std::unique_ptr<MediaCodecListBuilderBase> sCodec2InfoBuilder;
+
+MediaCodecListBuilderBase *GetCodec2InfoBuilder() {
+    Mutex::Autolock _l(sCodec2InfoBuilderMutex);
+    if (!sCodec2InfoBuilder) {
+        sCodec2InfoBuilder.reset(
+                StagefrightPluginLoader::GetCCodecInstance()->createBuilder());
+    }
+    return sCodec2InfoBuilder.get();
+}
+
+std::vector<MediaCodecListBuilderBase *> GetBuilders() {
+    std::vector<MediaCodecListBuilderBase *> builders;
+    // if plugin provides the input surface, we cannot use OMX video encoders.
+    // In this case, rely on plugin to provide list of OMX codecs that are usable.
+    sp<PersistentSurface> surfaceTest =
+        StagefrightPluginLoader::GetCCodecInstance()->createInputSurface();
+    if (surfaceTest == nullptr) {
+        builders.push_back(&sOmxInfoBuilder);
+    }
+    builders.push_back(GetCodec2InfoBuilder());
+    return builders;
+}
+
 }  // unnamed namespace
 
 // static
@@ -90,7 +114,7 @@ void *MediaCodecList::profilerThreadWrapper(void * /*arg*/) {
     ALOGV("Enter profilerThreadWrapper.");
     remove(kProfilingResults);  // remove previous result so that it won't be loaded to
                                 // the new MediaCodecList
-    sp<MediaCodecList> codecList(new MediaCodecList(&sOmxInfoBuilder));
+    sp<MediaCodecList> codecList(new MediaCodecList(GetBuilders()));
     if (codecList->initCheck() != OK) {
         ALOGW("Failed to create a new MediaCodecList, skipping codec profiling.");
         return nullptr;
@@ -100,7 +124,7 @@ void *MediaCodecList::profilerThreadWrapper(void * /*arg*/) {
     ALOGV("Codec profiling started.");
     profileCodecs(infos, kProfilingResults);
     ALOGV("Codec profiling completed.");
-    codecList = new MediaCodecList(&sOmxInfoBuilder);
+    codecList = new MediaCodecList(GetBuilders());
     if (codecList->initCheck() != OK) {
         ALOGW("Failed to parse profiling results.");
         return nullptr;
@@ -118,7 +142,7 @@ sp<IMediaCodecList> MediaCodecList::getLocalInstance() {
     Mutex::Autolock autoLock(sInitMutex);
 
     if (sCodecList == nullptr) {
-        MediaCodecList *codecList = new MediaCodecList(&sOmxInfoBuilder);
+        MediaCodecList *codecList = new MediaCodecList(GetBuilders());
         if (codecList->initCheck() == OK) {
             sCodecList = codecList;
 
@@ -171,11 +195,34 @@ sp<IMediaCodecList> MediaCodecList::getInstance() {
     return sRemoteList;
 }
 
-MediaCodecList::MediaCodecList(MediaCodecListBuilderBase* builder) {
+MediaCodecList::MediaCodecList(std::vector<MediaCodecListBuilderBase*> builders) {
     mGlobalSettings = new AMessage();
     mCodecInfos.clear();
-    MediaCodecListWriter writer(this);
-    mInitCheck = builder->buildMediaCodecList(&writer);
+    MediaCodecListWriter writer;
+    for (MediaCodecListBuilderBase *builder : builders) {
+        if (builder == nullptr) {
+            ALOGD("ignored a null builder");
+            continue;
+        }
+        mInitCheck = builder->buildMediaCodecList(&writer);
+        if (mInitCheck != OK) {
+            break;
+        }
+    }
+    writer.writeGlobalSettings(mGlobalSettings);
+    writer.writeCodecInfos(&mCodecInfos);
+    std::stable_sort(
+            mCodecInfos.begin(),
+            mCodecInfos.end(),
+            [](const sp<MediaCodecInfo> &info1, const sp<MediaCodecInfo> &info2) {
+                if (info2 == nullptr) {
+                    return false;
+                } else if (info1 == nullptr) {
+                    return true;
+                } else {
+                    return info1->rank() < info2->rank();
+                }
+            });
 }
 
 MediaCodecList::~MediaCodecList() {
@@ -183,23 +230,6 @@ MediaCodecList::~MediaCodecList() {
 
 status_t MediaCodecList::initCheck() const {
     return mInitCheck;
-}
-
-MediaCodecListWriter::MediaCodecListWriter(MediaCodecList* list) :
-    mList(list) {
-}
-
-void MediaCodecListWriter::addGlobalSetting(
-        const char* key, const char* value) {
-    mList->mGlobalSettings->setString(key, value);
-}
-
-std::unique_ptr<MediaCodecInfoWriter>
-        MediaCodecListWriter::addMediaCodecInfo() {
-    sp<MediaCodecInfo> info = new MediaCodecInfo();
-    mList->mCodecInfos.push_back(info);
-    return std::unique_ptr<MediaCodecInfoWriter>(
-            new MediaCodecInfoWriter(info.get()));
 }
 
 // legacy method for non-advanced codecs
@@ -262,7 +292,9 @@ const sp<AMessage> MediaCodecList::getGlobalSettings() const {
 //static
 bool MediaCodecList::isSoftwareCodec(const AString &componentName) {
     return componentName.startsWithIgnoreCase("OMX.google.")
-        || !componentName.startsWithIgnoreCase("OMX.");
+            || componentName.startsWithIgnoreCase("c2.android.")
+            || (!componentName.startsWithIgnoreCase("OMX.")
+                    && !componentName.startsWithIgnoreCase("c2."));
 }
 
 static int compareSoftwareCodecsFirst(const AString *name1, const AString *name2) {
@@ -273,7 +305,14 @@ static int compareSoftwareCodecsFirst(const AString *name1, const AString *name2
         return isSoftwareCodec2 - isSoftwareCodec1;
     }
 
-    // sort order 2: OMX codecs are first (lower)
+    // sort order 2: Codec 2.0 codecs are first (lower)
+    bool isC2_1 = name1->startsWithIgnoreCase("c2.");
+    bool isC2_2 = name2->startsWithIgnoreCase("c2.");
+    if (isC2_1 != isC2_2) {
+        return isC2_2 - isC2_1;
+    }
+
+    // sort order 3: OMX codecs are first (lower)
     bool isOMX1 = name1->startsWithIgnoreCase("OMX.");
     bool isOMX2 = name2->startsWithIgnoreCase("OMX.");
     return isOMX2 - isOMX1;
@@ -282,11 +321,8 @@ static int compareSoftwareCodecsFirst(const AString *name1, const AString *name2
 //static
 void MediaCodecList::findMatchingCodecs(
         const char *mime, bool encoder, uint32_t flags,
-        Vector<AString> *matches, Vector<AString> *owners) {
+        Vector<AString> *matches) {
     matches->clear();
-    if (owners != nullptr) {
-        owners->clear();
-    }
 
     const sp<IMediaCodecList> list = getInstance();
     if (list == nullptr) {
@@ -312,9 +348,6 @@ void MediaCodecList::findMatchingCodecs(
             ALOGV("skipping SW codec '%s'", componentName.c_str());
         } else {
             matches->push(componentName);
-            if (owners != nullptr) {
-                owners->push(AString(info->getOwnerName()));
-            }
             ALOGV("matching '%s'", componentName.c_str());
         }
     }
@@ -323,9 +356,6 @@ void MediaCodecList::findMatchingCodecs(
             property_get_bool("debug.stagefright.swcodec", false)) {
         matches->sort(compareSoftwareCodecsFirst);
     }
-}
-
-MediaCodecListBuilderBase::~MediaCodecListBuilderBase() {
 }
 
 }  // namespace android

@@ -80,6 +80,11 @@ struct AudioModeTraits
     typedef audio_mode_t Type;
     typedef Vector<Type> Collection;
 };
+struct AudioContentTraits
+{
+    typedef audio_content_type_t Type;
+    typedef Vector<Type> Collection;
+};
 struct UsageTraits
 {
     typedef audio_usage_t Type;
@@ -226,6 +231,7 @@ typedef TypeConverter<ChannelIndexTraits> ChannelIndexConverter;
 typedef TypeConverter<GainModeTraits> GainModeConverter;
 typedef TypeConverter<StreamTraits> StreamTypeConverter;
 typedef TypeConverter<AudioModeTraits> AudioModeConverter;
+typedef TypeConverter<AudioContentTraits> AudioContentTypeConverter;
 typedef TypeConverter<UsageTraits> UsageTypeConverter;
 typedef TypeConverter<SourceTraits> SourceTypeConverter;
 
@@ -240,6 +246,7 @@ template<> const ChannelIndexConverter::Table ChannelIndexConverter::mTable[];
 template<> const GainModeConverter::Table GainModeConverter::mTable[];
 template<> const StreamTypeConverter::Table StreamTypeConverter::mTable[];
 template<> const AudioModeConverter::Table AudioModeConverter::mTable[];
+template<> const AudioContentTypeConverter::Table AudioContentTypeConverter::mTable[];
 template<> const UsageTypeConverter::Table UsageTypeConverter::mTable[];
 template<> const SourceTypeConverter::Table SourceTypeConverter::mTable[];
 

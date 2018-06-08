@@ -30,4 +30,4 @@ public:
     status_t acquireSession(audio_session_t session, audio_io_handle_t ioHandle);
 };
 
-}; // namespace android
+} // namespace android

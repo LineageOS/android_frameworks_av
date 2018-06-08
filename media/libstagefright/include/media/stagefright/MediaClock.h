@@ -18,7 +18,8 @@
 
 #define MEDIA_CLOCK_H_
 
-#include <media/stagefright/foundation/ABase.h>
+#include <list>
+#include <media/stagefright/foundation/AHandler.h>
 #include <utils/Mutex.h>
 #include <utils/RefBase.h>
 
@@ -26,8 +27,14 @@ namespace android {
 
 struct AMessage;
 
-struct MediaClock : public RefBase {
+struct MediaClock : public AHandler {
+    enum {
+        TIMER_REASON_REACHED = 0,
+        TIMER_REASON_RESET = 1,
+    };
+
     MediaClock();
+    void init();
 
     void setStartingTimeMedia(int64_t startingTimeMediaUs);
 
@@ -54,15 +61,45 @@ struct MediaClock : public RefBase {
     // The result is saved in |outRealUs|.
     status_t getRealTimeFor(int64_t targetMediaUs, int64_t *outRealUs) const;
 
+    // request to set up a timer. The target time is |mediaTimeUs|, adjusted by
+    // system time of |adjustRealUs|. In other words, the wake up time is
+    // mediaTimeUs + (adjustRealUs / playbackRate)
+    void addTimer(const sp<AMessage> &notify, int64_t mediaTimeUs, int64_t adjustRealUs = 0);
+
+    void setNotificationMessage(const sp<AMessage> &msg);
+
+    void reset();
+
 protected:
     virtual ~MediaClock();
 
+    virtual void onMessageReceived(const sp<AMessage> &msg);
+
 private:
+    enum {
+        kWhatTimeIsUp = 'tIsU',
+    };
+
+    struct Timer {
+        Timer(const sp<AMessage> &notify, int64_t mediaTimeUs, int64_t adjustRealUs);
+        const sp<AMessage> mNotify;
+        int64_t mMediaTimeUs;
+        int64_t mAdjustRealUs;
+    };
+
     status_t getMediaTime_l(
             int64_t realUs,
             int64_t *outMediaUs,
             bool allowPastMaxTime) const;
 
+    void processTimers_l();
+
+    void updateAnchorTimesAndPlaybackRate_l(
+            int64_t anchorTimeMediaUs, int64_t anchorTimeRealUs , float playbackRate);
+
+    void notifyDiscontinuity_l();
+
+    sp<ALooper> mLooper;
     mutable Mutex mLock;
 
     int64_t mAnchorTimeMediaUs;
@@ -71,6 +108,10 @@ private:
     int64_t mStartingTimeMediaUs;
 
     float mPlaybackRate;
+
+    int32_t mGeneration;
+    std::list<Timer> mTimers;
+    sp<AMessage> mNotify;
 
     DISALLOW_EVIL_CONSTRUCTORS(MediaClock);
 };

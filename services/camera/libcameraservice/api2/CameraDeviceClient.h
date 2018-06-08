@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2013-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@
 #include "common/FrameProcessorBase.h"
 #include "common/Camera2ClientBase.h"
 
+using android::camera3::OutputStreamInfo;
+
 namespace android {
 
 struct CameraDeviceClientBase :
@@ -43,6 +45,7 @@ protected:
             const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
             const String16& clientPackageName,
             const String8& cameraId,
+            int api1CameraId,
             int cameraFacing,
             int clientPid,
             uid_t clientUid,
@@ -83,7 +86,8 @@ public:
 
     virtual binder::Status beginConfigure() override;
 
-    virtual binder::Status endConfigure(int operatingMode) override;
+    virtual binder::Status endConfigure(int operatingMode,
+            const hardware::camera2::impl::CameraMetadataNative& sessionParams) override;
 
     // Returns -EBUSY if device is not idle or in error state
     virtual binder::Status deleteStream(int streamId) override;
@@ -131,6 +135,10 @@ public:
     // Prepare stream by preallocating up to maxCount of its buffers
     virtual binder::Status prepare2(int32_t maxCount, int32_t streamId) override;
 
+    // Update an output configuration
+    virtual binder::Status updateOutputConfiguration(int streamId,
+            const hardware::camera2::params::OutputConfiguration &outputConfiguration) override;
+
     // Finalize the output configurations with surfaces not added before.
     virtual binder::Status finalizeOutputConfigurations(int32_t streamId,
             const hardware::camera2::params::OutputConfiguration &outputConfiguration) override;
@@ -149,7 +157,8 @@ public:
             int servicePid);
     virtual ~CameraDeviceClient();
 
-    virtual status_t      initialize(sp<CameraProviderManager> manager) override;
+    virtual status_t      initialize(sp<CameraProviderManager> manager,
+            const String8& monitorTags) override;
 
     virtual status_t      dump(int fd, const Vector<String16>& args);
 
@@ -206,24 +215,6 @@ private:
 
     }; // class StreamSurfaceId
 
-    // OutputStreamInfo describes the property of a camera stream.
-    class OutputStreamInfo {
-    public:
-        int width;
-        int height;
-        int format;
-        android_dataspace dataSpace;
-        uint64_t consumerUsage;
-        bool finalized = false;
-        OutputStreamInfo() :
-                width(-1), height(-1), format(-1), dataSpace(HAL_DATASPACE_UNKNOWN),
-                consumerUsage(0) {}
-        OutputStreamInfo(int _width, int _height, int _format, android_dataspace _dataSpace,
-                uint64_t _consumerUsage) :
-                    width(_width), height(_height), format(_format),
-                    dataSpace(_dataSpace), consumerUsage(_consumerUsage) {}
-    };
-
 private:
     /** ICameraDeviceUser interface-related private members */
 
@@ -232,8 +223,10 @@ private:
     static const int32_t FRAME_PROCESSOR_LISTENER_MIN_ID = 0;
     static const int32_t FRAME_PROCESSOR_LISTENER_MAX_ID = 0x7fffffffL;
 
+    std::vector<int32_t> mSupportedPhysicalRequestKeys;
+
     template<typename TProviderPtr>
-    status_t      initializeImpl(TProviderPtr providerPtr);
+    status_t      initializeImpl(TProviderPtr providerPtr, const String8& monitorTags);
 
     /** Utility members */
     binder::Status checkPidStatus(const char* checkLocation);
@@ -267,8 +260,21 @@ private:
     binder::Status createSurfaceFromGbp(OutputStreamInfo& streamInfo, bool isStreamInfoValid,
             sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp);
 
+
+    // Utility method to insert the surface into SurfaceMap
+    binder::Status insertGbpLocked(const sp<IGraphicBufferProducer>& gbp,
+            /*out*/SurfaceMap* surfaceMap, /*out*/Vector<int32_t>* streamIds,
+            /*out*/int32_t*  currentStreamId);
+
+    // Check that the physicalCameraId passed in is spported by the camera
+    // device.
+    bool checkPhysicalCameraId(const String8& physicalCameraId);
+
     // IGraphicsBufferProducer binder -> Stream ID + Surface ID for output streams
     KeyedVector<sp<IBinder>, StreamSurfaceId> mStreamMap;
+
+    // Stream ID -> OutputConfiguration. Used for looking up Surface by stream/surface index
+    KeyedVector<int32_t, hardware::camera2::params::OutputConfiguration> mConfiguredOutputs;
 
     struct InputStreamConfiguration {
         bool configured;

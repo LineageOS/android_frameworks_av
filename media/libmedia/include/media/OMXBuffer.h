@@ -91,6 +91,7 @@ public:
 
 private:
     friend struct OMXNodeInstance;
+    friend struct C2OMXNode;
 
     // This is needed temporarily for OMX HIDL transition.
     friend inline bool (::android::hardware::media::omx::V1_0::implementation::

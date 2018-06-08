@@ -34,8 +34,8 @@ class AudioMix;
 class AudioInputDescriptor: public AudioPortConfig, public AudioSessionInfoProvider
 {
 public:
-    explicit AudioInputDescriptor(const sp<IOProfile>& profile);
-    void setIoHandle(audio_io_handle_t ioHandle);
+    explicit AudioInputDescriptor(const sp<IOProfile>& profile,
+                                  AudioPolicyClientInterface *clientInterface);
     audio_port_handle_t getId() const;
     audio_module_handle_t getModuleHandle() const;
     uint32_t getOpenRefCount() const;
@@ -73,6 +73,20 @@ public:
 
     void setPatchHandle(audio_patch_handle_t handle);
 
+    status_t open(const audio_config_t *config,
+                  audio_devices_t device,
+                  const String8& address,
+                  audio_source_t source,
+                  audio_input_flags_t flags,
+                  audio_io_handle_t *input);
+    // Called when a stream is about to be started.
+    // Note: called after AudioSession::changeActiveCount(1)
+    status_t start();
+    // Called after a stream is stopped
+    // Note: called after AudioSession::changeActiveCount(-1)
+    void stop();
+    void close();
+
 private:
     audio_patch_handle_t          mPatchHandle;
     audio_port_handle_t           mId;
@@ -85,6 +99,7 @@ private:
     // a particular input started and prevent preemption of this active input by this session.
     // We also inherit sessions from the preempted input to avoid a 3 way preemption loop etc...
     SortedVector<audio_session_t> mPreemptedSessions;
+    AudioPolicyClientInterface *mClientInterface;
 };
 
 class AudioInputCollection :
@@ -112,4 +127,4 @@ public:
 };
 
 
-}; // namespace android
+} // namespace android

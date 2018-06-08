@@ -41,4 +41,4 @@ public:
     status_t dump(int fd, int spaces) const;
 };
 
-}; // namespace android
+} // namespace android

@@ -18,6 +18,7 @@
 #define ANDROID_MEDIA_MEDIAANALYTICSITEM_H
 
 #include <cutils/properties.h>
+#include <string>
 #include <sys/types.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
@@ -25,13 +26,10 @@
 #include <utils/StrongPointer.h>
 #include <utils/Timers.h>
 
-#include <media/stagefright/foundation/AString.h>
-
 namespace android {
 
-
-
 class IMediaAnalyticsService;
+class Parcel;
 
 // the class interface
 //
@@ -66,7 +64,7 @@ class MediaAnalyticsItem {
         // values can be "component/component"
         // basic values: "video", "audio", "drm"
         // XXX: need to better define the format
-        typedef AString Key;
+        typedef std::string Key;
         static const Key kKeyNone;              // ""
         static const Key kKeyAny;               // "*"
 
@@ -90,10 +88,6 @@ class MediaAnalyticsItem {
         MediaAnalyticsItem();
         MediaAnalyticsItem(Key);
         ~MediaAnalyticsItem();
-
-        // so clients can send intermediate values to be overlaid later
-        MediaAnalyticsItem &setFinalized(bool);
-        bool getFinalized() const;
 
         // SessionID ties multiple submissions for same key together
         // so that if video "height" and "width" are known at one point
@@ -170,18 +164,18 @@ class MediaAnalyticsItem {
         MediaAnalyticsItem &setUid(uid_t);
         uid_t getUid() const;
 
-        MediaAnalyticsItem &setPkgName(AString);
-        AString getPkgName() const;
+        MediaAnalyticsItem &setPkgName(const std::string &pkgName);
+        std::string getPkgName() const { return mPkgName; }
 
-        MediaAnalyticsItem &setPkgVersionCode(int32_t);
-        int32_t getPkgVersionCode() const;
+        MediaAnalyticsItem &setPkgVersionCode(int64_t);
+        int64_t getPkgVersionCode() const;
 
         // our serialization code for binder calls
         int32_t writeToParcel(Parcel *);
         int32_t readFromParcel(const Parcel&);
 
-        AString toString();
-        AString toString(int version);
+        std::string toString();
+        std::string toString(int version);
 
         // are we collecting analytics data
         static bool isEnabled();
@@ -204,8 +198,8 @@ class MediaAnalyticsItem {
         // to help validate that A doesn't mess with B's records
         pid_t     mPid;
         uid_t     mUid;
-        AString   mPkgName;
-        int32_t   mPkgVersionCode;
+        std::string   mPkgName;
+        int64_t   mPkgVersionCode;
 
         // let's reuse a binder connection
         static sp<IMediaAnalyticsService> sAnalyticsService;
@@ -243,7 +237,7 @@ class MediaAnalyticsItem {
         enum {
             kGrowProps = 10
         };
-        void growProps(int increment = kGrowProps);
+        bool growProps(int increment = kGrowProps);
         size_t findPropIndex(const char *name, size_t len);
         Prop *findProp(const char *name);
         Prop *allocateProp(const char *name);

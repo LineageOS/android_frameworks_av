@@ -26,9 +26,9 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 #include <media/hardware/HardwareAPI.h>
 #include <media/openmax/OMX_IndexExt.h>
-#include <media/MediaDefs.h>
 
 #include <ui/Fence.h>
 #include <ui/GraphicBufferMapper.h>
@@ -662,6 +662,19 @@ OMX_ERRORTYPE SoftVideoEncoderOMXComponent::getExtensionIndex(
         return OMX_ErrorNone;
     }
     return SimpleSoftOMXComponent::getExtensionIndex(name, index);
+}
+
+OMX_ERRORTYPE SoftVideoEncoderOMXComponent::validateInputBuffer(
+        const OMX_BUFFERHEADERTYPE *inputBufferHeader) {
+    size_t frameSize = mInputDataIsMeta ?
+            max(sizeof(VideoNativeMetadata), sizeof(VideoGrallocMetadata))
+            : mWidth * mHeight * 3 / 2;
+    if (inputBufferHeader->nFilledLen < frameSize) {
+        return OMX_ErrorUndefined;
+    } else if (inputBufferHeader->nFilledLen > frameSize) {
+        ALOGW("Input buffer contains more data than expected.");
+    }
+    return OMX_ErrorNone;
 }
 
 }  // namespace android

@@ -35,7 +35,8 @@ static const audio_format_t gDynamicFormat = AUDIO_FORMAT_DEFAULT;
  * A device mask for all audio input devices that are considered "virtual" when evaluating
  * active inputs in getActiveInputs()
  */
-#define APM_AUDIO_IN_DEVICE_VIRTUAL_ALL  (AUDIO_DEVICE_IN_REMOTE_SUBMIX)
+#define APM_AUDIO_IN_DEVICE_VIRTUAL_ALL (AUDIO_DEVICE_IN_REMOTE_SUBMIX|\
+        AUDIO_DEVICE_IN_BUS|AUDIO_DEVICE_IN_FM_TUNER)
 
 
 /**

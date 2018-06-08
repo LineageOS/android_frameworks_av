@@ -17,6 +17,8 @@
 #ifndef ANDROID_MEDIAPLAYER_H
 #define ANDROID_MEDIAPLAYER_H
 
+#include <media/mediaplayer_common.h>
+
 #include <arpa/inet.h>
 
 #include <binder/IMemory.h>
@@ -50,12 +52,15 @@ enum media_event_type {
     MEDIA_PAUSED            = 7,
     MEDIA_STOPPED           = 8,
     MEDIA_SKIPPED           = 9,
+    MEDIA_NOTIFY_TIME       = 98,
     MEDIA_TIMED_TEXT        = 99,
     MEDIA_ERROR             = 100,
     MEDIA_INFO              = 200,
     MEDIA_SUBTITLE_DATA     = 201,
     MEDIA_META_DATA         = 202,
     MEDIA_DRM_INFO          = 210,
+    MEDIA_TIME_DISCONTINUITY = 211,
+    MEDIA_AUDIO_ROUTING_CHANGED = 10000,
 };
 
 // Generic error codes for the media player framework.  Errors are fatal, the
@@ -186,16 +191,6 @@ enum media_player_invoke_ids {
     INVOKE_ID_GET_SELECTED_TRACK = 7
 };
 
-// Keep MEDIA_TRACK_TYPE_* in sync with MediaPlayer.java.
-enum media_track_type {
-    MEDIA_TRACK_TYPE_UNKNOWN = 0,
-    MEDIA_TRACK_TYPE_VIDEO = 1,
-    MEDIA_TRACK_TYPE_AUDIO = 2,
-    MEDIA_TRACK_TYPE_TIMEDTEXT = 3,
-    MEDIA_TRACK_TYPE_SUBTITLE = 4,
-    MEDIA_TRACK_TYPE_METADATA = 5,
-};
-
 // ----------------------------------------------------------------------------
 // ref-counted object for callbacks
 class MediaPlayerListener: virtual public RefBase
@@ -225,7 +220,6 @@ public:
             status_t        setVideoSurfaceTexture(
                                     const sp<IGraphicBufferProducer>& bufferProducer);
             status_t        setListener(const sp<MediaPlayerListener>& listener);
-            status_t        getDefaultBufferingSettings(BufferingSettings* buffering /* nonnull */);
             status_t        getBufferingSettings(BufferingSettings* buffering /* nonnull */);
             status_t        setBufferingSettings(const BufferingSettings& buffering);
             status_t        prepare();
@@ -245,6 +239,7 @@ public:
             status_t        seekTo(
                     int msec,
                     MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC);
+            status_t        notifyAt(int64_t mediaTimeUs);
             status_t        getCurrentPosition(int *msec);
             status_t        getDuration(int *msec);
             status_t        reset();
@@ -266,13 +261,17 @@ public:
             status_t        setRetransmitEndpoint(const char* addrString, uint16_t port);
             status_t        setNextMediaPlayer(const sp<MediaPlayer>& player);
 
-            VolumeShaper::Status applyVolumeShaper(
-                                    const sp<VolumeShaper::Configuration>& configuration,
-                                    const sp<VolumeShaper::Operation>& operation);
-            sp<VolumeShaper::State> getVolumeShaperState(int id);
+            media::VolumeShaper::Status applyVolumeShaper(
+                                    const sp<media::VolumeShaper::Configuration>& configuration,
+                                    const sp<media::VolumeShaper::Operation>& operation);
+            sp<media::VolumeShaper::State> getVolumeShaperState(int id);
             // Modular DRM
             status_t        prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId);
             status_t        releaseDrm();
+            // AudioRouting
+            status_t        setOutputDevice(audio_port_handle_t deviceId);
+            audio_port_handle_t getRoutedDeviceId();
+            status_t        enableAudioDeviceCallback(bool enabled);
 
 private:
             void            clear_l();
@@ -309,7 +308,6 @@ private:
     float                       mSendLevel;
     struct sockaddr_in          mRetransmitEndpoint;
     bool                        mRetransmitEndpointValid;
-    BufferingSettings           mCurrentBufferingSettings;
 };
 
 }; // namespace android

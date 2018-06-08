@@ -29,6 +29,7 @@ public:
     virtual int         requestPriority(/*pid_t*/int32_t pid, /*pid_t*/int32_t tid,
                                         int32_t prio, bool isForApp, bool asynchronous) = 0;
 
+    virtual int         requestCpusetBoost(bool enable, const sp<IInterface>& client) = 0;
 };
 
 class BnSchedulingPolicyService : public BnInterface<ISchedulingPolicyService>

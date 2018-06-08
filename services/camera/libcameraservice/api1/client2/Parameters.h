@@ -177,6 +177,8 @@ struct Parameters {
     bool isZslReprocessPresent;
     // Whether the device supports enableZsl.
     bool isDeviceZslSupported;
+    // Whether the device supports geometric distortion correction
+    bool isDistortionCorrectionSupported;
 
     // Overall camera state
     enum State {
@@ -207,6 +209,11 @@ struct Parameters {
     static const int32_t FPS_MARGIN = 1;
     // Max FPS for default parameters
     static const int32_t MAX_DEFAULT_FPS = 30;
+    // Minimum FPS for a size to be listed in supported preview/video sizes
+    // Set to slightly less than 30.0 to have some tolerance margin
+    static constexpr double MIN_PREVIEW_RECORD_FPS = 29.97;
+    // Maximum frame duration for a size to be listed in supported preview/video sizes
+    static constexpr int64_t MAX_PREVIEW_RECORD_DURATION_NS = 1e9 / MIN_PREVIEW_RECORD_FPS;
 
     // Full static camera info, object owned by someone else, such as
     // Camera2Device.
@@ -233,9 +240,11 @@ struct Parameters {
             }
         };
         DefaultKeyedVector<uint8_t, OverrideModes> sceneModeOverrides;
+        bool isExternalCamera;
         float minFocalLength;
         bool useFlexibleYuv;
         Size maxJpegSize;
+        Size maxZslSize;
     } fastInfo;
 
     // Quirks information; these are short-lived flags to enable workarounds for
@@ -380,6 +389,7 @@ private:
     Vector<Size> availablePreviewSizes;
     Vector<Size> availableVideoSizes;
     // Get size list (that are no larger than limit) from static metadata.
+    // This method filtered size with minFrameDuration < MAX_PREVIEW_RECORD_DURATION_NS
     status_t getFilteredSizes(Size limit, Vector<Size> *sizes);
     // Get max size (from the size array) that matches the given aspect ratio.
     Size getMaxSizeForRatio(float ratio, const int32_t* sizeArray, size_t count);

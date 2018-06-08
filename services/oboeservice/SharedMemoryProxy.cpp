@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudioService"
+#define LOG_TAG "SharedMemoryProxy"
 //#define LOG_NDEBUG 0
 #include <log/log.h>
 
@@ -45,12 +45,12 @@ aaudio_result_t SharedMemoryProxy::open(int originalFD, int32_t capacityInBytes)
 
     mProxyFileDescriptor = ashmem_create_region("AAudioProxyDataBuffer", mSharedMemorySizeInBytes);
     if (mProxyFileDescriptor < 0) {
-        ALOGE("SharedMemoryProxy::open() ashmem_create_region() failed %d", errno);
+        ALOGE("open() ashmem_create_region() failed %d", errno);
         return AAUDIO_ERROR_INTERNAL;
     }
     int err = ashmem_set_prot_region(mProxyFileDescriptor, PROT_READ|PROT_WRITE);
     if (err < 0) {
-        ALOGE("SharedMemoryProxy::open() ashmem_set_prot_region() failed %d", errno);
+        ALOGE("open() ashmem_set_prot_region() failed %d", errno);
         close(mProxyFileDescriptor);
         mProxyFileDescriptor = -1;
         return AAUDIO_ERROR_INTERNAL; // TODO convert errno to a better AAUDIO_ERROR;
@@ -62,7 +62,7 @@ aaudio_result_t SharedMemoryProxy::open(int originalFD, int32_t capacityInBytes)
                          MAP_SHARED,
                          mOriginalFileDescriptor, 0);
     if (mOriginalSharedMemory == MAP_FAILED) {
-        ALOGE("SharedMemoryProxy::open() original mmap(%d) failed %d (%s)",
+        ALOGE("open() original mmap(%d) failed %d (%s)",
                 mOriginalFileDescriptor, errno, strerror(errno));
         return AAUDIO_ERROR_INTERNAL; // TODO convert errno to a better AAUDIO_ERROR;
     }
@@ -73,7 +73,7 @@ aaudio_result_t SharedMemoryProxy::open(int originalFD, int32_t capacityInBytes)
                          MAP_SHARED,
                          mProxyFileDescriptor, 0);
     if (mProxySharedMemory != mOriginalSharedMemory) {
-        ALOGE("SharedMemoryProxy::open() proxy mmap(%d) failed %d", mProxyFileDescriptor, errno);
+        ALOGE("open() proxy mmap(%d) failed %d", mProxyFileDescriptor, errno);
         munmap(mOriginalSharedMemory, mSharedMemorySizeInBytes);
         mOriginalSharedMemory = nullptr;
         close(mProxyFileDescriptor);

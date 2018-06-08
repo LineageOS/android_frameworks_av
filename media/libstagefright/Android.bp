@@ -4,37 +4,114 @@ cc_library_headers {
     vendor_available: true,
 }
 
+cc_library_static {
+    name: "libstagefright_esds",
+
+    srcs: ["ESDS.cpp"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+        diag: {
+            cfi: true,
+        },
+    },
+
+    shared_libs: ["libmedia"],
+}
+
+cc_library_static {
+    name: "libstagefright_metadatautils",
+
+    srcs: ["MetaDataUtils.cpp"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+        diag: {
+            cfi: true,
+        },
+    },
+
+    shared_libs: ["libmedia"],
+}
+
+cc_library_shared {
+    name: "libstagefright_codecbase",
+
+    export_include_dirs: ["include"],
+
+    srcs: [
+        "CodecBase.cpp",
+        "FrameRenderTracker.cpp",
+        "MediaCodecListWriter.cpp",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    shared_libs: [
+        "libgui",
+        "liblog",
+        "libmedia_omx",
+        "libstagefright_foundation",
+        "libui",
+        "libutils",
+        "android.hardware.cas.native@1.0",
+    ],
+
+    sanitize: {
+        cfi: true,
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        diag: {
+            cfi: true,
+        },
+    },
+}
+
 cc_library_shared {
     name: "libstagefright",
 
     srcs: [
         "ACodec.cpp",
         "ACodecBufferChannel.cpp",
-        "AACExtractor.cpp",
         "AACWriter.cpp",
-        "AMRExtractor.cpp",
         "AMRWriter.cpp",
         "AudioPlayer.cpp",
+        "AudioPresentationInfo.cpp",
         "AudioSource.cpp",
         "BufferImpl.cpp",
-        "CodecBase.cpp",
         "CallbackDataSource.cpp",
+        "CallbackMediaSource.cpp",
         "CameraSource.cpp",
         "CameraSourceTimeLapse.cpp",
         "DataConverter.cpp",
-        "DataSource.cpp",
+        "DataSourceFactory.cpp",
         "DataURISource.cpp",
-        "ESDS.cpp",
         "FileSource.cpp",
-        "FLACExtractor.cpp",
-        "FrameRenderTracker.cpp",
+        "FrameDecoder.cpp",
         "HTTPBase.cpp",
         "HevcUtils.cpp",
-        "ItemTable.cpp",
+        "InterfaceUtils.cpp",
         "JPEGSource.cpp",
-        "MP3Extractor.cpp",
         "MPEG2TSWriter.cpp",
-        "MPEG4Extractor.cpp",
         "MPEG4Writer.cpp",
         "MediaAdapter.cpp",
         "MediaClock.cpp",
@@ -42,83 +119,72 @@ cc_library_shared {
         "MediaCodecList.cpp",
         "MediaCodecListOverrides.cpp",
         "MediaCodecSource.cpp",
-        "MediaExtractor.cpp",
+        "MediaExtractorFactory.cpp",
         "MediaSync.cpp",
-        "MidiExtractor.cpp",
         "http/MediaHTTP.cpp",
         "MediaMuxer.cpp",
-        "MediaSource.cpp",
         "NuCachedSource2.cpp",
         "NuMediaExtractor.cpp",
         "OMXClient.cpp",
         "OmxInfoBuilder.cpp",
-        "OggExtractor.cpp",
-        "SampleIterator.cpp",
-        "SampleTable.cpp",
+        "RemoteMediaExtractor.cpp",
+        "RemoteMediaSource.cpp",
         "SimpleDecodingSource.cpp",
         "SkipCutBuffer.cpp",
         "StagefrightMediaScanner.cpp",
         "StagefrightMetadataRetriever.cpp",
-        "SurfaceMediaSource.cpp",
+        "StagefrightPluginLoader.cpp",
         "SurfaceUtils.cpp",
-        "ThrottledSource.cpp",
         "Utils.cpp",
-        "VBRISeeker.cpp",
+        "ThrottledSource.cpp",
         "VideoFrameScheduler.cpp",
-        "WAVExtractor.cpp",
-        "XINGSeeker.cpp",
-        "avc_utils.cpp",
     ],
 
     shared_libs: [
         "libaudioutils",
         "libbinder",
         "libcamera_client",
-        "libcrypto",
         "libcutils",
         "libdl",
         "libdrmframework",
-        "libexpat",
         "libgui",
+        "libion",
         "liblog",
         "libmedia",
+        "libmedia_omx",
         "libaudioclient",
+        "libmediaextractor",
         "libmediametrics",
         "libmediautils",
         "libnetd_client",
-        "libsonivox",
         "libui",
         "libutils",
-        "libvorbisidec",
-        "libmediadrm",
-        "libnativewindow",
-
         "libmedia_helper",
-        "libstagefright_omx_utils",
-        "libstagefright_flacdec",
+        "libstagefright_codecbase",
         "libstagefright_foundation",
+        "libstagefright_omx_utils",
         "libstagefright_xmlparser",
         "libRScpp",
+        "libhidlallocatorutils",
         "libhidlbase",
         "libhidlmemory",
+        "libziparchive",
         "android.hidl.allocator@1.0",
-        "android.hidl.memory@1.0",
-        "android.hidl.token@1.0-utils",
-        "android.hardware.cas@1.0",
         "android.hardware.cas.native@1.0",
         "android.hardware.media.omx@1.0",
+        "android.hardware.graphics.allocator@2.0",
+        "android.hardware.graphics.mapper@2.0",
     ],
 
     static_libs: [
         "libstagefright_color_conversion",
         "libyuv_static",
-        "libstagefright_matroska",
         "libstagefright_mediafilter",
         "libstagefright_webm",
         "libstagefright_timedtext",
         "libvpx",
         "libwebm",
-        "libstagefright_mpeg2ts",
+        "libstagefright_esds",
         "libstagefright_id3",
         "libFLAC",
     ],
@@ -126,6 +192,92 @@ cc_library_shared {
     export_shared_lib_headers: [
         "libmedia",
         "android.hidl.allocator@1.0",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    cflags: [
+        "-Wno-multichar",
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    version_script: "exports.lds",
+
+    product_variables: {
+        debuggable: {
+            // enable experiments only in userdebug and eng builds
+            cflags: ["-DENABLE_STAGEFRIGHT_EXPERIMENTS"],
+        },
+    },
+
+    sanitize: {
+        cfi: true,
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        diag: {
+            cfi: true,
+        },
+    },
+}
+
+cc_library {
+    name: "libstagefright_player2",
+
+    srcs: [
+        "CallbackDataSource.cpp",
+        "CallbackMediaSource.cpp",
+        "DataSourceFactory.cpp",
+        "DataURISource.cpp",
+        "FileSource.cpp",
+        "HTTPBase.cpp",
+        "HevcUtils.cpp",
+        "InterfaceUtils.cpp",
+        "MediaClock.cpp",
+        "MediaExtractorFactory.cpp",
+        "NdkUtils.cpp",
+        "NuCachedSource2.cpp",
+        "RemoteMediaExtractor.cpp",
+        "RemoteMediaSource.cpp",
+        "Utils.cpp",
+        "VideoFrameScheduler.cpp",
+        "http/MediaHTTP.cpp",
+    ],
+
+    shared_libs: [
+        "libbinder",
+        "libcutils",
+        "libdrmframework",
+        "libgui",
+        "liblog",
+        "libmedia_player2_util",
+        "libaudioclient",
+        "libmediaextractor",
+        "libmediametrics",
+        "libmediautils",
+        "libnetd_client",
+        "libui",
+        "libutils",
+        "libmedia_helper",
+        "libstagefright_foundation",
+        "libziparchive",
+    ],
+
+    static_libs: [
+        "libstagefright_esds",
+    ],
+
+    header_libs:[
+        "media_plugin_headers",
+    ],
+
+    export_shared_lib_headers: [
+        "libmedia_player2_util",
     ],
 
     export_include_dirs: [
@@ -159,6 +311,7 @@ cc_library_shared {
 }
 
 subdirs = [
+    "codec2",
     "codecs/*",
     "colorconversion",
     "filters",
@@ -167,13 +320,11 @@ subdirs = [
     "http",
     "httplive",
     "id3",
-    "matroska",
     "mpeg2ts",
     "omx",
     "rtsp",
     "tests",
     "timedtext",
     "webm",
-    "wifi-display",
     "xmlparser",
 ]

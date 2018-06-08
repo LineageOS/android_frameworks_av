@@ -17,8 +17,8 @@
 #ifndef MEDIA_ADAPTER_H
 #define MEDIA_ADAPTER_H
 
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MetaData.h>
 #include <utils/threads.h>
@@ -40,13 +40,13 @@ public:
     virtual status_t stop();
     virtual sp<MetaData> getFormat();
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
     /////////////////////////////////////////////////
     // Inherited functions from MediaBufferObserver
     /////////////////////////////////////////////////
 
-    virtual void signalBufferReturned(MediaBuffer *buffer);
+    virtual void signalBufferReturned(MediaBufferBase *buffer);
 
     /////////////////////////////////////////////////
     // Non-inherited functions:

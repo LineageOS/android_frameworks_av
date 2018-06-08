@@ -17,6 +17,8 @@
 #ifndef ANDROID_SERVERS_STREAMSPLITTER_H
 #define ANDROID_SERVERS_STREAMSPLITTER_H
 
+#include <unordered_set>
+
 #include <gui/IConsumerListener.h>
 #include <gui/IProducerListener.h>
 #include <gui/BufferItemConsumer.h>
@@ -51,22 +53,25 @@ public:
 
     // Connect to the stream splitter by creating buffer queue and connecting it
     // with output surfaces.
-    status_t connect(const std::vector<sp<Surface> >& surfaces,
-            uint64_t consumerUsage, size_t halMaxBuffers,
-            sp<Surface>* consumer);
+    status_t connect(const std::unordered_map<size_t, sp<Surface>> &surfaces,
+            uint64_t consumerUsage, uint64_t producerUsage, size_t halMaxBuffers, uint32_t width,
+            uint32_t height, android::PixelFormat format, sp<Surface>* consumer);
 
     // addOutput adds an output BufferQueue to the splitter. The splitter
     // connects to outputQueue as a CPU producer, and any buffers queued
-    // to the input will be queued to each output. It is assumed that all of the
-    // outputs are added before any buffers are queued on the input. If any
-    // output is abandoned by its consumer, the splitter will abandon its input
-    // queue (see onAbandoned).
+    // to the input will be queued to each output. If any  output is abandoned
+    // by its consumer, the splitter will abandon its input queue (see onAbandoned).
     //
     // A return value other than NO_ERROR means that an error has occurred and
     // outputQueue has not been added to the splitter. BAD_VALUE is returned if
     // outputQueue is NULL. See IGraphicBufferProducer::connect for explanations
     // of other error codes.
-    status_t addOutput(const sp<Surface>& outputQueue);
+    status_t addOutput(size_t surfaceId, const sp<Surface>& outputQueue);
+
+    //removeOutput will remove a BufferQueue that was previously added to
+    //the splitter outputs. Any pending buffers in the BufferQueue will get
+    //reclaimed.
+    status_t removeOutput(size_t surfaceId);
 
     // Notification that the graphic buffer has been released to the input
     // BufferQueue. The buffer should be reused by the camera device instead of
@@ -117,10 +122,8 @@ private:
     // onFrameAvailable call to proceed.
     void onBufferReleasedByOutput(const sp<IGraphicBufferProducer>& from);
 
-    // This is the implementation of onBufferReleasedByOutput without the mutex locked.
-    // It could either be called from onBufferReleasedByOutput or from
-    // onFrameAvailable when a buffer in the async buffer queue is overwritten.
-    void onBufferReleasedByOutputLocked(const sp<IGraphicBufferProducer>& from);
+    // Called by outputBufferLocked when a buffer in the async buffer queue got replaced.
+    void onBufferReplacedLocked(const sp<IGraphicBufferProducer>& from, size_t surfaceId);
 
     // When this is called, the splitter disconnects from (i.e., abandons) its
     // input queue and signals any waiting onFrameAvailable calls to wake up.
@@ -131,7 +134,14 @@ private:
 
     // Decrement the buffer's reference count. Once the reference count becomes
     // 0, return the buffer back to the input BufferQueue.
-    void decrementBufRefCountLocked(uint64_t id, const sp<IGraphicBufferProducer>& from);
+    void decrementBufRefCountLocked(uint64_t id, size_t surfaceId);
+
+    // Check for and handle any output surface dequeue errors.
+    void handleOutputDequeueStatusLocked(status_t res, int slot);
+
+    // Handles released output surface buffers.
+    void returnOutputBufferLocked(const sp<Fence>& fence, const sp<IGraphicBufferProducer>& from,
+            size_t surfaceId, int slot);
 
     // This is a thin wrapper class that lets us determine which BufferQueue
     // the IProducerListener::onBufferReleased callback is associated with. We
@@ -168,7 +178,7 @@ private:
 
         // Returns the new value
         // Only called while mMutex is held
-        size_t decrementReferenceCountLocked();
+        size_t decrementReferenceCountLocked(size_t surfaceId);
 
         const std::vector<size_t> requestedSurfaces() const { return mRequestedSurfaces; }
 
@@ -191,13 +201,15 @@ private:
     // Must be accessed through RefBase
     virtual ~Camera3StreamSplitter();
 
-    status_t addOutputLocked(const sp<Surface>& outputQueue);
+    status_t addOutputLocked(size_t surfaceId, const sp<Surface>& outputQueue);
+
+    status_t removeOutputLocked(size_t surfaceId);
 
     // Send a buffer to particular output, and increment the reference count
     // of the buffer. If this output is abandoned, the buffer's reference count
     // won't be incremented.
     status_t outputBufferLocked(const sp<IGraphicBufferProducer>& output,
-            const BufferItem& bufferItem);
+            const BufferItem& bufferItem, size_t surfaceId);
 
     // Get unique name for the buffer queue consumer
     String8 getUniqueConsumerName();
@@ -205,14 +217,14 @@ private:
     // Helper function to get the BufferQueue slot where a particular buffer is attached to.
     int getSlotForOutputLocked(const sp<IGraphicBufferProducer>& gbp,
             const sp<GraphicBuffer>& gb);
-    // Helper function to remove the buffer from the BufferQueue slot
-    status_t removeSlotForOutputLocked(const sp<IGraphicBufferProducer>& gbp,
-            const sp<GraphicBuffer>& gb);
-
 
     // Sum of max consumer buffers for all outputs
     size_t mMaxConsumerBuffers = 0;
     size_t mMaxHalBuffers = 0;
+    uint32_t mWidth = 0;
+    uint32_t mHeight = 0;
+    android::PixelFormat mFormat = android::PIXEL_FORMAT_NONE;
+    uint64_t mProducerUsage = 0;
 
     static const nsecs_t kDequeueBufferTimeout   = s2ns(1); // 1 sec
 
@@ -223,7 +235,15 @@ private:
     sp<BufferItemConsumer> mBufferItemConsumer;
     sp<Surface> mSurface;
 
-    std::vector<sp<IGraphicBufferProducer> > mOutputs;
+    //Map graphic buffer ids -> buffer items
+    std::unordered_map<uint64_t, BufferItem> mInputSlots;
+
+    //Map surface ids -> gbp outputs
+    std::unordered_map<int, sp<IGraphicBufferProducer> > mOutputs;
+
+    //Map surface ids -> consumer buffer count
+    std::unordered_map<int, size_t > mConsumerBufferCount;
+
     // Map of GraphicBuffer IDs (GraphicBuffer::getId()) to buffer tracking
     // objects (which are mostly for counting how many outputs have released the
     // buffer, but also contain merged release fences).
@@ -241,6 +261,10 @@ private:
     typedef std::vector<sp<GraphicBuffer>> OutputSlots;
     std::unordered_map<sp<IGraphicBufferProducer>, std::unique_ptr<OutputSlots>,
             GBPHash> mOutputSlots;
+
+    //A set of buffers that could potentially stay in some of the outputs after removal
+    //and therefore should be detached from the input queue.
+    std::unordered_set<uint64_t> mDetachedBuffers;
 
     // Latest onFrameAvailable return value
     std::atomic<status_t> mOnFrameAvailableRes{0};

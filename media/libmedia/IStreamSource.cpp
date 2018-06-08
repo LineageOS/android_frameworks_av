@@ -20,23 +20,12 @@
 
 #include <media/IStreamSource.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/MediaKeys.h>
 
 #include <binder/IMemory.h>
 #include <binder/Parcel.h>
 
 namespace android {
-
-// static
-const char *const IStreamListener::kKeyResumeAtPTS = "resume-at-PTS";
-
-// static
-const char *const IStreamListener::kKeyDiscontinuityMask = "discontinuity-mask";
-
-// static
-const char *const IStreamListener::kKeyMediaTimeUs = "media-time-us";
-
-// static
-const char *const IStreamListener::kKeyRecentMediaTimeUs = "recent-media-time-us";
 
 enum {
     // IStreamSource

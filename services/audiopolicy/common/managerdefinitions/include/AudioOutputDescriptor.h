@@ -101,8 +101,6 @@ public:
 
     status_t    dump(int fd);
 
-    void setIoHandle(audio_io_handle_t ioHandle);
-
     virtual audio_devices_t device() const;
     virtual bool sharesHwModuleWith(const sp<AudioOutputDescriptor>& outputDesc);
     virtual audio_devices_t supportedDevices();
@@ -121,6 +119,23 @@ public:
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
                            const struct audio_port_config *srcConfig = NULL) const;
     virtual void toAudioPort(struct audio_port *port) const;
+
+            status_t open(const audio_config_t *config,
+                          audio_devices_t device,
+                          const String8& address,
+                          audio_stream_type_t stream,
+                          audio_output_flags_t flags,
+                          audio_io_handle_t *output);
+            // Called when a stream is about to be started
+            // Note: called before changeRefCount(1);
+            status_t start();
+            // Called after a stream is stopped.
+            // Note: called after changeRefCount(-1);
+            void stop();
+            void close();
+            status_t openDuplicating(const sp<SwAudioOutputDescriptor>& output1,
+                                     const sp<SwAudioOutputDescriptor>& output2,
+                                     audio_io_handle_t *ioHandle);
 
     const sp<IOProfile> mProfile;          // I/O profile this output derives from
     audio_io_handle_t mIoHandle;           // output handle
@@ -175,6 +190,15 @@ public:
     bool isStreamActiveRemotely(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
 
     /**
+     * return whether a stream is playing, but not on a "remote" device.
+     * Override to change the definition of a local/remote playback.
+     * Used for instance by policy manager to alter the speaker playback ("speaker safe" behavior)
+     * when media plays or not locally.
+     * For the base implementation, "remotely" means playing during screen mirroring.
+     */
+    bool isStreamActiveLocally(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
+
+    /**
      * returns the A2DP output handle if it is open or 0 otherwise
      */
     audio_io_handle_t getA2dpOutput() const;
@@ -218,4 +242,4 @@ public:
 };
 
 
-}; // namespace android
+} // namespace android

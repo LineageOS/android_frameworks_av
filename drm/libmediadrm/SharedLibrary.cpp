@@ -19,7 +19,7 @@
 
 #include <dlfcn.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/SharedLibrary.h>
+#include <mediadrm/SharedLibrary.h>
 #include <utils/Log.h>
 
 namespace android {

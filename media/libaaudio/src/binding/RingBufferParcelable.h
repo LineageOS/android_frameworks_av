@@ -66,11 +66,12 @@ public:
 
     aaudio_result_t resolve(SharedMemoryParcelable *memoryParcels, RingBufferDescriptor *descriptor);
 
-    aaudio_result_t validate();
-
     void dump();
 
 private:
+
+    aaudio_result_t validate() const;
+
     SharedRegionParcelable  mReadCounterParcelable;
     SharedRegionParcelable  mWriteCounterParcelable;
     SharedRegionParcelable  mDataParcelable;

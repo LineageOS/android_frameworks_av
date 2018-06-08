@@ -434,6 +434,14 @@ void SoftMPEG4Encoder::onQueueFilled(OMX_U32 /* portIndex */) {
         }
 
         if (inHeader->nFilledLen > 0) {
+            OMX_ERRORTYPE error = validateInputBuffer(inHeader);
+            if (error != OMX_ErrorNone) {
+                ALOGE("b/69065651");
+                android_errorWriteLog(0x534e4554, "69065651");
+                mSignalledError = true;
+                notify(OMX_EventError, error, 0, 0);
+                return;
+            }
             const uint8_t *inputData = NULL;
             if (mInputDataIsMeta) {
                 inputData =

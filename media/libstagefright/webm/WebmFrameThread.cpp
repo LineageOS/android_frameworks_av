@@ -252,7 +252,7 @@ void WebmFrameMediaSourceThread::clearFlags() {
 }
 
 WebmFrameMediaSourceThread::WebmFrameMediaSourceThread(
-        const sp<IMediaSource>& source,
+        const sp<MediaSource>& source,
         int type,
         LinkedBlockingQueue<const sp<WebmFrame> >& sink,
         uint64_t timeCodeScale,
@@ -337,7 +337,7 @@ void WebmFrameMediaSourceThread::run() {
     mStartTimeUs = kUninitialized;
 
     status_t err = OK;
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     while (!mDone && (err = mSource->read(&buffer, NULL)) == OK) {
         if (buffer->range_length() == 0) {
             buffer->release();
@@ -345,8 +345,8 @@ void WebmFrameMediaSourceThread::run() {
             continue;
         }
 
-        sp<MetaData> md = buffer->meta_data();
-        CHECK(md->findInt64(kKeyTime, &timestampUs));
+        MetaDataBase &md = buffer->meta_data();
+        CHECK(md.findInt64(kKeyTime, &timestampUs));
         if (mStartTimeUs == kUninitialized) {
             mStartTimeUs = timestampUs;
         }
@@ -374,7 +374,7 @@ void WebmFrameMediaSourceThread::run() {
         CHECK_GE(timestampUs, 0ll);
 
         int32_t isSync = false;
-        md->findInt32(kKeyIsSyncFrame, &isSync);
+        md.findInt32(kKeyIsSyncFrame, &isSync);
         const sp<WebmFrame> f = new WebmFrame(
             mType,
             isSync,

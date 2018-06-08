@@ -222,7 +222,7 @@ void profileCodecs(
     AString supportMultipleSecureCodecs = "true";
     for (const auto& info : infos) {
         AString name = info->getCodecName();
-        if (name.startsWith("OMX.google.") ||
+        if (name.startsWith("OMX.google.") || name.startsWith("c2.android.") ||
                 // TODO: reenable below codecs once fixed
                 name == "OMX.Intel.VideoDecoder.VP9.hybrid") {
             continue;

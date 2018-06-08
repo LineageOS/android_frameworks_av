@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 The Android Open Source Project
+ * Copyright (C) 2012-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -154,7 +154,8 @@ status_t CallbackProcessor::updateStream(const Parameters &params) {
                 callbackFormat, params.previewFormat);
         res = device->createStream(mCallbackWindow,
                 params.previewWidth, params.previewHeight, callbackFormat,
-                HAL_DATASPACE_V0_JFIF, CAMERA3_STREAM_ROTATION_0, &mCallbackStreamId);
+                HAL_DATASPACE_V0_JFIF, CAMERA3_STREAM_ROTATION_0, &mCallbackStreamId,
+                String8());
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create output stream for callbacks: "
                     "%s (%d)", __FUNCTION__, mId,

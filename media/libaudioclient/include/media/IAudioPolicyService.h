@@ -55,16 +55,12 @@ public:
     virtual status_t setForceUse(audio_policy_force_use_t usage,
                                     audio_policy_forced_cfg_t config) = 0;
     virtual audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage) = 0;
-    virtual audio_io_handle_t getOutput(audio_stream_type_t stream,
-                                        uint32_t samplingRate = 0,
-                                        audio_format_t format = AUDIO_FORMAT_DEFAULT,
-                                        audio_channel_mask_t channelMask = 0,
-                                        audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
-                                        const audio_offload_info_t *offloadInfo = NULL) = 0;
+    virtual audio_io_handle_t getOutput(audio_stream_type_t stream) = 0;
     virtual status_t getOutputForAttr(const audio_attributes_t *attr,
                                       audio_io_handle_t *output,
                                       audio_session_t session,
                                       audio_stream_type_t *stream,
+                                      pid_t pid,
                                       uid_t uid,
                                       const audio_config_t *config,
                                       audio_output_flags_t flags,
@@ -84,16 +80,15 @@ public:
                               audio_session_t session,
                               pid_t pid,
                               uid_t uid,
+                              const String16& opPackageName,
                               const audio_config_base_t *config,
                               audio_input_flags_t flags,
                               audio_port_handle_t *selectedDeviceId,
                               audio_port_handle_t *portId) = 0;
-    virtual status_t startInput(audio_io_handle_t input,
-                                audio_session_t session) = 0;
-    virtual status_t stopInput(audio_io_handle_t input,
-                               audio_session_t session) = 0;
-    virtual void releaseInput(audio_io_handle_t input,
-                              audio_session_t session) = 0;
+    virtual status_t startInput(audio_port_handle_t portId,
+                                bool *silenced) = 0;
+    virtual status_t stopInput(audio_port_handle_t portId) = 0;
+    virtual void releaseInput(audio_port_handle_t portId) = 0;
     virtual status_t initStreamVolume(audio_stream_type_t stream,
                                       int indexMin,
                                       int indexMax) = 0;
@@ -171,6 +166,12 @@ public:
     virtual status_t getMasterMono(bool *mono) = 0;
     virtual float    getStreamVolumeDB(
             audio_stream_type_t stream, int index, audio_devices_t device) = 0;
+
+    virtual status_t getSurroundFormats(unsigned int *numSurroundFormats,
+                                        audio_format_t *surroundFormats,
+                                        bool *surroundFormatsEnabled,
+                                        bool reported) = 0;
+    virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled) = 0;
 };
 
 
@@ -183,6 +184,10 @@ public:
                                     const Parcel& data,
                                     Parcel* reply,
                                     uint32_t flags = 0);
+private:
+    void sanetizeAudioAttributes(audio_attributes_t* attr);
+    status_t sanitizeEffectDescriptor(effect_descriptor_t* desc);
+    status_t sanitizeAudioPortConfig(struct audio_port_config* config);
 };
 
 // ----------------------------------------------------------------------------

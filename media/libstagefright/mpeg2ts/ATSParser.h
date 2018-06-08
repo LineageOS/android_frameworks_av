@@ -20,9 +20,9 @@
 
 #include <sys/types.h>
 
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/MediaSource.h>
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
 #include <utils/RefBase.h>
@@ -81,13 +81,13 @@ struct ATSParser : public RefBase {
     struct SyncEvent {
         explicit SyncEvent(off64_t offset);
 
-        void init(off64_t offset, const sp<MediaSource> &source,
+        void init(off64_t offset, const sp<AnotherPacketSource> &source,
                 int64_t timeUs, SourceType type);
 
         bool hasReturnedData() const { return mHasReturnedData; }
         void reset();
         off64_t getOffset() const { return mOffset; }
-        const sp<MediaSource> &getMediaSource() const { return mMediaSource; }
+        const sp<AnotherPacketSource> &getMediaSource() const { return mMediaSource; }
         int64_t getTimeUs() const { return mTimeUs; }
         SourceType getType() const { return mType; }
 
@@ -100,7 +100,7 @@ struct ATSParser : public RefBase {
          */
         off64_t mOffset;
         /* The media source object for this event. */
-        sp<MediaSource> mMediaSource;
+        sp<AnotherPacketSource> mMediaSource;
         /* The timestamp of the sync frame. */
         int64_t mTimeUs;
         SourceType mType;
@@ -126,7 +126,7 @@ struct ATSParser : public RefBase {
 
     void signalEOS(status_t finalResult);
 
-    sp<MediaSource> getSource(SourceType type);
+    sp<AnotherPacketSource> getSource(SourceType type);
     bool hasSource(SourceType type) const;
 
     bool PTSTimeDeltaEstablished();

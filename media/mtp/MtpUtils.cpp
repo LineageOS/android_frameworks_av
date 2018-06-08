@@ -36,6 +36,13 @@ namespace android {
 
 constexpr unsigned long FILE_COPY_SIZE = 262144;
 
+static void access_ok(const char *path) {
+    if (access(path, F_OK) == -1) {
+        // Ignore. Failure could be common in cases of delete where
+        // the metadata was updated through other paths.
+    }
+}
+
 /*
 DateTime strings follow a compatible subset of the definition found in ISO 8601, and
 take the form of a Unicode string formatted as: "YYYYMMDDThhmmss.s". In this
@@ -101,6 +108,7 @@ int makeFolder(const char *path) {
     } else {
         chown((const char *)path, getuid(), FILE_GROUP);
     }
+    access_ok(path);
     return ret;
 }
 
@@ -181,6 +189,7 @@ int copyFile(const char *fromPath, const char *toPath) {
     LOG(DEBUG) << "Copied a file with MTP. Time: " << diff.count() << " s, Size: " << length <<
         ", Rate: " << ((double) length) / diff.count() << " bytes/s";
     chown(toPath, getuid(), FILE_GROUP);
+    access_ok(toPath);
     return ret == -1 ? -1 : 0;
 }
 
@@ -204,29 +213,55 @@ void deleteRecursive(const char* path) {
         if (name[0] == '.' && (name[1] == 0 || (name[1] == '.' && name[2] == 0))) {
             continue;
         }
-        pathStr.append(name);
+        string childPath = pathStr + name;
+        int success;
         if (entry->d_type == DT_DIR) {
-            deleteRecursive(pathStr.c_str());
-            rmdir(pathStr.c_str());
+            deleteRecursive(childPath.c_str());
+            success = rmdir(childPath.c_str());
         } else {
-            unlink(pathStr.c_str());
+            success = unlink(childPath.c_str());
         }
+        access_ok(childPath.c_str());
+        if (success == -1)
+            PLOG(ERROR) << "Deleting path " << childPath << " failed";
     }
     closedir(dir);
 }
 
-void deletePath(const char* path) {
+bool deletePath(const char* path) {
     struct stat statbuf;
+    int success;
     if (stat(path, &statbuf) == 0) {
         if (S_ISDIR(statbuf.st_mode)) {
+            // rmdir will fail if the directory is non empty, so
+            // there is no need to keep errors from deleteRecursive
             deleteRecursive(path);
-            rmdir(path);
+            success = rmdir(path);
         } else {
-            unlink(path);
+            success = unlink(path);
         }
     } else {
-        PLOG(ERROR) << "deletePath stat failed for " << path;;
+        PLOG(ERROR) << "deletePath stat failed for " << path;
+        return false;
     }
+    if (success == -1)
+        PLOG(ERROR) << "Deleting path " << path << " failed";
+    access_ok(path);
+    return success == 0;
+}
+
+int renameTo(const char *oldPath, const char *newPath) {
+    int ret = rename(oldPath, newPath);
+    access_ok(oldPath);
+    access_ok(newPath);
+    return ret;
+}
+
+// Calls access(2) on the path to update underlying filesystems,
+// then closes the fd.
+void closeObjFd(int fd, const char *path) {
+    close(fd);
+    access_ok(path);
 }
 
 }  // namespace android

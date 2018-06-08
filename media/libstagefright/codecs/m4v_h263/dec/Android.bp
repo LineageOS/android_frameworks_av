@@ -53,6 +53,8 @@ cc_library_static {
         "-Werror",
     ],
 
+    version_script: "exports.lds",
+
     sanitize: {
         misc_undefined: [
             "signed-integer-overflow",
@@ -93,7 +95,6 @@ cc_library_shared {
     static_libs: ["libstagefright_m4vh263dec"],
 
     shared_libs: [
-        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",

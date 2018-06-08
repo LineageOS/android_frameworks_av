@@ -47,6 +47,7 @@ std::string AAudioServiceEndpointShared::dump() const {
            << std::setfill('0') << std::setw(8)
            << std::hex << mStreamInternal->getServiceHandle()
            << std::dec << std::setfill(' ');
+    result << ", XRuns = " << mStreamInternal->getXRunCount();
     result << "\n";
     result << "    Running Stream Count: " << mRunningStreamCount << "\n";
 
@@ -59,18 +60,16 @@ aaudio_result_t AAudioServiceEndpointShared::open(const aaudio::AAudioStreamRequ
     aaudio_result_t result = AAUDIO_OK;
     const AAudioStreamConfiguration &configuration = request.getConstantConfiguration();
 
+    copyFrom(configuration);
     mRequestedDeviceId = configuration.getDeviceId();
-    setDirection(configuration.getDirection());
 
     AudioStreamBuilder builder;
+    builder.copyFrom(configuration);
+
     builder.setSharingMode(AAUDIO_SHARING_MODE_EXCLUSIVE);
     // Don't fall back to SHARED because that would cause recursion.
     builder.setSharingModeMatchRequired(true);
-    builder.setDeviceId(mRequestedDeviceId);
-    builder.setFormat(configuration.getFormat());
-    builder.setSampleRate(configuration.getSampleRate());
-    builder.setSamplesPerFrame(configuration.getSamplesPerFrame());
-    builder.setDirection(configuration.getDirection());
+
     builder.setBufferCapacity(DEFAULT_BUFFER_CAPACITY);
 
     result = mStreamInternal->open(builder);
@@ -78,6 +77,7 @@ aaudio_result_t AAudioServiceEndpointShared::open(const aaudio::AAudioStreamRequ
     setSampleRate(mStreamInternal->getSampleRate());
     setSamplesPerFrame(mStreamInternal->getSamplesPerFrame());
     setDeviceId(mStreamInternal->getDeviceId());
+    setSessionId(mStreamInternal->getSessionId());
     mFramesPerBurst = mStreamInternal->getFramesPerBurst();
 
     return result;
@@ -88,13 +88,22 @@ aaudio_result_t AAudioServiceEndpointShared::close() {
 }
 
 // Glue between C and C++ callbacks.
-static void *aaudio_endpoint_thread_proc(void *context) {
-    AAudioServiceEndpointShared *endpoint = (AAudioServiceEndpointShared *) context;
-    if (endpoint != NULL) {
-        return endpoint->callbackLoop();
-    } else {
-        return NULL;
+static void *aaudio_endpoint_thread_proc(void *arg) {
+    assert(arg != nullptr);
+
+    // The caller passed in a smart pointer to prevent the endpoint from getting deleted
+    // while the thread was launching.
+    sp<AAudioServiceEndpointShared> *endpointForThread =
+            static_cast<sp<AAudioServiceEndpointShared> *>(arg);
+    sp<AAudioServiceEndpointShared> endpoint = *endpointForThread;
+    delete endpointForThread; // Just use scoped smart pointer. Don't need this anymore.
+    void *result = endpoint->callbackLoop();
+    // Close now so that the HW resource is freed and we can open a new device.
+    if (!endpoint->isConnected()) {
+        endpoint->close();
     }
+
+    return result;
 }
 
 aaudio_result_t aaudio::AAudioServiceEndpointShared::startSharingThread_l() {
@@ -103,7 +112,16 @@ aaudio_result_t aaudio::AAudioServiceEndpointShared::startSharingThread_l() {
                           * AAUDIO_NANOS_PER_SECOND
                           / getSampleRate();
     mCallbackEnabled.store(true);
-    return getStreamInternal()->createThread(periodNanos, aaudio_endpoint_thread_proc, this);
+    // Pass a smart pointer so the thread can hold a reference.
+    sp<AAudioServiceEndpointShared> *endpointForThread = new sp<AAudioServiceEndpointShared>(this);
+    aaudio_result_t result = getStreamInternal()->createThread(periodNanos,
+                                                               aaudio_endpoint_thread_proc,
+                                                               endpointForThread);
+    if (result != AAUDIO_OK) {
+        // The thread can't delete it so we have to do it here.
+        delete endpointForThread;
+    }
+    return result;
 }
 
 aaudio_result_t aaudio::AAudioServiceEndpointShared::stopSharingThread() {

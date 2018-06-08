@@ -142,6 +142,7 @@ TEST(VendorTagDescriptorTest, ConsistentAcrossParcel) {
     EXPECT_EQ(OK, vDescOriginal->writeToParcel(&p));
     p.setDataPosition(0);
 
+    vDescParceled = new VendorTagDescriptor();
     ASSERT_EQ(OK, vDescParceled->readFromParcel(&p));
 
     // Ensure consistent tag count

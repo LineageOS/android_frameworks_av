@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudio"
+#define LOG_TAG "AudioEndpoint"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -45,6 +45,7 @@ AudioEndpoint::~AudioEndpoint() {
     delete mUpCommandQueue;
 }
 
+// TODO Consider moving to a method in RingBufferDescriptor
 static aaudio_result_t AudioEndpoint_validateQueueDescriptor(const char *type,
                                                   const RingBufferDescriptor *descriptor) {
     if (descriptor == nullptr) {
@@ -127,19 +128,19 @@ aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDesc
     // ============================ up message queue =============================
     const RingBufferDescriptor *descriptor = &pEndpointDescriptor->upMessageQueueDescriptor;
     if(descriptor->bytesPerFrame != sizeof(AAudioServiceMessage)) {
-        ALOGE("AudioEndpoint.configure() bytesPerFrame != sizeof(AAudioServiceMessage) = %d",
+        ALOGE("configure() bytesPerFrame != sizeof(AAudioServiceMessage) = %d",
               descriptor->bytesPerFrame);
         return AAUDIO_ERROR_INTERNAL;
     }
 
     if(descriptor->readCounterAddress == nullptr || descriptor->writeCounterAddress == nullptr) {
-        ALOGE("AudioEndpoint.configure() NULL counter address");
+        ALOGE("configure() NULL counter address");
         return AAUDIO_ERROR_NULL;
     }
 
     // Prevent memory leak and reuse.
     if(mUpCommandQueue != nullptr || mDataQueue != nullptr) {
-        ALOGE("AudioEndpoint.configure() endpoint already used");
+        ALOGE("configure() endpoint already used");
         return AAUDIO_ERROR_INTERNAL;
     }
 
@@ -153,8 +154,8 @@ aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDesc
 
     // ============================ data queue =============================
     descriptor = &pEndpointDescriptor->dataQueueDescriptor;
-    ALOGV("AudioEndpoint.configure() data framesPerBurst = %d", descriptor->framesPerBurst);
-    ALOGV("AudioEndpoint.configure() data readCounterAddress = %p",
+    ALOGV("configure() data framesPerBurst = %d", descriptor->framesPerBurst);
+    ALOGV("configure() data readCounterAddress = %p",
           descriptor->readCounterAddress);
 
     // An example of free running is when the other side is read or written by hardware DMA
@@ -163,7 +164,7 @@ aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDesc
                              ? descriptor->readCounterAddress // read by other side
                              : descriptor->writeCounterAddress; // written by other side
     mFreeRunning = (remoteCounter == nullptr);
-    ALOGV("AudioEndpoint.configure() mFreeRunning = %d", mFreeRunning ? 1 : 0);
+    ALOGV("configure() mFreeRunning = %d", mFreeRunning ? 1 : 0);
 
     int64_t *readCounterAddress = (descriptor->readCounterAddress == nullptr)
                                   ? &mDataReadCounter
@@ -258,8 +259,8 @@ int32_t AudioEndpoint::getBufferCapacityInFrames() const
 }
 
 void AudioEndpoint::dump() const {
-    ALOGD("AudioEndpoint: data readCounter  = %lld", (long long) mDataQueue->getReadCounter());
-    ALOGD("AudioEndpoint: data writeCounter = %lld", (long long) mDataQueue->getWriteCounter());
+    ALOGD("data readCounter  = %lld", (long long) mDataQueue->getReadCounter());
+    ALOGD("data writeCounter = %lld", (long long) mDataQueue->getWriteCounter());
 }
 
 void AudioEndpoint::eraseDataMemory() {

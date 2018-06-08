@@ -39,14 +39,13 @@ public:
                       DeviceVector &availableOutputDevices,
                       DeviceVector &availableInputDevices,
                       sp<DeviceDescriptor> &defaultOutputDevices,
-                      bool &isSpeakerDrcEnabled,
                       VolumeCurvesCollection *volumes = nullptr)
         : mHwModules(hwModules),
           mAvailableOutputDevices(availableOutputDevices),
           mAvailableInputDevices(availableInputDevices),
           mDefaultOutputDevices(defaultOutputDevices),
           mVolumeCurves(volumes),
-          mIsSpeakerDrcEnabled(isSpeakerDrcEnabled)
+          mIsSpeakerDrcEnabled(false)
     {}
 
     void setVolumes(const VolumeCurvesCollection &volumes)
@@ -80,6 +79,8 @@ public:
         mAvailableOutputDevices.add(availableOutputDevices);
     }
 
+    bool isSpeakerDrcEnabled() const { return mIsSpeakerDrcEnabled; }
+
     void setSpeakerDrcEnabled(bool isSpeakerDrcEnabled)
     {
         mIsSpeakerDrcEnabled = isSpeakerDrcEnabled;
@@ -112,7 +113,7 @@ public:
         mAvailableOutputDevices.add(mDefaultOutputDevices);
         mAvailableInputDevices.add(defaultInputDevice);
 
-        module = new HwModule("primary");
+        module = new HwModule(AUDIO_HARDWARE_MODULE_ID_PRIMARY);
 
         sp<OutputProfile> outProfile;
         outProfile = new OutputProfile(String8("primary"));
@@ -121,7 +122,7 @@ public:
                 new AudioProfile(AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 44100));
         outProfile->addSupportedDevice(mDefaultOutputDevices);
         outProfile->setFlags(AUDIO_OUTPUT_FLAG_PRIMARY);
-        module->mOutputProfiles.add(outProfile);
+        module->addOutputProfile(outProfile);
 
         sp<InputProfile> inProfile;
         inProfile = new InputProfile(String8("primary"));
@@ -129,7 +130,7 @@ public:
         inProfile->addAudioProfile(
                 new AudioProfile(AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_MONO, 8000));
         inProfile->addSupportedDevice(defaultInputDevice);
-        module->mInputProfiles.add(inProfile);
+        module->addInputProfile(inProfile);
 
         mHwModules.add(module);
     }
@@ -140,7 +141,10 @@ private:
     DeviceVector &mAvailableInputDevices;
     sp<DeviceDescriptor> &mDefaultOutputDevices;
     VolumeCurvesCollection *mVolumeCurves;
-    bool &mIsSpeakerDrcEnabled;
+    // TODO: remove when legacy conf file is removed. true on devices that use DRC on the
+    // DEVICE_CATEGORY_SPEAKER path to boost soft sounds, used to adjust volume curves accordingly.
+    // Note: remove also speaker_drc_enabled from global configuration of XML config file.
+    bool mIsSpeakerDrcEnabled;
 };
 
-}; // namespace android
+} // namespace android

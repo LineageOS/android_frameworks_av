@@ -40,6 +40,7 @@
 #include <sys/types.h>
 
 #include "NdkMediaCodec.h"
+#include "NdkMediaDataSource.h"
 #include "NdkMediaFormat.h"
 #include "NdkMediaCrypto.h"
 
@@ -71,6 +72,15 @@ media_status_t AMediaExtractor_setDataSourceFd(AMediaExtractor*, int fd, off64_t
  */
 media_status_t AMediaExtractor_setDataSource(AMediaExtractor*, const char *location);
         // TODO support headers
+
+#if __ANDROID_API__ >= 28
+
+/**
+ * Set the custom data source implementation from which the extractor will read.
+ */
+media_status_t AMediaExtractor_setDataSourceCustom(AMediaExtractor*, AMediaDataSource *src);
+
+#endif /* __ANDROID_API__ >= 28 */
 
 /**
  * Return the number of tracks in the previously specified media file
@@ -160,11 +170,59 @@ PsshInfo* AMediaExtractor_getPsshInfo(AMediaExtractor*);
 
 AMediaCodecCryptoInfo *AMediaExtractor_getSampleCryptoInfo(AMediaExtractor *);
 
-
 enum {
     AMEDIAEXTRACTOR_SAMPLE_FLAG_SYNC = 1,
     AMEDIAEXTRACTOR_SAMPLE_FLAG_ENCRYPTED = 2,
 };
+
+#if __ANDROID_API__ >= 28
+
+/**
+ * Returns the format of the extractor. The caller must free the returned format
+ * using AMediaFormat_delete(format).
+ *
+ * This function will always return a format; however, the format could be empty
+ * (no key-value pairs) if the media container does not provide format information.
+ */
+AMediaFormat* AMediaExtractor_getFileFormat(AMediaExtractor*);
+
+/**
+ * Returns the size of the current sample in bytes, or -1 when no samples are
+ * available (end of stream). This API can be used in in conjunction with
+ * AMediaExtractor_readSampleData:
+ *
+ * ssize_t sampleSize = AMediaExtractor_getSampleSize(ex);
+ * uint8_t *buf = new uint8_t[sampleSize];
+ * AMediaExtractor_readSampleData(ex, buf, sampleSize);
+ *
+ */
+ssize_t AMediaExtractor_getSampleSize(AMediaExtractor*);
+
+/**
+ * Returns the duration of cached media samples downloaded from a network data source
+ * (AMediaExtractor_setDataSource with a "http(s)" URI) in microseconds.
+ *
+ * This information is calculated using total bitrate; if total bitrate is not in the
+ * media container it is calculated using total duration and file size.
+ *
+ * Returns -1 when the extractor is not reading from a network data source, or when the
+ * cached duration cannot be calculated (bitrate, duration, and file size information
+ * not available).
+ */
+int64_t AMediaExtractor_getCachedDuration(AMediaExtractor *);
+
+/**
+ * Read the current sample's metadata format into |fmt|. Examples of sample metadata are
+ * SEI (supplemental enhancement information) and MPEG user data, both of which can embed
+ * closed-caption data.
+ *
+ * Returns AMEDIA_OK on success or AMEDIA_ERROR_* to indicate failure reason.
+ * Existing key-value pairs in |fmt| would be removed if this API returns AMEDIA_OK.
+ * The contents of |fmt| is undefined if this API returns AMEDIA_ERROR_*.
+ */
+media_status_t AMediaExtractor_getSampleFormat(AMediaExtractor *ex, AMediaFormat *fmt);
+
+#endif /* __ANDROID_API__ >= 28 */
 
 #endif /* __ANDROID_API__ >= 21 */
 

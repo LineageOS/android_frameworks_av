@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <unistd.h>
 
 #include <tinyxml2.h>
 #include <log/log.h>
@@ -85,7 +86,7 @@ template <class Enum>
 constexpr std::enable_if<false, Enum> STREAM_NAME_MAP;
 
 /** All output stream types which support effects.
- * This need to be kept in sink with the xsd streamOutputType.
+ * This need to be kept in sync with the xsd streamOutputType.
  */
 template <>
 constexpr std::pair<audio_stream_type_t, const char*> STREAM_NAME_MAP<audio_stream_type_t>[] = {
@@ -102,7 +103,7 @@ constexpr std::pair<audio_stream_type_t, const char*> STREAM_NAME_MAP<audio_stre
 };
 
 /** All input stream types which support effects.
- * This need to be kept in sink with the xsd streamOutputType.
+ * This need to be kept in sync with the xsd streamOutputType.
  */
 template <>
 constexpr std::pair<audio_source_t, const char*> STREAM_NAME_MAP<audio_source_t>[] = {
@@ -142,7 +143,7 @@ bool parseLibrary(const XMLElement& xmlLibrary, Libraries* libraries) {
 }
 
 /** Find an element in a collection by its name.
- * @return nullptr if not found, the ellements address if found.
+ * @return nullptr if not found, the element address if found.
  */
 template <class T>
 T* findByName(const char* name, std::vector<T>& collection) {
@@ -202,7 +203,7 @@ bool parseEffect(const XMLElement& xmlEffect, Libraries& libraries, Effects* eff
         auto parseProxy = [&xmlEffect, &parseImpl](const char* tag, EffectImpl& proxyLib) {
             auto* xmlProxyLib = xmlEffect.FirstChildElement(tag);
             if (xmlProxyLib == nullptr) {
-                ALOGE("effectProxy must contain a <%s>: %s", tag, dump(*xmlProxyLib));
+                ALOGE("effectProxy must contain a <%s>: %s", tag, dump(xmlEffect));
                 return false;
             }
             return parseImpl(*xmlProxyLib, proxyLib);
@@ -249,15 +250,14 @@ bool parseStream(const XMLElement& xmlStream, Effects& effects, std::vector<Stre
     return true;
 }
 
-}; // namespace
-
-ParsingResult parse(const char* path) {
+/** Internal version of the public parse(const char* path) with precondition `path != nullptr`. */
+ParsingResult parseWithPath(const char* path) {
     XMLDocument doc;
     doc.LoadFile(path);
     if (doc.Error()) {
         ALOGE("Failed to parse %s: Tinyxml2 error (%d): %s", path,
               doc.ErrorID(), doc.ErrorStr());
-        return {nullptr, 0};
+        return {nullptr, 0, path};
     }
 
     auto config = std::make_unique<Config>();
@@ -295,7 +295,29 @@ ParsingResult parse(const char* path) {
             }
         }
     }
-    return {std::move(config), nbSkippedElements};
+    return {std::move(config), nbSkippedElements, path};
+}
+
+}; // namespace
+
+ParsingResult parse(const char* path) {
+    if (path != nullptr) {
+        return parseWithPath(path);
+    }
+
+    for (std::string location : DEFAULT_LOCATIONS) {
+        std::string defaultPath = location + '/' + DEFAULT_NAME;
+        if (access(defaultPath.c_str(), R_OK) != 0) {
+            continue;
+        }
+        auto result = parseWithPath(defaultPath.c_str());
+        if (result.parsedConfig != nullptr) {
+            return result;
+        }
+    }
+
+    ALOGE("Could not parse effect configuration in any of the default locations.");
+    return {nullptr, 0, nullptr};
 }
 
 } // namespace effectsConfig

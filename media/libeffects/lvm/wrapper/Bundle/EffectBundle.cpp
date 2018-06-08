@@ -27,6 +27,7 @@ typedef float LVM_FLOAT;
 #include <stdlib.h>
 #include <string.h>
 
+#include <audio_utils/primitives.h>
 #include <log/log.h>
 
 #include "EffectBundle.h"
@@ -62,16 +63,6 @@ extern "C" const struct effect_interface_s gLvmEffectInterface;
                     "out of range returned by %s in %s\n", callingFunc, calledFunc);\
         }\
     }
-
-
-static inline int16_t clamp16(int32_t sample)
-{
-    // check overflow for both positive and negative values:
-    // all bits above short range must me equal to sign bit
-    if ((sample>>15) ^ (sample>>31))
-        sample = 0x7FFF ^ (sample>>31);
-    return sample;
-}
 
 // Namespaces
 namespace android {
@@ -304,7 +295,7 @@ extern "C" int EffectCreate(const effect_uuid_t *uuid,
         pContext->pBundledContext->SamplesToExitCountVirt   = 0;
         pContext->pBundledContext->SamplesToExitCountBb     = 0;
         pContext->pBundledContext->SamplesToExitCountEq     = 0;
-#ifdef BUILD_FLOAT
+#if defined(BUILD_FLOAT) && !defined(NATIVE_FLOAT_BUFFER)
         pContext->pBundledContext->pInputBuffer             = NULL;
         pContext->pBundledContext->pOutputBuffer            = NULL;
 #endif
@@ -475,13 +466,9 @@ extern "C" int EffectRelease(effect_handle_t handle){
         if (pContext->pBundledContext->workBuffer != NULL) {
             free(pContext->pBundledContext->workBuffer);
         }
-#ifdef BUILD_FLOAT
-        if (pContext->pBundledContext->pInputBuffer != NULL) {
-            free(pContext->pBundledContext->pInputBuffer);
-        }
-        if (pContext->pBundledContext->pOutputBuffer != NULL) {
-            free(pContext->pBundledContext->pOutputBuffer);
-        }
+#if defined(BUILD_FLOAT) && !defined(NATIVE_FLOAT_BUFFER)
+        free(pContext->pBundledContext->pInputBuffer);
+        free(pContext->pBundledContext->pOutputBuffer);
 #endif
         delete pContext->pBundledContext;
         pContext->pBundledContext = LVM_NULL;
@@ -554,7 +541,7 @@ int LvmBundle_init(EffectContext *pContext){
 
     pContext->config.inputCfg.accessMode                    = EFFECT_BUFFER_ACCESS_READ;
     pContext->config.inputCfg.channels                      = AUDIO_CHANNEL_OUT_STEREO;
-    pContext->config.inputCfg.format                        = AUDIO_FORMAT_PCM_16_BIT;
+    pContext->config.inputCfg.format                        = EFFECT_BUFFER_FORMAT;
     pContext->config.inputCfg.samplingRate                  = 44100;
     pContext->config.inputCfg.bufferProvider.getBuffer      = NULL;
     pContext->config.inputCfg.bufferProvider.releaseBuffer  = NULL;
@@ -562,7 +549,7 @@ int LvmBundle_init(EffectContext *pContext){
     pContext->config.inputCfg.mask                          = EFFECT_CONFIG_ALL;
     pContext->config.outputCfg.accessMode                   = EFFECT_BUFFER_ACCESS_ACCUMULATE;
     pContext->config.outputCfg.channels                     = AUDIO_CHANNEL_OUT_STEREO;
-    pContext->config.outputCfg.format                       = AUDIO_FORMAT_PCM_16_BIT;
+    pContext->config.outputCfg.format                       = EFFECT_BUFFER_FORMAT;
     pContext->config.outputCfg.samplingRate                 = 44100;
     pContext->config.outputCfg.bufferProvider.getBuffer     = NULL;
     pContext->config.outputCfg.bufferProvider.releaseBuffer = NULL;
@@ -739,47 +726,6 @@ int LvmBundle_init(EffectContext *pContext){
     return 0;
 }   /* end LvmBundle_init */
 
-#ifdef BUILD_FLOAT
-/**********************************************************************************
-   FUNCTION INT16LTOFLOAT
-***********************************************************************************/
-// Todo: need to write function descriptor
-static void Int16ToFloat(const LVM_INT16 *src, LVM_FLOAT *dst, size_t n) {
-    size_t ii;
-    src += n-1;
-    dst += n-1;
-    for (ii = n; ii != 0; ii--) {
-        *dst = ((LVM_FLOAT)((LVM_INT16)*src)) / 32768.0f;
-        src--;
-        dst--;
-    }
-    return;
-}
-/**********************************************************************************
-   FUNCTION FLOATTOINT16_SAT
-***********************************************************************************/
-// Todo : Need to write function descriptor
-static void FloatToInt16_SAT(const LVM_FLOAT *src, LVM_INT16 *dst, size_t n) {
-    size_t ii;
-    LVM_INT32 temp;
-
-    src += n-1;
-    dst += n-1;
-    for (ii = n; ii != 0; ii--) {
-        temp = (LVM_INT32)((*src) * 32768.0f);
-        if (temp >= 32767) {
-            *dst = 32767;
-        } else if (temp <= -32768) {
-            *dst = -32768;
-        } else {
-            *dst = (LVM_INT16)temp;
-        }
-        src--;
-        dst--;
-    }
-    return;
-}
-#endif
 //----------------------------------------------------------------------------
 // LvmBundle_process()
 //----------------------------------------------------------------------------
@@ -787,8 +733,8 @@ static void FloatToInt16_SAT(const LVM_FLOAT *src, LVM_INT16 *dst, size_t n) {
 // Apply LVM Bundle effects
 //
 // Inputs:
-//  pIn:        pointer to stereo 16 bit input data
-//  pOut:       pointer to stereo 16 bit output data
+//  pIn:        pointer to stereo float or 16 bit input data
+//  pOut:       pointer to stereo float or 16 bit output data
 //  frameCount: Frames to process
 //  pContext:   effect engine context
 //  strength    strength to be applied
@@ -798,44 +744,37 @@ static void FloatToInt16_SAT(const LVM_FLOAT *src, LVM_INT16 *dst, size_t n) {
 //
 //----------------------------------------------------------------------------
 #ifdef BUILD_FLOAT
-int LvmBundle_process(LVM_INT16        *pIn,
-                      LVM_INT16        *pOut,
+int LvmBundle_process(effect_buffer_t  *pIn,
+                      effect_buffer_t  *pOut,
                       int              frameCount,
                       EffectContext    *pContext){
 
-
-    //LVM_ControlParams_t     ActiveParams;                           /* Current control Parameters */
     LVM_ReturnStatus_en     LvmStatus = LVM_SUCCESS;                /* Function call status */
-    LVM_INT16               *pOutTmp;
-    LVM_FLOAT               *pInputBuff;
-    LVM_FLOAT               *pOutputBuff;
-
-    if (pContext->pBundledContext->pInputBuffer == NULL ||
+    effect_buffer_t         *pOutTmp;
+#ifndef NATIVE_FLOAT_BUFFER
+    if (pContext->pBundledContext->pInputBuffer == nullptr ||
             pContext->pBundledContext->frameCount < frameCount) {
-        if (pContext->pBundledContext->pInputBuffer != NULL) {
-            free(pContext->pBundledContext->pInputBuffer);
-        }
-        pContext->pBundledContext->pInputBuffer = (LVM_FLOAT *)malloc(frameCount * \
-                                                                      sizeof(LVM_FLOAT) * FCC_2);
+        free(pContext->pBundledContext->pInputBuffer);
+        pContext->pBundledContext->pInputBuffer =
+                (LVM_FLOAT *)calloc(frameCount, sizeof(LVM_FLOAT) * FCC_2);
     }
 
-    if (pContext->pBundledContext->pOutputBuffer == NULL ||
+    if (pContext->pBundledContext->pOutputBuffer == nullptr ||
             pContext->pBundledContext->frameCount < frameCount) {
-        if (pContext->pBundledContext->pOutputBuffer != NULL) {
-            free(pContext->pBundledContext->pOutputBuffer);
-        }
-        pContext->pBundledContext->pOutputBuffer = (LVM_FLOAT *)malloc(frameCount * \
-                                                                       sizeof(LVM_FLOAT) * FCC_2);
+        free(pContext->pBundledContext->pOutputBuffer);
+        pContext->pBundledContext->pOutputBuffer =
+                (LVM_FLOAT *)calloc(frameCount, sizeof(LVM_FLOAT) * FCC_2);
     }
 
-    if ((pContext->pBundledContext->pInputBuffer == NULL) ||
-                                    (pContext->pBundledContext->pOutputBuffer == NULL)) {
-        ALOGV("LVM_ERROR : LvmBundle_process memory allocation for float buffer's failed");
+    if (pContext->pBundledContext->pInputBuffer == nullptr ||
+            pContext->pBundledContext->pOutputBuffer == nullptr) {
+        ALOGE("LVM_ERROR : LvmBundle_process memory allocation for float buffer's failed");
         return -EINVAL;
     }
 
-    pInputBuff = pContext->pBundledContext->pInputBuffer;
-    pOutputBuff = pContext->pBundledContext->pOutputBuffer;
+    LVM_FLOAT * const pInputBuff = pContext->pBundledContext->pInputBuffer;
+    LVM_FLOAT * const pOutputBuff = pContext->pBundledContext->pOutputBuffer;
+#endif
 
     if (pContext->config.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_WRITE){
         pOutTmp = pOut;
@@ -845,7 +784,7 @@ int LvmBundle_process(LVM_INT16        *pIn,
                 free(pContext->pBundledContext->workBuffer);
             }
             pContext->pBundledContext->workBuffer =
-                    (LVM_INT16 *)calloc(frameCount, sizeof(LVM_INT16) * FCC_2);
+                    (effect_buffer_t *)calloc(frameCount, sizeof(effect_buffer_t) * FCC_2);
             if (pContext->pBundledContext->workBuffer == NULL) {
                 return -ENOMEM;
             }
@@ -857,43 +796,61 @@ int LvmBundle_process(LVM_INT16        *pIn,
         return -EINVAL;
     }
 
-    #ifdef LVM_PCM
-    fwrite(pIn, frameCount*sizeof(LVM_INT16) * FCC_2, 1, pContext->pBundledContext->PcmInPtr);
+#ifdef LVM_PCM
+    fwrite(pIn,
+            frameCount*sizeof(effect_buffer_t) * FCC_2, 1, pContext->pBundledContext->PcmInPtr);
     fflush(pContext->pBundledContext->PcmInPtr);
-    #endif
+#endif
 
+#ifndef NATIVE_FLOAT_BUFFER
     /* Converting input data from fixed point to float point */
-    Int16ToFloat(pIn, pInputBuff, frameCount * 2);
+    memcpy_to_float_from_i16(pInputBuff, pIn, frameCount * FCC_2);
 
     /* Process the samples */
     LvmStatus = LVM_Process(pContext->pBundledContext->hInstance, /* Instance handle */
                             pInputBuff,                           /* Input buffer */
                             pOutputBuff,                          /* Output buffer */
                             (LVM_UINT16)frameCount,               /* Number of samples to read */
-                            0);                                   /* Audo Time */
+                            0);                                   /* Audio Time */
 
+    /* Converting output data from float point to fixed point */
+    memcpy_to_i16_from_float(pOutTmp, pOutputBuff, frameCount * FCC_2);
+
+#else
+    /* Process the samples */
+    LvmStatus = LVM_Process(pContext->pBundledContext->hInstance, /* Instance handle */
+                            pIn,                                  /* Input buffer */
+                            pOutTmp,                              /* Output buffer */
+                            (LVM_UINT16)frameCount,               /* Number of samples to read */
+                            0);                                   /* Audio Time */
+#endif
     LVM_ERROR_CHECK(LvmStatus, "LVM_Process", "LvmBundle_process")
     if(LvmStatus != LVM_SUCCESS) return -EINVAL;
 
-    /* Converting output data from float point to fixed point */
-    FloatToInt16_SAT(pOutputBuff, pOutTmp, (LVM_UINT16)frameCount * 2);
-    #ifdef LVM_PCM
-    fwrite(pOutTmp, frameCount*sizeof(LVM_INT16) * FCC_2, 1, pContext->pBundledContext->PcmOutPtr);
+#ifdef LVM_PCM
+    fwrite(pOutTmp,
+            frameCount*sizeof(effect_buffer_t) * FCC_2, 1, pContext->pBundledContext->PcmOutPtr);
     fflush(pContext->pBundledContext->PcmOutPtr);
-    #endif
+#endif
 
     if (pContext->config.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE){
-        for (int i = 0; i < frameCount * 2; i++){
+        for (int i = 0; i < frameCount * FCC_2; i++) {
+#ifndef NATIVE_FLOAT_BUFFER
             pOut[i] = clamp16((LVM_INT32)pOut[i] + (LVM_INT32)pOutTmp[i]);
+#else
+            pOut[i] = pOut[i] + pOutTmp[i];
+#endif
         }
     }
     return 0;
 }    /* end LvmBundle_process */
-#else
+
+#else // BUILD_FLOAT
+
 int LvmBundle_process(LVM_INT16        *pIn,
                       LVM_INT16        *pOut,
                       int              frameCount,
-                      EffectContext    *pContext){
+                      EffectContext    *pContext) {
 
     LVM_ReturnStatus_en     LvmStatus = LVM_SUCCESS;                /* Function call status */
     LVM_INT16               *pOutTmp;
@@ -906,7 +863,7 @@ int LvmBundle_process(LVM_INT16        *pIn,
                 free(pContext->pBundledContext->workBuffer);
             }
             pContext->pBundledContext->workBuffer =
-                    (LVM_INT16 *)calloc(frameCount, sizeof(LVM_INT16) * 2);
+                    (effect_buffer_t *)calloc(frameCount, sizeof(effect_buffer_t) * FCC_2);
             if (pContext->pBundledContext->workBuffer == NULL) {
                 return -ENOMEM;
             }
@@ -918,10 +875,11 @@ int LvmBundle_process(LVM_INT16        *pIn,
         return -EINVAL;
     }
 
-    #ifdef LVM_PCM
-    fwrite(pIn, frameCount*sizeof(LVM_INT16)*2, 1, pContext->pBundledContext->PcmInPtr);
+#ifdef LVM_PCM
+    fwrite(pIn, frameCount * sizeof(*pIn) * FCC_2,
+            1 /* nmemb */, pContext->pBundledContext->PcmInPtr);
     fflush(pContext->pBundledContext->PcmInPtr);
-    #endif
+#endif
 
     //ALOGV("Calling LVM_Process");
 
@@ -930,15 +888,16 @@ int LvmBundle_process(LVM_INT16        *pIn,
                             pIn,                                  /* Input buffer */
                             pOutTmp,                              /* Output buffer */
                             (LVM_UINT16)frameCount,               /* Number of samples to read */
-                            0);                                   /* Audo Time */
+                            0);                                   /* Audio Time */
 
     LVM_ERROR_CHECK(LvmStatus, "LVM_Process", "LvmBundle_process")
     if(LvmStatus != LVM_SUCCESS) return -EINVAL;
 
-    #ifdef LVM_PCM
-    fwrite(pOutTmp, frameCount*sizeof(LVM_INT16)*2, 1, pContext->pBundledContext->PcmOutPtr);
+#ifdef LVM_PCM
+    fwrite(pOutTmp, frameCount * sizeof(*pOutTmp) * FCC_2,
+            1 /* nmemb */, pContext->pBundledContext->PcmOutPtr);
     fflush(pContext->pBundledContext->PcmOutPtr);
-    #endif
+#endif
 
     if (pContext->config.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE){
         for (int i=0; i<frameCount*2; i++){
@@ -947,7 +906,8 @@ int LvmBundle_process(LVM_INT16        *pIn,
     }
     return 0;
 }    /* end LvmBundle_process */
-#endif
+
+#endif // BUILD_FLOAT
 
 //----------------------------------------------------------------------------
 // EqualizerUpdateActiveParams()
@@ -1281,8 +1241,7 @@ int Effect_setConfig(EffectContext *pContext, effect_config_t *pConfig){
     CHECK_ARG(pConfig->inputCfg.channels == AUDIO_CHANNEL_OUT_STEREO);
     CHECK_ARG(pConfig->outputCfg.accessMode == EFFECT_BUFFER_ACCESS_WRITE
               || pConfig->outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE);
-    CHECK_ARG(pConfig->inputCfg.format == AUDIO_FORMAT_PCM_16_BIT);
-
+    CHECK_ARG(pConfig->inputCfg.format == EFFECT_BUFFER_FORMAT);
     pContext->config = *pConfig;
 
     switch (pConfig->inputCfg.samplingRate) {
@@ -3354,10 +3313,17 @@ int Effect_process(effect_handle_t     self,
         pContext->pBundledContext->NumberEffectsCalled = 0;
         /* Process all the available frames, block processing is
            handled internalLY by the LVM bundle */
-        processStatus = android::LvmBundle_process(    (LVM_INT16 *)inBuffer->raw,
-                                                (LVM_INT16 *)outBuffer->raw,
-                                                outBuffer->frameCount,
-                                                pContext);
+#ifdef NATIVE_FLOAT_BUFFER
+        processStatus = android::LvmBundle_process(inBuffer->f32,
+                                                   outBuffer->f32,
+                                                   outBuffer->frameCount,
+                                                   pContext);
+#else
+        processStatus = android::LvmBundle_process(inBuffer->s16,
+                                                   outBuffer->s16,
+                                                   outBuffer->frameCount,
+                                                   pContext);
+#endif
         if (processStatus != 0){
             ALOGV("\tLVM_ERROR : LvmBundle_process returned error %d", processStatus);
             if (status == 0) {
@@ -3369,14 +3335,19 @@ int Effect_process(effect_handle_t     self,
         //ALOGV("\tEffect_process Not Calling process with %d effects enabled, %d called: Effect %d",
         //pContext->pBundledContext->NumberEffectsEnabled,
         //pContext->pBundledContext->NumberEffectsCalled, pContext->EffectType);
-        // 2 is for stereo input
+
         if (pContext->config.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
-            for (size_t i=0; i < outBuffer->frameCount*2; i++){
-                outBuffer->s16[i] =
-                        clamp16((LVM_INT32)outBuffer->s16[i] + (LVM_INT32)inBuffer->s16[i]);
+            for (size_t i = 0; i < outBuffer->frameCount * FCC_2; ++i){
+#ifdef NATIVE_FLOAT_BUFFER
+                outBuffer->f32[i] += inBuffer->f32[i];
+#else
+                outBuffer->s16[i] = clamp16((LVM_INT32)outBuffer->s16[i] + inBuffer->s16[i]);
+#endif
             }
         } else if (outBuffer->raw != inBuffer->raw) {
-            memcpy(outBuffer->raw, inBuffer->raw, outBuffer->frameCount*sizeof(LVM_INT16)*2);
+            memcpy(outBuffer->raw,
+                    inBuffer->raw,
+                    outBuffer->frameCount * sizeof(effect_buffer_t) * FCC_2);
         }
     }
 

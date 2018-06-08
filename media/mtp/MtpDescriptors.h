@@ -23,6 +23,16 @@
 
 namespace android {
 
+constexpr char FFS_MTP_EP0[] = "/dev/usb-ffs/mtp/ep0";
+constexpr char FFS_MTP_EP_IN[] = "/dev/usb-ffs/mtp/ep1";
+constexpr char FFS_MTP_EP_OUT[] = "/dev/usb-ffs/mtp/ep2";
+constexpr char FFS_MTP_EP_INTR[] = "/dev/usb-ffs/mtp/ep3";
+
+constexpr char FFS_PTP_EP0[] = "/dev/usb-ffs/ptp/ep0";
+constexpr char FFS_PTP_EP_IN[] = "/dev/usb-ffs/ptp/ep1";
+constexpr char FFS_PTP_EP_OUT[] = "/dev/usb-ffs/ptp/ep2";
+constexpr char FFS_PTP_EP_INTR[] = "/dev/usb-ffs/ptp/ep3";
+
 constexpr int MAX_PACKET_SIZE_FS = 64;
 constexpr int MAX_PACKET_SIZE_HS = 512;
 constexpr int MAX_PACKET_SIZE_SS = 1024;
@@ -90,6 +100,8 @@ extern const struct desc_v2 ptp_desc_v2;
 extern const struct desc_v1 mtp_desc_v1;
 extern const struct desc_v1 ptp_desc_v1;
 extern const struct functionfs_strings mtp_strings;
+
+bool writeDescriptors(int fd, bool ptp);
 
 }; // namespace android
 

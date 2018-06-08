@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2013-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,15 +35,18 @@ Camera3OutputStream::Camera3OutputStream(int id,
         sp<Surface> consumer,
         uint32_t width, uint32_t height, int format,
         android_dataspace dataSpace, camera3_stream_rotation_t rotation,
-        nsecs_t timestampOffset, int setId) :
+        nsecs_t timestampOffset, const String8& physicalCameraId,
+        int setId) :
         Camera3IOStreamBase(id, CAMERA3_STREAM_OUTPUT, width, height,
-                            /*maxSize*/0, format, dataSpace, rotation, setId),
+                            /*maxSize*/0, format, dataSpace, rotation,
+                            physicalCameraId, setId),
         mConsumer(consumer),
         mTransform(0),
         mTraceFirstBuffer(true),
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
         mConsumerUsage(0),
+        mDropBuffers(false),
         mDequeueBufferLatency(kDequeueLatencyBinSize) {
 
     if (mConsumer == NULL) {
@@ -60,9 +63,9 @@ Camera3OutputStream::Camera3OutputStream(int id,
         sp<Surface> consumer,
         uint32_t width, uint32_t height, size_t maxSize, int format,
         android_dataspace dataSpace, camera3_stream_rotation_t rotation,
-        nsecs_t timestampOffset, int setId) :
+        nsecs_t timestampOffset, const String8& physicalCameraId, int setId) :
         Camera3IOStreamBase(id, CAMERA3_STREAM_OUTPUT, width, height, maxSize,
-                            format, dataSpace, rotation, setId),
+                            format, dataSpace, rotation, physicalCameraId, setId),
         mConsumer(consumer),
         mTransform(0),
         mTraceFirstBuffer(true),
@@ -70,6 +73,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
         mConsumerUsage(0),
+        mDropBuffers(false),
         mDequeueBufferLatency(kDequeueLatencyBinSize) {
 
     if (format != HAL_PIXEL_FORMAT_BLOB && format != HAL_PIXEL_FORMAT_RAW_OPAQUE) {
@@ -91,15 +95,18 @@ Camera3OutputStream::Camera3OutputStream(int id,
 Camera3OutputStream::Camera3OutputStream(int id,
         uint32_t width, uint32_t height, int format,
         uint64_t consumerUsage, android_dataspace dataSpace,
-        camera3_stream_rotation_t rotation, nsecs_t timestampOffset, int setId) :
+        camera3_stream_rotation_t rotation, nsecs_t timestampOffset,
+        const String8& physicalCameraId, int setId) :
         Camera3IOStreamBase(id, CAMERA3_STREAM_OUTPUT, width, height,
-                            /*maxSize*/0, format, dataSpace, rotation, setId),
+                            /*maxSize*/0, format, dataSpace, rotation,
+                            physicalCameraId, setId),
         mConsumer(nullptr),
         mTransform(0),
         mTraceFirstBuffer(true),
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
         mConsumerUsage(consumerUsage),
+        mDropBuffers(false),
         mDequeueBufferLatency(kDequeueLatencyBinSize) {
     // Deferred consumer only support preview surface format now.
     if (format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
@@ -128,17 +135,20 @@ Camera3OutputStream::Camera3OutputStream(int id, camera3_stream_type_t type,
                                          int format,
                                          android_dataspace dataSpace,
                                          camera3_stream_rotation_t rotation,
+                                         const String8& physicalCameraId,
                                          uint64_t consumerUsage, nsecs_t timestampOffset,
                                          int setId) :
         Camera3IOStreamBase(id, type, width, height,
                             /*maxSize*/0,
-                            format, dataSpace, rotation, setId),
+                            format, dataSpace, rotation,
+                            physicalCameraId, setId),
         mTransform(0),
         mTraceFirstBuffer(true),
         mUseMonoTimestamp(false),
         mUseBufferManager(false),
         mTimestampOffset(timestampOffset),
         mConsumerUsage(consumerUsage),
+        mDropBuffers(false),
         mDequeueBufferLatency(kDequeueLatencyBinSize) {
 
     if (setId > CAMERA3_STREAM_SET_ID_INVALID) {
@@ -227,9 +237,14 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
     /**
      * Return buffer back to ANativeWindow
      */
-    if (buffer.status == CAMERA3_BUFFER_STATUS_ERROR) {
+    if (buffer.status == CAMERA3_BUFFER_STATUS_ERROR || mDropBuffers) {
         // Cancel buffer
-        ALOGW("A frame is dropped for stream %d", mId);
+        if (mDropBuffers) {
+            ALOGV("%s: Dropping a frame for stream %d.", __FUNCTION__, mId);
+        } else {
+            ALOGW("%s: A frame is dropped for stream %d due to buffer error.", __FUNCTION__, mId);
+        }
+
         res = currentConsumer->cancelBuffer(currentConsumer.get(),
                 anwBuffer,
                 anwReleaseFence);
@@ -691,6 +706,14 @@ status_t Camera3OutputStream::setBufferManager(sp<Camera3BufferManager> bufferMa
     return OK;
 }
 
+status_t Camera3OutputStream::updateStream(const std::vector<sp<Surface>> &/*outputSurfaces*/,
+            const std::vector<OutputStreamInfo> &/*outputInfo*/,
+            const std::vector<size_t> &/*removedSurfaceIds*/,
+            KeyedVector<sp<Surface>, size_t> * /*outputMapo*/) {
+    ALOGE("%s: this method is not supported!", __FUNCTION__);
+    return INVALID_OPERATION;
+}
+
 void Camera3OutputStream::BufferReleasedListener::onBufferReleased() {
     sp<Camera3OutputStream> stream = mParent.promote();
     if (stream == nullptr) {
@@ -728,7 +751,7 @@ void Camera3OutputStream::onBuffersRemovedLocked(
         const std::vector<sp<GraphicBuffer>>& removedBuffers) {
     sp<Camera3StreamBufferFreedListener> callback = mBufferFreedListener.promote();
     if (callback != nullptr) {
-        for (auto gb : removedBuffers) {
+        for (const auto& gb : removedBuffers) {
             callback->onBufferFreed(mId, gb->handle);
         }
     }
@@ -775,6 +798,17 @@ status_t Camera3OutputStream::detachBufferLocked(sp<GraphicBuffer>* buffer, int*
         onBuffersRemovedLocked(removedBuffers);
     }
     return res;
+}
+
+status_t Camera3OutputStream::dropBuffers(bool dropping) {
+    Mutex::Autolock l(mLock);
+    mDropBuffers = dropping;
+    return OK;
+}
+
+const String8& Camera3OutputStream::getPhysicalCameraId() const {
+    Mutex::Autolock l(mLock);
+    return physicalCameraId();
 }
 
 status_t Camera3OutputStream::notifyBufferReleased(ANativeWindowBuffer* /*anwBuffer*/) {

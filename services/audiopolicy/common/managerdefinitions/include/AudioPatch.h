@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "HandleGenerator.h"
 #include <system/audio.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
@@ -24,7 +25,7 @@
 
 namespace android {
 
-class AudioPatch : public RefBase
+class AudioPatch : public RefBase, private HandleGenerator<audio_patch_handle_t>
 {
 public:
     AudioPatch(const struct audio_patch *patch, uid_t uid);
@@ -35,9 +36,6 @@ public:
     struct audio_patch mPatch;
     uid_t mUid;
     audio_patch_handle_t mAfPatchHandle;
-
-private:
-    static volatile int32_t mNextUniqueId;
 };
 
 class AudioPatchCollection : public DefaultKeyedVector<audio_patch_handle_t, sp<AudioPatch> >
@@ -52,4 +50,4 @@ public:
     status_t dump(int fd) const;
 };
 
-}; // namespace android
+} // namespace android

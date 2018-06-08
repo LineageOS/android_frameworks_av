@@ -26,21 +26,21 @@
 /*                                                                                  */
 /************************************************************************************/
 #ifdef BUILD_FLOAT
-#define LVEQNB_Gain_Neg15_dB                             -0.822172f
-#define LVEQNB_Gain_Neg14_dB                             -0.800474f
-#define LVEQNB_Gain_Neg13_dB                             -0.776128f
-#define LVEQNB_Gain_Neg12_dB                             -0.748811f
-#define LVEQNB_Gain_Neg11_dB                             -0.718162f
-#define LVEQNB_Gain_Neg10_dB                             -0.683772f
-#define LVEQNB_Gain_Neg9_dB                              -0.645187f
-#define LVEQNB_Gain_Neg8_dB                              -0.601893f
-#define LVEQNB_Gain_Neg7_dB                              -0.553316f
-#define LVEQNB_Gain_Neg6_dB                              -0.498813f
-#define LVEQNB_Gain_Neg5_dB                              -0.437659f
-#define LVEQNB_Gain_Neg4_dB                              -0.369043f
-#define LVEQNB_Gain_Neg3_dB                              -0.292054f
-#define LVEQNB_Gain_Neg2_dB                              -0.205672f
-#define LVEQNB_Gain_Neg1_dB                              -0.108749f
+#define LVEQNB_Gain_Neg15_dB                             (-0.822172f)
+#define LVEQNB_Gain_Neg14_dB                             (-0.800474f)
+#define LVEQNB_Gain_Neg13_dB                             (-0.776128f)
+#define LVEQNB_Gain_Neg12_dB                             (-0.748811f)
+#define LVEQNB_Gain_Neg11_dB                             (-0.718162f)
+#define LVEQNB_Gain_Neg10_dB                             (-0.683772f)
+#define LVEQNB_Gain_Neg9_dB                              (-0.645187f)
+#define LVEQNB_Gain_Neg8_dB                              (-0.601893f)
+#define LVEQNB_Gain_Neg7_dB                              (-0.553316f)
+#define LVEQNB_Gain_Neg6_dB                              (-0.498813f)
+#define LVEQNB_Gain_Neg5_dB                              (-0.437659f)
+#define LVEQNB_Gain_Neg4_dB                              (-0.369043f)
+#define LVEQNB_Gain_Neg3_dB                              (-0.292054f)
+#define LVEQNB_Gain_Neg2_dB                              (-0.205672f)
+#define LVEQNB_Gain_Neg1_dB                              (-0.108749f)
 #define LVEQNB_Gain_0_dB                                  0.000000f
 #define LVEQNB_Gain_1_dB                                  0.122018f
 #define LVEQNB_Gain_2_dB                                  0.258925f

@@ -18,19 +18,24 @@
 
 #define DRM_HAL_H_
 
+#include <android/hardware/drm/1.0/IDrmFactory.h>
 #include <android/hardware/drm/1.0/IDrmPlugin.h>
 #include <android/hardware/drm/1.0/IDrmPluginListener.h>
-#include <android/hardware/drm/1.0/IDrmFactory.h>
+#include <android/hardware/drm/1.1/IDrmFactory.h>
+#include <android/hardware/drm/1.1/IDrmPlugin.h>
 
-#include <media/IDrm.h>
-#include <media/IDrmClient.h>
+#include <media/MediaAnalyticsItem.h>
+#include <mediadrm/DrmMetrics.h>
+#include <mediadrm/IDrm.h>
+#include <mediadrm/IDrmClient.h>
 #include <utils/threads.h>
 
-using ::android::hardware::drm::V1_0::EventType;
-using ::android::hardware::drm::V1_0::IDrmFactory;
-using ::android::hardware::drm::V1_0::IDrmPlugin;
-using ::android::hardware::drm::V1_0::IDrmPluginListener;
-using ::android::hardware::drm::V1_0::KeyStatus;
+namespace drm = ::android::hardware::drm;
+using drm::V1_0::EventType;
+using drm::V1_0::IDrmFactory;
+using drm::V1_0::IDrmPlugin;
+using drm::V1_0::IDrmPluginListener;
+using drm::V1_0::KeyStatus;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
@@ -59,7 +64,8 @@ struct DrmHal : public BnDrm,
 
     virtual status_t destroyPlugin();
 
-    virtual status_t openSession(Vector<uint8_t> &sessionId);
+    virtual status_t openSession(DrmPlugin::SecurityLevel level,
+            Vector<uint8_t> &sessionId);
 
     virtual status_t closeSession(Vector<uint8_t> const &sessionId);
 
@@ -93,10 +99,19 @@ struct DrmHal : public BnDrm,
                                               Vector<uint8_t> &wrappedKey);
 
     virtual status_t getSecureStops(List<Vector<uint8_t>> &secureStops);
+    virtual status_t getSecureStopIds(List<Vector<uint8_t>> &secureStopIds);
     virtual status_t getSecureStop(Vector<uint8_t> const &ssid, Vector<uint8_t> &secureStop);
 
     virtual status_t releaseSecureStops(Vector<uint8_t> const &ssRelease);
-    virtual status_t releaseAllSecureStops();
+    virtual status_t removeSecureStop(Vector<uint8_t> const &ssid);
+    virtual status_t removeAllSecureStops();
+
+    virtual status_t getHdcpLevels(DrmPlugin::HdcpLevel *connectedLevel,
+            DrmPlugin::HdcpLevel *maxLevel) const;
+    virtual status_t getNumberOfSessions(uint32_t *currentSessions,
+            uint32_t *maxSessions) const;
+    virtual status_t getSecurityLevel(Vector<uint8_t> const &sessionId,
+            DrmPlugin::SecurityLevel *level) const;
 
     virtual status_t getPropertyString(String8 const &name, String8 &value ) const;
     virtual status_t getPropertyByteArray(String8 const &name,
@@ -104,6 +119,7 @@ struct DrmHal : public BnDrm,
     virtual status_t setPropertyString(String8 const &name, String8 const &value ) const;
     virtual status_t setPropertyByteArray(String8 const &name,
                                           Vector<uint8_t> const &value ) const;
+    virtual status_t getMetrics(os::PersistableBundle *metrics);
 
     virtual status_t setCipherAlgorithm(Vector<uint8_t> const &sessionId,
                                         String8 const &algorithm);
@@ -165,9 +181,15 @@ private:
 
     const Vector<sp<IDrmFactory>> mFactories;
     sp<IDrmPlugin> mPlugin;
+    sp<drm::V1_1::IDrmPlugin> mPluginV1_1;
+    String8 mAppPackageName;
+
+    // Mutable to allow modification within GetPropertyByteArray.
+    mutable MediaDrmMetrics mMetrics;
 
     Vector<Vector<uint8_t>> mOpenSessions;
     void closeOpenSessions();
+    void cleanup();
 
     /**
      * mInitCheck is:
@@ -183,7 +205,8 @@ private:
 
     void writeByteArray(Parcel &obj, const hidl_vec<uint8_t>& array);
 
-    void reportMetrics() const;
+    void reportPluginMetrics() const;
+    void reportFrameworkMetrics() const;
     status_t getPropertyStringInternal(String8 const &name, String8 &value) const;
     status_t getPropertyByteArrayInternal(String8 const &name,
                                           Vector<uint8_t> &value) const;

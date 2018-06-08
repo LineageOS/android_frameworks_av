@@ -25,7 +25,7 @@
 
 #include <system/audio.h>
 
-#include <MetadataBufferType.h>
+#include <media/hardware/MetadataBufferType.h>
 
 namespace android {
 
@@ -72,6 +72,12 @@ struct StagefrightRecorder : public MediaRecorderBase {
     virtual status_t dump(int fd, const Vector<String16> &args) const;
     // Querying a SurfaceMediaSourcer
     virtual sp<IGraphicBufferProducer> querySurfaceMediaSource() const;
+    virtual status_t setInputDevice(audio_port_handle_t deviceId);
+    virtual status_t getRoutedDeviceId(audio_port_handle_t* deviceId);
+    virtual void setAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
+    virtual status_t enableAudioDeviceCallback(bool enabled);
+    virtual status_t getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+
 
 private:
     mutable Mutex mLock;
@@ -89,7 +95,7 @@ private:
 
     MediaAnalyticsItem *mAnalyticsItem;
     bool mAnalyticsDirty;
-    void resetMetrics();
+    void flushAndResetMetrics(bool reinitialize);
     void updateMetrics();
 
     audio_source_t mAudioSource;
@@ -121,6 +127,11 @@ private:
     int32_t mStartTimeOffsetMs;
     int32_t mTotalBitRate;
 
+    int64_t mDurationRecordedUs;
+    int64_t mStartedRecordingUs;
+    int64_t mDurationPausedUs;
+    int32_t mNPauses;
+
     bool mCaptureFpsEnable;
     double mCaptureFps;
     int64_t mTimeBetweenCaptureUs;
@@ -143,6 +154,10 @@ private:
     // frame buffers will be queued and dequeued
     sp<IGraphicBufferProducer> mGraphicBufferProducer;
     sp<ALooper> mLooper;
+
+    audio_port_handle_t mSelectedDeviceId;
+    bool mDeviceCallbackEnabled;
+    wp<AudioSystem::AudioDeviceCallback> mAudioDeviceCallback;
 
     static const int kMaxHighSpeedFps = 1000;
 

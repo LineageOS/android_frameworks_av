@@ -18,6 +18,7 @@
 // #define LOG_NDEBUG 0
 #define LOG_TAG "CameraRequest"
 #include <utils/Log.h>
+#include <utils/String16.h>
 
 #include <camera/camera2/CaptureRequest.h>
 
@@ -42,16 +43,46 @@ status_t CaptureRequest::readFromParcel(const android::Parcel* parcel) {
         return BAD_VALUE;
     }
 
-    mMetadata.clear();
     mSurfaceList.clear();
+    mStreamIdxList.clear();
+    mSurfaceIdxList.clear();
+    mPhysicalCameraSettings.clear();
 
     status_t err = OK;
 
-    if ((err = mMetadata.readFromParcel(parcel)) != OK) {
-        ALOGE("%s: Failed to read metadata from parcel", __FUNCTION__);
+    int32_t settingsCount;
+    if ((err = parcel->readInt32(&settingsCount)) != OK) {
+        ALOGE("%s: Failed to read the settings count from parcel: %d", __FUNCTION__, err);
         return err;
     }
-    ALOGV("%s: Read metadata from parcel", __FUNCTION__);
+
+    if (settingsCount <= 0) {
+        ALOGE("%s: Settings count %d should always be positive!", __FUNCTION__, settingsCount);
+        return BAD_VALUE;
+    }
+
+    for (int32_t i = 0; i < settingsCount; i++) {
+        String16 id;
+        if ((err = parcel->readString16(&id)) != OK) {
+            ALOGE("%s: Failed to read camera id!", __FUNCTION__);
+            return BAD_VALUE;
+        }
+
+        CameraMetadata settings;
+        if ((err = settings.readFromParcel(parcel)) != OK) {
+            ALOGE("%s: Failed to read metadata from parcel", __FUNCTION__);
+            return err;
+        }
+        ALOGV("%s: Read metadata from parcel", __FUNCTION__);
+        mPhysicalCameraSettings.push_back({std::string(String8(id).string()), settings});
+    }
+
+    int isReprocess = 0;
+    if ((err = parcel->readInt32(&isReprocess)) != OK) {
+        ALOGE("%s: Failed to read reprocessing from parcel", __FUNCTION__);
+        return err;
+    }
+    mIsReprocess = (isReprocess != 0);
 
     int32_t size;
     if ((err = parcel->readInt32(&size)) != OK) {
@@ -61,7 +92,7 @@ status_t CaptureRequest::readFromParcel(const android::Parcel* parcel) {
     ALOGV("%s: Read surface list size = %d", __FUNCTION__, size);
 
     // Do not distinguish null arrays from 0-sized arrays.
-    for (int i = 0; i < size; ++i) {
+    for (int32_t i = 0; i < size; ++i) {
         // Parcel.writeParcelableArray
         size_t len;
         const char16_t* className = parcel->readString16Inplace(&len);
@@ -88,12 +119,32 @@ status_t CaptureRequest::readFromParcel(const android::Parcel* parcel) {
         mSurfaceList.push_back(surface);
     }
 
-    int isReprocess = 0;
-    if ((err = parcel->readInt32(&isReprocess)) != OK) {
-        ALOGE("%s: Failed to read reprocessing from parcel", __FUNCTION__);
+    int32_t streamSurfaceSize;
+    if ((err = parcel->readInt32(&streamSurfaceSize)) != OK) {
+        ALOGE("%s: Failed to read streamSurfaceSize from parcel", __FUNCTION__);
         return err;
     }
-    mIsReprocess = (isReprocess != 0);
+
+    if (streamSurfaceSize < 0) {
+        ALOGE("%s: Bad streamSurfaceSize %d from parcel", __FUNCTION__, streamSurfaceSize);
+        return BAD_VALUE;
+    }
+
+    for (int32_t i = 0; i < streamSurfaceSize; ++i) {
+        int streamIdx;
+        if ((err = parcel->readInt32(&streamIdx)) != OK) {
+            ALOGE("%s: Failed to read stream index from parcel", __FUNCTION__);
+            return err;
+        }
+        mStreamIdxList.push_back(streamIdx);
+
+        int surfaceIdx;
+        if ((err = parcel->readInt32(&surfaceIdx)) != OK) {
+            ALOGE("%s: Failed to read surface index from parcel", __FUNCTION__);
+            return err;
+        }
+        mSurfaceIdxList.push_back(surfaceIdx);
+    }
 
     return OK;
 }
@@ -106,32 +157,62 @@ status_t CaptureRequest::writeToParcel(android::Parcel* parcel) const {
 
     status_t err = OK;
 
-    if ((err = mMetadata.writeToParcel(parcel)) != OK) {
+    int32_t settingsCount = static_cast<int32_t>(mPhysicalCameraSettings.size());
+
+    if ((err = parcel->writeInt32(settingsCount)) != OK) {
+        ALOGE("%s: Failed to write settings count!", __FUNCTION__);
         return err;
     }
 
-    int32_t size = static_cast<int32_t>(mSurfaceList.size());
+    for (const auto &it : mPhysicalCameraSettings) {
+        if ((err = parcel->writeString16(String16(it.id.c_str()))) != OK) {
+            ALOGE("%s: Failed to camera id!", __FUNCTION__);
+            return err;
+        }
 
-    // Send 0-sized arrays when it's empty. Do not send null arrays.
-    parcel->writeInt32(size);
-
-    for (int32_t i = 0; i < size; ++i) {
-        // not sure if readParcelableArray does this, hard to tell from source
-        parcel->writeString16(String16("android.view.Surface"));
-
-        // Surface.writeToParcel
-        view::Surface surfaceShim;
-        surfaceShim.name = String16("unknown_name");
-        surfaceShim.graphicBufferProducer = mSurfaceList[i]->getIGraphicBufferProducer();
-        if ((err = surfaceShim.writeToParcel(parcel)) != OK) {
-            ALOGE("%s: Failed to write output target Surface %d to parcel: %s (%d)",
-                    __FUNCTION__, i, strerror(-err), err);
+        if ((err = it.settings.writeToParcel(parcel)) != OK) {
+            ALOGE("%s: Failed to write settings!", __FUNCTION__);
             return err;
         }
     }
 
     parcel->writeInt32(mIsReprocess ? 1 : 0);
 
+    if (mSurfaceConverted) {
+        parcel->writeInt32(0); // 0-sized array
+    } else {
+        int32_t size = static_cast<int32_t>(mSurfaceList.size());
+
+        // Send 0-sized arrays when it's empty. Do not send null arrays.
+        parcel->writeInt32(size);
+
+        for (int32_t i = 0; i < size; ++i) {
+            // not sure if readParcelableArray does this, hard to tell from source
+            parcel->writeString16(String16("android.view.Surface"));
+
+            // Surface.writeToParcel
+            view::Surface surfaceShim;
+            surfaceShim.name = String16("unknown_name");
+            surfaceShim.graphicBufferProducer = mSurfaceList[i]->getIGraphicBufferProducer();
+            if ((err = surfaceShim.writeToParcel(parcel)) != OK) {
+                ALOGE("%s: Failed to write output target Surface %d to parcel: %s (%d)",
+                        __FUNCTION__, i, strerror(-err), err);
+                return err;
+            }
+        }
+    }
+
+    parcel->writeInt32(mStreamIdxList.size());
+    for (size_t i = 0; i < mStreamIdxList.size(); ++i) {
+        if ((err = parcel->writeInt32(mStreamIdxList[i])) != OK) {
+            ALOGE("%s: Failed to write stream index to parcel", __FUNCTION__);
+            return err;
+        }
+        if ((err = parcel->writeInt32(mSurfaceIdxList[i])) != OK) {
+            ALOGE("%s: Failed to write surface index to parcel", __FUNCTION__);
+            return err;
+        }
+    }
     return OK;
 }
 
