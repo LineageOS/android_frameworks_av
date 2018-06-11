@@ -385,6 +385,7 @@ AudioPortConfig::AudioPortConfig()
     mSamplingRate = 0;
     mChannelMask = AUDIO_CHANNEL_NONE;
     mFormat = AUDIO_FORMAT_INVALID;
+    memset(&mGain, 0, sizeof(struct audio_gain_config));
     mGain.index = -1;
 }
 
