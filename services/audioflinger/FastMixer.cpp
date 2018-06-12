@@ -336,13 +336,15 @@ void FastMixer::onWork()
 {
     // TODO: pass an ID parameter to indicate which time series we want to write to in NBLog.cpp
     // Or: pass both of these into a single call with a boolean
+    const FastMixerState * const current = (const FastMixerState *) mCurrent;
+    FastMixerDumpState * const dumpState = (FastMixerDumpState *) mDumpState;
+
     if (mIsWarm) {
         LOG_HIST_TS();
     } else {
+        dumpState->mTimestampVerifier.discontinuity();
         LOG_AUDIO_STATE();
     }
-    const FastMixerState * const current = (const FastMixerState *) mCurrent;
-    FastMixerDumpState * const dumpState = (FastMixerDumpState *) mDumpState;
     const FastMixerState::Command command = mCommand;
     const size_t frameCount = current->mFrameCount;
 
@@ -477,39 +479,47 @@ void FastMixer::onWork()
         mAttemptedWrite = true;
         // FIXME count # of writes blocked excessively, CPU usage, etc. for dump
 
-        ExtendedTimestamp timestamp; // local
-        status_t status = mOutputSink->getTimestamp(timestamp);
-        if (status == NO_ERROR) {
-            const int64_t totalNativeFramesPresented =
-                    timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
-            if (totalNativeFramesPresented <= mTotalNativeFramesWritten) {
-                mNativeFramesWrittenButNotPresented =
-                    mTotalNativeFramesWritten - totalNativeFramesPresented;
-                mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL] =
+        if (mIsWarm) {
+            ExtendedTimestamp timestamp; // local
+            status_t status = mOutputSink->getTimestamp(timestamp);
+            if (status == NO_ERROR) {
+                dumpState->mTimestampVerifier.add(
+                        timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL],
+                        timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL],
+                        mSampleRate);
+                const int64_t totalNativeFramesPresented =
                         timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
-                mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] =
-                        timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL];
-                // We don't compensate for server - kernel time difference and
-                // only update latency if we have valid info.
-                dumpState->mLatencyMs =
-                        (double)mNativeFramesWrittenButNotPresented * 1000 / mSampleRate;
+                if (totalNativeFramesPresented <= mTotalNativeFramesWritten) {
+                    mNativeFramesWrittenButNotPresented =
+                        mTotalNativeFramesWritten - totalNativeFramesPresented;
+                    mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL] =
+                            timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
+                    mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] =
+                            timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL];
+                    // We don't compensate for server - kernel time difference and
+                    // only update latency if we have valid info.
+                    dumpState->mLatencyMs =
+                            (double)mNativeFramesWrittenButNotPresented * 1000 / mSampleRate;
+                } else {
+                    // HAL reported that more frames were presented than were written
+                    mNativeFramesWrittenButNotPresented = 0;
+                    status = INVALID_OPERATION;
+                }
             } else {
-                // HAL reported that more frames were presented than were written
-                mNativeFramesWrittenButNotPresented = 0;
-                status = INVALID_OPERATION;
+                dumpState->mTimestampVerifier.error();
             }
-        }
-        if (status == NO_ERROR) {
-            mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] =
-                    mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL];
-        } else {
-            // fetch server time if we can't get timestamp
-            mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] =
-                    systemTime(SYSTEM_TIME_MONOTONIC);
-            // clear out kernel cached position as this may get rapidly stale
-            // if we never get a new valid timestamp
-            mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL] = 0;
-            mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] = -1;
+            if (status == NO_ERROR) {
+                mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] =
+                        mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL];
+            } else {
+                // fetch server time if we can't get timestamp
+                mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] =
+                        systemTime(SYSTEM_TIME_MONOTONIC);
+                // clear out kernel cached position as this may get rapidly stale
+                // if we never get a new valid timestamp
+                mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL] = 0;
+                mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] = -1;
+            }
         }
     }
 }

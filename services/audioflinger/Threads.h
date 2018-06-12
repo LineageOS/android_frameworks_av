@@ -499,6 +499,9 @@ protected:
                 sp<NBLog::Writer>       mNBLogWriter;
                 bool                    mSystemReady;
                 ExtendedTimestamp       mTimestamp;
+                TimestampVerifier< // For timestamp statistics.
+                        int64_t /* frame count */, int64_t /* time ns */> mTimestampVerifier;
+
                 // A condition that must be evaluated by the thread loop has changed and
                 // we must not wait for async write callback in the thread loop before evaluating it
                 bool                    mSignalPending;

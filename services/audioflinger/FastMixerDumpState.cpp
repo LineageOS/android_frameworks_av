@@ -73,6 +73,7 @@ void FastMixerDumpState::dump(int fd) const
                 mNumTracks, mWriteErrors, mUnderruns, mOverruns,
                 mSampleRate, mFrameCount, measuredWarmupMs, mWarmupCycles,
                 mixPeriodSec * 1e3, mLatencyMs);
+    dprintf(fd, "  FastMixer Timestamp stats: %s\n", mTimestampVerifier.toString().c_str());
 #ifdef FAST_THREAD_STATISTICS
     // find the interval of valid samples
     uint32_t bounds = mBounds;
