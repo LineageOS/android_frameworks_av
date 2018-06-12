@@ -28,6 +28,23 @@
 
 namespace android {
 
+static AudioProfile* createFullDynamicImpl()
+{
+    AudioProfile* dynamicProfile = new AudioProfile(gDynamicFormat,
+            ChannelsVector(), SampleRateVector());
+    dynamicProfile->setDynamicFormat(true);
+    dynamicProfile->setDynamicChannels(true);
+    dynamicProfile->setDynamicRate(true);
+    return dynamicProfile;
+}
+
+// static
+sp<AudioProfile> AudioProfile::createFullDynamic()
+{
+    static sp<AudioProfile> dynamicProfile = createFullDynamicImpl();
+    return dynamicProfile;
+}
+
 status_t AudioProfile::checkExact(uint32_t samplingRate, audio_channel_mask_t channelMask,
                                   audio_format_t format) const
 {

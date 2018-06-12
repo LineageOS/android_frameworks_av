@@ -242,12 +242,7 @@ status_t MixPortTraits::deserialize(_xmlDoc *doc, const _xmlNode *child, PtrElem
     AudioProfileTraits::Collection profiles;
     deserializeCollection<AudioProfileTraits>(doc, child, profiles, NULL);
     if (profiles.isEmpty()) {
-        sp <AudioProfile> dynamicProfile = new AudioProfile(gDynamicFormat,
-                                                            ChannelsVector(), SampleRateVector());
-        dynamicProfile->setDynamicFormat(true);
-        dynamicProfile->setDynamicChannels(true);
-        dynamicProfile->setDynamicRate(true);
-        profiles.add(dynamicProfile);
+        profiles.add(AudioProfile::createFullDynamic());
     }
     mixPort->setAudioProfiles(profiles);
 
@@ -328,12 +323,7 @@ status_t DevicePortTraits::deserialize(_xmlDoc *doc, const _xmlNode *root, PtrEl
     AudioProfileTraits::Collection profiles;
     deserializeCollection<AudioProfileTraits>(doc, root, profiles, NULL);
     if (profiles.isEmpty()) {
-        sp <AudioProfile> dynamicProfile = new AudioProfile(gDynamicFormat,
-                                                            ChannelsVector(), SampleRateVector());
-        dynamicProfile->setDynamicFormat(true);
-        dynamicProfile->setDynamicChannels(true);
-        dynamicProfile->setDynamicRate(true);
-        profiles.add(dynamicProfile);
+        profiles.add(AudioProfile::createFullDynamic());
     }
     deviceDesc->setAudioProfiles(profiles);
 

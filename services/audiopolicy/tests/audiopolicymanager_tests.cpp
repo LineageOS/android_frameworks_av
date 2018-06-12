@@ -16,9 +16,13 @@
 
 #include <memory>
 #include <set>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include <gtest/gtest.h>
 
+#define LOG_TAG "APM_Test"
+#include <log/log.h>
 #include <media/PatchBuilder.h>
 
 #include "AudioPolicyTestClient.h"
@@ -132,6 +136,36 @@ void AudioPolicyManagerTest::TearDown() {
 
 TEST_F(AudioPolicyManagerTest, InitSuccess) {
     // SetUp must finish with no assertions.
+}
+
+TEST_F(AudioPolicyManagerTest, Dump) {
+    int pipefd[2];
+    ASSERT_NE(-1, pipe(pipefd));
+    pid_t cpid = fork();
+    ASSERT_NE(-1, cpid);
+    if (cpid == 0) {
+        // Child process reads from the pipe and logs.
+        close(pipefd[1]);
+        std::string line;
+        char buf;
+        while (read(pipefd[0], &buf, sizeof(buf)) > 0) {
+            if (buf != '\n') {
+                line += buf;
+            } else {
+                ALOGI("%s", line.c_str());
+                line = "";
+            }
+        }
+        if (!line.empty()) ALOGI("%s", line.c_str());
+        close(pipefd[0]);
+        _exit(EXIT_SUCCESS);
+    } else {
+        // Parent does the dump and checks the status code.
+        close(pipefd[0]);
+        ASSERT_EQ(NO_ERROR, mManager->dump(pipefd[1]));
+        close(pipefd[1]);
+        wait(NULL);  // Wait for the child to exit.
+    }
 }
 
 TEST_F(AudioPolicyManagerTest, CreateAudioPatchFailure) {
