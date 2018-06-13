@@ -8170,7 +8170,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
 
     // Given that MmapThread::mAttr is mutable, should a MmapTrack have attributes ?
     sp<MmapTrack> track = new MmapTrack(this, mAttr, mSampleRate, mFormat, mChannelMask, mSessionId,
-                                        client.clientUid, client.clientPid, portId);
+                                        isOutput(), client.clientUid, client.clientPid, portId);
 
     track->setSilenced_l(silenced);
     mActiveTracks.add(track);
@@ -8696,7 +8696,7 @@ void AudioFlinger::MmapThread::dumpTracks(int fd, const Vector<String16>& args _
     const char *prefix = "    ";
     if (numtracks) {
         result.append(prefix);
-        MmapTrack::appendDumpHeader(result);
+        mActiveTracks[0]->appendDumpHeader(result);
         for (size_t i = 0; i < numtracks ; ++i) {
             sp<MmapTrack> track = mActiveTracks[i];
             result.append(prefix);
