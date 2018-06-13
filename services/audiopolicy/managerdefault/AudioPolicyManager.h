@@ -321,6 +321,10 @@ protected:
         bool isStrategyActive(const sp<AudioOutputDescriptor>& outputDesc, routing_strategy strategy,
                               uint32_t inPastMs = 0, nsecs_t sysTime = 0) const;
 
+        bool isStrategyActiveOnSameModule(const sp<AudioOutputDescriptor>& outputDesc,
+                                                  routing_strategy strategy, uint32_t inPastMs = 0,
+                                                  nsecs_t sysTime = 0) const;
+
         // change the route of the specified output. Returns the number of ms we have slept to
         // allow new routing to take effect in certain cases.
         virtual uint32_t setOutputDevice(const sp<AudioOutputDescriptor>& outputDesc,
