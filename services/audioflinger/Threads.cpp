@@ -6815,9 +6815,33 @@ reacquire_wakelock:
                 framesOut = min(framesOut,
                         destinationFramesPossible(
                                 framesIn, mSampleRate, activeTrack->mSampleRate));
-                // process frames from the RecordThread buffer provider to the RecordTrack buffer
-                framesOut = activeTrack->mRecordBufferConverter->convert(
-                        activeTrack->mSink.raw, activeTrack->mResamplerBufferProvider, framesOut);
+
+                if (activeTrack->isDirect()) {
+                    // No RecordBufferConverter used for compressed formats. Pass
+                    // straight from RecordThread buffer to RecordTrack buffer.
+                    AudioBufferProvider::Buffer buffer;
+                    buffer.frameCount = framesOut;
+                    status_t status = activeTrack->mResamplerBufferProvider->getNextBuffer(&buffer);
+                    if (status == OK && buffer.frameCount != 0) {
+                        ALOGV_IF(buffer.frameCount != framesOut,
+                                "%s() read less than expected (%zu vs %zu)",
+                                __func__, buffer.frameCount, framesOut);
+                        framesOut = buffer.frameCount;
+                        memcpy(activeTrack->mSink.raw, buffer.raw, buffer.frameCount);
+                        activeTrack->mResamplerBufferProvider->releaseBuffer(&buffer);
+                    } else {
+                        framesOut = 0;
+                        ALOGE("%s() cannot fill request, status: %d, frameCount: %zu",
+                            __func__, status, buffer.frameCount);
+                    }
+                } else {
+                    // process frames from the RecordThread buffer provider to the RecordTrack
+                    // buffer
+                    framesOut = activeTrack->mRecordBufferConverter->convert(
+                            activeTrack->mSink.raw,
+                            activeTrack->mResamplerBufferProvider,
+                            framesOut);
+                }
 
                 if (framesOut > 0 && (overrun == OVERRUN_UNKNOWN)) {
                     overrun = OVERRUN_FALSE;
@@ -7189,8 +7213,10 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
         // see previously buffered data before it called start(), but with greater risk of overrun.
 
         recordTrack->mResamplerBufferProvider->reset();
-        // clear any converter state as new data will be discontinuous
-        recordTrack->mRecordBufferConverter->reset();
+        if (!recordTrack->isDirect()) {
+            // clear any converter state as new data will be discontinuous
+            recordTrack->mRecordBufferConverter->reset();
+        }
         recordTrack->mState = TrackBase::STARTING_2;
         // signal thread to start
         mWaitWorkCV.broadcast();
