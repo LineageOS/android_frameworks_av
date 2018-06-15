@@ -423,6 +423,14 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
     uint32_t sampleRate = mPlayback.thread()->sampleRate();
     audio_format_t format = mPlayback.thread()->format();
 
+    audio_format_t inputFormat = mRecord.thread()->format();
+    if (!audio_is_linear_pcm(inputFormat)) {
+        // The playbackThread format will say PCM for IEC61937 packetized stream.
+        // Use recordThread format.
+        format = inputFormat;
+    }
+    audio_input_flags_t inputFlags = mAudioPatch.sources[0].config_mask & AUDIO_PORT_CONFIG_FLAGS ?
+            mAudioPatch.sources[0].flags.input : AUDIO_INPUT_FLAG_NONE;
     sp<RecordThread::PatchRecord> tempRecordTrack = new (std::nothrow) RecordThread::PatchRecord(
                                              mRecord.thread().get(),
                                              sampleRate,
@@ -431,11 +439,14 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
                                              frameCount,
                                              NULL,
                                              (size_t)0 /* bufferSize */,
-                                             AUDIO_INPUT_FLAG_NONE);
+                                             inputFlags);
     status = mRecord.checkTrack(tempRecordTrack.get());
     if (status != NO_ERROR) {
         return status;
     }
+
+    audio_output_flags_t outputFlags = mAudioPatch.sinks[0].config_mask & AUDIO_PORT_CONFIG_FLAGS ?
+            mAudioPatch.sinks[0].flags.output : AUDIO_OUTPUT_FLAG_NONE;
 
     // create a special playback track to render to playback thread.
     // this track is given the same buffer as the PatchRecord buffer
@@ -448,7 +459,7 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
                                            frameCount,
                                            tempRecordTrack->buffer(),
                                            tempRecordTrack->bufferSize(),
-                                           AUDIO_OUTPUT_FLAG_NONE);
+                                           outputFlags);
     status = mPlayback.checkTrack(tempPatchTrack.get());
     if (status != NO_ERROR) {
         return status;

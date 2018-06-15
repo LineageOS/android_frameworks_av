@@ -71,7 +71,8 @@ public:
             }
             bool        isOffloaded() const
                                 { return (mFlags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0; }
-            bool        isDirect() const { return (mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0; }
+            bool        isDirect() const override
+                                { return (mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0; }
             bool        isOffloadedOrDirect() const { return (mFlags
                             & (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD
                                     | AUDIO_OUTPUT_FLAG_DIRECT)) != 0; }

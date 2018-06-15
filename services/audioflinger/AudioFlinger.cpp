@@ -2335,6 +2335,9 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
         return 0;
     }
 
+    // Some flags are specific to framework and must not leak to the HAL.
+    flags = static_cast<audio_input_flags_t>(flags & ~AUDIO_INPUT_FRAMEWORK_FLAGS);
+
     // Audio Policy can request a specific handle for hardware hotword.
     // The goal here is not to re-open an already opened input.
     // It is to use a pre-assigned I/O handle.
