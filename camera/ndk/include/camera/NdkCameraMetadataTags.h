@@ -479,11 +479,26 @@ typedef enum acamera_metadata_tag {
      * Otherwise will always be present.</p>
      * <p>The maximum number of regions supported by the device is determined by the value
      * of android.control.maxRegionsAe.</p>
-     * <p>The coordinate system is based on the active pixel array,
-     * with (0,0) being the top-left pixel in the active pixel array, and
+     * <p>For devices not supporting ACAMERA_DISTORTION_CORRECTION_MODE control, the coordinate
+     * system always follows that of ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with (0,0) being
+     * the top-left pixel in the active pixel array, and
      * (ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.width - 1,
-     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.height - 1) being the
-     * bottom-right pixel in the active pixel array.</p>
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.height - 1) being the bottom-right pixel in the
+     * active pixel array.</p>
+     * <p>For devices supporting ACAMERA_DISTORTION_CORRECTION_MODE control, the coordinate
+     * system depends on the mode being set.
+     * When the distortion correction mode is OFF, the coordinate system follows
+     * ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE, with
+     * <code>(0, 0)</code> being the top-left pixel of the pre-correction active array, and
+     * (ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.width - 1,
+     * ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.height - 1) being the bottom-right
+     * pixel in the pre-correction active pixel array.
+     * When the distortion correction mode is not OFF, the coordinate system follows
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with
+     * <code>(0, 0)</code> being the top-left pixel of the active array, and
+     * (ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.width - 1,
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.height - 1) being the bottom-right pixel in the
+     * active pixel array.</p>
      * <p>The weight must be within <code>[0, 1000]</code>, and represents a weight
      * for every pixel in the area. This means that a large metering area
      * with the same weight as a smaller area will have more effect in
@@ -504,8 +519,10 @@ typedef enum acamera_metadata_tag {
      * The rectangle is defined to be inclusive on xmin and ymin, but exclusive on xmax and
      * ymax.</p>
      *
+     * @see ACAMERA_DISTORTION_CORRECTION_MODE
      * @see ACAMERA_SCALER_CROP_REGION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
+     * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      */
     ACAMERA_CONTROL_AE_REGIONS =                                // int32[5*area_count]
             ACAMERA_CONTROL_START + 4,
@@ -641,11 +658,26 @@ typedef enum acamera_metadata_tag {
      * Otherwise will always be present.</p>
      * <p>The maximum number of focus areas supported by the device is determined by the value
      * of android.control.maxRegionsAf.</p>
-     * <p>The coordinate system is based on the active pixel array,
-     * with (0,0) being the top-left pixel in the active pixel array, and
+     * <p>For devices not supporting ACAMERA_DISTORTION_CORRECTION_MODE control, the coordinate
+     * system always follows that of ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with (0,0) being
+     * the top-left pixel in the active pixel array, and
      * (ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.width - 1,
-     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.height - 1) being the
-     * bottom-right pixel in the active pixel array.</p>
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.height - 1) being the bottom-right pixel in the
+     * active pixel array.</p>
+     * <p>For devices supporting ACAMERA_DISTORTION_CORRECTION_MODE control, the coordinate
+     * system depends on the mode being set.
+     * When the distortion correction mode is OFF, the coordinate system follows
+     * ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE, with
+     * <code>(0, 0)</code> being the top-left pixel of the pre-correction active array, and
+     * (ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.width - 1,
+     * ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.height - 1) being the bottom-right
+     * pixel in the pre-correction active pixel array.
+     * When the distortion correction mode is not OFF, the coordinate system follows
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with
+     * <code>(0, 0)</code> being the top-left pixel of the active array, and
+     * (ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.width - 1,
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.height - 1) being the bottom-right pixel in the
+     * active pixel array.</p>
      * <p>The weight must be within <code>[0, 1000]</code>, and represents a weight
      * for every pixel in the area. This means that a large metering area
      * with the same weight as a smaller area will have more effect in
@@ -667,8 +699,10 @@ typedef enum acamera_metadata_tag {
      * The rectangle is defined to be inclusive on xmin and ymin, but exclusive on xmax and
      * ymax.</p>
      *
+     * @see ACAMERA_DISTORTION_CORRECTION_MODE
      * @see ACAMERA_SCALER_CROP_REGION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
+     * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      */
     ACAMERA_CONTROL_AF_REGIONS =                                // int32[5*area_count]
             ACAMERA_CONTROL_START + 8,
@@ -800,11 +834,26 @@ typedef enum acamera_metadata_tag {
      * Otherwise will always be present.</p>
      * <p>The maximum number of regions supported by the device is determined by the value
      * of android.control.maxRegionsAwb.</p>
-     * <p>The coordinate system is based on the active pixel array,
-     * with (0,0) being the top-left pixel in the active pixel array, and
+     * <p>For devices not supporting ACAMERA_DISTORTION_CORRECTION_MODE control, the coordinate
+     * system always follows that of ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with (0,0) being
+     * the top-left pixel in the active pixel array, and
      * (ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.width - 1,
-     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.height - 1) being the
-     * bottom-right pixel in the active pixel array.</p>
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.height - 1) being the bottom-right pixel in the
+     * active pixel array.</p>
+     * <p>For devices supporting ACAMERA_DISTORTION_CORRECTION_MODE control, the coordinate
+     * system depends on the mode being set.
+     * When the distortion correction mode is OFF, the coordinate system follows
+     * ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE, with
+     * <code>(0, 0)</code> being the top-left pixel of the pre-correction active array, and
+     * (ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.width - 1,
+     * ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.height - 1) being the bottom-right
+     * pixel in the pre-correction active pixel array.
+     * When the distortion correction mode is not OFF, the coordinate system follows
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with
+     * <code>(0, 0)</code> being the top-left pixel of the active array, and
+     * (ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.width - 1,
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.height - 1) being the bottom-right pixel in the
+     * active pixel array.</p>
      * <p>The weight must range from 0 to 1000, and represents a weight
      * for every pixel in the area. This means that a large metering area
      * with the same weight as a smaller area will have more effect in
@@ -825,8 +874,10 @@ typedef enum acamera_metadata_tag {
      * The rectangle is defined to be inclusive on xmin and ymin, but exclusive on xmax and
      * ymax.</p>
      *
+     * @see ACAMERA_DISTORTION_CORRECTION_MODE
      * @see ACAMERA_SCALER_CROP_REGION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
+     * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      */
     ACAMERA_CONTROL_AWB_REGIONS =                               // int32[5*area_count]
             ACAMERA_CONTROL_START + 12,
@@ -2979,9 +3030,17 @@ typedef enum acamera_metadata_tag {
      * </ul></p>
      *
      * <p>This control can be used to implement digital zoom.</p>
-     * <p>The crop region coordinate system is based off
-     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with <code>(0, 0)</code> being the
-     * top-left corner of the sensor active array.</p>
+     * <p>For devices not supporting ACAMERA_DISTORTION_CORRECTION_MODE control, the coordinate
+     * system always follows that of ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with <code>(0, 0)</code> being
+     * the top-left pixel of the active array.</p>
+     * <p>For devices supporting ACAMERA_DISTORTION_CORRECTION_MODE control, the coordinate
+     * system depends on the mode being set.
+     * When the distortion correction mode is OFF, the coordinate system follows
+     * ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE, with
+     * <code>(0, 0)</code> being the top-left pixel of the pre-correction active array.
+     * When the distortion correction mode is not OFF, the coordinate system follows
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with
+     * <code>(0, 0)</code> being the top-left pixel of the active array.</p>
      * <p>Output streams use this rectangle to produce their output,
      * cropping to a smaller region if necessary to maintain the
      * stream's aspect ratio, then scaling the sensor input to
@@ -3000,18 +3059,26 @@ typedef enum acamera_metadata_tag {
      * outputs will crop horizontally (pillarbox), and 16:9
      * streams will match exactly. These additional crops will
      * be centered within the crop region.</p>
-     * <p>The width and height of the crop region cannot
-     * be set to be smaller than
+     * <p>If the coordinate system is android.sensor.info.activeArraysSize, the width and height
+     * of the crop region cannot be set to be smaller than
      * <code>floor( activeArraySize.width / ACAMERA_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM )</code> and
      * <code>floor( activeArraySize.height / ACAMERA_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM )</code>, respectively.</p>
+     * <p>If the coordinate system is ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE, the width
+     * and height of the crop region cannot be set to be smaller than
+     * <code>floor( preCorrectionActiveArraySize.width / ACAMERA_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM )</code>
+     * and
+     * <code>floor( preCorrectionActiveArraySize.height / ACAMERA_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM )</code>,
+     * respectively.</p>
      * <p>The camera device may adjust the crop region to account
      * for rounding and other hardware requirements; the final
      * crop region used will be included in the output capture
      * result.</p>
      * <p>The data representation is int[4], which maps to (left, top, width, height).</p>
      *
+     * @see ACAMERA_DISTORTION_CORRECTION_MODE
      * @see ACAMERA_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
+     * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      */
     ACAMERA_SCALER_CROP_REGION =                                // int32[4]
             ACAMERA_SCALER_START,
@@ -3977,12 +4044,24 @@ typedef enum acamera_metadata_tag {
      * ACAMERA_SCALER_CROP_REGION, is defined relative to the active array rectangle given in
      * this field, with <code>(0, 0)</code> being the top-left of this rectangle.</p>
      * <p>The active array may be smaller than the full pixel array, since the full array may
-     * include black calibration pixels or other inactive regions, and geometric correction
-     * resulting in scaling or cropping may have been applied.</p>
+     * include black calibration pixels or other inactive regions.</p>
+     * <p>For devices that do not support ACAMERA_DISTORTION_CORRECTION_MODE control, the active
+     * array must be the same as ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.</p>
+     * <p>For devices that support ACAMERA_DISTORTION_CORRECTION_MODE control, the active array must
+     * be enclosed by ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE. The difference between
+     * pre-correction active array and active array accounts for scaling or cropping caused
+     * by lens geometric distortion correction.</p>
+     * <p>In general, application should always refer to active array size for controls like
+     * metering regions or crop region. Two exceptions are when the application is dealing with
+     * RAW image buffers (RAW_SENSOR, RAW10, RAW12 etc), or when application explicitly set
+     * ACAMERA_DISTORTION_CORRECTION_MODE to OFF. In these cases, application should refer
+     * to ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.</p>
      * <p>The data representation is <code>int[4]</code>, which maps to <code>(left, top, width, height)</code>.</p>
      *
+     * @see ACAMERA_DISTORTION_CORRECTION_MODE
      * @see ACAMERA_SCALER_CROP_REGION
      * @see ACAMERA_SENSOR_INFO_PIXEL_ARRAY_SIZE
+     * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      */
     ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE =                     // int32[4]
             ACAMERA_SENSOR_INFO_START,
@@ -4224,9 +4303,9 @@ typedef enum acamera_metadata_tag {
      * <ol>
      * <li>ACAMERA_LENS_DISTORTION.</li>
      * </ol>
-     * <p>If all of the geometric distortion fields are no-ops, this rectangle will be the same
-     * as the post-distortion-corrected rectangle given in
-     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.</p>
+     * <p>If the camera device doesn't support geometric distortion correction, or all of the
+     * geometric distortion fields are no-ops, this rectangle will be the same as the
+     * post-distortion-corrected rectangle given in ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.</p>
      * <p>This rectangle is defined relative to the full pixel array; (0,0) is the top-left of
      * the full pixel array, and the size of the full pixel array is given by
      * ACAMERA_SENSOR_INFO_PIXEL_ARRAY_SIZE.</p>
@@ -4372,11 +4451,22 @@ typedef enum acamera_metadata_tag {
      *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
      * </ul></p>
      *
-     * <p>The coordinate system is that of ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with
+     * <p>For devices not supporting ACAMERA_DISTORTION_CORRECTION_MODE control, the coordinate
+     * system always follows that of ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with <code>(0, 0)</code> being
+     * the top-left pixel of the active array.</p>
+     * <p>For devices supporting ACAMERA_DISTORTION_CORRECTION_MODE control, the coordinate
+     * system depends on the mode being set.
+     * When the distortion correction mode is OFF, the coordinate system follows
+     * ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE, with
+     * <code>(0, 0)</code> being the top-left pixel of the pre-correction active array.
+     * When the distortion correction mode is not OFF, the coordinate system follows
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with
      * <code>(0, 0)</code> being the top-left pixel of the active array.</p>
      * <p>Only available if ACAMERA_STATISTICS_FACE_DETECT_MODE == FULL</p>
      *
+     * @see ACAMERA_DISTORTION_CORRECTION_MODE
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
+     * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_STATISTICS_FACE_DETECT_MODE
      */
     ACAMERA_STATISTICS_FACE_LANDMARKS =                         // int32[n*6]
@@ -4392,12 +4482,23 @@ typedef enum acamera_metadata_tag {
      *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
      * </ul></p>
      *
-     * <p>The coordinate system is that of ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with
+     * <p>For devices not supporting ACAMERA_DISTORTION_CORRECTION_MODE control, the coordinate
+     * system always follows that of ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with <code>(0, 0)</code> being
+     * the top-left pixel of the active array.</p>
+     * <p>For devices supporting ACAMERA_DISTORTION_CORRECTION_MODE control, the coordinate
+     * system depends on the mode being set.
+     * When the distortion correction mode is OFF, the coordinate system follows
+     * ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE, with
+     * <code>(0, 0)</code> being the top-left pixel of the pre-correction active array.
+     * When the distortion correction mode is not OFF, the coordinate system follows
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with
      * <code>(0, 0)</code> being the top-left pixel of the active array.</p>
      * <p>Only available if ACAMERA_STATISTICS_FACE_DETECT_MODE != OFF
-     * The data representation is <code>int[4]</code>, which maps to <code>(left, top, width, height)</code>.</p>
+     * The data representation is <code>int[4]</code>, which maps to <code>(left, top, right, bottom)</code>.</p>
      *
+     * @see ACAMERA_DISTORTION_CORRECTION_MODE
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
+     * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_STATISTICS_FACE_DETECT_MODE
      */
     ACAMERA_STATISTICS_FACE_RECTANGLES =                        // int32[n*4]
@@ -5315,18 +5416,18 @@ typedef enum acamera_metadata_tag {
      * any correction at all would slow down capture rate.  Every output stream will have a
      * similar amount of enhancement applied.</p>
      * <p>The correction only applies to processed outputs such as YUV, JPEG, or DEPTH16; it is not
-     * applied to any RAW output.  Metadata coordinates such as face rectangles or metering
+     * applied to any RAW output. Metadata coordinates such as face rectangles or metering
      * regions are also not affected by correction.</p>
-     * <p>Applications enabling distortion correction need to pay extra attention when converting
-     * image coordinates between corrected output buffers and the sensor array. For example, if
-     * the app supports tap-to-focus and enables correction, it then has to apply the distortion
-     * model described in ACAMERA_LENS_DISTORTION to the image buffer tap coordinates to properly
-     * calculate the tap position on the sensor active array to be used with
-     * ACAMERA_CONTROL_AF_REGIONS. The same applies in reverse to detected face rectangles if
-     * they need to be drawn on top of the corrected output buffers.</p>
+     * <p>This control will be on by default on devices that support this control. Applications
+     * disabling distortion correction need to pay extra attention with the coordinate system of
+     * metering regions, crop region, and face rectangles. When distortion correction is OFF,
+     * metadata coordinates follow the coordinate system of
+     * ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE. When distortion is not OFF, metadata
+     * coordinates follow the coordinate system of ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.</p>
      *
-     * @see ACAMERA_CONTROL_AF_REGIONS
      * @see ACAMERA_LENS_DISTORTION
+     * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
+     * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      */
     ACAMERA_DISTORTION_CORRECTION_MODE =                        // byte (acamera_metadata_enum_android_distortion_correction_mode_t)
             ACAMERA_DISTORTION_CORRECTION_START,
