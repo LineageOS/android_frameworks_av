@@ -2834,8 +2834,7 @@ status_t AudioPolicyManager::createAudioPatch(const struct audio_patch *patch,
     }
     ALOGV("createAudioPatch() num sources %d num sinks %d", patch->num_sources, patch->num_sinks);
 
-    if (patch->num_sources == 0 || patch->num_sources > AUDIO_PATCH_PORTS_MAX ||
-            patch->num_sinks == 0 || patch->num_sinks > AUDIO_PATCH_PORTS_MAX) {
+    if (!audio_patch_is_valid(patch)) {
         return BAD_VALUE;
     }
     // only one source per audio patch supported for now
