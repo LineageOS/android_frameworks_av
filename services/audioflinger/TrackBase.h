@@ -91,6 +91,7 @@ public:
             void*       buffer() const { return mBuffer; }
             size_t      bufferSize() const { return mBufferSize; }
     virtual bool        isFastTrack() const = 0;
+    virtual bool        isDirect() const = 0;
             bool        isOutputTrack() const { return (mType == TYPE_OUTPUT); }
             bool        isPatchTrack() const { return (mType == TYPE_PATCH); }
             bool        isExternalTrack() const { return !isOutputTrack() && !isPatchTrack(); }

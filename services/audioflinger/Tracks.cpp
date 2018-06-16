@@ -1694,18 +1694,20 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
         return;
     }
 
-    mRecordBufferConverter = new RecordBufferConverter(
-            thread->mChannelMask, thread->mFormat, thread->mSampleRate,
-            channelMask, format, sampleRate);
-    // Check if the RecordBufferConverter construction was successful.
-    // If not, don't continue with construction.
-    //
-    // NOTE: It would be extremely rare that the record track cannot be created
-    // for the current device, but a pending or future device change would make
-    // the record track configuration valid.
-    if (mRecordBufferConverter->initCheck() != NO_ERROR) {
-        ALOGE("RecordTrack unable to create record buffer converter");
-        return;
+    if (!isDirect()) {
+        mRecordBufferConverter = new RecordBufferConverter(
+                thread->mChannelMask, thread->mFormat, thread->mSampleRate,
+                channelMask, format, sampleRate);
+        // Check if the RecordBufferConverter construction was successful.
+        // If not, don't continue with construction.
+        //
+        // NOTE: It would be extremely rare that the record track cannot be created
+        // for the current device, but a pending or future device change would make
+        // the record track configuration valid.
+        if (mRecordBufferConverter->initCheck() != NO_ERROR) {
+            ALOGE("RecordTrack unable to create record buffer converter");
+            return;
+        }
     }
 
     mServerProxy = new AudioRecordServerProxy(mCblk, mBuffer, frameCount,

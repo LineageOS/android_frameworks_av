@@ -63,6 +63,8 @@ public:
                                              const ExtendedTimestamp &timestamp);
 
     virtual bool        isFastTrack() const { return (mFlags & AUDIO_INPUT_FLAG_FAST) != 0; }
+            bool        isDirect() const override
+                                { return (mFlags & AUDIO_INPUT_FLAG_DIRECT) != 0; }
 
             void        setSilenced(bool silenced) { if (!isPatchTrack()) mSilenced = silenced; }
             bool        isSilenced() const { return mSilenced; }

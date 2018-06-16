@@ -40,6 +40,7 @@ public:
                               audio_session_t triggerSession);
     virtual void        stop();
     virtual bool        isFastTrack() const { return false; }
+            bool        isDirect() const override { return true; }
 
             void        appendDumpHeader(String8& result);
             void        appendDump(String8& result, bool active);
