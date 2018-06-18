@@ -44,8 +44,6 @@
 
 __BEGIN_DECLS
 
-#if __ANDROID_API__ >= 24
-
 /**
  * ACameraManager is opaque type that provides access to camera service.
  *
@@ -65,14 +63,14 @@ typedef struct ACameraManager ACameraManager;
  * @return a {@link ACameraManager} instance.
  *
  */
-ACameraManager* ACameraManager_create();
+ACameraManager* ACameraManager_create() __INTRODUCED_IN(24);
 
 /**
  * <p>Delete the {@link ACameraManager} instance and free its resources. </p>
  *
  * @param manager the {@link ACameraManager} instance to be deleted.
  */
-void ACameraManager_delete(ACameraManager* manager);
+void ACameraManager_delete(ACameraManager* manager) __INTRODUCED_IN(24);
 
 /// Struct to hold list of camera devices
 typedef struct ACameraIdList {
@@ -102,14 +100,14 @@ typedef struct ACameraIdList {
  *         <li>{@link ACAMERA_ERROR_NOT_ENOUGH_MEMORY} if allocating memory fails.</li></ul>
  */
 camera_status_t ACameraManager_getCameraIdList(ACameraManager* manager,
-                                              /*out*/ACameraIdList** cameraIdList);
+        /*out*/ACameraIdList** cameraIdList) __INTRODUCED_IN(24);
 
 /**
  * Delete a list of camera devices allocated via {@link ACameraManager_getCameraIdList}.
  *
  * @param cameraIdList the {@link ACameraIdList} to be deleted.
  */
-void ACameraManager_deleteCameraIdList(ACameraIdList* cameraIdList);
+void ACameraManager_deleteCameraIdList(ACameraIdList* cameraIdList) __INTRODUCED_IN(24);
 
 /**
  * Definition of camera availability callbacks.
@@ -120,7 +118,8 @@ void ACameraManager_deleteCameraIdList(ACameraIdList* cameraIdList);
  *                 argument is owned by camera framework and will become invalid immediately after
  *                 this callback returns.
  */
-typedef void (*ACameraManager_AvailabilityCallback)(void* context, const char* cameraId);
+typedef void (*ACameraManager_AvailabilityCallback)(void* context,
+        const char* cameraId) __INTRODUCED_IN(24);
 
 /**
  * A listener for camera devices becoming available or unavailable to open.
@@ -168,7 +167,8 @@ typedef struct ACameraManager_AvailabilityListener {
  *                  {ACameraManager_AvailabilityCallbacks#onCameraUnavailable} is NULL.</li></ul>
  */
 camera_status_t ACameraManager_registerAvailabilityCallback(
-        ACameraManager* manager, const ACameraManager_AvailabilityCallbacks* callback);
+        ACameraManager* manager,
+        const ACameraManager_AvailabilityCallbacks* callback) __INTRODUCED_IN(24);
 
 /**
  * Unregister camera availability callbacks.
@@ -185,7 +185,8 @@ camera_status_t ACameraManager_registerAvailabilityCallback(
  *                  {ACameraManager_AvailabilityCallbacks#onCameraUnavailable} is NULL.</li></ul>
  */
 camera_status_t ACameraManager_unregisterAvailabilityCallback(
-        ACameraManager* manager, const ACameraManager_AvailabilityCallbacks* callback);
+        ACameraManager* manager,
+        const ACameraManager_AvailabilityCallbacks* callback) __INTRODUCED_IN(24);
 
 /**
  * Query the capabilities of a camera device. These capabilities are
@@ -211,7 +212,7 @@ camera_status_t ACameraManager_unregisterAvailabilityCallback(
  */
 camera_status_t ACameraManager_getCameraCharacteristics(
         ACameraManager* manager, const char* cameraId,
-        /*out*/ACameraMetadata** characteristics);
+        /*out*/ACameraMetadata** characteristics) __INTRODUCED_IN(24);
 
 /**
  * Open a connection to a camera with the given ID. The opened camera device will be
@@ -271,9 +272,7 @@ camera_status_t ACameraManager_getCameraCharacteristics(
 camera_status_t ACameraManager_openCamera(
         ACameraManager* manager, const char* cameraId,
         ACameraDevice_StateCallbacks* callback,
-        /*out*/ACameraDevice** device);
-
-#endif /* __ANDROID_API__ >= 24 */
+        /*out*/ACameraDevice** device) __INTRODUCED_IN(24);
 
 __END_DECLS
 

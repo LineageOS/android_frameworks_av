@@ -6,11 +6,11 @@ LIBCAMERA2NDK {
     ACameraCaptureSession_getDevice;
     ACameraCaptureSession_setRepeatingRequest;
     ACameraCaptureSession_stopRepeating;
-    ACameraCaptureSession_updateSharedOutput;
+    ACameraCaptureSession_updateSharedOutput; # introduced=28
     ACameraDevice_close;
     ACameraDevice_createCaptureRequest;
     ACameraDevice_createCaptureSession;
-    ACameraDevice_createCaptureSessionWithSessionParameters;
+    ACameraDevice_createCaptureSessionWithSessionParameters; # introduced=28
     ACameraDevice_getId;
     ACameraManager_create;
     ACameraManager_delete;
@@ -27,11 +27,11 @@ LIBCAMERA2NDK {
     ACameraOutputTarget_create;
     ACameraOutputTarget_free;
     ACaptureRequest_addTarget;
-    ACaptureRequest_copy;
+    ACaptureRequest_copy; # introduced=28
     ACaptureRequest_free;
     ACaptureRequest_getAllTags;
     ACaptureRequest_getConstEntry;
-    ACaptureRequest_getUserContext;
+    ACaptureRequest_getUserContext; # introduced=28
     ACaptureRequest_removeTarget;
     ACaptureRequest_setEntry_double;
     ACaptureRequest_setEntry_float;
@@ -39,15 +39,15 @@ LIBCAMERA2NDK {
     ACaptureRequest_setEntry_i64;
     ACaptureRequest_setEntry_rational;
     ACaptureRequest_setEntry_u8;
-    ACaptureRequest_setUserContext;
+    ACaptureRequest_setUserContext; # introduced=28
     ACaptureSessionOutputContainer_add;
     ACaptureSessionOutputContainer_create;
     ACaptureSessionOutputContainer_free;
     ACaptureSessionOutputContainer_remove;
     ACaptureSessionOutput_create;
-    ACaptureSessionSharedOutput_create;
-    ACaptureSessionSharedOutput_add;
-    ACaptureSessionSharedOutput_remove;
+    ACaptureSessionSharedOutput_create; # introduced=28
+    ACaptureSessionSharedOutput_add; # introduced=28
+    ACaptureSessionSharedOutput_remove; # introduced=28
     ACaptureSessionOutput_free;
   local:
     *;
