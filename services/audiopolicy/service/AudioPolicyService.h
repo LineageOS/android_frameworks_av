@@ -38,8 +38,6 @@
 
 namespace android {
 
-using namespace std;
-
 // ----------------------------------------------------------------------------
 
 class AudioPolicyService :
