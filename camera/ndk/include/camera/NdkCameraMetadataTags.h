@@ -40,8 +40,6 @@
 
 __BEGIN_DECLS
 
-#if __ANDROID_API__ >= 24
-
 typedef enum acamera_metadata_section {
     ACAMERA_COLOR_CORRECTION,
     ACAMERA_CONTROL,
@@ -7879,9 +7877,6 @@ typedef enum acamera_metadata_enum_acamera_distortion_correction_mode {
     ACAMERA_DISTORTION_CORRECTION_MODE_HIGH_QUALITY                  = 2,
 
 } acamera_metadata_enum_android_distortion_correction_mode_t;
-
-
-#endif /* __ANDROID_API__ >= 24 */
 
 __END_DECLS
 
