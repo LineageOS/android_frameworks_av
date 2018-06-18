@@ -33,7 +33,7 @@ struct Track;
 class String8;
 
 struct MPEG2PSExtractor : public MediaExtractorPluginHelper {
-    explicit MPEG2PSExtractor(DataSourceBase *source);
+    explicit MPEG2PSExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
     virtual MediaTrack *getTrack(size_t index);
@@ -52,7 +52,7 @@ private:
     struct WrappedTrack;
 
     mutable Mutex mLock;
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
 
     off64_t mOffset;
     status_t mFinalResult;
@@ -73,7 +73,7 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(MPEG2PSExtractor);
 };
 
-bool SniffMPEG2PS(DataSourceBase *source, float *confidence);
+bool SniffMPEG2PS(DataSourceHelper *source, float *confidence);
 
 }  // namespace android
 

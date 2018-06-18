@@ -94,7 +94,7 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-MPEG2PSExtractor::MPEG2PSExtractor(DataSourceBase *source)
+MPEG2PSExtractor::MPEG2PSExtractor(DataSourceHelper *source)
     : mDataSource(source),
       mOffset(0),
       mFinalResult(OK),
@@ -120,6 +120,7 @@ MPEG2PSExtractor::MPEG2PSExtractor(DataSourceBase *source)
 }
 
 MPEG2PSExtractor::~MPEG2PSExtractor() {
+    delete mDataSource;
 }
 
 size_t MPEG2PSExtractor::countTracks() {
@@ -754,7 +755,7 @@ status_t MPEG2PSExtractor::WrappedTrack::read(
 ////////////////////////////////////////////////////////////////////////////////
 
 bool SniffMPEG2PS(
-        DataSourceBase *source, float *confidence) {
+        DataSourceHelper *source, float *confidence) {
     uint8_t header[5];
     if (source->readAt(0, header, sizeof(header)) < (ssize_t)sizeof(header)) {
         return false;

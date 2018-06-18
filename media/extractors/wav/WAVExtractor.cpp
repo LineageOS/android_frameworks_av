@@ -57,7 +57,7 @@ static uint16_t U16_LE_AT(const uint8_t *ptr) {
 
 struct WAVSource : public MediaTrack {
     WAVSource(
-            DataSourceBase *dataSource,
+            DataSourceHelper *dataSource,
             MetaDataBase &meta,
             uint16_t waveFormat,
             int32_t bitsPerSample,
@@ -78,7 +78,7 @@ protected:
 private:
     static const size_t kMaxFrameSize;
 
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     MetaDataBase &mMeta;
     uint16_t mWaveFormat;
     int32_t mSampleRate;
@@ -94,7 +94,7 @@ private:
     WAVSource &operator=(const WAVSource &);
 };
 
-WAVExtractor::WAVExtractor(DataSourceBase *source)
+WAVExtractor::WAVExtractor(DataSourceHelper *source)
     : mDataSource(source),
       mValidFormat(false),
       mChannelMask(CHANNEL_MASK_USE_CHANNEL_ORDER) {
@@ -102,6 +102,7 @@ WAVExtractor::WAVExtractor(DataSourceBase *source)
 }
 
 WAVExtractor::~WAVExtractor() {
+    delete mDataSource;
 }
 
 status_t WAVExtractor::getMetaData(MetaDataBase &meta) {
@@ -347,7 +348,7 @@ status_t WAVExtractor::init() {
 const size_t WAVSource::kMaxFrameSize = 32768;
 
 WAVSource::WAVSource(
-        DataSourceBase *dataSource,
+        DataSourceHelper *dataSource,
         MetaDataBase &meta,
         uint16_t waveFormat,
         int32_t bitsPerSample,
@@ -545,33 +546,38 @@ status_t WAVSource::read(
 ////////////////////////////////////////////////////////////////////////////////
 
 static CMediaExtractor* CreateExtractor(
-        DataSourceBase *source,
+        CDataSource *source,
         void *) {
-    return wrap(new WAVExtractor(source));
+    return wrap(new WAVExtractor(new DataSourceHelper(source)));
 }
 
 static CreatorFunc Sniff(
-        DataSourceBase *source,
+        CDataSource *source,
         float *confidence,
         void **,
         FreeMetaFunc *) {
+    DataSourceHelper *helper = new DataSourceHelper(source);
     char header[12];
-    if (source->readAt(0, header, sizeof(header)) < (ssize_t)sizeof(header)) {
+    if (helper->readAt(0, header, sizeof(header)) < (ssize_t)sizeof(header)) {
+        delete helper;
         return NULL;
     }
 
     if (memcmp(header, "RIFF", 4) || memcmp(&header[8], "WAVE", 4)) {
+        delete helper;
         return NULL;
     }
 
-    WAVExtractor *extractor = new WAVExtractor(source);
+    WAVExtractor *extractor = new WAVExtractor(helper);
     int numTracks = extractor->countTracks();
     delete extractor;
     if (numTracks == 0) {
+        delete helper;
         return NULL;
     }
 
     *confidence = 0.3f;
+    delete helper;
 
     return CreateExtractor;
 }

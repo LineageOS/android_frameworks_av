@@ -20,7 +20,6 @@
 
 #include <arpa/inet.h>
 
-#include <media/DataSourceBase.h>
 #include <media/MediaExtractorPluginApi.h>
 #include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MetaDataBase.h>
@@ -32,7 +31,8 @@
 
 namespace android {
 struct AMessage;
-class DataSourceBase;
+struct CDataSource;
+class DataSourceHelper;
 struct CachedRangedDataSource;
 class SampleTable;
 class String8;
@@ -56,7 +56,7 @@ struct Trex {
 
 class MPEG4Extractor : public MediaExtractorPluginHelper {
 public:
-    explicit MPEG4Extractor(DataSourceBase *source, const char *mime = NULL);
+    explicit MPEG4Extractor(DataSourceHelper *source, const char *mime = NULL);
 
     virtual size_t countTracks();
     virtual MediaTrack *getTrack(size_t index);
@@ -98,7 +98,7 @@ private:
 
     Vector<Trex> mTrex;
 
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     CachedRangedDataSource *mCachedSource;
     status_t mInitCheck;
     uint32_t mHeaderTimescale;
@@ -149,10 +149,6 @@ private:
     MPEG4Extractor(const MPEG4Extractor &);
     MPEG4Extractor &operator=(const MPEG4Extractor &);
 };
-
-bool SniffMPEG4(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *);
 
 }  // namespace android
 

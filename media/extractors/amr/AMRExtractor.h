@@ -31,7 +31,7 @@ class String8;
 
 class AMRExtractor : public MediaExtractorPluginHelper {
 public:
-    explicit AMRExtractor(DataSourceBase *source);
+    explicit AMRExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
     virtual MediaTrack *getTrack(size_t index);
@@ -44,7 +44,7 @@ protected:
     virtual ~AMRExtractor();
 
 private:
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     MetaDataBase mMeta;
     status_t mInitCheck;
     bool mIsWide;

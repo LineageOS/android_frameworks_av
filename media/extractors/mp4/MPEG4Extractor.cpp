@@ -32,6 +32,7 @@
 #include "ItemTable.h"
 #include "include/ESDS.h"
 
+#include <media/DataSourceBase.h>
 #include <media/ExtractorUtils.h>
 #include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ABitReader.h>
@@ -72,7 +73,7 @@ static const size_t  kMaxPcmFrameSize = 8192;
 public:
     // Caller retains ownership of both "dataSource" and "sampleTable".
     MPEG4Source(MetaDataBase &format,
-                DataSourceBase *dataSource,
+                DataSourceHelper *dataSource,
                 int32_t timeScale,
                 const sp<SampleTable> &sampleTable,
                 Vector<SidxEntry> &sidx,
@@ -96,7 +97,7 @@ private:
     Mutex mLock;
 
     MetaDataBase &mFormat;
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     int32_t mTimescale;
     sp<SampleTable> mSampleTable;
     uint32_t mCurrentSampleIndex;
@@ -197,11 +198,10 @@ private:
 // possibly wrapping multiple times to cover all tracks, i.e.
 // Each CachedRangedDataSource caches the sampletable metadata for a single track.
 
-struct CachedRangedDataSource : public DataSourceBase {
-    explicit CachedRangedDataSource(DataSourceBase *source);
+struct CachedRangedDataSource : public DataSourceHelper {
+    explicit CachedRangedDataSource(DataSourceHelper *source);
     virtual ~CachedRangedDataSource();
 
-    virtual status_t initCheck() const;
     virtual ssize_t readAt(off64_t offset, void *data, size_t size);
     virtual status_t getSize(off64_t *size);
     virtual uint32_t flags();
@@ -212,7 +212,7 @@ struct CachedRangedDataSource : public DataSourceBase {
 private:
     Mutex mLock;
 
-    DataSourceBase *mSource;
+    DataSourceHelper *mSource;
     bool mOwnsDataSource;
     off64_t mCachedOffset;
     size_t mCachedSize;
@@ -224,8 +224,9 @@ private:
     CachedRangedDataSource &operator=(const CachedRangedDataSource &);
 };
 
-CachedRangedDataSource::CachedRangedDataSource(DataSourceBase *source)
-    : mSource(source),
+CachedRangedDataSource::CachedRangedDataSource(DataSourceHelper *source)
+    : DataSourceHelper(source),
+      mSource(source),
       mOwnsDataSource(false),
       mCachedOffset(0),
       mCachedSize(0),
@@ -247,10 +248,6 @@ void CachedRangedDataSource::clearCache() {
 
     mCachedOffset = 0;
     mCachedSize = 0;
-}
-
-status_t CachedRangedDataSource::initCheck() const {
-    return mSource->initCheck();
 }
 
 ssize_t CachedRangedDataSource::readAt(off64_t offset, void *data, size_t size) {
@@ -364,11 +361,11 @@ static bool AdjustChannelsAndRate(uint32_t fourcc, uint32_t *channels, uint32_t 
     return false;
 }
 
-MPEG4Extractor::MPEG4Extractor(DataSourceBase *source, const char *mime)
+MPEG4Extractor::MPEG4Extractor(DataSourceHelper *source, const char *mime)
     : mMoofOffset(0),
       mMoofFound(false),
       mMdatFound(false),
-      mDataSource(source),
+      mDataSource(new DataSourceHelper(source)),
       mCachedSource(NULL),
       mInitCheck(NO_INIT),
       mHeaderTimescale(0),
@@ -397,6 +394,7 @@ MPEG4Extractor::~MPEG4Extractor() {
     mPssh.clear();
 
     delete mCachedSource;
+    delete mDataSource;
 }
 
 uint32_t MPEG4Extractor::flags() const {
@@ -4093,7 +4091,7 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
 
 MPEG4Source::MPEG4Source(
         MetaDataBase &format,
-        DataSourceBase *dataSource,
+        DataSourceHelper *dataSource,
         int32_t timeScale,
         const sp<SampleTable> &sampleTable,
         Vector<SidxEntry> &sidx,
@@ -5772,7 +5770,7 @@ MPEG4Extractor::Track *MPEG4Extractor::findTrackByMimePrefix(
     return NULL;
 }
 
-static bool LegacySniffMPEG4(DataSourceBase *source, float *confidence) {
+static bool LegacySniffMPEG4(DataSourceHelper *source, float *confidence) {
     uint8_t header[8];
 
     ssize_t n = source->readAt(4, header, sizeof(header));
@@ -5837,7 +5835,7 @@ static bool isCompatibleBrand(uint32_t fourcc) {
 // Also try to identify where this file's metadata ends
 // (end of the 'moov' atom) and report it to the caller as part of
 // the metadata.
-static bool BetterSniffMPEG4(DataSourceBase *source, float *confidence) {
+static bool BetterSniffMPEG4(DataSourceHelper *source, float *confidence) {
     // We scan up to 128 bytes to identify this file as an MP4.
     static const off64_t kMaxScanOffset = 128ll;
 
@@ -5944,18 +5942,19 @@ static bool BetterSniffMPEG4(DataSourceBase *source, float *confidence) {
     return true;
 }
 
-static CMediaExtractor* CreateExtractor(DataSourceBase *source, void *) {
-    return wrap(new MPEG4Extractor(source));
+static CMediaExtractor* CreateExtractor(CDataSource *source, void *) {
+    return wrap(new MPEG4Extractor(new DataSourceHelper(source)));
 }
 
 static CreatorFunc Sniff(
-        DataSourceBase *source, float *confidence, void **,
+        CDataSource *source, float *confidence, void **,
         FreeMetaFunc *) {
-    if (BetterSniffMPEG4(source, confidence)) {
+    DataSourceHelper helper(source);
+    if (BetterSniffMPEG4(&helper, confidence)) {
         return CreateExtractor;
     }
 
-    if (LegacySniffMPEG4(source, confidence)) {
+    if (LegacySniffMPEG4(&helper, confidence)) {
         ALOGW("Identified supported mpeg4 through LegacySniffMPEG4.");
         return CreateExtractor;
     }

@@ -27,7 +27,9 @@
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ByteUtils.h>
-#include <media/DataSourceBase.h>
+
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 
 namespace android {
 
@@ -37,7 +39,7 @@ static uint32_t U24_AT(const uint8_t *ptr) {
 
 // static
 VBRISeeker *VBRISeeker::CreateFromSource(
-        DataSourceBase *source, off64_t post_id3_pos) {
+        DataSourceHelper *source, off64_t post_id3_pos) {
     off64_t pos = post_id3_pos;
 
     uint8_t header[4];

@@ -35,12 +35,12 @@ namespace android {
 struct AMessage;
 struct AnotherPacketSource;
 struct ATSParser;
-class DataSourceBase;
+struct CDataSource;
 struct MPEG2TSSource;
 class String8;
 
 struct MPEG2TSExtractor : public MediaExtractorPluginHelper {
-    explicit MPEG2TSExtractor(DataSourceBase *source);
+    explicit MPEG2TSExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
     virtual MediaTrack *getTrack(size_t index);
@@ -53,12 +53,15 @@ struct MPEG2TSExtractor : public MediaExtractorPluginHelper {
     virtual uint32_t flags() const;
     virtual const char * name() { return "MPEG2TSExtractor"; }
 
+protected:
+    virtual ~MPEG2TSExtractor();
+
 private:
     friend struct MPEG2TSSource;
 
     mutable Mutex mLock;
 
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
 
     sp<ATSParser> mParser;
 
@@ -82,9 +85,9 @@ private:
     // Try to feed more data from source to parser.
     // |isInit| means this function is called inside init(). This is a signal to
     // save SyncEvent so that init() can add SyncPoint after it updates |mSourceImpls|.
-    // This function returns OK if expected amount of data is fed from DataSourceBase to
+    // This function returns OK if expected amount of data is fed from DataSourceHelper to
     // parser and is successfully parsed. Otherwise, various error codes could be
-    // returned, e.g., ERROR_END_OF_STREAM, or no data availalbe from DataSourceBase, or
+    // returned, e.g., ERROR_END_OF_STREAM, or no data availalbe from DataSourceHelper, or
     // the data has syntax error during parsing, etc.
     status_t feedMore(bool isInit = false);
     status_t seek(int64_t seekTimeUs,
@@ -102,7 +105,7 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(MPEG2TSExtractor);
 };
 
-bool SniffMPEG2TS(DataSourceBase *source, float *confidence);
+bool SniffMPEG2TS(DataSourceHelper *source, float *confidence);
 
 }  // namespace android
 

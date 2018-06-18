@@ -26,12 +26,12 @@
 namespace android {
 
 struct AMessage;
-class DataSourceBase;
+struct CDataSource;
 class String8;
 
 class WAVExtractor : public MediaExtractorPluginHelper {
 public:
-    explicit WAVExtractor(DataSourceBase *source);
+    explicit WAVExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
     virtual MediaTrack *getTrack(size_t index);
@@ -43,7 +43,7 @@ public:
     virtual ~WAVExtractor();
 
 private:
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     status_t mInitCheck;
     bool mValidFormat;
     uint16_t mWaveFormat;

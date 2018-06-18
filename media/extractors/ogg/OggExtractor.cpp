@@ -71,7 +71,7 @@ private:
 
 struct MyOggExtractor {
     MyOggExtractor(
-            DataSourceBase *source,
+            DataSourceHelper *source,
             const char *mimeType,
             size_t numHeaders,
             int64_t seekPreRollUs);
@@ -110,7 +110,7 @@ protected:
         int64_t mTimeUs;
     };
 
-    DataSourceBase *mSource;
+    DataSourceHelper *mSource;
     off64_t mOffset;
     Page mCurrentPage;
     uint64_t mCurGranulePosition;
@@ -169,7 +169,7 @@ protected:
 };
 
 struct MyVorbisExtractor : public MyOggExtractor {
-    explicit MyVorbisExtractor(DataSourceBase *source)
+    explicit MyVorbisExtractor(DataSourceHelper *source)
         : MyOggExtractor(source,
                 MEDIA_MIMETYPE_AUDIO_VORBIS,
                 /* numHeaders */ 3,
@@ -197,7 +197,7 @@ struct MyOpusExtractor : public MyOggExtractor {
     static const int32_t kOpusSampleRate = 48000;
     static const int64_t kOpusSeekPreRollUs = 80000; // 80 ms
 
-    explicit MyOpusExtractor(DataSourceBase *source)
+    explicit MyOpusExtractor(DataSourceHelper *source)
         : MyOggExtractor(source, MEDIA_MIMETYPE_AUDIO_OPUS, /*numHeaders*/ 2, kOpusSeekPreRollUs),
           mChannelCount(0),
           mCodecDelay(0),
@@ -296,7 +296,7 @@ status_t OggSource::read(
 ////////////////////////////////////////////////////////////////////////////////
 
 MyOggExtractor::MyOggExtractor(
-        DataSourceBase *source,
+        DataSourceHelper *source,
         const char *mimeType,
         size_t numHeaders,
         int64_t seekPreRollUs)
@@ -1193,7 +1193,7 @@ void MyOggExtractor::parseFileMetaData() {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-OggExtractor::OggExtractor(DataSourceBase *source)
+OggExtractor::OggExtractor(DataSourceHelper *source)
     : mDataSource(source),
       mInitCheck(NO_INIT),
       mImpl(NULL) {
@@ -1249,18 +1249,19 @@ status_t OggExtractor::getMetaData(MetaDataBase &meta) {
 }
 
 static CMediaExtractor* CreateExtractor(
-        DataSourceBase *source,
+        CDataSource *source,
         void *) {
-    return wrap(new OggExtractor(source));
+    return wrap(new OggExtractor(new DataSourceHelper(source)));
 }
 
 static CreatorFunc Sniff(
-        DataSourceBase *source,
+        CDataSource *source,
         float *confidence,
         void **,
         FreeMetaFunc *) {
+    DataSourceHelper helper(source);
     char tmp[4];
-    if (source->readAt(0, tmp, 4) < 4 || memcmp(tmp, "OggS", 4)) {
+    if (helper.readAt(0, tmp, 4) < 4 || memcmp(tmp, "OggS", 4)) {
         return NULL;
     }
 

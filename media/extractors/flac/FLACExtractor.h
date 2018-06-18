@@ -30,7 +30,7 @@ class FLACParser;
 class FLACExtractor : public MediaExtractorPluginHelper {
 
 public:
-    explicit FLACExtractor(DataSourceBase *source);
+    explicit FLACExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
     virtual MediaTrack *getTrack(size_t index);
@@ -43,7 +43,7 @@ protected:
     virtual ~FLACExtractor();
 
 private:
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     FLACParser *mParser;
     status_t mInitCheck;
     MetaDataBase mFileMetadata;
@@ -55,8 +55,6 @@ private:
     FLACExtractor &operator=(const FLACExtractor &);
 
 };
-
-bool SniffFLAC(DataSourceBase *source, float *confidence);
 
 }  // namespace android
 

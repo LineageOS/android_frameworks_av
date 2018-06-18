@@ -25,15 +25,16 @@
 
 namespace android {
 
+class DataSourceHelper;
+
 struct AMessage;
-class DataSourceBase;
 struct MP3Seeker;
 class String8;
 struct Mp3Meta;
 
 class MP3Extractor : public MediaExtractorPluginHelper {
 public:
-    MP3Extractor(DataSourceBase *source, Mp3Meta *meta);
+    MP3Extractor(DataSourceHelper *source, Mp3Meta *meta);
     ~MP3Extractor();
 
     virtual size_t countTracks();
@@ -46,7 +47,7 @@ public:
 private:
     status_t mInitCheck;
 
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     off64_t mFirstFramePos;
     MetaDataBase mMeta;
     uint32_t mFixedHeader;

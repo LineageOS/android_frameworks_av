@@ -44,7 +44,7 @@
 namespace android {
 
 struct DataSourceBaseReader : public mkvparser::IMkvReader {
-    explicit DataSourceBaseReader(DataSourceBase *source)
+    explicit DataSourceBaseReader(DataSourceHelper *source)
         : mSource(source) {
     }
 
@@ -86,7 +86,7 @@ struct DataSourceBaseReader : public mkvparser::IMkvReader {
     }
 
 private:
-    DataSourceBase *mSource;
+    DataSourceHelper *mSource;
 
     DataSourceBaseReader(const DataSourceBaseReader &);
     DataSourceBaseReader &operator=(const DataSourceBaseReader &);
@@ -921,7 +921,7 @@ status_t MatroskaSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-MatroskaExtractor::MatroskaExtractor(DataSourceBase *source)
+MatroskaExtractor::MatroskaExtractor(DataSourceHelper *source)
     : mDataSource(source),
       mReader(new DataSourceBaseReader(mDataSource)),
       mSegment(NULL),
@@ -994,6 +994,8 @@ MatroskaExtractor::~MatroskaExtractor() {
 
     delete mReader;
     mReader = NULL;
+
+    delete mDataSource;
 }
 
 size_t MatroskaExtractor::countTracks() {
@@ -1621,7 +1623,7 @@ uint32_t MatroskaExtractor::flags() const {
 }
 
 bool SniffMatroska(
-        DataSourceBase *source, float *confidence) {
+        DataSourceHelper *source, float *confidence) {
     DataSourceBaseReader reader(source);
     mkvparser::EBMLHeader ebmlHeader;
     long long pos;
@@ -1645,15 +1647,16 @@ ExtractorDef GETEXTRACTORDEF() {
         1,
         "Matroska Extractor",
         [](
-                DataSourceBase *source,
+                CDataSource *source,
                 float *confidence,
                 void **,
                 FreeMetaFunc *) -> CreatorFunc {
-            if (SniffMatroska(source, confidence)) {
+            DataSourceHelper helper(source);
+            if (SniffMatroska(&helper, confidence)) {
                 return [](
-                        DataSourceBase *source,
+                        CDataSource *source,
                         void *) -> CMediaExtractor* {
-                    return wrap(new MatroskaExtractor(source));};
+                    return wrap(new MatroskaExtractor(new DataSourceHelper(source)));};
             }
             return NULL;
         }

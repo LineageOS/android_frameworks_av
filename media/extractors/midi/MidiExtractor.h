@@ -31,7 +31,7 @@ namespace android {
 
 class MidiEngine {
 public:
-    explicit MidiEngine(DataSourceBase *dataSource,
+    explicit MidiEngine(CDataSource *dataSource,
             MetaDataBase *fileMetadata,
             MetaDataBase *trackMetadata);
     ~MidiEngine();
@@ -54,7 +54,7 @@ private:
 class MidiExtractor : public MediaExtractorPluginHelper {
 
 public:
-    explicit MidiExtractor(DataSourceBase *source);
+    explicit MidiExtractor(CDataSource *source);
 
     virtual size_t countTracks();
     virtual MediaTrack *getTrack(size_t index);
@@ -67,7 +67,7 @@ protected:
     virtual ~MidiExtractor();
 
 private:
-    DataSourceBase *mDataSource;
+    CDataSource *mDataSource;
     status_t mInitCheck;
     MetaDataBase mFileMetadata;
 
@@ -89,7 +89,7 @@ private:
 
 };
 
-bool SniffMidi(DataSourceBase *source, float *confidence);
+bool SniffMidi(CDataSource *source, float *confidence);
 
 }  // namespace android
 

@@ -78,13 +78,13 @@ sp<IMediaExtractor> MediaExtractorFactory::CreateFromService(
     FreeMetaFunc freeMeta = nullptr;
     float confidence;
     sp<ExtractorPlugin> plugin;
-    creator = sniff(source.get(), &confidence, &meta, &freeMeta, plugin);
+    creator = sniff(source, &confidence, &meta, &freeMeta, plugin);
     if (!creator) {
         ALOGV("FAILED to autodetect media content.");
         return NULL;
     }
 
-    CMediaExtractor *ret = creator(source.get(), meta);
+    CMediaExtractor *ret = creator(source->wrap(), meta);
     if (meta != nullptr && freeMeta != nullptr) {
         freeMeta(meta);
     }
@@ -129,7 +129,7 @@ bool MediaExtractorFactory::gPluginsRegistered = false;
 
 // static
 CreatorFunc MediaExtractorFactory::sniff(
-        DataSourceBase *source, float *confidence, void **meta,
+        const sp<DataSource> &source, float *confidence, void **meta,
         FreeMetaFunc *freeMeta, sp<ExtractorPlugin> &plugin) {
     *confidence = 0.0f;
     *meta = nullptr;
@@ -150,7 +150,7 @@ CreatorFunc MediaExtractorFactory::sniff(
         float newConfidence;
         void *newMeta = nullptr;
         FreeMetaFunc newFreeMeta = nullptr;
-        if ((curCreator = (*it)->def.sniff(source, &newConfidence, &newMeta, &newFreeMeta))) {
+        if ((curCreator = (*it)->def.sniff(source->wrap(), &newConfidence, &newMeta, &newFreeMeta))) {
             if (newConfidence > *confidence) {
                 *confidence = newConfidence;
                 if (*meta != nullptr && *freeMeta != nullptr) {

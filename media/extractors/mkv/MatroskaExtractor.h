@@ -36,7 +36,7 @@ struct DataSourceBaseReader;
 struct MatroskaSource;
 
 struct MatroskaExtractor : public MediaExtractorPluginHelper {
-    explicit MatroskaExtractor(DataSourceBase *source);
+    explicit MatroskaExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
 
@@ -77,7 +77,7 @@ private:
     Mutex mLock;
     Vector<TrackInfo> mTracks;
 
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     DataSourceBaseReader *mReader;
     mkvparser::Segment *mSegment;
     bool mExtractedThumbnails;

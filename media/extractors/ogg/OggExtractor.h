@@ -25,14 +25,13 @@
 namespace android {
 
 struct AMessage;
-class DataSourceBase;
 class String8;
 
 struct MyOggExtractor;
 struct OggSource;
 
 struct OggExtractor : public MediaExtractorPluginHelper {
-    explicit OggExtractor(DataSourceBase *source);
+    explicit OggExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
     virtual MediaTrack *getTrack(size_t index);
@@ -47,7 +46,7 @@ protected:
 private:
     friend struct OggSource;
 
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     status_t mInitCheck;
 
     MyOggExtractor *mImpl;

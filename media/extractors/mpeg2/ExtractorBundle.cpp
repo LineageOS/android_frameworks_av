@@ -19,10 +19,13 @@
 #include <utils/Log.h>
 
 #include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include "MPEG2PSExtractor.h"
 #include "MPEG2TSExtractor.h"
 
 namespace android {
+
+struct CDataSource;
 
 extern "C" {
 // This is the only symbol that needs to be exported
@@ -34,20 +37,21 @@ ExtractorDef GETEXTRACTORDEF() {
         1,
         "MPEG2-PS/TS Extractor",
         [](
-                DataSourceBase *source,
+                CDataSource *source,
                 float *confidence,
                 void **,
                 FreeMetaFunc *) -> CreatorFunc {
-            if (SniffMPEG2TS(source, confidence)) {
+            DataSourceHelper helper(source);
+            if (SniffMPEG2TS(&helper, confidence)) {
                 return [](
-                        DataSourceBase *source,
+                        CDataSource *source,
                         void *) -> CMediaExtractor* {
-                    return wrap(new MPEG2TSExtractor(source));};
-            } else if (SniffMPEG2PS(source, confidence)) {
+                    return wrap(new MPEG2TSExtractor(new DataSourceHelper(source)));};
+            } else if (SniffMPEG2PS(&helper, confidence)) {
                         return [](
-                                DataSourceBase *source,
+                                CDataSource *source,
                                 void *) -> CMediaExtractor* {
-                            return wrap(new MPEG2PSExtractor(source));};
+                            return wrap(new MPEG2PSExtractor(new DataSourceHelper(source)));};
             }
             return NULL;
         }

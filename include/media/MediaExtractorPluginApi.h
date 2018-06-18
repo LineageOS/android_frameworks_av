@@ -23,9 +23,16 @@ namespace android {
 
 struct MediaTrack;
 class MetaDataBase;
-class DataSourceBase;
 
 extern "C" {
+
+struct CDataSource {
+    ssize_t (*readAt)(void *handle, off64_t offset, void *data, size_t size);
+    status_t (*getSize)(void *handle, off64_t *size);
+    uint32_t (*flags)(void *handle );
+    bool (*getUri)(void *handle, char *uriString, size_t bufferSize);
+    void *handle;
+};
 
 struct CMediaExtractor {
     void *data;
@@ -44,7 +51,7 @@ struct CMediaExtractor {
     const char * (*name)(void *data);
 };
 
-typedef CMediaExtractor* (*CreatorFunc)(DataSourceBase *source, void *meta);
+typedef CMediaExtractor* (*CreatorFunc)(CDataSource *source, void *meta);
 typedef void (*FreeMetaFunc)(void *meta);
 
 // The sniffer can optionally fill in an opaque object, "meta", that helps
@@ -52,7 +59,7 @@ typedef void (*FreeMetaFunc)(void *meta);
 // effort already exerted by the sniffer. If "freeMeta" is given, it will be
 // called against the opaque object when it is no longer used.
 typedef CreatorFunc (*SnifferFunc)(
-        DataSourceBase *source, float *confidence,
+        CDataSource *source, float *confidence,
         void **meta, FreeMetaFunc *freeMeta);
 
 typedef struct {

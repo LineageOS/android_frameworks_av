@@ -49,7 +49,7 @@ private:
     static void RegisterExtractor(
             const sp<ExtractorPlugin> &plugin, std::list<sp<ExtractorPlugin>> &pluginList);
 
-    static CreatorFunc sniff(DataSourceBase *source,
+    static CreatorFunc sniff(const sp<DataSource> &source,
             float *confidence, void **meta, FreeMetaFunc *freeMeta,
             sp<ExtractorPlugin> &plugin);
 
