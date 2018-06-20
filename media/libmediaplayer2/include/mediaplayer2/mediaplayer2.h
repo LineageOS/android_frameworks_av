@@ -68,7 +68,7 @@ public:
             status_t        stop();
             status_t        pause();
             bool            isPlaying();
-            mediaplayer2_states getMediaPlayer2State();
+            mediaplayer2_states getState();
             status_t        setPlaybackSettings(const AudioPlaybackRate& rate);
             status_t        getPlaybackSettings(AudioPlaybackRate* rate /* nonnull */);
             status_t        setSyncSettings(const AVSyncSettings& sync, float videoFpsHint);
