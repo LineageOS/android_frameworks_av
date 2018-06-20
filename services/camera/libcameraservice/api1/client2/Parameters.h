@@ -326,7 +326,7 @@ struct Parameters {
     static const char* wbModeEnumToString(uint8_t wbMode);
     static int effectModeStringToEnum(const char *effectMode);
     static int abModeStringToEnum(const char *abMode);
-    static int sceneModeStringToEnum(const char *sceneMode);
+    static int sceneModeStringToEnum(const char *sceneMode, uint8_t defaultScene);
     static flashMode_t flashModeStringToEnum(const char *flashMode);
     static const char* flashModeEnumToString(flashMode_t flashMode);
     static focusMode_t focusModeStringToEnum(const char *focusMode);
@@ -434,6 +434,7 @@ private:
     Size getMaxSize(const Vector<Size>& sizes);
 
     int mDeviceVersion;
+    uint8_t mDefaultSceneMode;
 };
 
 // This class encapsulates the Parameters class so that it can only be accessed
