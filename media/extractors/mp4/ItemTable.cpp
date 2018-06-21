@@ -1529,12 +1529,16 @@ sp<MetaData> ItemTable::getImageMeta(const uint32_t imageIndex) {
         if (thumbItemIndex >= 0) {
             const ImageItem &thumbnail = mItemIdToItemMap[thumbItemIndex];
 
-            meta->setInt32(kKeyThumbnailWidth, thumbnail.width);
-            meta->setInt32(kKeyThumbnailHeight, thumbnail.height);
-            meta->setData(kKeyThumbnailHVCC, kTypeHVCC,
-                    thumbnail.hvcc->data(), thumbnail.hvcc->size());
-            ALOGV("image[%u]: thumbnail: size %dx%d, item index %zd",
-                    imageIndex, thumbnail.width, thumbnail.height, thumbItemIndex);
+            if (thumbnail.hvcc != NULL) {
+                meta->setInt32(kKeyThumbnailWidth, thumbnail.width);
+                meta->setInt32(kKeyThumbnailHeight, thumbnail.height);
+                meta->setData(kKeyThumbnailHVCC, kTypeHVCC,
+                        thumbnail.hvcc->data(), thumbnail.hvcc->size());
+                ALOGV("image[%u]: thumbnail: size %dx%d, item index %zd",
+                        imageIndex, thumbnail.width, thumbnail.height, thumbItemIndex);
+            } else {
+                ALOGW("%s: thumbnail data is missing for image[%u]!", __FUNCTION__, imageIndex);
+            }
         } else {
             ALOGW("%s: Referenced thumbnail does not exist!", __FUNCTION__);
         }
