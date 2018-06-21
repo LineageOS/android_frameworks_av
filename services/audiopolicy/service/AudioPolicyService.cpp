@@ -115,13 +115,17 @@ void AudioPolicyService::registerClient(const sp<IAudioPolicyServiceClient>& cli
     Mutex::Autolock _l(mNotificationClientsLock);
 
     uid_t uid = IPCThreadState::self()->getCallingUid();
-    if (mNotificationClients.indexOfKey(uid) < 0) {
+    pid_t pid = IPCThreadState::self()->getCallingPid();
+    int64_t token = ((int64_t)uid<<32) | pid;
+
+    if (mNotificationClients.indexOfKey(token) < 0) {
         sp<NotificationClient> notificationClient = new NotificationClient(this,
                                                                            client,
-                                                                           uid);
-        ALOGV("registerClient() client %p, uid %d", client.get(), uid);
+                                                                           uid,
+                                                                           pid);
+        ALOGV("registerClient() client %p, uid %d pid %d", client.get(), uid, pid);
 
-        mNotificationClients.add(uid, notificationClient);
+        mNotificationClients.add(token, notificationClient);
 
         sp<IBinder> binder = IInterface::asBinder(client);
         binder->linkToDeath(notificationClient);
@@ -133,22 +137,33 @@ void AudioPolicyService::setAudioPortCallbacksEnabled(bool enabled)
     Mutex::Autolock _l(mNotificationClientsLock);
 
     uid_t uid = IPCThreadState::self()->getCallingUid();
-    if (mNotificationClients.indexOfKey(uid) < 0) {
+    pid_t pid = IPCThreadState::self()->getCallingPid();
+    int64_t token = ((int64_t)uid<<32) | pid;
+
+    if (mNotificationClients.indexOfKey(token) < 0) {
         return;
     }
-    mNotificationClients.valueFor(uid)->setAudioPortCallbacksEnabled(enabled);
+    mNotificationClients.valueFor(token)->setAudioPortCallbacksEnabled(enabled);
 }
 
 // removeNotificationClient() is called when the client process dies.
-void AudioPolicyService::removeNotificationClient(uid_t uid)
+void AudioPolicyService::removeNotificationClient(uid_t uid, pid_t pid)
 {
     {
         Mutex::Autolock _l(mNotificationClientsLock);
-        mNotificationClients.removeItem(uid);
+        int64_t token = ((int64_t)uid<<32) | pid;
+        mNotificationClients.removeItem(token);
     }
     {
         Mutex::Autolock _l(mLock);
-        if (mAudioPolicyManager) {
+        bool hasSameUid = false;
+        for (size_t i = 0; i < mNotificationClients.size(); i++) {
+            if (mNotificationClients.valueAt(i)->uid() == uid) {
+                hasSameUid = true;
+                break;
+            }
+        }
+        if (mAudioPolicyManager && !hasSameUid) {
             // called from binder death notification: no need to clear caller identity
             mAudioPolicyManager->releaseResourcesForUid(uid);
         }
@@ -236,8 +251,9 @@ status_t AudioPolicyService::clientSetAudioPortConfig(const struct audio_port_co
 
 AudioPolicyService::NotificationClient::NotificationClient(const sp<AudioPolicyService>& service,
                                                      const sp<IAudioPolicyServiceClient>& client,
-                                                     uid_t uid)
-    : mService(service), mUid(uid), mAudioPolicyServiceClient(client),
+                                                     uid_t uid,
+                                                     pid_t pid)
+    : mService(service), mUid(uid), mPid(pid), mAudioPolicyServiceClient(client),
       mAudioPortCallbacksEnabled(false)
 {
 }
@@ -251,7 +267,7 @@ void AudioPolicyService::NotificationClient::binderDied(const wp<IBinder>& who _
     sp<NotificationClient> keep(this);
     sp<AudioPolicyService> service = mService.promote();
     if (service != 0) {
-        service->removeNotificationClient(mUid);
+        service->removeNotificationClient(mUid, mPid);
     }
 }
 
