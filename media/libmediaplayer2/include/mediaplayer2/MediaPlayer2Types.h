@@ -150,11 +150,11 @@ enum media2_info_type {
 
 // Do not change these values without updating their counterparts in MediaPlayer2.java
 enum mediaplayer2_states {
-    MEDIAPLAYER2_STATE_IDLE         = 1,
-    MEDIAPLAYER2_STATE_PREPARED     = 2,
-    MEDIAPLAYER2_STATE_PLAYING      = 3,
-    MEDIAPLAYER2_STATE_PAUSED       = 4,
-    MEDIAPLAYER2_STATE_ERROR        = 5,
+    MEDIAPLAYER2_STATE_IDLE         = 1001,
+    MEDIAPLAYER2_STATE_PREPARED     = 1002,
+    MEDIAPLAYER2_STATE_PLAYING      = 1003,
+    MEDIAPLAYER2_STATE_PAUSED       = 1004,
+    MEDIAPLAYER2_STATE_ERROR        = 1005,
 };
 
 enum media_player2_internal_states {

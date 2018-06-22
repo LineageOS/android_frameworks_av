@@ -73,7 +73,7 @@ static bool gRotate = false;            // rotate 90 degrees
 static bool gMonotonicTime = false;     // use system monotonic time for timestamps
 static bool gPersistentSurface = false; // use persistent surface
 static enum {
-    FORMAT_MP4, FORMAT_H264, FORMAT_FRAMES, FORMAT_RAW_FRAMES
+    FORMAT_MP4, FORMAT_H264, FORMAT_WEBM, FORMAT_3GPP, FORMAT_FRAMES, FORMAT_RAW_FRAMES
 } gOutputFormat = FORMAT_MP4;           // data format for output
 static AString gCodecName = "";         // codec name override
 static bool gSizeSpecified = false;     // was size explicitly requested?
@@ -669,7 +669,9 @@ static status_t recordScreen(const char* fileName) {
     sp<MediaMuxer> muxer = NULL;
     FILE* rawFp = NULL;
     switch (gOutputFormat) {
-        case FORMAT_MP4: {
+        case FORMAT_MP4:
+        case FORMAT_WEBM:
+        case FORMAT_3GPP: {
             // Configure muxer.  We have to wait for the CSD blob from the encoder
             // before we can start it.
             err = unlink(fileName);
@@ -682,7 +684,13 @@ static status_t recordScreen(const char* fileName) {
                 fprintf(stderr, "ERROR: couldn't open file\n");
                 abort();
             }
-            muxer = new MediaMuxer(fd, MediaMuxer::OUTPUT_FORMAT_MPEG_4);
+            if (gOutputFormat == FORMAT_MP4) {
+                muxer = new MediaMuxer(fd, MediaMuxer::OUTPUT_FORMAT_MPEG_4);
+            } else if (gOutputFormat == FORMAT_WEBM) {
+                muxer = new MediaMuxer(fd, MediaMuxer::OUTPUT_FORMAT_WEBM);
+            } else {
+                muxer = new MediaMuxer(fd, MediaMuxer::OUTPUT_FORMAT_THREE_GPP);
+            }
             close(fd);
             if (gRotate) {
                 muxer->setOrientationHint(90);  // TODO: does this do anything?
@@ -1002,6 +1010,10 @@ int main(int argc, char* const argv[]) {
                 gOutputFormat = FORMAT_MP4;
             } else if (strcmp(optarg, "h264") == 0) {
                 gOutputFormat = FORMAT_H264;
+            } else if (strcmp(optarg, "webm") == 0) {
+                gOutputFormat = FORMAT_WEBM;
+            } else if (strcmp(optarg, "3gpp") == 0) {
+                gOutputFormat = FORMAT_3GPP;
             } else if (strcmp(optarg, "frames") == 0) {
                 gOutputFormat = FORMAT_FRAMES;
             } else if (strcmp(optarg, "raw-frames") == 0) {

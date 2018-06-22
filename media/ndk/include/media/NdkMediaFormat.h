@@ -46,44 +46,42 @@ __BEGIN_DECLS
 struct AMediaFormat;
 typedef struct AMediaFormat AMediaFormat;
 
-#if __ANDROID_API__ >= 21
-
-AMediaFormat *AMediaFormat_new();
-media_status_t AMediaFormat_delete(AMediaFormat*);
+AMediaFormat *AMediaFormat_new() __INTRODUCED_IN(21);
+media_status_t AMediaFormat_delete(AMediaFormat*) __INTRODUCED_IN(21);
 
 /**
  * Human readable representation of the format. The returned string is owned by the format,
  * and remains valid until the next call to toString, or until the format is deleted.
  */
-const char* AMediaFormat_toString(AMediaFormat*);
+const char* AMediaFormat_toString(AMediaFormat*) __INTRODUCED_IN(21);
 
-bool AMediaFormat_getInt32(AMediaFormat*, const char *name, int32_t *out);
-bool AMediaFormat_getInt64(AMediaFormat*, const char *name, int64_t *out);
-bool AMediaFormat_getFloat(AMediaFormat*, const char *name, float *out);
-bool AMediaFormat_getSize(AMediaFormat*, const char *name, size_t *out);
+bool AMediaFormat_getInt32(AMediaFormat*, const char *name, int32_t *out) __INTRODUCED_IN(21);
+bool AMediaFormat_getInt64(AMediaFormat*, const char *name, int64_t *out) __INTRODUCED_IN(21);
+bool AMediaFormat_getFloat(AMediaFormat*, const char *name, float *out) __INTRODUCED_IN(21);
+bool AMediaFormat_getSize(AMediaFormat*, const char *name, size_t *out) __INTRODUCED_IN(21);
 /**
  * The returned data is owned by the format and remains valid as long as the named entry
  * is part of the format.
  */
-bool AMediaFormat_getBuffer(AMediaFormat*, const char *name, void** data, size_t *size);
+bool AMediaFormat_getBuffer(AMediaFormat*, const char *name, void** data, size_t *size) __INTRODUCED_IN(21);
 /**
  * The returned string is owned by the format, and remains valid until the next call to getString,
  * or until the format is deleted.
  */
-bool AMediaFormat_getString(AMediaFormat*, const char *name, const char **out);
+bool AMediaFormat_getString(AMediaFormat*, const char *name, const char **out) __INTRODUCED_IN(21);
 
 
-void AMediaFormat_setInt32(AMediaFormat*, const char* name, int32_t value);
-void AMediaFormat_setInt64(AMediaFormat*, const char* name, int64_t value);
-void AMediaFormat_setFloat(AMediaFormat*, const char* name, float value);
+void AMediaFormat_setInt32(AMediaFormat*, const char* name, int32_t value) __INTRODUCED_IN(21);
+void AMediaFormat_setInt64(AMediaFormat*, const char* name, int64_t value) __INTRODUCED_IN(21);
+void AMediaFormat_setFloat(AMediaFormat*, const char* name, float value) __INTRODUCED_IN(21);
 /**
  * The provided string is copied into the format.
  */
-void AMediaFormat_setString(AMediaFormat*, const char* name, const char* value);
+void AMediaFormat_setString(AMediaFormat*, const char* name, const char* value) __INTRODUCED_IN(21);
 /**
  * The provided data is copied into the format.
  */
-void AMediaFormat_setBuffer(AMediaFormat*, const char* name, void* data, size_t size);
+void AMediaFormat_setBuffer(AMediaFormat*, const char* name, void* data, size_t size) __INTRODUCED_IN(21);
 
 
 
@@ -157,18 +155,14 @@ extern const char* AMEDIAFORMAT_KEY_TRACK_ID;
 extern const char* AMEDIAFORMAT_KEY_TRACK_INDEX;
 extern const char* AMEDIAFORMAT_KEY_WIDTH;
 
-#endif /* __ANDROID_API__ >= 21 */
-
-#if __ANDROID_API__ >= 28
-bool AMediaFormat_getDouble(AMediaFormat*, const char *name, double *out);
+bool AMediaFormat_getDouble(AMediaFormat*, const char *name, double *out) __INTRODUCED_IN(28);
 bool AMediaFormat_getRect(AMediaFormat*, const char *name,
-                          int32_t *left, int32_t *top, int32_t *right, int32_t *bottom);
+        int32_t *left, int32_t *top, int32_t *right, int32_t *bottom) __INTRODUCED_IN(28);
 
-void AMediaFormat_setDouble(AMediaFormat*, const char* name, double value);
-void AMediaFormat_setSize(AMediaFormat*, const char* name, size_t value);
+void AMediaFormat_setDouble(AMediaFormat*, const char* name, double value) __INTRODUCED_IN(28);
+void AMediaFormat_setSize(AMediaFormat*, const char* name, size_t value) __INTRODUCED_IN(28);
 void AMediaFormat_setRect(AMediaFormat*, const char* name,
-                          int32_t left, int32_t top, int32_t right, int32_t bottom);
-#endif /* __ANDROID_API__ >= 28 */
+        int32_t left, int32_t top, int32_t right, int32_t bottom) __INTRODUCED_IN(28);
 
 __END_DECLS
 

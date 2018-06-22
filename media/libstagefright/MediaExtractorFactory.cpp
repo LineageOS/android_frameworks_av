@@ -123,7 +123,7 @@ struct ExtractorPlugin : public RefBase {
 };
 
 Mutex MediaExtractorFactory::gPluginMutex;
-std::shared_ptr<List<sp<ExtractorPlugin>>> MediaExtractorFactory::gPlugins;
+std::shared_ptr<std::list<sp<ExtractorPlugin>>> MediaExtractorFactory::gPlugins;
 bool MediaExtractorFactory::gPluginsRegistered = false;
 
 // static
@@ -133,7 +133,7 @@ MediaExtractor::CreatorFunc MediaExtractorFactory::sniff(
     *confidence = 0.0f;
     *meta = nullptr;
 
-    std::shared_ptr<List<sp<ExtractorPlugin>>> plugins;
+    std::shared_ptr<std::list<sp<ExtractorPlugin>>> plugins;
     {
         Mutex::Autolock autoLock(gPluginMutex);
         if (!gPluginsRegistered) {
@@ -145,6 +145,7 @@ MediaExtractor::CreatorFunc MediaExtractorFactory::sniff(
     MediaExtractor::CreatorFunc curCreator = NULL;
     MediaExtractor::CreatorFunc bestCreator = NULL;
     for (auto it = plugins->begin(); it != plugins->end(); ++it) {
+        ALOGV("sniffing %s", (*it)->def.extractor_name);
         float newConfidence;
         void *newMeta = nullptr;
         MediaExtractor::FreeMetaFunc newFreeMeta = nullptr;
@@ -171,7 +172,7 @@ MediaExtractor::CreatorFunc MediaExtractorFactory::sniff(
 
 // static
 void MediaExtractorFactory::RegisterExtractor(const sp<ExtractorPlugin> &plugin,
-        List<sp<ExtractorPlugin>> &pluginList) {
+        std::list<sp<ExtractorPlugin>> &pluginList) {
     // sanity check check struct version, uuid, name
     if (plugin->def.def_version == 0
             || plugin->def.def_version > MediaExtractor::EXTRACTORDEF_VERSION) {
@@ -213,7 +214,7 @@ void MediaExtractorFactory::RegisterExtractor(const sp<ExtractorPlugin> &plugin,
 
 //static
 void MediaExtractorFactory::RegisterExtractorsInApk(
-        const char *apkPath, List<sp<ExtractorPlugin>> &pluginList) {
+        const char *apkPath, std::list<sp<ExtractorPlugin>> &pluginList) {
     ALOGV("search for plugins at %s", apkPath);
     ZipArchiveHandle zipHandle;
     int32_t ret = OpenArchive(apkPath, &zipHandle);
@@ -261,7 +262,7 @@ void MediaExtractorFactory::RegisterExtractorsInApk(
 
 //static
 void MediaExtractorFactory::RegisterExtractorsInSystem(
-        const char *libDirPath, List<sp<ExtractorPlugin>> &pluginList) {
+        const char *libDirPath, std::list<sp<ExtractorPlugin>> &pluginList) {
     ALOGV("search for plugins at %s", libDirPath);
     DIR *libDir = opendir(libDirPath);
     if (libDir) {
@@ -291,6 +292,10 @@ void MediaExtractorFactory::RegisterExtractorsInSystem(
     }
 }
 
+static bool compareFunc(const sp<ExtractorPlugin>& first, const sp<ExtractorPlugin>& second) {
+    return strcmp(first->def.extractor_name, second->def.extractor_name) < 0;
+}
+
 // static
 void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
     Mutex::Autolock autoLock(gPluginMutex);
@@ -301,7 +306,7 @@ void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
         return;
     }
 
-    std::shared_ptr<List<sp<ExtractorPlugin>>> newList(new List<sp<ExtractorPlugin>>());
+    std::shared_ptr<std::list<sp<ExtractorPlugin>>> newList(new std::list<sp<ExtractorPlugin>>());
 
     RegisterExtractorsInSystem("/system/lib"
 #ifdef __LP64__
@@ -319,6 +324,7 @@ void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
         RegisterExtractorsInApk(newUpdateApkPath, *newList);
     }
 
+    newList->sort(compareFunc);
     gPlugins = newList;
     gPluginsRegistered = true;
 }

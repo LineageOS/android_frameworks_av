@@ -860,7 +860,7 @@ bool MediaPlayer2::isPlaying() {
     return false;
 }
 
-mediaplayer2_states MediaPlayer2::getMediaPlayer2State() {
+mediaplayer2_states MediaPlayer2::getState() {
     Mutex::Autolock _l(mLock);
     if (mCurrentState & MEDIA_PLAYER2_STATE_ERROR) {
         return MEDIAPLAYER2_STATE_ERROR;
