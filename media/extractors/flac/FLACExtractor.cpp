@@ -24,6 +24,8 @@
 // libFLAC parser
 #include "FLAC/stream_decoder.h"
 
+#include <audio_utils/primitives.h>
+#include <binder/IPCThreadState.h> // for IPCThreadState
 #include <media/MediaExtractorPluginApi.h>
 #include <media/NdkMediaFormat.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -35,8 +37,19 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MetaDataUtils.h>
 #include <media/stagefright/MediaBufferBase.h>
+#include <private/android_filesystem_config.h> // for AID_MEDIA
+#include <system/audio.h>
 
 namespace android {
+
+// MediaServer is capable of handling float extractor output, but general processes
+// may not be able to do so.
+// TODO: Improve API to set extractor float output.
+// (Note: duplicated with WAVExtractor.cpp)
+static inline bool shouldExtractorOutputFloat(int bitsPerSample)
+{
+    return bitsPerSample > 16 && IPCThreadState::self()->getCallingUid() == AID_MEDIA;
+}
 
 class FLACParser;
 
@@ -45,7 +58,8 @@ class FLACSource : public MediaTrackHelperV2 {
 public:
     FLACSource(
             DataSourceHelper *dataSource,
-            AMediaFormat *meta);
+            AMediaFormat *meta,
+            bool outputFloat);
 
     virtual media_status_t start();
     virtual media_status_t stop();
@@ -60,6 +74,7 @@ protected:
 private:
     DataSourceHelper *mDataSource;
     AMediaFormat *mTrackMetadata;
+    const bool mOutputFloat;
     FLACParser *mParser;
     bool mInitCheck;
     bool mStarted;
@@ -76,11 +91,12 @@ class FLACParser {
 
 public:
     enum {
-        kMaxChannels = 8,
+        kMaxChannels = FCC_8,
     };
 
     explicit FLACParser(
         DataSourceHelper *dataSource,
+        bool outputFloat,
         // If metadata pointers aren't provided, we don't fill them
         AMediaFormat *fileMetadata = 0,
         AMediaFormat *trackMetadata = 0);
@@ -120,6 +136,7 @@ public:
 
 private:
     DataSourceHelper *mDataSource;
+    const bool mOutputFloat;
     AMediaFormat *mFileMetadata;
     AMediaFormat *mTrackMetadata;
     bool mInitCheck;
@@ -170,6 +187,7 @@ private:
             const FLAC__Frame *frame, const FLAC__int32 * const buffer[]);
     void metadataCallback(const FLAC__StreamMetadata *metadata);
     void errorCallback(FLAC__StreamDecoderErrorStatus status);
+    size_t getOutputSampleSize() const { return mOutputFloat ? sizeof(float) : sizeof(int16_t); }
 
     // FLAC parser callbacks as C-callable functions
     static FLAC__StreamDecoderReadStatus read_callback(
@@ -381,122 +399,51 @@ void FLACParser::errorCallback(FLAC__StreamDecoderErrorStatus status)
     mErrorStatus = status;
 }
 
-// Copy samples from FLAC native 32-bit non-interleaved to 16-bit interleaved.
+// Copy samples from FLAC native 32-bit non-interleaved to 16-bit signed
+// or 32-bit float interleaved.
 // These are candidates for optimization if needed.
-
-static void copyMono8(
-        int16_t *dst,
-        const int * src[FLACParser::kMaxChannels],
+static void copyTo16Signed(
+        short *dst,
+        const int *const *src,
         unsigned nSamples,
-        unsigned /* nChannels */) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        *dst++ = src[0][i] << 8;
-    }
-}
-
-static void copyStereo8(
-        int16_t *dst,
-        const int * src[FLACParser::kMaxChannels],
-        unsigned nSamples,
-        unsigned /* nChannels */) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        *dst++ = src[0][i] << 8;
-        *dst++ = src[1][i] << 8;
-    }
-}
-
-static void copyMultiCh8(int16_t *dst, const int * src[FLACParser::kMaxChannels], unsigned nSamples, unsigned nChannels)
-{
+        unsigned nChannels,
+        unsigned bitsPerSample) {
+    const unsigned leftShift = 16 - bitsPerSample;
     for (unsigned i = 0; i < nSamples; ++i) {
         for (unsigned c = 0; c < nChannels; ++c) {
-            *dst++ = src[c][i] << 8;
+            *dst++ = src[c][i] << leftShift;
         }
     }
 }
 
-static void copyMono16(
-        int16_t *dst,
-        const int * src[FLACParser::kMaxChannels],
+static void copyToFloat(
+        float *dst,
+        const int *const *src,
         unsigned nSamples,
-        unsigned /* nChannels */) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        *dst++ = src[0][i];
-    }
-}
-
-static void copyStereo16(
-        int16_t *dst,
-        const int * src[FLACParser::kMaxChannels],
-        unsigned nSamples,
-        unsigned /* nChannels */) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        *dst++ = src[0][i];
-        *dst++ = src[1][i];
-    }
-}
-
-static void copyMultiCh16(int16_t *dst, const int * src[FLACParser::kMaxChannels], unsigned nSamples, unsigned nChannels)
-{
+        unsigned nChannels,
+        unsigned bitsPerSample) {
+    const unsigned leftShift = 32 - bitsPerSample;
     for (unsigned i = 0; i < nSamples; ++i) {
         for (unsigned c = 0; c < nChannels; ++c) {
-            *dst++ = src[c][i];
+            *dst++ = float_from_i32(src[c][i] << leftShift);
         }
     }
-}
-
-// 24-bit versions should do dithering or noise-shaping, here or in AudioFlinger
-
-static void copyMono24(
-        int16_t *dst,
-        const int * src[FLACParser::kMaxChannels],
-        unsigned nSamples,
-        unsigned /* nChannels */) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        *dst++ = src[0][i] >> 8;
-    }
-}
-
-static void copyStereo24(
-        int16_t *dst,
-        const int * src[FLACParser::kMaxChannels],
-        unsigned nSamples,
-        unsigned /* nChannels */) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        *dst++ = src[0][i] >> 8;
-        *dst++ = src[1][i] >> 8;
-    }
-}
-
-static void copyMultiCh24(int16_t *dst, const int * src[FLACParser::kMaxChannels], unsigned nSamples, unsigned nChannels)
-{
-    for (unsigned i = 0; i < nSamples; ++i) {
-        for (unsigned c = 0; c < nChannels; ++c) {
-            *dst++ = src[c][i] >> 8;
-        }
-    }
-}
-
-static void copyTrespass(
-        int16_t * /* dst */,
-        const int *[FLACParser::kMaxChannels] /* src */,
-        unsigned /* nSamples */,
-        unsigned /* nChannels */) {
-    TRESPASS();
 }
 
 // FLACParser
 
 FLACParser::FLACParser(
         DataSourceHelper *dataSource,
+        bool outputFloat,
         AMediaFormat *fileMetadata,
         AMediaFormat *trackMetadata)
     : mDataSource(dataSource),
+      mOutputFloat(outputFloat),
       mFileMetadata(fileMetadata),
       mTrackMetadata(trackMetadata),
       mInitCheck(false),
       mMaxBufferSize(0),
       mGroup(NULL),
-      mCopy(copyTrespass),
       mDecoder(NULL),
       mCurrentPos(0LL),
       mEOF(false),
@@ -590,29 +537,6 @@ status_t FLACParser::init()
             ALOGE("unsupported sample rate %u", getSampleRate());
             return NO_INIT;
         }
-        // configure the appropriate copy function, defaulting to trespass
-        static const struct {
-            unsigned mChannels;
-            unsigned mBitsPerSample;
-            void (*mCopy)(int16_t *dst, const int * src[kMaxChannels], unsigned nSamples, unsigned nChannels);
-        } table[] = {
-            { 1,  8, copyMono8    },
-            { 2,  8, copyStereo8  },
-            { 8,  8, copyMultiCh8  },
-            { 1, 16, copyMono16   },
-            { 2, 16, copyStereo16 },
-            { 8, 16, copyMultiCh16 },
-            { 1, 24, copyMono24   },
-            { 2, 24, copyStereo24 },
-            { 8, 24, copyMultiCh24 },
-        };
-        for (unsigned i = 0; i < sizeof(table)/sizeof(table[0]); ++i) {
-            if (table[i].mChannels >= getChannels() &&
-                    table[i].mBitsPerSample == getBitsPerSample()) {
-                mCopy = table[i].mCopy;
-                break;
-            }
-        }
         // populate track metadata
         if (mTrackMetadata != 0) {
             AMediaFormat_setString(mTrackMetadata,
@@ -623,8 +547,6 @@ status_t FLACParser::init()
                     AMEDIAFORMAT_KEY_SAMPLE_RATE, getSampleRate());
             AMediaFormat_setInt32(mTrackMetadata,
                     AMEDIAFORMAT_KEY_BITS_PER_SAMPLE, getBitsPerSample());
-            AMediaFormat_setInt32(mTrackMetadata,
-                    AMEDIAFORMAT_KEY_PCM_ENCODING, kAudioEncodingPcm16bit);
             // sample rate is non-zero, so division by zero not possible
             AMediaFormat_setInt64(mTrackMetadata,
                     AMEDIAFORMAT_KEY_DURATION, (getTotalSamples() * 1000000LL) / getSampleRate());
@@ -644,7 +566,7 @@ void FLACParser::allocateBuffers()
 {
     CHECK(mGroup == NULL);
     mGroup = new MediaBufferGroup;
-    mMaxBufferSize = getMaxBlockSize() * getChannels() * sizeof(int16_t);
+    mMaxBufferSize = getMaxBlockSize() * getChannels() * getOutputSampleSize();
     mGroup->add_buffer(MediaBufferBase::Create(mMaxBufferSize));
 }
 
@@ -697,12 +619,24 @@ MediaBufferBase *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
     if (err != OK) {
         return NULL;
     }
-    size_t bufferSize = blocksize * getChannels() * sizeof(int16_t);
+    const size_t bufferSize = blocksize * getChannels() * getOutputSampleSize();
     CHECK(bufferSize <= mMaxBufferSize);
-    int16_t *data = (int16_t *) buffer->data();
     buffer->set_range(0, bufferSize);
     // copy PCM from FLAC write buffer to our media buffer, with interleaving
-    (*mCopy)(data, mWriteBuffer, blocksize, getChannels());
+    const unsigned bitsPerSample = getBitsPerSample();
+    if (mOutputFloat) {
+        copyToFloat(reinterpret_cast<float*>(buffer->data()),
+                    mWriteBuffer,
+                    blocksize,
+                    getChannels(),
+                    bitsPerSample);
+    } else {
+        copyTo16Signed(reinterpret_cast<short*>(buffer->data()),
+                       mWriteBuffer,
+                       blocksize,
+                       getChannels(),
+                       bitsPerSample);
+    }
     // fill in buffer metadata
     CHECK(mWriteHeader.number_type == FLAC__FRAME_NUMBER_TYPE_SAMPLE_NUMBER);
     FLAC__uint64 sampleNumber = mWriteHeader.number.sample_number;
@@ -716,17 +650,16 @@ MediaBufferBase *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
 
 FLACSource::FLACSource(
         DataSourceHelper *dataSource,
-        AMediaFormat *trackMetadata)
+        AMediaFormat *trackMetadata,
+        bool outputFloat)
     : mDataSource(dataSource),
       mTrackMetadata(trackMetadata),
-      mParser(0),
-      mInitCheck(false),
+      mOutputFloat(outputFloat),
+      mParser(new FLACParser(mDataSource, outputFloat)),
+      mInitCheck(mParser->initCheck()),
       mStarted(false)
 {
     ALOGV("FLACSource::FLACSource");
-    // re-use the same track metadata passed into constructor from FLACExtractor
-    mParser = new FLACParser(mDataSource);
-    mInitCheck  = mParser->initCheck();
 }
 
 FLACSource::~FLACSource()
@@ -762,7 +695,12 @@ media_status_t FLACSource::stop()
 
 media_status_t FLACSource::getFormat(AMediaFormat *meta)
 {
-    return AMediaFormat_copy(meta, mTrackMetadata);
+    const media_status_t status = AMediaFormat_copy(meta, mTrackMetadata);
+    if (status == OK) {
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_PCM_ENCODING,
+                mOutputFloat ? kAudioEncodingPcmFloat : kAudioEncodingPcm16bit);
+    }
+    return status;
 }
 
 media_status_t FLACSource::read(
@@ -804,7 +742,7 @@ FLACExtractor::FLACExtractor(
     // FLACParser will fill in the metadata for us
     mFileMetadata = AMediaFormat_new();
     mTrackMetadata = AMediaFormat_new();
-    mParser = new FLACParser(mDataSource, mFileMetadata, mTrackMetadata);
+    mParser = new FLACParser(mDataSource, false /* outputFloat */, mFileMetadata, mTrackMetadata);
     mInitCheck = mParser->initCheck();
 }
 
@@ -827,7 +765,9 @@ MediaTrackHelperV2 *FLACExtractor::getTrack(size_t index)
     if (mInitCheck != OK || index > 0) {
         return NULL;
     }
-    return new FLACSource(mDataSource, mTrackMetadata);
+
+    return new FLACSource(
+            mDataSource, mTrackMetadata, shouldExtractorOutputFloat(mParser->getBitsPerSample()));
 }
 
 media_status_t FLACExtractor::getTrackMetaData(
@@ -836,7 +776,13 @@ media_status_t FLACExtractor::getTrackMetaData(
     if (mInitCheck != OK || index > 0) {
         return AMEDIA_ERROR_UNKNOWN;
     }
-    return AMediaFormat_copy(meta, mTrackMetadata);
+    const media_status_t status = AMediaFormat_copy(meta, mTrackMetadata);
+    if (status == OK) {
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_PCM_ENCODING,
+                shouldExtractorOutputFloat(mParser->getBitsPerSample())
+                        ? kAudioEncodingPcmFloat : kAudioEncodingPcm16bit);
+    }
+    return status;
 }
 
 media_status_t FLACExtractor::getMetaData(AMediaFormat *meta)
