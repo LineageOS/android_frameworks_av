@@ -16,3 +16,6 @@ on property:vts.native_server.on=1
     stop audioserver
 on property:vts.native_server.on=0
     start audioserver
+
+on init
+    mkdir /dev/socket/audioserver 0775 audioserver audioserver
