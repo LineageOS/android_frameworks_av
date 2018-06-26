@@ -63,6 +63,7 @@
 #include <media/VolumeShaper.h>
 
 #include <audio_utils/SimpleLog.h>
+#include <audio_utils/TimestampVerifier.h>
 
 #include "FastCapture.h"
 #include "FastMixer.h"
