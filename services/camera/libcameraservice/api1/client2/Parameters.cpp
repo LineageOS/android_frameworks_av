@@ -41,7 +41,8 @@ Parameters::Parameters(int cameraId,
         int cameraFacing) :
         cameraId(cameraId),
         cameraFacing(cameraFacing),
-        info(NULL) {
+        info(NULL),
+        mDefaultSceneMode(ANDROID_CONTROL_SCENE_MODE_DISABLED) {
 }
 
 Parameters::~Parameters() {
@@ -557,6 +558,10 @@ status_t Parameters::initialize(const CameraMetadata *info, int deviceVersion) {
                     noSceneModes = true;
                     break;
                 case ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY:
+                    // Face priority can be used as alternate default if supported.
+                    // Per API contract it shouldn't override the user set flash,
+                    // white balance and focus modes.
+                    mDefaultSceneMode = availableSceneModes.data.u8[i];
                     // Not in old API
                     addComma = false;
                     break;
@@ -1760,7 +1765,7 @@ status_t Parameters::set(const String8& paramString) {
 
     // SCENE_MODE
     validatedParams.sceneMode = sceneModeStringToEnum(
-        newParams.get(CameraParameters::KEY_SCENE_MODE) );
+        newParams.get(CameraParameters::KEY_SCENE_MODE), mDefaultSceneMode);
     if (validatedParams.sceneMode != sceneMode &&
             validatedParams.sceneMode !=
             ANDROID_CONTROL_SCENE_MODE_DISABLED) {
@@ -1778,7 +1783,7 @@ status_t Parameters::set(const String8& paramString) {
         }
     }
     bool sceneModeSet =
-            validatedParams.sceneMode != ANDROID_CONTROL_SCENE_MODE_DISABLED;
+            validatedParams.sceneMode != mDefaultSceneMode;
 
     // FLASH_MODE
     if (sceneModeSet) {
@@ -2157,7 +2162,7 @@ status_t Parameters::updateRequest(CameraMetadata *request) const {
     uint8_t reqSceneMode =
             sceneModeActive ? sceneMode :
             enableFaceDetect ? (uint8_t)ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY :
-            (uint8_t)ANDROID_CONTROL_SCENE_MODE_DISABLED;
+            mDefaultSceneMode;
     res = request->update(ANDROID_CONTROL_SCENE_MODE,
             &reqSceneMode, 1);
     if (res != OK) return res;
@@ -2589,12 +2594,12 @@ int Parameters::abModeStringToEnum(const char *abMode) {
         -1;
 }
 
-int Parameters::sceneModeStringToEnum(const char *sceneMode) {
+int Parameters::sceneModeStringToEnum(const char *sceneMode, uint8_t defaultSceneMode) {
     return
         !sceneMode ?
-            ANDROID_CONTROL_SCENE_MODE_DISABLED :
+            defaultSceneMode :
         !strcmp(sceneMode, CameraParameters::SCENE_MODE_AUTO) ?
-            ANDROID_CONTROL_SCENE_MODE_DISABLED :
+            defaultSceneMode :
         !strcmp(sceneMode, CameraParameters::SCENE_MODE_ACTION) ?
             ANDROID_CONTROL_SCENE_MODE_ACTION :
         !strcmp(sceneMode, CameraParameters::SCENE_MODE_PORTRAIT) ?
