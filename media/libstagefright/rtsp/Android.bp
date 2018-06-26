@@ -18,6 +18,7 @@ cc_defaults {
         "ARTSPConnection.cpp",
         "ASessionDescription.cpp",
         "SDPLoader.cpp",
+        "QualManager.cpp",
     ],
 
     shared_libs: [

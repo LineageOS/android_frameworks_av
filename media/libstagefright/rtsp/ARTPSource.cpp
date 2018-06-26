@@ -261,8 +261,6 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
     mPrevNumBuffersReceived = mNumBuffersReceived;
     int32_t cumulativePacketLost = (int32_t)expected - mNumBuffersReceived;
 
-    ALOGI("UID %p expectedPkts %lld lostPkts %lld", this, (long long)intervalExpected, (long long)intervalPacketLost);
-
     uint8_t *data = buffer->data() + buffer->size();
 
     data[0] = 0x80 | 1;
@@ -386,14 +384,16 @@ void ARTPSource::setTargetBitrate() {
     int64_t intervalReceived = mNumBuffersReceived - mPrevNumBuffersReceived;
     int64_t intervalPacketLost = intervalExpected - intervalReceived;
 
-    if (intervalPacketLost < 0)
+    ALOGI("UID %p expectedPkts %lld lostPkts %lld", this, (long long)intervalExpected, (long long)intervalPacketLost);
+
+    if (intervalPacketLost < 0 || intervalExpected == 0)
         fraction = 0;
-    else if (intervalExpected <= intervalPacketLost || intervalExpected == 0)
+    else if (intervalExpected <= intervalPacketLost)
         fraction = 255;
     else
         fraction = (intervalPacketLost << 8) / intervalExpected;
 
-    mQualManager.setTargetBitrate(fraction, ALooper::GetNowUs());
+    mQualManager.setTargetBitrate(fraction, ALooper::GetNowUs(), intervalExpected < 5);
 }
 
 bool ARTPSource::isNeedToReport() {
