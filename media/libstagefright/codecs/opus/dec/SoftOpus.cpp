@@ -431,7 +431,7 @@ void SoftOpus::onQueueFilled(OMX_U32 /* portIndex */) {
             }
 
             if (mInputBufferCount == 0) {
-                CHECK(mHeader == NULL);
+                delete mHeader;
                 mHeader = new OpusHeader();
                 memset(mHeader, 0, sizeof(*mHeader));
                 if (!ParseOpusHeader(data, size, mHeader)) {
@@ -452,6 +452,9 @@ void SoftOpus::onQueueFilled(OMX_U32 /* portIndex */) {
                 }
 
                 int status = OPUS_INVALID_STATE;
+                if (mDecoder != NULL) {
+                    opus_multistream_decoder_destroy(mDecoder);
+                }
                 mDecoder = opus_multistream_decoder_create(kRate,
                                                            mHeader->channels,
                                                            mHeader->num_streams,
