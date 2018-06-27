@@ -5813,39 +5813,7 @@ audio_stream_type_t AudioPolicyManager::streamTypefromAttributesInt(const audio_
         return AUDIO_STREAM_TTS;
     }
 
-    // usage to stream type mapping
-    switch (attr->usage) {
-    case AUDIO_USAGE_MEDIA:
-    case AUDIO_USAGE_GAME:
-    case AUDIO_USAGE_ASSISTANT:
-    case AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE:
-        return AUDIO_STREAM_MUSIC;
-    case AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY:
-        return AUDIO_STREAM_ACCESSIBILITY;
-    case AUDIO_USAGE_ASSISTANCE_SONIFICATION:
-        return AUDIO_STREAM_SYSTEM;
-    case AUDIO_USAGE_VOICE_COMMUNICATION:
-        return AUDIO_STREAM_VOICE_CALL;
-
-    case AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING:
-        return AUDIO_STREAM_DTMF;
-
-    case AUDIO_USAGE_ALARM:
-        return AUDIO_STREAM_ALARM;
-    case AUDIO_USAGE_NOTIFICATION_TELEPHONY_RINGTONE:
-        return AUDIO_STREAM_RING;
-
-    case AUDIO_USAGE_NOTIFICATION:
-    case AUDIO_USAGE_NOTIFICATION_COMMUNICATION_REQUEST:
-    case AUDIO_USAGE_NOTIFICATION_COMMUNICATION_INSTANT:
-    case AUDIO_USAGE_NOTIFICATION_COMMUNICATION_DELAYED:
-    case AUDIO_USAGE_NOTIFICATION_EVENT:
-        return AUDIO_STREAM_NOTIFICATION;
-
-    case AUDIO_USAGE_UNKNOWN:
-    default:
-        return AUDIO_STREAM_MUSIC;
-    }
+    return audio_usage_to_stream_type(attr->usage);
 }
 
 bool AudioPolicyManager::isValidAttributes(const audio_attributes_t *paa)
