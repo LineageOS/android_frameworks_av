@@ -853,6 +853,14 @@ void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args __u
     dprintf(fd, "  Input device: %#x (%s)\n", mInDevice, devicesToString(mInDevice).c_str());
     dprintf(fd, "  Audio source: %d (%s)\n", mAudioSource, sourceToString(mAudioSource));
 
+    // Dump timestamp statistics for the Thread types that support it.
+    if (mType == RECORD
+            || mType == MIXER
+            || mType == DUPLICATING
+            || (mType == DIRECT && audio_is_linear_pcm(mHALFormat))) {
+        dprintf(fd, "  Timestamp stats: %s\n", mTimestampVerifier.toString().c_str());
+    }
+
     if (locked) {
         mLock.unlock();
     }
@@ -3205,12 +3213,21 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                 logString = NULL;
             }
 
+            // Collect timestamp statistics for the Playback Thread types that support it.
+            if (mType == MIXER
+                    || mType == DUPLICATING
+                    || (mType == DIRECT && audio_is_linear_pcm(mHALFormat))) { // no indentation
             // Gather the framesReleased counters for all active tracks,
             // and associate with the sink frames written out.  We need
             // this to convert the sink timestamp to the track timestamp.
             bool kernelLocationUpdate = false;
             ExtendedTimestamp timestamp; // use private copy to fetch
-            if (threadloop_getHalTimestamp_l(&timestamp) == OK) {
+            if (mStandby) {
+                mTimestampVerifier.discontinuity();
+            } else if (threadloop_getHalTimestamp_l(&timestamp) == OK) {
+                mTimestampVerifier.add(timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL],
+                        timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL],
+                        mSampleRate);
                 // We always fetch the timestamp here because often the downstream
                 // sink will block while writing.
 
@@ -3241,7 +3258,10 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                         + mSuspendedFrames; // add frames discarded when suspended
                 mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] =
                         timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL];
+            } else {
+                mTimestampVerifier.error();
             }
+
             // mFramesWritten for non-offloaded tracks are contiguous
             // even after standby() is called. This is useful for the track frame
             // to sink frame mapping.
@@ -3274,6 +3294,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                     }
                 }
             }
+            } // if (mType ... ) { // no indentation
 #if 0
             // logFormat example
             if (z % 100 == 0) {
@@ -6730,8 +6751,9 @@ reacquire_wakelock:
         // Update server timestamp with kernel stats
         if (mPipeSource.get() == nullptr /* don't obtain for FastCapture, could block */) {
             int64_t position, time;
-            int ret = mInput->stream->getCapturePosition(&position, &time);
-            if (ret == NO_ERROR) {
+            if (mStandby) {
+                mTimestampVerifier.discontinuity();
+            } else if (mInput->stream->getCapturePosition(&position, &time) == NO_ERROR) {
                 mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL] = position;
                 mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] = time;
                 // Note: In general record buffers should tend to be empty in
@@ -6739,6 +6761,12 @@ reacquire_wakelock:
                 //
                 // Also, it is not advantageous to call get_presentation_position during the read
                 // as the read obtains a lock, preventing the timestamp call from executing.
+
+                mTimestampVerifier.add(mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL],
+                        mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL],
+                        mSampleRate);
+            } else {
+                mTimestampVerifier.error();
             }
         }
         // Use this to track timestamp information

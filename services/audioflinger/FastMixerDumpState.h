@@ -18,6 +18,7 @@
 #define ANDROID_AUDIO_FAST_MIXER_DUMP_STATE_H
 
 #include <stdint.h>
+#include <audio_utils/TimestampVerifier.h>
 #include "Configuration.h"
 #include "FastThreadDumpState.h"
 #include "FastMixerState.h"
@@ -75,6 +76,9 @@ struct FastMixerDumpState : FastThreadDumpState {
     size_t   mFrameCount;
     uint32_t mTrackMask;        // mask of active tracks
     FastTrackDump   mTracks[FastMixerState::kMaxFastTracks];
+
+    // For timestamp statistics.
+    TimestampVerifier<int64_t /* frame count */, int64_t /* time ns */> mTimestampVerifier;
 };
 
 }   // android
