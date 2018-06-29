@@ -15,7 +15,9 @@
  */
 
 
+#include <utils/Log.h>
 #include <media/TimeCheck.h>
+#include <media/EventLog.h>
 
 namespace android {
 
@@ -81,7 +83,10 @@ bool TimeCheck::TimeCheckThread::threadLoop()
             status = mCond.waitRelative(mMutex, waitTimeNs);
         }
     }
-    LOG_ALWAYS_FATAL_IF(status != NO_ERROR, "TimeCheck timeout for %s", tag);
+    if (status != NO_ERROR) {
+        LOG_EVENT_STRING(LOGTAG_AUDIO_BINDER_TIMEOUT, tag);
+        LOG_ALWAYS_FATAL("TimeCheck timeout for %s", tag);
+    }
     return true;
 }
 
