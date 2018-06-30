@@ -67,8 +67,6 @@ void AudioPolicyService::onFirstRef()
     {
         Mutex::Autolock _l(mLock);
 
-        // start tone playback thread
-        mTonePlaybackThread = new AudioCommandThread(String8("ApmTone"), this);
         // start audio commands thread
         mAudioCommandThread = new AudioCommandThread(String8("ApmAudio"), this);
         // start output activity command thread
@@ -90,7 +88,6 @@ void AudioPolicyService::onFirstRef()
 
 AudioPolicyService::~AudioPolicyService()
 {
-    mTonePlaybackThread->exit();
     mAudioCommandThread->exit();
     mOutputCommandThread->exit();
 
@@ -322,8 +319,6 @@ status_t AudioPolicyService::dumpInternals(int fd)
     result.append(buffer);
     snprintf(buffer, SIZE, "Command Thread: %p\n", mAudioCommandThread.get());
     result.append(buffer);
-    snprintf(buffer, SIZE, "Tones Thread: %p\n", mTonePlaybackThread.get());
-    result.append(buffer);
 
     write(fd, result.string(), result.size());
     return NO_ERROR;
@@ -358,9 +353,6 @@ status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
         dumpInternals(fd);
         if (mAudioCommandThread != 0) {
             mAudioCommandThread->dump(fd);
-        }
-        if (mTonePlaybackThread != 0) {
-            mTonePlaybackThread->dump(fd);
         }
 
         if (mAudioPolicyManager) {
@@ -632,7 +624,6 @@ AudioPolicyService::AudioCommandThread::AudioCommandThread(String8 name,
                                                            const wp<AudioPolicyService>& service)
     : Thread(false), mName(name), mService(service)
 {
-    mpToneGenerator = NULL;
 }
 
 
@@ -642,7 +633,6 @@ AudioPolicyService::AudioCommandThread::~AudioCommandThread()
         release_wake_lock(mName.string());
     }
     mAudioCommands.clear();
-    delete mpToneGenerator;
 }
 
 void AudioPolicyService::AudioCommandThread::onFirstRef()
@@ -667,26 +657,6 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                 mLastCommand = command;
 
                 switch (command->mCommand) {
-                case START_TONE: {
-                    mLock.unlock();
-                    ToneData *data = (ToneData *)command->mParam.get();
-                    ALOGV("AudioCommandThread() processing start tone %d on stream %d",
-                            data->mType, data->mStream);
-                    delete mpToneGenerator;
-                    mpToneGenerator = new ToneGenerator(data->mStream, 1.0);
-                    mpToneGenerator->startTone(data->mType);
-                    mLock.lock();
-                    }break;
-                case STOP_TONE: {
-                    mLock.unlock();
-                    ALOGV("AudioCommandThread() processing stop tone");
-                    if (mpToneGenerator != NULL) {
-                        mpToneGenerator->stopTone();
-                        delete mpToneGenerator;
-                        mpToneGenerator = NULL;
-                    }
-                    mLock.lock();
-                    }break;
                 case SET_VOLUME: {
                     VolumeData *data = (VolumeData *)command->mParam.get();
                     ALOGV("AudioCommandThread() processing set volume stream %d, \
@@ -891,27 +861,6 @@ status_t AudioPolicyService::AudioCommandThread::dump(int fd)
     if (locked) mLock.unlock();
 
     return NO_ERROR;
-}
-
-void AudioPolicyService::AudioCommandThread::startToneCommand(ToneGenerator::tone_type type,
-        audio_stream_type_t stream)
-{
-    sp<AudioCommand> command = new AudioCommand();
-    command->mCommand = START_TONE;
-    sp<ToneData> data = new ToneData();
-    data->mType = type;
-    data->mStream = stream;
-    command->mParam = data;
-    ALOGV("AudioCommandThread() adding tone start type %d, stream %d", type, stream);
-    sendCommand(command);
-}
-
-void AudioPolicyService::AudioCommandThread::stopToneCommand()
-{
-    sp<AudioCommand> command = new AudioCommand();
-    command->mCommand = STOP_TONE;
-    ALOGV("AudioCommandThread() adding tone stop");
-    sendCommand(command);
 }
 
 status_t AudioPolicyService::AudioCommandThread::volumeCommand(audio_stream_type_t stream,
@@ -1250,8 +1199,6 @@ void AudioPolicyService::AudioCommandThread::insertCommand_l(sp<AudioCommand>& c
 
         } break;
 
-        case START_TONE:
-        case STOP_TONE:
         default:
             break;
         }
@@ -1324,27 +1271,6 @@ int AudioPolicyService::setStreamVolume(audio_stream_type_t stream,
                                                    output, delayMs);
 }
 
-int AudioPolicyService::startTone(audio_policy_tone_t tone,
-                                  audio_stream_type_t stream)
-{
-    if (tone != AUDIO_POLICY_TONE_IN_CALL_NOTIFICATION) {
-        ALOGE("startTone: illegal tone requested (%d)", tone);
-    }
-    if (stream != AUDIO_STREAM_VOICE_CALL) {
-        ALOGE("startTone: illegal stream (%d) requested for tone %d", stream,
-            tone);
-    }
-    mTonePlaybackThread->startToneCommand(ToneGenerator::TONE_SUP_CALL_WAITING,
-                                          AUDIO_STREAM_VOICE_CALL);
-    return 0;
-}
-
-int AudioPolicyService::stopTone()
-{
-    mTonePlaybackThread->stopToneCommand();
-    return 0;
-}
-
 int AudioPolicyService::setVoiceVolume(float volume, int delayMs)
 {
     return (int)mAudioCommandThread->voiceVolumeCommand(volume, delayMs);
@@ -1400,9 +1326,6 @@ void aps_set_parameters(void *service, audio_io_handle_t io_handle,
 int aps_set_stream_volume(void *service, audio_stream_type_t stream,
                                      float volume, audio_io_handle_t output,
                                      int delay_ms);
-int aps_start_tone(void *service, audio_policy_tone_t tone,
-                              audio_stream_type_t stream);
-int aps_stop_tone(void *service);
 int aps_set_voice_volume(void *service, float volume, int delay_ms);
 };
 

@@ -157,8 +157,6 @@ public:
                                      float volume,
                                      audio_io_handle_t output,
                                      int delayMs = 0);
-    virtual status_t startTone(audio_policy_tone_t tone, audio_stream_type_t stream);
-    virtual status_t stopTone();
     virtual status_t setVoiceVolume(float volume, int delayMs = 0);
     virtual bool isOffloadSupported(const audio_offload_info_t &config);
 
@@ -304,10 +302,7 @@ private:
         std::unordered_map<uid_t, bool> mCachedUids;
     };
 
-    // Thread used for tone playback and to send audio config commands to audio flinger
-    // For tone playback, using a separate thread is necessary to avoid deadlock with mLock because
-    // startTone() and stopTone() are normally called with mLock locked and requesting a tone start
-    // or stop will cause calls to AudioPolicyService and an attempt to lock mLock.
+    // Thread used to send audio config commands to audio flinger
     // For audio config commands, it is necessary because audio flinger requires that the calling
     // process (user) has permission to modify audio settings.
     class AudioCommandThread : public Thread {
@@ -316,8 +311,6 @@ private:
 
         // commands for tone AudioCommand
         enum {
-            START_TONE,
-            STOP_TONE,
             SET_VOLUME,
             SET_PARAMETERS,
             SET_VOICE_VOLUME,
@@ -342,9 +335,6 @@ private:
         virtual     bool        threadLoop();
 
                     void        exit();
-                    void        startToneCommand(ToneGenerator::tone_type type,
-                                                 audio_stream_type_t stream);
-                    void        stopToneCommand();
                     status_t    volumeCommand(audio_stream_type_t stream, float volume,
                                             audio_io_handle_t output, int delayMs = 0);
                     status_t    parametersCommand(audio_io_handle_t ioHandle,
@@ -387,7 +377,7 @@ private:
 
             void dump(char* buffer, size_t size);
 
-            int mCommand;   // START_TONE, STOP_TONE ...
+            int mCommand;   // SET_VOLUME, SET_PARAMETERS...
             nsecs_t mTime;  // time stamp
             Mutex mLock;    // mutex associated to mCond
             Condition mCond; // condition for status return
@@ -401,12 +391,6 @@ private:
             virtual ~AudioCommandData() {}
         protected:
             AudioCommandData() {}
-        };
-
-        class ToneData : public AudioCommandData {
-        public:
-            ToneGenerator::tone_type mType; // tone type (START_TONE only)
-            audio_stream_type_t mStream;    // stream type (START_TONE only)
         };
 
         class VolumeData : public AudioCommandData {
@@ -475,7 +459,6 @@ private:
         Mutex   mLock;
         Condition mWaitWorkCV;
         Vector < sp<AudioCommand> > mAudioCommands; // list of pending commands
-        ToneGenerator *mpToneGenerator;     // the tone generator
         sp<AudioCommand> mLastCommand;      // last processed command (used by dump)
         String8 mName;                      // string used by wake lock fo delayed commands
         wp<AudioPolicyService> mService;
@@ -549,11 +532,6 @@ private:
         virtual void setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs, int delayMs = 0);
         // function enabling to receive proprietary informations directly from audio hardware interface to audio policy manager.
         virtual String8 getParameters(audio_io_handle_t ioHandle, const String8& keys);
-
-        // request the playback of a tone on the specified stream: used for instance to replace notification sounds when playing
-        // over a telephony device during a phone call.
-        virtual status_t startTone(audio_policy_tone_t tone, audio_stream_type_t stream);
-        virtual status_t stopTone();
 
         // set down link audio volume.
         virtual status_t setVoiceVolume(float volume, int delayMs = 0);
@@ -673,7 +651,6 @@ private:
     // mLock protects AudioPolicyManager methods that can call into audio flinger
     // and possibly back in to audio policy service and acquire mEffectsLock.
     sp<AudioCommandThread> mAudioCommandThread;     // audio commands thread
-    sp<AudioCommandThread> mTonePlaybackThread;     // tone playback thread
     sp<AudioCommandThread> mOutputCommandThread;    // process stop and release output
     struct audio_policy_device *mpAudioPolicyDev;
     struct audio_policy *mpAudioPolicy;
