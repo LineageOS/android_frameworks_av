@@ -99,6 +99,7 @@ static const MtpEventCode kSupportedEventCodes[] = {
     MTP_EVENT_STORE_ADDED,
     MTP_EVENT_STORE_REMOVED,
     MTP_EVENT_DEVICE_PROP_CHANGED,
+    MTP_EVENT_OBJECT_INFO_CHANGED,
 };
 
 MtpServer::MtpServer(IMtpDatabase* database, int controlFd, bool ptp,
@@ -257,6 +258,11 @@ void MtpServer::sendObjectAdded(MtpObjectHandle handle) {
 void MtpServer::sendObjectRemoved(MtpObjectHandle handle) {
     ALOGV("sendObjectRemoved %d\n", handle);
     sendEvent(MTP_EVENT_OBJECT_REMOVED, handle);
+}
+
+void MtpServer::sendObjectInfoChanged(MtpObjectHandle handle) {
+    ALOGV("sendObjectInfoChanged %d\n", handle);
+    sendEvent(MTP_EVENT_OBJECT_INFO_CHANGED, handle);
 }
 
 void MtpServer::sendStoreAdded(MtpStorageID id) {
