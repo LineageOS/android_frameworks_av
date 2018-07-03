@@ -62,6 +62,7 @@
 #include <media/LinearMap.h>
 #include <media/VolumeShaper.h>
 
+#include <audio_utils/clock.h>
 #include <audio_utils/SimpleLog.h>
 #include <audio_utils/TimestampVerifier.h>
 

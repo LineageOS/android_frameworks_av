@@ -857,7 +857,8 @@ void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args __u
     if (mType == RECORD
             || mType == MIXER
             || mType == DUPLICATING
-            || (mType == DIRECT && audio_is_linear_pcm(mHALFormat))) {
+            || mType == DIRECT
+            || mType == OFFLOAD) {
         dprintf(fd, "  Timestamp stats: %s\n", mTimestampVerifier.toString().c_str());
     }
 
@@ -2482,6 +2483,11 @@ void AudioFlinger::PlaybackThread::resetDraining(uint32_t sequence)
     Mutex::Autolock _l(mLock);
     // reject out of sequence requests
     if ((mDrainSequence & 1) && (sequence == mDrainSequence)) {
+        // Register discontinuity when HW drain is completed because that can cause
+        // the timestamp frame position to reset to 0 for direct and offload threads.
+        // (Out of sequence requests are ignored, since the discontinuity would be handled
+        // elsewhere, e.g. in flush).
+        mTimestampVerifier.discontinuity();
         mDrainSequence &= ~1;
         mWaitWorkCV.signal();
     }
@@ -3190,6 +3196,15 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
     checkSilentMode_l();
 
+    // DIRECT and OFFLOAD threads should reset frame count to zero on stop/flush
+    // TODO: add confirmation checks:
+    // 1) DIRECT threads and linear PCM format really resets to 0?
+    // 2) Is frame count really valid if not linear pcm?
+    // 3) Are all 64 bits of position returned, not just lowest 32 bits?
+    if (mType == OFFLOAD || mType == DIRECT) {
+        mTimestampVerifier.setDiscontinuityMode(mTimestampVerifier.DISCONTINUITY_MODE_ZERO);
+    }
+
     while (!exitPending())
     {
         // Log merge requests are performed during AudioFlinger binder transactions, but
@@ -3216,7 +3231,8 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             // Collect timestamp statistics for the Playback Thread types that support it.
             if (mType == MIXER
                     || mType == DUPLICATING
-                    || (mType == DIRECT && audio_is_linear_pcm(mHALFormat))) { // no indentation
+                    || mType == DIRECT
+                    || mType == OFFLOAD) { // no indentation
             // Gather the framesReleased counters for all active tracks,
             // and associate with the sink frames written out.  We need
             // this to convert the sink timestamp to the track timestamp.
@@ -5622,6 +5638,7 @@ void AudioFlinger::DirectOutputThread::flushHw_l()
     mOutput->flush();
     mHwPaused = false;
     mFlushPending = false;
+    mTimestampVerifier.discontinuity(); // DIRECT and OFFLOADED flush resets frame count.
 }
 
 int64_t AudioFlinger::DirectOutputThread::computeWaitTimeNs_l() const {
@@ -5956,6 +5973,14 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
                     track->presentationComplete(framesWritten, audioHALFrames);
                     track->reset();
                     tracksToRemove->add(track);
+                    // DIRECT and OFFLOADED stop resets frame counts.
+                    if (!mUseAsyncWrite) {
+                        // If we don't get explicit drain notification we must
+                        // register discontinuity regardless of whether this is
+                        // the previous (!last) or the upcoming (last) track
+                        // to avoid skipping the discontinuity.
+                        mTimestampVerifier.discontinuity();
+                    }
                 }
             } else {
                 // No buffers for this track. Give it a few chances to
