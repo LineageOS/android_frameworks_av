@@ -324,11 +324,6 @@ public:
     // function enabling to receive proprietary informations directly from audio hardware interface to audio policy manager.
     virtual String8 getParameters(audio_io_handle_t ioHandle, const String8& keys) = 0;
 
-    // request the playback of a tone on the specified stream: used for instance to replace notification sounds when playing
-    // over a telephony device during a phone call.
-    virtual status_t startTone(audio_policy_tone_t tone, audio_stream_type_t stream) = 0;
-    virtual status_t stopTone() = 0;
-
     // set down link audio volume.
     virtual status_t setVoiceVolume(float volume, int delayMs = 0) = 0;
 

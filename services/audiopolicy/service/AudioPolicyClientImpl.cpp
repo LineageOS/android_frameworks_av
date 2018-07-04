@@ -155,17 +155,6 @@ String8 AudioPolicyService::AudioPolicyClient::getParameters(audio_io_handle_t i
     return result;
 }
 
-status_t AudioPolicyService::AudioPolicyClient::startTone(audio_policy_tone_t tone,
-              audio_stream_type_t stream)
-{
-    return mAudioPolicyService->startTone(tone, stream);
-}
-
-status_t AudioPolicyService::AudioPolicyClient::stopTone()
-{
-    return mAudioPolicyService->stopTone();
-}
-
 status_t AudioPolicyService::AudioPolicyClient::setVoiceVolume(float volume, int delay_ms)
 {
     return mAudioPolicyService->setVoiceVolume(volume, delay_ms);
