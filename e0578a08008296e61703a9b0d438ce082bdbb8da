@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a9485a21_3ee098e6",
+        "filename": "services/audiopolicy/managerdefault/AudioPolicyManager.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 3562,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-07-05T17:11:50Z",
+      "side": 1,
+      "message": "It\u0027s a shame policy config loading can\u0027t be overridden easily by custom implementations.",
+      "range": {
+        "startLine": 3562,
+        "startChar": 16,
+        "endLine": 3562,
+        "endChar": 47
+      },
+      "revId": "e0578a08008296e61703a9b0d438ce082bdbb8da",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
