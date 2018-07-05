@@ -586,6 +586,16 @@ status_t StagefrightRecorder::setParamVideoEncodingBitRate(int32_t bitRate) {
     return OK;
 }
 
+status_t StagefrightRecorder::setParamVideoBitRateMode(int32_t bitRateMode) {
+    ALOGV("setParamVideoBitRateMode: %d", bitRateMode);
+    if (bitRateMode < -1) {
+        ALOGE("Unsupported video bitrate mode: %d", bitRateMode);
+        return BAD_VALUE;
+    }
+    mVideoBitRateMode = bitRateMode;
+    return OK;
+}
+
 // Always rotate clockwise, and only support 0, 90, 180 and 270 for now.
 status_t StagefrightRecorder::setParamVideoRotation(int32_t degrees) {
     ALOGV("setParamVideoRotation: %d", degrees);
@@ -941,6 +951,11 @@ status_t StagefrightRecorder::setParameter(
         int32_t video_bitrate;
         if (safe_strtoi32(value.string(), &video_bitrate)) {
             return setParamVideoEncodingBitRate(video_bitrate);
+        }
+    } else if (key == "video-param-bitrate-mode") {
+        int32_t video_bitrate_mode;
+        if (safe_strtoi32(value.string(), &video_bitrate_mode)) {
+            return setParamVideoBitRateMode(video_bitrate_mode);
         }
     } else if (key == "video-param-rotation-angle-degrees") {
         int32_t degrees;
@@ -1927,6 +1942,8 @@ status_t StagefrightRecorder::setupVideoEncoder(
     }
 
     format->setInt32("bitrate", mVideoBitRate);
+    // OMX encoder option how to control bitrate
+    format->setInt32("bitrate-mode", mVideoBitRateMode);
     format->setInt32("frame-rate", mFrameRate);
     format->setInt32("i-frame-interval", mIFramesIntervalSec);
 
@@ -2348,6 +2365,8 @@ status_t StagefrightRecorder::reset() {
     mVideoHeight   = 144;
     mFrameRate     = -1;
     mVideoBitRate  = 192000;
+    // Following ACodec's default
+    mVideoBitRateMode = OMX_Video_ControlRateVariable;
     mSampleRate    = 8000;
     mAudioChannels = 1;
     mAudioBitRate  = 12200;
