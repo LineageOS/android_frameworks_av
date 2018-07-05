@@ -263,6 +263,7 @@ status_t Camera3Device::initializeCommonLocked() {
 status_t Camera3Device::disconnect() {
     ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock stLock(mTrackerLock);
 
     ALOGI("%s: E", __FUNCTION__);
 
@@ -2699,8 +2700,9 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
     if (res < 0) return res;
 
     if (mInFlightMap.size() == 1) {
-        // hold mLock to prevent race with disconnect
-        Mutex::Autolock l(mLock);
+        // Hold a separate dedicated tracker lock to prevent race with disconnect and also
+        // avoid a deadlock during reprocess requests.
+        Mutex::Autolock l(mTrackerLock);
         if (mStatusTracker != nullptr) {
             mStatusTracker->markComponentActive(mInFlightStatusId);
         }
@@ -2733,8 +2735,9 @@ void Camera3Device::removeInFlightMapEntryLocked(int idx) {
 
     // Indicate idle inFlightMap to the status tracker
     if (mInFlightMap.size() == 0) {
-        // hold mLock to prevent race with disconnect
-        Mutex::Autolock l(mLock);
+        // Hold a separate dedicated tracker lock to prevent race with disconnect and also
+        // avoid a deadlock during reprocess requests.
+        Mutex::Autolock l(mTrackerLock);
         if (mStatusTracker != nullptr) {
             mStatusTracker->markComponentIdle(mInFlightStatusId, Fence::NO_FENCE);
         }
