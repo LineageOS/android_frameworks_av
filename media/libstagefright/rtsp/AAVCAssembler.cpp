@@ -62,7 +62,8 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     const int32_t jitterTime = source->mClockRate / 5;  // 200ms
     int32_t expiredTimeInJb = rtpTime + jitterTime;
     bool isExpired = expiredTimeInJb <= (playedTimeRtp);
-    bool isTooLate = expiredTimeInJb < (playedTimeRtp - jitterTime);
+    bool isTooLate200 = expiredTimeInJb < (playedTimeRtp - jitterTime);
+    bool isTooLate300 = expiredTimeInJb < (playedTimeRtp - (jitterTime * 3 / 2));
     ALOGV("start=%lld, now=%lld, played=%lld", (long long)startTime,
             (long long)nowTime, (long long)playedTime);
     ALOGV("rtp-time(JB)=%d, played-rtp-time(JB)=%d, expired-rtp-time(JB)=%d isExpired=%d",
@@ -73,8 +74,11 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
         return NOT_ENOUGH_DATA;
     }
 
-    if (isTooLate) {
-        ALOGV("buffer arrived too lately..");
+    if (isTooLate200)
+        ALOGW("=== WARNING === buffer arrived 200ms late. === WARNING === ");
+
+    if (isTooLate300) {
+        ALOGW("buffer arrived too late. 300ms..");
         ALOGW("start=%lld, now=%lld, played=%lld", (long long)startTime,
                 (long long)nowTime, (long long)playedTime);
         ALOGW("rtp-time(JB)=%d, plyed-rtp-time(JB)=%d, exp-rtp-time(JB)=%d diff=%lld isExpired=%d",
