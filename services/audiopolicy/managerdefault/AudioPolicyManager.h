@@ -377,10 +377,6 @@ protected:
                            int delayMs = 0,
                            audio_devices_t device = (audio_devices_t)0);
 
-        // handle special cases for sonification strategy while in call: mute streams or replace by
-        // a special tone in the device used for communication
-        void handleIncallSonification(audio_stream_type_t stream, bool starting, bool stateChange);
-
         audio_mode_t getPhoneState();
 
         // true if device is in a telephony or VoIP call

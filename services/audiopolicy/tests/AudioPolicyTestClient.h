@@ -60,9 +60,6 @@ public:
                        int /*delayMs*/) override { }
     String8 getParameters(audio_io_handle_t /*ioHandle*/,
                           const String8& /*keys*/) override { return String8(); }
-    status_t startTone(audio_policy_tone_t /*tone*/,
-                       audio_stream_type_t /*stream*/) override { return NO_INIT; }
-    status_t stopTone() override { return NO_INIT; }
     status_t setVoiceVolume(float /*volume*/, int /*delayMs*/) override { return NO_INIT; }
     status_t moveEffects(audio_session_t /*session*/,
                          audio_io_handle_t /*srcOutput*/,
