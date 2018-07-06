@@ -1335,7 +1335,8 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
         ALOGV("adding %s: itemId %d", image.isGrid() ? "grid" : "image", info.itemId);
 
         if (image.isGrid()) {
-            if (size > 12) {
+            // ImageGrid struct is at least 8-byte, at most 12-byte (if flags&1)
+            if (size < 8 || size > 12) {
                 return ERROR_MALFORMED;
             }
             uint8_t buf[12];

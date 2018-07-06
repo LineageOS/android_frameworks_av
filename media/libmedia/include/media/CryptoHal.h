@@ -79,7 +79,20 @@ private:
      */
     status_t mInitCheck;
 
-    KeyedVector<int32_t, uint32_t> mHeapBases;
+    struct HeapBase {
+        HeapBase() : mBufferId(0), mSize(0) {}
+        HeapBase(uint32_t bufferId, size_t size) :
+            mBufferId(bufferId), mSize(size) {}
+
+        uint32_t getBufferId() const {return mBufferId;}
+        size_t getSize() const {return mSize;}
+
+    private:
+        uint32_t mBufferId;
+        size_t mSize;
+    };
+
+    KeyedVector<int32_t, HeapBase> mHeapBases;
     uint32_t mNextBufferId;
     int32_t mHeapSeqNum;
 
