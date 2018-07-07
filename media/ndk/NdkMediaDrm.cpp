@@ -309,6 +309,7 @@ media_status_t AMediaDrm_getKeyRequest(AMediaDrm *mObj, const AMediaDrmScope *sc
     }
     String8 defaultUrl;
     DrmPlugin::KeyRequestType keyRequestType;
+    mObj->mKeyRequest.clear();
     status_t status = mObj->mDrm->getKeyRequest(*iter, mdInit, String8(mimeType),
             mdKeyType, mdOptionalParameters, mObj->mKeyRequest, defaultUrl,
             &keyRequestType);
