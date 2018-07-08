@@ -336,6 +336,7 @@ hardware::Return<void> CameraProviderManager::onRegistration(
         const hardware::hidl_string& /*fqName*/,
         const hardware::hidl_string& name,
         bool /*preexisting*/) {
+    std::lock_guard<std::mutex> providerLock(mProviderLifecycleLock);
     {
         std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
@@ -458,6 +459,7 @@ status_t CameraProviderManager::addProviderLocked(const std::string& newProvider
 }
 
 status_t CameraProviderManager::removeProvider(const std::string& provider) {
+    std::lock_guard<std::mutex> providerLock(mProviderLifecycleLock);
     std::unique_lock<std::mutex> lock(mInterfaceMutex);
     std::vector<String8> removedDeviceIds;
     status_t res = NAME_NOT_FOUND;
