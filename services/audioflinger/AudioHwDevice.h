@@ -35,6 +35,9 @@ public:
     enum Flags {
         AHWD_CAN_SET_MASTER_VOLUME  = 0x1,
         AHWD_CAN_SET_MASTER_MUTE    = 0x2,
+        // Means that this isn't a terminal module, and software patches
+        // are used to transport audio data further.
+        AHWD_IS_INSERT              = 0x4,
     };
 
     AudioHwDevice(audio_module_handle_t handle,
@@ -53,6 +56,10 @@ public:
 
     bool canSetMasterMute() const {
         return (0 != (mFlags & AHWD_CAN_SET_MASTER_MUTE));
+    }
+
+    bool isInsert() const {
+        return (0 != (mFlags & AHWD_IS_INSERT));
     }
 
     audio_module_handle_t handle() const { return mHandle; }

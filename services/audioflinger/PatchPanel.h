@@ -19,9 +19,31 @@
     #error This header file should only be included from AudioFlinger.h
 #endif
 
+
 // PatchPanel is concealed within AudioFlinger, their lifetimes are the same.
 class PatchPanel {
 public:
+    class SoftwarePatch {
+      public:
+        SoftwarePatch(const PatchPanel &patchPanel, audio_patch_handle_t patchHandle,
+                audio_io_handle_t playbackThreadHandle, audio_io_handle_t recordThreadHandle)
+                : mPatchPanel(patchPanel), mPatchHandle(patchHandle),
+                  mPlaybackThreadHandle(playbackThreadHandle),
+                  mRecordThreadHandle(recordThreadHandle) {}
+        SoftwarePatch(const SoftwarePatch&) = default;
+        SoftwarePatch& operator=(const SoftwarePatch&) = default;
+
+        // Must be called under AudioFlinger::mLock
+        status_t getLatencyMs_l(double *latencyMs) const;
+        audio_io_handle_t getPlaybackThreadHandle() const { return mPlaybackThreadHandle; };
+        audio_io_handle_t getRecordThreadHandle() const { return mRecordThreadHandle; };
+      private:
+        const PatchPanel &mPatchPanel;
+        const audio_patch_handle_t mPatchHandle;
+        const audio_io_handle_t mPlaybackThreadHandle;
+        const audio_io_handle_t mRecordThreadHandle;
+    };
+
     explicit PatchPanel(AudioFlinger* audioFlinger) : mAudioFlinger(*audioFlinger) {}
 
     /* List connected audio ports and their attributes */
@@ -42,7 +64,16 @@ public:
     status_t listAudioPatches(unsigned int *num_patches,
                                       struct audio_patch *patches);
 
-    void dump(int fd);
+    // Retrieves all currently estrablished software patches for a stream
+    // opened on an intermediate module.
+    status_t getDownstreamSoftwarePatches(audio_io_handle_t stream,
+            std::vector<SoftwarePatch> *patches) const;
+
+    // Notifies patch panel about all opened and closed streams.
+    void notifyStreamOpened(AudioHwDevice *audioHwDevice, audio_io_handle_t stream);
+    void notifyStreamClosed(audio_io_handle_t stream);
+
+    void dump(int fd) const;
 
 private:
     template<typename ThreadType, typename TrackType>
@@ -65,6 +96,7 @@ private:
         audio_patch_handle_t handle() const { return mHandle; }
         sp<ThreadType> thread() { return mThread; }
         sp<TrackType> track() { return mTrack; }
+        sp<const ThreadType> const_thread() const { return mThread; }
         sp<const TrackType> const_track() const { return mTrack; }
 
         void closeConnections(PatchPanel *panel) {
@@ -122,7 +154,7 @@ private:
         // returns the latency of the patch (from record to playback).
         status_t getLatencyMs(double *latencyMs) const;
 
-        String8 dump(audio_patch_handle_t myHandle);
+        String8 dump(audio_patch_handle_t myHandle) const;
 
         // Note that audio_patch::id is only unique within a HAL module
         struct audio_patch              mAudioPatch;
@@ -138,8 +170,38 @@ private:
         Endpoint<RecordThread, RecordThread::PatchRecord> mRecord;
     };
 
+    AudioHwDevice* findAudioHwDeviceByModule(audio_module_handle_t module);
     sp<DeviceHalInterface> findHwDeviceByModule(audio_module_handle_t module);
+    void addSoftwarePatchToInsertedModules(
+            audio_module_handle_t module, audio_patch_handle_t handle);
+    void removeSoftwarePatchFromInsertedModules(audio_patch_handle_t handle);
 
     AudioFlinger &mAudioFlinger;
     std::map<audio_patch_handle_t, Patch> mPatches;
+
+    // This map allows going from a thread to "downstream" software patches
+    // when a processing module inserted in between. Example:
+    //
+    //  from map value.streams                               map key
+    //  [Mixer thread] --> [Virtual output device] --> [Processing module] ---\
+    //       [Harware module] <-- [Physical output device] <-- [S/W Patch] <--/
+    //                                                 from map value.sw_patches
+    //
+    // This allows the mixer thread to look up the threads of the software patch
+    // for propagating timing info, parameters, etc.
+    //
+    // The current assumptions are:
+    //   1) The processing module acts as a mixer with several outputs which
+    //      represent differently downmixed and / or encoded versions of the same
+    //      mixed stream. There is no 1:1 correspondence between the input streams
+    //      and the software patches, but rather a N:N correspondence between
+    //      a group of streams and a group of patches.
+    //   2) There are only a couple of inserted processing modules in the system,
+    //      so when looking for a stream or patch handle we can iterate over
+    //      all modules.
+    struct ModuleConnections {
+        std::set<audio_io_handle_t> streams;
+        std::set<audio_patch_handle_t> sw_patches;
+    };
+    std::map<audio_module_handle_t, ModuleConnections> mInsertedModules;
 };
