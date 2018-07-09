@@ -110,9 +110,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
     status_t status = NO_ERROR;
     audio_patch_handle_t halHandle = AUDIO_PATCH_HANDLE_NONE;
 
-    if (patch->num_sources == 0 || patch->num_sources > AUDIO_PATCH_PORTS_MAX ||
-            (patch->num_sinks == 0 && patch->num_sources != 2) ||
-            patch->num_sinks > AUDIO_PATCH_PORTS_MAX) {
+    if (!audio_patch_is_valid(patch) || (patch->num_sinks == 0 && patch->num_sources != 2)) {
         return BAD_VALUE;
     }
     // limit number of sources to 1 for now or 2 sources for special cross hw module case.
