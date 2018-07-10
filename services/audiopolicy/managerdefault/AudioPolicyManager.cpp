@@ -801,39 +801,53 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
         stream_type_to_audio_attributes(*stream, &attributes);
     }
 
-    // TODO: check for existing client for this port ID
-    if (*portId == AUDIO_PORT_HANDLE_NONE) {
-        *portId = AudioPort::getNextUniqueId();
-    }
-
-    sp<SwAudioOutputDescriptor> desc;
-    if (mPolicyMixes.getOutputForAttr(attributes, uid, desc) == NO_ERROR) {
-        ALOG_ASSERT(desc != 0, "Invalid desc returned by getOutputForAttr");
-        if (!audio_has_proportional_frames(config->format)) {
-            return BAD_VALUE;
-        }
-        *stream = streamTypefromAttributesInt(&attributes);
-        *output = desc->mIoHandle;
-        ALOGV("getOutputForAttr() returns output %d", *output);
-        return NO_ERROR;
-    }
-    if (attributes.usage == AUDIO_USAGE_VIRTUAL_SOURCE) {
-        ALOGW("getOutputForAttr() no policy mix found for usage AUDIO_USAGE_VIRTUAL_SOURCE");
-        return BAD_VALUE;
-    }
-
     ALOGV("getOutputForAttr() usage=%d, content=%d, tag=%s flags=%08x"
             " session %d selectedDeviceId %d",
             attributes.usage, attributes.content_type, attributes.tags, attributes.flags,
             session, *selectedDeviceId);
 
-    *stream = streamTypefromAttributesInt(&attributes);
+    // TODO: check for existing client for this port ID
+    if (*portId == AUDIO_PORT_HANDLE_NONE) {
+        *portId = AudioPort::getNextUniqueId();
+    }
 
-    // Explicit routing?
+    // First check for explicit routing (eg. setPreferredDevice)
     sp<DeviceDescriptor> deviceDesc;
     if (*selectedDeviceId != AUDIO_PORT_HANDLE_NONE) {
         deviceDesc = mAvailableOutputDevices.getDeviceFromId(*selectedDeviceId);
+    } else {
+        // If no explict route, is there a matching dynamic policy that applies?
+        sp<SwAudioOutputDescriptor> desc;
+        if (mPolicyMixes.getOutputForAttr(attributes, uid, desc) == NO_ERROR) {
+            ALOG_ASSERT(desc != 0, "Invalid desc returned by getOutputForAttr");
+            if (!audio_has_proportional_frames(config->format)) {
+                return BAD_VALUE;
+            }
+            *stream = streamTypefromAttributesInt(&attributes);
+            *output = desc->mIoHandle;
+            ALOGV("getOutputForAttr() returns output %d", *output);
+            return NO_ERROR;
+        }
+
+        // Virtual sources must always be dynamicaly or explicitly routed
+        if (attributes.usage == AUDIO_USAGE_VIRTUAL_SOURCE) {
+            ALOGW("getOutputForAttr() no policy mix found for usage AUDIO_USAGE_VIRTUAL_SOURCE");
+            return BAD_VALUE;
+        }
     }
+
+    // Virtual sources must always be dynamicaly or explicitly routed
+    if (attributes.usage == AUDIO_USAGE_VIRTUAL_SOURCE) {
+        ALOGW("getOutputForAttr() no policy mix found for usage AUDIO_USAGE_VIRTUAL_SOURCE");
+        return BAD_VALUE;
+    }
+
+    *stream = streamTypefromAttributesInt(&attributes);
+
+    // TODO:  Should this happen only if an explicit route is active?
+    // the previous code structure meant that this would always happen which
+    // would appear to result in adding a null deviceDesc when not using an
+    // explicit route.  Is that the intended and necessary behavior?
     mOutputRoutes.addRoute(session, *stream, SessionRoute::SOURCE_TYPE_NA, deviceDesc, uid);
 
     routing_strategy strategy = (routing_strategy) getStrategyForAttr(&attributes);
