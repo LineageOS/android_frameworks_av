@@ -1924,6 +1924,10 @@ status_t StagefrightRecorder::setupVideoEncoder(
         format->setInt32("stride", stride);
         format->setInt32("slice-height", sliceHeight);
         format->setInt32("color-format", colorFormat);
+        if (mOutputFormat == OUTPUT_FORMAT_RTP_AVP) {
+            // This indicates that a raw image provided to encoder needs to be rotated.
+            format->setInt32("rotation-degrees", mRotationDegrees);
+        }
     } else {
         format->setInt32("width", mVideoWidth);
         format->setInt32("height", mVideoHeight);

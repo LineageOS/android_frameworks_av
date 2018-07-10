@@ -4117,6 +4117,29 @@ status_t ACodec::setupVideoEncoder(
         ALOGI("setupVideoEncoder succeeded");
     }
 
+    // Video should be encoded as stand straight because RTP protocol
+    // can provide rotation information only if CVO is supported.
+    // This needs to be added to support non-CVO case for video streaming scenario.
+    int32_t rotation = 0;
+    if (msg->findInt32("rotation-degrees", &rotation)) {
+        OMX_CONFIG_ROTATIONTYPE config;
+        InitOMXParams(&config);
+        config.nPortIndex = kPortIndexOutput;
+        status_t err = mOMXNode->getConfig(
+                (OMX_INDEXTYPE)OMX_IndexConfigCommonRotate, &config, sizeof(config));
+        if (err != OK) {
+            ALOGW("Failed to getConfig of OMX_IndexConfigCommonRotate(err %d)", err);
+        }
+        config.nRotation = rotation;
+        err = mOMXNode->setConfig(
+                (OMX_INDEXTYPE)OMX_IndexConfigCommonRotate, &config, sizeof(config));
+
+        ALOGD("Applying encoder-rotation=[%d] to video encoder.", config.nRotation);
+        if (err != OK) {
+            ALOGW("Failed to setConfig of OMX_IndexConfigCommonRotate(err %d)", err);
+        }
+    }
+
     return err;
 }
 
