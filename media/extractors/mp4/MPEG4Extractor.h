@@ -141,6 +141,8 @@ private:
 
     status_t parseAC3SampleEntry(off64_t offset);
     status_t parseAC3SpecificBox(off64_t offset, uint16_t sampleRate);
+    status_t parseAC4SampleEntry(off64_t offset);
+    status_t parseAC4SpecificBox(off64_t offset);
 
     MPEG4Extractor(const MPEG4Extractor &);
     MPEG4Extractor &operator=(const MPEG4Extractor &);
