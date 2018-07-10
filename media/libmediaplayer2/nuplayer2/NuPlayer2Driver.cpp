@@ -36,6 +36,9 @@
 
 #include <media/IMediaAnalyticsService.h>
 
+using google::protobuf::RepeatedPtrField;
+using android::media::MediaPlayer2Proto::Value;
+
 static const int kDumpLockRetries = 50;
 static const int kDumpLockSleepUs = 20000;
 
@@ -591,34 +594,30 @@ status_t NuPlayer2Driver::setLooping(int loop) {
     return OK;
 }
 
-status_t NuPlayer2Driver::invoke(const Parcel &request, Parcel *reply) {
-    if (reply == NULL) {
+status_t NuPlayer2Driver::invoke(const PlayerMessage &request, PlayerMessage *response) {
+    if (response == NULL) {
         ALOGE("reply is a NULL pointer");
         return BAD_VALUE;
     }
 
-    int32_t methodId;
-    status_t ret = request.readInt32(&methodId);
-    if (ret != OK) {
-        ALOGE("Failed to retrieve the requested method to invoke, err(%d)", ret);
-        return ret;
-    }
+    RepeatedPtrField<const Value>::const_iterator it = request.values().cbegin();
+    int32_t methodId = (it++)->int32_value();
 
     switch (methodId) {
         case MEDIA_PLAYER2_INVOKE_ID_SET_VIDEO_SCALING_MODE:
         {
-            int mode = request.readInt32();
+            int mode = (it++)->int32_value();
             return mPlayer->setVideoScalingMode(mode);
         }
 
         case MEDIA_PLAYER2_INVOKE_ID_GET_TRACK_INFO:
         {
-            return mPlayer->getTrackInfo(reply);
+            return mPlayer->getTrackInfo(response);
         }
 
         case MEDIA_PLAYER2_INVOKE_ID_SELECT_TRACK:
         {
-            int trackIndex = request.readInt32();
+            int trackIndex = (it++)->int32_value();
             int64_t msec = 0;
             // getCurrentPosition should always return OK
             getCurrentPosition(&msec);
@@ -627,14 +626,14 @@ status_t NuPlayer2Driver::invoke(const Parcel &request, Parcel *reply) {
 
         case MEDIA_PLAYER2_INVOKE_ID_UNSELECT_TRACK:
         {
-            int trackIndex = request.readInt32();
+            int trackIndex = (it++)->int32_value();
             return mPlayer->selectTrack(trackIndex, false /* select */, 0xdeadbeef /* not used */);
         }
 
         case MEDIA_PLAYER2_INVOKE_ID_GET_SELECTED_TRACK:
         {
-            int32_t type = request.readInt32();
-            return mPlayer->getSelectedTrack(type, reply);
+            int32_t type = (it++)->int32_value();
+            return mPlayer->getSelectedTrack(type, response);
         }
 
         default:

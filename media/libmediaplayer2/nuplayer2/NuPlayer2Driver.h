@@ -56,7 +56,7 @@ struct NuPlayer2Driver : public MediaPlayer2Interface {
     virtual status_t reset() override;
     virtual status_t notifyAt(int64_t mediaTimeUs) override;
     virtual status_t setLooping(int loop) override;
-    virtual status_t invoke(const Parcel &request, Parcel *reply) override;
+    virtual status_t invoke(const PlayerMessage &request, PlayerMessage *response) override;
     virtual void setAudioSink(const sp<AudioSink> &audioSink) override;
     virtual status_t setParameter(int key, const Parcel &request) override;
     virtual status_t getParameter(int key, Parcel *reply) override;

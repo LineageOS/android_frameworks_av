@@ -584,9 +584,8 @@ void NuPlayer2::seekToAsync(int64_t seekTimeUs, MediaPlayer2SeekMode mode, bool 
     msg->post();
 }
 
-
 void NuPlayer2::writeTrackInfo(
-        Parcel* reply, const sp<AMessage>& format) const {
+        PlayerMessage* reply, const sp<AMessage>& format) const {
     if (format == NULL) {
         ALOGE("NULL format");
         return;
@@ -619,10 +618,9 @@ void NuPlayer2::writeTrackInfo(
         return;
     }
 
-    reply->writeInt32(2); // write something non-zero
-    reply->writeInt32(trackType);
-    reply->writeString16(String16(mime.c_str()));
-    reply->writeString16(String16(lang.c_str()));
+    reply->add_values()->set_int32_value(trackType);
+    reply->add_values()->set_string_value(mime.c_str());
+    reply->add_values()->set_string_value(lang.c_str());
 
     if (trackType == MEDIA_TRACK_TYPE_SUBTITLE) {
         int32_t isAuto, isDefault, isForced;
@@ -630,9 +628,9 @@ void NuPlayer2::writeTrackInfo(
         CHECK(format->findInt32("default", &isDefault));
         CHECK(format->findInt32("forced", &isForced));
 
-        reply->writeInt32(isAuto);
-        reply->writeInt32(isDefault);
-        reply->writeInt32(isForced);
+        reply->add_values()->set_int32_value(isAuto);
+        reply->add_values()->set_int32_value(isDefault);
+        reply->add_values()->set_int32_value(isForced);
     }
 }
 
@@ -764,7 +762,7 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
 
-            Parcel* reply;
+            PlayerMessage* reply;
             CHECK(msg->findPointer("reply", (void**)&reply));
 
             size_t inbandTracks = 0;
@@ -778,7 +776,7 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             // total track count
-            reply->writeInt32(inbandTracks + ccTracks);
+            reply->add_values()->set_int32_value(inbandTracks + ccTracks);
 
             // write inband tracks
             for (size_t i = 0; i < inbandTracks; ++i) {
@@ -806,9 +804,9 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
                 media_track_type type = (media_track_type)type32;
                 ssize_t selectedTrack = mSource->getSelectedTrack(type);
 
-                Parcel* reply;
+                PlayerMessage* reply;
                 CHECK(msg->findPointer("reply", (void**)&reply));
-                reply->writeInt32(selectedTrack);
+                reply->add_values()->set_int32_value(selectedTrack);
             }
 
             sp<AMessage> response = new AMessage;
@@ -2231,7 +2229,7 @@ status_t NuPlayer2::setVideoScalingMode(int32_t mode) {
     return OK;
 }
 
-status_t NuPlayer2::getTrackInfo(Parcel* reply) const {
+status_t NuPlayer2::getTrackInfo(PlayerMessage* reply) const {
     sp<AMessage> msg = new AMessage(kWhatGetTrackInfo, this);
     msg->setPointer("reply", reply);
 
@@ -2240,7 +2238,7 @@ status_t NuPlayer2::getTrackInfo(Parcel* reply) const {
     return err;
 }
 
-status_t NuPlayer2::getSelectedTrack(int32_t type, Parcel* reply) const {
+status_t NuPlayer2::getSelectedTrack(int32_t type, PlayerMessage* reply) const {
     sp<AMessage> msg = new AMessage(kWhatGetSelectedTrack, this);
     msg->setPointer("reply", reply);
     msg->setInt32("type", type);
