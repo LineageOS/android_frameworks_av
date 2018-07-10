@@ -5541,7 +5541,14 @@ status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
         float voiceVolume;
         // Force voice volume to max for bluetooth SCO as volume is managed by the headset
         if (stream == AUDIO_STREAM_VOICE_CALL) {
-            voiceVolume = (float)index/(float)mVolumeCurves->getVolumeIndexMax(stream);
+            // FIXME: issue 111194621: this should not happen
+            int maxIndex = mVolumeCurves->getVolumeIndexMax(stream);
+            if (index > maxIndex) {
+                ALOGW("%s limiting voice call index %d to max index %d",
+                      __FUNCTION__, index, maxIndex);
+                index = maxIndex;
+            }
+            voiceVolume = (float)index/(float)maxIndex;
         } else {
             voiceVolume = 1.0;
         }
