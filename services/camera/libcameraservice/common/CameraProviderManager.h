@@ -246,6 +246,9 @@ private:
     wp<StatusListener> mListener;
     ServiceInteractionProxy* mServiceProxy;
 
+    // mProviderLifecycleLock is locked during onRegistration and removeProvider
+    mutable std::mutex mProviderLifecycleLock;
+
     static HardwareServiceInteractionProxy sHardwareServiceInteractionProxy;
 
     struct ProviderInfo :
