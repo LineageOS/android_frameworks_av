@@ -254,7 +254,7 @@ inline double logRound(double x, double mean) {
 // of PerformanceAnalysis
 void PerformanceAnalysis::reportPerformance(String8 *body, int author, log_hash_t hash,
                                             int maxHeight) {
-    if (mHists.empty()) {
+    if (mHists.empty() || body == nullptr) {
         return;
     }
 
@@ -273,10 +273,13 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int author, log_hash_
         }
     }
 
-    // underscores and spaces length corresponds to maximum width of histogram
-    static const int kLen = 200;
-    std::string underscores(kLen, '_');
-    std::string spaces(kLen, ' ');
+    static const int SIZE = 128;
+    char title[SIZE];
+    snprintf(title, sizeof(title), "\n%s %3.2f %s\n%s%d, %lld, %lld\n",
+            "Occurrences in", (elapsedMs / kMsPerSec), "seconds of audio:",
+            "Thread, hash, starting timestamp: ", author,
+            static_cast<long long>(hash), static_cast<long long>(startingTs));
+    static const char * const kLabel = "ms";
 
     auto it = buckets.begin();
     double maxDelta = it->first;
@@ -299,11 +302,7 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int author, log_hash_
         scalingFactor = (height + maxHeight) / maxHeight;
         height /= scalingFactor;
     }
-    body->appendFormat("\n%*s %3.2f %s", leftPadding + 11,
-            "Occurrences in", (elapsedMs / kMsPerSec), "seconds of audio:");
-    body->appendFormat("\n%*s%d, %lld, %lld\n", leftPadding + 11,
-            "Thread, hash, starting timestamp: ", author,
-            static_cast<long long int>(hash), static_cast<long long int>(startingTs));
+    body->appendFormat("%s", title);
     // write histogram label line with bucket values
     body->appendFormat("\n%s", " ");
     body->appendFormat("%*s", leftPadding, " ");
@@ -312,6 +311,11 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int author, log_hash_
         body->appendFormat("%*d", colWidth, x.second);
     }
     // write histogram ascii art
+    // underscores and spaces length corresponds to maximum width of histogram
+    static const int kLen = 200;
+    static const std::string underscores(kLen, '_');
+    static const std::string spaces(kLen, ' ');
+
     body->appendFormat("\n%s", " ");
     for (int row = height * scalingFactor; row >= 0; row -= scalingFactor) {
         const int value = 1 << row;
@@ -335,7 +339,7 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int author, log_hash_
         const int colWidth = numberWidth(x.first, leftPadding);
         body->appendFormat("%*.*f", colWidth, 1, x.first);
     }
-    body->appendFormat("%.*s%s", bucketWidth, spaces.c_str(), "ms\n");
+    body->appendFormat("%.*s%s\n", bucketWidth, spaces.c_str(), kLabel);
 
     // Now report glitches
     body->appendFormat("\ntime elapsed between glitches and glitch timestamps:\n");
