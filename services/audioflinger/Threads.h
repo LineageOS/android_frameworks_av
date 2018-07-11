@@ -1224,6 +1224,23 @@ public:
     virtual     bool        hasFastMixer() const { return false; }
 
     virtual     int64_t     computeWaitTimeNs_l() const override;
+
+    status_t    threadloop_getHalTimestamp_l(ExtendedTimestamp *timestamp) const override {
+                    // For DIRECT and OFFLOAD threads, query the output sink directly.
+                    if (mOutput != nullptr) {
+                        uint64_t uposition64;
+                        struct timespec time;
+                        if (mOutput->getPresentationPosition(
+                                &uposition64, &time) == OK) {
+                            timestamp->mPosition[ExtendedTimestamp::LOCATION_KERNEL]
+                                    = (int64_t)uposition64;
+                            timestamp->mTimeNs[ExtendedTimestamp::LOCATION_KERNEL]
+                                    = audio_utils_ns_from_timespec(&time);
+                            return NO_ERROR;
+                        }
+                    }
+                    return INVALID_OPERATION;
+                }
 };
 
 class OffloadThread : public DirectOutputThread {

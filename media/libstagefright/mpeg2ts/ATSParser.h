@@ -142,6 +142,7 @@ struct ATSParser : public RefBase {
         STREAMTYPE_MPEG2_VIDEO          = 0x02,
         STREAMTYPE_MPEG1_AUDIO          = 0x03,
         STREAMTYPE_MPEG2_AUDIO          = 0x04,
+        STREAMTYPE_PES_PRIVATE_DATA     = 0x06,
         STREAMTYPE_MPEG2_AUDIO_ADTS     = 0x0f,
         STREAMTYPE_MPEG4_VIDEO          = 0x10,
         STREAMTYPE_METADATA             = 0x15,
@@ -158,6 +159,20 @@ struct ATSParser : public RefBase {
         STREAMTYPE_H264_ENCRYPTED       = 0xDB,
         STREAMTYPE_AAC_ENCRYPTED        = 0xCF,
         STREAMTYPE_AC3_ENCRYPTED        = 0xC1,
+    };
+
+    enum {
+        // From ISO/IEC 13818-1: 2007 (E), Table 2-29
+        DESCRIPTOR_CA                   = 0x09,
+
+        // DVB BlueBook A038 Table 12
+        DESCRIPTOR_DVB_EXTENSION        = 0x7F,
+    };
+
+    // DVB BlueBook A038 Table 109
+    enum {
+        EXT_DESCRIPTOR_DVB_AC4              = 0x15,
+        EXT_DESCRIPTOR_DVB_RESERVED_MAX     = 0x7F,
     };
 
 protected:

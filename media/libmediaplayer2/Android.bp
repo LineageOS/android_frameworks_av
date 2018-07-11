@@ -9,6 +9,7 @@ cc_library {
 
     srcs: [
         "JAudioTrack.cpp",
+        "JavaVMHelper.cpp",
         "MediaPlayer2AudioOutput.cpp",
         "mediaplayer2.cpp",
     ],
@@ -47,6 +48,10 @@ cc_library {
 
     header_libs: [
         "media_plugin_headers",
+    ],
+
+    include_dirs: [
+        "frameworks/base/core/jni",
     ],
 
     static_libs: [
