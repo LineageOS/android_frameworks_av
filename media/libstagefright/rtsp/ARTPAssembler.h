@@ -55,6 +55,9 @@ protected:
     static sp<ABuffer> MakeCompoundFromPackets(
             const List<sp<ABuffer> > &frames);
 
+    int32_t mShowQueueCnt;
+    void showCurrentQueue(List<sp<ABuffer> > *queue);
+
 private:
     int64_t mFirstFailureTimeUs;
 

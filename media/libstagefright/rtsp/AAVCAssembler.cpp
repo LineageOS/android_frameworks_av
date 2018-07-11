@@ -64,6 +64,16 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     bool isExpired = expiredTimeInJb <= (playedTimeRtp);
     bool isTooLate200 = expiredTimeInJb < (playedTimeRtp - jitterTime);
     bool isTooLate300 = expiredTimeInJb < (playedTimeRtp - (jitterTime * 3 / 2));
+
+    if (mShowQueueCnt < 20) {
+        showCurrentQueue(queue);
+        ALOGD("start=%lld, now=%lld, played=%lld", (long long)startTime,
+                (long long)nowTime, (long long)playedTime);
+        ALOGD("rtp-time(JB)=%d, played-rtp-time(JB)=%d, expired-rtp-time(JB)=%d isExpired=%d",
+                rtpTime, playedTimeRtp, expiredTimeInJb, isExpired);
+        mShowQueueCnt++;
+    }
+
     ALOGV("start=%lld, now=%lld, played=%lld", (long long)startTime,
             (long long)nowTime, (long long)playedTime);
     ALOGV("rtp-time(JB)=%d, played-rtp-time(JB)=%d, expired-rtp-time(JB)=%d isExpired=%d",
