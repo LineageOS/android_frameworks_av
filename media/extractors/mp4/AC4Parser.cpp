@@ -577,14 +577,14 @@ bool AC4DSIParser::parse() {
                 BYTE_ALIGN;
                 CHECK_BITS_LEFT(16);
                 uint32_t name_len = mBitReader.getBits(16);
-                char* presentation_name = new char[name_len+1];
                 CHECK_BITS_LEFT(name_len * 8);
+                std::string &presentation_name =
+                    mPresentations[presentation].mDescription;
+                presentation_name.clear();
+                presentation_name.resize(name_len);
                 for (uint32_t i = 0; i < name_len; i++) {
                     presentation_name[i] = (char)(mBitReader.getBits(8));
                 }
-                presentation_name[name_len] = '\0';
-                std::string description(presentation_name, name_len);
-                mPresentations[presentation].mDescription = description;
                 CHECK_BITS_LEFT(5);
                 uint32_t n_targets = mBitReader.getBits(5);
                 CHECK_BITS_LEFT(n_targets * (3 + 8));
