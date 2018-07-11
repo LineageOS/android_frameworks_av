@@ -101,6 +101,7 @@ class Camera3Device :
     status_t disconnect() override;
     status_t dump(int fd, const Vector<String16> &args) override;
     const CameraMetadata& info() const override;
+    const CameraMetadata& info(const String8& physicalId) const override;
 
     // Capture and setStreamingRequest will configure streams if currently in
     // idle state
@@ -380,6 +381,7 @@ class Camera3Device :
     sp<HalInterface> mInterface;
 
     CameraMetadata             mDeviceInfo;
+    std::unordered_map<std::string, CameraMetadata> mPhysicalDeviceInfoMap;
 
     CameraMetadata             mRequestTemplateCache[CAMERA3_TEMPLATE_COUNT];
 
