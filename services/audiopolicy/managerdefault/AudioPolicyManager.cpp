@@ -2265,7 +2265,7 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
         sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
         audio_devices_t curDevice = Volume::getDeviceForVolume(desc->device());
         for (int curStream = 0; curStream < AUDIO_STREAM_FOR_POLICY_CNT; curStream++) {
-            if (!(streamsMatchForvolume(stream, (audio_stream_type_t)curStream) || isInCall())) {
+            if (!(streamsMatchForvolume(stream, (audio_stream_type_t)curStream))) {
                 continue;
             }
             if (!(desc->isStreamActive((audio_stream_type_t)curStream) || isInCall())) {
@@ -2286,13 +2286,15 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
                 applyVolume = !mVolumeCurves->hasVolumeIndexForDevice(
                         stream, curStreamDevice);
             }
-
+            // rescale index before applying to curStream as ranges may be different for
+            // stream and curStream
+            int idx = rescaleVolumeIndex(index, stream, (audio_stream_type_t)curStream);
             if (applyVolume) {
                 //FIXME: workaround for truncated touch sounds
                 // delayed volume change for system stream to be removed when the problem is
                 // handled by system UI
                 status_t volStatus =
-                        checkAndSetVolume((audio_stream_type_t)curStream, index, desc, curDevice,
+                        checkAndSetVolume((audio_stream_type_t)curStream, idx, desc, curDevice,
                             (stream == AUDIO_STREAM_SYSTEM) ? TOUCH_SOUND_FIXED_DELAY_MS : 0);
                 if (volStatus != NO_ERROR) {
                     status = volStatus;
@@ -5499,6 +5501,21 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
     return volumeDB;
 }
 
+int AudioPolicyManager::rescaleVolumeIndex(int srcIndex,
+                                           audio_stream_type_t srcStream,
+                                           audio_stream_type_t dstStream)
+{
+    if (srcStream == dstStream) {
+        return srcIndex;
+    }
+    float minSrc = (float)mVolumeCurves->getVolumeIndexMin(srcStream);
+    float maxSrc = (float)mVolumeCurves->getVolumeIndexMax(srcStream);
+    float minDst = (float)mVolumeCurves->getVolumeIndexMin(dstStream);
+    float maxDst = (float)mVolumeCurves->getVolumeIndexMax(dstStream);
+
+    return (int)(minDst + ((srcIndex - minSrc) * (maxDst - minDst)) / (maxSrc - minSrc));
+}
+
 status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
                                                    int index,
                                                    const sp<AudioOutputDescriptor>& outputDesc,
@@ -5541,14 +5558,7 @@ status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
         float voiceVolume;
         // Force voice volume to max for bluetooth SCO as volume is managed by the headset
         if (stream == AUDIO_STREAM_VOICE_CALL) {
-            // FIXME: issue 111194621: this should not happen
-            int maxIndex = mVolumeCurves->getVolumeIndexMax(stream);
-            if (index > maxIndex) {
-                ALOGW("%s limiting voice call index %d to max index %d",
-                      __FUNCTION__, index, maxIndex);
-                index = maxIndex;
-            }
-            voiceVolume = (float)index/(float)maxIndex;
+            voiceVolume = (float)index/(float)mVolumeCurves->getVolumeIndexMax(stream);
         } else {
             voiceVolume = 1.0;
         }
