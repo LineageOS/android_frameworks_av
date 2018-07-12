@@ -226,6 +226,7 @@ status_t AnotherPacketSource::read(
         int32_t cryptoMode;
         if (buffer->meta()->findInt32("cryptoMode", &cryptoMode)) {
             int32_t cryptoKey;
+            int32_t pesOffset;
             sp<ABuffer> clearBytesBuffer, encBytesBuffer;
 
             CHECK(buffer->meta()->findInt32("cryptoKey", &cryptoKey));
@@ -233,6 +234,8 @@ status_t AnotherPacketSource::read(
                     && clearBytesBuffer != NULL);
             CHECK(buffer->meta()->findBuffer("encBytes", &encBytesBuffer)
                     && encBytesBuffer != NULL);
+            CHECK(buffer->meta()->findInt32("pesOffset", &pesOffset)
+                    && (pesOffset >= 0) && (pesOffset < 65536));
 
             bufmeta.setInt32(kKeyCryptoMode, cryptoMode);
 
@@ -240,6 +243,11 @@ status_t AnotherPacketSource::read(
             bufmeta.setData(kKeyCryptoIV, 0, array, 16);
 
             array[0] = (uint8_t) (cryptoKey & 0xff);
+            // array[1] contains PES header flag, which we don't use.
+            // array[2~3] contain the PES offset.
+            array[2] = (uint8_t) (pesOffset & 0xff);
+            array[3] = (uint8_t) ((pesOffset >> 8) & 0xff);
+
             bufmeta.setData(kKeyCryptoKey, 0, array, 16);
 
             bufmeta.setData(kKeyPlainSizes, 0,
