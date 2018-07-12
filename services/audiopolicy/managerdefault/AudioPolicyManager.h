@@ -353,6 +353,10 @@ protected:
                                     int index,
                                     audio_devices_t device);
 
+        // rescale volume index from srcStream within range of dstStream
+        int rescaleVolumeIndex(int srcIndex,
+                               audio_stream_type_t srcStream,
+                               audio_stream_type_t dstStream);
         // check that volume change is permitted, compute and send new volume to audio hardware
         virtual status_t checkAndSetVolume(audio_stream_type_t stream, int index,
                                            const sp<AudioOutputDescriptor>& outputDesc,
