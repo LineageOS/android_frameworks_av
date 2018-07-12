@@ -555,6 +555,7 @@ ACodec::ACodec()
       mShutdownInProgress(false),
       mExplicitShutdown(false),
       mIsLegacyVP9Decoder(false),
+      mIsStreamCorruptFree(false),
       mEncoderDelay(0),
       mEncoderPadding(0),
       mRotationDegrees(0),
@@ -2304,6 +2305,12 @@ status_t ACodec::configureCodec(
         mChannelMaskPresent = true;
     } else {
         mChannelMaskPresent = false;
+    }
+
+    int32_t isCorruptFree = 0;
+    if (msg->findInt32("corrupt-free", &isCorruptFree)) {
+        mIsStreamCorruptFree = isCorruptFree == 1 ? true : false;
+        ALOGV("corrupt-free=[%d]", mIsStreamCorruptFree);
     }
 
     int32_t maxInputSize;
@@ -5955,6 +5962,12 @@ bool ACodec::BaseState::onOMXEvent(
              mCodec->mComponentName.c_str(), event, data1, data2);
 
         return false;
+    }
+
+    if (mCodec->mIsStreamCorruptFree && data1 == (OMX_U32)OMX_ErrorStreamCorrupt) {
+        ALOGV("[%s] handle OMX_ErrorStreamCorrupt as a normal operation",
+                mCodec->mComponentName.c_str());
+        return true;
     }
 
     ALOGE("[%s] ERROR(0x%08x)", mCodec->mComponentName.c_str(), data1);
