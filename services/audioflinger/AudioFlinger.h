@@ -23,6 +23,8 @@
 #include <mutex>
 #include <deque>
 #include <map>
+#include <memory>
+#include <string>
 #include <vector>
 #include <stdint.h>
 #include <sys/types.h>
@@ -111,6 +113,7 @@ public:
     static const char* getServiceName() ANDROID_API { return "media.audio_flinger"; }
 
     virtual     status_t    dump(int fd, const Vector<String16>& args);
+                std::string getJsonString();
 
     // IAudioFlinger interface, in binder opcode order
     virtual sp<IAudioTrack> createTrack(const CreateTrackInput& input,

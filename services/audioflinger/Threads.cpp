@@ -23,6 +23,8 @@
 #include "Configuration.h"
 #include <math.h>
 #include <fcntl.h>
+#include <memory>
+#include <string>
 #include <linux/futex.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -1758,6 +1760,11 @@ void AudioFlinger::PlaybackThread::dump(int fd, const Vector<String16>& args)
     dumpEffectChains(fd, args);
     dprintf(fd, "  Local log:\n");
     mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
+}
+
+std::string AudioFlinger::PlaybackThread::getJsonString() const
+{
+    return "{}";
 }
 
 void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& args __unused)
@@ -5098,9 +5105,8 @@ void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& ar
         // while we are dumping it.  It may be inconsistent, but it won't mutate!
         // This is a large object so we place it on the heap.
         // FIXME 25972958: Need an intelligent copy constructor that does not touch unused pages.
-        const FastMixerDumpState *copy = new FastMixerDumpState(mFastMixerDumpState);
+        const std::unique_ptr<FastMixerDumpState> copy(new FastMixerDumpState(mFastMixerDumpState));
         copy->dump(fd);
-        delete copy;
 
 #ifdef STATE_QUEUE_DUMP
         // Similar for state queue
@@ -5121,6 +5127,16 @@ void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& ar
     } else {
         dprintf(fd, "  No FastMixer\n");
     }
+}
+
+std::string AudioFlinger::MixerThread::getJsonString() const
+{
+    // Make a non-atomic copy of fast mixer dump state so it won't change underneath us
+    // while we are dumping it.  It may be inconsistent, but it won't mutate!
+    // This is a large object so we place it on the heap.
+    // FIXME 25972958: Need an intelligent copy constructor that does not touch unused pages.
+    return std::unique_ptr<FastMixerDumpState>(new FastMixerDumpState(mFastMixerDumpState))
+        ->getJsonString();
 }
 
 uint32_t AudioFlinger::MixerThread::idleSleepTimeUs() const
@@ -7423,9 +7439,8 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
     // while we are dumping it.  It may be inconsistent, but it won't mutate!
     // This is a large object so we place it on the heap.
     // FIXME 25972958: Need an intelligent copy constructor that does not touch unused pages.
-    const FastCaptureDumpState *copy = new FastCaptureDumpState(mFastCaptureDumpState);
+    std::unique_ptr<FastCaptureDumpState> copy(new FastCaptureDumpState(mFastCaptureDumpState));
     copy->dump(fd);
-    delete copy;
 }
 
 void AudioFlinger::RecordThread::dumpTracks(int fd, const Vector<String16>& args __unused)
