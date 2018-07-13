@@ -354,7 +354,10 @@ static void playSource(sp<MediaSource> &source) {
                     decodeTimesUs.push(delayDecodeUs);
                 }
 
-                if (showProgress && (n++ % 16) == 0) {
+                if (gVerbose) {
+                    MetaDataBase &meta = buffer->meta_data();
+                    fprintf(stdout, "%ld sample format: %s\n", numFrames, meta.toString().c_str());
+                } else if (showProgress && (n++ % 16) == 0) {
                     printf(".");
                     fflush(stdout);
                 }
