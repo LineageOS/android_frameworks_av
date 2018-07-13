@@ -188,7 +188,15 @@ status_t StreamHalHidl::createMmapBuffer(int32_t minSizeFrames,
                     const native_handle *handle = hidlInfo.sharedMemory.handle();
                     if (handle->numFds > 0) {
                         info->shared_memory_fd = handle->data[0];
+                        info->flags = audio_mmap_buffer_flag(hidlInfo.flags);
                         info->buffer_size_frames = hidlInfo.bufferSizeFrames;
+                        // Negative buffer size frame was a hack in O and P to
+                        // indicate that the buffer is shareable to applications
+                        if (info->buffer_size_frames < 0) {
+                            info->buffer_size_frames *= -1;
+                            info->flags = audio_mmap_buffer_flag(
+                                    info->flags | AUDIO_MMAP_APPLICATION_SHAREABLE);
+                        }
                         info->burst_size_frames = hidlInfo.burstSizeFrames;
                         // info->shared_memory_address is not needed in HIDL context
                         info->shared_memory_address = NULL;
