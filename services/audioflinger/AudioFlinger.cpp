@@ -1817,6 +1817,10 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
 
         mHardwareStatus = AUDIO_HW_IDLE;
     }
+    if (strcmp(name, AUDIO_HAL_SERVICE_NAME_MSD) == 0) {
+        // An MSD module is inserted before hardware modules in order to mix encoded streams.
+        flags = static_cast<AudioHwDevice::Flags>(flags | AudioHwDevice::AHWD_IS_INSERT);
+    }
 
     audio_module_handle_t handle = (audio_module_handle_t) nextUniqueId(AUDIO_UNIQUE_ID_USE_MODULE);
     mAudioHwDevs.add(handle, new AudioHwDevice(handle, name, dev, flags));
@@ -2096,6 +2100,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
                       *output, thread.get());
             }
             mPlaybackThreads.add(*output, thread);
+            mPatchPanel.notifyStreamOpened(outHwDev, *output);
             return thread;
         }
     }
@@ -2231,6 +2236,7 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
         const sp<AudioIoDescriptor> ioDesc = new AudioIoDescriptor();
         ioDesc->mIoHandle = output;
         ioConfigChanged(AUDIO_OUTPUT_CLOSED, ioDesc);
+        mPatchPanel.notifyStreamClosed(output);
     }
     // The thread entity (active unit of execution) is no longer running here,
     // but the ThreadBase container still exists.
