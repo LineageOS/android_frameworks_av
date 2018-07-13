@@ -17,6 +17,7 @@
 #pragma once
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <unordered_set>
 
@@ -409,6 +410,13 @@ protected:
 
         // close an input.
         void closeInput(audio_io_handle_t input);
+
+        // runs all the checks required for accomodating changes in devices and outputs
+        // if 'onOutputsChecked' callback is provided, it is executed after the outputs
+        // check via 'checkOutputForAllStrategies'. If the callback returns 'true',
+        // A2DP suspend status is rechecked.
+        void checkForDeviceAndOutputChanges();
+        void checkForDeviceAndOutputChanges(std::function<bool()> onOutputsChecked);
 
         // checks and if necessary changes outputs used for all strategies.
         // must be called every time a condition that affects the output choice for a given strategy
