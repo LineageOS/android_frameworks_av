@@ -17,10 +17,11 @@
 #ifndef _POSIXASYNCIO_H
 #define _POSIXASYNCIO_H
 
+#include <condition_variable>
+#include <mutex>
 #include <sys/cdefs.h>
 #include <sys/types.h>
 #include <time.h>
-#include <thread>
 #include <unistd.h>
 
 /**
@@ -35,10 +36,15 @@ struct aiocb {
     size_t aio_nbytes;
 
     // Used internally
-    std::thread thread;
+    bool read;
+    bool queued;
     ssize_t ret;
     int error;
 
+    std::mutex lock;
+    std::condition_variable cv;
+
+    aiocb();
     ~aiocb();
 };
 
