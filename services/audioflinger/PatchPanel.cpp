@@ -83,6 +83,16 @@ status_t AudioFlinger::listAudioPatches(unsigned int *num_patches,
     return mPatchPanel.listAudioPatches(num_patches, patches);
 }
 
+status_t AudioFlinger::PatchPanel::SoftwarePatch::getLatencyMs_l(double *latencyMs) const
+{
+    const auto& iter = mPatchPanel.mPatches.find(mPatchHandle);
+    if (iter != mPatchPanel.mPatches.end()) {
+        return iter->second.getLatencyMs(latencyMs);
+    } else {
+        return BAD_VALUE;
+    }
+}
+
 /* List connected audio ports and their attributes */
 status_t AudioFlinger::PatchPanel::listAudioPorts(unsigned int *num_ports __unused,
                                 struct audio_port *ports __unused)
@@ -159,21 +169,21 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                 }
             }
             mPatches.erase(iter);
+            removeSoftwarePatchFromInsertedModules(*handle);
         }
     }
 
     Patch newPatch{*patch};
+    audio_module_handle_t insertedModule = AUDIO_MODULE_HANDLE_NONE;
 
     switch (patch->sources[0].type) {
         case AUDIO_PORT_TYPE_DEVICE: {
             audio_module_handle_t srcModule = patch->sources[0].ext.device.hw_module;
-            ssize_t index = mAudioFlinger.mAudioHwDevs.indexOfKey(srcModule);
-            if (index < 0) {
-                ALOGW("%s() bad src hw module %d", __func__, srcModule);
+            AudioHwDevice *audioHwDevice = findAudioHwDeviceByModule(srcModule);
+            if (!audioHwDevice) {
                 status = BAD_VALUE;
                 goto exit;
             }
-            AudioHwDevice *audioHwDevice = mAudioFlinger.mAudioHwDevs.valueAt(index);
             for (unsigned int i = 0; i < patch->num_sinks; i++) {
                 // support only one sink if connection to a mix or across HW modules
                 if ((patch->sinks[i].type == AUDIO_PORT_TYPE_MIX ||
@@ -285,6 +295,9 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                 if (status != NO_ERROR) {
                     goto exit;
                 }
+                if (audioHwDevice->isInsert()) {
+                    insertedModule = audioHwDevice->handle();
+                }
             } else {
                 if (patch->sinks[0].type == AUDIO_PORT_TYPE_MIX) {
                     sp<ThreadBase> thread = mAudioFlinger.checkRecordThread_l(
@@ -364,6 +377,9 @@ exit:
         *handle = (audio_patch_handle_t) mAudioFlinger.nextUniqueId(AUDIO_UNIQUE_ID_USE_PATCH);
         newPatch.mHalHandle = halHandle;
         mPatches.insert(std::make_pair(*handle, std::move(newPatch)));
+        if (insertedModule != AUDIO_MODULE_HANDLE_NONE) {
+            addSoftwarePatchToInsertedModules(insertedModule, *handle);
+        }
         ALOGV("%s() added new patch handle %d halHandle %d", __func__, *handle, halHandle);
     } else {
         newPatch.clearConnections(this);
@@ -511,21 +527,17 @@ status_t AudioFlinger::PatchPanel::Patch::getLatencyMs(double *latencyMs) const
     return OK;
 }
 
-String8 AudioFlinger::PatchPanel::Patch::dump(audio_patch_handle_t myHandle)
+String8 AudioFlinger::PatchPanel::Patch::dump(audio_patch_handle_t myHandle) const
 {
-    String8 result;
-
     // TODO: Consider table dump form for patches, just like tracks.
-    result.appendFormat("Patch %d: thread %p => thread %p",
-            myHandle, mRecord.thread().get(), mPlayback.thread().get());
+    String8 result = String8::format("Patch %d: thread %p => thread %p",
+            myHandle, mRecord.const_thread().get(), mPlayback.const_thread().get());
 
     // add latency if it exists
     double latencyMs;
     if (getLatencyMs(&latencyMs) == OK) {
         result.appendFormat("  latency: %.2lf", latencyMs);
     }
-
-    result.append("\n");
     return result;
 }
 
@@ -596,6 +608,7 @@ status_t AudioFlinger::PatchPanel::releaseAudioPatch(audio_patch_handle_t handle
     }
 
     mPatches.erase(iter);
+    removeSoftwarePatchFromInsertedModules(handle);
     return status;
 }
 
@@ -607,35 +620,114 @@ status_t AudioFlinger::PatchPanel::listAudioPatches(unsigned int *num_patches __
     return NO_ERROR;
 }
 
-sp<DeviceHalInterface> AudioFlinger::PatchPanel::findHwDeviceByModule(audio_module_handle_t module)
+status_t AudioFlinger::PatchPanel::getDownstreamSoftwarePatches(
+        audio_io_handle_t stream,
+        std::vector<AudioFlinger::PatchPanel::SoftwarePatch> *patches) const
+{
+    for (const auto& module : mInsertedModules) {
+        if (module.second.streams.count(stream)) {
+            for (const auto& patchHandle : module.second.sw_patches) {
+                const auto& patch_iter = mPatches.find(patchHandle);
+                if (patch_iter != mPatches.end()) {
+                    const Patch &patch = patch_iter->second;
+                    patches->emplace_back(*this, patchHandle,
+                            patch.mPlayback.const_thread()->id(),
+                            patch.mRecord.const_thread()->id());
+                } else {
+                    ALOGE("Stale patch handle in the cache: %d", patchHandle);
+                }
+            }
+            return OK;
+        }
+    }
+    // The stream is not associated with any of inserted modules.
+    return BAD_VALUE;
+}
+
+void AudioFlinger::PatchPanel::notifyStreamOpened(
+        AudioHwDevice *audioHwDevice, audio_io_handle_t stream)
+{
+    if (audioHwDevice->isInsert()) {
+        mInsertedModules[audioHwDevice->handle()].streams.insert(stream);
+    }
+}
+
+void AudioFlinger::PatchPanel::notifyStreamClosed(audio_io_handle_t stream)
+{
+    for (auto& module : mInsertedModules) {
+        module.second.streams.erase(stream);
+    }
+}
+
+AudioHwDevice* AudioFlinger::PatchPanel::findAudioHwDeviceByModule(audio_module_handle_t module)
 {
     if (module == AUDIO_MODULE_HANDLE_NONE) return nullptr;
     ssize_t index = mAudioFlinger.mAudioHwDevs.indexOfKey(module);
     if (index < 0) {
+        ALOGW("%s() bad hw module %d", __func__, module);
         return nullptr;
     }
-    return mAudioFlinger.mAudioHwDevs.valueAt(index)->hwDevice();
+    return mAudioFlinger.mAudioHwDevs.valueAt(index);
 }
 
-void AudioFlinger::PatchPanel::dump(int fd)
+sp<DeviceHalInterface> AudioFlinger::PatchPanel::findHwDeviceByModule(audio_module_handle_t module)
 {
+    AudioHwDevice *audioHwDevice = findAudioHwDeviceByModule(module);
+    return audioHwDevice ? audioHwDevice->hwDevice() : nullptr;
+}
+
+void AudioFlinger::PatchPanel::addSoftwarePatchToInsertedModules(
+        audio_module_handle_t module, audio_patch_handle_t handle)
+{
+    mInsertedModules[module].sw_patches.insert(handle);
+}
+
+void AudioFlinger::PatchPanel::removeSoftwarePatchFromInsertedModules(
+        audio_patch_handle_t handle)
+{
+    for (auto& module : mInsertedModules) {
+        module.second.sw_patches.erase(handle);
+    }
+}
+
+void AudioFlinger::PatchPanel::dump(int fd) const
+{
+    String8 patchPanelDump;
+    const char *indent = "  ";
+
     // Only dump software patches.
     bool headerPrinted = false;
-    for (auto& iter : mPatches) {
+    for (const auto& iter : mPatches) {
         if (iter.second.isSoftware()) {
             if (!headerPrinted) {
-                String8 header("\nSoftware patches:\n");
-                write(fd, header.string(), header.size());
+                patchPanelDump += "\nSoftware patches:\n";
                 headerPrinted = true;
             }
-            String8 patchDump("  ");
-            patchDump.append(iter.second.dump(iter.first));
-            write(fd, patchDump.string(), patchDump.size());
+            patchPanelDump.appendFormat("%s%s\n", indent, iter.second.dump(iter.first).string());
         }
     }
-    if (headerPrinted) {
-        String8 trailing("\n");
-        write(fd, trailing.string(), trailing.size());
+
+    headerPrinted = false;
+    for (const auto& module : mInsertedModules) {
+        if (!module.second.streams.empty() || !module.second.sw_patches.empty()) {
+            if (!headerPrinted) {
+                patchPanelDump += "\nTracked inserted modules:\n";
+                headerPrinted = true;
+            }
+            String8 moduleDump = String8::format("Module %d: I/O handles: ", module.first);
+            for (const auto& stream : module.second.streams) {
+                moduleDump.appendFormat("%d ", stream);
+            }
+            moduleDump.append("; SW Patches: ");
+            for (const auto& patch : module.second.sw_patches) {
+                moduleDump.appendFormat("%d ", patch);
+            }
+            patchPanelDump.appendFormat("%s%s\n", indent, moduleDump.string());
+        }
+    }
+
+    if (!patchPanelDump.isEmpty()) {
+        write(fd, patchPanelDump.string(), patchPanelDump.size());
     }
 }
 

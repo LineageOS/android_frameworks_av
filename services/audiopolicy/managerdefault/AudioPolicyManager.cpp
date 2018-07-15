@@ -202,27 +202,25 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t device,
             return BAD_VALUE;
         }
 
-        // checkA2dpSuspend must run before checkOutputForAllStrategies so that A2DP
-        // output is suspended before any tracks are moved to it
-        checkA2dpSuspend();
-        checkOutputForAllStrategies();
-        // outputs must be closed after checkOutputForAllStrategies() is executed
-        if (!outputs.isEmpty()) {
-            for (audio_io_handle_t output : outputs) {
-                sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(output);
-                // close unused outputs after device disconnection or direct outputs that have been
-                // opened by checkOutputsForDevice() to query dynamic parameters
-                if ((state == AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE) ||
-                        (((desc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) &&
-                         (desc->mDirectOpenCount == 0))) {
-                    closeOutput(output);
+        checkForDeviceAndOutputChanges([&]() {
+            // outputs must be closed after checkOutputForAllStrategies() is executed
+            if (!outputs.isEmpty()) {
+                for (audio_io_handle_t output : outputs) {
+                    sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(output);
+                    // close unused outputs after device disconnection or direct outputs that have been
+                    // opened by checkOutputsForDevice() to query dynamic parameters
+                    if ((state == AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE) ||
+                            (((desc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) &&
+                             (desc->mDirectOpenCount == 0))) {
+                        closeOutput(output);
+                    }
                 }
+                // check A2DP again after closing A2DP output to reset mA2dpSuspended if needed
+                return true;
             }
-            // check again after closing A2DP output to reset mA2dpSuspended if needed
-            checkA2dpSuspend();
-        }
+            return false;
+        });
 
-        updateDevicesAndOutputs();
         if (mEngine->getPhoneState() == AUDIO_MODE_IN_CALL && hasPrimaryOutput()) {
             audio_devices_t newDevice = getNewOutputDevice(mPrimaryOutput, false /*fromCache*/);
             updateCallRouting(newDevice);
@@ -565,9 +563,7 @@ void AudioPolicyManager::setPhoneState(audio_mode_t state)
                   || (is_state_in_call(state) && (state != oldState)));
 
     // check for device and output changes triggered by new phone state
-    checkA2dpSuspend();
-    checkOutputForAllStrategies();
-    updateDevicesAndOutputs();
+    checkForDeviceAndOutputChanges();
 
     int delayMs = 0;
     if (isStateInCall(state)) {
@@ -667,9 +663,7 @@ void AudioPolicyManager::setForceUse(audio_policy_force_use_t usage,
             (usage == AUDIO_POLICY_FORCE_FOR_SYSTEM);
 
     // check for device and output changes triggered by new force usage
-    checkA2dpSuspend();
-    checkOutputForAllStrategies();
-    updateDevicesAndOutputs();
+    checkForDeviceAndOutputChanges();
 
     //FIXME: workaround for truncated touch sounds
     // to be removed when the problem is handled by system UI
@@ -4645,6 +4639,21 @@ bool AudioPolicyManager::vectorsEqual(SortedVector<audio_io_handle_t>& outputs1,
         }
     }
     return true;
+}
+
+void AudioPolicyManager::checkForDeviceAndOutputChanges()
+{
+    checkForDeviceAndOutputChanges([](){ return false; });
+}
+
+void AudioPolicyManager::checkForDeviceAndOutputChanges(std::function<bool()> onOutputsChecked)
+{
+    // checkA2dpSuspend must run before checkOutputForAllStrategies so that A2DP
+    // output is suspended before any tracks are moved to it
+    checkA2dpSuspend();
+    checkOutputForAllStrategies();
+    if (onOutputsChecked()) checkA2dpSuspend();
+    updateDevicesAndOutputs();
 }
 
 void AudioPolicyManager::checkOutputForStrategy(routing_strategy strategy)
