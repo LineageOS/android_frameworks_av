@@ -678,6 +678,9 @@ using effect_buffer_t = int16_t;
                 bool            updateOrphanEffectChains(const sp<EffectModule>& effect);
 
                 void broacastParametersToRecordThreads_l(const String8& keyValuePairs);
+                void forwardParametersToDownstreamPatches_l(
+                        audio_io_handle_t upStream, const String8& keyValuePairs,
+                        std::function<bool(const sp<PlaybackThread>&)> useThread = nullptr);
 
     // AudioStreamIn is immutable, so their fields are const.
     // For emphasis, we could also make all pointers to them be "const *",
