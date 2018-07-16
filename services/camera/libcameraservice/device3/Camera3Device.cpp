@@ -4739,6 +4739,7 @@ bool Camera3Device::RequestThread::threadLoop() {
 status_t Camera3Device::RequestThread::prepareHalRequests() {
     ATRACE_CALL();
 
+    bool batchedRequest = mNextRequests[0].captureRequest->mBatchSize > 1;
     for (size_t i = 0; i < mNextRequests.size(); i++) {
         auto& nextRequest = mNextRequests.editItemAt(i);
         sp<CaptureRequest> captureRequest = nextRequest.captureRequest;
@@ -4762,7 +4763,10 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         mPrevTriggers = triggerCount;
 
         // If the request is the same as last, or we had triggers last time
-        bool newRequest = mPrevRequest != captureRequest || triggersMixedIn;
+        bool newRequest = (mPrevRequest != captureRequest || triggersMixedIn) &&
+                // Request settings are all the same within one batch, so only treat the first
+                // request in a batch as new
+                !(batchedRequest && i >= 0);
         if (newRequest) {
             /**
              * HAL workaround:
@@ -4911,7 +4915,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         // preview), and the current request is not the last one in the batch,
         // do not send callback to the app.
         bool hasCallback = true;
-        if (mNextRequests[0].captureRequest->mBatchSize > 1 && i != mNextRequests.size()-1) {
+        if (batchedRequest && i != mNextRequests.size()-1) {
             hasCallback = false;
         }
         res = parent->registerInFlight(halRequest->frame_number,
