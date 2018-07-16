@@ -235,9 +235,19 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                     audio_devices_t device = patch->sinks[0].ext.device.type;
                     String8 address = String8(patch->sinks[0].ext.device.address);
                     audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-                    audio_output_flags_t flags =
-                            patch->sinks[0].config_mask & AUDIO_PORT_CONFIG_FLAGS ?
-                            patch->sinks[0].flags.output : AUDIO_OUTPUT_FLAG_NONE;
+                    audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE;
+                    if (patch->sinks[0].config_mask & AUDIO_PORT_CONFIG_SAMPLE_RATE) {
+                        config.sample_rate = patch->sinks[0].sample_rate;
+                    }
+                    if (patch->sinks[0].config_mask & AUDIO_PORT_CONFIG_CHANNEL_MASK) {
+                        config.channel_mask = patch->sinks[0].channel_mask;
+                    }
+                    if (patch->sinks[0].config_mask & AUDIO_PORT_CONFIG_FORMAT) {
+                        config.format = patch->sinks[0].format;
+                    }
+                    if (patch->sinks[0].config_mask & AUDIO_PORT_CONFIG_FLAGS) {
+                        flags = patch->sinks[0].flags.output;
+                    }
                     sp<ThreadBase> thread = mAudioFlinger.openOutput_l(
                                                             patch->sinks[0].ext.device.hw_module,
                                                             &output,
