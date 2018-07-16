@@ -137,6 +137,7 @@ private:
         kWhatOMXDied                 = 'OMXd',
         kWhatReleaseCodecInstance    = 'relC',
         kWhatForceStateTransition    = 'fstt',
+        kWhatCheckIfStuck            = 'Cstk',
     };
 
     enum {

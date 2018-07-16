@@ -5556,6 +5556,11 @@ bool ACodec::BaseState::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatCheckIfStuck: {
+            ALOGV("No-op by default");
+            break;
+        }
+
         default:
             return false;
     }
@@ -7873,6 +7878,18 @@ bool ACodec::OutputPortSettingsChangedState::onMessageReceived(
             break;
         }
 
+        case kWhatCheckIfStuck:
+        {
+            int32_t generation = 0;
+            CHECK(msg->findInt32("generation", &generation));
+            if (generation == mCodec->mStateGeneration) {
+                mCodec->signalError(OMX_ErrorUndefined, TIMED_OUT);
+            }
+
+            handled = true;
+            break;
+        }
+
         default:
             handled = BaseState::onMessageReceived(msg);
             break;
@@ -7884,6 +7901,11 @@ bool ACodec::OutputPortSettingsChangedState::onMessageReceived(
 void ACodec::OutputPortSettingsChangedState::stateEntered() {
     ALOGV("[%s] Now handling output port settings change",
          mCodec->mComponentName.c_str());
+
+    // If we haven't transitioned after 3 seconds, we're probably stuck.
+    sp<AMessage> msg = new AMessage(ACodec::kWhatCheckIfStuck, mCodec);
+    msg->setInt32("generation", mCodec->mStateGeneration);
+    msg->post(3000000);
 }
 
 bool ACodec::OutputPortSettingsChangedState::onOMXFrameRendered(
@@ -8146,6 +8168,11 @@ void ACodec::FlushingState::stateEntered() {
     ALOGV("[%s] Now Flushing", mCodec->mComponentName.c_str());
 
     mFlushComplete[kPortIndexInput] = mFlushComplete[kPortIndexOutput] = false;
+
+    // If we haven't transitioned after 3 seconds, we're probably stuck.
+    sp<AMessage> msg = new AMessage(ACodec::kWhatCheckIfStuck, mCodec);
+    msg->setInt32("generation", mCodec->mStateGeneration);
+    msg->post(3000000);
 }
 
 bool ACodec::FlushingState::onMessageReceived(const sp<AMessage> &msg) {
@@ -8160,6 +8187,7 @@ bool ACodec::FlushingState::onMessageReceived(const sp<AMessage> &msg) {
                 msg->setInt32("generation", mCodec->mStateGeneration);
                 msg->post(3000000);
             }
+            handled = true;
             break;
         }
 
@@ -8175,6 +8203,18 @@ bool ACodec::FlushingState::onMessageReceived(const sp<AMessage> &msg) {
             int32_t generation = 0;
             CHECK(msg->findInt32("generation", &generation));
             mCodec->forceStateTransition(generation);
+
+            handled = true;
+            break;
+        }
+
+        case kWhatCheckIfStuck:
+        {
+            int32_t generation = 0;
+            CHECK(msg->findInt32("generation", &generation));
+            if (generation == mCodec->mStateGeneration) {
+                mCodec->signalError(OMX_ErrorUndefined, TIMED_OUT);
+            }
 
             handled = true;
             break;
