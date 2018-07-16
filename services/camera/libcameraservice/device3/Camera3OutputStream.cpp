@@ -564,7 +564,7 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
 
             // Only transition to STATE_ABANDONED from STATE_CONFIGURED. (If it is STATE_PREPARING,
             // let prepareNextBuffer handle the error.)
-            if (res == NO_INIT && mState == STATE_CONFIGURED) {
+            if ((res == NO_INIT || res == DEAD_OBJECT) && mState == STATE_CONFIGURED) {
                 mState = STATE_ABANDONED;
             }
 
