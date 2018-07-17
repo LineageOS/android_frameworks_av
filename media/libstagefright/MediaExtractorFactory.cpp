@@ -21,9 +21,9 @@
 #include <binder/IServiceManager.h>
 #include <media/DataSource.h>
 #include <media/MediaAnalyticsItem.h>
-#include <media/MediaExtractor.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/InterfaceUtils.h>
+#include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MediaExtractorFactory.h>
 #include <media/IMediaExtractor.h>
 #include <media/IMediaExtractorService.h>
