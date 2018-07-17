@@ -64,7 +64,6 @@ private:
     struct Item {
         AString mURI;
         sp<AMessage> mMeta;
-        AString makeURL(const char *baseURL) const;
     };
 
     status_t mInitCheck;
