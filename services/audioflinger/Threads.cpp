@@ -7065,6 +7065,12 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         goto Exit;
     }
 
+    if (!audio_is_linear_pcm(mFormat) && (*flags & AUDIO_INPUT_FLAG_DIRECT) == 0) {
+        ALOGE("createRecordTrack_l() on an encoded stream requires AUDIO_INPUT_FLAG_DIRECT");
+        lStatus = BAD_VALUE;
+        goto Exit;
+    }
+
     if (*pSampleRate == 0) {
         *pSampleRate = mSampleRate;
     }
@@ -7779,10 +7785,15 @@ void AudioFlinger::RecordThread::readInputParameters_l()
 {
     status_t result = mInput->stream->getAudioProperties(&mSampleRate, &mChannelMask, &mHALFormat);
     LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving audio properties from HAL: %d", result);
-    mChannelCount = audio_channel_count_from_in_mask(mChannelMask);
-    LOG_ALWAYS_FATAL_IF(mChannelCount > FCC_8, "HAL channel count %d > %d", mChannelCount, FCC_8);
     mFormat = mHALFormat;
-    LOG_ALWAYS_FATAL_IF(!audio_is_linear_pcm(mFormat), "HAL format %#x is not linear pcm", mFormat);
+    mChannelCount = audio_channel_count_from_in_mask(mChannelMask);
+    if (audio_is_linear_pcm(mFormat)) {
+        LOG_ALWAYS_FATAL_IF(mChannelCount > FCC_8, "HAL channel count %d > %d",
+                mChannelCount, FCC_8);
+    } else {
+        // Can have more that FCC_8 channels in encoded streams.
+        ALOGI("HAL format %#x is not linear pcm", mFormat);
+    }
     result = mInput->stream->getFrameSize(&mFrameSize);
     LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving frame size from HAL: %d", result);
     result = mInput->stream->getBufferSize(&mBufferSize);
