@@ -2324,15 +2324,13 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
         if (track->isExternalTrack()) {
             TrackBase::track_state state = track->mState;
             mLock.unlock();
-            status = AudioSystem::startOutput(mId, track->streamType(),
-                                              track->sessionId());
+            status = AudioSystem::startOutput(track->portId());
             mLock.lock();
             // abort track was stopped/paused while we released the lock
             if (state != track->mState) {
                 if (status == NO_ERROR) {
                     mLock.unlock();
-                    AudioSystem::stopOutput(mId, track->streamType(),
-                                            track->sessionId());
+                    AudioSystem::stopOutput(track->portId());
                     mLock.lock();
                 }
                 return INVALID_OPERATION;
@@ -2812,15 +2810,13 @@ void AudioFlinger::PlaybackThread::threadLoop_removeTracks(
         for (size_t i = 0 ; i < count ; i++) {
             const sp<Track>& track = tracksToRemove.itemAt(i);
             if (track->isExternalTrack()) {
-                AudioSystem::stopOutput(mId, track->streamType(),
-                                        track->sessionId());
+                AudioSystem::stopOutput(track->portId());
 #ifdef ADD_BATTERY_DATA
                 // to track the speaker usage
                 addBatteryData(IMediaPlayerService::kBatteryDataAudioFlingerStop);
 #endif
                 if (track->isTerminated()) {
-                    AudioSystem::releaseOutput(mId, track->streamType(),
-                                               track->sessionId());
+                    AudioSystem::releaseOutput(track->portId());
                 }
             }
         }
@@ -8111,7 +8107,7 @@ void AudioFlinger::MmapThread::disconnect()
     }
     // This will decrement references and may cause the destruction of this thread.
     if (isOutput()) {
-        AudioSystem::releaseOutput(mId, streamType(), mSessionId);
+        AudioSystem::releaseOutput(mPortId);
     } else {
         AudioSystem::releaseInput(mPortId);
     }
@@ -8225,7 +8221,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
 
     bool silenced = false;
     if (isOutput()) {
-        ret = AudioSystem::startOutput(mId, streamType(), mSessionId);
+        ret = AudioSystem::startOutput(portId);
     } else {
         ret = AudioSystem::startInput(portId, &silenced);
     }
@@ -8237,7 +8233,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         if (mActiveTracks.size() != 0) {
             mLock.unlock();
             if (isOutput()) {
-                AudioSystem::releaseOutput(mId, streamType(), mSessionId);
+                AudioSystem::releaseOutput(portId);
             } else {
                 AudioSystem::releaseInput(portId);
             }
@@ -8309,8 +8305,8 @@ status_t AudioFlinger::MmapThread::stop(audio_port_handle_t handle)
 
     mLock.unlock();
     if (isOutput()) {
-        AudioSystem::stopOutput(mId, streamType(), track->sessionId());
-        AudioSystem::releaseOutput(mId, streamType(), track->sessionId());
+        AudioSystem::stopOutput(track->portId());
+        AudioSystem::releaseOutput(track->portId());
     } else {
         AudioSystem::stopInput(track->portId());
         AudioSystem::releaseInput(track->portId());

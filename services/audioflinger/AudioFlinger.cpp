@@ -306,7 +306,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         *sessionId = actualSessionId;
     } else {
         if (direction == MmapStreamInterface::DIRECTION_OUTPUT) {
-            AudioSystem::releaseOutput(io, streamType, actualSessionId);
+            AudioSystem::releaseOutput(portId);
         } else {
             AudioSystem::releaseInput(portId);
         }
@@ -777,7 +777,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
 
 Exit:
     if (lStatus != NO_ERROR && output.outputId != AUDIO_IO_HANDLE_NONE) {
-        AudioSystem::releaseOutput(output.outputId, streamType, sessionId);
+        AudioSystem::releaseOutput(portId);
     }
     *status = lStatus;
     return trackHandle;
