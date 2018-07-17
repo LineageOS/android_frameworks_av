@@ -44,7 +44,7 @@ bool XINGSeeker::getDuration(int64_t *durationUs) {
 }
 
 bool XINGSeeker::getOffsetForTime(int64_t *timeUs, off64_t *pos) {
-    if (mSizeBytes == 0 || !mTOCValid || mDurationUs < 0) {
+    if (mSizeBytes == 0 || mDurationUs < 0) {
         return false;
     }
 
@@ -54,7 +54,7 @@ bool XINGSeeker::getOffsetForTime(int64_t *timeUs, off64_t *pos) {
         fx = 0.0f;
     } else if( percent >= 100.0f ) {
         fx = 256.0f;
-    } else {
+    } else if (mTOCValid) {
         int a = (int)percent;
         float fa, fb;
         if ( a == 0 ) {
@@ -68,6 +68,8 @@ bool XINGSeeker::getOffsetForTime(int64_t *timeUs, off64_t *pos) {
             fb = 256.0f;
         }
         fx = fa + (fb-fa)*(percent-a);
+    } else {
+        fx = percent * 2.56f;
     }
 
     *pos = (int)((1.0f/256.0f)*fx*mSizeBytes) + mFirstFramePos;
