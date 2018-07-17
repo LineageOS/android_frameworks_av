@@ -83,7 +83,7 @@ void AMediaFormat_setString(AMediaFormat*, const char* name, const char* value) 
 /**
  * The provided data is copied into the format.
  */
-void AMediaFormat_setBuffer(AMediaFormat*, const char* name, void* data, size_t size) __INTRODUCED_IN(21);
+void AMediaFormat_setBuffer(AMediaFormat*, const char* name, const void* data, size_t size) __INTRODUCED_IN(21);
 
 
 
@@ -169,6 +169,18 @@ void AMediaFormat_setSize(AMediaFormat*, const char* name, size_t value) __INTRO
 void AMediaFormat_setRect(AMediaFormat*, const char* name,
         int32_t left, int32_t top, int32_t right, int32_t bottom) __INTRODUCED_IN(28);
 #endif /* __ANDROID_API__ >= 28 */
+
+#if __ANDROID_API__ >= 29
+/**
+ * remove all key/value pairs from the given AMediaFormat
+ */
+void AMediaFormat_clear(AMediaFormat*) __INTRODUCED_IN(29);
+
+/**
+ * copy one AMediaFormat to another
+ */
+media_status_t AMediaFormat_copy(AMediaFormat *to, AMediaFormat *from) __INTRODUCED_IN(29);
+#endif /* __ANDROID_API__ >= 29 */
 
 __END_DECLS
 

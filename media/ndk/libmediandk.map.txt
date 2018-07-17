@@ -185,6 +185,8 @@ LIBMEDIANDK {
     AMediaExtractor_setDataSourceCustom; # introduced=28
     AMediaExtractor_setDataSourceFd;
     AMediaExtractor_unselectTrack;
+    AMediaFormat_clear; # introduced=29
+    AMediaFormat_copy; # introduced=29
     AMediaFormat_delete;
     AMediaFormat_getBuffer;
     AMediaFormat_getDouble; # introduced=28

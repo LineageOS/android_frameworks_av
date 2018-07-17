@@ -20,7 +20,7 @@
 
 #include <media/NdkMediaMuxer.h>
 #include <media/NdkMediaCodec.h>
-#include "NdkMediaFormatPriv.h"
+#include <media/NdkMediaFormatPriv.h>
 
 
 #include <utils/Log.h>

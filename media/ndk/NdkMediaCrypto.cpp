@@ -20,7 +20,7 @@
 
 #include <media/NdkMediaCrypto.h>
 #include <media/NdkMediaCodec.h>
-#include "NdkMediaFormatPriv.h"
+#include <media/NdkMediaFormatPriv.h>
 
 
 #include <cutils/properties.h>

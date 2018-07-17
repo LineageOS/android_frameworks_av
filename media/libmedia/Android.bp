@@ -191,6 +191,7 @@ cc_library {
         "MediaResourcePolicy.cpp",
         "Visualizer.cpp",
         "StringArray.cpp",
+        "NdkMediaFormatPriv.cpp",
     ],
 
     aidl: {
