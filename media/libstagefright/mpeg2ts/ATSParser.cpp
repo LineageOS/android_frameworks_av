@@ -1437,7 +1437,7 @@ status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
     // Perform the 1st pass descrambling if needed
     if (descrambleBytes > 0) {
         memcpy(mDescrambledBuffer->data(), mBuffer->data(), descrambleBytes);
-        mDescrambledBuffer->setRange(0, descrambleBytes);
+        mDescrambledBuffer->setRange(0, mBuffer->size());
 
         hidl_vec<SubSample> subSamples;
         subSamples.resize(descrambleSubSamples);
@@ -1454,10 +1454,9 @@ status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
             }
         }
 
-        uint64_t srcOffset = 0, dstOffset = 0;
-        // If scrambled at PES-level, PES header should be skipped
+        // If scrambled at PES-level, PES header is in the clear
         if (pesScramblingControl != 0) {
-            srcOffset = dstOffset = pesOffset;
+            subSamples[0].numBytesOfClearData = pesOffset;
             subSamples[0].numBytesOfEncryptedData -= pesOffset;
         }
 
@@ -1473,9 +1472,9 @@ status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
                 (ScramblingControl) sctrl,
                 subSamples,
                 mDescramblerSrcBuffer,
-                srcOffset,
+                0 /*srcOffset*/,
                 dstBuffer,
-                dstOffset,
+                0 /*dstOffset*/,
                 [&status, &bytesWritten, &detailedError] (
                         Status _status, uint32_t _bytesWritten,
                         const hidl_string& _detailedError) {
@@ -1492,9 +1491,15 @@ status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
 
         ALOGV("[stream %d] descramble succeeded, %d bytes",
                 mElementaryPID, bytesWritten);
-        memcpy(mBuffer->data(), mDescrambledBuffer->data(), descrambleBytes);
+
+        // Set descrambleBytes to the returned result.
+        // Note that this might be smaller than the total length of input data.
+        // (eg. when we're descrambling the PES header portion of a secure stream,
+        // the plugin might cut it off right after the PES header.)
+        descrambleBytes = bytesWritten;
     }
 
+    sp<ABuffer> buffer;
     if (mQueue->isScrambled()) {
         // Queue subSample info for scrambled queue
         sp<ABuffer> clearSizesBuffer = new ABuffer(mSubSamples.size() * 4);
@@ -1506,8 +1511,7 @@ status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
         for (auto it = mSubSamples.begin();
                 it != mSubSamples.end(); it++, i++) {
             if ((it->transport_scrambling_mode == 0
-                    && pesScramblingControl == 0)
-                    || i < descrambleSubSamples) {
+                    && pesScramblingControl == 0)) {
                 clearSizePtr[i] = it->subSampleSize;
                 encSizePtr[i] = 0;
             } else {
@@ -1516,14 +1520,26 @@ status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
             }
             isSync |= it->random_access_indicator;
         }
+
+        // If scrambled at PES-level, PES header is in the clear
+        if (pesScramblingControl != 0) {
+            clearSizePtr[0] = pesOffset;
+            encSizePtr[0] -= pesOffset;
+        }
         // Pass the original TS subsample size now. The PES header adjust
         // will be applied when the scrambled AU is dequeued.
         mQueue->appendScrambledData(
                 mBuffer->data(), mBuffer->size(), sctrl,
                 isSync, clearSizesBuffer, encSizesBuffer);
+
+        buffer = mDescrambledBuffer;
+    } else {
+        memcpy(mBuffer->data(), mDescrambledBuffer->data(), descrambleBytes);
+
+        buffer = mBuffer;
     }
 
-    ABitReader br(mBuffer->data(), mBuffer->size());
+    ABitReader br(buffer->data(), buffer->size());
     status_t err = parsePES(&br, event);
 
     if (err != OK) {

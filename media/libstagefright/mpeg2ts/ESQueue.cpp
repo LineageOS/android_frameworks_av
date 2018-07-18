@@ -691,25 +691,9 @@ sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
         return NULL;
     }
 
-    // skip the PES header, and copy the rest into scrambled access unit
+    // copy into scrambled access unit
     sp<ABuffer> scrambledAccessUnit = ABuffer::CreateAsCopy(
-            mScrambledBuffer->data() + pesOffset,
-            scrambledLength - pesOffset);
-
-    // fix up first sample size after skipping the PES header
-    if (pesOffset > 0) {
-        int32_t &firstClearSize = *(int32_t*)clearSizes->data();
-        int32_t &firstEncSize = *(int32_t*)encSizes->data();
-        // Cut away the PES header
-        if (firstClearSize >= pesOffset) {
-            // This is for TS-level scrambling, we descrambled the first
-            // (or it was clear to begin with)
-            firstClearSize -= pesOffset;
-        } else if (firstEncSize >= pesOffset) {
-            // This can only be PES-level scrambling
-            firstEncSize -= pesOffset;
-        }
-    }
+            mScrambledBuffer->data(), scrambledLength);
 
     scrambledAccessUnit->meta()->setInt64("timeUs", timeUs);
     if (isSync) {
@@ -723,6 +707,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
     scrambledAccessUnit->meta()->setInt32("cryptoKey", keyId);
     scrambledAccessUnit->meta()->setBuffer("clearBytes", clearSizes);
     scrambledAccessUnit->meta()->setBuffer("encBytes", encSizes);
+    scrambledAccessUnit->meta()->setInt32("pesOffset", pesOffset);
 
     memmove(mScrambledBuffer->data(),
             mScrambledBuffer->data() + scrambledLength,

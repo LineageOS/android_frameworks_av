@@ -695,26 +695,26 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                     }break;
                 case STOP_OUTPUT: {
                     StopOutputData *data = (StopOutputData *)command->mParam.get();
-                    ALOGV("AudioCommandThread() processing stop output %d",
-                            data->mIO);
+                    ALOGV("AudioCommandThread() processing stop output portId %d",
+                            data->mPortId);
                     svc = mService.promote();
                     if (svc == 0) {
                         break;
                     }
                     mLock.unlock();
-                    svc->doStopOutput(data->mIO, data->mStream, data->mSession);
+                    svc->doStopOutput(data->mPortId);
                     mLock.lock();
                     }break;
                 case RELEASE_OUTPUT: {
                     ReleaseOutputData *data = (ReleaseOutputData *)command->mParam.get();
-                    ALOGV("AudioCommandThread() processing release output %d",
-                            data->mIO);
+                    ALOGV("AudioCommandThread() processing release output portId %d",
+                            data->mPortId);
                     svc = mService.promote();
                     if (svc == 0) {
                         break;
                     }
                     mLock.unlock();
-                    svc->doReleaseOutput(data->mIO, data->mStream, data->mSession);
+                    svc->doReleaseOutput(data->mPortId);
                     mLock.lock();
                     }break;
                 case CREATE_AUDIO_PATCH: {
@@ -925,33 +925,25 @@ status_t AudioPolicyService::AudioCommandThread::voiceVolumeCommand(float volume
     return sendCommand(command, delayMs);
 }
 
-void AudioPolicyService::AudioCommandThread::stopOutputCommand(audio_io_handle_t output,
-                                                               audio_stream_type_t stream,
-                                                               audio_session_t session)
+void AudioPolicyService::AudioCommandThread::stopOutputCommand(audio_port_handle_t portId)
 {
     sp<AudioCommand> command = new AudioCommand();
     command->mCommand = STOP_OUTPUT;
     sp<StopOutputData> data = new StopOutputData();
-    data->mIO = output;
-    data->mStream = stream;
-    data->mSession = session;
+    data->mPortId = portId;
     command->mParam = data;
-    ALOGV("AudioCommandThread() adding stop output %d", output);
+    ALOGV("AudioCommandThread() adding stop output portId %d", portId);
     sendCommand(command);
 }
 
-void AudioPolicyService::AudioCommandThread::releaseOutputCommand(audio_io_handle_t output,
-                                                                  audio_stream_type_t stream,
-                                                                  audio_session_t session)
+void AudioPolicyService::AudioCommandThread::releaseOutputCommand(audio_port_handle_t portId)
 {
     sp<AudioCommand> command = new AudioCommand();
     command->mCommand = RELEASE_OUTPUT;
     sp<ReleaseOutputData> data = new ReleaseOutputData();
-    data->mIO = output;
-    data->mStream = stream;
-    data->mSession = session;
+    data->mPortId = portId;
     command->mParam = data;
-    ALOGV("AudioCommandThread() adding release output %d", output);
+    ALOGV("AudioCommandThread() adding release output portId %d", portId);
     sendCommand(command);
 }
 

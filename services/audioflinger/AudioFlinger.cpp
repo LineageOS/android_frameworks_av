@@ -306,7 +306,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         *sessionId = actualSessionId;
     } else {
         if (direction == MmapStreamInterface::DIRECTION_OUTPUT) {
-            AudioSystem::releaseOutput(io, streamType, actualSessionId);
+            AudioSystem::releaseOutput(portId);
         } else {
             AudioSystem::releaseInput(portId);
         }
@@ -777,7 +777,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
 
 Exit:
     if (lStatus != NO_ERROR && output.outputId != AUDIO_IO_HANDLE_NONE) {
-        AudioSystem::releaseOutput(output.outputId, streamType, sessionId);
+        AudioSystem::releaseOutput(portId);
     }
     *status = lStatus;
     return trackHandle;
@@ -1144,6 +1144,23 @@ void AudioFlinger::broacastParametersToRecordThreads_l(const String8& keyValuePa
     }
 }
 
+// forwardAudioHwSyncToDownstreamPatches_l() must be called with AudioFlinger::mLock held
+void AudioFlinger::forwardParametersToDownstreamPatches_l(
+        audio_io_handle_t upStream, const String8& keyValuePairs,
+        std::function<bool(const sp<PlaybackThread>&)> useThread)
+{
+    std::vector<PatchPanel::SoftwarePatch> swPatches;
+    if (mPatchPanel.getDownstreamSoftwarePatches(upStream, &swPatches) != OK) return;
+    ALOGV_IF(!swPatches.empty(), "%s found %zu downstream patches for stream ID %d",
+            __func__, swPatches.size(), upStream);
+    for (const auto& swPatch : swPatches) {
+        sp<PlaybackThread> downStream = checkPlaybackThread_l(swPatch.getPlaybackThreadHandle());
+        if (downStream != NULL && (useThread == nullptr || useThread(downStream))) {
+            downStream->setParameters(keyValuePairs);
+        }
+    }
+}
+
 // Filter reserved keys from setParameters() before forwarding to audio HAL or acting upon.
 // Some keys are used for audio routing and audio path configuration and should be reserved for use
 // by audio policy and audio flinger for functional, privacy and security reasons.
@@ -1259,7 +1276,9 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
         }
     }
     if (thread != 0) {
-        return thread->setParameters(filteredKeyValuePairs);
+        status_t result = thread->setParameters(filteredKeyValuePairs);
+        forwardParametersToDownstreamPatches_l(thread->id(), filteredKeyValuePairs);
+        return result;
     }
     return BAD_VALUE;
 }
@@ -1964,7 +1983,10 @@ audio_hw_sync_t AudioFlinger::getAudioHwSyncForSession(audio_session_t sessionId
         if (sessions & ThreadBase::TRACK_SESSION) {
             AudioParameter param = AudioParameter();
             param.addInt(String8(AudioParameter::keyStreamHwAvSync), value);
-            thread->setParameters(param.toString());
+            String8 keyValuePairs = param.toString();
+            thread->setParameters(keyValuePairs);
+            forwardParametersToDownstreamPatches_l(thread->id(), keyValuePairs,
+                    [](const sp<PlaybackThread>& thread) { return thread->usesHwAvSync(); });
             break;
         }
     }
@@ -2010,7 +2032,10 @@ void AudioFlinger::setAudioHwSyncForSession_l(PlaybackThread *thread, audio_sess
         ALOGV("setAudioHwSyncForSession_l found ID %d for session %d", syncId, sessionId);
         AudioParameter param = AudioParameter();
         param.addInt(String8(AudioParameter::keyStreamHwAvSync), syncId);
-        thread->setParameters(param.toString());
+        String8 keyValuePairs = param.toString();
+        thread->setParameters(keyValuePairs);
+        forwardParametersToDownstreamPatches_l(thread->id(), keyValuePairs,
+                [](const sp<PlaybackThread>& thread) { return thread->usesHwAvSync(); });
     }
 }
 

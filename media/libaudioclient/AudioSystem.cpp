@@ -878,31 +878,25 @@ status_t AudioSystem::getOutputForAttr(const audio_attributes_t *attr,
                                  flags, selectedDeviceId, portId);
 }
 
-status_t AudioSystem::startOutput(audio_io_handle_t output,
-                                  audio_stream_type_t stream,
-                                  audio_session_t session)
+status_t AudioSystem::startOutput(audio_port_handle_t portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
-    return aps->startOutput(output, stream, session);
+    return aps->startOutput(portId);
 }
 
-status_t AudioSystem::stopOutput(audio_io_handle_t output,
-                                 audio_stream_type_t stream,
-                                 audio_session_t session)
+status_t AudioSystem::stopOutput(audio_port_handle_t portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
-    return aps->stopOutput(output, stream, session);
+    return aps->stopOutput(portId);
 }
 
-void AudioSystem::releaseOutput(audio_io_handle_t output,
-                                audio_stream_type_t stream,
-                                audio_session_t session)
+void AudioSystem::releaseOutput(audio_port_handle_t portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return;
-    aps->releaseOutput(output, stream, session);
+    aps->releaseOutput(portId);
 }
 
 status_t AudioSystem::getInputForAttr(const audio_attributes_t *attr,
