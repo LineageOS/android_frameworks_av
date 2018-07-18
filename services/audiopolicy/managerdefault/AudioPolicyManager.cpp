@@ -861,6 +861,21 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
         *flags = (audio_output_flags_t)(*flags | AUDIO_OUTPUT_FLAG_HW_AV_SYNC);
     }
 
+    // Set incall music only if device was explicitly set, and fallback to the device which is
+    // chosen by the engine if not.
+    // FIXME: provide a more generic approach which is not device specific and move this back
+    // to getOutputForDevice.
+    if (device == AUDIO_DEVICE_OUT_TELEPHONY_TX &&
+        *stream == AUDIO_STREAM_MUSIC &&
+        audio_is_linear_pcm(config->format) &&
+        isInCall()) {
+        if (*selectedDeviceId != AUDIO_PORT_HANDLE_NONE) {
+            *flags = (audio_output_flags_t)AUDIO_OUTPUT_FLAG_INCALL_MUSIC;
+        } else {
+            device = mEngine->getDeviceForStrategy(strategy);
+        }
+    }
+
     ALOGV("getOutputForAttr() device 0x%x, sampling rate %d, format %#x, channel mask %#x, "
           "flags %#x",
           device, config->sample_rate, config->format, config->channel_mask, *flags);
@@ -916,11 +931,6 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
         *flags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_VOIP_RX |
                                        AUDIO_OUTPUT_FLAG_DIRECT);
         ALOGV("Set VoIP and Direct output flags for PCM format");
-    } else if (device == AUDIO_DEVICE_OUT_TELEPHONY_TX &&
-        stream == AUDIO_STREAM_MUSIC &&
-        audio_is_linear_pcm(config->format) &&
-        isInCall()) {
-        *flags = (audio_output_flags_t)AUDIO_OUTPUT_FLAG_INCALL_MUSIC;
     }
 
 
