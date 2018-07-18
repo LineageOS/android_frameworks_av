@@ -4766,7 +4766,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         bool newRequest = (mPrevRequest != captureRequest || triggersMixedIn) &&
                 // Request settings are all the same within one batch, so only treat the first
                 // request in a batch as new
-                !(batchedRequest && i >= 0);
+                !(batchedRequest && i > 0);
         if (newRequest) {
             /**
              * HAL workaround:
