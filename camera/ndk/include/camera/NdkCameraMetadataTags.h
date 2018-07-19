@@ -5094,12 +5094,26 @@ typedef enum acamera_metadata_tag {
      * the following code snippet can be used:</p>
      * <pre><code>// Returns true if the device supports the required hardware level, or better.
      * boolean isHardwareLevelSupported(CameraCharacteristics c, int requiredLevel) {
+     *     final int[] sortedHwLevels = {
+     *         CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY,
+     *         CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL,
+     *         CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED,
+     *         CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL,
+     *         CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_3
+     *     };
      *     int deviceLevel = c.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
-     *     if (deviceLevel == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY) {
-     *         return requiredLevel == deviceLevel;
+     *     if (requiredLevel == deviceLevel) {
+     *         return true;
      *     }
-     *     // deviceLevel is not LEGACY, can use numerical sort
-     *     return requiredLevel &lt;= deviceLevel;
+     *
+     *     for (int sortedlevel : sortedHwLevels) {
+     *         if (sortedlevel == requiredLevel) {
+     *             return true;
+     *         } else if (sortedlevel == deviceLevel) {
+     *             return false;
+     *         }
+     *     }
+     *     return false; // Should never reach here
      * }
      * </code></pre>
      * <p>At a high level, the levels are:</p>
@@ -5113,6 +5127,8 @@ typedef enum acamera_metadata_tag {
      *   post-processing settings, and image capture at a high rate.</li>
      * <li><code>LEVEL_3</code> devices additionally support YUV reprocessing and RAW image capture, along
      *   with additional output stream configurations.</li>
+     * <li><code>EXTERNAL</code> devices are similar to <code>LIMITED</code> devices with exceptions like some sensor or
+     *   lens information not reorted or less stable framerates.</li>
      * </ul>
      * <p>See the individual level enums for full descriptions of the supported capabilities.  The
      * ACAMERA_REQUEST_AVAILABLE_CAPABILITIES entry describes the device's capabilities at a
