@@ -102,7 +102,7 @@ status_t Camera2Client::initializeImpl(TProviderPtr providerPtr, const String8& 
     {
         SharedParameters::Lock l(mParameters);
 
-        res = l.mParameters.initialize(&(mDevice->info()), mDeviceVersion);
+        res = l.mParameters.initialize(mDevice.get(), mDeviceVersion);
         if (res != OK) {
             ALOGE("%s: Camera %d: unable to build defaults: %s (%d)",
                     __FUNCTION__, mCameraId, strerror(-res), res);
@@ -250,6 +250,7 @@ status_t Camera2Client::dumpClient(int fd, const Vector<String16>& args) {
     switch (p.sceneMode) {
         case ANDROID_CONTROL_SCENE_MODE_DISABLED:
             result.append("AUTO\n"); break;
+        CASE_APPEND_ENUM(ANDROID_CONTROL_SCENE_MODE_FACE_PRIORITY)
         CASE_APPEND_ENUM(ANDROID_CONTROL_SCENE_MODE_ACTION)
         CASE_APPEND_ENUM(ANDROID_CONTROL_SCENE_MODE_PORTRAIT)
         CASE_APPEND_ENUM(ANDROID_CONTROL_SCENE_MODE_LANDSCAPE)
