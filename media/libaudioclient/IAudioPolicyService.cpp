@@ -935,7 +935,8 @@ status_t BnAudioPolicyService::onTransact(
             break;
     }
 
-    TimeCheck check("IAudioPolicyService");
+    std::string tag("IAudioPolicyService command " + std::to_string(code));
+    TimeCheck check(tag.c_str());
 
     switch (code) {
         case SET_DEVICE_CONNECTION_STATE: {
