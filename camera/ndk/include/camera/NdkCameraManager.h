@@ -44,6 +44,8 @@
 
 __BEGIN_DECLS
 
+#if __ANDROID_API__ >= 24
+
 /**
  * ACameraManager is opaque type that provides access to camera service.
  *
@@ -273,6 +275,8 @@ camera_status_t ACameraManager_openCamera(
         ACameraManager* manager, const char* cameraId,
         ACameraDevice_StateCallbacks* callback,
         /*out*/ACameraDevice** device) __INTRODUCED_IN(24);
+
+#endif /* __ANDROID_API__ >= 24 */
 
 __END_DECLS
 

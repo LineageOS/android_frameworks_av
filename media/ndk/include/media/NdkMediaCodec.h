@@ -121,6 +121,8 @@ struct AMediaCodecOnAsyncNotifyCallback {
       AMediaCodecOnAsyncError           onAsyncError;
 };
 
+#if __ANDROID_API__ >= 21
+
 /**
  * Create codec by name. Use this if you know the exact codec you want to use.
  * When configuring, you will need to specify whether to use the codec as an
@@ -274,6 +276,8 @@ media_status_t AMediaCodec_setOutputSurface(AMediaCodec*, ANativeWindow* surface
 media_status_t AMediaCodec_releaseOutputBufferAtTime(
         AMediaCodec *mData, size_t idx, int64_t timestampNs) __INTRODUCED_IN(21);
 
+#if __ANDROID_API__ >= 26
+
 /**
  * Creates a Surface that can be used as the input to encoder, in place of input buffers
  *
@@ -344,6 +348,10 @@ media_status_t AMediaCodec_setParameters(
  */
 media_status_t AMediaCodec_signalEndOfInputStream(AMediaCodec *mData) __INTRODUCED_IN(26);
 
+#endif /* __ANDROID_API__ >= 26 */
+
+#if __ANDROID_API__ >= 28
+
 /**
  * Get the component name. If the codec was created by createDecoderByType
  * or createEncoderByType, what component is chosen is not known beforehand.
@@ -404,6 +412,8 @@ bool AMediaCodecActionCode_isRecoverable(int32_t actionCode) __INTRODUCED_IN(28)
  * retried at a later time.
  */
 bool AMediaCodecActionCode_isTransient(int32_t actionCode) __INTRODUCED_IN(28);
+
+#endif /* __ANDROID_API__ >= 28 */
 
 typedef enum {
     AMEDIACODECRYPTOINFO_MODE_CLEAR = 0,
@@ -482,6 +492,8 @@ media_status_t AMediaCodecCryptoInfo_getClearBytes(AMediaCodecCryptoInfo*, size_
  * The number of trailing encrypted bytes in each subsample.
  */
 media_status_t AMediaCodecCryptoInfo_getEncryptedBytes(AMediaCodecCryptoInfo*, size_t *dst) __INTRODUCED_IN(21);
+
+#endif /* __ANDROID_API__ >= 21 */
 
 __END_DECLS
 
