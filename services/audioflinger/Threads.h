@@ -1527,6 +1527,8 @@ public:
 
             void        updateMetadata_l() override;
 
+            bool        fastTrackAvailable() const { return mFastTrackAvail; }
+
 private:
             // Enter standby if not already in standby, and set mStandby flag
             void    standbyIfNotAlreadyInStandby();
