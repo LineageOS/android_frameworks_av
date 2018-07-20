@@ -1679,8 +1679,7 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
                                                      config->channel_mask,
                                                      flags,
                                                      uid,
-                                                     isSoundTrigger,
-                                                     policyMix, mpClientInterface);
+                                                     isSoundTrigger);
 
 // FIXME: disable concurrent capture until UI is ready
 #if 0
@@ -2007,7 +2006,7 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
 
     // increment activity count before calling getNewInputDevice() below as only active sessions
     // are considered for device selection
-    audioSession->changeActiveCount(1);
+    inputDesc->changeRefCount(session, 1);
 
     // Routing?
     mInputRoutes.incRouteActivity(session);
@@ -2021,7 +2020,7 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
         status_t status = inputDesc->start();
         if (status != NO_ERROR) {
             mInputRoutes.decRouteActivity(session);
-            audioSession->changeActiveCount(-1);
+            inputDesc->changeRefCount(session, -1);
             return status;
         }
 
@@ -2085,7 +2084,7 @@ status_t AudioPolicyManager::stopInput(audio_io_handle_t input,
         return INVALID_OPERATION;
     }
 
-    audioSession->changeActiveCount(-1);
+    inputDesc->changeRefCount(session, -1);
 
     // Routing?
     mInputRoutes.decRouteActivity(session);
