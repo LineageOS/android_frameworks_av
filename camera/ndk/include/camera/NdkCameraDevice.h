@@ -44,6 +44,8 @@
 
 __BEGIN_DECLS
 
+#if __ANDROID_API__ >= 24
+
 /**
  * ACameraDevice is opaque type that provides access to a camera device.
  *
@@ -666,6 +668,10 @@ camera_status_t ACameraDevice_createCaptureSession(
         const ACameraCaptureSession_stateCallbacks* callbacks,
         /*out*/ACameraCaptureSession** session) __INTRODUCED_IN(24);
 
+#endif /* __ANDROID_API__ >= 24 */
+
+#if __ANDROID_API__ >= 28
+
 /**
  * Create a shared ACaptureSessionOutput object.
  *
@@ -756,6 +762,8 @@ camera_status_t ACameraDevice_createCaptureSessionWithSessionParameters(
         const ACaptureRequest* sessionParameters,
         const ACameraCaptureSession_stateCallbacks* callbacks,
         /*out*/ACameraCaptureSession** session) __INTRODUCED_IN(28);
+
+#endif /* __ANDROID_API__ >= 28 */
 
 __END_DECLS
 

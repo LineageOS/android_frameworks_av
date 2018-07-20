@@ -38,6 +38,8 @@ __BEGIN_DECLS
 struct AMediaDataSource;
 typedef struct AMediaDataSource AMediaDataSource;
 
+#if __ANDROID_API__ >= 28
+
 /*
  * AMediaDataSource's callbacks will be invoked on an implementation-defined thread
  * or thread pool. No guarantees are provided about which thread(s) will be used for
@@ -132,6 +134,8 @@ void AMediaDataSource_setGetSize(
 void AMediaDataSource_setClose(
         AMediaDataSource*,
         AMediaDataSourceClose) __INTRODUCED_IN(28);
+
+#endif  /*__ANDROID_API__ >= 28 */
 
 __END_DECLS
 

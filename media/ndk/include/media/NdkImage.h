@@ -516,6 +516,8 @@ typedef struct AImageCropRect {
     int32_t bottom;
 } AImageCropRect;
 
+#if __ANDROID_API__ >= 24
+
 /**
  * Return the image back the the system and delete the AImage object from memory.
  *
@@ -712,6 +714,10 @@ media_status_t AImage_getPlaneData(
         const AImage* image, int planeIdx,
         /*out*/uint8_t** data, /*out*/int* dataLength) __INTRODUCED_IN(24);
 
+#endif /* __ANDROID_API__ >= 24 */
+
+#if __ANDROID_API__ >= 26
+
 /**
  * Return the image back the the system and delete the AImage object from memory asynchronously.
  *
@@ -755,6 +761,8 @@ void AImage_deleteAsync(AImage* image, int releaseFenceFd) __INTRODUCED_IN(26);
  * @see AImageReader_ImageCallback
  */
 media_status_t AImage_getHardwareBuffer(const AImage* image, /*out*/AHardwareBuffer** buffer) __INTRODUCED_IN(26);
+
+#endif /* __ANDROID_API__ >= 26 */
 
 __END_DECLS
 
