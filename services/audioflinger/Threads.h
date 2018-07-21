@@ -658,6 +658,8 @@ public:
     virtual             ~PlaybackThread();
 
                 void        dump(int fd, const Vector<String16>& args);
+                // returns a string of audio performance related data in JSON format.
+    virtual     std::string getJsonString() const;
 
     // Thread virtuals
     virtual     bool        threadLoop();
@@ -1103,6 +1105,7 @@ public:
     virtual     bool        checkForNewParameter_l(const String8& keyValuePair,
                                                    status_t& status);
     virtual     void        dumpInternals(int fd, const Vector<String16>& args);
+                std::string getJsonString() const override;
 
     virtual     bool        isTrackAllowed_l(
                                     audio_channel_mask_t channelMask, audio_format_t format,

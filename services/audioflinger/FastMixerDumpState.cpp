@@ -24,6 +24,7 @@
 #include <cpustats/ThreadCpuUsage.h>
 #endif
 #endif
+#include <string>
 #include <utils/Debug.h>
 #include <utils/Log.h>
 #include "FastMixerDumpState.h"
@@ -76,14 +77,14 @@ void FastMixerDumpState::dump(int fd) const
     dprintf(fd, "  FastMixer Timestamp stats: %s\n", mTimestampVerifier.toString().c_str());
 #ifdef FAST_THREAD_STATISTICS
     // find the interval of valid samples
-    uint32_t bounds = mBounds;
-    uint32_t newestOpen = bounds & 0xFFFF;
+    const uint32_t bounds = mBounds;
+    const uint32_t newestOpen = bounds & 0xFFFF;
     uint32_t oldestClosed = bounds >> 16;
 
     //uint32_t n = (newestOpen - oldestClosed) & 0xFFFF;
     uint32_t n;
     __builtin_sub_overflow(newestOpen, oldestClosed, &n);
-    n = n & 0xFFFF;
+    n &= 0xFFFF;
 
     if (n > mSamplingN) {
         ALOGE("too many samples %u", n);
@@ -202,6 +203,58 @@ void FastMixerDumpState::dump(int fd) const
                 mostRecent, ftDump->mFramesReady,
                 (long long)ftDump->mFramesWritten);
     }
+}
+
+// TODO get rid of extraneous lines and use better key names.
+// TODO may go back to using a library to do the json formatting.
+std::string FastMixerDumpState::getJsonString() const
+{
+    if (mCommand == FastMixerState::INITIAL) {
+        return "    {\n      \"status\": \"uninitialized\"\n    }";
+    }
+    std::string jsonStr = "    {\n";
+#ifdef FAST_THREAD_STATISTICS
+    // find the interval of valid samples
+    const uint32_t bounds = mBounds;
+    const uint32_t newestOpen = bounds & 0xFFFF;
+    uint32_t oldestClosed = bounds >> 16;
+
+    //uint32_t n = (newestOpen - oldestClosed) & 0xFFFF;
+    uint32_t n;
+    __builtin_sub_overflow(newestOpen, oldestClosed, &n);
+    n &= 0xFFFF;
+
+    if (n > mSamplingN) {
+        ALOGE("too many samples %u", n);
+        n = mSamplingN;
+    }
+    // statistics for monotonic (wall clock) time, thread raw CPU load in time, CPU clock frequency,
+    // and adjusted CPU load in MHz normalized for CPU clock frequency
+    std::string jsonWallStr = "      \"wall_clock_time\":[";
+    std::string jsonLoadNsStr = "      \"raw_cpu_load\":[";
+    // loop over all the samples
+    for (uint32_t j = 0; j < n; ++j) {
+        size_t i = oldestClosed++ & (mSamplingN - 1);
+        uint32_t wallNs = mMonotonicNs[i];
+        if (j != 0) {
+            jsonWallStr += ',';
+            jsonLoadNsStr += ',';
+        }
+        /* jsonObject["wall"].append(wallNs); */
+        jsonWallStr += std::to_string(wallNs);
+        uint32_t sampleLoadNs = mLoadNs[i];
+        jsonLoadNsStr += std::to_string(sampleLoadNs);
+    }
+    jsonWallStr += ']';
+    jsonLoadNsStr += ']';
+    if (n) {
+        jsonStr += jsonWallStr + ",\n" + jsonLoadNsStr + "\n";
+    } else {
+        //dprintf(fd, "  No FastMixer statistics available currently\n");
+    }
+#endif
+    jsonStr += "    }";
+    return jsonStr;
 }
 
 }   // android

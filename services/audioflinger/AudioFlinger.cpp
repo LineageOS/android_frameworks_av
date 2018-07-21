@@ -20,9 +20,11 @@
 //#define LOG_NDEBUG 0
 
 #include "Configuration.h"
+#include <algorithm>    // std::any_of
 #include <dirent.h>
 #include <math.h>
 #include <signal.h>
+#include <string>
 #include <sys/time.h>
 #include <sys/resource.h>
 
@@ -434,6 +436,15 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
     if (!dumpAllowed()) {
         dumpPermissionDenial(fd, args);
     } else {
+        // XXX This is sort of hacky for now.
+        const bool formatJson = std::any_of(args.begin(), args.end(),
+                [](const String16 &arg) { return arg == String16("--json"); });
+        if (formatJson) {
+            // XXX consider buffering if the string happens to be too long.
+            dprintf(fd, "%s", getJsonString().c_str());
+            return NO_ERROR;
+        }
+
         // get state of hardware lock
         bool hardwareLocked = dumpTryLock(mHardwareLock);
         if (!hardwareLocked) {
@@ -443,7 +454,7 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
             mHardwareLock.unlock();
         }
 
-        bool locked = dumpTryLock(mLock);
+        const bool locked = dumpTryLock(mLock);
 
         // failed to lock - AudioFlinger is probably deadlocked
         if (!locked) {
@@ -543,6 +554,36 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
         }
     }
     return NO_ERROR;
+}
+
+std::string AudioFlinger::getJsonString()
+{
+    std::string jsonStr = "{\n";
+    const bool locked = dumpTryLock(mLock);
+
+    // failed to lock - AudioFlinger is probably deadlocked
+    if (!locked) {
+        jsonStr += "    \"deadlock_message\": ";
+        jsonStr += kDeadlockedString;
+        jsonStr += ",\n";
+    }
+    // FIXME risky to access data structures without a lock held?
+
+    jsonStr += "  \"Playback_Threads\": [\n";
+    // dump playback threads
+    for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
+        if (i != 0) {
+            jsonStr += ",\n";
+        }
+        jsonStr += mPlaybackThreads.valueAt(i)->getJsonString();
+    }
+    jsonStr += "\n  ]\n}\n";
+
+    if (locked) {
+        mLock.unlock();
+    }
+
+    return jsonStr;
 }
 
 sp<AudioFlinger::Client> AudioFlinger::registerPid(pid_t pid)
