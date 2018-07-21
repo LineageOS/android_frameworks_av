@@ -17,7 +17,6 @@
 #pragma once
 
 #include <sys/types.h>
-
 #include "AudioPort.h"
 #include <RoutingStrategy.h>
 #include <utils/Errors.h>
