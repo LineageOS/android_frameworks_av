@@ -471,12 +471,16 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
 
     audio_output_flags_t outputFlags = mAudioPatch.sinks[0].config_mask & AUDIO_PORT_CONFIG_FLAGS ?
             mAudioPatch.sinks[0].flags.output : AUDIO_OUTPUT_FLAG_NONE;
-
+    audio_stream_type_t streamType = AUDIO_STREAM_PATCH;
+    if (mAudioPatch.num_sources == 2 && mAudioPatch.sources[1].type == AUDIO_PORT_TYPE_MIX) {
+        // "reuse one existing output mix" case
+        streamType = mAudioPatch.sources[1].ext.mix.usecase.stream;
+    }
     // create a special playback track to render to playback thread.
     // this track is given the same buffer as the PatchRecord buffer
     sp<PlaybackThread::PatchTrack> tempPatchTrack = new (std::nothrow) PlaybackThread::PatchTrack(
                                            mPlayback.thread().get(),
-                                           mAudioPatch.sources[1].ext.mix.usecase.stream,
+                                           streamType,
                                            sampleRate,
                                            outChannelMask,
                                            format,

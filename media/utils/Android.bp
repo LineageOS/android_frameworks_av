@@ -22,6 +22,7 @@ cc_library {
         "ProcessInfo.cpp",
         "SchedulingPolicyService.cpp",
         "ServiceUtilities.cpp",
+        "TimeCheck.cpp",
     ],
     shared_libs: [
         "libbinder",
@@ -30,6 +31,8 @@ cc_library {
         "libutils",
         "libmemunreachable",
     ],
+
+    logtags: ["EventLogTags.logtags"],
 
     cflags: [
         "-Wall",

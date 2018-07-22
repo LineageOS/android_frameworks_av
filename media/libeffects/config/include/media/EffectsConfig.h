@@ -96,7 +96,7 @@ struct ParsingResult {
     /** Parsed config, nullptr if the xml lib could not load the file */
     std::unique_ptr<Config> parsedConfig;
     size_t nbSkippedElement; //< Number of skipped invalid library, effect or processing chain
-    const char* configPath; //< Path to the loaded configuration
+    const std::string configPath; //< Path to the loaded configuration
 };
 
 /** Parses the provided effect configuration.

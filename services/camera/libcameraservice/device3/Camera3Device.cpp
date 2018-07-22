@@ -3918,18 +3918,17 @@ status_t Camera3Device::HalInterface::processBatchCaptureRequests(
     }
 
     hardware::details::return_status err;
+    auto resultCallback =
+        [&status, &numRequestProcessed] (auto s, uint32_t n) {
+                status = s;
+                *numRequestProcessed = n;
+        };
     if (hidlSession_3_4 != nullptr) {
         err = hidlSession_3_4->processCaptureRequest_3_4(captureRequests_3_4, cachesToRemove,
-            [&status, &numRequestProcessed] (auto s, uint32_t n) {
-                status = s;
-                *numRequestProcessed = n;
-            });
+                                                         resultCallback);
     } else {
         err = mHidlSession->processCaptureRequest(captureRequests, cachesToRemove,
-            [&status, &numRequestProcessed] (auto s, uint32_t n) {
-                status = s;
-                *numRequestProcessed = n;
-            });
+                                                  resultCallback);
     }
     if (!err.isOk()) {
         ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
