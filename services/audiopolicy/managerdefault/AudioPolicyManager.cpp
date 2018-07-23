@@ -3426,7 +3426,7 @@ status_t AudioPolicyManager::connectAudioSource(const sp<AudioSourceDescriptor>&
     return NO_ERROR;
 }
 
-status_t AudioPolicyManager::stopAudioSource(audio_patch_handle_t handle __unused)
+status_t AudioPolicyManager::stopAudioSource(audio_patch_handle_t handle)
 {
     sp<AudioSourceDescriptor> sourceDesc = mAudioSources.valueFor(handle);
     ALOGV("%s handle %d", __FUNCTION__, handle);
@@ -4637,20 +4637,6 @@ SortedVector<audio_io_handle_t> AudioPolicyManager::getOutputsForDevice(
     return outputs;
 }
 
-bool AudioPolicyManager::vectorsEqual(SortedVector<audio_io_handle_t>& outputs1,
-                                      SortedVector<audio_io_handle_t>& outputs2)
-{
-    if (outputs1.size() != outputs2.size()) {
-        return false;
-    }
-    for (size_t i = 0; i < outputs1.size(); i++) {
-        if (outputs1[i] != outputs2[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
 void AudioPolicyManager::checkForDeviceAndOutputChanges()
 {
     checkForDeviceAndOutputChanges([](){ return false; });
@@ -4691,7 +4677,7 @@ void AudioPolicyManager::checkOutputForStrategy(routing_strategy strategy)
         }
     }
 
-    if (!vectorsEqual(srcOutputs,dstOutputs)) {
+    if (srcOutputs != dstOutputs) {
         // get maximum latency of all source outputs to determine the minimum mute time guaranteeing
         // audio from invalidated tracks will be rendered when unmuting
         uint32_t maxLatency = 0;

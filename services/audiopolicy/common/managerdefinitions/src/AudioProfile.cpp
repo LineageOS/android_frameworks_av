@@ -56,20 +56,6 @@ status_t AudioProfile::checkExact(uint32_t samplingRate, audio_channel_mask_t ch
     return BAD_VALUE;
 }
 
-template <typename T>
-bool operator == (const SortedVector<T> &left, const SortedVector<T> &right)
-{
-    if (left.size() != right.size()) {
-        return false;
-    }
-    for(size_t index = 0; index < right.size(); index++) {
-        if (left[index] != right[index]) {
-            return false;
-        }
-    }
-    return true;
-}
-
 bool operator == (const AudioProfile &left, const AudioProfile &compareTo)
 {
     return (left.getFormat() == compareTo.getFormat()) &&
