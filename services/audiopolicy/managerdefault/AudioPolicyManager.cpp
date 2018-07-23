@@ -1691,72 +1691,6 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
                                                      uid,
                                                      isSoundTrigger);
 
-// FIXME: disable concurrent capture until UI is ready
-#if 0
-    // reuse an open input if possible
-    sp<AudioInputDescriptor> reusedInputDesc;
-    for (size_t i = 0; i < mInputs.size(); i++) {
-        sp<AudioInputDescriptor> desc = mInputs.valueAt(i);
-        // reuse input if:
-        // - it shares the same profile
-        //      AND
-        // - it is not a reroute submix input
-        //      AND
-        // - it is: not used for sound trigger
-        //                OR
-        //          used for sound trigger and all clients use the same session ID
-        //
-        if ((profile == desc->mProfile) &&
-            (isSoundTrigger == desc->isSoundTrigger()) &&
-            !is_virtual_input_device(device)) {
-
-            sp<AudioSession> as = desc->getAudioSession(session);
-            if (as != 0) {
-                // do not allow unmatching properties on same session
-                if (as->matches(audioSession)) {
-                    as->changeOpenCount(1);
-                } else {
-                    ALOGW("getInputForDevice() record with different attributes"
-                          " exists for session %d", session);
-                    continue;
-                }
-            } else if (isSoundTrigger) {
-                continue;
-            }
-
-            // Reuse the already opened input stream on this profile if:
-            // - the new capture source is background OR
-            // - the path requested configurations match OR
-            // - the new source priority is less than the highest source priority on this input
-            // If the input stream cannot be reused, close it before opening a new stream
-            // on the same profile for the new client so that the requested path configuration
-            // can be selected.
-            if (!isConcurrentSource(inputSource) &&
-                    ((desc->mSamplingRate != samplingRate ||
-                    desc->mChannelMask != config->channel_mask ||
-                    !audio_formats_match(desc->mFormat, config->format)) &&
-                    (source_priority(desc->getHighestPrioritySource(false /*activeOnly*/)) <
-                     source_priority(inputSource)))) {
-                reusedInputDesc = desc;
-                continue;
-            } else {
-                desc->addAudioSession(session, audioSession);
-                ALOGV("%s: reusing input %d", __FUNCTION__, mInputs.keyAt(i));
-                return mInputs.keyAt(i);
-            }
-        }
-    }
-
-    if (reusedInputDesc != 0) {
-        AudioSessionCollection sessions = reusedInputDesc->getAudioSessions(false /*activeOnly*/);
-        for (size_t j = 0; j < sessions.size(); j++) {
-            audio_session_t currentSession = sessions.keyAt(j);
-            stopInput(reusedInputDesc->mIoHandle, currentSession);
-            releaseInput(reusedInputDesc->mIoHandle, currentSession);
-        }
-    }
-#endif
-
     if (!profile->canOpenNewIo()) {
         return AUDIO_IO_HANDLE_NONE;
     }
@@ -1900,20 +1834,6 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
         return BAD_VALUE;
     }
 
-// FIXME: disable concurrent capture until UI is ready
-#if 0
-    if (!isConcurentCaptureAllowed(inputDesc, audioSession)) {
-        ALOGW("startInput(%d) failed: other input already started", input);
-        return INVALID_OPERATION;
-    }
-
-    if (isInCall()) {
-        *concurrency |= API_INPUT_CONCURRENCY_CALL;
-    }
-    if (mInputs.activeInputsCountOnDevices() != 0) {
-        *concurrency |= API_INPUT_CONCURRENCY_CAPTURE;
-    }
-#else
     if (!is_virtual_input_device(inputDesc->mDevice)) {
         if (mCallTxPatch != 0 &&
             inputDesc->getModuleHandle() == mCallTxPatch->mPatch.sources[0].ext.device.hw_module) {
@@ -2009,7 +1929,6 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
             }
         }
     }
-#endif
 
     // Make sure we start with the correct silence state
     audioSession->setSilenced(silenced);
