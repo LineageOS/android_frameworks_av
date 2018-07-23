@@ -16,12 +16,15 @@
 
 #pragma once
 
+#include <vector>
+#include <map>
 #include <unistd.h>
 #include <sys/types.h>
 
 #include <system/audio.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
+#include <utils/String8.h>
 
 namespace android {
 
@@ -35,7 +38,8 @@ public:
         mConfig(config), mPreferredDeviceId(preferredDeviceId), mActive(false) {}
     ~ClientDescriptor() override = default;
 
-    virtual status_t  dump(int fd);
+    status_t dump(int fd, int spaces, int index);
+    virtual status_t dump(String8& dst, int spaces, int index);
 
     audio_port_handle_t portId() const { return mPortId; }
     uid_t uid() const { return mUid; }
@@ -67,7 +71,8 @@ public:
         mStream(stream), mFlags(flags) {}
     ~TrackClientDescriptor() override = default;
 
-    status_t    dump(int fd) override;
+    using ClientDescriptor::dump;
+    status_t dump(String8& dst, int spaces, int index) override;
 
     audio_output_flags_t flags() const { return mFlags; }
     audio_stream_type_t stream() const { return mStream; }
@@ -88,7 +93,8 @@ public:
         mSource(source), mFlags(flags) {}
     ~RecordClientDescriptor() override = default;
 
-    status_t    dump(int fd) override;
+    using ClientDescriptor::dump;
+    status_t dump(String8& dst, int spaces, int index) override;
 
     audio_source_t source() const { return mSource; }
     audio_input_flags_t flags() const { return mFlags; }
@@ -97,5 +103,10 @@ private:
     const audio_source_t mSource;
     const audio_input_flags_t mFlags;
 };
+
+typedef std::vector< sp<TrackClientDescriptor> > TrackClientVector;
+typedef std::map< audio_port_handle_t, sp<TrackClientDescriptor> > TrackClientMap;
+typedef std::vector< sp<RecordClientDescriptor> > RecordClientVector;
+typedef std::map< audio_port_handle_t, sp<RecordClientDescriptor> > RecordClientMap;
 
 } // namespace android

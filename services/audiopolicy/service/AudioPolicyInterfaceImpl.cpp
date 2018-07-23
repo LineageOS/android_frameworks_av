@@ -200,7 +200,7 @@ status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *attr,
         !modifyPhoneStateAllowed(pid, uid)) {
         // If the app tries to play music through the telephony device and doesn't have permission
         // the fallback to the default output device.
-        mAudioPolicyManager->releaseOutput(*output, *stream, session);
+        mAudioPolicyManager->releaseOutput(*portId);
         flags = originalFlags;
         *selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
         *portId = AUDIO_PORT_HANDLE_NONE;
@@ -245,8 +245,7 @@ status_t AudioPolicyService::startOutput(audio_port_handle_t portId)
     }
     Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
-    status_t status = mAudioPolicyManager->startOutput(
-        client->io, client->stream, client->session);
+    status_t status = mAudioPolicyManager->startOutput(portId);
     if (status == NO_ERROR) {
         client->active = true;
     }
@@ -298,8 +297,7 @@ status_t  AudioPolicyService::doStopOutput(audio_port_handle_t portId)
     }
     Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
-    status_t status = mAudioPolicyManager->stopOutput(
-        client->io, client->stream, client->session);
+    status_t status = mAudioPolicyManager->stopOutput(portId);
     if (status == NO_ERROR) {
         client->active = false;
     }
@@ -328,8 +326,7 @@ void AudioPolicyService::doReleaseOutput(audio_port_handle_t portId)
     mAudioRecordClients.removeItem(portId);
 
     // called from internal thread: no need to clear caller identity
-    mAudioPolicyManager->releaseOutput(
-        client->io, client->stream, client->session);
+    mAudioPolicyManager->releaseOutput(portId);
 }
 
 status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
@@ -433,7 +430,7 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
         if (status != NO_ERROR) {
             if (status == PERMISSION_DENIED) {
                 AutoCallerClear acc;
-                mAudioPolicyManager->releaseInput(*input, session);
+                mAudioPolicyManager->releaseInput(*portId);
             }
             return status;
         }
@@ -527,8 +524,7 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId, bool *silenc
     status_t status;
     {
         AutoCallerClear acc;
-        status = mAudioPolicyManager->startInput(
-                    client->io, client->session, *silenced, &concurrency);
+        status = mAudioPolicyManager->startInput(portId, *silenced, &concurrency);
 
     }
 
@@ -641,7 +637,7 @@ status_t AudioPolicyService::stopInput(audio_port_handle_t portId)
     // finish the recording app op
     finishRecording(client->opPackageName, client->uid);
     AutoCallerClear acc;
-    return mAudioPolicyManager->stopInput(client->io, client->session);
+    return mAudioPolicyManager->stopInput(portId);
 }
 
 void AudioPolicyService::releaseInput(audio_port_handle_t portId)
@@ -674,7 +670,7 @@ void AudioPolicyService::releaseInput(audio_port_handle_t portId)
     {
         Mutex::Autolock _l(mLock);
         AutoCallerClear acc;
-        mAudioPolicyManager->releaseInput(client->io, client->session);
+        mAudioPolicyManager->releaseInput(portId);
     }
 }
 

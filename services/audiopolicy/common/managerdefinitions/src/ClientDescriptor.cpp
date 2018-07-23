@@ -17,60 +17,50 @@
 #define LOG_TAG "APM_ClientDescriptor"
 //#define LOG_NDEBUG 0
 
+#include <utils/Log.h>
 #include <utils/String8.h>
 #include "ClientDescriptor.h"
 
 namespace android {
 
-status_t ClientDescriptor::dump(int fd)
+status_t ClientDescriptor::dump(int fd, int spaces, int index)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
+    String8 out;
 
-    snprintf(buffer, SIZE, " Port ID: %d Session Id: %d UID: %d\n", mPortId, mSessionId, mUid);
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Format: %08x Sampling rate: %d Channels: %08x\n",
+    status_t status = dump(out, spaces, index);
+    if (status == NO_ERROR) {
+        write(fd, out.string(), out.size());
+    }
+
+    return status;
+}
+
+status_t ClientDescriptor::dump(String8& out, int spaces, int index)
+{
+    out.appendFormat("%*sClient %d:\n", spaces, "", index+1);
+    out.appendFormat("%*s- Port ID: %d Session Id: %d UID: %d\n", spaces, "",
+             mPortId, mSessionId, mUid);
+    out.appendFormat("%*s- Format: %08x Sampling rate: %d Channels: %08x\n", spaces, "",
              mConfig.format, mConfig.sample_rate, mConfig.channel_mask);
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Preferred Device Id: %08x\n", mPreferredDeviceId);
-    result.append(buffer);
-    snprintf(buffer, SIZE, " State: %s\n", mActive ? "Active" : "Inactive");
-    result.append(buffer);
+    out.appendFormat("%*s- Preferred Device Id: %08x\n", spaces, "", mPreferredDeviceId);
+    out.appendFormat("%*s- State: %s\n", spaces, "", mActive ? "Active" : "Inactive");
+    return NO_ERROR;
+}
 
-    write(fd, result.string(), result.size());
+status_t TrackClientDescriptor::dump(String8& out, int spaces, int index)
+{
+    ClientDescriptor::dump(out, spaces, index);
+
+    out.appendFormat("%*s- Stream: %d flags: %08x\n", spaces, "", mStream, mFlags);
 
     return NO_ERROR;
 }
 
-status_t TrackClientDescriptor::dump(int fd)
+status_t RecordClientDescriptor::dump(String8& out, int spaces, int index)
 {
-    ClientDescriptor::dump(fd);
+    ClientDescriptor::dump(out, spaces, index);
 
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
-    snprintf(buffer, SIZE, " Stream: %d flags: %08x\n", mStream, mFlags);
-    result.append(buffer);
-
-    write(fd, result.string(), result.size());
-
-    return NO_ERROR;
-}
-
-status_t RecordClientDescriptor::dump(int fd)
-{
-    ClientDescriptor::dump(fd);
-
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
-    snprintf(buffer, SIZE, " Source: %d flags: %08x\n", mSource, mFlags);
-    result.append(buffer);
-
-    write(fd, result.string(), result.size());
+    out.appendFormat("%*s- Source: %d flags: %08x\n", spaces, "", mSource, mFlags);
 
     return NO_ERROR;
 }

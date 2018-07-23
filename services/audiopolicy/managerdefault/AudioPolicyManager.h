@@ -120,15 +120,9 @@ public:
                                           audio_output_flags_t *flags,
                                           audio_port_handle_t *selectedDeviceId,
                                           audio_port_handle_t *portId);
-        virtual status_t startOutput(audio_io_handle_t output,
-                                     audio_stream_type_t stream,
-                                     audio_session_t session);
-        virtual status_t stopOutput(audio_io_handle_t output,
-                                    audio_stream_type_t stream,
-                                    audio_session_t session);
-        virtual void releaseOutput(audio_io_handle_t output,
-                                   audio_stream_type_t stream,
-                                   audio_session_t session);
+        virtual status_t startOutput(audio_port_handle_t portId);
+        virtual status_t stopOutput(audio_port_handle_t portId);
+        virtual void releaseOutput(audio_port_handle_t portId);
         virtual status_t getInputForAttr(const audio_attributes_t *attr,
                                          audio_io_handle_t *input,
                                          audio_session_t session,
@@ -140,16 +134,13 @@ public:
                                          audio_port_handle_t *portId);
 
         // indicates to the audio policy manager that the input starts being used.
-        virtual status_t startInput(audio_io_handle_t input,
-                                    audio_session_t session,
+        virtual status_t startInput(audio_port_handle_t portId,
                                     bool silenced,
                                     concurrency_type__mask_t *concurrency);
 
         // indicates to the audio policy manager that the input stops being used.
-        virtual status_t stopInput(audio_io_handle_t input,
-                                   audio_session_t session);
-        virtual void releaseInput(audio_io_handle_t input,
-                                  audio_session_t session);
+        virtual status_t stopInput(audio_port_handle_t portId);
+        virtual void releaseInput(audio_port_handle_t portId);
         virtual void closeAllInputs();
         virtual void initStreamVolume(audio_stream_type_t stream,
                                                     int indexMin,
@@ -550,6 +541,10 @@ protected:
 
         static bool streamsMatchForvolume(audio_stream_type_t stream1,
                                           audio_stream_type_t stream2);
+
+        void closeSessions(const sp<AudioInputDescriptor>& input, bool activeOnly);
+        void closeSession(const sp<AudioInputDescriptor>& input,
+                          const sp<AudioSession>& session);
 
         const uid_t mUidCached;                         // AID_AUDIOSERVER
         AudioPolicyClientInterface *mpClientInterface;  // audio policy client interface

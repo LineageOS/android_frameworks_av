@@ -19,6 +19,7 @@
 #include "AudioIODescriptorInterface.h"
 #include "AudioPort.h"
 #include "AudioSession.h"
+#include "ClientDescriptor.h"
 #include <utils/Errors.h>
 #include <system/audio.h>
 #include <utils/SortedVector.h>
@@ -88,7 +89,10 @@ public:
     void stop();
     void close();
 
-private:
+    RecordClientMap& clients() { return mClients; }
+    RecordClientVector getClientsForSession(audio_session_t session);
+
+ private:
 
     void updateSessionRecordingConfiguration(int event, const sp<AudioSession>& audioSession);
 
@@ -105,6 +109,8 @@ private:
     SortedVector<audio_session_t> mPreemptedSessions;
     AudioPolicyClientInterface *mClientInterface;
     uint32_t mGlobalRefCount;  // non-session-specific ref count
+
+    RecordClientMap mClients;
 };
 
 class AudioInputCollection :
@@ -127,6 +133,8 @@ public:
     Vector<sp <AudioInputDescriptor> > getActiveInputs(bool ignoreVirtualInputs = true);
 
     audio_devices_t getSupportedDevices(audio_io_handle_t handle) const;
+
+    sp<AudioInputDescriptor> getInputForClient(audio_port_handle_t portId);
 
     status_t dump(int fd) const;
 };
