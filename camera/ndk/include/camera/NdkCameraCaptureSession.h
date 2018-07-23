@@ -45,6 +45,8 @@
 
 __BEGIN_DECLS
 
+#if __ANDROID_API__ >= 24
+
 /**
  * ACameraCaptureSession is an opaque type that manages frame captures of a camera device.
  *
@@ -591,6 +593,10 @@ camera_status_t ACameraCaptureSession_stopRepeating(ACameraCaptureSession* sessi
 camera_status_t ACameraCaptureSession_abortCaptures(ACameraCaptureSession* session)
         __INTRODUCED_IN(24);
 
+#endif /* __ANDROID_API__ >= 24 */
+
+#if __ANDROID_API__ >= 28
+
 typedef struct ACaptureSessionOutput ACaptureSessionOutput;
 
 /**
@@ -635,6 +641,7 @@ typedef struct ACaptureSessionOutput ACaptureSessionOutput;
  */
 camera_status_t ACameraCaptureSession_updateSharedOutput(ACameraCaptureSession* session,
         ACaptureSessionOutput* output) __INTRODUCED_IN(28);
+#endif /* __ANDROID_API__ >= 28 */
 
 __END_DECLS
 
