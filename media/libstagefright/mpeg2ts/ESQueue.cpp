@@ -366,7 +366,8 @@ status_t ElementaryStreamQueue::appendData(
         ALOGE("appending data after EOS");
         return ERROR_MALFORMED;
     }
-    if (mBuffer == NULL || mBuffer->size() == 0) {
+
+    if (!isScrambled() && (mBuffer == NULL || mBuffer->size() == 0)) {
         switch (mMode) {
             case H264:
             case MPEG_VIDEO:
@@ -617,6 +618,7 @@ status_t ElementaryStreamQueue::appendData(
 
 void ElementaryStreamQueue::appendScrambledData(
         const void *data, size_t size,
+        size_t leadingClearBytes,
         int32_t keyId, bool isSync,
         sp<ABuffer> clearSizes, sp<ABuffer> encSizes) {
     if (!isScrambled()) {
@@ -644,6 +646,7 @@ void ElementaryStreamQueue::appendScrambledData(
 
     ScrambledRangeInfo scrambledInfo;
     scrambledInfo.mLength = size;
+    scrambledInfo.mLeadingClearBytes = leadingClearBytes;
     scrambledInfo.mKeyId = keyId;
     scrambledInfo.mIsSync = isSync;
     scrambledInfo.mClearSizes = clearSizes;
@@ -656,7 +659,6 @@ void ElementaryStreamQueue::appendScrambledData(
 
 sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
     size_t nextScan = mBuffer->size();
-    mBuffer->setRange(0, 0);
     int32_t pesOffset = 0, pesScramblingControl = 0;
     int64_t timeUs = fetchTimestamp(nextScan, &pesOffset, &pesScramblingControl);
     if (timeUs < 0ll) {
@@ -667,6 +669,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
     // return scrambled unit
     int32_t keyId = pesScramblingControl, isSync = 0, scrambledLength = 0;
     sp<ABuffer> clearSizes, encSizes;
+    size_t leadingClearBytes;
     while (mScrambledRangeInfos.size() > mRangeInfos.size()) {
         auto it = mScrambledRangeInfos.begin();
         ALOGV("[stream %d] fetching scrambled range: size=%zu", mMode, it->mLength);
@@ -684,12 +687,77 @@ sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
         clearSizes = it->mClearSizes;
         encSizes = it->mEncSizes;
         isSync = it->mIsSync;
+        leadingClearBytes = it->mLeadingClearBytes;
         mScrambledRangeInfos.erase(it);
     }
     if (scrambledLength == 0) {
         ALOGE("[stream %d] empty scrambled unit!", mMode);
         return NULL;
     }
+
+    // Retrieve the leading clear bytes info, and use it to set the clear
+    // range on mBuffer. Note that the leading clear bytes includes the
+    // PES header portion, while mBuffer doesn't.
+    if ((int32_t)leadingClearBytes > pesOffset) {
+        mBuffer->setRange(0, leadingClearBytes - pesOffset);
+    } else {
+        mBuffer->setRange(0, 0);
+    }
+
+    // Try to parse formats, and if unavailable set up a dummy format.
+    // Only support the following modes for scrambled content for now.
+    // (will be expanded later).
+    if (mFormat == NULL) {
+        mFormat = new MetaData;
+        switch (mMode) {
+            case H264:
+            {
+                if (!MakeAVCCodecSpecificData(
+                        *mFormat, mBuffer->data(), mBuffer->size())) {
+                    ALOGI("Creating dummy AVC format for scrambled content");
+
+                    mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
+                    mFormat->setInt32(kKeyWidth, 1280);
+                    mFormat->setInt32(kKeyHeight, 720);
+                }
+                break;
+            }
+            case AAC:
+            {
+                if (!MakeAACCodecSpecificData(
+                        *mFormat, mBuffer->data(), mBuffer->size())) {
+                    ALOGI("Creating dummy AAC format for scrambled content");
+
+                    MakeAACCodecSpecificData(*mFormat,
+                            1 /*profile*/, 7 /*sampling_freq_index*/, 1 /*channel_config*/);
+                    mFormat->setInt32(kKeyIsADTS, true);
+                }
+
+                break;
+            }
+            case MPEG_VIDEO:
+            {
+                ALOGI("Creating dummy MPEG format for scrambled content");
+
+                mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG2);
+                mFormat->setInt32(kKeyWidth, 1280);
+                mFormat->setInt32(kKeyHeight, 720);
+                break;
+            }
+            default:
+            {
+                ALOGE("Unknown mode for scrambled content");
+                return NULL;
+            }
+        }
+
+        // for MediaExtractor.CasInfo
+        mFormat->setInt32(kKeyCASystemID, mCASystemId);
+        mFormat->setData(kKeyCASessionID,
+                0, mCasSessionId.data(), mCasSessionId.size());
+    }
+
+    mBuffer->setRange(0, 0);
 
     // copy into scrambled access unit
     sp<ABuffer> scrambledAccessUnit = ABuffer::CreateAsCopy(
@@ -722,7 +790,11 @@ sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
 }
 
 sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
-    if ((mFlags & kFlag_AlignedData) && mMode == H264 && !isScrambled()) {
+    if (isScrambled()) {
+        return dequeueScrambledAccessUnit();
+    }
+
+    if ((mFlags & kFlag_AlignedData) && mMode == H264) {
         if (mRangeInfos.empty()) {
             return NULL;
         }
@@ -1024,25 +1096,11 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAAC() {
         bool protection_absent = bits.getBits(1) != 0;
 
         if (mFormat == NULL) {
-            unsigned profile = bits.getBits(2);
-            if (profile == 3u) {
-                ALOGE("profile should not be 3");
-                return NULL;
-            }
-            unsigned sampling_freq_index = bits.getBits(4);
-            bits.getBits(1);  // private_bit
-            unsigned channel_configuration = bits.getBits(3);
-            if (channel_configuration == 0u) {
-                ALOGE("channel_config should not be 0");
-                return NULL;
-            }
-            bits.skipBits(2);  // original_copy, home
-
             mFormat = new MetaData;
-            MakeAACCodecSpecificData(*mFormat,
-                    profile, sampling_freq_index, channel_configuration);
-
-            mFormat->setInt32(kKeyIsADTS, true);
+            if (!MakeAACCodecSpecificData(
+                    *mFormat, mBuffer->data() + offset, mBuffer->size() - offset)) {
+                return NULL;
+            }
 
             int32_t sampleRate;
             int32_t numChannels;
@@ -1057,11 +1115,11 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAAC() {
 
             ALOGI("found AAC codec config (%d Hz, %d channels)",
                  sampleRate, numChannels);
-        } else {
-            // profile_ObjectType, sampling_frequency_index, private_bits,
-            // channel_configuration, original_copy, home
-            bits.skipBits(12);
         }
+
+        // profile_ObjectType, sampling_frequency_index, private_bits,
+        // channel_configuration, original_copy, home
+        bits.skipBits(12);
 
         // adts_variable_header
 
@@ -1177,27 +1235,6 @@ int64_t ElementaryStreamQueue::fetchTimestamp(
 }
 
 sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitH264() {
-    if (isScrambled()) {
-        if (mBuffer == NULL || mBuffer->size() == 0) {
-            return NULL;
-        }
-        if (mFormat == NULL) {
-            mFormat = new MetaData;
-            if (!MakeAVCCodecSpecificData(*mFormat, mBuffer->data(), mBuffer->size())) {
-                ALOGW("Creating dummy AVC format for scrambled content");
-                mFormat = new MetaData;
-                mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
-                mFormat->setInt32(kKeyWidth, 1280);
-                mFormat->setInt32(kKeyHeight, 720);
-            }
-            // for MediaExtractor.CasInfo
-            mFormat->setInt32(kKeyCASystemID, mCASystemId);
-            mFormat->setData(kKeyCASessionID, 0,
-                    mCasSessionId.data(), mCasSessionId.size());
-        }
-        return dequeueScrambledAccessUnit();
-    }
-
     const uint8_t *data = mBuffer->data();
 
     size_t size = mBuffer->size();
@@ -1497,25 +1534,6 @@ static sp<ABuffer> MakeMPEGVideoESDS(const sp<ABuffer> &csd) {
 }
 
 sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEGVideo() {
-    if (isScrambled()) {
-        if (mBuffer == NULL || mBuffer->size() == 0) {
-            return NULL;
-        }
-        if (mFormat == NULL) {
-            ALOGI("Creating dummy MPEG format for scrambled content");
-            mFormat = new MetaData;
-            mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG2);
-            mFormat->setInt32(kKeyWidth, 1280);
-            mFormat->setInt32(kKeyHeight, 720);
-
-            // for MediaExtractor.CasInfo
-            mFormat->setInt32(kKeyCASystemID, mCASystemId);
-            mFormat->setData(kKeyCASessionID, 0,
-                    mCasSessionId.data(), mCasSessionId.size());
-        }
-        return dequeueScrambledAccessUnit();
-    }
-
     const uint8_t *data = mBuffer->data();
     size_t size = mBuffer->size();
 

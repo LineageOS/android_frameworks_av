@@ -60,6 +60,7 @@ struct ElementaryStreamQueue {
 
     void appendScrambledData(
             const void *data, size_t size,
+            size_t leadingClearBytes,
             int32_t keyId, bool isSync,
             sp<ABuffer> clearSizes, sp<ABuffer> encSizes);
 
@@ -85,8 +86,8 @@ private:
     };
 
     struct ScrambledRangeInfo {
-        //int64_t mTimestampUs;
         size_t mLength;
+        size_t mLeadingClearBytes;
         int32_t mKeyId;
         int32_t mIsSync;
         sp<ABuffer> mClearSizes;

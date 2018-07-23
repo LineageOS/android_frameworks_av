@@ -16,8 +16,10 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MetaDataUtils"
+#include <utils/Log.h>
 
 #include <media/stagefright/foundation/avc_utils.h>
+#include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaDataUtils.h>
@@ -25,6 +27,10 @@
 namespace android {
 
 bool MakeAVCCodecSpecificData(MetaDataBase &meta, const uint8_t *data, size_t size) {
+    if (data == nullptr || size == 0) {
+        return false;
+    }
+
     int32_t width;
     int32_t height;
     int32_t sarWidth;
@@ -43,6 +49,44 @@ bool MakeAVCCodecSpecificData(MetaDataBase &meta, const uint8_t *data, size_t si
         meta.setInt32(kKeySARWidth, sarWidth);
         meta.setInt32(kKeySARHeight, sarHeight);
     }
+    return true;
+}
+
+bool MakeAACCodecSpecificData(MetaDataBase &meta, const uint8_t *data, size_t size) {
+    if (data == nullptr || size < 7) {
+        return false;
+    }
+
+    ABitReader bits(data, size);
+
+    // adts_fixed_header
+
+    if (bits.getBits(12) != 0xfffu) {
+        ALOGE("Wrong atds_fixed_header");
+        return false;
+    }
+
+    bits.skipBits(4);  // ID, layer, protection_absent
+
+    unsigned profile = bits.getBits(2);
+    if (profile == 3u) {
+        ALOGE("profile should not be 3");
+        return false;
+    }
+    unsigned sampling_freq_index = bits.getBits(4);
+    bits.getBits(1);  // private_bit
+    unsigned channel_configuration = bits.getBits(3);
+    if (channel_configuration == 0u) {
+        ALOGE("channel_config should not be 0");
+        return false;
+    }
+
+    if (!MakeAACCodecSpecificData(
+            meta, profile, sampling_freq_index, channel_configuration)) {
+        return false;
+    }
+
+    meta.setInt32(kKeyIsADTS, true);
     return true;
 }
 
