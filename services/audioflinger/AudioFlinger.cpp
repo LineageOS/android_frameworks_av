@@ -1877,7 +1877,7 @@ audio_module_handle_t AudioFlinger::loadHwModule_l(const char *name)
 
         mHardwareStatus = AUDIO_HW_IDLE;
     }
-    if (strcmp(name, AUDIO_HAL_SERVICE_NAME_MSD) == 0) {
+    if (strcmp(name, AUDIO_HARDWARE_MODULE_ID_MSD) == 0) {
         // An MSD module is inserted before hardware modules in order to mix encoded streams.
         flags = static_cast<AudioHwDevice::Flags>(flags | AudioHwDevice::AHWD_IS_INSERT);
     }
