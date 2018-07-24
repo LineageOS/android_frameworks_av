@@ -32,7 +32,7 @@ AudioInputDescriptor::AudioInputDescriptor(const sp<IOProfile>& profile,
     : mIoHandle(0),
       mDevice(AUDIO_DEVICE_NONE), mPolicyMix(NULL),
       mProfile(profile), mPatchHandle(AUDIO_PATCH_HANDLE_NONE), mId(0),
-      mClientInterface(clientInterface)
+      mClientInterface(clientInterface), mGlobalRefCount(0)
 {
     if (profile != NULL) {
         profile->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
@@ -164,7 +164,7 @@ size_t AudioInputDescriptor::getAudioSessionCount(bool activeOnly) const
 
 status_t AudioInputDescriptor::addAudioSession(audio_session_t session,
                          const sp<AudioSession>& audioSession) {
-    return mSessions.addSession(session, audioSession, /*AudioIODescriptorInterface*/this);
+    return mSessions.addSession(session, audioSession);
 }
 
 status_t AudioInputDescriptor::removeAudioSession(audio_session_t session) {
@@ -179,7 +179,11 @@ audio_patch_handle_t AudioInputDescriptor::getPatchHandle() const
 void AudioInputDescriptor::setPatchHandle(audio_patch_handle_t handle)
 {
     mPatchHandle = handle;
-    mSessions.onIODescriptorUpdate();
+    for (size_t i = 0; i < mSessions.size(); i++) {
+        if (mSessions[i]->activeCount() > 0) {
+            updateSessionRecordingConfiguration(RECORD_CONFIG_EVENT_START, mSessions[i]);
+        }
+    }
 }
 
 audio_config_base_t AudioInputDescriptor::getConfig() const
@@ -266,7 +270,7 @@ void AudioInputDescriptor::close()
         LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
                             __FUNCTION__, mProfile->curOpenCount);
         // do not call stop() here as stop() is supposed to be called after
-        // AudioSession::changeActiveCount(-1) and we don't know how many sessions
+        //  changeRefCount(session, -1) and we don't know how many sessions
         // are still active at this time
         if (isActive()) {
             mProfile->curActiveCount--;
@@ -274,6 +278,66 @@ void AudioInputDescriptor::close()
         mProfile->curOpenCount--;
         mIoHandle = AUDIO_IO_HANDLE_NONE;
     }
+}
+
+void AudioInputDescriptor::changeRefCount(audio_session_t session, int delta)
+{
+    sp<AudioSession> audioSession = mSessions.valueFor(session);
+    if (audioSession == 0) {
+        return;
+    }
+    // handle session-independent ref count
+    uint32_t oldGlobalRefCount = mGlobalRefCount;
+    if ((delta + (int)mGlobalRefCount) < 0) {
+        ALOGW("changeRefCount() invalid delta %d globalRefCount %d", delta, mGlobalRefCount);
+        delta = -((int)mGlobalRefCount);
+    }
+    mGlobalRefCount += delta;
+    if ((oldGlobalRefCount == 0) && (mGlobalRefCount > 0)) {
+        if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
+        {
+            mClientInterface->onDynamicPolicyMixStateUpdate(mPolicyMix->mDeviceAddress,
+                                                            MIX_STATE_MIXING);
+        }
+
+    } else if ((oldGlobalRefCount > 0) && (mGlobalRefCount == 0)) {
+        if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
+        {
+            mClientInterface->onDynamicPolicyMixStateUpdate(mPolicyMix->mDeviceAddress,
+                                                            MIX_STATE_IDLE);
+        }
+    }
+
+    uint32_t oldActiveCount = audioSession->activeCount();
+    if ((delta + (int)oldActiveCount) < 0) {
+        ALOGW("changeRefCount() invalid delta %d for sesion %d active count %d",
+              delta, session, oldActiveCount);
+        delta = -((int)oldActiveCount);
+    }
+
+    audioSession->changeActiveCount(delta);
+
+    int event = RECORD_CONFIG_EVENT_NONE;
+    if ((oldActiveCount == 0) && (audioSession->activeCount() > 0)) {
+        event = RECORD_CONFIG_EVENT_START;
+    } else if ((oldActiveCount > 0) && (audioSession->activeCount() == 0)) {
+        event = RECORD_CONFIG_EVENT_STOP;
+    }
+    if (event != RECORD_CONFIG_EVENT_NONE) {
+        updateSessionRecordingConfiguration(event, audioSession);
+    }
+
+}
+
+void AudioInputDescriptor::updateSessionRecordingConfiguration(
+    int event, const sp<AudioSession>& audioSession) {
+
+    const audio_config_base_t sessionConfig = audioSession->config();
+    const record_client_info_t recordClientInfo = audioSession->recordClientInfo();
+    const audio_config_base_t config = getConfig();
+    mClientInterface->onRecordingConfigurationUpdate(event,
+                                                     &recordClientInfo, &sessionConfig,
+                                                     &config, mPatchHandle);
 }
 
 status_t AudioInputDescriptor::dump(int fd)

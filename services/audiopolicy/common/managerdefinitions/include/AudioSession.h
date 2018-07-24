@@ -29,7 +29,7 @@ namespace android {
 
 class AudioPolicyClientInterface;
 
-class AudioSession : public RefBase, public AudioIODescriptorUpdateListener
+class AudioSession : public RefBase
 {
 public:
     AudioSession(audio_session_t session,
@@ -39,9 +39,7 @@ public:
                  audio_channel_mask_t channelMask,
                  audio_input_flags_t flags,
                  uid_t uid,
-                 bool isSoundTrigger,
-                 AudioMix* policyMix,
-                 AudioPolicyClientInterface *clientInterface);
+                 bool isSoundTrigger);
 
     status_t dump(int fd, int spaces, int index) const;
 
@@ -50,6 +48,8 @@ public:
     audio_format_t format() const { return mConfig.format; }
     uint32_t sampleRate() const { return mConfig.sample_rate; }
     audio_channel_mask_t channelMask() const { return mConfig.channel_mask; }
+    audio_config_base config() const { return mConfig; }
+    record_client_info_t recordClientInfo() const { return mRecordClientInfo; }
     audio_input_flags_t flags() const { return mFlags; }
     uid_t uid() const { return mRecordClientInfo.uid; }
     void setUid(uid_t uid) { mRecordClientInfo.uid = uid; }
@@ -63,10 +63,6 @@ public:
     uint32_t changeOpenCount(int delta);
     uint32_t changeActiveCount(int delta);
 
-    void setInfoProvider(AudioIODescriptorInterface *provider);
-    // implementation of AudioIODescriptorUpdateListener
-    virtual void onIODescriptorUpdate() const;
-
 private:
     record_client_info_t mRecordClientInfo;
     const struct audio_config_base mConfig;
@@ -75,19 +71,14 @@ private:
     bool mSilenced;
     uint32_t  mOpenCount;
     uint32_t  mActiveCount;
-    AudioMix* mPolicyMix; // non NULL when used by a dynamic policy
-    AudioPolicyClientInterface* mClientInterface;
-    const AudioIODescriptorInterface* mInfoProvider;
 };
 
 class AudioSessionCollection :
-    public DefaultKeyedVector<audio_session_t, sp<AudioSession> >,
-    public AudioIODescriptorUpdateListener
+    public DefaultKeyedVector<audio_session_t, sp<AudioSession> >
 {
 public:
     status_t addSession(audio_session_t session,
-                             const sp<AudioSession>& audioSession,
-                             AudioIODescriptorInterface *provider);
+                             const sp<AudioSession>& audioSession);
 
     status_t removeSession(audio_session_t session);
 
@@ -98,9 +89,6 @@ public:
     bool hasActiveSession() const;
     bool isSourceActive(audio_source_t source) const;
     audio_source_t getHighestPrioritySource(bool activeOnly) const;
-
-    // implementation of AudioIODescriptorUpdateListener
-    virtual void onIODescriptorUpdate() const;
 
     status_t dump(int fd, int spaces) const;
 };
