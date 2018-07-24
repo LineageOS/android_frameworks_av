@@ -328,7 +328,15 @@ status_t SampleIterator::findSampleTimeAndDuration(
         ++mTimeToSampleIndex;
     }
 
-    *time = mTTSSampleTime + mTTSDuration * (sampleIndex - mTTSSampleIndex);
+    // below is equivalent to:
+    // *time = mTTSSampleTime + mTTSDuration * (sampleIndex - mTTSSampleIndex);
+    uint32_t tmp;
+    if (__builtin_sub_overflow(sampleIndex, mTTSSampleIndex, &tmp) ||
+            __builtin_mul_overflow(mTTSDuration, tmp, &tmp) ||
+            __builtin_add_overflow(mTTSSampleTime, tmp, &tmp)) {
+        return ERROR_OUT_OF_RANGE;
+    }
+    *time = tmp;
 
     int32_t offset = mTable->getCompositionTimeOffset(sampleIndex);
     if ((offset < 0 && *time < (offset == INT32_MIN ?
