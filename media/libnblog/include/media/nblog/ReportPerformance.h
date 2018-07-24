@@ -23,9 +23,6 @@
 
 namespace android {
 
-// The String8 class is used by reportPerformance function
-class String8;
-
 namespace ReportPerformance {
 
 constexpr int kMsPerSec = 1000;

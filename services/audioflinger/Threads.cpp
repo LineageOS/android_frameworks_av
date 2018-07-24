@@ -3354,7 +3354,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
                 continue;
             }
-            if ((!mActiveTracks.size() && systemTime() > mStandbyTimeNs) ||
+            if ((mActiveTracks.isEmpty() && systemTime() > mStandbyTimeNs) ||
                                    isSuspended()) {
                 // put audio hardware into standby after short delay
                 if (shouldStandby_l()) {
@@ -3368,7 +3368,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                     mStandby = true;
                 }
 
-                if (!mActiveTracks.size() && mConfigEvents.isEmpty()) {
+                if (mActiveTracks.isEmpty() && mConfigEvents.isEmpty()) {
                     // we're about to wait, flush the binder command buffer
                     IPCThreadState::self()->flushCommands();
 
@@ -6649,7 +6649,7 @@ reacquire_wakelock:
             }
 
             // sleep if there are no active tracks to process
-            if (activeTracks.size() == 0) {
+            if (activeTracks.isEmpty()) {
                 if (sleepUs == 0) {
                     sleepUs = kRecordThreadSleepUs;
                 }
@@ -7443,7 +7443,7 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
     audio_input_flags_t flags = input != NULL ? input->flags : AUDIO_INPUT_FLAG_NONE;
     dprintf(fd, "  AudioStreamIn: %p flags %#x (%s)\n",
             input, flags, inputFlagsToString(flags).c_str());
-    if (mActiveTracks.size() == 0) {
+    if (mActiveTracks.isEmpty()) {
         dprintf(fd, "  No active record clients\n");
     }
 
@@ -7909,7 +7909,7 @@ sp<StreamHalInterface> AudioFlinger::RecordThread::stream() const
 status_t AudioFlinger::RecordThread::addEffectChain_l(const sp<EffectChain>& chain)
 {
     // only one chain per input thread
-    if (mEffectChains.size() != 0) {
+    if (!mEffectChains.isEmpty()) {
         ALOGW("addEffectChain_l() already one chain %p on thread %p", chain.get(), this);
         return INVALID_OPERATION;
     }
@@ -8245,7 +8245,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
     // abort if start is rejected by audio policy manager
     if (ret != NO_ERROR) {
         ALOGE("%s: error start rejected by AudioPolicyManager = %d", __FUNCTION__, ret);
-        if (mActiveTracks.size() != 0) {
+        if (!mActiveTracks.isEmpty()) {
             mLock.unlock();
             if (isOutput()) {
                 AudioSystem::releaseOutput(portId);
@@ -8346,7 +8346,7 @@ status_t AudioFlinger::MmapThread::standby()
     if (mHalStream == 0) {
         return NO_INIT;
     }
-    if (mActiveTracks.size() != 0) {
+    if (!mActiveTracks.isEmpty()) {
         return INVALID_OPERATION;
     }
     mHalStream->standby();
@@ -8784,7 +8784,7 @@ void AudioFlinger::MmapThread::dumpInternals(int fd, const Vector<String16>& arg
     dprintf(fd, "  Attributes: content type %d usage %d source %d\n",
             mAttr.content_type, mAttr.usage, mAttr.source);
     dprintf(fd, "  Session: %d port Id: %d\n", mSessionId, mPortId);
-    if (mActiveTracks.size() == 0) {
+    if (mActiveTracks.isEmpty()) {
         dprintf(fd, "  No active clients\n");
     }
 }
