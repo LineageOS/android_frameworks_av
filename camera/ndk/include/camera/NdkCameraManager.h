@@ -44,6 +44,8 @@
 
 __BEGIN_DECLS
 
+#if __ANDROID_API__ >= 24
+
 /**
  * ACameraManager is opaque type that provides access to camera service.
  *
@@ -119,7 +121,7 @@ void ACameraManager_deleteCameraIdList(ACameraIdList* cameraIdList) __INTRODUCED
  *                 this callback returns.
  */
 typedef void (*ACameraManager_AvailabilityCallback)(void* context,
-        const char* cameraId) __INTRODUCED_IN(24);
+        const char* cameraId);
 
 /**
  * A listener for camera devices becoming available or unavailable to open.
@@ -273,6 +275,8 @@ camera_status_t ACameraManager_openCamera(
         ACameraManager* manager, const char* cameraId,
         ACameraDevice_StateCallbacks* callback,
         /*out*/ACameraDevice** device) __INTRODUCED_IN(24);
+
+#endif /* __ANDROID_API__ >= 24 */
 
 __END_DECLS
 

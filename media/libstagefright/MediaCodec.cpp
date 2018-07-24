@@ -1943,7 +1943,9 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         mAnalyticsItem->setCString(kCodecCodec, mComponentName.c_str());
                     }
 
-                    if (mComponentName.startsWith("OMX.google.")) {
+                    const char *owner = mCodecInfo->getOwnerName();
+                    if (mComponentName.startsWith("OMX.google.")
+                            && (owner == nullptr || strncmp(owner, "default", 8) == 0)) {
                         mFlags |= kFlagUsesSoftwareRenderer;
                     } else {
                         mFlags &= ~kFlagUsesSoftwareRenderer;

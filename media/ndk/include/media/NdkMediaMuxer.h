@@ -53,6 +53,8 @@ typedef enum {
     AMEDIAMUXER_OUTPUT_FORMAT_WEBM   = 1,
 } OutputFormat;
 
+#if __ANDROID_API__ >= 21
+
 /**
  * Create new media muxer
  */
@@ -120,6 +122,8 @@ media_status_t AMediaMuxer_stop(AMediaMuxer*) __INTRODUCED_IN(21);
 media_status_t AMediaMuxer_writeSampleData(AMediaMuxer *muxer,
         size_t trackIdx, const uint8_t *data,
         const AMediaCodecBufferInfo *info) __INTRODUCED_IN(21);
+
+#endif /* __ANDROID_API__ >= 21 */
 
 __END_DECLS
 

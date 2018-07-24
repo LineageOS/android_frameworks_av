@@ -1210,6 +1210,9 @@ class Camera3Device :
 
     static callbacks_notify_t sNotify;
 
+    // Synchronizes access to status tracker between inflight updates and disconnect.
+    // b/79972865
+    Mutex mTrackerLock;
 }; // class Camera3Device
 
 }; // namespace android
