@@ -31,7 +31,24 @@ typedef SortedVector<audio_channel_mask_t> ChannelsVector;
 typedef Vector<audio_format_t> FormatVector;
 
 template <typename T>
-bool operator == (const SortedVector<T> &left, const SortedVector<T> &right);
+bool operator== (const SortedVector<T> &left, const SortedVector<T> &right)
+{
+    if (left.size() != right.size()) {
+        return false;
+    }
+    for (size_t index = 0; index < right.size(); index++) {
+        if (left[index] != right[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+template <typename T>
+bool operator!= (const SortedVector<T> &left, const SortedVector<T> &right)
+{
+    return !(left == right);
+}
 
 class AudioProfile : public virtual RefBase
 {
