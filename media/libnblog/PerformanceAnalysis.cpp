@@ -32,6 +32,7 @@
 #include <sys/prctl.h>
 #include <time.h>
 #include <new>
+#include <audio_utils/LogPlot.h>
 #include <audio_utils/roundup.h>
 #include <media/nblog/NBLog.h>
 #include <media/nblog/PerformanceAnalysis.h>
@@ -208,27 +209,6 @@ bool PerformanceAnalysis::detectAndStoreOutlier(const msInterval diffMs) {
     return isOutlier;
 }
 
-static int widthOf(int x) {
-    int width = 0;
-    if (x < 0) {
-        width++;
-        x = x == INT_MIN ? INT_MAX : -x;
-    }
-    // assert (x >= 0)
-    do {
-        ++width;
-        x /= 10;
-    } while (x > 0);
-    return width;
-}
-
-// computes the column width required for a specific histogram value
-inline int numberWidth(double number, int leftPadding) {
-    // Added values account for whitespaces needed around numbers, and for the
-    // dot and decimal digit not accounted for by widthOf
-    return std::max(std::max(widthOf(static_cast<int>(number)) + 3, 2), leftPadding + 1);
-}
-
 // rounds value to precision based on log-distance from mean
 __attribute__((no_sanitize("signed-integer-overflow")))
 inline double logRound(double x, double mean) {
@@ -281,65 +261,8 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int author, log_hash_
             static_cast<long long>(hash), static_cast<long long>(startingTs));
     static const char * const kLabel = "ms";
 
-    auto it = buckets.begin();
-    double maxDelta = it->first;
-    int maxCount = it->second;
-    // Compute maximum values
-    while (++it != buckets.end()) {
-        if (it->first > maxDelta) {
-            maxDelta = it->first;
-        }
-        if (it->second > maxCount) {
-            maxCount = it->second;
-        }
-    }
-    int height = log2(maxCount) + 1; // maxCount > 0, safe to call log2
-    const int leftPadding = widthOf(1 << height);
-    const int bucketWidth = numberWidth(maxDelta, leftPadding);
-    int scalingFactor = 1;
-    // scale data if it exceeds maximum height
-    if (height > maxHeight) {
-        scalingFactor = (height + maxHeight) / maxHeight;
-        height /= scalingFactor;
-    }
-    body->appendFormat("%s", title);
-    // write histogram label line with bucket values
-    body->appendFormat("\n%s", " ");
-    body->appendFormat("%*s", leftPadding, " ");
-    for (auto const &x : buckets) {
-        const int colWidth = numberWidth(x.first, leftPadding);
-        body->appendFormat("%*d", colWidth, x.second);
-    }
-    // write histogram ascii art
-    // underscores and spaces length corresponds to maximum width of histogram
-    static const int kLen = 200;
-    static const std::string underscores(kLen, '_');
-    static const std::string spaces(kLen, ' ');
-
-    body->appendFormat("\n%s", " ");
-    for (int row = height * scalingFactor; row >= 0; row -= scalingFactor) {
-        const int value = 1 << row;
-        body->appendFormat("%.*s", leftPadding, spaces.c_str());
-        for (auto const &x : buckets) {
-            const int colWidth = numberWidth(x.first, leftPadding);
-            body->appendFormat("%.*s%s", colWidth - 1,
-                               spaces.c_str(), x.second < value ? " " : "|");
-        }
-        body->appendFormat("\n%s", " ");
-    }
-    // print x-axis
-    const int columns = static_cast<int>(buckets.size());
-    body->appendFormat("%*c", leftPadding, ' ');
-    body->appendFormat("%.*s", (columns + 1) * bucketWidth, underscores.c_str());
-    body->appendFormat("\n%s", " ");
-
-    // write footer with bucket labels
-    body->appendFormat("%*s", leftPadding, " ");
-    for (auto const &x : buckets) {
-        const int colWidth = numberWidth(x.first, leftPadding);
-        body->appendFormat("%*.*f", colWidth, 1, x.first);
-    }
-    body->appendFormat("%.*s%s\n", bucketWidth, spaces.c_str(), kLabel);
+    body->appendFormat("%s",
+            audio_utils_plot_histogram(buckets, title, kLabel, maxHeight).c_str());
 
     // Now report glitches
     body->appendFormat("\ntime elapsed between glitches and glitch timestamps:\n");
