@@ -27,7 +27,6 @@
 namespace android {
 
 typedef SortedVector<uint32_t> SampleRateVector;
-typedef SortedVector<audio_channel_mask_t> ChannelsVector;
 typedef Vector<audio_format_t> FormatVector;
 
 template <typename T>
@@ -49,6 +48,21 @@ bool operator!= (const SortedVector<T> &left, const SortedVector<T> &right)
 {
     return !(left == right);
 }
+
+class ChannelsVector : public SortedVector<audio_channel_mask_t>
+{
+public:
+    ChannelsVector() = default;
+    ChannelsVector(const ChannelsVector&) = default;
+    ChannelsVector(const SortedVector<audio_channel_mask_t>& sv) :
+            SortedVector<audio_channel_mask_t>(sv) {}
+    ChannelsVector& operator=(const ChannelsVector&) = default;
+
+    // Applies audio_channel_mask_out_to_in to all elements and returns the result.
+    ChannelsVector asInMask() const;
+    // Applies audio_channel_mask_in_to_out to all elements and returns the result.
+    ChannelsVector asOutMask() const;
+};
 
 class AudioProfile : public virtual RefBase
 {
@@ -205,6 +219,16 @@ public:
     {
         for (size_t i = 0; i < size(); i++) {
             if (itemAt(i)->isValid()) {
+                return itemAt(i);
+            }
+        }
+        return 0;
+    }
+
+    sp<AudioProfile> getFirstValidProfileFor(audio_format_t format) const
+    {
+        for (size_t i = 0; i < size(); i++) {
+            if (itemAt(i)->isValid() && itemAt(i)->getFormat() == format) {
                 return itemAt(i);
             }
         }

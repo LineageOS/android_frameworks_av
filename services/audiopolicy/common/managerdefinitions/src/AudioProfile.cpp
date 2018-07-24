@@ -28,6 +28,28 @@
 
 namespace android {
 
+ChannelsVector ChannelsVector::asInMask() const
+{
+    ChannelsVector inMaskVector;
+    for (const auto& channel : *this) {
+        if (audio_channel_mask_out_to_in(channel) != AUDIO_CHANNEL_INVALID) {
+            inMaskVector.add(audio_channel_mask_out_to_in(channel));
+        }
+    }
+    return inMaskVector;
+}
+
+ChannelsVector ChannelsVector::asOutMask() const
+{
+    ChannelsVector outMaskVector;
+    for (const auto& channel : *this) {
+        if (audio_channel_mask_in_to_out(channel) != AUDIO_CHANNEL_INVALID) {
+            outMaskVector.add(audio_channel_mask_in_to_out(channel));
+        }
+    }
+    return outMaskVector;
+}
+
 static AudioProfile* createFullDynamicImpl()
 {
     AudioProfile* dynamicProfile = new AudioProfile(gDynamicFormat,
