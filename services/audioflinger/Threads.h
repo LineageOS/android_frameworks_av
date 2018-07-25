@@ -485,6 +485,10 @@ protected:
                 audio_devices_t         mPrevOutDevice;   // previous output device
                 audio_devices_t         mPrevInDevice;    // previous input device
                 struct audio_patch      mPatch;
+                /**
+                 * @brief mDeviceId  current device port unique identifier
+                 */
+                audio_port_handle_t     mDeviceId = AUDIO_PORT_HANDLE_NONE;
                 audio_source_t          mAudioSource;
 
                 const audio_io_handle_t mId;
@@ -1704,7 +1708,6 @@ class MmapThread : public ThreadBase
 
                 audio_attributes_t      mAttr;
                 audio_session_t         mSessionId;
-                audio_port_handle_t     mDeviceId;
                 audio_port_handle_t     mPortId;
 
                 wp<MmapStreamCallback>  mCallback;
