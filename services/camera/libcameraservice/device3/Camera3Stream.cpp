@@ -331,7 +331,14 @@ status_t Camera3Stream::finishConfiguration() {
 
     status_t res;
     res = configureQueueLocked();
-    if (res != OK) {
+    // configureQueueLocked could return error in case of abandoned surface.
+    // Treat as non-fatal error.
+    if (res == NO_INIT || res == DEAD_OBJECT) {
+        ALOGE("%s: Unable to configure stream %d queue (non-fatal): %s (%d)",
+                __FUNCTION__, mId, strerror(-res), res);
+        mState = STATE_ABANDONED;
+        return res;
+    } else if (res != OK) {
         ALOGE("%s: Unable to configure stream %d queue: %s (%d)",
                 __FUNCTION__, mId, strerror(-res), res);
         mState = STATE_ERROR;
