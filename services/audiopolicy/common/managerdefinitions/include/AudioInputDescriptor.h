@@ -66,6 +66,8 @@ public:
     AudioSessionCollection getAudioSessions(bool activeOnly) const;
     size_t getAudioSessionCount(bool activeOnly) const;
     audio_source_t getHighestPrioritySource(bool activeOnly) const;
+    void changeRefCount(audio_session_t session, int delta);
+
 
     // implementation of AudioIODescriptorInterface
     audio_config_base_t getConfig() const override;
@@ -79,14 +81,17 @@ public:
                   audio_input_flags_t flags,
                   audio_io_handle_t *input);
     // Called when a stream is about to be started.
-    // Note: called after AudioSession::changeActiveCount(1)
+    // Note: called after changeRefCount(session, 1)
     status_t start();
     // Called after a stream is stopped
-    // Note: called after AudioSession::changeActiveCount(-1)
+    // Note: called after changeRefCount(session, -1)
     void stop();
     void close();
 
 private:
+
+    void updateSessionRecordingConfiguration(int event, const sp<AudioSession>& audioSession);
+
     audio_patch_handle_t          mPatchHandle;
     audio_port_handle_t           mId;
     // audio sessions attached to this input
@@ -99,6 +104,7 @@ private:
     // We also inherit sessions from the preempted input to avoid a 3 way preemption loop etc...
     SortedVector<audio_session_t> mPreemptedSessions;
     AudioPolicyClientInterface *mClientInterface;
+    uint32_t mGlobalRefCount;  // non-session-specific ref count
 };
 
 class AudioInputCollection :

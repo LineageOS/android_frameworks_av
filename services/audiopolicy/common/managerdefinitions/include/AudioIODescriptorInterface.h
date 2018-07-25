@@ -34,12 +34,4 @@ public:
     virtual void setPatchHandle(audio_patch_handle_t handle) = 0;
 };
 
-class AudioIODescriptorUpdateListener
-{
-public:
-    virtual ~AudioIODescriptorUpdateListener() {};
-
-    virtual void onIODescriptorUpdate() const = 0;
-};
-
 } // namespace android

@@ -25,6 +25,8 @@
 
 namespace android {
 
+class String8;
+
 namespace ReportPerformance {
 
 class PerformanceAnalysis;

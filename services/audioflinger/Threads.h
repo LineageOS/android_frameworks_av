@@ -555,6 +555,9 @@ protected:
                     size_t          size() const {
                         return mActiveTracks.size();
                     }
+                    bool            isEmpty() const {
+                        return mActiveTracks.isEmpty();
+                    }
                     ssize_t         indexOf(const sp<T>& item) {
                         return mActiveTracks.indexOf(item);
                     }

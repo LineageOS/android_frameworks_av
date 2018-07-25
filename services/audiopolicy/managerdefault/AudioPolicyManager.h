@@ -39,6 +39,7 @@
 #include <AudioPolicyConfig.h>
 #include <AudioPort.h>
 #include <AudioPatch.h>
+#include <AudioProfile.h>
 #include <DeviceDescriptor.h>
 #include <IOProfile.h>
 #include <HwModule.h>
@@ -459,8 +460,6 @@ protected:
 
         SortedVector<audio_io_handle_t> getOutputsForDevice(audio_devices_t device,
                                                             const SwAudioOutputCollection& openOutputs);
-        bool vectorsEqual(SortedVector<audio_io_handle_t>& outputs1,
-                                           SortedVector<audio_io_handle_t>& outputs2);
 
         // mute/unmute strategies using an incompatible device combination
         // if muting, wait for the audio in pcm buffer to be drained before proceeding

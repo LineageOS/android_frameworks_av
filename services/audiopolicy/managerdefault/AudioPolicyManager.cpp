@@ -1689,8 +1689,7 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
                                                      config->channel_mask,
                                                      flags,
                                                      uid,
-                                                     isSoundTrigger,
-                                                     policyMix, mpClientInterface);
+                                                     isSoundTrigger);
 
 // FIXME: disable concurrent capture until UI is ready
 #if 0
@@ -2017,7 +2016,7 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
 
     // increment activity count before calling getNewInputDevice() below as only active sessions
     // are considered for device selection
-    audioSession->changeActiveCount(1);
+    inputDesc->changeRefCount(session, 1);
 
     // Routing?
     mInputRoutes.incRouteActivity(session);
@@ -2031,7 +2030,7 @@ status_t AudioPolicyManager::startInput(audio_io_handle_t input,
         status_t status = inputDesc->start();
         if (status != NO_ERROR) {
             mInputRoutes.decRouteActivity(session);
-            audioSession->changeActiveCount(-1);
+            inputDesc->changeRefCount(session, -1);
             return status;
         }
 
@@ -2095,7 +2094,7 @@ status_t AudioPolicyManager::stopInput(audio_io_handle_t input,
         return INVALID_OPERATION;
     }
 
-    audioSession->changeActiveCount(-1);
+    inputDesc->changeRefCount(session, -1);
 
     // Routing?
     mInputRoutes.decRouteActivity(session);
@@ -3426,7 +3425,7 @@ status_t AudioPolicyManager::connectAudioSource(const sp<AudioSourceDescriptor>&
     return NO_ERROR;
 }
 
-status_t AudioPolicyManager::stopAudioSource(audio_patch_handle_t handle __unused)
+status_t AudioPolicyManager::stopAudioSource(audio_patch_handle_t handle)
 {
     sp<AudioSourceDescriptor> sourceDesc = mAudioSources.valueFor(handle);
     ALOGV("%s handle %d", __FUNCTION__, handle);
@@ -4637,20 +4636,6 @@ SortedVector<audio_io_handle_t> AudioPolicyManager::getOutputsForDevice(
     return outputs;
 }
 
-bool AudioPolicyManager::vectorsEqual(SortedVector<audio_io_handle_t>& outputs1,
-                                      SortedVector<audio_io_handle_t>& outputs2)
-{
-    if (outputs1.size() != outputs2.size()) {
-        return false;
-    }
-    for (size_t i = 0; i < outputs1.size(); i++) {
-        if (outputs1[i] != outputs2[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
 void AudioPolicyManager::checkForDeviceAndOutputChanges()
 {
     checkForDeviceAndOutputChanges([](){ return false; });
@@ -4691,7 +4676,7 @@ void AudioPolicyManager::checkOutputForStrategy(routing_strategy strategy)
         }
     }
 
-    if (!vectorsEqual(srcOutputs,dstOutputs)) {
+    if (srcOutputs != dstOutputs) {
         // get maximum latency of all source outputs to determine the minimum mute time guaranteeing
         // audio from invalidated tracks will be rendered when unmuting
         uint32_t maxLatency = 0;
