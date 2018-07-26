@@ -1682,9 +1682,12 @@ void CameraDeviceClient::detachDevice() {
 
     // WORKAROUND: HAL refuses to disconnect while there's streams in flight
     {
-        mDevice->clearStreamingRequest();
-
+        int64_t lastFrameNumber;
         status_t code;
+        if ((code = mDevice->flush(&lastFrameNumber)) != OK) {
+            ALOGE("%s: flush failed with code 0x%x", __FUNCTION__, code);
+        }
+
         if ((code = mDevice->waitUntilDrained()) != OK) {
             ALOGE("%s: waitUntilDrained failed with code 0x%x", __FUNCTION__,
                   code);
