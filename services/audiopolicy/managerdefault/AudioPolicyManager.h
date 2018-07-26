@@ -508,7 +508,8 @@ protected:
             if (!hasPrimaryOutput()) {
                 return AUDIO_DEVICE_NONE;
             }
-            return mAvailableInputDevices.getDevicesFromHwModule(mPrimaryOutput->getModuleHandle());
+            return mAvailableInputDevices.getDeviceTypesFromHwModule(
+                    mPrimaryOutput->getModuleHandle());
         }
 
         uint32_t updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs = 0);

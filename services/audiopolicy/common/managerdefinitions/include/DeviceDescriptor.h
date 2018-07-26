@@ -82,8 +82,8 @@ public:
     DeviceVector getDevicesFromTypeMask(audio_devices_t types) const;
     sp<DeviceDescriptor> getDeviceFromId(audio_port_handle_t id) const;
     sp<DeviceDescriptor> getDeviceFromTagName(const String8 &tagName) const;
-
-    audio_devices_t getDevicesFromHwModule(audio_module_handle_t moduleHandle) const;
+    DeviceVector getDevicesFromHwModule(audio_module_handle_t moduleHandle) const;
+    audio_devices_t getDeviceTypesFromHwModule(audio_module_handle_t moduleHandle) const;
 
     status_t dump(int fd, const String8 &tag, int spaces = 0, bool verbose = true) const;
 
