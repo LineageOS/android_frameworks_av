@@ -546,8 +546,8 @@ void MediaProfiles::checkAndAddRequiredProfilesIfNecessary() {
 
             if (info->mHasRefProfile) {
 
-                CamcorderProfile *profile =
-                    new CamcorderProfile(
+                std::unique_ptr<CamcorderProfile> profile =
+                    std::make_unique<CamcorderProfile>(
                             *mCamcorderProfiles[info->mRefProfileIndex]);
 
                 // Overwrite the quality
@@ -581,7 +581,7 @@ void MediaProfiles::checkAndAddRequiredProfilesIfNecessary() {
                         mCamcorderProfiles[info->mRefProfileIndex]->mQuality,
                         profile->mQuality, cameraId);
 
-                mCamcorderProfiles.add(profile);
+                mCamcorderProfiles.add(profile.release());
             }
         }
     }
