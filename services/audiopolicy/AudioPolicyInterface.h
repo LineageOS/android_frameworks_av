@@ -124,17 +124,11 @@ public:
                                         audio_port_handle_t *selectedDeviceId,
                                         audio_port_handle_t *portId) = 0;
     // indicates to the audio policy manager that the output starts being used by corresponding stream.
-    virtual status_t startOutput(audio_io_handle_t output,
-                                 audio_stream_type_t stream,
-                                 audio_session_t session) = 0;
+    virtual status_t startOutput(audio_port_handle_t portId) = 0;
     // indicates to the audio policy manager that the output stops being used by corresponding stream.
-    virtual status_t stopOutput(audio_io_handle_t output,
-                                audio_stream_type_t stream,
-                                audio_session_t session) = 0;
+    virtual status_t stopOutput(audio_port_handle_t portId) = 0;
     // releases the output.
-    virtual void releaseOutput(audio_io_handle_t output,
-                               audio_stream_type_t stream,
-                               audio_session_t session) = 0;
+    virtual void releaseOutput(audio_port_handle_t portId) = 0;
 
     // request an input appropriate for record from the supplied device with supplied parameters.
     virtual status_t getInputForAttr(const audio_attributes_t *attr,
@@ -147,16 +141,13 @@ public:
                                      input_type_t *inputType,
                                      audio_port_handle_t *portId) = 0;
     // indicates to the audio policy manager that the input starts being used.
-    virtual status_t startInput(audio_io_handle_t input,
-                                audio_session_t session,
+    virtual status_t startInput(audio_port_handle_t portId,
                                 bool silenced,
                                 concurrency_type__mask_t *concurrency) = 0;
     // indicates to the audio policy manager that the input stops being used.
-    virtual status_t stopInput(audio_io_handle_t input,
-                               audio_session_t session) = 0;
+    virtual status_t stopInput(audio_port_handle_t portId) = 0;
     // releases the input.
-    virtual void releaseInput(audio_io_handle_t input,
-                              audio_session_t session) = 0;
+    virtual void releaseInput(audio_port_handle_t portId) = 0;
 
     //
     // volume control functions

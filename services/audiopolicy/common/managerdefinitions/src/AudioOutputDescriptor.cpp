@@ -224,6 +224,13 @@ status_t AudioOutputDescriptor::dump(int fd)
                  i, mCurVolume[i], mRefCount[i], mMuteCount[i]);
         result.append(buffer);
     }
+
+    result.append(" AudioTrack clients:\n");
+    size_t index = 0;
+    for (const auto& client : mClients) {
+        client.second->dump(result, 2, index++);
+    }
+    result.append(" \n");
     write(fd, result.string(), result.size());
 
     return NO_ERROR;
@@ -731,6 +738,18 @@ audio_devices_t SwAudioOutputCollection::getSupportedDevices(audio_io_handle_t h
     return devices;
 }
 
+sp<SwAudioOutputDescriptor> SwAudioOutputCollection::getOutputForClient(audio_port_handle_t portId)
+{
+    for (size_t i = 0; i < size(); i++) {
+        sp<SwAudioOutputDescriptor> outputDesc = valueAt(i);
+        for (const auto& client : outputDesc->clients()) {
+            if (client.second->portId() == portId) {
+                return outputDesc;
+            }
+        }
+    }
+    return 0;
+}
 
 status_t SwAudioOutputCollection::dump(int fd) const
 {

@@ -340,6 +340,18 @@ void AudioInputDescriptor::updateSessionRecordingConfiguration(
                                                      &config, mPatchHandle);
 }
 
+RecordClientVector AudioInputDescriptor::getClientsForSession(
+    audio_session_t session)
+{
+    RecordClientVector clients;
+    for (const auto &client : mClients) {
+        if (client.second->session() == session) {
+            clients.push_back(client.second);
+        }
+    }
+    return clients;
+}
+
 status_t AudioInputDescriptor::dump(int fd)
 {
     const size_t SIZE = 256;
@@ -361,6 +373,13 @@ status_t AudioInputDescriptor::dump(int fd)
 
     mSessions.dump(fd, 1);
 
+    size_t index = 0;
+    result = " AudioRecord clients:\n";
+    for (const auto& client: mClients) {
+        client.second->dump(result, 2, index++);
+    }
+    result.append(" \n");
+    write(fd, result.string(), result.size());
     return NO_ERROR;
 }
 
@@ -421,6 +440,19 @@ audio_devices_t AudioInputCollection::getSupportedDevices(audio_io_handle_t hand
     sp<AudioInputDescriptor> inputDesc = valueFor(handle);
     audio_devices_t devices = inputDesc->mProfile->getSupportedDevicesType();
     return devices;
+}
+
+sp<AudioInputDescriptor> AudioInputCollection::getInputForClient(audio_port_handle_t portId)
+{
+    for (size_t i = 0; i < size(); i++) {
+        sp<AudioInputDescriptor> inputDesc = valueAt(i);
+        for (const auto& client : inputDesc->clients()) {
+            if (client.second->portId() == portId) {
+                return inputDesc;
+            }
+        }
+    }
+    return 0;
 }
 
 status_t AudioInputCollection::dump(int fd) const
