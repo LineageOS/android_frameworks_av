@@ -27,7 +27,7 @@
 //#define AUDIO_WATCHDOG
 
 // uncomment to display CPU load adjusted for CPU frequency
-#define CPU_FREQUENCY_STATISTICS
+//define CPU_FREQUENCY_STATISTICS
 
 // uncomment to enable fast threads to take performance samples for later statistical analysis
 #define FAST_THREAD_STATISTICS
