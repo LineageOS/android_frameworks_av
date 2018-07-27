@@ -312,8 +312,8 @@ status_t DistortionMapper::mapRawRectToCorrected(int32_t *rects, int rectCount, 
         int32_t coords[4] = {
             rects[i],
             rects[i + 1],
-            rects[i] + rects[i + 2],
-            rects[i + 1] + rects[i + 3]
+            rects[i] + rects[i + 2] - 1,
+            rects[i + 1] + rects[i + 3] - 1
         };
 
         mapRawToCorrected(coords, 2, clamp, simple);
@@ -321,8 +321,8 @@ status_t DistortionMapper::mapRawRectToCorrected(int32_t *rects, int rectCount, 
         // Map back to (l, t, width, height)
         rects[i] = coords[0];
         rects[i + 1] = coords[1];
-        rects[i + 2] = coords[2] - coords[0];
-        rects[i + 3] = coords[3] - coords[1];
+        rects[i + 2] = coords[2] - coords[0] + 1;
+        rects[i + 3] = coords[3] - coords[1] + 1;
     }
 
     return OK;
@@ -400,8 +400,8 @@ status_t DistortionMapper::mapCorrectedRectToRaw(int32_t *rects, int rectCount, 
         int32_t coords[4] = {
             rects[i],
             rects[i + 1],
-            rects[i] + rects[i + 2],
-            rects[i + 1] + rects[i + 3]
+            rects[i] + rects[i + 2] - 1,
+            rects[i + 1] + rects[i + 3] - 1
         };
 
         mapCorrectedToRaw(coords, 2, clamp, simple);
@@ -409,8 +409,8 @@ status_t DistortionMapper::mapCorrectedRectToRaw(int32_t *rects, int rectCount, 
         // Map back to (l, t, width, height)
         rects[i] = coords[0];
         rects[i + 1] = coords[1];
-        rects[i + 2] = coords[2] - coords[0];
-        rects[i + 3] = coords[3] - coords[1];
+        rects[i + 2] = coords[2] - coords[0] + 1;
+        rects[i + 3] = coords[3] - coords[1] + 1;
     }
 
     return OK;
