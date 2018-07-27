@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include <system/audio.h>
 #include <utils/RefBase.h>
 #include <utils/SortedVector.h>
@@ -139,6 +141,16 @@ public:
                                     audio_port_type_t portType,
                                     audio_port_role_t portRole) const;
     void clearProfiles();
+    // Assuming that this profile vector contains input profiles,
+    // find the best matching config from 'outputProfiles', according to
+    // the given preferences for audio formats and channel masks.
+    // Note: std::vectors are used because specialized containers for formats
+    //       and channels can be sorted and use their own ordering.
+    status_t findBestMatchingOutputConfig(const AudioProfileVector& outputProfiles,
+            const std::vector<audio_format_t>& preferredFormats, // order: most pref -> least pref
+            const std::vector<audio_channel_mask_t>& preferredOutputChannels,
+            bool preferHigherSamplingRates,
+            audio_config_base *bestOutputConfig) const;
 
     sp<AudioProfile> getFirstValidProfile() const;
     sp<AudioProfile> getFirstValidProfileFor(audio_format_t format) const;

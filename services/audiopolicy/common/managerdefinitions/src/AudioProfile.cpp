@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <algorithm>
+#include <set>
 #include <string>
 
 #define LOG_TAG "APM::AudioProfile"
@@ -404,6 +406,76 @@ void AudioProfileVector::clearProfiles()
         }
         profile->clear();
     }
+}
+
+// Returns an intersection between two possibly unsorted vectors and the contents of 'order'.
+// The result is ordered according to 'order'.
+template<typename T, typename Order>
+std::vector<typename T::value_type> intersectFilterAndOrder(
+        const T& input1, const T& input2, const Order& order)
+{
+    std::set<typename T::value_type> set1{input1.begin(), input1.end()};
+    std::set<typename T::value_type> set2{input2.begin(), input2.end()};
+    std::set<typename T::value_type> common;
+    std::set_intersection(set1.begin(), set1.end(), set2.begin(), set2.end(),
+            std::inserter(common, common.begin()));
+    std::vector<typename T::value_type> result;
+    for (const auto& e : order) {
+        if (common.find(e) != common.end()) result.push_back(e);
+    }
+    return result;
+}
+
+// Intersect two possibly unsorted vectors, return common elements according to 'comp' ordering.
+// 'comp' is a comparator function.
+template<typename T, typename Compare>
+std::vector<typename T::value_type> intersectAndOrder(
+        const T& input1, const T& input2, Compare comp)
+{
+    std::set<typename T::value_type, Compare> set1{input1.begin(), input1.end(), comp};
+    std::set<typename T::value_type, Compare> set2{input2.begin(), input2.end(), comp};
+    std::vector<typename T::value_type> result;
+    std::set_intersection(set1.begin(), set1.end(), set2.begin(), set2.end(),
+            std::back_inserter(result), comp);
+    return result;
+}
+
+status_t AudioProfileVector::findBestMatchingOutputConfig(const AudioProfileVector& outputProfiles,
+            const std::vector<audio_format_t>& preferredFormats,
+            const std::vector<audio_channel_mask_t>& preferredOutputChannels,
+            bool preferHigherSamplingRates,
+            audio_config_base *bestOutputConfig) const
+{
+    auto formats = intersectFilterAndOrder(getSupportedFormats(),
+            outputProfiles.getSupportedFormats(), preferredFormats);
+    // Pick the best compatible profile.
+    for (const auto& f : formats) {
+        sp<AudioProfile> inputProfile = getFirstValidProfileFor(f);
+        sp<AudioProfile> outputProfile = outputProfiles.getFirstValidProfileFor(f);
+        if (inputProfile == nullptr || outputProfile == nullptr) {
+            continue;
+        }
+        auto channels = intersectFilterAndOrder(inputProfile->getChannels().asOutMask(),
+                outputProfile->getChannels(), preferredOutputChannels);
+        if (channels.empty()) {
+            continue;
+        }
+        auto sampleRates = preferHigherSamplingRates ?
+                intersectAndOrder(inputProfile->getSampleRates(), outputProfile->getSampleRates(),
+                        std::greater<typename SampleRateVector::value_type>()) :
+                intersectAndOrder(inputProfile->getSampleRates(), outputProfile->getSampleRates(),
+                        std::less<typename SampleRateVector::value_type>());
+        if (sampleRates.empty()) {
+            continue;
+        }
+        ALOGD("%s() found channel mask %#x and sample rate %d for format %#x.",
+                __func__, *channels.begin(), *sampleRates.begin(), f);
+        bestOutputConfig->format = f;
+        bestOutputConfig->sample_rate = *sampleRates.begin();
+        bestOutputConfig->channel_mask = *channels.begin();
+        return NO_ERROR;
+    }
+    return BAD_VALUE;
 }
 
 sp<AudioProfile> AudioProfileVector::getFirstValidProfile() const
