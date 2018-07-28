@@ -740,11 +740,11 @@ public:
 
     virtual status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,
-                                      audio_patch_handle_t *handle)
+                                      audio_port_handle_t *portId)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
-        if (source == NULL || attributes == NULL || handle == NULL) {
+        if (source == NULL || attributes == NULL || portId == NULL) {
             return BAD_VALUE;
         }
         data.write(source, sizeof(struct audio_port_config));
@@ -757,15 +757,15 @@ public:
         if (status != NO_ERROR) {
             return status;
         }
-        *handle = (audio_patch_handle_t)reply.readInt32();
+        *portId = (audio_port_handle_t)reply.readInt32();
         return status;
     }
 
-    virtual status_t stopAudioSource(audio_patch_handle_t handle)
+    virtual status_t stopAudioSource(audio_port_handle_t portId)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
-        data.writeInt32(handle);
+        data.writeInt32(portId);
         status_t status = remote()->transact(STOP_AUDIO_SOURCE, data, &reply);
         if (status != NO_ERROR) {
             return status;
@@ -1472,17 +1472,17 @@ status_t BnAudioPolicyService::onTransact(
             audio_attributes_t attributes = {};
             data.read(&attributes, sizeof(audio_attributes_t));
             sanetizeAudioAttributes(&attributes);
-            audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
-            status_t status = startAudioSource(&source, &attributes, &handle);
+            audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+            status_t status = startAudioSource(&source, &attributes, &portId);
             reply->writeInt32(status);
-            reply->writeInt32(handle);
+            reply->writeInt32(portId);
             return NO_ERROR;
         } break;
 
         case STOP_AUDIO_SOURCE: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            audio_patch_handle_t handle = (audio_patch_handle_t) data.readInt32();
-            status_t status = stopAudioSource(handle);
+            audio_port_handle_t portId = (audio_port_handle_t) data.readInt32();
+            status_t status = stopAudioSource(portId);
             reply->writeInt32(status);
             return NO_ERROR;
         } break;

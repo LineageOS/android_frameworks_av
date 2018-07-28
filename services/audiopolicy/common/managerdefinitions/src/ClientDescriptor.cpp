@@ -19,13 +19,22 @@
 
 #include <utils/Log.h>
 #include <utils/String8.h>
+#include "AudioGain.h"
+#include "AudioOutputDescriptor.h"
+#include "AudioPatch.h"
 #include "ClientDescriptor.h"
+#include "DeviceDescriptor.h"
+#include "HwModule.h"
+#include "IOProfile.h"
 
 namespace android {
 
 status_t ClientDescriptor::dump(int fd, int spaces, int index)
 {
     String8 out;
+
+    // FIXME: use until other descriptor classes have a dump to String8 method
+    mDumpFd = fd;
 
     status_t status = dump(out, spaces, index);
     if (status == NO_ERROR) {
@@ -61,6 +70,52 @@ status_t RecordClientDescriptor::dump(String8& out, int spaces, int index)
     ClientDescriptor::dump(out, spaces, index);
 
     out.appendFormat("%*s- Source: %d flags: %08x\n", spaces, "", mSource, mFlags);
+
+    return NO_ERROR;
+}
+
+SourceClientDescriptor::SourceClientDescriptor(audio_port_handle_t portId, uid_t uid,
+         audio_attributes_t attributes, const sp<AudioPatch>& patchDesc,
+         const sp<DeviceDescriptor>& srcDevice, audio_stream_type_t stream) :
+    TrackClientDescriptor::TrackClientDescriptor(portId, uid, AUDIO_SESSION_NONE, attributes,
+        AUDIO_CONFIG_BASE_INITIALIZER, AUDIO_PORT_HANDLE_NONE, stream, AUDIO_OUTPUT_FLAG_NONE),
+        mPatchDesc(patchDesc), mSrcDevice(srcDevice)
+{
+}
+
+void SourceClientDescriptor::setSwOutput(const sp<SwAudioOutputDescriptor>& swOutput)
+{
+    mSwOutput = swOutput;
+}
+
+void SourceClientDescriptor::setHwOutput(const sp<HwAudioOutputDescriptor>& hwOutput)
+{
+    mHwOutput = hwOutput;
+}
+
+status_t SourceClientDescriptor::dump(String8& out, int spaces, int index)
+{
+    TrackClientDescriptor::dump(out, spaces, index);
+
+    if (mDumpFd >= 0) {
+        out.appendFormat("%*s- Device:\n", spaces, "");
+        write(mDumpFd, out.string(), out.size());
+
+        mSrcDevice->dump(mDumpFd, 2, 0);
+        mDumpFd = -1;
+    }
+
+    return NO_ERROR;
+}
+
+status_t SourceClientCollection::dump(int fd) const
+{
+    String8 out;
+    out.append("\nAudio sources:\n");
+    write(fd, out.string(), out.size());
+    for (size_t i = 0; i < size(); i++) {
+        valueAt(i)->dump(fd, 2, i);
+    }
 
     return NO_ERROR;
 }

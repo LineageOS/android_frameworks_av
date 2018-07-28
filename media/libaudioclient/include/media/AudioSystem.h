@@ -322,9 +322,9 @@ public:
     static status_t registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration);
 
     static status_t startAudioSource(const struct audio_port_config *source,
-                                      const audio_attributes_t *attributes,
-                                      audio_patch_handle_t *handle);
-    static status_t stopAudioSource(audio_patch_handle_t handle);
+                                     const audio_attributes_t *attributes,
+                                     audio_port_handle_t *portId);
+    static status_t stopAudioSource(audio_port_handle_t portId);
 
     static status_t setMasterMono(bool mono);
     static status_t getMasterMono(bool *mono);

@@ -1238,18 +1238,18 @@ status_t AudioSystem::registerPolicyMixes(const Vector<AudioMix>& mixes, bool re
 
 status_t AudioSystem::startAudioSource(const struct audio_port_config *source,
                                        const audio_attributes_t *attributes,
-                                       audio_patch_handle_t *handle)
+                                       audio_port_handle_t *portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
-    return aps->startAudioSource(source, attributes, handle);
+    return aps->startAudioSource(source, attributes, portId);
 }
 
-status_t AudioSystem::stopAudioSource(audio_patch_handle_t handle)
+status_t AudioSystem::stopAudioSource(audio_port_handle_t portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
-    return aps->stopAudioSource(handle);
+    return aps->stopAudioSource(portId);
 }
 
 status_t AudioSystem::setMasterMono(bool mono)

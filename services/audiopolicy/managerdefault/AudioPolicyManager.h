@@ -223,9 +223,9 @@ public:
 
         virtual status_t startAudioSource(const struct audio_port_config *source,
                                           const audio_attributes_t *attributes,
-                                          audio_patch_handle_t *handle,
+                                          audio_port_handle_t *portId,
                                           uid_t uid);
-        virtual status_t stopAudioSource(audio_patch_handle_t handle);
+        virtual status_t stopAudioSource(audio_port_handle_t portId);
 
         virtual status_t setMasterMono(bool mono);
         virtual status_t getMasterMono(bool *mono);
@@ -525,10 +525,10 @@ protected:
 
         status_t hasPrimaryOutput() const { return mPrimaryOutput != 0; }
 
-        status_t connectAudioSource(const sp<AudioSourceDescriptor>& sourceDesc);
-        status_t disconnectAudioSource(const sp<AudioSourceDescriptor>& sourceDesc);
+        status_t connectAudioSource(const sp<SourceClientDescriptor>& sourceDesc);
+        status_t disconnectAudioSource(const sp<SourceClientDescriptor>& sourceDesc);
 
-        sp<AudioSourceDescriptor> getSourceForStrategyOnOutput(audio_io_handle_t output,
+        sp<SourceClientDescriptor> getSourceForStrategyOnOutput(audio_io_handle_t output,
                                                                routing_strategy strategy);
 
         void cleanUpForDevice(const sp<DeviceDescriptor>& deviceDesc);
@@ -587,7 +587,7 @@ protected:
         sp<AudioPatch> mCallRxPatch;
 
         HwAudioOutputCollection mHwOutputs;
-        AudioSourceCollection mAudioSources;
+        SourceClientCollection mAudioSources;
 
         // for supporting "beacon" streams, i.e. streams that only play on speaker, and never
         // when something other than STREAM_TTS (a.k.a. "Transmitted Through Speaker") is playing
