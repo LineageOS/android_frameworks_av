@@ -352,6 +352,20 @@ RecordClientVector AudioInputDescriptor::getClientsForSession(
     return clients;
 }
 
+RecordClientVector AudioInputDescriptor::clientsList(bool activeOnly, audio_source_t source,
+                                                     bool preferredDeviceOnly) const
+{
+    RecordClientVector clients;
+    for (const auto &client : mClients) {
+        if ((!activeOnly || client.second->active())
+            && (source == AUDIO_SOURCE_DEFAULT || source == client.second->source())
+            && (!preferredDeviceOnly || client.second->hasPreferredDevice())) {
+            clients.push_back(client.second);
+        }
+    }
+    return clients;
+}
+
 status_t AudioInputDescriptor::dump(int fd)
 {
     const size_t SIZE = 256;
@@ -446,7 +460,7 @@ sp<AudioInputDescriptor> AudioInputCollection::getInputForClient(audio_port_hand
 {
     for (size_t i = 0; i < size(); i++) {
         sp<AudioInputDescriptor> inputDesc = valueAt(i);
-        for (const auto& client : inputDesc->clients()) {
+        for (const auto& client : inputDesc->clientsMap()) {
             if (client.second->portId() == portId) {
                 return inputDesc;
             }

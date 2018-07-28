@@ -201,6 +201,20 @@ void AudioOutputDescriptor::toAudioPort(struct audio_port *port) const
     port->ext.mix.hw_module = getModuleHandle();
 }
 
+TrackClientVector AudioOutputDescriptor::clientsList(bool activeOnly, routing_strategy strategy,
+                                                     bool preferredDeviceOnly) const
+{
+    TrackClientVector clients;
+    for (const auto &client : mClients) {
+        if ((!activeOnly || client.second->active())
+            && (strategy == STRATEGY_NONE || strategy == client.second->strategy())
+            && (!preferredDeviceOnly || client.second->hasPreferredDevice())) {
+            clients.push_back(client.second);
+        }
+    }
+    return clients;
+}
+
 status_t AudioOutputDescriptor::dump(int fd)
 {
     const size_t SIZE = 256;
@@ -742,7 +756,7 @@ sp<SwAudioOutputDescriptor> SwAudioOutputCollection::getOutputForClient(audio_po
 {
     for (size_t i = 0; i < size(); i++) {
         sp<SwAudioOutputDescriptor> outputDesc = valueAt(i);
-        for (const auto& client : outputDesc->clients()) {
+        for (const auto& client : outputDesc->clientsMap()) {
             if (client.second->portId() == portId) {
                 return outputDesc;
             }

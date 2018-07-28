@@ -78,7 +78,9 @@ public:
     audio_patch_handle_t getPatchHandle() const override;
     void setPatchHandle(audio_patch_handle_t handle) override;
 
-    TrackClientMap& clients() { return mClients; }
+    TrackClientMap& clientsMap() { return mClients; }
+    TrackClientVector clientsList(bool activeOnly = false,
+        routing_strategy strategy = STRATEGY_NONE, bool preferredDeviceOnly = false) const;
 
     sp<AudioPort> mPort;
     audio_devices_t mDevice;                   // current device this output is routed to

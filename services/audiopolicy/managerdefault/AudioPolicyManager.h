@@ -49,7 +49,6 @@
 #include <AudioPolicyMix.h>
 #include <EffectDescriptor.h>
 #include <SoundTriggerSession.h>
-#include <SessionRoute.h>
 #include <VolumeCurve.h>
 
 namespace android {
@@ -156,7 +155,7 @@ public:
         // return the strategy corresponding to a given stream type
         virtual uint32_t getStrategyForStream(audio_stream_type_t stream);
         // return the strategy corresponding to the given audio attributes
-        virtual uint32_t getStrategyForAttr(const audio_attributes_t *attr);
+        virtual routing_strategy getStrategyForAttr(const audio_attributes_t *attr);
 
         // return the enabled output devices for the given stream type
         virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream);
@@ -366,7 +365,7 @@ protected:
                              bool on,
                              const sp<AudioOutputDescriptor>& outputDesc,
                              int delayMs = 0,
-                             audio_devices_t device = (audio_devices_t)0);
+                             audio_devices_t device = AUDIO_DEVICE_NONE);
 
         // Mute or unmute the stream on the specified output
         void setStreamMute(audio_stream_type_t stream,
@@ -421,6 +420,14 @@ protected:
 
         // manages A2DP output suspend/restore according to phone state and BT SCO usage
         void checkA2dpSuspend();
+
+        template <class IoDescriptor, class Filter>
+        sp<DeviceDescriptor> findPreferredDevice(IoDescriptor& desc, Filter filter,
+                                                bool& active, const DeviceVector& devices);
+
+        template <class IoCollection, class Filter>
+        sp<DeviceDescriptor> findPreferredDevice(IoCollection& ioCollection, Filter filter,
+                                                const DeviceVector& devices);
 
         // selects the most appropriate device on output for current state
         // must be called every time a condition that affects the device choice for a given output is
@@ -508,16 +515,11 @@ protected:
         sp<DeviceDescriptor> findDevice(
                 const DeviceVector& devices, audio_devices_t device) const;
 
-        // if argument "device" is different from AUDIO_DEVICE_NONE,  startSource() will force
-        // the re-evaluation of the output device.
-        status_t startSource(const sp<AudioOutputDescriptor>& outputDesc,
-                             audio_stream_type_t stream,
-                             audio_devices_t device,
-                             const char *address,
+        status_t startSource(const sp<SwAudioOutputDescriptor>& outputDesc,
+                             const sp<TrackClientDescriptor>& client,
                              uint32_t *delayMs);
-        status_t stopSource(const sp<AudioOutputDescriptor>& outputDesc,
-                            audio_stream_type_t stream,
-                            bool forceDeviceUpdate);
+        status_t stopSource(const sp<SwAudioOutputDescriptor>& outputDesc,
+                            const sp<TrackClientDescriptor>& client);
 
         void clearAudioPatches(uid_t uid);
         void clearSessionRoutes(uid_t uid);
@@ -560,9 +562,6 @@ protected:
 
         DeviceVector  mAvailableOutputDevices; // all available output devices
         DeviceVector  mAvailableInputDevices;  // all available input devices
-
-        SessionRouteMap mOutputRoutes = SessionRouteMap(SessionRouteMap::MAPTYPE_OUTPUT);
-        SessionRouteMap mInputRoutes = SessionRouteMap(SessionRouteMap::MAPTYPE_INPUT);
 
         bool    mLimitRingtoneVolume;        // limit ringtone volume to music volume if headset connected
         audio_devices_t mDeviceForStrategy[NUM_STRATEGIES];

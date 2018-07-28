@@ -28,7 +28,6 @@
 #include <AudioPolicyMix.h>
 #include <EffectDescriptor.h>
 #include <SoundTriggerSession.h>
-#include <SessionRoute.h>
 
 namespace android {
 

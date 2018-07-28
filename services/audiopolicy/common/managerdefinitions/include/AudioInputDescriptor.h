@@ -89,8 +89,10 @@ public:
     void stop();
     void close();
 
-    RecordClientMap& clients() { return mClients; }
+    RecordClientMap& clientsMap() { return mClients; }
     RecordClientVector getClientsForSession(audio_session_t session);
+    RecordClientVector clientsList(bool activeOnly = false,
+        audio_source_t source = AUDIO_SOURCE_DEFAULT, bool preferredDeviceOnly = false) const;
 
  private:
 

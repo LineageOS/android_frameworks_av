@@ -17,7 +17,6 @@ LOCAL_SRC_FILES:= \
     src/AudioCollections.cpp \
     src/EffectDescriptor.cpp \
     src/SoundTriggerSession.cpp \
-    src/SessionRoute.cpp \
     src/VolumeCurve.cpp \
     src/TypeConverter.cpp \
     src/AudioSession.cpp \
