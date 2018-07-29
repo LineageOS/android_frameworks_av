@@ -313,7 +313,7 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
             audio_devices_t txDevice = getDeviceForInputSource(AUDIO_SOURCE_VOICE_COMMUNICATION);
             sp<AudioOutputDescriptor> primaryOutput = outputs.getPrimaryOutput();
             audio_devices_t availPrimaryInputDevices =
-                 availableInputDevices.getDevicesFromHwModule(primaryOutput->getModuleHandle());
+                 availableInputDevices.getDeviceTypesFromHwModule(primaryOutput->getModuleHandle());
 
             // TODO: getPrimaryOutput return only devices from first module in
             // audio_policy_configuration.xml, hearing aid is not there, but it's
@@ -668,9 +668,8 @@ audio_devices_t Engine::getDeviceForInputSource(audio_source_t inputSource) cons
         if ((getPhoneState() == AUDIO_MODE_IN_CALL) &&
                 (availableOutputDevices.types() & AUDIO_DEVICE_OUT_TELEPHONY_TX) == 0) {
             sp<AudioOutputDescriptor> primaryOutput = outputs.getPrimaryOutput();
-            availableDeviceTypes =
-                    availableInputDevices.getDevicesFromHwModule(primaryOutput->getModuleHandle())
-                    & ~AUDIO_DEVICE_BIT_IN;
+            availableDeviceTypes = availableInputDevices.getDeviceTypesFromHwModule(
+                    primaryOutput->getModuleHandle()) & ~AUDIO_DEVICE_BIT_IN;
         }
 
         switch (mForceUse[AUDIO_POLICY_FORCE_FOR_COMMUNICATION]) {

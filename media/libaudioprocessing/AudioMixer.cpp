@@ -875,7 +875,7 @@ void AudioMixer::process__validate()
                 t->hook = Track::getTrackHook(TRACKTYPE_RESAMPLE, t->mMixerChannelCount,
                         t->mMixerInFormat, t->mMixerFormat);
                 ALOGV_IF((n & NEEDS_CHANNEL_COUNT__MASK) > NEEDS_CHANNEL_2,
-                        "Track %d needs downmix + resample", i);
+                        "Track %d needs downmix + resample", name);
             } else {
                 if ((n & NEEDS_CHANNEL_COUNT__MASK) == NEEDS_CHANNEL_1){
                     t->hook = Track::getTrackHook(
@@ -890,7 +890,7 @@ void AudioMixer::process__validate()
                     t->hook = Track::getTrackHook(TRACKTYPE_NORESAMPLE, t->mMixerChannelCount,
                             t->mMixerInFormat, t->mMixerFormat);
                     ALOGV_IF((n & NEEDS_CHANNEL_COUNT__MASK) > NEEDS_CHANNEL_2,
-                            "Track %d needs downmix", i);
+                            "Track %d needs downmix", name);
                 }
             }
         }

@@ -121,15 +121,26 @@ ssize_t DeviceVector::remove(const sp<DeviceDescriptor>& item)
     return ret;
 }
 
-audio_devices_t DeviceVector::getDevicesFromHwModule(audio_module_handle_t moduleHandle) const
+DeviceVector DeviceVector::getDevicesFromHwModule(audio_module_handle_t moduleHandle) const
 {
-    audio_devices_t devices = AUDIO_DEVICE_NONE;
-    for (size_t i = 0; i < size(); i++) {
-        if (itemAt(i)->getModuleHandle() == moduleHandle) {
-            devices |= itemAt(i)->type();
+    DeviceVector devices;
+    for (const auto& device : *this) {
+        if (device->getModuleHandle() == moduleHandle) {
+            devices.add(device);
         }
     }
     return devices;
+}
+
+audio_devices_t DeviceVector::getDeviceTypesFromHwModule(audio_module_handle_t moduleHandle) const
+{
+    audio_devices_t deviceTypes = AUDIO_DEVICE_NONE;
+    for (const auto& device : *this) {
+        if (device->getModuleHandle() == moduleHandle) {
+            deviceTypes |= device->type();
+        }
+    }
+    return deviceTypes;
 }
 
 sp<DeviceDescriptor> DeviceVector::getDevice(audio_devices_t type, const String8& address) const
