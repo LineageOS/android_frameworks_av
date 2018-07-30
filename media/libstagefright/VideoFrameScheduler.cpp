@@ -475,7 +475,16 @@ nsecs_t VideoFrameScheduler::schedule(nsecs_t renderTime) {
                 nextVsyncTime += mVsyncPeriod;
                 if (vsyncsForLastFrame < ULONG_MAX)
                     ++vsyncsForLastFrame;
+            } else if (mTimeCorrection < -correctionLimit * 2
+                    || mTimeCorrection > correctionLimit * 2) {
+                ALOGW("correction beyond limit: %lld vs %lld (vsyncs for last frame: %zu, min: %zu)"
+                        " restarting. render=%lld",
+                        (long long)mTimeCorrection, (long long)correctionLimit,
+                        vsyncsForLastFrame, minVsyncsPerFrame, (long long)origRenderTime);
+                restart();
+                return origRenderTime;
             }
+
             ATRACE_INT("FRAME_VSYNCS", vsyncsForLastFrame);
         }
         mLastVsyncTime = nextVsyncTime;
