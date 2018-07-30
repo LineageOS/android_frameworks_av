@@ -1155,9 +1155,9 @@ status_t AudioPolicyManager::getBestMsdAudioProfileFor(audio_devices_t outputDev
             compressedFormatsOrder, surroundChannelMasksOrder, true /*preferHigherSamplingRates*/,
             &bestSinkConfig);
     if (result != NO_ERROR) {
-        return result;
         ALOGD("%s() no matching profiles found for device: %#x, hwAvSync: %d",
                 __func__, outputDevice, hwAvSync);
+        return result;
     }
     sinkConfig->sample_rate = bestSinkConfig.sample_rate;
     sinkConfig->channel_mask = bestSinkConfig.channel_mask;
