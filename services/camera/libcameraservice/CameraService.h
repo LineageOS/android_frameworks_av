@@ -174,6 +174,7 @@ public:
     };
 
     void                loadSound();
+    void                ensureCameraShutterSoundDisabled(const String16& clientPackageName);
     void                playSound(sound_kind kind);
     void                releaseSound();
 
