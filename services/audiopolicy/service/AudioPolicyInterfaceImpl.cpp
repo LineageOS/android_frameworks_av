@@ -990,26 +990,26 @@ status_t AudioPolicyService::registerPolicyMixes(const Vector<AudioMix>& mixes, 
 }
 
 status_t AudioPolicyService::startAudioSource(const struct audio_port_config *source,
-                                  const audio_attributes_t *attributes,
-                                  audio_patch_handle_t *handle)
+                                              const audio_attributes_t *attributes,
+                                              audio_port_handle_t *portId)
 {
     Mutex::Autolock _l(mLock);
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
     AutoCallerClear acc;
-    return mAudioPolicyManager->startAudioSource(source, attributes, handle,
+    return mAudioPolicyManager->startAudioSource(source, attributes, portId,
                                                  IPCThreadState::self()->getCallingUid());
 }
 
-status_t AudioPolicyService::stopAudioSource(audio_patch_handle_t handle)
+status_t AudioPolicyService::stopAudioSource(audio_port_handle_t portId)
 {
     Mutex::Autolock _l(mLock);
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
     AutoCallerClear acc;
-    return mAudioPolicyManager->stopAudioSource(handle);
+    return mAudioPolicyManager->stopAudioSource(portId);
 }
 
 status_t AudioPolicyService::setMasterMono(bool mono)

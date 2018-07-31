@@ -23,10 +23,16 @@
 
 #include <system/audio.h>
 #include <utils/Errors.h>
+#include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
 #include <utils/String8.h>
+#include "AudioPatch.h"
 
 namespace android {
+
+class DeviceDescriptor;
+class HwAudioOutputDescriptor;
+class SwAudioOutputDescriptor;
 
 class ClientDescriptor: public RefBase
 {
@@ -58,6 +64,10 @@ private:
     const audio_config_base_t mConfig;
     const audio_port_handle_t mPreferredDeviceId;  // selected input device port ID
           bool mActive;
+
+protected:
+    // FIXME: use until other descriptor classes have a dump to String8 method
+    int mDumpFd;
 };
 
 class TrackClientDescriptor: public ClientDescriptor
@@ -102,6 +112,38 @@ public:
 private:
     const audio_source_t mSource;
     const audio_input_flags_t mFlags;
+};
+
+class SourceClientDescriptor: public TrackClientDescriptor
+{
+public:
+    SourceClientDescriptor(audio_port_handle_t portId, uid_t uid, audio_attributes_t attributes,
+                           const sp<AudioPatch>& patchDesc, const sp<DeviceDescriptor>& srcDevice,
+                           audio_stream_type_t stream);
+    ~SourceClientDescriptor() override = default;
+
+    sp<AudioPatch> patchDesc() const { return mPatchDesc; }
+    sp<DeviceDescriptor> srcDevice() const { return mSrcDevice; };
+    wp<SwAudioOutputDescriptor> swOutput() const { return mSwOutput; }
+    void setSwOutput(const sp<SwAudioOutputDescriptor>& swOutput);
+    wp<HwAudioOutputDescriptor> hwOutput() const { return mHwOutput; }
+    void setHwOutput(const sp<HwAudioOutputDescriptor>& hwOutput);
+
+    using ClientDescriptor::dump;
+    status_t dump(String8& dst, int spaces, int index) override;
+
+ private:
+    const sp<AudioPatch> mPatchDesc;
+    const sp<DeviceDescriptor> mSrcDevice;
+    wp<SwAudioOutputDescriptor> mSwOutput;
+    wp<HwAudioOutputDescriptor> mHwOutput;
+};
+
+class SourceClientCollection :
+    public DefaultKeyedVector< audio_port_handle_t, sp<SourceClientDescriptor> >
+{
+public:
+    status_t dump(int fd) const;
 };
 
 typedef std::vector< sp<TrackClientDescriptor> > TrackClientVector;

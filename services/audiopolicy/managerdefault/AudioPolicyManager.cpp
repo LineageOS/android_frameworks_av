@@ -1155,9 +1155,9 @@ status_t AudioPolicyManager::getBestMsdAudioProfileFor(audio_devices_t outputDev
             compressedFormatsOrder, surroundChannelMasksOrder, true /*preferHigherSamplingRates*/,
             &bestSinkConfig);
     if (result != NO_ERROR) {
-        return result;
         ALOGD("%s() no matching profiles found for device: %#x, hwAvSync: %d",
                 __func__, outputDevice, hwAvSync);
+        return result;
     }
     sinkConfig->sample_rate = bestSinkConfig.sample_rate;
     sinkConfig->channel_mask = bestSinkConfig.channel_mask;
@@ -2794,6 +2794,7 @@ status_t AudioPolicyManager::dump(int fd)
     mEffects.dump(fd);
     mAudioPatches.dump(fd);
     mPolicyMixes.dump(fd);
+    mAudioSources.dump(fd);
 
     return NO_ERROR;
 }
@@ -3436,8 +3437,8 @@ void AudioPolicyManager::clearSessionRoutes(uid_t uid)
 void AudioPolicyManager::clearAudioSources(uid_t uid)
 {
     for (ssize_t i = (ssize_t)mAudioSources.size() - 1; i >= 0; i--)  {
-        sp<AudioSourceDescriptor> sourceDesc = mAudioSources.valueAt(i);
-        if (sourceDesc->mUid == uid) {
+        sp<SourceClientDescriptor> sourceDesc = mAudioSources.valueAt(i);
+        if (sourceDesc->uid() == uid) {
             stopAudioSource(mAudioSources.keyAt(i));
         }
     }
@@ -3455,20 +3456,23 @@ status_t AudioPolicyManager::acquireSoundTriggerSession(audio_session_t *session
 }
 
 status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *source,
-                                  const audio_attributes_t *attributes,
-                                  audio_patch_handle_t *handle,
-                                  uid_t uid)
+                                              const audio_attributes_t *attributes,
+                                              audio_port_handle_t *portId,
+                                              uid_t uid)
 {
-    ALOGV("%s source %p attributes %p handle %p", __FUNCTION__, source, attributes, handle);
-    if (source == NULL || attributes == NULL || handle == NULL) {
+    ALOGV("%s", __FUNCTION__);
+    *portId = AUDIO_PORT_HANDLE_NONE;
+
+    if (source == NULL || attributes == NULL || portId == NULL) {
+        ALOGW("%s invalid argument: source %p attributes %p handle %p",
+              __FUNCTION__, source, attributes, portId);
         return BAD_VALUE;
     }
 
-    *handle = AUDIO_PATCH_HANDLE_NONE;
-
     if (source->role != AUDIO_PORT_ROLE_SOURCE ||
             source->type != AUDIO_PORT_TYPE_DEVICE) {
-        ALOGV("%s INVALID_OPERATION source->role %d source->type %d", __FUNCTION__, source->role, source->type);
+        ALOGW("%s INVALID_OPERATION source->role %d source->type %d",
+              __FUNCTION__, source->role, source->type);
         return INVALID_OPERATION;
     }
 
@@ -3476,34 +3480,37 @@ status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *so
             mAvailableInputDevices.getDevice(source->ext.device.type,
                                               String8(source->ext.device.address));
     if (srcDeviceDesc == 0) {
-        ALOGV("%s source->ext.device.type %08x not found", __FUNCTION__, source->ext.device.type);
+        ALOGW("%s source->ext.device.type %08x not found", __FUNCTION__, source->ext.device.type);
         return BAD_VALUE;
     }
-    sp<AudioSourceDescriptor> sourceDesc =
-            new AudioSourceDescriptor(srcDeviceDesc, attributes, uid);
+
+    *portId = AudioPort::getNextUniqueId();
 
     struct audio_patch dummyPatch = {};
     sp<AudioPatch> patchDesc = new AudioPatch(&dummyPatch, uid);
-    sourceDesc->mPatchDesc = patchDesc;
+
+    sp<SourceClientDescriptor> sourceDesc =
+        new SourceClientDescriptor(*portId, uid, *attributes, patchDesc, srcDeviceDesc,
+                                   streamTypefromAttributesInt(attributes));
 
     status_t status = connectAudioSource(sourceDesc);
     if (status == NO_ERROR) {
-        mAudioSources.add(sourceDesc->getHandle(), sourceDesc);
-        *handle = sourceDesc->getHandle();
+        mAudioSources.add(*portId, sourceDesc);
     }
     return status;
 }
 
-status_t AudioPolicyManager::connectAudioSource(const sp<AudioSourceDescriptor>& sourceDesc)
+status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>& sourceDesc)
 {
-    ALOGV("%s handle %d", __FUNCTION__, sourceDesc->getHandle());
+    ALOGV("%s handle %d", __FUNCTION__, sourceDesc->portId());
 
     // make sure we only have one patch per source.
     disconnectAudioSource(sourceDesc);
 
-    routing_strategy strategy = (routing_strategy) getStrategyForAttr(&sourceDesc->mAttributes);
-    audio_stream_type_t stream = streamTypefromAttributesInt(&sourceDesc->mAttributes);
-    sp<DeviceDescriptor> srcDeviceDesc = sourceDesc->mDevice;
+    audio_attributes_t attributes = sourceDesc->attributes();
+    routing_strategy strategy = (routing_strategy) getStrategyForAttr(&attributes);
+    audio_stream_type_t stream = sourceDesc->stream();
+    sp<DeviceDescriptor> srcDeviceDesc = sourceDesc->srcDevice();
 
     audio_devices_t sinkDevice = getDeviceForStrategy(strategy, true);
     sp<DeviceDescriptor> sinkDeviceDesc =
@@ -3548,7 +3555,7 @@ status_t AudioPolicyManager::connectAudioSource(const sp<AudioSourceDescriptor>&
                                                               0);
         ALOGV("%s patch panel returned %d patchHandle %d", __FUNCTION__,
                                                               status, afPatchHandle);
-        sourceDesc->mPatchDesc->mPatch = *patchBuilder.patch();
+        sourceDesc->patchDesc()->mPatch = *patchBuilder.patch();
         if (status != NO_ERROR) {
             ALOGW("%s patch panel could not connect device patch, error %d",
                   __FUNCTION__, status);
@@ -3558,32 +3565,32 @@ status_t AudioPolicyManager::connectAudioSource(const sp<AudioSourceDescriptor>&
         status = startSource(outputDesc, stream, sinkDevice, NULL, &delayMs);
 
         if (status != NO_ERROR) {
-            mpClientInterface->releaseAudioPatch(sourceDesc->mPatchDesc->mAfPatchHandle, 0);
+            mpClientInterface->releaseAudioPatch(sourceDesc->patchDesc()->mAfPatchHandle, 0);
             return status;
         }
-        sourceDesc->mSwOutput = outputDesc;
+        sourceDesc->setSwOutput(outputDesc);
         if (delayMs != 0) {
             usleep(delayMs * 1000);
         }
     }
 
-    sourceDesc->mPatchDesc->mAfPatchHandle = afPatchHandle;
-    addAudioPatch(sourceDesc->mPatchDesc->mHandle, sourceDesc->mPatchDesc);
+    sourceDesc->patchDesc()->mAfPatchHandle = afPatchHandle;
+    addAudioPatch(sourceDesc->patchDesc()->mHandle, sourceDesc->patchDesc());
 
     return NO_ERROR;
 }
 
-status_t AudioPolicyManager::stopAudioSource(audio_patch_handle_t handle)
+status_t AudioPolicyManager::stopAudioSource(audio_port_handle_t portId)
 {
-    sp<AudioSourceDescriptor> sourceDesc = mAudioSources.valueFor(handle);
-    ALOGV("%s handle %d", __FUNCTION__, handle);
+    sp<SourceClientDescriptor> sourceDesc = mAudioSources.valueFor(portId);
+    ALOGV("%s port ID %d", __FUNCTION__, portId);
     if (sourceDesc == 0) {
-        ALOGW("%s unknown source for handle %d", __FUNCTION__, handle);
+        ALOGW("%s unknown source for port ID %d", __FUNCTION__, portId);
         return BAD_VALUE;
     }
     status_t status = disconnectAudioSource(sourceDesc);
 
-    mAudioSources.removeItem(handle);
+    mAudioSources.removeItem(portId);
     return status;
 }
 
@@ -3917,20 +3924,20 @@ void AudioPolicyManager::setRecordSilenced(uid_t uid, bool silenced)
     }
 }
 
-status_t AudioPolicyManager::disconnectAudioSource(const sp<AudioSourceDescriptor>& sourceDesc)
+status_t AudioPolicyManager::disconnectAudioSource(const sp<SourceClientDescriptor>& sourceDesc)
 {
-    ALOGV("%s handle %d", __FUNCTION__, sourceDesc->getHandle());
+    ALOGV("%s port Id %d", __FUNCTION__, sourceDesc->portId());
 
-    sp<AudioPatch> patchDesc = mAudioPatches.valueFor(sourceDesc->mPatchDesc->mHandle);
+    sp<AudioPatch> patchDesc = mAudioPatches.valueFor(sourceDesc->patchDesc()->mHandle);
     if (patchDesc == 0) {
         ALOGW("%s source has no patch with handle %d", __FUNCTION__,
-              sourceDesc->mPatchDesc->mHandle);
+              sourceDesc->patchDesc()->mHandle);
         return BAD_VALUE;
     }
-    removeAudioPatch(sourceDesc->mPatchDesc->mHandle);
+    removeAudioPatch(sourceDesc->patchDesc()->mHandle);
 
-    audio_stream_type_t stream = streamTypefromAttributesInt(&sourceDesc->mAttributes);
-    sp<SwAudioOutputDescriptor> swOutputDesc = sourceDesc->mSwOutput.promote();
+    audio_stream_type_t stream = sourceDesc->stream();
+    sp<SwAudioOutputDescriptor> swOutputDesc = sourceDesc->swOutput().promote();
     if (swOutputDesc != 0) {
         status_t status = stopSource(swOutputDesc, stream, false);
         if (status == NO_ERROR) {
@@ -3938,7 +3945,7 @@ status_t AudioPolicyManager::disconnectAudioSource(const sp<AudioSourceDescripto
         }
         mpClientInterface->releaseAudioPatch(patchDesc->mAfPatchHandle, 0);
     } else {
-        sp<HwAudioOutputDescriptor> hwOutputDesc = sourceDesc->mHwOutput.promote();
+        sp<HwAudioOutputDescriptor> hwOutputDesc = sourceDesc->hwOutput().promote();
         if (hwOutputDesc != 0) {
           //   release patch between src device and output device
           //   close Hwoutput and remove from mHwOutputs
@@ -3949,15 +3956,16 @@ status_t AudioPolicyManager::disconnectAudioSource(const sp<AudioSourceDescripto
     return NO_ERROR;
 }
 
-sp<AudioSourceDescriptor> AudioPolicyManager::getSourceForStrategyOnOutput(
+sp<SourceClientDescriptor> AudioPolicyManager::getSourceForStrategyOnOutput(
         audio_io_handle_t output, routing_strategy strategy)
 {
-    sp<AudioSourceDescriptor> source;
+    sp<SourceClientDescriptor> source;
     for (size_t i = 0; i < mAudioSources.size(); i++)  {
-        sp<AudioSourceDescriptor> sourceDesc = mAudioSources.valueAt(i);
+        sp<SourceClientDescriptor> sourceDesc = mAudioSources.valueAt(i);
+        audio_attributes_t attributes = sourceDesc->attributes();
         routing_strategy sourceStrategy =
-                (routing_strategy) getStrategyForAttr(&sourceDesc->mAttributes);
-        sp<SwAudioOutputDescriptor> outputDesc = sourceDesc->mSwOutput.promote();
+                (routing_strategy) getStrategyForAttr(&attributes);
+        sp<SwAudioOutputDescriptor> outputDesc = sourceDesc->swOutput().promote();
         if (sourceStrategy == strategy && outputDesc != 0 && outputDesc->mIoHandle == output) {
             source = sourceDesc;
             break;
@@ -4841,7 +4849,7 @@ void AudioPolicyManager::checkOutputForStrategy(routing_strategy strategy)
                 setStrategyMute(strategy, true, desc);
                 setStrategyMute(strategy, false, desc, maxLatency * LATENCY_MUTE_FACTOR, newDevice);
             }
-            sp<AudioSourceDescriptor> source =
+            sp<SourceClientDescriptor> source =
                     getSourceForStrategyOnOutput(srcOut, strategy);
             if (source != 0){
                 connectAudioSource(source);
@@ -5922,10 +5930,10 @@ bool AudioPolicyManager::isStateInCall(int state)
 void AudioPolicyManager::cleanUpForDevice(const sp<DeviceDescriptor>& deviceDesc)
 {
     for (ssize_t i = (ssize_t)mAudioSources.size() - 1; i >= 0; i--)  {
-        sp<AudioSourceDescriptor> sourceDesc = mAudioSources.valueAt(i);
-        if (sourceDesc->mDevice->equals(deviceDesc)) {
-            ALOGV("%s releasing audio source %d", __FUNCTION__, sourceDesc->getHandle());
-            stopAudioSource(sourceDesc->getHandle());
+        sp<SourceClientDescriptor> sourceDesc = mAudioSources.valueAt(i);
+        if (sourceDesc->srcDevice()->equals(deviceDesc)) {
+            ALOGV("%s releasing audio source %d", __FUNCTION__, sourceDesc->portId());
+            stopAudioSource(sourceDesc->portId());
         }
     }
 

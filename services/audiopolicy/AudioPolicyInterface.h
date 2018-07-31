@@ -226,9 +226,9 @@ public:
 
     virtual status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,
-                                      audio_patch_handle_t *handle,
+                                      audio_port_handle_t *portId,
                                       uid_t uid) = 0;
-    virtual status_t stopAudioSource(audio_patch_handle_t handle) = 0;
+    virtual status_t stopAudioSource(audio_port_handle_t portId) = 0;
 
     virtual status_t setMasterMono(bool mono) = 0;
     virtual status_t getMasterMono(bool *mono) = 0;

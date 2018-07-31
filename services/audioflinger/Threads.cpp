@@ -73,7 +73,7 @@
 #endif
 
 #ifdef DEBUG_CPU_USAGE
-#include <cpustats/CentralTendencyStatistics.h>
+#include <audio_utils/Statistics.h>
 #include <cpustats/ThreadCpuUsage.h>
 #endif
 
@@ -335,9 +335,9 @@ public:
 #ifdef DEBUG_CPU_USAGE
 private:
     ThreadCpuUsage mCpuUsage;           // instantaneous thread CPU usage in wall clock ns
-    CentralTendencyStatistics mWcStats; // statistics on thread CPU usage in wall clock ns
+    Statistics<double> mWcStats;        // statistics on thread CPU usage in wall clock ns
 
-    CentralTendencyStatistics mHzStats; // statistics on thread CPU usage in cycles
+    Statistics<double> mHzStats;        // statistics on thread CPU usage in cycles
 
     int mCpuNum;                        // thread's current CPU number
     int mCpukHz;                        // frequency of thread's current CPU in kHz
@@ -363,7 +363,7 @@ void CpuStats::sample(const String8 &title
 
     // record sample for wall clock statistics
     if (valid) {
-        mWcStats.sample(wcNs);
+        mWcStats.add(wcNs);
     }
 
     // get the current CPU number
@@ -382,26 +382,26 @@ void CpuStats::sample(const String8 &title
 
     // if no change in CPU number or frequency, then record sample for cycle statistics
     if (valid && mCpukHz > 0) {
-        double cycles = wcNs * cpukHz * 0.000001;
-        mHzStats.sample(cycles);
+        const double cycles = wcNs * cpukHz * 0.000001;
+        mHzStats.add(cycles);
     }
 
-    unsigned n = mWcStats.n();
+    const unsigned n = mWcStats.getN();
     // mCpuUsage.elapsed() is expensive, so don't call it every loop
     if ((n & 127) == 1) {
-        long long elapsed = mCpuUsage.elapsed();
+        const long long elapsed = mCpuUsage.elapsed();
         if (elapsed >= DEBUG_CPU_USAGE * 1000000000LL) {
-            double perLoop = elapsed / (double) n;
-            double perLoop100 = perLoop * 0.01;
-            double perLoop1k = perLoop * 0.001;
-            double mean = mWcStats.mean();
-            double stddev = mWcStats.stddev();
-            double minimum = mWcStats.minimum();
-            double maximum = mWcStats.maximum();
-            double meanCycles = mHzStats.mean();
-            double stddevCycles = mHzStats.stddev();
-            double minCycles = mHzStats.minimum();
-            double maxCycles = mHzStats.maximum();
+            const double perLoop = elapsed / (double) n;
+            const double perLoop100 = perLoop * 0.01;
+            const double perLoop1k = perLoop * 0.001;
+            const double mean = mWcStats.getMean();
+            const double stddev = mWcStats.getStdDev();
+            const double minimum = mWcStats.getMin();
+            const double maximum = mWcStats.getMax();
+            const double meanCycles = mHzStats.getMean();
+            const double stddevCycles = mHzStats.getStdDev();
+            const double minCycles = mHzStats.getMin();
+            const double maxCycles = mHzStats.getMax();
             mCpuUsage.resetElapsed();
             mWcStats.reset();
             mHzStats.reset();

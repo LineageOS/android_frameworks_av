@@ -558,9 +558,9 @@ status_t SwAudioOutputDescriptor::openDuplicating(const sp<SwAudioOutputDescript
 }
 
 // HwAudioOutputDescriptor implementation
-HwAudioOutputDescriptor::HwAudioOutputDescriptor(const sp<AudioSourceDescriptor>& source,
+HwAudioOutputDescriptor::HwAudioOutputDescriptor(const sp<SourceClientDescriptor>& source,
                                                  AudioPolicyClientInterface *clientInterface)
-    : AudioOutputDescriptor(source->mDevice, clientInterface),
+    : AudioOutputDescriptor(source->srcDevice(), clientInterface),
       mSource(source)
 {
 }
@@ -576,7 +576,7 @@ status_t HwAudioOutputDescriptor::dump(int fd)
     snprintf(buffer, SIZE, "Source:\n");
     result.append(buffer);
     write(fd, result.string(), result.size());
-    mSource->dump(fd);
+    mSource->dump(fd, 0, 0);
 
     return NO_ERROR;
 }
@@ -590,13 +590,13 @@ void HwAudioOutputDescriptor::toAudioPortConfig(
                                                  struct audio_port_config *dstConfig,
                                                  const struct audio_port_config *srcConfig) const
 {
-    mSource->mDevice->toAudioPortConfig(dstConfig, srcConfig);
+    mSource->srcDevice()->toAudioPortConfig(dstConfig, srcConfig);
 }
 
 void HwAudioOutputDescriptor::toAudioPort(
                                                     struct audio_port *port) const
 {
-    mSource->mDevice->toAudioPort(port);
+    mSource->srcDevice()->toAudioPort(port);
 }
 
 

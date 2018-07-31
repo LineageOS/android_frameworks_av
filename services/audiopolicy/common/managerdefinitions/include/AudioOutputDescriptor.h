@@ -24,7 +24,6 @@
 #include <RoutingStrategy.h>
 #include "AudioIODescriptorInterface.h"
 #include "AudioPort.h"
-#include "AudioSourceDescriptor.h"
 #include "ClientDescriptor.h"
 
 namespace android {
@@ -159,7 +158,7 @@ public:
 class HwAudioOutputDescriptor: public AudioOutputDescriptor
 {
 public:
-    HwAudioOutputDescriptor(const sp<AudioSourceDescriptor>& source,
+    HwAudioOutputDescriptor(const sp<SourceClientDescriptor>& source,
                             AudioPolicyClientInterface *clientInterface);
     virtual ~HwAudioOutputDescriptor() {}
 
@@ -176,7 +175,7 @@ public:
                            const struct audio_port_config *srcConfig = NULL) const;
     virtual void toAudioPort(struct audio_port *port) const;
 
-    const sp<AudioSourceDescriptor> mSource;
+    const sp<SourceClientDescriptor> mSource;
 
 };
 

@@ -32,7 +32,7 @@
 #include <utils/Trace.h>
 #include <system/audio.h>
 #ifdef FAST_THREAD_STATISTICS
-#include <cpustats/CentralTendencyStatistics.h>
+#include <audio_utils/Statistics.h>
 #ifdef CPU_FREQUENCY_STATISTICS
 #include <cpustats/ThreadCpuUsage.h>
 #endif
