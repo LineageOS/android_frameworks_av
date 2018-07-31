@@ -421,7 +421,18 @@ AMediaCodecCryptoInfo *AMediaCodecCryptoInfo_new(
         size_t *encryptedbytes) {
 
     // size needed to store all the crypto data
-    size_t cryptosize = sizeof(AMediaCodecCryptoInfo) + sizeof(size_t) * numsubsamples * 2;
+    size_t cryptosize;
+    // = sizeof(AMediaCodecCryptoInfo) + sizeof(size_t) * numsubsamples * 2;
+    if (numsubsamples > SIZE_MAX / (sizeof(size_t) * 2)) {
+        ALOGE("crypto size overflow");
+        return NULL;
+    }
+    cryptosize = sizeof(size_t) * numsubsamples * 2;
+    if (sizeof(AMediaCodecCryptoInfo) > SIZE_MAX - cryptosize) {
+        ALOGE("crypto size overflow");
+        return NULL;
+    }
+    cryptosize += sizeof(AMediaCodecCryptoInfo);
     AMediaCodecCryptoInfo *ret = (AMediaCodecCryptoInfo*) malloc(cryptosize);
     if (!ret) {
         ALOGE("couldn't allocate %zu bytes", cryptosize);
