@@ -96,8 +96,7 @@ public:
             int cameraFacing,
             int clientPid,
             uid_t clientUid,
-            int servicePid,
-            bool legacyMode);
+            int servicePid);
 
     virtual ~Camera2Client();
 
