@@ -2058,8 +2058,25 @@ CameraService::Client::Client(const sp<CameraService>& cameraService,
     mRemoteCallback = cameraClient;
 
     cameraService->loadSound();
+    cameraService->ensureCameraShuterSoundDisabled(clientPackageName);
 
     LOG1("Client::Client X (pid %d, id %d)", callingPid, mCameraId);
+}
+
+void CameraService::ensureCameraShuterSoundDisabled(const String16& clientPackageName) {
+    char value[PROPERTY_VALUE_MAX];
+    if (property_get("camera.disable_shutter_sound.packagelist", value, NULL) > 0){
+        std::stringstream disable_shutter_package_list(value);
+        std::string package;
+        while(std::getline(disable_shutter_package_list, package, ',')){
+            if (package.compare(String8(clientPackageName)) == 0){
+                mSoundPlayer[SOUND_SHUTTER] = NULL;
+                mSoundPlayer[SOUND_RECORDING_START] = NULL;
+                mSoundPlayer[SOUND_RECORDING_STOP] = NULL;
+                return;
+            }
+        }
+    }
 }
 
 // tear down the client
