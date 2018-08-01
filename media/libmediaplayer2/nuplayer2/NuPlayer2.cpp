@@ -2474,8 +2474,8 @@ void NuPlayer2::performPlayNextDataSource() {
     if (mDriver != NULL) {
         sp<NuPlayer2Driver> driver = mDriver.promote();
         if (driver != NULL) {
-            notifyListener(previousSrcId, MEDIA2_INFO, MEDIA2_INFO_PLAYBACK_COMPLETE, 0);
-            notifyListener(mSrcId, MEDIA2_INFO, MEDIA2_INFO_STARTED_AS_NEXT, 0);
+            notifyListener(previousSrcId, MEDIA2_INFO, MEDIA2_INFO_DATA_SOURCE_END, 0);
+            notifyListener(mSrcId, MEDIA2_INFO, MEDIA2_INFO_DATA_SOURCE_START, 0);
         }
     }
 
