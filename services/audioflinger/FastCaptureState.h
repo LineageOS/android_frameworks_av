@@ -18,6 +18,7 @@
 #define ANDROID_AUDIO_FAST_CAPTURE_STATE_H
 
 #include <media/nbaio/NBAIO.h>
+#include <media/AudioBufferProvider.h>
 #include "FastThreadState.h"
 #include <private/media/AudioTrackShared.h>
 
@@ -36,6 +37,10 @@ struct FastCaptureState : FastThreadState {
     int             mPipeSinkGen;       // increment when mPipeSink is assigned
     size_t          mFrameCount;        // number of frames per fast capture buffer
     audio_track_cblk_t* mCblk;          // control block for the single fast client, or NULL
+
+    audio_format_t  mFastPatchRecordFormat = AUDIO_FORMAT_INVALID;
+    AudioBufferProvider* mFastPatchRecordBufferProvider = nullptr;   // a reference to a patch
+                                                                     // record in fast mode
 
     // Extends FastThreadState::Command
     static const Command

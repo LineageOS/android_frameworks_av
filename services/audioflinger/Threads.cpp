@@ -6700,6 +6700,14 @@ reacquire_wakelock:
                 }
                 didModify = true;
             }
+            AudioBufferProvider* abp = (fastTrack != 0 && fastTrack->isPatchTrack()) ?
+                    reinterpret_cast<AudioBufferProvider*>(fastTrack.get()) : nullptr;
+            if (state->mFastPatchRecordBufferProvider != abp) {
+                state->mFastPatchRecordBufferProvider = abp;
+                state->mFastPatchRecordFormat = fastTrack == 0 ?
+                        AUDIO_FORMAT_INVALID : fastTrack->format();
+                didModify = true;
+            }
             sq->end(didModify);
             if (didModify) {
                 sq->push(block);

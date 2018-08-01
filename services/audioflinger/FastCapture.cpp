@@ -20,6 +20,7 @@
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 
 #include "Configuration.h"
+#include <audio_utils/format.h>
 #include <linux/futex.h>
 #include <sys/syscall.h>
 #include <media/AudioBufferProvider.h>
@@ -161,7 +162,21 @@ void FastCapture::onWork()
     const FastCaptureState * const current = (const FastCaptureState *) mCurrent;
     FastCaptureDumpState * const dumpState = (FastCaptureDumpState *) mDumpState;
     const FastCaptureState::Command command = mCommand;
-    const size_t frameCount = current->mFrameCount;
+    size_t frameCount = current->mFrameCount;
+    AudioBufferProvider* fastPatchRecordBufferProvider = current->mFastPatchRecordBufferProvider;
+    AudioBufferProvider::Buffer patchBuffer;
+
+    if (fastPatchRecordBufferProvider != 0) {
+        patchBuffer.frameCount = ~0;
+        status_t status = fastPatchRecordBufferProvider->getNextBuffer(&patchBuffer);
+        if (status != NO_ERROR) {
+            frameCount = 0;
+        } else if (patchBuffer.frameCount < frameCount) {
+            // TODO: Make sure that it doesn't cause any issues if we just get a small available
+            // buffer from the buffer provider.
+            frameCount = patchBuffer.frameCount;
+        }
+    }
 
     if ((command & FastCaptureState::READ) /*&& isWarm*/) {
         ALOG_ASSERT(mInputSource != NULL);
@@ -176,6 +191,7 @@ void FastCapture::onWork()
             mTotalNativeFramesRead += framesRead;
             dumpState->mFramesRead = mTotalNativeFramesRead;
             mReadBufferState = framesRead;
+            patchBuffer.frameCount = framesRead;
         } else {
             dumpState->mReadErrors++;
             mReadBufferState = 0;
@@ -193,11 +209,18 @@ void FastCapture::onWork()
         }
         if (mReadBufferState > 0) {
             ssize_t framesWritten = mPipeSink->write(mReadBuffer, mReadBufferState);
-            // FIXME This supports at most one fast capture client.
-            //       To handle multiple clients this could be converted to an array,
-            //       or with a lot more work the control block could be shared by all clients.
             audio_track_cblk_t* cblk = current->mCblk;
-            if (cblk != NULL && framesWritten > 0) {
+            if (fastPatchRecordBufferProvider != 0) {
+                // This indicates the fast track is a patch record, update the cblk by
+                // calling releaseBuffer().
+                memcpy_by_audio_format(patchBuffer.raw, current->mFastPatchRecordFormat,
+                        mReadBuffer, mFormat.mFormat, framesWritten * mFormat.mChannelCount);
+                patchBuffer.frameCount = framesWritten;
+                fastPatchRecordBufferProvider->releaseBuffer(&patchBuffer);
+            } else if (cblk != NULL && framesWritten > 0) {
+                // FIXME This supports at most one fast capture client.
+                //       To handle multiple clients this could be converted to an array,
+                //       or with a lot more work the control block could be shared by all clients.
                 int32_t rear = cblk->u.mStreaming.mRear;
                 android_atomic_release_store(framesWritten + rear, &cblk->u.mStreaming.mRear);
                 cblk->mServer += framesWritten;

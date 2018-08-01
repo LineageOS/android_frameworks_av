@@ -431,14 +431,14 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
     // use a pseudo LCM between input and output framecount
     size_t playbackFrameCount = mPlayback.thread()->frameCount();
     int playbackShift = __builtin_ctz(playbackFrameCount);
-    size_t recordFramecount = mRecord.thread()->frameCount();
-    int shift = __builtin_ctz(recordFramecount);
+    size_t recordFrameCount = mRecord.thread()->frameCount();
+    int shift = __builtin_ctz(recordFrameCount);
     if (playbackShift < shift) {
         shift = playbackShift;
     }
-    size_t frameCount = (playbackFrameCount * recordFramecount) >> shift;
-    ALOGV("%s() playframeCount %zu recordFramecount %zu frameCount %zu",
-            __func__, playbackFrameCount, recordFramecount, frameCount);
+    size_t frameCount = (playbackFrameCount * recordFrameCount) >> shift;
+    ALOGV("%s() playframeCount %zu recordFrameCount %zu frameCount %zu",
+            __func__, playbackFrameCount, recordFrameCount, frameCount);
 
     // create a special record track to capture from record thread
     uint32_t channelCount = mPlayback.thread()->channelCount();
@@ -455,6 +455,17 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
     }
     audio_input_flags_t inputFlags = mAudioPatch.sources[0].config_mask & AUDIO_PORT_CONFIG_FLAGS ?
             mAudioPatch.sources[0].flags.input : AUDIO_INPUT_FLAG_NONE;
+    if (sampleRate == mRecord.thread()->sampleRate() &&
+            inChannelMask == mRecord.thread()->channelMask() &&
+            mRecord.thread()->fastTrackAvailable() &&
+            mRecord.thread()->hasFastCapture()) {
+        // Create a fast track if the record thread has fast capture to get better performance.
+        // Only enable fast mode when there is no resample needed.
+        inputFlags = (audio_input_flags_t) (inputFlags | AUDIO_INPUT_FLAG_FAST);
+    } else {
+        // Fast mode is not available in this case.
+        inputFlags = (audio_input_flags_t) (inputFlags & ~AUDIO_INPUT_FLAG_FAST);
+    }
     sp<RecordThread::PatchRecord> tempRecordTrack = new (std::nothrow) RecordThread::PatchRecord(
                                              mRecord.thread().get(),
                                              sampleRate,
@@ -476,6 +487,11 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
         // "reuse one existing output mix" case
         streamType = mAudioPatch.sources[1].ext.mix.usecase.stream;
     }
+    if (mPlayback.thread()->hasFastMixer()) {
+        // Create a fast track if the playback thread has fast mixer to get better performance.
+        outputFlags = (audio_output_flags_t) (outputFlags | AUDIO_OUTPUT_FLAG_FAST);
+    }
+
     // create a special playback track to render to playback thread.
     // this track is given the same buffer as the PatchRecord buffer
     sp<PlaybackThread::PatchTrack> tempPatchTrack = new (std::nothrow) PlaybackThread::PatchTrack(
