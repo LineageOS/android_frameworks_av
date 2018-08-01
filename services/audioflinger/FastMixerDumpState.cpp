@@ -92,9 +92,9 @@ void FastMixerDumpState::dump(int fd) const
     }
     // statistics for monotonic (wall clock) time, thread raw CPU load in time, CPU clock frequency,
     // and adjusted CPU load in MHz normalized for CPU clock frequency
-    Statistics<double> wall, loadNs;
+    audio_utils::Statistics<double> wall, loadNs;
 #ifdef CPU_FREQUENCY_STATISTICS
-    Statistics<double> kHz, loadMHz;
+    audio_utils::Statistics<double> kHz, loadMHz;
     uint32_t previousCpukHz = 0;
 #endif
     // Assuming a normal distribution for cycle times, three standard deviations on either side of
@@ -152,7 +152,7 @@ void FastMixerDumpState::dump(int fd) const
         qsort(tail, n, sizeof(uint32_t), compare_uint32_t);
         // assume same number of tail samples on each side, left and right
         uint32_t count = n / kTailDenominator;
-        Statistics<double> left, right;
+        audio_utils::Statistics<double> left, right;
         for (uint32_t i = 0; i < count; ++i) {
             left.add(tail[i]);
             right.add(tail[n - (i + 1)]);
