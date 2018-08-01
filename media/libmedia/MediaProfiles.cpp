@@ -689,6 +689,7 @@ void MediaProfiles::checkAndAddRequiredProfilesIfNecessary() {
 /*static*/ MediaProfiles*
 MediaProfiles::getInstance()
 {
+    char platform[PROPERTY_VALUE_MAX] = {0};
     ALOGV("getInstance");
     Mutex::Autolock lock(sLock);
     if (!sIsInitialized) {
@@ -709,6 +710,47 @@ MediaProfiles::getInstance()
                 sInstance = createInstanceFromXmlFile(xmlFile);
             }
         } else {
+                if (!strncmp(value, "/vendor/etc", strlen("/vendor/etc"))) {
+                    property_get("ro.board.platform", platform, NULL);
+                    if (!strcmp(platform, "msm8953")){
+                        if (property_get("vendor.media.target.version", value, "0") &&
+                            (atoi(value) == 1)){
+                            strlcpy(value, "/vendor/etc/media_profiles_8953_v1.xml",
+                                    PROPERTY_VALUE_MAX);
+                        } else {
+                            strlcpy(value, "/vendor/etc/media_profiles_vendor.xml",
+                                    PROPERTY_VALUE_MAX);
+                        }
+                    } else if (!strcmp(platform, "sdm660")) {
+                        property_get("vendor.media.target.version", value, "0");
+                        if (atoi(value) == 1) {
+                            strlcpy(value, "/vendor/etc/media_profiles_sdm660_v1.xml",
+                                    PROPERTY_VALUE_MAX);
+                        } else {
+                            strlcpy(value, "/vendor/etc/media_profiles_vendor.xml",
+                                    PROPERTY_VALUE_MAX);
+                        }
+                    } else if (!strcmp(platform, "bengal")) {
+                        property_get("vendor.sys.media.target.version", value, "0");
+                        if (atoi(value) == 3) {
+                            strlcpy(value, "/vendor/etc/media_profiles_khaje.xml",
+                                    PROPERTY_VALUE_MAX);
+                        } else if (atoi(value) == 2) {
+                            strlcpy(value, "/vendor/etc/media_profiles_scuba.xml",
+                                    PROPERTY_VALUE_MAX);
+                        } else {
+                            strlcpy(value, "/vendor/etc/media_profiles_vendor.xml",
+                                    PROPERTY_VALUE_MAX);
+                        }
+                    }
+                    char variant[PROPERTY_VALUE_MAX];
+                    if (property_get("ro.media.xml_variant.codecs", variant, NULL) > 0) {
+                        std::string xmlPath = std::string("/vendor/etc/media_profiles") +
+                                              std::string(variant) + std::string(".xml");
+                        strlcpy(value, xmlPath.c_str(), PROPERTY_VALUE_MAX);
+                        ALOGI("Profiles xml path: %s", value);
+                    }
+                }
             sInstance = createInstanceFromXmlFile(value);
         }
         CHECK(sInstance != NULL);
