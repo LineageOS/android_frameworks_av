@@ -5231,9 +5231,13 @@ status_t MPEG4Source::fragmentedRead(
     uint32_t cts = 0;
     bool isSyncSample = false;
     bool newBuffer = false;
-    if (mBuffer == NULL) {
+    if (mBuffer == NULL || mCurrentSampleIndex >= mCurrentSamples.size()) {
         newBuffer = true;
 
+        if (mBuffer != NULL) {
+            mBuffer->release();
+            mBuffer = NULL;
+        }
         if (mCurrentSampleIndex >= mCurrentSamples.size()) {
             // move to next fragment if there is one
             if (mNextMoofOffset <= mCurrentMoofOffset) {
