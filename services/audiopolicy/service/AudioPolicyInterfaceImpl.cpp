@@ -254,15 +254,6 @@ status_t AudioPolicyService::startOutput(audio_port_handle_t portId)
 
 status_t AudioPolicyService::stopOutput(audio_port_handle_t portId)
 {
-    {
-        Mutex::Autolock _l(mLock);
-
-        const ssize_t index = mAudioPlaybackClients.indexOfKey(portId);
-        if (index < 0) {
-            ALOGE("%s AudioTrack client not found for portId %d", __FUNCTION__, portId);
-            return INVALID_OPERATION;
-        }
-    }
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
