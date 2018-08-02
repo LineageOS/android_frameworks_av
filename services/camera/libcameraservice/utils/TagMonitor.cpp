@@ -49,7 +49,8 @@ void TagMonitor::parseTagsToMonitor(String8 tagNames) {
     std::lock_guard<std::mutex> lock(mMonitorMutex);
 
     // Expand shorthands
-    if (ssize_t idx = tagNames.find("3a") != -1) {
+    ssize_t idx = tagNames.find("3a");
+    if (idx != -1) {
         ssize_t end = tagNames.find(",", idx);
         char* start = tagNames.lockBuffer(tagNames.size());
         start[idx] = '\0';
