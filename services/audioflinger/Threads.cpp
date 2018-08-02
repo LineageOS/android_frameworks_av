@@ -6733,8 +6733,7 @@ reacquire_wakelock:
 
         // If an NBAIO source is present, use it to read the normal capture's data
         if (mPipeSource != 0) {
-            size_t framesToRead = mBufferSize / mFrameSize;
-            framesToRead = min(mRsmpInFramesOA - rear, mRsmpInFramesP2 / 2);
+            size_t framesToRead = min(mRsmpInFramesOA - rear, mRsmpInFramesP2 / 2);
 
             // The audio fifo read() returns OVERRUN on overflow, and advances the read pointer
             // to the full buffer point (clearing the overflow condition).  Upon OVERRUN error,
