@@ -23,6 +23,7 @@
 #include <memory>
 #include <cutils/misc.h>
 #include <media/AudioEffect.h>
+#include <media/AudioPolicyHelper.h>
 #include <media/EffectsConfig.h>
 #include <mediautils/ServiceUtilities.h>
 #include <system/audio.h>
@@ -317,6 +318,102 @@ status_t AudioPolicyEffects::releaseOutputSessionEffects(audio_io_handle_t outpu
     return status;
 }
 
+status_t AudioPolicyEffects::addStreamDefaultEffect(const effect_uuid_t *type,
+                                                    const String16& opPackageName,
+                                                    const effect_uuid_t *uuid,
+                                                    int32_t priority,
+                                                    audio_usage_t usage,
+                                                    audio_unique_id_t* id)
+{
+    if (uuid == NULL || type == NULL) {
+        ALOGE("addStreamDefaultEffect(): Null uuid or type uuid pointer");
+        return BAD_VALUE;
+    }
+
+    audio_stream_type_t stream = audio_usage_to_stream_type(usage);
+
+    if (stream < AUDIO_STREAM_MIN || stream >= AUDIO_STREAM_PUBLIC_CNT) {
+        ALOGE("addStreamDefaultEffect(): Unsupported stream type %d", stream);
+        return BAD_VALUE;
+    }
+
+    // Check that |uuid| or |type| corresponds to an effect on the system.
+    effect_descriptor_t descriptor = {};
+    status_t res = AudioEffect::getEffectDescriptor(
+            uuid, type, EFFECT_FLAG_TYPE_INSERT, &descriptor);
+    if (res != OK) {
+        ALOGE("addStreamDefaultEffect(): Failed to find effect descriptor matching uuid/type.");
+        return res;
+    }
+
+    // Only insert effects can be added dynamically as stream defaults.
+    if ((descriptor.flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_INSERT) {
+        ALOGE("addStreamDefaultEffect(): Desired effect cannot be attached "
+              "as a stream default effect.");
+        return BAD_VALUE;
+    }
+
+    Mutex::Autolock _l(mLock);
+
+    // Find the EffectDescVector for the given stream type, or create a new one if necessary.
+    ssize_t index = mOutputStreams.indexOfKey(stream);
+    EffectDescVector *desc = NULL;
+    if (index < 0) {
+        // No effects for this stream type yet.
+        desc = new EffectDescVector();
+        mOutputStreams.add(stream, desc);
+    } else {
+        desc = mOutputStreams.valueAt(index);
+    }
+
+    // Create a new effect and add it to the vector.
+    res = AudioEffect::newEffectUniqueId(id);
+    if (res != OK) {
+        ALOGE("addStreamDefaultEffect(): failed to get new unique id.");
+        return res;
+    }
+    EffectDesc *effect = new EffectDesc(
+            descriptor.name, *type, opPackageName, *uuid, priority, *id);
+    desc->mEffects.add(effect);
+    // TODO(b/71813697): Support setting params as well.
+
+    // TODO(b/71814300): Retroactively attach to any existing streams of the given type.
+    // This requires tracking the stream type of each session id in addition to what is
+    // already being tracked.
+
+    return NO_ERROR;
+}
+
+status_t AudioPolicyEffects::removeStreamDefaultEffect(audio_unique_id_t id)
+{
+    if (id == AUDIO_UNIQUE_ID_ALLOCATE) {
+        // ALLOCATE is not a unique identifier, but rather a reserved value indicating
+        // a real id has not been assigned. For default effects, this value is only used
+        // by system-owned defaults from the loaded config, which cannot be removed.
+        return BAD_VALUE;
+    }
+
+    Mutex::Autolock _l(mLock);
+
+    // Check each stream type.
+    size_t numStreams = mOutputStreams.size();
+    for (size_t i = 0; i < numStreams; ++i) {
+        // Check each effect for each stream.
+        EffectDescVector* descVector = mOutputStreams[i];
+        for (auto desc = descVector->mEffects.begin(); desc != descVector->mEffects.end(); ++desc) {
+            if ((*desc)->mId == id) {
+                // Found it!
+                // TODO(b/71814300): Remove from any streams the effect was attached to.
+                descVector->mEffects.erase(desc);
+                // Handles are unique; there can only be one match, so return early.
+                return NO_ERROR;
+            }
+        }
+    }
+
+    // Effect wasn't found, so it's been trivially removed successfully.
+    return NO_ERROR;
+}
 
 void AudioPolicyEffects::EffectVector::setProcessorEnabled(bool enabled)
 {

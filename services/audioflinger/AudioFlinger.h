@@ -208,6 +208,8 @@ public:
     virtual status_t queryEffect(uint32_t index, effect_descriptor_t *descriptor) const;
 
     virtual status_t getEffectDescriptor(const effect_uuid_t *pUuid,
+                                         const effect_uuid_t *pTypeUuid,
+                                         uint32_t preferredTypeFlag,
                                          effect_descriptor_t *descriptor) const;
 
     virtual sp<IEffect> createEffect(

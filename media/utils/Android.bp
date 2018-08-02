@@ -40,6 +40,12 @@ cc_library {
         "-Werror",
     ],
 
+    product_variables: {
+        product_is_iot: {
+            cflags: ["-DTARGET_ANDROID_THINGS"],
+        },
+    },
+
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
 }

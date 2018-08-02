@@ -90,27 +90,34 @@ public:
      */
     static status_t queryEffect(uint32_t index, effect_descriptor_t *descriptor);
 
-
     /*
-     * Returns the descriptor for the specified effect uuid.
+     * Returns a descriptor for the specified effect uuid or type.
+     *
+     * Lookup an effect by uuid, or if that's unspecified (EFFECT_UUID_NULL),
+     * do so by type and preferred flags instead.
      *
      * Parameters:
      *      uuid:       pointer to effect uuid.
+     *      type:       pointer to effect type uuid.
+     *      preferredTypeFlags: if multiple effects of the given type exist,
+     *                  one with a matching type flag will be chosen over one without.
+     *                  Use EFFECT_FLAG_TYPE_MASK to indicate no preference.
      *      descriptor: address where the effect descriptor should be returned.
      *
      * Returned status (from utils/Errors.h) can be:
      *      NO_ERROR        successful operation.
      *      PERMISSION_DENIED could not get AudioFlinger interface
      *      NO_INIT         effect library failed to initialize
-     *      BAD_VALUE       invalid uuid or descriptor pointers
+     *      BAD_VALUE       invalid type or descriptor pointers
      *      NAME_NOT_FOUND  no effect with this uuid found
      *
      * Returned value
      *   *descriptor updated with effect descriptor
      */
     static status_t getEffectDescriptor(const effect_uuid_t *uuid,
-                                        effect_descriptor_t *descriptor) /*const*/;
-
+                                        const effect_uuid_t *type,
+                                        uint32_t preferredTypeFlag,
+                                        effect_descriptor_t *descriptor);
 
     /*
      * Returns a list of descriptors corresponding to the pre processings enabled by default
@@ -142,6 +149,79 @@ public:
     static status_t queryDefaultPreProcessing(audio_session_t audioSession,
                                               effect_descriptor_t *descriptors,
                                               uint32_t *count);
+
+    /*
+     * Gets a new system-wide unique effect id.
+     *
+     * Parameters:
+     *      id: The address to return the generated id.
+     *
+     * Returned status (from utils/Errors.h) can be:
+     *      NO_ERROR        successful operation.
+     *      PERMISSION_DENIED could not get AudioFlinger interface
+     *                        or caller lacks required permissions.
+     * Returned value
+     *   *id:  The new unique system-wide effect id.
+     */
+    static status_t newEffectUniqueId(audio_unique_id_t* id);
+
+    /*
+     * Static methods for adding/removing system-wide effects.
+     */
+
+    /*
+     * Adds an effect to the list of default output effects for a given stream type.
+     *
+     * If the effect is no longer available when a stream of the given type
+     * is created, the system will continue without adding it.
+     *
+     * Parameters:
+     *   typeStr:  Type uuid of effect to be a default: can be null if uuidStr is specified.
+     *             This may correspond to the OpenSL ES interface implemented by this effect,
+     *             or could be some vendor-defined type.
+     *   opPackageName: The package name used for app op checks.
+     *   uuidStr:  Uuid of effect to be a default: can be null if type is specified.
+     *             This uuid corresponds to a particular implementation of an effect type.
+     *             Note if both uuidStr and typeStr are specified, typeStr is ignored.
+     *   priority: Requested priority for effect control: the priority level corresponds to the
+     *             value of priority parameter: negative values indicate lower priorities, positive
+     *             values higher priorities, 0 being the normal priority.
+     *   usage:    The usage this effect should be a default for. Unrecognized values will be
+     *             treated as AUDIO_USAGE_UNKNOWN.
+     *   id:       Address where the system-wide unique id of the default effect should be returned.
+     *
+     * Returned status (from utils/Errors.h) can be:
+     *      NO_ERROR        successful operation.
+     *      PERMISSION_DENIED could not get AudioFlinger interface
+     *                        or caller lacks required permissions.
+     *      NO_INIT         effect library failed to initialize.
+     *      BAD_VALUE       invalid type uuid or implementation uuid.
+     *      NAME_NOT_FOUND  no effect with this uuid or type found.
+     *
+     * Returned value
+     *   *id:  The system-wide unique id of the added default effect.
+     */
+    static status_t addStreamDefaultEffect(const char* typeStr,
+                                           const String16& opPackageName,
+                                           const char* uuidStr,
+                                           int32_t priority,
+                                           audio_usage_t usage,
+                                           audio_unique_id_t* id);
+
+    /*
+     * Removes an effect from the list of default output effects for a given stream type.
+     *
+     * Parameters:
+     *      id: The system-wide unique id of the effect that should no longer be a default.
+     *
+     * Returned status (from utils/Errors.h) can be:
+     *      NO_ERROR        successful operation.
+     *      PERMISSION_DENIED could not get AudioFlinger interface
+     *                        or caller lacks required permissions.
+     *      NO_INIT         effect library failed to initialize.
+     *      BAD_VALUE       invalid id.
+     */
+    static status_t removeStreamDefaultEffect(audio_unique_id_t id);
 
     /*
      * Events used by callback function (effect_callback_t).
