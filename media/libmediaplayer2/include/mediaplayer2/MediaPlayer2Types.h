@@ -96,17 +96,17 @@ enum media2_error_type {
 enum media2_info_type {
     // 0xx
     MEDIA2_INFO_UNKNOWN = 1,
-    // The player was started because it was used as the next player for another
-    // player, which just completed playback
-    MEDIA2_INFO_STARTED_AS_NEXT = 2,
+    // The player just started the playback of this data source.
+    MEDIA2_INFO_DATA_SOURCE_START = 2,
     // The player just pushed the very first video frame for rendering
     MEDIA2_INFO_VIDEO_RENDERING_START = 3,
     // The player just pushed the very first audio frame for rendering
     MEDIA2_INFO_AUDIO_RENDERING_START = 4,
     // The player just completed the playback of this data source
-    MEDIA2_INFO_PLAYBACK_COMPLETE = 5,
-    // The player just completed the playback of the full play list
-    MEDIA2_INFO_PLAYLIST_END = 6,
+    MEDIA2_INFO_DATA_SOURCE_END = 5,
+    // The player just completed the playback of all data sources.
+    // But this is not visible in native code. Just keep this entry for completeness.
+    MEDIA2_INFO_DATA_SOURCE_LIST_END = 6,
 
     //1xx
     // The player just prepared a data source.

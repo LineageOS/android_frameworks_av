@@ -889,7 +889,7 @@ error:
         delete session->procFrame;
         session->procFrame = NULL;
         delete session->apm;
-        session->apm = NULL;
+        session->apm = NULL; // NOLINT(clang-analyzer-cplusplus.NewDelete)
     }
     return status;
 }
