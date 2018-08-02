@@ -313,6 +313,9 @@ static const char *FourCC2MIME(uint32_t fourcc) {
         case FOURCC('s', 'a', 'w', 'b'):
             return MEDIA_MIMETYPE_AUDIO_AMR_WB;
 
+        case FOURCC('e', 'c', '-', '3'):
+            return MEDIA_MIMETYPE_AUDIO_EAC3;
+
         case FOURCC('m', 'p', '4', 'v'):
             return MEDIA_MIMETYPE_VIDEO_MPEG4;
 
@@ -2438,13 +2441,19 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC('a', 'c', '-', '3'):
         {
             *offset += chunk_size;
-            return parseAC3SampleEntry(data_offset);
+            return parseAC3SpecificBox(data_offset);
+        }
+
+        case FOURCC('e', 'c', '-', '3'):
+        {
+            *offset += chunk_size;
+            return parseEAC3SpecificBox(data_offset);
         }
 
         case FOURCC('a', 'c', '-', '4'):
         {
             *offset += chunk_size;
-            return parseAC4SampleEntry(data_offset);
+            return parseAC4SpecificBox(data_offset);
         }
 
         case FOURCC('f', 't', 'y', 'p'):
@@ -2518,43 +2527,43 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
     return OK;
 }
 
-status_t MPEG4Extractor::parseAC4SampleEntry(off64_t offset) {
+status_t MPEG4Extractor::parseChannelCountSampleRate(
+        off64_t *offset, uint16_t *channelCount, uint16_t *sampleRate) {
     // skip 16 bytes:
     //  + 6-byte reserved,
     //  + 2-byte data reference index,
     //  + 8-byte reserved
-    offset += 16;
-    uint16_t channelCount;
-    if (!mDataSource->getUInt16(offset, &channelCount)) {
-        ALOGE("MPEG4Extractor: error while reading ac-4 block: cannot read channel count");
+    *offset += 16;
+    if (!mDataSource->getUInt16(*offset, channelCount)) {
+        ALOGE("MPEG4Extractor: error while reading sample entry box: cannot read channel count");
         return ERROR_MALFORMED;
     }
     // skip 8 bytes:
     //  + 2-byte channelCount,
     //  + 2-byte sample size,
     //  + 4-byte reserved
-    offset += 8;
-    uint16_t sampleRate;
-    if (!mDataSource->getUInt16(offset, &sampleRate)) {
-        ALOGE("MPEG4Extractor: error while reading ac-4 block: cannot read sample rate");
+    *offset += 8;
+    if (!mDataSource->getUInt16(*offset, sampleRate)) {
+        ALOGE("MPEG4Extractor: error while reading sample entry box: cannot read sample rate");
         return ERROR_MALFORMED;
     }
-
     // skip 4 bytes:
     //  + 2-byte sampleRate,
     //  + 2-byte reserved
-    offset += 4;
-
-    if (mLastTrack == NULL) {
-        return ERROR_MALFORMED;
-    }
-    mLastTrack->meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AC4);
-    mLastTrack->meta.setInt32(kKeyChannelCount, channelCount);
-    mLastTrack->meta.setInt32(kKeySampleRate, sampleRate);
-    return parseAC4SpecificBox(offset);
+    *offset += 4;
+    return OK;
 }
 
 status_t MPEG4Extractor::parseAC4SpecificBox(off64_t offset) {
+    if (mLastTrack == NULL) {
+        return ERROR_MALFORMED;
+    }
+
+    uint16_t sampleRate, channelCount;
+    status_t status;
+    if ((status = parseChannelCountSampleRate(&offset, &channelCount, &sampleRate)) != OK) {
+        return status;
+    }
     uint32_t size;
     // + 4-byte size
     // + 4-byte type
@@ -2593,39 +2602,185 @@ status_t MPEG4Extractor::parseAC4SpecificBox(off64_t offset) {
         return ERROR_MALFORMED;
     }
 
+    mLastTrack->meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AC4);
+    mLastTrack->meta.setInt32(kKeyChannelCount, channelCount);
+    mLastTrack->meta.setInt32(kKeySampleRate, sampleRate);
     return OK;
 }
 
-status_t MPEG4Extractor::parseAC3SampleEntry(off64_t offset) {
-    // skip 16 bytes:
-    //  + 6-byte reserved,
-    //  + 2-byte data reference index,
-    //  + 8-byte reserved
-    offset += 16;
-    uint16_t channelCount;
-    if (!mDataSource->getUInt16(offset, &channelCount)) {
-        return ERROR_MALFORMED;
-    }
-    // skip 8 bytes:
-    //  + 2-byte channelCount,
-    //  + 2-byte sample size,
-    //  + 4-byte reserved
-    offset += 8;
-    uint16_t sampleRate;
-    if (!mDataSource->getUInt16(offset, &sampleRate)) {
-        ALOGE("MPEG4Extractor: error while reading ac-3 block: cannot read sample rate");
+status_t MPEG4Extractor::parseEAC3SpecificBox(off64_t offset) {
+    if (mLastTrack == NULL) {
         return ERROR_MALFORMED;
     }
 
-    // skip 4 bytes:
-    //  + 2-byte sampleRate,
-    //  + 2-byte reserved
+    uint16_t sampleRate, channels;
+    status_t status;
+    if ((status = parseChannelCountSampleRate(&offset, &channels, &sampleRate)) != OK) {
+        return status;
+    }
+    uint32_t size;
+    // + 4-byte size
+    // + 4-byte type
+    // + 3-byte payload
+    const uint32_t kEAC3SpecificBoxMinSize = 11;
+    // 13 + 3 + (8 * (2 + 5 + 5 + 3 + 1 + 3 + 4 + (14 * 9 + 1))) bits == 152 bytes theoretical max
+    // calculated from the required bits read below as well as the maximum number of independent
+    // and dependant sub streams you can have
+    const uint32_t kEAC3SpecificBoxMaxSize = 152;
+    if (!mDataSource->getUInt32(offset, &size) ||
+        size < kEAC3SpecificBoxMinSize ||
+        size > kEAC3SpecificBoxMaxSize) {
+        ALOGE("MPEG4Extractor: error while reading eac-3 block: cannot read specific box size");
+        return ERROR_MALFORMED;
+    }
+
     offset += 4;
-    return parseAC3SpecificBox(offset, sampleRate);
+    uint32_t type;
+    if (!mDataSource->getUInt32(offset, &type) || type != FOURCC('d', 'e', 'c', '3')) {
+        ALOGE("MPEG4Extractor: error while reading eac-3 specific block: header not dec3");
+        return ERROR_MALFORMED;
+    }
+
+    offset += 4;
+    uint8_t* chunk = new (std::nothrow) uint8_t[size];
+    if (chunk == NULL) {
+        return ERROR_MALFORMED;
+    }
+
+    if (mDataSource->readAt(offset, chunk, size) != (ssize_t)size) {
+        ALOGE("MPEG4Extractor: error while reading eac-3 specific block: bitstream fields");
+        delete[] chunk;
+        return ERROR_MALFORMED;
+    }
+
+    ABitReader br(chunk, size);
+    static const unsigned channelCountTable[] = {2, 1, 2, 3, 3, 4, 4, 5};
+    static const unsigned sampleRateTable[] = {48000, 44100, 32000};
+
+    if (br.numBitsLeft() < 16) {
+        delete[] chunk;
+        return ERROR_MALFORMED;
+    }
+    unsigned data_rate = br.getBits(13);
+    ALOGV("EAC3 data rate = %d", data_rate);
+
+    unsigned num_ind_sub = br.getBits(3) + 1;
+    ALOGV("EAC3 independant substreams = %d", num_ind_sub);
+    if (br.numBitsLeft() < (num_ind_sub * 23)) {
+        delete[] chunk;
+        return ERROR_MALFORMED;
+    }
+
+    unsigned channelCount = 0;
+    for (unsigned i = 0; i < num_ind_sub; i++) {
+        unsigned fscod = br.getBits(2);
+        if (fscod == 3) {
+            ALOGE("Incorrect fscod (3) in EAC3 header");
+            delete[] chunk;
+            return ERROR_MALFORMED;
+        }
+        unsigned boxSampleRate = sampleRateTable[fscod];
+        if (boxSampleRate != sampleRate) {
+            ALOGE("sample rate mismatch: boxSampleRate = %d, sampleRate = %d",
+                boxSampleRate, sampleRate);
+            delete[] chunk;
+            return ERROR_MALFORMED;
+        }
+
+        unsigned bsid = br.getBits(5);
+        if (bsid < 8) {
+            ALOGW("Incorrect bsid in EAC3 header. Possibly AC-3?");
+            delete[] chunk;
+            return ERROR_MALFORMED;
+        }
+
+        // skip
+        br.skipBits(2);
+        unsigned bsmod = br.getBits(3);
+        unsigned acmod = br.getBits(3);
+        unsigned lfeon = br.getBits(1);
+        // we currently only support the first stream
+        if (i == 0)
+            channelCount = channelCountTable[acmod] + lfeon;
+        ALOGV("bsmod = %d, acmod = %d, lfeon = %d", bsmod, acmod, lfeon);
+
+        br.skipBits(3);
+        unsigned num_dep_sub = br.getBits(4);
+        ALOGV("EAC3 dependant substreams = %d", num_dep_sub);
+        if (num_dep_sub != 0) {
+            if (br.numBitsLeft() < 9) {
+                delete[] chunk;
+                return ERROR_MALFORMED;
+            }
+            static const char* chan_loc_tbl[] = { "Lc/Rc","Lrs/Rrs","Cs","Ts","Lsd/Rsd",
+                "Lw/Rw","Lvh/Rvh","Cvh","Lfe2" };
+            unsigned chan_loc = br.getBits(9);
+            unsigned mask = 1;
+            for (unsigned j = 0; j < 9; j++, mask <<= 1) {
+                if ((chan_loc & mask) != 0) {
+                    // we currently only support the first stream
+                    if (i == 0) {
+                        channelCount++;
+                        // these are 2 channels in the mask
+                        if (j == 0 || j == 1 || j == 4 || j == 5 || j == 6) {
+                            channelCount++;
+                        }
+                    }
+                    ALOGV(" %s", chan_loc_tbl[j]);
+                }
+            }
+        } else {
+            if (br.numBitsLeft() == 0) {
+                delete[] chunk;
+                return ERROR_MALFORMED;
+            }
+            br.skipBits(1);
+        }
+    }
+
+    if (br.numBitsLeft() != 0) {
+        if (br.numBitsLeft() < 8) {
+            delete[] chunk;
+            return ERROR_MALFORMED;
+        }
+        unsigned mask = br.getBits(8);
+        for (unsigned i = 0; i < 8; i++) {
+            if (((0x1 << i) && mask) == 0)
+                continue;
+
+            if (br.numBitsLeft() < 8) {
+                delete[] chunk;
+                return ERROR_MALFORMED;
+            }
+            switch (i) {
+                case 0: {
+                    unsigned complexity = br.getBits(8);
+                    ALOGV("Found a JOC stream with complexity = %d", complexity);
+                }break;
+                default: {
+                    br.skipBits(8);
+                }break;
+            }
+        }
+    }
+    mLastTrack->meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_EAC3);
+    mLastTrack->meta.setInt32(kKeyChannelCount, channelCount);
+    mLastTrack->meta.setInt32(kKeySampleRate, sampleRate);
+
+    delete[] chunk;
+    return OK;
 }
 
-status_t MPEG4Extractor::parseAC3SpecificBox(
-        off64_t offset, uint16_t sampleRate) {
+status_t MPEG4Extractor::parseAC3SpecificBox(off64_t offset) {
+    if (mLastTrack == NULL) {
+        return ERROR_MALFORMED;
+    }
+
+    uint16_t sampleRate, channels;
+    status_t status;
+    if ((status = parseChannelCountSampleRate(&offset, &channels, &sampleRate)) != OK) {
+        return status;
+    }
     uint32_t size;
     // + 4-byte size
     // + 4-byte type
@@ -2680,9 +2835,6 @@ status_t MPEG4Extractor::parseAC3SpecificBox(
     unsigned lfeon = br.getBits(1);
     unsigned channelCount = channelCountTable[acmod] + lfeon;
 
-    if (mLastTrack == NULL) {
-        return ERROR_MALFORMED;
-    }
     mLastTrack->meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AC3);
     mLastTrack->meta.setInt32(kKeyChannelCount, channelCount);
     mLastTrack->meta.setInt32(kKeySampleRate, sampleRate);

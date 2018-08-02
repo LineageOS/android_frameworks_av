@@ -38,6 +38,7 @@ struct ElementaryStreamQueue {
         H264,
         AAC,
         AC3,
+        EAC3,
         AC4,
         MPEG_AUDIO,
         MPEG_VIDEO,
@@ -116,7 +117,7 @@ private:
 
     sp<ABuffer> dequeueAccessUnitH264();
     sp<ABuffer> dequeueAccessUnitAAC();
-    sp<ABuffer> dequeueAccessUnitAC3();
+    sp<ABuffer> dequeueAccessUnitEAC3();
     sp<ABuffer> dequeueAccessUnitAC4();
     sp<ABuffer> dequeueAccessUnitMPEGAudio();
     sp<ABuffer> dequeueAccessUnitMPEGVideo();

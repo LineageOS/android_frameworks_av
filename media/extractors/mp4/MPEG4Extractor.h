@@ -139,9 +139,10 @@ private:
 
     Track *findTrackByMimePrefix(const char *mimePrefix);
 
-    status_t parseAC3SampleEntry(off64_t offset);
-    status_t parseAC3SpecificBox(off64_t offset, uint16_t sampleRate);
-    status_t parseAC4SampleEntry(off64_t offset);
+    status_t parseChannelCountSampleRate(
+            off64_t *offset, uint16_t *channelCount, uint16_t *sampleRate);
+    status_t parseAC3SpecificBox(off64_t offset);
+    status_t parseEAC3SpecificBox(off64_t offset);
     status_t parseAC4SpecificBox(off64_t offset);
 
     MPEG4Extractor(const MPEG4Extractor &);
