@@ -335,9 +335,9 @@ public:
 #ifdef DEBUG_CPU_USAGE
 private:
     ThreadCpuUsage mCpuUsage;           // instantaneous thread CPU usage in wall clock ns
-    Statistics<double> mWcStats;        // statistics on thread CPU usage in wall clock ns
+    audio_utils::Statistics<double> mWcStats; // statistics on thread CPU usage in wall clock ns
 
-    Statistics<double> mHzStats;        // statistics on thread CPU usage in cycles
+    audio_utils::Statistics<double> mHzStats; // statistics on thread CPU usage in cycles
 
     int mCpuNum;                        // thread's current CPU number
     int mCpukHz;                        // frequency of thread's current CPU in kHz
