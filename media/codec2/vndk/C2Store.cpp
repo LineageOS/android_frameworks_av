@@ -856,6 +856,7 @@ C2PlatformComponentStore::C2PlatformComponentStore()
     emplace("libcodec2_soft_h263dec.so");
     emplace("libcodec2_soft_h263enc.so");
     emplace("libcodec2_soft_hevcdec.so");
+    emplace("libcodec2_soft_hevcenc.so");
     emplace("libcodec2_soft_mp3dec.so");
     emplace("libcodec2_soft_mpeg2dec.so");
     emplace("libcodec2_soft_mpeg4dec.so");
