@@ -189,6 +189,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
         minSizeFrames = AAUDIO_BUFFER_CAPACITY_MIN;
     }
     status = mMmapStream->createMmapBuffer(minSizeFrames, &mMmapBufferinfo);
+    bool isBufferShareable = mMmapBufferinfo.flags & AUDIO_MMAP_APPLICATION_SHAREABLE;
     if (status != OK) {
         ALOGE("%s() - createMmapBuffer() failed with status %d %s",
               __func__, status, strerror(-status));
@@ -198,18 +199,13 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
         ALOGD("%s() createMmapBuffer() returned = %d, buffer_size = %d, burst_size %d"
                       ", Sharable FD: %s",
               __func__, status,
-              abs(mMmapBufferinfo.buffer_size_frames),
+              mMmapBufferinfo.buffer_size_frames,
               mMmapBufferinfo.burst_size_frames,
-              mMmapBufferinfo.buffer_size_frames < 0 ? "Yes" : "No");
+              isBufferShareable ? "Yes" : "No");
     }
 
     setBufferCapacity(mMmapBufferinfo.buffer_size_frames);
-    // The audio HAL indicates if the shared memory fd can be shared outside of audioserver
-    // by returning a negative buffer size
-    if (getBufferCapacity() < 0) {
-        // Exclusive mode can be used by client or service.
-        setBufferCapacity(-getBufferCapacity());
-    } else {
+    if (!isBufferShareable) {
         // Exclusive mode can only be used by the service because the FD cannot be shared.
         uid_t audioServiceUid = getuid();
         if ((mMmapClient.clientUid != audioServiceUid) &&
