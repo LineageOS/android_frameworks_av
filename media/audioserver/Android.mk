@@ -21,6 +21,9 @@ LOCAL_SHARED_LIBRARIES := \
 	libsoundtriggerservice \
 	libutils
 
+LOCAL_STATIC_LIBRARIES := \
+	libjsoncpp
+
 # TODO oboeservice is the old folder name for aaudioservice. It will be changed.
 LOCAL_C_INCLUDES := \
 	frameworks/av/services/audioflinger \

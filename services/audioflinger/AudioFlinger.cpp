@@ -58,6 +58,8 @@
 
 #include <audio_utils/primitives.h>
 
+#include <json/json.h>
+
 #include <powermanager/PowerManager.h>
 
 #include <media/IMediaLogService.h>
@@ -440,8 +442,11 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
         const bool formatJson = std::any_of(args.begin(), args.end(),
                 [](const String16 &arg) { return arg == String16("--json"); });
         if (formatJson) {
+            Json::Value root = getJsonDump();
+            Json::FastWriter writer;
+            std::string rootStr = writer.write(root);
             // XXX consider buffering if the string happens to be too long.
-            dprintf(fd, "%s", getJsonString().c_str());
+            dprintf(fd, "%s", rootStr.c_str());
             return NO_ERROR;
         }
 
@@ -556,34 +561,30 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
     return NO_ERROR;
 }
 
-std::string AudioFlinger::getJsonString()
+Json::Value AudioFlinger::getJsonDump()
 {
-    std::string jsonStr = "{\n";
+    Json::Value root(Json::objectValue);
     const bool locked = dumpTryLock(mLock);
 
     // failed to lock - AudioFlinger is probably deadlocked
     if (!locked) {
-        jsonStr += "    \"deadlock_message\": ";
-        jsonStr += kDeadlockedString;
-        jsonStr += ",\n";
+        root["deadlock_message"] = kDeadlockedString;
     }
     // FIXME risky to access data structures without a lock held?
 
-    jsonStr += "  \"Playback_Threads\": [\n";
+    Json::Value playbackThreads = Json::arrayValue;
     // dump playback threads
     for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-        if (i != 0) {
-            jsonStr += ",\n";
-        }
-        jsonStr += mPlaybackThreads.valueAt(i)->getJsonString();
+        playbackThreads.append(mPlaybackThreads.valueAt(i)->getJsonDump());
     }
-    jsonStr += "\n  ]\n}\n";
 
     if (locked) {
         mLock.unlock();
     }
 
-    return jsonStr;
+    root["playback_threads"] = playbackThreads;
+
+    return root;
 }
 
 sp<AudioFlinger::Client> AudioFlinger::registerPid(pid_t pid)
