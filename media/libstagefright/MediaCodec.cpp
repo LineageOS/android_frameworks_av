@@ -2664,7 +2664,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             CHECK(msg->senderAwaitsResponse(&replyID));
 
             if (mFlags & kFlagIsAsync) {
-                ALOGE("dequeueOutputBuffer can't be used in async mode");
+                ALOGE("dequeueInputBuffer can't be used in async mode");
                 PostReplyWithError(replyID, INVALID_OPERATION);
                 break;
             }
