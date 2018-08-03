@@ -634,10 +634,10 @@ public:
         sp<IEffect> effect;
 
         if (pDesc == NULL) {
-            return effect;
             if (status != NULL) {
                 *status = BAD_VALUE;
             }
+            return effect;
         }
 
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
