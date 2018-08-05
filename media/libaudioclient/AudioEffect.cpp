@@ -430,13 +430,14 @@ status_t AudioEffect::queryEffect(uint32_t index, effect_descriptor_t *descripto
 }
 
 status_t AudioEffect::getEffectDescriptor(const effect_uuid_t *uuid,
-        effect_descriptor_t *descriptor) /*const*/
+                                          const effect_uuid_t *type,
+                                          uint32_t preferredTypeFlag,
+                                          effect_descriptor_t *descriptor)
 {
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == 0) return PERMISSION_DENIED;
-    return af->getEffectDescriptor(uuid, descriptor);
+    return af->getEffectDescriptor(uuid, type, preferredTypeFlag, descriptor);
 }
-
 
 status_t AudioEffect::queryDefaultPreProcessing(audio_session_t audioSession,
                                           effect_descriptor_t *descriptors,
@@ -446,6 +447,55 @@ status_t AudioEffect::queryDefaultPreProcessing(audio_session_t audioSession,
     if (aps == 0) return PERMISSION_DENIED;
     return aps->queryDefaultPreProcessing(audioSession, descriptors, count);
 }
+
+status_t AudioEffect::newEffectUniqueId(audio_unique_id_t* id)
+{
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == 0) return PERMISSION_DENIED;
+    *id = af->newAudioUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT);
+    return NO_ERROR;
+}
+
+status_t AudioEffect::addStreamDefaultEffect(const char *typeStr,
+                                             const String16& opPackageName,
+                                             const char *uuidStr,
+                                             int32_t priority,
+                                             audio_usage_t usage,
+                                             audio_unique_id_t *id)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+
+    if (typeStr == NULL && uuidStr == NULL) return BAD_VALUE;
+
+    // Convert type & uuid from string to effect_uuid_t.
+    effect_uuid_t type;
+    if (typeStr != NULL) {
+        status_t res = stringToGuid(typeStr, &type);
+        if (res != OK) return res;
+    } else {
+        type = *EFFECT_UUID_NULL;
+    }
+
+    effect_uuid_t uuid;
+    if (uuidStr != NULL) {
+        status_t res = stringToGuid(uuidStr, &uuid);
+        if (res != OK) return res;
+    } else {
+        uuid = *EFFECT_UUID_NULL;
+    }
+
+    return aps->addStreamDefaultEffect(&type, opPackageName, &uuid, priority, usage, id);
+}
+
+status_t AudioEffect::removeStreamDefaultEffect(audio_unique_id_t id)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+
+    return aps->removeStreamDefaultEffect(id);
+}
+
 // -------------------------------------------------------------------------
 
 status_t AudioEffect::stringToGuid(const char *str, effect_uuid_t *guid)

@@ -815,6 +815,10 @@ ATSParser::Stream::Stream(
             mode = ElementaryStreamQueue::AC3;
             break;
 
+        case STREAMTYPE_EAC3:
+            mode = ElementaryStreamQueue::EAC3;
+            break;
+
         case STREAMTYPE_PES_PRIVATE_DATA:
             if (mStreamTypeExt == EXT_DESCRIPTOR_DVB_AC4) {
                 mode = ElementaryStreamQueue::AC4;
@@ -1026,6 +1030,7 @@ bool ATSParser::Stream::isAudio() const {
         case STREAMTYPE_MPEG2_AUDIO_ADTS:
         case STREAMTYPE_LPCM_AC3:
         case STREAMTYPE_AC3:
+        case STREAMTYPE_EAC3:
         case STREAMTYPE_AAC_ENCRYPTED:
         case STREAMTYPE_AC3_ENCRYPTED:
             return true;

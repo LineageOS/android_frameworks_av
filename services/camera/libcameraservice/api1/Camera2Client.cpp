@@ -54,8 +54,7 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
         int cameraFacing,
         int clientPid,
         uid_t clientUid,
-        int servicePid,
-        bool legacyMode):
+        int servicePid):
         Camera2ClientBase(cameraService, cameraClient, clientPackageName,
                 cameraDeviceId, api1CameraId, cameraFacing,
                 clientPid, clientUid, servicePid),
@@ -65,8 +64,6 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
 
     SharedParameters::Lock l(mParameters);
     l.mParameters.state = Parameters::DISCONNECTED;
-
-    mLegacyMode = legacyMode;
 }
 
 status_t Camera2Client::initialize(sp<CameraProviderManager> manager, const String8& monitorTags) {
@@ -1443,7 +1440,7 @@ status_t Camera2Client::cancelAutoFocus() {
     return OK;
 }
 
-status_t Camera2Client::takePicture(int msgType) {
+status_t Camera2Client::takePicture(int /*msgType*/) {
     ATRACE_CALL();
     Mutex::Autolock icl(mBinderSerializationLock);
     status_t res;
@@ -1542,7 +1539,7 @@ status_t Camera2Client::takePicture(int msgType) {
     // Need HAL to have correct settings before (possibly) triggering precapture
     syncWithDevice();
 
-    res = mCaptureSequencer->startCapture(msgType);
+    res = mCaptureSequencer->startCapture();
     if (res != OK) {
         ALOGE("%s: Camera %d: Unable to start capture: %s (%d)",
                 __FUNCTION__, mCameraId, strerror(-res), res);
@@ -1660,27 +1657,6 @@ status_t Camera2Client::commandEnableShutterSoundL(bool enable) {
     if (enable) {
         l.mParameters.playShutterSound = true;
         return OK;
-    }
-
-    // the camera2 api legacy mode can unconditionally disable the shutter sound
-    if (mLegacyMode) {
-        ALOGV("%s: Disable shutter sound in legacy mode", __FUNCTION__);
-        l.mParameters.playShutterSound = false;
-        return OK;
-    }
-
-    // Disabling shutter sound may not be allowed. In that case only
-    // allow the mediaserver process to disable the sound.
-    char value[PROPERTY_VALUE_MAX];
-    property_get("ro.camera.sound.forced", value, "0");
-    if (strncmp(value, "0", 2) != 0) {
-        // Disabling shutter sound is not allowed. Deny if the current
-        // process is not mediaserver.
-        if (getCallingPid() != getpid()) {
-            ALOGE("Failed to disable shutter sound. Permission denied (pid %d)",
-                    getCallingPid());
-            return PERMISSION_DENIED;
-        }
     }
 
     l.mParameters.playShutterSound = false;

@@ -68,6 +68,7 @@ bool captureAudioOutputAllowed(pid_t pid, uid_t uid);
 bool captureHotwordAllowed(pid_t pid, uid_t uid);
 bool settingsAllowed();
 bool modifyAudioRoutingAllowed();
+bool modifyDefaultAudioEffectsAllowed();
 bool dumpAllowed();
 bool modifyPhoneStateAllowed(pid_t pid, uid_t uid);
 status_t checkIMemory(const sp<IMemory>& iMemory);

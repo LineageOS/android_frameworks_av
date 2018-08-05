@@ -46,7 +46,7 @@ StagefrightPluginLoader::StagefrightPluginLoader(const char *libPath)
     }
     mCreateInputSurface = (CodecBase::CreateInputSurfaceFunc)dlsym(
             mLibHandle, "CreateInputSurface");
-    if (mCreateBuilder == nullptr) {
+    if (mCreateInputSurface == nullptr) {
         ALOGD("Failed to find symbol: CreateInputSurface (%s)", dlerror());
     }
 }

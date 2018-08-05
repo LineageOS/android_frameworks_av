@@ -582,7 +582,7 @@ Status CameraService::filterGetInfoErrorCode(status_t err) {
 Status CameraService::makeClient(const sp<CameraService>& cameraService,
         const sp<IInterface>& cameraCb, const String16& packageName, const String8& cameraId,
         int api1CameraId, int facing, int clientPid, uid_t clientUid, int servicePid,
-        bool legacyMode, int halVersion, int deviceVersion, apiLevel effectiveApiLevel,
+        int halVersion, int deviceVersion, apiLevel effectiveApiLevel,
         /*out*/sp<BasicClient>* client) {
 
     if (halVersion < 0 || halVersion == deviceVersion) {
@@ -594,7 +594,7 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
                 sp<ICameraClient> tmp = static_cast<ICameraClient*>(cameraCb.get());
                 *client = new CameraClient(cameraService, tmp, packageName,
                         api1CameraId, facing, clientPid, clientUid,
-                        getpid(), legacyMode);
+                        getpid());
             } else { // Camera2 API route
                 ALOGW("Camera using old HAL version: %d", deviceVersion);
                 return STATUS_ERROR_FMT(ERROR_DEPRECATED_HAL,
@@ -612,7 +612,7 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
                 *client = new Camera2Client(cameraService, tmp, packageName,
                         cameraId, api1CameraId,
                         facing, clientPid, clientUid,
-                        servicePid, legacyMode);
+                        servicePid);
             } else { // Camera2 API route
                 sp<hardware::camera2::ICameraDeviceCallbacks> tmp =
                         static_cast<hardware::camera2::ICameraDeviceCallbacks*>(cameraCb.get());
@@ -636,7 +636,7 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
             sp<ICameraClient> tmp = static_cast<ICameraClient*>(cameraCb.get());
             *client = new CameraClient(cameraService, tmp, packageName,
                     api1CameraId, facing, clientPid, clientUid,
-                    servicePid, legacyMode);
+                    servicePid);
         } else {
             // Other combinations (e.g. HAL3.x open as HAL2.x) are not supported yet.
             ALOGE("Invalid camera HAL version %x: HAL %x device can only be"
@@ -735,8 +735,7 @@ Status CameraService::initializeShimMetadata(int cameraId) {
             sp<ICameraClient>{nullptr}, id, cameraId,
             static_cast<int>(CAMERA_HAL_API_VERSION_UNSPECIFIED),
             internalPackageName, uid, USE_CALLING_PID,
-            API_1, /*legacyMode*/ false, /*shimUpdateOnly*/ true,
-            /*out*/ tmp)
+            API_1, /*shimUpdateOnly*/ true, /*out*/ tmp)
             ).isOk()) {
         ALOGE("%s: Error initializing shim metadata: %s", __FUNCTION__, ret.toString8().string());
     }
@@ -1200,8 +1199,7 @@ Status CameraService::connect(
     sp<Client> client = nullptr;
     ret = connectHelper<ICameraClient,Client>(cameraClient, id, api1CameraId,
             CAMERA_HAL_API_VERSION_UNSPECIFIED, clientPackageName, clientUid, clientPid, API_1,
-            /*legacyMode*/ false, /*shimUpdateOnly*/ false,
-            /*out*/client);
+            /*shimUpdateOnly*/ false, /*out*/client);
 
     if(!ret.isOk()) {
         logRejected(id, getCallingPid(), String8(clientPackageName),
@@ -1227,8 +1225,7 @@ Status CameraService::connectLegacy(
     Status ret = Status::ok();
     sp<Client> client = nullptr;
     ret = connectHelper<ICameraClient,Client>(cameraClient, id, api1CameraId, halVersion,
-            clientPackageName, clientUid, USE_CALLING_PID, API_1,
-            /*legacyMode*/ true, /*shimUpdateOnly*/ false,
+            clientPackageName, clientUid, USE_CALLING_PID, API_1, /*shimUpdateOnly*/ false,
             /*out*/client);
 
     if(!ret.isOk()) {
@@ -1256,9 +1253,7 @@ Status CameraService::connectDevice(
     ret = connectHelper<hardware::camera2::ICameraDeviceCallbacks,CameraDeviceClient>(cameraCb, id,
             /*api1CameraId*/-1,
             CAMERA_HAL_API_VERSION_UNSPECIFIED, clientPackageName,
-            clientUid, USE_CALLING_PID, API_2,
-            /*legacyMode*/ false, /*shimUpdateOnly*/ false,
-            /*out*/client);
+            clientUid, USE_CALLING_PID, API_2, /*shimUpdateOnly*/ false, /*out*/client);
 
     if(!ret.isOk()) {
         logRejected(id, getCallingPid(), String8(clientPackageName),
@@ -1273,7 +1268,7 @@ Status CameraService::connectDevice(
 template<class CALLBACK, class CLIENT>
 Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
         int api1CameraId, int halVersion, const String16& clientPackageName, int clientUid,
-        int clientPid, apiLevel effectiveApiLevel, bool legacyMode, bool shimUpdateOnly,
+        int clientPid, apiLevel effectiveApiLevel, bool shimUpdateOnly,
         /*out*/sp<CLIENT>& device) {
     binder::Status ret = binder::Status::ok();
 
@@ -1358,7 +1353,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         sp<BasicClient> tmp = nullptr;
         if(!(ret = makeClient(this, cameraCb, clientPackageName,
                 cameraId, api1CameraId, facing,
-                clientPid, clientUid, getpid(), legacyMode,
+                clientPid, clientUid, getpid(),
                 halVersion, deviceVersion, effectiveApiLevel,
                 /*out*/&tmp)).isOk()) {
             return ret;

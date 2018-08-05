@@ -210,8 +210,81 @@ static unsigned parseAC3SyncFrame(
     return payloadSize;
 }
 
-static bool IsSeeminglyValidAC3Header(const uint8_t *ptr, size_t size) {
-    return parseAC3SyncFrame(ptr, size, NULL) > 0;
+// Parse EAC3 header assuming the current ptr is start position of syncframe,
+// update metadata only applicable, and return the payload size
+// ATSC A/52:2012 E2.3.1
+static unsigned parseEAC3SyncFrame(
+    const uint8_t *ptr, size_t size, sp<MetaData> *metaData) {
+    static const unsigned channelCountTable[] = {2, 1, 2, 3, 3, 4, 4, 5};
+    static const unsigned samplingRateTable[] = {48000, 44100, 32000};
+    static const unsigned samplingRateTable2[] = {24000, 22050, 16000};
+
+    ABitReader bits(ptr, size);
+    if (bits.numBitsLeft() < 16) {
+        ALOGE("Not enough bits left for further parsing");
+        return 0;
+    }
+    if (bits.getBits(16) != 0x0B77) {
+        ALOGE("No valid sync word in EAC3 header");
+        return 0;
+    }
+
+    // we parse up to bsid so there needs to be at least that many bits
+    if (bits.numBitsLeft() < 2 + 3 + 11 + 2 + 2 + 3 + 1 + 5) {
+        ALOGE("Not enough bits left for further parsing");
+        return 0;
+    }
+
+    unsigned strmtyp = bits.getBits(2);
+    if (strmtyp == 3) {
+        ALOGE("Incorrect strmtyp in EAC3 header");
+        return 0;
+    }
+
+    unsigned substreamid = bits.getBits(3);
+    // only the first independent stream is supported
+    if ((strmtyp == 0 || strmtyp == 2) && substreamid != 0)
+        return 0;
+
+    unsigned frmsiz = bits.getBits(11);
+    unsigned fscod = bits.getBits(2);
+
+    unsigned samplingRate = 0;
+    if (fscod == 0x3) {
+        unsigned fscod2 = bits.getBits(2);
+        if (fscod2 == 3) {
+            ALOGW("Incorrect fscod2 in EAC3 header");
+            return 0;
+        }
+        samplingRate = samplingRateTable2[fscod2];
+    } else {
+        samplingRate = samplingRateTable[fscod];
+        unsigned numblkscod __unused = bits.getBits(2);
+    }
+
+    unsigned acmod = bits.getBits(3);
+    unsigned lfeon = bits.getBits(1);
+    unsigned bsid = bits.getBits(5);
+    if (bsid < 11 || bsid > 16) {
+        ALOGW("Incorrect bsid in EAC3 header. Could be AC-3 or some unknown EAC3 format");
+        return 0;
+    }
+
+    // we currently only support the first independant stream
+    if (metaData != NULL && (strmtyp == 0 || strmtyp == 2)) {
+        unsigned channelCount = channelCountTable[acmod] + lfeon;
+        ALOGV("EAC3 channelCount = %d", channelCount);
+        ALOGV("EAC3 samplingRate = %d", samplingRate);
+        (*metaData)->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_EAC3);
+        (*metaData)->setInt32(kKeyChannelCount, channelCount);
+        (*metaData)->setInt32(kKeySampleRate, samplingRate);
+        (*metaData)->setInt32(kKeyIsSyncFrame, 1);
+    }
+
+    unsigned payloadSize = frmsiz + 1;
+    payloadSize <<= 1;  // convert from 16-bit words to bytes
+
+    return payloadSize;
 }
 
 // Parse AC4 header assuming the current ptr is start position of syncframe
@@ -477,12 +550,19 @@ status_t ElementaryStreamQueue::appendData(
             }
 
             case AC3:
+            case EAC3:
             {
                 uint8_t *ptr = (uint8_t *)data;
 
                 ssize_t startOffset = -1;
                 for (size_t i = 0; i < size; ++i) {
-                    if (IsSeeminglyValidAC3Header(&ptr[i], size - i)) {
+                    unsigned payloadSize = 0;
+                    if (mMode == AC3) {
+                        payloadSize = parseAC3SyncFrame(&ptr[i], size - i, NULL);
+                    } else if (mMode == EAC3) {
+                        payloadSize = parseEAC3SyncFrame(&ptr[i], size - i, NULL);
+                    }
+                    if (payloadSize > 0) {
                         startOffset = i;
                         break;
                     }
@@ -493,7 +573,7 @@ status_t ElementaryStreamQueue::appendData(
                 }
 
                 if (startOffset > 0) {
-                    ALOGI("found something resembling an AC3 syncword at "
+                    ALOGI("found something resembling an (E)AC3 syncword at "
                           "offset %zd",
                           startOffset);
                 }
@@ -526,8 +606,9 @@ status_t ElementaryStreamQueue::appendData(
                 }
 
                 if (startOffset > 0) {
-                    ALOGI("found something resembling an AC4 syncword at offset %zd",
-                         startOffset);
+                    ALOGI("found something resembling an AC4 syncword at "
+                          "offset %zd",
+                          startOffset);
                 }
                 if (frameSize != size - startOffset) {
                     ALOGV("AC4 frame size is %u bytes, while the buffer size is %zd bytes.",
@@ -756,7 +837,8 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
         case AAC:
             return dequeueAccessUnitAAC();
         case AC3:
-            return dequeueAccessUnitAC3();
+        case EAC3:
+            return dequeueAccessUnitEAC3();
         case AC4:
             return dequeueAccessUnitAC4();
         case MPEG_VIDEO:
@@ -776,41 +858,44 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
     }
 }
 
-sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAC3() {
+sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitEAC3() {
     unsigned syncStartPos = 0;  // in bytes
     unsigned payloadSize = 0;
     sp<MetaData> format = new MetaData;
 
-    ALOGV("dequeueAccessUnit_AC3[%d]: mBuffer %p(%zu)", mAUIndex, mBuffer->data(), mBuffer->size());
+    ALOGV("dequeueAccessUnitEAC3[%d]: mBuffer %p(%zu)", mAUIndex,
+            mBuffer->data(), mBuffer->size());
 
     while (true) {
         if (syncStartPos + 2 >= mBuffer->size()) {
             return NULL;
         }
 
-        payloadSize = parseAC3SyncFrame(
-                mBuffer->data() + syncStartPos,
-                mBuffer->size() - syncStartPos,
-                &format);
+        uint8_t *ptr = mBuffer->data() + syncStartPos;
+        size_t size = mBuffer->size() - syncStartPos;
+        if (mMode == AC3) {
+            payloadSize = parseAC3SyncFrame(ptr, size, &format);
+        } else if (mMode == EAC3) {
+            payloadSize = parseEAC3SyncFrame(ptr, size, &format);
+        }
         if (payloadSize > 0) {
             break;
         }
 
-        ALOGV("dequeueAccessUnit_AC3[%d]: syncStartPos %u payloadSize %u",
+        ALOGV("dequeueAccessUnitEAC3[%d]: syncStartPos %u payloadSize %u",
                 mAUIndex, syncStartPos, payloadSize);
 
         ++syncStartPos;
     }
 
     if (mBuffer->size() < syncStartPos + payloadSize) {
-        ALOGV("Not enough buffer size for AC3");
+        ALOGV("Not enough buffer size for E/AC3");
         return NULL;
     }
 
     if (mFormat == NULL) {
         mFormat = format;
     }
-
 
     int64_t timeUs = fetchTimestamp(syncStartPos + payloadSize);
     if (timeUs < 0ll) {
@@ -820,7 +905,12 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAC3() {
 
     // Not decrypting if key info not available (e.g., scanner/extractor parsing ts files)
     if (mSampleDecryptor != NULL) {
-        mSampleDecryptor->processAC3(mBuffer->data() + syncStartPos, payloadSize);
+        if (mMode == AC3) {
+            mSampleDecryptor->processAC3(mBuffer->data() + syncStartPos, payloadSize);
+        } else if (mMode == EAC3) {
+            ALOGE("EAC3 AU is encrypted and decryption is not supported");
+            return NULL;
+        }
     }
     mAUIndex++;
 

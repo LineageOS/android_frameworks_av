@@ -126,6 +126,14 @@ public:
     virtual status_t queryDefaultPreProcessing(audio_session_t audioSession,
                                               effect_descriptor_t *descriptors,
                                               uint32_t *count);
+    virtual status_t addStreamDefaultEffect(const effect_uuid_t *type,
+                                            const String16& opPackageName,
+                                            const effect_uuid_t *uuid,
+                                            int32_t priority,
+                                            audio_usage_t usage,
+                                            audio_unique_id_t* id);
+    virtual status_t removeStreamDefaultEffect(audio_unique_id_t id);
+
     virtual     status_t    onTransact(
                                 uint32_t code,
                                 const Parcel& data,

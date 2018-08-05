@@ -2312,7 +2312,9 @@ typedef enum acamera_metadata_tag {
      * <p>If this device is the largest or only camera device with a given facing, then this
      * position will be <code>(0, 0, 0)</code>; a camera device with a lens optical center located 3 cm
      * from the main sensor along the +X axis (to the right from the user's perspective) will
-     * report <code>(0.03, 0, 0)</code>.</p>
+     * report <code>(0.03, 0, 0)</code>.  Note that this means that, for many computer vision
+     * applications, the position needs to be negated to convert it to a translation from the
+     * camera to the origin.</p>
      * <p>To transform a pixel coordinates between two cameras facing the same direction, first
      * the source camera ACAMERA_LENS_DISTORTION must be corrected for.  Then the source
      * camera ACAMERA_LENS_INTRINSIC_CALIBRATION needs to be applied, followed by the
@@ -2324,7 +2326,8 @@ typedef enum acamera_metadata_tag {
      * <p>To compare this against a real image from the destination camera, the destination camera
      * image then needs to be corrected for radial distortion before comparison or sampling.</p>
      * <p>When ACAMERA_LENS_POSE_REFERENCE is GYROSCOPE, then this position is relative to
-     * the center of the primary gyroscope on the device.</p>
+     * the center of the primary gyroscope on the device. The axis definitions are the same as
+     * with PRIMARY_CAMERA.</p>
      *
      * @see ACAMERA_LENS_DISTORTION
      * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
@@ -2418,13 +2421,15 @@ typedef enum acamera_metadata_tag {
      * </code></pre>
      * <p>which can then be combined with the camera pose rotation
      * <code>R</code> and translation <code>t</code> (ACAMERA_LENS_POSE_ROTATION and
-     * ACAMERA_LENS_POSE_TRANSLATION, respective) to calculate the
+     * ACAMERA_LENS_POSE_TRANSLATION, respectively) to calculate the
      * complete transform from world coordinates to pixel
      * coordinates:</p>
-     * <pre><code>P = [ K 0   * [ R t
-     *      0 1 ]     0 1 ]
+     * <pre><code>P = [ K 0   * [ R -Rt
+     *      0 1 ]      0 1 ]
      * </code></pre>
-     * <p>and with <code>p_w</code> being a point in the world coordinate system
+     * <p>(Note the negation of poseTranslation when mapping from camera
+     * to world coordinates, and multiplication by the rotation).</p>
+     * <p>With <code>p_w</code> being a point in the world coordinate system
      * and <code>p_s</code> being a point in the camera active pixel array
      * coordinate system, and with the mapping including the
      * homogeneous division by z:</p>
@@ -2446,6 +2451,13 @@ typedef enum acamera_metadata_tag {
      * activeArraySize rectangle), to determine the final pixel
      * coordinate of the world point for processed (non-RAW)
      * output buffers.</p>
+     * <p>For camera devices, the center of pixel <code>(x,y)</code> is located at
+     * coordinate <code>(x + 0.5, y + 0.5)</code>.  So on a device with a
+     * precorrection active array of size <code>(10,10)</code>, the valid pixel
+     * indices go from <code>(0,0)-(9,9)</code>, and an perfectly-built camera would
+     * have an optical center at the exact center of the pixel grid, at
+     * coordinates <code>(5.0, 5.0)</code>, which is the top-left corner of pixel
+     * <code>(5,5)</code>.</p>
      *
      * @see ACAMERA_LENS_DISTORTION
      * @see ACAMERA_LENS_POSE_ROTATION
@@ -3059,7 +3071,7 @@ typedef enum acamera_metadata_tag {
      * outputs will crop horizontally (pillarbox), and 16:9
      * streams will match exactly. These additional crops will
      * be centered within the crop region.</p>
-     * <p>If the coordinate system is android.sensor.info.activeArraysSize, the width and height
+     * <p>If the coordinate system is ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, the width and height
      * of the crop region cannot be set to be smaller than
      * <code>floor( activeArraySize.width / ACAMERA_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM )</code> and
      * <code>floor( activeArraySize.height / ACAMERA_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM )</code>, respectively.</p>
@@ -4675,8 +4687,8 @@ typedef enum acamera_metadata_tag {
     ACAMERA_STATISTICS_LENS_SHADING_MAP_MODE =                  // byte (acamera_metadata_enum_android_statistics_lens_shading_map_mode_t)
             ACAMERA_STATISTICS_START + 16,
     /**
-     * <p>A control for selecting whether OIS position information is included in output
-     * result metadata.</p>
+     * <p>A control for selecting whether optical stabilization (OIS) position
+     * information is included in output result metadata.</p>
      *
      * <p>Type: byte (acamera_metadata_enum_android_statistics_ois_data_mode_t)</p>
      *
@@ -4686,6 +4698,12 @@ typedef enum acamera_metadata_tag {
      *   <li>ACaptureRequest</li>
      * </ul></p>
      *
+     * <p>Since optical image stabilization generally involves motion much faster than the duration
+     * of individualq image exposure, multiple OIS samples can be included for a single capture
+     * result. For example, if the OIS reporting operates at 200 Hz, a typical camera operating
+     * at 30fps may have 6-7 OIS samples per capture result. This information can be combined
+     * with the rolling shutter skew to account for lens motion during image exposure in
+     * post-processing algorithms.</p>
      */
     ACAMERA_STATISTICS_OIS_DATA_MODE =                          // byte (acamera_metadata_enum_android_statistics_ois_data_mode_t)
             ACAMERA_STATISTICS_START + 17,
@@ -4717,11 +4735,15 @@ typedef enum acamera_metadata_tag {
      * </ul></p>
      *
      * <p>The array contains the amount of shifts in x direction, in pixels, based on OIS samples.
-     * A positive value is a shift from left to right in active array coordinate system. For
-     * example, if the optical center is (1000, 500) in active array coordinates, a shift of
-     * (3, 0) puts the new optical center at (1003, 500).</p>
+     * A positive value is a shift from left to right in the pre-correction active array
+     * coordinate system. For example, if the optical center is (1000, 500) in pre-correction
+     * active array coordinates, a shift of (3, 0) puts the new optical center at (1003, 500).</p>
      * <p>The number of shifts must match the number of timestamps in
      * ACAMERA_STATISTICS_OIS_TIMESTAMPS.</p>
+     * <p>The OIS samples are not affected by whether lens distortion correction is enabled (on
+     * supporting devices). They are always reported in pre-correction active array coordinates,
+     * since the scaling of OIS shifts would depend on the specific spot on the sensor the shift
+     * is needed.</p>
      *
      * @see ACAMERA_STATISTICS_OIS_TIMESTAMPS
      */
@@ -4738,11 +4760,15 @@ typedef enum acamera_metadata_tag {
      * </ul></p>
      *
      * <p>The array contains the amount of shifts in y direction, in pixels, based on OIS samples.
-     * A positive value is a shift from top to bottom in active array coordinate system. For
-     * example, if the optical center is (1000, 500) in active array coordinates, a shift of
-     * (0, 5) puts the new optical center at (1000, 505).</p>
+     * A positive value is a shift from top to bottom in pre-correction active array coordinate
+     * system. For example, if the optical center is (1000, 500) in active array coordinates, a
+     * shift of (0, 5) puts the new optical center at (1000, 505).</p>
      * <p>The number of shifts must match the number of timestamps in
      * ACAMERA_STATISTICS_OIS_TIMESTAMPS.</p>
+     * <p>The OIS samples are not affected by whether lens distortion correction is enabled (on
+     * supporting devices). They are always reported in pre-correction active array coordinates,
+     * since the scaling of OIS shifts would depend on the specific spot on the sensor the shift
+     * is needed.</p>
      *
      * @see ACAMERA_STATISTICS_OIS_TIMESTAMPS
      */
@@ -5432,16 +5458,34 @@ typedef enum acamera_metadata_tag {
      * any correction at all would slow down capture rate.  Every output stream will have a
      * similar amount of enhancement applied.</p>
      * <p>The correction only applies to processed outputs such as YUV, JPEG, or DEPTH16; it is not
-     * applied to any RAW output. Metadata coordinates such as face rectangles or metering
-     * regions are also not affected by correction.</p>
+     * applied to any RAW output.</p>
      * <p>This control will be on by default on devices that support this control. Applications
      * disabling distortion correction need to pay extra attention with the coordinate system of
      * metering regions, crop region, and face rectangles. When distortion correction is OFF,
      * metadata coordinates follow the coordinate system of
      * ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE. When distortion is not OFF, metadata
-     * coordinates follow the coordinate system of ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.</p>
+     * coordinates follow the coordinate system of ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.  The
+     * camera device will map these metadata fields to match the corrected image produced by the
+     * camera device, for both capture requests and results.  However, this mapping is not very
+     * precise, since rectangles do not generally map to rectangles when corrected.  Only linear
+     * scaling between the active array and precorrection active array coordinates is
+     * performed. Applications that require precise correction of metadata need to undo that
+     * linear scaling, and apply a more complete correction that takes into the account the app's
+     * own requirements.</p>
+     * <p>The full list of metadata that is affected in this way by distortion correction is:</p>
+     * <ul>
+     * <li>ACAMERA_CONTROL_AF_REGIONS</li>
+     * <li>ACAMERA_CONTROL_AE_REGIONS</li>
+     * <li>ACAMERA_CONTROL_AWB_REGIONS</li>
+     * <li>ACAMERA_SCALER_CROP_REGION</li>
+     * <li>android.statistics.faces</li>
+     * </ul>
      *
+     * @see ACAMERA_CONTROL_AE_REGIONS
+     * @see ACAMERA_CONTROL_AF_REGIONS
+     * @see ACAMERA_CONTROL_AWB_REGIONS
      * @see ACAMERA_LENS_DISTORTION
+     * @see ACAMERA_SCALER_CROP_REGION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      */

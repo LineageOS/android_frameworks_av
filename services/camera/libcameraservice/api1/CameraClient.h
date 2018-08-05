@@ -68,8 +68,7 @@ public:
             int cameraFacing,
             int clientPid,
             int clientUid,
-            int servicePid,
-            bool legacyMode = false);
+            int servicePid);
     ~CameraClient();
 
     virtual status_t initialize(sp<CameraProviderManager> manager,

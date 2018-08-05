@@ -585,8 +585,7 @@ private:
     template<class CALLBACK, class CLIENT>
     binder::Status connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
             int api1CameraId, int halVersion, const String16& clientPackageName,
-            int clientUid, int clientPid,
-            apiLevel effectiveApiLevel, bool legacyMode, bool shimUpdateOnly,
+            int clientUid, int clientPid, apiLevel effectiveApiLevel, bool shimUpdateOnly,
             /*out*/sp<CLIENT>& device);
 
     // Lock guarding camera service state
@@ -844,7 +843,7 @@ private:
     static binder::Status makeClient(const sp<CameraService>& cameraService,
             const sp<IInterface>& cameraCb, const String16& packageName, const String8& cameraId,
             int api1CameraId, int facing, int clientPid, uid_t clientUid, int servicePid,
-            bool legacyMode, int halVersion, int deviceVersion, apiLevel effectiveApiLevel,
+            int halVersion, int deviceVersion, apiLevel effectiveApiLevel,
             /*out*/sp<BasicClient>* client);
 
     status_t checkCameraAccess(const String16& opPackageName);

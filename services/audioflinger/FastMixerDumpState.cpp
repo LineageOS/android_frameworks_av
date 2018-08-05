@@ -24,6 +24,7 @@
 #include <cpustats/ThreadCpuUsage.h>
 #endif
 #endif
+#include <json/json.h>
 #include <string>
 #include <utils/Debug.h>
 #include <utils/Log.h>
@@ -92,9 +93,9 @@ void FastMixerDumpState::dump(int fd) const
     }
     // statistics for monotonic (wall clock) time, thread raw CPU load in time, CPU clock frequency,
     // and adjusted CPU load in MHz normalized for CPU clock frequency
-    Statistics<double> wall, loadNs;
+    audio_utils::Statistics<double> wall, loadNs;
 #ifdef CPU_FREQUENCY_STATISTICS
-    Statistics<double> kHz, loadMHz;
+    audio_utils::Statistics<double> kHz, loadMHz;
     uint32_t previousCpukHz = 0;
 #endif
     // Assuming a normal distribution for cycle times, three standard deviations on either side of
@@ -152,7 +153,7 @@ void FastMixerDumpState::dump(int fd) const
         qsort(tail, n, sizeof(uint32_t), compare_uint32_t);
         // assume same number of tail samples on each side, left and right
         uint32_t count = n / kTailDenominator;
-        Statistics<double> left, right;
+        audio_utils::Statistics<double> left, right;
         for (uint32_t i = 0; i < count; ++i) {
             left.add(tail[i]);
             right.add(tail[n - (i + 1)]);
@@ -205,14 +206,13 @@ void FastMixerDumpState::dump(int fd) const
     }
 }
 
-// TODO get rid of extraneous lines and use better key names.
-// TODO may go back to using a library to do the json formatting.
-std::string FastMixerDumpState::getJsonString() const
+Json::Value FastMixerDumpState::getJsonDump() const
 {
+    Json::Value root(Json::objectValue);
     if (mCommand == FastMixerState::INITIAL) {
-        return "    {\n      \"status\": \"uninitialized\"\n    }";
+        root["status"] = "uninitialized";
+        return root;
     }
-    std::string jsonStr = "    {\n";
 #ifdef FAST_THREAD_STATISTICS
     // find the interval of valid samples
     const uint32_t bounds = mBounds;
@@ -230,31 +230,25 @@ std::string FastMixerDumpState::getJsonString() const
     }
     // statistics for monotonic (wall clock) time, thread raw CPU load in time, CPU clock frequency,
     // and adjusted CPU load in MHz normalized for CPU clock frequency
-    std::string jsonWallStr = "      \"wall_clock_time\":[";
-    std::string jsonLoadNsStr = "      \"raw_cpu_load\":[";
+    Json::Value jsonWall(Json::arrayValue);
+    Json::Value jsonLoadNs(Json::arrayValue);
     // loop over all the samples
     for (uint32_t j = 0; j < n; ++j) {
         size_t i = oldestClosed++ & (mSamplingN - 1);
         uint32_t wallNs = mMonotonicNs[i];
-        if (j != 0) {
-            jsonWallStr += ',';
-            jsonLoadNsStr += ',';
-        }
-        /* jsonObject["wall"].append(wallNs); */
-        jsonWallStr += std::to_string(wallNs);
+        jsonWall.append(wallNs);
         uint32_t sampleLoadNs = mLoadNs[i];
-        jsonLoadNsStr += std::to_string(sampleLoadNs);
+        jsonLoadNs.append(sampleLoadNs);
     }
-    jsonWallStr += ']';
-    jsonLoadNsStr += ']';
     if (n) {
-        jsonStr += jsonWallStr + ",\n" + jsonLoadNsStr + "\n";
+        root["wall_clock_time_ns"] = jsonWall;
+        root["raw_cpu_load_ns"] = jsonLoadNs;
+        root["status"] = "ok";
     } else {
-        //dprintf(fd, "  No FastMixer statistics available currently\n");
+        root["status"] = "unavailable";
     }
 #endif
-    jsonStr += "    }";
-    return jsonStr;
+    return root;
 }
 
 }   // android

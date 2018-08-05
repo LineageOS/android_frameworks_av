@@ -42,6 +42,7 @@
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
 #include <audio_utils/minifloat.h>
+#include <json/json.h>
 #include <system/audio_effects/effect_ns.h>
 #include <system/audio_effects/effect_aec.h>
 #include <system/audio.h>
@@ -335,9 +336,9 @@ public:
 #ifdef DEBUG_CPU_USAGE
 private:
     ThreadCpuUsage mCpuUsage;           // instantaneous thread CPU usage in wall clock ns
-    Statistics<double> mWcStats;        // statistics on thread CPU usage in wall clock ns
+    audio_utils::Statistics<double> mWcStats; // statistics on thread CPU usage in wall clock ns
 
-    Statistics<double> mHzStats;        // statistics on thread CPU usage in cycles
+    audio_utils::Statistics<double> mHzStats; // statistics on thread CPU usage in cycles
 
     int mCpuNum;                        // thread's current CPU number
     int mCpukHz;                        // frequency of thread's current CPU in kHz
@@ -1763,9 +1764,9 @@ void AudioFlinger::PlaybackThread::dump(int fd, const Vector<String16>& args)
     mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
 }
 
-std::string AudioFlinger::PlaybackThread::getJsonString() const
+Json::Value AudioFlinger::PlaybackThread::getJsonDump() const
 {
-    return "{}";
+    return Json::Value(Json::objectValue);
 }
 
 void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& args __unused)
@@ -5141,14 +5142,20 @@ void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& ar
     }
 }
 
-std::string AudioFlinger::MixerThread::getJsonString() const
+Json::Value AudioFlinger::MixerThread::getJsonDump() const
 {
-    // Make a non-atomic copy of fast mixer dump state so it won't change underneath us
-    // while we are dumping it.  It may be inconsistent, but it won't mutate!
-    // This is a large object so we place it on the heap.
-    // FIXME 25972958: Need an intelligent copy constructor that does not touch unused pages.
-    return std::unique_ptr<FastMixerDumpState>(new FastMixerDumpState(mFastMixerDumpState))
-        ->getJsonString();
+    Json::Value root;
+    if (hasFastMixer()) {
+        // Make a non-atomic copy of fast mixer dump state so it won't change underneath us
+        // while we are dumping it.  It may be inconsistent, but it won't mutate!
+        // This is a large object so we place it on the heap.
+        // FIXME 25972958: Need an intelligent copy constructor that does not touch unused pages.
+        const std::unique_ptr<FastMixerDumpState> copy(new FastMixerDumpState(mFastMixerDumpState));
+        root["fastmixer_stats"] = copy->getJsonDump();
+    } else {
+        root["fastmixer_stats"] = "no_fastmixer";
+    }
+    return root;
 }
 
 uint32_t AudioFlinger::MixerThread::idleSleepTimeUs() const
@@ -6733,8 +6740,7 @@ reacquire_wakelock:
 
         // If an NBAIO source is present, use it to read the normal capture's data
         if (mPipeSource != 0) {
-            size_t framesToRead = mBufferSize / mFrameSize;
-            framesToRead = min(mRsmpInFramesOA - rear, mRsmpInFramesP2 / 2);
+            size_t framesToRead = min(mRsmpInFramesOA - rear, mRsmpInFramesP2 / 2);
 
             // The audio fifo read() returns OVERRUN on overflow, and advances the read pointer
             // to the full buffer point (clearing the overflow condition).  Upon OVERRUN error,

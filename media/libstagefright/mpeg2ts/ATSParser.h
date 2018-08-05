@@ -154,6 +154,7 @@ struct ATSParser : public RefBase {
         // Stream type 0x83 is non-standard,
         // it could be LPCM or TrueHD AC3
         STREAMTYPE_LPCM_AC3             = 0x83,
+        STREAMTYPE_EAC3                 = 0x87,
 
         //Sample Encrypted types
         STREAMTYPE_H264_ENCRYPTED       = 0xDB,

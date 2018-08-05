@@ -338,7 +338,7 @@ int main(int argc, const char **argv)
     aaudio_sharing_mode_t requestedInputSharingMode  = AAUDIO_SHARING_MODE_SHARED;
     int                   requestedInputChannelCount = NUM_INPUT_CHANNELS;
     aaudio_format_t       requestedInputFormat       = AAUDIO_FORMAT_UNSPECIFIED;
-    int32_t               requestedInputCapacity     = -1;
+    int32_t               requestedInputCapacity     = AAUDIO_UNSPECIFIED;
     aaudio_performance_mode_t inputPerformanceLevel  = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
 
     int32_t               outputFramesPerBurst = 0;
@@ -459,15 +459,8 @@ int main(int argc, const char **argv)
     argParser.setPerformanceMode(inputPerformanceLevel);
     argParser.setChannelCount(requestedInputChannelCount);
     argParser.setSharingMode(requestedInputSharingMode);
-
-    // Make sure the input buffer has plenty of capacity.
-    // Extra capacity on input should not increase latency if we keep it drained.
-    int32_t inputBufferCapacity = requestedInputCapacity;
-    if (inputBufferCapacity < 0) {
-        int32_t outputBufferCapacity = AAudioStream_getBufferCapacityInFrames(outputStream);
-        inputBufferCapacity = 2 * outputBufferCapacity;
-    }
-    argParser.setBufferCapacity(inputBufferCapacity);
+    // Warning! If you change input capacity then you may not get a FAST track on Legacy path.
+    argParser.setBufferCapacity(requestedInputCapacity);
 
     result = recorder.open(argParser);
     if (result != AAUDIO_OK) {

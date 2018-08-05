@@ -598,14 +598,18 @@ public:
     }
 
     virtual status_t getEffectDescriptor(const effect_uuid_t *pUuid,
-            effect_descriptor_t *pDescriptor) const
+                                         const effect_uuid_t *pType,
+                                         uint32_t preferredTypeFlag,
+                                         effect_descriptor_t *pDescriptor) const
     {
-        if (pUuid == NULL || pDescriptor == NULL) {
+        if (pUuid == NULL || pType == NULL || pDescriptor == NULL) {
             return BAD_VALUE;
         }
         Parcel data, reply;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
         data.write(pUuid, sizeof(effect_uuid_t));
+        data.write(pType, sizeof(effect_uuid_t));
+        data.writeUint32(preferredTypeFlag);
         status_t status = remote()->transact(GET_EFFECT_DESCRIPTOR, data, &reply);
         if (status != NO_ERROR) {
             return status;
@@ -634,10 +638,10 @@ public:
         sp<IEffect> effect;
 
         if (pDesc == NULL) {
-            return effect;
             if (status != NULL) {
                 *status = BAD_VALUE;
             }
+            return effect;
         }
 
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
@@ -1277,8 +1281,11 @@ status_t BnAudioFlinger::onTransact(
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             effect_uuid_t uuid;
             data.read(&uuid, sizeof(effect_uuid_t));
+            effect_uuid_t type;
+            data.read(&type, sizeof(effect_uuid_t));
+            uint32_t preferredTypeFlag = data.readUint32();
             effect_descriptor_t desc = {};
-            status_t status = getEffectDescriptor(&uuid, &desc);
+            status_t status = getEffectDescriptor(&uuid, &type, preferredTypeFlag, &desc);
             reply->writeInt32(status);
             if (status == NO_ERROR) {
                 reply->write(&desc, sizeof(effect_descriptor_t));

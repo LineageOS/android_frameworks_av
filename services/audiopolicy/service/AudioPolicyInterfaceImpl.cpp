@@ -254,15 +254,6 @@ status_t AudioPolicyService::startOutput(audio_port_handle_t portId)
 
 status_t AudioPolicyService::stopOutput(audio_port_handle_t portId)
 {
-    {
-        Mutex::Autolock _l(mLock);
-
-        const ssize_t index = mAudioPlaybackClients.indexOfKey(portId);
-        if (index < 0) {
-            ALOGE("%s AudioTrack client not found for portId %d", __FUNCTION__, portId);
-            return INVALID_OPERATION;
-        }
-    }
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
@@ -857,6 +848,50 @@ status_t AudioPolicyService::queryDefaultPreProcessing(audio_session_t audioSess
     }
     return audioPolicyEffects->queryDefaultInputEffects(
             (audio_session_t)audioSession, descriptors, count);
+}
+
+status_t AudioPolicyService::addStreamDefaultEffect(const effect_uuid_t *type,
+                                                    const String16& opPackageName,
+                                                    const effect_uuid_t *uuid,
+                                                    int32_t priority,
+                                                    audio_usage_t usage,
+                                                    audio_unique_id_t* id)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    if (!modifyDefaultAudioEffectsAllowed()) {
+        return PERMISSION_DENIED;
+    }
+    sp<AudioPolicyEffects>audioPolicyEffects;
+    {
+        Mutex::Autolock _l(mLock);
+        audioPolicyEffects = mAudioPolicyEffects;
+    }
+    if (audioPolicyEffects == 0) {
+        return NO_INIT;
+    }
+    return audioPolicyEffects->addStreamDefaultEffect(
+            type, opPackageName, uuid, priority, usage, id);
+}
+
+status_t AudioPolicyService::removeStreamDefaultEffect(audio_unique_id_t id)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    if (!modifyDefaultAudioEffectsAllowed()) {
+        return PERMISSION_DENIED;
+    }
+    sp<AudioPolicyEffects>audioPolicyEffects;
+    {
+        Mutex::Autolock _l(mLock);
+        audioPolicyEffects = mAudioPolicyEffects;
+    }
+    if (audioPolicyEffects == 0) {
+        return NO_INIT;
+    }
+    return audioPolicyEffects->removeStreamDefaultEffect(id);
 }
 
 bool AudioPolicyService::isOffloadSupported(const audio_offload_info_t& info)
