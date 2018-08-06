@@ -66,7 +66,6 @@
 #include <media/MemoryLeakTrackUtil.h>
 #include <media/nbaio/Pipe.h>
 #include <media/nbaio/PipeReader.h>
-#include <media/AudioParameter.h>
 #include <mediautils/BatteryNotifier.h>
 #include <mediautils/ServiceUtilities.h>
 #include <private/android_filesystem_config.h>
@@ -516,6 +515,15 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
         }
 
         mPatchPanel.dump(fd);
+
+        // dump external setParameters
+        auto dumpLogger = [fd](SimpleLog& logger, const char* name) {
+            dprintf(fd, "\n%s setParameters:\n", name);
+            logger.dump(fd, "    " /* prefix */);
+        };
+        dumpLogger(mRejectedSetParameterLog, "Rejected");
+        dumpLogger(mAppSetParameterLog, "App");
+        dumpLogger(mSystemSetParameterLog, "System");
 
         BUFLOG_RESET;
 
@@ -1229,14 +1237,31 @@ void AudioFlinger::filterReservedParameters(String8& keyValuePairs, uid_t callin
 
     AudioParameter param = AudioParameter(keyValuePairs);
     String8 value;
+    AudioParameter rejectedParam;
     for (auto& key : kReservedParameters) {
         if (param.get(key, value) == NO_ERROR) {
-            ALOGW("%s: filtering key %s value %s from uid %d",
-                  __func__, key.string(), value.string(), callingUid);
+            rejectedParam.add(key, value);
             param.remove(key);
         }
     }
+    logFilteredParameters(param.size() + rejectedParam.size(), keyValuePairs,
+                          rejectedParam.size(), rejectedParam.toString(), callingUid);
     keyValuePairs = param.toString();
+}
+
+void AudioFlinger::logFilteredParameters(size_t originalKVPSize, const String8& originalKVPs,
+                                         size_t rejectedKVPSize, const String8& rejectedKVPs,
+                                         uid_t callingUid) {
+    auto prefix = String8::format("UID %5d", callingUid);
+    auto suffix = String8::format("%zu KVP received: %s", originalKVPSize, originalKVPs.c_str());
+    if (rejectedKVPSize != 0) {
+        auto error = String8::format("%zu KVP rejected: %s", rejectedKVPSize, rejectedKVPs.c_str());
+        ALOGW("%s: %s, %s, %s", __func__, prefix.c_str(), error.c_str(), suffix.c_str());
+        mRejectedSetParameterLog.log("%s, %s, %s", prefix.c_str(), error.c_str(), suffix.c_str());
+    } else {
+        auto& logger = (isServiceUid(callingUid) ? mSystemSetParameterLog : mAppSetParameterLog);
+        logger.log("%s, %s", prefix.c_str(), suffix.c_str());
+    }
 }
 
 status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs)
