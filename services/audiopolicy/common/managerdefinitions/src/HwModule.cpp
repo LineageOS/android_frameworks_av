@@ -154,10 +154,9 @@ sp<DeviceDescriptor> HwModule::getRouteSinkDevice(const sp<AudioRoute> &route) c
 DeviceVector HwModule::getRouteSourceDevices(const sp<AudioRoute> &route) const
 {
     DeviceVector sourceDevices;
-    Vector <sp<AudioPort> > sources = route->getSources();
-    for (size_t i = 0; i < sources.size(); i++) {
-        if (sources[i]->getType() == AUDIO_PORT_TYPE_DEVICE) {
-            sourceDevices.add(mDeclaredDevices.getDeviceFromTagName(sources[i]->getTagName()));
+    for (const auto& source : route->getSources()) {
+        if (source->getType() == AUDIO_PORT_TYPE_DEVICE) {
+            sourceDevices.add(mDeclaredDevices.getDeviceFromTagName(source->getTagName()));
         }
     }
     return sourceDevices;
@@ -173,17 +172,15 @@ void HwModule::setRoutes(const AudioRouteVector &routes)
 void HwModule::refreshSupportedDevices()
 {
     // Now updating the streams (aka IOProfile until now) supported devices
-    for (size_t i = 0; i < mInputProfiles.size(); i++) {
-        sp<IOProfile> stream = mInputProfiles[i];
+    for (const auto& stream : mInputProfiles) {
         DeviceVector sourceDevices;
-        const AudioRouteVector &routes = stream->getRoutes();
-        for (size_t j = 0; j < routes.size(); j++) {
-            sp<AudioPort> sink = routes[j]->getSink();
+        for (const auto& route : stream->getRoutes()) {
+            sp<AudioPort> sink = route->getSink();
             if (sink == 0 || stream != sink) {
                 ALOGE("%s: Invalid route attached to input stream", __FUNCTION__);
                 continue;
             }
-            DeviceVector sourceDevicesForRoute = getRouteSourceDevices(routes[j]);
+            DeviceVector sourceDevicesForRoute = getRouteSourceDevices(route);
             if (sourceDevicesForRoute.isEmpty()) {
                 ALOGE("%s: invalid source devices for %s", __FUNCTION__, stream->getName().string());
                 continue;
@@ -196,17 +193,15 @@ void HwModule::refreshSupportedDevices()
         }
         stream->setSupportedDevices(sourceDevices);
     }
-    for (size_t i = 0; i < mOutputProfiles.size(); i++) {
-        sp<IOProfile> stream = mOutputProfiles[i];
+    for (const auto& stream : mOutputProfiles) {
         DeviceVector sinkDevices;
-        const AudioRouteVector &routes = stream->getRoutes();
-        for (size_t j = 0; j < routes.size(); j++) {
-            sp<AudioPort> source = routes[j]->getSources().findByTagName(stream->getTagName());
+        for (const auto& route : stream->getRoutes()) {
+            sp<AudioPort> source = route->getSources().findByTagName(stream->getTagName());
             if (source == 0 || stream != source) {
                 ALOGE("%s: Invalid route attached to output stream", __FUNCTION__);
                 continue;
             }
-            sp<DeviceDescriptor> sinkDevice = getRouteSinkDevice(routes[j]);
+            sp<DeviceDescriptor> sinkDevice = getRouteSinkDevice(route);
             if (sinkDevice == 0) {
                 ALOGE("%s: invalid sink device for %s", __FUNCTION__, stream->getName().string());
                 continue;
@@ -215,6 +210,12 @@ void HwModule::refreshSupportedDevices()
         }
         stream->setSupportedDevices(sinkDevices);
     }
+}
+
+void HwModule::setHandle(audio_module_handle_t handle) {
+    ALOGW_IF(mHandle != AUDIO_MODULE_HANDLE_NONE,
+            "HwModule handle is changing from %d to %d", mHandle, handle);
+    mHandle = handle;
 }
 
 void HwModule::dump(int fd)
@@ -252,60 +253,40 @@ void HwModule::dump(int fd)
 
 sp <HwModule> HwModuleCollection::getModuleFromName(const char *name) const
 {
-    sp <HwModule> module;
-
-    for (size_t i = 0; i < size(); i++)
-    {
-        if (strcmp(itemAt(i)->getName(), name) == 0) {
-            return itemAt(i);
+    for (const auto& module : *this) {
+        if (strcmp(module->getName(), name) == 0) {
+            return module;
         }
     }
-    return module;
+    return nullptr;
 }
-
 
 sp <HwModule> HwModuleCollection::getModuleForDevice(audio_devices_t device) const
 {
-    sp <HwModule> module;
-
-    for (size_t i = 0; i < size(); i++) {
-        if (itemAt(i)->getHandle() == 0) {
-            continue;
-        }
-        if (audio_is_output_device(device)) {
-            for (size_t j = 0; j < itemAt(i)->mOutputProfiles.size(); j++)
-            {
-                if (itemAt(i)->mOutputProfiles[j]->supportDevice(device)) {
-                    return itemAt(i);
-                }
-            }
-        } else {
-            for (size_t j = 0; j < itemAt(i)->mInputProfiles.size(); j++) {
-                if (itemAt(i)->mInputProfiles[j]->supportDevice(device)) {
-                    return itemAt(i);
-                }
+    for (const auto& module : *this) {
+        const auto& profiles = audio_is_output_device(device) ?
+                module->getOutputProfiles() : module->getInputProfiles();
+        for (const auto& profile : profiles) {
+            if (profile->supportDevice(device)) {
+                return module;
             }
         }
     }
-    return module;
+    return nullptr;
 }
 
-sp<DeviceDescriptor>  HwModuleCollection::getDeviceDescriptor(const audio_devices_t device,
-                                                              const char *device_address,
-                                                              const char *device_name,
-                                                              bool matchAdress) const
+sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices_t device,
+                                                             const char *device_address,
+                                                             const char *device_name,
+                                                             bool matchAdress) const
 {
-    String8 address = (device_address == NULL) ? String8("") : String8(device_address);
+    String8 address = (device_address == nullptr) ? String8("") : String8(device_address);
     // handle legacy remote submix case where the address was not always specified
     if (device_distinguishes_on_address(device) && (address.length() == 0)) {
         address = String8("0");
     }
 
-    for (size_t i = 0; i < size(); i++) {
-        const sp<HwModule> hwModule = itemAt(i);
-        if (hwModule->mHandle == 0) {
-            continue;
-        }
+    for (const auto& hwModule : *this) {
         DeviceVector declaredDevices = hwModule->getDeclaredDevices();
         DeviceVector deviceList = declaredDevices.getDevicesFromTypeAddr(device, address);
         if (!deviceList.isEmpty()) {
@@ -339,5 +320,6 @@ status_t HwModuleCollection::dump(int fd) const
     }
     return NO_ERROR;
 }
+
 
 } //namespace android

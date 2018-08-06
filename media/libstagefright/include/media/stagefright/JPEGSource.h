@@ -18,7 +18,7 @@
 
 #define JPEG_SOURCE_H_
 
-#include <media/stagefright/MediaSource.h>
+#include <media/MediaSource.h>
 
 namespace android {
 
@@ -33,7 +33,7 @@ struct JPEGSource : public MediaSource {
     virtual sp<MetaData> getFormat();
 
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~JPEGSource();

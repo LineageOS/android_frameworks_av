@@ -4,7 +4,7 @@ cc_library_headers {
     vendor_available: true,
 }
 
-cc_library_shared {
+cc_library {
     name: "libstagefright_foundation",
     vendor_available: true,
     vndk: {
@@ -14,6 +14,8 @@ cc_library_shared {
     include_dirs: [
         "frameworks/av/include",
         "frameworks/native/include",
+        "frameworks/native/libs/arect/include",
+        "frameworks/native/libs/nativebase/include",
     ],
 
     local_include_dirs: [
@@ -23,15 +25,16 @@ cc_library_shared {
     header_libs: [
         "libhardware_headers",
         "libstagefright_foundation_headers",
+        "media_plugin_headers",
     ],
 
     export_header_lib_headers: [
         "libstagefright_foundation_headers",
+        "media_plugin_headers",
     ],
 
     export_shared_lib_headers: [
         "libbinder",
-        "libui",
     ],
 
     cflags: [
@@ -43,10 +46,8 @@ cc_library_shared {
     shared_libs: [
         "libbinder",
         "libutils",
-        "libui",
         "libcutils",
         "liblog",
-        "libpowermanager",
     ],
 
     srcs: [
@@ -62,22 +63,15 @@ cc_library_shared {
         "ANetworkSession.cpp",
         "AString.cpp",
         "AStringUtils.cpp",
-        "AWakeLock.cpp",
+        "ByteUtils.cpp",
         "ColorUtils.cpp",
-        "MediaBuffer.cpp",
-        "MediaBufferGroup.cpp",
-        "MetaData.cpp",
+        "MediaDefs.cpp",
+        "MediaKeys.cpp",
         "ParsedMessage.cpp",
+        "avc_utils.cpp",
         "base64.cpp",
         "hexdump.cpp",
     ],
-
-    target: {
-        vendor: {
-            exclude_shared_libs: ["libpowermanager"],
-            exclude_srcs: ["AWakeLock.cpp"],
-        },
-    },
 
     clang: true,
 

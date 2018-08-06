@@ -21,6 +21,7 @@
 #include "include/CallbackDataSource.h"
 
 #include <binder/IMemory.h>
+#include <binder/IPCThreadState.h>
 #include <media/IDataSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 
@@ -34,7 +35,10 @@ CallbackDataSource::CallbackDataSource(
       mIsClosed(false) {
     // Set up the buffer to read into.
     mMemory = mIDataSource->getIMemory();
-    mName = String8::format("CallbackDataSource(%s)", mIDataSource->toString().string());
+    mName = String8::format("CallbackDataSource(%d->%d, %s)",
+            getpid(),
+            IPCThreadState::self()->getCallingPid(),
+            mIDataSource->toString().string());
 
 }
 

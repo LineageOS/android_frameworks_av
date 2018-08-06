@@ -30,8 +30,8 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
+#include <media/MediaSource.h>
 #include <media/mediarecorder.h>
 
 namespace android {
@@ -67,7 +67,7 @@ status_t AACWriter::initCheck() const {
 }
 
 
-status_t AACWriter::addSource(const sp<IMediaSource> &source) {
+status_t AACWriter::addSource(const sp<MediaSource> &source) {
     if (mInitCheck != OK) {
         return mInitCheck;
     }
@@ -294,7 +294,7 @@ status_t AACWriter::threadFunc() {
     prctl(PR_SET_NAME, (unsigned long)"AACWriterThread", 0, 0, 0);
 
     while (!mDone && err == OK) {
-        MediaBuffer *buffer;
+        MediaBufferBase *buffer;
         err = mSource->read(&buffer);
 
         if (err != OK) {
@@ -316,7 +316,7 @@ status_t AACWriter::threadFunc() {
         }
 
         int32_t isCodecSpecific = 0;
-        if (buffer->meta_data()->findInt32(kKeyIsCodecConfig, &isCodecSpecific) && isCodecSpecific) {
+        if (buffer->meta_data().findInt32(kKeyIsCodecConfig, &isCodecSpecific) && isCodecSpecific) {
             ALOGV("Drop codec specific info buffer");
             buffer->release();
             buffer = NULL;
@@ -324,7 +324,7 @@ status_t AACWriter::threadFunc() {
         }
 
         int64_t timestampUs;
-        CHECK(buffer->meta_data()->findInt64(kKeyTime, &timestampUs));
+        CHECK(buffer->meta_data().findInt64(kKeyTime, &timestampUs));
         if (timestampUs > mEstimatedDurationUs) {
             mEstimatedDurationUs = timestampUs;
         }

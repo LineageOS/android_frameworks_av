@@ -18,6 +18,8 @@
 
 namespace android {
 
+using media::VolumeShaper;
+
 //--------------------------------------------------------------------------------------------------
 TrackPlayerBase::TrackPlayerBase() : PlayerBase(),
         mPlayerVolumeL(1.0f), mPlayerVolumeR(1.0f)
@@ -103,18 +105,24 @@ status_t TrackPlayerBase::doSetVolume() {
 }
 
 
-void TrackPlayerBase::applyVolumeShaper(
-        const sp<VolumeShaper::Configuration>& configuration,
-        const sp<VolumeShaper::Operation>& operation) {
+binder::Status TrackPlayerBase::applyVolumeShaper(
+        const VolumeShaper::Configuration& configuration,
+        const VolumeShaper::Operation& operation) {
+
+    sp<VolumeShaper::Configuration> spConfiguration = new VolumeShaper::Configuration(configuration);
+    sp<VolumeShaper::Operation> spOperation = new VolumeShaper::Operation(operation);
+
     if (mAudioTrack != 0) {
         ALOGD("TrackPlayerBase::applyVolumeShaper() from IPlayer");
-        VolumeShaper::Status status = mAudioTrack->applyVolumeShaper(configuration, operation);
+        VolumeShaper::Status status = mAudioTrack->applyVolumeShaper(spConfiguration, spOperation);
         if (status < 0) { // a non-negative value is the volume shaper id.
             ALOGE("TrackPlayerBase::applyVolumeShaper() failed with status %d", status);
         }
+        return binder::Status::fromStatusT(status);
     } else {
         ALOGD("TrackPlayerBase::applyVolumeShaper()"
-                " no AudioTrack for volume control from IPlayer");
+              " no AudioTrack for volume control from IPlayer");
+        return binder::Status::ok();
     }
 }
 

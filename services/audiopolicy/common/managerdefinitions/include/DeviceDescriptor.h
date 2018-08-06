@@ -91,4 +91,4 @@ private:
     audio_devices_t mDeviceTypes;
 };
 
-}; // namespace android
+} // namespace android

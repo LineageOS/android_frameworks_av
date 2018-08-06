@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#define LOG_TAG (mInService ? "AAudioService" : "AAudio")
+#define LOG_TAG (mInService ? "AudioStreamInternalPlay_Service" \
+                          : "AudioStreamInternalPlay_Client")
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -37,12 +38,26 @@ AudioStreamInternalPlay::AudioStreamInternalPlay(AAudioServiceInterface  &servic
 
 AudioStreamInternalPlay::~AudioStreamInternalPlay() {}
 
+constexpr int kRampMSec = 10; // time to apply a change in volume
 
-aaudio_result_t AudioStreamInternalPlay::requestPauseInternal()
+aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder) {
+    aaudio_result_t result = AudioStreamInternal::open(builder);
+    if (result == AAUDIO_OK) {
+        // Sample rate is constrained to common values by now and should not overflow.
+        int32_t numFrames = kRampMSec * getSampleRate() / AAUDIO_MILLIS_PER_SECOND;
+        mVolumeRamp.setLengthInFrames(numFrames);
+    }
+    return result;
+}
+
+aaudio_result_t AudioStreamInternalPlay::requestPause()
 {
+    aaudio_result_t result = stopCallback();
+    if (result != AAUDIO_OK) {
+        return result;
+    }
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("AudioStreamInternal::requestPauseInternal() mServiceStreamHandle invalid = 0x%08X",
-              mServiceStreamHandle);
+        ALOGE("%s() mServiceStreamHandle invalid", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -52,20 +67,9 @@ aaudio_result_t AudioStreamInternalPlay::requestPauseInternal()
     return mServiceInterface.pauseStream(mServiceStreamHandle);
 }
 
-aaudio_result_t AudioStreamInternalPlay::requestPause()
-{
-    aaudio_result_t result = stopCallback();
-    if (result != AAUDIO_OK) {
-        return result;
-    }
-    result = requestPauseInternal();
-    return result;
-}
-
 aaudio_result_t AudioStreamInternalPlay::requestFlush() {
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("AudioStreamInternal::requestFlush() mServiceStreamHandle invalid = 0x%08X",
-              mServiceStreamHandle);
+        ALOGE("%s() mServiceStreamHandle invalid", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -80,7 +84,7 @@ void AudioStreamInternalPlay::advanceClientToMatchServerPosition() {
     // Bump offset so caller does not see the retrograde motion in getFramesRead().
     int64_t offset = writeCounter - readCounter;
     mFramesOffsetFromService += offset;
-    ALOGD("advanceClientToMatchServerPosition() readN = %lld, writeN = %lld, offset = %lld",
+    ALOGV("%s() readN = %lld, writeN = %lld, offset = %lld", __func__,
           (long long)readCounter, (long long)writeCounter, (long long)mFramesOffsetFromService);
 
     // Force writeCounter to match readCounter.
@@ -94,9 +98,7 @@ void AudioStreamInternalPlay::onFlushFromServer() {
 
 // Write the data, block if needed and timeoutMillis > 0
 aaudio_result_t AudioStreamInternalPlay::write(const void *buffer, int32_t numFrames,
-                                           int64_t timeoutNanoseconds)
-
-{
+                                               int64_t timeoutNanoseconds) {
     return processData((void *)buffer, numFrames, timeoutNanoseconds);
 }
 
@@ -115,7 +117,7 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
         // Still haven't got any timestamps from server.
         // Keep waiting until we get some valid timestamps then start writing to the
         // current buffer position.
-        ALOGD("processDataNow() wait for valid timestamps");
+        ALOGV("%s() wait for valid timestamps", __func__);
         // Sleep very briefly and hope we get a timestamp soon.
         *wakeTimePtr = currentNanoTime + (2000 * AAUDIO_NANOS_PER_MICROSECOND);
         ATRACE_END();
@@ -139,7 +141,8 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
     }
 
     // If the read index passed the write index then consider it an underrun.
-    if (mAudioEndpoint.getFullFramesAvailable() < 0) {
+    // For shared streams, the xRunCount is passed up from the service.
+    if (mAudioEndpoint.isFreeRunning() && mAudioEndpoint.getFullFramesAvailable() < 0) {
         mXRunCount++;
         if (ATRACE_ENABLED()) {
             ATRACE_INT("aaUnderRuns", mXRunCount);
@@ -196,10 +199,8 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
 
 aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buffer,
                                                             int32_t numFrames) {
-    // ALOGD("AudioStreamInternal::writeNowWithConversion(%p, %d)",
-    //              buffer, numFrames);
     WrappingBuffer wrappingBuffer;
-    uint8_t *source = (uint8_t *) buffer;
+    uint8_t *byteBuffer = (uint8_t *) buffer;
     int32_t framesLeft = numFrames;
 
     mAudioEndpoint.getEmptyFramesAvailable(&wrappingBuffer);
@@ -213,70 +214,26 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
             if (framesToWrite > framesAvailable) {
                 framesToWrite = framesAvailable;
             }
+
             int32_t numBytes = getBytesPerFrame() * framesToWrite;
-            int32_t numSamples = framesToWrite * getSamplesPerFrame();
             // Data conversion.
             float levelFrom;
             float levelTo;
-            bool ramping = mVolumeRamp.nextSegment(framesToWrite * getSamplesPerFrame(),
-                                                   &levelFrom, &levelTo);
-            // The formats are validated when the stream is opened so we do not have to
-            // check for illegal combinations here.
-            // TODO factor this out into a utility function
-            if (getFormat() == AAUDIO_FORMAT_PCM_FLOAT) {
-                if (mDeviceFormat == AAUDIO_FORMAT_PCM_FLOAT) {
-                    AAudio_linearRamp(
-                            (const float *) source,
-                            (float *) wrappingBuffer.data[partIndex],
-                            framesToWrite,
-                            getSamplesPerFrame(),
-                            levelFrom,
-                            levelTo);
-                } else if (mDeviceFormat == AAUDIO_FORMAT_PCM_I16) {
-                    if (ramping) {
-                        AAudioConvert_floatToPcm16(
-                                (const float *) source,
-                                (int16_t *) wrappingBuffer.data[partIndex],
-                                framesToWrite,
-                                getSamplesPerFrame(),
-                                levelFrom,
-                                levelTo);
-                    } else {
-                        AAudioConvert_floatToPcm16(
-                                (const float *) source,
-                                (int16_t *) wrappingBuffer.data[partIndex],
-                                numSamples,
-                                levelTo);
-                    }
-                }
-            } else if (getFormat() == AAUDIO_FORMAT_PCM_I16) {
-                if (mDeviceFormat == AAUDIO_FORMAT_PCM_FLOAT) {
-                    if (ramping) {
-                        AAudioConvert_pcm16ToFloat(
-                                (const int16_t *) source,
-                                (float *) wrappingBuffer.data[partIndex],
-                                framesToWrite,
-                                getSamplesPerFrame(),
-                                levelFrom,
-                                levelTo);
-                    } else {
-                        AAudioConvert_pcm16ToFloat(
-                                (const int16_t *) source,
-                                (float *) wrappingBuffer.data[partIndex],
-                                numSamples,
-                                levelTo);
-                    }
-                } else if (mDeviceFormat == AAUDIO_FORMAT_PCM_I16) {
-                    AAudio_linearRamp(
-                            (const int16_t *) source,
-                            (int16_t *) wrappingBuffer.data[partIndex],
-                            framesToWrite,
-                            getSamplesPerFrame(),
-                            levelFrom,
-                            levelTo);
-                }
-            }
-            source += numBytes;
+            mVolumeRamp.nextSegment(framesToWrite, &levelFrom, &levelTo);
+
+            AAudioDataConverter::FormattedData source(
+                    (void *)byteBuffer,
+                    getFormat(),
+                    getSamplesPerFrame());
+            AAudioDataConverter::FormattedData destination(
+                    wrappingBuffer.data[partIndex],
+                    getDeviceFormat(),
+                    getDeviceChannelCount());
+
+            AAudioDataConverter::convert(source, destination, framesToWrite,
+                                         levelFrom, levelTo);
+
+            byteBuffer += numBytes;
             framesLeft -= framesToWrite;
         } else {
             break;
@@ -286,7 +243,6 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
     int32_t framesWritten = numFrames - framesLeft;
     mAudioEndpoint.advanceWriteIndex(framesWritten);
 
-    // ALOGD("AudioStreamInternal::writeNowWithConversion() returns %d", framesWritten);
     return framesWritten;
 }
 
@@ -305,7 +261,6 @@ int64_t AudioStreamInternalPlay::getFramesRead()
     } else {
         mLastFramesRead = framesRead;
     }
-    //ALOGD("AudioStreamInternalPlay::getFramesRead() returns %lld", (long long)framesRead);
     return framesRead;
 }
 
@@ -313,60 +268,51 @@ int64_t AudioStreamInternalPlay::getFramesWritten()
 {
     int64_t framesWritten = mAudioEndpoint.getDataWriteCounter()
                                + mFramesOffsetFromService;
-    //ALOGD("AudioStreamInternalPlay::getFramesWritten() returns %lld", (long long)framesWritten);
     return framesWritten;
 }
 
 
 // Render audio in the application callback and then write the data to the stream.
 void *AudioStreamInternalPlay::callbackLoop() {
+    ALOGD("%s() entering >>>>>>>>>>>>>>>", __func__);
     aaudio_result_t result = AAUDIO_OK;
     aaudio_data_callback_result_t callbackResult = AAUDIO_CALLBACK_RESULT_CONTINUE;
-    AAudioStream_dataCallback appCallback = getDataCallbackProc();
-    if (appCallback == nullptr) return NULL;
+    if (!isDataCallbackSet()) return NULL;
     int64_t timeoutNanos = calculateReasonableTimeout(mCallbackFrames);
 
     // result might be a frame count
     while (mCallbackEnabled.load() && isActive() && (result >= 0)) {
         // Call application using the AAudio callback interface.
-        callbackResult = (*appCallback)(
-                (AAudioStream *) this,
-                getDataCallbackUserData(),
-                mCallbackBuffer,
-                mCallbackFrames);
+        callbackResult = maybeCallDataCallback(mCallbackBuffer, mCallbackFrames);
 
         if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
             // Write audio data to stream. This is a BLOCKING WRITE!
             result = write(mCallbackBuffer, mCallbackFrames, timeoutNanos);
             if ((result != mCallbackFrames)) {
-                ALOGE("AudioStreamInternalPlay(): callbackLoop: write() returned %d", result);
                 if (result >= 0) {
                     // Only wrote some of the frames requested. Must have timed out.
                     result = AAUDIO_ERROR_TIMEOUT;
                 }
-                AAudioStream_errorCallback errorCallback = getErrorCallbackProc();
-                if (errorCallback != nullptr) {
-                    (*errorCallback)(
-                            (AAudioStream *) this,
-                            getErrorCallbackUserData(),
-                            result);
-                }
+                maybeCallErrorCallback(result);
                 break;
             }
         } else if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
-            ALOGD("AudioStreamInternalPlay(): callback returned AAUDIO_CALLBACK_RESULT_STOP");
+            ALOGV("%s(): callback returned AAUDIO_CALLBACK_RESULT_STOP", __func__);
             break;
         }
     }
 
-    ALOGD("AudioStreamInternalPlay(): callbackLoop() exiting, result = %d, isActive() = %d",
-          result, (int) isActive());
+    ALOGD("%s() exiting, result = %d, isActive() = %d <<<<<<<<<<<<<<",
+          __func__, result, (int) isActive());
     return NULL;
 }
 
 //------------------------------------------------------------------------------
 // Implementation of PlayerBase
 status_t AudioStreamInternalPlay::doSetVolume() {
-    mVolumeRamp.setTarget(mStreamVolume * getDuckAndMuteVolume());
+    float combinedVolume = mStreamVolume * getDuckAndMuteVolume();
+    ALOGD("%s() mStreamVolume * duckAndMuteVolume = %f * %f = %f",
+          __func__, mStreamVolume, getDuckAndMuteVolume(), combinedVolume);
+    mVolumeRamp.setTarget(combinedVolume);
     return android::NO_ERROR;
 }

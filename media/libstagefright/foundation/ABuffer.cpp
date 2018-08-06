@@ -19,13 +19,11 @@
 #include "ADebug.h"
 #include "ALooper.h"
 #include "AMessage.h"
-#include "MediaBufferBase.h"
 
 namespace android {
 
 ABuffer::ABuffer(size_t capacity)
-    : mMediaBufferBase(NULL),
-      mRangeOffset(0),
+    : mRangeOffset(0),
       mInt32Data(0),
       mOwnsData(true) {
     mData = malloc(capacity);
@@ -39,8 +37,7 @@ ABuffer::ABuffer(size_t capacity)
 }
 
 ABuffer::ABuffer(void *data, size_t capacity)
-    : mMediaBufferBase(NULL),
-      mData(data),
+    : mData(data),
       mCapacity(capacity),
       mRangeOffset(0),
       mRangeLength(capacity),
@@ -66,8 +63,6 @@ ABuffer::~ABuffer() {
             mData = NULL;
         }
     }
-
-    setMediaBufferBase(NULL);
 }
 
 void ABuffer::setRange(size_t offset, size_t size) {
@@ -83,20 +78,6 @@ sp<AMessage> ABuffer::meta() {
         mMeta = new AMessage;
     }
     return mMeta;
-}
-
-MediaBufferBase *ABuffer::getMediaBufferBase() {
-    if (mMediaBufferBase != NULL) {
-        mMediaBufferBase->add_ref();
-    }
-    return mMediaBufferBase;
-}
-
-void ABuffer::setMediaBufferBase(MediaBufferBase *mediaBuffer) {
-    if (mMediaBufferBase != NULL) {
-        mMediaBufferBase->release();
-    }
-    mMediaBufferBase = mediaBuffer;
 }
 
 }  // namespace android

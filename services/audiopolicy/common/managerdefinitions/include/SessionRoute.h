@@ -24,6 +24,7 @@
 namespace android {
 
 class DeviceDescriptor;
+class DeviceVector;
 
 class SessionRoute : public RefBase
 {
@@ -54,7 +55,7 @@ public:
 
     void log(const char* prefix);
 
-    bool isActive() {
+    bool isActiveOrChanged() {
         return (mDeviceDescriptor != 0) && (mChanged || (mActivityCount > 0));
     }
 
@@ -96,9 +97,10 @@ public:
 
     int incRouteActivity(audio_session_t session);
     int decRouteActivity(audio_session_t session);
-    bool hasRouteChanged(audio_session_t session); // also clears the changed flag
+    bool getAndClearRouteChanged(audio_session_t session); // also clears the changed flag
     void log(const char* caption);
-
+    audio_devices_t getActiveDeviceForStream(audio_stream_type_t streamType,
+                                             const DeviceVector& availableDevices);
     // Specify an Output(Sink) route by passing SessionRoute::SOURCE_TYPE_NA in the
     // source argument.
     // Specify an Input(Source) rout by passing SessionRoute::AUDIO_STREAM_DEFAULT
@@ -115,4 +117,4 @@ private:
     const session_route_map_type_t mMapType;
 };
 
-}; // namespace android
+} // namespace android

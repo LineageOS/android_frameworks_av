@@ -1,4 +1,4 @@
-cc_library_shared {
+cc_library {
     name: "libstagefright_httplive",
 
     srcs: [
@@ -36,8 +36,20 @@ cc_library_shared {
         "libcrypto",
         "libcutils",
         "libmedia",
+        "libmediaextractor",
         "libstagefright",
         "libstagefright_foundation",
         "libutils",
+        "libhidlallocatorutils",
+        "libhidlbase",
+        "android.hardware.cas@1.0",
+        "android.hardware.cas.native@1.0",
     ],
+
+    static_libs: [
+        "libstagefright_id3",
+        "libstagefright_metadatautils",
+        "libstagefright_mpeg2support",
+    ],
+
 }

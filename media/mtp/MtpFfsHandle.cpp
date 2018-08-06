@@ -39,10 +39,6 @@
 
 namespace {
 
-constexpr char FFS_MTP_EP_IN[] = "/dev/usb-ffs/mtp/ep1";
-constexpr char FFS_MTP_EP_OUT[] = "/dev/usb-ffs/mtp/ep2";
-constexpr char FFS_MTP_EP_INTR[] = "/dev/usb-ffs/mtp/ep3";
-
 constexpr unsigned AIO_BUFS_MAX = 128;
 constexpr unsigned AIO_BUF_LEN = 16384;
 
@@ -73,7 +69,9 @@ int MtpFfsHandle::getPacketSize(int ffs_fd) {
     }
 }
 
-MtpFfsHandle::MtpFfsHandle() {}
+MtpFfsHandle::MtpFfsHandle(int controlFd) {
+    mControl.reset(controlFd);
+}
 
 MtpFfsHandle::~MtpFfsHandle() {}
 
@@ -83,27 +81,27 @@ void MtpFfsHandle::closeEndpoints() {
     mBulkOut.reset();
 }
 
-bool MtpFfsHandle::openEndpoints() {
+bool MtpFfsHandle::openEndpoints(bool ptp) {
     if (mBulkIn < 0) {
-        mBulkIn.reset(TEMP_FAILURE_RETRY(open(FFS_MTP_EP_IN, O_RDWR)));
+        mBulkIn.reset(TEMP_FAILURE_RETRY(open(ptp ? FFS_PTP_EP_IN : FFS_MTP_EP_IN, O_RDWR)));
         if (mBulkIn < 0) {
-            PLOG(ERROR) << FFS_MTP_EP_IN << ": cannot open bulk in ep";
+            PLOG(ERROR) << (ptp ? FFS_PTP_EP_IN : FFS_MTP_EP_IN) << ": cannot open bulk in ep";
             return false;
         }
     }
 
     if (mBulkOut < 0) {
-        mBulkOut.reset(TEMP_FAILURE_RETRY(open(FFS_MTP_EP_OUT, O_RDWR)));
+        mBulkOut.reset(TEMP_FAILURE_RETRY(open(ptp ? FFS_PTP_EP_OUT : FFS_MTP_EP_OUT, O_RDWR)));
         if (mBulkOut < 0) {
-            PLOG(ERROR) << FFS_MTP_EP_OUT << ": cannot open bulk out ep";
+            PLOG(ERROR) << (ptp ? FFS_PTP_EP_OUT : FFS_MTP_EP_OUT) << ": cannot open bulk out ep";
             return false;
         }
     }
 
     if (mIntr < 0) {
-        mIntr.reset(TEMP_FAILURE_RETRY(open(FFS_MTP_EP_INTR, O_RDWR)));
+        mIntr.reset(TEMP_FAILURE_RETRY(open(ptp ? FFS_PTP_EP_INTR : FFS_MTP_EP_INTR, O_RDWR)));
         if (mIntr < 0) {
-            PLOG(ERROR) << FFS_MTP_EP_INTR << ": cannot open intr ep";
+            PLOG(ERROR) << (ptp ? FFS_PTP_EP_INTR : FFS_MTP_EP_INTR) << ": cannot open intr ep";
             return false;
         }
     }
@@ -121,66 +119,53 @@ void MtpFfsHandle::advise(int fd) {
         PLOG(ERROR) << "Failed to fadvise";
 }
 
-bool MtpFfsHandle::initFunctionfs() {
-    if (mControl < 0) { // might have already done this before
-        mControl.reset(TEMP_FAILURE_RETRY(open(FFS_MTP_EP0, O_RDWR)));
-        if (mControl < 0) {
-            PLOG(ERROR) << FFS_MTP_EP0 << ": cannot open control endpoint";
-            return false;
-        }
-        if (!writeDescriptors()) {
-            closeConfig();
-            return false;
-        }
-    }
-    return true;
-}
-
-bool MtpFfsHandle::writeDescriptors() {
-    ssize_t ret = TEMP_FAILURE_RETRY(::write(mControl,
-                &(mPtp ? ptp_desc_v2 : mtp_desc_v2), sizeof(desc_v2)));
-    if (ret < 0) {
-        PLOG(ERROR) << FFS_MTP_EP0 << "Switching to V1 descriptor format";
-        ret = TEMP_FAILURE_RETRY(::write(mControl,
-                    &(mPtp ? ptp_desc_v1 : mtp_desc_v1), sizeof(desc_v1)));
-        if (ret < 0) {
-            PLOG(ERROR) << FFS_MTP_EP0 << "Writing descriptors failed";
-            return false;
-        }
-    }
-    ret = TEMP_FAILURE_RETRY(::write(mControl, &mtp_strings, sizeof(mtp_strings)));
-    if (ret < 0) {
-        PLOG(ERROR) << FFS_MTP_EP0 << "Writing strings failed";
-        return false;
-    }
-    return true;
+bool MtpFfsHandle::writeDescriptors(bool ptp) {
+    return ::android::writeDescriptors(mControl, ptp);
 }
 
 void MtpFfsHandle::closeConfig() {
     mControl.reset();
 }
 
-int MtpFfsHandle::doAsync(void* data, size_t len, bool read) {
-    struct io_event ioevs[1];
-    if (len > AIO_BUF_LEN) {
-        LOG(ERROR) << "Mtp read/write too large " << len;
-        errno = EINVAL;
-        return -1;
+int MtpFfsHandle::doAsync(void* data, size_t len, bool read, bool zero_packet) {
+    struct io_event ioevs[AIO_BUFS_MAX];
+    size_t total = 0;
+
+    while (total < len) {
+        size_t this_len = std::min(len - total, static_cast<size_t>(AIO_BUF_LEN * AIO_BUFS_MAX));
+        int num_bufs = this_len / AIO_BUF_LEN + (this_len % AIO_BUF_LEN == 0 ? 0 : 1);
+        for (int i = 0; i < num_bufs; i++) {
+            mIobuf[0].buf[i] = reinterpret_cast<unsigned char*>(data) + total + i * AIO_BUF_LEN;
+        }
+        int ret = iobufSubmit(&mIobuf[0], read ? mBulkOut : mBulkIn, this_len, read);
+        if (ret < 0) return -1;
+        ret = waitEvents(&mIobuf[0], ret, ioevs, nullptr);
+        if (ret < 0) return -1;
+        total += ret;
+        if (static_cast<size_t>(ret) < this_len) break;
     }
-    mIobuf[0].buf[0] = reinterpret_cast<unsigned char*>(data);
-    if (iobufSubmit(&mIobuf[0], read ? mBulkOut : mBulkIn, len, read) == -1)
-        return -1;
-    int ret = waitEvents(&mIobuf[0], 1, ioevs, nullptr);
-    mIobuf[0].buf[0] = mIobuf[0].bufs.data();
-    return ret;
+
+    int packet_size = getPacketSize(read ? mBulkOut : mBulkIn);
+    if (len % packet_size == 0 && zero_packet) {
+        int ret = iobufSubmit(&mIobuf[0], read ? mBulkOut : mBulkIn, 0, read);
+        if (ret < 0) return -1;
+        ret = waitEvents(&mIobuf[0], ret, ioevs, nullptr);
+        if (ret < 0) return -1;
+    }
+
+    for (unsigned i = 0; i < AIO_BUFS_MAX; i++) {
+        mIobuf[0].buf[i] = mIobuf[0].bufs.data() + i * AIO_BUF_LEN;
+    }
+    return total;
 }
 
 int MtpFfsHandle::read(void* data, size_t len) {
-    return doAsync(data, len, true);
+    // Zero packets are handled by receiveFile()
+    return doAsync(data, len, true, false);
 }
 
 int MtpFfsHandle::write(const void* data, size_t len) {
-    return doAsync(const_cast<void*>(data), len, false);
+    return doAsync(const_cast<void*>(data), len, false, true);
 }
 
 int MtpFfsHandle::handleEvent() {
@@ -197,11 +182,9 @@ int MtpFfsHandle::handleEvent() {
         switch (event->type) {
         case FUNCTIONFS_BIND:
         case FUNCTIONFS_ENABLE:
-        case FUNCTIONFS_RESUME:
             ret = 0;
             errno = 0;
             break;
-        case FUNCTIONFS_SUSPEND:
         case FUNCTIONFS_UNBIND:
         case FUNCTIONFS_DISABLE:
             errno = ESHUTDOWN;
@@ -210,6 +193,9 @@ int MtpFfsHandle::handleEvent() {
         case FUNCTIONFS_SETUP:
             if (handleControlRequest(&event->u.setup) == -1)
                 ret = -1;
+            break;
+        case FUNCTIONFS_SUSPEND:
+        case FUNCTIONFS_RESUME:
             break;
         default:
             LOG(ERROR) << "Mtp Event " << event->type << " (unknown)";
@@ -277,10 +263,8 @@ int MtpFfsHandle::handleControlRequest(const struct usb_ctrlrequest *setup) {
     return 0;
 }
 
-int MtpFfsHandle::start() {
-    mLock.lock();
-
-    if (!openEndpoints())
+int MtpFfsHandle::start(bool ptp) {
+    if (!openEndpoints(ptp))
         return -1;
 
     for (unsigned i = 0; i < NUM_IO_BUFS; i++) {
@@ -309,33 +293,10 @@ int MtpFfsHandle::start() {
     return 0;
 }
 
-int MtpFfsHandle::configure(bool usePtp) {
-    // Wait till previous server invocation has closed
-    if (!mLock.try_lock_for(std::chrono::milliseconds(300))) {
-        LOG(ERROR) << "MtpServer was unable to get configure lock";
-        return -1;
-    }
-    int ret = 0;
-
-    // If ptp is changed, the configuration must be rewritten
-    if (mPtp != usePtp) {
-        closeEndpoints();
-        closeConfig();
-    }
-    mPtp = usePtp;
-
-    if (!initFunctionfs()) {
-        ret = -1;
-    }
-
-    mLock.unlock();
-    return ret;
-}
-
 void MtpFfsHandle::close() {
     io_destroy(mCtx);
     closeEndpoints();
-    mLock.unlock();
+    closeConfig();
 }
 
 int MtpFfsHandle::waitEvents(struct io_buffer *buf, int min_events, struct io_event *events,
@@ -627,7 +588,8 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
     if (TEMP_FAILURE_RETRY(pread(mfr.fd, mIobuf[0].bufs.data() +
                     sizeof(mtp_data_header), init_read_len, offset))
             != init_read_len) return -1;
-    if (write(mIobuf[0].bufs.data(), sizeof(mtp_data_header) + init_read_len) == -1)
+    if (doAsync(mIobuf[0].bufs.data(), sizeof(mtp_data_header) + init_read_len,
+                false, false /* zlps are handled below */) == -1)
         return -1;
     file_length -= init_read_len;
     offset += init_read_len;

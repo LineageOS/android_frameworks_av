@@ -194,7 +194,7 @@ private:
     AudioPolicyManagerObserver *mApmObserver;
 };
 
-}; // namespace audio_policy
+} // namespace audio_policy
 
-}; // namespace android
+} // namespace android
 

@@ -23,6 +23,8 @@
 
 #include <media/stagefright/MediaMuxer.h>
 
+#include <media/mediarecorder.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -31,17 +33,22 @@
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MPEG4Writer.h>
 #include <media/stagefright/Utils.h>
 
 namespace android {
 
+static bool isMp4Format(MediaMuxer::OutputFormat format) {
+    return format == MediaMuxer::OUTPUT_FORMAT_MPEG_4 ||
+           format == MediaMuxer::OUTPUT_FORMAT_THREE_GPP ||
+           format == MediaMuxer::OUTPUT_FORMAT_HEIF;
+}
+
 MediaMuxer::MediaMuxer(int fd, OutputFormat format)
     : mFormat(format),
       mState(UNINITIALIZED) {
-    if (format == OUTPUT_FORMAT_MPEG_4 || format == OUTPUT_FORMAT_THREE_GPP) {
+    if (isMp4Format(format)) {
         mWriter = new MPEG4Writer(fd);
     } else if (format == OUTPUT_FORMAT_WEBM) {
         mWriter = new WebmWriter(fd);
@@ -49,6 +56,10 @@ MediaMuxer::MediaMuxer(int fd, OutputFormat format)
 
     if (mWriter != NULL) {
         mFileMeta = new MetaData;
+        if (format == OUTPUT_FORMAT_HEIF) {
+            // Note that the key uses recorder file types.
+            mFileMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_HEIF);
+        }
         mState = INITIALIZED;
     }
 }
@@ -108,8 +119,8 @@ status_t MediaMuxer::setLocation(int latitude, int longitude) {
         ALOGE("setLocation() must be called before start().");
         return INVALID_OPERATION;
     }
-    if (mFormat != OUTPUT_FORMAT_MPEG_4 && mFormat != OUTPUT_FORMAT_THREE_GPP) {
-        ALOGE("setLocation() is only supported for .mp4 pr .3gp output.");
+    if (!isMp4Format(mFormat)) {
+        ALOGE("setLocation() is only supported for .mp4, .3gp or .heic output.");
         return INVALID_OPERATION;
     }
 
@@ -170,13 +181,17 @@ status_t MediaMuxer::writeSampleData(const sp<ABuffer> &buffer, size_t trackInde
     mediaBuffer->add_ref(); // Released in MediaAdapter::signalBufferReturned().
     mediaBuffer->set_range(buffer->offset(), buffer->size());
 
-    sp<MetaData> sampleMetaData = mediaBuffer->meta_data();
-    sampleMetaData->setInt64(kKeyTime, timeUs);
+    MetaDataBase &sampleMetaData = mediaBuffer->meta_data();
+    sampleMetaData.setInt64(kKeyTime, timeUs);
     // Just set the kKeyDecodingTime as the presentation time for now.
-    sampleMetaData->setInt64(kKeyDecodingTime, timeUs);
+    sampleMetaData.setInt64(kKeyDecodingTime, timeUs);
 
     if (flags & MediaCodec::BUFFER_FLAG_SYNCFRAME) {
-        sampleMetaData->setInt32(kKeyIsSyncFrame, true);
+        sampleMetaData.setInt32(kKeyIsSyncFrame, true);
+    }
+
+    if (flags & MediaCodec::BUFFER_FLAG_MUXER_DATA) {
+        sampleMetaData.setInt32(kKeyIsMuxerData, 1);
     }
 
     sp<MediaAdapter> currentTrack = mTrackList[trackIndex];

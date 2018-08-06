@@ -23,11 +23,13 @@
 #include <media/AudioIoDescriptor.h>
 #include <media/IAudioFlingerClient.h>
 #include <media/IAudioPolicyServiceClient.h>
+#include <media/MicrophoneInfo.h>
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
 #include <utils/Errors.h>
 #include <utils/Mutex.h>
+#include <vector>
 
 namespace android {
 
@@ -106,6 +108,9 @@ public:
 
     static float linearToLog(int volume);
     static int logToLinear(float volume);
+    static size_t calculateMinFrameCount(
+            uint32_t afLatencyMs, uint32_t afFrameCount, uint32_t afSampleRate,
+            uint32_t sampleRate, float speed /*, uint32_t notificationsPerBufferReq*/);
 
     // Returned samplingRate and frameCount output values are guaranteed
     // to be non-zero if status == NO_ERROR
@@ -209,18 +214,11 @@ public:
     static status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     static audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);
 
-    // Client must successfully hand off the handle reference to AudioFlinger via createTrack(),
-    // or release it with releaseOutput().
-    static audio_io_handle_t getOutput(audio_stream_type_t stream,
-                                        uint32_t samplingRate = 0,
-                                        audio_format_t format = AUDIO_FORMAT_DEFAULT,
-                                        audio_channel_mask_t channelMask = AUDIO_CHANNEL_OUT_STEREO,
-                                        audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
-                                        const audio_offload_info_t *offloadInfo = NULL);
     static status_t getOutputForAttr(const audio_attributes_t *attr,
                                      audio_io_handle_t *output,
                                      audio_session_t session,
                                      audio_stream_type_t *stream,
+                                     pid_t pid,
                                      uid_t uid,
                                      const audio_config_t *config,
                                      audio_output_flags_t flags,
@@ -236,24 +234,23 @@ public:
                               audio_stream_type_t stream,
                               audio_session_t session);
 
-    // Client must successfully hand off the handle reference to AudioFlinger via openRecord(),
+    // Client must successfully hand off the handle reference to AudioFlinger via createRecord(),
     // or release it with releaseInput().
     static status_t getInputForAttr(const audio_attributes_t *attr,
                                     audio_io_handle_t *input,
                                     audio_session_t session,
                                     pid_t pid,
                                     uid_t uid,
+                                    const String16& opPackageName,
                                     const audio_config_base_t *config,
                                     audio_input_flags_t flags,
                                     audio_port_handle_t *selectedDeviceId,
                                     audio_port_handle_t *portId);
 
-    static status_t startInput(audio_io_handle_t input,
-                               audio_session_t session);
-    static status_t stopInput(audio_io_handle_t input,
-                              audio_session_t session);
-    static void releaseInput(audio_io_handle_t input,
-                             audio_session_t session);
+    static status_t startInput(audio_port_handle_t portId,
+                               bool *silenced);
+    static status_t stopInput(audio_port_handle_t portId);
+    static void releaseInput(audio_port_handle_t portId);
     static status_t initStreamVolume(audio_stream_type_t stream,
                                       int indexMin,
                                       int indexMax);
@@ -286,7 +283,7 @@ public:
     static uint32_t getPrimaryOutputSamplingRate();
     static size_t getPrimaryOutputFrameCount();
 
-    static status_t setLowRamDevice(bool isLowRamDevice);
+    static status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory);
 
     // Check if hw offload is possible for given format, stream type, sample rate,
     // bit rate, duration, video and streaming or offload property is enabled
@@ -340,6 +337,17 @@ public:
 
     static float    getStreamVolumeDB(
             audio_stream_type_t stream, int index, audio_devices_t device);
+
+    static status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones);
+
+    // numSurroundFormats holds the maximum number of formats and bool value allowed in the array.
+    // When numSurroundFormats is 0, surroundFormats and surroundFormatsEnabled will not be
+    // populated. The actual number of surround formats should be returned at numSurroundFormats.
+    static status_t getSurroundFormats(unsigned int *numSurroundFormats,
+                                       audio_format_t *surroundFormats,
+                                       bool *surroundFormatsEnabled,
+                                       bool reported);
+    static status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
 
     // ----------------------------------------------------------------------------
 
@@ -432,6 +440,7 @@ private:
 
         int addAudioPortCallback(const sp<AudioPortCallback>& callback);
         int removeAudioPortCallback(const sp<AudioPortCallback>& callback);
+        bool isAudioPortCbEnabled() const { return (mAudioPortCallbacks.size() != 0); }
 
         // DeathRecipient
         virtual void binderDied(const wp<IBinder>& who);
@@ -450,6 +459,7 @@ private:
         Vector <sp <AudioPortCallback> >    mAudioPortCallbacks;
     };
 
+    static audio_io_handle_t getOutput(audio_stream_type_t stream);
     static const sp<AudioFlingerClient> getAudioFlingerClient();
     static sp<AudioIoDescriptor> getIoDescriptor(audio_io_handle_t ioHandle);
 

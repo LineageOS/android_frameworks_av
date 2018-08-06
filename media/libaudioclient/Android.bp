@@ -6,7 +6,22 @@ cc_library_headers {
 
 cc_library_shared {
     name: "libaudioclient",
+
+    aidl: {
+        export_aidl_headers: true,
+        local_include_dirs: ["aidl"],
+        include_dirs: [
+            "frameworks/av/media/libaudioclient/aidl",
+        ],
+    },
+
     srcs: [
+        // AIDL files for audioclient interfaces
+        // The headers for these interfaces will be available to any modules that
+        // include libaudioclient, at the path "aidl/package/path/BnFoo.h"
+        "aidl/android/media/IAudioRecord.aidl",
+        ":libaudioclient_aidl",
+
         "AudioEffect.cpp",
         "AudioPolicy.cpp",
         "AudioRecord.cpp",
@@ -17,7 +32,6 @@ cc_library_shared {
         "IAudioFlingerClient.cpp",
         "IAudioPolicyService.cpp",
         "IAudioPolicyServiceClient.cpp",
-        "IAudioRecord.cpp",
         "IAudioTrack.cpp",
         "IEffect.cpp",
         "IEffectClient.cpp",
@@ -33,10 +47,12 @@ cc_library_shared {
         "libdl",
         "libaudioutils",
         "libaudiomanager",
+        "libmedia_helper",
+        "libmediametrics",
     ],
     export_shared_lib_headers: ["libbinder"],
 
-    local_include_dirs: ["include/media"],
+    local_include_dirs: ["include/media", "aidl"],
     header_libs: ["libaudioclient_headers"],
     export_header_lib_headers: ["libaudioclient_headers"],
 
@@ -55,4 +71,12 @@ cc_library_shared {
             "signed-integer-overflow",
         ],
     },
+}
+
+// AIDL interface between libaudioclient and framework.jar
+filegroup {
+    name: "libaudioclient_aidl",
+    srcs: [
+        "aidl/android/media/IPlayer.aidl",
+    ],
 }

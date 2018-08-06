@@ -188,13 +188,13 @@ inline void MixAccum(TO *auxaccum, TI value) {
 
 template<>
 inline void MixAccum<float, int16_t>(float *auxaccum, int16_t value) {
-    static const float norm = 1. / (1 << 15);
+    static constexpr float norm = 1. / (1 << 15);
     *auxaccum += norm * value;
 }
 
 template<>
 inline void MixAccum<float, int32_t>(float *auxaccum, int32_t value) {
-    static const float norm = 1. / (1 << 27);
+    static constexpr float norm = 1. / (1 << 27);
     *auxaccum += norm * value;
 }
 
@@ -238,6 +238,7 @@ enum {
  *   NCHAN represents number of input and output channels.
  *   TO: int32_t (Q4.27) or float
  *   TI: int32_t (Q4.27) or int16_t (Q0.15) or float
+ *   TA: int32_t (Q4.27) or float
  *   TV: int32_t (U4.28) or int16_t (U4.12) or float
  *   vol: represents a volume array.
  *
@@ -247,7 +248,8 @@ enum {
  *   Single input channel. NCHAN represents number of output channels.
  *   TO: int32_t (Q4.27) or float
  *   TI: int32_t (Q4.27) or int16_t (Q0.15) or float
- *   TV: int32_t (U4.28) or int16_t (U4.12) or float
+ *   TA: int32_t (Q4.27) or float
+ *   TV/TAV: int32_t (U4.28) or int16_t (U4.12) or float
  *   Input channel count is 1.
  *   vol: represents volume array.
  *
@@ -257,7 +259,8 @@ enum {
  *   NCHAN represents number of input and output channels.
  *   TO: int16_t (Q.15) or float
  *   TI: int32_t (Q4.27) or int16_t (Q0.15) or float
- *   TV: int32_t (U4.28) or int16_t (U4.12) or float
+ *   TA: int32_t (Q4.27) or float
+ *   TV/TAV: int32_t (U4.28) or int16_t (U4.12) or float
  *   vol: represents a volume array.
  *
  *   MIXTYPE_MULTI_SAVEONLY does not accumulate into the out pointer.

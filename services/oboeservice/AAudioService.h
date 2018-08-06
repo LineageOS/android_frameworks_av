@@ -83,6 +83,8 @@ public:
     aaudio_result_t stopClient(aaudio::aaudio_handle_t streamHandle,
                                        audio_port_handle_t clientHandle) override;
 
+    aaudio_result_t disconnectStreamByPortHandle(audio_port_handle_t portHandle);
+
 private:
 
     /**
@@ -94,9 +96,15 @@ private:
             aaudio::aaudio_handle_t streamHandle);
 
 
-    android::AudioClient mAudioClient;
 
-    aaudio::AAudioStreamTracker                 mStreamTracker;
+    bool releaseStream(const sp<aaudio::AAudioServiceStreamBase> &serviceStream);
+
+    aaudio_result_t checkForPendingClose(const sp<aaudio::AAudioServiceStreamBase> &serviceStream,
+                                         aaudio_result_t defaultResult);
+
+    android::AudioClient            mAudioClient;
+
+    aaudio::AAudioStreamTracker     mStreamTracker;
 
     enum constants {
         DEFAULT_AUDIO_PRIORITY = 2

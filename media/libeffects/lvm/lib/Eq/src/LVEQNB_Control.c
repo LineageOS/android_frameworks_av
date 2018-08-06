@@ -430,7 +430,15 @@ LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t        hInstance,
     }
 
 
-    if(bChange){
+    // During operating mode transition, there is a race condition where the mode
+    // is still LVEQNB_ON, but the effect is considered disabled in the upper layers.
+    // modeChange handles this special race condition.
+    const int /* bool */ modeChange = pParams->OperatingMode != OperatingModeSave
+            || (OperatingModeSave == LVEQNB_ON
+                    && pInstance->bInOperatingModeTransition
+                    && LVC_Mixer_GetTarget(&pInstance->BypassMixer.MixerStream[0]) == 0);
+
+    if (bChange || modeChange) {
 
         /*
          * If the sample rate has changed clear the history
@@ -462,8 +470,7 @@ LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t        hInstance,
             LVEQNB_SetCoefficients(pInstance);                  /* Instance pointer */
         }
 
-        if(pParams->OperatingMode != OperatingModeSave)
-        {
+        if (modeChange) {
             if(pParams->OperatingMode == LVEQNB_ON)
             {
 #ifdef BUILD_FLOAT
@@ -479,6 +486,8 @@ LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t        hInstance,
             else
             {
                 /* Stay on the ON operating mode until the transition is done */
+                // This may introduce a state race condition if the effect is enabled again
+                // while in transition.  This is fixed in the modeChange logic.
                 pInstance->Params.OperatingMode = LVEQNB_ON;
 #ifdef BUILD_FLOAT
                 LVC_Mixer_SetTarget(&pInstance->BypassMixer.MixerStream[0], 0.0f);

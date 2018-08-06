@@ -25,6 +25,7 @@ namespace android {
 // Keep in sync with frameworks/base/core/java/android/os/ISchedulingPolicyService.aidl
 enum {
     REQUEST_PRIORITY_TRANSACTION = IBinder::FIRST_CALL_TRANSACTION,
+    REQUEST_CPUSET_BOOST,
 };
 
 // ----------------------------------------------------------------------
@@ -60,6 +61,23 @@ public:
         }
         return reply.readInt32();
     }
+
+    virtual int requestCpusetBoost(bool enable, const sp<IInterface>& client)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISchedulingPolicyService::getInterfaceDescriptor());
+        data.writeInt32(enable);
+        data.writeStrongBinder(IInterface::asBinder(client));
+        status_t status = remote()->transact(REQUEST_CPUSET_BOOST, data, &reply, 0);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        // fail on exception: force binder reconnection
+        if (reply.readExceptionCode() != 0) {
+            return DEAD_OBJECT;
+        }
+        return reply.readInt32();
+    }
 };
 
 IMPLEMENT_META_INTERFACE(SchedulingPolicyService, "android.os.ISchedulingPolicyService");
@@ -71,6 +89,7 @@ status_t BnSchedulingPolicyService::onTransact(
 {
     switch (code) {
     case REQUEST_PRIORITY_TRANSACTION:
+    case REQUEST_CPUSET_BOOST:
         // Not reached
         return NO_ERROR;
         break;

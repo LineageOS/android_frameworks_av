@@ -48,6 +48,8 @@
 
 namespace android {
 
+using media::VolumeShaper;
+
 MediaPlayer::MediaPlayer()
 {
     ALOGV("constructor");
@@ -137,10 +139,8 @@ status_t MediaPlayer::attachNewPlayer(const sp<IMediaPlayer>& player)
         mPlayer = player;
         if (player != 0) {
             mCurrentState = MEDIA_PLAYER_INITIALIZED;
-            player->getDefaultBufferingSettings(&mCurrentBufferingSettings);
             err = NO_ERROR;
         } else {
-            mCurrentBufferingSettings = BufferingSettings();
             ALOGE("Unable to create media player");
         }
     }
@@ -247,17 +247,6 @@ status_t MediaPlayer::setVideoSurfaceTexture(
     return mPlayer->setVideoSurfaceTexture(bufferProducer);
 }
 
-status_t MediaPlayer::getDefaultBufferingSettings(BufferingSettings* buffering /* nonnull */)
-{
-    ALOGV("getDefaultBufferingSettings");
-
-    Mutex::Autolock _l(mLock);
-    if (mPlayer == 0) {
-        return NO_INIT;
-    }
-    return mPlayer->getDefaultBufferingSettings(buffering);
-}
-
 status_t MediaPlayer::getBufferingSettings(BufferingSettings* buffering /* nonnull */)
 {
     ALOGV("getBufferingSettings");
@@ -266,8 +255,7 @@ status_t MediaPlayer::getBufferingSettings(BufferingSettings* buffering /* nonnu
     if (mPlayer == 0) {
         return NO_INIT;
     }
-    *buffering = mCurrentBufferingSettings;
-    return NO_ERROR;
+    return mPlayer->getBufferingSettings(buffering);
 }
 
 status_t MediaPlayer::setBufferingSettings(const BufferingSettings& buffering)
@@ -278,11 +266,7 @@ status_t MediaPlayer::setBufferingSettings(const BufferingSettings& buffering)
     if (mPlayer == 0) {
         return NO_INIT;
     }
-    status_t err =  mPlayer->setBufferingSettings(buffering);
-    if (err == NO_ERROR) {
-        mCurrentBufferingSettings = buffering;
-    }
-    return err;
+    return mPlayer->setBufferingSettings(buffering);
 }
 
 // must call with lock held
@@ -608,6 +592,15 @@ status_t MediaPlayer::seekTo(int msec, MediaPlayerSeekMode mode)
     return result;
 }
 
+status_t MediaPlayer::notifyAt(int64_t mediaTimeUs)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer != 0) {
+        return mPlayer->notifyAt(mediaTimeUs);
+    }
+    return INVALID_OPERATION;
+}
+
 status_t MediaPlayer::reset_l()
 {
     mLoop = false;
@@ -625,7 +618,6 @@ status_t MediaPlayer::reset_l()
         // setDataSource has to be called again to create a
         // new mediaplayer.
         mPlayer = 0;
-        mCurrentBufferingSettings = BufferingSettings();
         return ret;
     }
     clear_l();
@@ -649,8 +641,12 @@ status_t MediaPlayer::doSetRetransmitEndpoint(const sp<IMediaPlayer>& player) {
 status_t MediaPlayer::reset()
 {
     ALOGV("reset");
+    mLockThreadId = getThreadId();
     Mutex::Autolock _l(mLock);
-    return reset_l();
+    status_t result = reset_l();
+    mLockThreadId = 0;
+
+    return result;
 }
 
 status_t MediaPlayer::setAudioStreamType(audio_stream_type_t type)
@@ -860,7 +856,7 @@ void MediaPlayer::notify(int msg, int ext1, int ext2, const Parcel *obj)
     // this will deadlock.
     //
     // The threadId hack below works around this for the care of prepare,
-    // seekTo and start within the same process.
+    // seekTo, start, and reset within the same process.
     // FIXME: Remember, this is a hack, it's not even a hack that is applied
     // consistently for all use-cases, this needs to be revisited.
     if (mLockThreadId != getThreadId()) {
@@ -943,6 +939,9 @@ void MediaPlayer::notify(int msg, int ext1, int ext2, const Parcel *obj)
         ALOGV("New video size %d x %d", ext1, ext2);
         mVideoWidth = ext1;
         mVideoHeight = ext2;
+        break;
+    case MEDIA_NOTIFY_TIME:
+        ALOGV("Received notify time message");
         break;
     case MEDIA_TIMED_TEXT:
         ALOGV("Received timed text message");
@@ -1074,6 +1073,41 @@ status_t MediaPlayer::releaseDrm()
     }
 
     return status;
+}
+
+status_t MediaPlayer::setOutputDevice(audio_port_handle_t deviceId)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        ALOGV("setOutputDevice: player not init");
+        return NO_INIT;
+    }
+    return mPlayer->setOutputDevice(deviceId);
+}
+
+audio_port_handle_t MediaPlayer::getRoutedDeviceId()
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        ALOGV("getRoutedDeviceId: player not init");
+        return AUDIO_PORT_HANDLE_NONE;
+    }
+    audio_port_handle_t deviceId;
+    status_t status = mPlayer->getRoutedDeviceId(&deviceId);
+    if (status != NO_ERROR) {
+        return AUDIO_PORT_HANDLE_NONE;
+    }
+    return deviceId;
+}
+
+status_t MediaPlayer::enableAudioDeviceCallback(bool enabled)
+{
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        ALOGV("addAudioDeviceCallback: player not init");
+        return NO_INIT;
+    }
+    return mPlayer->enableAudioDeviceCallback(enabled);
 }
 
 } // namespace android

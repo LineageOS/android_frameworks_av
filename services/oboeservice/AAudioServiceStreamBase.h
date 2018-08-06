@@ -55,7 +55,7 @@ class AAudioServiceStreamBase
     , public Runnable  {
 
 public:
-    AAudioServiceStreamBase(android::AAudioService &aAudioService);
+    explicit AAudioServiceStreamBase(android::AAudioService &aAudioService);
 
     virtual ~AAudioServiceStreamBase();
 
@@ -129,11 +129,15 @@ public:
     // -------------------------------------------------------------------
 
     /**
-     * Send a message to the client.
+     * Send a message to the client with an int64_t data value.
      */
     aaudio_result_t sendServiceEvent(aaudio_service_event_t event,
-                                     double  dataDouble = 0.0,
                                      int64_t dataLong = 0);
+    /**
+     * Send a message to the client with an double data value.
+     */
+    aaudio_result_t sendServiceEvent(aaudio_service_event_t event,
+                                     double  dataDouble);
 
     /**
      * Fill in a parcelable description of stream.
@@ -176,11 +180,61 @@ public:
         mHandle = handle;
     }
 
+    audio_port_handle_t getPortHandle() const {
+        return mClientHandle;
+    }
+
     aaudio_stream_state_t getState() const {
         return mState;
     }
 
     void onVolumeChanged(float volume);
+
+    /**
+     * Set false when the stream is started.
+     * Set true when data is first read from the stream.
+     * @param b
+     */
+    void setFlowing(bool b) {
+        mFlowing = b;
+    }
+
+    bool isFlowing() const {
+        return mFlowing;
+    }
+
+    /**
+     * Atomically increment the number of active references to the stream by AAudioService.
+     *
+     * This is called under a global lock in AAudioStreamTracker.
+     *
+     * @return value after the increment
+     */
+    int32_t incrementServiceReferenceCount_l();
+
+    /**
+     * Atomically decrement the number of active references to the stream by AAudioService.
+     * This should only be called after incrementServiceReferenceCount_l().
+     *
+     * This is called under a global lock in AAudioStreamTracker.
+     *
+     * @return value after the decrement
+     */
+    int32_t decrementServiceReferenceCount_l();
+
+    bool isCloseNeeded() const {
+        return mCloseNeeded.load();
+    }
+
+    /**
+     * Mark this stream as needing to be closed.
+     * Once marked for closing, it cannot be unmarked.
+     */
+    void markCloseNeeded() {
+        mCloseNeeded.store(true);
+    }
+
+    virtual const char *getTypeText() const { return "Base"; }
 
 protected:
 
@@ -203,6 +257,8 @@ protected:
     aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command);
 
     aaudio_result_t sendCurrentTimestamp();
+
+    aaudio_result_t sendXRunCount(int32_t xRunCount);
 
     /**
      * @param positionFrames
@@ -228,15 +284,27 @@ protected:
 
     int32_t                 mFramesPerBurst = 0;
     android::AudioClient    mMmapClient; // set in open, used in MMAP start()
+    // TODO rename mClientHandle to mPortHandle to be more consistent with AudioFlinger.
     audio_port_handle_t     mClientHandle = AUDIO_PORT_HANDLE_NONE;
 
     SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
 
     android::AAudioService &mAudioService;
+
+    // The mServiceEndpoint variable can be accessed by multiple threads.
+    // So we access it by locally promoting a weak pointer to a smart pointer,
+    // which is thread-safe.
     android::sp<AAudioServiceEndpoint> mServiceEndpoint;
+    android::wp<AAudioServiceEndpoint> mServiceEndpointWeak;
 
 private:
     aaudio_handle_t         mHandle = -1;
+    bool                    mFlowing = false;
+
+    // This is modified under a global lock in AAudioStreamTracker.
+    int32_t                 mCallingCount = 0;
+
+    std::atomic<bool>       mCloseNeeded{false};
 };
 
 } /* namespace aaudio */

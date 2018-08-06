@@ -18,8 +18,8 @@
 
 #define ANOTHER_PACKET_SOURCE_H_
 
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/MediaSource.h>
 #include <utils/threads.h>
 #include <utils/List.h>
 
@@ -39,7 +39,7 @@ struct AnotherPacketSource : public MediaSource {
     virtual sp<MetaData> getFormat();
 
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
     void clear();
 

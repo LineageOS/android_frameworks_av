@@ -52,6 +52,13 @@ public:
     virtual status_t                setDataSource(const sp<IDataSource>& source, const char *mime);
     virtual sp<IMemory>             getFrameAtTime(
             int64_t timeUs, int option, int colorFormat, bool metaOnly);
+    virtual sp<IMemory>             getImageAtIndex(
+            int index, int colorFormat, bool metaOnly, bool thumbnail);
+    virtual sp<IMemory>             getImageRectAtIndex(
+            int index, int colorFormat, int left, int top, int right, int bottom);
+    virtual status_t getFrameAtIndex(
+                std::vector<sp<IMemory> > *frames,
+                int frameIndex, int numFrames, int colorFormat, bool metaOnly);
     virtual sp<IMemory>             extractAlbumArt();
     virtual const char*             extractMetadata(int keyCode);
 
@@ -68,9 +75,8 @@ private:
     sp<MediaMetadataRetrieverBase>         mRetriever;
     pid_t                                  mPid;
 
-    // Keep the shared memory copy of album art and capture frame (for thumbnail)
+    // Keep the shared memory copy of album art
     sp<IMemory>                            mAlbumArt;
-    sp<IMemory>                            mThumbnail;
 };
 
 }; // namespace android

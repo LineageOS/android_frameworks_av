@@ -349,8 +349,8 @@ AImageReader::~AImageReader() {
     for (auto it = mAcquiredImages.begin();
               it != mAcquiredImages.end(); it++) {
         AImage* image = *it;
+        Mutex::Autolock _l(image->mLock);
         releaseImageLocked(image, /*releaseFenceFd*/-1);
-        image->close();
     }
 
     // Delete Buffer Items
@@ -502,6 +502,8 @@ AImageReader::releaseImageLocked(AImage* image, int releaseFenceFd) {
     mBufferItemConsumer->releaseBuffer(*buffer, bufferFence);
     returnBufferItemLocked(buffer);
     image->mBuffer = nullptr;
+    image->mLockedBuffer = nullptr;
+    image->mIsClosed = true;
 
     bool found = false;
     // cleanup acquired image list
@@ -655,7 +657,7 @@ void AImageReader_delete(AImageReader* reader) {
 
 EXPORT
 media_status_t AImageReader_getWindow(AImageReader* reader, /*out*/ANativeWindow** window) {
-    ALOGE("%s", __FUNCTION__);
+    ALOGV("%s", __FUNCTION__);
     if (reader == nullptr || window == nullptr) {
         ALOGE("%s: invalid argument. reader %p, window %p",
                 __FUNCTION__, reader, window);

@@ -17,7 +17,10 @@
 #ifndef AAUDIO_EXAMPLE_ARGS_PARSER_H
 #define AAUDIO_EXAMPLE_ARGS_PARSER_H
 
-#include <cctype>
+#define MAX_CHANNELS                     8
+
+//#include <cctype>
+#include <dlfcn.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,7 +30,63 @@
 
 #include "AAudioExampleUtils.h"
 
-// TODO use this as a base class within AAudio
+
+static void (*s_setUsage)(AAudioStreamBuilder* builder, aaudio_usage_t usage) = nullptr;
+static void (*s_setContentType)(AAudioStreamBuilder* builder,
+                                aaudio_content_type_t contentType) = nullptr;
+static void (*s_setInputPreset)(AAudioStreamBuilder* builder,
+                                aaudio_input_preset_t inputPreset) = nullptr;
+
+static bool s_loadAttempted = false;
+static aaudio_usage_t (*s_getUsage)(AAudioStream *stream) = nullptr;
+static aaudio_content_type_t (*s_getContentType)(AAudioStream *stream) = nullptr;
+static aaudio_input_preset_t (*s_getInputPreset)(AAudioStream *stream) = nullptr;
+
+// Link to test functions in shared library.
+static void loadFutureFunctions() {
+    if (s_loadAttempted)  return; // only try once
+    s_loadAttempted = true;
+
+    void *handle = dlopen("libaaudio.so", RTLD_NOW);
+    if (handle != nullptr) {
+        s_setUsage = (void (*)(AAudioStreamBuilder *, aaudio_usage_t))
+                dlsym(handle, "AAudioStreamBuilder_setUsage");
+        if (s_setUsage == nullptr) goto error;
+
+        s_setContentType = (void (*)(AAudioStreamBuilder *, aaudio_content_type_t))
+                dlsym(handle, "AAudioStreamBuilder_setContentType");
+        if (s_setContentType == nullptr) goto error;
+
+        s_setInputPreset = (void (*)(AAudioStreamBuilder *, aaudio_input_preset_t))
+                dlsym(handle, "AAudioStreamBuilder_setInputPreset");
+        if (s_setInputPreset == nullptr) goto error;
+
+        s_getUsage = (aaudio_usage_t (*)(AAudioStream *))
+                dlsym(handle, "AAudioStream_getUsage");
+        if (s_getUsage == nullptr) goto error;
+
+        s_getContentType = (aaudio_content_type_t (*)(AAudioStream *))
+                dlsym(handle, "AAudioStream_getContentType");
+        if (s_getContentType == nullptr) goto error;
+
+        s_getInputPreset = (aaudio_input_preset_t (*)(AAudioStream *))
+                dlsym(handle, "AAudioStream_getInputPreset");
+        if (s_getInputPreset == nullptr) goto error;
+    }
+    return;
+
+error:
+    // prevent any calls to these functions
+    s_setUsage = nullptr;
+    s_setContentType = nullptr;
+    s_setInputPreset = nullptr;
+    s_getUsage = nullptr;
+    s_getContentType = nullptr;
+    s_getInputPreset = nullptr;
+    dlclose(handle);
+    return;
+}
+
 class AAudioParameters {
 public:
 
@@ -39,6 +98,10 @@ public:
     }
 
     void setChannelCount(int32_t channelCount) {
+        if (channelCount > MAX_CHANNELS) {
+            printf("Sorry, MAX of %d channels!\n", MAX_CHANNELS);
+            channelCount = MAX_CHANNELS;
+        }
         mChannelCount = channelCount;
     }
 
@@ -82,6 +145,30 @@ public:
         mPerformanceMode = performanceMode;
     }
 
+    aaudio_usage_t getUsage() const {
+        return mUsage;
+    }
+
+    void setUsage(aaudio_usage_t usage) {
+        mUsage = usage;
+    }
+
+    aaudio_content_type_t getContentType() const {
+        return mContentType;
+    }
+
+    void setContentType(aaudio_content_type_t contentType) {
+        mContentType = contentType;
+    }
+
+    aaudio_input_preset_t getInputPreset() const {
+        return mInputPreset;
+    }
+
+    void setInputPreset(aaudio_input_preset_t inputPreset) {
+        mInputPreset = inputPreset;
+    }
+
     int32_t getDeviceId() const {
         return mDeviceId;
     }
@@ -110,6 +197,24 @@ public:
         AAudioStreamBuilder_setDeviceId(builder, mDeviceId);
         AAudioStreamBuilder_setSharingMode(builder, mSharingMode);
         AAudioStreamBuilder_setPerformanceMode(builder, mPerformanceMode);
+
+        // Call P functions if supported.
+        loadFutureFunctions();
+        if (s_setUsage != nullptr) {
+            s_setUsage(builder, mUsage);
+        } else if (mUsage != AAUDIO_UNSPECIFIED){
+            printf("WARNING: setUsage not supported");
+        }
+        if (s_setContentType != nullptr) {
+            s_setContentType(builder, mContentType);
+        } else if (mUsage != AAUDIO_UNSPECIFIED){
+            printf("WARNING: setContentType not supported");
+        }
+        if (s_setInputPreset != nullptr) {
+            s_setInputPreset(builder, mInputPreset);
+        } else if (mUsage != AAUDIO_UNSPECIFIED){
+            printf("WARNING: setInputPreset not supported");
+        }
     }
 
 private:
@@ -121,6 +226,10 @@ private:
     int32_t                    mDeviceId        = AAUDIO_UNSPECIFIED;
     aaudio_sharing_mode_t      mSharingMode     = AAUDIO_SHARING_MODE_SHARED;
     aaudio_performance_mode_t  mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
+
+    aaudio_usage_t             mUsage           = AAUDIO_UNSPECIFIED;
+    aaudio_content_type_t      mContentType     = AAUDIO_UNSPECIFIED;
+    aaudio_input_preset_t      mInputPreset     = AAUDIO_UNSPECIFIED;
 
     int32_t                    mNumberOfBursts  = AAUDIO_UNSPECIFIED;
 };
@@ -152,8 +261,11 @@ public:
                 case 'd':
                     setDeviceId(atoi(&arg[2]));
                     break;
-                case 's':
-                    mDurationSeconds = atoi(&arg[2]);
+                case 'f':
+                    setFormat(atoi(&arg[2]));
+                    break;
+                case 'i':
+                    setInputPreset(atoi(&arg[2]));
                     break;
                 case 'm': {
                     aaudio_policy_t policy = AAUDIO_POLICY_AUTO;
@@ -171,8 +283,17 @@ public:
                 case 'r':
                     setSampleRate(atoi(&arg[2]));
                     break;
+                case 's':
+                    mDurationSeconds = atoi(&arg[2]);
+                    break;
+                case 'u':
+                    setUsage(atoi(&arg[2]));
+                    break;
                 case 'x':
                     setSharingMode(AAUDIO_SHARING_MODE_EXCLUSIVE);
+                    break;
+                case 'y':
+                    setContentType(atoi(&arg[2]));
                     break;
                 default:
                     unrecognized = true;
@@ -201,24 +322,32 @@ public:
     }
 
     static void usage() {
-        printf("-c{channels} -d{duration} -m -n{burstsPerBuffer} -p{perfMode} -r{rate} -x\n");
+        printf("-c{channels} -d{deviceId} -m{mmapPolicy} -n{burstsPerBuffer} -p{perfMode}");
+        printf(" -r{rate} -s{seconds} -x\n");
         printf("      Default values are UNSPECIFIED unless otherwise stated.\n");
         printf("      -b{bufferCapacity} frames\n");
         printf("      -c{channels} for example 2 for stereo\n");
         printf("      -d{deviceId} default is %d\n", AAUDIO_UNSPECIFIED);
-        printf("      -s{duration} in seconds, default is %d\n", DEFAULT_DURATION_SECONDS);
+        printf("      -f{0|1|2} set format\n");
+        printf("          0 = UNSPECIFIED\n");
+        printf("          1 = PCM_I16\n");
+        printf("          2 = FLOAT\n");
+        printf("      -i{inputPreset} eg. 5 for AAUDIO_INPUT_PRESET_CAMCORDER\n");
         printf("      -m{0|1|2|3} set MMAP policy\n");
-        printf("          0 = _UNSPECIFIED, default\n");
-        printf("          1 = _NEVER\n");
-        printf("          2 = _AUTO, also if -m is used with no number\n");
-        printf("          3 = _ALWAYS\n");
+        printf("          0 = _UNSPECIFIED, use aaudio.mmap_policy system property, default\n");
+        printf("          1 = _NEVER, never use MMAP\n");
+        printf("          2 = _AUTO, use MMAP if available, default for -m with no number\n");
+        printf("          3 = _ALWAYS, use MMAP or fail\n");
         printf("      -n{numberOfBursts} for setBufferSize\n");
         printf("      -p{performanceMode} set output AAUDIO_PERFORMANCE_MODE*, default NONE\n");
         printf("          n for _NONE\n");
         printf("          l for _LATENCY\n");
         printf("          p for _POWER_SAVING;\n");
         printf("      -r{sampleRate} for example 44100\n");
+        printf("      -s{duration} in seconds, default is %d\n", DEFAULT_DURATION_SECONDS);
+        printf("      -u{usage} eg. 14 for AAUDIO_USAGE_GAME\n");
         printf("      -x to use EXCLUSIVE mode\n");
+        printf("      -y{contentType} eg. 1 for AAUDIO_CONTENT_TYPE_SPEECH\n");
     }
 
     static aaudio_performance_mode_t parsePerformanceMode(char c) {
@@ -281,6 +410,24 @@ public:
 
         printf("  PerformanceMode: requested = %d, actual = %d\n",
                getPerformanceMode(), AAudioStream_getPerformanceMode(stream));
+
+        loadFutureFunctions();
+
+        if (s_setUsage != nullptr) {
+            printf("  Usage:        requested = %d, actual = %d\n",
+                   getUsage(), s_getUsage(stream));
+        }
+        if (s_getContentType != nullptr) {
+            printf("  ContentType:  requested = %d, actual = %d\n",
+                   getContentType(), s_getContentType(stream));
+        }
+
+        if (AAudioStream_getDirection(stream) == AAUDIO_DIRECTION_INPUT
+            && s_getInputPreset != nullptr) {
+                printf("  InputPreset:  requested = %d, actual = %d\n",
+                       getInputPreset(), s_getInputPreset(stream));
+        }
+
         printf("  Is MMAP used? %s\n", AAudioStream_isMMapUsed(stream)
                ? "yes" : "no");
 

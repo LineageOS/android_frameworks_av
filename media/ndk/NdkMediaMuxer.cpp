@@ -27,7 +27,6 @@
 #include <utils/StrongPointer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaMuxer.h>
 #include <media/IMediaHTTPService.h>
 #include <android_runtime/AndroidRuntime.h>

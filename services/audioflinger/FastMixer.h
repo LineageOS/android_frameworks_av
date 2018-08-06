@@ -57,8 +57,6 @@ private:
     static const FastMixerState sInitial;
 
     FastMixerState  mPreIdle;   // copy of state before we went into idle
-    int             mFastTrackNames[FastMixerState::kMaxFastTracks];
-                                // handles used by mixer to identify tracks
     int             mGenerations[FastMixerState::kMaxFastTracks];
                                 // last observed mFastTracks[i].mGeneration
     NBAIO_Sink*     mOutputSink;

@@ -37,8 +37,8 @@ AImage::AImage(AImageReader* reader, int32_t format, uint64_t usage, BufferItem*
         mTimestamp(timestamp), mWidth(width), mHeight(height), mNumPlanes(numPlanes) {
 }
 
-// Can only be called by free() with mLock hold
 AImage::~AImage() {
+    Mutex::Autolock _l(mLock);
     if (!mIsClosed) {
         LOG_ALWAYS_FATAL(
                 "Error: AImage %p is deleted before returning buffer to AImageReader!", this);
@@ -53,7 +53,6 @@ AImage::isClosed() const {
 
 void
 AImage::close(int releaseFenceFd) {
-    lockReader();
     Mutex::Autolock _l(mLock);
     if (mIsClosed) {
         return;
@@ -71,7 +70,6 @@ AImage::close(int releaseFenceFd) {
     mBuffer = nullptr;
     mLockedBuffer = nullptr;
     mIsClosed = true;
-    unlockReader();
 }
 
 void
@@ -80,7 +78,6 @@ AImage::free() {
         ALOGE("Cannot free AImage before close!");
         return;
     }
-    Mutex::Autolock _l(mLock);
     delete this;
 }
 
@@ -622,7 +619,9 @@ EXPORT
 void AImage_deleteAsync(AImage* image, int releaseFenceFd) {
     ALOGV("%s", __FUNCTION__);
     if (image != nullptr) {
+        image->lockReader();
         image->close(releaseFenceFd);
+        image->unlockReader();
         if (!image->isClosed()) {
             LOG_ALWAYS_FATAL("Image close failed!");
         }

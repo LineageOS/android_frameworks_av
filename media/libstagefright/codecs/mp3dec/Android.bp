@@ -65,8 +65,11 @@ cc_library_static {
     },
 
     include_dirs: ["frameworks/av/media/libstagefright/include"],
-    local_include_dirs: ["src"],
-    export_include_dirs: ["include"],
+
+    export_include_dirs: [
+        "include",
+        "src",
+    ],
 
     cflags: [
         "-DOSCL_UNUSED_ARG(x)=(void)(x)",
@@ -96,6 +99,8 @@ cc_library_shared {
 
     cflags: ["-Werror"],
 
+    version_script: "exports.lds",
+
     sanitize: {
         misc_undefined: [
             "signed-integer-overflow",
@@ -107,7 +112,6 @@ cc_library_shared {
     },
 
     shared_libs: [
-        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",

@@ -23,7 +23,7 @@
 #include <sys/types.h>
 
 #include <utils/Errors.h>
-#include <hardware/audio.h>
+#include <system/audio.h>
 
 #include "aaudio/AAudio.h"
 
@@ -36,6 +36,13 @@ android::status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result);
  * Convert an Android status into the closest matching AAudio result.
  */
 aaudio_result_t AAudioConvert_androidToAAudioResult(android::status_t status);
+
+/**
+ * Convert an aaudio_session_id_t to a value that is safe to pass to AudioFlinger.
+ * @param sessionId
+ * @return safe value
+ */
+audio_session_t AAudioConvert_aaudioToAndroidSessionId(aaudio_session_id_t sessionId);
 
 /**
  * Convert an array of floats to an array of int16_t.
@@ -152,20 +159,80 @@ void AAudio_linearRamp(const int16_t *source,
                        float amplitude1,
                        float amplitude2);
 
+class AAudioDataConverter {
+public:
+
+    struct FormattedData {
+
+        FormattedData(void *data, aaudio_format_t format, int32_t channelCount)
+            : data(data)
+            , format(format)
+            , channelCount(channelCount) {}
+
+        const void            *data = nullptr;
+        const aaudio_format_t  format = AAUDIO_FORMAT_UNSPECIFIED;
+        const int32_t          channelCount = 1;
+    };
+
+    static void convert(const FormattedData &source,
+                        const FormattedData &destination,
+                        int32_t numFrames,
+                        float levelFrom,
+                        float levelTo);
+
+private:
+    static void convertMonoToStereo(const FormattedData &source,
+                                    const FormattedData &destination,
+                                    int32_t numFrames,
+                                    float levelFrom,
+                                    float levelTo);
+
+    static void convertChannelsMatch(const FormattedData &source,
+                                     const FormattedData &destination,
+                                     int32_t numFrames,
+                                     float levelFrom,
+                                     float levelTo);
+};
+
 /**
  * Calculate the number of bytes and prevent numeric overflow.
+ * The *sizeInBytes will be set to zero if there is an error.
+ *
  * @param numFrames frame count
  * @param bytesPerFrame size of a frame in bytes
- * @param sizeInBytes total size in bytes
+ * @param sizeInBytes pointer to a variable to receive total size in bytes
  * @return AAUDIO_OK or negative error, eg. AAUDIO_ERROR_OUT_OF_RANGE
  */
 int32_t AAudioConvert_framesToBytes(int32_t numFrames,
-                                            int32_t bytesPerFrame,
-                                            int32_t *sizeInBytes);
+                                    int32_t bytesPerFrame,
+                                    int32_t *sizeInBytes);
 
 audio_format_t AAudioConvert_aaudioToAndroidDataFormat(aaudio_format_t aaudio_format);
 
 aaudio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t format);
+
+
+/**
+ * Note that this function does not validate the passed in value.
+ * That is done somewhere else.
+ * @return internal value
+ */
+
+audio_usage_t AAudioConvert_usageToInternal(aaudio_usage_t usage);
+
+/**
+ * Note that this function does not validate the passed in value.
+ * That is done somewhere else.
+ * @return internal value
+ */
+audio_content_type_t AAudioConvert_contentTypeToInternal(aaudio_content_type_t contentType);
+
+/**
+ * Note that this function does not validate the passed in value.
+ * That is done somewhere else.
+ * @return internal audio source
+ */
+audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t preset);
 
 /**
  * @return the size of a sample of the given format in bytes or AAUDIO_ERROR_ILLEGAL_ARGUMENT
@@ -234,6 +301,14 @@ int32_t AAudioProperty_getMinimumSleepMicros();
  * @return minimum number of microseconds for a MMAP HW burst
  */
 int32_t AAudioProperty_getHardwareBurstMinMicros();
+
+
+/**
+ * Is flush allowed for the given state?
+ * @param state
+ * @return AAUDIO_OK if allowed or an error
+ */
+aaudio_result_t AAudio_isFlushAllowed(aaudio_stream_state_t state);
 
 /**
  * Try a function f until it returns true.

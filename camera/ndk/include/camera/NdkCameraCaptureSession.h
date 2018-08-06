@@ -593,6 +593,54 @@ camera_status_t ACameraCaptureSession_abortCaptures(ACameraCaptureSession* sessi
 
 #endif /* __ANDROID_API__ >= 24 */
 
+#if __ANDROID_API__ >= 28
+
+typedef struct ACaptureSessionOutput ACaptureSessionOutput;
+
+/**
+ * Update shared ACaptureSessionOutput.
+ *
+ * <p>A shared ACaptureSessionOutput (see {@link ACaptureSessionSharedOutput_create}) that
+ * was modified via calls to {@link ACaptureSessionSharedOutput_add} or
+ * {@link ACaptureSessionSharedOutput_remove} must be updated by calling this method before its
+ * changes take effect. After the update call returns  with {@link ACAMERA_OK}, any newly added
+ * native windows can be used as a target in subsequent capture requests.</p>
+ *
+ * <p>Native windows that get removed must not be part of any active repeating or single/burst
+ * request or have any pending results. Consider updating repeating requests via
+ * {@link ACaptureSessionOutput_setRepeatingRequest} and then wait for the last frame number
+ * when the sequence completes
+ * {@link ACameraCaptureSession_captureCallback#onCaptureSequenceCompleted}.</p>
+ *
+ * <p>Native windows that get added must not be part of any other registered ACaptureSessionOutput
+ * and must be compatible. Compatible windows must have matching format, rotation and
+ * consumer usage.</p>
+ *
+ * <p>A shared ACameraCaptureSession can support up to 4 additional native windows.</p>
+ *
+ * @param session the capture session of interest
+ * @param output the modified output configuration
+ *
+ * @return <ul><li>
+ *             {@link ACAMERA_OK} if the method succeeds.</li>
+ *         <li>{@link ACAMERA_ERROR_INVALID_PARAMETER} if session or output is NULL; or output
+ *             contains invalid native windows; or if an attempt was made to add
+ *             a native window to a different output configuration; or new native window is not
+ *             compatible; or any removed native window still has pending requests;</li>
+ *         <li>{@link ACAMERA_ERROR_INVALID_OPERATION} if output configuration is not shared (see
+ *             {@link ACaptureSessionSharedOutput_create};  or the number of additional
+ *             native windows goes beyond the supported limit.</li>
+ *         <li>{@link ACAMERA_ERROR_SESSION_CLOSED} if the capture session has been closed</li>
+ *         <li>{@link ACAMERA_ERROR_CAMERA_DISCONNECTED} if the camera device is closed</li>
+ *         <li>{@link ACAMERA_ERROR_CAMERA_DEVICE} if the camera device encounters fatal error</li>
+ *         <li>{@link ACAMERA_ERROR_CAMERA_SERVICE} if the camera service encounters fatal
+ *             error</li>
+ *         <li>{@link ACAMERA_ERROR_UNKNOWN} if the method fails for some other reasons</li></ul>
+ */
+camera_status_t ACameraCaptureSession_updateSharedOutput(ACameraCaptureSession* session,
+        ACaptureSessionOutput* output);
+#endif /* __ANDROID_API__ >= 28 */
+
 __END_DECLS
 
 #endif /* _NDK_CAMERA_CAPTURE_SESSION_H */

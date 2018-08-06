@@ -33,22 +33,24 @@ public:
 
     /**
      * Mix from this FIFO
-     * @param fifo
-     * @param volume
-     * @return true if underflowed
+     * @param streamIndex for marking stream variables in systrace
+     * @param fifo to read from
+     * @param allowUnderflow if true then allow mixer to advance read index past the write index
+     * @return frames read from this stream
      */
-    bool mix(int trackIndex, android::FifoBuffer *fifo, float volume);
-
-    void mixPart(float *destination, float *source, int32_t numFrames, float volume);
+    int32_t mix(int streamIndex, android::FifoBuffer *fifo, bool allowUnderflow);
 
     float *getOutputBuffer();
 
+    int32_t getFramesPerBurst() const { return mFramesPerBurst; }
+
 private:
+    void mixPart(float *destination, float *source, int32_t numFrames);
+
     float   *mOutputBuffer = nullptr;
     int32_t  mSamplesPerFrame = 0;
     int32_t  mFramesPerBurst = 0;
     int32_t  mBufferSizeInBytes = 0;
 };
-
 
 #endif //AAUDIO_AAUDIO_MIXER_H

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudio"
+#define LOG_TAG "AudioEndpointParcelable"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -64,27 +64,54 @@ int32_t AudioEndpointParcelable::addFileDescriptor(const unique_fd& fd,
  * The read and write must be symmetric.
  */
 status_t AudioEndpointParcelable::writeToParcel(Parcel* parcel) const {
-    parcel->writeInt32(mNumSharedMemories);
+    status_t status = AAudioConvert_aaudioToAndroidStatus(validate());
+    if (status != NO_ERROR) goto error;
+
+    status = parcel->writeInt32(mNumSharedMemories);
+    if (status != NO_ERROR) goto error;
+
     for (int i = 0; i < mNumSharedMemories; i++) {
-        mSharedMemories[i].writeToParcel(parcel);
+        status = mSharedMemories[i].writeToParcel(parcel);
+        if (status != NO_ERROR) goto error;
     }
-    mUpMessageQueueParcelable.writeToParcel(parcel);
-    mDownMessageQueueParcelable.writeToParcel(parcel);
-    mUpDataQueueParcelable.writeToParcel(parcel);
-    mDownDataQueueParcelable.writeToParcel(parcel);
-    return NO_ERROR; // TODO check for errors above
+    status = mUpMessageQueueParcelable.writeToParcel(parcel);
+    if (status != NO_ERROR) goto error;
+    status = mDownMessageQueueParcelable.writeToParcel(parcel);
+    if (status != NO_ERROR) goto error;
+    status = mUpDataQueueParcelable.writeToParcel(parcel);
+    if (status != NO_ERROR) goto error;
+    status = mDownDataQueueParcelable.writeToParcel(parcel);
+    if (status != NO_ERROR) goto error;
+
+    return NO_ERROR;
+
+error:
+    ALOGE("%s returning %d", __func__, status);
+    return status;
 }
 
 status_t AudioEndpointParcelable::readFromParcel(const Parcel* parcel) {
-    parcel->readInt32(&mNumSharedMemories);
+    status_t status = parcel->readInt32(&mNumSharedMemories);
+    if (status != NO_ERROR) goto error;
+
     for (int i = 0; i < mNumSharedMemories; i++) {
         mSharedMemories[i].readFromParcel(parcel);
+        if (status != NO_ERROR) goto error;
     }
-    mUpMessageQueueParcelable.readFromParcel(parcel);
-    mDownMessageQueueParcelable.readFromParcel(parcel);
-    mUpDataQueueParcelable.readFromParcel(parcel);
-    mDownDataQueueParcelable.readFromParcel(parcel);
-    return NO_ERROR; // TODO check for errors above
+    status = mUpMessageQueueParcelable.readFromParcel(parcel);
+    if (status != NO_ERROR) goto error;
+    status = mDownMessageQueueParcelable.readFromParcel(parcel);
+    if (status != NO_ERROR) goto error;
+    status = mUpDataQueueParcelable.readFromParcel(parcel);
+    if (status != NO_ERROR) goto error;
+    status = mDownDataQueueParcelable.readFromParcel(parcel);
+    if (status != NO_ERROR) goto error;
+
+    return AAudioConvert_aaudioToAndroidStatus(validate());
+
+error:
+    ALOGE("%s returning %d", __func__, status);
+    return status;
 }
 
 aaudio_result_t AudioEndpointParcelable::resolve(EndpointDescriptor *descriptor) {
@@ -109,52 +136,28 @@ aaudio_result_t AudioEndpointParcelable::close() {
     return AAudioConvert_androidToAAudioResult(err);
 }
 
-aaudio_result_t AudioEndpointParcelable::validate() {
-    aaudio_result_t result;
+aaudio_result_t AudioEndpointParcelable::validate() const {
     if (mNumSharedMemories < 0 || mNumSharedMemories >= MAX_SHARED_MEMORIES) {
-        ALOGE("AudioEndpointParcelable invalid mNumSharedMemories = %d", mNumSharedMemories);
+        ALOGE("invalid mNumSharedMemories = %d", mNumSharedMemories);
         return AAUDIO_ERROR_INTERNAL;
-    }
-    for (int i = 0; i < mNumSharedMemories; i++) {
-        result = mSharedMemories[i].validate();
-        if (result != AAUDIO_OK) {
-            ALOGE("AudioEndpointParcelable invalid mSharedMemories[%d] = %d", i, result);
-            return result;
-        }
-    }
-    if ((result = mUpMessageQueueParcelable.validate()) != AAUDIO_OK) {
-        ALOGE("AudioEndpointParcelable invalid mUpMessageQueueParcelable = %d", result);
-        return result;
-    }
-    if ((result = mDownMessageQueueParcelable.validate()) != AAUDIO_OK) {
-        ALOGE("AudioEndpointParcelable invalid mDownMessageQueueParcelable = %d", result);
-        return result;
-    }
-    if ((result = mUpDataQueueParcelable.validate()) != AAUDIO_OK) {
-        ALOGE("AudioEndpointParcelable invalid mUpDataQueueParcelable = %d", result);
-        return result;
-    }
-    if ((result = mDownDataQueueParcelable.validate()) != AAUDIO_OK) {
-        ALOGE("AudioEndpointParcelable invalid mDownDataQueueParcelable = %d", result);
-        return result;
     }
     return AAUDIO_OK;
 }
 
 void AudioEndpointParcelable::dump() {
-    ALOGD("AudioEndpointParcelable ======================================= BEGIN");
-    ALOGD("AudioEndpointParcelable mNumSharedMemories = %d", mNumSharedMemories);
+    ALOGD("======================================= BEGIN");
+    ALOGD("mNumSharedMemories = %d", mNumSharedMemories);
     for (int i = 0; i < mNumSharedMemories; i++) {
         mSharedMemories[i].dump();
     }
-    ALOGD("AudioEndpointParcelable mUpMessageQueueParcelable =========");
+    ALOGD("mUpMessageQueueParcelable =========");
     mUpMessageQueueParcelable.dump();
-    ALOGD("AudioEndpointParcelable mDownMessageQueueParcelable =======");
+    ALOGD("mDownMessageQueueParcelable =======");
     mDownMessageQueueParcelable.dump();
-    ALOGD("AudioEndpointParcelable mUpDataQueueParcelable ============");
+    ALOGD("mUpDataQueueParcelable ============");
     mUpDataQueueParcelable.dump();
-    ALOGD("AudioEndpointParcelable mDownDataQueueParcelable ==========");
+    ALOGD("mDownDataQueueParcelable ==========");
     mDownDataQueueParcelable.dump();
-    ALOGD("AudioEndpointParcelable ======================================= END");
+    ALOGD("======================================= END");
 }
 

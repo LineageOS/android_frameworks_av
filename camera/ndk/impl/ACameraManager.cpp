@@ -221,7 +221,7 @@ void CameraManagerGlobal::unregisterAvailabilityCallback(
     mCallbacks.erase(cb);
 }
 
-void CameraManagerGlobal::getCameraIdList(std::vector<String8> *cameraIds) {
+void CameraManagerGlobal::getCameraIdList(std::vector<String8>* cameraIds) {
     // Ensure that we have initialized/refreshed the list of available devices
     auto cs = getCameraService();
     Mutex::Autolock _l(mLock);

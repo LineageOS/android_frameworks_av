@@ -26,7 +26,6 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MetaData.h>
 #include <OMX_IndexExt.h>
 #include <OMX_VideoExt.h>
 
@@ -1170,6 +1169,12 @@ OMX_ERRORTYPE SoftAVC::setEncodeArgs(
     ps_inp_raw_buf->e_color_fmt = mIvVideoColorFormat;
     source = NULL;
     if ((inputBufferHeader != NULL) && inputBufferHeader->nFilledLen) {
+        OMX_ERRORTYPE error = validateInputBuffer(inputBufferHeader);
+        if (error != OMX_ErrorNone) {
+            ALOGE("b/69065651");
+            android_errorWriteLog(0x534e4554, "69065651");
+            return error;
+        }
         source = inputBufferHeader->pBuffer + inputBufferHeader->nOffset;
 
         if (mInputDataIsMeta) {

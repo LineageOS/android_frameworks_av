@@ -4,6 +4,7 @@
 
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
 
@@ -59,10 +60,10 @@ sp<MetaData> SineSource::getFormat() {
 }
 
 status_t SineSource::read(
-        MediaBuffer **out, const ReadOptions * /* options */) {
+        MediaBufferBase **out, const ReadOptions * /* options */) {
     *out = NULL;
 
-    MediaBuffer *buffer;
+    MediaBufferBase *buffer;
     status_t err = mGroup->acquire_buffer(&buffer);
 
     if (err != OK) {
@@ -88,7 +89,7 @@ status_t SineSource::read(
         x += k;
     }
 
-    buffer->meta_data()->setInt64(
+    buffer->meta_data().setInt64(
             kKeyTime, ((int64_t)mPhase * 1000000) / mSampleRate);
 
     mPhase += numFramesPerBuffer;

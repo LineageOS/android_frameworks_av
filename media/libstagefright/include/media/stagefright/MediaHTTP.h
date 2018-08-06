@@ -24,10 +24,10 @@
 
 namespace android {
 
-struct IMediaHTTPConnection;
+struct MediaHTTPConnection;
 
 struct MediaHTTP : public HTTPBase {
-    MediaHTTP(const sp<IMediaHTTPConnection> &conn);
+    MediaHTTP(const sp<MediaHTTPConnection> &conn);
 
     virtual status_t connect(
             const char *uri,
@@ -50,13 +50,12 @@ protected:
     virtual ~MediaHTTP();
 
     virtual sp<DecryptHandle> DrmInitialization(const char* mime);
-    virtual void getDrmInfo(sp<DecryptHandle> &handle, DrmManagerClient **client);
     virtual String8 getUri();
     virtual String8 getMIMEType() const;
 
 private:
     status_t mInitCheck;
-    sp<IMediaHTTPConnection> mHTTPConnection;
+    sp<MediaHTTPConnection> mHTTPConnection;
 
     KeyedVector<String8, String8> mLastHeaders;
     AString mLastURI;

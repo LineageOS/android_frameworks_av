@@ -35,7 +35,9 @@ bool IOProfile::isCompatibleProfile(audio_devices_t device,
                                     audio_format_t *updatedFormat,
                                     audio_channel_mask_t channelMask,
                                     audio_channel_mask_t *updatedChannelMask,
-                                    uint32_t flags) const
+                                    // FIXME type punning here
+                                    uint32_t flags,
+                                    bool exactMatchRequiredForInputFlags) const
 {
     const bool isPlaybackThread =
             getType() == AUDIO_PORT_TYPE_MIX && getRole() == AUDIO_PORT_ROLE_SOURCE;
@@ -71,7 +73,13 @@ bool IOProfile::isCompatibleProfile(audio_devices_t device,
             return false;
         }
     } else {
-        if (checkExactAudioProfile(samplingRate, channelMask, format) != NO_ERROR) {
+        const struct audio_port_config config = {
+            .config_mask = AUDIO_PORT_CONFIG_ALL & ~AUDIO_PORT_CONFIG_GAIN,
+            .sample_rate = samplingRate,
+            .channel_mask = channelMask,
+            .format = format,
+        };
+        if (checkExactAudioProfile(&config) != NO_ERROR) {
             return false;
         }
     }
@@ -84,7 +92,7 @@ bool IOProfile::isCompatibleProfile(audio_devices_t device,
     // An existing normal stream is compatible with a fast track request,
     // but the fast request will be denied by AudioFlinger and converted to normal track.
     if (isRecordThread && ((getFlags() ^ flags) &
-            ~AUDIO_INPUT_FLAG_FAST)) {
+            ~(exactMatchRequiredForInputFlags ? AUDIO_INPUT_FLAG_NONE : AUDIO_INPUT_FLAG_FAST))) {
         return false;
     }
 
@@ -122,6 +130,16 @@ void IOProfile::dump(int fd)
     result.append("\n");
     write(fd, result.string(), result.size());
     mSupportedDevices.dump(fd, String8("Supported"), 4, false);
+
+    result.clear();
+    snprintf(buffer, SIZE, "\n    - maxOpenCount: %u - curOpenCount: %u\n",
+             maxOpenCount, curOpenCount);
+    result.append(buffer);
+    snprintf(buffer, SIZE, "    - maxActiveCount: %u - curActiveCount: %u\n",
+             maxActiveCount, curActiveCount);
+    result.append(buffer);
+
+    write(fd, result.string(), result.size());
 }
 
 void IOProfile::log()
@@ -129,4 +147,4 @@ void IOProfile::log()
     // @TODO: forward log to AudioPort
 }
 
-}; // namespace android
+} // namespace android

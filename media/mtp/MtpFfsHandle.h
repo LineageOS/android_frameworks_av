@@ -29,8 +29,6 @@
 
 namespace android {
 
-constexpr char FFS_MTP_EP0[] = "/dev/usb-ffs/mtp/ep0";
-
 constexpr int NUM_IO_BUFS = 2;
 
 struct io_buffer {
@@ -42,30 +40,23 @@ struct io_buffer {
 };
 
 template <class T> class MtpFfsHandleTest;
-template <class T> class MtpFfsHandleTest_testControl_Test;
 
 class MtpFfsHandle : public IMtpHandle {
     template <class T> friend class MtpFfsHandleTest;
-    template <class T> friend class MtpFfsHandleTest_testControl_Test;
 protected:
-    bool initFunctionfs();
-    bool writeDescriptors();
     void closeConfig();
     void closeEndpoints();
     void advise(int fd);
     int handleControlRequest(const struct usb_ctrlrequest *request);
-    int doAsync(void* data, size_t len, bool read);
+    int doAsync(void* data, size_t len, bool read, bool zero_packet);
     int handleEvent();
     void cancelTransaction();
     void doSendEvent(mtp_event me);
-    bool openEndpoints();
+    bool openEndpoints(bool ptp);
 
     static int getPacketSize(int ffs_fd);
 
-    bool mPtp;
     bool mCanceled;
-
-    std::timed_mutex mLock; // protects configure() vs main loop
 
     android::base::unique_fd mControl;
     // "in" from the host's perspective => sink for mtp server
@@ -99,12 +90,12 @@ public:
     int sendFile(mtp_file_range mfr) override;
     int sendEvent(mtp_event me) override;
 
-    int start() override;
+    int start(bool ptp) override;
     void close() override;
 
-    int configure(bool ptp) override;
+    bool writeDescriptors(bool ptp);
 
-    MtpFfsHandle();
+    MtpFfsHandle(int controlFd);
     ~MtpFfsHandle();
 };
 

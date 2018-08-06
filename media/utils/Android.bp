@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-cc_library_shared {
+cc_library {
     name: "libmediautils",
 
     srcs: [
@@ -24,7 +24,6 @@ cc_library_shared {
     ],
     shared_libs: [
         "libbinder",
-        "libcutils",
         "liblog",
         "libutils",
         "libmemunreachable",

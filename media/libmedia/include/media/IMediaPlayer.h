@@ -23,7 +23,7 @@
 #include <utils/KeyedVector.h>
 #include <system/audio.h>
 
-#include <media/IMediaSource.h>
+#include <media/MediaSource.h>
 #include <media/VolumeShaper.h>
 
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
@@ -42,7 +42,7 @@ struct AudioPlaybackRate;
 struct AVSyncSettings;
 struct BufferingSettings;
 
-typedef IMediaSource::ReadOptions::SeekMode MediaPlayerSeekMode;
+typedef MediaSource::ReadOptions::SeekMode MediaPlayerSeekMode;
 
 class IMediaPlayer: public IInterface
 {
@@ -61,7 +61,7 @@ public:
     virtual status_t        setDataSource(const sp<IDataSource>& source) = 0;
     virtual status_t        setVideoSurfaceTexture(
                                     const sp<IGraphicBufferProducer>& bufferProducer) = 0;
-    virtual status_t        getDefaultBufferingSettings(
+    virtual status_t        getBufferingSettings(
                                     BufferingSettings* buffering /* nonnull */) = 0;
     virtual status_t        setBufferingSettings(const BufferingSettings& buffering) = 0;
     virtual status_t        prepareAsync() = 0;
@@ -79,6 +79,7 @@ public:
             MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC) = 0;
     virtual status_t        getCurrentPosition(int* msec) = 0;
     virtual status_t        getDuration(int* msec) = 0;
+    virtual status_t        notifyAt(int64_t mediaTimeUs) = 0;
     virtual status_t        reset() = 0;
     virtual status_t        setAudioStreamType(audio_stream_type_t type) = 0;
     virtual status_t        setLooping(int loop) = 0;
@@ -91,10 +92,10 @@ public:
     virtual status_t        getRetransmitEndpoint(struct sockaddr_in* endpoint) = 0;
     virtual status_t        setNextPlayer(const sp<IMediaPlayer>& next) = 0;
 
-    virtual VolumeShaper::Status applyVolumeShaper(
-                                    const sp<VolumeShaper::Configuration>& configuration,
-                                    const sp<VolumeShaper::Operation>& operation) = 0;
-    virtual sp<VolumeShaper::State> getVolumeShaperState(int id) = 0;
+    virtual media::VolumeShaper::Status applyVolumeShaper(
+                                    const sp<media::VolumeShaper::Configuration>& configuration,
+                                    const sp<media::VolumeShaper::Operation>& operation) = 0;
+    virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) = 0;
 
     // Modular DRM
     virtual status_t        prepareDrm(const uint8_t uuid[16],
@@ -130,6 +131,11 @@ public:
     virtual status_t        getMetadata(bool update_only,
                                         bool apply_filter,
                                         Parcel *metadata) = 0;
+
+    // AudioRouting
+    virtual status_t        setOutputDevice(audio_port_handle_t deviceId) = 0;
+    virtual status_t        getRoutedDeviceId(audio_port_handle_t *deviceId) = 0;
+    virtual status_t        enableAudioDeviceCallback(bool enabled) = 0;
 };
 
 // ----------------------------------------------------------------------------

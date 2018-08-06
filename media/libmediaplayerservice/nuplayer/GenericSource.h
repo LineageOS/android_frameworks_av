@@ -24,6 +24,7 @@
 #include "ATSParser.h"
 
 #include <media/mediaplayer.h>
+#include <media/stagefright/MediaBuffer.h>
 
 namespace android {
 
@@ -34,13 +35,16 @@ class DataSource;
 class IDataSource;
 struct IMediaHTTPService;
 struct MediaSource;
+class IMediaSource;
 class MediaBuffer;
+struct MediaClock;
 struct NuCachedSource2;
 
 struct NuPlayer::GenericSource : public NuPlayer::Source,
                                  public MediaBufferObserver // Modular DRM
 {
-    GenericSource(const sp<AMessage> &notify, bool uidValid, uid_t uid);
+    GenericSource(const sp<AMessage> &notify, bool uidValid, uid_t uid,
+                  const sp<MediaClock> &mediaClock);
 
     status_t setDataSource(
             const sp<IMediaHTTPService> &httpService,
@@ -51,7 +55,7 @@ struct NuPlayer::GenericSource : public NuPlayer::Source,
 
     status_t setDataSource(const sp<DataSource>& dataSource);
 
-    virtual status_t getDefaultBufferingSettings(
+    virtual status_t getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) override;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
 
@@ -79,17 +83,13 @@ struct NuPlayer::GenericSource : public NuPlayer::Source,
         int64_t seekTimeUs,
         MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC) override;
 
-    virtual status_t setBuffers(bool audio, Vector<MediaBuffer *> &buffers);
-
     virtual bool isStreaming() const;
 
-    virtual void setOffloadAudio(bool offload);
-
     // Modular DRM
-    virtual void signalBufferReturned(MediaBuffer *buffer);
+    virtual void signalBufferReturned(MediaBufferBase *buffer);
 
     virtual status_t prepareDrm(
-            const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId, sp<ICrypto> *crypto);
+            const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId, sp<ICrypto> *outCrypto);
 
     virtual status_t releaseDrm();
 
@@ -111,101 +111,17 @@ private:
         kWhatSendTimedTextData,
         kWhatChangeAVSource,
         kWhatPollBuffering,
-        kWhatGetFormat,
-        kWhatGetSelectedTrack,
-        kWhatSelectTrack,
         kWhatSeek,
         kWhatReadBuffer,
         kWhatStart,
         kWhatResume,
         kWhatSecureDecodersInstantiated,
-        // Modular DRM
-        kWhatPrepareDrm,
-        kWhatReleaseDrm,
     };
 
     struct Track {
         size_t mIndex;
         sp<IMediaSource> mSource;
         sp<AnotherPacketSource> mPackets;
-    };
-
-    // Helper to monitor buffering status. The polling happens every second.
-    // When necessary, it will send out buffering events to the player.
-    struct BufferingMonitor : public AHandler {
-    public:
-        explicit BufferingMonitor(const sp<AMessage> &notify);
-
-        void getDefaultBufferingSettings(BufferingSettings *buffering /* nonnull */);
-        status_t setBufferingSettings(const BufferingSettings &buffering);
-
-        // Set up state.
-        void prepare(const sp<NuCachedSource2> &cachedSource,
-                int64_t durationUs,
-                int64_t bitrate,
-                bool isStreaming);
-        // Stop and reset buffering monitor.
-        void stop();
-        // Cancel the current monitor task.
-        void cancelPollBuffering();
-        // Restart the monitor task.
-        void restartPollBuffering();
-        // Stop buffering task and send out corresponding events.
-        void stopBufferingIfNecessary();
-        // Make sure data source is getting data.
-        void ensureCacheIsFetching();
-        // Update media time of just extracted buffer from data source.
-        void updateQueuedTime(bool isAudio, int64_t timeUs);
-
-        // Set the offload mode.
-        void setOffloadAudio(bool offload);
-        // Update media time of last dequeued buffer which is sent to the decoder.
-        void updateDequeuedBufferTime(int64_t mediaUs);
-
-    protected:
-        virtual ~BufferingMonitor();
-        virtual void onMessageReceived(const sp<AMessage> &msg);
-
-    private:
-        enum {
-            kWhatPollBuffering,
-        };
-
-        sp<AMessage> mNotify;
-
-        sp<NuCachedSource2> mCachedSource;
-        int64_t mDurationUs;
-        int64_t mBitrate;
-        bool mIsStreaming;
-
-        int64_t mAudioTimeUs;
-        int64_t mVideoTimeUs;
-        int32_t mPollBufferingGeneration;
-        bool mPrepareBuffering;
-        bool mBuffering;
-        int32_t mPrevBufferPercentage;
-
-        mutable Mutex mLock;
-
-        BufferingSettings mSettings;
-        bool mOffloadAudio;
-        int64_t mFirstDequeuedBufferRealUs;
-        int64_t mFirstDequeuedBufferMediaUs;
-        int64_t mlastDequeuedBufferMediaUs;
-
-        void prepare_l(const sp<NuCachedSource2> &cachedSource,
-                int64_t durationUs,
-                int64_t bitrate,
-                bool isStreaming);
-        void cancelPollBuffering_l();
-        void notifyBufferingUpdate_l(int32_t percentage);
-        void startBufferingIfNecessary_l();
-        void stopBufferingIfNecessary_l();
-        void sendCacheStats_l();
-        void ensureCacheIsFetching_l();
-        int64_t getLastReadPosition_l();
-        void onPollBuffering_l();
-        void schedulePollBuffering_l();
     };
 
     Vector<sp<IMediaSource> > mSources;
@@ -218,6 +134,13 @@ private:
     Track mSubtitleTrack;
     Track mTimedTextTrack;
 
+    BufferingSettings mBufferingSettings;
+    int32_t mPrevBufferPercentage;
+    int32_t mPollBufferingGeneration;
+    bool mSentPauseOnBuffering;
+
+    int32_t mAudioDataGeneration;
+    int32_t mVideoDataGeneration;
     int32_t mFetchSubtitleDataGeneration;
     int32_t mFetchTimedTextDataGeneration;
     int64_t mDurationUs;
@@ -227,6 +150,7 @@ private:
     bool mIsStreaming;
     bool mUIDValid;
     uid_t mUID;
+    const sp<MediaClock> mMediaClock;
     sp<IMediaHTTPService> mHTTPService;
     AString mUri;
     KeyedVector<String8, String8> mUriHeaders;
@@ -234,22 +158,20 @@ private:
     int64_t mOffset;
     int64_t mLength;
 
+    bool mDisconnected;
     sp<DataSource> mDataSource;
     sp<NuCachedSource2> mCachedSource;
     sp<DataSource> mHttpSource;
     sp<MetaData> mFileMeta;
     bool mStarted;
-    bool mStopRead;
+    bool mPreparing;
     int64_t mBitrate;
-    sp<BufferingMonitor> mBufferingMonitor;
     uint32_t mPendingReadBufferTypes;
     sp<ABuffer> mGlobalTimedText;
 
-    mutable Mutex mReadBufferLock;
-    mutable Mutex mDisconnectLock;
+    mutable Mutex mLock;
 
     sp<ALooper> mLooper;
-    sp<ALooper> mBufferingMonitorLooper;
 
     void resetDataSource();
 
@@ -260,18 +182,6 @@ private:
     void onSecureDecodersInstantiated(status_t err);
     void finishPrepareAsync();
     status_t startSources();
-
-    void onGetFormatMeta(const sp<AMessage>& msg) const;
-    sp<MetaData> doGetFormatMeta(bool audio) const;
-
-    void onGetTrackInfo(const sp<AMessage>& msg) const;
-    sp<AMessage> doGetTrackInfo(size_t trackIndex) const;
-
-    void onGetSelectedTrack(const sp<AMessage>& msg) const;
-    ssize_t doGetSelectedTrack(media_track_type type) const;
-
-    void onSelectTrack(const sp<AMessage>& msg);
-    status_t doSelectTrack(size_t trackIndex, bool select, int64_t timeUs);
 
     void onSeek(const sp<AMessage>& msg);
     status_t doSeek(int64_t seekTimeUs, MediaPlayerSeekMode mode);
@@ -291,7 +201,7 @@ private:
             int32_t curGen, const sp<AnotherPacketSource>& packets, const sp<AMessage>& msg);
 
     sp<ABuffer> mediaBufferToABuffer(
-            MediaBuffer *mbuf,
+            MediaBufferBase *mbuf,
             media_track_type trackType);
 
     void postReadBuffer(media_track_type trackType);
@@ -310,6 +220,15 @@ private:
     void queueDiscontinuityIfNeeded(
             bool seeking, bool formatChange, media_track_type trackType, Track *track);
 
+    void schedulePollBuffering();
+    void onPollBuffering();
+    void notifyBufferingUpdate(int32_t percentage);
+
+    void sendCacheStats();
+
+    sp<MetaData> getFormatMeta_l(bool audio);
+    int32_t getDataGeneration(media_track_type type) const;
+
     // Modular DRM
     // The source is DRM protected and is prepared for DRM.
     bool mIsDrmProtected;
@@ -318,8 +237,6 @@ private:
     Vector<String8> mMimes;
 
     status_t checkDrmInfo();
-    status_t onPrepareDrm(const sp<AMessage> &msg);
-    status_t onReleaseDrm();
 
     DISALLOW_EVIL_CONSTRUCTORS(GenericSource);
 };

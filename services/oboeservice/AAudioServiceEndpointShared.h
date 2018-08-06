@@ -30,8 +30,7 @@
 namespace aaudio {
 
 /**
- * This Service class corresponds to a Client stream that shares an MMAP device through a mixer
- * or an input distributor.
+ * This manages an AudioStreamInternal that is shared by multiple Client streams.
  */
 class AAudioServiceEndpointShared : public AAudioServiceEndpoint {
 
@@ -55,11 +54,12 @@ public:
 
     virtual void            *callbackLoop() = 0;
 
+
+protected:
+
     AudioStreamInternal *getStreamInternal() const {
         return mStreamInternal;
     };
-
-protected:
 
     aaudio_result_t          startSharingThread_l();
 

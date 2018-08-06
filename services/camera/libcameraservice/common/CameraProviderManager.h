@@ -18,7 +18,7 @@
 #define ANDROID_SERVERS_CAMERA_CAMERAPROVIDER_H
 
 #include <vector>
-#include <set>
+#include <unordered_set>
 #include <string>
 #include <mutex>
 
@@ -125,16 +125,14 @@ public:
      */
     int getCameraCount() const;
 
+    std::vector<std::string> getCameraDeviceIds() const;
+
     /**
      * Retrieve the number of API1 compatible cameras; these are internal and
      * backwards-compatible. This is the set of cameras that will be
-     * accessible via the old camera API, with IDs in range of
-     * [0, getAPI1CompatibleCameraCount()-1]. This value is not expected to change dynamically.
+     * accessible via the old camera API.
+     * The return value may change dynamically due to external camera hotplug.
      */
-    int getAPI1CompatibleCameraCount() const;
-
-    std::vector<std::string> getCameraDeviceIds() const;
-
     std::vector<std::string> getAPI1CompatibleCameraDeviceIds() const;
 
     /**
@@ -232,6 +230,13 @@ public:
             hardware::hidl_version minVersion = hardware::hidl_version{0,0},
             hardware::hidl_version maxVersion = hardware::hidl_version{1000,0}) const;
 
+    /*
+     * Check if a camera with staticInfo is a logical camera. And if yes, return
+     * the physical camera ids.
+     */
+    static bool isLogicalCamera(const CameraMetadata& staticInfo,
+            std::vector<std::string>* physicalCameraIds);
+
 private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
     mutable std::mutex mInterfaceMutex;
@@ -293,6 +298,7 @@ private:
             virtual status_t setTorchMode(bool enabled) = 0;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const = 0;
             virtual bool isAPI1Compatible() const = 0;
+            virtual status_t dumpState(int fd) const = 0;
             virtual status_t getCameraCharacteristics(CameraMetadata *characteristics) const {
                 (void) characteristics;
                 return INVALID_OPERATION;
@@ -313,9 +319,9 @@ private:
             static status_t setTorchMode(InterfaceT& interface, bool enabled);
         };
         std::vector<std::unique_ptr<DeviceInfo>> mDevices;
-        std::set<std::string> mUniqueCameraIds;
+        std::unordered_set<std::string> mUniqueCameraIds;
         int mUniqueDeviceCount;
-        std::set<std::string> mUniqueAPI1CompatibleCameraIds;
+        std::vector<std::string> mUniqueAPI1CompatibleCameraIds;
 
         // HALv1-specific camera fields, including the actual device interface
         struct DeviceInfo1 : public DeviceInfo {
@@ -326,6 +332,7 @@ private:
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
             //In case of Device1Info assume that we are always API1 compatible
             virtual bool isAPI1Compatible() const override { return true; }
+            virtual status_t dumpState(int fd) const override;
             DeviceInfo1(const std::string& name, const metadata_vendor_id_t tagId,
                     const std::string &id, uint16_t minorVersion,
                     const hardware::camera::common::V1_0::CameraResourceCost& resourceCost,
@@ -343,6 +350,7 @@ private:
             virtual status_t setTorchMode(bool enabled) override;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
             virtual bool isAPI1Compatible() const override;
+            virtual status_t dumpState(int fd) const override;
             virtual status_t getCameraCharacteristics(
                     CameraMetadata *characteristics) const override;
 
@@ -362,6 +370,8 @@ private:
         std::mutex mLock;
 
         CameraProviderManager *mManager;
+
+        bool mInitialized = false;
 
         // Templated method to instantiate the right kind of DeviceInfo and call the
         // right CameraProvider getCameraDeviceInterface_* method.
@@ -411,6 +421,9 @@ private:
     static const char* torchStatusToString(
         const hardware::camera::common::V1_0::TorchModeStatus&);
 
+    status_t getCameraCharacteristicsLocked(const std::string &id,
+            CameraMetadata* characteristics) const;
+    void filterLogicalCameraIdsLocked(std::vector<std::string>& deviceIds) const;
 };
 
 } // namespace android

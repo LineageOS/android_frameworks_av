@@ -233,4 +233,4 @@ audio_unique_id_t AudioPolicyService::AudioPolicyClient::newAudioUniqueId(audio_
     return AudioSystem::newAudioUniqueId(use);
 }
 
-}; // namespace android
+} // namespace android

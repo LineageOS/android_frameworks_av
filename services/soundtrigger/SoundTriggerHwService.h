@@ -214,19 +214,19 @@ public:
     };
 
     static void recognitionCallback(struct sound_trigger_recognition_event *event, void *cookie);
-           sp<IMemory> prepareRecognitionEvent_l(struct sound_trigger_recognition_event *event);
+           sp<IMemory> prepareRecognitionEvent(struct sound_trigger_recognition_event *event);
            void sendRecognitionEvent(struct sound_trigger_recognition_event *event, Module *module);
 
     static void soundModelCallback(struct sound_trigger_model_event *event, void *cookie);
-           sp<IMemory> prepareSoundModelEvent_l(struct sound_trigger_model_event *event);
+           sp<IMemory> prepareSoundModelEvent(struct sound_trigger_model_event *event);
            void sendSoundModelEvent(struct sound_trigger_model_event *event, Module *module);
 
-           sp<IMemory> prepareServiceStateEvent_l(sound_trigger_service_state_t state);
-           void sendServiceStateEvent_l(sound_trigger_service_state_t state, Module *module);
-           void sendServiceStateEvent_l(sound_trigger_service_state_t state,
-                                        ModuleClient *moduleClient);
+           sp<IMemory> prepareServiceStateEvent(sound_trigger_service_state_t state);
+           void sendServiceStateEvent(sound_trigger_service_state_t state, Module *module);
+           void sendServiceStateEvent(sound_trigger_service_state_t state,
+                                      ModuleClient *moduleClient);
 
-           void sendCallbackEvent_l(const sp<CallbackEvent>& event);
+           void sendCallbackEvent(const sp<CallbackEvent>& event);
            void onCallbackEvent(const sp<CallbackEvent>& event);
 
 private:
@@ -238,6 +238,7 @@ private:
     DefaultKeyedVector< sound_trigger_module_handle_t, sp<Module> >     mModules;
     sp<CallbackThread>  mCallbackThread;
     sp<MemoryDealer>    mMemoryDealer;
+    Mutex               mMemoryDealerLock;
     bool                mCaptureState;
 };
 

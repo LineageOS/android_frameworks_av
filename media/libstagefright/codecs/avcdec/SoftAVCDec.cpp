@@ -171,7 +171,7 @@ status_t SoftAVC::setParams(size_t stride) {
 status_t SoftAVC::resetPlugin() {
     mIsInFlush = false;
     mReceivedEOS = false;
-    mInputOffset = 0;
+
     memset(mTimeStamps, 0, sizeof(mTimeStamps));
     memset(mTimeStampsValid, 0, sizeof(mTimeStampsValid));
 
@@ -274,10 +274,6 @@ status_t SoftAVC::initDecoder() {
 
         status = ivdec_api_function(mCodecCtx, (void *)&s_create_ip, (void *)&s_create_op);
 
-        mCodecCtx = (iv_obj_t*)s_create_op.s_ivd_create_op_t.pv_handle;
-        mCodecCtx->pv_fxns = dec_fxns;
-        mCodecCtx->u4_size = sizeof(iv_obj_t);
-
         if (status != IV_SUCCESS) {
             ALOGE("Error in create: 0x%x",
                     s_create_op.s_ivd_create_op_t.u4_error_code);
@@ -285,6 +281,10 @@ status_t SoftAVC::initDecoder() {
             mCodecCtx = NULL;
             return UNKNOWN_ERROR;
         }
+
+        mCodecCtx = (iv_obj_t*)s_create_op.s_ivd_create_op_t.pv_handle;
+        mCodecCtx->pv_fxns = dec_fxns;
+        mCodecCtx->u4_size = sizeof(iv_obj_t);
     }
 
     /* Reset the plugin state */
@@ -304,7 +304,6 @@ status_t SoftAVC::initDecoder() {
 }
 
 status_t SoftAVC::deInitDecoder() {
-    size_t i;
     IV_API_CALL_STATUS_T status;
 
     if (mCodecCtx) {
@@ -334,6 +333,7 @@ void SoftAVC::onReset() {
     SoftVideoDecoderOMXComponent::onReset();
 
     mSignalledError = false;
+    mInputOffset = 0;
     resetDecoder();
     resetPlugin();
 }
@@ -450,7 +450,6 @@ void SoftAVC::onPortFlushCompleted(OMX_U32 portIndex) {
             ivd_video_decode_ip_t s_dec_ip;
             ivd_video_decode_op_t s_dec_op;
             IV_API_CALL_STATUS_T status;
-            size_t sizeY, sizeUV;
 
             setDecodeArgs(&s_dec_ip, &s_dec_op, NULL, NULL, 0);
 
@@ -465,7 +464,8 @@ void SoftAVC::onPortFlushCompleted(OMX_U32 portIndex) {
             free(mFlushOutBuffer);
             mFlushOutBuffer = NULL;
         }
-
+    } else {
+        mInputOffset = 0;
     }
 }
 
@@ -530,7 +530,7 @@ void SoftAVC::onQueueFilled(OMX_U32 portIndex) {
                 notifyEmptyBufferDone(inHeader);
 
                 if (!(inHeader->nFlags & OMX_BUFFERFLAG_EOS)) {
-                    continue;
+                    return;
                 }
 
                 mReceivedEOS = true;
@@ -561,7 +561,6 @@ void SoftAVC::onQueueFilled(OMX_U32 portIndex) {
             ivd_video_decode_ip_t s_dec_ip;
             ivd_video_decode_op_t s_dec_op;
             nsecs_t timeDelay, timeTaken;
-            size_t sizeY, sizeUV;
 
             if (!setDecodeArgs(&s_dec_ip, &s_dec_op, inHeader, outHeader, timeStampIx)) {
                 ALOGE("Decoder arg setup failed");

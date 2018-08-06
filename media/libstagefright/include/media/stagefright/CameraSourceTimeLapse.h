@@ -107,7 +107,7 @@ private:
 
     // Stores a copy of the MediaBuffer read in the last read() call after
     // mQuickStop was true.
-    MediaBuffer* mLastReadBufferCopy;
+    MediaBufferBase* mLastReadBufferCopy;
 
     // Status code for last read.
     status_t mLastReadStatus;
@@ -128,10 +128,10 @@ private:
     // Wrapper over CameraSource::signalBufferReturned() to implement quick stop.
     // It only handles the case when mLastReadBufferCopy is signalled. Otherwise
     // it calls the base class' function.
-    virtual void signalBufferReturned(MediaBuffer* buffer);
+    virtual void signalBufferReturned(MediaBufferBase* buffer);
 
     // Wrapper over CameraSource::read() to implement quick stop.
-    virtual status_t read(MediaBuffer **buffer, const ReadOptions *options = NULL);
+    virtual status_t read(MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
     // mSkipCurrentFrame is set to true in dataCallbackTimestamp() if the current
     // frame needs to be skipped and this function just returns the value of mSkipCurrentFrame.
@@ -170,7 +170,7 @@ private:
 
     // Convenience function to fill mLastReadBufferCopy from the just read
     // buffer.
-    void fillLastReadBufferCopy(MediaBuffer& sourceBuffer);
+    void fillLastReadBufferCopy(MediaBufferBase& sourceBuffer);
 
     // If the passed in size (width x height) is a supported video/preview size,
     // the function sets the camera's video/preview size to it and returns true.

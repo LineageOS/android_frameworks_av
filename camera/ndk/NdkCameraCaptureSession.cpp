@@ -135,3 +135,19 @@ camera_status_t ACameraCaptureSession_abortCaptures(ACameraCaptureSession* sessi
     }
     return session->abortCaptures();
 }
+
+EXPORT
+camera_status_t ACameraCaptureSession_updateSharedOutput(ACameraCaptureSession* session,
+        ACaptureSessionOutput* output) {
+    ATRACE_CALL();
+    if (session == nullptr) {
+        ALOGE("%s: Error: session is null", __FUNCTION__);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+
+    if (session->isClosed()) {
+        ALOGE("%s: session %p is already closed", __FUNCTION__, session);
+        return ACAMERA_ERROR_SESSION_CLOSED;
+    }
+    return session->updateOutputConfiguration(output);
+}

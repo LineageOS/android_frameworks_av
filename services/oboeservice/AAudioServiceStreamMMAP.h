@@ -69,9 +69,7 @@ public:
 
     aaudio_result_t close() override;
 
-    /**
-     * Send a MMAP/NOIRQ buffer timestamp to the client.
-     */
+    const char *getTypeText() const override { return "MMAP"; }
 
 protected:
 

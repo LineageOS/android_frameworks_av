@@ -14,7 +14,6 @@ cc_library_shared {
 
     shared_libs: [
         "libopus",
-        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",
@@ -22,6 +21,8 @@ cc_library_shared {
     ],
 
     cflags: ["-Werror"],
+
+    version_script: "exports.lds",
 
     sanitize: {
         misc_undefined: [

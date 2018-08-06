@@ -19,16 +19,15 @@
 #define I_MEDIA_HTTP_CONNECTION_H_
 
 #include <binder/IInterface.h>
+#include <media/MediaHTTPConnection.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <utils/KeyedVector.h>
 
 namespace android {
 
-struct IMediaHTTPConnection;
-
 /** MUST stay in sync with IMediaHTTPConnection.aidl */
 
-struct IMediaHTTPConnection : public IInterface {
+struct IMediaHTTPConnection : public MediaHTTPConnection, public IInterface {
     DECLARE_META_INTERFACE(MediaHTTPConnection);
 
     virtual bool connect(

@@ -56,8 +56,6 @@ public:
 
     aaudio_result_t resolve(EndpointDescriptor *descriptor);
 
-    aaudio_result_t validate();
-
     aaudio_result_t close();
 
     void dump();
@@ -70,6 +68,8 @@ public: // TODO add getters
     RingBufferParcelable    mDownDataQueueParcelable;    // eg. playback
 
 private:
+    aaudio_result_t         validate() const;
+
     int32_t                 mNumSharedMemories = 0;
     SharedMemoryParcelable  mSharedMemories[MAX_SHARED_MEMORIES];
 };

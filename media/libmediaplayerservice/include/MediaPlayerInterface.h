@@ -66,14 +66,17 @@ enum player_type {
 // duration below which we do not allow deep audio buffering
 #define AUDIO_SINK_MIN_DEEP_BUFFER_DURATION_US 5000000
 
-// callback mechanism for passing messages to MediaPlayer object
-typedef void (*notify_callback_f)(void* cookie,
-        int msg, int ext1, int ext2, const Parcel *obj);
-
 // abstract base class - use MediaPlayerInterface
 class MediaPlayerBase : public RefBase
 {
 public:
+    // callback mechanism for passing messages to MediaPlayer object
+    class Listener : public RefBase {
+    public:
+        virtual void notify(int msg, int ext1, int ext2, const Parcel *obj) = 0;
+        virtual ~Listener() {}
+    };
+
     // AudioSink: abstraction layer for audio output
     class AudioSink : public RefBase {
     public:
@@ -146,13 +149,18 @@ public:
         virtual status_t    setParameters(const String8& /* keyValuePairs */) { return NO_ERROR; }
         virtual String8     getParameters(const String8& /* keys */) { return String8::empty(); }
 
-        virtual VolumeShaper::Status applyVolumeShaper(
-                                    const sp<VolumeShaper::Configuration>& configuration,
-                                    const sp<VolumeShaper::Operation>& operation);
-        virtual sp<VolumeShaper::State> getVolumeShaperState(int id);
+        virtual media::VolumeShaper::Status applyVolumeShaper(
+                                    const sp<media::VolumeShaper::Configuration>& configuration,
+                                    const sp<media::VolumeShaper::Operation>& operation);
+        virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id);
+
+        // AudioRouting
+        virtual status_t    setOutputDevice(audio_port_handle_t deviceId);
+        virtual status_t    getRoutedDeviceId(audio_port_handle_t* deviceId);
+        virtual status_t    enableAudioDeviceCallback(bool enabled);
     };
 
-                        MediaPlayerBase() : mCookie(0), mNotify(0) {}
+                        MediaPlayerBase() {}
     virtual             ~MediaPlayerBase() {}
     virtual status_t    initCheck() = 0;
     virtual bool        hardwareOutput() = 0;
@@ -180,7 +188,7 @@ public:
     virtual status_t    setVideoSurfaceTexture(
                                 const sp<IGraphicBufferProducer>& bufferProducer) = 0;
 
-    virtual status_t    getDefaultBufferingSettings(
+    virtual status_t    getBufferingSettings(
                                 BufferingSettings* buffering /* nonnull */) {
         *buffering = BufferingSettings();
         return OK;
@@ -225,6 +233,9 @@ public:
     virtual status_t    getCurrentPosition(int *msec) = 0;
     virtual status_t    getDuration(int *msec) = 0;
     virtual status_t    reset() = 0;
+    virtual status_t    notifyAt(int64_t /* mediaTimeUs */) {
+        return INVALID_OPERATION;
+    }
     virtual status_t    setLooping(int loop) = 0;
     virtual player_type playerType() = 0;
     virtual status_t    setParameter(int key, const Parcel &request) = 0;
@@ -263,22 +274,22 @@ public:
     };
 
     void        setNotifyCallback(
-            void* cookie, notify_callback_f notifyFunc) {
+            const sp<Listener> &listener) {
         Mutex::Autolock autoLock(mNotifyLock);
-        mCookie = cookie; mNotify = notifyFunc;
+        mListener = listener;
     }
 
     void        sendEvent(int msg, int ext1=0, int ext2=0,
                           const Parcel *obj=NULL) {
-        notify_callback_f notifyCB;
-        void* cookie;
+        sp<Listener> listener;
         {
             Mutex::Autolock autoLock(mNotifyLock);
-            notifyCB = mNotify;
-            cookie = mCookie;
+            listener = mListener;
         }
 
-        if (notifyCB) notifyCB(cookie, msg, ext1, ext2, obj);
+        if (listener != NULL) {
+            listener->notify(msg, ext1, ext2, obj);
+        }
     }
 
     virtual status_t dump(int /* fd */, const Vector<String16>& /* args */) const {
@@ -297,8 +308,7 @@ private:
     friend class MediaPlayerService;
 
     Mutex               mNotifyLock;
-    void*               mCookie;
-    notify_callback_f   mNotify;
+    sp<Listener>        mListener;
 };
 
 // Implement this class for media players that use the AudioFlinger software mixer

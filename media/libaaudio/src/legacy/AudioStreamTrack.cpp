@@ -22,6 +22,7 @@
 #include <media/AudioTrack.h>
 
 #include <aaudio/AAudio.h>
+#include <system/audio.h>
 #include "utility/AudioClock.h"
 #include "legacy/AudioStreamLegacy.h"
 #include "legacy/AudioStreamTrack.h"
@@ -113,14 +114,35 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     }
     mCallbackBufferSize = builder.getFramesPerDataCallback();
 
-    ALOGD("AudioStreamTrack::open(), request notificationFrames = %d, frameCount = %u",
+    ALOGD("open(), request notificationFrames = %d, frameCount = %u",
           notificationFrames, (uint)frameCount);
-    mAudioTrack = new AudioTrack(); // TODO review
-    if (getDeviceId() != AAUDIO_UNSPECIFIED) {
-        mAudioTrack->setOutputDevice(getDeviceId());
-    }
+
+    // Don't call mAudioTrack->setDeviceId() because it will be overwritten by set()!
+    audio_port_handle_t selectedDeviceId = (getDeviceId() == AAUDIO_UNSPECIFIED)
+                                           ? AUDIO_PORT_HANDLE_NONE
+                                           : getDeviceId();
+
+    const audio_content_type_t contentType =
+            AAudioConvert_contentTypeToInternal(builder.getContentType());
+    const audio_usage_t usage =
+            AAudioConvert_usageToInternal(builder.getUsage());
+
+    const audio_attributes_t attributes = {
+            .content_type = contentType,
+            .usage = usage,
+            .source = AUDIO_SOURCE_DEFAULT, // only used for recording
+            .flags = AUDIO_FLAG_NONE, // Different than the AUDIO_OUTPUT_FLAGS
+            .tags = ""
+    };
+
+    static_assert(AAUDIO_UNSPECIFIED == AUDIO_SESSION_ALLOCATE, "Session IDs should match");
+
+    aaudio_session_id_t requestedSessionId = builder.getSessionId();
+    audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
+
+    mAudioTrack = new AudioTrack();
     mAudioTrack->set(
-            (audio_stream_type_t) AUDIO_STREAM_MUSIC,
+            AUDIO_STREAM_DEFAULT,  // ignored because we pass attributes below
             getSampleRate(),
             format,
             channelMask,
@@ -129,17 +151,26 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             callback,
             callbackData,
             notificationFrames,
-            0 /*sharedBuffer*/,
-            false /*threadCanCallJava*/,
-            AUDIO_SESSION_ALLOCATE,
-            streamTransferType
-            );
+            0,       // DEFAULT sharedBuffer*/,
+            false,   // DEFAULT threadCanCallJava
+            sessionId,
+            streamTransferType,
+            NULL,    // DEFAULT audio_offload_info_t
+            AUDIO_UID_INVALID, // DEFAULT uid
+            -1,      // DEFAULT pid
+            &attributes,
+            // WARNING - If doNotReconnect set true then audio stops after plugging and unplugging
+            // headphones a few times.
+            false,   // DEFAULT doNotReconnect,
+            1.0f,    // DEFAULT maxRequiredSpeed
+            selectedDeviceId
+    );
 
     // Did we get a valid track?
     status_t status = mAudioTrack->initCheck();
     if (status != NO_ERROR) {
         close();
-        ALOGE("AudioStreamTrack::open(), initCheck() returned %d", status);
+        ALOGE("open(), initCheck() returned %d", status);
         return AAudioConvert_androidToAAudioResult(status);
     }
 
@@ -150,10 +181,11 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     aaudio_format_t aaudioFormat =
             AAudioConvert_androidToAAudioDataFormat(mAudioTrack->format());
     setFormat(aaudioFormat);
+    setDeviceFormat(aaudioFormat);
 
     int32_t actualSampleRate = mAudioTrack->getSampleRate();
     ALOGW_IF(actualSampleRate != getSampleRate(),
-             "AudioStreamTrack::open() sampleRate changed from %d to %d",
+             "open() sampleRate changed from %d to %d",
              getSampleRate(), actualSampleRate);
     setSampleRate(actualSampleRate);
 
@@ -168,6 +200,13 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     setState(AAUDIO_STREAM_STATE_OPEN);
     setDeviceId(mAudioTrack->getRoutedDeviceId());
+
+    aaudio_session_id_t actualSessionId =
+            (requestedSessionId == AAUDIO_SESSION_ID_NONE)
+            ? AAUDIO_SESSION_ID_NONE
+            : (aaudio_session_id_t) mAudioTrack->getSessionId();
+    setSessionId(actualSessionId);
+
     mAudioTrack->addAudioDeviceCallback(mDeviceCallback);
 
     // Update performance mode based on the actual stream flags.
@@ -186,10 +225,10 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     // Log warning if we did not get what we asked for.
     ALOGW_IF(actualFlags != flags,
-             "AudioStreamTrack::open() flags changed from 0x%08X to 0x%08X",
+             "open() flags changed from 0x%08X to 0x%08X",
              flags, actualFlags);
     ALOGW_IF(actualPerformanceMode != perfMode,
-             "AudioStreamTrack::open() perfMode changed from %d to %d",
+             "open() perfMode changed from %d to %d",
              perfMode, actualPerformanceMode);
 
     return AAUDIO_OK;
@@ -224,10 +263,8 @@ void AudioStreamTrack::processCallback(int event, void *info) {
 }
 
 aaudio_result_t AudioStreamTrack::requestStart() {
-    std::lock_guard<std::mutex> lock(mStreamMutex);
-
     if (mAudioTrack.get() == nullptr) {
-        ALOGE("AudioStreamTrack::requestStart() no AudioTrack");
+        ALOGE("requestStart() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     // Get current position so we can detect when the track is playing.
@@ -236,73 +273,62 @@ aaudio_result_t AudioStreamTrack::requestStart() {
         return AAudioConvert_androidToAAudioResult(err);
     }
 
+    // Enable callback before starting AudioTrack to avoid shutting
+    // down because of a race condition.
+    mCallbackEnabled.store(true);
     err = mAudioTrack->start();
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
     } else {
-        onStart();
         setState(AAUDIO_STREAM_STATE_STARTING);
     }
     return AAUDIO_OK;
 }
 
 aaudio_result_t AudioStreamTrack::requestPause() {
-    std::lock_guard<std::mutex> lock(mStreamMutex);
-
     if (mAudioTrack.get() == nullptr) {
         ALOGE("requestPause() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
-    } else if (getState() != AAUDIO_STREAM_STATE_STARTING
-            && getState() != AAUDIO_STREAM_STATE_STARTED) {
-        ALOGE("requestPause(), called when state is %s",
-              AAudio_convertStreamStateToText(getState()));
-        return AAUDIO_ERROR_INVALID_STATE;
     }
-    onStop();
+
     setState(AAUDIO_STREAM_STATE_PAUSING);
     mAudioTrack->pause();
-    checkForDisconnectRequest();
+    mCallbackEnabled.store(false);
     status_t err = mAudioTrack->getPosition(&mPositionWhenPausing);
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
     }
-    return AAUDIO_OK;
+    return checkForDisconnectRequest(false);
 }
 
 aaudio_result_t AudioStreamTrack::requestFlush() {
-    std::lock_guard<std::mutex> lock(mStreamMutex);
-
     if (mAudioTrack.get() == nullptr) {
-        ALOGE("AudioStreamTrack::requestFlush() no AudioTrack");
-        return AAUDIO_ERROR_INVALID_STATE;
-    } else if (getState() != AAUDIO_STREAM_STATE_PAUSED) {
-        ALOGE("AudioStreamTrack::requestFlush() not paused");
+        ALOGE("requestFlush() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     }
+
     setState(AAUDIO_STREAM_STATE_FLUSHING);
     incrementFramesRead(getFramesWritten() - getFramesRead());
     mAudioTrack->flush();
-    mFramesWritten.reset32();
+    mFramesRead.reset32(); // service reads frames, service position reset on flush
     mTimestampPosition.reset32();
     return AAUDIO_OK;
 }
 
 aaudio_result_t AudioStreamTrack::requestStop() {
-    std::lock_guard<std::mutex> lock(mStreamMutex);
-
     if (mAudioTrack.get() == nullptr) {
-        ALOGE("AudioStreamTrack::requestStop() no AudioTrack");
+        ALOGE("requestStop() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    onStop();
+
     setState(AAUDIO_STREAM_STATE_STOPPING);
     incrementFramesRead(getFramesWritten() - getFramesRead()); // TODO review
     mTimestampPosition.set(getFramesWritten());
-    mFramesWritten.reset32();
+    mFramesRead.reset32(); // service reads frames, service position reset on stop
     mTimestampPosition.reset32();
     mAudioTrack->stop();
-    checkForDisconnectRequest();
-    return AAUDIO_OK;
+    mCallbackEnabled.store(false);
+    return checkForDisconnectRequest(false);;
 }
 
 aaudio_result_t AudioStreamTrack::updateStateMachine()

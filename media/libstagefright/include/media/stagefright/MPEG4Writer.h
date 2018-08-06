@@ -20,7 +20,6 @@
 
 #include <stdio.h>
 
-#include <media/IMediaSource.h>
 #include <media/stagefright/MediaWriter.h>
 #include <utils/List.h>
 #include <utils/threads.h>
@@ -31,7 +30,7 @@ namespace android {
 
 struct AMessage;
 class MediaBuffer;
-class MetaData;
+struct ABuffer;
 
 class MPEG4Writer : public MediaWriter {
 public:
@@ -40,7 +39,7 @@ public:
     // Limitations
     // No more than one video and/or one audio source can be added, but
     // multiple metadata sources can be added.
-    virtual status_t addSource(const sp<IMediaSource> &source);
+    virtual status_t addSource(const sp<MediaSource> &source);
 
     // Returns INVALID_OPERATION if there is no source or track.
     virtual status_t start(MetaData *param = NULL);
@@ -101,12 +100,12 @@ private:
     bool mSendNotify;
     off64_t mOffset;
     off_t mMdatOffset;
-    uint8_t *mMoovBoxBuffer;
-    off64_t mMoovBoxBufferOffset;
-    bool  mWriteMoovBoxToMemory;
+    uint8_t *mInMemoryCache;
+    off64_t mInMemoryCacheOffset;
+    off64_t mInMemoryCacheSize;
+    bool  mWriteBoxToMemory;
     off64_t mFreeBoxOffset;
     bool mStreamableFile;
-    off64_t mEstimatedMoovBoxSize;
     off64_t mMoovExtraSize;
     uint32_t mInterleaveDurationUs;
     int32_t mTimeScale;
@@ -133,6 +132,8 @@ private:
     status_t startTracks(MetaData *params);
     size_t numTracks();
     int64_t estimateMoovBoxSize(int32_t bitRate);
+    int64_t estimateFileLevelMetaSize(MetaData *params);
+    void writeCachedBoxToFile(const char *type);
 
     struct Chunk {
         Track               *mTrack;        // Owner
@@ -164,6 +165,50 @@ private:
     pthread_t       mThread;                // Thread id for the writer
     List<ChunkInfo> mChunkInfos;            // Chunk infos
     Condition       mChunkReadyCondition;   // Signal that chunks are available
+
+    // HEIF writing
+    typedef key_value_pair_t< const char *, Vector<uint16_t> > ItemRefs;
+    typedef struct _ItemInfo {
+        bool isGrid() const { return !strcmp("grid", itemType); }
+        bool isImage() const { return !strcmp("hvc1", itemType) || isGrid(); }
+        const char *itemType;
+        uint16_t itemId;
+        bool isPrimary;
+        bool isHidden;
+        union {
+            // image item
+            struct {
+                uint32_t offset;
+                uint32_t size;
+            };
+            // grid item
+            struct {
+                uint32_t rows;
+                uint32_t cols;
+                uint32_t width;
+                uint32_t height;
+            };
+        };
+        Vector<uint16_t> properties;
+        Vector<ItemRefs> refsList;
+    } ItemInfo;
+
+    typedef struct _ItemProperty {
+        uint32_t type;
+        int32_t width;
+        int32_t height;
+        int32_t rotation;
+        sp<ABuffer> hvcc;
+    } ItemProperty;
+
+    bool mHasFileLevelMeta;
+    bool mHasMoovBox;
+    uint32_t mPrimaryItemId;
+    uint32_t mAssociationEntryCount;
+    uint32_t mNumGrids;
+    bool mHasRefs;
+    Vector<ItemInfo> mItems;
+    Vector<ItemProperty> mProperties;
 
     // Writer thread handling
     status_t startWriterThread();
@@ -210,9 +255,12 @@ private:
     void initInternal(int fd, bool isFirstSession);
 
     // Acquire lock before calling these methods
-    off64_t addSample_l(MediaBuffer *buffer);
-    off64_t addLengthPrefixedSample_l(MediaBuffer *buffer);
-    off64_t addMultipleLengthPrefixedSamples_l(MediaBuffer *buffer);
+    off64_t addSample_l(MediaBuffer *buffer, bool usePrefix, bool isExif, size_t *bytesWritten);
+    void addLengthPrefixedSample_l(MediaBuffer *buffer);
+    void addMultipleLengthPrefixedSamples_l(MediaBuffer *buffer);
+    uint16_t addProperty_l(const ItemProperty &);
+    uint16_t addItem_l(const ItemInfo &);
+    void addRefs_l(uint16_t itemId, const ItemRefs &);
 
     bool exceedsFileSizeLimit();
     bool use32BitFileOffset() const;
@@ -231,10 +279,23 @@ private:
     void finishCurrentSession();
 
     void addDeviceMeta();
-    void writeHdlr();
+    void writeHdlr(const char *handlerType);
     void writeKeys();
     void writeIlst();
-    void writeMetaBox();
+    void writeMoovLevelMetaBox();
+
+    // HEIF writing
+    void writeIlocBox();
+    void writeInfeBox(uint16_t itemId, const char *type, uint32_t flags);
+    void writeIinfBox();
+    void writeIpcoBox();
+    void writeIpmaBox();
+    void writeIprpBox();
+    void writeIdatBox();
+    void writeIrefBox();
+    void writePitmBox();
+    void writeFileLevelMetaBox();
+
     void sendSessionSummary();
     void release();
     status_t switchFd();

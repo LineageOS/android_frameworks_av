@@ -18,8 +18,8 @@
 
 #define LIVE_DATA_SOURCE_H_
 
+#include <media/DataSource.h>
 #include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/DataSource.h>
 #include <utils/threads.h>
 #include <utils/List.h>
 

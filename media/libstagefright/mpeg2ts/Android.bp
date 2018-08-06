@@ -1,5 +1,5 @@
 cc_library_static {
-    name: "libstagefright_mpeg2ts",
+    name: "libstagefright_mpeg2support",
 
     srcs: [
         "AnotherPacketSource.cpp",
@@ -7,8 +7,6 @@ cc_library_static {
         "CasManager.cpp",
         "ESQueue.cpp",
         "HlsSampleDecryptor.cpp",
-        "MPEG2PSExtractor.cpp",
-        "MPEG2TSExtractor.cpp",
     ],
 
     include_dirs: [
@@ -35,8 +33,12 @@ cc_library_static {
     shared_libs: [
         "libcrypto",
         "libmedia",
-        "libhidlmemory",
+        "libhidlallocatorutils",
         "android.hardware.cas.native@1.0",
         "android.hidl.memory@1.0",
+    ],
+
+    whole_static_libs: [
+        "libstagefright_metadatautils",
     ],
 }

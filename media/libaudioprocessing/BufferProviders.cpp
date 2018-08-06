@@ -183,7 +183,7 @@ DownmixerBufferProvider::DownmixerBufferProvider(
      mOutFrameSize =
              audio_bytes_per_sample(format) * audio_channel_count_from_out_mask(outputChannelMask);
      status_t status;
-     status = EffectBufferHalInterface::mirror(
+     status = mEffectsFactory->mirrorBuffer(
              nullptr, mInFrameSize * bufferFrameCount, &mInBuffer);
      if (status != 0) {
          ALOGE("DownmixerBufferProvider() error %d while creating input buffer", status);
@@ -191,7 +191,7 @@ DownmixerBufferProvider::DownmixerBufferProvider(
          mEffectsFactory.clear();
          return;
      }
-     status = EffectBufferHalInterface::mirror(
+     status = mEffectsFactory->mirrorBuffer(
              nullptr, mOutFrameSize * bufferFrameCount, &mOutBuffer);
      if (status != 0) {
          ALOGE("DownmixerBufferProvider() error %d while creating output buffer", status);
@@ -374,6 +374,23 @@ ReformatBufferProvider::ReformatBufferProvider(int32_t channelCount,
 void ReformatBufferProvider::copyFrames(void *dst, const void *src, size_t frames)
 {
     memcpy_by_audio_format(dst, mOutputFormat, src, mInputFormat, frames * mChannelCount);
+}
+
+ClampFloatBufferProvider::ClampFloatBufferProvider(int32_t channelCount, size_t bufferFrameCount) :
+        CopyBufferProvider(
+                channelCount * audio_bytes_per_sample(AUDIO_FORMAT_PCM_FLOAT),
+                channelCount * audio_bytes_per_sample(AUDIO_FORMAT_PCM_FLOAT),
+                bufferFrameCount),
+        mChannelCount(channelCount)
+{
+    ALOGV("ClampFloatBufferProvider(%p)(%u)", this, channelCount);
+}
+
+void ClampFloatBufferProvider::copyFrames(void *dst, const void *src, size_t frames)
+{
+    memcpy_to_float_from_float_with_clamping((float*)dst, (const float*)src,
+                                             frames * mChannelCount,
+                                             FLOAT_NOMINAL_RANGE_HEADROOM);
 }
 
 TimestretchBufferProvider::TimestretchBufferProvider(int32_t channelCount,

@@ -34,7 +34,7 @@ struct BpMediaHTTPService : public BpInterface<IMediaHTTPService> {
         : BpInterface<IMediaHTTPService>(impl) {
     }
 
-    virtual sp<IMediaHTTPConnection> makeHTTPConnection() {
+    virtual sp<MediaHTTPConnection> makeHTTPConnection() {
         Parcel data, reply;
         data.writeInterfaceToken(
                 IMediaHTTPService::getInterfaceDescriptor());

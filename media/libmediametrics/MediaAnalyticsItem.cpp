@@ -29,8 +29,6 @@
 #include <utils/SortedVector.h>
 #include <utils/threads.h>
 
-#include <media/stagefright/foundation/AString.h>
-
 #include <binder/IServiceManager.h>
 #include <media/IMediaAnalyticsService.h>
 #include <media/MediaAnalyticsItem.h>
@@ -62,7 +60,7 @@ MediaAnalyticsItem::MediaAnalyticsItem()
       mPkgVersionCode(0),
       mSessionID(MediaAnalyticsItem::SessionIDNone),
       mTimestamp(0),
-      mFinalized(0),
+      mFinalized(1),
       mPropCount(0), mPropSize(0), mProps(NULL)
 {
     mKey = MediaAnalyticsItem::kKeyNone;
@@ -74,7 +72,7 @@ MediaAnalyticsItem::MediaAnalyticsItem(MediaAnalyticsItem::Key key)
       mPkgVersionCode(0),
       mSessionID(MediaAnalyticsItem::SessionIDNone),
       mTimestamp(0),
-      mFinalized(0),
+      mFinalized(1),
       mPropCount(0), mPropSize(0), mProps(NULL)
 {
     if (DEBUG_ALLOCATIONS) {
@@ -139,16 +137,6 @@ MediaAnalyticsItem *MediaAnalyticsItem::dup() {
     return dst;
 }
 
-// so clients can send intermediate values to be overlaid later
-MediaAnalyticsItem &MediaAnalyticsItem::setFinalized(bool value) {
-    mFinalized = value;
-    return *this;
-}
-
-bool MediaAnalyticsItem::getFinalized() const {
-    return mFinalized;
-}
-
 MediaAnalyticsItem &MediaAnalyticsItem::setSessionID(MediaAnalyticsItem::SessionID_t id) {
     mSessionID = id;
     return *this;
@@ -205,21 +193,17 @@ uid_t MediaAnalyticsItem::getUid() const {
     return mUid;
 }
 
-MediaAnalyticsItem &MediaAnalyticsItem::setPkgName(AString pkgName) {
+MediaAnalyticsItem &MediaAnalyticsItem::setPkgName(const std::string &pkgName) {
     mPkgName = pkgName;
     return *this;
 }
 
-AString MediaAnalyticsItem::getPkgName() const {
-    return mPkgName;
-}
-
-MediaAnalyticsItem &MediaAnalyticsItem::setPkgVersionCode(int32_t pkgVersionCode) {
+MediaAnalyticsItem &MediaAnalyticsItem::setPkgVersionCode(int64_t pkgVersionCode) {
     mPkgVersionCode = pkgVersionCode;
     return *this;
 }
 
-int32_t MediaAnalyticsItem::getPkgVersionCode() const {
+int64_t MediaAnalyticsItem::getPkgVersionCode() const {
     return mPkgVersionCode;
 }
 
@@ -264,12 +248,17 @@ MediaAnalyticsItem::Prop *MediaAnalyticsItem::findProp(const char *name) {
 }
 
 void MediaAnalyticsItem::Prop::setName(const char *name, size_t len) {
-    mNameLen = len;
+    free((void *)mName);
     mName = (const char *) malloc(len+1);
+    LOG_ALWAYS_FATAL_IF(mName == NULL,
+                        "failed malloc() for property '%s' (len %zu)",
+                        name, len);
     memcpy ((void *)mName, name, len+1);
+    mNameLen = len;
 }
 
-// used only as part of a storing operation
+// consider this "find-or-allocate".
+// caller validates type and uses clearPropValue() accordingly
 MediaAnalyticsItem::Prop *MediaAnalyticsItem::allocateProp(const char *name) {
     size_t len = strlen(name);
     size_t i = findPropIndex(name, len);
@@ -279,13 +268,14 @@ MediaAnalyticsItem::Prop *MediaAnalyticsItem::allocateProp(const char *name) {
         prop = &mProps[i];
     } else {
         if (i == mPropSize) {
-            growProps();
-            // XXX: verify success
+            if (growProps() == false) {
+                ALOGE("failed allocation for new props");
+                return NULL;
+            }
         }
         i = mPropCount++;
         prop = &mProps[i];
         prop->setName(name, len);
-        prop->mType = kTypeNone;        // make caller set type info
     }
 
     return prop;
@@ -312,41 +302,59 @@ bool MediaAnalyticsItem::removeProp(const char *name) {
 // set the values
 void MediaAnalyticsItem::setInt32(MediaAnalyticsItem::Attr name, int32_t value) {
     Prop *prop = allocateProp(name);
-    prop->mType = kTypeInt32;
-    prop->u.int32Value = value;
+    if (prop != NULL) {
+        clearPropValue(prop);
+        prop->mType = kTypeInt32;
+        prop->u.int32Value = value;
+    }
 }
 
 void MediaAnalyticsItem::setInt64(MediaAnalyticsItem::Attr name, int64_t value) {
     Prop *prop = allocateProp(name);
-    prop->mType = kTypeInt64;
-    prop->u.int64Value = value;
+    if (prop != NULL) {
+        clearPropValue(prop);
+        prop->mType = kTypeInt64;
+        prop->u.int64Value = value;
+    }
 }
 
 void MediaAnalyticsItem::setDouble(MediaAnalyticsItem::Attr name, double value) {
     Prop *prop = allocateProp(name);
-    prop->mType = kTypeDouble;
-    prop->u.doubleValue = value;
+    if (prop != NULL) {
+        clearPropValue(prop);
+        prop->mType = kTypeDouble;
+        prop->u.doubleValue = value;
+    }
 }
 
 void MediaAnalyticsItem::setCString(MediaAnalyticsItem::Attr name, const char *value) {
 
     Prop *prop = allocateProp(name);
     // any old value will be gone
-    prop->mType = kTypeCString;
-    prop->u.CStringValue = strdup(value);
+    if (prop != NULL) {
+        clearPropValue(prop);
+        prop->mType = kTypeCString;
+        prop->u.CStringValue = strdup(value);
+    }
 }
 
 void MediaAnalyticsItem::setRate(MediaAnalyticsItem::Attr name, int64_t count, int64_t duration) {
     Prop *prop = allocateProp(name);
-    prop->mType = kTypeRate;
-    prop->u.rate.count = count;
-    prop->u.rate.duration = duration;
+    if (prop != NULL) {
+        clearPropValue(prop);
+        prop->mType = kTypeRate;
+        prop->u.rate.count = count;
+        prop->u.rate.duration = duration;
+    }
 }
 
 
 // find/add/set fused into a single operation
 void MediaAnalyticsItem::addInt32(MediaAnalyticsItem::Attr name, int32_t value) {
     Prop *prop = allocateProp(name);
+    if (prop == NULL) {
+        return;
+    }
     switch (prop->mType) {
         case kTypeInt32:
             prop->u.int32Value += value;
@@ -361,6 +369,9 @@ void MediaAnalyticsItem::addInt32(MediaAnalyticsItem::Attr name, int32_t value) 
 
 void MediaAnalyticsItem::addInt64(MediaAnalyticsItem::Attr name, int64_t value) {
     Prop *prop = allocateProp(name);
+    if (prop == NULL) {
+        return;
+    }
     switch (prop->mType) {
         case kTypeInt64:
             prop->u.int64Value += value;
@@ -375,6 +386,9 @@ void MediaAnalyticsItem::addInt64(MediaAnalyticsItem::Attr name, int64_t value) 
 
 void MediaAnalyticsItem::addRate(MediaAnalyticsItem::Attr name, int64_t count, int64_t duration) {
     Prop *prop = allocateProp(name);
+    if (prop == NULL) {
+        return;
+    }
     switch (prop->mType) {
         case kTypeRate:
             prop->u.rate.count += count;
@@ -391,6 +405,9 @@ void MediaAnalyticsItem::addRate(MediaAnalyticsItem::Attr name, int64_t count, i
 
 void MediaAnalyticsItem::addDouble(MediaAnalyticsItem::Attr name, double value) {
     Prop *prop = allocateProp(name);
+    if (prop == NULL) {
+        return;
+    }
     switch (prop->mType) {
         case kTypeDouble:
             prop->u.doubleValue += value;
@@ -577,6 +594,9 @@ void MediaAnalyticsItem::copyProp(Prop *dst, const Prop *src)
     // fix any pointers that we blindly copied, so we have our own copies
     if (dst->mName) {
         void *p =  malloc(dst->mNameLen + 1);
+        LOG_ALWAYS_FATAL_IF(p == NULL,
+                            "failed malloc() duping property '%s' (len %zu)",
+                            dst->mName, dst->mNameLen);
         memcpy (p, src->mName, dst->mNameLen + 1);
         dst->mName = (const char *) p;
     }
@@ -585,7 +605,7 @@ void MediaAnalyticsItem::copyProp(Prop *dst, const Prop *src)
     }
 }
 
-void MediaAnalyticsItem::growProps(int increment)
+bool MediaAnalyticsItem::growProps(int increment)
 {
     if (increment <= 0) {
         increment = kGrowProps;
@@ -599,6 +619,10 @@ void MediaAnalyticsItem::growProps(int increment)
         }
         mProps = ni;
         mPropSize = nsize;
+        return true;
+    } else {
+        ALOGW("MediaAnalyticsItem::growProps fails");
+        return false;
     }
 }
 
@@ -612,9 +636,12 @@ int32_t MediaAnalyticsItem::readFromParcel(const Parcel& data) {
     mPid = data.readInt32();
     mUid = data.readInt32();
     mPkgName = data.readCString();
-    mPkgVersionCode = data.readInt32();
+    mPkgVersionCode = data.readInt64();
     mSessionID = data.readInt64();
+    // We no longer pay attention to user setting of finalized, BUT it's
+    // still part of the wire packet -- so read & discard.
     mFinalized = data.readInt32();
+    mFinalized = 1;
     mTimestamp = data.readInt64();
 
     int count = data.readInt32();
@@ -659,7 +686,7 @@ int32_t MediaAnalyticsItem::writeToParcel(Parcel *data) {
     data->writeInt32(mPid);
     data->writeInt32(mUid);
     data->writeCString(mPkgName.c_str());
-    data->writeInt32(mPkgVersionCode);
+    data->writeInt64(mPkgVersionCode);
     data->writeInt64(mSessionID);
     data->writeInt32(mFinalized);
     data->writeInt64(mTimestamp);
@@ -699,11 +726,11 @@ int32_t MediaAnalyticsItem::writeToParcel(Parcel *data) {
 }
 
 
-AString MediaAnalyticsItem::toString() {
-   return toString(-1);
+std::string MediaAnalyticsItem::toString() {
+   return toString(PROTO_LAST);
 }
 
-AString MediaAnalyticsItem::toString(int version) {
+std::string MediaAnalyticsItem::toString(int version) {
 
     // v0 : released with 'o'
     // v1 : bug fix (missing pid/finalized separator),
@@ -716,7 +743,7 @@ AString MediaAnalyticsItem::toString(int version) {
         version = PROTO_LAST;
     }
 
-    AString result;
+    std::string result;
     char buffer[512];
 
     if (version == PROTO_V0) {
@@ -738,7 +765,7 @@ AString MediaAnalyticsItem::toString(int version) {
 
     if (version >= PROTO_V1) {
         result.append(mPkgName);
-        snprintf(buffer, sizeof(buffer), ":%d:", mPkgVersionCode);
+        snprintf(buffer, sizeof(buffer), ":%"  PRId64 ":", mPkgVersionCode);
         result.append(buffer);
     }
 
@@ -813,7 +840,7 @@ bool MediaAnalyticsItem::selfrecord() {
 bool MediaAnalyticsItem::selfrecord(bool forcenew) {
 
     if (DEBUG_API) {
-        AString p = this->toString();
+        std::string p = this->toString();
         ALOGD("selfrecord of: %s [forcenew=%d]", p.c_str(), forcenew);
     }
 
@@ -822,13 +849,13 @@ bool MediaAnalyticsItem::selfrecord(bool forcenew) {
     if (svc != NULL) {
         MediaAnalyticsItem::SessionID_t newid = svc->submit(this, forcenew);
         if (newid == SessionIDInvalid) {
-            AString p = this->toString();
+            std::string p = this->toString();
             ALOGW("Failed to record: %s [forcenew=%d]", p.c_str(), forcenew);
             return false;
         }
         return true;
     } else {
-        AString p = this->toString();
+        std::string p = this->toString();
         ALOGW("Unable to record: %s [forcenew=%d]", p.c_str(), forcenew);
         return false;
     }
@@ -956,39 +983,30 @@ bool MediaAnalyticsItem::merge(MediaAnalyticsItem *incoming) {
         mSessionID = incoming->mSessionID;
     }
 
-    // we always take the more recent 'finalized' value
-    setFinalized(incoming->getFinalized());
-
     // for each attribute from 'incoming', resolve appropriately
     int nattr = incoming->mPropCount;
     for (int i = 0 ; i < nattr; i++ ) {
         Prop *iprop = &incoming->mProps[i];
-        Prop *oprop = findProp(iprop->mName);
         const char *p = iprop->mName;
         size_t len = strlen(p);
-        char semantic = p[len-1];
+
+        // should ignore a zero length name...
+        if (len == 0) {
+            continue;
+        }
+
+        Prop *oprop = findProp(iprop->mName);
 
         if (oprop == NULL) {
             // no oprop, so we insert the new one
             oprop = allocateProp(p);
-            copyProp(oprop, iprop);
-        } else {
-            // merge iprop into oprop
-            switch (semantic) {
-                case '<':       // first  aka keep old)
-                    /* nop */
-                    break;
-
-                default:        // default is 'last'
-                case '>':       // last (aka keep new)
-                    copyProp(oprop, iprop);
-                    break;
-
-                case '+':       /* sum */
-                    // XXX validate numeric types, sum in place
-                    break;
-
+            if (oprop != NULL) {
+                copyProp(oprop, iprop);
+            } else {
+                ALOGW("dropped property '%s'", iprop->mName);
             }
+        } else {
+            copyProp(oprop, iprop);
         }
     }
 

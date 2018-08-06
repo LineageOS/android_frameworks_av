@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 The Android Open Source Project
+ * Copyright (C) 2014-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,6 +57,17 @@ class Camera3DummyStream :
     virtual status_t detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd);
 
     /**
+     * Drop buffers for stream of streamId if dropping is true. If dropping is false, do not
+     * drop buffers for stream of streamId.
+     */
+    virtual status_t dropBuffers(bool /*dropping*/) override;
+
+    /**
+     * Query the physical camera id for the output stream.
+     */
+    virtual const String8& getPhysicalCameraId() const override;
+
+    /**
      * Return if this output stream is for video encoding.
      */
     bool isVideoStream() const;
@@ -70,6 +81,19 @@ class Camera3DummyStream :
      * Set the consumer surfaces to the output stream.
      */
     virtual status_t setConsumers(const std::vector<sp<Surface>>& consumers);
+
+    /**
+     * Query the output surface id.
+     */
+    virtual ssize_t getSurfaceId(const sp<Surface> &/*surface*/) { return 0; }
+
+    /**
+     * Update the stream output surfaces.
+     */
+    virtual status_t updateStream(const std::vector<sp<Surface>> &outputSurfaces,
+            const std::vector<OutputStreamInfo> &outputInfo,
+            const std::vector<size_t> &removedSurfaceIds,
+            KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
 
   protected:
 
@@ -95,6 +119,7 @@ class Camera3DummyStream :
     static const android_dataspace DUMMY_DATASPACE = HAL_DATASPACE_UNKNOWN;
     static const camera3_stream_rotation_t DUMMY_ROTATION = CAMERA3_STREAM_ROTATION_0;
     static const uint64_t DUMMY_USAGE = GRALLOC_USAGE_HW_COMPOSER;
+    static const String8 DUMMY_ID;
 
     /**
      * Internal Camera3Stream interface

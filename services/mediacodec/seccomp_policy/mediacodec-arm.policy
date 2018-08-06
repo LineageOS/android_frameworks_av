@@ -55,18 +55,4 @@ ugetrlimit: 1
 getdents64: 1
 getrandom: 1
 
-# for attaching to debuggerd on process crash
-sigaction: 1
-tgkill: 1
-socket: 1
-connect: 1
-fcntl64: 1
-rt_tgsigqueueinfo: 1
-geteuid32: 1
-getgid32: 1
-getegid32: 1
-getgroups32: 1
-recvmsg: 1
-getpid: 1
-gettid: 1
-process_vm_readv: 1
+@include /system/etc/seccomp_policy/crash_dump.arm.policy

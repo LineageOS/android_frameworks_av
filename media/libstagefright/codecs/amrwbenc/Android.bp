@@ -159,6 +159,8 @@ cc_library_shared {
 
     cflags: ["-Werror"],
 
+    version_script: "exports.lds",
+
     sanitize: {
         misc_undefined: [
             "signed-integer-overflow",

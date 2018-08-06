@@ -40,10 +40,11 @@ protected:
     virtual void onQueueFilled(OMX_U32 portIndex);
     virtual void onPortFlushCompleted(OMX_U32 portIndex);
     virtual void onReset();
+    virtual bool supportDescribeHdrStaticInfo();
 
 private:
     enum {
-        kNumBuffers = 4
+        kNumBuffers = 10
     };
 
     enum {

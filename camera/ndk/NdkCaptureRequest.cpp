@@ -142,3 +142,40 @@ void ACaptureRequest_free(ACaptureRequest* request) {
     delete request;
     return;
 }
+
+EXPORT
+camera_status_t ACaptureRequest_setUserContext(
+        ACaptureRequest* request, void* context) {
+    if (request == nullptr) {
+        ALOGE("%s: invalid argument! request is NULL", __FUNCTION__);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    return request->setContext(context);
+}
+
+EXPORT
+camera_status_t ACaptureRequest_getUserContext(
+        const ACaptureRequest* request, /*out*/void** context) {
+    if (request == nullptr || context == nullptr) {
+        ALOGE("%s: invalid argument! request %p, context %p",
+                __FUNCTION__, request, context);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    return request->getContext(context);
+}
+
+EXPORT
+ACaptureRequest* ACaptureRequest_copy(const ACaptureRequest* src) {
+    ATRACE_CALL();
+    if (src == nullptr) {
+        ALOGE("%s: src is null!", __FUNCTION__);
+        return nullptr;
+    }
+
+    ACaptureRequest* pRequest = new ACaptureRequest();
+    pRequest->settings = new ACameraMetadata(*(src->settings));
+    pRequest->targets  = new ACameraOutputTargets();
+    *(pRequest->targets)  = *(src->targets);
+    pRequest->context = src->context;
+    return pRequest;
+}

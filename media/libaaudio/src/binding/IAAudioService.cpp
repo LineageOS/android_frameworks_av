@@ -121,16 +121,10 @@ public:
             ALOGE("BpAAudioService::client GET_STREAM_DESCRIPTION passed result %d", result);
             return result;
         }
-        err = parcelable.readFromParcel(&reply);;
+        err = parcelable.readFromParcel(&reply);
         if (err != NO_ERROR) {
             ALOGE("BpAAudioService::client transact(GET_STREAM_DESCRIPTION) read endpoint %d", err);
             return AAudioConvert_androidToAAudioResult(err);
-        }
-        //parcelable.dump();
-        result = parcelable.validate();
-        if (result != AAUDIO_OK) {
-            ALOGE("BpAAudioService::client GET_STREAM_DESCRIPTION validation fails %d", result);
-            return result;
         }
         return result;
     }
@@ -250,6 +244,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
     pid_t tid;
     int64_t nanoseconds;
     aaudio_result_t result;
+    status_t status = NO_ERROR;
     ALOGV("BnAAudioService::onTransact(%i) %i", code, flags);
 
     switch(code) {
@@ -294,21 +289,20 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
 
         case GET_STREAM_DESCRIPTION: {
             CHECK_INTERFACE(IAAudioService, data, reply);
-            data.readInt32(&streamHandle);
+            status = data.readInt32(&streamHandle);
+            if (status != NO_ERROR) {
+                return status;
+            }
             aaudio::AudioEndpointParcelable parcelable;
             result = getStreamDescription(streamHandle, parcelable);
             if (result != AAUDIO_OK) {
                 return AAudioConvert_aaudioToAndroidStatus(result);
             }
-            result = parcelable.validate();
-            if (result != AAUDIO_OK) {
-                ALOGE("BnAAudioService::onTransact getStreamDescription() returns %d", result);
-                parcelable.dump();
-                return AAudioConvert_aaudioToAndroidStatus(result);
+            status = reply->writeInt32(result);
+            if (status != NO_ERROR) {
+                return status;
             }
-            reply->writeInt32(result);
-            parcelable.writeToParcel(reply);
-            return NO_ERROR;
+            return parcelable.writeToParcel(reply);
         } break;
 
         case START_STREAM: {

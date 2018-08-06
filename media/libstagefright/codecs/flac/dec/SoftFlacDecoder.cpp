@@ -45,9 +45,11 @@ SoftFlacDecoder::SoftFlacDecoder(
         OMX_COMPONENTTYPE **component)
     : SimpleSoftOMXComponent(name, callbacks, appData, component),
       mFLACDecoder(NULL),
-      mHasStreamInfo(false),
       mInputBufferCount(0),
+      mHasStreamInfo(false),
       mSignalledError(false),
+      mSawInputEOS(false),
+      mFinishedDecoder(false),
       mOutputPortSettingsChange(NONE) {
     ALOGV("ctor:");
     memset(&mStreamInfo, 0, sizeof(mStreamInfo));
@@ -57,6 +59,7 @@ SoftFlacDecoder::SoftFlacDecoder(
 
 SoftFlacDecoder::~SoftFlacDecoder() {
     ALOGV("dtor:");
+    delete mFLACDecoder;
 }
 
 void SoftFlacDecoder::initPorts() {
@@ -291,7 +294,6 @@ bool SoftFlacDecoder::isConfigured() const {
 }
 
 void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
-    ALOGV("onQueueFilled:");
     if (mSignalledError || mOutputPortSettingsChange != NONE) {
         return;
     }
@@ -299,96 +301,114 @@ void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
     List<BufferInfo *> &inQueue = getPortQueue(0);
     List<BufferInfo *> &outQueue = getPortQueue(1);
 
-    while (!inQueue.empty() && !outQueue.empty()) {
-        BufferInfo *inInfo = *inQueue.begin();
-        OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
+    ALOGV("onQueueFilled %d/%d:", inQueue.empty(), outQueue.empty());
+    while ((!inQueue.empty() || mSawInputEOS) && !outQueue.empty() && !mFinishedDecoder) {
         BufferInfo *outInfo = *outQueue.begin();
         OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
-        uint8_t* inBuffer = inHeader->pBuffer + inHeader->nOffset;
-        uint32_t inBufferLength = inHeader->nFilledLen;
-        bool endOfInput = (inHeader->nFlags & OMX_BUFFERFLAG_EOS) != 0;
+        short *outBuffer = reinterpret_cast<short *>(outHeader->pBuffer + outHeader->nOffset);
+        size_t outBufferSize = outHeader->nAllocLen - outHeader->nOffset;
+        int64_t timeStamp = 0;
 
-        if (inHeader->nFilledLen == 0) {
-            if (endOfInput) {
-                outHeader->nFilledLen = 0;
-                outHeader->nFlags = OMX_BUFFERFLAG_EOS;
-                outInfo->mOwnedByUs = false;
-                outQueue.erase(outQueue.begin());
-                notifyFillBufferDone(outHeader);
-            } else {
-                ALOGE("onQueueFilled: emptyInputBuffer received");
+        if (!inQueue.empty()) {
+            BufferInfo *inInfo = *inQueue.begin();
+            OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
+            uint8_t* inBuffer = inHeader->pBuffer + inHeader->nOffset;
+            uint32_t inBufferLength = inHeader->nFilledLen;
+            ALOGV("input: %u bytes", inBufferLength);
+            if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
+                ALOGV("saw EOS");
+                mSawInputEOS = true;
+                if (mInputBufferCount == 0 && inHeader->nFilledLen == 0) {
+                    // first buffer was empty and EOS: signal EOS on output and return
+                    ALOGV("empty first EOS");
+                    outHeader->nFilledLen = 0;
+                    outHeader->nTimeStamp = inHeader->nTimeStamp;
+                    outHeader->nFlags = OMX_BUFFERFLAG_EOS;
+                    outInfo->mOwnedByUs = false;
+                    outQueue.erase(outQueue.begin());
+                    notifyFillBufferDone(outHeader);
+                    mFinishedDecoder = true;
+                    inInfo->mOwnedByUs = false;
+                    inQueue.erase(inQueue.begin());
+                    notifyEmptyBufferDone(inHeader);
+                    return;
+                }
             }
-            inInfo->mOwnedByUs = false;
-            inQueue.erase(inQueue.begin());
-            notifyEmptyBufferDone(inHeader);
-            return;
-        }
-        if (mInputBufferCount == 0 && !(inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG)) {
-            ALOGE("onQueueFilled: first buffer should have OMX_BUFFERFLAG_CODECCONFIG set");
-            inHeader->nFlags |= OMX_BUFFERFLAG_CODECCONFIG;
-        }
-        if ((inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG) != 0) {
-            status_t decoderErr = mFLACDecoder->parseMetadata(inBuffer, inBufferLength);
-            mInputBufferCount++;
 
-            if (decoderErr != OK && decoderErr != WOULD_BLOCK) {
-                ALOGE("onQueueFilled: FLACDecoder parseMetaData returns error %d", decoderErr);
+            if (mInputBufferCount == 0 && !(inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG)) {
+                ALOGE("onQueueFilled: first buffer should have OMX_BUFFERFLAG_CODECCONFIG set");
+                inHeader->nFlags |= OMX_BUFFERFLAG_CODECCONFIG;
+            }
+            if ((inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG) != 0) {
+                ALOGV("received config buffer of size %u", inBufferLength);
+                status_t decoderErr = mFLACDecoder->parseMetadata(inBuffer, inBufferLength);
+                mInputBufferCount++;
+
+                if (decoderErr != OK && decoderErr != WOULD_BLOCK) {
+                    ALOGE("onQueueFilled: FLACDecoder parseMetaData returns error %d", decoderErr);
+                    mSignalledError = true;
+                    notify(OMX_EventError, OMX_ErrorStreamCorrupt, decoderErr, NULL);
+                    return;
+                }
+
+                inInfo->mOwnedByUs = false;
+                inQueue.erase(inQueue.begin());
+                notifyEmptyBufferDone(inHeader);
+
+                if (decoderErr == WOULD_BLOCK) {
+                    continue;
+                }
+                mStreamInfo = mFLACDecoder->getStreamInfo();
+                mHasStreamInfo = true;
+
+                // Only send out port settings changed event if both sample rate
+                // and numChannels are valid.
+                if (mStreamInfo.sample_rate && mStreamInfo.channels) {
+                    ALOGD("onQueueFilled: initially configuring decoder: %d Hz, %d channels",
+                        mStreamInfo.sample_rate, mStreamInfo.channels);
+
+                    notify(OMX_EventPortSettingsChanged, 1, 0, NULL);
+                    mOutputPortSettingsChange = AWAITING_DISABLED;
+                }
+                return;
+            }
+
+            status_t decoderErr = mFLACDecoder->decodeOneFrame(
+                    inBuffer, inBufferLength, outBuffer, &outBufferSize);
+            if (decoderErr != OK) {
+                ALOGE("onQueueFilled: FLACDecoder decodeOneFrame returns error %d", decoderErr);
                 mSignalledError = true;
                 notify(OMX_EventError, OMX_ErrorStreamCorrupt, decoderErr, NULL);
                 return;
             }
 
+            mInputBufferCount++;
+            timeStamp = inHeader->nTimeStamp;
             inInfo->mOwnedByUs = false;
             inQueue.erase(inQueue.begin());
             notifyEmptyBufferDone(inHeader);
 
-            if (decoderErr == WOULD_BLOCK) {
+            if (outBufferSize == 0) {
+                ALOGV("no output, trying again");
                 continue;
             }
-            mStreamInfo = mFLACDecoder->getStreamInfo();
-            mHasStreamInfo = true;
-
-            // Only send out port settings changed event if both sample rate
-            // and numChannels are valid.
-            if (mStreamInfo.sample_rate && mStreamInfo.channels) {
-                ALOGD("onQueueFilled: initially configuring decoder: %d Hz, %d channels",
-                    mStreamInfo.sample_rate, mStreamInfo.channels);
-
-                notify(OMX_EventPortSettingsChanged, 1, 0, NULL);
-                mOutputPortSettingsChange = AWAITING_DISABLED;
+        } else if (mSawInputEOS) {
+            status_t decoderErr = mFLACDecoder->decodeOneFrame(NULL, 0, outBuffer, &outBufferSize);
+            mFinishedDecoder = true;
+            if (decoderErr != OK) {
+                ALOGE("onQueueFilled: FLACDecoder finish returns error %d", decoderErr);
+                mSignalledError = true;
+                notify(OMX_EventError, OMX_ErrorStreamCorrupt, decoderErr, NULL);
+                return;
             }
-            return;
-        }
-
-        short *outBuffer =
-                reinterpret_cast<short *>(outHeader->pBuffer + outHeader->nOffset);
-        size_t outBufferSize = outHeader->nAllocLen - outHeader->nOffset;
-
-        status_t decoderErr = mFLACDecoder->decodeOneFrame(
-                inBuffer, inBufferLength, outBuffer, &outBufferSize);
-        if (decoderErr != OK) {
-            ALOGE("onQueueFilled: FLACDecoder decodeOneFrame returns error %d", decoderErr);
-            mSignalledError = true;
-            notify(OMX_EventError, OMX_ErrorStreamCorrupt, decoderErr, NULL);
-            return;
-        }
-
-        mInputBufferCount++;
-        int64_t ts = inHeader->nTimeStamp;
-        inInfo->mOwnedByUs = false;
-        inQueue.erase(inQueue.begin());
-        notifyEmptyBufferDone(inHeader);
-
-        if (endOfInput) {
             outHeader->nFlags = OMX_BUFFERFLAG_EOS;
-        } else if (outBufferSize == 0) {
-            continue;
         } else {
-            outHeader->nFlags = 0;
+            // no more input buffers at this time, loop and see if there is more output
+            continue;
         }
 
         outHeader->nFilledLen = outBufferSize;
-        outHeader->nTimeStamp = ts;
+        outHeader->nTimeStamp = timeStamp;
 
         outInfo->mOwnedByUs = false;
         outQueue.erase(outQueue.begin());
@@ -405,9 +425,12 @@ void SoftFlacDecoder::onPortFlushCompleted(OMX_U32 portIndex) {
 
 void SoftFlacDecoder::drainDecoder() {
     mFLACDecoder->flush();
+    mSawInputEOS = false;
+    mFinishedDecoder = false;
 }
 
 void SoftFlacDecoder::onReset() {
+    ALOGV("onReset");
     drainDecoder();
 
     memset(&mStreamInfo, 0, sizeof(mStreamInfo));

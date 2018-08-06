@@ -24,8 +24,8 @@
 #include <binder/IServiceManager.h>
 #include <utils/Log.h>
 
-#include <media/CryptoHal.h>
-#include <media/DrmHal.h>
+#include <mediadrm/CryptoHal.h>
+#include <mediadrm/DrmHal.h>
 
 namespace android {
 

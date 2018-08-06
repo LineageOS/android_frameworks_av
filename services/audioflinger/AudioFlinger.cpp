@@ -28,6 +28,7 @@
 
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
+#include <cutils/multiuser.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include <binder/Parcel.h>
@@ -55,6 +56,7 @@
 #include <system/audio_effects/effect_aec.h>
 
 #include <audio_utils/primitives.h>
+#include <audio_utils/string.h>
 
 #include <powermanager/PowerManager.h>
 
@@ -155,6 +157,8 @@ AudioFlinger::AudioFlinger()
       mBtNrecIsOff(false),
       mIsLowRamDevice(true),
       mIsDeviceTypeKnown(false),
+      mTotalMemory(0),
+      mClientSharedHeapSize(kMinimumClientSharedHeapSizeBytes),
       mGlobalEffectEnableTime(0),
       mSystemReady(false)
 {
@@ -262,6 +266,7 @@ status_t MmapStreamInterface::openMmapStream(MmapStreamInterface::stream_directi
                                              audio_config_base_t *config,
                                              const AudioClient& client,
                                              audio_port_handle_t *deviceId,
+                                             audio_session_t *sessionId,
                                              const sp<MmapStreamCallback>& callback,
                                              sp<MmapStreamInterface>& interface,
                                              audio_port_handle_t *handle)
@@ -274,7 +279,8 @@ status_t MmapStreamInterface::openMmapStream(MmapStreamInterface::stream_directi
     status_t ret = NO_INIT;
     if (af != 0) {
         ret = af->openMmapStream(
-                direction, attr, config, client, deviceId, callback, interface, handle);
+                direction, attr, config, client, deviceId,
+                sessionId, callback, interface, handle);
     }
     return ret;
 }
@@ -284,6 +290,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
                                       audio_config_base_t *config,
                                       const AudioClient& client,
                                       audio_port_handle_t *deviceId,
+                                      audio_session_t *sessionId,
                                       const sp<MmapStreamCallback>& callback,
                                       sp<MmapStreamInterface>& interface,
                                       audio_port_handle_t *handle)
@@ -292,8 +299,10 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
     if (ret != NO_ERROR) {
         return ret;
     }
-
-    audio_session_t sessionId = (audio_session_t) newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
+    audio_session_t actualSessionId = *sessionId;
+    if (actualSessionId == AUDIO_SESSION_ALLOCATE) {
+        actualSessionId = (audio_session_t) newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
+    }
     audio_stream_type_t streamType = AUDIO_STREAM_DEFAULT;
     audio_io_handle_t io = AUDIO_IO_HANDLE_NONE;
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
@@ -303,17 +312,18 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         fullConfig.channel_mask = config->channel_mask;
         fullConfig.format = config->format;
         ret = AudioSystem::getOutputForAttr(attr, &io,
-                                            sessionId,
-                                            &streamType, client.clientUid,
+                                            actualSessionId,
+                                            &streamType, client.clientPid, client.clientUid,
                                             &fullConfig,
                                             (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ |
                                                     AUDIO_OUTPUT_FLAG_DIRECT),
                                             deviceId, &portId);
     } else {
         ret = AudioSystem::getInputForAttr(attr, &io,
-                                              sessionId,
+                                              actualSessionId,
                                               client.clientPid,
                                               client.clientUid,
+                                              client.packageName,
                                               config,
                                               AUDIO_INPUT_FLAG_MMAP_NOIRQ, deviceId, &portId);
     }
@@ -326,13 +336,14 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
     sp<MmapThread> thread = mMmapThreads.valueFor(io);
     if (thread != 0) {
         interface = new MmapThreadHandle(thread);
-        thread->configure(attr, streamType, sessionId, callback, *deviceId, portId);
+        thread->configure(attr, streamType, actualSessionId, callback, *deviceId, portId);
         *handle = portId;
+        *sessionId = actualSessionId;
     } else {
         if (direction == MmapStreamInterface::DIRECTION_OUTPUT) {
-            AudioSystem::releaseOutput(io, streamType, sessionId);
+            AudioSystem::releaseOutput(io, streamType, actualSessionId);
         } else {
-            AudioSystem::releaseInput(io, sessionId);
+            AudioSystem::releaseInput(portId);
         }
         ret = NO_INIT;
     }
@@ -641,38 +652,56 @@ void AudioFlinger::unregisterWriter(const sp<NBLog::Writer>& writer)
 
 // IAudioFlinger interface
 
-
-sp<IAudioTrack> AudioFlinger::createTrack(
-        audio_stream_type_t streamType,
-        uint32_t sampleRate,
-        audio_format_t format,
-        audio_channel_mask_t channelMask,
-        size_t *frameCount,
-        audio_output_flags_t *flags,
-        const sp<IMemory>& sharedBuffer,
-        audio_io_handle_t output,
-        pid_t pid,
-        pid_t tid,
-        audio_session_t *sessionId,
-        int clientUid,
-        status_t *status,
-        audio_port_handle_t portId)
+sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
+                                          CreateTrackOutput& output,
+                                          status_t *status)
 {
     sp<PlaybackThread::Track> track;
     sp<TrackHandle> trackHandle;
     sp<Client> client;
     status_t lStatus;
-    audio_session_t lSessionId;
+    audio_stream_type_t streamType;
+    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
 
+    bool updatePid = (input.clientInfo.clientPid == -1);
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
-    if (pid == -1 || !isTrustedCallingUid(callingUid)) {
+    uid_t clientUid = input.clientInfo.clientUid;
+    if (!isTrustedCallingUid(callingUid)) {
+        ALOGW_IF(clientUid != callingUid,
+                "%s uid %d tried to pass itself off as %d",
+                __FUNCTION__, callingUid, clientUid);
+        clientUid = callingUid;
+        updatePid = true;
+    }
+    pid_t clientPid = input.clientInfo.clientPid;
+    if (updatePid) {
         const pid_t callingPid = IPCThreadState::self()->getCallingPid();
-        ALOGW_IF(pid != -1 && pid != callingPid,
+        ALOGW_IF(clientPid != -1 && clientPid != callingPid,
                  "%s uid %d pid %d tried to pass itself off as pid %d",
-                 __func__, callingUid, callingPid, pid);
-        pid = callingPid;
+                 __func__, callingUid, callingPid, clientPid);
+        clientPid = callingPid;
     }
 
+    audio_session_t sessionId = input.sessionId;
+    if (sessionId == AUDIO_SESSION_ALLOCATE) {
+        sessionId = (audio_session_t) newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
+    } else if (audio_unique_id_get_use(sessionId) != AUDIO_UNIQUE_ID_USE_SESSION) {
+        lStatus = BAD_VALUE;
+        goto Exit;
+    }
+
+    output.sessionId = sessionId;
+    output.outputId = AUDIO_IO_HANDLE_NONE;
+    output.selectedDeviceId = input.selectedDeviceId;
+
+    lStatus = AudioSystem::getOutputForAttr(&input.attr, &output.outputId, sessionId, &streamType,
+                                            clientPid, clientUid, &input.config, input.flags,
+                                            &output.selectedDeviceId, &portId);
+
+    if (lStatus != NO_ERROR || output.outputId == AUDIO_IO_HANDLE_NONE) {
+        ALOGE("createTrack() getOutputForAttr() return error %d or invalid output handle", lStatus);
+        goto Exit;
+    }
     // client AudioTrack::set already implements AUDIO_STREAM_DEFAULT => AUDIO_STREAM_MUSIC,
     // but if someone uses binder directly they could bypass that and cause us to crash
     if (uint32_t(streamType) >= AUDIO_STREAM_CNT) {
@@ -681,78 +710,63 @@ sp<IAudioTrack> AudioFlinger::createTrack(
         goto Exit;
     }
 
-    // further sample rate checks are performed by createTrack_l() depending on the thread type
-    if (sampleRate == 0) {
-        ALOGE("createTrack() invalid sample rate %u", sampleRate);
-        lStatus = BAD_VALUE;
-        goto Exit;
-    }
-
     // further channel mask checks are performed by createTrack_l() depending on the thread type
-    if (!audio_is_output_channel(channelMask)) {
-        ALOGE("createTrack() invalid channel mask %#x", channelMask);
+    if (!audio_is_output_channel(input.config.channel_mask)) {
+        ALOGE("createTrack() invalid channel mask %#x", input.config.channel_mask);
         lStatus = BAD_VALUE;
         goto Exit;
     }
 
     // further format checks are performed by createTrack_l() depending on the thread type
-    if (!audio_is_valid_format(format)) {
-        ALOGE("createTrack() invalid format %#x", format);
-        lStatus = BAD_VALUE;
-        goto Exit;
-    }
-
-    if (sharedBuffer != 0 && sharedBuffer->pointer() == NULL) {
-        ALOGE("createTrack() sharedBuffer is non-0 but has NULL pointer()");
+    if (!audio_is_valid_format(input.config.format)) {
+        ALOGE("createTrack() invalid format %#x", input.config.format);
         lStatus = BAD_VALUE;
         goto Exit;
     }
 
     {
         Mutex::Autolock _l(mLock);
-        PlaybackThread *thread = checkPlaybackThread_l(output);
+        PlaybackThread *thread = checkPlaybackThread_l(output.outputId);
         if (thread == NULL) {
-            ALOGE("no playback thread found for output handle %d", output);
+            ALOGE("no playback thread found for output handle %d", output.outputId);
             lStatus = BAD_VALUE;
             goto Exit;
         }
 
-        client = registerPid(pid);
+        client = registerPid(clientPid);
 
         PlaybackThread *effectThread = NULL;
-        if (sessionId != NULL && *sessionId != AUDIO_SESSION_ALLOCATE) {
-            if (audio_unique_id_get_use(*sessionId) != AUDIO_UNIQUE_ID_USE_SESSION) {
-                ALOGE("createTrack() invalid session ID %d", *sessionId);
-                lStatus = BAD_VALUE;
-                goto Exit;
-            }
-            lSessionId = *sessionId;
-            // check if an effect chain with the same session ID is present on another
-            // output thread and move it here.
-            for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-                sp<PlaybackThread> t = mPlaybackThreads.valueAt(i);
-                if (mPlaybackThreads.keyAt(i) != output) {
-                    uint32_t sessions = t->hasAudioSession(lSessionId);
-                    if (sessions & ThreadBase::EFFECT_SESSION) {
-                        effectThread = t.get();
-                        break;
-                    }
+        // check if an effect chain with the same session ID is present on another
+        // output thread and move it here.
+        for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
+            sp<PlaybackThread> t = mPlaybackThreads.valueAt(i);
+            if (mPlaybackThreads.keyAt(i) != output.outputId) {
+                uint32_t sessions = t->hasAudioSession(sessionId);
+                if (sessions & ThreadBase::EFFECT_SESSION) {
+                    effectThread = t.get();
+                    break;
                 }
             }
-        } else {
-            // if no audio session id is provided, create one here
-            lSessionId = (audio_session_t) nextUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
-            if (sessionId != NULL) {
-                *sessionId = lSessionId;
-            }
         }
-        ALOGV("createTrack() lSessionId: %d", lSessionId);
+        ALOGV("createTrack() sessionId: %d", sessionId);
 
-        track = thread->createTrack_l(client, streamType, sampleRate, format,
-                channelMask, frameCount, sharedBuffer, lSessionId, flags, tid,
-                clientUid, &lStatus, portId);
+        output.sampleRate = input.config.sample_rate;
+        output.frameCount = input.frameCount;
+        output.notificationFrameCount = input.notificationFrameCount;
+        output.flags = input.flags;
+
+        track = thread->createTrack_l(client, streamType, input.attr, &output.sampleRate,
+                                      input.config.format, input.config.channel_mask,
+                                      &output.frameCount, &output.notificationFrameCount,
+                                      input.notificationsPerBuffer, input.speed,
+                                      input.sharedBuffer, sessionId, &output.flags,
+                                      input.clientInfo.clientTid, clientUid, &lStatus, portId);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (track == 0));
         // we don't abort yet if lStatus != NO_ERROR; there is still work to be done regardless
+
+        output.afFrameCount = thread->frameCount();
+        output.afSampleRate = thread->sampleRate();
+        output.afLatencyMs = thread->latency();
 
         // move effect chain to this output thread if an effect on same session was waiting
         // for a track to be created
@@ -760,12 +774,12 @@ sp<IAudioTrack> AudioFlinger::createTrack(
             // no risk of deadlock because AudioFlinger::mLock is held
             Mutex::Autolock _dl(thread->mLock);
             Mutex::Autolock _sl(effectThread->mLock);
-            moveEffectChain_l(lSessionId, effectThread, thread, true);
+            moveEffectChain_l(sessionId, effectThread, thread, true);
         }
 
         // Look for sync events awaiting for a session to be used.
         for (size_t i = 0; i < mPendingSyncEvents.size(); i++) {
-            if (mPendingSyncEvents[i]->triggerSession() == lSessionId) {
+            if (mPendingSyncEvents[i]->triggerSession() == sessionId) {
                 if (thread->isValidSyncEvent(mPendingSyncEvents[i])) {
                     if (lStatus == NO_ERROR) {
                         (void) track->setSyncEvent(mPendingSyncEvents[i]);
@@ -778,7 +792,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(
             }
         }
 
-        setAudioHwSyncForSession_l(thread, lSessionId);
+        setAudioHwSyncForSession_l(thread, sessionId);
     }
 
     if (lStatus != NO_ERROR) {
@@ -798,6 +812,9 @@ sp<IAudioTrack> AudioFlinger::createTrack(
     trackHandle = new TrackHandle(track);
 
 Exit:
+    if (lStatus != NO_ERROR && output.outputId != AUDIO_IO_HANDLE_NONE) {
+        AudioSystem::releaseOutput(output.outputId, streamType, sessionId);
+    }
     *status = lStatus;
     return trackHandle;
 }
@@ -981,6 +998,19 @@ bool AudioFlinger::getMicMute() const
     return mute;
 }
 
+void AudioFlinger::setRecordSilenced(uid_t uid, bool silenced)
+{
+    ALOGV("AudioFlinger::setRecordSilenced(uid:%d, silenced:%d)", uid, silenced);
+
+    AutoMutex lock(mLock);
+    for (size_t i = 0; i < mRecordThreads.size(); i++) {
+        mRecordThreads[i]->setRecordSilenced(uid, silenced);
+    }
+    for (size_t i = 0; i < mMmapThreads.size(); i++) {
+        mMmapThreads[i]->setRecordSilenced(uid, silenced);
+    }
+}
+
 status_t AudioFlinger::setMasterMute(bool muted)
 {
     status_t ret = initCheck();
@@ -1069,26 +1099,17 @@ status_t AudioFlinger::setStreamVolume(audio_stream_type_t stream, float value,
     if (status != NO_ERROR) {
         return status;
     }
+    if (output == AUDIO_IO_HANDLE_NONE) {
+        return BAD_VALUE;
+    }
     ALOG_ASSERT(stream != AUDIO_STREAM_PATCH, "attempt to change AUDIO_STREAM_PATCH volume");
 
     AutoMutex lock(mLock);
-    Vector<VolumeInterface *> volumeInterfaces;
-    if (output != AUDIO_IO_HANDLE_NONE) {
-        VolumeInterface *volumeInterface = getVolumeInterface_l(output);
-        if (volumeInterface == NULL) {
-            return BAD_VALUE;
-        }
-        volumeInterfaces.add(volumeInterface);
+    VolumeInterface *volumeInterface = getVolumeInterface_l(output);
+    if (volumeInterface == NULL) {
+        return BAD_VALUE;
     }
-
-    mStreamTypes[stream].volume = value;
-
-    if (volumeInterfaces.size() == 0) {
-        volumeInterfaces = getAllVolumeInterfaces_l();
-    }
-    for (size_t i = 0; i < volumeInterfaces.size(); i++) {
-        volumeInterfaces[i]->setStreamVolume(stream, value);
-    }
+    volumeInterface->setStreamVolume(stream, value);
 
     return NO_ERROR;
 }
@@ -1127,21 +1148,17 @@ float AudioFlinger::streamVolume(audio_stream_type_t stream, audio_io_handle_t o
     if (status != NO_ERROR) {
         return 0.0f;
     }
-
-    AutoMutex lock(mLock);
-    float volume;
-    if (output != AUDIO_IO_HANDLE_NONE) {
-        VolumeInterface *volumeInterface = getVolumeInterface_l(output);
-        if (volumeInterface != NULL) {
-            volume = volumeInterface->streamVolume(stream);
-        } else {
-            volume = 0.0f;
-        }
-    } else {
-        volume = streamVolume_l(stream);
+    if (output == AUDIO_IO_HANDLE_NONE) {
+        return 0.0f;
     }
 
-    return volume;
+    AutoMutex lock(mLock);
+    VolumeInterface *volumeInterface = getVolumeInterface_l(output);
+    if (volumeInterface == NULL) {
+        return 0.0f;
+    }
+
+    return volumeInterface->streamVolume(stream);
 }
 
 bool AudioFlinger::streamMute(audio_stream_type_t stream) const
@@ -1163,15 +1180,58 @@ void AudioFlinger::broacastParametersToRecordThreads_l(const String8& keyValuePa
     }
 }
 
+// Filter reserved keys from setParameters() before forwarding to audio HAL or acting upon.
+// Some keys are used for audio routing and audio path configuration and should be reserved for use
+// by audio policy and audio flinger for functional, privacy and security reasons.
+void AudioFlinger::filterReservedParameters(String8& keyValuePairs, uid_t callingUid)
+{
+    static const String8 kReservedParameters[] = {
+        String8(AudioParameter::keyRouting),
+        String8(AudioParameter::keySamplingRate),
+        String8(AudioParameter::keyFormat),
+        String8(AudioParameter::keyChannels),
+        String8(AudioParameter::keyFrameCount),
+        String8(AudioParameter::keyInputSource),
+        String8(AudioParameter::keyMonoOutput),
+        String8(AudioParameter::keyStreamConnect),
+        String8(AudioParameter::keyStreamDisconnect),
+        String8(AudioParameter::keyStreamSupportedFormats),
+        String8(AudioParameter::keyStreamSupportedChannels),
+        String8(AudioParameter::keyStreamSupportedSamplingRates),
+    };
+
+    // multiuser friendly app ID check for requests coming from audioserver
+    if (multiuser_get_app_id(callingUid) == AID_AUDIOSERVER) {
+        return;
+    }
+
+    AudioParameter param = AudioParameter(keyValuePairs);
+    String8 value;
+    for (auto& key : kReservedParameters) {
+        if (param.get(key, value) == NO_ERROR) {
+            ALOGW("%s: filtering key %s value %s from uid %d",
+                  __func__, key.string(), value.string(), callingUid);
+            param.remove(key);
+        }
+    }
+    keyValuePairs = param.toString();
+}
+
 status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs)
 {
-    ALOGV("setParameters(): io %d, keyvalue %s, calling pid %d",
-            ioHandle, keyValuePairs.string(), IPCThreadState::self()->getCallingPid());
+    ALOGV("setParameters(): io %d, keyvalue %s, calling pid %d calling uid %d",
+            ioHandle, keyValuePairs.string(),
+            IPCThreadState::self()->getCallingPid(), IPCThreadState::self()->getCallingUid());
 
     // check calling permissions
     if (!settingsAllowed()) {
         return PERMISSION_DENIED;
     }
+
+    String8 filteredKeyValuePairs = keyValuePairs;
+    filterReservedParameters(filteredKeyValuePairs, IPCThreadState::self()->getCallingUid());
+
+    ALOGV("%s: filtered keyvalue %s", __func__, filteredKeyValuePairs.string());
 
     // AUDIO_IO_HANDLE_NONE means the parameters are global to the audio hardware interface
     if (ioHandle == AUDIO_IO_HANDLE_NONE) {
@@ -1183,7 +1243,7 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
             mHardwareStatus = AUDIO_HW_SET_PARAMETER;
             for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
                 sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
-                status_t result = dev->setParameters(keyValuePairs);
+                status_t result = dev->setParameters(filteredKeyValuePairs);
                 // return success if at least one audio device accepts the parameters as not all
                 // HALs are requested to support all parameters. If no audio device supports the
                 // requested parameters, the last error is reported.
@@ -1194,7 +1254,7 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
             mHardwareStatus = AUDIO_HW_IDLE;
         }
         // disable AEC and NS if the device is a BT SCO headset supporting those pre processings
-        AudioParameter param = AudioParameter(keyValuePairs);
+        AudioParameter param = AudioParameter(filteredKeyValuePairs);
         String8 value;
         if (param.get(String8(AudioParameter::keyBtNrec), value) == NO_ERROR) {
             bool btNrecIsOff = (value == AudioParameter::valueOff);
@@ -1227,16 +1287,16 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
             }
         } else if (thread == primaryPlaybackThread_l()) {
             // indicate output device change to all input threads for pre processing
-            AudioParameter param = AudioParameter(keyValuePairs);
+            AudioParameter param = AudioParameter(filteredKeyValuePairs);
             int value;
             if ((param.getInt(String8(AudioParameter::keyRouting), value) == NO_ERROR) &&
                     (value != 0)) {
-                broacastParametersToRecordThreads_l(keyValuePairs);
+                broacastParametersToRecordThreads_l(filteredKeyValuePairs);
             }
         }
     }
     if (thread != 0) {
-        return thread->setParameters(keyValuePairs);
+        return thread->setParameters(filteredKeyValuePairs);
     }
     return BAD_VALUE;
 }
@@ -1485,17 +1545,9 @@ AudioFlinger::Client::Client(const sp<AudioFlinger>& audioFlinger, pid_t pid)
         mAudioFlinger(audioFlinger),
         mPid(pid)
 {
-    size_t heapSize = property_get_int32("ro.af.client_heap_size_kbyte", 0);
-    heapSize *= 1024;
-    if (!heapSize) {
-        heapSize = kClientSharedHeapSizeBytes;
-        // Increase heap size on non low ram devices to limit risk of reconnection failure for
-        // invalidated tracks
-        if (!audioFlinger->isLowRamDevice()) {
-            heapSize *= kClientSharedHeapSizeMultiplier;
-        }
-    }
-    mMemoryDealer = new MemoryDealer(heapSize, "AudioFlinger::Client");
+    mMemoryDealer = new MemoryDealer(
+            audioFlinger->getClientSharedHeapSize(),
+            (std::string("AudioFlinger::Client(") + std::to_string(pid) + ")").c_str());
 }
 
 // Client destructor must be called with AudioFlinger::mClientLock held
@@ -1566,120 +1618,144 @@ void AudioFlinger::requestLogMerge() {
 
 // ----------------------------------------------------------------------------
 
-sp<IAudioRecord> AudioFlinger::openRecord(
-        audio_io_handle_t input,
-        uint32_t sampleRate,
-        audio_format_t format,
-        audio_channel_mask_t channelMask,
-        const String16& opPackageName,
-        size_t *frameCount,
-        audio_input_flags_t *flags,
-        pid_t pid,
-        pid_t tid,
-        int clientUid,
-        audio_session_t *sessionId,
-        size_t *notificationFrames,
-        sp<IMemory>& cblk,
-        sp<IMemory>& buffers,
-        status_t *status,
-        audio_port_handle_t portId)
+sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& input,
+                                                   CreateRecordOutput& output,
+                                                   status_t *status)
 {
     sp<RecordThread::RecordTrack> recordTrack;
     sp<RecordHandle> recordHandle;
     sp<Client> client;
     status_t lStatus;
-    audio_session_t lSessionId;
+    audio_session_t sessionId = input.sessionId;
+    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
 
-    cblk.clear();
-    buffers.clear();
+    output.cblk.clear();
+    output.buffers.clear();
+    output.inputId = AUDIO_IO_HANDLE_NONE;
 
-    bool updatePid = (pid == -1);
+    bool updatePid = (input.clientInfo.clientPid == -1);
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
+    uid_t clientUid = input.clientInfo.clientUid;
     if (!isTrustedCallingUid(callingUid)) {
-        ALOGW_IF((uid_t)clientUid != callingUid,
-                "%s uid %d tried to pass itself off as %d", __FUNCTION__, callingUid, clientUid);
+        ALOGW_IF(clientUid != callingUid,
+                "%s uid %d tried to pass itself off as %d",
+                __FUNCTION__, callingUid, clientUid);
         clientUid = callingUid;
         updatePid = true;
     }
-
+    pid_t clientPid = input.clientInfo.clientPid;
     if (updatePid) {
         const pid_t callingPid = IPCThreadState::self()->getCallingPid();
-        ALOGW_IF(pid != -1 && pid != callingPid,
+        ALOGW_IF(clientPid != -1 && clientPid != callingPid,
                  "%s uid %d pid %d tried to pass itself off as pid %d",
-                 __func__, callingUid, callingPid, pid);
-        pid = callingPid;
-    }
-
-    // check calling permissions
-    if (!recordingAllowed(opPackageName, tid, clientUid)) {
-        ALOGE("openRecord() permission denied: recording not allowed");
-        lStatus = PERMISSION_DENIED;
-        goto Exit;
-    }
-
-    // further sample rate checks are performed by createRecordTrack_l()
-    if (sampleRate == 0) {
-        ALOGE("openRecord() invalid sample rate %u", sampleRate);
-        lStatus = BAD_VALUE;
-        goto Exit;
+                 __func__, callingUid, callingPid, clientPid);
+        clientPid = callingPid;
     }
 
     // we don't yet support anything other than linear PCM
-    if (!audio_is_valid_format(format) || !audio_is_linear_pcm(format)) {
-        ALOGE("openRecord() invalid format %#x", format);
+    if (!audio_is_valid_format(input.config.format) || !audio_is_linear_pcm(input.config.format)) {
+        ALOGE("createRecord() invalid format %#x", input.config.format);
         lStatus = BAD_VALUE;
         goto Exit;
     }
 
     // further channel mask checks are performed by createRecordTrack_l()
-    if (!audio_is_input_channel(channelMask)) {
-        ALOGE("openRecord() invalid channel mask %#x", channelMask);
+    if (!audio_is_input_channel(input.config.channel_mask)) {
+        ALOGE("createRecord() invalid channel mask %#x", input.config.channel_mask);
         lStatus = BAD_VALUE;
         goto Exit;
     }
 
+    if (sessionId == AUDIO_SESSION_ALLOCATE) {
+        sessionId = (audio_session_t) newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
+    } else if (audio_unique_id_get_use(sessionId) != AUDIO_UNIQUE_ID_USE_SESSION) {
+        lStatus = BAD_VALUE;
+        goto Exit;
+    }
+
+    output.sessionId = sessionId;
+    output.selectedDeviceId = input.selectedDeviceId;
+    output.flags = input.flags;
+
+    client = registerPid(clientPid);
+
+    // Not a conventional loop, but a retry loop for at most two iterations total.
+    // Try first maybe with FAST flag then try again without FAST flag if that fails.
+    // Exits loop via break on no error of got exit on error
+    // The sp<> references will be dropped when re-entering scope.
+    // The lack of indentation is deliberate, to reduce code churn and ease merges.
+    for (;;) {
+    // release previously opened input if retrying.
+    if (output.inputId != AUDIO_IO_HANDLE_NONE) {
+        recordTrack.clear();
+        AudioSystem::releaseInput(portId);
+        output.inputId = AUDIO_IO_HANDLE_NONE;
+        output.selectedDeviceId = input.selectedDeviceId;
+        portId = AUDIO_PORT_HANDLE_NONE;
+    }
+    lStatus = AudioSystem::getInputForAttr(&input.attr, &output.inputId,
+                                      sessionId,
+                                    // FIXME compare to AudioTrack
+                                      clientPid,
+                                      clientUid,
+                                      input.opPackageName,
+                                      &input.config,
+                                      output.flags, &output.selectedDeviceId, &portId);
+
     {
         Mutex::Autolock _l(mLock);
-        RecordThread *thread = checkRecordThread_l(input);
+        RecordThread *thread = checkRecordThread_l(output.inputId);
         if (thread == NULL) {
-            ALOGE("openRecord() checkRecordThread_l failed");
+            ALOGE("createRecord() checkRecordThread_l failed");
             lStatus = BAD_VALUE;
             goto Exit;
         }
 
-        client = registerPid(pid);
+        ALOGV("createRecord() lSessionId: %d input %d", sessionId, output.inputId);
 
-        if (sessionId != NULL && *sessionId != AUDIO_SESSION_ALLOCATE) {
-            if (audio_unique_id_get_use(*sessionId) != AUDIO_UNIQUE_ID_USE_SESSION) {
-                lStatus = BAD_VALUE;
-                goto Exit;
-            }
-            lSessionId = *sessionId;
-        } else {
-            // if no audio session id is provided, create one here
-            lSessionId = (audio_session_t) nextUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
-            if (sessionId != NULL) {
-                *sessionId = lSessionId;
-            }
-        }
-        ALOGV("openRecord() lSessionId: %d input %d", lSessionId, input);
+        output.sampleRate = input.config.sample_rate;
+        output.frameCount = input.frameCount;
+        output.notificationFrameCount = input.notificationFrameCount;
 
-        recordTrack = thread->createRecordTrack_l(client, sampleRate, format, channelMask,
-                                                  frameCount, lSessionId, notificationFrames,
-                                                  clientUid, flags, tid, &lStatus, portId);
+        recordTrack = thread->createRecordTrack_l(client, input.attr, &output.sampleRate,
+                                                  input.config.format, input.config.channel_mask,
+                                                  &output.frameCount, sessionId,
+                                                  &output.notificationFrameCount,
+                                                  clientUid, &output.flags,
+                                                  input.clientInfo.clientTid,
+                                                  &lStatus, portId);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (recordTrack == 0));
 
-        if (lStatus == NO_ERROR) {
-            // Check if one effect chain was awaiting for an AudioRecord to be created on this
-            // session and move it to this thread.
-            sp<EffectChain> chain = getOrphanEffectChain_l(lSessionId);
-            if (chain != 0) {
-                Mutex::Autolock _l(thread->mLock);
-                thread->addEffectChain_l(chain);
-            }
+        // lStatus == BAD_TYPE means FAST flag was rejected: request a new input from
+        // audio policy manager without FAST constraint
+        if (lStatus == BAD_TYPE) {
+            continue;
         }
+
+        if (lStatus != NO_ERROR) {
+            goto Exit;
+        }
+
+        // Check if one effect chain was awaiting for an AudioRecord to be created on this
+        // session and move it to this thread.
+        sp<EffectChain> chain = getOrphanEffectChain_l(sessionId);
+        if (chain != 0) {
+            Mutex::Autolock _l(thread->mLock);
+            thread->addEffectChain_l(chain);
+        }
+        break;
+    }
+    // End of retry loop.
+    // The lack of indentation is deliberate, to reduce code churn and ease merges.
     }
 
+    output.cblk = recordTrack->getCblk();
+    output.buffers = recordTrack->getBuffers();
+
+    // return handle to client
+    recordHandle = new RecordHandle(recordTrack);
+
+Exit:
     if (lStatus != NO_ERROR) {
         // remove local strong reference to Client before deleting the RecordTrack so that the
         // Client destructor is called by the TrackBase destructor with mClientLock held
@@ -1690,16 +1766,11 @@ sp<IAudioRecord> AudioFlinger::openRecord(
             client.clear();
         }
         recordTrack.clear();
-        goto Exit;
+        if (output.inputId != AUDIO_IO_HANDLE_NONE) {
+            AudioSystem::releaseInput(portId);
+        }
     }
 
-    cblk = recordTrack->getCblk();
-    buffers = recordTrack->getBuffers();
-
-    // return handle to client
-    recordHandle = new RecordHandle(recordTrack);
-
-Exit:
     *status = lStatus;
     return recordHandle;
 }
@@ -1811,7 +1882,7 @@ size_t AudioFlinger::getPrimaryOutputFrameCount()
 
 // ----------------------------------------------------------------------------
 
-status_t AudioFlinger::setLowRamDevice(bool isLowRamDevice)
+status_t AudioFlinger::setLowRamDevice(bool isLowRamDevice, int64_t totalMemory)
 {
     uid_t uid = IPCThreadState::self()->getCallingUid();
     if (uid != AID_SYSTEM) {
@@ -1822,8 +1893,41 @@ status_t AudioFlinger::setLowRamDevice(bool isLowRamDevice)
         return INVALID_OPERATION;
     }
     mIsLowRamDevice = isLowRamDevice;
+    mTotalMemory = totalMemory;
+    // mIsLowRamDevice and mTotalMemory are obtained through ActivityManager;
+    // see ActivityManager.isLowRamDevice() and ActivityManager.getMemoryInfo().
+    // mIsLowRamDevice generally represent devices with less than 1GB of memory,
+    // though actual setting is determined through device configuration.
+    constexpr int64_t GB = 1024 * 1024 * 1024;
+    mClientSharedHeapSize =
+            isLowRamDevice ? kMinimumClientSharedHeapSizeBytes
+                    : mTotalMemory < 2 * GB ? 4 * kMinimumClientSharedHeapSizeBytes
+                    : mTotalMemory < 3 * GB ? 8 * kMinimumClientSharedHeapSizeBytes
+                    : mTotalMemory < 4 * GB ? 16 * kMinimumClientSharedHeapSizeBytes
+                    : 32 * kMinimumClientSharedHeapSizeBytes;
     mIsDeviceTypeKnown = true;
+
+    // TODO: Cache the client shared heap size in a persistent property.
+    // It's possible that a native process or Java service or app accesses audioserver
+    // after it is registered by system server, but before AudioService updates
+    // the memory info.  This would occur immediately after boot or an audioserver
+    // crash and restore. Before update from AudioService, the client would get the
+    // minimum heap size.
+
+    ALOGD("isLowRamDevice:%s totalMemory:%lld mClientSharedHeapSize:%zu",
+            (isLowRamDevice ? "true" : "false"),
+            (long long)mTotalMemory,
+            mClientSharedHeapSize.load());
     return NO_ERROR;
+}
+
+size_t AudioFlinger::getClientSharedHeapSize() const
+{
+    size_t heapSizeInBytes = property_get_int32("ro.af.client_heap_size_kbyte", 0) * 1024;
+    if (heapSizeInBytes != 0) { // read-only property overrides all.
+        return heapSizeInBytes;
+    }
+    return mClientSharedHeapSize;
 }
 
 audio_hw_sync_t AudioFlinger::getAudioHwSyncForSession(audio_session_t sessionId)
@@ -1898,6 +2002,14 @@ status_t AudioFlinger::systemReady()
         thread->systemReady();
     }
     return NO_ERROR;
+}
+
+status_t AudioFlinger::getMicrophones(std::vector<media::MicrophoneInfo> *microphones)
+{
+    AutoMutex lock(mHardwareLock);
+    sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
+    status_t status = dev->getMicrophones(microphones);
+    return status;
 }
 
 // setAudioHwSyncForSession_l() must be called with AudioFlinger::mLock held
@@ -2014,8 +2126,8 @@ status_t AudioFlinger::openOutput(audio_module_handle_t module,
                                   uint32_t *latencyMs,
                                   audio_output_flags_t flags)
 {
-    ALOGI("openOutput() this %p, module %d Device %x, SamplingRate %d, Format %#08x, Channels %x, "
-              "flags %x",
+    ALOGI("openOutput() this %p, module %d Device %#x, SamplingRate %d, Format %#08x, "
+              "Channels %#x, flags %#x",
               this, module,
               (devices != NULL) ? *devices : 0,
               config->sample_rate,
@@ -2257,8 +2369,8 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
     sp<StreamInHalInterface> inStream;
     status_t status = inHwHal->openInputStream(
             *input, devices, &halconfig, flags, address.string(), source, &inStream);
-    ALOGV("openInput_l() openInputStream returned input %p, devices %x, SamplingRate %d"
-           ", Format %#x, Channels %x, flags %#x, status %d addr %s",
+    ALOGV("openInput_l() openInputStream returned input %p, devices %#x, SamplingRate %d"
+           ", Format %#x, Channels %#x, flags %#x, status %d addr %s",
             inStream.get(),
             devices,
             halconfig.sample_rate,
@@ -2954,6 +3066,7 @@ sp<IEffect> AudioFlinger::createEffect(
 
         // check recording permission for visualizer
         if ((memcmp(&desc.type, SL_IID_VISUALIZATION, sizeof(effect_uuid_t)) == 0) &&
+            // TODO: Do we need to start/stop op - i.e. is there recording being performed?
             !recordingAllowed(opPackageName, pid, IPCThreadState::self()->getCallingUid())) {
             lStatus = PERMISSION_DENIED;
             goto Exit;
@@ -3277,8 +3390,7 @@ void AudioFlinger::dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_hand
         // They would both traverse the directory, but the result would simply be
         // failures at unlink() which are ignored.  It's also unlikely since
         // normally dumpsys is only done by bugreport or from the command line.
-        char teePath[32+256];
-        strcpy(teePath, "/data/misc/audioserver");
+        char teePath[PATH_MAX] = "/data/misc/audioserver";
         size_t teePathLen = strlen(teePath);
         DIR *dir = opendir(teePath);
         teePath[teePathLen++] = '/';
@@ -3288,27 +3400,19 @@ void AudioFlinger::dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_hand
             struct Entry entries[TEE_MAX_SORT];
             size_t entryCount = 0;
             while (entryCount < TEE_MAX_SORT) {
-                struct dirent de;
-                struct dirent *result = NULL;
-                int rc = readdir_r(dir, &de, &result);
-                if (rc != 0) {
-                    ALOGW("readdir_r failed %d", rc);
-                    break;
-                }
-                if (result == NULL) {
-                    break;
-                }
-                if (result != &de) {
-                    ALOGW("readdir_r returned unexpected result %p != %p", result, &de);
+                errno = 0; // clear errno before readdir() to track potential errors.
+                const struct dirent *result = readdir(dir);
+                if (result == nullptr) {
+                    ALOGW_IF(errno != 0, "tee readdir() failure %s", strerror(errno));
                     break;
                 }
                 // ignore non .wav file entries
-                size_t nameLen = strlen(de.d_name);
+                const size_t nameLen = strlen(result->d_name);
                 if (nameLen <= 4 || nameLen >= TEE_MAX_FILENAME ||
-                        strcmp(&de.d_name[nameLen - 4], ".wav")) {
+                        strcmp(&result->d_name[nameLen - 4], ".wav")) {
                     continue;
                 }
-                strcpy(entries[entryCount++].mFileName, de.d_name);
+                (void)audio_utils_strlcpy(entries[entryCount++].mFileName, result->d_name);
             }
             (void) closedir(dir);
             if (entryCount > TEE_MAX_KEEP) {
@@ -3379,8 +3483,13 @@ void AudioFlinger::dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_hand
             // FIXME not big-endian safe
             write(teeFd, &temp, sizeof(temp));
             close(teeFd);
-            if (fd >= 0) {
-                dprintf(fd, "tee copied to %s\n", teePath);
+            // TODO Should create file with temporary name and then rename to final if non-empty.
+            if (total > 0) {
+                if (fd >= 0) {
+                    dprintf(fd, "tee copied to %s\n", teePath);
+                }
+            } else {
+                unlink(teePath);
             }
         } else {
             if (fd >= 0) {

@@ -30,15 +30,16 @@ struct AMessage;
 struct AudioPlaybackRate;
 struct AVSyncSettings;
 class IDataSource;
+struct MediaClock;
 class MetaData;
 struct NuPlayerDriver;
 
 struct NuPlayer : public AHandler {
-    explicit NuPlayer(pid_t pid);
+    explicit NuPlayer(pid_t pid, const sp<MediaClock> &mediaClock);
 
     void setUID(uid_t uid);
 
-    void setDriver(const wp<NuPlayerDriver> &driver);
+    void init(const wp<NuPlayerDriver> &driver);
 
     void setDataSourceAsync(const sp<IStreamSource> &source);
 
@@ -51,7 +52,7 @@ struct NuPlayer : public AHandler {
 
     void setDataSourceAsync(const sp<DataSource> &source);
 
-    status_t getDefaultBufferingSettings(BufferingSettings* buffering /* nonnull */);
+    status_t getBufferingSettings(BufferingSettings* buffering /* nonnull */);
     status_t setBufferingSettings(const BufferingSettings& buffering);
 
     void prepareAsync();
@@ -72,6 +73,9 @@ struct NuPlayer : public AHandler {
     // Will notify the driver through "notifyResetComplete" once finished.
     void resetAsync();
 
+    // Request a notification when specified media time is reached.
+    status_t notifyAt(int64_t mediaTimeUs);
+
     // Will notify the driver through "notifySeekComplete" once finished
     // and needNotify is true.
     void seekToAsync(
@@ -84,7 +88,7 @@ struct NuPlayer : public AHandler {
     status_t getSelectedTrack(int32_t type, Parcel* reply) const;
     status_t selectTrack(size_t trackIndex, bool select, int64_t timeUs);
     status_t getCurrentPosition(int64_t *mediaUs);
-    void getStats(Vector<sp<AMessage> > *mTrackStats);
+    void getStats(Vector<sp<AMessage> > *trackStats);
 
     sp<MetaData> getFileMeta();
     float getFrameRate();
@@ -94,6 +98,8 @@ struct NuPlayer : public AHandler {
     status_t releaseDrm();
 
     const char *getDataSourceType();
+
+    void updateInternalTimers();
 
 protected:
     virtual ~NuPlayer();
@@ -139,6 +145,7 @@ private:
         kWhatClosedCaptionNotify        = 'capN',
         kWhatRendererNotify             = 'renN',
         kWhatReset                      = 'rset',
+        kWhatNotifyTime                 = 'nfyT',
         kWhatSeek                       = 'seek',
         kWhatPause                      = 'paus',
         kWhatResume                     = 'rsme',
@@ -147,16 +154,19 @@ private:
         kWhatGetTrackInfo               = 'gTrI',
         kWhatGetSelectedTrack           = 'gSel',
         kWhatSelectTrack                = 'selT',
-        kWhatGetDefaultBufferingSettings = 'gDBS',
+        kWhatGetBufferingSettings       = 'gBus',
         kWhatSetBufferingSettings       = 'sBuS',
         kWhatPrepareDrm                 = 'pDrm',
         kWhatReleaseDrm                 = 'rDrm',
+        kWhatMediaClockNotify           = 'mckN',
+        kWhatGetStats                   = 'gSts',
     };
 
     wp<NuPlayerDriver> mDriver;
     bool mUIDValid;
     uid_t mUID;
     pid_t mPID;
+    const sp<MediaClock> mMediaClock;
     Mutex mSourceLock;  // guard |mSource|.
     sp<Source> mSource;
     uint32_t mSourceFlags;
@@ -172,7 +182,14 @@ private:
     int32_t mVideoDecoderGeneration;
     int32_t mRendererGeneration;
 
+    Mutex mPlayingTimeLock;
     int64_t mLastStartedPlayingTimeNs;
+    void updatePlaybackTimer(bool stopping, const char *where);
+    void startPlaybackTimer(const char *where);
+
+    int64_t mLastStartedRebufferingTimeNs;
+    void startRebufferingTimer();
+    void updateRebufferingTimer(bool stopping, bool exitingPlayback);
 
     int64_t mPreviousSeekTimeUs;
 

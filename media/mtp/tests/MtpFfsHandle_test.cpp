@@ -23,7 +23,7 @@
 #include <random>
 #include <string>
 #include <unistd.h>
-#include <utils/Log.h>
+#include <log/log.h>
 
 #include "MtpDescriptors.h"
 #include "MtpFfsHandle.h"
@@ -64,7 +64,7 @@ protected:
 
     MtpFfsHandleTest() {
         int fd[2];
-        handle = std::make_unique<T>();
+        handle = std::make_unique<T>(-1);
 
         EXPECT_EQ(pipe(fd), 0);
         control.reset(fd[0]);
@@ -84,7 +84,7 @@ protected:
         intr.reset(fd[0]);
         handle->mIntr.reset(fd[1]);
 
-        EXPECT_EQ(handle->start(), 0);
+        EXPECT_EQ(handle->start(false), 0);
     }
 
     ~MtpFfsHandleTest() {
@@ -95,13 +95,23 @@ protected:
 typedef ::testing::Types<MtpFfsHandle, MtpFfsCompatHandle> mtpHandles;
 TYPED_TEST_CASE(MtpFfsHandleTest, mtpHandles);
 
-TYPED_TEST(MtpFfsHandleTest, testControl) {
-    EXPECT_TRUE(this->handle->writeDescriptors());
+TYPED_TEST(MtpFfsHandleTest, testMtpControl) {
+    EXPECT_TRUE(this->handle->writeDescriptors(false));
     struct desc_v2 desc;
     struct functionfs_strings strings;
     EXPECT_EQ(read(this->control, &desc, sizeof(desc)), (long)sizeof(desc));
     EXPECT_EQ(read(this->control, &strings, sizeof(strings)), (long)sizeof(strings));
     EXPECT_TRUE(std::memcmp(&desc, &mtp_desc_v2, sizeof(desc)) == 0);
+    EXPECT_TRUE(std::memcmp(&strings, &mtp_strings, sizeof(strings)) == 0);
+}
+
+TYPED_TEST(MtpFfsHandleTest, testPtpControl) {
+    EXPECT_TRUE(this->handle->writeDescriptors(true));
+    struct desc_v2 desc;
+    struct functionfs_strings strings;
+    EXPECT_EQ(read(this->control, &desc, sizeof(desc)), (long)sizeof(desc));
+    EXPECT_EQ(read(this->control, &strings, sizeof(strings)), (long)sizeof(strings));
+    EXPECT_TRUE(std::memcmp(&desc, &ptp_desc_v2, sizeof(desc)) == 0);
     EXPECT_TRUE(std::memcmp(&strings, &mtp_strings, sizeof(strings)) == 0);
 }
 
@@ -113,12 +123,42 @@ TYPED_TEST(MtpFfsHandleTest, testRead) {
     EXPECT_STREQ(buf, dummyDataStr.c_str());
 }
 
+TYPED_TEST(MtpFfsHandleTest, testReadLarge) {
+    std::stringstream ss;
+    int size = TEST_PACKET_SIZE * MED_MULT;
+    char buf[size + 1];
+    buf[size] = '\0';
+
+    for (int i = 0; i < MED_MULT; i++)
+        ss << dummyDataStr;
+
+    EXPECT_EQ(write(this->bulk_out, ss.str().c_str(), size), size);
+    EXPECT_EQ(this->handle->read(buf, size), size);
+
+    EXPECT_STREQ(buf, ss.str().c_str());
+}
+
 TYPED_TEST(MtpFfsHandleTest, testWrite) {
     char buf[TEST_PACKET_SIZE + 1];
     buf[TEST_PACKET_SIZE] = '\0';
     EXPECT_EQ(this->handle->write(dummyDataStr.c_str(), TEST_PACKET_SIZE), TEST_PACKET_SIZE);
     EXPECT_EQ(read(this->bulk_in, buf, TEST_PACKET_SIZE), TEST_PACKET_SIZE);
     EXPECT_STREQ(buf, dummyDataStr.c_str());
+}
+
+TYPED_TEST(MtpFfsHandleTest, testWriteLarge) {
+    std::stringstream ss;
+    int size = TEST_PACKET_SIZE * MED_MULT;
+    char buf[size + 1];
+    buf[size] = '\0';
+
+    for (int i = 0; i < MED_MULT; i++)
+        ss << dummyDataStr;
+
+    EXPECT_EQ(this->handle->write(ss.str().c_str(), size), size);
+    EXPECT_EQ(read(this->bulk_in, buf, size), size);
+
+    EXPECT_STREQ(buf, ss.str().c_str());
 }
 
 TYPED_TEST(MtpFfsHandleTest, testReceiveFileEmpty) {

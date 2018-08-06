@@ -17,7 +17,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libmedia_omx",
+        "libstagefright_foundation",
         "libstagefright_omx",
         "libutils",
         "liblog",
@@ -39,5 +39,8 @@ cc_library_shared {
         "-Wno-unused-variable",
     ],
     ldflags: ["-Wl,-Bsymbolic"],
+
+    version_script: "exports.lds",
+
     compile_multilib: "32",
 }

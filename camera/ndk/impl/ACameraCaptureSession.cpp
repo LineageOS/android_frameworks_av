@@ -148,6 +148,23 @@ camera_status_t ACameraCaptureSession::capture(
     return ret;
 }
 
+camera_status_t ACameraCaptureSession::updateOutputConfiguration(ACaptureSessionOutput *output) {
+    sp<CameraDevice> dev = getDeviceSp();
+    if (dev == nullptr) {
+        ALOGE("Error: Device associated with session %p has been closed!", this);
+        return ACAMERA_ERROR_SESSION_CLOSED;
+    }
+
+    camera_status_t ret;
+    dev->lockDeviceForSessionOps();
+    {
+        Mutex::Autolock _l(mSessionLock);
+        ret = dev->updateOutputConfigurationLocked(output);
+    }
+    dev->unlockDevice();
+    return ret;
+}
+
 ACameraDevice*
 ACameraCaptureSession::getDevice() {
     Mutex::Autolock _l(mSessionLock);

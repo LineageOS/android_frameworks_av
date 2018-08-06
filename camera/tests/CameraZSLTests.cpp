@@ -256,10 +256,10 @@ TEST_F(CameraZSLTests, TestAllPictureSizes) {
         ASSERT_TRUE(nullptr != surfaceControl.get());
         ASSERT_TRUE(surfaceControl->isValid());
 
-        SurfaceComposerClient::openGlobalTransaction();
-        ASSERT_EQ(NO_ERROR, surfaceControl->setLayer(0x7fffffff));
-        ASSERT_EQ(NO_ERROR, surfaceControl->show());
-        SurfaceComposerClient::closeGlobalTransaction();
+        SurfaceComposerClient::Transaction{}
+                .setLayer(surfaceControl, 0x7fffffff)
+                .show(surfaceControl)
+                .apply();
 
         previewSurface = surfaceControl->getSurface();
         ASSERT_TRUE(previewSurface != NULL);

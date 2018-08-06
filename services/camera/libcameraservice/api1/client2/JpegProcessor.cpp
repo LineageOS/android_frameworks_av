@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 The Android Open Source Project
+ * Copyright (C) 2012-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -168,7 +168,8 @@ status_t JpegProcessor::updateStream(const Parameters &params) {
         res = device->createStream(mCaptureWindow,
                 params.pictureWidth, params.pictureHeight,
                 HAL_PIXEL_FORMAT_BLOB, HAL_DATASPACE_V0_JFIF,
-                CAMERA3_STREAM_ROTATION_0, &mCaptureStreamId);
+                CAMERA3_STREAM_ROTATION_0, &mCaptureStreamId,
+                String8());
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create output stream for capture: "
                     "%s (%d)", __FUNCTION__, mId,
@@ -198,7 +199,11 @@ status_t JpegProcessor::deleteStream() {
             return INVALID_OPERATION;
         }
 
-        device->deleteStream(mCaptureStreamId);
+        status_t res = device->deleteStream(mCaptureStreamId);
+        if (res != OK) {
+            ALOGE("%s: delete stream %d failed!", __FUNCTION__, mCaptureStreamId);
+            return res;
+        }
 
         mCaptureHeap.clear();
         mCaptureWindow.clear();
@@ -395,7 +400,7 @@ size_t JpegProcessor::findJpegSize(uint8_t* jpegBuffer, size_t maxSize) {
     }
 
     // Read JFIF segment markers, skip over segment data
-    size = 0;
+    size = MARKER_LENGTH; //jump SOI;
     while (size <= maxSize - MARKER_LENGTH) {
         segment_t *segment = (segment_t*)(jpegBuffer + size);
         uint8_t type = checkJpegMarker(segment->marker);

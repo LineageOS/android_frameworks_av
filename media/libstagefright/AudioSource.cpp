@@ -52,7 +52,7 @@ static void AudioRecordCallbackFunction(int event, void *user, void *info) {
 AudioSource::AudioSource(
         audio_source_t inputSource, const String16 &opPackageName,
         uint32_t sampleRate, uint32_t channelCount, uint32_t outSampleRate,
-        uid_t uid, pid_t pid)
+        uid_t uid, pid_t pid, audio_port_handle_t selectedDeviceId)
     : mStarted(false),
       mSampleRate(sampleRate),
       mOutSampleRate(outSampleRate > 0 ? outSampleRate : sampleRate),
@@ -101,7 +101,9 @@ AudioSource::AudioSource(
                     AudioRecord::TRANSFER_DEFAULT,
                     AUDIO_INPUT_FLAG_NONE,
                     uid,
-                    pid);
+                    pid,
+                    NULL /*pAttributes*/,
+                    selectedDeviceId);
         mInitCheck = mRecord->initCheck();
         if (mInitCheck != OK) {
             mRecord.clear();
@@ -238,7 +240,7 @@ void AudioSource::rampVolume(
 }
 
 status_t AudioSource::read(
-        MediaBuffer **out, const ReadOptions * /* options */) {
+        MediaBufferBase **out, const ReadOptions * /* options */) {
     Mutex::Autolock autoLock(mLock);
     *out = NULL;
 
@@ -263,7 +265,7 @@ status_t AudioSource::read(
 
     // Mute/suppress the recording sound
     int64_t timeUs;
-    CHECK(buffer->meta_data()->findInt64(kKeyTime, &timeUs));
+    CHECK(buffer->meta_data().findInt64(kKeyTime, &timeUs));
     int64_t elapsedTimeUs = timeUs - mStartTimeUs;
     if (elapsedTimeUs < kAutoRampStartUs) {
         memset((uint8_t *) buffer->data(), 0, buffer->range_length());
@@ -287,7 +289,7 @@ status_t AudioSource::read(
 
     if (mSampleRate != mOutSampleRate) {
             timeUs *= (int64_t)mSampleRate / (int64_t)mOutSampleRate;
-            buffer->meta_data()->setInt64(kKeyTime, timeUs);
+            buffer->meta_data().setInt64(kKeyTime, timeUs);
     }
 
     *out = buffer;
@@ -309,7 +311,7 @@ status_t AudioSource::setStopTimeUs(int64_t stopTimeUs) {
     return OK;
 }
 
-void AudioSource::signalBufferReturned(MediaBuffer *buffer) {
+void AudioSource::signalBufferReturned(MediaBufferBase *buffer) {
     ALOGV("signalBufferReturned: %p", buffer->data());
     Mutex::Autolock autoLock(mLock);
     --mNumClientOwnedBuffers;
@@ -431,11 +433,11 @@ void AudioSource::queueInputBuffer_l(MediaBuffer *buffer, int64_t timeUs) {
                         (mSampleRate >> 1)) / mSampleRate;
 
     if (mNumFramesReceived == 0) {
-        buffer->meta_data()->setInt64(kKeyAnchorTime, mStartTimeUs);
+        buffer->meta_data().setInt64(kKeyAnchorTime, mStartTimeUs);
     }
 
-    buffer->meta_data()->setInt64(kKeyTime, mPrevSampleTimeUs);
-    buffer->meta_data()->setInt64(kKeyDriftTime, timeUs - mInitialReadTimeUs);
+    buffer->meta_data().setInt64(kKeyTime, mPrevSampleTimeUs);
+    buffer->meta_data().setInt64(kKeyDriftTime, timeUs - mInitialReadTimeUs);
     mPrevSampleTimeUs = timestampUs;
     mNumFramesReceived += bufferSize / frameSize;
     mBuffersReceived.push_back(buffer);
@@ -463,6 +465,45 @@ int16_t AudioSource::getMaxAmplitude() {
     mMaxAmplitude = 0;
     ALOGV("max amplitude since last call: %d", value);
     return value;
+}
+
+status_t AudioSource::setInputDevice(audio_port_handle_t deviceId) {
+    if (mRecord != 0) {
+        return mRecord->setInputDevice(deviceId);
+    }
+    return NO_INIT;
+}
+
+status_t AudioSource::getRoutedDeviceId(audio_port_handle_t* deviceId) {
+    if (mRecord != 0) {
+        *deviceId = mRecord->getRoutedDeviceId();
+        return NO_ERROR;
+    }
+    return NO_INIT;
+}
+
+status_t AudioSource::addAudioDeviceCallback(
+        const sp<AudioSystem::AudioDeviceCallback>& callback) {
+    if (mRecord != 0) {
+        return mRecord->addAudioDeviceCallback(callback);
+    }
+    return NO_INIT;
+}
+
+status_t AudioSource::removeAudioDeviceCallback(
+        const sp<AudioSystem::AudioDeviceCallback>& callback) {
+    if (mRecord != 0) {
+        return mRecord->removeAudioDeviceCallback(callback);
+    }
+    return NO_INIT;
+}
+
+status_t AudioSource::getActiveMicrophones(
+        std::vector<media::MicrophoneInfo>* activeMicrophones) {
+    if (mRecord != 0) {
+        return mRecord->getActiveMicrophones(activeMicrophones);
+    }
+    return NO_INIT;
 }
 
 }  // namespace android

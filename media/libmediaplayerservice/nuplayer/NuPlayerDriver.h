@@ -22,6 +22,7 @@
 namespace android {
 
 struct ALooper;
+struct MediaClock;
 struct NuPlayer;
 
 struct NuPlayerDriver : public MediaPlayerInterface {
@@ -45,7 +46,7 @@ struct NuPlayerDriver : public MediaPlayerInterface {
     virtual status_t setVideoSurfaceTexture(
             const sp<IGraphicBufferProducer> &bufferProducer);
 
-    virtual status_t getDefaultBufferingSettings(
+    virtual status_t getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) override;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
 
@@ -64,6 +65,7 @@ struct NuPlayerDriver : public MediaPlayerInterface {
     virtual status_t getCurrentPosition(int *msec);
     virtual status_t getDuration(int *msec);
     virtual status_t reset();
+    virtual status_t notifyAt(int64_t mediaTimeUs) override;
     virtual status_t setLooping(int loop);
     virtual player_type playerType();
     virtual status_t invoke(const Parcel &request, Parcel *reply);
@@ -82,6 +84,8 @@ struct NuPlayerDriver : public MediaPlayerInterface {
     void notifySetSurfaceComplete();
     void notifyDuration(int64_t durationUs);
     void notifyMorePlayingTimeUs(int64_t timeUs);
+    void notifyMoreRebufferingTimeUs(int64_t timeUs);
+    void notifyRebufferingWhenExit(bool status);
     void notifySeekComplete();
     void notifySeekComplete_l();
     void notifyListener(int msg, int ext1 = 0, int ext2 = 0, const Parcel *in = NULL);
@@ -109,6 +113,8 @@ private:
         STATE_STOPPED_AND_PREPARED,     // equivalent to PAUSED, but seek complete
     };
 
+    std::string stateString(State state);
+
     mutable Mutex mLock;
     Condition mCondition;
 
@@ -124,9 +130,13 @@ private:
     int64_t mPositionUs;
     bool mSeekInProgress;
     int64_t mPlayingTimeUs;
+    int64_t mRebufferingTimeUs;
+    int32_t mRebufferingEvents;
+    bool mRebufferingAtExit;
     // <<<
 
     sp<ALooper> mLooper;
+    const sp<MediaClock> mMediaClock;
     const sp<NuPlayer> mPlayer;
     sp<AudioSink> mAudioSink;
     uint32_t mPlayerFlags;

@@ -425,6 +425,9 @@ protected:
                 // check if some effects must be suspended when an effect chain is added
                 void checkSuspendOnAddEffectChain_l(const sp<EffectChain>& chain);
 
+                // sends the metadata of the active tracks to the HAL
+    virtual     void        updateMetadata_l() = 0;
+
                 String16 getWakeLockTag();
 
     virtual     void        preExit() { }
@@ -485,6 +488,7 @@ protected:
                 // Updated by updateSuspendedSessions_l() only.
                 KeyedVector< audio_session_t, KeyedVector< int, sp<SuspendedSessionDesc> > >
                                         mSuspendedSessions;
+                // TODO: add comment and adjust size as needed
                 static const size_t     kLogSize = 4 * 1024;
                 sp<NBLog::Writer>       mNBLogWriter;
                 bool                    mSystemReady;
@@ -562,6 +566,10 @@ protected:
                     // periodically called in the threadLoop() to update power state uids.
                     void            updatePowerState(sp<ThreadBase> thread, bool force = false);
 
+                    /** @return true if one or move active tracks was added or removed since the
+                     *          last time this function was called or the vector was created. */
+                    bool            readAndClearHasChanged();
+
                 private:
                     void            logTrack(const char *funcName, const sp<T> &track) const;
 
@@ -580,6 +588,8 @@ protected:
                     int                 mLastActiveTracksGeneration;
                     wp<T>               mLatestActiveTrack; // latest track added to ActiveTracks
                     SimpleLog * const   mLocalLog;
+                    // If the vector has changed since last call to readAndClearHasChanged
+                    bool                mHasChanged = false;
                 };
 
                 SimpleLog mLocalLog;
@@ -622,8 +632,8 @@ public:
     static const int8_t kMaxTrackRetriesOffload = 20;
     static const int8_t kMaxTrackStartupRetriesOffload = 100;
     static const int8_t kMaxTrackStopRetriesOffload = 2;
-    // 14 tracks max per client allows for 2 misbehaving application leaving 4 available tracks.
-    static const uint32_t kMaxTracksPerUid = 14;
+    static constexpr uint32_t kMaxTracksPerUid = 40;
+    static constexpr size_t kMaxTracks = 256;
 
     // Maximum delay (in nanoseconds) for upcoming buffers in suspend mode, otherwise
     // if delay is greater, the estimated time for timeLoopNextNs is reset.
@@ -705,10 +715,14 @@ public:
                 sp<Track>   createTrack_l(
                                 const sp<AudioFlinger::Client>& client,
                                 audio_stream_type_t streamType,
-                                uint32_t sampleRate,
+                                const audio_attributes_t& attr,
+                                uint32_t *sampleRate,
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
                                 size_t *pFrameCount,
+                                size_t *pNotificationFrameCount,
+                                uint32_t notificationsPerBuffer,
+                                float speed,
                                 const sp<IMemory>& sharedBuffer,
                                 audio_session_t sessionId,
                                 audio_output_flags_t *flags,
@@ -737,11 +751,10 @@ public:
     virtual     String8     getParameters(const String8& keys);
     virtual     void        ioConfigChanged(audio_io_config_event event, pid_t pid = 0);
                 status_t    getRenderPosition(uint32_t *halFrames, uint32_t *dspFrames);
-                // FIXME rename mixBuffer() to sinkBuffer() and remove int16_t* dependency.
                 // Consider also removing and passing an explicit mMainBuffer initialization
                 // parameter to AF::PlaybackThread::Track::Track().
-                int16_t     *mixBuffer() const {
-                    return reinterpret_cast<int16_t *>(mSinkBuffer); };
+                effect_buffer_t *sinkBuffer() const {
+                    return reinterpret_cast<effect_buffer_t *>(mSinkBuffer); };
 
     virtual     void detachAuxEffect_l(int effectId);
                 status_t attachAuxEffect(const sp<AudioFlinger::PlaybackThread::Track>& track,
@@ -775,6 +788,16 @@ public:
     virtual     int64_t     computeWaitTimeNs_l() const { return INT64_MAX; }
 
     virtual     bool        isOutput() const override { return true; }
+
+                // returns true if the track is allowed to be added to the thread.
+    virtual     bool        isTrackAllowed_l(
+                                    audio_channel_mask_t channelMask __unused,
+                                    audio_format_t format __unused,
+                                    audio_session_t sessionId __unused,
+                                    uid_t uid) const {
+                                return trackCountForUid_l(uid) < PlaybackThread::kMaxTracksPerUid
+                                       && mTracks.size() < PlaybackThread::kMaxTracks;
+                            }
 
 protected:
     // updated by readOutputParameters_l()
@@ -864,12 +887,6 @@ private:
 protected:
     ActiveTracks<Track>     mActiveTracks;
 
-    // Allocate a track name for a given channel mask.
-    //   Returns name >= 0 if successful, -1 on failure.
-    virtual int             getTrackName_l(audio_channel_mask_t channelMask, audio_format_t format,
-                                           audio_session_t sessionId, uid_t uid) = 0;
-    virtual void            deleteTrackName_l(int name) = 0;
-
     // Time to sleep between cycles when:
     virtual uint32_t        activeSleepTimeUs() const;      // mixer state MIXER_TRACKS_ENABLED
     virtual uint32_t        idleSleepTimeUs() const = 0;    // mixer state MIXER_IDLE
@@ -897,7 +914,7 @@ protected:
                                     && mHwSupportsPause
                                     && (mOutput->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC); }
 
-                uint32_t    trackCountForUid_l(uid_t uid);
+                uint32_t    trackCountForUid_l(uid_t uid) const;
 
 private:
 
@@ -910,11 +927,70 @@ private:
     void        removeTrack_l(const sp<Track>& track);
 
     void        readOutputParameters_l();
+    void        updateMetadata_l() final;
+    virtual void sendMetadataToBackend_l(const StreamOutHalInterface::SourceMetadata& metadata);
 
     virtual void dumpInternals(int fd, const Vector<String16>& args);
     void        dumpTracks(int fd, const Vector<String16>& args);
 
-    SortedVector< sp<Track> >       mTracks;
+    // The Tracks class manages names for all tracks
+    // added and removed from the Thread.
+    template <typename T>
+    class Tracks {
+    public:
+        Tracks(bool saveDeletedTrackNames) :
+            mSaveDeletedTrackNames(saveDeletedTrackNames) { }
+
+        // SortedVector methods
+        ssize_t         add(const sp<T> &track);
+        ssize_t         remove(const sp<T> &track);
+        size_t          size() const {
+            return mTracks.size();
+        }
+        bool            isEmpty() const {
+            return mTracks.isEmpty();
+        }
+        ssize_t         indexOf(const sp<T> &item) {
+            return mTracks.indexOf(item);
+        }
+        sp<T>           operator[](size_t index) const {
+            return mTracks[index];
+        }
+        typename SortedVector<sp<T>>::iterator begin() {
+            return mTracks.begin();
+        }
+        typename SortedVector<sp<T>>::iterator end() {
+            return mTracks.end();
+        }
+
+        size_t          processDeletedTrackNames(std::function<void(int)> f) {
+            const size_t size = mDeletedTrackNames.size();
+            if (size > 0) {
+                for (const int name : mDeletedTrackNames) {
+                    f(name);
+                }
+            }
+            return size;
+        }
+
+        void            clearDeletedTrackNames() { mDeletedTrackNames.clear(); }
+
+    private:
+        // Track names pending deletion for MIXER type threads
+        const bool mSaveDeletedTrackNames; // true to enable tracking
+        std::set<int> mDeletedTrackNames;
+
+        // Fast lookup of previously deleted track names for reuse.
+        // This is an arbitrary decision (actually any non-negative
+        // integer that isn't in mTracks[*]->names() could be used) - we attempt
+        // to use the smallest possible available name.
+        std::set<int> mUnusedTrackNames;
+
+        SortedVector<sp<T>> mTracks; // wrapped SortedVector.
+    };
+
+    Tracks<Track>                   mTracks;
+
     stream_type_t                   mStreamTypes[AUDIO_STREAM_CNT];
     AudioStreamOut                  *mOutput;
 
@@ -984,6 +1060,7 @@ private:
     sp<NBAIO_Source>        mTeeSource;
 #endif
     uint32_t                mScreenState;   // cached copy of gScreenState
+    // TODO: add comment and adjust size as needed
     static const size_t     kFastMixerLogSize = 8 * 1024;
     sp<NBLog::Writer>       mFastMixerNBLogWriter;
 
@@ -1020,11 +1097,11 @@ public:
                                                    status_t& status);
     virtual     void        dumpInternals(int fd, const Vector<String16>& args);
 
+    virtual     bool        isTrackAllowed_l(
+                                    audio_channel_mask_t channelMask, audio_format_t format,
+                                    audio_session_t sessionId, uid_t uid) const override;
 protected:
     virtual     mixer_state prepareTracks_l(Vector< sp<Track> > *tracksToRemove);
-    virtual     int         getTrackName_l(audio_channel_mask_t channelMask, audio_format_t format,
-                                           audio_session_t sessionId, uid_t uid);
-    virtual     void        deleteTrackName_l(int name);
     virtual     uint32_t    idleSleepTimeUs() const;
     virtual     uint32_t    suspendSleepTimeUs() const;
     virtual     void        cacheParameters_l();
@@ -1102,9 +1179,6 @@ public:
     virtual     void        flushHw_l();
 
 protected:
-    virtual     int         getTrackName_l(audio_channel_mask_t channelMask, audio_format_t format,
-                                           audio_session_t sessionId, uid_t uid);
-    virtual     void        deleteTrackName_l(int name);
     virtual     uint32_t    activeSleepTimeUs() const;
     virtual     uint32_t    idleSleepTimeUs() const;
     virtual     uint32_t    suspendSleepTimeUs() const;
@@ -1208,9 +1282,14 @@ public:
     virtual                 ~DuplicatingThread();
 
     // Thread virtuals
+    virtual     void        dumpInternals(int fd, const Vector<String16>& args) override;
+
                 void        addOutputTrack(MixerThread* thread);
                 void        removeOutputTrack(MixerThread* thread);
                 uint32_t    waitTimeMs() const { return mWaitTimeMs; }
+
+                void        sendMetadataToBackend_l(
+                        const StreamOutHalInterface::SourceMetadata& metadata) override;
 protected:
     virtual     uint32_t    activeSleepTimeUs() const;
 
@@ -1323,12 +1402,13 @@ public:
 
             sp<AudioFlinger::RecordThread::RecordTrack>  createRecordTrack_l(
                     const sp<AudioFlinger::Client>& client,
-                    uint32_t sampleRate,
+                    const audio_attributes_t& attr,
+                    uint32_t *pSampleRate,
                     audio_format_t format,
                     audio_channel_mask_t channelMask,
                     size_t *pFrameCount,
                     audio_session_t sessionId,
-                    size_t *notificationFrames,
+                    size_t *pNotificationFrameCount,
                     uid_t uid,
                     audio_input_flags_t *flags,
                     pid_t tid,
@@ -1391,6 +1471,13 @@ public:
     virtual bool        isOutput() const override { return false; }
 
             void        checkBtNrec();
+
+            // Sets the UID records silence
+            void        setRecordSilenced(uid_t uid, bool silenced);
+
+            status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+
+            void        updateMetadata_l() override;
 
 private:
             // Enter standby if not already in standby, and set mStandby flag
@@ -1456,6 +1543,7 @@ private:
             // If a fast capture is present, the Pipe as IMemory, otherwise clear
             sp<IMemory>                         mPipeMemory;
 
+            // TODO: add comment and adjust size as needed
             static const size_t                 kFastCaptureLogSize = 4 * 1024;
             sp<NBLog::Writer>                   mFastCaptureNBLogWriter;
 
@@ -1501,6 +1589,7 @@ class MmapThread : public ThreadBase
     virtual     void        threadLoop_exit();
     virtual     void        threadLoop_standby();
     virtual     bool        shouldStandby_l() { return false; }
+    virtual     status_t    exitStandby();
 
     virtual     status_t    initCheck() const { return (mHalStream == 0) ? NO_INIT : NO_ERROR; }
     virtual     size_t      frameCount() const { return mFrameCount; }
@@ -1533,6 +1622,9 @@ class MmapThread : public ThreadBase
 
     virtual     void        invalidateTracks(audio_stream_type_t streamType __unused) {}
 
+                // Sets the UID records silence
+    virtual     void        setRecordSilenced(uid_t uid __unused, bool silenced __unused) {}
+
                 void        dump(int fd, const Vector<String16>& args);
     virtual     void        dumpInternals(int fd, const Vector<String16>& args);
                 void        dumpTracks(int fd, const Vector<String16>& args);
@@ -1549,6 +1641,10 @@ class MmapThread : public ThreadBase
                 sp<DeviceHalInterface>  mHalDevice;
                 AudioHwDevice* const    mAudioHwDev;
                 ActiveTracks<MmapTrack> mActiveTracks;
+                float                   mHalVolFloat;
+
+                int32_t                 mNoCallbackWarningCount;
+     static     constexpr int32_t       kMaxNoCallbackWarnings = 5;
 };
 
 class MmapPlaybackThread : public MmapThread, public VolumeInterface
@@ -1582,11 +1678,13 @@ public:
 
     virtual     audio_stream_type_t streamType() { return mStreamType; }
     virtual     void        checkSilentMode_l();
-    virtual     void        processVolume_l();
+                void        processVolume_l() override;
 
     virtual     void        dumpInternals(int fd, const Vector<String16>& args);
 
     virtual     bool        isOutput() const override { return true; }
+
+                void        updateMetadata_l() override;
 
 protected:
 
@@ -1595,7 +1693,6 @@ protected:
                 float                       mStreamVolume;
                 bool                        mMasterMute;
                 bool                        mStreamMute;
-                float                       mHalVolFloat;
                 AudioStreamOut*             mOutput;
 };
 
@@ -1610,7 +1707,12 @@ public:
 
                 AudioStreamIn* clearInput();
 
+                status_t       exitStandby() override;
     virtual     bool           isOutput() const override { return false; }
+
+                void           updateMetadata_l() override;
+                void           processVolume_l() override;
+                void           setRecordSilenced(uid_t uid, bool silenced) override;
 
 protected:
 

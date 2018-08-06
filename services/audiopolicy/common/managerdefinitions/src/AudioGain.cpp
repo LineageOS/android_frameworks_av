@@ -126,4 +126,4 @@ void AudioGain::dump(int fd, int spaces, int index) const
     write(fd, result.string(), result.size());
 }
 
-}; // namespace android
+} // namespace android

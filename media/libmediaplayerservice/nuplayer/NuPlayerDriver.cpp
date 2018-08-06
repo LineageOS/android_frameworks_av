@@ -28,6 +28,8 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AUtils.h>
+#include <media/stagefright/foundation/ByteUtils.h>
+#include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 
@@ -41,6 +43,9 @@ namespace android {
 // key for media statistics
 static const char *kKeyPlayer = "nuplayer";
 // attrs for media statistics
+    // NB: these are matched with public Java API constants defined
+    // in frameworks/base/media/java/android/media/MediaPlayer.java
+    // These must be kept synchronized with the constants there.
 static const char *kPlayerVMime = "android.media.mediaplayer.video.mime";
 static const char *kPlayerVCodec = "android.media.mediaplayer.video.codec";
 static const char *kPlayerWidth = "android.media.mediaplayer.width";
@@ -53,7 +58,14 @@ static const char *kPlayerDuration = "android.media.mediaplayer.durationMs";
 static const char *kPlayerPlaying = "android.media.mediaplayer.playingMs";
 static const char *kPlayerError = "android.media.mediaplayer.err";
 static const char *kPlayerErrorCode = "android.media.mediaplayer.errcode";
+
+    // NB: These are not yet exposed as public Java API constants.
+static const char *kPlayerErrorState = "android.media.mediaplayer.errstate";
 static const char *kPlayerDataSourceType = "android.media.mediaplayer.dataSource";
+//
+static const char *kPlayerRebuffering = "android.media.mediaplayer.rebufferingMs";
+static const char *kPlayerRebufferingCount = "android.media.mediaplayer.rebuffers";
+static const char *kPlayerRebufferingAtExit = "android.media.mediaplayer.rebufferExit";
 
 
 NuPlayerDriver::NuPlayerDriver(pid_t pid)
@@ -65,8 +77,12 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
       mPositionUs(-1),
       mSeekInProgress(false),
       mPlayingTimeUs(0),
+      mRebufferingTimeUs(0),
+      mRebufferingEvents(0),
+      mRebufferingAtExit(false),
       mLooper(new ALooper),
-      mPlayer(new NuPlayer(pid)),
+      mMediaClock(new MediaClock),
+      mPlayer(new NuPlayer(pid, mMediaClock)),
       mPlayerFlags(0),
       mAnalyticsItem(NULL),
       mClientUid(-1),
@@ -76,9 +92,10 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
     ALOGD("NuPlayerDriver(%p) created, clientPid(%d)", this, pid);
     mLooper->setName("NuPlayerDriver Looper");
 
+    mMediaClock->init();
+
     // set up an analytics record
     mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
-    mAnalyticsItem->generateSessionID();
 
     mLooper->start(
             false, /* runOnCallingThread */
@@ -87,7 +104,7 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
 
     mLooper->registerHandler(mPlayer);
 
-    mPlayer->setDriver(this);
+    mPlayer->init(this);
 }
 
 NuPlayerDriver::~NuPlayerDriver() {
@@ -226,8 +243,8 @@ status_t NuPlayerDriver::setVideoSurfaceTexture(
     return OK;
 }
 
-status_t NuPlayerDriver::getDefaultBufferingSettings(BufferingSettings* buffering) {
-    ALOGV("getDefaultBufferingSettings(%p)", this);
+status_t NuPlayerDriver::getBufferingSettings(BufferingSettings* buffering) {
+    ALOGV("getBufferingSettings(%p)", this);
     {
         Mutex::Autolock autoLock(mLock);
         if (mState == STATE_IDLE) {
@@ -235,7 +252,7 @@ status_t NuPlayerDriver::getDefaultBufferingSettings(BufferingSettings* bufferin
         }
     }
 
-    return mPlayer->getDefaultBufferingSettings(buffering);
+    return mPlayer->getBufferingSettings(buffering);
 }
 
 status_t NuPlayerDriver::setBufferingSettings(const BufferingSettings& buffering) {
@@ -518,6 +535,7 @@ status_t NuPlayerDriver::getDuration(int *msec) {
 }
 
 void NuPlayerDriver::updateMetrics(const char *where) {
+
     if (where == NULL) {
         where = "unknown";
     }
@@ -575,7 +593,15 @@ void NuPlayerDriver::updateMetrics(const char *where) {
     getDuration(&duration_ms);
     mAnalyticsItem->setInt64(kPlayerDuration, duration_ms);
 
+    mPlayer->updateInternalTimers();
+
     mAnalyticsItem->setInt64(kPlayerPlaying, (mPlayingTimeUs+500)/1000 );
+
+    if (mRebufferingEvents != 0) {
+        mAnalyticsItem->setInt64(kPlayerRebuffering, (mRebufferingTimeUs+500)/1000 );
+        mAnalyticsItem->setInt32(kPlayerRebufferingCount, mRebufferingEvents);
+        mAnalyticsItem->setInt32(kPlayerRebufferingAtExit, mRebufferingAtExit);
+    }
 
     mAnalyticsItem->setCString(kPlayerDataSourceType, mPlayer->getDataSourceType());
 }
@@ -598,18 +624,16 @@ void NuPlayerDriver::logMetrics(const char *where) {
     // So the canonical "empty" record has 3 elements in it.
     if (mAnalyticsItem->count() > 3) {
 
-        mAnalyticsItem->setFinalized(true);
         mAnalyticsItem->selfrecord();
 
         // re-init in case we prepare() and start() again.
         delete mAnalyticsItem ;
         mAnalyticsItem = new MediaAnalyticsItem("nuplayer");
         if (mAnalyticsItem) {
-            mAnalyticsItem->generateSessionID();
             mAnalyticsItem->setUid(mClientUid);
         }
     } else {
-        ALOGV("did not have anything to record");
+        ALOGV("nothing to record (only %d fields)", mAnalyticsItem->count());
     }
 }
 
@@ -645,6 +669,11 @@ status_t NuPlayerDriver::reset() {
         notifyListener_l(MEDIA_STOPPED);
     }
 
+    if (property_get_bool("persist.debug.sf.stats", false)) {
+        Vector<String16> args;
+        dump(-1, args);
+    }
+
     mState = STATE_RESET_IN_PROGRESS;
     mPlayer->resetAsync();
 
@@ -656,8 +685,16 @@ status_t NuPlayerDriver::reset() {
     mPositionUs = -1;
     mLooping = false;
     mPlayingTimeUs = 0;
+    mRebufferingTimeUs = 0;
+    mRebufferingEvents = 0;
+    mRebufferingAtExit = false;
 
     return OK;
+}
+
+status_t NuPlayerDriver::notifyAt(int64_t mediaTimeUs) {
+    ALOGV("notifyAt(%p), time:%lld", this, (long long)mediaTimeUs);
+    return mPlayer->notifyAt(mediaTimeUs);
 }
 
 status_t NuPlayerDriver::setLooping(int loop) {
@@ -799,6 +836,17 @@ void NuPlayerDriver::notifyDuration(int64_t durationUs) {
 void NuPlayerDriver::notifyMorePlayingTimeUs(int64_t playingUs) {
     Mutex::Autolock autoLock(mLock);
     mPlayingTimeUs += playingUs;
+}
+
+void NuPlayerDriver::notifyMoreRebufferingTimeUs(int64_t rebufferingUs) {
+    Mutex::Autolock autoLock(mLock);
+    mRebufferingTimeUs += rebufferingUs;
+    mRebufferingEvents++;
+}
+
+void NuPlayerDriver::notifyRebufferingWhenExit(bool status) {
+    Mutex::Autolock autoLock(mLock);
+    mRebufferingAtExit = status;
 }
 
 void NuPlayerDriver::notifySeekComplete() {
@@ -956,6 +1004,7 @@ void NuPlayerDriver::notifyListener_l(
                 if (ext2 != 0) {
                     mAnalyticsItem->setInt32(kPlayerErrorCode, ext2);
                 }
+                mAnalyticsItem->setCString(kPlayerErrorState, stateString(mState).c_str());
             }
             mAtEOS = true;
             break;
@@ -1050,6 +1099,32 @@ status_t NuPlayerDriver::releaseDrm()
     ALOGV("releaseDrm ret: %d", ret);
 
     return ret;
+}
+
+std::string NuPlayerDriver::stateString(State state) {
+    const char *rval = NULL;
+    char rawbuffer[16];  // allows "%d"
+
+    switch (state) {
+        case STATE_IDLE: rval = "IDLE"; break;
+        case STATE_SET_DATASOURCE_PENDING: rval = "SET_DATASOURCE_PENDING"; break;
+        case STATE_UNPREPARED: rval = "UNPREPARED"; break;
+        case STATE_PREPARING: rval = "PREPARING"; break;
+        case STATE_PREPARED: rval = "PREPARED"; break;
+        case STATE_RUNNING: rval = "RUNNING"; break;
+        case STATE_PAUSED: rval = "PAUSED"; break;
+        case STATE_RESET_IN_PROGRESS: rval = "RESET_IN_PROGRESS"; break;
+        case STATE_STOPPED: rval = "STOPPED"; break;
+        case STATE_STOPPED_AND_PREPARING: rval = "STOPPED_AND_PREPARING"; break;
+        case STATE_STOPPED_AND_PREPARED: rval = "STOPPED_AND_PREPARED"; break;
+        default:
+            // yes, this buffer is shared and vulnerable to races
+            snprintf(rawbuffer, sizeof(rawbuffer), "%d", state);
+            rval = rawbuffer;
+            break;
+    }
+
+    return rval;
 }
 
 }  // namespace android

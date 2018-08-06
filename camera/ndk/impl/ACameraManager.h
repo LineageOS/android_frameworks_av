@@ -19,6 +19,7 @@
 
 #include <camera/NdkCameraManager.h>
 
+#include <android-base/parseint.h>
 #include <android/hardware/ICameraService.h>
 #include <android/hardware/BnCameraServiceListener.h>
 #include <camera/CameraMetadata.h>
@@ -140,8 +141,29 @@ class CameraManagerGlobal final : public RefBase {
     static bool validStatus(int32_t status);
     static bool isStatusAvailable(int32_t status);
 
+    // The sort logic must match the logic in
+    // libcameraservice/common/CameraProviderManager.cpp::getAPI1CompatibleCameraDeviceIds
+    struct CameraIdComparator {
+        bool operator()(const String8& a, const String8& b) const {
+            uint32_t aUint = 0, bUint = 0;
+            bool aIsUint = base::ParseUint(a.c_str(), &aUint);
+            bool bIsUint = base::ParseUint(b.c_str(), &bUint);
+
+            // Uint device IDs first
+            if (aIsUint && bIsUint) {
+                return aUint < bUint;
+            } else if (aIsUint) {
+                return true;
+            } else if (bIsUint) {
+                return false;
+            }
+            // Simple string compare if both id are not uint
+            return a < b;
+        }
+    };
+
     // Map camera_id -> status
-    std::map<String8, int32_t> mDeviceStatusMap;
+    std::map<String8, int32_t, CameraIdComparator> mDeviceStatusMap;
 
     // For the singleton instance
     static Mutex sLock;

@@ -59,4 +59,4 @@ protected:
     virtual ~AudioPolicyManagerObserver() {}
 };
 
-}; // namespace android
+} // namespace android

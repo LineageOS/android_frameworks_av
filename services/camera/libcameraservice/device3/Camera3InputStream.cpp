@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2013-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,10 +27,13 @@ namespace android {
 
 namespace camera3 {
 
+const String8 Camera3InputStream::DUMMY_ID;
+
 Camera3InputStream::Camera3InputStream(int id,
         uint32_t width, uint32_t height, int format) :
         Camera3IOStreamBase(id, CAMERA3_STREAM_INPUT, width, height, /*maxSize*/0,
-                            format, HAL_DATASPACE_UNKNOWN, CAMERA3_STREAM_ROTATION_0) {
+                            format, HAL_DATASPACE_UNKNOWN, CAMERA3_STREAM_ROTATION_0,
+                            DUMMY_ID) {
 
     if (format == HAL_PIXEL_FORMAT_BLOB) {
         ALOGE("%s: Bad format, BLOB not supported", __FUNCTION__);

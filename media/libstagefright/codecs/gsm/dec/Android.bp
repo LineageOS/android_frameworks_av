@@ -15,6 +15,8 @@ cc_library_shared {
 
     cflags: ["-Werror"],
 
+    version_script: "exports.lds",
+
     sanitize: {
         misc_undefined: [
             "signed-integer-overflow",
@@ -27,7 +29,7 @@ cc_library_shared {
     },
 
     shared_libs: [
-        "libmedia_omx",
+        "libstagefright_foundation",
         "libstagefright_omx",
         "libutils",
         "liblog",

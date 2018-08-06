@@ -168,7 +168,7 @@ bool CameraSourceTimeLapse::trySettingVideoSize(
     return isSuccessful;
 }
 
-void CameraSourceTimeLapse::signalBufferReturned(MediaBuffer* buffer) {
+void CameraSourceTimeLapse::signalBufferReturned(MediaBufferBase* buffer) {
     ALOGV("signalBufferReturned");
     Mutex::Autolock autoLock(mQuickStopLock);
     if (mQuickStop && (buffer == mLastReadBufferCopy)) {
@@ -180,9 +180,9 @@ void CameraSourceTimeLapse::signalBufferReturned(MediaBuffer* buffer) {
 }
 
 void createMediaBufferCopy(
-        const MediaBuffer& sourceBuffer,
+        const MediaBufferBase& sourceBuffer,
         int64_t frameTime,
-        MediaBuffer **newBuffer) {
+        MediaBufferBase **newBuffer) {
 
     ALOGV("createMediaBufferCopy");
     size_t sourceSize = sourceBuffer.size();
@@ -191,20 +191,20 @@ void createMediaBufferCopy(
     (*newBuffer) = new MediaBuffer(sourceSize);
     memcpy((*newBuffer)->data(), sourcePointer, sourceSize);
 
-    (*newBuffer)->meta_data()->setInt64(kKeyTime, frameTime);
+    (*newBuffer)->meta_data().setInt64(kKeyTime, frameTime);
 }
 
-void CameraSourceTimeLapse::fillLastReadBufferCopy(MediaBuffer& sourceBuffer) {
+void CameraSourceTimeLapse::fillLastReadBufferCopy(MediaBufferBase& sourceBuffer) {
     ALOGV("fillLastReadBufferCopy");
     int64_t frameTime;
-    CHECK(sourceBuffer.meta_data()->findInt64(kKeyTime, &frameTime));
+    CHECK(sourceBuffer.meta_data().findInt64(kKeyTime, &frameTime));
     createMediaBufferCopy(sourceBuffer, frameTime, &mLastReadBufferCopy);
     mLastReadBufferCopy->add_ref();
     mLastReadBufferCopy->setObserver(this);
 }
 
 status_t CameraSourceTimeLapse::read(
-        MediaBuffer **buffer, const ReadOptions *options) {
+        MediaBufferBase **buffer, const ReadOptions *options) {
     ALOGV("read");
     if (mLastReadBufferCopy == NULL) {
         mLastReadStatus = CameraSource::read(buffer, options);

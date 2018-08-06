@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudioService"
+#define LOG_TAG "AAudioThread"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -27,12 +27,26 @@
 
 using namespace aaudio;
 
+std::atomic<uint32_t> AAudioThread::mNextThreadIndex{1};
 
-AAudioThread::AAudioThread()
-    : mRunnable(nullptr)
-    , mHasThread(false) {
+AAudioThread::AAudioThread(const char *prefix) {
+    setup(prefix);
+}
+
+AAudioThread::AAudioThread() {
+    setup("AAudio");
+}
+
+void AAudioThread::setup(const char *prefix) {
     // mThread is a pthread_t of unknown size so we need memset().
     memset(&mThread, 0, sizeof(mThread));
+
+    // Name the thread with an increasing index, "prefix_#", for debugging.
+    uint32_t index = mNextThreadIndex++;
+    // Wrap the index so that we do not hit the 16 char limit
+    // and to avoid hard-to-read large numbers.
+    index = index % 100000; // arbitrary
+    snprintf(mName, sizeof(mName), "%s_%u", prefix, index);
 }
 
 void AAudioThread::dispatch() {
@@ -53,7 +67,7 @@ static void * AAudioThread_internalThreadProc(void *arg) {
 
 aaudio_result_t AAudioThread::start(Runnable *runnable) {
     if (mHasThread) {
-        ALOGE("AAudioThread::start() - mHasThread already true");
+        ALOGE("start() - mHasThread already true");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     // mRunnable will be read by the new thread when it starts.
@@ -61,9 +75,11 @@ aaudio_result_t AAudioThread::start(Runnable *runnable) {
     mRunnable = runnable;
     int err = pthread_create(&mThread, nullptr, AAudioThread_internalThreadProc, this);
     if (err != 0) {
-        ALOGE("AAudioThread::start() - pthread_create() returned %d %s", err, strerror(err));
+        ALOGE("start() - pthread_create() returned %d %s", err, strerror(err));
         return AAudioConvert_androidToAAudioResult(-err);
     } else {
+        int err = pthread_setname_np(mThread, mName);
+        ALOGW_IF((err != 0), "Could not set name of AAudioThread. err = %d", err);
         mHasThread = true;
         return AAUDIO_OK;
     }
@@ -71,13 +87,13 @@ aaudio_result_t AAudioThread::start(Runnable *runnable) {
 
 aaudio_result_t AAudioThread::stop() {
     if (!mHasThread) {
-        ALOGE("AAudioThread::stop() but no thread running");
+        ALOGE("stop() but no thread running");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     int err = pthread_join(mThread, nullptr);
     mHasThread = false;
     if (err != 0) {
-        ALOGE("AAudioThread::stop() - pthread_join() returned %d %s", err, strerror(err));
+        ALOGE("stop() - pthread_join() returned %d %s", err, strerror(err));
         return AAudioConvert_androidToAAudioResult(-err);
     } else {
         return AAUDIO_OK;

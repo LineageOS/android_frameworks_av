@@ -25,6 +25,7 @@ LOCAL_SHARED_LIBRARIES := \
     libserviceutility \
     libaudiopolicymanager \
     libmedia_helper \
+    libmediametrics \
     libeffectsconfig
 
 LOCAL_STATIC_LIBRARIES := \
@@ -60,6 +61,7 @@ LOCAL_REQUIRED_MODULES := \
     audio_policy_criteria.conf \
 
 LOCAL_C_INCLUDES += frameworks/av/services/audiopolicy/engineconfigurable/include
+LOCAL_C_INCLUDES += frameworks/av/include
 
 LOCAL_SHARED_LIBRARIES += libaudiopolicyengineconfigurable
 
@@ -78,6 +80,7 @@ LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents
 
 LOCAL_SHARED_LIBRARIES += libmedia_helper
+LOCAL_SHARED_LIBRARIES += libmediametrics
 
 ifeq ($(USE_XML_AUDIO_POLICY_CONF), 1)
 LOCAL_SHARED_LIBRARIES += libicuuc libxml2

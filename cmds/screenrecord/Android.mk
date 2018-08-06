@@ -25,8 +25,8 @@ LOCAL_SRC_FILES := \
 	Program.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-	libstagefright libmedia libutils libbinder libstagefright_foundation \
-	libjpeg libgui libcutils liblog libEGL libGLESv2
+	libstagefright libmedia libmedia_omx libutils libbinder libstagefright_foundation \
+	libjpeg libui libgui libcutils liblog libEGL libGLESv2
 
 LOCAL_C_INCLUDES := \
 	frameworks/av/media/libstagefright \

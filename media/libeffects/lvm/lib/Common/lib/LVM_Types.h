@@ -44,9 +44,6 @@ extern "C" {
 
 #define LVM_MAXINT_8            127                 /* Maximum positive integer size */
 #define LVM_MAXINT_16           32767
-#ifdef BUILD_FLOAT
-#define LVM_MAXFLOAT            1.0f
-#endif
 #define LVM_MAXINT_32           2147483647
 #define LVM_MAXENUM             2147483647
 
@@ -99,8 +96,32 @@ typedef     int32_t             LVM_INT32;          /* Signed 32-bit word */
 typedef     uint32_t            LVM_UINT32;         /* Unsigned 32-bit word */
 
 #ifdef BUILD_FLOAT
-typedef     float               LVM_FLOAT;          /* single precission floating point*/
-#endif
+
+#define LVM_MAXFLOAT            1.f
+
+typedef     float               LVM_FLOAT;          /* single precision floating point */
+
+// If NATIVE_FLOAT_BUFFER is defined, we expose effects as floating point format;
+// otherwise we expose as integer 16 bit and translate to float for the effect libraries.
+// Hence, NATIVE_FLOAT_BUFFER should only be enabled under BUILD_FLOAT compilation.
+
+#define NATIVE_FLOAT_BUFFER
+
+#endif // BUILD_FLOAT
+
+// Select whether we expose int16_t or float buffers.
+#ifdef NATIVE_FLOAT_BUFFER
+
+#define    EFFECT_BUFFER_FORMAT AUDIO_FORMAT_PCM_FLOAT
+typedef     float               effect_buffer_t;
+
+#else // NATIVE_FLOAT_BUFFER
+
+#define    EFFECT_BUFFER_FORMAT AUDIO_FORMAT_PCM_16_BIT
+typedef     int16_t             effect_buffer_t;
+
+#endif // NATIVE_FLOAT_BUFFER
+
 /****************************************************************************************/
 /*                                                                                      */
 /*  Standard Enumerated types                                                           */

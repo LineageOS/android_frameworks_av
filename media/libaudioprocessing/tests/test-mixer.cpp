@@ -143,10 +143,6 @@ int main(int argc, char* argv[]) {
         usage(progname);
         return EXIT_FAILURE;
     }
-    if ((unsigned)argc > AudioMixer::MAX_NUM_TRACKS) {
-        fprintf(stderr, "too many tracks: %d > %u", argc, AudioMixer::MAX_NUM_TRACKS);
-        return EXIT_FAILURE;
-    }
 
     size_t outputFrames = 0;
 
@@ -246,9 +242,10 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < providers.size(); ++i) {
         //printf("track %d out of %d\n", i, providers.size());
         uint32_t channelMask = audio_channel_out_mask_from_count(providers[i].getNumChannels());
-        int32_t name = mixer->getTrackName(channelMask,
-                formats[i], AUDIO_SESSION_OUTPUT_MIX);
-        ALOG_ASSERT(name >= 0);
+        const int name = i;
+        const status_t status = mixer->create(
+                name, channelMask, formats[i], AUDIO_SESSION_OUTPUT_MIX);
+        LOG_ALWAYS_FATAL_IF(status != OK);
         names[i] = name;
         mixer->setBufferProvider(name, &providers[i]);
         mixer->setParameter(name, AudioMixer::TRACK, AudioMixer::MAIN_BUFFER,
@@ -315,9 +312,10 @@ int main(int argc, char* argv[]) {
     writeFile(outputFilename, outputAddr,
             outputSampleRate, outputChannels, outputFrames, useMixerFloat);
     if (auxFilename) {
-        // Aux buffer is always in q4_27 format for now.
-        // memcpy_to_i16_from_q4_27(), but with stereo frame count (not sample count)
-        ditherAndClamp((int32_t*)auxAddr, (int32_t*)auxAddr, outputFrames >> 1);
+        // Aux buffer is always in q4_27 format for O and earlier.
+        // memcpy_to_i16_from_q4_27((int16_t*)auxAddr, (const int32_t*)auxAddr, outputFrames);
+        // Aux buffer is always in float format for P.
+        memcpy_to_i16_from_float((int16_t*)auxAddr, (const float*)auxAddr, outputFrames);
         writeFile(auxFilename, auxAddr, outputSampleRate, 1, outputFrames, false);
     }
 

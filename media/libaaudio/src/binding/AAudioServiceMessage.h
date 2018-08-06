@@ -36,15 +36,17 @@ typedef enum aaudio_service_event_e : uint32_t {
     AAUDIO_SERVICE_EVENT_PAUSED,
     AAUDIO_SERVICE_EVENT_STOPPED,
     AAUDIO_SERVICE_EVENT_FLUSHED,
-    AAUDIO_SERVICE_EVENT_CLOSED,
     AAUDIO_SERVICE_EVENT_DISCONNECTED,
-    AAUDIO_SERVICE_EVENT_VOLUME
+    AAUDIO_SERVICE_EVENT_VOLUME,
+    AAUDIO_SERVICE_EVENT_XRUN
 } aaudio_service_event_t;
 
 struct AAudioMessageEvent {
     aaudio_service_event_t event;
-    double                 dataDouble;
-    int64_t                dataLong;
+    union {
+        double  dataDouble;
+        int64_t dataLong;
+    };
 };
 
 typedef struct AAudioServiceMessage_s {

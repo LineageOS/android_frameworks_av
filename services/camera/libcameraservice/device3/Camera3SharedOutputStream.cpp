@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2016-2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,16 +20,25 @@ namespace android {
 
 namespace camera3 {
 
+const size_t Camera3SharedOutputStream::kMaxOutputs;
+
 Camera3SharedOutputStream::Camera3SharedOutputStream(int id,
         const std::vector<sp<Surface>>& surfaces,
         uint32_t width, uint32_t height, int format,
         uint64_t consumerUsage, android_dataspace dataSpace,
         camera3_stream_rotation_t rotation,
-        nsecs_t timestampOffset, int setId) :
+        nsecs_t timestampOffset, const String8& physicalCameraId,
+        int setId) :
         Camera3OutputStream(id, CAMERA3_STREAM_OUTPUT, width, height,
-                            format, dataSpace, rotation, consumerUsage,
-                            timestampOffset, setId),
-        mSurfaces(surfaces) {
+                            format, dataSpace, rotation, physicalCameraId,
+                            consumerUsage, timestampOffset, setId) {
+    size_t consumerCount = std::min(surfaces.size(), kMaxOutputs);
+    if (surfaces.size() > consumerCount) {
+        ALOGE("%s: Trying to add more consumers than the maximum ", __func__);
+    }
+    for (size_t i = 0; i < consumerCount; i++) {
+        mSurfaces[i] = surfaces[i];
+    }
 }
 
 Camera3SharedOutputStream::~Camera3SharedOutputStream() {
@@ -44,7 +53,16 @@ status_t Camera3SharedOutputStream::connectStreamSplitterLocked() {
     uint64_t usage;
     getEndpointUsage(&usage);
 
-    res = mStreamSplitter->connect(mSurfaces, usage, camera3_stream::max_buffers, &mConsumer);
+    std::unordered_map<size_t, sp<Surface>> initialSurfaces;
+    for (size_t i = 0; i < kMaxOutputs; i++) {
+        if (mSurfaces[i] != nullptr) {
+            initialSurfaces.emplace(i, mSurfaces[i]);
+        }
+    }
+
+    android::PixelFormat format = isFormatOverridden() ? getOriginalFormat() : getFormat();
+    res = mStreamSplitter->connect(initialSurfaces, usage, mUsage, camera3_stream::max_buffers,
+            getWidth(), getHeight(), format, &mConsumer);
     if (res != OK) {
         ALOGE("%s: Failed to connect to stream splitter: %s(%d)",
                 __FUNCTION__, strerror(-res), res);
@@ -68,7 +86,11 @@ status_t Camera3SharedOutputStream::notifyBufferReleased(ANativeWindowBuffer *an
 
 bool Camera3SharedOutputStream::isConsumerConfigurationDeferred(size_t surface_id) const {
     Mutex::Autolock l(mLock);
-    return (surface_id >= mSurfaces.size());
+    if (surface_id >= kMaxOutputs) {
+        return true;
+    }
+
+    return (mSurfaces[surface_id] == nullptr);
 }
 
 status_t Camera3SharedOutputStream::setConsumers(const std::vector<sp<Surface>>& surfaces) {
@@ -85,11 +107,17 @@ status_t Camera3SharedOutputStream::setConsumers(const std::vector<sp<Surface>>&
             return INVALID_OPERATION;
         }
 
-        mSurfaces.push_back(surface);
+        ssize_t id = getNextSurfaceIdLocked();
+        if (id < 0) {
+            ALOGE("%s: No surface ids available!", __func__);
+            return NO_MEMORY;
+        }
+
+        mSurfaces[id] = surface;
 
         // Only call addOutput if the splitter has been connected.
         if (mStreamSplitter != nullptr) {
-            ret = mStreamSplitter->addOutput(surface);
+            ret = mStreamSplitter->addOutput(id, surface);
             if (ret != OK) {
                 ALOGE("%s: addOutput failed with error code %d", __FUNCTION__, ret);
                 return ret;
@@ -200,9 +228,9 @@ status_t Camera3SharedOutputStream::getEndpointUsage(uint64_t *usage) const {
         // Called before shared buffer queue is constructed.
         *usage = getPresetConsumerUsage();
 
-        for (auto surface : mSurfaces) {
-            if (surface != nullptr) {
-                res = getEndpointUsageForSurface(&u, surface);
+        for (size_t id = 0; id < kMaxOutputs; id++) {
+            if (mSurfaces[id] != nullptr) {
+                res = getEndpointUsageForSurface(&u, mSurfaces[id]);
                 *usage |= u;
             }
         }
@@ -213,6 +241,140 @@ status_t Camera3SharedOutputStream::getEndpointUsage(uint64_t *usage) const {
     }
 
     return res;
+}
+
+ssize_t Camera3SharedOutputStream::getNextSurfaceIdLocked() {
+    ssize_t id = -1;
+    for (size_t i = 0; i < kMaxOutputs; i++) {
+        if (mSurfaces[i] == nullptr) {
+            id = i;
+            break;
+        }
+    }
+
+    return id;
+}
+
+ssize_t Camera3SharedOutputStream::getSurfaceId(const sp<Surface> &surface) {
+    Mutex::Autolock l(mLock);
+    ssize_t id = -1;
+    for (size_t i = 0; i < kMaxOutputs; i++) {
+        if (mSurfaces[i] == surface) {
+            id = i;
+            break;
+        }
+    }
+
+    return id;
+}
+
+status_t Camera3SharedOutputStream::revertPartialUpdateLocked(
+        const KeyedVector<sp<Surface>, size_t> &removedSurfaces,
+        const KeyedVector<sp<Surface>, size_t> &attachedSurfaces) {
+    status_t ret = OK;
+
+    for (size_t i = 0; i < attachedSurfaces.size(); i++) {
+        size_t index = attachedSurfaces.valueAt(i);
+        if (mStreamSplitter != nullptr) {
+            ret = mStreamSplitter->removeOutput(index);
+            if (ret != OK) {
+                return UNKNOWN_ERROR;
+            }
+        }
+        mSurfaces[index] = nullptr;
+    }
+
+    for (size_t i = 0; i < removedSurfaces.size(); i++) {
+        size_t index = removedSurfaces.valueAt(i);
+        if (mStreamSplitter != nullptr) {
+            ret = mStreamSplitter->addOutput(index, removedSurfaces.keyAt(i));
+            if (ret != OK) {
+                return UNKNOWN_ERROR;
+            }
+        }
+        mSurfaces[index] = removedSurfaces.keyAt(i);
+    }
+
+    return ret;
+}
+
+status_t Camera3SharedOutputStream::updateStream(const std::vector<sp<Surface>> &outputSurfaces,
+        const std::vector<OutputStreamInfo> &outputInfo,
+        const std::vector<size_t> &removedSurfaceIds,
+        KeyedVector<sp<Surface>, size_t> *outputMap) {
+    status_t ret = OK;
+    Mutex::Autolock l(mLock);
+
+    if ((outputMap == nullptr) || (outputInfo.size() != outputSurfaces.size()) ||
+            (outputSurfaces.size() > kMaxOutputs)) {
+        return BAD_VALUE;
+    }
+
+    uint64_t usage;
+    getEndpointUsage(&usage);
+    KeyedVector<sp<Surface>, size_t> removedSurfaces;
+    //Check whether the new surfaces are compatible.
+    for (const auto &infoIt : outputInfo) {
+        bool imgReaderUsage = (infoIt.consumerUsage & GRALLOC_USAGE_SW_READ_OFTEN) ? true : false;
+        bool sizeMismatch = ((static_cast<uint32_t>(infoIt.width) != getWidth()) ||
+                                (static_cast<uint32_t> (infoIt.height) != getHeight())) ?
+                                true : false;
+        if ((imgReaderUsage && sizeMismatch) ||
+                (infoIt.format != getOriginalFormat() && infoIt.format != getFormat()) ||
+                (infoIt.dataSpace != getDataSpace() &&
+                 infoIt.dataSpace != getOriginalDataSpace())) {
+            ALOGE("%s: Shared surface parameters format: 0x%x dataSpace: 0x%x "
+                    " don't match source stream format: 0x%x  dataSpace: 0x%x", __FUNCTION__,
+                    infoIt.format, infoIt.dataSpace, getFormat(), getDataSpace());
+            return BAD_VALUE;
+        }
+    }
+
+    //First remove all absent outputs
+    for (const auto &it : removedSurfaceIds) {
+        if (mStreamSplitter != nullptr) {
+            ret = mStreamSplitter->removeOutput(it);
+            if (ret != OK) {
+                ALOGE("%s: failed with error code %d", __FUNCTION__, ret);
+                status_t res = revertPartialUpdateLocked(removedSurfaces, *outputMap);
+                if (res != OK) {
+                    return res;
+                }
+                return ret;
+
+            }
+        }
+        mSurfaces[it] = nullptr;
+        removedSurfaces.add(mSurfaces[it], it);
+    }
+
+    //Next add the new outputs
+    for (const auto &it : outputSurfaces) {
+        ssize_t surfaceId = getNextSurfaceIdLocked();
+        if (surfaceId < 0) {
+            ALOGE("%s: No more available output slots!", __FUNCTION__);
+            status_t res = revertPartialUpdateLocked(removedSurfaces, *outputMap);
+            if (res != OK) {
+                return res;
+            }
+            return NO_MEMORY;
+        }
+        if (mStreamSplitter != nullptr) {
+            ret = mStreamSplitter->addOutput(surfaceId, it);
+            if (ret != OK) {
+                ALOGE("%s: failed with error code %d", __FUNCTION__, ret);
+                status_t res = revertPartialUpdateLocked(removedSurfaces, *outputMap);
+                if (res != OK) {
+                    return res;
+                }
+                return ret;
+            }
+        }
+        mSurfaces[surfaceId] = it;
+        outputMap->add(it, surfaceId);
+    }
+
+    return ret;
 }
 
 } // namespace camera3

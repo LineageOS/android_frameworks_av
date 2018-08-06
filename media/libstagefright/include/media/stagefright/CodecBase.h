@@ -18,6 +18,7 @@
 
 #define CODEC_BASE_H_
 
+#include <list>
 #include <memory>
 
 #include <stdint.h>
@@ -26,7 +27,6 @@
 
 #include <media/hardware/CryptoAPI.h>
 #include <media/hardware/HardwareAPI.h>
-#include <media/IOMX.h>
 #include <media/MediaCodecInfo.h>
 #include <media/stagefright/foundation/AHandler.h>
 #include <media/stagefright/foundation/ColorUtils.h>
@@ -222,9 +222,8 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
     virtual void signalSetParameters(const sp<AMessage> &msg) = 0;
     virtual void signalEndOfInputStream() = 0;
 
-    /*
-     * Codec-related defines
-     */
+    typedef CodecBase *(*CreateCodecFunc)(void);
+    typedef PersistentSurface *(*CreateInputSurfaceFunc)(void);
 
 protected:
     CodecBase() = default;
@@ -324,4 +323,3 @@ protected:
 }  // namespace android
 
 #endif  // CODEC_BASE_H_
-

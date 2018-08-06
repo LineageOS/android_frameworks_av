@@ -52,6 +52,7 @@ static media_status_t translate_error(status_t err) {
 
 enum {
     kWhatActivityNotify,
+    kWhatAsyncNotify,
     kWhatRequestActivityNotifications,
     kWhatStopActivityNotifications,
 };
@@ -88,6 +89,11 @@ struct AMediaCodec {
     bool mRequestedActivityNotification;
     OnCodecEvent mCallback;
     void *mCallbackUserData;
+
+    sp<AMessage> mAsyncNotify;
+    mutable Mutex mAsyncCallbackLock;
+    AMediaCodecOnAsyncNotifyCallback mAsyncCallback;
+    void *mAsyncCallbackUserData;
 };
 
 CodecHandler::CodecHandler(AMediaCodec *codec) {
@@ -128,6 +134,147 @@ void CodecHandler::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatAsyncNotify:
+        {
+             int32_t cbID;
+             if (!msg->findInt32("callbackID", &cbID)) {
+                 ALOGE("kWhatAsyncNotify: callbackID is expected.");
+                 break;
+             }
+
+             ALOGV("kWhatAsyncNotify: cbID = %d", cbID);
+
+             switch (cbID) {
+                 case MediaCodec::CB_INPUT_AVAILABLE:
+                 {
+                     int32_t index;
+                     if (!msg->findInt32("index", &index)) {
+                         ALOGE("CB_INPUT_AVAILABLE: index is expected.");
+                         break;
+                     }
+
+                     Mutex::Autolock _l(mCodec->mAsyncCallbackLock);
+                     if (mCodec->mAsyncCallbackUserData != NULL
+                         || mCodec->mAsyncCallback.onAsyncInputAvailable != NULL) {
+                         mCodec->mAsyncCallback.onAsyncInputAvailable(
+                                 mCodec,
+                                 mCodec->mAsyncCallbackUserData,
+                                 index);
+                     }
+
+                     break;
+                 }
+
+                 case MediaCodec::CB_OUTPUT_AVAILABLE:
+                 {
+                     int32_t index;
+                     size_t offset;
+                     size_t size;
+                     int64_t timeUs;
+                     int32_t flags;
+
+                     if (!msg->findInt32("index", &index)) {
+                         ALOGE("CB_OUTPUT_AVAILABLE: index is expected.");
+                         break;
+                     }
+                     if (!msg->findSize("offset", &offset)) {
+                         ALOGE("CB_OUTPUT_AVAILABLE: offset is expected.");
+                         break;
+                     }
+                     if (!msg->findSize("size", &size)) {
+                         ALOGE("CB_OUTPUT_AVAILABLE: size is expected.");
+                         break;
+                     }
+                     if (!msg->findInt64("timeUs", &timeUs)) {
+                         ALOGE("CB_OUTPUT_AVAILABLE: timeUs is expected.");
+                         break;
+                     }
+                     if (!msg->findInt32("flags", &flags)) {
+                         ALOGE("CB_OUTPUT_AVAILABLE: flags is expected.");
+                         break;
+                     }
+
+                     AMediaCodecBufferInfo bufferInfo = {
+                         (int32_t)offset,
+                         (int32_t)size,
+                         timeUs,
+                         (uint32_t)flags};
+
+                     Mutex::Autolock _l(mCodec->mAsyncCallbackLock);
+                     if (mCodec->mAsyncCallbackUserData != NULL
+                         || mCodec->mAsyncCallback.onAsyncOutputAvailable != NULL) {
+                         mCodec->mAsyncCallback.onAsyncOutputAvailable(
+                                 mCodec,
+                                 mCodec->mAsyncCallbackUserData,
+                                 index,
+                                 &bufferInfo);
+                     }
+
+                     break;
+                 }
+
+                 case MediaCodec::CB_OUTPUT_FORMAT_CHANGED:
+                 {
+                     sp<AMessage> format;
+                     if (!msg->findMessage("format", &format)) {
+                         ALOGE("CB_OUTPUT_FORMAT_CHANGED: format is expected.");
+                         break;
+                     }
+
+                     AMediaFormat *aMediaFormat = AMediaFormat_fromMsg(&format);
+
+                     Mutex::Autolock _l(mCodec->mAsyncCallbackLock);
+                     if (mCodec->mAsyncCallbackUserData != NULL
+                         || mCodec->mAsyncCallback.onAsyncFormatChanged != NULL) {
+                         mCodec->mAsyncCallback.onAsyncFormatChanged(
+                                 mCodec,
+                                 mCodec->mAsyncCallbackUserData,
+                                 aMediaFormat);
+                     }
+
+                     break;
+                 }
+
+                 case MediaCodec::CB_ERROR:
+                 {
+                     status_t err;
+                     int32_t actionCode;
+                     AString detail;
+                     if (!msg->findInt32("err", &err)) {
+                         ALOGE("CB_ERROR: err is expected.");
+                         break;
+                     }
+                     if (!msg->findInt32("action", &actionCode)) {
+                         ALOGE("CB_ERROR: action is expected.");
+                         break;
+                     }
+                     msg->findString("detail", &detail);
+                     ALOGE("Decoder reported error(0x%x), actionCode(%d), detail(%s)",
+                           err, actionCode, detail.c_str());
+
+                     Mutex::Autolock _l(mCodec->mAsyncCallbackLock);
+                     if (mCodec->mAsyncCallbackUserData != NULL
+                         || mCodec->mAsyncCallback.onAsyncError != NULL) {
+                         mCodec->mAsyncCallback.onAsyncError(
+                                 mCodec,
+                                 mCodec->mAsyncCallbackUserData,
+                                 translate_error(err),
+                                 actionCode,
+                                 detail.c_str());
+                     }
+
+                     break;
+                 }
+
+                 default:
+                 {
+                     ALOGE("kWhatAsyncNotify: callbackID(%d) is unexpected.", cbID);
+                     break;
+                 }
+             }
+             break;
+        }
+
         case kWhatStopActivityNotifications:
         {
             sp<AReplyToken> replyID;
@@ -162,7 +309,7 @@ static AMediaCodec * createAMediaCodec(const char *name, bool name_is_type, bool
     size_t res = mData->mLooper->start(
             false,      // runOnCallingThread
             true,       // canCallJava XXX
-            PRIORITY_FOREGROUND);
+            PRIORITY_AUDIO);
     if (res != OK) {
         ALOGE("Failed to start the looper");
         AMediaCodec_delete(mData);
@@ -182,6 +329,9 @@ static AMediaCodec * createAMediaCodec(const char *name, bool name_is_type, bool
     mData->mGeneration = 1;
     mData->mRequestedActivityNotification = false;
     mData->mCallback = NULL;
+
+    mData->mAsyncCallback = {};
+    mData->mAsyncCallbackUserData = NULL;
 
     return mData;
 }
@@ -222,6 +372,32 @@ media_status_t AMediaCodec_delete(AMediaCodec *mData) {
 }
 
 EXPORT
+media_status_t AMediaCodec_getName(
+        AMediaCodec *mData,
+        char** out_name) {
+    if (out_name == NULL) {
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    AString compName;
+    status_t err = mData->mCodec->getName(&compName);
+    if (err != OK) {
+        return translate_error(err);
+    }
+    *out_name = strdup(compName.c_str());
+    return AMEDIA_OK;
+}
+
+EXPORT
+void AMediaCodec_releaseName(
+        AMediaCodec * /* mData */,
+        char* name) {
+    if (name != NULL) {
+        free(name);
+    }
+}
+
+EXPORT
 media_status_t AMediaCodec_configure(
         AMediaCodec *mData,
         const AMediaFormat* format,
@@ -236,8 +412,40 @@ media_status_t AMediaCodec_configure(
         surface = (Surface*) window;
     }
 
-    return translate_error(mData->mCodec->configure(nativeFormat, surface,
-            crypto ? crypto->mCrypto : NULL, flags));
+    status_t err = mData->mCodec->configure(nativeFormat, surface,
+            crypto ? crypto->mCrypto : NULL, flags);
+    if (err != OK) {
+        ALOGE("configure: err(%d), failed with format: %s",
+              err, nativeFormat->debugString(0).c_str());
+    }
+    return translate_error(err);
+}
+
+EXPORT
+media_status_t AMediaCodec_setAsyncNotifyCallback(
+        AMediaCodec *mData,
+        AMediaCodecOnAsyncNotifyCallback callback,
+        void *userdata) {
+    if (mData->mAsyncNotify == NULL && userdata != NULL) {
+        mData->mAsyncNotify = new AMessage(kWhatAsyncNotify, mData->mHandler);
+        status_t err = mData->mCodec->setCallback(mData->mAsyncNotify);
+        if (err != OK) {
+            ALOGE("setAsyncNotifyCallback: err(%d), failed to set async callback", err);
+            return translate_error(err);
+        }
+    }
+
+    Mutex::Autolock _l(mData->mAsyncCallbackLock);
+    mData->mAsyncCallback = callback;
+    mData->mAsyncCallbackUserData = userdata;
+
+    return AMEDIA_OK;
+}
+
+
+EXPORT
+media_status_t AMediaCodec_releaseCrypto(AMediaCodec *mData) {
+    return translate_error(mData->mCodec->releaseCrypto());
 }
 
 EXPORT
@@ -282,6 +490,19 @@ ssize_t AMediaCodec_dequeueInputBuffer(AMediaCodec *mData, int64_t timeoutUs) {
 
 EXPORT
 uint8_t* AMediaCodec_getInputBuffer(AMediaCodec *mData, size_t idx, size_t *out_size) {
+    if (mData->mAsyncNotify != NULL) {
+        // Asynchronous mode
+        sp<MediaCodecBuffer> abuf;
+        if (mData->mCodec->getInputBuffer(idx, &abuf) != 0) {
+            return NULL;
+        }
+
+        if (out_size != NULL) {
+            *out_size = abuf->capacity();
+        }
+        return abuf->data();
+    }
+
     android::Vector<android::sp<android::MediaCodecBuffer> > abufs;
     if (mData->mCodec->getInputBuffers(&abufs) == 0) {
         size_t n = abufs.size();
@@ -304,6 +525,19 @@ uint8_t* AMediaCodec_getInputBuffer(AMediaCodec *mData, size_t idx, size_t *out_
 
 EXPORT
 uint8_t* AMediaCodec_getOutputBuffer(AMediaCodec *mData, size_t idx, size_t *out_size) {
+    if (mData->mAsyncNotify != NULL) {
+        // Asynchronous mode
+        sp<MediaCodecBuffer> abuf;
+        if (mData->mCodec->getOutputBuffer(idx, &abuf) != 0) {
+            return NULL;
+        }
+
+        if (out_size != NULL) {
+            *out_size = abuf->capacity();
+        }
+        return abuf->data();
+    }
+
     android::Vector<android::sp<android::MediaCodecBuffer> > abufs;
     if (mData->mCodec->getOutputBuffers(&abufs) == 0) {
         size_t n = abufs.size();
@@ -363,6 +597,20 @@ EXPORT
 AMediaFormat* AMediaCodec_getOutputFormat(AMediaCodec *mData) {
     sp<AMessage> format;
     mData->mCodec->getOutputFormat(&format);
+    return AMediaFormat_fromMsg(&format);
+}
+
+EXPORT
+AMediaFormat* AMediaCodec_getInputFormat(AMediaCodec *mData) {
+    sp<AMessage> format;
+    mData->mCodec->getInputFormat(&format);
+    return AMediaFormat_fromMsg(&format);
+}
+
+EXPORT
+AMediaFormat* AMediaCodec_getBufferFormat(AMediaCodec *mData, size_t index) {
+    sp<AMessage> format;
+    mData->mCodec->getOutputFormat(index, &format);
     return AMediaFormat_fromMsg(&format);
 }
 
@@ -533,6 +781,16 @@ media_status_t AMediaCodec_queueSecureInputBuffer(
     }
     delete [] subSamples;
     return translate_error(err);
+}
+
+EXPORT
+bool AMediaCodecActionCode_isRecoverable(int32_t actionCode) {
+    return (actionCode == ACTION_CODE_RECOVERABLE);
+}
+
+EXPORT
+bool AMediaCodecActionCode_isTransient(int32_t actionCode) {
+    return (actionCode == ACTION_CODE_TRANSIENT);
 }
 
 

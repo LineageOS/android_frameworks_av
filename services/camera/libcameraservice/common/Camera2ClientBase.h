@@ -49,13 +49,14 @@ public:
                       const sp<TCamCallbacks>& remoteCallback,
                       const String16& clientPackageName,
                       const String8& cameraId,
+                      int api1CameraId,
                       int cameraFacing,
                       int clientPid,
                       uid_t clientUid,
                       int servicePid);
     virtual ~Camera2ClientBase();
 
-    virtual status_t      initialize(sp<CameraProviderManager> manager);
+    virtual status_t      initialize(sp<CameraProviderManager> manager, const String8& monitorTags);
     virtual status_t      dumpClient(int fd, const Vector<String16>& args);
 
     /**
@@ -140,9 +141,11 @@ protected:
 
     bool                  mDeviceActive;
 
+    const int             mApi1CameraId; // -1 if client is API2
+
 private:
     template<typename TProviderPtr>
-    status_t              initializeImpl(TProviderPtr providerPtr);
+    status_t              initializeImpl(TProviderPtr providerPtr, const String8& monitorTags);
 };
 
 }; // namespace android

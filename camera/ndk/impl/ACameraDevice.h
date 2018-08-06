@@ -36,7 +36,8 @@
 #include <camera/camera2/OutputConfiguration.h>
 #include <camera/camera2/CaptureRequest.h>
 
-#include <camera/NdkCameraDevice.h>
+#include <camera/NdkCameraManager.h>
+#include <camera/NdkCameraCaptureSession.h>
 #include "ACameraMetadata.h"
 
 namespace android {
@@ -59,6 +60,7 @@ class CameraDevice final : public RefBase {
 
     camera_status_t createCaptureSession(
             const ACaptureSessionOutputContainer*       outputs,
+            const ACaptureRequest* sessionParameters,
             const ACameraCaptureSession_stateCallbacks* callbacks,
             /*out*/ACameraCaptureSession** session);
 
@@ -72,7 +74,8 @@ class CameraDevice final : public RefBase {
         binder::Status onCaptureStarted(const CaptureResultExtras& resultExtras,
                               int64_t timestamp) override;
         binder::Status onResultReceived(const CameraMetadata& metadata,
-                              const CaptureResultExtras& resultExtras) override;
+                              const CaptureResultExtras& resultExtras,
+                              const std::vector<PhysicalCaptureResultInfo>& physicalResultInfos) override;
         binder::Status onPrepared(int streamId) override;
         binder::Status onRequestQueueEmpty() override;
         binder::Status onRepeatingRequestError(int64_t lastFrameNumber,
@@ -122,7 +125,9 @@ class CameraDevice final : public RefBase {
             /*out*/int* captureSequenceId,
             bool isRepeating);
 
-    static camera_status_t allocateCaptureRequest(
+    camera_status_t updateOutputConfigurationLocked(ACaptureSessionOutput *output);
+
+    camera_status_t allocateCaptureRequest(
             const ACaptureRequest* request, sp<CaptureRequest>& outReq);
 
     static ACaptureRequest* allocateACaptureRequest(sp<CaptureRequest>& req);
@@ -136,7 +141,8 @@ class CameraDevice final : public RefBase {
     // For capture session to notify its end of life
     void notifySessionEndOfLifeLocked(ACameraCaptureSession* session);
 
-    camera_status_t configureStreamsLocked(const ACaptureSessionOutputContainer* outputs);
+    camera_status_t configureStreamsLocked(const ACaptureSessionOutputContainer* outputs,
+           const ACaptureRequest* sessionParameters);
 
     // Input message will be posted and cleared after this returns
     void postSessionMsgAndCleanup(sp<AMessage>& msg);
@@ -306,9 +312,10 @@ struct ACameraDevice {
 
     camera_status_t createCaptureSession(
             const ACaptureSessionOutputContainer*       outputs,
+            const ACaptureRequest* sessionParameters,
             const ACameraCaptureSession_stateCallbacks* callbacks,
             /*out*/ACameraCaptureSession** session) {
-        return mDevice->createCaptureSession(outputs, callbacks, session);
+        return mDevice->createCaptureSession(outputs, sessionParameters, callbacks, session);
     }
 
     /***********************

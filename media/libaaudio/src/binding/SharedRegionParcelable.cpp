@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AAudio"
+#define LOG_TAG "SharedRegionParcelable"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -24,6 +24,7 @@
 #include <binder/Parcelable.h>
 
 #include <aaudio/AAudio.h>
+#include <utility/AAudioUtilities.h>
 
 #include "binding/SharedMemoryParcelable.h"
 #include "binding/SharedRegionParcelable.h"
@@ -47,21 +48,38 @@ void SharedRegionParcelable::setup(int32_t sharedMemoryIndex,
 }
 
 status_t SharedRegionParcelable::writeToParcel(Parcel* parcel) const {
-    parcel->writeInt32(mSizeInBytes);
+    status_t status = AAudioConvert_aaudioToAndroidStatus(validate());
+    if (status != NO_ERROR) goto error;
+
+    status = parcel->writeInt32(mSizeInBytes);
+    if (status != NO_ERROR) goto error;
     if (mSizeInBytes > 0) {
-        parcel->writeInt32(mSharedMemoryIndex);
-        parcel->writeInt32(mOffsetInBytes);
+        status = parcel->writeInt32(mSharedMemoryIndex);
+        if (status != NO_ERROR) goto error;
+        status = parcel->writeInt32(mOffsetInBytes);
+        if (status != NO_ERROR) goto error;
     }
-    return NO_ERROR; // TODO check for errors above
+    return NO_ERROR;
+
+error:
+    ALOGE("%s returning %d", __func__, status);
+    return status;
 }
 
 status_t SharedRegionParcelable::readFromParcel(const Parcel* parcel) {
-    parcel->readInt32(&mSizeInBytes);
+    status_t status = parcel->readInt32(&mSizeInBytes);
+    if (status != NO_ERROR) goto error;
     if (mSizeInBytes > 0) {
-        parcel->readInt32(&mSharedMemoryIndex);
-        parcel->readInt32(&mOffsetInBytes);
+        status = parcel->readInt32(&mSharedMemoryIndex);
+        if (status != NO_ERROR) goto error;
+        status = parcel->readInt32(&mOffsetInBytes);
+        if (status != NO_ERROR) goto error;
     }
-    return NO_ERROR; // TODO check for errors above
+    return AAudioConvert_aaudioToAndroidStatus(validate());
+
+error:
+    ALOGE("%s returning %d", __func__, status);
+    return status;
 }
 
 aaudio_result_t SharedRegionParcelable::resolve(SharedMemoryParcelable *memoryParcels,
@@ -71,25 +89,25 @@ aaudio_result_t SharedRegionParcelable::resolve(SharedMemoryParcelable *memoryPa
         return AAUDIO_OK;
     }
     if (mSharedMemoryIndex < 0) {
-        ALOGE("SharedRegionParcelable invalid mSharedMemoryIndex = %d", mSharedMemoryIndex);
+        ALOGE("invalid mSharedMemoryIndex = %d", mSharedMemoryIndex);
         return AAUDIO_ERROR_INTERNAL;
     }
     SharedMemoryParcelable *memoryParcel = &memoryParcels[mSharedMemoryIndex];
     return memoryParcel->resolve(mOffsetInBytes, mSizeInBytes, regionAddressPtr);
 }
 
-aaudio_result_t SharedRegionParcelable::validate() {
+aaudio_result_t SharedRegionParcelable::validate() const {
     if (mSizeInBytes < 0 || mSizeInBytes >= MAX_MMAP_SIZE_BYTES) {
-        ALOGE("SharedRegionParcelable invalid mSizeInBytes = %d", mSizeInBytes);
+        ALOGE("invalid mSizeInBytes = %d", mSizeInBytes);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
     if (mSizeInBytes > 0) {
         if (mOffsetInBytes < 0 || mOffsetInBytes >= MAX_MMAP_OFFSET_BYTES) {
-            ALOGE("SharedRegionParcelable invalid mOffsetInBytes = %d", mOffsetInBytes);
+            ALOGE("invalid mOffsetInBytes = %d", mOffsetInBytes);
             return AAUDIO_ERROR_OUT_OF_RANGE;
         }
         if (mSharedMemoryIndex < 0 || mSharedMemoryIndex >= MAX_SHARED_MEMORIES) {
-            ALOGE("SharedRegionParcelable invalid mSharedMemoryIndex = %d", mSharedMemoryIndex);
+            ALOGE("invalid mSharedMemoryIndex = %d", mSharedMemoryIndex);
             return AAUDIO_ERROR_INTERNAL;
         }
     }
@@ -97,9 +115,9 @@ aaudio_result_t SharedRegionParcelable::validate() {
 }
 
 void SharedRegionParcelable::dump() {
-    ALOGD("SharedRegionParcelable mSizeInBytes = %d -----", mSizeInBytes);
+    ALOGD("mSizeInBytes = %d -----", mSizeInBytes);
     if (mSizeInBytes > 0) {
-        ALOGD("SharedRegionParcelable mSharedMemoryIndex = %d", mSharedMemoryIndex);
-        ALOGD("SharedRegionParcelable mOffsetInBytes = %d", mOffsetInBytes);
+        ALOGD("mSharedMemoryIndex = %d", mSharedMemoryIndex);
+        ALOGD("mOffsetInBytes = %d", mOffsetInBytes);
     }
 }

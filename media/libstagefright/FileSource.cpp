@@ -194,12 +194,6 @@ sp<DecryptHandle> FileSource::DrmInitialization(const char *mime) {
     return mDecryptHandle;
 }
 
-void FileSource::getDrmInfo(sp<DecryptHandle> &handle, DrmManagerClient **client) {
-    handle = mDecryptHandle;
-
-    *client = mDrmManagerClient;
-}
-
 ssize_t FileSource::readAtDRM(off64_t offset, void *data, size_t size) {
     size_t DRM_CACHE_SIZE = 1024;
     if (mDrmBuf == NULL) {

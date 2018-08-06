@@ -1040,7 +1040,7 @@ void CameraSource::releaseOneRecordingFrame(const sp<IMemory>& frame) {
     releaseRecordingFrame(frame);
 }
 
-void CameraSource::signalBufferReturned(MediaBuffer *buffer) {
+void CameraSource::signalBufferReturned(MediaBufferBase *buffer) {
     ALOGV("signalBufferReturned: %p", buffer->data());
     Mutex::Autolock autoLock(mLock);
     for (List<sp<IMemory> >::iterator it = mFramesBeingEncoded.begin();
@@ -1059,7 +1059,7 @@ void CameraSource::signalBufferReturned(MediaBuffer *buffer) {
 }
 
 status_t CameraSource::read(
-        MediaBuffer **buffer, const ReadOptions *options) {
+        MediaBufferBase **buffer, const ReadOptions *options) {
     ALOGV("read");
 
     *buffer = NULL;
@@ -1100,7 +1100,7 @@ status_t CameraSource::read(
         *buffer = new MediaBuffer(frame->pointer(), frame->size());
         (*buffer)->setObserver(this);
         (*buffer)->add_ref();
-        (*buffer)->meta_data()->setInt64(kKeyTime, frameTime);
+        (*buffer)->meta_data().setInt64(kKeyTime, frameTime);
     }
     return OK;
 }
