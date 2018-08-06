@@ -1034,8 +1034,6 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
             }
             return AUDIO_IO_HANDLE_NONE;
         }
-        outputDesc->mRefCount[stream] = 0;
-        outputDesc->mStopTime[stream] = 0;
         outputDesc->mDirectOpenCount = 1;
         outputDesc->mDirectClientSession = session;
 
@@ -1394,8 +1392,7 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
     // increment usage count for this stream on the requested output:
     // NOTE that the usage count is the same for duplicated output and hardware output which is
     // necessary for a correct control of hardware output routing by startOutput() and stopOutput()
-    outputDesc->changeRefCount(stream, 1);
-    client->setActive(true);
+    outputDesc->setClientActive(client, true);
 
     if (client->hasPreferredDevice(true)) {
         device = getNewOutputDevice(outputDesc, false /*fromCache*/);
@@ -1408,7 +1405,7 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
         selectOutputForMusicEffects();
     }
 
-    if (outputDesc->mRefCount[stream] == 1 || device != AUDIO_DEVICE_NONE) {
+    if (outputDesc->streamActiveCount(stream) == 1 || device != AUDIO_DEVICE_NONE) {
         // starting an output being rerouted?
         if (device == AUDIO_DEVICE_NONE) {
             device = getNewOutputDevice(outputDesc, false /*fromCache*/);
@@ -1537,8 +1534,8 @@ status_t AudioPolicyManager::stopSource(const sp<SwAudioOutputDescriptor>& outpu
 
     handleEventForBeacon(stream == AUDIO_STREAM_TTS ? STOPPING_BEACON : STOPPING_OUTPUT);
 
-    if (outputDesc->mRefCount[stream] > 0) {
-        if (outputDesc->mRefCount[stream] == 1) {
+    if (outputDesc->streamActiveCount(stream) > 0) {
+        if (outputDesc->streamActiveCount(stream) == 1) {
             // Automatically disable the remote submix input when output is stopped on a
             // re routing mix of type MIX_TYPE_RECORDERS
             if (audio_is_remote_submix_device(outputDesc->mDevice) &&
@@ -1557,11 +1554,10 @@ status_t AudioPolicyManager::stopSource(const sp<SwAudioOutputDescriptor>& outpu
         }
 
         // decrement usage count of this stream on the output
-        outputDesc->changeRefCount(stream, -1);
-        client->setActive(false);
+        outputDesc->setClientActive(client, false);
 
         // store time at which the stream was stopped - see isStreamActive()
-        if (outputDesc->mRefCount[stream] == 0 || forceDeviceUpdate) {
+        if (outputDesc->streamActiveCount(stream) == 0 || forceDeviceUpdate) {
             outputDesc->mStopTime[stream] = systemTime();
             audio_devices_t newDevice = getNewOutputDevice(outputDesc, false /*fromCache*/);
             // delay the device switch by twice the latency because stopOutput() is executed when
@@ -4621,8 +4617,8 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
             // the other output.
             bool wasActive = outputDesc2->isActive();
             for (int j = 0; j < AUDIO_STREAM_CNT; j++) {
-                int refCount = dupOutputDesc->mRefCount[j];
-                outputDesc2->changeRefCount((audio_stream_type_t)j,-refCount);
+                int activeCount = dupOutputDesc->streamActiveCount((audio_stream_type_t)j);
+                outputDesc2->changeStreamActiveCount((audio_stream_type_t)j,-activeCount);
             }
             // stop() will be a no op if the output is still active but is needed in case all
             // active streams refcounts where cleared above
