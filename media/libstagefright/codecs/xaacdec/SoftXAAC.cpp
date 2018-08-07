@@ -79,7 +79,7 @@ static void InitOMXParams(T* params) {
 
 static const OMX_U32 kSupportedProfiles[] = {
     OMX_AUDIO_AACObjectLC, OMX_AUDIO_AACObjectHE,  OMX_AUDIO_AACObjectHE_PS,
-    OMX_AUDIO_AACObjectLD, OMX_AUDIO_AACObjectELD,
+    OMX_AUDIO_AACObjectLD, OMX_AUDIO_AACObjectELD, OMX_AUDIO_AACObjectXHE
 };
 
 SoftXAAC::SoftXAAC(const char* name, const OMX_CALLBACKTYPE* callbacks, OMX_PTR appData,
