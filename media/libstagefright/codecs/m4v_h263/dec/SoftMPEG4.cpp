@@ -353,7 +353,8 @@ bool SoftMPEG4::handlePortSettingsChange() {
     bool portWillReset = false;
     const bool fakeStride = true;
     SoftVideoDecoderOMXComponent::handlePortSettingsChange(
-            &portWillReset, buf_width, buf_height, cropSettingsMode, fakeStride);
+            &portWillReset, buf_width, buf_height,
+            OMX_COLOR_FormatYUV420Planar, cropSettingsMode, fakeStride);
     if (portWillReset) {
         if (mMode == MODE_H263) {
             PVCleanUpVideoDecoder(mHandle);

@@ -19,18 +19,19 @@
 #define I_MEDIA_HTTP_SERVICE_H_
 
 #include <binder/IInterface.h>
+#include <media/MediaHTTPService.h>
 #include <media/stagefright/foundation/ABase.h>
 
 namespace android {
 
-struct IMediaHTTPConnection;
+struct MediaHTTPConnection;
 
 /** MUST stay in sync with IMediaHTTPService.aidl */
 
-struct IMediaHTTPService : public IInterface {
+struct IMediaHTTPService : public MediaHTTPService, public IInterface {
     DECLARE_META_INTERFACE(MediaHTTPService);
 
-    virtual sp<IMediaHTTPConnection> makeHTTPConnection() = 0;
+    virtual sp<MediaHTTPConnection> makeHTTPConnection() = 0;
 
 private:
     DISALLOW_EVIL_CONSTRUCTORS(IMediaHTTPService);

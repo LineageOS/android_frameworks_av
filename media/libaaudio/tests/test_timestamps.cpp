@@ -22,8 +22,7 @@
 
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
-#include "utils/AAudioExampleUtils.h"
-#include "../examples/utils/AAudioExampleUtils.h"
+#include "AAudioExampleUtils.h"
 
 // Arbitrary period for glitches, once per second at 48000 Hz.
 #define FORCED_UNDERRUN_PERIOD_FRAMES    48000

@@ -16,18 +16,18 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MPEG2TSWriter"
-#include <media/stagefright/foundation/ADebug.h>
 
+#include <media/MediaSource.h>
+#include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/MPEG2TSWriter.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
-#include <media/stagefright/Utils.h>
 #include <arpa/inet.h>
 
 #include "include/ESDS.h"
@@ -35,7 +35,7 @@
 namespace android {
 
 struct MPEG2TSWriter::SourceInfo : public AHandler {
-    explicit SourceInfo(const sp<IMediaSource> &source);
+    explicit SourceInfo(const sp<MediaSource> &source);
 
     void start(const sp<AMessage> &notify, const sp<MetaData> &params);
     void stop();
@@ -69,7 +69,7 @@ private:
         kWhatRead  = 'read',
     };
 
-    sp<IMediaSource> mSource;
+    sp<MediaSource> mSource;
     sp<ALooper> mLooper;
     sp<AMessage> mNotify;
 
@@ -85,13 +85,13 @@ private:
 
     void extractCodecSpecificData();
 
-    void appendAACFrames(MediaBuffer *buffer);
-    void appendAVCFrame(MediaBuffer *buffer);
+    void appendAACFrames(MediaBufferBase *buffer);
+    void appendAVCFrame(MediaBufferBase *buffer);
 
     DISALLOW_EVIL_CONSTRUCTORS(SourceInfo);
 };
 
-MPEG2TSWriter::SourceInfo::SourceInfo(const sp<IMediaSource> &source)
+MPEG2TSWriter::SourceInfo::SourceInfo(const sp<MediaSource> &source)
     : mSource(source),
       mLooper(new ALooper),
       mEOSReceived(false),
@@ -249,7 +249,7 @@ void MPEG2TSWriter::SourceInfo::extractCodecSpecificData() {
     notify->post();
 }
 
-void MPEG2TSWriter::SourceInfo::appendAVCFrame(MediaBuffer *buffer) {
+void MPEG2TSWriter::SourceInfo::appendAVCFrame(MediaBufferBase *buffer) {
     sp<AMessage> notify = mNotify->dup();
     notify->setInt32("what", kNotifyBuffer);
 
@@ -264,11 +264,11 @@ void MPEG2TSWriter::SourceInfo::appendAVCFrame(MediaBuffer *buffer) {
            buffer->range_length());
 
     int64_t timeUs;
-    CHECK(buffer->meta_data()->findInt64(kKeyTime, &timeUs));
+    CHECK(buffer->meta_data().findInt64(kKeyTime, &timeUs));
     mBuffer->meta()->setInt64("timeUs", timeUs);
 
     int32_t isSync;
-    if (buffer->meta_data()->findInt32(kKeyIsSyncFrame, &isSync)
+    if (buffer->meta_data().findInt32(kKeyIsSyncFrame, &isSync)
             && isSync != 0) {
         mBuffer->meta()->setInt32("isSync", true);
     }
@@ -279,7 +279,7 @@ void MPEG2TSWriter::SourceInfo::appendAVCFrame(MediaBuffer *buffer) {
     notify->post();
 }
 
-void MPEG2TSWriter::SourceInfo::appendAACFrames(MediaBuffer *buffer) {
+void MPEG2TSWriter::SourceInfo::appendAACFrames(MediaBufferBase *buffer) {
     sp<AMessage> notify = mNotify->dup();
     notify->setInt32("what", kNotifyBuffer);
 
@@ -288,7 +288,7 @@ void MPEG2TSWriter::SourceInfo::appendAACFrames(MediaBuffer *buffer) {
     }
 
     int64_t timeUs;
-    CHECK(buffer->meta_data()->findInt64(kKeyTime, &timeUs));
+    CHECK(buffer->meta_data().findInt64(kKeyTime, &timeUs));
 
     mBuffer->meta()->setInt64("timeUs", timeUs);
     mBuffer->meta()->setInt32("isSync", true);
@@ -368,7 +368,7 @@ void MPEG2TSWriter::SourceInfo::onMessageReceived(const sp<AMessage> &msg) {
 
         case kWhatRead:
         {
-            MediaBuffer *buffer;
+            MediaBufferBase *buffer;
             status_t err = mSource->read(&buffer);
 
             if (err != OK && err != INFO_FORMAT_CHANGED) {
@@ -499,7 +499,7 @@ MPEG2TSWriter::~MPEG2TSWriter() {
     }
 }
 
-status_t MPEG2TSWriter::addSource(const sp<IMediaSource> &source) {
+status_t MPEG2TSWriter::addSource(const sp<MediaSource> &source) {
     CHECK(!mStarted);
 
     sp<MetaData> meta = source->getFormat();

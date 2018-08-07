@@ -34,6 +34,12 @@ using android::IAAudioService;
 
 namespace aaudio {
 
+    // These are intended to be outside the range of what is normally encountered.
+    // TODO MAXes should probably be much bigger.
+    constexpr int32_t MIN_FRAMES_PER_BURST = 16; // arbitrary
+    constexpr int32_t MAX_FRAMES_PER_BURST = 16 * 1024;  // arbitrary
+    constexpr int32_t MAX_BUFFER_CAPACITY_IN_FRAMES = 32 * 1024;  // arbitrary
+
 // A stream that talks to the AAudioService or directly to a HAL.
 class AudioStreamInternal : public AudioStream {
 
@@ -115,8 +121,6 @@ protected:
 
     aaudio_result_t processCommands();
 
-    aaudio_result_t requestStopInternal();
-
     aaudio_result_t stopCallback();
 
     virtual void advanceClientToMatchServerPosition() = 0;
@@ -134,14 +138,19 @@ protected:
     // Calculate timeout for an operation involving framesPerOperation.
     int64_t calculateReasonableTimeout(int32_t framesPerOperation);
 
-    aaudio_format_t          mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    int32_t getDeviceChannelCount() const { return mDeviceChannelCount; }
+
+    /**
+     * @return true if running in audio service, versus in app process
+     */
+    bool isInService() const { return mInService; }
 
     IsochronousClockModel    mClockModel;      // timing model for chasing the HAL
 
     AudioEndpoint            mAudioEndpoint;   // source for reads or sink for writes
     aaudio_handle_t          mServiceStreamHandle; // opaque handle returned from service
 
-    int32_t                  mFramesPerBurst;     // frames per HAL transfer
+    int32_t                  mFramesPerBurst = MIN_FRAMES_PER_BURST; // frames per HAL transfer
     int32_t                  mXRunCount = 0;      // how many underrun events?
 
     // Offset from underlying frame position.
@@ -183,6 +192,8 @@ private:
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
 
     int64_t                  mServiceLatencyNanos = 0;
+
+    int32_t                  mDeviceChannelCount = 0;
 };
 
 } /* namespace aaudio */

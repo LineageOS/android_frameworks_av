@@ -36,6 +36,7 @@ LOCAL_C_INCLUDES := \
     frameworks/av/services/audiopolicy/common/include \
     frameworks/av/services/audiopolicy \
     frameworks/av/services/audiopolicy/utilities \
+    system/media/audio_utils/include \
 
 ifeq ($(USE_XML_AUDIO_POLICY_CONF), 1)
 

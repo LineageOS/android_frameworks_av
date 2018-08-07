@@ -50,6 +50,14 @@ status_t AAudioStreamConfiguration::writeToParcel(Parcel* parcel) const {
     if (status != NO_ERROR) goto error;
     status = parcel->writeInt32(getBufferCapacity());
     if (status != NO_ERROR) goto error;
+    status = parcel->writeInt32((int32_t) getUsage());
+    if (status != NO_ERROR) goto error;
+    status = parcel->writeInt32((int32_t) getContentType());
+    if (status != NO_ERROR) goto error;
+    status = parcel->writeInt32((int32_t) getInputPreset());
+    if (status != NO_ERROR) goto error;
+    status = parcel->writeInt32(getSessionId());
+    if (status != NO_ERROR) goto error;
     return NO_ERROR;
 error:
     ALOGE("AAudioStreamConfiguration.writeToParcel(): write failed = %d", status);
@@ -69,16 +77,28 @@ status_t AAudioStreamConfiguration::readFromParcel(const Parcel* parcel) {
     setSamplesPerFrame(value);
     status = parcel->readInt32(&value);
     if (status != NO_ERROR) goto error;
-    setSharingMode(value);
+    setSharingMode((aaudio_sharing_mode_t) value);
     status = parcel->readInt32(&value);
     if (status != NO_ERROR) goto error;
-    setFormat(value);
+    setFormat((aaudio_format_t) value);
     status = parcel->readInt32(&value);
     if (status != NO_ERROR) goto error;
     setDirection((aaudio_direction_t) value);
     status = parcel->readInt32(&value);
     if (status != NO_ERROR) goto error;
     setBufferCapacity(value);
+    status = parcel->readInt32(&value);
+    if (status != NO_ERROR) goto error;
+    setUsage((aaudio_usage_t) value);
+    status = parcel->readInt32(&value);
+    if (status != NO_ERROR) goto error;
+    setContentType((aaudio_content_type_t) value);
+    status = parcel->readInt32(&value);
+    if (status != NO_ERROR) goto error;
+    setInputPreset((aaudio_input_preset_t) value);
+    status = parcel->readInt32(&value);
+    if (status != NO_ERROR) goto error;
+    setSessionId(value);
     return NO_ERROR;
 error:
     ALOGE("AAudioStreamConfiguration.readFromParcel(): read failed = %d", status);

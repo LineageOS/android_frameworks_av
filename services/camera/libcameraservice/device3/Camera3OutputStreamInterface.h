@@ -18,6 +18,7 @@
 #define ANDROID_SERVERS_CAMERA3_OUTPUT_STREAM_INTERFACE_H
 
 #include "Camera3StreamInterface.h"
+#include <utils/KeyedVector.h>
 
 namespace android {
 
@@ -59,6 +60,29 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
      *
      */
     virtual status_t detachBuffer(sp<GraphicBuffer>* buffer, int* fenceFd) = 0;
+
+    /**
+     * Query the surface id.
+     */
+    virtual ssize_t getSurfaceId(const sp<Surface> &surface) = 0;
+
+    /**
+     * Update the stream output surfaces.
+     */
+    virtual status_t updateStream(const std::vector<sp<Surface>> &outputSurfaces,
+            const std::vector<OutputStreamInfo> &outputInfo,
+            const std::vector<size_t> &removedSurfaceIds,
+            KeyedVector<sp<Surface>, size_t> *outputMap/*out*/) = 0;
+
+    /**
+     * Drop buffers if dropping is true. If dropping is false, do not drop buffers.
+     */
+    virtual status_t dropBuffers(bool /*dropping*/) = 0;
+
+    /**
+     * Query the physical camera id for the output stream.
+     */
+    virtual const String8& getPhysicalCameraId() const = 0;
 };
 
 } // namespace camera3

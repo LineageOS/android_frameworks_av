@@ -18,21 +18,33 @@
 
 #define PERSISTENT_SURFACE_H_
 
-#include <gui/IGraphicBufferProducer.h>
 #include <android/IGraphicBufferSource.h>
-#include <media/stagefright/foundation/ABase.h>
 #include <binder/Parcel.h>
+#include <hidl/HidlSupport.h>
+#include <hidl/HybridInterface.h>
+#include <gui/IGraphicBufferProducer.h>
+#include <media/stagefright/foundation/ABase.h>
+
+using android::hidl::base::V1_0::IBase;
 
 namespace android {
 
 struct PersistentSurface : public RefBase {
     PersistentSurface() {}
 
+    // create an OMX persistent surface
     PersistentSurface(
             const sp<IGraphicBufferProducer>& bufferProducer,
             const sp<IGraphicBufferSource>& bufferSource) :
         mBufferProducer(bufferProducer),
         mBufferSource(bufferSource) { }
+
+    // create a HIDL persistent surface
+    PersistentSurface(
+            const sp<IGraphicBufferProducer>& bufferProducer,
+            const sp<IBase>& hidlTarget) :
+        mBufferProducer(bufferProducer),
+        mHidlTarget(hidlTarget) { }
 
     sp<IGraphicBufferProducer> getBufferProducer() const {
         return mBufferProducer;
@@ -42,9 +54,25 @@ struct PersistentSurface : public RefBase {
         return mBufferSource;
     }
 
+    sp<IBase> getHidlTarget() const {
+        return mHidlTarget;
+    }
+
     status_t writeToParcel(Parcel *parcel) const {
         parcel->writeStrongBinder(IInterface::asBinder(mBufferProducer));
+        // this can handle null
         parcel->writeStrongBinder(IInterface::asBinder(mBufferSource));
+        // write hidl target
+        if (mHidlTarget != nullptr) {
+            HalToken token;
+            bool result = createHalToken(mHidlTarget, &token);
+            parcel->writeBool(result);
+            if (result) {
+                parcel->writeByteArray(token.size(), token.data());
+            }
+        } else {
+            parcel->writeBool(false);
+        }
         return NO_ERROR;
     }
 
@@ -53,12 +81,24 @@ struct PersistentSurface : public RefBase {
                 parcel->readStrongBinder());
         mBufferSource = interface_cast<IGraphicBufferSource>(
                 parcel->readStrongBinder());
+        // read hidl target
+        bool haveHidlTarget = parcel->readBool();
+        if (haveHidlTarget) {
+            std::vector<uint8_t> tokenVector;
+            parcel->readByteVector(&tokenVector);
+            HalToken token = HalToken(tokenVector);
+            mHidlTarget = retrieveHalInterface(token);
+            deleteHalToken(token);
+        } else {
+            mHidlTarget.clear();
+        }
         return NO_ERROR;
     }
 
 private:
     sp<IGraphicBufferProducer> mBufferProducer;
     sp<IGraphicBufferSource> mBufferSource;
+    sp<IBase> mHidlTarget;
 
     DISALLOW_EVIL_CONSTRUCTORS(PersistentSurface);
 };

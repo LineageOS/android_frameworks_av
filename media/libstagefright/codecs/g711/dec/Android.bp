@@ -13,13 +13,15 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libmedia_omx",
+        "libstagefright_foundation",
         "libstagefright_omx",
         "libutils",
         "liblog",
     ],
 
     cflags: ["-Werror"],
+
+    version_script: "exports.lds",
 
     sanitize: {
         misc_undefined: [

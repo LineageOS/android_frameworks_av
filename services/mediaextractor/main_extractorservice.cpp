@@ -25,11 +25,13 @@
 #include <string>
 
 #include <android-base/logging.h>
+#include <android-base/properties.h>
 #include <utils/misc.h>
 
 // from LOCAL_C_INCLUDES
 #include "IcuUtils.h"
 #include "MediaExtractorService.h"
+#include "MediaExtractorUpdateService.h"
 #include "MediaUtils.h"
 #include "minijail.h"
 
@@ -63,6 +65,12 @@ int main(int argc __unused, char** argv)
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();
     MediaExtractorService::instantiate();
+
+    std::string value = base::GetProperty("ro.build.type", "unknown");
+    if (value == "userdebug" || value == "eng") {
+        media::MediaExtractorUpdateService::instantiate();
+    }
+
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
 }

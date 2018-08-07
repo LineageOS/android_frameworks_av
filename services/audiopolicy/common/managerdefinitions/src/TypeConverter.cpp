@@ -29,6 +29,7 @@ const DeviceCategoryConverter::Table DeviceCategoryConverter::mTable[] = {
     MAKE_STRING_FROM_ENUM(DEVICE_CATEGORY_SPEAKER),
     MAKE_STRING_FROM_ENUM(DEVICE_CATEGORY_EARPIECE),
     MAKE_STRING_FROM_ENUM(DEVICE_CATEGORY_EXT_MEDIA),
+    MAKE_STRING_FROM_ENUM(DEVICE_CATEGORY_HEARING_AID),
     TERMINATOR
 };
 
@@ -65,4 +66,4 @@ template class TypeConverter<MixTypeTraits>;
 template class TypeConverter<RouteFlagTraits>;
 template class TypeConverter<RuleTraits>;
 
-}; // namespace android
+} // namespace android

@@ -43,7 +43,9 @@ class AAudioThread
 {
 public:
     AAudioThread();
-    AAudioThread(Runnable *runnable);
+
+    explicit AAudioThread(const char *prefix);
+
     virtual ~AAudioThread() = default;
 
     /**
@@ -66,10 +68,15 @@ public:
     void dispatch(); // called internally from 'C' thread wrapper
 
 private:
-    Runnable    *mRunnable;
-    bool         mHasThread;
+
+    void setup(const char *prefix);
+
+    Runnable    *mRunnable = nullptr;
+    bool         mHasThread = false;
     pthread_t    mThread; // initialized in constructor
 
+    static std::atomic<uint32_t> mNextThreadIndex;
+    char         mName[16]; // max length for a pthread_name
 };
 
 } /* namespace aaudio */

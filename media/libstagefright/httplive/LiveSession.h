@@ -33,7 +33,7 @@ struct AReplyToken;
 struct AnotherPacketSource;
 class DataSource;
 struct HTTPBase;
-struct IMediaHTTPService;
+struct MediaHTTPService;
 struct LiveDataSource;
 struct M3UParser;
 struct PlaylistFetcher;
@@ -71,7 +71,7 @@ struct LiveSession : public AHandler {
     LiveSession(
             const sp<AMessage> &notify,
             uint32_t flags,
-            const sp<IMediaHTTPService> &httpService);
+            const sp<MediaHTTPService> &httpService);
 
     void setBufferingSettings(const BufferingSettings &buffering);
 
@@ -187,7 +187,7 @@ private:
 
     sp<AMessage> mNotify;
     uint32_t mFlags;
-    sp<IMediaHTTPService> mHTTPService;
+    sp<MediaHTTPService> mHTTPService;
 
     bool mBuffering;
     bool mInPreparationPhase;

@@ -39,7 +39,7 @@ public:
             std::vector<CasPluginDescriptor> *descriptors) const override;
     virtual status_t createPlugin(
             int32_t CA_system_id,
-            uint64_t appData,
+            void *appData,
             CasPluginCallback callback,
             CasPlugin **plugin) override;
 };

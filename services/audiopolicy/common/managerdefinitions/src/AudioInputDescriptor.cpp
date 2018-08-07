@@ -17,6 +17,7 @@
 #define LOG_TAG "APM::AudioInputDescriptor"
 //#define LOG_NDEBUG 0
 
+#include <AudioPolicyInterface.h>
 #include "AudioInputDescriptor.h"
 #include "IOProfile.h"
 #include "AudioGain.h"
@@ -26,10 +27,12 @@
 
 namespace android {
 
-AudioInputDescriptor::AudioInputDescriptor(const sp<IOProfile>& profile)
+AudioInputDescriptor::AudioInputDescriptor(const sp<IOProfile>& profile,
+                                           AudioPolicyClientInterface *clientInterface)
     : mIoHandle(0),
       mDevice(AUDIO_DEVICE_NONE), mPolicyMix(NULL),
-      mProfile(profile), mPatchHandle(AUDIO_PATCH_HANDLE_NONE), mId(0)
+      mProfile(profile), mPatchHandle(AUDIO_PATCH_HANDLE_NONE), mId(0),
+      mClientInterface(clientInterface)
 {
     if (profile != NULL) {
         profile->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
@@ -37,12 +40,6 @@ AudioInputDescriptor::AudioInputDescriptor(const sp<IOProfile>& profile)
             profile->mGains[0]->getDefaultConfig(&mGain);
         }
     }
-}
-
-void AudioInputDescriptor::setIoHandle(audio_io_handle_t ioHandle)
-{
-    mId = AudioPort::getNextUniqueId();
-    mIoHandle = ioHandle;
 }
 
 audio_module_handle_t AudioInputDescriptor::getModuleHandle() const
@@ -190,6 +187,93 @@ audio_config_base_t AudioInputDescriptor::getConfig() const
     const audio_config_base_t config = { .sample_rate = mSamplingRate, .channel_mask = mChannelMask,
             .format = mFormat };
     return config;
+}
+
+status_t AudioInputDescriptor::open(const audio_config_t *config,
+                                       audio_devices_t device,
+                                       const String8& address,
+                                       audio_source_t source,
+                                       audio_input_flags_t flags,
+                                       audio_io_handle_t *input)
+{
+    audio_config_t lConfig;
+    if (config == nullptr) {
+        lConfig = AUDIO_CONFIG_INITIALIZER;
+        lConfig.sample_rate = mSamplingRate;
+        lConfig.channel_mask = mChannelMask;
+        lConfig.format = mFormat;
+    } else {
+        lConfig = *config;
+    }
+
+    mDevice = device;
+
+    ALOGV("opening input for device %08x address %s profile %p name %s",
+          mDevice, address.string(), mProfile.get(), mProfile->getName().string());
+
+    status_t status = mClientInterface->openInput(mProfile->getModuleHandle(),
+                                                  input,
+                                                  &lConfig,
+                                                  &mDevice,
+                                                  address,
+                                                  source,
+                                                  flags);
+    LOG_ALWAYS_FATAL_IF(mDevice != device,
+                        "%s openInput returned device %08x when given device %08x",
+                        __FUNCTION__, mDevice, device);
+
+    if (status == NO_ERROR) {
+        LOG_ALWAYS_FATAL_IF(*input == AUDIO_IO_HANDLE_NONE,
+                            "%s openInput returned input handle %d for device %08x",
+                            __FUNCTION__, *input, device);
+        mSamplingRate = lConfig.sample_rate;
+        mChannelMask = lConfig.channel_mask;
+        mFormat = lConfig.format;
+        mId = AudioPort::getNextUniqueId();
+        mIoHandle = *input;
+        mProfile->curOpenCount++;
+    }
+
+    return status;
+}
+
+status_t AudioInputDescriptor::start()
+{
+    if (getAudioSessionCount(true/*activeOnly*/) == 1) {
+        if (!mProfile->canStartNewIo()) {
+            ALOGI("%s mProfile->curActiveCount %d", __func__, mProfile->curActiveCount);
+            return INVALID_OPERATION;
+        }
+        mProfile->curActiveCount++;
+    }
+    return NO_ERROR;
+}
+
+void AudioInputDescriptor::stop()
+{
+    if (!isActive()) {
+        LOG_ALWAYS_FATAL_IF(mProfile->curActiveCount < 1,
+                            "%s invalid profile active count %u",
+                            __func__, mProfile->curActiveCount);
+        mProfile->curActiveCount--;
+    }
+}
+
+void AudioInputDescriptor::close()
+{
+    if (mIoHandle != AUDIO_IO_HANDLE_NONE) {
+        mClientInterface->closeInput(mIoHandle);
+        LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
+                            __FUNCTION__, mProfile->curOpenCount);
+        // do not call stop() here as stop() is supposed to be called after
+        // AudioSession::changeActiveCount(-1) and we don't know how many sessions
+        // are still active at this time
+        if (isActive()) {
+            mProfile->curActiveCount--;
+        }
+        mProfile->curOpenCount--;
+        mIoHandle = AUDIO_IO_HANDLE_NONE;
+    }
 }
 
 status_t AudioInputDescriptor::dump(int fd)

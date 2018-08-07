@@ -103,8 +103,71 @@ camera_status_t ACaptureSessionOutput_create(
                 __FUNCTION__, window, out);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
-    *out = new ACaptureSessionOutput(window);
+    *out = new ACaptureSessionOutput(window, false);
     return ACAMERA_OK;
+}
+
+EXPORT
+camera_status_t ACaptureSessionSharedOutput_create(
+        ANativeWindow* window, /*out*/ACaptureSessionOutput** out) {
+    ATRACE_CALL();
+    if (window == nullptr || out == nullptr) {
+        ALOGE("%s: Error: bad argument. window %p, out %p",
+                __FUNCTION__, window, out);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    *out = new ACaptureSessionOutput(window, true);
+    return ACAMERA_OK;
+}
+
+EXPORT
+camera_status_t ACaptureSessionSharedOutput_add(ACaptureSessionOutput *out,
+        ANativeWindow* window) {
+    ATRACE_CALL();
+    if ((window == nullptr) || (out == nullptr)) {
+        ALOGE("%s: Error: bad argument. window %p, out %p",
+                __FUNCTION__, window, out);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    if (!out->mIsShared) {
+        ALOGE("%s: Error trying to insert a new window in non-shared output configuration",
+                __FUNCTION__);
+        return ACAMERA_ERROR_INVALID_OPERATION;
+    }
+    if (out->mWindow == window) {
+        ALOGE("%s: Error trying to add the same window associated with the output configuration",
+                __FUNCTION__);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+
+    auto insert = out->mSharedWindows.insert(window);
+    camera_status_t ret = (insert.second) ? ACAMERA_OK : ACAMERA_ERROR_INVALID_PARAMETER;
+    return ret;
+}
+
+EXPORT
+camera_status_t ACaptureSessionSharedOutput_remove(ACaptureSessionOutput *out,
+        ANativeWindow* window) {
+    ATRACE_CALL();
+    if ((window == nullptr) || (out == nullptr)) {
+        ALOGE("%s: Error: bad argument. window %p, out %p",
+                __FUNCTION__, window, out);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    if (!out->mIsShared) {
+        ALOGE("%s: Error trying to remove a  window in non-shared output configuration",
+                __FUNCTION__);
+        return ACAMERA_ERROR_INVALID_OPERATION;
+    }
+    if (out->mWindow == window) {
+        ALOGE("%s: Error trying to remove the same window associated with the output configuration",
+                __FUNCTION__);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+
+    auto remove = out->mSharedWindows.erase(window);
+    camera_status_t ret = (remove) ? ACAMERA_OK : ACAMERA_ERROR_INVALID_PARAMETER;
+    return ret;
 }
 
 EXPORT
@@ -157,5 +220,21 @@ camera_status_t ACameraDevice_createCaptureSession(
                 __FUNCTION__, device, outputs, callbacks, session);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
-    return device->createCaptureSession(outputs, callbacks, session);
+    return device->createCaptureSession(outputs, nullptr, callbacks, session);
+}
+
+EXPORT
+camera_status_t ACameraDevice_createCaptureSessionWithSessionParameters(
+        ACameraDevice* device,
+        const ACaptureSessionOutputContainer*       outputs,
+        const ACaptureRequest* sessionParameters,
+        const ACameraCaptureSession_stateCallbacks* callbacks,
+        /*out*/ACameraCaptureSession** session) {
+    ATRACE_CALL();
+    if (device == nullptr || outputs == nullptr || callbacks == nullptr || session == nullptr) {
+        ALOGE("%s: Error: invalid input: device %p, outputs %p, callbacks %p, session %p",
+                __FUNCTION__, device, outputs, callbacks, session);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    return device->createCaptureSession(outputs, sessionParameters, callbacks, session);
 }

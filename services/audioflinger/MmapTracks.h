@@ -23,6 +23,7 @@
 class MmapTrack : public TrackBase {
 public:
                 MmapTrack(ThreadBase *thread,
+                            const audio_attributes_t& attr,
                             uint32_t sampleRate,
                             audio_format_t format,
                             audio_channel_mask_t channelMask,
@@ -42,6 +43,15 @@ public:
      static void        appendDumpHeader(String8& result);
             void        appendDump(String8& result, bool active);
 
+                        // protected by MMapThread::mLock
+            void        setSilenced_l(bool silenced) { mSilenced = silenced;
+                                                       mSilencedNotified = false;}
+                        // protected by MMapThread::mLock
+            bool        isSilenced_l() const { return mSilenced; }
+                        // protected by MMapThread::mLock
+            bool        getAndSetSilencedNotified_l() { bool silencedNotified = mSilencedNotified;
+                                                        mSilencedNotified = true;
+                                                        return silencedNotified; }
 private:
     friend class MmapThread;
 
@@ -57,5 +67,7 @@ private:
     virtual void onTimestamp(const ExtendedTimestamp &timestamp);
 
     pid_t mPid;
+    bool  mSilenced;            // protected by MMapThread::mLock
+    bool  mSilencedNotified;    // protected by MMapThread::mLock
 };  // end of Track
 

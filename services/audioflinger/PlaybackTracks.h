@@ -25,6 +25,7 @@ public:
                         Track(  PlaybackThread *thread,
                                 const sp<Client>& client,
                                 audio_stream_type_t streamType,
+                                const audio_attributes_t& attr,
                                 uint32_t sampleRate,
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
@@ -51,6 +52,11 @@ public:
             void        flush();
             void        destroy();
             int         name() const { return mName; }
+            void        setName(int name) {
+                LOG_ALWAYS_FATAL_IF(mName >= 0 && name >= 0,
+                        "%s both old name %d and new name %d are valid", __func__, mName, name);
+                mName = name;
+            }
 
     virtual uint32_t    sampleRate() const;
 
@@ -68,8 +74,8 @@ public:
             status_t    attachAuxEffect(int EffectId);
             void        setAuxBuffer(int EffectId, int32_t *buffer);
             int32_t     *auxBuffer() const { return mAuxBuffer; }
-            void        setMainBuffer(int16_t *buffer) { mMainBuffer = buffer; }
-            int16_t     *mainBuffer() const { return mMainBuffer; }
+            void        setMainBuffer(effect_buffer_t *buffer) { mMainBuffer = buffer; }
+            effect_buffer_t *mainBuffer() const { return mMainBuffer; }
             int         auxEffectId() const { return mAuxEffectId; }
     virtual status_t    getTimestamp(AudioTimestamp& timestamp);
             void        signal();
@@ -82,11 +88,28 @@ public:
     virtual bool        isFastTrack() const { return (mFlags & AUDIO_OUTPUT_FLAG_FAST) != 0; }
 
 // implement volume handling.
-   VolumeShaper::Status applyVolumeShaper(
-                                const sp<VolumeShaper::Configuration>& configuration,
-                                const sp<VolumeShaper::Operation>& operation);
-sp<VolumeShaper::State> getVolumeShaperState(int id);
-    sp<VolumeHandler>   getVolumeHandler() { return mVolumeHandler; }
+    media::VolumeShaper::Status applyVolumeShaper(
+                                const sp<media::VolumeShaper::Configuration>& configuration,
+                                const sp<media::VolumeShaper::Operation>& operation);
+    sp<media::VolumeShaper::State> getVolumeShaperState(int id);
+    sp<media::VolumeHandler>   getVolumeHandler() { return mVolumeHandler; }
+    /** Set the computed normalized final volume of the track.
+     * !masterMute * masterVolume * streamVolume * averageLRVolume */
+    void                setFinalVolume(float volume);
+    float               getFinalVolume() const { return mFinalVolume; }
+
+    /** @return true if the track has changed (metadata or volume) since
+     *          the last time this function was called,
+     *          true if this function was never called since the track creation,
+     *          false otherwise.
+     *  Thread safe.
+     */
+    bool            readAndClearHasChanged() { return !mChangeNotified.test_and_set(); }
+
+    using SourceMetadatas = std::vector<playback_track_metadata_t>;
+    using MetadataInserter = std::back_insert_iterator<SourceMetadatas>;
+    /** Copy the track metadata in the provided iterator. Thread safe. */
+    virtual void    copyMetadataTo(MetadataInserter& backInserter) const;
 
 protected:
     // for numerous
@@ -127,6 +150,8 @@ protected:
     bool presentationComplete(int64_t framesWritten, size_t audioHalFrames);
     void signalClientFlag(int32_t flag);
 
+    /** Set that a metadata has changed and needs to be notified to backend. Thread safe. */
+    void setMetadataHasChanged() { mChangeNotified.clear(); }
 public:
     void triggerEvents(AudioSystem::sync_event_t type);
     virtual void invalidate();
@@ -146,11 +171,9 @@ protected:
 
     bool                mResetDone;
     const audio_stream_type_t mStreamType;
-    int                 mName;      // track name on the normal mixer,
-                                    // allocated statically at track creation time,
-                                    // and is even allocated (though unused) for fast tracks
-                                    // FIXME don't allocate track name for fast tracks
-    int16_t             *mMainBuffer;
+    int                 mName;
+    effect_buffer_t     *mMainBuffer;
+
     int32_t             *mAuxBuffer;
     int                 mAuxEffectId;
     bool                mHasVolumeController;
@@ -163,7 +186,7 @@ protected:
 
     ExtendedTimestamp  mSinkTimestamp;
 
-    sp<VolumeHandler>  mVolumeHandler; // handles multiple VolumeShaper configs and operations
+    sp<media::VolumeHandler>  mVolumeHandler; // handles multiple VolumeShaper configs and operations
 
 private:
     // The following fields are only for fast tracks, and should be in a subclass
@@ -178,10 +201,13 @@ private:
     volatile float      mCachedVolume;  // combined master volume and stream type volume;
                                         // 'volatile' means accessed without lock or
                                         // barrier, but is read/written atomically
+    float               mFinalVolume; // combine master volume, stream type volume and track volume
     sp<AudioTrackServerProxy>  mAudioTrackServerProxy;
     bool                mResumeToStopping; // track was paused in stopping state.
     bool                mFlushHwPending; // track requests for thread flush
     audio_output_flags_t mFlags;
+    // If the last track change was notified to the client with readAndClearHasChanged
+    std::atomic_flag     mChangeNotified = ATOMIC_FLAG_INIT;
 };  // end of Track
 
 
@@ -212,8 +238,11 @@ public:
             bool        isActive() const { return mActive; }
     const wp<ThreadBase>& thread() const { return mThread; }
 
-private:
+            void        copyMetadataTo(MetadataInserter& backInserter) const override;
+    /** Set the metadatas of the upstream tracks. Thread safe. */
+            void        setMetadatas(const SourceMetadatas& metadatas);
 
+private:
     status_t            obtainBuffer(AudioBufferProvider::Buffer* buffer,
                                      uint32_t waitTimeMs);
     void                clearBufferQueue();
@@ -228,6 +257,20 @@ private:
     bool                        mActive;
     DuplicatingThread* const    mSourceThread; // for waitTimeMs() in write()
     sp<AudioTrackClientProxy>   mClientProxy;
+    /** Attributes of the source tracks.
+     *
+     * This member must be accessed with mTrackMetadatasMutex taken.
+     * There is one writer (duplicating thread) and one reader (downstream mixer).
+     *
+     * That means that the duplicating thread can block the downstream mixer
+     * thread and vice versa for the time of the copy.
+     * If this becomes an issue, the metadata could be stored in an atomic raw pointer,
+     * and a exchange with nullptr and delete can be used.
+     * Alternatively a read-copy-update might be implemented.
+     */
+    SourceMetadatas mTrackMetadatas;
+    /** Protects mTrackMetadatas against concurrent access. */
+    mutable std::mutex mTrackMetadatasMutex;
 };  // end of OutputTrack
 
 // playback track, used by PatchPanel

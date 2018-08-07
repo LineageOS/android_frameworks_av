@@ -22,9 +22,9 @@
 #include <media/stagefright/omx/OMXUtils.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AUtils.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/hardware/HardwareAPI.h>
-#include <media/MediaDefs.h>
 #include <system/graphics-base.h>
 
 namespace android {
@@ -163,6 +163,8 @@ const char *GetComponentRole(bool isEncoder, const char *mime) {
             "audio_decoder.ac3", "audio_encoder.ac3" },
         { MEDIA_MIMETYPE_AUDIO_EAC3,
             "audio_decoder.eac3", "audio_encoder.eac3" },
+        { MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC,
+            "image_decoder.heic", "image_encoder.heic" },
     };
 
     static const size_t kNumMimeToRole =
@@ -215,6 +217,9 @@ bool DescribeDefaultColorFormat(DescribeColorFormat2Params &params) {
         fmt != OMX_COLOR_FormatYUV420PackedSemiPlanar &&
         fmt != (OMX_COLOR_FORMATTYPE)HAL_PIXEL_FORMAT_YV12) {
         ALOGW("do not know color format 0x%x = %d", fmt, fmt);
+        if (fmt == OMX_COLOR_FormatYUV420Planar16) {
+            ALOGW("Cannot describe color format OMX_COLOR_FormatYUV420Planar16");
+        }
         return false;
     }
 

@@ -29,8 +29,10 @@
 #include <media/IOMX.h>
 
 namespace android {
-
-using hardware::hidl_memory;
+namespace hardware {
+class HidlMemory;
+};
+using hardware::HidlMemory;
 
 /**
  * BufferChannelBase implementation for ACodec.
@@ -119,7 +121,7 @@ private:
     sp<MemoryDealer> mDealer;
     sp<IMemory> mDecryptDestination;
     int32_t mHeapSeqNum;
-    hidl_memory mHidlMemory;
+    sp<HidlMemory> mHidlMemory;
 
     // These should only be accessed via std::atomic_* functions.
     //

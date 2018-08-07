@@ -48,7 +48,9 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/MediaBuffer.h>
+#include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
@@ -56,7 +58,6 @@
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/Surface.h>
 
-#include "avc_utils.h"
 
 #include "ESDS.h"
 #include <media/stagefright/Utils.h>
@@ -172,14 +173,17 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-NuPlayer::NuPlayer(pid_t pid)
+NuPlayer::NuPlayer(pid_t pid, const sp<MediaClock> &mediaClock)
     : mUIDValid(false),
       mPID(pid),
+      mMediaClock(mediaClock),
       mSourceFlags(0),
       mOffloadAudio(false),
       mAudioDecoderGeneration(0),
       mVideoDecoderGeneration(0),
       mRendererGeneration(0),
+      mLastStartedPlayingTimeNs(0),
+      mLastStartedRebufferingTimeNs(0),
       mPreviousSeekTimeUs(0),
       mAudioEOS(false),
       mVideoEOS(false),
@@ -204,6 +208,7 @@ NuPlayer::NuPlayer(pid_t pid)
       mPausedForBuffering(false),
       mIsDrmProtected(false),
       mDataSourceType(DATA_SOURCE_TYPE_NONE) {
+    CHECK(mediaClock != NULL);
     clearFlushComplete();
 }
 
@@ -215,8 +220,11 @@ void NuPlayer::setUID(uid_t uid) {
     mUID = uid;
 }
 
-void NuPlayer::setDriver(const wp<NuPlayerDriver> &driver) {
+void NuPlayer::init(const wp<NuPlayerDriver> &driver) {
     mDriver = driver;
+
+    sp<AMessage> notify = new AMessage(kWhatMediaClockNotify, this);
+    mMediaClock->setNotificationMessage(notify);
 }
 
 void NuPlayer::setDataSourceAsync(const sp<IStreamSource> &source) {
@@ -278,7 +286,7 @@ void NuPlayer::setDataSourceAsync(
         ALOGV("setDataSourceAsync GenericSource %s", url);
 
         sp<GenericSource> genericSource =
-                new GenericSource(notify, mUIDValid, mUID);
+                new GenericSource(notify, mUIDValid, mUID, mMediaClock);
 
         status_t err = genericSource->setDataSource(httpService, url, headers);
 
@@ -301,7 +309,7 @@ void NuPlayer::setDataSourceAsync(int fd, int64_t offset, int64_t length) {
     sp<AMessage> notify = new AMessage(kWhatSourceNotify, this);
 
     sp<GenericSource> source =
-            new GenericSource(notify, mUIDValid, mUID);
+            new GenericSource(notify, mUIDValid, mUID, mMediaClock);
 
     ALOGV("setDataSourceAsync fd %d/%lld/%lld source: %p",
             fd, (long long)offset, (long long)length, source.get());
@@ -322,7 +330,7 @@ void NuPlayer::setDataSourceAsync(const sp<DataSource> &dataSource) {
     sp<AMessage> msg = new AMessage(kWhatSetDataSource, this);
     sp<AMessage> notify = new AMessage(kWhatSourceNotify, this);
 
-    sp<GenericSource> source = new GenericSource(notify, mUIDValid, mUID);
+    sp<GenericSource> source = new GenericSource(notify, mUIDValid, mUID, mMediaClock);
     status_t err = source->setDataSource(dataSource);
 
     if (err != OK) {
@@ -335,9 +343,9 @@ void NuPlayer::setDataSourceAsync(const sp<DataSource> &dataSource) {
     mDataSourceType = DATA_SOURCE_TYPE_MEDIA;
 }
 
-status_t NuPlayer::getDefaultBufferingSettings(
+status_t NuPlayer::getBufferingSettings(
         BufferingSettings *buffering /* nonnull */) {
-    sp<AMessage> msg = new AMessage(kWhatGetDefaultBufferingSettings, this);
+    sp<AMessage> msg = new AMessage(kWhatGetBufferingSettings, this);
     sp<AMessage> response;
     status_t err = msg->postAndAwaitResponse(&response);
     if (err == OK && response != NULL) {
@@ -470,6 +478,13 @@ void NuPlayer::resetAsync() {
     (new AMessage(kWhatReset, this))->post();
 }
 
+status_t NuPlayer::notifyAt(int64_t mediaTimeUs) {
+    sp<AMessage> notify = new AMessage(kWhatNotifyTime, this);
+    notify->setInt64("timerUs", mediaTimeUs);
+    mMediaClock->addTimer(notify, mediaTimeUs);
+    return OK;
+}
+
 void NuPlayer::seekToAsync(int64_t seekTimeUs, MediaPlayerSeekMode mode, bool needNotify) {
     sp<AMessage> msg = new AMessage(kWhatSeek, this);
     msg->setInt64("seekTimeUs", seekTimeUs);
@@ -556,16 +571,16 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
-        case kWhatGetDefaultBufferingSettings:
+        case kWhatGetBufferingSettings:
         {
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
 
-            ALOGV("kWhatGetDefaultBufferingSettings");
+            ALOGV("kWhatGetBufferingSettings");
             BufferingSettings buffering;
             status_t err = OK;
             if (mSource != NULL) {
-                err = mSource->getDefaultBufferingSettings(&buffering);
+                err = mSource->getBufferingSettings(&buffering);
             } else {
                 err = INVALID_OPERATION;
             }
@@ -1274,7 +1289,8 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                 ALOGV("Tear down audio with reason %d.", reason);
                 if (reason == Renderer::kDueToTimeout && !(mPaused && mOffloadAudio)) {
                     // TimeoutWhenPaused is only for offload mode.
-                    ALOGW("Receive a stale message for teardown.");
+                    ALOGW("Received a stale message for teardown, mPaused(%d), mOffloadAudio(%d)",
+                          mPaused, mOffloadAudio);
                     break;
                 }
                 int64_t positionUs;
@@ -1299,6 +1315,8 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             ALOGV("kWhatReset");
 
             mResetting = true;
+            updatePlaybackTimer(true /* stopping */, "kWhatReset");
+            updateRebufferingTimer(true /* stopping */, true /* exiting */);
 
             mDeferredActions.push_back(
                     new FlushDecoderAction(
@@ -1309,6 +1327,16 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                     new SimpleAction(&NuPlayer::performReset));
 
             processDeferredActions();
+            break;
+        }
+
+        case kWhatNotifyTime:
+        {
+            ALOGV("kWhatNotifyTime");
+            int64_t timerUs;
+            CHECK(msg->findInt64("timerUs", &timerUs));
+
+            notifyListener(MEDIA_NOTIFY_TIME, timerUs, 0);
             break;
         }
 
@@ -1401,6 +1429,47 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatMediaClockNotify:
+        {
+            ALOGV("kWhatMediaClockNotify");
+            int64_t anchorMediaUs, anchorRealUs;
+            float playbackRate;
+            CHECK(msg->findInt64("anchor-media-us", &anchorMediaUs));
+            CHECK(msg->findInt64("anchor-real-us", &anchorRealUs));
+            CHECK(msg->findFloat("playback-rate", &playbackRate));
+
+            Parcel in;
+            in.writeInt64(anchorMediaUs);
+            in.writeInt64(anchorRealUs);
+            in.writeFloat(playbackRate);
+
+            notifyListener(MEDIA_TIME_DISCONTINUITY, 0, 0, &in);
+            break;
+        }
+
+        case kWhatGetStats:
+        {
+            ALOGV("kWhatGetStats");
+
+            Vector<sp<AMessage>> *trackStats;
+            CHECK(msg->findPointer("trackstats", (void**)&trackStats));
+
+            trackStats->clear();
+            if (mVideoDecoder != NULL) {
+                trackStats->push_back(mVideoDecoder->getStats());
+            }
+            if (mAudioDecoder != NULL) {
+                trackStats->push_back(mAudioDecoder->getStats());
+            }
+
+            // respond for synchronization
+            sp<AMessage> response = new AMessage;
+            sp<AReplyToken> replyID;
+            CHECK(msg->senderAwaitsResponse(&replyID));
+            response->postReply(replyID);
+            break;
+        }
+
         default:
             TRESPASS();
             break;
@@ -1429,7 +1498,7 @@ void NuPlayer::onResume() {
         ALOGW("resume called when renderer is gone or not set");
     }
 
-    mLastStartedPlayingTimeNs = systemTime();
+    startPlaybackTimer("onresume");
 }
 
 status_t NuPlayer::onInstantiateSecureDecoders() {
@@ -1523,7 +1592,7 @@ void NuPlayer::onStart(int64_t startPositionUs, MediaPlayerSeekMode mode) {
     sp<AMessage> notify = new AMessage(kWhatRendererNotify, this);
     ++mRendererGeneration;
     notify->setInt32("generation", mRendererGeneration);
-    mRenderer = new Renderer(mAudioSink, notify, flags);
+    mRenderer = new Renderer(mAudioSink, mMediaClock, notify, flags);
     mRendererLooper = new ALooper;
     mRendererLooper->setName("NuPlayerRenderer");
     mRendererLooper->start(false, false, ANDROID_PRIORITY_AUDIO);
@@ -1549,12 +1618,91 @@ void NuPlayer::onStart(int64_t startPositionUs, MediaPlayerSeekMode mode) {
         mAudioDecoder->setRenderer(mRenderer);
     }
 
-    mLastStartedPlayingTimeNs = systemTime();
+    startPlaybackTimer("onstart");
 
     postScanSources();
 }
 
+void NuPlayer::startPlaybackTimer(const char *where) {
+    Mutex::Autolock autoLock(mPlayingTimeLock);
+    if (mLastStartedPlayingTimeNs == 0) {
+        mLastStartedPlayingTimeNs = systemTime();
+        ALOGV("startPlaybackTimer() time %20" PRId64 " (%s)",  mLastStartedPlayingTimeNs, where);
+    }
+}
+
+void NuPlayer::updatePlaybackTimer(bool stopping, const char *where) {
+    Mutex::Autolock autoLock(mPlayingTimeLock);
+
+    ALOGV("updatePlaybackTimer(%s)  time %20" PRId64 " (%s)",
+	  stopping ? "stop" : "snap", mLastStartedPlayingTimeNs, where);
+
+    if (mLastStartedPlayingTimeNs != 0) {
+        sp<NuPlayerDriver> driver = mDriver.promote();
+        int64_t now = systemTime();
+        if (driver != NULL) {
+            int64_t played = now - mLastStartedPlayingTimeNs;
+            ALOGV("updatePlaybackTimer()  log  %20" PRId64 "", played);
+
+            if (played > 0) {
+                driver->notifyMorePlayingTimeUs((played+500)/1000);
+            }
+        }
+	if (stopping) {
+            mLastStartedPlayingTimeNs = 0;
+	} else {
+            mLastStartedPlayingTimeNs = now;
+	}
+    }
+}
+
+void NuPlayer::startRebufferingTimer() {
+    Mutex::Autolock autoLock(mPlayingTimeLock);
+    if (mLastStartedRebufferingTimeNs == 0) {
+        mLastStartedRebufferingTimeNs = systemTime();
+        ALOGV("startRebufferingTimer() time %20" PRId64 "",  mLastStartedRebufferingTimeNs);
+    }
+}
+
+void NuPlayer::updateRebufferingTimer(bool stopping, bool exitingPlayback) {
+    Mutex::Autolock autoLock(mPlayingTimeLock);
+
+    ALOGV("updateRebufferingTimer(%s)  time %20" PRId64 " (exiting %d)",
+	  stopping ? "stop" : "snap", mLastStartedRebufferingTimeNs, exitingPlayback);
+
+    if (mLastStartedRebufferingTimeNs != 0) {
+        sp<NuPlayerDriver> driver = mDriver.promote();
+        int64_t now = systemTime();
+        if (driver != NULL) {
+            int64_t rebuffered = now - mLastStartedRebufferingTimeNs;
+            ALOGV("updateRebufferingTimer()  log  %20" PRId64 "", rebuffered);
+
+            if (rebuffered > 0) {
+                driver->notifyMoreRebufferingTimeUs((rebuffered+500)/1000);
+                if (exitingPlayback) {
+                    driver->notifyRebufferingWhenExit(true);
+                }
+            }
+        }
+	if (stopping) {
+            mLastStartedRebufferingTimeNs = 0;
+	} else {
+            mLastStartedRebufferingTimeNs = now;
+	}
+    }
+}
+
+void NuPlayer::updateInternalTimers() {
+    // update values, but ticking clocks keep ticking
+    ALOGV("updateInternalTimers()");
+    updatePlaybackTimer(false /* stopping */, "updateInternalTimers");
+    updateRebufferingTimer(false /* stopping */, false /* exiting */);
+}
+
 void NuPlayer::onPause() {
+
+    updatePlaybackTimer(true /* stopping */, "onPause");
+
     if (mPaused) {
         return;
     }
@@ -1570,13 +1718,6 @@ void NuPlayer::onPause() {
         ALOGW("pause called when renderer is gone or not set");
     }
 
-    sp<NuPlayerDriver> driver = mDriver.promote();
-    if (driver != NULL) {
-        int64_t now = systemTime();
-        int64_t played = now - mLastStartedPlayingTimeNs;
-
-        driver->notifyMorePlayingTimeUs((played+500)/1000);
-    }
 }
 
 bool NuPlayer::audioDecoderStillNeeded() {
@@ -1672,6 +1813,8 @@ void NuPlayer::closeAudioSink() {
 
 void NuPlayer::restartAudio(
         int64_t currentPositionUs, bool forceNonOffload, bool needsToCreateAudioDecoder) {
+    ALOGD("restartAudio timeUs(%lld), dontOffload(%d), createDecoder(%d)",
+          (long long)currentPositionUs, forceNonOffload, needsToCreateAudioDecoder);
     if (mAudioDecoder != NULL) {
         mAudioDecoder->pause();
         mAudioDecoder.clear();
@@ -2090,16 +2233,16 @@ status_t NuPlayer::getCurrentPosition(int64_t *mediaUs) {
     return renderer->getCurrentPosition(mediaUs);
 }
 
-void NuPlayer::getStats(Vector<sp<AMessage> > *mTrackStats) {
-    CHECK(mTrackStats != NULL);
+void NuPlayer::getStats(Vector<sp<AMessage> > *trackStats) {
+    CHECK(trackStats != NULL);
 
-    mTrackStats->clear();
-    if (mVideoDecoder != NULL) {
-        mTrackStats->push_back(mVideoDecoder->getStats());
-    }
-    if (mAudioDecoder != NULL) {
-        mTrackStats->push_back(mAudioDecoder->getStats());
-    }
+    ALOGV("NuPlayer::getStats()");
+    sp<AMessage> msg = new AMessage(kWhatGetStats, this);
+    msg->setPointer("trackstats", trackStats);
+
+    sp<AMessage> response;
+    (void) msg->postAndAwaitResponse(&response);
+    // response is for synchronization, ignore contents
 }
 
 sp<MetaData> NuPlayer::getFileMeta() {
@@ -2202,6 +2345,9 @@ void NuPlayer::performReset() {
 
     CHECK(mAudioDecoder == NULL);
     CHECK(mVideoDecoder == NULL);
+
+    updatePlaybackTimer(true /* stopping */, "performReset");
+    updateRebufferingTimer(true /* stopping */, true /* exiting */);
 
     cancelPollDuration();
 
@@ -2455,6 +2601,7 @@ void NuPlayer::onSourceNotify(const sp<AMessage> &msg) {
             if (mStarted) {
                 ALOGI("buffer low, pausing...");
 
+                startRebufferingTimer();
                 mPausedForBuffering = true;
                 onPause();
             }
@@ -2468,6 +2615,7 @@ void NuPlayer::onSourceNotify(const sp<AMessage> &msg) {
             if (mStarted) {
                 ALOGI("buffer ready, resuming...");
 
+                updateRebufferingTimer(true /* stopping */, false /* exiting */);
                 mPausedForBuffering = false;
 
                 // do not resume yet if client didn't unpause
@@ -2601,7 +2749,7 @@ void NuPlayer::onClosedCaptionNotify(const sp<AMessage> &msg) {
 void NuPlayer::sendSubtitleData(const sp<ABuffer> &buffer, int32_t baseIndex) {
     int32_t trackIndex;
     int64_t timeUs, durationUs;
-    CHECK(buffer->meta()->findInt32("trackIndex", &trackIndex));
+    CHECK(buffer->meta()->findInt32("track-index", &trackIndex));
     CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
     CHECK(buffer->meta()->findInt64("durationUs", &durationUs));
 

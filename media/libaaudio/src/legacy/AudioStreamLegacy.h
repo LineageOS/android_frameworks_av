@@ -112,12 +112,14 @@ protected:
 
     void onAudioDeviceUpdate(audio_port_handle_t deviceId);
 
-    void checkForDisconnectRequest();
+    /*
+     * Check to see whether a callback thread has requested a disconnected.
+     * @param errorCallbackEnabled set true to call errorCallback on disconnect
+     * @return AAUDIO_OK or AAUDIO_ERROR_DISCONNECTED
+     */
+    aaudio_result_t checkForDisconnectRequest(bool errorCallbackEnabled);
 
-    void forceDisconnect();
-
-    void onStart() { mCallbackEnabled.store(true); }
-    void onStop() { mCallbackEnabled.store(false); }
+    void forceDisconnect(bool errorCallbackEnabled = true);
 
     int64_t incrementFramesWritten(int32_t frames) {
         return mFramesWritten.increment(frames);

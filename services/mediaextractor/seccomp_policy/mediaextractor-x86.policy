@@ -39,28 +39,20 @@ getgroups32: 1
 nanosleep: 1
 getrandom: 1
 
+# for dynamically loading extractors
+getdents64: 1
+readlinkat: 1
+pread64: 1
+mremap: 1
+
 # for FileSource
 readlinkat: 1
 _llseek: 1
-
-# for attaching to debuggerd on process crash
-socketcall: 1
-sigaction: 1
-tgkill: 1
-rt_sigprocmask: 1
-fcntl64: 1
-rt_tgsigqueueinfo: 1
-geteuid32: 1
-getgid32: 1
-getegid32: 1
-getgroups32: 1
-getdents64: 1
-pipe2: 1
-ppoll: 1
-process_vm_readv: 1
 
 # Required by AddressSanitizer
 gettid: 1
 sched_yield: 1
 getpid: 1
 gettid: 1
+
+@include /system/etc/seccomp_policy/crash_dump.x86.policy

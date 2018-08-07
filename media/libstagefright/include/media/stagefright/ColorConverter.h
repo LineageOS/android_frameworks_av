@@ -33,6 +33,8 @@ struct ColorConverter {
 
     bool isValid() const;
 
+    bool isDstRGB() const;
+
     status_t convert(
             const void *srcBits,
             size_t srcWidth, size_t srcHeight,
@@ -76,6 +78,15 @@ private:
     status_t convertYUV420PlanarUseLibYUV(
             const BitmapParams &src, const BitmapParams &dst);
 
+    status_t convertYUV420Planar16(
+            const BitmapParams &src, const BitmapParams &dst);
+
+    status_t convertYUV420Planar16ToY410(
+            const BitmapParams &src, const BitmapParams &dst);
+
+    status_t convertYUV420Planar16ToRGB(
+            const BitmapParams &src, const BitmapParams &dst);
+
     status_t convertQCOMYUV420SemiPlanar(
             const BitmapParams &src, const BitmapParams &dst);
 
@@ -84,10 +95,6 @@ private:
 
     status_t convertTIYUV420PackedSemiPlanar(
             const BitmapParams &src, const BitmapParams &dst);
-
-    void writeToDst(void *dst_ptr, uint8_t *kAdjustedClip, bool uncropped,
-            signed r1, signed g1, signed b1,
-            signed r2, signed g2, signed b2);
 
     ColorConverter(const ColorConverter &);
     ColorConverter &operator=(const ColorConverter &);

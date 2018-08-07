@@ -51,7 +51,7 @@ class MediaRecorderClient;
 #if CALLBACK_ANTAGONIZER
 class Antagonizer {
 public:
-    Antagonizer(notify_callback_f cb, void* client);
+    Antagonizer(const sp<MediaPlayerBase::Listener> &listener);
     void start() { mActive = true; }
     void stop() { mActive = false; }
     void kill();
@@ -59,12 +59,11 @@ private:
     static const int interval;
     Antagonizer();
     static int callbackThread(void* cookie);
-    Mutex               mLock;
-    Condition           mCondition;
-    bool                mExit;
-    bool                mActive;
-    void*               mClient;
-    notify_callback_f   mCb;
+    Mutex                         mLock;
+    Condition                     mCondition;
+    bool                          mExit;
+    bool                          mActive;
+    sp<MediaPlayerBase::Listener> mListener;
 };
 #endif
 
@@ -78,8 +77,12 @@ class MediaPlayerService : public BnMediaPlayerService
         class CallbackData;
 
      public:
-                                AudioOutput(audio_session_t sessionId, uid_t uid, int pid,
-                                        const audio_attributes_t * attr);
+                                AudioOutput(
+                                        audio_session_t sessionId,
+                                        uid_t uid,
+                                        int pid,
+                                        const audio_attributes_t * attr,
+                                        const sp<AudioSystem::AudioDeviceCallback>& deviceCallback);
         virtual                 ~AudioOutput();
 
         virtual bool            ready() const { return mTrack != 0; }
@@ -132,10 +135,15 @@ class MediaPlayerService : public BnMediaPlayerService
         virtual status_t        setParameters(const String8& keyValuePairs);
         virtual String8         getParameters(const String8& keys);
 
-        virtual VolumeShaper::Status applyVolumeShaper(
-                                        const sp<VolumeShaper::Configuration>& configuration,
-                                        const sp<VolumeShaper::Operation>& operation) override;
-        virtual sp<VolumeShaper::State> getVolumeShaperState(int id) override;
+        virtual media::VolumeShaper::Status applyVolumeShaper(
+                                        const sp<media::VolumeShaper::Configuration>& configuration,
+                                        const sp<media::VolumeShaper::Operation>& operation) override;
+        virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) override;
+
+        // AudioRouting
+        virtual status_t        setOutputDevice(audio_port_handle_t deviceId);
+        virtual status_t        getRoutedDeviceId(audio_port_handle_t* deviceId);
+        virtual status_t        enableAudioDeviceCallback(bool enabled);
 
     private:
         static void             setMinBufferCount();
@@ -165,7 +173,11 @@ class MediaPlayerService : public BnMediaPlayerService
         float                   mSendLevel;
         int                     mAuxEffectId;
         audio_output_flags_t    mFlags;
-        sp<VolumeHandler>       mVolumeHandler;
+        sp<media::VolumeHandler>       mVolumeHandler;
+        audio_port_handle_t     mSelectedDeviceId;
+        audio_port_handle_t     mRoutedDeviceId;
+        bool                    mDeviceCallbackEnabled;
+        wp<AudioSystem::AudioDeviceCallback>        mDeviceCallback;
         mutable Mutex           mLock;
 
         // static variables below not protected by mutex
@@ -215,7 +227,6 @@ class MediaPlayerService : public BnMediaPlayerService
 
     }; // AudioOutput
 
-
 public:
     static  void                instantiate();
 
@@ -228,8 +239,6 @@ public:
                                        audio_session_t audioSessionId);
 
     virtual sp<IMediaCodecList> getCodecList() const;
-    virtual sp<IOMX>            getOMX();
-    virtual sp<IHDCP>           makeHDCP(bool createEncryptionModule);
 
     virtual sp<IRemoteDisplay> listenForRemoteDisplay(const String16 &opPackageName,
             const sp<IRemoteDisplayClient>& client, const String8& iface);
@@ -309,7 +318,7 @@ private:
         virtual status_t        setVideoSurfaceTexture(
                                         const sp<IGraphicBufferProducer>& bufferProducer);
         virtual status_t        setBufferingSettings(const BufferingSettings& buffering) override;
-        virtual status_t        getDefaultBufferingSettings(
+        virtual status_t        getBufferingSettings(
                                         BufferingSettings* buffering /* nonnull */) override;
         virtual status_t        prepareAsync();
         virtual status_t        start();
@@ -327,6 +336,7 @@ private:
         virtual status_t        getCurrentPosition(int* msec);
         virtual status_t        getDuration(int* msec);
         virtual status_t        reset();
+        virtual status_t        notifyAt(int64_t mediaTimeUs);
         virtual status_t        setAudioStreamType(audio_stream_type_t type);
         virtual status_t        setLooping(int loop);
         virtual status_t        setVolume(float leftVolume, float rightVolume);
@@ -343,10 +353,10 @@ private:
         virtual status_t        getRetransmitEndpoint(struct sockaddr_in* endpoint);
         virtual status_t        setNextPlayer(const sp<IMediaPlayer>& player);
 
-        virtual VolumeShaper::Status applyVolumeShaper(
-                                        const sp<VolumeShaper::Configuration>& configuration,
-                                        const sp<VolumeShaper::Operation>& operation) override;
-        virtual sp<VolumeShaper::State> getVolumeShaperState(int id) override;
+        virtual media::VolumeShaper::Status applyVolumeShaper(
+                                        const sp<media::VolumeShaper::Configuration>& configuration,
+                                        const sp<media::VolumeShaper::Operation>& operation) override;
+        virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) override;
 
         sp<MediaPlayerBase>     createPlayer(player_type playerType);
 
@@ -362,11 +372,10 @@ private:
 
 
         sp<MediaPlayerBase>     setDataSource_pre(player_type playerType);
-        void                    setDataSource_post(const sp<MediaPlayerBase>& p,
+        status_t                setDataSource_post(const sp<MediaPlayerBase>& p,
                                                    status_t status);
 
-        static  void            notify(void* cookie, int msg,
-                                       int ext1, int ext2, const Parcel *obj);
+                void            notify(int msg, int ext1, int ext2, const Parcel *obj);
 
                 pid_t           pid() const { return mPid; }
         virtual status_t        dump(int fd, const Vector<String16>& args);
@@ -375,6 +384,10 @@ private:
         // Modular DRM
         virtual status_t prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId);
         virtual status_t releaseDrm();
+        // AudioRouting
+        virtual status_t setOutputDevice(audio_port_handle_t deviceId);
+        virtual status_t getRoutedDeviceId(audio_port_handle_t* deviceId);
+        virtual status_t enableAudioDeviceCallback(bool enabled);
 
     private:
         class ServiceDeathNotifier:
@@ -404,7 +417,22 @@ private:
             wp<MediaPlayerBase> mListener;
         };
 
-        void clearDeathNotifiers();
+        class AudioDeviceUpdatedNotifier: public AudioSystem::AudioDeviceCallback
+        {
+        public:
+            AudioDeviceUpdatedNotifier(const sp<MediaPlayerBase>& listener) {
+                mListener = listener;
+            }
+            ~AudioDeviceUpdatedNotifier() {}
+
+            virtual void onAudioDeviceUpdate(audio_io_handle_t audioIo,
+                                             audio_port_handle_t deviceId);
+
+        private:
+            wp<MediaPlayerBase> mListener;
+        };
+
+        void clearDeathNotifiers_l();
 
         friend class MediaPlayerService;
                                 Client( const sp<MediaPlayerService>& service,
@@ -433,27 +461,42 @@ private:
         void addNewMetadataUpdate(media::Metadata::Type type);
 
         // Disconnect from the currently connected ANativeWindow.
-        void disconnectNativeWindow();
+        void disconnectNativeWindow_l();
 
         status_t setAudioAttributes_l(const Parcel &request);
 
-        mutable     Mutex                       mLock;
-                    sp<MediaPlayerBase>         mPlayer;
-                    sp<MediaPlayerService>      mService;
-                    sp<IMediaPlayerClient>      mClient;
-                    sp<AudioOutput>             mAudioOutput;
-                    pid_t                       mPid;
-                    status_t                    mStatus;
-                    bool                        mLoop;
-                    int32_t                     mConnId;
-                    audio_session_t             mAudioSessionId;
-                    audio_attributes_t *        mAudioAttributes;
-                    uid_t                       mUid;
-                    sp<ANativeWindow>           mConnectedWindow;
-                    sp<IBinder>                 mConnectedWindowBinder;
-                    struct sockaddr_in          mRetransmitEndpoint;
-                    bool                        mRetransmitEndpointValid;
-                    sp<Client>                  mNextClient;
+        class Listener : public MediaPlayerBase::Listener {
+        public:
+            Listener(const wp<Client> &client) : mClient(client) {}
+            virtual ~Listener() {}
+            virtual void notify(int msg, int ext1, int ext2, const Parcel *obj) {
+                sp<Client> client = mClient.promote();
+                if (client != NULL) {
+                    client->notify(msg, ext1, ext2, obj);
+                }
+            }
+        private:
+            wp<Client> mClient;
+        };
+
+        mutable     Mutex                         mLock;
+                    sp<MediaPlayerBase>           mPlayer;
+                    sp<MediaPlayerService>        mService;
+                    sp<IMediaPlayerClient>        mClient;
+                    sp<AudioOutput>               mAudioOutput;
+                    pid_t                         mPid;
+                    status_t                      mStatus;
+                    bool                          mLoop;
+                    int32_t                       mConnId;
+                    audio_session_t               mAudioSessionId;
+                    audio_attributes_t *          mAudioAttributes;
+                    uid_t                         mUid;
+                    sp<ANativeWindow>             mConnectedWindow;
+                    sp<IBinder>                   mConnectedWindowBinder;
+                    struct sockaddr_in            mRetransmitEndpoint;
+                    bool                          mRetransmitEndpointValid;
+                    sp<Client>                    mNextClient;
+                    sp<MediaPlayerBase::Listener> mListener;
 
         // Metadata filters.
         media::Metadata::Filter mMetadataAllow;  // protected by mLock
@@ -467,8 +510,9 @@ private:
 
         sp<ServiceDeathNotifier> mExtractorDeathListener;
         sp<ServiceDeathNotifier> mCodecDeathListener;
+        sp<AudioDeviceUpdatedNotifier> mAudioDeviceUpdatedListener;
 #if CALLBACK_ANTAGONIZER
-                    Antagonizer*                mAntagonizer;
+                    Antagonizer*                  mAntagonizer;
 #endif
     }; // Client
 
@@ -481,7 +525,6 @@ private:
                 SortedVector< wp<Client> >  mClients;
                 SortedVector< wp<MediaRecorderClient> > mMediaRecorderClients;
                 int32_t                     mNextConnId;
-                sp<IOMX>                    mOMX;
 };
 
 // ----------------------------------------------------------------------------

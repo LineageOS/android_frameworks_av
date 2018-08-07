@@ -4,8 +4,7 @@ cc_library_static {
 
     srcs: [
         "src/bitstream_io.cpp",
-        "src/combined_encode.cpp",
-        "src/datapart_encode.cpp",
+        "src/combined_encode.cpp", "src/datapart_encode.cpp",
         "src/dct.cpp",
         "src/findhalfpel.cpp",
         "src/fastcodemb.cpp",
@@ -30,6 +29,8 @@ cc_library_static {
 
         "-Werror",
     ],
+
+    version_script: "exports.lds",
 
     include_dirs: [
         "frameworks/av/media/libstagefright/include",
@@ -80,7 +81,7 @@ cc_library_shared {
     static_libs: ["libstagefright_m4vh263enc"],
 
     shared_libs: [
-        "libmedia_omx",
+        "libstagefright_foundation",
         "libstagefright_omx",
         "libutils",
         "liblog",

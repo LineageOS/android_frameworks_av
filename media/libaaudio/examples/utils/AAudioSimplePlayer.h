@@ -19,11 +19,10 @@
 #ifndef AAUDIO_SIMPLE_PLAYER_H
 #define AAUDIO_SIMPLE_PLAYER_H
 
-#include <unistd.h>
 #include <sched.h>
+#include <unistd.h>
 
 #include <aaudio/AAudio.h>
-#include <atomic>
 #include "AAudioArgsParser.h"
 #include "SineGenerator.h"
 
@@ -31,12 +30,12 @@
 #define SHARING_MODE  AAUDIO_SHARING_MODE_SHARED
 #define PERFORMANCE_MODE AAUDIO_PERFORMANCE_MODE_NONE
 
-// Arbitrary period for glitches, once per second at 48000 Hz.
-#define FORCED_UNDERRUN_PERIOD_FRAMES    48000
+// Arbitrary period for glitches
+#define FORCED_UNDERRUN_PERIOD_FRAMES    (2 * 48000)
 // How long to sleep in a callback to cause an intentional glitch. For testing.
 #define FORCED_UNDERRUN_SLEEP_MICROS     (10 * 1000)
 
-#define MAX_TIMESTAMPS   16
+#define MAX_TIMESTAMPS                   16
 
 typedef struct Timestamp {
     int64_t position;
@@ -70,13 +69,6 @@ public:
     }
 
     // TODO Extract a common base class for record and playback.
-    /**
-     * Also known as "sample rate"
-     * Only call this after open() has been called.
-     */
-    int32_t getFramesPerSecond() const {
-        return getSampleRate(); // alias
-    }
 
     /**
      * Only call this after open() has been called.
@@ -172,12 +164,12 @@ public:
         result = AAudioStreamBuilder_openStream(builder, &mStream);
 
         AAudioStreamBuilder_delete(builder);
+
         return result;
     }
 
     aaudio_result_t close() {
         if (mStream != nullptr) {
-            printf("call AAudioStream_close(%p)\n", mStream);  fflush(stdout);
             AAudioStream_close(mStream);
             mStream = nullptr;
         }
@@ -212,10 +204,32 @@ public:
         aaudio_result_t result = AAudioStream_requestStop(mStream);
         if (result != AAUDIO_OK) {
             printf("ERROR - AAudioStream_requestStop() returned %d %s\n",
-                    result, AAudio_convertResultToText(result));
+                   result, AAudio_convertResultToText(result));
         }
         int32_t xRunCount = AAudioStream_getXRunCount(mStream);
         printf("AAudioStream_getXRunCount %d\n", xRunCount);
+        return result;
+    }
+
+    // Pause the stream. AAudio will stop calling your callback function.
+    aaudio_result_t pause() {
+        aaudio_result_t result = AAudioStream_requestPause(mStream);
+        if (result != AAUDIO_OK) {
+            printf("ERROR - AAudioStream_requestPause() returned %d %s\n",
+                   result, AAudio_convertResultToText(result));
+        }
+        int32_t xRunCount = AAudioStream_getXRunCount(mStream);
+        printf("AAudioStream_getXRunCount %d\n", xRunCount);
+        return result;
+    }
+
+    // Flush the stream. AAudio will stop calling your callback function.
+    aaudio_result_t flush() {
+        aaudio_result_t result = AAudioStream_requestFlush(mStream);
+        if (result != AAUDIO_OK) {
+            printf("ERROR - AAudioStream_requestFlush() returned %d %s\n",
+                   result, AAudio_convertResultToText(result));
+        }
         return result;
     }
 
@@ -232,22 +246,48 @@ private:
 
 typedef struct SineThreadedData_s {
 
-    SineGenerator  sineOsc1;
-    SineGenerator  sineOsc2;
-    Timestamp      timestamps[MAX_TIMESTAMPS];
-    int64_t        framesTotal = 0;
-    int64_t        nextFrameToGlitch = FORCED_UNDERRUN_PERIOD_FRAMES;
-    int32_t        minNumFrames = INT32_MAX;
-    int32_t        maxNumFrames = 0;
-    int32_t        timestampCount = 0; // in timestamps
+    SineGenerator      sineOscillators[MAX_CHANNELS];
+    Timestamp          timestamps[MAX_TIMESTAMPS];
+    int64_t            framesTotal = 0;
+    int64_t            nextFrameToGlitch = FORCED_UNDERRUN_PERIOD_FRAMES;
+    int32_t            minNumFrames = INT32_MAX;
+    int32_t            maxNumFrames = 0;
+    int32_t            timestampCount = 0; // in timestamps
+    int32_t            sampleRate = 48000;
+    int32_t            prefixToneFrames = 0;
+    bool               sweepSetup = false;
 
-    int            scheduler = 0;
-    bool           schedulerChecked = false;
-    bool           forceUnderruns = false;
+    int                scheduler = 0;
+    bool               schedulerChecked = false;
+    bool               forceUnderruns = false;
 
     AAudioSimplePlayer simplePlayer;
     int32_t            callbackCount = 0;
     WakeUp             waker{AAUDIO_OK};
+
+    /**
+     * Set sampleRate first.
+     */
+    void setupSineBlip() {
+        for (int i = 0; i < MAX_CHANNELS; ++i) {
+            double centerFrequency = 880.0 * (i + 2);
+            sineOscillators[i].setup(centerFrequency, sampleRate);
+            sineOscillators[i].setSweep(centerFrequency, centerFrequency, 0.0);
+        }
+    }
+
+    void setupSineSweeps() {
+        for (int i = 0; i < MAX_CHANNELS; ++i) {
+            double centerFrequency = 220.0 * (i + 2);
+            sineOscillators[i].setup(centerFrequency, sampleRate);
+            double minFrequency = centerFrequency * 2.0 / 3.0;
+            // Change range slightly so they will go out of phase.
+            double maxFrequency = centerFrequency * 3.0 / 2.0;
+            double sweepSeconds = 5.0 + i;
+            sineOscillators[i].setSweep(minFrequency, maxFrequency, sweepSeconds);
+        }
+        sweepSetup = true;
+    }
 
 } SineThreadedData_t;
 
@@ -265,9 +305,11 @@ aaudio_data_callback_result_t SimplePlayerDataCallbackProc(
         return AAUDIO_CALLBACK_RESULT_STOP;
     }
     SineThreadedData_t *sineData = (SineThreadedData_t *) userData;
-    sineData->callbackCount++;
 
-    sineData->framesTotal += numFrames;
+    // Play an initial high tone so we can tell whether the beginning was truncated.
+    if (!sineData->sweepSetup && sineData->framesTotal >= sineData->prefixToneFrames) {
+        sineData->setupSineSweeps();
+    }
 
     if (sineData->forceUnderruns) {
         if (sineData->framesTotal > sineData->nextFrameToGlitch) {
@@ -301,33 +343,32 @@ aaudio_data_callback_result_t SimplePlayerDataCallbackProc(
     }
 
     int32_t samplesPerFrame = AAudioStream_getChannelCount(stream);
-    // This code only plays on the first one or two channels.
-    // TODO Support arbitrary number of channels.
+
+
+    int numActiveOscilators = (samplesPerFrame > MAX_CHANNELS) ? MAX_CHANNELS : samplesPerFrame;
     switch (AAudioStream_getFormat(stream)) {
         case AAUDIO_FORMAT_PCM_I16: {
             int16_t *audioBuffer = (int16_t *) audioData;
-            // Render sine waves as shorts to first channel.
-            sineData->sineOsc1.render(&audioBuffer[0], samplesPerFrame, numFrames);
-            // Render sine waves to second channel if there is one.
-            if (samplesPerFrame > 1) {
-                sineData->sineOsc2.render(&audioBuffer[1], samplesPerFrame, numFrames);
+            for (int i = 0; i < numActiveOscilators; ++i) {
+                sineData->sineOscillators[i].render(&audioBuffer[i], samplesPerFrame,
+                                                    numFrames);
             }
         }
-        break;
+            break;
         case AAUDIO_FORMAT_PCM_FLOAT: {
             float *audioBuffer = (float *) audioData;
-            // Render sine waves as floats to first channel.
-            sineData->sineOsc1.render(&audioBuffer[0], samplesPerFrame, numFrames);
-            // Render sine waves to second channel if there is one.
-            if (samplesPerFrame > 1) {
-                sineData->sineOsc2.render(&audioBuffer[1], samplesPerFrame, numFrames);
+            for (int i = 0; i < numActiveOscilators; ++i) {
+                sineData->sineOscillators[i].render(&audioBuffer[i], samplesPerFrame,
+                                                    numFrames);
             }
         }
-        break;
+            break;
         default:
             return AAUDIO_CALLBACK_RESULT_STOP;
     }
 
+    sineData->callbackCount++;
+    sineData->framesTotal += numFrames;
     return AAUDIO_CALLBACK_RESULT_CONTINUE;
 }
 

@@ -197,7 +197,6 @@ status_t FrameProcessor::processFaceDetect(const CameraMetadata &frame,
                                 faceRects[i*4 + 2], scalerCrop);
             face.rect[3] = l.mParameters.arrayYToNormalizedWithCrop(
                                 faceRects[i*4 + 3], scalerCrop);
-
             face.score = faceScores[i];
             if (faceDetectMode == ANDROID_STATISTICS_FACE_DETECT_MODE_FULL) {
                 face.id = faceIds[i];
@@ -292,7 +291,8 @@ status_t FrameProcessor::process3aState(const CaptureResult &frame,
     }
 
     // Once all 3A states are received, notify the client about 3A changes.
-    if (pendingState.aeState != m3aState.aeState) {
+    if (pendingState.aeState != m3aState.aeState ||
+            pendingState.aeTriggerId > m3aState.aeTriggerId) {
         ALOGV("%s: Camera %d: AE state %d->%d",
                 __FUNCTION__, cameraId,
                 m3aState.aeState, pendingState.aeState);

@@ -95,11 +95,6 @@ struct ACodec : public AHierarchicalStateMachine, public CodecBase {
 
     static status_t getOMXChannelMapping(size_t numChannels, OMX_AUDIO_CHANNELTYPE map[]);
 
-    // Save the flag.
-    void setTrebleFlag(bool trebleFlag);
-    // Return the saved flag.
-    bool getTrebleFlag() const;
-
 protected:
     virtual ~ACodec();
 
@@ -233,15 +228,14 @@ private:
     sp<IOMX> mOMX;
     sp<IOMXNode> mOMXNode;
     int32_t mNodeGeneration;
-    bool mTrebleFlag;
     sp<TAllocator> mAllocator[2];
-    sp<MemoryDealer> mDealer[2];
 
     bool mUsingNativeWindow;
     sp<ANativeWindow> mNativeWindow;
     int mNativeWindowUsageBits;
     android_native_rect_t mLastNativeWindowCrop;
     int32_t mLastNativeWindowDataSpace;
+    HDRStaticInfo mLastHDRStaticInfo;
     sp<AMessage> mConfigFormat;
     sp<AMessage> mInputFormat;
     sp<AMessage> mOutputFormat;
@@ -259,6 +253,7 @@ private:
 
     sp<AMessage> mLastOutputFormat;
     bool mIsVideo;
+    bool mIsImage;
     bool mIsEncoder;
     bool mFatalError;
     bool mShutdownInProgress;
@@ -451,6 +446,7 @@ private:
         int32_t heavyCompression;
         int32_t targetRefLevel;
         int32_t encodedTargetLevel;
+        int32_t effectType;
     } drcParams_t;
 
     status_t setupAACCodec(
@@ -495,13 +491,15 @@ private:
     status_t setupMPEG4EncoderParameters(const sp<AMessage> &msg);
     status_t setupH263EncoderParameters(const sp<AMessage> &msg);
     status_t setupAVCEncoderParameters(const sp<AMessage> &msg);
-    status_t setupHEVCEncoderParameters(const sp<AMessage> &msg);
+    status_t setupHEVCEncoderParameters(const sp<AMessage> &msg, sp<AMessage> &outputFormat);
     status_t setupVPXEncoderParameters(const sp<AMessage> &msg, sp<AMessage> &outputFormat);
 
-    status_t verifySupportForProfileAndLevel(int32_t profile, int32_t level);
+    status_t verifySupportForProfileAndLevel(
+            OMX_U32 portIndex, int32_t profile, int32_t level);
 
+    status_t configureImageGrid(const sp<AMessage> &msg, sp<AMessage> &outputFormat);
     status_t configureBitrate(
-            int32_t bitrate, OMX_VIDEO_CONTROLRATETYPE bitrateMode);
+            OMX_VIDEO_CONTROLRATETYPE bitrateMode, int32_t bitrate, int32_t quality = 0);
     void configureEncoderLatency(const sp<AMessage> &msg);
 
     status_t setupErrorCorrectionParameters();

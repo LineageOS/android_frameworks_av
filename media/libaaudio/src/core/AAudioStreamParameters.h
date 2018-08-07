@@ -88,6 +88,38 @@ public:
         mDirection = direction;
     }
 
+    aaudio_usage_t getUsage() const {
+        return mUsage;
+    }
+
+    void setUsage(aaudio_usage_t usage) {
+        mUsage = usage;
+    }
+
+    aaudio_content_type_t getContentType() const {
+        return mContentType;
+    }
+
+    void setContentType(aaudio_content_type_t contentType) {
+        mContentType = contentType;
+    }
+
+    aaudio_input_preset_t getInputPreset() const {
+        return mInputPreset;
+    }
+
+    void setInputPreset(aaudio_input_preset_t inputPreset) {
+        mInputPreset = inputPreset;
+    }
+
+    aaudio_session_id_t getSessionId() const {
+        return mSessionId;
+    }
+
+    void setSessionId(aaudio_session_id_t sessionId) {
+        mSessionId = sessionId;
+    }
+
     int32_t calculateBytesPerFrame() const {
         return getSamplesPerFrame() * AAudioConvert_formatToSizeInBytes(getFormat());
     }
@@ -109,7 +141,11 @@ private:
     aaudio_sharing_mode_t      mSharingMode     = AAUDIO_SHARING_MODE_SHARED;
     aaudio_format_t            mAudioFormat     = AAUDIO_FORMAT_UNSPECIFIED;
     aaudio_direction_t         mDirection       = AAUDIO_DIRECTION_OUTPUT;
+    aaudio_usage_t             mUsage           = AAUDIO_UNSPECIFIED;
+    aaudio_content_type_t      mContentType     = AAUDIO_UNSPECIFIED;
+    aaudio_input_preset_t      mInputPreset     = AAUDIO_UNSPECIFIED;
     int32_t                    mBufferCapacity  = AAUDIO_UNSPECIFIED;
+    aaudio_session_id_t        mSessionId       = AAUDIO_SESSION_ID_NONE;
 };
 
 } /* namespace aaudio */

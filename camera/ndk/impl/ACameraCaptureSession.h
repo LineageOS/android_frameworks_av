@@ -24,7 +24,8 @@
 using namespace android;
 
 struct ACaptureSessionOutput {
-    explicit ACaptureSessionOutput(ANativeWindow* window) : mWindow(window) {};
+    explicit ACaptureSessionOutput(ANativeWindow* window, bool isShared = false) :
+            mWindow(window), mIsShared(isShared) {};
 
     bool operator == (const ACaptureSessionOutput& other) const {
         return mWindow == other.mWindow;
@@ -40,6 +41,8 @@ struct ACaptureSessionOutput {
     }
 
     ANativeWindow* mWindow;
+    std::set<ANativeWindow *> mSharedWindows;
+    bool           mIsShared;
     int            mRotation = CAMERA3_STREAM_ROTATION_0;
 };
 
@@ -88,6 +91,8 @@ struct ACameraCaptureSession : public RefBase {
             /*optional*/ACameraCaptureSession_captureCallbacks* cbs,
             int numRequests, ACaptureRequest** requests,
             /*optional*/int* captureSequenceId);
+
+    camera_status_t updateOutputConfiguration(ACaptureSessionOutput *output);
 
     ACameraDevice* getDevice();
 

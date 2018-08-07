@@ -44,7 +44,15 @@ extern "C" {
 #define AAUDIO_UNSPECIFIED           0
 
 enum {
+    /**
+     * Audio data will travel out of the device, for example through a speaker.
+     */
     AAUDIO_DIRECTION_OUTPUT,
+
+
+    /**
+     * Audio data will travel into the device, for example from a microphone.
+     */
     AAUDIO_DIRECTION_INPUT
 };
 typedef int32_t aaudio_direction_t;
@@ -52,33 +60,112 @@ typedef int32_t aaudio_direction_t;
 enum {
     AAUDIO_FORMAT_INVALID = -1,
     AAUDIO_FORMAT_UNSPECIFIED = 0,
+
+    /**
+     * This format uses the int16_t data type.
+     * The maximum range of the data is -32768 to 32767.
+     */
     AAUDIO_FORMAT_PCM_I16,
+
+    /**
+     * This format uses the float data type.
+     * The nominal range of the data is [-1.0f, 1.0f).
+     * Values outside that range may be clipped.
+     *
+     * See also 'floatData' at
+     * https://developer.android.com/reference/android/media/AudioTrack#write(float[],%20int,%20int,%20int)
+     */
     AAUDIO_FORMAT_PCM_FLOAT
 };
 typedef int32_t aaudio_format_t;
 
+/**
+ * These result codes are returned from AAudio functions to indicate success or failure.
+ * Note that error return codes may change in the future so applications should generally
+ * not rely on specific return codes.
+ */
 enum {
+    /**
+     * The call was successful.
+     */
     AAUDIO_OK,
     AAUDIO_ERROR_BASE = -900, // TODO review
+
+    /**
+     * The audio device was disconnected. This could occur, for example, when headphones
+     * are plugged in or unplugged. The stream cannot be used after the device is disconnected.
+     * Applications should stop and close the stream.
+     * If this error is received in an error callback then another thread should be
+     * used to stop and close the stream.
+     */
     AAUDIO_ERROR_DISCONNECTED,
+
+    /**
+     * An invalid parameter was passed to AAudio.
+     */
     AAUDIO_ERROR_ILLEGAL_ARGUMENT,
     // reserved
     AAUDIO_ERROR_INTERNAL = AAUDIO_ERROR_ILLEGAL_ARGUMENT + 2,
+
+    /**
+     * The requested operation is not appropriate for the current state of AAudio.
+     */
     AAUDIO_ERROR_INVALID_STATE,
     // reserved
     // reserved
+    /* The server rejected the handle used to identify the stream.
+     */
     AAUDIO_ERROR_INVALID_HANDLE = AAUDIO_ERROR_INVALID_STATE + 3,
     // reserved
+
+    /**
+     * The function is not implemented for this stream.
+     */
     AAUDIO_ERROR_UNIMPLEMENTED = AAUDIO_ERROR_INVALID_HANDLE + 2,
+
+    /**
+     * A resource or information is unavailable.
+     * This could occur when an application tries to open too many streams,
+     * or a timestamp is not available.
+     */
     AAUDIO_ERROR_UNAVAILABLE,
     AAUDIO_ERROR_NO_FREE_HANDLES,
+
+    /**
+     * Memory could not be allocated.
+     */
     AAUDIO_ERROR_NO_MEMORY,
+
+    /**
+     * A NULL pointer was passed to AAudio.
+     * Or a NULL pointer was detected internally.
+     */
     AAUDIO_ERROR_NULL,
+
+    /**
+     * An operation took longer than expected.
+     */
     AAUDIO_ERROR_TIMEOUT,
     AAUDIO_ERROR_WOULD_BLOCK,
+
+    /**
+     * The requested data format is not supported.
+     */
     AAUDIO_ERROR_INVALID_FORMAT,
+
+    /**
+     * A requested was out of range.
+     */
     AAUDIO_ERROR_OUT_OF_RANGE,
+
+    /**
+     * The audio service was not available.
+     */
     AAUDIO_ERROR_NO_SERVICE,
+
+    /**
+     * The requested sample rate was not supported.
+     */
     AAUDIO_ERROR_INVALID_RATE
 };
 typedef int32_t  aaudio_result_t;
@@ -123,19 +210,199 @@ enum {
     /**
      * No particular performance needs. Default.
      */
-            AAUDIO_PERFORMANCE_MODE_NONE = 10,
+    AAUDIO_PERFORMANCE_MODE_NONE = 10,
 
     /**
-     * Extending battery life is most important.
+     * Extending battery life is more important than low latency.
+     *
+     * This mode is not supported in input streams.
+     * For input, mode NONE will be used if this is requested.
      */
-            AAUDIO_PERFORMANCE_MODE_POWER_SAVING,
+    AAUDIO_PERFORMANCE_MODE_POWER_SAVING,
 
     /**
-     * Reducing latency is most important.
+     * Reducing latency is more important than battery life.
      */
-            AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
+    AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
 };
 typedef int32_t aaudio_performance_mode_t;
+
+/**
+ * The USAGE attribute expresses "why" you are playing a sound, what is this sound used for.
+ * This information is used by certain platforms or routing policies
+ * to make more refined volume or routing decisions.
+ *
+ * Note that these match the equivalent values in AudioAttributes in the Android Java API.
+ *
+ * Added in API level 28.
+ */
+enum {
+    /**
+     * Use this for streaming media, music performance, video, podcasts, etcetera.
+     */
+    AAUDIO_USAGE_MEDIA = 1,
+
+    /**
+     * Use this for voice over IP, telephony, etcetera.
+     */
+    AAUDIO_USAGE_VOICE_COMMUNICATION = 2,
+
+    /**
+     * Use this for sounds associated with telephony such as busy tones, DTMF, etcetera.
+     */
+    AAUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING = 3,
+
+    /**
+     * Use this to demand the users attention.
+     */
+    AAUDIO_USAGE_ALARM = 4,
+
+    /**
+     * Use this for notifying the user when a message has arrived or some
+     * other background event has occured.
+     */
+    AAUDIO_USAGE_NOTIFICATION = 5,
+
+    /**
+     * Use this when the phone rings.
+     */
+    AAUDIO_USAGE_NOTIFICATION_RINGTONE = 6,
+
+    /**
+     * Use this to attract the users attention when, for example, the battery is low.
+     */
+    AAUDIO_USAGE_NOTIFICATION_EVENT = 10,
+
+    /**
+     * Use this for screen readers, etcetera.
+     */
+    AAUDIO_USAGE_ASSISTANCE_ACCESSIBILITY = 11,
+
+    /**
+     * Use this for driving or navigation directions.
+     */
+    AAUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE = 12,
+
+    /**
+     * Use this for user interface sounds, beeps, etcetera.
+     */
+    AAUDIO_USAGE_ASSISTANCE_SONIFICATION = 13,
+
+    /**
+     * Use this for game audio and sound effects.
+     */
+    AAUDIO_USAGE_GAME = 14,
+
+    /**
+     * Use this for audio responses to user queries, audio instructions or help utterances.
+     */
+    AAUDIO_USAGE_ASSISTANT = 16
+};
+typedef int32_t aaudio_usage_t;
+
+/**
+ * The CONTENT_TYPE attribute describes "what" you are playing.
+ * It expresses the general category of the content. This information is optional.
+ * But in case it is known (for instance {@link #AAUDIO_CONTENT_TYPE_MOVIE} for a
+ * movie streaming service or {@link #AAUDIO_CONTENT_TYPE_SPEECH} for
+ * an audio book application) this information might be used by the audio framework to
+ * enforce audio focus.
+ *
+ * Note that these match the equivalent values in AudioAttributes in the Android Java API.
+ *
+ * Added in API level 28.
+ */
+enum {
+
+    /**
+     * Use this for spoken voice, audio books, etcetera.
+     */
+    AAUDIO_CONTENT_TYPE_SPEECH = 1,
+
+    /**
+     * Use this for pre-recorded or live music.
+     */
+    AAUDIO_CONTENT_TYPE_MUSIC = 2,
+
+    /**
+     * Use this for a movie or video soundtrack.
+     */
+    AAUDIO_CONTENT_TYPE_MOVIE = 3,
+
+    /**
+     * Use this for sound is designed to accompany a user action,
+     * such as a click or beep sound made when the user presses a button.
+     */
+    AAUDIO_CONTENT_TYPE_SONIFICATION = 4
+};
+typedef int32_t aaudio_content_type_t;
+
+/**
+ * Defines the audio source.
+ * An audio source defines both a default physical source of audio signal, and a recording
+ * configuration.
+ *
+ * Note that these match the equivalent values in MediaRecorder.AudioSource in the Android Java API.
+ *
+ * Added in API level 28.
+ */
+enum {
+    /**
+     * Use this preset when other presets do not apply.
+     */
+    AAUDIO_INPUT_PRESET_GENERIC = 1,
+
+    /**
+     * Use this preset when recording video.
+     */
+    AAUDIO_INPUT_PRESET_CAMCORDER = 5,
+
+    /**
+     * Use this preset when doing speech recognition.
+     */
+    AAUDIO_INPUT_PRESET_VOICE_RECOGNITION = 6,
+
+    /**
+     * Use this preset when doing telephony or voice messaging.
+     */
+    AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION = 7,
+
+    /**
+     * Use this preset to obtain an input with no effects.
+     * Note that this input will not have automatic gain control
+     * so the recorded volume may be very low.
+     */
+    AAUDIO_INPUT_PRESET_UNPROCESSED = 9,
+};
+typedef int32_t aaudio_input_preset_t;
+
+/**
+ * These may be used with AAudioStreamBuilder_setSessionId().
+ *
+ * Added in API level 28.
+ */
+enum {
+    /**
+     * Do not allocate a session ID.
+     * Effects cannot be used with this stream.
+     * Default.
+     *
+     * Added in API level 28.
+     */
+    AAUDIO_SESSION_ID_NONE = -1,
+
+    /**
+     * Allocate a session ID that can be used to attach and control
+     * effects using the Java AudioEffects API.
+     * Note that using this may result in higher latency.
+     *
+     * Note that this matches the value of AudioManager.AUDIO_SESSION_ID_GENERATE.
+     *
+     * Added in API level 28.
+     */
+    AAUDIO_SESSION_ID_ALLOCATE = 0,
+};
+typedef int32_t aaudio_session_id_t;
 
 typedef struct AAudioStreamStruct         AAudioStream;
 typedef struct AAudioStreamBuilderStruct  AAudioStreamBuilder;
@@ -299,13 +566,103 @@ AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilde
 /**
  * Set the requested performance mode.
  *
+ * Supported modes are AAUDIO_PERFORMANCE_MODE_NONE, AAUDIO_PERFORMANCE_MODE_POWER_SAVING
+ * and AAUDIO_PERFORMANCE_MODE_LOW_LATENCY.
+ *
  * The default, if you do not call this function, is AAUDIO_PERFORMANCE_MODE_NONE.
+ *
+ * You may not get the mode you requested.
+ * You can call AAudioStream_getPerformanceMode() to find out the final mode for the stream.
  *
  * @param builder reference provided by AAudio_createStreamBuilder()
  * @param mode the desired performance mode, eg. AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
  */
 AAUDIO_API void AAudioStreamBuilder_setPerformanceMode(AAudioStreamBuilder* builder,
                                                 aaudio_performance_mode_t mode);
+
+/**
+ * Set the intended use case for the stream.
+ *
+ * The AAudio system will use this information to optimize the
+ * behavior of the stream.
+ * This could, for example, affect how volume and focus is handled for the stream.
+ *
+ * The default, if you do not call this function, is AAUDIO_USAGE_MEDIA.
+ *
+ * Added in API level 28.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param usage the desired usage, eg. AAUDIO_USAGE_GAME
+ */
+AAUDIO_API void AAudioStreamBuilder_setUsage(AAudioStreamBuilder* builder,
+                                                       aaudio_usage_t usage);
+
+/**
+ * Set the type of audio data that the stream will carry.
+ *
+ * The AAudio system will use this information to optimize the
+ * behavior of the stream.
+ * This could, for example, affect whether a stream is paused when a notification occurs.
+ *
+ * The default, if you do not call this function, is AAUDIO_CONTENT_TYPE_MUSIC.
+ *
+ * Added in API level 28.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param contentType the type of audio data, eg. AAUDIO_CONTENT_TYPE_SPEECH
+ */
+AAUDIO_API void AAudioStreamBuilder_setContentType(AAudioStreamBuilder* builder,
+                                             aaudio_content_type_t contentType);
+
+/**
+ * Set the input (capture) preset for the stream.
+ *
+ * The AAudio system will use this information to optimize the
+ * behavior of the stream.
+ * This could, for example, affect which microphones are used and how the
+ * recorded data is processed.
+ *
+ * The default, if you do not call this function, is AAUDIO_INPUT_PRESET_VOICE_RECOGNITION.
+ * That is because VOICE_RECOGNITION is the preset with the lowest latency
+ * on many platforms.
+ *
+ * Added in API level 28.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param inputPreset the desired configuration for recording
+ */
+AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
+                                                   aaudio_input_preset_t inputPreset);
+
+/** Set the requested session ID.
+ *
+ * The session ID can be used to associate a stream with effects processors.
+ * The effects are controlled using the Android AudioEffect Java API.
+ *
+ * The default, if you do not call this function, is AAUDIO_SESSION_ID_NONE.
+ *
+ * If set to AAUDIO_SESSION_ID_ALLOCATE then a session ID will be allocated
+ * when the stream is opened.
+ *
+ * The allocated session ID can be obtained by calling AAudioStream_getSessionId()
+ * and then used with this function when opening another stream.
+ * This allows effects to be shared between streams.
+ *
+ * Session IDs from AAudio can be used with the Android Java APIs and vice versa.
+ * So a session ID from an AAudio stream can be passed to Java
+ * and effects applied using the Java AudioEffect API.
+ *
+ * Note that allocating or setting a session ID may result in a stream with higher latency.
+ *
+ * Allocated session IDs will always be positive and nonzero.
+ *
+ * Added in API level 28.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param sessionId an allocated sessionID or AAUDIO_SESSION_ID_ALLOCATE
+ */
+AAUDIO_API void AAudioStreamBuilder_setSessionId(AAudioStreamBuilder* builder,
+                                                aaudio_session_id_t sessionId);
 
 /**
  * Return one of these values from the data callback function.
@@ -337,7 +694,13 @@ typedef int32_t aaudio_data_callback_result_t;
  * For an input stream, this function should read and process numFrames of data
  * from the audioData buffer.
  *
- * Note that this callback function should be considered a "real-time" function.
+ * The audio data is passed through the buffer. So do NOT call AAudioStream_read() or
+ * AAudioStream_write() on the stream that is making the callback.
+ *
+ * Note that numFrames can vary unless AAudioStreamBuilder_setFramesPerDataCallback()
+ * is called.
+ *
+ * Also note that this callback function should be considered a "real-time" function.
  * It must not do anything that could cause an unbounded delay because that can cause the
  * audio to glitch or pop.
  *
@@ -348,6 +711,15 @@ typedef int32_t aaudio_data_callback_result_t;
  * <li>any network operations such as streaming</li>
  * <li>use any mutexes or other synchronization primitives</li>
  * <li>sleep</li>
+ * <li>stop or close the stream</li>
+ * <li>AAudioStream_read()</li>
+ * <li>AAudioStream_write()</li>
+ * </ul>
+ *
+ * The following are OK to call from the data callback:
+ * <ul>
+ * <li>AAudioStream_get*()</li>
+ * <li>AAudio_convertResultToText()</li>
  * </ul>
  *
  * If you need to move data, eg. MIDI commands, in or out of the callback function then
@@ -356,7 +728,7 @@ typedef int32_t aaudio_data_callback_result_t;
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @param userData the same address that was passed to AAudioStreamBuilder_setCallback()
  * @param audioData a pointer to the audio data
- * @param numFrames the number of frames to be processed
+ * @param numFrames the number of frames to be processed, which can vary
  * @return AAUDIO_CALLBACK_RESULT_*
  */
 typedef aaudio_data_callback_result_t (*AAudioStream_dataCallback)(
@@ -421,6 +793,22 @@ AAUDIO_API void AAudioStreamBuilder_setFramesPerDataCallback(AAudioStreamBuilder
  * Prototype for the callback function that is passed to
  * AAudioStreamBuilder_setErrorCallback().
  *
+ * The following may NOT be called from the error callback:
+ * <ul>
+ * <li>AAudioStream_requestStop()</li>
+ * <li>AAudioStream_requestPause()</li>
+ * <li>AAudioStream_close()</li>
+ * <li>AAudioStream_waitForStateChange()</li>
+ * <li>AAudioStream_read()</li>
+ * <li>AAudioStream_write()</li>
+ * </ul>
+ *
+ * The following are OK to call from the error callback:
+ * <ul>
+ * <li>AAudioStream_get*()</li>
+ * <li>AAudio_convertResultToText()</li>
+ * </ul>
+ *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @param userData the same address that was passed to AAudioStreamBuilder_setErrorCallback()
  * @param error an AAUDIO_ERROR_* value.
@@ -431,17 +819,18 @@ typedef void (*AAudioStream_errorCallback)(
         aaudio_result_t error);
 
 /**
- * Request that AAudio call this functions if any error occurs on a callback thread.
+ * Request that AAudio call this function if any error occurs or the stream is disconnected.
  *
  * It will be called, for example, if a headset or a USB device is unplugged causing the stream's
- * device to be unavailable.
- * In response, this function could signal or launch another thread to reopen a
- * stream on another device. Do not reopen the stream in this callback.
- *
- * This will not be called because of actions by the application, such as stopping
- * or closing a stream.
- *
+ * device to be unavailable or "disconnected".
  * Another possible cause of error would be a timeout or an unanticipated internal error.
+ *
+ * In response, this function should signal or create another thread to stop
+ * and close this stream. The other thread could then reopen a stream on another device.
+ * Do not stop or close the stream, or reopen the new stream, directly from this callback.
+ *
+ * This callback will not be called because of actions by the application, such as stopping
+ * or closing a stream.
  *
  * Note that the AAudio callbacks will never be called simultaneously from multiple threads.
  *
@@ -554,11 +943,13 @@ AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream* stream);
  * This will update the current client state.
  *
  * <pre><code>
- * aaudio_stream_state_t currentState;
- * aaudio_result_t result = AAudioStream_getState(stream, &currentState);
- * while (result == AAUDIO_OK && currentState != AAUDIO_STREAM_STATE_PAUSING) {
+ * aaudio_result_t result = AAUDIO_OK;
+ * aaudio_stream_state_t currentState = AAudioStream_getState(stream);
+ * aaudio_stream_state_t inputState = currentState;
+ * while (result == AAUDIO_OK && currentState != AAUDIO_STREAM_STATE_PAUSED) {
  *     result = AAudioStream_waitForStateChange(
- *                                   stream, currentState, &currentState, MY_TIMEOUT_NANOS);
+ *                                   stream, inputState, &currentState, MY_TIMEOUT_NANOS);
+ *     inputState = currentState;
  * }
  * </code></pre>
  *
@@ -589,6 +980,8 @@ AAUDIO_API aaudio_result_t AAudioStream_waitForStateChange(AAudioStream* stream,
  *
  * This call is "strong non-blocking" unless it has to wait for data.
  *
+ * If the call times out then zero or a partial frame count will be returned.
+ *
  * @param stream A stream created using AAudioStreamBuilder_openStream().
  * @param buffer The address of the first sample.
  * @param numFrames Number of frames to read. Only complete frames will be written.
@@ -611,6 +1004,8 @@ AAUDIO_API aaudio_result_t AAudioStream_read(AAudioStream* stream,
  * So it will be implemented using CLOCK_BOOTTIME.
  *
  * This call is "strong non-blocking" unless it has to wait for room in the buffer.
+ *
+ * If the call times out then zero or a partial frame count will be returned.
  *
  * @param stream A stream created using AAudioStreamBuilder_openStream().
  * @param buffer The address of the first sample.
@@ -636,7 +1031,8 @@ AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream* stream,
  * This cannot be set higher than AAudioStream_getBufferCapacityInFrames().
  *
  * Note that you will probably not get the exact size you request.
- * Call AAudioStream_getBufferSizeInFrames() to see what the actual final size is.
+ * You can check the return value or call AAudioStream_getBufferSizeInFrames()
+ * to see what the actual final size is.
  *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @param numFrames requested number of frames that can be filled without blocking
@@ -683,10 +1079,10 @@ AAUDIO_API int32_t AAudioStream_getBufferCapacityInFrames(AAudioStream* stream);
  * This call can be used if the application needs to know the value of numFrames before
  * the stream is started. This is not normally necessary.
  *
- * If a specific size was requested by calling AAudioStreamBuilder_setCallbackSizeInFrames()
+ * If a specific size was requested by calling AAudioStreamBuilder_setFramesPerDataCallback()
  * then this will be the same size.
  *
- * If AAudioStreamBuilder_setCallbackSizeInFrames() was not called then this will
+ * If AAudioStreamBuilder_setFramesPerDataCallback() was not called then this will
  * return the size chosen by AAudio, or AAUDIO_UNSPECIFIED.
  *
  * AAUDIO_UNSPECIFIED indicates that the callback buffer size for this stream
@@ -771,7 +1167,8 @@ AAUDIO_API aaudio_direction_t AAudioStream_getDirection(AAudioStream* stream);
 
 /**
  * Passes back the number of frames that have been written since the stream was created.
- * For an output stream, this will be advanced by the application calling write().
+ * For an output stream, this will be advanced by the application calling write()
+ * or by a data callback.
  * For an input stream, this will be advanced by the endpoint.
  *
  * The frame position is monotonically increasing.
@@ -784,7 +1181,8 @@ AAUDIO_API int64_t AAudioStream_getFramesWritten(AAudioStream* stream);
 /**
  * Passes back the number of frames that have been read since the stream was created.
  * For an output stream, this will be advanced by the endpoint.
- * For an input stream, this will be advanced by the application calling read().
+ * For an input stream, this will be advanced by the application calling read()
+ * or by a data callback.
  *
  * The frame position is monotonically increasing.
  *
@@ -792,6 +1190,30 @@ AAUDIO_API int64_t AAudioStream_getFramesWritten(AAudioStream* stream);
  * @return frames read
  */
 AAUDIO_API int64_t AAudioStream_getFramesRead(AAudioStream* stream);
+
+/**
+ * Passes back the session ID associated with this stream.
+ *
+ * The session ID can be used to associate a stream with effects processors.
+ * The effects are controlled using the Android AudioEffect Java API.
+ *
+ * If AAudioStreamBuilder_setSessionId() was called with AAUDIO_SESSION_ID_ALLOCATE
+ * then a new session ID should be allocated once when the stream is opened.
+ *
+ * If AAudioStreamBuilder_setSessionId() was called with a previously allocated
+ * session ID then that value should be returned.
+ *
+ * If AAudioStreamBuilder_setSessionId() was not called then this function should
+ * return AAUDIO_SESSION_ID_NONE.
+ *
+ * The sessionID for a stream should not change once the stream has been opened.
+ *
+ * Added in API level 28.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return session ID or AAUDIO_SESSION_ID_NONE
+ */
+AAUDIO_API aaudio_session_id_t AAudioStream_getSessionId(AAudioStream* stream);
 
 /**
  * Passes back the time at which a particular frame was presented.
@@ -819,6 +1241,36 @@ AAUDIO_API aaudio_result_t AAudioStream_getTimestamp(AAudioStream* stream,
                                       clockid_t clockid,
                                       int64_t *framePosition,
                                       int64_t *timeNanoseconds);
+
+/**
+ * Return the use case for the stream.
+ *
+ * Added in API level 28.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return frames read
+ */
+AAUDIO_API aaudio_usage_t AAudioStream_getUsage(AAudioStream* stream);
+
+/**
+ * Return the content type for the stream.
+ *
+ * Added in API level 28.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return content type, for example AAUDIO_CONTENT_TYPE_MUSIC
+ */
+AAUDIO_API aaudio_content_type_t AAudioStream_getContentType(AAudioStream* stream);
+
+/**
+ * Return the input preset for the stream.
+ *
+ * Added in API level 28.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return input preset, for example AAUDIO_INPUT_PRESET_CAMCORDER
+ */
+AAUDIO_API aaudio_input_preset_t AAudioStream_getInputPreset(AAudioStream* stream);
 
 #ifdef __cplusplus
 }

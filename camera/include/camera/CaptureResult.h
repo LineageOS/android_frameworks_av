@@ -91,14 +91,36 @@ struct CaptureResultExtras : public android::Parcelable {
     virtual status_t                readFromParcel(const android::Parcel* parcel) override;
     virtual status_t                writeToParcel(android::Parcel* parcel) const override;
 };
+
+struct PhysicalCaptureResultInfo : public android::Parcelable {
+
+    PhysicalCaptureResultInfo()
+        : mPhysicalCameraId(),
+          mPhysicalCameraMetadata() {
+    }
+    PhysicalCaptureResultInfo(const String16& cameraId,
+            const CameraMetadata& cameraMetadata)
+            : mPhysicalCameraId(cameraId),
+              mPhysicalCameraMetadata(cameraMetadata) {
+    }
+
+    String16  mPhysicalCameraId;
+    CameraMetadata mPhysicalCameraMetadata;
+
+    virtual status_t                readFromParcel(const android::Parcel* parcel) override;
+    virtual status_t                writeToParcel(android::Parcel* parcel) const override;
+};
+
 } // namespace impl
 } // namespace camera2
 } // namespace hardware
 
 using hardware::camera2::impl::CaptureResultExtras;
+using hardware::camera2::impl::PhysicalCaptureResultInfo;
 
 struct CaptureResult : public virtual LightRefBase<CaptureResult> {
     CameraMetadata          mMetadata;
+    std::vector<PhysicalCaptureResultInfo> mPhysicalMetadatas;
     CaptureResultExtras     mResultExtras;
 
     CaptureResult();

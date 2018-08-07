@@ -58,6 +58,12 @@ public:
     static const char * const keyMonoOutput;
     static const char * const keyStreamHwAvSync;
 
+    //  keys for presentation selection
+    //  keyPresentationId: Audio presentation identifier
+    //  keyProgramId: Audio presentation program identifier
+    static const char * const keyPresentationId;
+    static const char * const keyProgramId;
+
     //  keyStreamConnect / Disconnect: value is an int in audio_devices_t
     static const char * const keyStreamConnect;
     static const char * const keyStreamDisconnect;
@@ -74,6 +80,11 @@ public:
     static const char * const valueOff;
 
     static const char * const valueListSeparator;
+
+    // keyReconfigA2dp: Ask HwModule to reconfigure A2DP offloaded codec
+    // keyReconfigA2dpSupported: Query if HwModule supports A2DP offload codec config
+    static const char * const keyReconfigA2dp;
+    static const char * const keyReconfigA2dpSupported;
 
     String8 toString() const { return toStringImpl(true); }
     String8 keysToString() const { return toStringImpl(false); }

@@ -17,6 +17,8 @@
 #ifndef ANDROID_HARDWARE_SOUNDTRIGGER_HAL_HIDL_H
 #define ANDROID_HARDWARE_SOUNDTRIGGER_HAL_HIDL_H
 
+#include <utility>
+
 #include <stdatomic.h>
 #include <utils/RefBase.h>
 #include <utils/KeyedVector.h>
@@ -24,21 +26,29 @@
 #include <utils/threads.h>
 #include "SoundTriggerHalInterface.h"
 #include <android/hardware/soundtrigger/2.0/types.h>
-#include <android/hardware/soundtrigger/2.0/ISoundTriggerHw.h>
+#include <android/hardware/soundtrigger/2.1/ISoundTriggerHw.h>
 #include <android/hardware/soundtrigger/2.0/ISoundTriggerHwCallback.h>
+#include <android/hardware/soundtrigger/2.1/ISoundTriggerHwCallback.h>
 
 namespace android {
 
-using android::hardware::audio::common::V2_0::Uuid;
-using android::hardware::soundtrigger::V2_0::ConfidenceLevel;
-using android::hardware::soundtrigger::V2_0::PhraseRecognitionExtra;
-using android::hardware::soundtrigger::V2_0::SoundModelType;
-using android::hardware::soundtrigger::V2_0::SoundModelHandle;
-using android::hardware::soundtrigger::V2_0::ISoundTriggerHw;
-using android::hardware::soundtrigger::V2_0::ISoundTriggerHwCallback;
+using ::android::hardware::audio::common::V2_0::Uuid;
+using ::android::hardware::hidl_vec;
+using ::android::hardware::soundtrigger::V2_0::ConfidenceLevel;
+using ::android::hardware::soundtrigger::V2_0::PhraseRecognitionExtra;
+using ::android::hardware::soundtrigger::V2_0::SoundModelType;
+using ::android::hardware::soundtrigger::V2_0::SoundModelHandle;
+using ::android::hardware::soundtrigger::V2_0::ISoundTriggerHw;
+using V2_0_ISoundTriggerHwCallback =
+        ::android::hardware::soundtrigger::V2_0::ISoundTriggerHwCallback;
+using V2_1_ISoundTriggerHw =
+        ::android::hardware::soundtrigger::V2_1::ISoundTriggerHw;
+using V2_1_ISoundTriggerHwCallback =
+        ::android::hardware::soundtrigger::V2_1::ISoundTriggerHwCallback;
+using ::android::hidl::memory::V1_0::IMemory;
 
 class SoundTriggerHalHidl : public SoundTriggerHalInterface,
-                            public virtual ISoundTriggerHwCallback
+                            public virtual V2_1_ISoundTriggerHwCallback
 
 {
 public:
@@ -84,11 +94,17 @@ public:
 
         // ISoundTriggerHwCallback
         virtual ::android::hardware::Return<void> recognitionCallback(
-                const ISoundTriggerHwCallback::RecognitionEvent& event, CallbackCookie cookie);
+                const V2_0_ISoundTriggerHwCallback::RecognitionEvent& event, CallbackCookie cookie);
         virtual ::android::hardware::Return<void> phraseRecognitionCallback(
-                const ISoundTriggerHwCallback::PhraseRecognitionEvent& event, int32_t cookie);
+                const V2_0_ISoundTriggerHwCallback::PhraseRecognitionEvent& event, int32_t cookie);
         virtual ::android::hardware::Return<void> soundModelCallback(
-                const ISoundTriggerHwCallback::ModelEvent& event, CallbackCookie cookie);
+                const V2_0_ISoundTriggerHwCallback::ModelEvent& event, CallbackCookie cookie);
+        virtual ::android::hardware::Return<void> recognitionCallback_2_1(
+                const RecognitionEvent& event, CallbackCookie cookie);
+        virtual ::android::hardware::Return<void> phraseRecognitionCallback_2_1(
+                const PhraseRecognitionEvent& event, int32_t cookie);
+        virtual ::android::hardware::Return<void> soundModelCallback_2_1(
+                const ModelEvent& event, CallbackCookie cookie);
 private:
         class SoundModel : public RefBase {
         public:
@@ -124,25 +140,48 @@ private:
         void convertTriggerPhraseToHal(
                 ISoundTriggerHw::Phrase *halTriggerPhrase,
                 const struct sound_trigger_phrase *triggerPhrase);
-        ISoundTriggerHw::SoundModel *convertSoundModelToHal(
+        void convertTriggerPhrasesToHal(
+                hidl_vec<ISoundTriggerHw::Phrase> *halTriggerPhrases,
+                struct sound_trigger_phrase_sound_model *keyPhraseModel);
+        void convertSoundModelToHal(ISoundTriggerHw::SoundModel *halModel,
                 const struct sound_trigger_sound_model *soundModel);
+        std::pair<bool, sp<IMemory>> convertSoundModelToHal(
+                V2_1_ISoundTriggerHw::SoundModel *halModel,
+                const struct sound_trigger_sound_model *soundModel)
+                __attribute__((warn_unused_result));
+        void convertPhraseSoundModelToHal(ISoundTriggerHw::PhraseSoundModel *halKeyPhraseModel,
+                const struct sound_trigger_sound_model *soundModel);
+        std::pair<bool, sp<IMemory>> convertPhraseSoundModelToHal(
+                V2_1_ISoundTriggerHw::PhraseSoundModel *halKeyPhraseModel,
+                const struct sound_trigger_sound_model *soundModel)
+                __attribute__((warn_unused_result));
 
         void convertPhraseRecognitionExtraToHal(
                 PhraseRecognitionExtra *halExtra,
                 const struct sound_trigger_phrase_recognition_extra *extra);
-        ISoundTriggerHw::RecognitionConfig *convertRecognitionConfigToHal(
+        void convertRecognitionConfigToHal(ISoundTriggerHw::RecognitionConfig *halConfig,
                 const struct sound_trigger_recognition_config *config);
+        std::pair<bool, sp<IMemory>> convertRecognitionConfigToHal(
+                V2_1_ISoundTriggerHw::RecognitionConfig *halConfig,
+                const struct sound_trigger_recognition_config *config)
+                __attribute__((warn_unused_result));
 
         struct sound_trigger_model_event *convertSoundModelEventFromHal(
-                                              const ISoundTriggerHwCallback::ModelEvent *halEvent);
+                                              const V2_0_ISoundTriggerHwCallback::ModelEvent *halEvent);
         void convertPhraseRecognitionExtraFromHal(
                 struct sound_trigger_phrase_recognition_extra *extra,
                 const PhraseRecognitionExtra *halExtra);
+        struct sound_trigger_phrase_recognition_event* convertPhraseRecognitionEventFromHal(
+                const V2_0_ISoundTriggerHwCallback::PhraseRecognitionEvent *halPhraseEvent);
         struct sound_trigger_recognition_event *convertRecognitionEventFromHal(
-                const ISoundTriggerHwCallback::RecognitionEvent *halEvent);
+                const V2_0_ISoundTriggerHwCallback::RecognitionEvent *halEvent);
+        void fillRecognitionEventFromHal(
+                struct sound_trigger_recognition_event *event,
+                const V2_0_ISoundTriggerHwCallback::RecognitionEvent *halEvent);
 
         uint32_t nextUniqueId();
         sp<ISoundTriggerHw> getService();
+        sp<V2_1_ISoundTriggerHw> toService2_1(const sp<ISoundTriggerHw>& s);
         sp<SoundModel> getModel(sound_model_handle_t handle);
         sp<SoundModel> removeModel(sound_model_handle_t handle);
 

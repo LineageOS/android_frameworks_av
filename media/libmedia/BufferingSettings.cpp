@@ -23,43 +23,16 @@
 
 namespace android {
 
-// static
-bool BufferingSettings::IsValidBufferingMode(int mode) {
-    return (mode >= BUFFERING_MODE_NONE && mode < BUFFERING_MODE_COUNT);
-}
-
-// static
-bool BufferingSettings::IsTimeBasedBufferingMode(int mode) {
-    return (mode == BUFFERING_MODE_TIME_ONLY || mode == BUFFERING_MODE_TIME_THEN_SIZE);
-}
-
-// static
-bool BufferingSettings::IsSizeBasedBufferingMode(int mode) {
-    return (mode == BUFFERING_MODE_SIZE_ONLY || mode == BUFFERING_MODE_TIME_THEN_SIZE);
-}
-
 BufferingSettings::BufferingSettings()
-        : mInitialBufferingMode(BUFFERING_MODE_NONE),
-          mRebufferingMode(BUFFERING_MODE_NONE),
-          mInitialWatermarkMs(kNoWatermark),
-          mInitialWatermarkKB(kNoWatermark),
-          mRebufferingWatermarkLowMs(kNoWatermark),
-          mRebufferingWatermarkHighMs(kNoWatermark),
-          mRebufferingWatermarkLowKB(kNoWatermark),
-          mRebufferingWatermarkHighKB(kNoWatermark) { }
+        : mInitialMarkMs(kNoMark),
+          mResumePlaybackMarkMs(kNoMark) { }
 
 status_t BufferingSettings::readFromParcel(const Parcel* parcel) {
     if (parcel == nullptr) {
         return BAD_VALUE;
     }
-    mInitialBufferingMode = (BufferingMode)parcel->readInt32();
-    mRebufferingMode = (BufferingMode)parcel->readInt32();
-    mInitialWatermarkMs = parcel->readInt32();
-    mInitialWatermarkKB = parcel->readInt32();
-    mRebufferingWatermarkLowMs = parcel->readInt32();
-    mRebufferingWatermarkHighMs = parcel->readInt32();
-    mRebufferingWatermarkLowKB = parcel->readInt32();
-    mRebufferingWatermarkHighKB = parcel->readInt32();
+    mInitialMarkMs = parcel->readInt32();
+    mResumePlaybackMarkMs = parcel->readInt32();
 
     return OK;
 }
@@ -68,26 +41,17 @@ status_t BufferingSettings::writeToParcel(Parcel* parcel) const {
     if (parcel == nullptr) {
         return BAD_VALUE;
     }
-    parcel->writeInt32(mInitialBufferingMode);
-    parcel->writeInt32(mRebufferingMode);
-    parcel->writeInt32(mInitialWatermarkMs);
-    parcel->writeInt32(mInitialWatermarkKB);
-    parcel->writeInt32(mRebufferingWatermarkLowMs);
-    parcel->writeInt32(mRebufferingWatermarkHighMs);
-    parcel->writeInt32(mRebufferingWatermarkLowKB);
-    parcel->writeInt32(mRebufferingWatermarkHighKB);
+    parcel->writeInt32(mInitialMarkMs);
+    parcel->writeInt32(mResumePlaybackMarkMs);
 
     return OK;
 }
 
 String8 BufferingSettings::toString() const {
     String8 s;
-    s.appendFormat("initialMode(%d), rebufferingMode(%d), "
-            "initialMarks(%d ms, %d KB), rebufferingMarks(%d, %d)ms, (%d, %d)KB",
-            mInitialBufferingMode, mRebufferingMode,
-            mInitialWatermarkMs, mInitialWatermarkKB,
-            mRebufferingWatermarkLowMs, mRebufferingWatermarkHighMs,
-            mRebufferingWatermarkLowKB, mRebufferingWatermarkHighKB);
+    s.appendFormat(
+            "initialMarks(%d ms), resumePlaybackMarks(%d ms)",
+            mInitialMarkMs, mResumePlaybackMarkMs);
     return s;
 }
 

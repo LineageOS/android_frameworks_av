@@ -15,7 +15,7 @@
  */
 
 
-#define LOG_TAG "AAudio"
+#define LOG_TAG "AAudioBinderClient"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -61,11 +61,11 @@ AAudioBinderClient::AAudioBinderClient()
         , Singleton<AAudioBinderClient>() {
     gKeepBinderClient = this; // so this singleton won't get deleted
     mAAudioClient = new AAudioClient(this);
-    ALOGV("AAudioBinderClient() this = %p, created mAAudioClient = %p", this, mAAudioClient.get());
+    ALOGV("%s - this = %p, created mAAudioClient = %p", __func__, this, mAAudioClient.get());
 }
 
 AAudioBinderClient::~AAudioBinderClient() {
-    ALOGV("AAudioBinderClient()::~AAudioBinderClient() destroying %p", this);
+    ALOGV("%s - destroying %p", __func__, this);
     Mutex::Autolock _l(mServiceLock);
     if (mAAudioService != 0) {
         IInterface::asBinder(mAAudioService)->unlinkToDeath(mAAudioClient);
@@ -137,7 +137,7 @@ aaudio_handle_t AAudioBinderClient::openStream(const AAudioStreamRequest &reques
         stream = service->openStream(request, configurationOutput);
 
         if (stream == AAUDIO_ERROR_NO_SERVICE) {
-            ALOGE("AAudioBinderClient::openStream lost connection to AAudioService.");
+            ALOGE("openStream lost connection to AAudioService.");
             dropAAudioService(); // force a reconnect
         } else {
             break;

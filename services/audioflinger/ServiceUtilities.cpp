@@ -30,6 +30,8 @@
 
 namespace android {
 
+static const String16 sAndroidPermissionRecordAudio("android.permission.RECORD_AUDIO");
+
 // Not valid until initialized by AudioFlinger constructor.  It would have to be
 // re-initialized if the process containing AudioFlinger service forks (which it doesn't).
 // This is often used to validate binder interface calls within audioserver
@@ -48,26 +50,11 @@ bool isTrustedCallingUid(uid_t uid) {
     }
 }
 
-bool recordingAllowed(const String16& opPackageName, pid_t pid, uid_t uid) {
-    // we're always OK.
-    if (getpid_cached == IPCThreadState::self()->getCallingPid()) return true;
-
-    static const String16 sRecordAudio("android.permission.RECORD_AUDIO");
-
-    // We specify a pid and uid here as mediaserver (aka MediaRecorder or StageFrightRecorder)
-    // may open a record track on behalf of a client.  Note that pid may be a tid.
-    // IMPORTANT: Don't use PermissionCache - a runtime permission and may change.
-    const bool ok = checkPermission(sRecordAudio, pid, uid);
-    if (!ok) {
-        ALOGE("Request requires android.permission.RECORD_AUDIO");
-        return false;
+static String16 resolveCallingPackage(PermissionController& permissionController,
+        const String16& opPackageName, uid_t uid) {
+    if (opPackageName.size() > 0) {
+        return opPackageName;
     }
-
-    // To permit command-line native tests
-    if (uid == AID_ROOT) return true;
-
-    String16 checkedOpPackageName = opPackageName;
-
     // In some cases the calling code has no access to the package it runs under.
     // For example, code using the wilhelm framework's OpenSL-ES APIs. In this
     // case we will get the packages for the calling UID and pick the first one
@@ -75,40 +62,89 @@ bool recordingAllowed(const String16& opPackageName, pid_t pid, uid_t uid) {
     // as for legacy apps we will toggle the app op for all packages in the UID.
     // The caveat is that the operation may be attributed to the wrong package and
     // stats based on app ops may be slightly off.
-    if (checkedOpPackageName.size() <= 0) {
-        sp<IServiceManager> sm = defaultServiceManager();
-        sp<IBinder> binder = sm->getService(String16("permission"));
-        if (binder == 0) {
-            ALOGE("Cannot get permission service");
-            return false;
-        }
+    Vector<String16> packages;
+    permissionController.getPackagesForUid(uid, packages);
+    if (packages.isEmpty()) {
+        ALOGE("No packages for uid %d", uid);
+        return opPackageName; // empty string
+    }
+    return packages[0];
+}
 
-        sp<IPermissionController> permCtrl = interface_cast<IPermissionController>(binder);
-        Vector<String16> packages;
+static inline bool isAudioServerOrRoot(uid_t uid) {
+    // AID_ROOT is OK for command-line tests.  Native unforked audioserver always OK.
+    return uid == AID_ROOT || uid == AID_AUDIOSERVER ;
+}
 
-        permCtrl->getPackagesForUid(uid, packages);
+static bool checkRecordingInternal(const String16& opPackageName, pid_t pid,
+        uid_t uid, bool start) {
+    // Okay to not track in app ops as audio server is us and if
+    // device is rooted security model is considered compromised.
+    if (isAudioServerOrRoot(uid)) return true;
 
-        if (packages.isEmpty()) {
-            ALOGE("No packages for calling UID");
-            return false;
-        }
-        checkedOpPackageName = packages[0];
+    // We specify a pid and uid here as mediaserver (aka MediaRecorder or StageFrightRecorder)
+    // may open a record track on behalf of a client.  Note that pid may be a tid.
+    // IMPORTANT: DON'T USE PermissionCache - RUNTIME PERMISSIONS CHANGE.
+    PermissionController permissionController;
+    const bool ok = permissionController.checkPermission(sAndroidPermissionRecordAudio, pid, uid);
+    if (!ok) {
+        ALOGE("Request requires %s", String8(sAndroidPermissionRecordAudio).c_str());
+        return false;
+    }
+
+    String16 resolvedOpPackageName = resolveCallingPackage(
+            permissionController, opPackageName, uid);
+    if (resolvedOpPackageName.size() == 0) {
+        return false;
     }
 
     AppOpsManager appOps;
-    if (appOps.noteOp(AppOpsManager::OP_RECORD_AUDIO, uid, checkedOpPackageName)
-            != AppOpsManager::MODE_ALLOWED) {
-        ALOGE("Request denied by app op OP_RECORD_AUDIO");
-        return false;
+    const int32_t op = appOps.permissionToOpCode(sAndroidPermissionRecordAudio);
+    if (start) {
+        if (appOps.startOpNoThrow(op, uid, resolvedOpPackageName, /*startIfModeDefault*/ false)
+                != AppOpsManager::MODE_ALLOWED) {
+            ALOGE("Request denied by app op: %d", op);
+            return false;
+        }
+    } else {
+        if (appOps.noteOp(op, uid, resolvedOpPackageName) != AppOpsManager::MODE_ALLOWED) {
+            ALOGE("Request denied by app op: %d", op);
+            return false;
+        }
     }
 
     return true;
 }
 
+bool recordingAllowed(const String16& opPackageName, pid_t pid, uid_t uid) {
+    return checkRecordingInternal(opPackageName, pid, uid, /*start*/ false);
+}
+
+bool startRecording(const String16& opPackageName, pid_t pid, uid_t uid) {
+     return checkRecordingInternal(opPackageName, pid, uid, /*start*/ true);
+}
+
+void finishRecording(const String16& opPackageName, uid_t uid) {
+    // Okay to not track in app ops as audio server is us and if
+    // device is rooted security model is considered compromised.
+    if (isAudioServerOrRoot(uid)) return;
+
+    PermissionController permissionController;
+    String16 resolvedOpPackageName = resolveCallingPackage(
+            permissionController, opPackageName, uid);
+    if (resolvedOpPackageName.size() == 0) {
+        return;
+    }
+
+    AppOpsManager appOps;
+    const int32_t op = appOps.permissionToOpCode(sAndroidPermissionRecordAudio);
+    appOps.finishOp(op, uid, resolvedOpPackageName);
+}
+
 bool captureAudioOutputAllowed(pid_t pid, uid_t uid) {
     if (getpid_cached == IPCThreadState::self()->getCallingPid()) return true;
     static const String16 sCaptureAudioOutput("android.permission.CAPTURE_AUDIO_OUTPUT");
-    bool ok = checkPermission(sCaptureAudioOutput, pid, uid);
+    bool ok = PermissionCache::checkPermission(sCaptureAudioOutput, pid, uid);
     if (!ok) ALOGE("Request requires android.permission.CAPTURE_AUDIO_OUTPUT");
     return ok;
 }
@@ -150,6 +186,13 @@ bool dumpAllowed() {
     bool ok = PermissionCache::checkCallingPermission(sDump);
     // convention is for caller to dump an error message to fd instead of logging here
     //if (!ok) ALOGE("Request requires android.permission.DUMP");
+    return ok;
+}
+
+bool modifyPhoneStateAllowed(pid_t pid, uid_t uid) {
+    static const String16 sModifyPhoneState("android.permission.MODIFY_PHONE_STATE");
+    bool ok = PermissionCache::checkPermission(sModifyPhoneState, pid, uid);
+    if (!ok) ALOGE("Request requires android.permission.MODIFY_PHONE_STATE");
     return ok;
 }
 

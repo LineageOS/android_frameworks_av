@@ -1,4 +1,6 @@
-cc_library_shared {
+// TODO: change it back to cc_library_shared when there is a way to
+// expose media metrics as stable API.
+cc_library {
     name: "libmediametrics",
 
     srcs: [

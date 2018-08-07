@@ -25,20 +25,22 @@
 
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
-#include <binder/MemoryDealer.h>
+#include <cutils/properties.h>
+#include <media/DataSource.h>
 #include <media/IMediaHTTPService.h>
-#include <media/IMediaCodecService.h>
+#include <media/MediaExtractor.h>
+#include <media/MediaSource.h>
+#include <media/OMXBuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
-#include <media/stagefright/DataSource.h>
+#include <media/stagefright/DataSourceFactory.h>
+#include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaExtractor.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/SimpleDecodingSource.h>
-#include <media/OMXBuffer.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
 #include <media/omx/1.0/WOmx.h>
 #include <system/window.h>
@@ -67,7 +69,7 @@ void Harness::CodecObserver::onMessages(const std::list<omx_message> &messages) 
 /////////////////////////////////////////////////////////////////////
 
 Harness::Harness()
-    : mInitCheck(NO_INIT), mUseTreble(false) {
+    : mInitCheck(NO_INIT) {
     mInitCheck = initOMX();
 }
 
@@ -79,21 +81,12 @@ status_t Harness::initCheck() const {
 }
 
 status_t Harness::initOMX() {
-    if (property_get_bool("persist.media.treble_omx", true)) {
-        using namespace ::android::hardware::media::omx::V1_0;
-        sp<IOmx> tOmx = IOmx::getService();
-        if (tOmx == nullptr) {
-            return NO_INIT;
-        }
-        mOMX = new utils::LWOmx(tOmx);
-        mUseTreble = true;
-    } else {
-        sp<IServiceManager> sm = defaultServiceManager();
-        sp<IBinder> binder = sm->getService(String16("media.codec"));
-        sp<IMediaCodecService> service = interface_cast<IMediaCodecService>(binder);
-        mOMX = service->getOMX();
-        mUseTreble = false;
+    using namespace ::android::hardware::media::omx::V1_0;
+    sp<IOmx> tOmx = IOmx::getService();
+    if (tOmx == nullptr) {
+        return NO_INIT;
     }
+    mOMX = new utils::LWOmx(tOmx);
 
     return mOMX != 0 ? OK : NO_INIT;
 }
@@ -221,25 +214,19 @@ status_t Harness::allocatePortBuffers(
     for (OMX_U32 i = 0; i < def.nBufferCountActual; ++i) {
         Buffer buffer;
         buffer.mFlags = 0;
-        if (mUseTreble) {
-            bool success;
-            auto transStatus = mAllocator->allocate(def.nBufferSize,
-                    [&success, &buffer](
-                            bool s,
-                            hidl_memory const& m) {
-                        success = s;
-                        buffer.mHidlMemory = m;
-                    });
-            EXPECT(transStatus.isOk(),
-                    "Cannot call allocator");
-            EXPECT(success,
-                    "Cannot allocate memory");
-            err = mOMXNode->useBuffer(portIndex, buffer.mHidlMemory, &buffer.mID);
-        } else {
-            buffer.mMemory = mDealer->allocate(def.nBufferSize);
-            CHECK(buffer.mMemory != NULL);
-            err = mOMXNode->useBuffer(portIndex, buffer.mMemory, &buffer.mID);
-        }
+        bool success;
+        auto transStatus = mAllocator->allocate(def.nBufferSize,
+                [&success, &buffer](
+                        bool s,
+                        hidl_memory const& m) {
+                    success = s;
+                    buffer.mHidlMemory = m;
+                });
+        EXPECT(transStatus.isOk(),
+                "Cannot call allocator");
+        EXPECT(success,
+                "Cannot allocate memory");
+        err = mOMXNode->useBuffer(portIndex, buffer.mHidlMemory, &buffer.mID);
 
         EXPECT_SUCCESS(err, "useBuffer");
 
@@ -291,13 +278,13 @@ private:
 
 static sp<IMediaExtractor> CreateExtractorFromURI(const char *uri) {
     sp<DataSource> source =
-        DataSource::CreateFromURI(NULL /* httpService */, uri);
+        DataSourceFactory::CreateFromURI(NULL /* httpService */, uri);
 
     if (source == NULL) {
         return NULL;
     }
 
-    return MediaExtractor::Create(source);
+    return MediaExtractorFactory::Create(source);
 }
 
 status_t Harness::testStateTransitions(
@@ -308,13 +295,11 @@ status_t Harness::testStateTransitions(
         return OK;
     }
 
-    if (mUseTreble) {
-        mAllocator = IAllocator::getService("ashmem");
-        EXPECT(mAllocator != nullptr,
-                "Cannot obtain hidl AshmemAllocator");
-    } else {
-        mDealer = new MemoryDealer(16 * 1024 * 1024, "OMXHarness");
-    }
+    mAllocator = IAllocator::getService("ashmem");
+    EXPECT(mAllocator != nullptr,
+            "Cannot obtain hidl AshmemAllocator");
+    // TODO: When Treble has MemoryHeap/MemoryDealer, we should specify the heap
+    // size to be 16 * 1024 * 1024.
 
     sp<CodecObserver> observer = new CodecObserver(this, ++mCurGeneration);
 
@@ -543,7 +528,7 @@ static const char *GetURLForMime(const char *mime) {
     return NULL;
 }
 
-static sp<IMediaSource> CreateSourceForMime(const char *mime) {
+static sp<MediaSource> CreateSourceForMime(const char *mime) {
     const char *url = GetURLForMime(mime);
 
     if (url == NULL) {
@@ -564,7 +549,7 @@ static sp<IMediaSource> CreateSourceForMime(const char *mime) {
         CHECK(meta->findCString(kKeyMIMEType, &trackMime));
 
         if (!strcasecmp(mime, trackMime)) {
-            return extractor->getTrack(i);
+            return CreateMediaSourceFromIMediaSource(extractor->getTrack(i));
         }
     }
 
@@ -610,7 +595,7 @@ status_t Harness::testSeek(
         return OK;
     }
 
-    sp<IMediaSource> source = CreateSourceForMime(mime);
+    sp<MediaSource> source = CreateSourceForMime(mime);
 
     if (source == NULL) {
         printf("  * Unable to open test content for type '%s', "
@@ -620,14 +605,14 @@ status_t Harness::testSeek(
         return OK;
     }
 
-    sp<IMediaSource> seekSource = CreateSourceForMime(mime);
+    sp<MediaSource> seekSource = CreateSourceForMime(mime);
     if (source == NULL || seekSource == NULL) {
         return UNKNOWN_ERROR;
     }
 
     CHECK_EQ(seekSource->start(), (status_t)OK);
 
-    sp<IMediaSource> codec = SimpleDecodingSource::Create(
+    sp<MediaSource> codec = SimpleDecodingSource::Create(
             source, 0 /* flags */, NULL /* nativeWindow */, componentName);
 
     CHECK(codec != NULL);
@@ -673,7 +658,7 @@ status_t Harness::testSeek(
                      requestedSeekTimeUs, requestedSeekTimeUs / 1E6);
             }
 
-            MediaBuffer *buffer = NULL;
+            MediaBufferBase *buffer = NULL;
             options.setSeekTo(
                     requestedSeekTimeUs, MediaSource::ReadOptions::SEEK_NEXT_SYNC);
 
@@ -682,7 +667,7 @@ status_t Harness::testSeek(
                 actualSeekTimeUs = -1;
             } else {
                 CHECK(buffer != NULL);
-                CHECK(buffer->meta_data()->findInt64(kKeyTime, &actualSeekTimeUs));
+                CHECK(buffer->meta_data().findInt64(kKeyTime, &actualSeekTimeUs));
                 CHECK(actualSeekTimeUs >= 0);
 
                 buffer->release();
@@ -694,7 +679,7 @@ status_t Harness::testSeek(
         }
 
         status_t err;
-        MediaBuffer *buffer;
+        MediaBufferBase *buffer;
         for (;;) {
             err = codec->read(&buffer, &options);
             options.clearSeekTo();
@@ -743,7 +728,7 @@ status_t Harness::testSeek(
             CHECK(buffer != NULL);
 
             int64_t bufferTimeUs;
-            CHECK(buffer->meta_data()->findInt64(kKeyTime, &bufferTimeUs));
+            CHECK(buffer->meta_data().findInt64(kKeyTime, &bufferTimeUs));
             if (!CloseEnough(bufferTimeUs, actualSeekTimeUs)) {
                 printf("\n  * Attempted seeking to %" PRId64 " us (%.2f secs)",
                        requestedSeekTimeUs, requestedSeekTimeUs / 1E6);

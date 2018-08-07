@@ -24,6 +24,7 @@ class RecordTrack : public TrackBase {
 public:
                         RecordTrack(RecordThread *thread,
                                 const sp<Client>& client,
+                                const audio_attributes_t& attr,
                                 uint32_t sampleRate,
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
@@ -63,6 +64,11 @@ public:
 
     virtual bool        isFastTrack() const { return (mFlags & AUDIO_INPUT_FLAG_FAST) != 0; }
 
+            void        setSilenced(bool silenced) { if (!isPatchTrack()) mSilenced = silenced; }
+            bool        isSilenced() const { return mSilenced; }
+
+            status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+
 private:
     friend class AudioFlinger;  // for mState
 
@@ -91,6 +97,8 @@ private:
             // used by the record thread to convert frames to proper destination format
             RecordBufferConverter              *mRecordBufferConverter;
             audio_input_flags_t                mFlags;
+
+            bool                               mSilenced;
 };
 
 // playback track, used by PatchPanel

@@ -27,16 +27,10 @@ public:
     OMXClient();
 
     status_t connect();
-    status_t connect(bool* trebleFlag);
-    status_t connect(const char* name, bool* trebleFlag = nullptr);
-
-    status_t connectLegacy();
-    status_t connectTreble(const char* name = "default");
+    status_t connect(const char* name);
     void disconnect();
 
-    sp<IOMX> interface() {
-        return mOMX;
-    }
+    sp<IOMX> interface();
 
 private:
     sp<IOMX> mOMX;

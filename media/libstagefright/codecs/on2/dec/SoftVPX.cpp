@@ -30,7 +30,9 @@ namespace android {
 
 // Only need to declare the highest supported profile and level here.
 static const CodecProfileLevel kVP9ProfileLevels[] = {
-    { OMX_VIDEO_VP9Profile0, OMX_VIDEO_VP9Level5  },
+    { OMX_VIDEO_VP9Profile0, OMX_VIDEO_VP9Level5 },
+    { OMX_VIDEO_VP9Profile2, OMX_VIDEO_VP9Level5 },
+    { OMX_VIDEO_VP9Profile2HDR, OMX_VIDEO_VP9Level5 },
 };
 
 SoftVPX::SoftVPX(
@@ -76,6 +78,10 @@ static int GetCPUCoreCount() {
     CHECK(cpuCoreCount >= 1);
     ALOGV("Number of CPU cores: %d", cpuCoreCount);
     return cpuCoreCount;
+}
+
+bool SoftVPX::supportDescribeHdrStaticInfo() {
+    return true;
 }
 
 status_t SoftVPX::initDecoder() {
@@ -146,15 +152,21 @@ bool SoftVPX::outputBuffers(bool flushDecoder, bool display, bool eos, bool *por
         uint32_t height = mImg->d_h;
         outInfo = *outQueue.begin();
         outHeader = outInfo->mHeader;
-        CHECK_EQ(mImg->fmt, VPX_IMG_FMT_I420);
-        handlePortSettingsChange(portWillReset, width, height);
+        CHECK(mImg->fmt == VPX_IMG_FMT_I420 || mImg->fmt == VPX_IMG_FMT_I42016);
+        OMX_COLOR_FORMATTYPE outputColorFormat = OMX_COLOR_FormatYUV420Planar;
+        int32_t bpp = 1;
+        if (mImg->fmt == VPX_IMG_FMT_I42016) {
+            outputColorFormat = OMX_COLOR_FormatYUV420Planar16;
+            bpp = 2;
+        }
+        handlePortSettingsChange(portWillReset, width, height, outputColorFormat);
         if (*portWillReset) {
             return true;
         }
 
         outHeader->nOffset = 0;
         outHeader->nFlags = 0;
-        outHeader->nFilledLen = (outputBufferWidth() * outputBufferHeight() * 3) / 2;
+        outHeader->nFilledLen = (outputBufferWidth() * outputBufferHeight() * bpp * 3) / 2;
         outHeader->nTimeStamp = *(OMX_TICKS *)mImg->user_priv;
         if (outputBufferSafe(outHeader)) {
             uint8_t *dst = outHeader->pBuffer;

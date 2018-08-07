@@ -235,7 +235,7 @@ ACameraMetadata::getTags(/*out*/int32_t* numTags,
 }
 
 const CameraMetadata&
-ACameraMetadata::getInternalData() {
+ACameraMetadata::getInternalData() const {
     return mData;
 }
 
@@ -305,6 +305,7 @@ ACameraMetadata::isCaptureRequestTag(const uint32_t tag) {
         case ACAMERA_STATISTICS_FACE_DETECT_MODE:
         case ACAMERA_STATISTICS_HOT_PIXEL_MAP_MODE:
         case ACAMERA_STATISTICS_LENS_SHADING_MAP_MODE:
+        case ACAMERA_STATISTICS_OIS_DATA_MODE:
         case ACAMERA_TONEMAP_CURVE_BLUE:
         case ACAMERA_TONEMAP_CURVE_GREEN:
         case ACAMERA_TONEMAP_CURVE_RED:
@@ -312,6 +313,7 @@ ACameraMetadata::isCaptureRequestTag(const uint32_t tag) {
         case ACAMERA_TONEMAP_GAMMA:
         case ACAMERA_TONEMAP_PRESET_CURVE:
         case ACAMERA_BLACK_LEVEL_LOCK:
+        case ACAMERA_DISTORTION_CORRECTION_MODE:
             return true;
         default:
             return false;

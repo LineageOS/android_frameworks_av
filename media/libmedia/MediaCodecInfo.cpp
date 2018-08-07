@@ -141,6 +141,10 @@ bool MediaCodecInfo::isEncoder() const {
     return mIsEncoder;
 }
 
+uint32_t MediaCodecInfo::rank() const {
+    return mRank;
+}
+
 void MediaCodecInfo::getSupportedMimes(Vector<AString> *mimes) const {
     mimes->clear();
     for (size_t ix = 0; ix < mCaps.size(); ix++) {
@@ -170,10 +174,12 @@ sp<MediaCodecInfo> MediaCodecInfo::FromParcel(const Parcel &parcel) {
     AString name = AString::FromParcel(parcel);
     AString owner = AString::FromParcel(parcel);
     bool isEncoder = static_cast<bool>(parcel.readInt32());
+    uint32_t rank = parcel.readUint32();
     sp<MediaCodecInfo> info = new MediaCodecInfo;
     info->mName = name;
     info->mOwner = owner;
     info->mIsEncoder = isEncoder;
+    info->mRank = rank;
     size_t size = static_cast<size_t>(parcel.readInt32());
     for (size_t i = 0; i < size; i++) {
         AString mime = AString::FromParcel(parcel);
@@ -191,6 +197,7 @@ status_t MediaCodecInfo::writeToParcel(Parcel *parcel) const {
     mName.writeToParcel(parcel);
     mOwner.writeToParcel(parcel);
     parcel->writeInt32(mIsEncoder);
+    parcel->writeUint32(mRank);
     parcel->writeInt32(mCaps.size());
     for (size_t i = 0; i < mCaps.size(); i++) {
         mCaps.keyAt(i).writeToParcel(parcel);
@@ -210,7 +217,7 @@ ssize_t MediaCodecInfo::getCapabilityIndex(const char *mime) const {
     return -1;
 }
 
-MediaCodecInfo::MediaCodecInfo() {
+MediaCodecInfo::MediaCodecInfo() : mRank(0x100) {
 }
 
 void MediaCodecInfoWriter::setName(const char* name) {
@@ -223,6 +230,10 @@ void MediaCodecInfoWriter::setOwner(const char* owner) {
 
 void MediaCodecInfoWriter::setEncoder(bool isEncoder) {
     mInfo->mIsEncoder = isEncoder;
+}
+
+void MediaCodecInfoWriter::setRank(uint32_t rank) {
+    mInfo->mRank = rank;
 }
 
 std::unique_ptr<MediaCodecInfo::CapabilitiesWriter>

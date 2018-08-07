@@ -19,13 +19,12 @@
 
 #include "AnotherPacketSource.h"
 
-#include "include/avc_utils.h"
-
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/hexdump.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
@@ -164,7 +163,7 @@ void AnotherPacketSource::requeueAccessUnit(const sp<ABuffer> &buffer) {
 }
 
 status_t AnotherPacketSource::read(
-        MediaBuffer **out, const ReadOptions *) {
+        MediaBufferBase **out, const ReadOptions *) {
     *out = NULL;
 
     Mutex::Autolock autoLock(mLock);
@@ -203,24 +202,24 @@ status_t AnotherPacketSource::read(
             seg.mMaxDequeTimeUs = timeUs;
         }
 
-        MediaBuffer *mediaBuffer = new MediaBuffer(buffer);
-        sp<MetaData> bufmeta = mediaBuffer->meta_data();
+        MediaBufferBase *mediaBuffer = new MediaBuffer(buffer);
+        MetaDataBase &bufmeta = mediaBuffer->meta_data();
 
-        bufmeta->setInt64(kKeyTime, timeUs);
+        bufmeta.setInt64(kKeyTime, timeUs);
 
         int32_t isSync;
         if (buffer->meta()->findInt32("isSync", &isSync)) {
-            bufmeta->setInt32(kKeyIsSyncFrame, isSync);
+            bufmeta.setInt32(kKeyIsSyncFrame, isSync);
         }
 
         sp<ABuffer> sei;
         if (buffer->meta()->findBuffer("sei", &sei) && sei != NULL) {
-            bufmeta->setData(kKeySEI, 0, sei->data(), sei->size());
+            bufmeta.setData(kKeySEI, 0, sei->data(), sei->size());
         }
 
         sp<ABuffer> mpegUserData;
-        if (buffer->meta()->findBuffer("mpegUserData", &mpegUserData) && mpegUserData != NULL) {
-            bufmeta->setData(
+        if (buffer->meta()->findBuffer("mpeg-user-data", &mpegUserData) && mpegUserData != NULL) {
+            bufmeta.setData(
                     kKeyMpegUserData, 0, mpegUserData->data(), mpegUserData->size());
         }
 
@@ -235,18 +234,18 @@ status_t AnotherPacketSource::read(
             CHECK(buffer->meta()->findBuffer("encBytes", &encBytesBuffer)
                     && encBytesBuffer != NULL);
 
-            bufmeta->setInt32(kKeyCryptoMode, cryptoMode);
+            bufmeta.setInt32(kKeyCryptoMode, cryptoMode);
 
             uint8_t array[16] = {0};
-            bufmeta->setData(kKeyCryptoIV, 0, array, 16);
+            bufmeta.setData(kKeyCryptoIV, 0, array, 16);
 
             array[0] = (uint8_t) (cryptoKey & 0xff);
-            bufmeta->setData(kKeyCryptoKey, 0, array, 16);
+            bufmeta.setData(kKeyCryptoKey, 0, array, 16);
 
-            bufmeta->setData(kKeyPlainSizes, 0,
+            bufmeta.setData(kKeyPlainSizes, 0,
                     clearBytesBuffer->data(), clearBytesBuffer->size());
 
-            bufmeta->setData(kKeyEncryptedSizes, 0,
+            bufmeta.setData(kKeyEncryptedSizes, 0,
                     encBytesBuffer->data(), encBytesBuffer->size());
         }
 
@@ -663,7 +662,7 @@ sp<AMessage> AnotherPacketSource::trimBuffersBeforeMeta(
                         && !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC);
             }
         }
-        if (isAvc && !IsIDR(buffer)) {
+        if (isAvc && !IsIDR(buffer->data(), buffer->size())) {
             continue;
         }
 

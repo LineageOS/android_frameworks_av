@@ -25,11 +25,11 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/Utils.h>
 
-#include <media/IMediaHTTPConnection.h>
+#include <media/MediaHTTPConnection.h>
 
 namespace android {
 
-MediaHTTP::MediaHTTP(const sp<IMediaHTTPConnection> &conn)
+MediaHTTP::MediaHTTP(const sp<MediaHTTPConnection> &conn)
     : mInitCheck((conn != NULL) ? OK : NO_INIT),
       mHTTPConnection(conn),
       mCachedSizeValid(false),
@@ -174,12 +174,6 @@ sp<DecryptHandle> MediaHTTP::DrmInitialization(const char* mime) {
     }
 
     return mDecryptHandle;
-}
-
-void MediaHTTP::getDrmInfo(
-        sp<DecryptHandle> &handle, DrmManagerClient **client) {
-    handle = mDecryptHandle;
-    *client = mDrmManagerClient;
 }
 
 String8 MediaHTTP::getUri() {

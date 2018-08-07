@@ -20,9 +20,9 @@
 
 #include "../include/ID3.h"
 
+#include <media/DataSource.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/DataSource.h>
-#include <media/stagefright/Utils.h>
+#include <media/stagefright/foundation/ByteUtils.h>
 #include <utils/String8.h>
 #include <byteswap.h>
 
@@ -30,7 +30,7 @@ namespace android {
 
 static const size_t kMaxMetadataSize = 3 * 1024 * 1024;
 
-struct MemorySource : public DataSource {
+struct MemorySource : public DataSourceBase {
     MemorySource(const uint8_t *data, size_t size)
         : mData(data),
           mSize(size) {
@@ -56,7 +56,7 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(MemorySource);
 };
 
-ID3::ID3(const sp<DataSource> &source, bool ignoreV1, off64_t offset)
+ID3::ID3(DataSourceBase *source, bool ignoreV1, off64_t offset)
     : mIsValid(false),
       mData(NULL),
       mSize(0),
@@ -77,7 +77,7 @@ ID3::ID3(const uint8_t *data, size_t size, bool ignoreV1)
       mFirstFrameOffset(0),
       mVersion(ID3_UNKNOWN),
       mRawSize(0) {
-    sp<MemorySource> source = new (std::nothrow) MemorySource(data, size);
+    MemorySource *source = new (std::nothrow) MemorySource(data, size);
 
     if (source == NULL)
         return;
@@ -87,6 +87,7 @@ ID3::ID3(const uint8_t *data, size_t size, bool ignoreV1)
     if (!mIsValid && !ignoreV1) {
         mIsValid = parseV1(source);
     }
+    delete source;
 }
 
 ID3::~ID3() {
@@ -118,7 +119,7 @@ bool ID3::ParseSyncsafeInteger(const uint8_t encoded[4], size_t *x) {
     return true;
 }
 
-bool ID3::parseV2(const sp<DataSource> &source, off64_t offset) {
+bool ID3::parseV2(DataSourceBase *source, off64_t offset) {
 struct id3_header {
     char id[3];
     uint8_t version_major;
@@ -328,12 +329,25 @@ struct id3_header {
 }
 
 void ID3::removeUnsynchronization() {
-    for (size_t i = 0; i + 1 < mSize; ++i) {
-        if (mData[i] == 0xff && mData[i + 1] == 0x00) {
-            memmove(&mData[i + 1], &mData[i + 2], mSize - i - 2);
-            --mSize;
+
+    // This file has "unsynchronization", so we have to replace occurrences
+    // of 0xff 0x00 with just 0xff in order to get the real data.
+
+    size_t writeOffset = 1;
+    for (size_t readOffset = 1; readOffset < mSize; ++readOffset) {
+        if (mData[readOffset - 1] == 0xff && mData[readOffset] == 0x00) {
+            continue;
         }
+        // Only move data if there's actually something to move.
+        // This handles the special case of the data being only [0xff, 0x00]
+        // which should be converted to just 0xff if unsynchronization is on.
+        mData[writeOffset++] = mData[readOffset];
     }
+
+    if (writeOffset < mSize) {
+        mSize = writeOffset;
+    }
+
 }
 
 static void WriteSyncsafeInteger(uint8_t *dst, size_t x) {
@@ -392,7 +406,12 @@ bool ID3::removeUnsynchronizationV2_4(bool iTunesHack) {
                     --mSize;
                     --dataSize;
                 }
-                mData[writeOffset++] = mData[readOffset++];
+                if (i + 1 < dataSize) {
+                    // Only move data if there's actually something to move.
+                    // This handles the special case of the data being only [0xff, 0x00]
+                    // which should be converted to just 0xff if unsynchronization is on.
+                    mData[writeOffset++] = mData[readOffset++];
+                }
             }
             // move the remaining data following this frame
             if (readOffset <= oldSize) {
@@ -588,6 +607,9 @@ void ID3::Iterator::getstring(String8 *id, bool otherdata) const {
         // UCS-2
         // API wants number of characters, not number of bytes...
         int len = n / 2;
+        if (len == 0) {
+            return;
+        }
         const char16_t *framedata = (const char16_t *) (frameData + 1);
         char16_t *framedatacopy = NULL;
         if (*framedata == 0xfffe) {
@@ -955,7 +977,7 @@ ID3::getAlbumArt(size_t *length, String8 *mime) const {
     return NULL;
 }
 
-bool ID3::parseV1(const sp<DataSource> &source) {
+bool ID3::parseV1(DataSourceBase *source) {
     const size_t V1_TAG_SIZE = 128;
 
     off64_t size;

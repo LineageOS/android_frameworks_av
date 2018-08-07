@@ -67,10 +67,16 @@ std::string AAudioEndpointManager::dump() const {
 
         result << "Exclusive MMAP Endpoints: " << mExclusiveStreams.size() << "\n";
         index = 0;
-        for (const auto &output : mExclusiveStreams) {
+        for (const auto &stream : mExclusiveStreams) {
             result << "  #" << index++ << ":";
-            result << output->dump() << "\n";
+            result << stream->dump() << "\n";
         }
+
+        result << "  ExclusiveSearchCount:  " << mExclusiveSearchCount << "\n";
+        result << "  ExclusiveFoundCount:   " << mExclusiveFoundCount << "\n";
+        result << "  ExclusiveOpenCount:    " << mExclusiveOpenCount << "\n";
+        result << "  ExclusiveCloseCount:   " << mExclusiveCloseCount << "\n";
+        result << "\n";
 
         if (isExclusiveLocked) {
             mExclusiveLock.unlock();
@@ -79,10 +85,16 @@ std::string AAudioEndpointManager::dump() const {
 
     result << "Shared Endpoints: " << mSharedStreams.size() << "\n";
     index = 0;
-    for (const auto &input : mSharedStreams) {
+    for (const auto &stream : mSharedStreams) {
         result << "  #" << index++ << ":";
-        result << input->dump() << "\n";
+        result << stream->dump() << "\n";
     }
+
+    result << "  SharedSearchCount:     " << mSharedSearchCount << "\n";
+    result << "  SharedFoundCount:      " << mSharedFoundCount << "\n";
+    result << "  SharedOpenCount:       " << mSharedOpenCount << "\n";
+    result << "  SharedCloseCount:      " << mSharedCloseCount << "\n";
+    result << "\n";
 
     if (isSharedLocked) {
         mSharedLock.unlock();
@@ -95,15 +107,17 @@ std::string AAudioEndpointManager::dump() const {
 sp<AAudioServiceEndpoint> AAudioEndpointManager::findExclusiveEndpoint_l(
         const AAudioStreamConfiguration &configuration) {
     sp<AAudioServiceEndpoint> endpoint;
+    mExclusiveSearchCount++;
     for (const auto ep : mExclusiveStreams) {
         if (ep->matches(configuration)) {
+            mExclusiveFoundCount++;
             endpoint = ep;
             break;
         }
     }
 
-    ALOGV("AAudioEndpointManager.findExclusiveEndpoint_l(), found %p for device = %d",
-          endpoint.get(), configuration.getDeviceId());
+    ALOGV("findExclusiveEndpoint_l(), found %p for device = %d, sessionId = %d",
+          endpoint.get(), configuration.getDeviceId(), configuration.getSessionId());
     return endpoint;
 }
 
@@ -111,15 +125,17 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::findExclusiveEndpoint_l(
 sp<AAudioServiceEndpointShared> AAudioEndpointManager::findSharedEndpoint_l(
         const AAudioStreamConfiguration &configuration) {
     sp<AAudioServiceEndpointShared> endpoint;
+    mSharedSearchCount++;
     for (const auto ep  : mSharedStreams) {
         if (ep->matches(configuration)) {
+            mSharedFoundCount++;
             endpoint = ep;
             break;
         }
     }
 
-    ALOGV("AAudioEndpointManager.findSharedEndpoint_l(), found %p for device = %d",
-          endpoint.get(), configuration.getDeviceId());
+    ALOGV("findSharedEndpoint_l(), found %p for device = %d, sessionId = %d",
+          endpoint.get(), configuration.getDeviceId(), configuration.getSessionId());
     return endpoint;
 }
 
@@ -134,7 +150,7 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openEndpoint(AAudioService &aud
 }
 
 sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
-        AAudioService &aaudioService __unused,
+        AAudioService &aaudioService,
         const aaudio::AAudioStreamRequest &request) {
 
     std::lock_guard<std::mutex> lock(mExclusiveLock);
@@ -146,24 +162,23 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
 
     // If we find an existing one then this one cannot be exclusive.
     if (endpoint.get() != nullptr) {
-        ALOGE("AAudioEndpointManager.openExclusiveEndpoint() already in use");
+        ALOGW("openExclusiveEndpoint() already in use");
         // Already open so do not allow a second stream.
         return nullptr;
     } else {
-        sp<AAudioServiceEndpointMMAP> endpointMMap = new AAudioServiceEndpointMMAP();
-        ALOGE("AAudioEndpointManager.openEndpoint(),created MMAP %p", endpointMMap.get());
+        sp<AAudioServiceEndpointMMAP> endpointMMap = new AAudioServiceEndpointMMAP(aaudioService);
+        ALOGV("openExclusiveEndpoint(), no match so try to open MMAP %p for dev %d",
+              endpointMMap.get(), configuration.getDeviceId());
         endpoint = endpointMMap;
 
         aaudio_result_t result = endpoint->open(request);
         if (result != AAUDIO_OK) {
-            ALOGE("AAudioEndpointManager.openEndpoint(), open failed");
+            ALOGE("openExclusiveEndpoint(), open failed");
             endpoint.clear();
         } else {
             mExclusiveStreams.push_back(endpointMMap);
+            mExclusiveOpenCount++;
         }
-
-        ALOGD("AAudioEndpointManager.openEndpoint(), created %p for device = %d",
-              endpoint.get(), configuration.getDeviceId());
     }
 
     if (endpoint.get() != nullptr) {
@@ -203,14 +218,14 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openSharedEndpoint(
         if (endpoint.get() != nullptr) {
             aaudio_result_t result = endpoint->open(request);
             if (result != AAUDIO_OK) {
-                ALOGE("AAudioEndpointManager.openEndpoint(), open failed");
                 endpoint.clear();
             } else {
                 mSharedStreams.push_back(endpoint);
+                mSharedOpenCount++;
             }
         }
-        ALOGD("AAudioEndpointManager.openSharedEndpoint(), created %p for device = %d, dir = %d",
-              endpoint.get(), configuration.getDeviceId(), (int)direction);
+        ALOGV("%s(), created endpoint %p, requested device = %d, dir = %d",
+              __func__, endpoint.get(), configuration.getDeviceId(), (int)direction);
         IPCThreadState::self()->restoreCallingIdentity(token);
     }
 
@@ -239,15 +254,16 @@ void AAudioEndpointManager::closeExclusiveEndpoint(sp<AAudioServiceEndpoint> ser
     int32_t newRefCount = serviceEndpoint->getOpenCount() - 1;
     serviceEndpoint->setOpenCount(newRefCount);
 
-    // If no longer in use then close and delete it.
+    // If no longer in use then actually close it.
     if (newRefCount <= 0) {
         mExclusiveStreams.erase(
                 std::remove(mExclusiveStreams.begin(), mExclusiveStreams.end(), serviceEndpoint),
                 mExclusiveStreams.end());
 
         serviceEndpoint->close();
-        ALOGD("AAudioEndpointManager::closeExclusiveEndpoint() %p for device %d",
-              serviceEndpoint.get(), serviceEndpoint->getDeviceId());
+        mExclusiveCloseCount++;
+        ALOGV("%s() %p for device %d",
+              __func__, serviceEndpoint.get(), serviceEndpoint->getDeviceId());
     }
 }
 
@@ -261,14 +277,15 @@ void AAudioEndpointManager::closeSharedEndpoint(sp<AAudioServiceEndpoint> servic
     int32_t newRefCount = serviceEndpoint->getOpenCount() - 1;
     serviceEndpoint->setOpenCount(newRefCount);
 
-    // If no longer in use then close and delete it.
+    // If no longer in use then actually close it.
     if (newRefCount <= 0) {
         mSharedStreams.erase(
                 std::remove(mSharedStreams.begin(), mSharedStreams.end(), serviceEndpoint),
                 mSharedStreams.end());
 
         serviceEndpoint->close();
-        ALOGD("AAudioEndpointManager::closeSharedEndpoint() %p for device %d",
-              serviceEndpoint.get(), serviceEndpoint->getDeviceId());
+        mSharedCloseCount++;
+        ALOGV("%s() %p for device %d",
+              __func__, serviceEndpoint.get(), serviceEndpoint->getDeviceId());
     }
 }

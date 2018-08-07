@@ -40,7 +40,7 @@ struct NuPlayer::RTSPSource : public NuPlayer::Source {
             uid_t uid = 0,
             bool isSDP = false);
 
-    virtual status_t getDefaultBufferingSettings(
+    virtual status_t getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) override;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
 
@@ -71,7 +71,6 @@ private:
         kWhatPerformSeek     = 'seek',
         kWhatPollBuffering   = 'poll',
         kWhatSignalEOS       = 'eos ',
-        kWhatSetBufferingSettings = 'sBuS',
     };
 
     enum State {
@@ -109,6 +108,8 @@ private:
     bool mBuffering;
     bool mInPreparationPhase;
     bool mEOSPending;
+
+    Mutex mBufferingSettingsLock;
     BufferingSettings mBufferingSettings;
 
     sp<ALooper> mLooper;

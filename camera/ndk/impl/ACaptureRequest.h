@@ -45,8 +45,19 @@ struct ACameraOutputTargets {
 };
 
 struct ACaptureRequest {
+    camera_status_t setContext(void* ctx) {
+        context = ctx;
+        return ACAMERA_OK;
+    }
+
+    camera_status_t getContext(void** ctx) const {
+        *ctx = context;
+        return ACAMERA_OK;
+    }
+
     ACameraMetadata*      settings;
     ACameraOutputTargets* targets;
+    void*                 context;
 };
 
 #endif // _ACAPTURE_REQUEST_H

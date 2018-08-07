@@ -21,15 +21,13 @@
 #include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/foundation/MediaBufferBase.h>
 
 namespace android {
 
 MediaCodecBuffer::MediaCodecBuffer(const sp<AMessage> &format, const sp<ABuffer> &buffer)
     : mMeta(new AMessage),
       mFormat(format),
-      mBuffer(buffer),
-      mMediaBufferBase(nullptr) {
+      mBuffer(buffer) {
 }
 
 // ABuffer-like interface
@@ -56,20 +54,6 @@ size_t MediaCodecBuffer::offset() const {
 status_t MediaCodecBuffer::setRange(size_t offset, size_t size) {
     mBuffer->setRange(offset, size);
     return OK;
-}
-
-MediaBufferBase *MediaCodecBuffer::getMediaBufferBase() {
-    if (mMediaBufferBase != NULL) {
-        mMediaBufferBase->add_ref();
-    }
-    return mMediaBufferBase;
-}
-
-void MediaCodecBuffer::setMediaBufferBase(MediaBufferBase *mediaBuffer) {
-    if (mMediaBufferBase != NULL) {
-        mMediaBufferBase->release();
-    }
-    mMediaBufferBase = mediaBuffer;
 }
 
 sp<AMessage> MediaCodecBuffer::meta() {

@@ -13,6 +13,8 @@ cc_library_shared {
 
     cflags: ["-Wall", "-Werror"],
 
+    version_script: "exports.lds",
+
     include_dirs: [
         "frameworks/av/media/libstagefright/include",
         "frameworks/native/include/media/openmax",
@@ -32,7 +34,6 @@ cc_library_shared {
     static_libs: ["libvpx"],
 
     shared_libs: [
-        "libmedia_omx",
         "libstagefright_omx",
         "libstagefright_foundation",
         "libutils",

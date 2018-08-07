@@ -497,9 +497,6 @@ status_t AudioFlinger::PatchPanel::createPatchConnections(Patch *patch,
                                            patch->mPatchRecord->buffer(),
                                            patch->mPatchRecord->bufferSize(),
                                            AUDIO_OUTPUT_FLAG_NONE);
-    if (patch->mPatchTrack == 0) {
-        return NO_MEMORY;
-    }
     status = patch->mPatchTrack->initCheck();
     if (status != NO_ERROR) {
         return status;

@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+//#define LOG_NDEBUG 0
+#define LOG_TAG "SimpleDecodingSource"
+#include <utils/Log.h>
+
 #include <gui/Surface.h>
 
 #include <media/ICrypto.h>
@@ -36,14 +40,14 @@ const int64_t kTimeoutWaitForInputUs = 5000; // 5 milliseconds
 
 //static
 sp<SimpleDecodingSource> SimpleDecodingSource::Create(
-        const sp<IMediaSource> &source, uint32_t flags) {
+        const sp<MediaSource> &source, uint32_t flags) {
     return SimpleDecodingSource::Create(source, flags, nullptr, nullptr);
 }
 
 //static
 sp<SimpleDecodingSource> SimpleDecodingSource::Create(
-        const sp<IMediaSource> &source, uint32_t flags, const sp<ANativeWindow> &nativeWindow,
-        const char *desiredCodec) {
+        const sp<MediaSource> &source, uint32_t flags, const sp<ANativeWindow> &nativeWindow,
+        const char *desiredCodec, bool skipMediaCodecList) {
     sp<Surface> surface = static_cast<Surface*>(nativeWindow.get());
     const char *mime = NULL;
     sp<MetaData> meta = source->getFormat();
@@ -63,6 +67,33 @@ sp<SimpleDecodingSource> SimpleDecodingSource::Create(
     looper->start();
 
     sp<MediaCodec> codec;
+    auto configure = [=](const sp<MediaCodec> &codec, const AString &componentName)
+            -> sp<SimpleDecodingSource> {
+        if (codec != NULL) {
+            ALOGI("Successfully allocated codec '%s'", componentName.c_str());
+
+            status_t err = codec->configure(format, surface, NULL /* crypto */, 0 /* flags */);
+            sp<AMessage> outFormat;
+            if (err == OK) {
+                err = codec->getOutputFormat(&outFormat);
+            }
+            if (err == OK) {
+                return new SimpleDecodingSource(codec, source, looper,
+                        surface != NULL,
+                        strcmp(mime, MEDIA_MIMETYPE_AUDIO_VORBIS) == 0,
+                        outFormat);
+            }
+
+            ALOGD("Failed to configure codec '%s'", componentName.c_str());
+            codec->release();
+        }
+        return NULL;
+    };
+
+    if (skipMediaCodecList) {
+        codec = MediaCodec::CreateByComponentName(looper, desiredCodec);
+        return configure(codec, desiredCodec);
+    }
 
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
         const AString &componentName = matchingCodecs[i];
@@ -73,22 +104,10 @@ sp<SimpleDecodingSource> SimpleDecodingSource::Create(
         ALOGV("Attempting to allocate codec '%s'", componentName.c_str());
 
         codec = MediaCodec::CreateByComponentName(looper, componentName);
-        if (codec != NULL) {
-            ALOGI("Successfully allocated codec '%s'", componentName.c_str());
-
-            status_t err = codec->configure(format, surface, NULL /* crypto */, 0 /* flags */);
-            if (err == OK) {
-                err = codec->getOutputFormat(&format);
-            }
-            if (err == OK) {
-                return new SimpleDecodingSource(codec, source, looper,
-                        surface != NULL,
-                        strcmp(mime, MEDIA_MIMETYPE_AUDIO_VORBIS) == 0,
-                        format);
-            }
-
-            ALOGD("Failed to configure codec '%s'", componentName.c_str());
-            codec->release();
+        sp<SimpleDecodingSource> res = configure(codec, componentName);
+        if (res != NULL) {
+            return res;
+        } else {
             codec = NULL;
         }
     }
@@ -99,7 +118,7 @@ sp<SimpleDecodingSource> SimpleDecodingSource::Create(
 }
 
 SimpleDecodingSource::SimpleDecodingSource(
-        const sp<MediaCodec> &codec, const sp<IMediaSource> &source, const sp<ALooper> &looper,
+        const sp<MediaCodec> &codec, const sp<MediaSource> &source, const sp<ALooper> &looper,
         bool usingSurface, bool isVorbis, const sp<AMessage> &format)
     : mCodec(codec),
       mSource(source),
@@ -181,7 +200,7 @@ SimpleDecodingSource::ProtectedState::ProtectedState(const sp<AMessage> &format)
 }
 
 status_t SimpleDecodingSource::read(
-        MediaBuffer **buffer, const ReadOptions *options) {
+        MediaBufferBase **buffer, const ReadOptions *options) {
     *buffer = NULL;
 
     Mutexed<ProtectedState>::Locked me(mProtectedState);
@@ -202,7 +221,7 @@ status_t SimpleDecodingSource::read(
 }
 
 status_t SimpleDecodingSource::doRead(
-        Mutexed<ProtectedState>::Locked &me, MediaBuffer **buffer, const ReadOptions *options) {
+        Mutexed<ProtectedState>::Locked &me, MediaBufferBase **buffer, const ReadOptions *options) {
     // |me| is always locked on entry, but is allowed to be unlocked on exit
     CHECK_EQ(me->mState, STARTED);
 
@@ -212,7 +231,7 @@ status_t SimpleDecodingSource::doRead(
     status_t res;
 
     // flush codec on seek
-    IMediaSource::ReadOptions::SeekMode mode;
+    MediaSource::ReadOptions::SeekMode mode;
     if (options != NULL && options->getSeekTo(&out_pts, &mode)) {
         me->mQueuedInputEOS = false;
         me->mGotOutputEOS = false;
@@ -248,7 +267,7 @@ status_t SimpleDecodingSource::doRead(
                 return UNKNOWN_ERROR;
             }
 
-            MediaBuffer *in_buf;
+            MediaBufferBase *in_buf;
             while (true) {
                 in_buf = NULL;
                 me.unlock();
@@ -290,7 +309,7 @@ status_t SimpleDecodingSource::doRead(
 
             if (in_buf != NULL) {
                 int64_t timestampUs = 0;
-                CHECK(in_buf->meta_data()->findInt64(kKeyTime, &timestampUs));
+                CHECK(in_buf->meta_data().findInt64(kKeyTime, &timestampUs));
                 if (in_buf->range_length() + (mIsVorbis ? 4 : 0) > in_buffer->capacity()) {
                     ALOGW("'%s' received %zu input bytes for buffer of size %zu",
                             mComponentName.c_str(),
@@ -302,7 +321,7 @@ status_t SimpleDecodingSource::doRead(
 
                 if (mIsVorbis) {
                     int32_t numPageSamples;
-                    if (!in_buf->meta_data()->findInt32(kKeyValidSamples, &numPageSamples)) {
+                    if (!in_buf->meta_data().findInt32(kKeyValidSamples, &numPageSamples)) {
                         numPageSamples = -1;
                     }
                     memcpy(in_buffer->base() + cpLen, &numPageSamples, sizeof(numPageSamples));
@@ -374,7 +393,7 @@ status_t SimpleDecodingSource::doRead(
             *buffer = new MediaBuffer(out_size);
             CHECK_LE(out_buffer->size(), (*buffer)->size());
             memcpy((*buffer)->data(), out_buffer->data(), out_buffer->size());
-            (*buffer)->meta_data()->setInt64(kKeyTime, out_pts);
+            (*buffer)->meta_data().setInt64(kKeyTime, out_pts);
             mCodec->releaseOutputBuffer(out_ix);
         }
         return OK;

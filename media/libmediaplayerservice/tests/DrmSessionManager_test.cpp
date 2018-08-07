@@ -20,11 +20,11 @@
 
 #include <gtest/gtest.h>
 
-#include <media/Drm.h>
-#include <media/DrmSessionClientInterface.h>
-#include <media/DrmSessionManager.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/ProcessInfoInterface.h>
+#include <mediadrm/DrmHal.h>
+#include <mediadrm/DrmSessionClientInterface.h>
+#include <mediadrm/DrmSessionManager.h>
 
 namespace android {
 

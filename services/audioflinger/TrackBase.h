@@ -54,8 +54,14 @@ public:
         TYPE_PATCH,
     };
 
+    enum {
+        TRACK_NAME_PENDING = -1,
+        TRACK_NAME_FAILURE = -2,
+    };
+
                         TrackBase(ThreadBase *thread,
                                 const sp<Client>& client,
+                                const audio_attributes_t& mAttr,
                                 uint32_t sampleRate,
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
@@ -92,6 +98,7 @@ public:
     virtual void        invalidate() { mIsInvalid = true; }
             bool        isInvalid() const { return mIsInvalid; }
 
+    audio_attributes_t  attributes() const { return mAttr; }
 
 protected:
     DISALLOW_COPY_AND_ASSIGN(TrackBase);
@@ -183,6 +190,7 @@ protected:
     size_t              mBufferSize; // size of mBuffer in bytes
     // we don't really need a lock for these
     track_state         mState;
+    const audio_attributes_t mAttr;
     const uint32_t      mSampleRate;    // initial sample rate only; for tracks which
                         // support dynamic rates, the current value is in control block
     const audio_format_t mFormat;
@@ -192,7 +200,7 @@ protected:
                                     // where for AudioTrack (but not AudioRecord),
                                     // 8-bit PCM samples are stored as 16-bit
     const size_t        mFrameCount;// size of track buffer given at createTrack() or
-                                    // openRecord(), and then adjusted as needed
+                                    // createRecord(), and then adjusted as needed
 
     const audio_session_t mSessionId;
     uid_t               mUid;

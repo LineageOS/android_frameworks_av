@@ -18,6 +18,8 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <inttypes.h>
+#include <mutex>
 #include <time.h>
 #include <pthread.h>
 
@@ -175,11 +177,36 @@ AAUDIO_API void AAudioStreamBuilder_setSharingMode(AAudioStreamBuilder* builder,
     streamBuilder->setSharingMode(sharingMode);
 }
 
+AAUDIO_API void AAudioStreamBuilder_setUsage(AAudioStreamBuilder* builder,
+                                             aaudio_usage_t usage) {
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setUsage(usage);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setContentType(AAudioStreamBuilder* builder,
+                                                   aaudio_content_type_t contentType) {
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setContentType(contentType);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
+                                                   aaudio_input_preset_t inputPreset) {
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setInputPreset(inputPreset);
+}
+
 AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilder* builder,
-                                                        int32_t frames)
+                                                              int32_t frames)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setBufferCapacity(frames);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setSessionId(AAudioStreamBuilder* builder,
+                                                 aaudio_session_id_t sessionId)
+{
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setSessionId(sessionId);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setDataCallback(AAudioStreamBuilder* builder,
@@ -238,15 +265,26 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder* buil
 
 AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
 {
+    aaudio_result_t result = AAUDIO_ERROR_NULL;
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("AAudioStream_close(%p)", stream);
+    ALOGD("AAudioStream_close(%p) called ---------------", stream);
     if (audioStream != nullptr) {
-        audioStream->close();
-        audioStream->unregisterPlayerBase();
-        delete audioStream;
-        return AAUDIO_OK;
+        result = audioStream->safeClose();
+        // Close will only fail if called illegally, for example, from a callback.
+        // That would result in deleting an active stream, which would cause a crash.
+        if (result == AAUDIO_OK) {
+            audioStream->unregisterPlayerBase();
+            delete audioStream;
+        } else {
+            ALOGW("%s attempt to close failed. Close it from another thread.", __func__);
+        }
     }
-    return AAUDIO_ERROR_NULL;
+    // We're potentially freeing `stream` above, so its use here makes some
+    // static analysis tools unhappy. Casting to uintptr_t helps assure
+    // said tools that we're not doing anything bad here.
+    ALOGD("AAudioStream_close(%#" PRIxPTR ") returned %d ---------",
+          reinterpret_cast<uintptr_t>(stream), result);
+    return result;
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream* stream)
@@ -269,7 +307,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestFlush(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     ALOGD("AAudioStream_requestFlush(%p)", stream);
-    return audioStream->requestFlush();
+    return audioStream->safeFlush();
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestStop(AAudioStream* stream)
@@ -324,7 +362,7 @@ AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream* stream,
     }
 
     // Don't allow writes when playing with a callback.
-    if (audioStream->getDataCallbackProc() != nullptr && audioStream->isActive()) {
+    if (audioStream->isDataCallbackActive()) {
         ALOGE("Cannot write to a callback stream when running.");
         return AAUDIO_ERROR_INVALID_STATE;
     }
@@ -432,6 +470,30 @@ AAUDIO_API aaudio_sharing_mode_t AAudioStream_getSharingMode(AAudioStream* strea
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getSharingMode();
+}
+
+AAUDIO_API aaudio_usage_t AAudioStream_getUsage(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getUsage();
+}
+
+AAUDIO_API aaudio_content_type_t AAudioStream_getContentType(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getContentType();
+}
+
+AAUDIO_API aaudio_input_preset_t AAudioStream_getInputPreset(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getInputPreset();
+}
+
+AAUDIO_API int32_t AAudioStream_getSessionId(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getSessionId();
 }
 
 AAUDIO_API int64_t AAudioStream_getFramesWritten(AAudioStream* stream)

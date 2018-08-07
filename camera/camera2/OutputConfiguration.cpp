@@ -1,6 +1,6 @@
 /*
 **
-** Copyright 2015, The Android Open Source Project
+** Copyright 2015-2018, The Android Open Source Project
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -62,6 +62,10 @@ bool OutputConfiguration::isDeferred() const {
 
 bool OutputConfiguration::isShared() const {
     return mIsShared;
+}
+
+String16 OutputConfiguration::getPhysicalCameraId() const {
+    return mPhysicalCameraId;
 }
 
 OutputConfiguration::OutputConfiguration() :
@@ -139,6 +143,8 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    parcel->readString16(&mPhysicalCameraId);
+
     mRotation = rotation;
     mSurfaceSetID = setID;
     mSurfaceType = surfaceType;
@@ -153,19 +159,20 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
         mGbps.push_back(surface.graphicBufferProducer);
     }
 
-    ALOGV("%s: OutputConfiguration: rotation = %d, setId = %d, surfaceType = %d",
-            __FUNCTION__, mRotation, mSurfaceSetID, mSurfaceType);
+    ALOGV("%s: OutputConfiguration: rotation = %d, setId = %d, surfaceType = %d,"
+          " physicalCameraId = %s", __FUNCTION__, mRotation, mSurfaceSetID,
+          mSurfaceType, String8(mPhysicalCameraId).string());
 
     return err;
 }
 
 OutputConfiguration::OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int rotation,
-        int surfaceSetID) {
+        int surfaceSetID, bool isShared) {
     mGbps.push_back(gbp);
     mRotation = rotation;
     mSurfaceSetID = surfaceSetID;
     mIsDeferred = false;
-    mIsShared = false;
+    mIsShared = isShared;
 }
 
 status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
@@ -202,6 +209,9 @@ status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
         surfaceShims.push_back(surfaceShim);
     }
     err = parcel->writeParcelableVector(surfaceShims);
+    if (err != OK) return err;
+
+    err = parcel->writeString16(mPhysicalCameraId);
     if (err != OK) return err;
 
     return OK;

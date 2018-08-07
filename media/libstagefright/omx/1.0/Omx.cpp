@@ -24,7 +24,7 @@
 
 #include <media/stagefright/omx/OMXUtils.h>
 #include <media/stagefright/omx/OMXMaster.h>
-#include <media/stagefright/omx/GraphicBufferSource.h>
+#include <media/stagefright/omx/OmxGraphicBufferSource.h>
 
 #include <media/stagefright/omx/1.0/WOmxNode.h>
 #include <media/stagefright/omx/1.0/WOmxObserver.h>
@@ -148,7 +148,7 @@ Return<void> Omx::allocateNode(
 Return<void> Omx::createInputSurface(createInputSurface_cb _hidl_cb) {
     sp<::android::IGraphicBufferProducer> bufferProducer;
 
-    sp<GraphicBufferSource> graphicBufferSource = new GraphicBufferSource();
+    sp<OmxGraphicBufferSource> graphicBufferSource = new OmxGraphicBufferSource();
     status_t err = graphicBufferSource->initCheck();
     if (err != OK) {
         LOG(ERROR) << "Failed to create persistent input surface: "

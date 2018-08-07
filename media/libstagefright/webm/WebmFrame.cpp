@@ -27,7 +27,7 @@ using namespace android;
 using namespace webm;
 
 namespace {
-sp<ABuffer> toABuffer(MediaBuffer *mbuf) {
+sp<ABuffer> toABuffer(MediaBufferBase *mbuf) {
     sp<ABuffer> abuf = new ABuffer(mbuf->range_length());
     memcpy(abuf->data(), (uint8_t*) mbuf->data() + mbuf->range_offset(), mbuf->range_length());
     return abuf;
@@ -46,7 +46,7 @@ WebmFrame::WebmFrame()
       mEos(true) {
 }
 
-WebmFrame::WebmFrame(int type, bool key, uint64_t absTimecode, MediaBuffer *mbuf)
+WebmFrame::WebmFrame(int type, bool key, uint64_t absTimecode, MediaBufferBase *mbuf)
     : mType(type),
       mKey(key),
       mAbsTimecode(absTimecode),

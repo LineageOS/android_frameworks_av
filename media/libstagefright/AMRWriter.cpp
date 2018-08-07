@@ -25,8 +25,8 @@
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
+#include <media/MediaSource.h>
 #include <media/mediarecorder.h>
 
 namespace android {
@@ -54,7 +54,7 @@ status_t AMRWriter::initCheck() const {
     return mInitCheck;
 }
 
-status_t AMRWriter::addSource(const sp<IMediaSource> &source) {
+status_t AMRWriter::addSource(const sp<MediaSource> &source) {
     if (mInitCheck != OK) {
         return mInitCheck;
     }
@@ -193,7 +193,7 @@ status_t AMRWriter::threadFunc() {
 
     prctl(PR_SET_NAME, (unsigned long)"AMRWriter", 0, 0, 0);
     while (!mDone) {
-        MediaBuffer *buffer;
+        MediaBufferBase *buffer;
         err = mSource->read(&buffer);
 
         if (err != OK) {
@@ -215,7 +215,7 @@ status_t AMRWriter::threadFunc() {
         }
 
         int64_t timestampUs;
-        CHECK(buffer->meta_data()->findInt64(kKeyTime, &timestampUs));
+        CHECK(buffer->meta_data().findInt64(kKeyTime, &timestampUs));
         if (timestampUs > mEstimatedDurationUs) {
             mEstimatedDurationUs = timestampUs;
         }

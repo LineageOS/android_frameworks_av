@@ -60,6 +60,8 @@ struct AudioTrackSharedStreaming {
     volatile int32_t mRear;     // written by producer (output: client, input: server)
     volatile int32_t mFlush;    // incremented by client to indicate a request to flush;
                                 // server notices and discards all data between mFront and mRear
+    volatile int32_t mStop;     // set by client to indicate a stop frame position; server
+                                // will not read beyond this position until start is called.
     volatile uint32_t mUnderrunFrames; // server increments for each unavailable but desired frame
     volatile uint32_t mUnderrunCount;  // server increments for each underrun occurrence
 };
@@ -335,6 +337,8 @@ public:
         mTimestamp.clear();
     }
 
+    virtual void stop() { }; // called by client in AudioTrack::stop()
+
 private:
     // This is a copy of mCblk->mBufferSizeInFrames
     uint32_t   mBufferSizeInFrames;  // effective size of the buffer
@@ -383,7 +387,13 @@ public:
         mPlaybackRateMutator.push(playbackRate);
     }
 
+    // Sends flush and stop position information from the client to the server,
+    // used by streaming AudioTrack flush() or stop().
+    void sendStreamingFlushStop(bool flush);
+
     virtual void flush();
+
+            void stop() override;
 
     virtual uint32_t    getUnderrunFrames() const {
         return mCblk->u.mStreaming.mUnderrunFrames;
@@ -409,6 +419,8 @@ public:
     virtual ~StaticAudioTrackClientProxy() { }
 
     virtual void    flush();
+
+    void stop() override;
 
 #define MIN_LOOP    16  // minimum length of each loop iteration in frames
 
@@ -438,7 +450,11 @@ public:
         return 0;
     }
 
-    virtual uint32_t    getUnderrunFrames() const {
+    virtual uint32_t getUnderrunFrames() const override {
+        return 0;
+    }
+
+    virtual uint32_t getUnderrunCount() const override {
         return 0;
     }
 
@@ -528,6 +544,10 @@ public:
     //   client will be notified via Futex
     virtual void    flushBufferIfNeeded();
 
+    // Returns the rear position of the AudioTrack shared ring buffer, limited by
+    // the stop frame position level.
+    virtual int32_t getRear() const = 0;
+
     // Total count of the number of flushed frames since creation (never reset).
     virtual int64_t     framesFlushed() const { return mFlushed; }
 
@@ -603,9 +623,17 @@ public:
         return mDrained.load();
     }
 
+    int32_t             getRear() const override;
+
+    // Called on server side track start().
+    virtual void        start();
+
 private:
     AudioPlaybackRate             mPlaybackRate;  // last observed playback rate
     PlaybackRateQueue::Observer   mPlaybackRateObserver;
+
+    // Last client stop-at position when start() was called. Used for streaming AudioTracks.
+    std::atomic<int32_t>          mStopLast{0};
 
     // The server keeps a copy here where it is safe from the client.
     uint32_t                      mUnderrunCount; // echoed to mCblk
@@ -629,6 +657,10 @@ public:
     virtual void        releaseBuffer(Buffer* buffer);
     virtual void        tallyUnderrunFrames(uint32_t frameCount);
     virtual uint32_t    getUnderrunFrames() const { return 0; }
+
+    int32_t getRear() const override;
+
+    void start() override { } // ignore for static tracks
 
 private:
     status_t            updateStateWithLoop(StaticAudioTrackState *localState,
@@ -656,6 +688,10 @@ public:
     AudioRecordServerProxy(audio_track_cblk_t* cblk, void *buffers, size_t frameCount,
             size_t frameSize, bool clientInServer)
         : ServerProxy(cblk, buffers, frameCount, frameSize, false /*isOut*/, clientInServer) { }
+
+    int32_t getRear() const override {
+        return mCblk->u.mStreaming.mRear; // For completeness only; mRear written by server.
+    }
 
 protected:
     virtual ~AudioRecordServerProxy() { }

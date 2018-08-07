@@ -20,13 +20,15 @@
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
-#include <media/stagefright/omx/OMXNodeInstance.h>
 #include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
+#include <utils/KeyedVector.h>
+#include <utils/Mutex.h>
 
 namespace android {
 
 struct OMXMaster;
+struct OMXNodeInstance;
 
 namespace hardware {
 namespace media {
@@ -50,10 +52,9 @@ using ::android::sp;
 using ::android::wp;
 
 using ::android::OMXMaster;
-using ::android::OmxNodeOwner;
 using ::android::OMXNodeInstance;
 
-struct Omx : public IOmx, public hidl_death_recipient, public OmxNodeOwner {
+struct Omx : public IOmx, public hidl_death_recipient {
     Omx();
     virtual ~Omx();
 
@@ -68,8 +69,8 @@ struct Omx : public IOmx, public hidl_death_recipient, public OmxNodeOwner {
     // Method from hidl_death_recipient
     void serviceDied(uint64_t cookie, const wp<IBase>& who) override;
 
-    // Method from OmxNodeOwner
-    virtual status_t freeNode(sp<OMXNodeInstance> const& instance) override;
+    // Method for OMXNodeInstance
+    status_t freeNode(sp<OMXNodeInstance> const& instance);
 
 protected:
     OMXMaster* mMaster;

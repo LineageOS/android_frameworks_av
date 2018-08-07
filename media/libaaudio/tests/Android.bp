@@ -27,6 +27,7 @@ cc_test {
 
 cc_test {
     name: "test_timestamps",
+    defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_timestamps.cpp"],
     header_libs: ["libaaudio_example_utils"],
     shared_libs: ["libaaudio"],
@@ -85,4 +86,84 @@ cc_test {
         "libcutils",
         "libutils",
     ],
+}
+
+cc_test {
+    name: "test_bad_disconnect",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_bad_disconnect.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_various",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_various.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_session_id",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_session_id.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_aaudio_monkey",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_aaudio_monkey.cpp"],
+    header_libs: ["libaaudio_example_utils"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_attributes",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_attributes.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_interference",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_interference.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_atomic_fifo",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_atomic_fifo.cpp"],
+    shared_libs: ["libaaudio"],
 }

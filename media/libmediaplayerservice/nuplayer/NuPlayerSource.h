@@ -66,7 +66,7 @@ struct NuPlayer::Source : public AHandler {
         : mNotify(notify) {
     }
 
-    virtual status_t getDefaultBufferingSettings(
+    virtual status_t getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) = 0;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) = 0;
 
@@ -118,10 +118,6 @@ struct NuPlayer::Source : public AHandler {
     virtual status_t seekTo(
             int64_t /* seekTimeUs */,
             MediaPlayerSeekMode /* mode */ = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC) {
-        return INVALID_OPERATION;
-    }
-
-    virtual status_t setBuffers(bool /* audio */, Vector<MediaBuffer *> &/* buffers */) {
         return INVALID_OPERATION;
     }
 

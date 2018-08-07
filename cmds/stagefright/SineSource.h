@@ -2,7 +2,7 @@
 
 #define SINE_SOURCE_H_
 
-#include <media/stagefright/MediaSource.h>
+#include <media/MediaSource.h>
 #include <utils/Compat.h>
 
 namespace android {
@@ -18,7 +18,7 @@ struct SineSource : public MediaSource {
     virtual sp<MetaData> getFormat();
 
     virtual status_t read(
-            MediaBuffer **out, const ReadOptions *options = NULL);
+            MediaBufferBase **out, const ReadOptions *options = NULL);
 
 protected:
     virtual ~SineSource();

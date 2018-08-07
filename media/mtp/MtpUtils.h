@@ -33,9 +33,10 @@ void formatDateTime(time_t seconds, char* buffer, int bufferLength);
 int makeFolder(const char *path);
 int copyRecursive(const char *fromPath, const char *toPath);
 int copyFile(const char *fromPath, const char *toPath);
-void deleteRecursive(const char* path);
-void deletePath(const char* path);
+bool deletePath(const char* path);
+int renameTo(const char *oldPath, const char *newPath);
 
+void closeObjFd(int fd, const char *path);
 }; // namespace android
 
 #endif // _MTP_UTILS_H

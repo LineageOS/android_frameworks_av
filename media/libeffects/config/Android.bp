@@ -1,9 +1,14 @@
 // Effect configuration
-cc_library_shared {
+cc_library {
     name: "libeffectsconfig",
     vendor_available: true,
 
     srcs: ["src/EffectsConfig.cpp"],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
 
     shared_libs: [
         "liblog",

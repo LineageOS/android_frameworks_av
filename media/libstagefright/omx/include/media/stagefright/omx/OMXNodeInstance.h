@@ -25,9 +25,9 @@
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
 #include <utils/SortedVector.h>
-#include "OmxNodeOwner.h"
 
 #include <android/hidl/memory/1.0/IMemory.h>
+#include <media/stagefright/omx/1.0/Omx.h>
 
 namespace android {
 class GraphicBuffer;
@@ -35,11 +35,12 @@ class IOMXBufferSource;
 class IOMXObserver;
 struct OMXMaster;
 class OMXBuffer;
-typedef hidl::memory::V1_0::IMemory IHidlMemory;
+using IHidlMemory = hidl::memory::V1_0::IMemory;
+using hardware::media::omx::V1_0::implementation::Omx;
 
 struct OMXNodeInstance : public BnOMXNode {
     OMXNodeInstance(
-            OmxNodeOwner *owner, const sp<IOMXObserver> &observer, const char *name);
+            Omx *owner, const sp<IOMXObserver> &observer, const char *name);
 
     void setHandle(OMX_HANDLETYPE handle);
 
@@ -122,7 +123,7 @@ private:
 
     Mutex mLock;
 
-    OmxNodeOwner *mOwner;
+    Omx *mOwner;
     OMX_HANDLETYPE mHandle;
     sp<IOMXObserver> mObserver;
     sp<CallbackDispatcher> mDispatcher;
@@ -287,6 +288,21 @@ private:
 
     bool handleDataSpaceChanged(omx_message &msg);
 
+    /*
+     * Set the max pts gap between frames.
+     *
+     * When the pts gap number is positive, it indicates the maximum pts gap between
+     * two adjacent frames. If two frames are further apart, timestamps will be modified
+     * to meet this requirement before the frames are sent to the encoder.
+     *
+     * When the pts gap number is negative, it indicates that the original timestamp
+     * should always be modified such that all adjacent frames have the same pts gap
+     * equal to the absolute value of the passed in number. This option is typically
+     * used when client wants to make sure all frames are captured even when source
+     * potentially sends out-of-order frames.
+     *
+     * Timestamps will be restored to the original when the output is sent back to the client.
+     */
     status_t setMaxPtsGapUs(const void *params, size_t size);
     int64_t getCodecTimestamp(OMX_TICKS timestamp);
 

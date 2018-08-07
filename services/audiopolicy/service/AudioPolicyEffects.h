@@ -192,6 +192,6 @@ private:
     KeyedVector< audio_session_t, EffectVector* > mOutputSessions;
 };
 
-}; // namespace android
+} // namespace android
 
 #endif // ANDROID_AUDIOPOLICYEFFECTS_H

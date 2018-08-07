@@ -20,19 +20,25 @@
 #include <sys/mman.h>
 #include <utils/Log.h>
 #include <binder/PermissionCache.h>
-#include <media/nbaio/NBLog.h>
+#include <media/nblog/NBLog.h>
 #include <private/android_filesystem_config.h>
 #include "MediaLogService.h"
 
 namespace android {
 
- static const char kDeadlockedString[] = "MediaLogService may be deadlocked\n";
+static const char kDeadlockedString[] = "MediaLogService may be deadlocked\n";
+
+// mMerger, mMergeReader, and mMergeThread all point to the same location in memory
+// mMergerShared. This is the local memory FIFO containing data merged from all
+// individual thread FIFOs in shared memory. mMergeThread is used to periodically
+// call NBLog::Merger::merge() to collect the data and write it to the FIFO, and call
+// NBLog::MergeReader::getAndProcessSnapshot to process the merged data.
 MediaLogService::MediaLogService() :
     BnMediaLogService(),
     mMergerShared((NBLog::Shared*) malloc(NBLog::Timeline::sharedSize(kMergeBufferSize))),
     mMerger(mMergerShared, kMergeBufferSize),
     mMergeReader(mMergerShared, kMergeBufferSize, mMerger),
-    mMergeThread(new NBLog::MergeThread(mMerger))
+    mMergeThread(new NBLog::MergeThread(mMerger, mMergeReader))
 {
     mMergeThread->run("MergeThread");
 }
@@ -123,15 +129,10 @@ status_t MediaLogService::dump(int fd, const Vector<String16>& args __unused)
                 } else {
                     ALOGI("%s:", namedReader.name());
                 }
-                // TODO This code is for testing, remove it when done
-                // namedReader.reader()->dump(fd, 0 /*indent*/);
             }
-
             mLock.unlock();
         }
     }
-
-    // FIXME request merge to make sure log is up to date
     mMergeReader.dump(fd);
     return NO_ERROR;
 }

@@ -28,7 +28,7 @@
 
 #include <android/BnGraphicBufferSource.h>
 
-#include <media/stagefright/omx/GraphicBufferSource.h>
+#include <media/stagefright/omx/OmxGraphicBufferSource.h>
 
 namespace android {
 namespace hardware {
@@ -37,7 +37,7 @@ namespace omx {
 namespace V1_0 {
 namespace implementation {
 
-using ::android::GraphicBufferSource;
+using ::android::OmxGraphicBufferSource;
 using ::android::hardware::graphics::common::V1_0::Dataspace;
 using ::android::hardware::media::omx::V1_0::ColorAspects;
 using ::android::hardware::media::omx::V1_0::IGraphicBufferSource;
@@ -69,10 +69,10 @@ typedef ::android::hardware::media::omx::V1_0::IGraphicBufferSource
 struct TWGraphicBufferSource : public TGraphicBufferSource {
     struct TWOmxNodeWrapper;
     struct TWOmxBufferSource;
-    sp<GraphicBufferSource> mBase;
+    sp<OmxGraphicBufferSource> mBase;
     sp<IOmxBufferSource> mOmxBufferSource;
 
-    TWGraphicBufferSource(sp<GraphicBufferSource> const& base);
+    TWGraphicBufferSource(sp<OmxGraphicBufferSource> const& base);
     Return<Status> configure(
             const sp<IOmxNode>& omxNode, Dataspace dataspace) override;
     Return<Status> setSuspend(bool suspend, int64_t timeUs) override;

@@ -18,9 +18,10 @@
 
 #define HTTP_BASE_H_
 
+#include <media/DataSource.h>
 #include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/DataSource.h>
 #include <media/stagefright/MediaErrors.h>
+#include <utils/List.h>
 #include <utils/threads.h>
 
 namespace android {

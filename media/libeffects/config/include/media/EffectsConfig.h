@@ -32,8 +32,13 @@
 namespace android {
 namespace effectsConfig {
 
-/** Default path of effect configuration file. */
-constexpr char DEFAULT_PATH[] = "/vendor/etc/audio_effects.xml";
+/** Default path of effect configuration file. Relative to DEFAULT_LOCATIONS. */
+constexpr const char* DEFAULT_NAME = "audio_effects.xml";
+
+/** Default path of effect configuration file.
+ * The /vendor partition is the recommended one, the others are deprecated.
+ */
+constexpr const char* DEFAULT_LOCATIONS[] = {"/odm/etc", "/vendor/etc", "/system/etc"};
 
 /** Directories where the effect libraries will be search for. */
 constexpr const char* LD_EFFECT_LIBRARY_PATH[] =
@@ -91,13 +96,16 @@ struct ParsingResult {
     /** Parsed config, nullptr if the xml lib could not load the file */
     std::unique_ptr<Config> parsedConfig;
     size_t nbSkippedElement; //< Number of skipped invalid library, effect or processing chain
+    const char* configPath; //< Path to the loaded configuration
 };
 
 /** Parses the provided effect configuration.
  * Parsing do not stop of first invalid element, but continues to the next.
+ * @param[in] path of the configuration file do load
+ *                 if nullptr, look for DEFAULT_NAME in DEFAULT_LOCATIONS.
  * @see ParsingResult::nbSkippedElement
  */
-ParsingResult parse(const char* path = DEFAULT_PATH);
+ParsingResult parse(const char* path = nullptr);
 
 } // namespace effectsConfig
 } // namespace android

@@ -89,6 +89,18 @@ public:
         mCounter32 = 0;
     }
 
+    /**
+     * Round 64-bit counter up to a multiple of the period.
+     *
+     * @param period might be, for example, a buffer capacity
+     */
+    void roundUp64(int32_t period) {
+        if (period > 0) {
+            int64_t numPeriods = (mCounter64 + period - 1) / period;
+            mCounter64 = numPeriods * period;
+        }
+    }
+
 private:
     int64_t mCounter64 = 0;
     int32_t mCounter32 = 0;

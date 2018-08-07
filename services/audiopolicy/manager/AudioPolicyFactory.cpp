@@ -29,4 +29,4 @@ extern "C" void destroyAudioPolicyManager(AudioPolicyInterface *interface)
     delete interface;
 }
 
-}; // namespace android
+} // namespace android

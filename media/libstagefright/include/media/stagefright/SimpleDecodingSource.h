@@ -17,7 +17,7 @@
 #ifndef SIMPLE_DECODING_SOURCE_H_
 #define SIMPLE_DECODING_SOURCE_H_
 
-#include <media/stagefright/MediaSource.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/Mutexed.h>
 
@@ -45,12 +45,13 @@ public:
     // does not support secure input or pausing.
     // if |desiredCodec| is given, use this specific codec.
     static sp<SimpleDecodingSource> Create(
-            const sp<IMediaSource> &source, uint32_t flags,
+            const sp<MediaSource> &source, uint32_t flags,
             const sp<ANativeWindow> &nativeWindow,
-            const char *desiredCodec = NULL);
+            const char *desiredCodec = NULL,
+            bool skipMediaCodecList = false);
 
     static sp<SimpleDecodingSource> Create(
-            const sp<IMediaSource> &source, uint32_t flags = 0);
+            const sp<MediaSource> &source, uint32_t flags = 0);
 
     virtual ~SimpleDecodingSource();
 
@@ -64,20 +65,19 @@ public:
     virtual sp<MetaData> getFormat();
 
     // reads from the source. This call always blocks.
-    virtual status_t read(MediaBuffer **buffer, const ReadOptions *options);
+    virtual status_t read(MediaBufferBase **buffer, const ReadOptions *options);
 
     // unsupported methods
     virtual status_t pause() { return INVALID_OPERATION; }
-    virtual status_t setBuffers(const Vector<MediaBuffer *> &) { return INVALID_OPERATION; }
 
 private:
     // Construct this using a codec, source and looper.
     SimpleDecodingSource(
-            const sp<MediaCodec> &codec, const sp<IMediaSource> &source, const sp<ALooper> &looper,
+            const sp<MediaCodec> &codec, const sp<MediaSource> &source, const sp<ALooper> &looper,
             bool usingSurface, bool isVorbis, const sp<AMessage> &format);
 
     sp<MediaCodec> mCodec;
-    sp<IMediaSource> mSource;
+    sp<MediaSource> mSource;
     sp<ALooper> mLooper;
     bool mUsingSurface;
     bool mIsVorbis;
@@ -104,7 +104,8 @@ private:
 
     // do the actual reading
     status_t doRead(
-            Mutexed<ProtectedState>::Locked &me, MediaBuffer **buffer, const ReadOptions *options);
+            Mutexed<ProtectedState>::Locked &me, MediaBufferBase **buffer,
+            const ReadOptions *options);
 };
 
 } // namespace android

@@ -3,7 +3,8 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-	main_audioserver.cpp
+	main_audioserver.cpp \
+	../libaudioclient/aidl/android/media/IAudioRecord.aidl
 
 LOCAL_SHARED_LIBRARIES := \
 	libaaudioservice \
@@ -12,11 +13,13 @@ LOCAL_SHARED_LIBRARIES := \
 	libbinder \
 	libcutils \
 	liblog \
+	libhidltransport \
+	libhwbinder \
+	libmedia \
 	libmedialogservice \
 	libnbaio \
 	libsoundtriggerservice \
-	libutils \
-	libhwbinder
+	libutils
 
 # TODO oboeservice is the old folder name for aaudioservice. It will be changed.
 LOCAL_C_INCLUDES := \
@@ -33,8 +36,12 @@ LOCAL_C_INCLUDES := \
 	frameworks/av/media/libaaudio/include \
 	frameworks/av/media/libaaudio/src \
 	frameworks/av/media/libaaudio/src/binding \
+	frameworks/av/media/libmedia \
 	$(call include-path-for, audio-utils) \
 	external/sonic \
+
+LOCAL_AIDL_INCLUDES := \
+        frameworks/av/media/libaudioclient/aidl
 
 # If AUDIOSERVER_MULTILIB in device.mk is non-empty then it is used to control
 # the LOCAL_MULTILIB for all audioserver exclusive libraries.

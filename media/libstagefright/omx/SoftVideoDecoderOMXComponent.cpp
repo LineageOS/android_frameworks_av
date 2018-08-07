@@ -26,8 +26,8 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 #include <media/hardware/HardwareAPI.h>
-#include <media/MediaDefs.h>
 
 namespace android {
 
@@ -61,6 +61,7 @@ SoftVideoDecoderOMXComponent::SoftVideoDecoderOMXComponent(
         mCropTop(0),
         mCropWidth(width),
         mCropHeight(height),
+        mOutputFormat(OMX_COLOR_FormatYUV420Planar),
         mOutputPortSettingsChange(NONE),
         mUpdateColorAspects(false),
         mMinInputBufferSize(384), // arbitrary, using one uncompressed macroblock
@@ -74,6 +75,7 @@ SoftVideoDecoderOMXComponent::SoftVideoDecoderOMXComponent(
     memset(&mDefaultColorAspects, 0, sizeof(ColorAspects));
     memset(&mBitstreamColorAspects, 0, sizeof(ColorAspects));
     memset(&mFinalColorAspects, 0, sizeof(ColorAspects));
+    memset(&mHdrStaticInfo, 0, sizeof(HDRStaticInfo));
 }
 
 void SoftVideoDecoderOMXComponent::initPorts(
@@ -140,7 +142,6 @@ void SoftVideoDecoderOMXComponent::initPorts(
     def.format.video.xFramerate = 0;
     def.format.video.bFlagErrorConcealment = OMX_FALSE;
     def.format.video.eCompressionFormat = OMX_VIDEO_CodingUnused;
-    def.format.video.eColorFormat = OMX_COLOR_FormatYUV420Planar;
     def.format.video.pNativeWindow = NULL;
 
     addPort(def);
@@ -152,11 +153,13 @@ void SoftVideoDecoderOMXComponent::updatePortDefinitions(bool updateCrop, bool u
     OMX_PARAM_PORTDEFINITIONTYPE *outDef = &editPortInfo(kOutputPortIndex)->mDef;
     outDef->format.video.nFrameWidth = outputBufferWidth();
     outDef->format.video.nFrameHeight = outputBufferHeight();
+    outDef->format.video.eColorFormat = mOutputFormat;
     outDef->format.video.nStride = outDef->format.video.nFrameWidth;
     outDef->format.video.nSliceHeight = outDef->format.video.nFrameHeight;
 
+    int32_t bpp = (mOutputFormat == OMX_COLOR_FormatYUV420Planar16) ? 2 : 1;
     outDef->nBufferSize =
-        (outDef->format.video.nStride * outDef->format.video.nSliceHeight * 3) / 2;
+        (outDef->format.video.nStride * outDef->format.video.nSliceHeight * bpp * 3) / 2;
 
     OMX_PARAM_PORTDEFINITIONTYPE *inDef = &editPortInfo(kInputPortIndex)->mDef;
     inDef->format.video.nFrameWidth = mWidth;
@@ -191,9 +194,11 @@ uint32_t SoftVideoDecoderOMXComponent::outputBufferHeight() {
 
 void SoftVideoDecoderOMXComponent::handlePortSettingsChange(
         bool *portWillReset, uint32_t width, uint32_t height,
+        OMX_COLOR_FORMATTYPE outputFormat,
         CropSettingsMode cropSettingsMode, bool fakeStride) {
     *portWillReset = false;
     bool sizeChanged = (width != mWidth || height != mHeight);
+    bool formatChanged = (outputFormat != mOutputFormat);
     bool updateCrop = (cropSettingsMode == kCropUnSet);
     bool cropChanged = (cropSettingsMode == kCropChanged);
     bool strideChanged = false;
@@ -205,13 +210,18 @@ void SoftVideoDecoderOMXComponent::handlePortSettingsChange(
         }
     }
 
-    if (sizeChanged || cropChanged || strideChanged) {
+    if (formatChanged || sizeChanged || cropChanged || strideChanged) {
+        if (formatChanged) {
+            ALOGD("formatChanged: 0x%08x -> 0x%08x", mOutputFormat, outputFormat);
+        }
+        mOutputFormat = outputFormat;
         mWidth = width;
         mHeight = height;
 
         if ((sizeChanged && !mIsAdaptive)
             || width > mAdaptiveMaxWidth
-            || height > mAdaptiveMaxHeight) {
+            || height > mAdaptiveMaxHeight
+            || formatChanged) {
             if (mIsAdaptive) {
                 if (width > mAdaptiveMaxWidth) {
                     mAdaptiveMaxWidth = width;
@@ -305,27 +315,30 @@ status_t SoftVideoDecoderOMXComponent::handleColorAspectsChange() {
 void SoftVideoDecoderOMXComponent::copyYV12FrameToOutputBuffer(
         uint8_t *dst, const uint8_t *srcY, const uint8_t *srcU, const uint8_t *srcV,
         size_t srcYStride, size_t srcUStride, size_t srcVStride) {
-    size_t dstYStride = outputBufferWidth();
+    OMX_PARAM_PORTDEFINITIONTYPE *outDef = &editPortInfo(kOutputPortIndex)->mDef;
+    int32_t bpp = (outDef->format.video.eColorFormat == OMX_COLOR_FormatYUV420Planar16) ? 2 : 1;
+
+    size_t dstYStride = outputBufferWidth() * bpp;
     size_t dstUVStride = dstYStride / 2;
     size_t dstHeight = outputBufferHeight();
     uint8_t *dstStart = dst;
 
     for (size_t i = 0; i < mHeight; ++i) {
-         memcpy(dst, srcY, mWidth);
+         memcpy(dst, srcY, mWidth * bpp);
          srcY += srcYStride;
          dst += dstYStride;
     }
 
     dst = dstStart + dstYStride * dstHeight;
     for (size_t i = 0; i < mHeight / 2; ++i) {
-         memcpy(dst, srcU, mWidth / 2);
+         memcpy(dst, srcU, mWidth / 2 * bpp);
          srcU += srcUStride;
          dst += dstUVStride;
     }
 
     dst = dstStart + (5 * dstYStride * dstHeight) / 4;
     for (size_t i = 0; i < mHeight / 2; ++i) {
-         memcpy(dst, srcV, mWidth / 2);
+         memcpy(dst, srcV, mWidth / 2 * bpp);
          srcV += srcVStride;
          dst += dstUVStride;
     }
@@ -550,6 +563,10 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::getConfig(
             DescribeColorAspectsParams* colorAspectsParams =
                     (DescribeColorAspectsParams *)params;
 
+            if (!isValidOMXParam(colorAspectsParams)) {
+                return OMX_ErrorBadParameter;
+            }
+
             if (colorAspectsParams->nPortIndex != kOutputPortIndex) {
                 return OMX_ErrorBadParameter;
             }
@@ -558,6 +575,28 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::getConfig(
             if (colorAspectsParams->bRequestingDataSpace || colorAspectsParams->bDataSpaceChanged) {
                 return OMX_ErrorUnsupportedSetting;
             }
+
+            return OMX_ErrorNone;
+        }
+
+        case kDescribeHdrStaticInfoIndex:
+        {
+            if (!supportDescribeHdrStaticInfo()) {
+                return OMX_ErrorUnsupportedIndex;
+            }
+
+            DescribeHDRStaticInfoParams* hdrStaticInfoParams =
+                    (DescribeHDRStaticInfoParams *)params;
+
+            if (!isValidOMXParam(hdrStaticInfoParams)) {
+                return OMX_ErrorBadParameter;
+            }
+
+            if (hdrStaticInfoParams->nPortIndex != kOutputPortIndex) {
+                return OMX_ErrorBadPortIndex;
+            }
+
+            hdrStaticInfoParams->sInfo = mHdrStaticInfo;
 
             return OMX_ErrorNone;
         }
@@ -595,6 +634,29 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::setConfig(
             return OMX_ErrorNone;
         }
 
+        case kDescribeHdrStaticInfoIndex:
+        {
+            if (!supportDescribeHdrStaticInfo()) {
+                return OMX_ErrorUnsupportedIndex;
+            }
+
+            const DescribeHDRStaticInfoParams* hdrStaticInfoParams =
+                    (DescribeHDRStaticInfoParams *)params;
+
+            if (!isValidOMXParam(hdrStaticInfoParams)) {
+                return OMX_ErrorBadParameter;
+            }
+
+            if (hdrStaticInfoParams->nPortIndex != kOutputPortIndex) {
+                return OMX_ErrorBadPortIndex;
+            }
+
+            mHdrStaticInfo = hdrStaticInfoParams->sInfo;
+            updatePortDefinitions(false);
+
+            return OMX_ErrorNone;
+        }
+
         default:
             return OMX_ErrorUnsupportedIndex;
     }
@@ -610,6 +672,10 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::getExtensionIndex(
                 && supportsDescribeColorAspects()) {
         *(int32_t*)index = kDescribeColorAspectsIndex;
         return OMX_ErrorNone;
+    } else if (!strcmp(name, "OMX.google.android.index.describeHDRStaticInfo")
+            && supportDescribeHdrStaticInfo()) {
+        *(int32_t*)index = kDescribeHdrStaticInfoIndex;
+        return OMX_ErrorNone;
     }
 
     return SimpleSoftOMXComponent::getExtensionIndex(name, index);
@@ -621,6 +687,10 @@ bool SoftVideoDecoderOMXComponent::supportsDescribeColorAspects() {
 
 int SoftVideoDecoderOMXComponent::getColorAspectPreference() {
     return kNotSupported;
+}
+
+bool SoftVideoDecoderOMXComponent::supportDescribeHdrStaticInfo() {
+    return false;
 }
 
 void SoftVideoDecoderOMXComponent::onReset() {

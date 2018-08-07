@@ -19,8 +19,8 @@
 #define CAMERA_SOURCE_H_
 
 #include <deque>
+#include <media/MediaSource.h>
 #include <media/stagefright/MediaBuffer.h>
-#include <media/stagefright/MediaSource.h>
 #include <camera/android/hardware/ICamera.h>
 #include <camera/ICameraRecordingProxy.h>
 #include <camera/ICameraRecordingProxyListener.h>
@@ -97,7 +97,7 @@ public:
     virtual status_t start(MetaData *params = NULL);
     virtual status_t stop() { return reset(); }
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options = NULL);
+            MediaBufferBase **buffer, const ReadOptions *options = NULL);
     virtual status_t setStopTimeUs(int64_t stopTimeUs);
 
     /**
@@ -127,7 +127,7 @@ public:
      */
     MetadataBufferType metaDataStoredInVideoBuffers() const;
 
-    virtual void signalBufferReturned(MediaBuffer* buffer);
+    virtual void signalBufferReturned(MediaBufferBase* buffer);
 
 protected:
 

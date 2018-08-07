@@ -681,10 +681,6 @@ sp<DecryptHandle> NuCachedSource2::DrmInitialization(const char* mime) {
     return mSource->DrmInitialization(mime);
 }
 
-void NuCachedSource2::getDrmInfo(sp<DecryptHandle> &handle, DrmManagerClient **client) {
-    mSource->getDrmInfo(handle, client);
-}
-
 String8 NuCachedSource2::getUri() {
     return mSource->getUri();
 }

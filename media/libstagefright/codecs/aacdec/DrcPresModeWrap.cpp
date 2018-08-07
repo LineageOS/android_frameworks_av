@@ -24,7 +24,7 @@
 //#define DRC_PRES_MODE_WRAP_DEBUG
 
 #define GPM_ENCODER_TARGET_LEVEL 64
-#define MAX_TARGET_LEVEL 64
+#define MAX_TARGET_LEVEL 40
 
 CDrcPresModeWrapper::CDrcPresModeWrapper()
 {
@@ -164,7 +164,7 @@ CDrcPresModeWrapper::update()
     if (mDataUpdate) {
         // sanity check
         if (mDesTarget < MAX_TARGET_LEVEL){
-            mDesTarget = MAX_TARGET_LEVEL;  // limit target level to -16 dB or below
+            mDesTarget = MAX_TARGET_LEVEL;  // limit target level to -10 dB or below
             newTarget = MAX_TARGET_LEVEL;
         }
 

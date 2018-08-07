@@ -28,7 +28,7 @@
 #include <aaudio/AAudio.h>
 #include "AAudioExampleUtils.h"
 #include "AAudioSimplePlayer.h"
-#include "../../utils/AAudioSimplePlayer.h"
+#include "AAudioArgsParser.h"
 
 /**
  * Open stream, play some sine waves, then close the stream.
@@ -36,37 +36,39 @@
  * @param argParser
  * @return AAUDIO_OK or negative error code
  */
-static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser)
+static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser,
+                                         int32_t loopCount,
+                                         int32_t prefixToneMsec,
+                                         bool forceUnderruns)
 {
     SineThreadedData_t myData;
     AAudioSimplePlayer &player = myData.simplePlayer;
     aaudio_result_t    result = AAUDIO_OK;
     bool               disconnected = false;
+    bool               bailOut = false;
     int64_t            startedAtNanos;
 
     printf("----------------------- run complete test --------------------------\n");
     myData.schedulerChecked = false;
     myData.callbackCount = 0;
-    myData.forceUnderruns = false; // set true to test AAudioStream_getXRunCount()
+    myData.forceUnderruns = forceUnderruns; // test AAudioStream_getXRunCount()
 
     result = player.open(argParser,
                          SimplePlayerDataCallbackProc, SimplePlayerErrorCallbackProc, &myData);
     if (result != AAUDIO_OK) {
-        fprintf(stderr, "ERROR -  player.open() returned %d\n", result);
+        fprintf(stderr, "ERROR -  player.open() returned %s\n",
+                AAudio_convertResultToText(result));
         goto error;
     }
 
     argParser.compareWithStream(player.getStream());
 
-    // Setup sine wave generators.
-    {
-        int32_t actualSampleRate = player.getSampleRate();
-        myData.sineOsc1.setup(440.0, actualSampleRate);
-        myData.sineOsc1.setSweep(300.0, 600.0, 5.0);
-        myData.sineOsc1.setAmplitude(0.2);
-        myData.sineOsc2.setup(660.0, actualSampleRate);
-        myData.sineOsc2.setSweep(350.0, 900.0, 7.0);
-        myData.sineOsc2.setAmplitude(0.2);
+    myData.sampleRate = player.getSampleRate();
+    myData.prefixToneFrames = prefixToneMsec * myData.sampleRate / 1000;
+    if (myData.prefixToneFrames > 0) {
+        myData.setupSineBlip();
+    } else {
+        myData.setupSineSweeps();
     }
 
 #if 0
@@ -78,42 +80,93 @@ static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser)
     }
 #endif
 
-    result = player.start();
-    if (result != AAUDIO_OK) {
-        fprintf(stderr, "ERROR - player.start() returned %d\n", result);
-        goto error;
-    }
+    for (int loopIndex = 0; loopIndex < loopCount; loopIndex++) {
+        // Only play data on every other loop so we can hear if there is stale data.
+        double amplitude;
+        int32_t durationSeconds;
+        if ((loopIndex & 1) == 0) {
+            printf("--------------- SINE ------\n");
+            amplitude = 0.2;
+            durationSeconds = argParser.getDurationSeconds();
+        } else {
+            printf("--------------- QUIET -----\n");
+            amplitude = 0.0;
+            durationSeconds = 2; // just wait briefly when quiet
+        }
+        for (int i = 0; i < MAX_CHANNELS; ++i) {
+            myData.sineOscillators[i].setAmplitude(amplitude);
+        }
 
-    // Play a sine wave in the background.
-    printf("Sleep for %d seconds while audio plays in a callback thread.\n",
-           argParser.getDurationSeconds());
-    startedAtNanos = getNanoseconds(CLOCK_MONOTONIC);
-    for (int second = 0; second < argParser.getDurationSeconds(); second++)
-    {
-        // Sleep a while. Wake up early if there is an error, for example a DISCONNECT.
-        long ret = myData.waker.wait(AAUDIO_OK, NANOS_PER_SECOND);
-        int64_t millis = (getNanoseconds(CLOCK_MONOTONIC) - startedAtNanos) / NANOS_PER_MILLISECOND;
-        result = myData.waker.get();
-        printf("wait() returns %ld, aaudio_result = %d, at %6d millis"
-               ", second = %d, framesWritten = %8d, underruns = %d\n",
-               ret, result, (int) millis,
-               second,
-               (int) AAudioStream_getFramesWritten(player.getStream()),
-               (int) AAudioStream_getXRunCount(player.getStream()));
+        result = player.start();
         if (result != AAUDIO_OK) {
-            if (result == AAUDIO_ERROR_DISCONNECTED) {
-                disconnected = true;
+            fprintf(stderr, "ERROR - player.start() returned %d\n", result);
+            goto error;
+        }
+
+        // Play a sine wave in the background.
+        printf("Sleep for %d seconds while audio plays in a callback thread. %d of %d\n",
+               argParser.getDurationSeconds(), (loopIndex + 1), loopCount);
+        startedAtNanos = getNanoseconds(CLOCK_MONOTONIC);
+        for (int second = 0; second < durationSeconds; second++) {
+            // Sleep a while. Wake up early if there is an error, for example a DISCONNECT.
+            long ret = myData.waker.wait(AAUDIO_OK, NANOS_PER_SECOND);
+            int64_t millis =
+                    (getNanoseconds(CLOCK_MONOTONIC) - startedAtNanos) / NANOS_PER_MILLISECOND;
+            result = myData.waker.get();
+            printf("wait() returns %ld, aaudio_result = %d, at %6d millis"
+                           ", second = %3d, framesWritten = %8d, underruns = %d\n",
+                   ret, result, (int) millis,
+                   second,
+                   (int) AAudioStream_getFramesWritten(player.getStream()),
+                   (int) AAudioStream_getXRunCount(player.getStream()));
+            if (result != AAUDIO_OK) {
+                disconnected = (result == AAUDIO_ERROR_DISCONNECTED);
+                bailOut = true;
+                break;
             }
+        }
+        printf("AAudio result = %d = %s\n", result, AAudio_convertResultToText(result));
+
+        // Alternate between using stop or pause for each sine/quiet pair.
+        // Repeat this pattern: {sine-stop-quiet-stop-sine-pause-quiet-pause}
+        if ((loopIndex & 2) == 0) {
+            printf("STOP, callback # = %d\n", myData.callbackCount);
+            result = player.stop();
+        } else {
+            printf("PAUSE/FLUSH, callback # = %d\n", myData.callbackCount);
+            result = player.pause();
+            if (result != AAUDIO_OK) {
+                goto error;
+            }
+            result = player.flush();
+        }
+        if (result != AAUDIO_OK) {
+            goto error;
+        }
+
+        if (bailOut) {
             break;
         }
-    }
-    printf("AAudio result = %d = %s\n", result, AAudio_convertResultToText(result));
 
-    printf("call stop() callback # = %d\n", myData.callbackCount);
-    result = player.stop();
-    if (result != AAUDIO_OK) {
-        goto error;
+        {
+            aaudio_stream_state_t state = AAudioStream_getState(player.getStream());
+            aaudio_stream_state_t finalState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+            int64_t timeoutNanos = 2000 * NANOS_PER_MILLISECOND;
+            result = AAudioStream_waitForStateChange(player.getStream(), state,
+                                                     &finalState, timeoutNanos);
+            printf("waitForStateChange returns %s, state = %s\n",
+                   AAudio_convertResultToText(result),
+                   AAudio_convertStreamStateToText(finalState));
+            int64_t written = AAudioStream_getFramesWritten(player.getStream());
+            int64_t read = AAudioStream_getFramesRead(player.getStream());
+            printf("   framesWritten = %lld, framesRead = %lld, diff = %d\n",
+                   (long long) written,
+                   (long long) read,
+                   (int) (written - read));
+        }
+
     }
+
     printf("call close()\n");
     result = player.close();
     if (result != AAUDIO_OK) {
@@ -147,23 +200,59 @@ error:
     return disconnected ? AAUDIO_ERROR_DISCONNECTED : result;
 }
 
+static void usage() {
+    AAudioArgsParser::usage();
+    printf("      -l{count} loopCount start/stop, every other one is silent\n");
+    printf("      -t{msec}  play a high pitched tone at the beginning\n");
+    printf("      -z        force periodic underruns by sleeping in callback\n");
+}
+
 int main(int argc, const char **argv)
 {
     AAudioArgsParser   argParser;
     aaudio_result_t    result;
+    int32_t            loopCount = 1;
+    int32_t            prefixToneMsec = 0;
+    bool               forceUnderruns = false;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("%s - Play a sine sweep using an AAudio callback V0.1.2\n", argv[0]);
+    printf("%s - Play a sine sweep using an AAudio callback V0.1.4\n", argv[0]);
 
-    if (argParser.parseArgs(argc, argv)) {
-        return EXIT_FAILURE;
+    for (int i = 1; i < argc; i++) {
+        const char *arg = argv[i];
+        if (argParser.parseArg(arg)) {
+            // Handle options that are not handled by the ArgParser
+            if (arg[0] == '-') {
+                char option = arg[1];
+                switch (option) {
+                    case 'l':
+                        loopCount = atoi(&arg[2]);
+                        break;
+                    case 't':
+                        prefixToneMsec = atoi(&arg[2]);
+                        break;
+                    case 'z':
+                        forceUnderruns = true;  // Zzzzzzz
+                        break;
+                    default:
+                        usage();
+                        exit(EXIT_FAILURE);
+                        break;
+                }
+            } else {
+                usage();
+                exit(EXIT_FAILURE);
+                break;
+            }
+        }
     }
 
     // Keep looping until we can complete the test without disconnecting.
-    while((result = testOpenPlayClose(argParser)) == AAUDIO_ERROR_DISCONNECTED);
+    while((result = testOpenPlayClose(argParser, loopCount, prefixToneMsec, forceUnderruns))
+            == AAUDIO_ERROR_DISCONNECTED);
 
     return (result) ? EXIT_FAILURE : EXIT_SUCCESS;
 }

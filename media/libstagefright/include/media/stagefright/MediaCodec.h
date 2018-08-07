@@ -61,9 +61,11 @@ struct MediaCodec : public AHandler {
     };
 
     enum BufferFlags {
-        BUFFER_FLAG_SYNCFRAME   = 1,
-        BUFFER_FLAG_CODECCONFIG = 2,
-        BUFFER_FLAG_EOS         = 4,
+        BUFFER_FLAG_SYNCFRAME     = 1,
+        BUFFER_FLAG_CODECCONFIG   = 2,
+        BUFFER_FLAG_EOS           = 4,
+        BUFFER_FLAG_PARTIAL_FRAME = 8,
+        BUFFER_FLAG_MUXER_DATA    = 16,
     };
 
     enum {
@@ -184,6 +186,8 @@ struct MediaCodec : public AHandler {
 
     status_t getName(AString *componentName) const;
 
+    status_t getCodecInfo(sp<MediaCodecInfo> *codecInfo) const;
+
     status_t getMetrics(MediaAnalyticsItem * &reply);
 
     status_t setParameters(const sp<AMessage> &params);
@@ -217,6 +221,7 @@ private:
         STOPPING,
         RELEASING,
     };
+    std::string stateString(State state);
 
     enum {
         kPortIndexInput         = 0,
@@ -247,6 +252,7 @@ private:
         kWhatRequestIDRFrame                = 'ridr',
         kWhatRequestActivityNotification    = 'racN',
         kWhatGetName                        = 'getN',
+        kWhatGetCodecInfo                   = 'gCoI',
         kWhatSetParameters                  = 'setP',
         kWhatSetCallback                    = 'setC',
         kWhatSetNotification                = 'setN',
@@ -307,6 +313,7 @@ private:
     sp<ALooper> mCodecLooper;
     sp<CodecBase> mCodec;
     AString mComponentName;
+    sp<MediaCodecInfo> mCodecInfo;
     sp<AReplyToken> mReplyID;
     uint32_t mFlags;
     status_t mStickyError;
@@ -315,7 +322,9 @@ private:
 
     MediaAnalyticsItem *mAnalyticsItem;
     void initAnalyticsItem();
+    void updateAnalyticsItem();
     void flushAnalyticsItem();
+    void updateEphemeralAnalytics(MediaAnalyticsItem *item);
 
     sp<AMessage> mOutputFormat;
     sp<AMessage> mInputFormat;
@@ -333,8 +342,6 @@ private:
 
     // initial create parameters
     AString mInitName;
-    bool mInitNameIsType;
-    bool mInitIsEncoder;
 
     // configure parameter
     sp<AMessage> mConfigureMsg;
@@ -364,19 +371,20 @@ private:
 
     bool mHaveInputSurface;
     bool mHavePendingInputBuffers;
+    bool mCpuBoostRequested;
 
     std::shared_ptr<BufferChannelBase> mBufferChannel;
 
     MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid);
 
-    static sp<CodecBase> GetCodecBase(const AString &name, bool nameIsType = false);
+    static sp<CodecBase> GetCodecBase(const AString &name);
 
     static status_t PostAndAwaitResponse(
             const sp<AMessage> &msg, sp<AMessage> *response);
 
     void PostReplyWithError(const sp<AReplyToken> &replyID, int32_t err);
 
-    status_t init(const AString &name, bool nameIsType, bool encoder);
+    status_t init(const AString &name);
 
     void setState(State newState);
     void returnBuffersToCodec(bool isReclaim = false);
@@ -420,6 +428,7 @@ private:
 
     uint64_t getGraphicBufferSize();
     void addResource(MediaResource::Type type, MediaResource::SubType subtype, uint64_t value);
+    void requestCpuBoostIfNeeded();
 
     bool hasPendingBuffer(int portIndex);
     bool hasPendingBuffer();
@@ -437,6 +446,63 @@ private:
     }
 
     void onReleaseCrypto(const sp<AMessage>& msg);
+
+    // managing time-of-flight aka latency
+    typedef struct {
+            int64_t presentationUs;
+            int64_t startedNs;
+    } BufferFlightTiming_t;
+    std::deque<BufferFlightTiming_t> mBuffersInFlight;
+    Mutex mLatencyLock;
+    int64_t mLatencyUnknown;    // buffers for which we couldn't calculate latency
+
+    void statsBufferSent(int64_t presentationUs);
+    void statsBufferReceived(int64_t presentationUs);
+
+    enum {
+        // the default shape of our latency histogram buckets
+        // XXX: should these be configurable in some way?
+        kLatencyHistBuckets = 20,
+        kLatencyHistWidth = 2000,
+        kLatencyHistFloor = 2000,
+
+        // how many samples are in the 'recent latency' histogram
+        // 300 frames = 5 sec @ 60fps or ~12 sec @ 24fps
+        kRecentLatencyFrames = 300,
+
+        // how we initialize mRecentSamples
+        kRecentSampleInvalid = -1,
+    };
+
+    int64_t mRecentSamples[kRecentLatencyFrames];
+    int mRecentHead;
+    Mutex mRecentLock;
+
+    class Histogram {
+      public:
+        Histogram() : mFloor(0), mWidth(0), mBelow(0), mAbove(0),
+                      mMin(INT64_MAX), mMax(INT64_MIN), mSum(0), mCount(0),
+                      mBucketCount(0), mBuckets(NULL) {};
+        ~Histogram() { clear(); };
+        void clear() { if (mBuckets != NULL) free(mBuckets); mBuckets = NULL; };
+        bool setup(int nbuckets, int64_t width, int64_t floor = 0);
+        void insert(int64_t sample);
+        int64_t getMin() const { return mMin; }
+        int64_t getMax() const { return mMax; }
+        int64_t getCount() const { return mCount; }
+        int64_t getSum() const { return mSum; }
+        int64_t getAvg() const { return mSum / (mCount == 0 ? 1 : mCount); }
+        std::string emit();
+      private:
+        int64_t mFloor, mCeiling, mWidth;
+        int64_t mBelow, mAbove;
+        int64_t mMin, mMax, mSum, mCount;
+
+        int mBucketCount;
+        int64_t *mBuckets;
+    };
+
+    Histogram mLatencyHist;
 
     DISALLOW_EVIL_CONSTRUCTORS(MediaCodec);
 };

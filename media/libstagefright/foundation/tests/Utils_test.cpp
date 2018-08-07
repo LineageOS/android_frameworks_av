@@ -22,7 +22,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AStringUtils.h>
 #include <media/stagefright/foundation/AUtils.h>
-#include <media/stagefright/Utils.h> // for FOURCC
+#include <media/stagefright/foundation/ByteUtils.h> // for FOURCC
 
 namespace android {
 

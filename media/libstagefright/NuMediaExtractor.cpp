@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #define LOG_TAG "NuMediaExtractor"
 #include <utils/Log.h>
 
@@ -23,20 +23,32 @@
 #include "include/ESDS.h"
 #include "include/NuCachedSource2.h"
 
+#include <media/DataSource.h>
+#include <media/MediaExtractor.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/DataSource.h>
+#include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaExtractor.h>
-#include <media/stagefright/MediaSource.h>
+#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 
 namespace android {
+
+NuMediaExtractor::Sample::Sample()
+    : mBuffer(NULL),
+      mSampleTimeUs(-1ll) {
+}
+
+NuMediaExtractor::Sample::Sample(MediaBufferBase *buffer, int64_t timeUs)
+    : mBuffer(buffer),
+      mSampleTimeUs(timeUs) {
+}
 
 NuMediaExtractor::NuMediaExtractor()
     : mTotalBitrate(-1ll),
@@ -44,7 +56,7 @@ NuMediaExtractor::NuMediaExtractor()
 }
 
 NuMediaExtractor::~NuMediaExtractor() {
-    releaseTrackSamples();
+    releaseAllTrackSamples();
 
     for (size_t i = 0; i < mSelectedTracks.size(); ++i) {
         TrackInfo *info = &mSelectedTracks.editItemAt(i);
@@ -60,7 +72,7 @@ NuMediaExtractor::~NuMediaExtractor() {
 }
 
 status_t NuMediaExtractor::setDataSource(
-        const sp<IMediaHTTPService> &httpService,
+        const sp<MediaHTTPService> &httpService,
         const char *path,
         const KeyedVector<String8, String8> *headers) {
     Mutex::Autolock autoLock(mLock);
@@ -70,13 +82,13 @@ status_t NuMediaExtractor::setDataSource(
     }
 
     sp<DataSource> dataSource =
-        DataSource::CreateFromURI(httpService, path, headers);
+        DataSourceFactory::CreateFromURI(httpService, path, headers);
 
     if (dataSource == NULL) {
         return -ENOENT;
     }
 
-    mImpl = MediaExtractor::Create(dataSource);
+    mImpl = MediaExtractorFactory::Create(dataSource);
 
     if (mImpl == NULL) {
         return ERROR_UNSUPPORTED;
@@ -112,7 +124,7 @@ status_t NuMediaExtractor::setDataSource(int fd, off64_t offset, off64_t size) {
         return err;
     }
 
-    mImpl = MediaExtractor::Create(fileSource);
+    mImpl = MediaExtractorFactory::Create(fileSource);
 
     if (mImpl == NULL) {
         return ERROR_UNSUPPORTED;
@@ -142,7 +154,7 @@ status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
         return err;
     }
 
-    mImpl = MediaExtractor::Create(source);
+    mImpl = MediaExtractorFactory::Create(source);
 
     if (mImpl == NULL) {
         return ERROR_UNSUPPORTED;
@@ -191,6 +203,15 @@ status_t NuMediaExtractor::setMediaCas(const HInterfaceToken &casToken) {
     }
 
     return OK;
+}
+
+void NuMediaExtractor::disconnect() {
+    if (mDataSource != NULL) {
+        // disconnect data source
+        if (mDataSource->flags() & DataSource::kIsCachingDataSource) {
+            static_cast<NuCachedSource2 *>(mDataSource.get())->disconnect();
+        }
+    }
 }
 
 status_t NuMediaExtractor::updateDurationAndBitrate() {
@@ -286,7 +307,28 @@ status_t NuMediaExtractor::getFileFormat(sp<AMessage> *format) const {
     return OK;
 }
 
-status_t NuMediaExtractor::selectTrack(size_t index) {
+status_t NuMediaExtractor::getExifOffsetSize(off64_t *offset, size_t *size) const {
+    Mutex::Autolock autoLock(mLock);
+
+    if (mImpl == NULL) {
+        return -EINVAL;
+    }
+
+    sp<MetaData> meta = mImpl->getMetaData();
+
+    int64_t exifOffset, exifSize;
+    if (meta->findInt64(kKeyExifOffset, &exifOffset)
+     && meta->findInt64(kKeyExifSize, &exifSize)) {
+        *offset = (off64_t) exifOffset;
+        *size = (size_t) exifSize;
+
+        return OK;
+    }
+    return ERROR_UNSUPPORTED;
+}
+
+status_t NuMediaExtractor::selectTrack(size_t index,
+        int64_t startTimeUs, MediaSource::ReadOptions::SeekMode mode) {
     Mutex::Autolock autoLock(mLock);
 
     if (mImpl == NULL) {
@@ -309,29 +351,54 @@ status_t NuMediaExtractor::selectTrack(size_t index) {
     sp<IMediaSource> source = mImpl->getTrack(index);
 
     if (source == nullptr) {
+        ALOGE("track %zu is empty", index);
         return ERROR_MALFORMED;
     }
 
     status_t ret = source->start();
     if (ret != OK) {
+        ALOGE("track %zu failed to start", index);
         return ret;
     }
+
+    sp<MetaData> meta = source->getFormat();
+    if (meta == NULL) {
+        ALOGE("track %zu has no meta data", index);
+        return ERROR_MALFORMED;
+    }
+
+    const char *mime;
+    if (!meta->findCString(kKeyMIMEType, &mime)) {
+        ALOGE("track %zu has no mime type in meta data", index);
+        return ERROR_MALFORMED;
+    }
+    ALOGV("selectTrack, track[%zu]: %s", index, mime);
 
     mSelectedTracks.push();
     TrackInfo *info = &mSelectedTracks.editItemAt(mSelectedTracks.size() - 1);
 
     info->mSource = source;
     info->mTrackIndex = index;
+    if (!strncasecmp(mime, "audio/", 6)) {
+        info->mTrackType = MEDIA_TRACK_TYPE_AUDIO;
+        info->mMaxFetchCount = 64;
+    } else if (!strncasecmp(mime, "video/", 6)) {
+        info->mTrackType = MEDIA_TRACK_TYPE_VIDEO;
+        info->mMaxFetchCount = 8;
+    } else {
+        info->mTrackType = MEDIA_TRACK_TYPE_UNKNOWN;
+        info->mMaxFetchCount = 1;
+    }
     info->mFinalResult = OK;
-    info->mSample = NULL;
-    info->mSampleTimeUs = -1ll;
+    releaseTrackSamples(info);
     info->mTrackFlags = 0;
-
-    const char *mime;
-    CHECK(source->getFormat()->findCString(kKeyMIMEType, &mime));
 
     if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_VORBIS)) {
         info->mTrackFlags |= kIsVorbis;
+    }
+
+    if (startTimeUs >= 0) {
+        fetchTrackSamples(info, startTimeUs, mode);
     }
 
     return OK;
@@ -364,12 +431,7 @@ status_t NuMediaExtractor::unselectTrack(size_t index) {
 
     TrackInfo *info = &mSelectedTracks.editItemAt(i);
 
-    if (info->mSample != NULL) {
-        info->mSample->release();
-        info->mSample = NULL;
-
-        info->mSampleTimeUs = -1ll;
-    }
+    releaseTrackSamples(info);
 
     CHECK_EQ((status_t)OK, info->mSource->stop());
 
@@ -378,79 +440,141 @@ status_t NuMediaExtractor::unselectTrack(size_t index) {
     return OK;
 }
 
-void NuMediaExtractor::releaseTrackSamples() {
-    for (size_t i = 0; i < mSelectedTracks.size(); ++i) {
-        TrackInfo *info = &mSelectedTracks.editItemAt(i);
+void NuMediaExtractor::releaseOneSample(TrackInfo *info) {
+    if (info == NULL || info->mSamples.empty()) {
+        return;
+    }
 
-        if (info->mSample != NULL) {
-            info->mSample->release();
-            info->mSample = NULL;
+    auto it = info->mSamples.begin();
+    if (it->mBuffer != NULL) {
+        it->mBuffer->release();
+    }
+    info->mSamples.erase(it);
+}
 
-            info->mSampleTimeUs = -1ll;
+void NuMediaExtractor::releaseTrackSamples(TrackInfo *info) {
+    if (info == NULL) {
+        return;
+    }
+
+    auto it = info->mSamples.begin();
+    while (it != info->mSamples.end()) {
+        if (it->mBuffer != NULL) {
+            it->mBuffer->release();
         }
+        it = info->mSamples.erase(it);
     }
 }
 
-ssize_t NuMediaExtractor::fetchTrackSamples(
+void NuMediaExtractor::releaseAllTrackSamples() {
+    for (size_t i = 0; i < mSelectedTracks.size(); ++i) {
+        releaseTrackSamples(&mSelectedTracks.editItemAt(i));
+    }
+}
+
+ssize_t NuMediaExtractor::fetchAllTrackSamples(
         int64_t seekTimeUs, MediaSource::ReadOptions::SeekMode mode) {
     TrackInfo *minInfo = NULL;
-    ssize_t minIndex = -1;
+    ssize_t minIndex = ERROR_END_OF_STREAM;
 
     for (size_t i = 0; i < mSelectedTracks.size(); ++i) {
         TrackInfo *info = &mSelectedTracks.editItemAt(i);
+        fetchTrackSamples(info, seekTimeUs, mode);
 
-        if (seekTimeUs >= 0ll) {
-            info->mFinalResult = OK;
+        status_t err = info->mFinalResult;
+        if (err != OK && err != ERROR_END_OF_STREAM) {
+            return err;
+        }
 
-            if (info->mSample != NULL) {
-                info->mSample->release();
-                info->mSample = NULL;
-                info->mSampleTimeUs = -1ll;
-            }
-        } else if (info->mFinalResult != OK) {
+        if (info->mSamples.empty()) {
             continue;
         }
 
-        if (info->mSample == NULL) {
-            MediaSource::ReadOptions options;
-            if (seekTimeUs >= 0ll) {
-                options.setSeekTo(seekTimeUs, mode);
-            }
-            status_t err = info->mSource->read(&info->mSample, &options);
-
-            if (err != OK) {
-                CHECK(info->mSample == NULL);
-
-                info->mFinalResult = err;
-
-                if (info->mFinalResult != ERROR_END_OF_STREAM) {
-                    ALOGW("read on track %zu failed with error %d",
-                          info->mTrackIndex, err);
-                }
-
-                info->mSampleTimeUs = -1ll;
-                continue;
-            } else {
-                CHECK(info->mSample != NULL);
-                CHECK(info->mSample->meta_data()->findInt64(
-                            kKeyTime, &info->mSampleTimeUs));
-            }
-        }
-
-        if (minInfo == NULL  || info->mSampleTimeUs < minInfo->mSampleTimeUs) {
+        if (minInfo == NULL) {
             minInfo = info;
             minIndex = i;
+        } else {
+            auto it = info->mSamples.begin();
+            auto itMin = minInfo->mSamples.begin();
+            if (it->mSampleTimeUs < itMin->mSampleTimeUs) {
+                minInfo = info;
+                minIndex = i;
+            }
         }
     }
 
     return minIndex;
 }
 
+void NuMediaExtractor::fetchTrackSamples(TrackInfo *info,
+        int64_t seekTimeUs, MediaSource::ReadOptions::SeekMode mode) {
+    if (info == NULL) {
+        return;
+    }
+
+    MediaSource::ReadOptions options;
+    if (seekTimeUs >= 0ll) {
+        options.setSeekTo(seekTimeUs, mode);
+        info->mFinalResult = OK;
+        releaseTrackSamples(info);
+    } else if (info->mFinalResult != OK || !info->mSamples.empty()) {
+        return;
+    }
+
+    status_t err = OK;
+    Vector<MediaBufferBase *> mediaBuffers;
+    if (info->mSource->supportReadMultiple()) {
+        options.setNonBlocking();
+        err = info->mSource->readMultiple(&mediaBuffers, info->mMaxFetchCount, &options);
+    } else {
+        MediaBufferBase *mbuf = NULL;
+        err = info->mSource->read(&mbuf, &options);
+        if (err == OK && mbuf != NULL) {
+            mediaBuffers.push_back(mbuf);
+        }
+    }
+
+    info->mFinalResult = err;
+    if (err != OK && err != ERROR_END_OF_STREAM) {
+        ALOGW("read on track %zu failed with error %d", info->mTrackIndex, err);
+        size_t count = mediaBuffers.size();
+        for (size_t id = 0; id < count; ++id) {
+            MediaBufferBase *mbuf = mediaBuffers[id];
+            if (mbuf != NULL) {
+                mbuf->release();
+            }
+        }
+        return;
+    }
+
+    size_t count = mediaBuffers.size();
+    bool releaseRemaining = false;
+    for (size_t id = 0; id < count; ++id) {
+        int64_t timeUs;
+        MediaBufferBase *mbuf = mediaBuffers[id];
+        if (mbuf == NULL) {
+            continue;
+        }
+        if (releaseRemaining) {
+            mbuf->release();
+            continue;
+        }
+        if (mbuf->meta_data().findInt64(kKeyTime, &timeUs)) {
+            info->mSamples.emplace_back(mbuf, timeUs);
+        } else {
+            mbuf->meta_data().dumpToLog();
+            info->mFinalResult = ERROR_MALFORMED;
+            mbuf->release();
+            releaseRemaining = true;
+        }
+    }
+}
+
 status_t NuMediaExtractor::seekTo(
         int64_t timeUs, MediaSource::ReadOptions::SeekMode mode) {
     Mutex::Autolock autoLock(mLock);
 
-    ssize_t minIndex = fetchTrackSamples(timeUs, mode);
+    ssize_t minIndex = fetchAllTrackSamples(timeUs, mode);
 
     if (minIndex < 0) {
         return ERROR_END_OF_STREAM;
@@ -462,7 +586,7 @@ status_t NuMediaExtractor::seekTo(
 status_t NuMediaExtractor::advance() {
     Mutex::Autolock autoLock(mLock);
 
-    ssize_t minIndex = fetchTrackSamples();
+    ssize_t minIndex = fetchAllTrackSamples();
 
     if (minIndex < 0) {
         return ERROR_END_OF_STREAM;
@@ -470,28 +594,27 @@ status_t NuMediaExtractor::advance() {
 
     TrackInfo *info = &mSelectedTracks.editItemAt(minIndex);
 
-    info->mSample->release();
-    info->mSample = NULL;
-    info->mSampleTimeUs = -1ll;
+    releaseOneSample(info);
 
     return OK;
 }
 
-status_t NuMediaExtractor::appendVorbisNumPageSamples(TrackInfo *info, const sp<ABuffer> &buffer) {
+status_t NuMediaExtractor::appendVorbisNumPageSamples(
+        MediaBufferBase *mbuf, const sp<ABuffer> &buffer) {
     int32_t numPageSamples;
-    if (!info->mSample->meta_data()->findInt32(
+    if (!mbuf->meta_data().findInt32(
             kKeyValidSamples, &numPageSamples)) {
         numPageSamples = -1;
     }
 
-    memcpy((uint8_t *)buffer->data() + info->mSample->range_length(),
+    memcpy((uint8_t *)buffer->data() + mbuf->range_length(),
            &numPageSamples,
            sizeof(numPageSamples));
 
     uint32_t type;
     const void *data;
     size_t size, size2;
-    if (info->mSample->meta_data()->findData(kKeyEncryptedSizes, &type, &data, &size)) {
+    if (mbuf->meta_data().findData(kKeyEncryptedSizes, &type, &data, &size)) {
         // Signal numPageSamples (a plain int32_t) is appended at the end,
         // i.e. sizeof(numPageSamples) plain bytes + 0 encrypted bytes
         if (SIZE_MAX - size < sizeof(int32_t)) {
@@ -509,9 +632,9 @@ status_t NuMediaExtractor::appendVorbisNumPageSamples(TrackInfo *info, const sp<
         int32_t zero = 0;
         memcpy(adata, data, size);
         memcpy(adata + size, &zero, sizeof(zero));
-        info->mSample->meta_data()->setData(kKeyEncryptedSizes, type, adata, newSize);
+        mbuf->meta_data().setData(kKeyEncryptedSizes, type, adata, newSize);
 
-        if (info->mSample->meta_data()->findData(kKeyPlainSizes, &type, &data, &size2)) {
+        if (mbuf->meta_data().findData(kKeyPlainSizes, &type, &data, &size2)) {
             if (size2 != size) {
                 return ERROR_MALFORMED;
             }
@@ -524,7 +647,7 @@ status_t NuMediaExtractor::appendVorbisNumPageSamples(TrackInfo *info, const sp<
         // append sizeof(numPageSamples) to plain sizes.
         int32_t int32Size = sizeof(numPageSamples);
         memcpy(adata + size, &int32Size, sizeof(int32Size));
-        info->mSample->meta_data()->setData(kKeyPlainSizes, type, adata, newSize);
+        mbuf->meta_data().setData(kKeyPlainSizes, type, adata, newSize);
     }
 
     return OK;
@@ -533,7 +656,7 @@ status_t NuMediaExtractor::appendVorbisNumPageSamples(TrackInfo *info, const sp<
 status_t NuMediaExtractor::readSampleData(const sp<ABuffer> &buffer) {
     Mutex::Autolock autoLock(mLock);
 
-    ssize_t minIndex = fetchTrackSamples();
+    ssize_t minIndex = fetchAllTrackSamples();
 
     if (minIndex < 0) {
         return ERROR_END_OF_STREAM;
@@ -541,7 +664,8 @@ status_t NuMediaExtractor::readSampleData(const sp<ABuffer> &buffer) {
 
     TrackInfo *info = &mSelectedTracks.editItemAt(minIndex);
 
-    size_t sampleSize = info->mSample->range_length();
+    auto it = info->mSamples.begin();
+    size_t sampleSize = it->mBuffer->range_length();
 
     if (info->mTrackFlags & kIsVorbis) {
         // Each sample's data is suffixed by the number of page samples
@@ -554,14 +678,14 @@ status_t NuMediaExtractor::readSampleData(const sp<ABuffer> &buffer) {
     }
 
     const uint8_t *src =
-        (const uint8_t *)info->mSample->data()
-            + info->mSample->range_offset();
+        (const uint8_t *)it->mBuffer->data()
+            + it->mBuffer->range_offset();
 
-    memcpy((uint8_t *)buffer->data(), src, info->mSample->range_length());
+    memcpy((uint8_t *)buffer->data(), src, it->mBuffer->range_length());
 
     status_t err = OK;
     if (info->mTrackFlags & kIsVorbis) {
-        err = appendVorbisNumPageSamples(info, buffer);
+        err = appendVorbisNumPageSamples(it->mBuffer, buffer);
     }
 
     if (err == OK) {
@@ -571,10 +695,32 @@ status_t NuMediaExtractor::readSampleData(const sp<ABuffer> &buffer) {
     return err;
 }
 
+status_t NuMediaExtractor::getSampleSize(size_t *sampleSize) {
+    Mutex::Autolock autoLock(mLock);
+
+    ssize_t minIndex = fetchAllTrackSamples();
+
+    if (minIndex < 0) {
+        return ERROR_END_OF_STREAM;
+    }
+
+    TrackInfo *info = &mSelectedTracks.editItemAt(minIndex);
+    auto it = info->mSamples.begin();
+    *sampleSize = it->mBuffer->range_length();
+
+    if (info->mTrackFlags & kIsVorbis) {
+        // Each sample's data is suffixed by the number of page samples
+        // or -1 if not available.
+        *sampleSize += sizeof(int32_t);
+    }
+
+    return OK;
+}
+
 status_t NuMediaExtractor::getSampleTrackIndex(size_t *trackIndex) {
     Mutex::Autolock autoLock(mLock);
 
-    ssize_t minIndex = fetchTrackSamples();
+    ssize_t minIndex = fetchAllTrackSamples();
 
     if (minIndex < 0) {
         return ERROR_END_OF_STREAM;
@@ -589,14 +735,14 @@ status_t NuMediaExtractor::getSampleTrackIndex(size_t *trackIndex) {
 status_t NuMediaExtractor::getSampleTime(int64_t *sampleTimeUs) {
     Mutex::Autolock autoLock(mLock);
 
-    ssize_t minIndex = fetchTrackSamples();
+    ssize_t minIndex = fetchAllTrackSamples();
 
     if (minIndex < 0) {
         return ERROR_END_OF_STREAM;
     }
 
     TrackInfo *info = &mSelectedTracks.editItemAt(minIndex);
-    *sampleTimeUs = info->mSampleTimeUs;
+    *sampleTimeUs = info->mSamples.begin()->mSampleTimeUs;
 
     return OK;
 }
@@ -606,14 +752,15 @@ status_t NuMediaExtractor::getSampleMeta(sp<MetaData> *sampleMeta) {
 
     *sampleMeta = NULL;
 
-    ssize_t minIndex = fetchTrackSamples();
+    ssize_t minIndex = fetchAllTrackSamples();
 
     if (minIndex < 0) {
-        return ERROR_END_OF_STREAM;
+        status_t err = minIndex;
+        return err;
     }
 
     TrackInfo *info = &mSelectedTracks.editItemAt(minIndex);
-    *sampleMeta = info->mSample->meta_data();
+    *sampleMeta = new MetaData(info->mSamples.begin()->mBuffer->meta_data());
 
     return OK;
 }
@@ -624,7 +771,7 @@ status_t NuMediaExtractor::getMetrics(Parcel *reply) {
 }
 
 bool NuMediaExtractor::getTotalBitrate(int64_t *bitrate) const {
-    if (mTotalBitrate >= 0) {
+    if (mTotalBitrate > 0) {
         *bitrate = mTotalBitrate;
         return true;
     }

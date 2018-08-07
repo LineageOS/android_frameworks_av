@@ -140,19 +140,19 @@ status_t AudioGainTraits::deserialize(_xmlDoc */*doc*/, const _xmlNode *root, Pt
     }
 
     string minValueMBLiteral = getXmlAttribute(root, Attributes::minValueMB);
-    uint32_t minValueMB;
+    int32_t minValueMB;
     if (!minValueMBLiteral.empty() && convertTo(minValueMBLiteral, minValueMB)) {
         gain->setMinValueInMb(minValueMB);
     }
 
     string maxValueMBLiteral = getXmlAttribute(root, Attributes::maxValueMB);
-    uint32_t maxValueMB;
+    int32_t maxValueMB;
     if (!maxValueMBLiteral.empty() && convertTo(maxValueMBLiteral, maxValueMB)) {
         gain->setMaxValueInMb(maxValueMB);
     }
 
     string defaultValueMBLiteral = getXmlAttribute(root, Attributes::defaultValueMB);
-    uint32_t defaultValueMB;
+    int32_t defaultValueMB;
     if (!defaultValueMBLiteral.empty() && convertTo(defaultValueMBLiteral, defaultValueMB)) {
         gain->setDefaultValueInMb(defaultValueMB);
     }
@@ -217,6 +217,8 @@ const char *const MixPortTraits::tag = "mixPort";
 const char MixPortTraits::Attributes::name[] = "name";
 const char MixPortTraits::Attributes::role[] = "role";
 const char MixPortTraits::Attributes::flags[] = "flags";
+const char MixPortTraits::Attributes::maxOpenCount[] = "maxOpenCount";
+const char MixPortTraits::Attributes::maxActiveCount[] = "maxActiveCount";
 
 status_t MixPortTraits::deserialize(_xmlDoc *doc, const _xmlNode *child, PtrElement &mixPort,
                                     PtrSerializingCtx /*serializingContext*/)
@@ -258,6 +260,14 @@ status_t MixPortTraits::deserialize(_xmlDoc *doc, const _xmlNode *child, PtrElem
             // Sink role
             mixPort->setFlags(InputFlagConverter::maskFromString(flags));
         }
+    }
+    string maxOpenCount = getXmlAttribute(child, Attributes::maxOpenCount);
+    if (!maxOpenCount.empty()) {
+        convertTo(maxOpenCount, mixPort->maxOpenCount);
+    }
+    string maxActiveCount = getXmlAttribute(child, Attributes::maxActiveCount);
+    if (!maxActiveCount.empty()) {
+        convertTo(maxActiveCount, mixPort->maxActiveCount);
     }
     // Deserialize children
     AudioGainTraits::Collection gains;
@@ -638,4 +648,4 @@ status_t PolicySerializer::deserialize(const char *configFile, AudioPolicyConfig
     return android::OK;
 }
 
-}; // namespace android
+} // namespace android

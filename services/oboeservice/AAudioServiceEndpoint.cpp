@@ -39,7 +39,7 @@ using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
 
 AAudioServiceEndpoint::~AAudioServiceEndpoint() {
-    ALOGD("AAudioServiceEndpoint::~AAudioServiceEndpoint() destroying endpoint %p", this);
+    ALOGD("%s(%p) destroyed", __func__, this);
 }
 
 std::string AAudioServiceEndpoint::dump() const {
@@ -55,11 +55,17 @@ std::string AAudioServiceEndpoint::dump() const {
 
     result << "    Direction:            " << ((getDirection() == AAUDIO_DIRECTION_OUTPUT)
                                    ? "OUTPUT" : "INPUT") << "\n";
-    result << "    Sample Rate:          " << getSampleRate() << "\n";
-    result << "    Frames Per Burst:     " << mFramesPerBurst << "\n";
-    result << "    Reference Count:      " << mOpenCount << "\n";
     result << "    Requested Device Id:  " << mRequestedDeviceId << "\n";
     result << "    Device Id:            " << getDeviceId() << "\n";
+    result << "    Sample Rate:          " << getSampleRate() << "\n";
+    result << "    Channel Count:        " << getSamplesPerFrame() << "\n";
+    result << "    Frames Per Burst:     " << mFramesPerBurst << "\n";
+    result << "    Usage:                " << getUsage() << "\n";
+    result << "    ContentType:          " << getContentType() << "\n";
+    result << "    InputPreset:          " << getInputPreset() << "\n";
+    result << "    Reference Count:      " << mOpenCount << "\n";
+    result << "    Session Id:           " << getSessionId() << "\n";
+    result << "    Connected:            " << mConnected.load() << "\n";
     result << "    Registered Streams:" << "\n";
     result << AAudioServiceStreamShared::dumpHeader() << "\n";
     for (const auto stream : mRegisteredStreams) {
@@ -72,9 +78,22 @@ std::string AAudioServiceEndpoint::dump() const {
     return result.str();
 }
 
-void AAudioServiceEndpoint::disconnectRegisteredStreams() {
+// @return true if stream found
+bool AAudioServiceEndpoint::isStreamRegistered(audio_port_handle_t portHandle) {
     std::lock_guard<std::mutex> lock(mLockStreams);
     for (const auto stream : mRegisteredStreams) {
+        if (stream->getPortHandle() == portHandle) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void AAudioServiceEndpoint::disconnectRegisteredStreams() {
+    std::lock_guard<std::mutex> lock(mLockStreams);
+    mConnected.store(false);
+    for (const auto stream : mRegisteredStreams) {
+        ALOGD("disconnectRegisteredStreams() stop and disconnect %p", stream.get());
         stream->stop();
         stream->disconnect();
     }
@@ -96,11 +115,18 @@ aaudio_result_t AAudioServiceEndpoint::unregisterStream(sp<AAudioServiceStreamBa
 }
 
 bool AAudioServiceEndpoint::matches(const AAudioStreamConfiguration& configuration) {
+    if (!mConnected.load()) {
+        return false; // Only use an endpoint if it is connected to a device.
+    }
     if (configuration.getDirection() != getDirection()) {
         return false;
     }
     if (configuration.getDeviceId() != AAUDIO_UNSPECIFIED &&
         configuration.getDeviceId() != getDeviceId()) {
+        return false;
+    }
+    if (configuration.getSessionId() != AAUDIO_SESSION_ID_ALLOCATE &&
+        configuration.getSessionId() != getSessionId()) {
         return false;
     }
     if (configuration.getSampleRate() != AAUDIO_UNSPECIFIED &&

@@ -262,7 +262,7 @@ void MtpDevice::initialize() {
                 MtpDeviceProperty propCode = (*mDeviceInfo->mDeviceProperties)[i];
                 MtpProperty* property = getDevicePropDesc(propCode);
                 if (property)
-                    mDeviceProperties.push(property);
+                    mDeviceProperties.push_back(property);
             }
         }
     }
@@ -327,7 +327,7 @@ const char* MtpDevice::getDeviceName() {
 }
 
 bool MtpDevice::openSession() {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mSessionID = 0;
     mTransactionID = 0;
@@ -353,7 +353,7 @@ bool MtpDevice::closeSession() {
 }
 
 MtpDeviceInfo* MtpDevice::getDeviceInfo() {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     if (!sendRequest(MTP_OPERATION_GET_DEVICE_INFO))
@@ -372,7 +372,7 @@ MtpDeviceInfo* MtpDevice::getDeviceInfo() {
 }
 
 MtpStorageIDList* MtpDevice::getStorageIDs() {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     if (!sendRequest(MTP_OPERATION_GET_STORAGE_IDS))
@@ -387,7 +387,7 @@ MtpStorageIDList* MtpDevice::getStorageIDs() {
 }
 
 MtpStorageInfo* MtpDevice::getStorageInfo(MtpStorageID storageID) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     mRequest.setParameter(1, storageID);
@@ -408,7 +408,7 @@ MtpStorageInfo* MtpDevice::getStorageInfo(MtpStorageID storageID) {
 
 MtpObjectHandleList* MtpDevice::getObjectHandles(MtpStorageID storageID,
             MtpObjectFormat format, MtpObjectHandle parent) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     mRequest.setParameter(1, storageID);
@@ -426,7 +426,7 @@ MtpObjectHandleList* MtpDevice::getObjectHandles(MtpStorageID storageID,
 }
 
 MtpObjectInfo* MtpDevice::getObjectInfo(MtpObjectHandle handle) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     // FIXME - we might want to add some caching here
 
@@ -448,7 +448,7 @@ MtpObjectInfo* MtpDevice::getObjectInfo(MtpObjectHandle handle) {
 }
 
 void* MtpDevice::getThumbnail(MtpObjectHandle handle, int& outLength) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     mRequest.setParameter(1, handle);
@@ -463,7 +463,7 @@ void* MtpDevice::getThumbnail(MtpObjectHandle handle, int& outLength) {
 }
 
 MtpObjectHandle MtpDevice::sendObjectInfo(MtpObjectInfo* info) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     MtpObjectHandle parent = info->mParent;
@@ -517,7 +517,7 @@ MtpObjectHandle MtpDevice::sendObjectInfo(MtpObjectInfo* info) {
 }
 
 bool MtpDevice::sendObject(MtpObjectHandle handle, int size, int srcFD) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     if (mLastSendObjectInfoTransactionID + 1 != mTransactionID ||
             mLastSendObjectInfoObjectHandle != handle) {
@@ -537,7 +537,7 @@ bool MtpDevice::sendObject(MtpObjectHandle handle, int size, int srcFD) {
 }
 
 bool MtpDevice::deleteObject(MtpObjectHandle handle) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     mRequest.setParameter(1, handle);
@@ -572,7 +572,7 @@ MtpObjectHandle MtpDevice::getStorageID(MtpObjectHandle handle) {
 }
 
 MtpObjectPropertyList* MtpDevice::getObjectPropsSupported(MtpObjectFormat format) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     mRequest.setParameter(1, format);
@@ -589,7 +589,7 @@ MtpObjectPropertyList* MtpDevice::getObjectPropsSupported(MtpObjectFormat format
 }
 
 MtpProperty* MtpDevice::getDevicePropDesc(MtpDeviceProperty code) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     mRequest.setParameter(1, code);
@@ -609,7 +609,7 @@ MtpProperty* MtpDevice::getDevicePropDesc(MtpDeviceProperty code) {
 }
 
 MtpProperty* MtpDevice::getObjectPropDesc(MtpObjectProperty code, MtpObjectFormat format) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     mRequest.setParameter(1, code);
@@ -633,7 +633,7 @@ bool MtpDevice::getObjectPropValue(MtpObjectHandle handle, MtpProperty* property
     if (property == nullptr)
         return false;
 
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     mRequest.setParameter(1, handle);
@@ -684,7 +684,7 @@ bool MtpDevice::readObjectInternal(MtpObjectHandle handle,
                                    ReadObjectCallback callback,
                                    const uint32_t* expectedLength,
                                    void* clientData) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     mRequest.setParameter(1, handle);
@@ -806,7 +806,7 @@ bool MtpDevice::readPartialObject(MtpObjectHandle handle,
                                   uint32_t *writtenSize,
                                   ReadObjectCallback callback,
                                   void* clientData) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     mRequest.setParameter(1, handle);
@@ -828,7 +828,7 @@ bool MtpDevice::readPartialObject64(MtpObjectHandle handle,
                                     uint32_t *writtenSize,
                                     ReadObjectCallback callback,
                                     void* clientData) {
-    Mutex::Autolock autoLock(mMutex);
+    std::lock_guard<std::mutex> lg(mMutex);
 
     mRequest.reset();
     mRequest.setParameter(1, handle);
@@ -908,7 +908,7 @@ MtpResponseCode MtpDevice::readResponse() {
 }
 
 int MtpDevice::submitEventRequest() {
-    if (mEventMutex.tryLock()) {
+    if (!mEventMutex.try_lock()) {
         // An event is being reaped on another thread.
         return -1;
     }
@@ -916,7 +916,7 @@ int MtpDevice::submitEventRequest() {
         // An event request was submitted, but no reapEventRequest called so far.
         return -1;
     }
-    Mutex::Autolock autoLock(mEventMutexForInterrupt);
+    std::lock_guard<std::mutex> lg(mEventMutexForInterrupt);
     mEventPacket.sendRequest(mRequestIntr);
     const int currentHandle = ++mCurrentEventHandle;
     mProcessingEvent = true;
@@ -925,7 +925,7 @@ int MtpDevice::submitEventRequest() {
 }
 
 int MtpDevice::reapEventRequest(int handle, uint32_t (*parameters)[3]) {
-    Mutex::Autolock autoLock(mEventMutex);
+    std::lock_guard<std::mutex> lg(mEventMutex);
     if (!mProcessingEvent || mCurrentEventHandle != handle || !parameters) {
         return -1;
     }
@@ -940,7 +940,7 @@ int MtpDevice::reapEventRequest(int handle, uint32_t (*parameters)[3]) {
 }
 
 void MtpDevice::discardEventRequest(int handle) {
-    Mutex::Autolock autoLock(mEventMutexForInterrupt);
+    std::lock_guard<std::mutex> lg(mEventMutexForInterrupt);
     if (mCurrentEventHandle != handle) {
         return;
     }

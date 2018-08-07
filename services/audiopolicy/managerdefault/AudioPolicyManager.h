@@ -16,6 +16,10 @@
 
 #pragma once
 
+#include <atomic>
+#include <memory>
+#include <unordered_set>
+
 #include <stdint.h>
 #include <sys/types.h>
 #include <cutils/config_utils.h>
@@ -31,6 +35,7 @@
 #include <AudioPolicyManagerInterface.h>
 #include <AudioPolicyManagerObserver.h>
 #include <AudioGain.h>
+#include <AudioPolicyConfig.h>
 #include <AudioPort.h>
 #include <AudioPatch.h>
 #include <DeviceDescriptor.h>
@@ -63,6 +68,10 @@ namespace android {
 // is switched
 #define MUTE_TIME_MS 2000
 
+// multiplication factor applied to output latency when calculating a safe mute delay when
+// invalidating tracks
+#define LATENCY_MUTE_FACTOR 4
+
 #define NUM_TEST_OUTPUTS 5
 
 #define NUM_VOL_CURVE_KNEES 2
@@ -76,10 +85,6 @@ namespace android {
 // ----------------------------------------------------------------------------
 
 class AudioPolicyManager : public AudioPolicyInterface, public AudioPolicyManagerObserver
-
-#ifdef AUDIO_POLICY_TEST
-    , public Thread
-#endif //AUDIO_POLICY_TEST
 {
 
 public:
@@ -103,19 +108,14 @@ public:
 
         virtual void setSystemProperty(const char* property, const char* value);
         virtual status_t initCheck();
-        virtual audio_io_handle_t getOutput(audio_stream_type_t stream,
-                                            uint32_t samplingRate,
-                                            audio_format_t format,
-                                            audio_channel_mask_t channelMask,
-                                            audio_output_flags_t flags,
-                                            const audio_offload_info_t *offloadInfo);
+        virtual audio_io_handle_t getOutput(audio_stream_type_t stream);
         virtual status_t getOutputForAttr(const audio_attributes_t *attr,
                                           audio_io_handle_t *output,
                                           audio_session_t session,
                                           audio_stream_type_t *stream,
                                           uid_t uid,
                                           const audio_config_t *config,
-                                          audio_output_flags_t flags,
+                                          audio_output_flags_t *flags,
                                           audio_port_handle_t *selectedDeviceId,
                                           audio_port_handle_t *portId);
         virtual status_t startOutput(audio_io_handle_t output,
@@ -140,6 +140,7 @@ public:
         // indicates to the audio policy manager that the input starts being used.
         virtual status_t startInput(audio_io_handle_t input,
                                     audio_session_t session,
+                                    bool silenced,
                                     concurrency_type__mask_t *concurrency);
 
         // indicates to the audio policy manager that the input stops being used.
@@ -237,10 +238,33 @@ public:
         virtual float    getStreamVolumeDB(
                     audio_stream_type_t stream, int index, audio_devices_t device);
 
+        virtual status_t getSurroundFormats(unsigned int *numSurroundFormats,
+                                            audio_format_t *surroundFormats,
+                                            bool *surroundFormatsEnabled,
+                                            bool reported);
+        virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
+
         // return the strategy corresponding to a given stream type
         routing_strategy getStrategy(audio_stream_type_t stream) const;
 
+        virtual void setRecordSilenced(uid_t uid, bool silenced);
+
 protected:
+        // A constructor that allows more fine-grained control over initialization process,
+        // used in automatic tests.
+        AudioPolicyManager(AudioPolicyClientInterface *clientInterface, bool forTesting);
+
+        // These methods should be used when finer control over APM initialization
+        // is needed, e.g. in tests. Must be used in conjunction with the constructor
+        // that only performs fields initialization. The public constructor comprises
+        // these steps in the following sequence:
+        //   - field initializing constructor;
+        //   - loadConfig;
+        //   - initialize.
+        AudioPolicyConfig& getConfig() { return mConfig; }
+        void loadConfig();
+        status_t initialize();
+
         // From AudioPolicyManagerObserver
         virtual const AudioPatchCollection &getAudioPatches() const
         {
@@ -275,7 +299,7 @@ protected:
         {
             return mDefaultOutputDevice;
         }
-protected:
+
         void addOutput(audio_io_handle_t output, const sp<SwAudioOutputDescriptor>& outputDesc);
         void removeOutput(audio_io_handle_t output);
         void addInput(audio_io_handle_t input, const sp<AudioInputDescriptor>& inputDesc);
@@ -304,7 +328,8 @@ protected:
                              bool force = false,
                              int delayMs = 0,
                              audio_patch_handle_t *patchHandle = NULL,
-                             const char* address = NULL);
+                             const char *address = nullptr,
+                             bool requiresMuteCheck = true);
         status_t resetOutputDevice(const sp<AudioOutputDescriptor>& outputDesc,
                                    int delayMs = 0,
                                    audio_patch_handle_t *patchHandle = NULL);
@@ -419,11 +444,6 @@ protected:
         {
             return mEffects.getMaxEffectsMemory();
         }
-#ifdef AUDIO_POLICY_TEST
-        virtual     bool        threadLoop();
-                    void        exit();
-        int testOutputIndex(audio_io_handle_t output);
-#endif //AUDIO_POLICY_TEST
 
         SortedVector<audio_io_handle_t> getOutputsForDevice(audio_devices_t device,
                                                             const SwAudioOutputCollection& openOutputs);
@@ -481,6 +501,9 @@ protected:
         }
 
         uint32_t updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs = 0);
+        sp<AudioPatch> createTelephonyPatch(bool isRx, audio_devices_t device, uint32_t delayMs);
+        sp<DeviceDescriptor> fillAudioPortConfigForDevice(
+                const DeviceVector& devices, audio_devices_t device, audio_port_config *config);
 
         // if argument "device" is different from AUDIO_DEVICE_NONE,  startSource() will force
         // the re-evaluation of the output device.
@@ -534,18 +557,20 @@ protected:
         SessionRouteMap mOutputRoutes = SessionRouteMap(SessionRouteMap::MAPTYPE_OUTPUT);
         SessionRouteMap mInputRoutes = SessionRouteMap(SessionRouteMap::MAPTYPE_INPUT);
 
-        IVolumeCurvesCollection *mVolumeCurves; // Volume Curves per use case and device category
-
         bool    mLimitRingtoneVolume;        // limit ringtone volume to music volume if headset connected
         audio_devices_t mDeviceForStrategy[NUM_STRATEGIES];
         float   mLastVoiceVolume;            // last voice volume value sent to audio HAL
-
-        EffectDescriptorCollection mEffects;  // list of registered audio effects
         bool    mA2dpSuspended;  // true if A2DP output is suspended
-        sp<DeviceDescriptor> mDefaultOutputDevice; // output device selected by default at boot time
-        HwModuleCollection mHwModules;
 
-        volatile int32_t mAudioPortGeneration;
+        std::unique_ptr<IVolumeCurvesCollection> mVolumeCurves; // Volume Curves per use case and device category
+        EffectDescriptorCollection mEffects;  // list of registered audio effects
+        sp<DeviceDescriptor> mDefaultOutputDevice; // output device selected by default at boot time
+        HwModuleCollection mHwModules; // contains only modules that have been loaded successfully
+        HwModuleCollection mHwModulesAll; // normally not needed, used during construction and for
+                                          // dumps
+        AudioPolicyConfig mConfig;
+
+        std::atomic<uint32_t> mAudioPortGeneration;
 
         AudioPatchCollection mAudioPatches;
 
@@ -574,30 +599,19 @@ protected:
         AudioPolicyMixCollection mPolicyMixes; // list of registered mixes
         audio_io_handle_t mMusicEffectOutput;     // output selected for music effects
 
-
-#ifdef AUDIO_POLICY_TEST
-        Mutex   mLock;
-        Condition mWaitWorkCV;
-
-        int             mCurOutput;
-        bool            mDirectOutput;
-        audio_io_handle_t mTestOutputs[NUM_TEST_OUTPUTS];
-        int             mTestInput;
-        uint32_t        mTestDevice;
-        uint32_t        mTestSamplingRate;
-        uint32_t        mTestFormat;
-        uint32_t        mTestChannels;
-        uint32_t        mTestLatencyMs;
-#endif //AUDIO_POLICY_TEST
-
         uint32_t nextAudioPortGeneration();
 
         // Audio Policy Engine Interface.
         AudioPolicyManagerInterface *mEngine;
+
+        // Surround formats that are enabled.
+        std::unordered_set<audio_format_t> mSurroundFormats;
 private:
         // Add or remove AC3 DTS encodings based on user preferences.
         void filterSurroundFormats(FormatVector *formatsPtr);
         void filterSurroundChannelMasks(ChannelsVector *channelMasksPtr);
+
+        status_t getSupportedFormats(audio_io_handle_t ioHandle, FormatVector& formats);
 
         // If any, resolve any "dynamic" fields of an Audio Profiles collection
         void updateAudioProfiles(audio_devices_t device, audio_io_handle_t ioHandle,
@@ -630,20 +644,15 @@ private:
                 audio_devices_t device,
                 audio_session_t session,
                 audio_stream_type_t stream,
-                uint32_t samplingRate,
-                audio_format_t format,
-                audio_channel_mask_t channelMask,
-                audio_output_flags_t flags,
-                const audio_offload_info_t *offloadInfo);
+                const audio_config_t *config,
+                audio_output_flags_t *flags);
         // internal method to return the input handle for the given device and format
         audio_io_handle_t getInputForDevice(audio_devices_t device,
                 String8 address,
                 audio_session_t session,
                 uid_t uid,
                 audio_source_t inputSource,
-                uint32_t samplingRate,
-                audio_format_t format,
-                audio_channel_mask_t channelMask,
+                const audio_config_base_t *config,
                 audio_input_flags_t flags,
                 AudioMix *policyMix);
 

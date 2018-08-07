@@ -8,9 +8,9 @@ LOCAL_SRC_FILES:=       \
         SineSource.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libmedia libutils libbinder libstagefright_foundation \
-        libjpeg libgui libcutils liblog \
-        libhidlmemory \
+        libstagefright libmedia libmedia_omx libmediaextractor libutils libbinder \
+        libstagefright_foundation libjpeg libui libgui libcutils liblog \
+        libhidlbase \
         android.hardware.media.omx@1.0 \
 
 LOCAL_C_INCLUDES:= \
@@ -36,7 +36,8 @@ LOCAL_SRC_FILES:=         \
         record.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libmedia liblog libutils libbinder libstagefright_foundation
+        libstagefright libmedia libmediaextractor liblog libutils libbinder \
+        libstagefright_foundation
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
@@ -60,7 +61,8 @@ LOCAL_SRC_FILES:=         \
         recordvideo.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libmedia liblog libutils libbinder libstagefright_foundation
+        libstagefright libmedia libmediaextractor liblog libutils libbinder \
+        libstagefright_foundation
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
@@ -85,7 +87,8 @@ LOCAL_SRC_FILES:=         \
         audioloop.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libmedia liblog libutils libbinder libstagefright_foundation
+        libstagefright libmedia libmediaextractor liblog libutils libbinder \
+        libstagefright_foundation
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
@@ -107,8 +110,8 @@ LOCAL_SRC_FILES:=         \
         stream.cpp    \
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright liblog libutils libbinder libgui \
-        libstagefright_foundation libmedia libcutils
+        libstagefright liblog libutils libbinder libui libgui \
+        libstagefright_foundation libmedia libcutils libmediaextractor
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
@@ -132,7 +135,7 @@ LOCAL_SRC_FILES:=               \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright liblog libutils libbinder libstagefright_foundation \
-        libmedia libaudioclient libgui libcutils
+        libmedia libmedia_omx libaudioclient libui libgui libcutils
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
@@ -163,6 +166,8 @@ LOCAL_SHARED_LIBRARIES := \
         libbinder \
         libstagefright_foundation \
         libmedia \
+        libmedia_omx \
+        libui \
         libgui \
         libcutils \
         libRScpp \
@@ -199,7 +204,7 @@ LOCAL_SRC_FILES:=               \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright liblog libutils libbinder libstagefright_foundation \
-        libcutils libc
+        libcutils libc libmediaextractor
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \

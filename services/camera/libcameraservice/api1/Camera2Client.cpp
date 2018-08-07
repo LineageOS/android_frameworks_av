@@ -49,16 +49,17 @@ static int getCallingPid() {
 Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
         const sp<hardware::ICameraClient>& cameraClient,
         const String16& clientPackageName,
-        int cameraId,
+        const String8& cameraDeviceId,
+        int api1CameraId,
         int cameraFacing,
         int clientPid,
         uid_t clientUid,
         int servicePid,
         bool legacyMode):
         Camera2ClientBase(cameraService, cameraClient, clientPackageName,
-                String8::format("%d", cameraId), cameraFacing,
+                cameraDeviceId, api1CameraId, cameraFacing,
                 clientPid, clientUid, servicePid),
-        mParameters(cameraId, cameraFacing)
+        mParameters(api1CameraId, cameraFacing)
 {
     ATRACE_CALL();
 
@@ -68,8 +69,8 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
     mLegacyMode = legacyMode;
 }
 
-status_t Camera2Client::initialize(sp<CameraProviderManager> manager) {
-    return initializeImpl(manager);
+status_t Camera2Client::initialize(sp<CameraProviderManager> manager, const String8& monitorTags) {
+    return initializeImpl(manager, monitorTags);
 }
 
 bool Camera2Client::isZslEnabledInStillTemplate() {
@@ -87,13 +88,13 @@ bool Camera2Client::isZslEnabledInStillTemplate() {
 }
 
 template<typename TProviderPtr>
-status_t Camera2Client::initializeImpl(TProviderPtr providerPtr)
+status_t Camera2Client::initializeImpl(TProviderPtr providerPtr, const String8& monitorTags)
 {
     ATRACE_CALL();
     ALOGV("%s: Initializing client for camera %d", __FUNCTION__, mCameraId);
     status_t res;
 
-    res = Camera2ClientBase::initialize(providerPtr);
+    res = Camera2ClientBase::initialize(providerPtr, monitorTags);
     if (res != OK) {
         return res;
     }
@@ -778,7 +779,35 @@ status_t Camera2Client::startPreviewL(Parameters &params, bool restart) {
     int lastJpegStreamId = mJpegProcessor->getStreamId();
     // If jpeg stream will slow down preview, make sure we remove it before starting preview
     if (params.slowJpegMode) {
-        mJpegProcessor->deleteStream();
+        // Pause preview if we are streaming
+        int32_t activeRequestId = mStreamingProcessor->getActiveRequestId();
+        if (activeRequestId != 0) {
+            res = mStreamingProcessor->togglePauseStream(/*pause*/true);
+            if (res != OK) {
+                ALOGE("%s: Camera %d: Can't pause streaming: %s (%d)",
+                        __FUNCTION__, mCameraId, strerror(-res), res);
+            }
+            res = mDevice->waitUntilDrained();
+            if (res != OK) {
+                ALOGE("%s: Camera %d: Waiting to stop streaming failed: %s (%d)",
+                        __FUNCTION__, mCameraId, strerror(-res), res);
+            }
+        }
+
+        res = mJpegProcessor->deleteStream();
+
+        if (res != OK) {
+            ALOGE("%s: Camera %d: delete Jpeg stream failed: %s (%d)",
+                    __FUNCTION__, mCameraId,  strerror(-res), res);
+        }
+
+        if (activeRequestId != 0) {
+            res = mStreamingProcessor->togglePauseStream(/*pause*/false);
+            if (res != OK) {
+                ALOGE("%s: Camera %d: Can't unpause streaming: %s (%d)",
+                        __FUNCTION__, mCameraId, strerror(-res), res);
+            }
+        }
     } else {
         res = updateProcessorStream(mJpegProcessor, params);
         if (res != OK) {
@@ -858,6 +887,12 @@ status_t Camera2Client::startPreviewL(Parameters &params, bool restart) {
     }
 
     outputStreams.push(getPreviewStreamId());
+
+    if (params.isDeviceZslSupported) {
+        // If device ZSL is supported, resume preview buffers that may be paused
+        // during last takePicture().
+        mDevice->dropStreamBuffers(false, getPreviewStreamId());
+    }
 
     if (!params.recordingHint) {
         if (!restart) {

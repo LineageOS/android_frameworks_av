@@ -8,6 +8,8 @@ cc_test {
         "libstagefright",
         "libbinder",
         "libmedia",
+        "libmedia_omx",
+        "libmediaextractor",
         "libutils",
         "liblog",
         "libstagefright_foundation",
@@ -31,22 +33,4 @@ cc_test {
     ],
 
     compile_multilib: "32",
-}
-
-cc_test {
-    name: "FrameDropper_test",
-
-    srcs: ["FrameDropper_test.cpp"],
-
-    shared_libs: [
-        "libstagefright_omx",
-        "libutils",
-    ],
-
-    include_dirs: ["frameworks/av/media/libstagefright/omx"],
-
-    cflags: [
-        "-Werror",
-        "-Wall",
-    ],
 }

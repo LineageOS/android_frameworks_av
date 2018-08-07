@@ -19,7 +19,7 @@
 
 #include "Configuration.h"
 #include <stdint.h>
-#include <media/nbaio/NBLog.h>
+#include <media/nblog/NBLog.h>
 
 namespace android {
 

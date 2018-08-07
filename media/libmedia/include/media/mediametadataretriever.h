@@ -59,6 +59,15 @@ enum {
     METADATA_KEY_LOCATION        = 23,
     METADATA_KEY_VIDEO_ROTATION  = 24,
     METADATA_KEY_CAPTURE_FRAMERATE = 25,
+    METADATA_KEY_HAS_IMAGE       = 26,
+    METADATA_KEY_IMAGE_COUNT     = 27,
+    METADATA_KEY_IMAGE_PRIMARY   = 28,
+    METADATA_KEY_IMAGE_WIDTH     = 29,
+    METADATA_KEY_IMAGE_HEIGHT    = 30,
+    METADATA_KEY_IMAGE_ROTATION  = 31,
+    METADATA_KEY_VIDEO_FRAME_COUNT  = 32,
+    METADATA_KEY_EXIF_OFFSET     = 33,
+    METADATA_KEY_EXIF_LENGTH     = 34,
 
     // Add more here...
 };
@@ -79,6 +88,13 @@ public:
     status_t setDataSource(
             const sp<IDataSource>& dataSource, const char *mime = NULL);
     sp<IMemory> getFrameAtTime(int64_t timeUs, int option,
+            int colorFormat = HAL_PIXEL_FORMAT_RGB_565, bool metaOnly = false);
+    sp<IMemory> getImageAtIndex(int index,
+            int colorFormat = HAL_PIXEL_FORMAT_RGB_565, bool metaOnly = false, bool thumbnail = false);
+    sp<IMemory> getImageRectAtIndex(
+            int index, int colorFormat, int left, int top, int right, int bottom);
+    status_t getFrameAtIndex(
+            std::vector<sp<IMemory> > *frames, int frameIndex, int numFrames = 1,
             int colorFormat = HAL_PIXEL_FORMAT_RGB_565, bool metaOnly = false);
     sp<IMemory> extractAlbumArt();
     const char* extractMetadata(int keyCode);

@@ -15,10 +15,7 @@ cc_library_shared {
 
     shared_libs: [
         "libexpat",
-        "libutils",
         "liblog",
-        "libcutils",
-        "libstagefright_foundation",
         "libstagefright_omx_utils",
     ],
 

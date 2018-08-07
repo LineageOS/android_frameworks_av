@@ -15,25 +15,18 @@
 ** limitations under the License.
 */
 
-#include <fcntl.h>
-#include <sys/prctl.h>
-#include <sys/wait.h>
-#include <binder/IPCThreadState.h>
-#include <binder/ProcessState.h>
-#include <binder/IServiceManager.h>
-#include <cutils/properties.h>
-
-#include <string>
-
 #include <android-base/logging.h>
 
 // from LOCAL_C_INCLUDES
-#include "MediaCodecService.h"
 #include "minijail.h"
 
+#include <binder/ProcessState.h>
 #include <hidl/HidlTransportSupport.h>
 #include <media/stagefright/omx/1.0/Omx.h>
 #include <media/stagefright/omx/1.0/OmxStore.h>
+
+#include <media/CodecServiceRegistrant.h>
+#include <dlfcn.h>
 
 using namespace android;
 
@@ -45,21 +38,32 @@ static const char kVendorSeccompPolicyPath[] =
 
 int main(int argc __unused, char** argv)
 {
+    strcpy(argv[0], "media.codec");
     LOG(INFO) << "mediacodecservice starting";
-    bool treble = property_get_bool("persist.media.treble_omx", true);
-    if (treble) {
-      android::ProcessState::initWithDriver("/dev/vndbinder");
-    }
-
     signal(SIGPIPE, SIG_IGN);
     SetUpMinijail(kSystemSeccompPolicyPath, kVendorSeccompPolicyPath);
 
-    strcpy(argv[0], "media.codec");
+    android::ProcessState::initWithDriver("/dev/vndbinder");
+    android::ProcessState::self()->startThreadPool();
 
     ::android::hardware::configureRpcThreadpool(64, false);
-    sp<ProcessState> proc(ProcessState::self());
 
-    if (treble) {
+    // Registration of customized codec services
+    void *registrantLib = dlopen(
+            "libmedia_codecserviceregistrant.so",
+            RTLD_NOW | RTLD_LOCAL);
+    if (registrantLib) {
+        RegisterCodecServicesFunc registerCodecServices =
+                reinterpret_cast<RegisterCodecServicesFunc>(
+                dlsym(registrantLib, "RegisterCodecServices"));
+        if (registerCodecServices) {
+            registerCodecServices();
+        } else {
+            LOG(WARNING) << "Cannot register additional services "
+                    "-- corrupted library.";
+        }
+    } else {
+        // Default codec services
         using namespace ::android::hardware::media::omx::V1_0;
         sp<IOmxStore> omxStore = new implementation::OmxStore();
         if (omxStore == nullptr) {
@@ -73,13 +77,9 @@ int main(int argc __unused, char** argv)
         } else if (omx->registerAsService() != OK) {
             LOG(ERROR) << "Cannot register IOmx HAL service.";
         } else {
-            LOG(INFO) << "Treble OMX service created.";
+            LOG(INFO) << "IOmx HAL service created.";
         }
-    } else {
-        MediaCodecService::instantiate();
-        LOG(INFO) << "Non-Treble OMX service created.";
     }
 
-    ProcessState::self()->startThreadPool();
-    IPCThreadState::self()->joinThreadPool();
+    ::android::hardware::joinRpcThreadpool();
 }

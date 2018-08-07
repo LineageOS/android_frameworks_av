@@ -19,8 +19,11 @@
 #define ANDROID_AUDIO_FLINGER_H
 
 #include "Configuration.h"
+#include <atomic>
+#include <mutex>
 #include <deque>
 #include <map>
+#include <vector>
 #include <stdint.h>
 #include <sys/types.h>
 #include <limits.h>
@@ -34,7 +37,6 @@
 #include <media/IAudioFlinger.h>
 #include <media/IAudioFlingerClient.h>
 #include <media/IAudioTrack.h>
-#include <media/IAudioRecord.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTrack.h>
 #include <media/MmapStreamInterface.h>
@@ -72,9 +74,11 @@
 
 #include <powermanager/IPowerManager.h>
 
-#include <media/nbaio/NBLog.h>
+#include <media/nblog/NBLog.h>
 #include <private/media/AudioEffectShared.h>
 #include <private/media/AudioTrackShared.h>
+
+#include "android/media/BnAudioRecord.h"
 
 namespace android {
 
@@ -93,12 +97,6 @@ class ServerProxy;
 
 static const nsecs_t kDefaultStandbyTimeInNsecs = seconds(3);
 
-
-// Max shared memory size for audio tracks and audio records per client process
-static const size_t kClientSharedHeapSizeBytes = 1024*1024;
-// Shared memory size multiplier for non low ram devices
-static const size_t kClientSharedHeapSizeMultiplier = 4;
-
 #define INCLUDING_FROM_AUDIOFLINGER_H
 
 class AudioFlinger :
@@ -113,39 +111,13 @@ public:
     virtual     status_t    dump(int fd, const Vector<String16>& args);
 
     // IAudioFlinger interface, in binder opcode order
-    virtual sp<IAudioTrack> createTrack(
-                                audio_stream_type_t streamType,
-                                uint32_t sampleRate,
-                                audio_format_t format,
-                                audio_channel_mask_t channelMask,
-                                size_t *pFrameCount,
-                                audio_output_flags_t *flags,
-                                const sp<IMemory>& sharedBuffer,
-                                audio_io_handle_t output,
-                                pid_t pid,
-                                pid_t tid,
-                                audio_session_t *sessionId,
-                                int clientUid,
-                                status_t *status /*non-NULL*/,
-                                audio_port_handle_t portId);
+    virtual sp<IAudioTrack> createTrack(const CreateTrackInput& input,
+                                        CreateTrackOutput& output,
+                                        status_t *status);
 
-    virtual sp<IAudioRecord> openRecord(
-                                audio_io_handle_t input,
-                                uint32_t sampleRate,
-                                audio_format_t format,
-                                audio_channel_mask_t channelMask,
-                                const String16& opPackageName,
-                                size_t *pFrameCount,
-                                audio_input_flags_t *flags,
-                                pid_t pid,
-                                pid_t tid,
-                                int clientUid,
-                                audio_session_t *sessionId,
-                                size_t *notificationFrames,
-                                sp<IMemory>& cblk,
-                                sp<IMemory>& buffers,
-                                status_t *status /*non-NULL*/,
-                                audio_port_handle_t portId);
+    virtual sp<media::IAudioRecord> createRecord(const CreateRecordInput& input,
+                                                 CreateRecordOutput& output,
+                                                 status_t *status);
 
     virtual     uint32_t    sampleRate(audio_io_handle_t ioHandle) const;
     virtual     audio_format_t format(audio_io_handle_t output) const;
@@ -171,6 +143,8 @@ public:
 
     virtual     status_t    setMicMute(bool state);
     virtual     bool        getMicMute() const;
+
+    virtual     void        setRecordSilenced(uid_t uid, bool silenced);
 
     virtual     status_t    setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs);
     virtual     String8     getParameters(audio_io_handle_t ioHandle, const String8& keys) const;
@@ -250,7 +224,7 @@ public:
     virtual uint32_t getPrimaryOutputSamplingRate();
     virtual size_t getPrimaryOutputFrameCount();
 
-    virtual status_t setLowRamDevice(bool isLowRamDevice);
+    virtual status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) override;
 
     /* List available audio ports and their attributes */
     virtual status_t listAudioPorts(unsigned int *num_ports,
@@ -279,6 +253,8 @@ public:
     /* Indicate JAVA services are ready (scheduling, power management ...) */
     virtual status_t systemReady();
 
+    virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones);
+
     virtual     status_t    onTransact(
                                 uint32_t code,
                                 const Parcel& data,
@@ -296,6 +272,7 @@ public:
                             audio_config_base_t *config,
                             const AudioClient& client,
                             audio_port_handle_t *deviceId,
+                            audio_session_t *sessionId,
                             const sp<MmapStreamCallback>& callback,
                             sp<MmapStreamInterface>& interface,
                             audio_port_handle_t *handle);
@@ -537,6 +514,13 @@ private:
     };
 
     // --- PlaybackThread ---
+#ifdef FLOAT_EFFECT_CHAIN
+#define EFFECT_BUFFER_FORMAT AUDIO_FORMAT_PCM_FLOAT
+using effect_buffer_t = float;
+#else
+#define EFFECT_BUFFER_FORMAT AUDIO_FORMAT_PCM_16_BIT
+using effect_buffer_t = int16_t;
+#endif
 
 #include "Threads.h"
 
@@ -556,10 +540,10 @@ private:
         virtual void        pause();
         virtual status_t    attachAuxEffect(int effectId);
         virtual status_t    setParameters(const String8& keyValuePairs);
-        virtual VolumeShaper::Status applyVolumeShaper(
-                const sp<VolumeShaper::Configuration>& configuration,
-                const sp<VolumeShaper::Operation>& operation) override;
-        virtual sp<VolumeShaper::State> getVolumeShaperState(int id) override;
+        virtual media::VolumeShaper::Status applyVolumeShaper(
+                const sp<media::VolumeShaper::Configuration>& configuration,
+                const sp<media::VolumeShaper::Operation>& operation) override;
+        virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) override;
         virtual status_t    getTimestamp(AudioTimestamp& timestamp);
         virtual void        signal(); // signal playback thread for a change in control block
 
@@ -571,15 +555,15 @@ private:
     };
 
     // server side of the client's IAudioRecord
-    class RecordHandle : public android::BnAudioRecord {
+    class RecordHandle : public android::media::BnAudioRecord {
     public:
         explicit RecordHandle(const sp<RecordThread::RecordTrack>& recordTrack);
         virtual             ~RecordHandle();
-        virtual status_t    start(int /*AudioSystem::sync_event_t*/ event,
-                audio_session_t triggerSession);
-        virtual void        stop();
-        virtual status_t onTransact(
-            uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags);
+        virtual binder::Status    start(int /*AudioSystem::sync_event_t*/ event,
+                int /*audio_session_t*/ triggerSession);
+        virtual binder::Status   stop();
+        virtual binder::Status   getActiveMicrophones(
+                std::vector<media::MicrophoneInfo>* activeMicrophones);
     private:
         const sp<RecordThread::RecordTrack> mRecordTrack;
 
@@ -635,9 +619,6 @@ private:
               // no range check, AudioFlinger::mLock held
               bool streamMute_l(audio_stream_type_t stream) const
                                 { return mStreamTypes[stream].mute; }
-              // no range check, doesn't check per-thread stream volume, AudioFlinger::mLock held
-              float streamVolume_l(audio_stream_type_t stream) const
-                                { return mStreamTypes[stream].volume; }
               void ioConfigChanged(audio_io_config_event event,
                                    const sp<AudioIoDescriptor>& ioDesc,
                                    pid_t pid = 0);
@@ -817,6 +798,8 @@ private:
 
     status_t    checkStreamType(audio_stream_type_t stream) const;
 
+    void        filterReservedParameters(String8& keyValuePairs, uid_t callingUid);
+
 #ifdef TEE_SINK
     // all record threads serially share a common tee sink, which is re-created on format change
     sp<NBAIO_Sink>   mRecordTeeSink;
@@ -846,15 +829,18 @@ public:
     static const size_t kTeeSinkTrackFramesDefault = 0x200000;
 #endif
 
-    // This method reads from a variable without mLock, but the variable is updated under mLock.  So
-    // we might read a stale value, or a value that's inconsistent with respect to other variables.
-    // In this case, it's safe because the return value isn't used for making an important decision.
-    // The reason we don't want to take mLock is because it could block the caller for a long time.
+    // These methods read variables atomically without mLock,
+    // though the variables are updated with mLock.
     bool    isLowRamDevice() const { return mIsLowRamDevice; }
+    size_t getClientSharedHeapSize() const;
 
 private:
-    bool    mIsLowRamDevice;
+    std::atomic<bool> mIsLowRamDevice;
     bool    mIsDeviceTypeKnown;
+    int64_t mTotalMemory;
+    std::atomic<size_t> mClientSharedHeapSize;
+    static constexpr size_t kMinimumClientSharedHeapSizeBytes = 1024 * 1024; // 1MB
+
     nsecs_t mGlobalEffectEnableTime;  // when a global effect was last enabled
 
     sp<PatchPanel> mPatchPanel;

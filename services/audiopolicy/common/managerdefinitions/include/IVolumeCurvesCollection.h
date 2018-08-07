@@ -25,6 +25,8 @@ namespace android {
 class IVolumeCurvesCollection
 {
 public:
+    virtual ~IVolumeCurvesCollection() = default;
+
     virtual void clearCurrentVolumeIndex(audio_stream_type_t stream) = 0;
     virtual void addCurrentVolumeIndex(audio_stream_type_t stream, audio_devices_t device,
                                        int index) = 0;
@@ -46,9 +48,6 @@ public:
                                          audio_devices_t device) const = 0;
 
     virtual status_t dump(int fd) const = 0;
-
-protected:
-    virtual ~IVolumeCurvesCollection() {}
 };
 
-}; // namespace android
+} // namespace android

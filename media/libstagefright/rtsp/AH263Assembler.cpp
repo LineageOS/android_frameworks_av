@@ -25,7 +25,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/hexdump.h>
-#include <media/stagefright/Utils.h>
+#include <media/stagefright/foundation/ByteUtils.h>
 
 namespace android {
 

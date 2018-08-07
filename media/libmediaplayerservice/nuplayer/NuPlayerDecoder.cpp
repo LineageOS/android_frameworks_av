@@ -29,10 +29,12 @@
 
 #include <cutils/properties.h>
 #include <media/ICrypto.h>
+#include <media/MediaBufferHolder.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaDefs.h>
@@ -40,7 +42,6 @@
 #include <media/stagefright/SurfaceUtils.h>
 #include <gui/Surface.h>
 
-#include "avc_utils.h"
 #include "ATSParser.h"
 
 namespace android {
@@ -744,25 +745,34 @@ bool NuPlayer::Decoder::handleAnOutputBuffer(
     sp<AMessage> reply = new AMessage(kWhatRenderBuffer, this);
     reply->setSize("buffer-ix", index);
     reply->setInt32("generation", mBufferGeneration);
+    reply->setSize("size", size);
 
     if (eos) {
         ALOGI("[%s] saw output EOS", mIsAudio ? "audio" : "video");
 
         buffer->meta()->setInt32("eos", true);
         reply->setInt32("eos", true);
-    } else if (mSkipRenderingUntilMediaTimeUs >= 0) {
+    }
+
+    mNumFramesTotal += !mIsAudio;
+
+    if (mSkipRenderingUntilMediaTimeUs >= 0) {
         if (timeUs < mSkipRenderingUntilMediaTimeUs) {
             ALOGV("[%s] dropping buffer at time %lld as requested.",
                      mComponentName.c_str(), (long long)timeUs);
 
             reply->post();
+            if (eos) {
+                notifyResumeCompleteIfNecessary();
+                if (mRenderer != NULL && !isDiscontinuityPending()) {
+                    mRenderer->queueEOS(mIsAudio, ERROR_END_OF_STREAM);
+                }
+            }
             return true;
         }
 
         mSkipRenderingUntilMediaTimeUs = -1;
     }
-
-    mNumFramesTotal += !mIsAudio;
 
     // wait until 1st frame comes out to signal resume complete
     notifyResumeCompleteIfNecessary();
@@ -937,7 +947,8 @@ status_t NuPlayer::Decoder::fetchInputData(sp<AMessage> &reply) {
                             mCurrentMaxVideoTemporalLayerId);
                 } else if (layerId > mCurrentMaxVideoTemporalLayerId) {
                     mCurrentMaxVideoTemporalLayerId = layerId;
-                } else if (layerId == 0 && mNumVideoTemporalLayerTotal > 1 && IsIDR(accessUnit)) {
+                } else if (layerId == 0 && mNumVideoTemporalLayerTotal > 1
+                        && IsIDR(accessUnit->data(), accessUnit->size())) {
                     mCurrentMaxVideoTemporalLayerId = mNumVideoTemporalLayerTotal - 1;
                 }
             }
@@ -1036,7 +1047,7 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
         }
 
         // Modular DRM
-        MediaBuffer *mediaBuf = NULL;
+        MediaBufferBase *mediaBuf = NULL;
         NuPlayerDrm::CryptoInfo *cryptInfo = NULL;
 
         // copy into codec buffer
@@ -1052,16 +1063,17 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
                 memcpy(codecBuffer->data(), buffer->data(), buffer->size());
             } else { // No buffer->data()
                 //Modular DRM
-                mediaBuf = (MediaBuffer*)buffer->getMediaBufferBase();
+                sp<RefBase> holder;
+                if (buffer->meta()->findObject("mediaBufferHolder", &holder)) {
+                    mediaBuf = (holder != nullptr) ?
+                        static_cast<MediaBufferHolder*>(holder.get())->mediaBuffer() : nullptr;
+                }
                 if (mediaBuf != NULL) {
                     codecBuffer->setRange(0, mediaBuf->size());
                     memcpy(codecBuffer->data(), mediaBuf->data(), mediaBuf->size());
 
-                    sp<MetaData> meta_data = mediaBuf->meta_data();
+                    MetaDataBase &meta_data = mediaBuf->meta_data();
                     cryptInfo = NuPlayerDrm::getSampleCryptoInfo(meta_data);
-
-                    // since getMediaBuffer() has incremented the refCount
-                    mediaBuf->release();
                 } else { // No mediaBuf
                     ALOGE("onInputBufferFetched: buffer->data()/mediaBuf are NULL for %p",
                             buffer.get());
@@ -1116,6 +1128,7 @@ void NuPlayer::Decoder::onRenderBuffer(const sp<AMessage> &msg) {
     int32_t render;
     size_t bufferIx;
     int32_t eos;
+    size_t size;
     CHECK(msg->findSize("buffer-ix", &bufferIx));
 
     if (!mIsAudio) {
@@ -1135,7 +1148,10 @@ void NuPlayer::Decoder::onRenderBuffer(const sp<AMessage> &msg) {
         CHECK(msg->findInt64("timestampNs", &timestampNs));
         err = mCodec->renderOutputBufferAndRelease(bufferIx, timestampNs);
     } else {
-        mNumOutputFramesDropped += !mIsAudio;
+        if (!msg->findInt32("eos", &eos) || !eos ||
+                !msg->findSize("size", &size) || size) {
+            mNumOutputFramesDropped += !mIsAudio;
+        }
         err = mCodec->releaseOutputBuffer(bufferIx);
     }
     if (err != OK) {

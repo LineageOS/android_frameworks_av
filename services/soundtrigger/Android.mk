@@ -49,11 +49,16 @@ LOCAL_SRC_FILES +=               \
 LOCAL_SHARED_LIBRARIES += \
     libhwbinder \
     libhidlbase \
+    libhidlmemory \
     libhidltransport \
     libbase \
     libaudiohal \
+    libaudiohal_deathhandler \
     android.hardware.soundtrigger@2.0 \
-    android.hardware.audio.common@2.0
+    android.hardware.soundtrigger@2.1 \
+    android.hardware.audio.common@2.0 \
+    android.hidl.allocator@1.0 \
+    android.hidl.memory@1.0
 endif
 
 

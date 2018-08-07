@@ -22,6 +22,7 @@
 #include <media/AudioTimestamp.h>
 #include <media/IAudioTrack.h>
 #include <media/AudioResamplerPublic.h>
+#include <media/MediaAnalyticsItem.h>
 #include <media/Modulo.h>
 #include <utils/threads.h>
 
@@ -218,6 +219,8 @@ public:
      *                     maxRequiredSpeed playback. Values less than 1.0f and greater than
      *                     AUDIO_TIMESTRETCH_SPEED_MAX will be clamped.  For non-PCM tracks
      *                     and direct or offloaded tracks, this parameter is ignored.
+     * selectedDeviceId:   Selected device id of the app which initially requested the AudioTrack
+     *                     to open with a specific device.
      * threadCanCallJava:  Not present in parameter list, and so is fixed at false.
      */
 
@@ -237,7 +240,8 @@ public:
                                     pid_t pid = -1,
                                     const audio_attributes_t* pAttributes = NULL,
                                     bool doNotReconnect = false,
-                                    float maxRequiredSpeed = 1.0f);
+                                    float maxRequiredSpeed = 1.0f,
+                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
 
     /* Creates an audio track and registers it with AudioFlinger.
      * With this constructor, the track is configured for static buffer mode.
@@ -313,7 +317,8 @@ public:
                             pid_t pid = -1,
                             const audio_attributes_t* pAttributes = NULL,
                             bool doNotReconnect = false,
-                            float maxRequiredSpeed = 1.0f);
+                            float maxRequiredSpeed = 1.0f,
+                            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
 
     /* Result of constructing the AudioTrack. This must be checked for successful initialization
      * before using any AudioTrack API (except for set()), because using
@@ -380,6 +385,11 @@ public:
 
     /* Return the static buffer specified in constructor or set(), or 0 for streaming mode */
             sp<IMemory> sharedBuffer() const { return mSharedBuffer; }
+
+    /*
+     * return metrics information for the current track.
+     */
+            status_t getMetrics(MediaAnalyticsItem * &item);
 
     /* After it's created the track is not active. Call start() to
      * make it active. If set, the callback will start being called.
@@ -748,12 +758,15 @@ public:
             status_t    setParameters(const String8& keyValuePairs);
 
     /* Sets the volume shaper object */
-            VolumeShaper::Status applyVolumeShaper(
-                    const sp<VolumeShaper::Configuration>& configuration,
-                    const sp<VolumeShaper::Operation>& operation);
+            media::VolumeShaper::Status applyVolumeShaper(
+                    const sp<media::VolumeShaper::Configuration>& configuration,
+                    const sp<media::VolumeShaper::Operation>& operation);
 
     /* Gets the volume shaper state */
-            sp<VolumeShaper::State> getVolumeShaperState(int id);
+            sp<media::VolumeShaper::State> getVolumeShaperState(int id);
+
+    /* Selects the presentation (if available) */
+            status_t    selectPresentation(int presentationId, int programId);
 
     /* Get parameters */
             String8     getParameters(const String8& keys);
@@ -990,7 +1003,7 @@ protected:
     sp<IAudioTrack>         mAudioTrack;
     sp<IMemory>             mCblkMemory;
     audio_track_cblk_t*     mCblk;                  // re-load after mLock.unlock()
-    audio_io_handle_t       mOutput;                // returned by AudioSystem::getOutput()
+    audio_io_handle_t       mOutput;                // returned by AudioSystem::getOutputForAttr()
 
     sp<AudioTrackThread>    mAudioTrackThread;
     bool                    mThreadCanCallJava;
@@ -1160,7 +1173,7 @@ protected:
                                               // May not match the app selection depending on other
                                               // activity and connected devices.
 
-    sp<VolumeHandler>       mVolumeHandler;
+    sp<media::VolumeHandler>       mVolumeHandler;
 
 private:
     class DeathNotifier : public IBinder::DeathRecipient {
@@ -1178,7 +1191,25 @@ private:
     pid_t                   mClientPid;
 
     wp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
-    audio_port_handle_t     mPortId;  // unique ID allocated by audio policy
+
+private:
+    class MediaMetrics {
+      public:
+        MediaMetrics() : mAnalyticsItem(new MediaAnalyticsItem("audiotrack")) {
+        }
+        ~MediaMetrics() {
+            // mAnalyticsItem alloc failure will be flagged in the constructor
+            // don't log empty records
+            if (mAnalyticsItem->count() > 0) {
+                mAnalyticsItem->selfrecord();
+            }
+        }
+        void gather(const AudioTrack *track);
+        MediaAnalyticsItem *dup() { return mAnalyticsItem->dup(); }
+      private:
+        std::unique_ptr<MediaAnalyticsItem> mAnalyticsItem;
+    };
+    MediaMetrics mMediaMetrics;
 };
 
 }; // namespace android
