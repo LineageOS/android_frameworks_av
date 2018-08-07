@@ -775,10 +775,12 @@ ATSParser::Stream::Stream(
     ALOGV("new stream PID 0x%02x, type 0x%02x, scrambled %d, SampleEncrypted: %d",
             elementaryPID, streamType, mScrambled, mSampleEncrypted);
 
-    uint32_t flags =
-            (isVideo() && mScrambled) ? ElementaryStreamQueue::kFlag_ScrambledData :
-            (mSampleEncrypted) ? ElementaryStreamQueue::kFlag_SampleEncryptedData :
-            0;
+    uint32_t flags = 0;
+    if (((isVideo() || isAudio()) && mScrambled)) {
+        flags = ElementaryStreamQueue::kFlag_ScrambledData;
+    } else if (mSampleEncrypted) {
+        flags = ElementaryStreamQueue::kFlag_SampleEncryptedData;
+    }
 
     ElementaryStreamQueue::Mode mode = ElementaryStreamQueue::INVALID;
 
@@ -1504,7 +1506,13 @@ status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
         descrambleBytes = bytesWritten;
     }
 
-    sp<ABuffer> buffer;
+    // |buffer| points to the buffer from which we'd parse the PES header.
+    // When the output stream is scrambled, it points to mDescrambledBuffer
+    // (unless all packets in this PES are actually clear, in which case,
+    // it points to mBuffer since we never copied into mDescrambledBuffer).
+    // When the output stream is clear, it points to mBuffer, and we'll
+    // copy all descrambled data back to mBuffer.
+    sp<ABuffer> buffer = mBuffer;
     if (mQueue->isScrambled()) {
         // Queue subSample info for scrambled queue
         sp<ABuffer> clearSizesBuffer = new ABuffer(mSubSamples.size() * 4);
@@ -1533,15 +1541,18 @@ status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
         }
         // Pass the original TS subsample size now. The PES header adjust
         // will be applied when the scrambled AU is dequeued.
+        // Note that if descrambleBytes is 0, it means this PES contains only
+        // all ts packets, leadingClearBytes is entire buffer size.
         mQueue->appendScrambledData(
-                mBuffer->data(), mBuffer->size(), sctrl,
-                isSync, clearSizesBuffer, encSizesBuffer);
+                mBuffer->data(), mBuffer->size(),
+                (descrambleBytes > 0) ? descrambleBytes : mBuffer->size(),
+                sctrl, isSync, clearSizesBuffer, encSizesBuffer);
 
-        buffer = mDescrambledBuffer;
+        if (descrambleBytes > 0) {
+            buffer = mDescrambledBuffer;
+        }
     } else {
         memcpy(mBuffer->data(), mDescrambledBuffer->data(), descrambleBytes);
-
-        buffer = mBuffer;
     }
 
     ABitReader br(buffer->data(), buffer->size());
