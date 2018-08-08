@@ -1906,10 +1906,16 @@ status_t MediaPlayerService::AudioOutput::open(
         if (AudioSystem::getOutputSamplingRate(&afSampleRate, mStreamType) != NO_ERROR) {
             return NO_INIT;
         }
+        if (afSampleRate == 0) {
+            return NO_INIT;
+        }
         const size_t framesPerBuffer =
                 (unsigned long long)sampleRate * afFrameCount / afSampleRate;
 
         if (bufferCount == 0) {
+            if (framesPerBuffer == 0) {
+                return NO_INIT;
+            }
             // use suggestedFrameCount
             bufferCount = (suggestedFrameCount + framesPerBuffer - 1) / framesPerBuffer;
         }
