@@ -19,7 +19,6 @@ LOCAL_SRC_FILES:= \
     src/SoundTriggerSession.cpp \
     src/VolumeCurve.cpp \
     src/TypeConverter.cpp \
-    src/AudioSession.cpp \
     src/ClientDescriptor.cpp
 
 LOCAL_SHARED_LIBRARIES := \

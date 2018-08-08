@@ -107,9 +107,9 @@ public:
     RecordClientDescriptor(audio_port_handle_t portId, uid_t uid, audio_session_t sessionId,
                         audio_attributes_t attributes, audio_config_base_t config,
                         audio_port_handle_t preferredDeviceId,
-                        audio_source_t source, audio_input_flags_t flags) :
+                        audio_source_t source, audio_input_flags_t flags, bool isSoundTrigger) :
         ClientDescriptor(portId, uid, sessionId, attributes, config, preferredDeviceId),
-        mSource(source), mFlags(flags) {}
+        mSource(source), mFlags(flags), mIsSoundTrigger(isSoundTrigger), mSilenced(false) {}
     ~RecordClientDescriptor() override = default;
 
     using ClientDescriptor::dump;
@@ -117,10 +117,15 @@ public:
 
     audio_source_t source() const { return mSource; }
     audio_input_flags_t flags() const { return mFlags; }
+    bool isSoundTrigger() const { return mIsSoundTrigger; }
+    void setSilenced(bool silenced) { mSilenced = silenced; }
+    bool isSilenced() const { return mSilenced; }
 
 private:
     const audio_source_t mSource;
     const audio_input_flags_t mFlags;
+    const bool mIsSoundTrigger;
+          bool mSilenced;
 };
 
 class SourceClientDescriptor: public TrackClientDescriptor

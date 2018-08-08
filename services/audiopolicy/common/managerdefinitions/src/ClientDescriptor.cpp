@@ -29,7 +29,6 @@
 
 namespace android {
 
-
 status_t ClientDescriptor::dump(int fd, int spaces, int index)
 {
     String8 out;

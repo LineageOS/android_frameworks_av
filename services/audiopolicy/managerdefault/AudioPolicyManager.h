@@ -539,15 +539,11 @@ protected:
 
         static bool isConcurrentSource(audio_source_t source);
 
-        bool isConcurentCaptureAllowed(const sp<AudioInputDescriptor>& inputDesc,
-                const sp<AudioSession>& audioSession);
-
         static bool streamsMatchForvolume(audio_stream_type_t stream1,
                                           audio_stream_type_t stream2);
 
-        void closeSessions(const sp<AudioInputDescriptor>& input, bool activeOnly);
-        void closeSession(const sp<AudioInputDescriptor>& input,
-                          const sp<AudioSession>& session);
+        void closeActiveClients(const sp<AudioInputDescriptor>& input);
+        void closeClient(audio_port_handle_t portId);
 
         const uid_t mUidCached;                         // AID_AUDIOSERVER
         AudioPolicyClientInterface *mpClientInterface;  // audio policy client interface
@@ -667,7 +663,6 @@ private:
         audio_io_handle_t getInputForDevice(audio_devices_t device,
                 String8 address,
                 audio_session_t session,
-                uid_t uid,
                 audio_source_t inputSource,
                 const audio_config_base_t *config,
                 audio_input_flags_t flags,
