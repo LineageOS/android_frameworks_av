@@ -24,11 +24,25 @@
 #include <string.h>
 #include <time.h>
 
+#include <algorithm> // max
 #include <new>
 
 #include <log/log.h>
 
 #include <audio_effects/effect_visualizer.h>
+#include <audio_utils/primitives.h>
+
+#define BUILD_FLOAT
+
+#ifdef BUILD_FLOAT
+
+static constexpr audio_format_t kProcessFormat = AUDIO_FORMAT_PCM_FLOAT;
+
+#else
+
+static constexpr audio_format_t kProcessFormat = AUDIO_FORMAT_PCM_16_BIT;
+
+#endif // BUILD_FLOAT
 
 extern "C" {
 
@@ -146,7 +160,7 @@ int Visualizer_setConfig(VisualizerContext *pContext, effect_config_t *pConfig)
     if (pConfig->inputCfg.channels != AUDIO_CHANNEL_OUT_STEREO) return -EINVAL;
     if (pConfig->outputCfg.accessMode != EFFECT_BUFFER_ACCESS_WRITE &&
             pConfig->outputCfg.accessMode != EFFECT_BUFFER_ACCESS_ACCUMULATE) return -EINVAL;
-    if (pConfig->inputCfg.format != AUDIO_FORMAT_PCM_16_BIT) return -EINVAL;
+    if (pConfig->inputCfg.format != kProcessFormat) return -EINVAL;
 
     pContext->mConfig = *pConfig;
 
@@ -192,7 +206,7 @@ int Visualizer_init(VisualizerContext *pContext)
 {
     pContext->mConfig.inputCfg.accessMode = EFFECT_BUFFER_ACCESS_READ;
     pContext->mConfig.inputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
-    pContext->mConfig.inputCfg.format = AUDIO_FORMAT_PCM_16_BIT;
+    pContext->mConfig.inputCfg.format = kProcessFormat;
     pContext->mConfig.inputCfg.samplingRate = 44100;
     pContext->mConfig.inputCfg.bufferProvider.getBuffer = NULL;
     pContext->mConfig.inputCfg.bufferProvider.releaseBuffer = NULL;
@@ -200,7 +214,7 @@ int Visualizer_init(VisualizerContext *pContext)
     pContext->mConfig.inputCfg.mask = EFFECT_CONFIG_ALL;
     pContext->mConfig.outputCfg.accessMode = EFFECT_BUFFER_ACCESS_ACCUMULATE;
     pContext->mConfig.outputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
-    pContext->mConfig.outputCfg.format = AUDIO_FORMAT_PCM_16_BIT;
+    pContext->mConfig.outputCfg.format = kProcessFormat;
     pContext->mConfig.outputCfg.samplingRate = 44100;
     pContext->mConfig.outputCfg.bufferProvider.getBuffer = NULL;
     pContext->mConfig.outputCfg.bufferProvider.releaseBuffer = NULL;
@@ -301,15 +315,8 @@ int VisualizerLib_GetDescriptor(const effect_uuid_t *uuid,
 //--- Effect Control Interface Implementation
 //
 
-static inline int16_t clamp16(int32_t sample)
-{
-    if ((sample>>15) ^ (sample>>31))
-        sample = 0x7FFF ^ (sample>>31);
-    return sample;
-}
-
 int Visualizer_process(
-        effect_handle_t self,audio_buffer_t *inBuffer, audio_buffer_t *outBuffer)
+        effect_handle_t self, audio_buffer_t *inBuffer, audio_buffer_t *outBuffer)
 {
     VisualizerContext * pContext = (VisualizerContext *)self;
 
@@ -324,20 +331,28 @@ int Visualizer_process(
         return -EINVAL;
     }
 
+    const size_t sampleLen = inBuffer->frameCount * pContext->mChannelCount;
+
     // perform measurements if needed
     if (pContext->mMeasurementMode & MEASUREMENT_MODE_PEAK_RMS) {
         // find the peak and RMS squared for the new buffer
-        uint32_t inIdx;
-        int16_t maxSample = 0;
         float rmsSqAcc = 0;
-        for (inIdx = 0 ; inIdx < inBuffer->frameCount * pContext->mChannelCount ; inIdx++) {
-            if (inBuffer->s16[inIdx] > maxSample) {
-                maxSample = inBuffer->s16[inIdx];
-            } else if (-inBuffer->s16[inIdx] > maxSample) {
-                maxSample = -inBuffer->s16[inIdx];
-            }
-            rmsSqAcc += (inBuffer->s16[inIdx] * inBuffer->s16[inIdx]);
+
+#ifdef BUILD_FLOAT
+        float maxSample = 0.f;
+        for (size_t inIdx = 0; inIdx < sampleLen; ++inIdx) {
+            maxSample = fmax(maxSample, fabs(inBuffer->f32[inIdx]));
+            rmsSqAcc += inBuffer->f32[inIdx] * inBuffer->f32[inIdx];
         }
+        maxSample *= 1 << 15; // scale to int16_t, with exactly 1 << 15 representing positive num.
+        rmsSqAcc *= 1 << 30; // scale to int16_t * 2
+#else
+        int maxSample = 0;
+        for (size_t inIdx = 0; inIdx < sampleLen; ++inIdx) {
+            maxSample = std::max(maxSample, std::abs(int32_t(inBuffer->s16[inIdx])));
+            rmsSqAcc += inBuffer->s16[inIdx] * inBuffer->s16[inIdx];
+        }
+#endif
         // store the measurement
         pContext->mPastMeasurements[pContext->mMeasurementBufferIdx].mPeakU16 = (uint16_t)maxSample;
         pContext->mPastMeasurements[pContext->mMeasurementBufferIdx].mRmsSquared =
@@ -348,32 +363,59 @@ int Visualizer_process(
         }
     }
 
-    // all code below assumes stereo 16 bit PCM output and input
+#ifdef BUILD_FLOAT
+    float fscale; // multiplicative scale
+#else
     int32_t shift;
+#endif // BUILD_FLOAT
 
     if (pContext->mScalingMode == VISUALIZER_SCALING_MODE_NORMALIZED) {
         // derive capture scaling factor from peak value in current buffer
         // this gives more interesting captures for display.
-        shift = 32;
-        int len = inBuffer->frameCount * 2;
-        for (int i = 0; i < len; i++) {
+
+#ifdef BUILD_FLOAT
+        float maxSample = 0.f;
+        for (size_t inIdx = 0; inIdx < sampleLen; ++inIdx) {
+            maxSample = fmax(maxSample, fabs(inBuffer->f32[inIdx]));
+        }
+        if (maxSample > 0.f) {
+            constexpr float halfish = 127.f / 256.f;
+            fscale = halfish / maxSample;
+            int exp; // unused
+            const float significand = frexp(fscale, &exp);
+            if (significand == 0.5f) {
+                fscale *= 255.f / 256.f; // avoid returning unaltered PCM signal
+            }
+        } else {
+            // scale doesn't matter, the values are all 0.
+            fscale = 1.f;
+        }
+#else
+        int32_t orAccum = 0;
+        for (size_t i = 0; i < sampleLen; ++i) {
             int32_t smp = inBuffer->s16[i];
             if (smp < 0) smp = -smp - 1; // take care to keep the max negative in range
-            int32_t clz = __builtin_clz(smp);
-            if (shift > clz) shift = clz;
+            orAccum |= smp;
         }
+
         // A maximum amplitude signal will have 17 leading zeros, which we want to
         // translate to a shift of 8 (for converting 16 bit to 8 bit)
-        shift = 25 - shift;
+        shift = 25 - __builtin_clz(orAccum);
+
         // Never scale by less than 8 to avoid returning unaltered PCM signal.
         if (shift < 3) {
             shift = 3;
         }
         // add one to combine the division by 2 needed after summing left and right channels below
         shift++;
+#endif // BUILD_FLOAT
     } else {
         assert(pContext->mScalingMode == VISUALIZER_SCALING_MODE_AS_PLAYED);
+#ifdef BUILD_FLOAT
+        fscale = 0.5f;  // default divide by 2 to account for sum of L + R.
+#else
         shift = 9;
+#endif // BUILD_FLOAT
     }
 
     uint32_t captIdx;
@@ -386,9 +428,13 @@ int Visualizer_process(
             // wrap around
             captIdx = 0;
         }
-        int32_t smp = inBuffer->s16[2 * inIdx] + inBuffer->s16[2 * inIdx + 1];
-        smp = smp >> shift;
+#ifdef BUILD_FLOAT
+        const float smp = (inBuffer->f32[2 * inIdx] + inBuffer->f32[2 * inIdx + 1]) * fscale;
+        buf[captIdx] = clamp8_from_float(smp);
+#else
+        const int32_t smp = (inBuffer->s16[2 * inIdx] + inBuffer->s16[2 * inIdx + 1]) >> shift;
         buf[captIdx] = ((uint8_t)smp)^0x80;
+#endif // BUILD_FLOAT
     }
 
     // XXX the following two should really be atomic, though it probably doesn't
@@ -400,6 +446,15 @@ int Visualizer_process(
     }
 
     if (inBuffer->raw != outBuffer->raw) {
+#ifdef BUILD_FLOAT
+        if (pContext->mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
+            for (size_t i = 0; i < sampleLen; ++i) {
+                outBuffer->f32[i] += inBuffer->f32[i];
+            }
+        } else {
+            memcpy(outBuffer->raw, inBuffer->raw, sampleLen * sizeof(float));
+        }
+#else
         if (pContext->mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
             for (size_t i = 0; i < outBuffer->frameCount*2; i++) {
                 outBuffer->s16[i] = clamp16(outBuffer->s16[i] + inBuffer->s16[i]);
@@ -407,6 +462,7 @@ int Visualizer_process(
         } else {
             memcpy(outBuffer->raw, inBuffer->raw, outBuffer->frameCount * 2 * sizeof(int16_t));
         }
+#endif // BUILD_FLOAT
     }
     if (pContext->mState != VISUALIZER_STATE_ACTIVE) {
         return -ENODATA;
