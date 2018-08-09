@@ -547,14 +547,46 @@ status_t AudioFlinger::PatchPanel::Patch::getLatencyMs(double *latencyMs) const
     // reverse due to internal biases).
     //
     // TODO: is this stable enough? Consider a PatchTrack synchronized version of this.
-    double recordServerLatencyMs;
-    if (recordTrack->getServerLatencyMs(&recordServerLatencyMs) != OK) return INVALID_OPERATION;
 
-    double playbackTrackLatencyMs;
-    if (playbackTrack->getTrackLatencyMs(&playbackTrackLatencyMs) != OK) return INVALID_OPERATION;
+    // For PCM tracks get server latency.
+    if (audio_is_linear_pcm(recordTrack->format())) {
+        double recordServerLatencyMs, playbackTrackLatencyMs;
+        if (recordTrack->getServerLatencyMs(&recordServerLatencyMs) == OK
+                && playbackTrack->getTrackLatencyMs(&playbackTrackLatencyMs) == OK) {
+            *latencyMs = recordServerLatencyMs + playbackTrackLatencyMs;
+            return OK;
+        }
+    }
 
-    *latencyMs = recordServerLatencyMs + playbackTrackLatencyMs;
-    return OK;
+    // See if kernel latencies are available.
+    // If so, do a frame diff and time difference computation to estimate
+    // the total patch latency. This requires that frame counts are reported by the
+    // HAL are matched properly in the case of record overruns and playback underruns.
+    ThreadBase::TrackBase::FrameTime recordFT{}, playFT{};
+    recordTrack->getKernelFrameTime(&recordFT);
+    playbackTrack->getKernelFrameTime(&playFT);
+    if (recordFT.timeNs > 0 && playFT.timeNs > 0) {
+        const int64_t frameDiff = recordFT.frames - playFT.frames;
+        const int64_t timeDiffNs = recordFT.timeNs - playFT.timeNs;
+
+        // It is possible that the patch track and patch record have a large time disparity because
+        // one thread runs but another is stopped.  We arbitrarily choose the maximum timestamp
+        // time difference based on how often we expect the timestamps to update in normal operation
+        // (typical should be no more than 50 ms).
+        //
+        // If the timestamps aren't sampled close enough, the patch latency is not
+        // considered valid.
+        //
+        // TODO: change this based on more experiments.
+        constexpr int64_t maxValidTimeDiffNs = 200 * NANOS_PER_MILLISECOND;
+        if (std::abs(timeDiffNs) < maxValidTimeDiffNs) {
+            *latencyMs = frameDiff * 1e3 / recordTrack->sampleRate()
+                   - timeDiffNs * 1e-6;
+            return OK;
+        }
+    }
+
+    return INVALID_OPERATION;
 }
 
 String8 AudioFlinger::PatchPanel::Patch::dump(audio_patch_handle_t myHandle) const
