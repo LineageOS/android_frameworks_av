@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "6d50a341_7b085b34",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 2066,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-08-09T06:51:55Z",
+      "side": 1,
+      "message": "shutter",
+      "revId": "a2a11caaf928467fb3e3861c00533548024a6d2d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
