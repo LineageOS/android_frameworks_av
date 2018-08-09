@@ -35,6 +35,7 @@ public:
 
         // Must be called under AudioFlinger::mLock
         status_t getLatencyMs_l(double *latencyMs) const;
+        audio_patch_handle_t getPatchHandle() const { return mPatchHandle; };
         audio_io_handle_t getPlaybackThreadHandle() const { return mPlaybackThreadHandle; };
         audio_io_handle_t getRecordThreadHandle() const { return mRecordThreadHandle; };
       private:

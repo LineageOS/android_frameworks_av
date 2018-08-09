@@ -3220,6 +3220,8 @@ bool AudioFlinger::PlaybackThread::threadLoop()
     if (mType == OFFLOAD || mType == DIRECT) {
         mTimestampVerifier.setDiscontinuityMode(mTimestampVerifier.DISCONTINUITY_MODE_ZERO);
     }
+    audio_utils::Statistics<double> downstreamLatencyStatMs(0.999 /* alpha */);
+    audio_patch_handle_t lastDownstreamPatchHandle = AUDIO_PATCH_HANDLE_NONE;
 
     while (!exitPending())
     {
@@ -3230,6 +3232,46 @@ bool AudioFlinger::PlaybackThread::threadLoop()
         cpuStats.sample(myName);
 
         Vector< sp<EffectChain> > effectChains;
+
+        // If the device is AUDIO_DEVICE_OUT_BUS, check for downstream latency.
+        //
+        // Note: we access outDevice() outside of mLock.
+        if (isMsdDevice() && (outDevice() & AUDIO_DEVICE_OUT_BUS) != 0) {
+            // Here, we try for the AF lock, but do not block on it as the latency
+            // is more informational.
+            if (mAudioFlinger->mLock.tryLock() == NO_ERROR) {
+                std::vector<PatchPanel::SoftwarePatch> swPatches;
+                double latencyMs;
+                status_t status = INVALID_OPERATION;
+                audio_patch_handle_t downstreamPatchHandle = AUDIO_PATCH_HANDLE_NONE;
+                if (mAudioFlinger->mPatchPanel.getDownstreamSoftwarePatches(id(), &swPatches) == OK
+                        && swPatches.size() > 0) {
+                        status = swPatches[0].getLatencyMs_l(&latencyMs);
+                        downstreamPatchHandle = swPatches[0].getPatchHandle();
+                }
+                if (downstreamPatchHandle != lastDownstreamPatchHandle) {
+                    downstreamLatencyStatMs.reset();
+                    lastDownstreamPatchHandle = downstreamPatchHandle;
+                }
+                if (status == OK) {
+                    // verify downstream latency (we assume a max reasonable
+                    // latency of 1 second).
+                    if (latencyMs >= 0. && latencyMs <= 1000.) {
+                        ALOGV("new downstream latency %lf ms", latencyMs);
+                        downstreamLatencyStatMs.add(latencyMs);
+                    } else {
+                        ALOGD("out of range downstream latency %lf ms", latencyMs);
+                    }
+                }
+                mAudioFlinger->mLock.unlock();
+            }
+        } else {
+            if (lastDownstreamPatchHandle != AUDIO_PATCH_HANDLE_NONE) {
+                // our device is no longer AUDIO_DEVICE_OUT_BUS, reset patch handle and stats.
+                downstreamLatencyStatMs.reset();
+                lastDownstreamPatchHandle = AUDIO_PATCH_HANDLE_NONE;
+            }
+        }
 
         { // scope for mLock
 
@@ -3273,6 +3315,18 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                     ALOGV("TS_AFTER: %d %lld %lld", id(),
                             (long long)timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL],
                             (long long)timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]);
+
+                    // Note: Downstream latency only added if timestamp correction enabled.
+                    if (downstreamLatencyStatMs.getN() > 0) { // we have latency info.
+                        const int64_t newPosition =
+                                timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]
+                                - int64_t(downstreamLatencyStatMs.getMean() * mSampleRate * 1e-3);
+                        // prevent retrograde
+                        timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL] = max(
+                                newPosition,
+                                (mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]
+                                        - mSuspendedFrames));
+                    }
                 }
 
                 // We always fetch the timestamp here because often the downstream
