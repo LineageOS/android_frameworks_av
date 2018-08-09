@@ -994,6 +994,9 @@ class Camera3Device :
         // Map of physicalCameraId <-> Metadata
         std::vector<PhysicalCaptureResultInfo> physicalMetadatas;
 
+        // Indicates a still capture request.
+        bool stillCapture;
+
         // Default constructor needed by KeyedVector
         InFlightRequest() :
                 shutterTimestamp(0),
@@ -1004,12 +1007,13 @@ class Camera3Device :
                 hasInputBuffer(false),
                 hasCallback(true),
                 maxExpectedDuration(kDefaultExpectedDuration),
-                skipResultMetadata(false) {
+                skipResultMetadata(false),
+                stillCapture(false) {
         }
 
         InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
                 bool hasAppCallback, nsecs_t maxDuration,
-                const std::set<String8>& physicalCameraIdSet) :
+                const std::set<String8>& physicalCameraIdSet, bool isStillCapture) :
                 shutterTimestamp(0),
                 sensorTimestamp(0),
                 requestStatus(OK),
@@ -1020,7 +1024,8 @@ class Camera3Device :
                 hasCallback(hasAppCallback),
                 maxExpectedDuration(maxDuration),
                 skipResultMetadata(false),
-                physicalCameraIds(physicalCameraIdSet) {
+                physicalCameraIds(physicalCameraIdSet),
+                stillCapture(isStillCapture) {
         }
     };
 
@@ -1034,10 +1039,10 @@ class Camera3Device :
     nsecs_t                mExpectedInflightDuration = 0;
     int                    mInFlightStatusId;
 
-
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
-            bool callback, nsecs_t maxExpectedDuration, std::set<String8>& physicalCameraIds);
+            bool callback, nsecs_t maxExpectedDuration, std::set<String8>& physicalCameraIds,
+            bool isStillCapture);
 
     /**
      * Returns the maximum expected time it'll take for all currently in-flight
