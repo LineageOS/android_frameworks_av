@@ -6833,6 +6833,7 @@ reacquire_wakelock:
             goto unlock;
         }
         ALOG_ASSERT(framesRead > 0);
+        mFramesRead += framesRead;
 
 #ifdef TEE_SINK
         (void)mTee.write((uint8_t*)mRsmpInBuffer + rear * mFrameSize, framesRead);
@@ -7457,6 +7458,7 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
     audio_input_flags_t flags = input != NULL ? input->flags : AUDIO_INPUT_FLAG_NONE;
     dprintf(fd, "  AudioStreamIn: %p flags %#x (%s)\n",
             input, flags, inputFlagsToString(flags).c_str());
+    dprintf(fd, "  Frames read: %lld\n", (long long)mFramesRead);
     if (mActiveTracks.isEmpty()) {
         dprintf(fd, "  No active record clients\n");
     }
