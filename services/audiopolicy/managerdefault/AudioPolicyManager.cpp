@@ -1514,11 +1514,6 @@ status_t AudioPolicyManager::startSource(const sp<AudioOutputDescriptor>& output
         setStrategyMute(STRATEGY_SONIFICATION, true, outputDesc);
     }
 
-    if (stream == AUDIO_STREAM_ENFORCED_AUDIBLE &&
-            mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) == AUDIO_POLICY_FORCE_SYSTEM_ENFORCED) {
-        setStrategyMute(STRATEGY_SONIFICATION, true, outputDesc);
-    }
-
     return NO_ERROR;
 }
 
