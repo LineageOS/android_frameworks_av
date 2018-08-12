@@ -1601,6 +1601,8 @@ private:
             bool                                mFastTrackAvail;    // true if fast track available
             // common state to all record threads
             std::atomic_bool                    mBtNrecSuspended;
+
+            int64_t                             mFramesRead = 0;    // continuous running counter.
 };
 
 class MmapThread : public ThreadBase
