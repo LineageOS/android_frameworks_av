@@ -1081,6 +1081,9 @@ status_t OMXNodeInstance::useBuffer(
 
         case OMXBuffer::kBufferTypeSharedMem: {
             if (mPortMode[portIndex] != IOMX::kPortModePresetByteBuffer
+#ifdef DYNAMIC_NATIVE_HANDLE_AVAILABLE
+                    && mPortMode[portIndex] != IOMX::kPortModeDynamicNativeHandle
+#endif
                     && mPortMode[portIndex] != IOMX::kPortModeDynamicANWBuffer) {
                 break;
             }
