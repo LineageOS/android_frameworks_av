@@ -22,6 +22,30 @@
       "revId": "5befec0548e364dcf336a3bc5e29f25d2b366516",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "51a77f17_67c997ea",
+        "filename": "media/libstagefright/omx/OMXNodeInstance.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1084,
+      "author": {
+        "id": 13589
+      },
+      "writtenOn": "2018-08-13T10:12:02Z",
+      "side": 1,
+      "message": "DYNAMIC_NATIVE_HANDLE_AVAILABLE ?",
+      "parentUuid": "5bb724b9_b81b9886",
+      "range": {
+        "startLine": 1084,
+        "startChar": 7,
+        "endLine": 1084,
+        "endChar": 34
+      },
+      "revId": "5befec0548e364dcf336a3bc5e29f25d2b366516",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
