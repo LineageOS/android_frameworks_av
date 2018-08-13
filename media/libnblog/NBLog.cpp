@@ -64,7 +64,9 @@ int NBLog::Entry::copyEntryDataAt(size_t offset) const
 // ---------------------------------------------------------------------------
 
 /*static*/
-std::unique_ptr<NBLog::AbstractEntry> NBLog::AbstractEntry::buildEntry(const uint8_t *ptr) {
+std::unique_ptr<NBLog::AbstractEntry> NBLog::AbstractEntry::buildEntry(const uint8_t *ptr)
+{
+    if (ptr == nullptr) return nullptr;
     const uint8_t type = EntryIterator(ptr)->type;
     switch (type) {
     case EVENT_START_FMT:
@@ -78,31 +80,33 @@ std::unique_ptr<NBLog::AbstractEntry> NBLog::AbstractEntry::buildEntry(const uin
     }
 }
 
-NBLog::AbstractEntry::AbstractEntry(const uint8_t *entry) : mEntry(entry) {
+NBLog::AbstractEntry::AbstractEntry(const uint8_t *entry) : mEntry(entry)
+{
 }
 
 // ---------------------------------------------------------------------------
 
-NBLog::EntryIterator NBLog::FormatEntry::begin() const {
+NBLog::EntryIterator NBLog::FormatEntry::begin() const
+{
     return EntryIterator(mEntry);
 }
 
-const char *NBLog::FormatEntry::formatString() const {
+const char *NBLog::FormatEntry::formatString() const
+{
     return (const char*) mEntry + offsetof(entry, data);
 }
 
-size_t NBLog::FormatEntry::formatStringLength() const {
+size_t NBLog::FormatEntry::formatStringLength() const
+{
     return mEntry[offsetof(entry, length)];
 }
 
-NBLog::EntryIterator NBLog::FormatEntry::args() const {
+NBLog::EntryIterator NBLog::FormatEntry::args() const
+{
     auto it = begin();
-    // skip start fmt
-    ++it;
-    // skip timestamp
-    ++it;
-    // skip hash
-    ++it;
+    ++it; // skip start fmt
+    ++it; // skip timestamp
+    ++it; // skip hash
     // Skip author if present
     if (it->type == EVENT_AUTHOR) {
         ++it;
@@ -110,33 +114,30 @@ NBLog::EntryIterator NBLog::FormatEntry::args() const {
     return it;
 }
 
-int64_t NBLog::FormatEntry::timestamp() const {
+int64_t NBLog::FormatEntry::timestamp() const
+{
     auto it = begin();
-    // skip start fmt
-    ++it;
+    ++it; // skip start fmt
     return it.payload<int64_t>();
 }
 
-NBLog::log_hash_t NBLog::FormatEntry::hash() const {
+NBLog::log_hash_t NBLog::FormatEntry::hash() const
+{
     auto it = begin();
-    // skip start fmt
-    ++it;
-    // skip timestamp
-    ++it;
+    ++it; // skip start fmt
+    ++it; // skip timestamp
     // unaligned 64-bit read not supported
     log_hash_t hash;
     memcpy(&hash, it->data, sizeof(hash));
     return hash;
 }
 
-int NBLog::FormatEntry::author() const {
+int NBLog::FormatEntry::author() const
+{
     auto it = begin();
-    // skip start fmt
-    ++it;
-    // skip timestamp
-    ++it;
-    // skip hash
-    ++it;
+    ++it; // skip start fmt
+    ++it; // skip timestamp
+    ++it; // skip hash
     // if there is an author entry, return it, return -1 otherwise
     if (it->type == EVENT_AUTHOR) {
         return it.payload<int>();
@@ -145,19 +146,18 @@ int NBLog::FormatEntry::author() const {
 }
 
 NBLog::EntryIterator NBLog::FormatEntry::copyWithAuthor(
-        std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const {
+        std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const
+{
     auto it = begin();
-    // copy fmt start entry
-    it.copyTo(dst);
-    // copy timestamp
-    (++it).copyTo(dst);    // copy hash
-    (++it).copyTo(dst);
+    it.copyTo(dst);     // copy fmt start entry
+    (++it).copyTo(dst); // copy timestamp
+    (++it).copyTo(dst); // copy hash
     // insert author entry
-    size_t authorEntrySize = NBLog::Entry::kOverhead + sizeof(author);
+    size_t authorEntrySize = Entry::kOverhead + sizeof(author);
     uint8_t authorEntry[authorEntrySize];
     authorEntry[offsetof(entry, type)] = EVENT_AUTHOR;
     authorEntry[offsetof(entry, length)] =
-        authorEntry[authorEntrySize + NBLog::Entry::kPreviousLengthOffset] =
+        authorEntry[authorEntrySize + Entry::kPreviousLengthOffset] =
         sizeof(author);
     *(int*) (&authorEntry[offsetof(entry, data)]) = author;
     dst->write(authorEntry, authorEntrySize);
@@ -170,76 +170,96 @@ NBLog::EntryIterator NBLog::FormatEntry::copyWithAuthor(
     return it;
 }
 
-void NBLog::EntryIterator::copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst) const {
-    size_t length = ptr[offsetof(entry, length)] + NBLog::Entry::kOverhead;
-    dst->write(ptr, length);
+void NBLog::EntryIterator::copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst) const
+{
+    size_t length = mPtr[offsetof(entry, length)] + Entry::kOverhead;
+    dst->write(mPtr, length);
 }
 
-void NBLog::EntryIterator::copyData(uint8_t *dst) const {
-    memcpy((void*) dst, ptr + offsetof(entry, data), ptr[offsetof(entry, length)]);
+void NBLog::EntryIterator::copyData(uint8_t *dst) const
+{
+    memcpy((void*) dst, mPtr + offsetof(entry, data), mPtr[offsetof(entry, length)]);
 }
 
-NBLog::EntryIterator::EntryIterator()
-    : ptr(nullptr) {}
+NBLog::EntryIterator::EntryIterator()   // Dummy initialization.
+    : mPtr(nullptr)
+{
+}
 
 NBLog::EntryIterator::EntryIterator(const uint8_t *entry)
-    : ptr(entry) {}
+    : mPtr(entry)
+{
+}
 
 NBLog::EntryIterator::EntryIterator(const NBLog::EntryIterator &other)
-    : ptr(other.ptr) {}
-
-const NBLog::entry& NBLog::EntryIterator::operator*() const {
-    return *(entry*) ptr;
+    : mPtr(other.mPtr)
+{
 }
 
-const NBLog::entry* NBLog::EntryIterator::operator->() const {
-    return (entry*) ptr;
+const NBLog::entry& NBLog::EntryIterator::operator*() const
+{
+    return *(entry*) mPtr;
 }
 
-NBLog::EntryIterator& NBLog::EntryIterator::operator++() {
-    ptr += ptr[offsetof(entry, length)] + NBLog::Entry::kOverhead;
+const NBLog::entry* NBLog::EntryIterator::operator->() const
+{
+    return (entry*) mPtr;
+}
+
+NBLog::EntryIterator& NBLog::EntryIterator::operator++()
+{
+    mPtr += mPtr[offsetof(entry, length)] + Entry::kOverhead;
     return *this;
 }
 
-NBLog::EntryIterator& NBLog::EntryIterator::operator--() {
-    ptr -= ptr[NBLog::Entry::kPreviousLengthOffset] + NBLog::Entry::kOverhead;
+NBLog::EntryIterator& NBLog::EntryIterator::operator--()
+{
+    mPtr -= mPtr[Entry::kPreviousLengthOffset] + Entry::kOverhead;
     return *this;
 }
 
-NBLog::EntryIterator NBLog::EntryIterator::next() const {
+NBLog::EntryIterator NBLog::EntryIterator::next() const
+{
     EntryIterator aux(*this);
     return ++aux;
 }
 
-NBLog::EntryIterator NBLog::EntryIterator::prev() const {
+NBLog::EntryIterator NBLog::EntryIterator::prev() const
+{
     EntryIterator aux(*this);
     return --aux;
 }
 
-int NBLog::EntryIterator::operator-(const NBLog::EntryIterator &other) const {
-    return ptr - other.ptr;
+int NBLog::EntryIterator::operator-(const NBLog::EntryIterator &other) const
+{
+    return mPtr - other.mPtr;
 }
 
-bool NBLog::EntryIterator::operator!=(const EntryIterator &other) const {
-    return ptr != other.ptr;
+bool NBLog::EntryIterator::operator!=(const EntryIterator &other) const
+{
+    return mPtr != other.mPtr;
 }
 
-bool NBLog::EntryIterator::hasConsistentLength() const {
-    return ptr[offsetof(entry, length)] == ptr[ptr[offsetof(entry, length)] +
-        NBLog::Entry::kOverhead + NBLog::Entry::kPreviousLengthOffset];
+bool NBLog::EntryIterator::hasConsistentLength() const
+{
+    return mPtr[offsetof(entry, length)] == mPtr[mPtr[offsetof(entry, length)] +
+        Entry::kOverhead + Entry::kPreviousLengthOffset];
 }
 
 // ---------------------------------------------------------------------------
 
-int64_t NBLog::HistogramEntry::timestamp() const {
+int64_t NBLog::HistogramEntry::timestamp() const
+{
     return EntryIterator(mEntry).payload<HistTsEntry>().ts;
 }
 
-NBLog::log_hash_t NBLog::HistogramEntry::hash() const {
+NBLog::log_hash_t NBLog::HistogramEntry::hash() const
+{
     return EntryIterator(mEntry).payload<HistTsEntry>().hash;
 }
 
-int NBLog::HistogramEntry::author() const {
+int NBLog::HistogramEntry::author() const
+{
     EntryIterator it(mEntry);
     if (it->length == sizeof(HistTsEntryWithAuthor)) {
         return it.payload<HistTsEntryWithAuthor>().author;
@@ -249,7 +269,8 @@ int NBLog::HistogramEntry::author() const {
 }
 
 NBLog::EntryIterator NBLog::HistogramEntry::copyWithAuthor(
-        std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const {
+        std::unique_ptr<audio_utils_fifo_writer> &dst, int author) const
+{
     // Current histogram entry has {type, length, struct HistTsEntry, length}.
     // We now want {type, length, struct HistTsEntryWithAuthor, length}
     uint8_t buffer[Entry::kOverhead + sizeof(HistTsEntryWithAuthor)];
@@ -336,9 +357,7 @@ NBLog::Writer::~Writer()
 
 void NBLog::Writer::log(const char *string)
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     LOG_ALWAYS_FATAL_IF(string == NULL, "Attempted to log NULL string");
     size_t length = strlen(string);
     if (length > Entry::kMaxLength) {
@@ -349,9 +368,7 @@ void NBLog::Writer::log(const char *string)
 
 void NBLog::Writer::logf(const char *fmt, ...)
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     va_list ap;
     va_start(ap, fmt);
     Writer::logvf(fmt, ap);     // the Writer:: is needed to avoid virtual dispatch for LockedWriter
@@ -360,9 +377,7 @@ void NBLog::Writer::logf(const char *fmt, ...)
 
 void NBLog::Writer::logvf(const char *fmt, va_list ap)
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     char buffer[Entry::kMaxLength + 1 /*NUL*/];
     int length = vsnprintf(buffer, sizeof(buffer), fmt, ap);
     if (length >= (int) sizeof(buffer)) {
@@ -377,9 +392,7 @@ void NBLog::Writer::logvf(const char *fmt, va_list ap)
 
 void NBLog::Writer::logTimestamp()
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     int64_t ts = get_monotonic_ns();
     if (ts > 0) {
         log(EVENT_TIMESTAMP, &ts, sizeof(ts));
@@ -390,41 +403,31 @@ void NBLog::Writer::logTimestamp()
 
 void NBLog::Writer::logTimestamp(const int64_t ts)
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     log(EVENT_TIMESTAMP, &ts, sizeof(ts));
 }
 
 void NBLog::Writer::logInteger(const int x)
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     log(EVENT_INTEGER, &x, sizeof(x));
 }
 
 void NBLog::Writer::logFloat(const float x)
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     log(EVENT_FLOAT, &x, sizeof(x));
 }
 
 void NBLog::Writer::logPID()
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     log(EVENT_PID, mPidTag, mPidTagSize);
 }
 
 void NBLog::Writer::logStart(const char *fmt)
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     size_t length = strlen(fmt);
     if (length > Entry::kMaxLength) {
         length = Entry::kMaxLength;
@@ -434,26 +437,20 @@ void NBLog::Writer::logStart(const char *fmt)
 
 void NBLog::Writer::logEnd()
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     Entry entry = Entry(EVENT_END_FMT, NULL, 0);
-    log(&entry, true);
+    log(entry, true);
 }
 
 void NBLog::Writer::logHash(log_hash_t hash)
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     log(EVENT_HASH, &hash, sizeof(hash));
 }
 
 void NBLog::Writer::logEventHistTs(Event event, log_hash_t hash)
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     HistTsEntry data;
     data.hash = hash;
     data.ts = get_monotonic_ns();
@@ -466,10 +463,7 @@ void NBLog::Writer::logEventHistTs(Event event, log_hash_t hash)
 
 void NBLog::Writer::logFormat(const char *fmt, log_hash_t hash, ...)
 {
-    if (!mEnabled) {
-        return;
-    }
-
+    if (!mEnabled) return;
     va_list ap;
     va_start(ap, hash);
     Writer::logVFormat(fmt, hash, ap);
@@ -478,9 +472,7 @@ void NBLog::Writer::logFormat(const char *fmt, log_hash_t hash, ...)
 
 void NBLog::Writer::logVFormat(const char *fmt, log_hash_t hash, va_list argp)
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     Writer::logStart(fmt);
     int i;
     double f;
@@ -536,9 +528,7 @@ void NBLog::Writer::logVFormat(const char *fmt, log_hash_t hash, va_list argp)
 
 void NBLog::Writer::log(Event event, const void *data, size_t length)
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     if (data == NULL || length > Entry::kMaxLength) {
         // TODO Perhaps it makes sense to display truncated data or at least a
         //      message that the data is too long?  The current behavior can create
@@ -550,19 +540,17 @@ void NBLog::Writer::log(Event event, const void *data, size_t length)
         return;
     }
     Entry etr(event, data, length);
-    log(&etr, true /*trusted*/);
+    log(etr, true /*trusted*/);
 }
 
-void NBLog::Writer::log(const NBLog::Entry *etr, bool trusted)
+void NBLog::Writer::log(const NBLog::Entry &etr, bool trusted)
 {
-    if (!mEnabled) {
-        return;
-    }
+    if (!mEnabled) return;
     if (!trusted) {
-        log(etr->mEvent, etr->mData, etr->mLength);
+        log(etr.mEvent, etr.mData, etr.mLength);
         return;
     }
-    size_t need = etr->mLength + Entry::kOverhead;    // mEvent, mLength, data[mLength], mLength
+    size_t need = etr.mLength + Entry::kOverhead;    // mEvent, mLength, data[mLength], mLength
                                                       // need = number of bytes written to FIFO
 
     // FIXME optimize this using memcpy for the data part of the Entry.
@@ -571,7 +559,7 @@ void NBLog::Writer::log(const NBLog::Entry *etr, bool trusted)
     uint8_t temp[Entry::kMaxLength + Entry::kOverhead];
     // write this data to temp array
     for (size_t i = 0; i < need; i++) {
-        temp[i] = etr->copyEntryDataAt(i);
+        temp[i] = etr.copyEntryDataAt(i);
     }
     // write to circular buffer
     mFifoWriter->write(temp, need);
@@ -743,15 +731,14 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
     if (mFifoReader == NULL) {
         return std::unique_ptr<NBLog::Reader::Snapshot>(new Snapshot());
     }
-    // make a copy to avoid race condition with writer
-    size_t capacity = mFifo->capacity();
 
     // This emulates the behaviour of audio_utils_fifo_reader::read, but without incrementing the
     // reader index. The index is incremented after handling corruption, to after the last complete
     // entry of the buffer
     size_t lost;
     audio_utils_iovec iovec[2];
-    ssize_t availToRead = mFifoReader->obtain(iovec, capacity, NULL /*timeout*/, &lost);
+    const ssize_t availToRead = mFifoReader->obtain(iovec, mFifo->capacity(),
+            NULL /*timeout*/, &lost);
     if (availToRead <= 0) {
         return std::unique_ptr<NBLog::Reader::Snapshot>(new Snapshot());
     }
@@ -800,7 +787,6 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 
     snapshot->mLost = lost;
     return snapshot;
-
 }
 
 // Takes raw content of the local merger FIFO, processes log entries, and
@@ -854,7 +840,7 @@ void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Reader::Snapshot &snapshot
     }
     // FIXME: decide whether to print the warnings here or elsewhere
     if (!body.isEmpty()) {
-        dumpLine(timestamp, body);
+        dumpLine(&timestamp, &body);
     }
 }
 
@@ -865,20 +851,22 @@ void NBLog::MergeReader::getAndProcessSnapshot()
     getAndProcessSnapshot(*snap);
 }
 
-void NBLog::MergeReader::dump(int fd, int indent) {
+void NBLog::MergeReader::dump(int fd, int indent)
+{
     // TODO: add a mutex around media.log dump
     ReportPerformance::dump(fd, indent, mThreadPerformanceAnalysis);
 }
 
 // Writes a string to the console
-void NBLog::Reader::dumpLine(const String8 &timestamp, String8 &body)
+void NBLog::Reader::dumpLine(const String8 *timestamp, String8 *body)
 {
+    if (timestamp == nullptr || body == nullptr) return;
     if (mFd >= 0) {
-        dprintf(mFd, "%.*s%s %s\n", mIndent, "", timestamp.string(), body.string());
+        dprintf(mFd, "%.*s%s %s\n", mIndent, "", timestamp->string(), body->string());
     } else {
-        ALOGI("%.*s%s %s", mIndent, "", timestamp.string(), body.string());
+        ALOGI("%.*s%s %s", mIndent, "", timestamp->string(), body->string());
     }
-    body.clear();
+    body->clear();
 }
 
 bool NBLog::Reader::isIMemory(const sp<IMemory>& iMemory) const
@@ -888,25 +876,33 @@ bool NBLog::Reader::isIMemory(const sp<IMemory>& iMemory) const
 
 // ---------------------------------------------------------------------------
 
-void NBLog::appendTimestamp(String8 *body, const void *data) {
+void NBLog::appendTimestamp(String8 *body, const void *data)
+{
+    if (body == nullptr || data == nullptr) return;
     int64_t ts;
     memcpy(&ts, data, sizeof(ts));
     body->appendFormat("[%d.%03d]", (int) (ts / (1000 * 1000 * 1000)),
                     (int) ((ts / (1000 * 1000)) % 1000));
 }
 
-void NBLog::appendInt(String8 *body, const void *data) {
+void NBLog::appendInt(String8 *body, const void *data)
+{
+    if (body == nullptr || data == nullptr) return;
     int x = *((int*) data);
     body->appendFormat("<%d>", x);
 }
 
-void NBLog::appendFloat(String8 *body, const void *data) {
+void NBLog::appendFloat(String8 *body, const void *data)
+{
+    if (body == nullptr || data == nullptr) return;
     float f;
-    memcpy(&f, data, sizeof(float));
+    memcpy(&f, data, sizeof(f));
     body->appendFormat("<%f>", f);
 }
 
-void NBLog::appendPID(String8 *body, const void* data, size_t length) {
+void NBLog::appendPID(String8 *body, const void* data, size_t length)
+{
+    if (body == nullptr || data == nullptr) return;
     pid_t id = *((pid_t*) data);
     char * name = &((char*) data)[sizeof(pid_t)];
     body->appendFormat("<PID: %d, name: %.*s>", id, (int) (length - sizeof(pid_t)), name);
@@ -915,9 +911,9 @@ void NBLog::appendPID(String8 *body, const void* data, size_t length) {
 String8 NBLog::bufferDump(const uint8_t *buffer, size_t size)
 {
     String8 str;
+    if (buffer == nullptr) return str;
     str.append("[ ");
-    for(size_t i = 0; i < size; i++)
-    {
+    for(size_t i = 0; i < size; i++) {
         str.appendFormat("%d ", buffer[i]);
     }
     str.append("]");
@@ -931,7 +927,8 @@ String8 NBLog::bufferDump(const EntryIterator &it)
 
 NBLog::EntryIterator NBLog::Reader::handleFormat(const FormatEntry &fmtEntry,
                                                          String8 *timestamp,
-                                                         String8 *body) {
+                                                         String8 *body)
+{
     // log timestamp
     int64_t ts = fmtEntry.timestamp();
     timestamp->clear();
@@ -947,7 +944,7 @@ NBLog::EntryIterator NBLog::Reader::handleFormat(const FormatEntry &fmtEntry,
     handleAuthor(fmtEntry, body);
 
     // log string
-    NBLog::EntryIterator arg = fmtEntry.args();
+    EntryIterator arg = fmtEntry.args();
 
     const char* fmt = fmtEntry.formatString();
     size_t fmt_length = fmtEntry.formatStringLength();
@@ -1026,10 +1023,11 @@ NBLog::Merger::Merger(const void *shared, size_t size):
         new audio_utils_fifo(size, sizeof(uint8_t),
             mShared->mBuffer, mShared->mRear, NULL /*throttlesFront*/) : NULL),
       mFifoWriter(mFifo != NULL ? new audio_utils_fifo_writer(*mFifo) : NULL)
-      {}
+{
+}
 
-void NBLog::Merger::addReader(const NBLog::NamedReader &reader) {
-
+void NBLog::Merger::addReader(const NBLog::NamedReader &reader)
+{
     // FIXME This is called by binder thread in MediaLogService::registerWriter
     //       but the access to shared variable mNamedReaders is not yet protected by a lock.
     mNamedReaders.push_back(reader);
@@ -1044,25 +1042,23 @@ struct MergeItem
     MergeItem(int64_t ts, int index): ts(ts), index(index) {}
 };
 
-// operators needed for priority queue in merge
-// bool operator>(const int64_t &t1, const int64_t &t2) {
-//     return t1.tv_sec > t2.tv_sec || (t1.tv_sec == t2.tv_sec && t1.tv_nsec > t2.tv_nsec);
-// }
-
-bool operator>(const struct MergeItem &i1, const struct MergeItem &i2) {
+bool operator>(const struct MergeItem &i1, const struct MergeItem &i2)
+{
     return i1.ts > i2.ts || (i1.ts == i2.ts && i1.index > i2.index);
 }
 
 // Merge registered readers, sorted by timestamp, and write data to a single FIFO in local memory
-void NBLog::Merger::merge() {
+void NBLog::Merger::merge()
+{
     // FIXME This is called by merge thread
     //       but the access to shared variable mNamedReaders is not yet protected by a lock.
-    int nLogs = mNamedReaders.size();
+    const int nLogs = mNamedReaders.size();
     std::vector<std::unique_ptr<NBLog::Reader::Snapshot>> snapshots(nLogs);
-    std::vector<NBLog::EntryIterator> offsets(nLogs);
+    std::vector<EntryIterator> offsets;
+    offsets.reserve(nLogs);
     for (int i = 0; i < nLogs; ++i) {
         snapshots[i] = mNamedReaders[i].reader()->getSnapshot();
-        offsets[i] = snapshots[i]->begin();
+        offsets.push_back(snapshots[i]->begin());
     }
     // initialize offsets
     // TODO custom heap implementation could allow to update top, improving performance
@@ -1071,17 +1067,19 @@ void NBLog::Merger::merge() {
     for (int i = 0; i < nLogs; ++i)
     {
         if (offsets[i] != snapshots[i]->end()) {
-            int64_t ts = AbstractEntry::buildEntry(offsets[i])->timestamp();
-            timestamps.emplace(ts, i);
+            std::unique_ptr<AbstractEntry> abstractEntry = AbstractEntry::buildEntry(offsets[i]);
+            if (abstractEntry == nullptr) {
+                continue;
+            }
+            timestamps.emplace(abstractEntry->timestamp(), i);
         }
     }
 
     while (!timestamps.empty()) {
-        // find minimum timestamp
-        int index = timestamps.top().index;
+        int index = timestamps.top().index;     // find minimum timestamp
         // copy it to the log, increasing offset
-        offsets[index] = AbstractEntry::buildEntry(offsets[index])->copyWithAuthor(mFifoWriter,
-                                                                                   index);
+        offsets[index] = AbstractEntry::buildEntry(offsets[index])->
+            copyWithAuthor(mFifoWriter, index);
         // update data structures
         timestamps.pop();
         if (offsets[index] != snapshots[index]->end()) {
@@ -1091,7 +1089,8 @@ void NBLog::Merger::merge() {
     }
 }
 
-const std::vector<NBLog::NamedReader>& NBLog::Merger::getNamedReaders() const {
+const std::vector<NBLog::NamedReader>& NBLog::Merger::getNamedReaders() const
+{
     // FIXME This is returning a reference to a shared variable that needs a lock
     return mNamedReaders;
 }
@@ -1099,10 +1098,16 @@ const std::vector<NBLog::NamedReader>& NBLog::Merger::getNamedReaders() const {
 // ---------------------------------------------------------------------------
 
 NBLog::MergeReader::MergeReader(const void *shared, size_t size, Merger &merger)
-    : Reader(shared, size), mNamedReaders(merger.getNamedReaders()) {}
+    : Reader(shared, size), mNamedReaders(merger.getNamedReaders())
+{
+}
 
-void NBLog::MergeReader::handleAuthor(const NBLog::AbstractEntry &entry, String8 *body) {
+void NBLog::MergeReader::handleAuthor(const NBLog::AbstractEntry &entry, String8 *body)
+{
     int author = entry.author();
+    if (author == -1) {
+        return;
+    }
     // FIXME Needs a lock
     const char* name = mNamedReaders[author].name();
     body->appendFormat("%s: ", name);
@@ -1113,16 +1118,20 @@ void NBLog::MergeReader::handleAuthor(const NBLog::AbstractEntry &entry, String8
 NBLog::MergeThread::MergeThread(NBLog::Merger &merger, NBLog::MergeReader &mergeReader)
     : mMerger(merger),
       mMergeReader(mergeReader),
-      mTimeoutUs(0) {}
+      mTimeoutUs(0)
+{
+}
 
-NBLog::MergeThread::~MergeThread() {
+NBLog::MergeThread::~MergeThread()
+{
     // set exit flag, set timeout to 0 to force threadLoop to exit and wait for the thread to join
     requestExit();
     setTimeoutUs(0);
     join();
 }
 
-bool NBLog::MergeThread::threadLoop() {
+bool NBLog::MergeThread::threadLoop()
+{
     bool doMerge;
     {
         AutoMutex _l(mMutex);
@@ -1144,11 +1153,13 @@ bool NBLog::MergeThread::threadLoop() {
     return true;
 }
 
-void NBLog::MergeThread::wakeup() {
+void NBLog::MergeThread::wakeup()
+{
     setTimeoutUs(kThreadWakeupPeriodUs);
 }
 
-void NBLog::MergeThread::setTimeoutUs(int time) {
+void NBLog::MergeThread::setTimeoutUs(int time)
+{
     AutoMutex _l(mMutex);
     mTimeoutUs = time;
     mCond.signal();
