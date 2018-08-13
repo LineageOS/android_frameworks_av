@@ -107,6 +107,9 @@ enum media2_info_type {
     // The player just completed the playback of all data sources.
     // But this is not visible in native code. Just keep this entry for completeness.
     MEDIA2_INFO_DATA_SOURCE_LIST_END = 6,
+    // The player just completed an iteration of playback loop. This event is sent only when
+    // looping is enabled.
+    MEDIA2_INFO_DATA_SOURCE_REPEAT = 7,
 
     //1xx
     // The player just prepared a data source.
