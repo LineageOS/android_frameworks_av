@@ -81,13 +81,24 @@ public:
                              audio_stream_type_t stream,
                              audio_session_t audioSession);
 
-    // Add the effect to the list of default effects for streams of type |stream|.
+    // Add the effect to the list of default effects for sources of type |source|.
+    status_t addSourceDefaultEffect(const effect_uuid_t *type,
+                                    const String16& opPackageName,
+                                    const effect_uuid_t *uuid,
+                                    int32_t priority,
+                                    audio_source_t source,
+                                    audio_unique_id_t* id);
+
+    // Add the effect to the list of default effects for streams of a given usage.
     status_t addStreamDefaultEffect(const effect_uuid_t *type,
                                     const String16& opPackageName,
                                     const effect_uuid_t *uuid,
                                     int32_t priority,
                                     audio_usage_t usage,
                                     audio_unique_id_t* id);
+
+    // Remove the default source effect from wherever it's attached.
+    status_t removeSourceDefaultEffect(audio_unique_id_t id);
 
     // Remove the default stream effect from wherever it's attached.
     status_t removeStreamDefaultEffect(audio_unique_id_t id);

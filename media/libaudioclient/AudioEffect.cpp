@@ -456,6 +456,38 @@ status_t AudioEffect::newEffectUniqueId(audio_unique_id_t* id)
     return NO_ERROR;
 }
 
+status_t AudioEffect::addSourceDefaultEffect(const char *typeStr,
+                                             const String16& opPackageName,
+                                             const char *uuidStr,
+                                             int32_t priority,
+                                             audio_source_t source,
+                                             audio_unique_id_t *id)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+
+    if (typeStr == NULL && uuidStr == NULL) return BAD_VALUE;
+
+    // Convert type & uuid from string to effect_uuid_t.
+    effect_uuid_t type;
+    if (typeStr != NULL) {
+        status_t res = stringToGuid(typeStr, &type);
+        if (res != OK) return res;
+    } else {
+        type = *EFFECT_UUID_NULL;
+    }
+
+    effect_uuid_t uuid;
+    if (uuidStr != NULL) {
+        status_t res = stringToGuid(uuidStr, &uuid);
+        if (res != OK) return res;
+    } else {
+        uuid = *EFFECT_UUID_NULL;
+    }
+
+    return aps->addSourceDefaultEffect(&type, opPackageName, &uuid, priority, source, id);
+}
+
 status_t AudioEffect::addStreamDefaultEffect(const char *typeStr,
                                              const String16& opPackageName,
                                              const char *uuidStr,
@@ -486,6 +518,14 @@ status_t AudioEffect::addStreamDefaultEffect(const char *typeStr,
     }
 
     return aps->addStreamDefaultEffect(&type, opPackageName, &uuid, priority, usage, id);
+}
+
+status_t AudioEffect::removeSourceDefaultEffect(audio_unique_id_t id)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+
+    return aps->removeSourceDefaultEffect(id);
 }
 
 status_t AudioEffect::removeStreamDefaultEffect(audio_unique_id_t id)

@@ -170,6 +170,44 @@ public:
      */
 
     /*
+     * Adds an effect to the list of default output effects for a given source type.
+     *
+     * If the effect is no longer available when a source of the given type
+     * is created, the system will continue without adding it.
+     *
+     * Parameters:
+     *   typeStr:  Type uuid of effect to be a default: can be null if uuidStr is specified.
+     *             This may correspond to the OpenSL ES interface implemented by this effect,
+     *             or could be some vendor-defined type.
+     *   opPackageName: The package name used for app op checks.
+     *   uuidStr:  Uuid of effect to be a default: can be null if type is specified.
+     *             This uuid corresponds to a particular implementation of an effect type.
+     *             Note if both uuidStr and typeStr are specified, typeStr is ignored.
+     *   priority: Requested priority for effect control: the priority level corresponds to the
+     *             value of priority parameter: negative values indicate lower priorities, positive
+     *             values higher priorities, 0 being the normal priority.
+     *   source:   The source this effect should be a default for.
+     *   id:       Address where the system-wide unique id of the default effect should be returned.
+     *
+     * Returned status (from utils/Errors.h) can be:
+     *      NO_ERROR        successful operation.
+     *      PERMISSION_DENIED could not get AudioFlinger interface
+     *                        or caller lacks required permissions.
+     *      NO_INIT         effect library failed to initialize.
+     *      BAD_VALUE       invalid source, type uuid or implementation uuid.
+     *      NAME_NOT_FOUND  no effect with this uuid or type found.
+     *
+     * Returned value
+     *   *id:  The system-wide unique id of the added default effect.
+     */
+    static status_t addSourceDefaultEffect(const char* typeStr,
+                                           const String16& opPackageName,
+                                           const char* uuidStr,
+                                           int32_t priority,
+                                           audio_source_t source,
+                                           audio_unique_id_t* id);
+
+    /*
      * Adds an effect to the list of default output effects for a given stream type.
      *
      * If the effect is no longer available when a stream of the given type
@@ -207,6 +245,21 @@ public:
                                            int32_t priority,
                                            audio_usage_t usage,
                                            audio_unique_id_t* id);
+
+    /*
+     * Removes an effect from the list of default output effects for a given source type.
+     *
+     * Parameters:
+     *      id: The system-wide unique id of the effect that should no longer be a default.
+     *
+     * Returned status (from utils/Errors.h) can be:
+     *      NO_ERROR        successful operation.
+     *      PERMISSION_DENIED could not get AudioFlinger interface
+     *                        or caller lacks required permissions.
+     *      NO_INIT         effect library failed to initialize.
+     *      BAD_VALUE       invalid id.
+     */
+    static status_t removeSourceDefaultEffect(audio_unique_id_t id);
 
     /*
      * Removes an effect from the list of default output effects for a given stream type.
