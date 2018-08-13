@@ -81,6 +81,9 @@ cc_library_shared {
 
     product_variables: {
         lineage: {
+            hal1_needs_dyn_native_handle: {
+                cppflags: ["-DHAL1_NEEDS_DYN_NATIVE_HANDLE"],
+            },
             uses_qcom_bsp_legacy: {
                 cppflags: ["-DQCOM_BSP_LEGACY"],
             },
