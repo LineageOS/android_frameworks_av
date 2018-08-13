@@ -81,6 +81,9 @@ cc_library_shared {
 
     product_variables: {
         lineage: {
+            needs_dyn_native_handle_for_shmem_buf: {
+                cppflags: ["-DDYN_NATIVE_HANDLE_FOR_SHMEM_BUF"],
+            },
             uses_qcom_bsp_legacy: {
                 cppflags: ["-DQCOM_BSP_LEGACY"],
             },
