@@ -491,6 +491,34 @@ Status CameraService::getCameraCharacteristics(const String16& cameraId,
                 strerror(-res), res);
     }
 
+    int callingPid = getCallingPid();
+    int callingUid = getCallingUid();
+    std::vector<int32_t> tagsRemoved;
+    // If it's not calling from cameraserver, check the permission.
+    if ((callingPid != getpid()) &&
+            !checkPermission(String16("android.permission.CAMERA"), callingPid, callingUid)) {
+        res = cameraInfo->removePermissionEntries(
+                mCameraProviderManager->getProviderTagIdLocked(String8(cameraId).string()),
+                &tagsRemoved);
+        if (res != OK) {
+            cameraInfo->clear();
+            return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION, "Failed to remove camera"
+                    " characteristics needing camera permission for device %s: %s (%d)",
+                    String8(cameraId).string(), strerror(-res), res);
+        }
+    }
+
+    if (!tagsRemoved.empty()) {
+        res = cameraInfo->update(ANDROID_REQUEST_CHARACTERISTIC_KEYS_NEEDING_PERMISSION,
+                tagsRemoved.data(), tagsRemoved.size());
+        if (res != OK) {
+            cameraInfo->clear();
+            return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION, "Failed to insert camera "
+                    "keys needing permission for device %s: %s (%d)", String8(cameraId).string(),
+                    strerror(-res), res);
+        }
+    }
+
     return ret;
 }
 
