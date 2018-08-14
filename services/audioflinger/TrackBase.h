@@ -187,6 +187,19 @@ public:
                             return status;
                         }
 
+           // TODO: Consider making this external.
+           struct FrameTime {
+               int64_t frames;
+               int64_t timeNs;
+           };
+
+           // KernelFrameTime is updated per "mix" period even for non-pcm tracks.
+           void         getKernelFrameTime(FrameTime *ft) const {
+                           *ft = mKernelFrameTime.load();
+                        }
+
+           audio_format_t format() const { return mFormat; }
+
 protected:
     DISALLOW_COPY_AND_ASSIGN(TrackBase);
 
@@ -197,8 +210,6 @@ protected:
     // ExtendedAudioBufferProvider interface is only needed for Track,
     // but putting it in TrackBase avoids the complexity of virtual inheritance
     virtual size_t  framesReady() const { return SIZE_MAX; }
-
-    audio_format_t format() const { return mFormat; }
 
     uint32_t channelCount() const { return mChannelCount; }
 
@@ -307,6 +318,7 @@ protected:
     bool                mServerLatencySupported = false;
     std::atomic<bool>   mServerLatencyFromTrack{}; // latency from track or server timestamp.
     std::atomic<double> mServerLatencyMs{};        // last latency pushed from server thread.
+    std::atomic<FrameTime> mKernelFrameTime{};     // last frame time on kernel side.
 };
 
 // PatchProxyBufferProvider interface is implemented by PatchTrack and PatchRecord.
