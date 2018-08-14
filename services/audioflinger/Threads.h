@@ -393,6 +393,10 @@ public:
 
                         void        broadcast_l();
 
+                virtual bool        isTimestampCorrectionEnabled() const { return false; }
+
+                bool                isMsdDevice() const { return mIsMsdDevice; }
+
     mutable     Mutex                   mLock;
 
 protected:
@@ -501,7 +505,8 @@ protected:
                 ExtendedTimestamp       mTimestamp;
                 TimestampVerifier< // For timestamp statistics.
                         int64_t /* frame count */, int64_t /* time ns */> mTimestampVerifier;
-
+                audio_devices_t         mTimestampCorrectedDevices = AUDIO_DEVICE_NONE;
+                bool                    mIsMsdDevice = false;
                 // A condition that must be evaluated by the thread loop has changed and
                 // we must not wait for async write callback in the thread loop before evaluating it
                 bool                    mSignalPending;
@@ -816,6 +821,11 @@ public:
                                        && mTracks.size() < PlaybackThread::kMaxTracks;
                             }
 
+                bool        isTimestampCorrectionEnabled() const override {
+                                const audio_devices_t device =
+                                        mOutDevice & mTimestampCorrectedDevices;
+                                return audio_is_output_devices(device) && popcount(device) > 0;
+                            }
 protected:
     // updated by readOutputParameters_l()
     size_t                          mNormalFrameCount;  // normal mixer and effects
@@ -1532,6 +1542,11 @@ public:
 
             bool        fastTrackAvailable() const { return mFastTrackAvail; }
 
+            bool        isTimestampCorrectionEnabled() const override {
+                            // checks popcount for exactly one device.
+                            return audio_is_input_device(
+                                    mInDevice & mTimestampCorrectedDevices);
+                        }
 private:
             // Enter standby if not already in standby, and set mStandby flag
             void    standbyIfNotAlreadyInStandby();
