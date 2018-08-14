@@ -930,7 +930,12 @@ void NuPlayer2Driver::notifyListener_l(
                             // the last little bit of audio. In looping mode, we need to restart it.
                             mAudioSink->start();
                         }
-                        // don't send completion event when looping
+
+                        sp<AMessage> notify = new AMessage(kWhatNotifyListener, this);
+                        notify->setInt64("srcId", srcId);
+                        notify->setInt32("messageId", MEDIA2_INFO);
+                        notify->setInt32("ext1", MEDIA2_INFO_DATA_SOURCE_REPEAT);
+                        notify->post();
                         return;
                     }
                     if (property_get_bool("persist.debug.sf.stats", false)) {

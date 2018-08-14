@@ -98,7 +98,12 @@ private:
     // entry iterator
     class EntryIterator {
     public:
+        // Used for dummy initialization. Performing operations on a default-constructed
+        // EntryIterator other than assigning it to another valid EntryIterator
+        // is undefined behavior.
         EntryIterator();
+        // Caller's responsibility to make sure entry is not nullptr.
+        // Passing in nullptr can result in undefined behavior.
         explicit EntryIterator(const uint8_t *entry);
         EntryIterator(const EntryIterator &other);
 
@@ -109,7 +114,9 @@ private:
         EntryIterator&       operator++(); // ++i
         // back to previous entry
         EntryIterator&       operator--(); // --i
+        // returns an EntryIterator corresponding to the next entry
         EntryIterator        next() const;
+        // returns an EntryIterator corresponding to the previous entry
         EntryIterator        prev() const;
         bool            operator!=(const EntryIterator &other) const;
         int             operator-(const EntryIterator &other) const;
@@ -120,25 +127,22 @@ private:
 
         template<typename T>
         inline const T& payload() {
-            return *reinterpret_cast<const T *>(ptr + offsetof(entry, data));
+            return *reinterpret_cast<const T *>(mPtr + offsetof(entry, data));
         }
 
         inline operator const uint8_t*() const {
-            return ptr;
+            return mPtr;
         }
 
     private:
-        const uint8_t  *ptr;
+        const uint8_t  *mPtr;   // Should not be nullptr except for dummy initialization
     };
 
     class AbstractEntry {
     public:
-
-        // Entry starting in the given pointer
-        explicit AbstractEntry(const uint8_t *entry);
         virtual ~AbstractEntry() {}
 
-        // build concrete entry of appropriate class from pointer
+        // build concrete entry of appropriate class from ptr.
         static std::unique_ptr<AbstractEntry> buildEntry(const uint8_t *ptr);
 
         // get format entry timestamp
@@ -158,6 +162,8 @@ private:
                                                 int author) const = 0;
 
     protected:
+        // Entry starting in the given pointer, which shall not be nullptr.
+        explicit AbstractEntry(const uint8_t *entry);
         // copies ordinary entry from src to dst, and returns length of entry
         // size_t      copyEntry(audio_utils_fifo_writer *dst, const iterator &it);
         const uint8_t  *mEntry;
@@ -360,7 +366,7 @@ public:
         // writes a single Entry to the FIFO
         void    log(Event event, const void *data, size_t length);
         // checks validity of an event before calling log above this one
-        void    log(const Entry *entry, bool trusted = false);
+        void    log(const Entry &entry, bool trusted = false);
 
         Shared* const   mShared;    // raw pointer to shared memory
         sp<IMemory>     mIMemory;   // ref-counted version, initialized in constructor
@@ -432,7 +438,6 @@ public:
             EntryIterator end() { return mEnd; }
 
         private:
-            friend class MergeReader;
             friend class Reader;
             uint8_t              *mData;
             size_t                mLost;
@@ -454,7 +459,7 @@ public:
 
     protected:
         // print a summary of the performance to the console
-        void    dumpLine(const String8& timestamp, String8& body);
+        void    dumpLine(const String8 *timestamp, String8 *body);
         EntryIterator   handleFormat(const FormatEntry &fmtEntry,
                                      String8 *timestamp,
                                      String8 *body);
