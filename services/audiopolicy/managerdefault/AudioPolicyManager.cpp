@@ -4999,6 +4999,7 @@ audio_devices_t AudioPolicyManager::getDevicesForStream(audio_stream_type_t stre
     if (stream < (audio_stream_type_t) 0 || stream >= AUDIO_STREAM_PUBLIC_CNT) {
         return AUDIO_DEVICE_NONE;
     }
+    audio_devices_t activeDevices = AUDIO_DEVICE_NONE;
     audio_devices_t devices = AUDIO_DEVICE_NONE;
     for (int curStream = 0; curStream < AUDIO_STREAM_FOR_POLICY_CNT; curStream++) {
         if (!streamsMatchForvolume(stream, (audio_stream_type_t)curStream)) {
@@ -5007,15 +5008,20 @@ audio_devices_t AudioPolicyManager::getDevicesForStream(audio_stream_type_t stre
         routing_strategy curStrategy = getStrategy((audio_stream_type_t)curStream);
         audio_devices_t curDevices =
                 getDeviceForStrategy((routing_strategy)curStrategy, false /*fromCache*/);
+        devices |= curDevices;
         for (audio_io_handle_t output : getOutputsForDevice(curDevices, mOutputs)) {
             sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
             if (outputDesc->isStreamActive((audio_stream_type_t)curStream)) {
-                curDevices |= outputDesc->device();
+                activeDevices |= outputDesc->device();
             }
         }
-        devices |= curDevices;
     }
 
+    // Favor devices selected on active streams if any to report correct device in case of
+    // explicit device selection
+    if (activeDevices != AUDIO_DEVICE_NONE) {
+        devices = activeDevices;
+    }
     /*Filter SPEAKER_SAFE out of results, as AudioService doesn't know about it
       and doesn't really need to.*/
     if (devices & AUDIO_DEVICE_OUT_SPEAKER_SAFE) {
