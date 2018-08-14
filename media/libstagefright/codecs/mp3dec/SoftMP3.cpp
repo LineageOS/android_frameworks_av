@@ -114,7 +114,7 @@ void SoftMP3::initDecoder() {
     mConfig->crcEnabled = false;
 
     uint32_t memRequirements = pvmp3_decoderMemRequirements();
-    mDecoderBuf = malloc(memRequirements);
+    mDecoderBuf = calloc(1, memRequirements);
 
     pvmp3_InitDecoder(mConfig, mDecoderBuf);
     mIsFirst = true;
