@@ -130,7 +130,10 @@ protected:
     /** CameraDeviceBase instance wrapping HAL3+ entry */
 
     const int mDeviceVersion;
-    sp<CameraDeviceBase>  mDevice;
+
+    // Set to const to avoid mDevice being updated (update of sp<> is racy) during
+    // dumpDevice (which is important to be lock free for debugging purpose)
+    const sp<CameraDeviceBase>  mDevice;
 
     /** Utility members */
 

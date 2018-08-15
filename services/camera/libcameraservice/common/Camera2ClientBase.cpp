@@ -57,13 +57,13 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
                 cameraId, api1CameraId, cameraFacing, clientPid, clientUid, servicePid),
         mSharedCameraCallbacks(remoteCallback),
         mDeviceVersion(cameraService->getDeviceVersion(TClientBase::mCameraIdStr)),
+        mDevice(new Camera3Device(cameraId)),
         mDeviceActive(false), mApi1CameraId(api1CameraId)
 {
     ALOGI("Camera %s: Opened. Client: %s (PID %d, UID %d)", cameraId.string(),
             String8(clientPackageName).string(), clientPid, clientUid);
 
     mInitialClientPid = clientPid;
-    mDevice = new Camera3Device(cameraId);
     LOG_ALWAYS_FATAL_IF(mDevice == 0, "Device should never be NULL here.");
 }
 
@@ -205,8 +205,6 @@ template <typename TClientBase>
 void Camera2ClientBase<TClientBase>::detachDevice() {
     if (mDevice == 0) return;
     mDevice->disconnect();
-
-    mDevice.clear();
 
     ALOGV("Camera %s: Detach complete", TClientBase::mCameraIdStr.string());
 }

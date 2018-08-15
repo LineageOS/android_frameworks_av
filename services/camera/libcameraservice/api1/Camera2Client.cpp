@@ -453,8 +453,6 @@ binder::Status Camera2Client::disconnect() {
 
     mDevice->disconnect();
 
-    mDevice.clear();
-
     CameraService::Client::disconnect();
 
     return res;
