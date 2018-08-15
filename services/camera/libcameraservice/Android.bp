@@ -53,6 +53,7 @@ cc_library_shared {
         "device3/DistortionMapper.cpp",
         "gui/RingBufferConsumer.cpp",
         "utils/CameraThreadState.cpp",
+        "hidl/AidlCameraServiceListener.cpp",
         "hidl/HidlCameraService.cpp",
         "hidl/Convert.cpp",
         "utils/CameraTraces.cpp",

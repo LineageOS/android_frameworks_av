@@ -73,7 +73,19 @@ struct HidlCameraService final : public HCameraService {
 private:
     HidlCameraService(android::CameraService *cs) : mAidlICameraService(cs) { };
 
-    android::CameraService * const mAidlICameraService = nullptr;
+    sp<hardware::ICameraServiceListener> searchListenerCacheLocked(
+        sp<HCameraServiceListener> listener, /*removeIfFound*/ bool shouldRemove = false);
+
+    void addToListenerCacheLocked(sp<HCameraServiceListener> hListener,
+                                  sp<hardware::ICameraServiceListener> csListener);
+
+    android::CameraService *const mAidlICameraService = nullptr;
+
+    Mutex mListenerListLock;
+
+    using HIListeners =
+        std::pair<sp<HCameraServiceListener>, sp<ICameraServiceListener>>;
+    std::list<HIListeners> mListeners;
 };
 
 }  // namespace implementation

@@ -17,6 +17,7 @@
 #include <hidl/Convert.h>
 
 #include <hidl/HidlCameraService.h>
+#include <hidl/AidlCameraServiceListener.h>
 
 #include <hidl/HidlTransportSupport.h>
 
@@ -33,6 +34,7 @@ using hardware::cameraservice::utils::conversion::convertToHidl;
 using hardware::cameraservice::utils::conversion::B2HStatus;
 using hardware::Void;
 
+using service::V2_0::implementation::H2BCameraServiceListener;
 using HCameraMetadataType = android::frameworks::cameraservice::common::V2_0::CameraMetadataType;
 using HVendorTag = android::frameworks::cameraservice::common::V2_0::VendorTag;
 using HVendorTagSection = android::frameworks::cameraservice::common::V2_0::VendorTagSection;
@@ -85,18 +87,91 @@ Return<void> HidlCameraService::connectDevice(const sp<HCameraDeviceCallback>& h
     return Void();
 }
 
+void HidlCameraService::addToListenerCacheLocked(sp<HCameraServiceListener> hListener,
+                                                 sp<hardware::ICameraServiceListener> csListener) {
+        mListeners.emplace_back(std::make_pair(hListener, csListener));
+}
+
+sp<hardware::ICameraServiceListener>
+HidlCameraService::searchListenerCacheLocked(sp<HCameraServiceListener> hListener,
+                                             bool shouldRemove) {
+    // Go through the mListeners list and compare the listener with the HIDL
+    // listener registered.
+    auto it = mListeners.begin();
+    sp<ICameraServiceListener> csListener = nullptr;
+    for (;it != mListeners.end(); it++) {
+        if (hardware::interfacesEqual(it->first, hListener)) {
+            break;
+        }
+    }
+    if (it != mListeners.end()) {
+        csListener = it->second;
+        if (shouldRemove) {
+          mListeners.erase(it);
+        }
+    }
+    return csListener;
+}
+
 Return<void> HidlCameraService::addListener(const sp<HCameraServiceListener>& hCsListener,
                                             addListener_cb _hidl_cb) {
-    // To silence Wunused-parameter.
-    (void)hCsListener;
-    (void)_hidl_cb;
-
+    if (mAidlICameraService == nullptr) {
+        _hidl_cb(HStatus::UNKNOWN_ERROR, {});
+        return Void();
+    }
+    if (hCsListener == nullptr) {
+        ALOGE("%s listener must not be NULL", __FUNCTION__);
+        _hidl_cb(HStatus::ILLEGAL_ARGUMENT, {});
+        return Void();
+    }
+    sp<hardware::ICameraServiceListener> csListener = nullptr;
+    // Check the cache for previously registered callbacks
+    {
+        Mutex::Autolock l(mListenerListLock);
+        csListener = searchListenerCacheLocked(hCsListener);
+        if (csListener == nullptr) {
+            // Wrap an hCsListener with AidlCameraServiceListener and pass it to
+            // CameraService.
+            csListener = new H2BCameraServiceListener(hCsListener);
+            // Add to cache
+            addToListenerCacheLocked(hCsListener, csListener);
+        } else {
+            ALOGE("%s: Trying to add a listener %p already registered",
+                  __FUNCTION__, hCsListener.get());
+            _hidl_cb(HStatus::ILLEGAL_ARGUMENT, {});
+            return Void();
+        }
+    }
+    std::vector<hardware::CameraStatus> cameraStatusAndIds{};
+    binder::Status serviceRet = mAidlICameraService->addListener(csListener, &cameraStatusAndIds);
+    HStatus status = HStatus::NO_ERROR;
+    if (!serviceRet.isOk()) {
+      ALOGE("%s: Unable to add camera device status listener", __FUNCTION__);
+      status = B2HStatus(serviceRet);
+      _hidl_cb(status, {});
+      return Void();
+    }
+    hidl_vec<HCameraStatusAndId> hCameraStatusAndIds;
+    //Convert cameraStatusAndIds to HIDL and call callback
+    convertToHidl(cameraStatusAndIds, &hCameraStatusAndIds);
+    _hidl_cb(status, hCameraStatusAndIds);
     return Void();
 }
 
 Return<HStatus> HidlCameraService::removeListener(const sp<HCameraServiceListener>& hCsListener) {
     if (hCsListener == nullptr) {
         ALOGE("%s listener must not be NULL", __FUNCTION__);
+        return HStatus::ILLEGAL_ARGUMENT;
+    }
+    sp<ICameraServiceListener> csListener = nullptr;
+    {
+        Mutex::Autolock l(mListenerListLock);
+        csListener = searchListenerCacheLocked(hCsListener, /*removeIfFound*/true);
+    }
+    if (csListener != nullptr) {
+          mAidlICameraService->removeListener(csListener);
+    } else {
+        ALOGE("%s Removing unregistered listener %p", __FUNCTION__, hCsListener.get());
         return HStatus::ILLEGAL_ARGUMENT;
     }
     return HStatus::NO_ERROR;
