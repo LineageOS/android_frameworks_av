@@ -58,11 +58,10 @@ void MediaLogService::registerWriter(const sp<IMemory>& shared, size_t size, con
             shared->size() < NBLog::Timeline::sharedSize(size)) {
         return;
     }
-    sp<NBLog::Reader> reader(new NBLog::Reader(shared, size));
-    NBLog::NamedReader namedReader(reader, name);
+    sp<NBLog::Reader> reader(new NBLog::Reader(shared, size, name));
     Mutex::Autolock _l(mLock);
-    mNamedReaders.add(namedReader);
-    mMerger.addReader(namedReader);
+    mReaders.add(reader);
+    mMerger.addReader(reader);
 }
 
 void MediaLogService::unregisterWriter(const sp<IMemory>& shared)
@@ -71,9 +70,9 @@ void MediaLogService::unregisterWriter(const sp<IMemory>& shared)
         return;
     }
     Mutex::Autolock _l(mLock);
-    for (size_t i = 0; i < mNamedReaders.size(); ) {
-        if (mNamedReaders[i].reader()->isIMemory(shared)) {
-            mNamedReaders.removeAt(i);
+    for (size_t i = 0; i < mReaders.size(); ) {
+        if (mReaders[i]->isIMemory(shared)) {
+            mReaders.removeAt(i);
         } else {
             i++;
         }
@@ -106,7 +105,7 @@ status_t MediaLogService::dump(int fd, const Vector<String16>& args __unused)
     if (args.size() > 0) {
         const String8 arg0(args[0]);
         if (!strcmp(arg0.string(), "-r")) {
-            // needed because mNamedReaders is protected by mLock
+            // needed because mReaders is protected by mLock
             bool locked = dumpTryLock(mLock);
 
             // failed to lock - MediaLogService is probably deadlocked
@@ -121,17 +120,18 @@ status_t MediaLogService::dump(int fd, const Vector<String16>& args __unused)
                 return NO_ERROR;
             }
 
-            for (const auto& namedReader : mNamedReaders) {
+            for (auto reader : mReaders) {
                 if (fd >= 0) {
-                    dprintf(fd, "\n%s:\n", namedReader.name());
+                    dprintf(fd, "\n%s:\n", reader->name().c_str());
+                    reader->dump(fd, 0 /*indent*/);
                 } else {
-                    ALOGI("%s:", namedReader.name());
+                    ALOGI("%s:", reader->name().c_str());
                 }
             }
             mLock.unlock();
         }
     }
-    mMergeReader.dump(fd);
+    //mMergeReader.dump(fd);
     return NO_ERROR;
 }
 
