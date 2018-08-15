@@ -18,6 +18,8 @@
 #define LOG_TAG "FLACExtractor"
 #include <utils/Log.h>
 
+#include <stdint.h>
+
 #include "FLACExtractor.h"
 // libFLAC parser
 #include "FLAC/stream_decoder.h"
@@ -124,7 +126,7 @@ private:
     // media buffers
     size_t mMaxBufferSize;
     MediaBufferGroup *mGroup;
-    void (*mCopy)(short *dst, const int * src[kMaxChannels], unsigned nSamples, unsigned nChannels);
+    void (*mCopy)(int16_t *dst, const int * src[kMaxChannels], unsigned nSamples, unsigned nChannels);
 
     // handle to underlying libFLAC parser
     FLAC__StreamDecoder *mDecoder;
@@ -383,7 +385,7 @@ void FLACParser::errorCallback(FLAC__StreamDecoderErrorStatus status)
 // These are candidates for optimization if needed.
 
 static void copyMono8(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACParser::kMaxChannels],
         unsigned nSamples,
         unsigned /* nChannels */) {
@@ -393,7 +395,7 @@ static void copyMono8(
 }
 
 static void copyStereo8(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACParser::kMaxChannels],
         unsigned nSamples,
         unsigned /* nChannels */) {
@@ -403,7 +405,7 @@ static void copyStereo8(
     }
 }
 
-static void copyMultiCh8(short *dst, const int * src[FLACParser::kMaxChannels], unsigned nSamples, unsigned nChannels)
+static void copyMultiCh8(int16_t *dst, const int * src[FLACParser::kMaxChannels], unsigned nSamples, unsigned nChannels)
 {
     for (unsigned i = 0; i < nSamples; ++i) {
         for (unsigned c = 0; c < nChannels; ++c) {
@@ -413,7 +415,7 @@ static void copyMultiCh8(short *dst, const int * src[FLACParser::kMaxChannels], 
 }
 
 static void copyMono16(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACParser::kMaxChannels],
         unsigned nSamples,
         unsigned /* nChannels */) {
@@ -423,7 +425,7 @@ static void copyMono16(
 }
 
 static void copyStereo16(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACParser::kMaxChannels],
         unsigned nSamples,
         unsigned /* nChannels */) {
@@ -433,7 +435,7 @@ static void copyStereo16(
     }
 }
 
-static void copyMultiCh16(short *dst, const int * src[FLACParser::kMaxChannels], unsigned nSamples, unsigned nChannels)
+static void copyMultiCh16(int16_t *dst, const int * src[FLACParser::kMaxChannels], unsigned nSamples, unsigned nChannels)
 {
     for (unsigned i = 0; i < nSamples; ++i) {
         for (unsigned c = 0; c < nChannels; ++c) {
@@ -445,7 +447,7 @@ static void copyMultiCh16(short *dst, const int * src[FLACParser::kMaxChannels],
 // 24-bit versions should do dithering or noise-shaping, here or in AudioFlinger
 
 static void copyMono24(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACParser::kMaxChannels],
         unsigned nSamples,
         unsigned /* nChannels */) {
@@ -455,7 +457,7 @@ static void copyMono24(
 }
 
 static void copyStereo24(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACParser::kMaxChannels],
         unsigned nSamples,
         unsigned /* nChannels */) {
@@ -465,7 +467,7 @@ static void copyStereo24(
     }
 }
 
-static void copyMultiCh24(short *dst, const int * src[FLACParser::kMaxChannels], unsigned nSamples, unsigned nChannels)
+static void copyMultiCh24(int16_t *dst, const int * src[FLACParser::kMaxChannels], unsigned nSamples, unsigned nChannels)
 {
     for (unsigned i = 0; i < nSamples; ++i) {
         for (unsigned c = 0; c < nChannels; ++c) {
@@ -475,7 +477,7 @@ static void copyMultiCh24(short *dst, const int * src[FLACParser::kMaxChannels],
 }
 
 static void copyTrespass(
-        short * /* dst */,
+        int16_t * /* dst */,
         const int *[FLACParser::kMaxChannels] /* src */,
         unsigned /* nSamples */,
         unsigned /* nChannels */) {
@@ -592,7 +594,7 @@ status_t FLACParser::init()
         static const struct {
             unsigned mChannels;
             unsigned mBitsPerSample;
-            void (*mCopy)(short *dst, const int * src[kMaxChannels], unsigned nSamples, unsigned nChannels);
+            void (*mCopy)(int16_t *dst, const int * src[kMaxChannels], unsigned nSamples, unsigned nChannels);
         } table[] = {
             { 1,  8, copyMono8    },
             { 2,  8, copyStereo8  },
@@ -635,7 +637,7 @@ void FLACParser::allocateBuffers()
 {
     CHECK(mGroup == NULL);
     mGroup = new MediaBufferGroup;
-    mMaxBufferSize = getMaxBlockSize() * getChannels() * sizeof(short);
+    mMaxBufferSize = getMaxBlockSize() * getChannels() * sizeof(int16_t);
     mGroup->add_buffer(MediaBufferBase::Create(mMaxBufferSize));
 }
 
@@ -688,9 +690,9 @@ MediaBufferBase *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
     if (err != OK) {
         return NULL;
     }
-    size_t bufferSize = blocksize * getChannels() * sizeof(short);
+    size_t bufferSize = blocksize * getChannels() * sizeof(int16_t);
     CHECK(bufferSize <= mMaxBufferSize);
-    short *data = (short *) buffer->data();
+    int16_t *data = (int16_t *) buffer->data();
     buffer->set_range(0, bufferSize);
     // copy PCM from FLAC write buffer to our media buffer, with interleaving
     (*mCopy)(data, mWriteBuffer, blocksize, getChannels());
