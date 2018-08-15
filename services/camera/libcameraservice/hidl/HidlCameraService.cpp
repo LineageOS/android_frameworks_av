@@ -17,6 +17,9 @@
 #include <hidl/Convert.h>
 
 #include <hidl/HidlCameraService.h>
+
+#include <hidl/HidlCameraDeviceUser.h>
+#include <hidl/AidlCameraDeviceCallbacks.h>
 #include <hidl/AidlCameraServiceListener.h>
 
 #include <hidl/HidlTransportSupport.h>
@@ -34,6 +37,8 @@ using hardware::cameraservice::utils::conversion::convertToHidl;
 using hardware::cameraservice::utils::conversion::B2HStatus;
 using hardware::Void;
 
+using device::V2_0::implementation::H2BCameraDeviceCallbacks;
+using device::V2_0::implementation::HidlCameraDeviceUser;
 using service::V2_0::implementation::H2BCameraServiceListener;
 using HCameraMetadataType = android::frameworks::cameraservice::common::V2_0::CameraMetadataType;
 using HVendorTag = android::frameworks::cameraservice::common::V2_0::VendorTag;
@@ -79,11 +84,43 @@ HidlCameraService::getCameraCharacteristics(const hidl_string& cameraId,
 Return<void> HidlCameraService::connectDevice(const sp<HCameraDeviceCallback>& hCallback,
                                               const hidl_string& cameraId,
                                               connectDevice_cb _hidl_cb) {
-    // To silence Wunused-parameter.
-    (void)hCallback;
-    (void)cameraId;
-    (void)_hidl_cb;
-
+    // Here, we first get ICameraDeviceUser from mAidlICameraService, then save
+    // that interface in the newly created HidlCameraDeviceUser impl class.
+    if (mAidlICameraService == nullptr) {
+        _hidl_cb(HStatus::UNKNOWN_ERROR, nullptr);
+        return Void();
+    }
+    sp<hardware::camera2::ICameraDeviceUser> deviceRemote = nullptr;
+    // Create a hardware::camera2::ICameraDeviceCallback object which internally
+    // calls callback functions passed through hCallback.
+    sp<H2BCameraDeviceCallbacks> hybridCallbacks = new H2BCameraDeviceCallbacks(hCallback);
+    if (!hybridCallbacks->initializeLooper()) {
+        ALOGE("Unable to handle callbacks on device, cannot connect");
+        _hidl_cb(HStatus::UNKNOWN_ERROR, nullptr);
+        return Void();
+    }
+    sp<hardware::camera2::ICameraDeviceCallbacks> callbacks = hybridCallbacks;
+    binder::Status serviceRet = mAidlICameraService->connectDevice(
+            callbacks, String16(cameraId.c_str()), String16(""),
+            hardware::ICameraService::USE_CALLING_UID, /*out*/&deviceRemote);
+    HStatus status = HStatus::NO_ERROR;
+    if (!serviceRet.isOk()) {
+        ALOGE("%s: Unable to connect to camera device", __FUNCTION__);
+        status = B2HStatus(serviceRet);
+        _hidl_cb(status, nullptr);
+        return Void();
+    }
+    // Now we create a HidlCameraDeviceUser class, store the deviceRemote in it,
+    // and return that back. All calls on that interface will be forwarded to
+    // the AIDL interface.
+    sp<HidlCameraDeviceUser> hDeviceRemote = new HidlCameraDeviceUser(deviceRemote);
+    if (!hDeviceRemote->initStatus()) {
+        ALOGE("%s: Unable to initialize camera device HIDL wrapper", __FUNCTION__);
+        _hidl_cb(HStatus::UNKNOWN_ERROR, nullptr);
+        return Void();
+    }
+    hybridCallbacks->setCaptureResultMetadataQueue(hDeviceRemote->getCaptureResultMetadataQueue());
+    _hidl_cb(status, hDeviceRemote);
     return Void();
 }
 

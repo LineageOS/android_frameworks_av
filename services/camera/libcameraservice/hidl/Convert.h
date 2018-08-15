@@ -28,7 +28,9 @@
 #include <android/hardware/camera2/ICameraDeviceUser.h>
 #include <android/hardware/graphics/bufferqueue/1.0/IGraphicBufferProducer.h>
 #include <android/hardware/ICameraService.h>
+#include <fmq/MessageQueue.h>
 #include <hardware/camera.h>
+#include <hidl/MQDescriptor.h>
 
 namespace android {
 namespace hardware {
@@ -39,6 +41,7 @@ namespace conversion {
 using hardware::camera2::impl::CaptureResultExtras;
 using hardware::camera2::impl::PhysicalCaptureResultInfo;
 
+using CaptureResultMetadataQueue = MessageQueue<uint8_t, kSynchronizedReadWrite>;
 using HCameraMetadata = frameworks::cameraservice::service::V2_0::CameraMetadata;
 using HCameraDeviceStatus = frameworks::cameraservice::service::V2_0::CameraDeviceStatus;
 using HCameraStatusAndId = frameworks::cameraservice::service::V2_0::CameraStatusAndId;
@@ -78,6 +81,10 @@ void convertToHidl(const hardware::camera2::utils::SubmitInfo &submitInfo,
 HErrorCode convertToHidl(int32_t errorCode);
 
 HCaptureResultExtras convertToHidl(const CaptureResultExtras &captureResultExtras);
+
+hidl_vec<HPhysicalCaptureResultInfo> convertToHidl(
+    const std::vector<PhysicalCaptureResultInfo> &physicalCaptureResultInfos,
+    std::shared_ptr<CaptureResultMetadataQueue> &captureResultMetadataQueue);
 
 HStatus B2HStatus(const binder::Status &bStatus);
 

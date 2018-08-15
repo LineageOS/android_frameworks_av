@@ -220,6 +220,43 @@ HStatus B2HStatus(const binder::Status &bStatus) {
   return status;
 }
 
+HPhysicalCaptureResultInfo convertToHidl(
+    const PhysicalCaptureResultInfo &physicalCaptureResultInfo,
+    std::shared_ptr<CaptureResultMetadataQueue> &captureResultMetadataQueue) {
+    HPhysicalCaptureResultInfo hPhysicalCaptureResultInfo;
+    hPhysicalCaptureResultInfo.physicalCameraId =
+        String8(physicalCaptureResultInfo.mPhysicalCameraId).string();
+    const camera_metadata_t *rawMetadata =
+        physicalCaptureResultInfo.mPhysicalCameraMetadata.getAndLock();
+    // Try using fmq at first.
+    size_t metadata_size = get_camera_metadata_size(rawMetadata);
+    if ((metadata_size > 0) && (captureResultMetadataQueue->availableToWrite() > 0)) {
+        if (captureResultMetadataQueue->write((uint8_t *)rawMetadata, metadata_size)) {
+            hPhysicalCaptureResultInfo.physicalCameraMetadata.fmqMetadataSize(metadata_size);
+        } else {
+            ALOGW("%s Couldn't use fmq, falling back to hwbinder", __FUNCTION__);
+            HCameraMetadata metadata;
+            convertToHidl(rawMetadata, &metadata);
+            hPhysicalCaptureResultInfo.physicalCameraMetadata.metadata(std::move(metadata));
+        }
+    }
+    physicalCaptureResultInfo.mPhysicalCameraMetadata.unlock(rawMetadata);
+    return hPhysicalCaptureResultInfo;
+}
+
+hidl_vec<HPhysicalCaptureResultInfo> convertToHidl(
+    const std::vector<PhysicalCaptureResultInfo> &physicalCaptureResultInfos,
+    std::shared_ptr<CaptureResultMetadataQueue> &captureResultMetadataQueue) {
+    hidl_vec<HPhysicalCaptureResultInfo> hPhysicalCaptureResultInfos;
+    hPhysicalCaptureResultInfos.resize(physicalCaptureResultInfos.size());
+    size_t i = 0;
+    for (auto &physicalCaptureResultInfo : physicalCaptureResultInfos) {
+        hPhysicalCaptureResultInfos[i++] = convertToHidl(physicalCaptureResultInfo,
+                                                         captureResultMetadataQueue);
+    }
+    return hPhysicalCaptureResultInfos;
+}
+
 } //conversion
 } // utils
 } //cameraservice
