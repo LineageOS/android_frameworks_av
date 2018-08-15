@@ -42,11 +42,11 @@ sp<IMediaHTTPService> CreateHTTPServiceInCurrentJavaContext() {
             env, env->FindClass("android/media/MediaHTTPService"));
     CHECK(clazz.get() != NULL);
 
-    jmethodID constructID = env->GetMethodID(clazz.get(), "<init>", "()V");
+    jmethodID constructID = env->GetMethodID(clazz.get(), "<init>", "(Ljava/util/List;)V");
     CHECK(constructID != NULL);
 
     ScopedLocalRef<jobject> httpServiceObj(
-            env, env->NewObject(clazz.get(), constructID));
+            env, env->NewObject(clazz.get(), constructID, NULL));
 
     sp<IMediaHTTPService> httpService;
     if (httpServiceObj.get() != NULL) {
