@@ -863,6 +863,7 @@ void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args __u
             || mType == DIRECT
             || mType == OFFLOAD) {
         dprintf(fd, "  Timestamp stats: %s\n", mTimestampVerifier.toString().c_str());
+        dprintf(fd, "  Timestamp corrected: %s\n", isTimestampCorrectionEnabled() ? "yes" : "no");
     }
 
     if (locked) {
@@ -1732,9 +1733,20 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         if (mOutput->audioHwDev->canSetMasterMute()) {
             mMasterMute = false;
         }
+        mIsMsdDevice = strcmp(
+                mOutput->audioHwDev->moduleName(), AUDIO_HARDWARE_MODULE_ID_MSD) == 0;
     }
 
     readOutputParameters_l();
+
+    // TODO: We may also match on address as well as device type for
+    // AUDIO_DEVICE_OUT_BUS, AUDIO_DEVICE_OUT_ALL_A2DP, AUDIO_DEVICE_OUT_REMOTE_SUBMIX
+    if (type == MIXER || type == DIRECT) {
+        mTimestampCorrectedDevices = (audio_devices_t)property_get_int64(
+                "audio.timestamp.corrected_output_devices",
+                (int64_t)(mIsMsdDevice ? AUDIO_DEVICE_OUT_BUS // turn on by default for MSD
+                                       : AUDIO_DEVICE_NONE));
+    }
 
     // ++ operator does not compile
     for (audio_stream_type_t stream = AUDIO_STREAM_MIN; stream < AUDIO_STREAM_FOR_POLICY_CNT;
@@ -3208,6 +3220,8 @@ bool AudioFlinger::PlaybackThread::threadLoop()
     if (mType == OFFLOAD || mType == DIRECT) {
         mTimestampVerifier.setDiscontinuityMode(mTimestampVerifier.DISCONTINUITY_MODE_ZERO);
     }
+    audio_utils::Statistics<double> downstreamLatencyStatMs(0.999 /* alpha */);
+    audio_patch_handle_t lastDownstreamPatchHandle = AUDIO_PATCH_HANDLE_NONE;
 
     while (!exitPending())
     {
@@ -3218,6 +3232,46 @@ bool AudioFlinger::PlaybackThread::threadLoop()
         cpuStats.sample(myName);
 
         Vector< sp<EffectChain> > effectChains;
+
+        // If the device is AUDIO_DEVICE_OUT_BUS, check for downstream latency.
+        //
+        // Note: we access outDevice() outside of mLock.
+        if (isMsdDevice() && (outDevice() & AUDIO_DEVICE_OUT_BUS) != 0) {
+            // Here, we try for the AF lock, but do not block on it as the latency
+            // is more informational.
+            if (mAudioFlinger->mLock.tryLock() == NO_ERROR) {
+                std::vector<PatchPanel::SoftwarePatch> swPatches;
+                double latencyMs;
+                status_t status = INVALID_OPERATION;
+                audio_patch_handle_t downstreamPatchHandle = AUDIO_PATCH_HANDLE_NONE;
+                if (mAudioFlinger->mPatchPanel.getDownstreamSoftwarePatches(id(), &swPatches) == OK
+                        && swPatches.size() > 0) {
+                        status = swPatches[0].getLatencyMs_l(&latencyMs);
+                        downstreamPatchHandle = swPatches[0].getPatchHandle();
+                }
+                if (downstreamPatchHandle != lastDownstreamPatchHandle) {
+                    downstreamLatencyStatMs.reset();
+                    lastDownstreamPatchHandle = downstreamPatchHandle;
+                }
+                if (status == OK) {
+                    // verify downstream latency (we assume a max reasonable
+                    // latency of 1 second).
+                    if (latencyMs >= 0. && latencyMs <= 1000.) {
+                        ALOGV("new downstream latency %lf ms", latencyMs);
+                        downstreamLatencyStatMs.add(latencyMs);
+                    } else {
+                        ALOGD("out of range downstream latency %lf ms", latencyMs);
+                    }
+                }
+                mAudioFlinger->mLock.unlock();
+            }
+        } else {
+            if (lastDownstreamPatchHandle != AUDIO_PATCH_HANDLE_NONE) {
+                // our device is no longer AUDIO_DEVICE_OUT_BUS, reset patch handle and stats.
+                downstreamLatencyStatMs.reset();
+                lastDownstreamPatchHandle = AUDIO_PATCH_HANDLE_NONE;
+            }
+        }
 
         { // scope for mLock
 
@@ -3248,6 +3302,33 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                 mTimestampVerifier.add(timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL],
                         timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL],
                         mSampleRate);
+
+                if (isTimestampCorrectionEnabled()) {
+                    ALOGV("TS_BEFORE: %d %lld %lld", id(),
+                            (long long)timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL],
+                            (long long)timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]);
+                    auto correctedTimestamp = mTimestampVerifier.getLastCorrectedTimestamp();
+                    timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]
+                            = correctedTimestamp.mFrames;
+                    timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL]
+                            = correctedTimestamp.mTimeNs;
+                    ALOGV("TS_AFTER: %d %lld %lld", id(),
+                            (long long)timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL],
+                            (long long)timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]);
+
+                    // Note: Downstream latency only added if timestamp correction enabled.
+                    if (downstreamLatencyStatMs.getN() > 0) { // we have latency info.
+                        const int64_t newPosition =
+                                timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]
+                                - int64_t(downstreamLatencyStatMs.getMean() * mSampleRate * 1e-3);
+                        // prevent retrograde
+                        timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL] = max(
+                                newPosition,
+                                (mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]
+                                        - mSuspendedFrames));
+                    }
+                }
+
                 // We always fetch the timestamp here because often the downstream
                 // sink will block while writing.
 
@@ -6368,7 +6449,19 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
     snprintf(mThreadName, kThreadNameLength, "AudioIn_%X", id);
     mNBLogWriter = audioFlinger->newWriter_l(kLogSize, mThreadName);
 
+    if (mInput != nullptr && mInput->audioHwDev != nullptr) {
+        mIsMsdDevice = strcmp(
+                mInput->audioHwDev->moduleName(), AUDIO_HARDWARE_MODULE_ID_MSD) == 0;
+    }
+
     readInputParameters_l();
+
+    // TODO: We may also match on address as well as device type for
+    // AUDIO_DEVICE_IN_BUS, AUDIO_DEVICE_IN_BLUETOOTH_A2DP, AUDIO_DEVICE_IN_REMOTE_SUBMIX
+    mTimestampCorrectedDevices = (audio_devices_t)property_get_int64(
+            "audio.timestamp.corrected_input_devices",
+            (int64_t)(mIsMsdDevice ? AUDIO_DEVICE_IN_BUS // turn on by default for MSD
+                                   : AUDIO_DEVICE_NONE));
 
     // create an NBAIO source for the HAL input stream, and negotiate
     mInputSource = new AudioStreamInSource(input->stream);
@@ -6804,7 +6897,22 @@ reacquire_wakelock:
             int64_t position, time;
             if (mStandby) {
                 mTimestampVerifier.discontinuity();
-            } else if (mInput->stream->getCapturePosition(&position, &time) == NO_ERROR) {
+            } else if (mInput->stream->getCapturePosition(&position, &time) == NO_ERROR
+                    && time > mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL]) {
+
+                mTimestampVerifier.add(position, time, mSampleRate);
+
+                // Correct timestamps
+                if (isTimestampCorrectionEnabled()) {
+                    ALOGV("TS_BEFORE: %d %lld %lld",
+                            id(), (long long)time, (long long)position);
+                    auto correctedTimestamp = mTimestampVerifier.getLastCorrectedTimestamp();
+                    position = correctedTimestamp.mFrames;
+                    time = correctedTimestamp.mTimeNs;
+                    ALOGV("TS_AFTER: %d %lld %lld",
+                            id(), (long long)time, (long long)position);
+                }
+
                 mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL] = position;
                 mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] = time;
                 // Note: In general record buffers should tend to be empty in
@@ -6812,10 +6920,6 @@ reacquire_wakelock:
                 //
                 // Also, it is not advantageous to call get_presentation_position during the read
                 // as the read obtains a lock, preventing the timestamp call from executing.
-
-                mTimestampVerifier.add(mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL],
-                        mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL],
-                        mSampleRate);
             } else {
                 mTimestampVerifier.error();
             }
