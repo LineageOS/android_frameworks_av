@@ -175,6 +175,12 @@ OutputConfiguration::OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int ro
     mIsShared = isShared;
 }
 
+OutputConfiguration::OutputConfiguration(
+        const std::vector<sp<IGraphicBufferProducer>>& gbps,
+    int rotation, int surfaceSetID,  int surfaceType, int width, int height, bool isShared)
+  : mGbps(gbps), mRotation(rotation), mSurfaceSetID(surfaceSetID), mSurfaceType(surfaceType),
+    mWidth(width), mHeight(height), mIsDeferred(false), mIsShared(isShared) { }
+
 status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
 
     if (parcel == nullptr) return BAD_VALUE;
