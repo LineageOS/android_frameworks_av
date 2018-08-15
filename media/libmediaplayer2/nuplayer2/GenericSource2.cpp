@@ -34,7 +34,7 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/DataSourceFactory.h>
+#include <media/stagefright/ClearDataSourceFactory.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaClock.h>
@@ -368,7 +368,7 @@ void NuPlayer2::GenericSource2::onPrepareAsync() {
             String8 contentType;
 
             if (!strncasecmp("http://", uri, 7) || !strncasecmp("https://", uri, 8)) {
-                mHttpSource = DataSourceFactory::CreateMediaHTTP(mHTTPService);
+                mHttpSource = ClearDataSourceFactory::CreateMediaHTTP(mHTTPService);
                 if (mHttpSource == NULL) {
                     ALOGE("Failed to create http source!");
                     notifyPreparedAndCleanup(UNKNOWN_ERROR);
@@ -378,7 +378,7 @@ void NuPlayer2::GenericSource2::onPrepareAsync() {
 
             mLock.unlock();
             // This might take long time if connection has some issue.
-            sp<DataSource> dataSource = DataSourceFactory::CreateFromURI(
+            sp<DataSource> dataSource = ClearDataSourceFactory::CreateFromURI(
                    mHTTPService, uri, &mUriHeaders, &contentType,
                    static_cast<HTTPBase *>(mHttpSource.get()));
             mLock.lock();
