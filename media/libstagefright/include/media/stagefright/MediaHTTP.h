@@ -19,50 +19,21 @@
 #define MEDIA_HTTP_H_
 
 #include <media/stagefright/foundation/AString.h>
-
-#include "include/HTTPBase.h"
+#include <media/stagefright/ClearMediaHTTP.h>
 
 namespace android {
 
 struct MediaHTTPConnection;
 
-struct MediaHTTP : public HTTPBase {
+struct MediaHTTP : public ClearMediaHTTP {
     MediaHTTP(const sp<MediaHTTPConnection> &conn);
-
-    virtual status_t connect(
-            const char *uri,
-            const KeyedVector<String8, String8> *headers,
-            off64_t offset);
-
-    virtual void disconnect();
-
-    virtual status_t initCheck() const;
-
-    virtual ssize_t readAt(off64_t offset, void *data, size_t size);
-
-    virtual status_t getSize(off64_t *size);
-
-    virtual uint32_t flags();
-
-    virtual status_t reconnectAtOffset(off64_t offset);
 
 protected:
     virtual ~MediaHTTP();
 
     virtual sp<DecryptHandle> DrmInitialization(const char* mime);
-    virtual String8 getUri();
-    virtual String8 getMIMEType() const;
 
 private:
-    status_t mInitCheck;
-    sp<MediaHTTPConnection> mHTTPConnection;
-
-    KeyedVector<String8, String8> mLastHeaders;
-    AString mLastURI;
-
-    bool mCachedSizeValid;
-    off64_t mCachedSize;
-
     sp<DecryptHandle> mDecryptHandle;
     DrmManagerClient *mDrmManagerClient;
 

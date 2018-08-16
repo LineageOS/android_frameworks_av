@@ -24,7 +24,7 @@
 
 #include <media/MediaHTTPConnection.h>
 #include <media/MediaHTTPService.h>
-#include <media/stagefright/MediaHTTP.h>
+#include <media/stagefright/ClearMediaHTTP.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/Utils.h>
@@ -41,7 +41,7 @@ SDPLoader::SDPLoader(
       mFlags(flags),
       mNetLooper(new ALooper),
       mCancelled(false),
-      mHTTPDataSource(new MediaHTTP(httpService->makeHTTPConnection())) {
+      mHTTPDataSource(new ClearMediaHTTP(httpService->makeHTTPConnection())) {
     mNetLooper->setName("sdp net");
     mNetLooper->start(false /* runOnCallingThread */,
                       false /* canCallJava */,

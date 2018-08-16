@@ -239,8 +239,14 @@ NuPlayerDrm::CryptoInfo *NuPlayerDrm::makeCryptoInfo(
         size_t *encryptedbytes)
 {
     // size needed to store all the crypto data
-    size_t cryptosize = sizeof(CryptoInfo) +
-                        sizeof(CryptoPlugin::SubSample) * numSubSamples;
+    size_t cryptosize;
+    // sizeof(CryptoInfo) + sizeof(CryptoPlugin::SubSample) * numSubSamples;
+    if (__builtin_mul_overflow(sizeof(CryptoPlugin::SubSample), numSubSamples, &cryptosize) ||
+            __builtin_add_overflow(cryptosize, sizeof(CryptoInfo), &cryptosize)) {
+        ALOGE("crypto size overflow");
+        return NULL;
+    }
+
     CryptoInfo *ret = (CryptoInfo*) malloc(cryptosize);
     if (ret == NULL) {
         ALOGE("couldn't allocate %zu bytes", cryptosize);

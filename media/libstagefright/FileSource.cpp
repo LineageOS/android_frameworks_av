@@ -22,90 +22,28 @@
 #include <media/stagefright/FileSource.h>
 #include <media/stagefright/Utils.h>
 #include <private/android_filesystem_config.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 namespace android {
 
 FileSource::FileSource(const char *filename)
-    : mFd(-1),
-      mOffset(0),
-      mLength(-1),
-      mName("<null>"),
+    : ClearFileSource(filename),
       mDecryptHandle(NULL),
       mDrmManagerClient(NULL),
       mDrmBufOffset(0),
       mDrmBufSize(0),
       mDrmBuf(NULL){
-
-    if (filename) {
-        mName = String8::format("FileSource(%s)", filename);
-    }
-    ALOGV("%s", filename);
-    mFd = open(filename, O_LARGEFILE | O_RDONLY);
-
-    if (mFd >= 0) {
-        mLength = lseek64(mFd, 0, SEEK_END);
-    } else {
-        ALOGE("Failed to open file '%s'. (%s)", filename, strerror(errno));
-    }
 }
 
 FileSource::FileSource(int fd, int64_t offset, int64_t length)
-    : mFd(fd),
-      mOffset(offset),
-      mLength(length),
-      mName("<null>"),
+    : ClearFileSource(fd, offset, length),
       mDecryptHandle(NULL),
       mDrmManagerClient(NULL),
       mDrmBufOffset(0),
       mDrmBufSize(0),
       mDrmBuf(NULL) {
-    ALOGV("fd=%d (%s), offset=%lld, length=%lld",
-            fd, nameForFd(fd).c_str(), (long long) offset, (long long) length);
-
-    if (mOffset < 0) {
-        mOffset = 0;
-    }
-    if (mLength < 0) {
-        mLength = 0;
-    }
-    if (mLength > INT64_MAX - mOffset) {
-        mLength = INT64_MAX - mOffset;
-    }
-    struct stat s;
-    if (fstat(fd, &s) == 0) {
-        if (mOffset > s.st_size) {
-            mOffset = s.st_size;
-            mLength = 0;
-        }
-        if (mOffset + mLength > s.st_size) {
-            mLength = s.st_size - mOffset;
-        }
-    }
-    if (mOffset != offset || mLength != length) {
-        ALOGW("offset/length adjusted from %lld/%lld to %lld/%lld",
-                (long long) offset, (long long) length,
-                (long long) mOffset, (long long) mLength);
-    }
-
-    mName = String8::format(
-            "FileSource(fd(%s), %lld, %lld)",
-            nameForFd(fd).c_str(),
-            (long long) mOffset,
-            (long long) mLength);
-
 }
 
 FileSource::~FileSource() {
-    if (mFd >= 0) {
-        ::close(mFd);
-        mFd = -1;
-    }
-
     if (mDrmBuf != NULL) {
         delete[] mDrmBuf;
         mDrmBuf = NULL;
@@ -122,10 +60,6 @@ FileSource::~FileSource() {
         delete mDrmManagerClient;
         mDrmManagerClient = NULL;
     }
-}
-
-status_t FileSource::initCheck() const {
-    return mFd >= 0 ? OK : NO_INIT;
 }
 
 ssize_t FileSource::readAt(off64_t offset, void *data, size_t size) {
@@ -147,28 +81,10 @@ ssize_t FileSource::readAt(off64_t offset, void *data, size_t size) {
 
     if (mDecryptHandle != NULL && DecryptApiType::CONTAINER_BASED
             == mDecryptHandle->decryptApiType) {
-        return readAtDRM(offset, data, size);
+        return readAtDRM_l(offset, data, size);
    } else {
-        off64_t result = lseek64(mFd, offset + mOffset, SEEK_SET);
-        if (result == -1) {
-            ALOGE("seek to %lld failed", (long long)(offset + mOffset));
-            return UNKNOWN_ERROR;
-        }
-
-        return ::read(mFd, data, size);
+        return readAt_l(offset, data, size);
     }
-}
-
-status_t FileSource::getSize(off64_t *size) {
-    Mutex::Autolock autoLock(mLock);
-
-    if (mFd < 0) {
-        return NO_INIT;
-    }
-
-    *size = mLength;
-
-    return OK;
 }
 
 sp<DecryptHandle> FileSource::DrmInitialization(const char *mime) {
@@ -194,7 +110,7 @@ sp<DecryptHandle> FileSource::DrmInitialization(const char *mime) {
     return mDecryptHandle;
 }
 
-ssize_t FileSource::readAtDRM(off64_t offset, void *data, size_t size) {
+ssize_t FileSource::readAtDRM_l(off64_t offset, void *data, size_t size) {
     size_t DRM_CACHE_SIZE = 1024;
     if (mDrmBuf == NULL) {
         mDrmBuf = new unsigned char[DRM_CACHE_SIZE];
