@@ -52,6 +52,7 @@ AudioEffect::AudioEffect(const effect_uuid_t *type,
                 )
     : mStatus(NO_INIT), mOpPackageName(opPackageName)
 {
+    AutoMutex lock(mConstructLock);
     mStatus = set(type, uuid, priority, cbf, user, sessionId, io);
 }
 
@@ -85,6 +86,7 @@ AudioEffect::AudioEffect(const char *typeStr,
         }
     }
 
+    AutoMutex lock(mConstructLock);
     mStatus = set(pType, pUuid, priority, cbf, user, sessionId, io);
 }
 
