@@ -36,6 +36,11 @@ struct SampleIterator {
     uint32_t getSampleTime() const { return mCurrentSampleTime; }
     uint32_t getSampleDuration() const { return mCurrentSampleDuration; }
 
+    uint32_t getLastSampleIndexInChunk() const {
+        return mCurrentSampleIndex + mSamplesPerChunk -
+                ((mCurrentSampleIndex - mFirstChunkSampleIndex) % mSamplesPerChunk) - 1;
+    }
+
     status_t getSampleSizeDirect(
             uint32_t sampleIndex, size_t *size);
 

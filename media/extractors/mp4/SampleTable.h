@@ -69,6 +69,9 @@ public:
             bool *isSyncSample = NULL,
             uint32_t *sampleDuration = NULL);
 
+    // call only after getMetaDataForSample has been called successfully.
+    uint32_t getLastSampleIndexInChunk();
+
     enum {
         kFlagBefore,
         kFlagAfter,
