@@ -53,6 +53,7 @@ enum {
     kKeyFrameRate         = 'frmR',  // int32_t (video frame rate fps)
     kKeyBitRate           = 'brte',  // int32_t (bps)
     kKeyMaxBitRate        = 'mxBr',  // int32_t (bps)
+    kKeyBitsPerSample     = 'bits',  // int32_t (bits per sample)
     kKeyStreamHeader      = 'stHd',  // raw data
     kKeyESDS              = 'esds',  // raw data
     kKeyAACProfile        = 'aacp',  // int32_t
@@ -225,6 +226,7 @@ enum {
     kKeyExifOffset       = 'exof', // int64_t, Exif data offset
     kKeyExifSize         = 'exsz', // int64_t, Exif data size
     kKeyIsExif           = 'exif', // bool (int32_t) buffer contains exif data block
+    kKeyPcmBigEndian     = 'pcmb', // bool (int32_t)
 };
 
 enum {
