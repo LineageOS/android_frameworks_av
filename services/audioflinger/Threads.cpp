@@ -2332,6 +2332,11 @@ float AudioFlinger::PlaybackThread::streamVolume(audio_stream_type_t stream) con
     return mStreamTypes[stream].volume;
 }
 
+void AudioFlinger::PlaybackThread::setVolumeForOutput_l(float left, float right) const
+{
+    mOutput->stream->setVolume(left, right);
+}
+
 // addTrack_l() must be called with ThreadBase::mLock held
 status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
 {
@@ -5317,20 +5322,20 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
             mLeftVolFloat = left;
             mRightVolFloat = right;
 
-            // Convert volumes from float to 8.24
-            uint32_t vl = (uint32_t)(left * (1 << 24));
-            uint32_t vr = (uint32_t)(right * (1 << 24));
-
             // Delegate volume control to effect in track effect chain if needed
             // only one effect chain can be present on DirectOutputThread, so if
             // there is one, the track is connected to it
             if (!mEffectChains.isEmpty()) {
-                mEffectChains[0]->setVolume_l(&vl, &vr);
-                left = (float)vl / (1 << 24);
-                right = (float)vr / (1 << 24);
+                // if effect chain exists, volume is handled by it.
+                // Convert volumes from float to 8.24
+                uint32_t vl = (uint32_t)(left * (1 << 24));
+                uint32_t vr = (uint32_t)(right * (1 << 24));
+                // Direct/Offload effect chains set output volume in setVolume_l().
+                (void)mEffectChains[0]->setVolume_l(&vl, &vr);
+            } else {
+                // otherwise we directly set the volume.
+                setVolumeForOutput_l(left, right);
             }
-            status_t result = mOutput->stream->setVolume(left, right);
-            ALOGE_IF(result != OK, "Error when setting output stream volume: %d", result);
         }
     }
 }
