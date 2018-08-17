@@ -39,7 +39,7 @@ MediaBuffer::MediaBuffer(void *data, size_t size)
       mRangeOffset(0),
       mRangeLength(size),
       mOwnsData(false),
-      mMetaData(new MetaData),
+      mMetaData(new MetaDataBase),
       mOriginal(NULL) {
 }
 
@@ -51,7 +51,7 @@ MediaBuffer::MediaBuffer(size_t size)
       mRangeOffset(0),
       mRangeLength(size),
       mOwnsData(true),
-      mMetaData(new MetaData),
+      mMetaData(new MetaDataBase),
       mOriginal(NULL) {
     if (size < kSharedMemThreshold
             || std::atomic_load_explicit(&mUseSharedMemory, std::memory_order_seq_cst) == 0) {
@@ -84,7 +84,7 @@ MediaBuffer::MediaBuffer(const sp<ABuffer> &buffer)
       mRangeLength(mSize),
       mBuffer(buffer),
       mOwnsData(false),
-      mMetaData(new MetaData),
+      mMetaData(new MetaDataBase),
       mOriginal(NULL) {
 }
 
@@ -96,7 +96,7 @@ void MediaBuffer::release() {
         return;
     }
 
-    int prevCount = __sync_fetch_and_sub(&mRefCount, 1);
+    int prevCount = mRefCount.fetch_sub(1);
     if (prevCount == 1) {
         if (mObserver == NULL) {
             delete this;
@@ -110,13 +110,13 @@ void MediaBuffer::release() {
 
 void MediaBuffer::claim() {
     CHECK(mObserver != NULL);
-    CHECK_EQ(mRefCount, 1);
+    CHECK_EQ(mRefCount.load(std::memory_order_relaxed), 1);
 
-    mRefCount = 0;
+    mRefCount.store(0, std::memory_order_relaxed);
 }
 
 void MediaBuffer::add_ref() {
-    (void) __sync_fetch_and_add(&mRefCount, 1);
+    (void) mRefCount.fetch_add(1);
 }
 
 void *MediaBuffer::data() const {
