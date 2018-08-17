@@ -475,8 +475,15 @@ status_t MPEG4Extractor::getTrackMetaData(
             if (__builtin_mul_overflow(media_time, samplerate, &delay) ||
                     __builtin_add_overflow(delay, halfscale, &delay) ||
                     (delay /= mHeaderTimescale, false) ||
-                    delay > INT32_MAX ||
-                    delay < INT32_MIN) {
+                    /* the calculated delay should be small, but some apps
+                     * appear to write a bogus edit list that causes a really
+                     * large delay, resulting in playback problems.
+                     * Ignore such edit lists.
+                     * (4096 is enough to drop 4 full samples)
+                     */
+                    delay > 4096 ||
+                    delay < 0) {
+                ALOGW("ignoring edit list with bogus values");
                 return;
             }
             ALOGV("delay = %" PRId64, delay);
