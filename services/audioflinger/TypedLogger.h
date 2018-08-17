@@ -97,6 +97,11 @@ constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
 #define LOG_AUDIO_STATE() do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
         x->logEventHistTs(NBLog::EVENT_AUDIO_STATE, hash(__FILE__, __LINE__)); } while(0)
 
+// Record a typed entry that represents a thread's cycle time in nanoseconds.
+// Parameter ns should be of type uint32_t.
+#define LOG_MONOTONIC_CYCLE_TIME(ns) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+        x->logMonotonicCycleTime(ns); } while (0)
+
 namespace android {
 extern "C" {
 extern thread_local NBLog::Writer *tlNBLogWriter;

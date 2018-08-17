@@ -25,6 +25,7 @@
 #include <iostream>
 #include <math.h>
 #include <numeric>
+#include <unordered_set>
 #include <vector>
 #include <stdarg.h>
 #include <stdint.h>
@@ -66,7 +67,9 @@ int NBLog::Entry::copyEntryDataAt(size_t offset) const
 /*static*/
 std::unique_ptr<NBLog::AbstractEntry> NBLog::AbstractEntry::buildEntry(const uint8_t *ptr)
 {
-    if (ptr == nullptr) return nullptr;
+    if (ptr == nullptr) {
+        return nullptr;
+    }
     const uint8_t type = EntryIterator(ptr)->type;
     switch (type) {
     case EVENT_START_FMT:
@@ -139,10 +142,7 @@ int NBLog::FormatEntry::author() const
     ++it; // skip timestamp
     ++it; // skip hash
     // if there is an author entry, return it, return -1 otherwise
-    if (it->type == EVENT_AUTHOR) {
-        return it.payload<int>();
-    }
-    return -1;
+    return it->type == EVENT_AUTHOR ? it.payload<int>() : -1;
 }
 
 NBLog::EntryIterator NBLog::FormatEntry::copyWithAuthor(
@@ -261,11 +261,8 @@ NBLog::log_hash_t NBLog::HistogramEntry::hash() const
 int NBLog::HistogramEntry::author() const
 {
     EntryIterator it(mEntry);
-    if (it->length == sizeof(HistTsEntryWithAuthor)) {
-        return it.payload<HistTsEntryWithAuthor>().author;
-    } else {
-        return -1;
-    }
+    return it->length == sizeof(HistTsEntryWithAuthor)
+            ? it.payload<HistTsEntryWithAuthor>().author : -1;
 }
 
 NBLog::EntryIterator NBLog::HistogramEntry::copyWithAuthor(
@@ -357,7 +354,9 @@ NBLog::Writer::~Writer()
 
 void NBLog::Writer::log(const char *string)
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     LOG_ALWAYS_FATAL_IF(string == NULL, "Attempted to log NULL string");
     size_t length = strlen(string);
     if (length > Entry::kMaxLength) {
@@ -368,7 +367,9 @@ void NBLog::Writer::log(const char *string)
 
 void NBLog::Writer::logf(const char *fmt, ...)
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     va_list ap;
     va_start(ap, fmt);
     Writer::logvf(fmt, ap);     // the Writer:: is needed to avoid virtual dispatch for LockedWriter
@@ -377,7 +378,9 @@ void NBLog::Writer::logf(const char *fmt, ...)
 
 void NBLog::Writer::logvf(const char *fmt, va_list ap)
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     char buffer[Entry::kMaxLength + 1 /*NUL*/];
     int length = vsnprintf(buffer, sizeof(buffer), fmt, ap);
     if (length >= (int) sizeof(buffer)) {
@@ -392,7 +395,9 @@ void NBLog::Writer::logvf(const char *fmt, va_list ap)
 
 void NBLog::Writer::logTimestamp()
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     int64_t ts = get_monotonic_ns();
     if (ts > 0) {
         log(EVENT_TIMESTAMP, &ts, sizeof(ts));
@@ -403,31 +408,41 @@ void NBLog::Writer::logTimestamp()
 
 void NBLog::Writer::logTimestamp(const int64_t ts)
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     log(EVENT_TIMESTAMP, &ts, sizeof(ts));
 }
 
 void NBLog::Writer::logInteger(const int x)
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     log(EVENT_INTEGER, &x, sizeof(x));
 }
 
 void NBLog::Writer::logFloat(const float x)
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     log(EVENT_FLOAT, &x, sizeof(x));
 }
 
 void NBLog::Writer::logPID()
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     log(EVENT_PID, mPidTag, mPidTagSize);
 }
 
 void NBLog::Writer::logStart(const char *fmt)
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     size_t length = strlen(fmt);
     if (length > Entry::kMaxLength) {
         length = Entry::kMaxLength;
@@ -437,20 +452,26 @@ void NBLog::Writer::logStart(const char *fmt)
 
 void NBLog::Writer::logEnd()
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     Entry entry = Entry(EVENT_END_FMT, NULL, 0);
     log(entry, true);
 }
 
 void NBLog::Writer::logHash(log_hash_t hash)
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     log(EVENT_HASH, &hash, sizeof(hash));
 }
 
 void NBLog::Writer::logEventHistTs(Event event, log_hash_t hash)
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     HistTsEntry data;
     data.hash = hash;
     data.ts = get_monotonic_ns();
@@ -461,9 +482,19 @@ void NBLog::Writer::logEventHistTs(Event event, log_hash_t hash)
     }
 }
 
+void NBLog::Writer::logMonotonicCycleTime(uint32_t monotonicNs)
+{
+    if (!mEnabled) {
+        return;
+    }
+    log(EVENT_MONOTONIC_CYCLE_TIME, &monotonicNs, sizeof(&monotonicNs));
+}
+
 void NBLog::Writer::logFormat(const char *fmt, log_hash_t hash, ...)
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     va_list ap;
     va_start(ap, hash);
     Writer::logVFormat(fmt, hash, ap);
@@ -472,7 +503,9 @@ void NBLog::Writer::logFormat(const char *fmt, log_hash_t hash, ...)
 
 void NBLog::Writer::logVFormat(const char *fmt, log_hash_t hash, va_list argp)
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     Writer::logStart(fmt);
     int i;
     double f;
@@ -528,7 +561,9 @@ void NBLog::Writer::logVFormat(const char *fmt, log_hash_t hash, va_list argp)
 
 void NBLog::Writer::log(Event event, const void *data, size_t length)
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     if (data == NULL || length > Entry::kMaxLength) {
         // TODO Perhaps it makes sense to display truncated data or at least a
         //      message that the data is too long?  The current behavior can create
@@ -545,13 +580,15 @@ void NBLog::Writer::log(Event event, const void *data, size_t length)
 
 void NBLog::Writer::log(const NBLog::Entry &etr, bool trusted)
 {
-    if (!mEnabled) return;
+    if (!mEnabled) {
+        return;
+    }
     if (!trusted) {
         log(etr.mEvent, etr.mData, etr.mLength);
         return;
     }
-    size_t need = etr.mLength + Entry::kOverhead;    // mEvent, mLength, data[mLength], mLength
-                                                      // need = number of bytes written to FIFO
+    const size_t need = etr.mLength + Entry::kOverhead; // mEvent, mLength, data[mLength], mLength
+                                                        // need = number of bytes written to FIFO
 
     // FIXME optimize this using memcpy for the data part of the Entry.
     // The Entry could have a method copyTo(ptr, offset, size) to optimize the copy.
@@ -676,15 +713,21 @@ bool NBLog::LockedWriter::setEnabled(bool enabled)
 
 // ---------------------------------------------------------------------------
 
-const std::set<NBLog::Event> NBLog::Reader::startingTypes {NBLog::Event::EVENT_START_FMT,
+const std::unordered_set<NBLog::Event> NBLog::Reader::startingTypes {
+        NBLog::Event::EVENT_START_FMT,
         NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS,
-        NBLog::Event::EVENT_AUDIO_STATE};
-const std::set<NBLog::Event> NBLog::Reader::endingTypes   {NBLog::Event::EVENT_END_FMT,
+        NBLog::Event::EVENT_AUDIO_STATE,
+        NBLog::Event::EVENT_MONOTONIC_CYCLE_TIME
+};
+const std::unordered_set<NBLog::Event> NBLog::Reader::endingTypes   {
+        NBLog::Event::EVENT_END_FMT,
         NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS,
-        NBLog::Event::EVENT_AUDIO_STATE};
+        NBLog::Event::EVENT_AUDIO_STATE,
+        NBLog::Event::EVENT_MONOTONIC_CYCLE_TIME
+};
 
-NBLog::Reader::Reader(const void *shared, size_t size)
-    : mFd(-1), mIndent(0), mLost(0),
+NBLog::Reader::Reader(const void *shared, size_t size, const std::string &name)
+    : mFd(-1), mIndent(0), mLost(0), mName(name),
       mShared((/*const*/ Shared *) shared), /*mIMemory*/
       mFifo(mShared != NULL ?
         new audio_utils_fifo(size, sizeof(uint8_t),
@@ -693,8 +736,8 @@ NBLog::Reader::Reader(const void *shared, size_t size)
 {
 }
 
-NBLog::Reader::Reader(const sp<IMemory>& iMemory, size_t size)
-    : Reader(iMemory != 0 ? (Shared *) iMemory->pointer() : NULL, size)
+NBLog::Reader::Reader(const sp<IMemory>& iMemory, size_t size, const std::string &name)
+    : Reader(iMemory != 0 ? (Shared *) iMemory->pointer() : NULL, size, name)
 {
     mIMemory = iMemory;
 }
@@ -706,7 +749,7 @@ NBLog::Reader::~Reader()
 }
 
 const uint8_t *NBLog::Reader::findLastEntryOfTypes(const uint8_t *front, const uint8_t *back,
-                                            const std::set<Event> &types) {
+                                            const std::unordered_set<Event> &types) {
     while (back + Entry::kPreviousLengthOffset >= front) {
         const uint8_t *prev = back - back[Entry::kPreviousLengthOffset] - Entry::kOverhead;
         if (prev < front || prev + prev[offsetof(entry, length)] +
@@ -735,19 +778,38 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
     // This emulates the behaviour of audio_utils_fifo_reader::read, but without incrementing the
     // reader index. The index is incremented after handling corruption, to after the last complete
     // entry of the buffer
-    size_t lost;
+    size_t lost = 0;
     audio_utils_iovec iovec[2];
-    const ssize_t availToRead = mFifoReader->obtain(iovec, mFifo->capacity(),
-            NULL /*timeout*/, &lost);
+    const size_t capacity = mFifo->capacity();
+    ssize_t availToRead;
+    // A call to audio_utils_fifo_reader::obtain() places the read pointer one buffer length
+    // before the writer's pointer (since mFifoReader was constructed with flush=false). The
+    // do while loop is an attempt to read all of the FIFO's contents regardless of how behind
+    // the reader is with respect to the writer. However, the following scheduling sequence is
+    // possible and can lead to a starvation situation:
+    // - Writer T1 writes, overrun with respect to Reader T2
+    // - T2 calls obtain() and gets EOVERFLOW, T2 ptr placed one buffer size behind T1 ptr
+    // - T1 write, overrun
+    // - T2 obtain(), EOVERFLOW (and so on...)
+    // To address this issue, we limit the number of tries for the reader to catch up with
+    // the writer.
+    int tries = 0;
+    size_t lostTemp;
+    do {
+        availToRead = mFifoReader->obtain(iovec, capacity, NULL /*timeout*/, &lostTemp);
+        lost += lostTemp;
+    } while (availToRead < 0 || ++tries <= kMaxObtainTries);
+
     if (availToRead <= 0) {
-        return std::unique_ptr<NBLog::Reader::Snapshot>(new Snapshot());
+        ALOGW_IF(availToRead < 0, "NBLog Reader %s failed to catch up with Writer", mName.c_str());
+        return std::make_unique<NBLog::Reader::Snapshot>();
     }
 
     std::unique_ptr<Snapshot> snapshot(new Snapshot(availToRead));
     memcpy(snapshot->mData, (const char *) mFifo->buffer() + iovec[0].mOffset, iovec[0].mLength);
     if (iovec[1].mLength > 0) {
         memcpy(snapshot->mData + (iovec[0].mLength),
-            (const char *) mFifo->buffer() + iovec[1].mOffset, iovec[1].mLength);
+                (const char *) mFifo->buffer() + iovec[1].mOffset, iovec[1].mLength);
     }
 
     // Handle corrupted buffer
@@ -857,10 +919,60 @@ void NBLog::MergeReader::dump(int fd, int indent)
     ReportPerformance::dump(fd, indent, mThreadPerformanceAnalysis);
 }
 
+void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
+{
+    mFd = fd;
+    mIndent = indent;
+    String8 timestamp, body;
+
+    // Range-based for loop isn't used here because handleFormat() returns an EntryIterator
+    // that points to the next entry (it handles all of the necessary operator++() calls).
+    for (auto entry = snapshot.begin(); entry != snapshot.end();) {
+        switch (entry->type) {
+        case EVENT_START_FMT:
+            entry = handleFormat(FormatEntry(entry), &timestamp, &body);
+            break;
+        case EVENT_HISTOGRAM_ENTRY_TS:
+            ++entry;
+            break;
+        case EVENT_AUDIO_STATE:
+            ++entry;
+            break;
+        case EVENT_END_FMT:
+            body.appendFormat("warning: got to end format event");
+            ++entry;
+            break;
+        case EVENT_MONOTONIC_CYCLE_TIME: {
+            uint32_t monotonicNs = *(uint32_t *) (entry->data);
+            body.appendFormat("Thread cycle took %u ns", monotonicNs);
+            ++entry;
+        } break;
+        case EVENT_RESERVED:
+        default:
+            body.appendFormat("warning: unexpected event %d", entry->type);
+            ++entry;
+            break;
+        }
+        // FIXME: decide whether to print the warnings here or elsewhere
+        if (!body.isEmpty()) {
+            dumpLine(&timestamp, &body);
+        }
+    }
+}
+
+void NBLog::Reader::dump(int fd, size_t indent)
+{
+    // get a snapshot, dump it
+    std::unique_ptr<Snapshot> snap = getSnapshot();
+    dump(fd, indent, *snap);
+}
+
 // Writes a string to the console
 void NBLog::Reader::dumpLine(const String8 *timestamp, String8 *body)
 {
-    if (timestamp == nullptr || body == nullptr) return;
+    if (timestamp == nullptr || body == nullptr) {
+        return;
+    }
     if (mFd >= 0) {
         dprintf(mFd, "%.*s%s %s\n", mIndent, "", timestamp->string(), body->string());
     } else {
@@ -878,7 +990,9 @@ bool NBLog::Reader::isIMemory(const sp<IMemory>& iMemory) const
 
 void NBLog::appendTimestamp(String8 *body, const void *data)
 {
-    if (body == nullptr || data == nullptr) return;
+    if (body == nullptr || data == nullptr) {
+        return;
+    }
     int64_t ts;
     memcpy(&ts, data, sizeof(ts));
     body->appendFormat("[%d.%03d]", (int) (ts / (1000 * 1000 * 1000)),
@@ -887,14 +1001,18 @@ void NBLog::appendTimestamp(String8 *body, const void *data)
 
 void NBLog::appendInt(String8 *body, const void *data)
 {
-    if (body == nullptr || data == nullptr) return;
+    if (body == nullptr || data == nullptr) {
+        return;
+    }
     int x = *((int*) data);
     body->appendFormat("<%d>", x);
 }
 
 void NBLog::appendFloat(String8 *body, const void *data)
 {
-    if (body == nullptr || data == nullptr) return;
+    if (body == nullptr || data == nullptr) {
+        return;
+    }
     float f;
     memcpy(&f, data, sizeof(f));
     body->appendFormat("<%f>", f);
@@ -902,7 +1020,9 @@ void NBLog::appendFloat(String8 *body, const void *data)
 
 void NBLog::appendPID(String8 *body, const void* data, size_t length)
 {
-    if (body == nullptr || data == nullptr) return;
+    if (body == nullptr || data == nullptr) {
+        return;
+    }
     pid_t id = *((pid_t*) data);
     char * name = &((char*) data)[sizeof(pid_t)];
     body->appendFormat("<PID: %d, name: %.*s>", id, (int) (length - sizeof(pid_t)), name);
@@ -911,7 +1031,9 @@ void NBLog::appendPID(String8 *body, const void* data, size_t length)
 String8 NBLog::bufferDump(const uint8_t *buffer, size_t size)
 {
     String8 str;
-    if (buffer == nullptr) return str;
+    if (buffer == nullptr) {
+        return str;
+    }
     str.append("[ ");
     for(size_t i = 0; i < size; i++) {
         str.appendFormat("%d ", buffer[i]);
@@ -1026,11 +1148,11 @@ NBLog::Merger::Merger(const void *shared, size_t size):
 {
 }
 
-void NBLog::Merger::addReader(const NBLog::NamedReader &reader)
+void NBLog::Merger::addReader(const sp<NBLog::Reader> &reader)
 {
     // FIXME This is called by binder thread in MediaLogService::registerWriter
-    //       but the access to shared variable mNamedReaders is not yet protected by a lock.
-    mNamedReaders.push_back(reader);
+    //       but the access to shared variable mReaders is not yet protected by a lock.
+    mReaders.push_back(reader);
 }
 
 // items placed in priority queue during merge
@@ -1052,12 +1174,12 @@ void NBLog::Merger::merge()
 {
     // FIXME This is called by merge thread
     //       but the access to shared variable mNamedReaders is not yet protected by a lock.
-    const int nLogs = mNamedReaders.size();
+    const int nLogs = mReaders.size();
     std::vector<std::unique_ptr<NBLog::Reader::Snapshot>> snapshots(nLogs);
     std::vector<EntryIterator> offsets;
     offsets.reserve(nLogs);
     for (int i = 0; i < nLogs; ++i) {
-        snapshots[i] = mNamedReaders[i].reader()->getSnapshot();
+        snapshots[i] = mReaders[i]->getSnapshot();
         offsets.push_back(snapshots[i]->begin());
     }
     // initialize offsets
@@ -1089,16 +1211,16 @@ void NBLog::Merger::merge()
     }
 }
 
-const std::vector<NBLog::NamedReader>& NBLog::Merger::getNamedReaders() const
+const std::vector<sp<NBLog::Reader>>& NBLog::Merger::getReaders() const
 {
-    // FIXME This is returning a reference to a shared variable that needs a lock
-    return mNamedReaders;
+    //AutoMutex _l(mLock);
+    return mReaders;
 }
 
 // ---------------------------------------------------------------------------
 
 NBLog::MergeReader::MergeReader(const void *shared, size_t size, Merger &merger)
-    : Reader(shared, size), mNamedReaders(merger.getNamedReaders())
+    : Reader(shared, size, "MergeReader"), mReaders(merger.getReaders())
 {
 }
 
@@ -1109,7 +1231,7 @@ void NBLog::MergeReader::handleAuthor(const NBLog::AbstractEntry &entry, String8
         return;
     }
     // FIXME Needs a lock
-    const char* name = mNamedReaders[author].name();
+    const char* name = mReaders[author]->name().c_str();
     body->appendFormat("%s: ", name);
 }
 
@@ -1142,6 +1264,7 @@ bool NBLog::MergeThread::threadLoop()
         doMerge = mTimeoutUs > 0;
         mTimeoutUs -= kThreadSleepPeriodUs;
     }
+    doMerge = false;    // Disable merging for now.
     if (doMerge) {
         // Merge data from all the readers
         mMerger.merge();
