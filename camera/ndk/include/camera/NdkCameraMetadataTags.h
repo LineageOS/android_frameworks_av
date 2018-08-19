@@ -7217,11 +7217,11 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * camera in the list of supported camera devices.</p>
      * <p>This capability requires the camera device to support the following:</p>
      * <ul>
-     * <li>This camera device must list the following static metadata entries in <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html">CameraCharacteristics</a>:<ul>
-     * <li>android.logicalMultiCamera.physicalIds</li>
-     * <li>ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE</li>
-     * </ul>
-     * </li>
+     * <li>The IDs of underlying physical cameras are returned via
+     *   <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#getPhysicalCameraIds">CameraCharacteristics#getPhysicalCameraIds</a>.</li>
+     * <li>This camera device must list static metadata
+     *   ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE in
+     *   <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html">CameraCharacteristics</a>.</li>
      * <li>The underlying physical cameras' static metadata must list the following entries,
      *   so that the application can correlate pixels from the physical streams:<ul>
      * <li>ACAMERA_LENS_POSE_REFERENCE</li>

@@ -21,7 +21,7 @@
 
 #include <deque>
 #include <map>
-#include <set>
+#include <unordered_set>
 #include <vector>
 
 #include <audio_utils/fifo.h>
@@ -63,6 +63,12 @@ public:
         EVENT_HISTOGRAM_ENTRY_TS,   // single datum for timestamp histogram
         EVENT_AUDIO_STATE,          // audio on/off event: logged on FastMixer::onStateChange call
         EVENT_END_FMT,              // end of logFormat argument list
+
+        // Types representing audio performance metrics
+        EVENT_LATENCY,              // TODO classify specifically what this is
+        EVENT_CPU_FREQUENCY,        // instantaneous CPU frequency in kHz
+        EVENT_MONOTONIC_CYCLE_TIME, // thread per-cycle monotonic time
+        EVENT_CPU_CYCLE_TIME,       // thread per-cycle cpu time
 
         EVENT_UPPER_BOUND,          // to check for invalid events
     };
@@ -200,7 +206,6 @@ private:
         // copy entry, adding author before timestamp, returns size of original entry
         virtual EntryIterator    copyWithAuthor(std::unique_ptr<audio_utils_fifo_writer> &dst,
                                                 int author) const override;
-
     };
 
     class HistogramEntry : public AbstractEntry {
@@ -217,13 +222,13 @@ private:
 
         virtual EntryIterator    copyWithAuthor(std::unique_ptr<audio_utils_fifo_writer> &dst,
                                                 int author) const override;
-
     };
 
     // ---------------------------------------------------------------------------
 
     // representation of a single log entry in private memory
-    struct Entry {
+    class Entry {
+    public:
         Entry(Event event, const void *data, size_t length)
             : mEvent(event), mLength(length), mData(data) { }
         /*virtual*/ ~Entry() { }
@@ -345,12 +350,15 @@ public:
         virtual void    logInteger(const int x);
         virtual void    logFloat(const float x);
         virtual void    logPID();
-        virtual void    logFormat(const char *fmt, log_hash_t hash, ...);
-        virtual void    logVFormat(const char *fmt, log_hash_t hash, va_list ap);
         virtual void    logStart(const char *fmt);
         virtual void    logEnd();
         virtual void    logHash(log_hash_t hash);
+        // The functions below are not in LockedWriter yet.
+        virtual void    logFormat(const char *fmt, log_hash_t hash, ...);
+        virtual void    logVFormat(const char *fmt, log_hash_t hash, va_list ap);
         virtual void    logEventHistTs(Event event, log_hash_t hash);
+        virtual void    logMonotonicCycleTime(uint32_t monotonicNs);
+        // End of functions that are not in LockedWriter yet.
 
         virtual bool    isEnabled() const;
 
@@ -447,15 +455,21 @@ public:
 
         // Input parameter 'size' is the desired size of the timeline in byte units.
         // The size of the shared memory must be at least Timeline::sharedSize(size).
-        Reader(const void *shared, size_t size);
-        Reader(const sp<IMemory>& iMemory, size_t size);
+        Reader(const void *shared, size_t size, const std::string &name);
+        Reader(const sp<IMemory>& iMemory, size_t size, const std::string &name);
 
         virtual ~Reader();
 
         // get snapshot of readers fifo buffer, effectively consuming the buffer
         std::unique_ptr<Snapshot> getSnapshot();
+        // dump a particular snapshot of the reader
+        void dump(int fd, size_t indent, Snapshot &snap);
+        // dump the current content of the reader's buffer (call getSnapshot() and previous dump())
+        void dump(int fd, size_t indent = 0);
 
         bool     isIMemory(const sp<IMemory>& iMemory) const;
+
+        const std::string &name() const { return mName; }
 
     protected:
         // print a summary of the performance to the console
@@ -466,10 +480,12 @@ public:
         int mFd;                // file descriptor
         int mIndent;            // indentation level
         int mLost;              // bytes of data lost before buffer was read
+        const std::string mName;      // name of reader (actually name of writer)
+        static constexpr int kMaxObtainTries = 3;
 
     private:
-        static const std::set<Event> startingTypes;
-        static const std::set<Event> endingTypes;
+        static const std::unordered_set<Event> startingTypes;
+        static const std::unordered_set<Event> endingTypes;
 
         // declared as const because audio_utils_fifo() constructor
         sp<IMemory> mIMemory;       // ref-counted version, assigned only in constructor
@@ -483,27 +499,10 @@ public:
         // Searches for the last entry of type <type> in the range [front, back)
         // back has to be entry-aligned. Returns nullptr if none enconuntered.
         static const uint8_t *findLastEntryOfTypes(const uint8_t *front, const uint8_t *back,
-                                                   const std::set<Event> &types);
+                                                   const std::unordered_set<Event> &types);
 
         // dummy method for handling absent author entry
         virtual void handleAuthor(const AbstractEntry& /*fmtEntry*/, String8* /*body*/) {}
-    };
-
-    // Wrapper for a reader with a name. Contains a pointer to the reader and a pointer to the name
-    class NamedReader {
-    public:
-        NamedReader() { mName[0] = '\0'; } // for Vector
-        NamedReader(const sp<NBLog::Reader>& reader, const char *name) :
-            mReader(reader)
-            { strlcpy(mName, name, sizeof(mName)); }
-        ~NamedReader() { }
-        const sp<NBLog::Reader>&  reader() const { return mReader; }
-        const char*               name() const { return mName; }
-
-    private:
-        sp<NBLog::Reader>   mReader;
-        static const size_t kMaxName = 32;
-        char                mName[kMaxName];
     };
 
     // ---------------------------------------------------------------------------
@@ -516,18 +515,18 @@ public:
 
         virtual ~Merger() {}
 
-        void addReader(const NamedReader &reader);
+        void addReader(const sp<NBLog::Reader> &reader);
         // TODO add removeReader
         void merge();
 
         // FIXME This is returning a reference to a shared variable that needs a lock
-        const std::vector<NamedReader>& getNamedReaders() const;
+        const std::vector<sp<Reader>>& getReaders() const;
 
     private:
         // vector of the readers the merger is supposed to merge from.
         // every reader reads from a writer's buffer
         // FIXME Needs to be protected by a lock
-        std::vector<NamedReader> mNamedReaders;
+        std::vector<sp<Reader>> mReaders;
 
         Shared * const mShared; // raw pointer to shared memory
         std::unique_ptr<audio_utils_fifo> mFifo; // FIFO itself
@@ -535,7 +534,7 @@ public:
     };
 
     // This class has a pointer to the FIFO in local memory which stores the merged
-    // data collected by NBLog::Merger from all NamedReaders. It is used to process
+    // data collected by NBLog::Merger from all Readers. It is used to process
     // this data and write the result to PerformanceAnalysis.
     class MergeReader : public Reader {
     public:
@@ -550,7 +549,8 @@ public:
     private:
         // FIXME Needs to be protected by a lock,
         //       because even though our use of it is read-only there may be asynchronous updates
-        const std::vector<NamedReader>& mNamedReaders;
+        // The object is owned by the Merger class.
+        const std::vector<sp<Reader>>& mReaders;
 
         // analyzes, compresses and stores the merged data
         // contains a separate instance for every author (thread), and for every source file

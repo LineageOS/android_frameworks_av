@@ -210,6 +210,8 @@ class Camera3Device :
 
   private:
 
+    status_t disconnectImpl();
+
     // internal typedefs
     using RequestMetadataQueue = hardware::MessageQueue<uint8_t, hardware::kSynchronizedReadWrite>;
     using ResultMetadataQueue  = hardware::MessageQueue<uint8_t, hardware::kSynchronizedReadWrite>;

@@ -50,6 +50,8 @@
 #define ALOGVV(a...) do { } while(0)
 #endif
 
+#define DEFAULT_OUTPUT_SAMPLE_RATE 48000
+
 namespace android {
 
 // ----------------------------------------------------------------------------
@@ -263,7 +265,9 @@ bool AudioFlinger::EffectModule::updateState() {
         }
         break;
     case STOPPING:
-        if (stop_l() == NO_ERROR) {
+        // volume control for offload and direct threads must take effect immediately.
+        if (stop_l() == NO_ERROR
+            && !(isVolumeControl() && isOffloadedOrDirect())) {
             mDisableWaitCnt = mMaxDisableWaitCnt;
         } else {
             mDisableWaitCnt = 1; // will cause immediate transition to IDLE
@@ -547,7 +551,14 @@ status_t AudioFlinger::EffectModule::configure()
 
     mConfig.inputCfg.format = EFFECT_BUFFER_FORMAT;
     mConfig.outputCfg.format = EFFECT_BUFFER_FORMAT;
-    mConfig.inputCfg.samplingRate = thread->sampleRate();
+
+    // Don't use sample rate for thread if effect isn't offloadable.
+    if ((thread->type() == ThreadBase::OFFLOAD) && !isOffloaded()) {
+        mConfig.inputCfg.samplingRate = DEFAULT_OUTPUT_SAMPLE_RATE;
+        ALOGV("Overriding effect input as 48kHz");
+    } else {
+        mConfig.inputCfg.samplingRate = thread->sampleRate();
+    }
     mConfig.outputCfg.samplingRate = mConfig.inputCfg.samplingRate;
     mConfig.inputCfg.bufferProvider.cookie = NULL;
     mConfig.inputCfg.bufferProvider.getBuffer = NULL;
@@ -778,6 +789,16 @@ status_t AudioFlinger::EffectModule::stop_l()
     }
     status_t cmdStatus = NO_ERROR;
     uint32_t size = sizeof(status_t);
+
+    if (isVolumeControl() && isOffloadedOrDirect()) {
+        sp<EffectChain>chain = mChain.promote();
+        // We have the EffectChain and EffectModule lock, permit a reentrant call to setVolume:
+        // resetVolume_l --> setVolume_l --> EffectModule::setVolume
+        mSetVolumeReentrantTid = gettid();
+        chain->resetVolume_l();
+        mSetVolumeReentrantTid = INVALID_PID;
+    }
+
     status_t status = mEffectInterface->command(EFFECT_CMD_DISABLE,
                                                 0,
                                                 NULL,
@@ -993,6 +1014,16 @@ bool AudioFlinger::EffectModule::isProcessEnabled() const
     }
 }
 
+bool AudioFlinger::EffectModule::isOffloadedOrDirect() const
+{
+    return (mThreadType == ThreadBase::OFFLOAD || mThreadType == ThreadBase::DIRECT);
+}
+
+bool AudioFlinger::EffectModule::isVolumeControlEnabled() const
+{
+    return (isVolumeControl() && (isOffloadedOrDirect() ? isEnabled() : isProcessEnabled()));
+}
+
 void AudioFlinger::EffectModule::setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
     ALOGVV("setInBuffer %p",(&buffer));
 
@@ -1091,7 +1122,7 @@ void AudioFlinger::EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>
 
 status_t AudioFlinger::EffectModule::setVolume(uint32_t *left, uint32_t *right, bool controller)
 {
-    Mutex::Autolock _l(mLock);
+    AutoLockReentrant _l(mLock, mSetVolumeReentrantTid);
     if (mStatus != NO_ERROR) {
         return mStatus;
     }
@@ -1120,6 +1151,18 @@ status_t AudioFlinger::EffectModule::setVolume(uint32_t *left, uint32_t *right, 
         }
     }
     return status;
+}
+
+void AudioFlinger::EffectChain::setVolumeForOutput_l(uint32_t left, uint32_t right)
+{
+    sp<ThreadBase> thread = mThread.promote();
+    if (thread != 0 &&
+        (thread->type() == ThreadBase::OFFLOAD || thread->type() == ThreadBase::DIRECT)) {
+        PlaybackThread *t = (PlaybackThread *)thread.get();
+        float vol_l = (float)left / (1 << 24);
+        float vol_r = (float)right / (1 << 24);
+        t->setVolumeForOutput_l(vol_l, vol_r);
+    }
 }
 
 status_t AudioFlinger::EffectModule::setDevice(audio_devices_t device)
@@ -2200,8 +2243,7 @@ bool AudioFlinger::EffectChain::setVolume_l(uint32_t *left, uint32_t *right, boo
 
     // first update volume controller
     for (size_t i = size; i > 0; i--) {
-        if (mEffects[i - 1]->isProcessEnabled() &&
-            (mEffects[i - 1]->desc().flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_CTRL) {
+        if (mEffects[i - 1]->isVolumeControlEnabled()) {
             ctrlIdx = i - 1;
             hasControl = true;
             break;
@@ -2246,6 +2288,8 @@ bool AudioFlinger::EffectChain::setVolume_l(uint32_t *left, uint32_t *right, boo
     }
     *left = newLeft;
     *right = newRight;
+
+    setVolumeForOutput_l(*left, *right);
 
     return hasControl;
 }

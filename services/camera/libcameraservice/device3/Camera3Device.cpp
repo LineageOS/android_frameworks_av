@@ -90,7 +90,7 @@ Camera3Device::~Camera3Device()
 {
     ATRACE_CALL();
     ALOGV("%s: Tearing down for camera id %s", __FUNCTION__, mId.string());
-    disconnect();
+    disconnectImpl();
 }
 
 const String8& Camera3Device::getId() const {
@@ -275,6 +275,10 @@ status_t Camera3Device::initializeCommonLocked() {
 }
 
 status_t Camera3Device::disconnect() {
+    return disconnectImpl();
+}
+
+status_t Camera3Device::disconnectImpl() {
     ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock stLock(mTrackerLock);
