@@ -55,7 +55,7 @@ struct ACaptureRequest {
         return ACAMERA_OK;
     }
 
-    ACameraMetadata*      settings;
+    sp<ACameraMetadata>   settings;
     ACameraOutputTargets* targets;
     void*                 context;
 };

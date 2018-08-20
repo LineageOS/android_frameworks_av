@@ -50,11 +50,11 @@ const char* CameraDevice::kAnwKey            = "Anw";
 CameraDevice::CameraDevice(
         const char* id,
         ACameraDevice_StateCallbacks* cb,
-        std::unique_ptr<ACameraMetadata> chars,
+        sp<ACameraMetadata> chars,
         ACameraDevice* wrapper) :
         mCameraId(id),
         mAppCallbacks(*cb),
-        mChars(std::move(chars)),
+        mChars(chars),
         mServiceCallback(new ServiceCallback(this)),
         mWrapper(wrapper),
         mInError(false),
@@ -436,7 +436,7 @@ CameraDevice::freeACaptureRequest(ACaptureRequest* req) {
     if (req == nullptr) {
         return;
     }
-    delete req->settings;
+    req->settings.clear();
     delete req->targets;
     delete req;
 }

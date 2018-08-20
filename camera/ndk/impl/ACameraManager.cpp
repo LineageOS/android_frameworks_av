@@ -402,7 +402,7 @@ ACameraManager::deleteCameraIdList(ACameraIdList* cameraIdList) {
 }
 
 camera_status_t ACameraManager::getCameraCharacteristics(
-        const char *cameraIdStr, ACameraMetadata **characteristics) {
+        const char* cameraIdStr, sp<ACameraMetadata>* characteristics) {
     Mutex::Autolock _l(mLock);
 
     sp<hardware::ICameraService> cs = CameraManagerGlobal::getInstance().getCameraService();
@@ -437,18 +437,16 @@ ACameraManager::openCamera(
         const char* cameraId,
         ACameraDevice_StateCallbacks* callback,
         /*out*/ACameraDevice** outDevice) {
-    ACameraMetadata* rawChars;
-    camera_status_t ret = getCameraCharacteristics(cameraId, &rawChars);
+    sp<ACameraMetadata> chars;
+    camera_status_t ret = getCameraCharacteristics(cameraId, &chars);
     Mutex::Autolock _l(mLock);
     if (ret != ACAMERA_OK) {
         ALOGE("%s: cannot get camera characteristics for camera %s. err %d",
                 __FUNCTION__, cameraId, ret);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
-    std::unique_ptr<ACameraMetadata> chars(rawChars);
-    rawChars = nullptr;
 
-    ACameraDevice* device = new ACameraDevice(cameraId, callback, std::move(chars));
+    ACameraDevice* device = new ACameraDevice(cameraId, callback, chars);
 
     sp<hardware::ICameraService> cs = CameraManagerGlobal::getInstance().getCameraService();
     if (cs == nullptr) {

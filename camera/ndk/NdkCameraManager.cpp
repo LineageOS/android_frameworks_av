@@ -23,6 +23,7 @@
 
 #include <camera/NdkCameraManager.h>
 #include "impl/ACameraManager.h"
+#include "impl/ACameraMetadata.h"
 
 using namespace android;
 
@@ -107,7 +108,14 @@ camera_status_t ACameraManager_getCameraCharacteristics(
                 __FUNCTION__, mgr, cameraId, chars);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
-    return mgr->getCameraCharacteristics(cameraId, chars);
+    sp<ACameraMetadata> spChars;
+    camera_status_t status = mgr->getCameraCharacteristics(cameraId, &spChars);
+    if (status != ACAMERA_OK) {
+        return status;
+    }
+    spChars->incStrong((void*) ACameraManager_getCameraCharacteristics);
+    *chars = spChars.get();
+    return ACAMERA_OK;
 }
 
 EXPORT
