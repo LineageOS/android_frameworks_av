@@ -20,10 +20,12 @@
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
+#include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/ColorConverter.h>
 #include <media/stagefright/MediaErrors.h>
 
 #include "libyuv/convert_from.h"
+#include "libyuv/convert_argb.h"
 #include "libyuv/video_common.h"
 #include <functional>
 #include <sys/time.h>
@@ -44,10 +46,28 @@
 
 namespace android {
 
+static bool isRGB(OMX_COLOR_FORMATTYPE colorFormat) {
+    return colorFormat == OMX_COLOR_Format16bitRGB565
+            || colorFormat == OMX_COLOR_Format32BitRGBA8888
+            || colorFormat == OMX_COLOR_Format32bitBGRA8888;
+}
+
+bool ColorConverter::ColorSpace::isBt709() {
+    return (mStandard == ColorUtils::kColorStandardBT709);
+}
+
+
+bool ColorConverter::ColorSpace::isJpeg() {
+    return ((mStandard == ColorUtils::kColorStandardBT601_625)
+            || (mStandard == ColorUtils::kColorStandardBT601_525))
+            && (mRange == ColorUtils::kColorRangeFull);
+}
+
 ColorConverter::ColorConverter(
         OMX_COLOR_FORMATTYPE from, OMX_COLOR_FORMATTYPE to)
     : mSrcFormat(from),
       mDstFormat(to),
+      mSrcColorSpace({0, 0, 0}),
       mClip(NULL) {
 }
 
@@ -80,9 +100,18 @@ bool ColorConverter::isValid() const {
 }
 
 bool ColorConverter::isDstRGB() const {
-    return mDstFormat == OMX_COLOR_Format16bitRGB565
-            || mDstFormat == OMX_COLOR_Format32BitRGBA8888
-            || mDstFormat == OMX_COLOR_Format32bitBGRA8888;
+    return isRGB(mDstFormat);
+}
+
+void ColorConverter::setSrcColorSpace(
+        uint32_t standard, uint32_t range, uint32_t transfer) {
+    if (isRGB(mSrcFormat)) {
+        ALOGW("Can't set color space on RGB source");
+        return;
+    }
+    mSrcColorSpace.mStandard = standard;
+    mSrcColorSpace.mRange = range;
+    mSrcColorSpace.mTransfer = transfer;
 }
 
 /*
@@ -281,6 +310,13 @@ status_t ColorConverter::convertCbYCrY(
     return OK;
 }
 
+#define DECLARE_YUV2RGBFUNC(func, rgb) int (*func)(     \
+        const uint8*, int, const uint8*, int,           \
+        const uint8*, int, uint8*, int, int, int)       \
+        = mSrcColorSpace.isBt709() ? libyuv::H420To##rgb \
+        : mSrcColorSpace.isJpeg() ? libyuv::J420To##rgb  \
+        : libyuv::I420To##rgb
+
 status_t ColorConverter::convertYUV420PlanarUseLibYUV(
         const BitmapParams &src, const BitmapParams &dst) {
     uint8_t *dst_ptr = (uint8_t *)dst.mBits
@@ -298,19 +334,28 @@ status_t ColorConverter::convertYUV420PlanarUseLibYUV(
 
     switch (mDstFormat) {
     case OMX_COLOR_Format16bitRGB565:
-        libyuv::I420ToRGB565(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
+    {
+        DECLARE_YUV2RGBFUNC(func, RGB565);
+        (*func)(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
                 (uint8 *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
         break;
+    }
 
     case OMX_COLOR_Format32BitRGBA8888:
-        libyuv::ConvertFromI420(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
-                (uint8 *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight(), libyuv::FOURCC_ABGR);
+    {
+        DECLARE_YUV2RGBFUNC(func, ABGR);
+        (*func)(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
+                (uint8 *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
         break;
+    }
 
     case OMX_COLOR_Format32bitBGRA8888:
-        libyuv::ConvertFromI420(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
-                (uint8 *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight(), libyuv::FOURCC_ARGB);
+    {
+        DECLARE_YUV2RGBFUNC(func, ARGB);
+        (*func)(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
+                (uint8 *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
         break;
+    }
 
     default:
         return ERROR_UNSUPPORTED;
