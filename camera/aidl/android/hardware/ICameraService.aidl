@@ -149,8 +149,10 @@ interface ICameraService
     const int API_VERSION_1 = 1;
     const int API_VERSION_2 = 2;
 
-    // Determines if a particular API version is supported directly
+    // Determines if a particular API version is supported directly for a cameraId.
     boolean supportsCameraApi(String cameraId, int apiVersion);
+    // Determines if a cameraId is a hidden physical camera of a logical multi-camera.
+    boolean isHiddenPhysicalCamera(String cameraId);
 
     void setTorchMode(String cameraId, boolean enabled, IBinder clientBinder);
 

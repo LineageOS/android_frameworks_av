@@ -20,9 +20,12 @@
 
 #include "CameraProviderManager.h"
 
+#include <android/hardware/camera/device/3.5/ICameraDevice.h>
+
 #include <algorithm>
 #include <chrono>
 #include <inttypes.h>
+#include <hardware/camera_common.h>
 #include <hidl/ServiceManagement.h>
 #include <functional>
 #include <camera_metadata_hidden.h>
@@ -424,6 +427,48 @@ bool CameraProviderManager::isLogicalCamera(const CameraMetadata& staticInfo,
     return true;
 }
 
+bool CameraProviderManager::isHiddenPhysicalCamera(const std::string& cameraId) {
+    for (auto& provider : mProviders) {
+        for (auto& deviceInfo : provider->mDevices) {
+            if (deviceInfo->mId == cameraId) {
+                // cameraId is found in public camera IDs advertised by the
+                // provider.
+                return false;
+            }
+        }
+    }
+
+    for (auto& provider : mProviders) {
+        for (auto& deviceInfo : provider->mDevices) {
+            CameraMetadata info;
+            status_t res = deviceInfo->getCameraCharacteristics(&info);
+            if (res != OK) {
+                ALOGE("%s: Failed to getCameraCharacteristics for id %s", __FUNCTION__,
+                        deviceInfo->mId.c_str());
+                return false;
+            }
+
+            std::vector<std::string> physicalIds;
+            if (isLogicalCamera(info, &physicalIds)) {
+                if (std::find(physicalIds.begin(), physicalIds.end(), cameraId) !=
+                        physicalIds.end()) {
+                    int deviceVersion = HARDWARE_DEVICE_API_VERSION(
+                            deviceInfo->mVersion.get_major(), deviceInfo->mVersion.get_minor());
+                    if (deviceVersion < CAMERA_DEVICE_API_VERSION_3_5) {
+                        ALOGE("%s: Wrong deviceVersion %x for hiddenPhysicalCameraId %s",
+                                __FUNCTION__, deviceVersion, cameraId.c_str());
+                        return false;
+                    } else {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
 status_t CameraProviderManager::addProviderLocked(const std::string& newProvider, bool expected) {
     for (const auto& providerInfo : mProviders) {
         if (providerInfo->mProviderName == newProvider) {
@@ -544,13 +589,22 @@ status_t CameraProviderManager::ProviderInfo::initialize() {
 
     // Get initial list of camera devices, if any
     std::vector<std::string> devices;
-    hardware::Return<void> ret = mInterface->getCameraIdList([&status, &devices](
+    hardware::Return<void> ret = mInterface->getCameraIdList([&status, this, &devices](
             Status idStatus,
             const hardware::hidl_vec<hardware::hidl_string>& cameraDeviceNames) {
         status = idStatus;
         if (status == Status::OK) {
-            for (size_t i = 0; i < cameraDeviceNames.size(); i++) {
-                devices.push_back(cameraDeviceNames[i]);
+            for (auto& name : cameraDeviceNames) {
+                uint16_t major, minor;
+                std::string type, id;
+                status_t res = parseDeviceName(name, &major, &minor, &type, &id);
+                if (res != OK) {
+                    ALOGE("%s: Error parsing deviceName: %s: %d", __FUNCTION__, name.c_str(), res);
+                    status = Status::INTERNAL_ERROR;
+                } else {
+                    devices.push_back(name);
+                    mProviderPublicCameraIds.push_back(id);
+                }
             }
         } });
     if (!ret.isOk()) {
@@ -705,6 +759,25 @@ status_t CameraProviderManager::ProviderInfo::dump(int fd, const Vector<String16
             info2.dump(fd, /*verbosity*/ 2, /*indentation*/ 4);
         }
 
+        // Dump characteristics of non-standalone physical camera
+        std::vector<std::string> physicalIds;
+        if (isLogicalCamera(info2, &physicalIds)) {
+            for (auto& id : physicalIds) {
+                // Skip if physical id is an independent camera
+                if (std::find(mProviderPublicCameraIds.begin(), mProviderPublicCameraIds.end(), id)
+                        != mProviderPublicCameraIds.end()) {
+                    continue;
+                }
+
+                CameraMetadata physicalInfo;
+                status_t status = device->getPhysicalCameraCharacteristics(id, &physicalInfo);
+                if (status == OK) {
+                    dprintf(fd, "  Physical camera %s characteristics:\n", id.c_str());
+                    physicalInfo.dump(fd, /*verbosity*/ 2, /*indentation*/ 4);
+                }
+            }
+        }
+
         dprintf(fd, "== Camera HAL device %s (v%d.%d) dumpState: ==\n", device->mName.c_str(),
                 device->mVersion.get_major(), device->mVersion.get_minor());
         res = device->dumpState(fd);
@@ -838,7 +911,7 @@ std::unique_ptr<CameraProviderManager::ProviderInfo::DeviceInfo>
 
     return std::unique_ptr<DeviceInfo>(
         new DeviceInfoT(name, tagId, id, minorVersion, resourceCost,
-                cameraInterface));
+                mProviderPublicCameraIds, cameraInterface));
 }
 
 template<class InterfaceT>
@@ -912,9 +985,10 @@ CameraProviderManager::ProviderInfo::DeviceInfo1::DeviceInfo1(const std::string&
         const metadata_vendor_id_t tagId, const std::string &id,
         uint16_t minorVersion,
         const CameraResourceCost& resourceCost,
+        const std::vector<std::string>& publicCameraIds,
         sp<InterfaceT> interface) :
         DeviceInfo(name, tagId, id, hardware::hidl_version{1, minorVersion},
-                   resourceCost),
+                   publicCameraIds, resourceCost),
         mInterface(interface) {
     // Get default parameters and initialize flash unit availability
     // Requires powering on the camera device
@@ -1011,9 +1085,10 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
         const metadata_vendor_id_t tagId, const std::string &id,
         uint16_t minorVersion,
         const CameraResourceCost& resourceCost,
+        const std::vector<std::string>& publicCameraIds,
         sp<InterfaceT> interface) :
         DeviceInfo(name, tagId, id, hardware::hidl_version{3, minorVersion},
-                   resourceCost),
+                   publicCameraIds, resourceCost),
         mInterface(interface) {
     // Get camera characteristics and initialize flash unit availability
     Status status;
@@ -1053,6 +1128,59 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
         mHasFlashUnit = true;
     } else {
         mHasFlashUnit = false;
+    }
+
+    // Get physical camera characteristics if applicable
+    auto castResult = device::V3_5::ICameraDevice::castFrom(mInterface);
+    if (!castResult.isOk()) {
+        ALOGV("%s: Unable to convert ICameraDevice instance to version 3.5", __FUNCTION__);
+        return;
+    }
+    sp<hardware::camera::device::V3_5::ICameraDevice> interface_3_5 = castResult;
+    if (interface_3_5 == nullptr) {
+        ALOGE("%s: Converted ICameraDevice instance to nullptr", __FUNCTION__);
+        return;
+    }
+
+    std::vector<std::string> physicalIds;
+    if (CameraProviderManager::isLogicalCamera(mCameraCharacteristics, &physicalIds)) {
+        for (auto& id : physicalIds) {
+            if (std::find(mPublicCameraIds.begin(), mPublicCameraIds.end(), id) !=
+                    mPublicCameraIds.end()) {
+                continue;
+            }
+
+            hardware::hidl_string hidlId(id);
+            ret = interface_3_5->getPhysicalCameraCharacteristics(hidlId,
+                    [&status, &id, this](Status s, device::V3_2::CameraMetadata metadata) {
+                status = s;
+                if (s == Status::OK) {
+                    camera_metadata_t *buffer =
+                            reinterpret_cast<camera_metadata_t*>(metadata.data());
+                    size_t expectedSize = metadata.size();
+                    int res = validate_camera_metadata_structure(buffer, &expectedSize);
+                    if (res == OK || res == CAMERA_METADATA_VALIDATION_SHIFTED) {
+                        set_camera_metadata_vendor_id(buffer, mProviderTagid);
+                        mPhysicalCameraCharacteristics[id] = buffer;
+                    } else {
+                        ALOGE("%s: Malformed camera metadata received from HAL", __FUNCTION__);
+                        status = Status::INTERNAL_ERROR;
+                    }
+                }
+            });
+
+            if (!ret.isOk()) {
+                ALOGE("%s: Transaction error getting physical camera %s characteristics for %s: %s",
+                        __FUNCTION__, id.c_str(), mId.c_str(), ret.description().c_str());
+                return;
+            }
+            if (status != Status::OK) {
+                ALOGE("%s: Unable to get physical camera %s characteristics for device %s: %s (%d)",
+                        __FUNCTION__, id.c_str(), mId.c_str(),
+                        CameraProviderManager::statusToString(status), status);
+                return;
+            }
+        }
     }
 }
 
@@ -1126,6 +1254,18 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getCameraCharacterist
     if (characteristics == nullptr) return BAD_VALUE;
 
     *characteristics = mCameraCharacteristics;
+    return OK;
+}
+
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getPhysicalCameraCharacteristics(
+        const std::string& physicalCameraId, CameraMetadata *characteristics) const {
+    if (characteristics == nullptr) return BAD_VALUE;
+    if (mPhysicalCameraCharacteristics.find(physicalCameraId) ==
+            mPhysicalCameraCharacteristics.end()) {
+        return NAME_NOT_FOUND;
+    }
+
+    *characteristics = mPhysicalCameraCharacteristics.at(physicalCameraId);
     return OK;
 }
 
@@ -1460,10 +1600,20 @@ status_t HidlVendorTagDescriptor::createDescriptorFromHidl(
 
 status_t CameraProviderManager::getCameraCharacteristicsLocked(const std::string &id,
         CameraMetadata* characteristics) const {
-    auto deviceInfo = findDeviceInfoLocked(id, /*minVersion*/ {3,0}, /*maxVersion*/ {4,0});
-    if (deviceInfo == nullptr) return NAME_NOT_FOUND;
+    auto deviceInfo = findDeviceInfoLocked(id, /*minVersion*/ {3,0}, /*maxVersion*/ {5,0});
+    if (deviceInfo != nullptr) {
+        return deviceInfo->getCameraCharacteristics(characteristics);
+    }
 
-    return deviceInfo->getCameraCharacteristics(characteristics);
+    // Find hidden physical camera characteristics
+    for (auto& provider : mProviders) {
+        for (auto& deviceInfo : provider->mDevices) {
+            status_t res = deviceInfo->getPhysicalCameraCharacteristics(id, characteristics);
+            if (res != NAME_NOT_FOUND) return res;
+        }
+    }
+
+    return NAME_NOT_FOUND;
 }
 
 void CameraProviderManager::filterLogicalCameraIdsLocked(
@@ -1482,7 +1632,7 @@ void CameraProviderManager::filterLogicalCameraIdsLocked(
 
         // idCombo contains the ids of a logical camera and its physical cameras
         std::vector<std::string> idCombo;
-        bool logicalCamera = CameraProviderManager::isLogicalCamera(info, &idCombo);
+        bool logicalCamera = isLogicalCamera(info, &idCombo);
         if (!logicalCamera) {
             continue;
         }

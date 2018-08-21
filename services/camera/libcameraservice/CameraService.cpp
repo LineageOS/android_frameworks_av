@@ -607,6 +607,7 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
           case CAMERA_DEVICE_API_VERSION_3_2:
           case CAMERA_DEVICE_API_VERSION_3_3:
           case CAMERA_DEVICE_API_VERSION_3_4:
+          case CAMERA_DEVICE_API_VERSION_3_5:
             if (effectiveApiLevel == API_1) { // Camera1 API route
                 sp<ICameraClient> tmp = static_cast<ICameraClient*>(cameraCb.get());
                 *client = new Camera2Client(cameraService, tmp, packageName,
@@ -1687,7 +1688,7 @@ Status CameraService::supportsCameraApi(const String16& cameraId, int apiVersion
     }
 
     int deviceVersion = getDeviceVersion(id);
-    switch(deviceVersion) {
+    switch (deviceVersion) {
         case CAMERA_DEVICE_API_VERSION_1_0:
         case CAMERA_DEVICE_API_VERSION_3_0:
         case CAMERA_DEVICE_API_VERSION_3_1:
@@ -1704,6 +1705,7 @@ Status CameraService::supportsCameraApi(const String16& cameraId, int apiVersion
         case CAMERA_DEVICE_API_VERSION_3_2:
         case CAMERA_DEVICE_API_VERSION_3_3:
         case CAMERA_DEVICE_API_VERSION_3_4:
+        case CAMERA_DEVICE_API_VERSION_3_5:
             ALOGV("%s: Camera id %s uses HAL3.2 or newer, supports api1/api2 directly",
                     __FUNCTION__, id.string());
             *isSupported = true;
@@ -1720,6 +1722,18 @@ Status CameraService::supportsCameraApi(const String16& cameraId, int apiVersion
             return STATUS_ERROR(ERROR_INVALID_OPERATION, msg.string());
         }
     }
+
+    return Status::ok();
+}
+
+Status CameraService::isHiddenPhysicalCamera(const String16& cameraId,
+        /*out*/ bool *isSupported) {
+    ATRACE_CALL();
+
+    const String8 id = String8(cameraId);
+
+    ALOGV("%s: for camera ID = %s", __FUNCTION__, id.string());
+    *isSupported = mCameraProviderManager->isHiddenPhysicalCamera(id.string());
 
     return Status::ok();
 }
