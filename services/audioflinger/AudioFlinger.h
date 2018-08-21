@@ -812,6 +812,9 @@ private:
     status_t    checkStreamType(audio_stream_type_t stream) const;
 
     void        filterReservedParameters(String8& keyValuePairs, uid_t callingUid);
+    void        logFilteredParameters(size_t originalKVPSize, const String8& originalKVPs,
+                                      size_t rejectedKVPSize, const String8& rejectedKVPs,
+                                      uid_t callingUid);
 
 public:
     // These methods read variables atomically without mLock,
@@ -832,7 +835,11 @@ private:
     PatchPanel mPatchPanel;
     sp<EffectsFactoryHalInterface> mEffectsFactoryHal;
 
-    bool        mSystemReady;
+    bool       mSystemReady;
+
+    SimpleLog  mRejectedSetParameterLog;
+    SimpleLog  mAppSetParameterLog;
+    SimpleLog  mSystemSetParameterLog;
 };
 
 #undef INCLUDING_FROM_AUDIOFLINGER_H
