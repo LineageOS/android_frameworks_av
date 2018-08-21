@@ -121,9 +121,23 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
 
     res = manager->getCameraCharacteristics(mId.string(), &mDeviceInfo);
     if (res != OK) {
-        SET_ERR_L("Could not retrive camera characteristics: %s (%d)", strerror(-res), res);
+        SET_ERR_L("Could not retrieve camera characteristics: %s (%d)", strerror(-res), res);
         session->close();
         return res;
+    }
+
+    std::vector<std::string> physicalCameraIds;
+    bool isLogical = CameraProviderManager::isLogicalCamera(mDeviceInfo, &physicalCameraIds);
+    if (isLogical) {
+        for (auto& physicalId : physicalCameraIds) {
+            res = manager->getCameraCharacteristics(physicalId, &mPhysicalDeviceInfoMap[physicalId]);
+            if (res != OK) {
+                SET_ERR_L("Could not retrieve camera %s characteristics: %s (%d)",
+                        physicalId.c_str(), strerror(-res), res);
+                session->close();
+                return res;
+            }
+        }
     }
 
     std::shared_ptr<RequestMetadataQueue> queue;
@@ -719,7 +733,7 @@ status_t Camera3Device::dump(int fd, const Vector<String16> &args) {
     return OK;
 }
 
-const CameraMetadata& Camera3Device::info() const {
+const CameraMetadata& Camera3Device::info(const String8& physicalId) const {
     ALOGVV("%s: E", __FUNCTION__);
     if (CC_UNLIKELY(mStatus == STATUS_UNINITIALIZED ||
                     mStatus == STATUS_ERROR)) {
@@ -727,7 +741,22 @@ const CameraMetadata& Camera3Device::info() const {
                 mStatus == STATUS_ERROR ?
                 "when in error state" : "before init");
     }
-    return mDeviceInfo;
+    if (physicalId.isEmpty()) {
+        return mDeviceInfo;
+    } else {
+        std::string id(physicalId.c_str());
+        if (mPhysicalDeviceInfoMap.find(id) != mPhysicalDeviceInfoMap.end()) {
+            return mPhysicalDeviceInfoMap.at(id);
+        } else {
+            ALOGE("%s: Invalid physical camera id %s", __FUNCTION__, physicalId.c_str());
+            return mDeviceInfo;
+        }
+    }
+}
+
+const CameraMetadata& Camera3Device::info() const {
+    String8 emptyId;
+    return info(emptyId);
 }
 
 status_t Camera3Device::checkStatusOkToCaptureLocked() {
