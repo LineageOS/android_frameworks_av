@@ -1641,9 +1641,9 @@ status_t AudioTrack::obtainBuffer(Buffer* audioBuffer, int32_t waitCount, size_t
     } else if (waitCount == 0) {
         requested = &ClientProxy::kNonBlocking;
     } else if (waitCount > 0) {
-        long long ms = WAIT_PERIOD_MS * (long long) waitCount;
+        time_t ms = WAIT_PERIOD_MS * (time_t) waitCount;
         timeout.tv_sec = ms / 1000;
-        timeout.tv_nsec = (int) (ms % 1000) * 1000000;
+        timeout.tv_nsec = (long) (ms % 1000) * 1000000;
         requested = &timeout;
     } else {
         ALOGE("%s invalid waitCount %d", __func__, waitCount);
