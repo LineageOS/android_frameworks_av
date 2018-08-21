@@ -163,7 +163,7 @@ struct TestInteractionProxy : public CameraProviderManager::ServiceInteractionPr
         mTestCameraProvider = provider;
     }
 
-    std::string mLastRequestedServiceName;
+    std::vector<std::string> mLastRequestedServiceNames;
 
     virtual ~TestInteractionProxy() {}
 
@@ -177,7 +177,7 @@ struct TestInteractionProxy : public CameraProviderManager::ServiceInteractionPr
 
     virtual sp<hardware::camera::provider::V2_4::ICameraProvider> getService(
             const std::string &serviceName) override {
-        mLastRequestedServiceName = serviceName;
+        mLastRequestedServiceNames.push_back(serviceName);
         return mTestCameraProvider;
     }
 
@@ -210,9 +210,18 @@ TEST(CameraProviderManagerTest, InitializeTest) {
     res = providerManager->initialize(statusListener, &serviceProxy);
     ASSERT_EQ(res, OK) << "Unable to initialize provider manager";
 
-    hardware::hidl_string legacyInstanceName = "legacy/0";
-    ASSERT_EQ(serviceProxy.mLastRequestedServiceName, legacyInstanceName) <<
+    std::string legacyInstanceName = "legacy/0";
+    std::string externalInstanceName = "external/0";
+    bool gotLegacy = false;
+    bool gotExternal = false;
+    for (auto& serviceName : serviceProxy.mLastRequestedServiceNames) {
+        if (serviceName == legacyInstanceName) gotLegacy = true;
+        if (serviceName == externalInstanceName) gotExternal = true;
+    }
+    ASSERT_TRUE(gotLegacy) <<
             "Legacy instance not requested from service manager";
+    ASSERT_TRUE(gotExternal) <<
+            "External instance not requested from service manager";
 
     hardware::hidl_string testProviderFqInterfaceName =
             "android.hardware.camera.provider@2.4::ICameraProvider";
@@ -221,7 +230,7 @@ TEST(CameraProviderManagerTest, InitializeTest) {
             testProviderFqInterfaceName,
             testProviderInstanceName, false);
 
-    ASSERT_EQ(serviceProxy.mLastRequestedServiceName, testProviderInstanceName) <<
+    ASSERT_EQ(serviceProxy.mLastRequestedServiceNames.back(), testProviderInstanceName) <<
             "Incorrect instance requested from service manager";
 }
 
@@ -255,7 +264,7 @@ TEST(CameraProviderManagerTest, MultipleVendorTagTest) {
             "android.hardware.camera.provider@2.4::ICameraProvider";
     serviceProxy.mManagerNotificationInterface->onRegistration(
             testProviderFqInterfaceName, testProviderInstanceName, false);
-    ASSERT_EQ(serviceProxy.mLastRequestedServiceName, testProviderInstanceName) <<
+    ASSERT_EQ(serviceProxy.mLastRequestedServiceNames.back(), testProviderInstanceName) <<
             "Incorrect instance requested from service manager";
 
     hardware::hidl_string sectionNameSecond = "SecondVendorTestSection";
@@ -273,7 +282,7 @@ TEST(CameraProviderManagerTest, MultipleVendorTagTest) {
     hardware::hidl_string testProviderSecondInstanceName = "test2/0";
     serviceProxy.mManagerNotificationInterface->onRegistration(
             testProviderFqInterfaceName, testProviderSecondInstanceName, false);
-    ASSERT_EQ(serviceProxy.mLastRequestedServiceName,
+    ASSERT_EQ(serviceProxy.mLastRequestedServiceNames.back(),
               testProviderSecondInstanceName) <<
             "Incorrect instance requested from service manager";
 
