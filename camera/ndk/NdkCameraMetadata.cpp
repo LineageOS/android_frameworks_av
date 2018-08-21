@@ -57,13 +57,15 @@ ACameraMetadata* ACameraMetadata_copy(const ACameraMetadata* src) {
         ALOGE("%s: src is null!", __FUNCTION__);
         return nullptr;
     }
-    return new ACameraMetadata(*src);
+    ACameraMetadata* copy = new ACameraMetadata(*src);
+    copy->incStrong((void*) ACameraMetadata_copy);
+    return copy;
 }
 
 EXPORT
 void ACameraMetadata_free(ACameraMetadata* metadata) {
     ATRACE_CALL();
     if (metadata != nullptr) {
-        delete metadata;
+        metadata->decStrong((void*) ACameraMetadata_free);
     }
 }

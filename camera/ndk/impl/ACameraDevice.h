@@ -48,7 +48,7 @@ struct CameraCaptureFailure : public RefBase, public ACameraCaptureFailure {};
 class CameraDevice final : public RefBase {
   public:
     CameraDevice(const char* id, ACameraDevice_StateCallbacks* cb,
-                  std::unique_ptr<ACameraMetadata> chars,
+                  sp<ACameraMetadata> chars,
                   ACameraDevice* wrapper);
     ~CameraDevice();
 
@@ -156,7 +156,7 @@ class CameraDevice final : public RefBase {
     mutable Mutex mDeviceLock;
     const String8 mCameraId;                          // Camera ID
     const ACameraDevice_StateCallbacks mAppCallbacks; // Callback to app
-    const std::unique_ptr<ACameraMetadata> mChars;    // Camera characteristics
+    const sp<ACameraMetadata> mChars;                 // Camera characteristics
     const sp<ServiceCallback> mServiceCallback;
     ACameraDevice* mWrapper;
 
@@ -294,8 +294,8 @@ class CameraDevice final : public RefBase {
  */
 struct ACameraDevice {
     ACameraDevice(const char* id, ACameraDevice_StateCallbacks* cb,
-                  std::unique_ptr<ACameraMetadata> chars) :
-            mDevice(new CameraDevice(id, cb, std::move(chars), this)) {}
+                  sp<ACameraMetadata> chars) :
+            mDevice(new CameraDevice(id, cb, chars, this)) {}
 
     ~ACameraDevice() {};
 

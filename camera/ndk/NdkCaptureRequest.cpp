@@ -137,7 +137,7 @@ void ACaptureRequest_free(ACaptureRequest* request) {
     if (request == nullptr) {
         return;
     }
-    delete request->settings;
+    request->settings.clear();
     delete request->targets;
     delete request;
     return;
