@@ -69,6 +69,10 @@ class CameraDeviceBase : public virtual RefBase {
      * The device's static characteristics metadata buffer
      */
     virtual const CameraMetadata& info() const = 0;
+    /**
+     * The physical camera device's static characteristics metadata buffer
+     */
+    virtual const CameraMetadata& info(const String8& physicalId) const = 0;
 
     struct PhysicalCameraSettings {
         std::string cameraId;
