@@ -829,25 +829,53 @@ bool AudioPolicyService::isSourceActive(audio_source_t source) const
     return mAudioPolicyManager->isSourceActive(source);
 }
 
-status_t AudioPolicyService::queryDefaultPreProcessing(audio_session_t audioSession,
-                                                       effect_descriptor_t *descriptors,
-                                                       uint32_t *count)
+status_t AudioPolicyService::getAudioPolicyEffects(sp<AudioPolicyEffects>& audioPolicyEffects)
 {
     if (mAudioPolicyManager == NULL) {
-        *count = 0;
         return NO_INIT;
     }
-    sp<AudioPolicyEffects>audioPolicyEffects;
     {
         Mutex::Autolock _l(mLock);
         audioPolicyEffects = mAudioPolicyEffects;
     }
     if (audioPolicyEffects == 0) {
-        *count = 0;
         return NO_INIT;
+    }
+
+    return OK;
+}
+
+status_t AudioPolicyService::queryDefaultPreProcessing(audio_session_t audioSession,
+                                                       effect_descriptor_t *descriptors,
+                                                       uint32_t *count)
+{
+    sp<AudioPolicyEffects>audioPolicyEffects;
+    status_t status = getAudioPolicyEffects(audioPolicyEffects);
+    if (status != OK) {
+        *count = 0;
+        return status;
     }
     return audioPolicyEffects->queryDefaultInputEffects(
             (audio_session_t)audioSession, descriptors, count);
+}
+
+status_t AudioPolicyService::addSourceDefaultEffect(const effect_uuid_t *type,
+                                                    const String16& opPackageName,
+                                                    const effect_uuid_t *uuid,
+                                                    int32_t priority,
+                                                    audio_source_t source,
+                                                    audio_unique_id_t* id)
+{
+    sp<AudioPolicyEffects>audioPolicyEffects;
+    status_t status = getAudioPolicyEffects(audioPolicyEffects);
+    if (status != OK) {
+        return status;
+    }
+    if (!modifyDefaultAudioEffectsAllowed()) {
+        return PERMISSION_DENIED;
+    }
+    return audioPolicyEffects->addSourceDefaultEffect(
+            type, opPackageName, uuid, priority, source, id);
 }
 
 status_t AudioPolicyService::addStreamDefaultEffect(const effect_uuid_t *type,
@@ -857,39 +885,40 @@ status_t AudioPolicyService::addStreamDefaultEffect(const effect_uuid_t *type,
                                                     audio_usage_t usage,
                                                     audio_unique_id_t* id)
 {
-    if (mAudioPolicyManager == NULL) {
-        return NO_INIT;
+    sp<AudioPolicyEffects>audioPolicyEffects;
+    status_t status = getAudioPolicyEffects(audioPolicyEffects);
+    if (status != OK) {
+        return status;
     }
     if (!modifyDefaultAudioEffectsAllowed()) {
         return PERMISSION_DENIED;
-    }
-    sp<AudioPolicyEffects>audioPolicyEffects;
-    {
-        Mutex::Autolock _l(mLock);
-        audioPolicyEffects = mAudioPolicyEffects;
-    }
-    if (audioPolicyEffects == 0) {
-        return NO_INIT;
     }
     return audioPolicyEffects->addStreamDefaultEffect(
             type, opPackageName, uuid, priority, usage, id);
 }
 
-status_t AudioPolicyService::removeStreamDefaultEffect(audio_unique_id_t id)
+status_t AudioPolicyService::removeSourceDefaultEffect(audio_unique_id_t id)
 {
-    if (mAudioPolicyManager == NULL) {
-        return NO_INIT;
+    sp<AudioPolicyEffects>audioPolicyEffects;
+    status_t status = getAudioPolicyEffects(audioPolicyEffects);
+    if (status != OK) {
+        return status;
     }
     if (!modifyDefaultAudioEffectsAllowed()) {
         return PERMISSION_DENIED;
     }
+    return audioPolicyEffects->removeSourceDefaultEffect(id);
+}
+
+status_t AudioPolicyService::removeStreamDefaultEffect(audio_unique_id_t id)
+{
     sp<AudioPolicyEffects>audioPolicyEffects;
-    {
-        Mutex::Autolock _l(mLock);
-        audioPolicyEffects = mAudioPolicyEffects;
+    status_t status = getAudioPolicyEffects(audioPolicyEffects);
+    if (status != OK) {
+        return status;
     }
-    if (audioPolicyEffects == 0) {
-        return NO_INIT;
+    if (!modifyDefaultAudioEffectsAllowed()) {
+        return PERMISSION_DENIED;
     }
     return audioPolicyEffects->removeStreamDefaultEffect(id);
 }

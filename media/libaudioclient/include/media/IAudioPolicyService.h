@@ -109,12 +109,19 @@ public:
     virtual status_t queryDefaultPreProcessing(audio_session_t audioSession,
                                               effect_descriptor_t *descriptors,
                                               uint32_t *count) = 0;
+    virtual status_t addSourceDefaultEffect(const effect_uuid_t *type,
+                                            const String16& opPackageName,
+                                            const effect_uuid_t *uuid,
+                                            int32_t priority,
+                                            audio_source_t source,
+                                            audio_unique_id_t* id) = 0;
     virtual status_t addStreamDefaultEffect(const effect_uuid_t *type,
                                             const String16& opPackageName,
                                             const effect_uuid_t *uuid,
                                             int32_t priority,
                                             audio_usage_t usage,
                                             audio_unique_id_t* id) = 0;
+    virtual status_t removeSourceDefaultEffect(audio_unique_id_t id) = 0;
     virtual status_t removeStreamDefaultEffect(audio_unique_id_t id) = 0;
    // Check if offload is possible for given format, stream type, sample rate,
     // bit rate, duration, video and streaming or offload property is enabled

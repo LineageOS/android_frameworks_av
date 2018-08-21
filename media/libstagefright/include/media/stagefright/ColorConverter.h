@@ -35,6 +35,8 @@ struct ColorConverter {
 
     bool isDstRGB() const;
 
+    void setSrcColorSpace(uint32_t standard, uint32_t range, uint32_t transfer);
+
     status_t convert(
             const void *srcBits,
             size_t srcWidth, size_t srcHeight, size_t srcStride,
@@ -46,6 +48,15 @@ struct ColorConverter {
             size_t dstCropRight, size_t dstCropBottom);
 
 private:
+    struct ColorSpace {
+        uint32_t mStandard;
+        uint32_t mRange;
+        uint32_t mTransfer;
+
+        bool isBt709();
+        bool isJpeg();
+    };
+
     struct BitmapParams {
         BitmapParams(
                 void *bits,
@@ -65,6 +76,7 @@ private:
     };
 
     OMX_COLOR_FORMATTYPE mSrcFormat, mDstFormat;
+    ColorSpace mSrcColorSpace;
     uint8_t *mClip;
 
     uint8_t *initClip();

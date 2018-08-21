@@ -528,6 +528,18 @@ status_t VideoFrameDecoder::onOutputReceived(
 
     ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, dstFormat());
 
+    uint32_t standard, range, transfer;
+    if (!outputFormat->findInt32("color-standard", (int32_t*)&standard)) {
+        standard = 0;
+    }
+    if (!outputFormat->findInt32("color-range", (int32_t*)&range)) {
+        range = 0;
+    }
+    if (!outputFormat->findInt32("color-transfer", (int32_t*)&transfer)) {
+        transfer = 0;
+    }
+    converter.setSrcColorSpace(standard, range, transfer);
+
     if (converter.isValid()) {
         converter.convert(
                 (const uint8_t *)videoFrameBuffer->data(),
@@ -698,6 +710,18 @@ status_t ImageDecoder::onOutputReceived(
     CHECK(outputFormat->findInt32("color-format", &srcFormat));
 
     ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, dstFormat());
+
+    uint32_t standard, range, transfer;
+    if (!outputFormat->findInt32("color-standard", (int32_t*)&standard)) {
+        standard = 0;
+    }
+    if (!outputFormat->findInt32("color-range", (int32_t*)&range)) {
+        range = 0;
+    }
+    if (!outputFormat->findInt32("color-transfer", (int32_t*)&transfer)) {
+        transfer = 0;
+    }
+    converter.setSrcColorSpace(standard, range, transfer);
 
     int32_t dstLeft, dstTop, dstRight, dstBottom;
     dstLeft = mTilesDecoded % mGridCols * width;
