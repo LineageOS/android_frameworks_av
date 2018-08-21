@@ -1136,13 +1136,13 @@ void ToneGenerator::stopTone() {
             // This is needed in case of cold start of the output stream.
             if ((mStartTime.tv_sec != 0) && (clock_gettime(CLOCK_MONOTONIC, &stopTime) == 0)) {
                 time_t sec = stopTime.tv_sec - mStartTime.tv_sec;
-                long nsec = stopTime.tv_nsec - mStartTime.tv_nsec;
+                auto nsec = stopTime.tv_nsec - mStartTime.tv_nsec;
                 if (nsec < 0) {
                     --sec;
                     nsec += 1000000000;
                 }
 
-                if ((sec + 1) > ((long)(INT_MAX / mSamplingRate))) {
+                if ((sec + 1) > ((time_t)(INT_MAX / mSamplingRate))) {
                     mMaxSmp = sec * mSamplingRate;
                 } else {
                     // mSamplingRate is always > 1000
@@ -1257,8 +1257,8 @@ void ToneGenerator::audioCallback(int event, void* user, void *info) {
 
     AudioTrack::Buffer *buffer = static_cast<AudioTrack::Buffer *>(info);
     ToneGenerator *lpToneGen = static_cast<ToneGenerator *>(user);
-    short *lpOut = buffer->i16;
-    unsigned int lNumSmp = buffer->size/sizeof(short);
+    int16_t *lpOut = buffer->i16;
+    unsigned int lNumSmp = buffer->size/sizeof(int16_t);
     const ToneDescriptor *lpToneDesc = lpToneGen->mpToneDesc;
 
     if (buffer->size == 0) return;
@@ -1329,7 +1329,7 @@ void ToneGenerator::audioCallback(int event, void* user, void *info) {
             if (lpToneDesc->segments[lpToneGen->mCurSegment].waveFreq[0] != 0) {
                 lWaveCmd = WaveGenerator::WAVEGEN_STOP;
                 unsigned int lFreqIdx = 0;
-                unsigned short lFrequency = lpToneDesc->segments[lpToneGen->mCurSegment].waveFreq[lFreqIdx];
+                uint16_t lFrequency = lpToneDesc->segments[lpToneGen->mCurSegment].waveFreq[lFreqIdx];
 
                 while (lFrequency != 0) {
                     WaveGenerator *lpWaveGen = lpToneGen->mWaveGens.valueFor(lFrequency);
@@ -1415,7 +1415,7 @@ void ToneGenerator::audioCallback(int event, void* user, void *info) {
         if (lGenSmp) {
             // If samples must be generated, call all active wave generators and acumulate waves in lpOut
             unsigned int lFreqIdx = 0;
-            unsigned short lFrequency = lpToneDesc->segments[lpToneGen->mCurSegment].waveFreq[lFreqIdx];
+            uint16_t lFrequency = lpToneDesc->segments[lpToneGen->mCurSegment].waveFreq[lFreqIdx];
 
             while (lFrequency != 0) {
                 WaveGenerator *lpWaveGen = lpToneGen->mWaveGens.valueFor(lFrequency);
@@ -1654,17 +1654,17 @@ ToneGenerator::tone_type ToneGenerator::getToneForRegion(tone_type toneType) {
 //
 ////////////////////////////////////////////////////////////////////////////////
 ToneGenerator::WaveGenerator::WaveGenerator(uint32_t samplingRate,
-        unsigned short frequency, float volume) {
+        uint16_t frequency, float volume) {
     double d0;
     double F_div_Fs;  // frequency / samplingRate
 
     F_div_Fs = frequency / (double)samplingRate;
     d0 = - (float)GEN_AMP * sin(2 * M_PI * F_div_Fs);
-    mS2_0 = (short)d0;
+    mS2_0 = (int16_t)d0;
     mS1 = 0;
     mS2 = mS2_0;
 
-    mAmplitude_Q15 = (short)(32767. * 32767. * volume / GEN_AMP);
+    mAmplitude_Q15 = (int16_t)(32767. * 32767. * volume / GEN_AMP);
     // take some margin for amplitude fluctuation
     if (mAmplitude_Q15 > 32500)
         mAmplitude_Q15 = 32500;
@@ -1672,7 +1672,7 @@ ToneGenerator::WaveGenerator::WaveGenerator(uint32_t samplingRate,
     d0 = 32768.0 * cos(2 * M_PI * F_div_Fs);  // Q14*2*cos()
     if (d0 > 32767)
         d0 = 32767;
-    mA1_Q14 = (short) d0;
+    mA1_Q14 = (int16_t) d0;
 
     ALOGV("WaveGenerator init, mA1_Q14: %d, mS2_0: %d, mAmplitude_Q15: %d",
             mA1_Q14, mS2_0, mAmplitude_Q15);
@@ -1710,7 +1710,7 @@ ToneGenerator::WaveGenerator::~WaveGenerator() {
 //        none
 //
 ////////////////////////////////////////////////////////////////////////////////
-void ToneGenerator::WaveGenerator::getSamples(short *outBuffer,
+void ToneGenerator::WaveGenerator::getSamples(int16_t *outBuffer,
         unsigned int count, unsigned int command) {
     long lS1, lS2;
     long lA1, lAmplitude;
@@ -1741,7 +1741,7 @@ void ToneGenerator::WaveGenerator::getSamples(short *outBuffer,
             lS2 = lS1;
             lS1 = Sample;
             Sample = ((lAmplitude>>16) * Sample) >> S_Q15;
-            *(outBuffer++) += (short)Sample;  // put result in buffer
+            *(outBuffer++) += (int16_t)Sample;  // put result in buffer
             lAmplitude -= dec;
         }
     } else {
@@ -1753,7 +1753,7 @@ void ToneGenerator::WaveGenerator::getSamples(short *outBuffer,
             lS2 = lS1;
             lS1 = Sample;
             Sample = (lAmplitude * Sample) >> S_Q15;
-            *(outBuffer++) += (short)Sample;  // put result in buffer
+            *(outBuffer++) += (int16_t)Sample;  // put result in buffer
         }
     }
 

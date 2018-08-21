@@ -286,7 +286,8 @@ status_t ClientProxy::obtainBuffer(Buffer* buffer, const struct timespec *reques
                 struct timespec after;
                 clock_gettime(CLOCK_MONOTONIC, &after);
                 total.tv_sec += after.tv_sec - before.tv_sec;
-                long deltaNs = after.tv_nsec - before.tv_nsec;
+                // Use auto instead of long to avoid the google-runtime-int warning.
+                auto deltaNs = after.tv_nsec - before.tv_nsec;
                 if (deltaNs < 0) {
                     deltaNs += 1000000000;
                     total.tv_sec--;
