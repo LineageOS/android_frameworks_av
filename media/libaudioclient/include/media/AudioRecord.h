@@ -85,7 +85,7 @@ public:
 
         union {
             void*       raw;
-            short*      i16;        // signed 16-bit
+            int16_t*    i16;        // signed 16-bit
             int8_t*     i8;         // unsigned 8-bit, offset by 0x80
                                     // input to obtainBuffer(): unused, output: pointer to buffer
         };
