@@ -44,7 +44,7 @@
 namespace android {
 
 struct DataSourceBaseReader : public mkvparser::IMkvReader {
-    explicit DataSourceBaseReader(DataSourceBase *source)
+    explicit DataSourceBaseReader(DataSourceHelper *source)
         : mSource(source) {
     }
 
@@ -86,7 +86,7 @@ struct DataSourceBaseReader : public mkvparser::IMkvReader {
     }
 
 private:
-    DataSourceBase *mSource;
+    DataSourceHelper *mSource;
 
     DataSourceBaseReader(const DataSourceBaseReader &);
     DataSourceBaseReader &operator=(const DataSourceBaseReader &);
@@ -921,7 +921,7 @@ status_t MatroskaSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-MatroskaExtractor::MatroskaExtractor(DataSourceBase *source)
+MatroskaExtractor::MatroskaExtractor(DataSourceHelper *source)
     : mDataSource(source),
       mReader(new DataSourceBaseReader(mDataSource)),
       mSegment(NULL),
@@ -994,6 +994,8 @@ MatroskaExtractor::~MatroskaExtractor() {
 
     delete mReader;
     mReader = NULL;
+
+    delete mDataSource;
 }
 
 size_t MatroskaExtractor::countTracks() {
@@ -1621,7 +1623,7 @@ uint32_t MatroskaExtractor::flags() const {
 }
 
 bool SniffMatroska(
-        DataSourceBase *source, float *confidence) {
+        DataSourceHelper *source, float *confidence) {
     DataSourceBaseReader reader(source);
     mkvparser::EBMLHeader ebmlHeader;
     long long pos;
@@ -1638,22 +1640,23 @@ bool SniffMatroska(
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("abbedd92-38c4-4904-a4c1-b3f45f899980"),
         1,
         "Matroska Extractor",
         [](
-                DataSourceBase *source,
+                CDataSource *source,
                 float *confidence,
                 void **,
-                MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
-            if (SniffMatroska(source, confidence)) {
+                FreeMetaFunc *) -> CreatorFunc {
+            DataSourceHelper helper(source);
+            if (SniffMatroska(&helper, confidence)) {
                 return [](
-                        DataSourceBase *source,
-                        void *) -> MediaExtractor* {
-                    return new MatroskaExtractor(source);};
+                        CDataSource *source,
+                        void *) -> CMediaExtractor* {
+                    return wrap(new MatroskaExtractor(new DataSourceHelper(source)));};
             }
             return NULL;
         }

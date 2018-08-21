@@ -19,7 +19,7 @@
 #include <utils/Log.h>
 
 #include "AACExtractor.h"
-#include <media/DataSourceBase.h>
+#include <media/MediaExtractorPluginApi.h>
 #include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -36,7 +36,7 @@ namespace android {
 class AACSource : public MediaTrack {
 public:
     AACSource(
-            DataSourceBase *source,
+            DataSourceHelper *source,
             MetaDataBase &meta,
             const Vector<uint64_t> &offset_vector,
             int64_t frame_duration_us);
@@ -54,7 +54,7 @@ protected:
 
 private:
     static const size_t kMaxFrameSize;
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     MetaDataBase mMeta;
 
     off64_t mOffset;
@@ -92,7 +92,7 @@ uint32_t get_sample_rate(const uint8_t sf_index)
 // The returned value is the AAC frame size with the ADTS header length (regardless of
 //     the presence of the CRC).
 // If headerSize is non-NULL, it will be used to return the size of the header of this ADTS frame.
-static size_t getAdtsFrameLength(DataSourceBase *source, off64_t offset, size_t* headerSize) {
+static size_t getAdtsFrameLength(DataSourceHelper *source, off64_t offset, size_t* headerSize) {
 
     const size_t kAdtsHeaderLengthNoCrc = 7;
     const size_t kAdtsHeaderLengthWithCrc = 9;
@@ -133,7 +133,7 @@ static size_t getAdtsFrameLength(DataSourceBase *source, off64_t offset, size_t*
 }
 
 AACExtractor::AACExtractor(
-        DataSourceBase *source, off64_t offset)
+        DataSourceHelper *source, off64_t offset)
     : mDataSource(source),
       mInitCheck(NO_INIT),
       mFrameDurationUs(0) {
@@ -219,7 +219,7 @@ status_t AACExtractor::getTrackMetaData(MetaDataBase &meta, size_t index, uint32
 const size_t AACSource::kMaxFrameSize = 8192;
 
 AACSource::AACSource(
-        DataSourceBase *source,
+        DataSourceHelper *source,
         MetaDataBase &meta,
         const Vector<uint64_t> &offset_vector,
         int64_t frame_duration_us)
@@ -323,21 +323,22 @@ status_t AACSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static MediaExtractor* CreateExtractor(
-        DataSourceBase *source,
+static CMediaExtractor* CreateExtractor(
+        CDataSource *source,
         void *meta) {
     off64_t offset = *static_cast<off64_t*>(meta);
-    return new AACExtractor(source, offset);
+    return wrap(new AACExtractor(new DataSourceHelper(source), offset));
 }
 
-static MediaExtractor::CreatorFunc Sniff(
-        DataSourceBase *source, float *confidence, void **meta,
-        MediaExtractor::FreeMetaFunc *freeMeta) {
+static CreatorFunc Sniff(
+        CDataSource *source, float *confidence, void **meta,
+        FreeMetaFunc *freeMeta) {
     off64_t pos = 0;
 
+    DataSourceHelper helper(source);
     for (;;) {
         uint8_t id3header[10];
-        if (source->readAt(pos, id3header, sizeof(id3header))
+        if (helper.readAt(pos, id3header, sizeof(id3header))
                 < (ssize_t)sizeof(id3header)) {
             return NULL;
         }
@@ -364,7 +365,7 @@ static MediaExtractor::CreatorFunc Sniff(
 
     uint8_t header[2];
 
-    if (source->readAt(pos, &header, 2) != 2) {
+    if (helper.readAt(pos, &header, 2) != 2) {
         return NULL;
     }
 
@@ -387,9 +388,9 @@ static MediaExtractor::CreatorFunc Sniff(
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("4fd80eae-03d2-4d72-9eb9-48fa6bb54613"),
         1, // version
         "AAC Extractor",

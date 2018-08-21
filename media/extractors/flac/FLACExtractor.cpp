@@ -24,7 +24,7 @@
 // libFLAC parser
 #include "FLAC/stream_decoder.h"
 
-#include <media/DataSourceBase.h>
+#include <media/MediaExtractorPluginApi.h>
 #include <media/MediaTrack.h>
 #include <media/VorbisComment.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -43,7 +43,7 @@ class FLACSource : public MediaTrack {
 
 public:
     FLACSource(
-            DataSourceBase *dataSource,
+            DataSourceHelper *dataSource,
             MetaDataBase &meta);
 
     virtual status_t start(MetaDataBase *params);
@@ -57,7 +57,7 @@ protected:
     virtual ~FLACSource();
 
 private:
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     MetaDataBase mTrackMetadata;
     FLACParser *mParser;
     bool mInitCheck;
@@ -79,7 +79,7 @@ public:
     };
 
     explicit FLACParser(
-        DataSourceBase *dataSource,
+        DataSourceHelper *dataSource,
         // If metadata pointers aren't provided, we don't fill them
         MetaDataBase *fileMetadata = 0,
         MetaDataBase *trackMetadata = 0);
@@ -118,7 +118,7 @@ public:
     }
 
 private:
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     MetaDataBase *mFileMetadata;
     MetaDataBase *mTrackMetadata;
     bool mInitCheck;
@@ -487,7 +487,7 @@ static void copyTrespass(
 // FLACParser
 
 FLACParser::FLACParser(
-        DataSourceBase *dataSource,
+        DataSourceHelper *dataSource,
         MetaDataBase *fileMetadata,
         MetaDataBase *trackMetadata)
     : mDataSource(dataSource),
@@ -708,7 +708,7 @@ MediaBufferBase *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
 // FLACsource
 
 FLACSource::FLACSource(
-        DataSourceBase *dataSource,
+        DataSourceHelper *dataSource,
         MetaDataBase &trackMetadata)
     : mDataSource(dataSource),
       mTrackMetadata(trackMetadata),
@@ -789,7 +789,7 @@ status_t FLACSource::read(
 // FLACExtractor
 
 FLACExtractor::FLACExtractor(
-        DataSourceBase *dataSource)
+        DataSourceHelper *dataSource)
     : mDataSource(dataSource),
       mParser(nullptr),
       mInitCheck(false)
@@ -804,6 +804,7 @@ FLACExtractor::~FLACExtractor()
 {
     ALOGV("~FLACExtractor::FLACExtractor");
     delete mParser;
+    delete mDataSource;
 }
 
 size_t FLACExtractor::countTracks()
@@ -837,7 +838,7 @@ status_t FLACExtractor::getMetaData(MetaDataBase &meta)
 
 // Sniffer
 
-bool SniffFLAC(DataSourceBase *source, float *confidence)
+bool SniffFLAC(DataSourceHelper *source, float *confidence)
 {
     // first 4 is the signature word
     // second 4 is the sizeof STREAMINFO
@@ -859,22 +860,23 @@ bool SniffFLAC(DataSourceBase *source, float *confidence)
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
             UUID("1364b048-cc45-4fda-9934-327d0ebf9829"),
             1,
             "FLAC Extractor",
             [](
-                    DataSourceBase *source,
+                    CDataSource *source,
                     float *confidence,
                     void **,
-                    MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
-                if (SniffFLAC(source, confidence)) {
+                    FreeMetaFunc *) -> CreatorFunc {
+                DataSourceHelper helper(source);
+                if (SniffFLAC(&helper, confidence)) {
                     return [](
-                            DataSourceBase *source,
-                            void *) -> MediaExtractor* {
-                        return new FLACExtractor(source);};
+                            CDataSource *source,
+                            void *) -> CMediaExtractor* {
+                        return wrap(new FLACExtractor(new DataSourceHelper(source)));};
                 }
                 return NULL;
             }

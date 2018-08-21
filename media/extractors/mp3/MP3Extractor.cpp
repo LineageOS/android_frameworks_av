@@ -24,7 +24,6 @@
 #include "VBRISeeker.h"
 #include "XINGSeeker.h"
 
-#include <media/DataSourceBase.h>
 #include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -46,7 +45,7 @@ namespace android {
 static const uint32_t kMask = 0xfffe0c00;
 
 static bool Resync(
-        DataSourceBase *source, uint32_t match_header,
+        DataSourceHelper *source, uint32_t match_header,
         off64_t *inout_pos, off64_t *post_id3_pos, uint32_t *out_header) {
     if (post_id3_pos != NULL) {
         *post_id3_pos = 0;
@@ -212,7 +211,7 @@ static bool Resync(
 class MP3Source : public MediaTrack {
 public:
     MP3Source(
-            MetaDataBase &meta, DataSourceBase *source,
+            MetaDataBase &meta, DataSourceHelper *source,
             off64_t first_frame_pos, uint32_t fixed_header,
             MP3Seeker *seeker);
 
@@ -230,7 +229,7 @@ protected:
 private:
     static const size_t kMaxFrameSize;
     MetaDataBase &mMeta;
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     off64_t mFirstFramePos;
     uint32_t mFixedHeader;
     off64_t mCurrentPos;
@@ -253,7 +252,7 @@ struct Mp3Meta {
 };
 
 MP3Extractor::MP3Extractor(
-        DataSourceBase *source, Mp3Meta *meta)
+        DataSourceHelper *source, Mp3Meta *meta)
     : mInitCheck(NO_INIT),
       mDataSource(source),
       mFirstFramePos(-1),
@@ -371,7 +370,8 @@ MP3Extractor::MP3Extractor(
     // Get iTunes-style gapless info if present.
     // When getting the id3 tag, skip the V1 tags to prevent the source cache
     // from being iterated to the end of the file.
-    ID3 id3(mDataSource, true);
+    DataSourceHelper helper(mDataSource);
+    ID3 id3(&helper, true);
     if (id3.isValid()) {
         ID3::Iterator *com = new ID3::Iterator(id3, "COM");
         if (com->done()) {
@@ -404,6 +404,7 @@ MP3Extractor::MP3Extractor(
 
 MP3Extractor::~MP3Extractor() {
     delete mSeeker;
+    delete mDataSource;
 }
 
 size_t MP3Extractor::countTracks() {
@@ -440,7 +441,7 @@ status_t MP3Extractor::getTrackMetaData(
 // Set our max frame size to the nearest power of 2 above this size (aka, 4kB)
 const size_t MP3Source::kMaxFrameSize = (1 << 12); /* 4096 bytes */
 MP3Source::MP3Source(
-        MetaDataBase &meta, DataSourceBase *source,
+        MetaDataBase &meta, DataSourceHelper *source,
         off64_t first_frame_pos, uint32_t fixed_header,
         MP3Seeker *seeker)
     : mMeta(meta),
@@ -612,7 +613,8 @@ status_t MP3Extractor::getMetaData(MetaDataBase &meta) {
     }
     meta.setCString(kKeyMIMEType, "audio/mpeg");
 
-    ID3 id3(mDataSource);
+    DataSourceHelper helper(mDataSource);
+    ID3 id3(&helper);
 
     if (!id3.isValid()) {
         return OK;
@@ -669,21 +671,22 @@ status_t MP3Extractor::getMetaData(MetaDataBase &meta) {
     return OK;
 }
 
-static MediaExtractor* CreateExtractor(
-        DataSourceBase *source,
+static CMediaExtractor* CreateExtractor(
+        CDataSource *source,
         void *meta) {
     Mp3Meta *metaData = static_cast<Mp3Meta *>(meta);
-    return new MP3Extractor(source, metaData);
+    return wrap(new MP3Extractor(new DataSourceHelper(source), metaData));
 }
 
-static MediaExtractor::CreatorFunc Sniff(
-        DataSourceBase *source, float *confidence, void **meta,
-        MediaExtractor::FreeMetaFunc *freeMeta) {
+static CreatorFunc Sniff(
+        CDataSource *source, float *confidence, void **meta,
+        FreeMetaFunc *freeMeta) {
     off64_t pos = 0;
     off64_t post_id3_pos;
     uint32_t header;
     uint8_t mpeg_header[5];
-    if (source->readAt(0, mpeg_header, sizeof(mpeg_header)) < (ssize_t)sizeof(mpeg_header)) {
+    DataSourceHelper helper(source);
+    if (helper.readAt(0, mpeg_header, sizeof(mpeg_header)) < (ssize_t)sizeof(mpeg_header)) {
         return NULL;
     }
 
@@ -691,7 +694,7 @@ static MediaExtractor::CreatorFunc Sniff(
         ALOGV("MPEG1PS container is not supported!");
         return NULL;
     }
-    if (!Resync(source, 0, &pos, &post_id3_pos, &header)) {
+    if (!Resync(&helper, 0, &pos, &post_id3_pos, &header)) {
         return NULL;
     }
 
@@ -710,9 +713,9 @@ static MediaExtractor::CreatorFunc Sniff(
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("812a3f6c-c8cf-46de-b529-3774b14103d4"),
         1, // version
         "MP3 Extractor",

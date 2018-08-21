@@ -39,4 +39,43 @@ uint32_t MediaExtractor::flags() const {
     return CAN_SEEK_BACKWARD | CAN_SEEK_FORWARD | CAN_PAUSE | CAN_SEEK;
 }
 
+// --------------------------------------------------------------------------------
+MediaExtractorCUnwrapper::MediaExtractorCUnwrapper(CMediaExtractor *wrapper) {
+    this->wrapper = wrapper;
+}
+
+MediaExtractorCUnwrapper::~MediaExtractorCUnwrapper() {
+    wrapper->free(wrapper->data);
+    free(wrapper);
+}
+
+size_t MediaExtractorCUnwrapper::countTracks() {
+    return wrapper->countTracks(wrapper->data);
+}
+
+MediaTrack *MediaExtractorCUnwrapper::getTrack(size_t index) {
+    return wrapper->getTrack(wrapper->data, index);
+}
+
+status_t MediaExtractorCUnwrapper::getTrackMetaData(
+        MetaDataBase& meta, size_t index, uint32_t flags) {
+    return wrapper->getTrackMetaData(wrapper->data, meta, index, flags);
+}
+
+status_t MediaExtractorCUnwrapper::getMetaData(MetaDataBase& meta) {
+    return wrapper->getMetaData(wrapper->data, meta);
+}
+
+const char * MediaExtractorCUnwrapper::name() {
+    return wrapper->name(wrapper->data);
+}
+
+uint32_t MediaExtractorCUnwrapper::flags() const {
+    return wrapper->flags(wrapper->data);
+}
+
+status_t MediaExtractorCUnwrapper::setMediaCas(const uint8_t* casToken, size_t size) {
+    return wrapper->setMediaCas(wrapper->data, casToken, size);
+}
+
 }  // namespace android

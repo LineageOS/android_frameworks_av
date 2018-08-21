@@ -22,11 +22,11 @@
 
 namespace android {
 
-class DataSourceBase;
+class DataSourceHelper;
 
 struct XINGSeeker : public MP3Seeker {
     static XINGSeeker *CreateFromSource(
-            DataSourceBase *source, off64_t first_frame_pos);
+            DataSourceHelper *source, off64_t first_frame_pos);
 
     virtual bool getDuration(int64_t *durationUs);
     virtual bool getOffsetForTime(int64_t *timeUs, off64_t *pos);

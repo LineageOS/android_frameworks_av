@@ -21,6 +21,8 @@
 #include "../include/ID3.h"
 
 #include <media/DataSource.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <utils/String8.h>
@@ -55,6 +57,55 @@ private:
 
     DISALLOW_EVIL_CONSTRUCTORS(MemorySource);
 };
+
+class DataSourceUnwrapper : public DataSourceBase {
+
+public:
+    explicit DataSourceUnwrapper(DataSourceHelper *sourcehelper) {
+        mSource = sourcehelper;
+    }
+    virtual status_t initCheck() const { return OK; }
+
+    // Returns the number of bytes read, or -1 on failure. It's not an error if
+    // this returns zero; it just means the given offset is equal to, or
+    // beyond, the end of the source.
+    virtual ssize_t readAt(off64_t offset, void *data, size_t size) {
+        return mSource->readAt(offset, data, size);
+    }
+
+    // May return ERROR_UNSUPPORTED.
+    virtual status_t getSize(off64_t *size) {
+        return mSource->getSize(size);
+    }
+
+    virtual bool getUri(char * /*uriString*/, size_t /*bufferSize*/) {
+        return false;
+    }
+
+    virtual uint32_t flags() {
+        return 0;
+    }
+
+    virtual void close() {};
+private:
+    DataSourceHelper *mSource;
+};
+
+
+ID3::ID3(DataSourceHelper *sourcehelper, bool ignoreV1, off64_t offset)
+    : mIsValid(false),
+      mData(NULL),
+      mSize(0),
+      mFirstFrameOffset(0),
+      mVersion(ID3_UNKNOWN),
+      mRawSize(0) {
+    DataSourceUnwrapper source(sourcehelper);
+    mIsValid = parseV2(&source, offset);
+
+    if (!mIsValid && !ignoreV1) {
+        mIsValid = parseV1(&source);
+    }
+}
 
 ID3::ID3(DataSourceBase *source, bool ignoreV1, off64_t offset)
     : mIsValid(false),

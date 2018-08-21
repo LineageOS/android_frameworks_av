@@ -20,7 +20,8 @@
 
 #include "mkvparser/mkvparser.h"
 
-#include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MetaDataBase.h>
 #include <utils/Vector.h>
 #include <utils/threads.h>
@@ -34,8 +35,8 @@ class MetaData;
 struct DataSourceBaseReader;
 struct MatroskaSource;
 
-struct MatroskaExtractor : public MediaExtractor {
-    explicit MatroskaExtractor(DataSourceBase *source);
+struct MatroskaExtractor : public MediaExtractorPluginHelper {
+    explicit MatroskaExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
 
@@ -76,7 +77,7 @@ private:
     Mutex mLock;
     Vector<TrackInfo> mTracks;
 
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     DataSourceBaseReader *mReader;
     mkvparser::Segment *mSegment;
     bool mExtractedThumbnails;

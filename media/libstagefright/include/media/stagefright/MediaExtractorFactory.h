@@ -49,8 +49,8 @@ private:
     static void RegisterExtractor(
             const sp<ExtractorPlugin> &plugin, std::list<sp<ExtractorPlugin>> &pluginList);
 
-    static MediaExtractor::CreatorFunc sniff(DataSourceBase *source,
-            float *confidence, void **meta, MediaExtractor::FreeMetaFunc *freeMeta,
+    static CreatorFunc sniff(const sp<DataSource> &source,
+            float *confidence, void **meta, FreeMetaFunc *freeMeta,
             sp<ExtractorPlugin> &plugin);
 
     static void UpdateExtractors(const char *newUpdateApkPath);

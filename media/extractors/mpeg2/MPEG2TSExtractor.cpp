@@ -123,12 +123,16 @@ status_t MPEG2TSSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-MPEG2TSExtractor::MPEG2TSExtractor(DataSourceBase *source)
+MPEG2TSExtractor::MPEG2TSExtractor(DataSourceHelper *source)
     : mDataSource(source),
       mParser(new ATSParser),
       mLastSyncEvent(0),
       mOffset(0) {
     init();
+}
+
+MPEG2TSExtractor::~MPEG2TSExtractor() {
+    delete mDataSource;
 }
 
 size_t MPEG2TSExtractor::countTracks() {
@@ -652,7 +656,7 @@ status_t MPEG2TSExtractor::feedUntilBufferAvailable(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool SniffMPEG2TS(DataSourceBase *source, float *confidence) {
+bool SniffMPEG2TS(DataSourceHelper *source, float *confidence) {
     for (int i = 0; i < 5; ++i) {
         char header;
         if (source->readAt(kTSPacketSize * i, &header, 1) != 1
