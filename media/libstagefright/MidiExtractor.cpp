@@ -246,9 +246,8 @@ MediaBuffer* MidiEngine::readBuffer() {
         EAS_I32 numRendered;
         EAS_RESULT result = EAS_Render(mEasData, p, mEasConfig->mixBufferSize, &numRendered);
         if (result != EAS_SUCCESS) {
-            ALOGE("EAS_Render() returned %ld, numBytesOutput = %d", result, numBytesOutput);
-            buffer->release();
-            return NULL; // Stop processing to prevent infinite loops.
+            ALOGE("EAS_Render returned %ld", result);
+            break;
         }
         p += numRendered * mEasConfig->numChannels;
         numBytesOutput += numRendered * mEasConfig->numChannels * sizeof(EAS_PCM);
