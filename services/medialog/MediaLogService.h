@@ -55,7 +55,7 @@ private:
 
     Mutex               mLock;
 
-    Vector<sp<NBLog::Reader>> mReaders;   // protected by mLock
+    Vector<sp<NBLog::DumpReader>> mDumpReaders;   // protected by mLock
 
     // FIXME Need comments on all of these, especially about locking
     NBLog::Shared *mMergerShared;
