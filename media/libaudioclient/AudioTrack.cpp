@@ -706,6 +706,13 @@ status_t AudioTrack::start()
         // force refresh of remaining frames by processAudioBuffer() as last
         // write before stop could be partial.
         mRefreshRemaining = true;
+
+        // for static track, clear the old flags when starting from stopped state
+        if (mSharedBuffer != 0) {
+            android_atomic_and(
+            ~(CBLK_LOOP_CYCLE | CBLK_LOOP_FINAL | CBLK_BUFFER_END),
+            &mCblk->mFlags);
+        }
     }
     mNewPosition = mPosition + mUpdatePeriod;
     int32_t flags = android_atomic_and(~(CBLK_STREAM_END_DONE | CBLK_DISABLED), &mCblk->mFlags);
