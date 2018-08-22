@@ -365,7 +365,7 @@ MPEG4Extractor::MPEG4Extractor(DataSourceHelper *source, const char *mime)
     : mMoofOffset(0),
       mMoofFound(false),
       mMdatFound(false),
-      mDataSource(new DataSourceHelper(source)),
+      mDataSource(source),
       mCachedSource(NULL),
       mInitCheck(NO_INIT),
       mHeaderTimescale(0),

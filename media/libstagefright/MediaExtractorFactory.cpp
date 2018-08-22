@@ -150,7 +150,8 @@ CreatorFunc MediaExtractorFactory::sniff(
         float newConfidence;
         void *newMeta = nullptr;
         FreeMetaFunc newFreeMeta = nullptr;
-        if ((curCreator = (*it)->def.sniff(source->wrap(), &newConfidence, &newMeta, &newFreeMeta))) {
+        if ((curCreator = (*it)->def.sniff(
+                        source->wrap(), &newConfidence, &newMeta, &newFreeMeta))) {
             if (newConfidence > *confidence) {
                 *confidence = newConfidence;
                 if (*meta != nullptr && *freeMeta != nullptr) {

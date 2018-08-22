@@ -568,16 +568,14 @@ static CreatorFunc Sniff(
         return NULL;
     }
 
-    WAVExtractor *extractor = new WAVExtractor(helper);
+    WAVExtractor *extractor = new WAVExtractor(helper); // extractor owns the helper
     int numTracks = extractor->countTracks();
     delete extractor;
     if (numTracks == 0) {
-        delete helper;
         return NULL;
     }
 
     *confidence = 0.3f;
-    delete helper;
 
     return CreateExtractor;
 }

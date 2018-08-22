@@ -1220,6 +1220,7 @@ OggExtractor::OggExtractor(DataSourceHelper *source)
 OggExtractor::~OggExtractor() {
     delete mImpl;
     mImpl = NULL;
+    delete mDataSource;
 }
 
 size_t OggExtractor::countTracks() {
