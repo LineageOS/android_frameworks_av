@@ -717,6 +717,40 @@ status_t SoundTriggerHwService::Module::stopRecognition(sound_model_handle_t han
     return NO_ERROR;
 }
 
+status_t SoundTriggerHwService::Module::getModelState(sound_model_handle_t handle,
+                                                      sp<IMemory>& eventMemory)
+{
+    ALOGV("getModelState() model handle %d", handle);
+    if (mHalInterface == 0) {
+        return NO_INIT;
+    }
+    AutoMutex lock(mLock);
+    sp<Model> model = getModel(handle);
+    if (model == 0) {
+        return BAD_VALUE;
+    }
+
+    if (model->mState != Model::STATE_ACTIVE) {
+        return INVALID_OPERATION;
+    }
+
+    if (model->mType != SOUND_MODEL_TYPE_GENERIC) {
+        return BAD_VALUE;
+    }
+
+    struct sound_trigger_recognition_event* event = nullptr;
+    status_t status = mHalInterface->getModelState(handle, &event);
+    if (status == NO_ERROR) {
+        sp<SoundTriggerHwService> service;
+        service = mService.promote();
+        if (service != 0) {
+            eventMemory = service->prepareRecognitionEvent(event);
+        }
+        free(event);
+    }
+    return status;
+}
+
 void SoundTriggerHwService::Module::onCallbackEvent(const sp<CallbackEvent>& event)
 {
     ALOGV("onCallbackEvent type %d", event->mType);
@@ -1016,6 +1050,22 @@ status_t SoundTriggerHwService::ModuleClient::stopRecognition(sound_model_handle
         return NO_INIT;
     }
     return module->stopRecognition(handle);
+}
+
+status_t SoundTriggerHwService::ModuleClient::getModelState(sound_model_handle_t handle,
+                                                            sp<IMemory>& eventMemory)
+{
+    ALOGV("getModelState() model handle %d", handle);
+    if (!captureHotwordAllowed(IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
+        return PERMISSION_DENIED;
+    }
+
+    sp<Module> module = mModule.promote();
+    if (module == 0) {
+        return NO_INIT;
+    }
+    return module->getModelState(handle, eventMemory);
 }
 
 void SoundTriggerHwService::ModuleClient::setCaptureState_l(bool active)
