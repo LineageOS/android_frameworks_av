@@ -25,7 +25,7 @@
 
 namespace android {
 
-class DataSourceBase;
+class DataSourceHelper;
 class MetaData;
 
 namespace heif {
@@ -45,7 +45,7 @@ struct ItemReference;
 
 class ItemTable : public RefBase {
 public:
-    explicit ItemTable(DataSourceBase *source);
+    explicit ItemTable(DataSourceHelper *source);
 
     status_t parse(uint32_t type, off64_t offset, size_t size);
 
@@ -62,7 +62,7 @@ protected:
     ~ItemTable();
 
 private:
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
 
     KeyedVector<uint32_t, ItemLoc> mItemLocs;
     Vector<ItemInfo> mItemInfos;

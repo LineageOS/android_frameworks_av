@@ -178,6 +178,10 @@ const int32  is_ratio_factor[8] = {0,
 ; FUNCTION CODE
 ----------------------------------------------------------------------------*/
 
+#if __has_attribute(no_sanitize)
+// deliberately playing near overflow points of int32
+__attribute__((no_sanitize("integer")))
+#endif
 void pvmp3_st_mid_side(int32 xr[SUBBANDS_NUMBER*FILTERBANK_BANDS],
                        int32 xl[SUBBANDS_NUMBER*FILTERBANK_BANDS],
                        int32 Start,

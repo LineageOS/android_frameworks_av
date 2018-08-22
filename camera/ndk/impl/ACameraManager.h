@@ -186,7 +186,7 @@ struct ACameraManager {
     static void     deleteCameraIdList(ACameraIdList* cameraIdList);
 
     camera_status_t getCameraCharacteristics(
-            const char *cameraId, ACameraMetadata **characteristics);
+            const char* cameraId, android::sp<ACameraMetadata>* characteristics);
     camera_status_t openCamera(const char* cameraId,
                                ACameraDevice_StateCallbacks* callback,
                                /*out*/ACameraDevice** device);

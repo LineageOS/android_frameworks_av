@@ -20,11 +20,7 @@
 
 #include <algorithm>
 #include <climits>
-#include <deque>
-#include <fstream>
-#include <iostream>
 #include <math.h>
-#include <numeric>
 #include <unordered_set>
 #include <vector>
 #include <stdarg.h>
@@ -727,7 +723,7 @@ const std::unordered_set<NBLog::Event> NBLog::Reader::endingTypes   {
 };
 
 NBLog::Reader::Reader(const void *shared, size_t size, const std::string &name)
-    : mFd(-1), mIndent(0), mLost(0), mName(name),
+    : mName(name),
       mShared((/*const*/ Shared *) shared), /*mIMemory*/
       mFifo(mShared != NULL ?
         new audio_utils_fifo(size, sizeof(uint8_t),
@@ -769,10 +765,10 @@ const uint8_t *NBLog::Reader::findLastEntryOfTypes(const uint8_t *front, const u
 // Copies content of a Reader FIFO into its Snapshot
 // The Snapshot has the same raw data, but represented as a sequence of entries
 // and an EntryIterator making it possible to process the data.
-std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
+std::unique_ptr<NBLog::Snapshot> NBLog::Reader::getSnapshot()
 {
     if (mFifoReader == NULL) {
-        return std::unique_ptr<NBLog::Reader::Snapshot>(new Snapshot());
+        return std::make_unique<Snapshot>();
     }
 
     // This emulates the behaviour of audio_utils_fifo_reader::read, but without incrementing the
@@ -802,7 +798,7 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 
     if (availToRead <= 0) {
         ALOGW_IF(availToRead < 0, "NBLog Reader %s failed to catch up with Writer", mName.c_str());
-        return std::make_unique<NBLog::Reader::Snapshot>();
+        return std::make_unique<Snapshot>();
     }
 
     std::unique_ptr<Snapshot> snapshot(new Snapshot(availToRead));
@@ -853,17 +849,12 @@ std::unique_ptr<NBLog::Reader::Snapshot> NBLog::Reader::getSnapshot()
 
 // Takes raw content of the local merger FIFO, processes log entries, and
 // writes the data to a map of class PerformanceAnalysis, based on their thread ID.
-void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Reader::Snapshot &snapshot)
+void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Snapshot &snapshot, int author)
 {
-    String8 timestamp, body;
-
-    for (auto entry = snapshot.begin(); entry != snapshot.end();) {
-        switch (entry->type) {
-        case EVENT_START_FMT:
-            entry = handleFormat(FormatEntry(entry), &timestamp, &body);
-            break;
+    for (const entry &etr : snapshot) {
+        switch (etr.type) {
         case EVENT_HISTOGRAM_ENTRY_TS: {
-            HistTsEntryWithAuthor *data = (HistTsEntryWithAuthor *) (entry->data);
+            HistTsEntry *data = (HistTsEntry *) (etr.data);
             // TODO This memcpies are here to avoid unaligned memory access crash.
             // There's probably a more efficient way to do it
             log_hash_t hash;
@@ -872,45 +863,41 @@ void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Reader::Snapshot &snapshot
             memcpy(&ts, &data->ts, sizeof(ts));
             // TODO: hash for histogram ts and audio state need to match
             // and correspond to audio production source file location
-            mThreadPerformanceAnalysis[data->author][0 /*hash*/].logTsEntry(ts);
-            ++entry;
-            break;
-        }
+            mThreadPerformanceAnalysis[author][0 /*hash*/].logTsEntry(ts);
+        } break;
         case EVENT_AUDIO_STATE: {
-            HistTsEntryWithAuthor *data = (HistTsEntryWithAuthor *) (entry->data);
+            HistTsEntry *data = (HistTsEntry *) (etr.data);
             // TODO This memcpies are here to avoid unaligned memory access crash.
             // There's probably a more efficient way to do it
             log_hash_t hash;
             memcpy(&hash, &(data->hash), sizeof(hash));
-            // TODO: remove ts if unused
-            int64_t ts;
-            memcpy(&ts, &data->ts, sizeof(ts));
-            mThreadPerformanceAnalysis[data->author][0 /*hash*/].handleStateChange();
-            ++entry;
-            break;
-        }
+            mThreadPerformanceAnalysis[author][0 /*hash*/].handleStateChange();
+        } break;
         case EVENT_END_FMT:
-            body.appendFormat("warning: got to end format event");
-            ++entry;
-            break;
         case EVENT_RESERVED:
+        case EVENT_UPPER_BOUND:
+            ALOGW("warning: unexpected event %d", etr.type);
         default:
-            body.appendFormat("warning: unexpected event %d", entry->type);
-            ++entry;
             break;
         }
-    }
-    // FIXME: decide whether to print the warnings here or elsewhere
-    if (!body.isEmpty()) {
-        dumpLine(&timestamp, &body);
     }
 }
 
 void NBLog::MergeReader::getAndProcessSnapshot()
 {
-    // get a snapshot, process it
-    std::unique_ptr<Snapshot> snap = getSnapshot();
-    getAndProcessSnapshot(*snap);
+    // get a snapshot of each reader and process them
+    // TODO insert lock here
+    const size_t nLogs = mReaders.size();
+    std::vector<std::unique_ptr<Snapshot>> snapshots(nLogs);
+    for (size_t i = 0; i < nLogs; i++) {
+        snapshots[i] = mReaders[i]->getSnapshot();
+    }
+    // TODO unlock lock here
+    for (size_t i = 0; i < nLogs; i++) {
+        if (snapshots[i] != nullptr) {
+            getAndProcessSnapshot(*(snapshots[i]), i);
+        }
+    }
 }
 
 void NBLog::MergeReader::dump(int fd, int indent)
@@ -919,66 +906,41 @@ void NBLog::MergeReader::dump(int fd, int indent)
     ReportPerformance::dump(fd, indent, mThreadPerformanceAnalysis);
 }
 
-void NBLog::Reader::dump(int fd, size_t indent, NBLog::Reader::Snapshot &snapshot)
+// TODO for future compatibility, would prefer to have a dump() go to string, and then go
+// to fd only when invoked through binder.
+void NBLog::DumpReader::dump(int fd, size_t indent)
 {
-    mFd = fd;
-    mIndent = indent;
-    String8 timestamp, body;
-
-    // Range-based for loop isn't used here because handleFormat() returns an EntryIterator
-    // that points to the next entry (it handles all of the necessary operator++() calls).
-    for (auto entry = snapshot.begin(); entry != snapshot.end();) {
-        switch (entry->type) {
-        case EVENT_START_FMT:
-            entry = handleFormat(FormatEntry(entry), &timestamp, &body);
-            break;
-        case EVENT_HISTOGRAM_ENTRY_TS:
-            ++entry;
-            break;
-        case EVENT_AUDIO_STATE:
-            ++entry;
-            break;
-        case EVENT_END_FMT:
-            body.appendFormat("warning: got to end format event");
-            ++entry;
-            break;
-        case EVENT_MONOTONIC_CYCLE_TIME: {
-            uint32_t monotonicNs = *(uint32_t *) (entry->data);
-            body.appendFormat("Thread cycle took %u ns", monotonicNs);
-            ++entry;
-        } break;
-        case EVENT_RESERVED:
-        default:
-            body.appendFormat("warning: unexpected event %d", entry->type);
-            ++entry;
-            break;
-        }
-        // FIXME: decide whether to print the warnings here or elsewhere
-        if (!body.isEmpty()) {
-            dumpLine(&timestamp, &body);
-        }
-    }
-}
-
-void NBLog::Reader::dump(int fd, size_t indent)
-{
-    // get a snapshot, dump it
-    std::unique_ptr<Snapshot> snap = getSnapshot();
-    dump(fd, indent, *snap);
-}
-
-// Writes a string to the console
-void NBLog::Reader::dumpLine(const String8 *timestamp, String8 *body)
-{
-    if (timestamp == nullptr || body == nullptr) {
+    if (fd < 0) return;
+    std::unique_ptr<Snapshot> snapshot = getSnapshot();
+    if (snapshot == nullptr) {
         return;
     }
-    if (mFd >= 0) {
-        dprintf(mFd, "%.*s%s %s\n", mIndent, "", timestamp->string(), body->string());
-    } else {
-        ALOGI("%.*s%s %s", mIndent, "", timestamp->string(), body->string());
+    String8 timestamp, body;
+
+    // TODO all logged types should have a printable format.
+    for (auto it = snapshot->begin(); it != snapshot->end(); ++it) {
+        switch (it->type) {
+        case EVENT_START_FMT:
+            it = handleFormat(FormatEntry(it), &timestamp, &body);
+            break;
+        case EVENT_MONOTONIC_CYCLE_TIME: {
+            uint32_t monotonicNs;
+            memcpy(&monotonicNs, it->data, sizeof(monotonicNs));
+            body.appendFormat("Thread cycle took %u ns", monotonicNs);
+        } break;
+        case EVENT_END_FMT:
+        case EVENT_RESERVED:
+        case EVENT_UPPER_BOUND:
+            body.appendFormat("warning: unexpected event %d", it->type);
+        default:
+            break;
+        }
+        if (!body.isEmpty()) {
+            dprintf(fd, "%.*s%s %s\n", (int)indent, "", timestamp.string(), body.string());
+            body.clear();
+        }
+        timestamp.clear();
     }
-    body->clear();
 }
 
 bool NBLog::Reader::isIMemory(const sp<IMemory>& iMemory) const
@@ -986,9 +948,7 @@ bool NBLog::Reader::isIMemory(const sp<IMemory>& iMemory) const
     return iMemory != 0 && mIMemory != 0 && iMemory->pointer() == mIMemory->pointer();
 }
 
-// ---------------------------------------------------------------------------
-
-void NBLog::appendTimestamp(String8 *body, const void *data)
+void NBLog::DumpReader::appendTimestamp(String8 *body, const void *data)
 {
     if (body == nullptr || data == nullptr) {
         return;
@@ -999,7 +959,7 @@ void NBLog::appendTimestamp(String8 *body, const void *data)
                     (int) ((ts / (1000 * 1000)) % 1000));
 }
 
-void NBLog::appendInt(String8 *body, const void *data)
+void NBLog::DumpReader::appendInt(String8 *body, const void *data)
 {
     if (body == nullptr || data == nullptr) {
         return;
@@ -1008,7 +968,7 @@ void NBLog::appendInt(String8 *body, const void *data)
     body->appendFormat("<%d>", x);
 }
 
-void NBLog::appendFloat(String8 *body, const void *data)
+void NBLog::DumpReader::appendFloat(String8 *body, const void *data)
 {
     if (body == nullptr || data == nullptr) {
         return;
@@ -1018,7 +978,7 @@ void NBLog::appendFloat(String8 *body, const void *data)
     body->appendFormat("<%f>", f);
 }
 
-void NBLog::appendPID(String8 *body, const void* data, size_t length)
+void NBLog::DumpReader::appendPID(String8 *body, const void* data, size_t length)
 {
     if (body == nullptr || data == nullptr) {
         return;
@@ -1028,7 +988,7 @@ void NBLog::appendPID(String8 *body, const void* data, size_t length)
     body->appendFormat("<PID: %d, name: %.*s>", id, (int) (length - sizeof(pid_t)), name);
 }
 
-String8 NBLog::bufferDump(const uint8_t *buffer, size_t size)
+String8 NBLog::DumpReader::bufferDump(const uint8_t *buffer, size_t size)
 {
     String8 str;
     if (buffer == nullptr) {
@@ -1042,14 +1002,14 @@ String8 NBLog::bufferDump(const uint8_t *buffer, size_t size)
     return str;
 }
 
-String8 NBLog::bufferDump(const EntryIterator &it)
+String8 NBLog::DumpReader::bufferDump(const EntryIterator &it)
 {
     return bufferDump(it, it->length + Entry::kOverhead);
 }
 
-NBLog::EntryIterator NBLog::Reader::handleFormat(const FormatEntry &fmtEntry,
-                                                         String8 *timestamp,
-                                                         String8 *body)
+NBLog::EntryIterator NBLog::DumpReader::handleFormat(const FormatEntry &fmtEntry,
+                                                           String8 *timestamp,
+                                                           String8 *body)
 {
     // log timestamp
     int64_t ts = fmtEntry.timestamp();
@@ -1135,7 +1095,6 @@ NBLog::EntryIterator NBLog::Reader::handleFormat(const FormatEntry &fmtEntry,
         ++arg;
     }
     ALOGW_IF(arg->type != EVENT_END_FMT, "Expected end of format, got %d", arg->type);
-    ++arg;
     return arg;
 }
 
@@ -1172,10 +1131,10 @@ bool operator>(const struct MergeItem &i1, const struct MergeItem &i2)
 // Merge registered readers, sorted by timestamp, and write data to a single FIFO in local memory
 void NBLog::Merger::merge()
 {
-    // FIXME This is called by merge thread
-    //       but the access to shared variable mNamedReaders is not yet protected by a lock.
+    if (true) return; // Merging is not necessary at the moment, so this is to disable it
+                      // and bypass compiler warnings about member variables not being used.
     const int nLogs = mReaders.size();
-    std::vector<std::unique_ptr<NBLog::Reader::Snapshot>> snapshots(nLogs);
+    std::vector<std::unique_ptr<Snapshot>> snapshots(nLogs);
     std::vector<EntryIterator> offsets;
     offsets.reserve(nLogs);
     for (int i = 0; i < nLogs; ++i) {
@@ -1258,13 +1217,12 @@ bool NBLog::MergeThread::threadLoop()
     {
         AutoMutex _l(mMutex);
         // If mTimeoutUs is negative, wait on the condition variable until it's positive.
-        // If it's positive, wait kThreadSleepPeriodUs and then merge
-        nsecs_t waitTime = mTimeoutUs > 0 ? kThreadSleepPeriodUs * 1000 : LLONG_MAX;
-        mCond.waitRelative(mMutex, waitTime);
+        // If it's positive, merge. The minimum period between waking the condition variable
+        // is handled in AudioFlinger::MediaLogNotifier::threadLoop().
+        mCond.wait(mMutex);
         doMerge = mTimeoutUs > 0;
         mTimeoutUs -= kThreadSleepPeriodUs;
     }
-    doMerge = false;    // Disable merging for now.
     if (doMerge) {
         // Merge data from all the readers
         mMerger.merge();

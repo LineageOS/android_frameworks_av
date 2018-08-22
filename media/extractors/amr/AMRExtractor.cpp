@@ -20,7 +20,6 @@
 
 #include "AMRExtractor.h"
 
-#include <media/DataSourceBase.h>
 #include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaBufferGroup.h>
@@ -34,7 +33,7 @@ namespace android {
 class AMRSource : public MediaTrack {
 public:
     AMRSource(
-            DataSourceBase *source,
+            DataSourceHelper *source,
             MetaDataBase &meta,
             bool isWide,
             const off64_t *offset_table,
@@ -52,7 +51,7 @@ protected:
     virtual ~AMRSource();
 
 private:
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     MetaDataBase mMeta;
     bool mIsWide;
 
@@ -98,7 +97,7 @@ static size_t getFrameSize(bool isWide, unsigned FT) {
     return frameSize;
 }
 
-static status_t getFrameSizeByOffset(DataSourceBase *source,
+static status_t getFrameSizeByOffset(DataSourceHelper *source,
         off64_t offset, bool isWide, size_t *frameSize) {
     uint8_t header;
     ssize_t count = source->readAt(offset, &header, 1);
@@ -118,7 +117,7 @@ static status_t getFrameSizeByOffset(DataSourceBase *source,
 }
 
 static bool SniffAMR(
-        DataSourceBase *source, bool *isWide, float *confidence) {
+        DataSourceHelper *source, bool *isWide, float *confidence) {
     char header[9];
 
     if (source->readAt(0, header, sizeof(header)) != sizeof(header)) {
@@ -144,7 +143,7 @@ static bool SniffAMR(
     return false;
 }
 
-AMRExtractor::AMRExtractor(DataSourceBase *source)
+AMRExtractor::AMRExtractor(DataSourceHelper *source)
     : mDataSource(source),
       mInitCheck(NO_INIT),
       mOffsetTableLength(0) {
@@ -192,6 +191,7 @@ AMRExtractor::AMRExtractor(DataSourceBase *source)
 }
 
 AMRExtractor::~AMRExtractor() {
+    delete mDataSource;
 }
 
 status_t AMRExtractor::getMetaData(MetaDataBase &meta) {
@@ -229,7 +229,7 @@ status_t AMRExtractor::getTrackMetaData(MetaDataBase &meta, size_t index, uint32
 ////////////////////////////////////////////////////////////////////////////////
 
 AMRSource::AMRSource(
-        DataSourceBase *source, MetaDataBase &meta,
+        DataSourceHelper *source, MetaDataBase &meta,
         bool isWide, const off64_t *offset_table, size_t offset_table_length)
     : mDataSource(source),
       mMeta(meta),
@@ -365,22 +365,23 @@ status_t AMRSource::read(
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("c86639c9-2f31-40ac-a715-fa01b4493aaf"),
         1,
         "AMR Extractor",
         [](
-                DataSourceBase *source,
+                CDataSource *source,
                 float *confidence,
                 void **,
-                MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
-            if (SniffAMR(source, nullptr, confidence)) {
+                FreeMetaFunc *) -> CreatorFunc {
+            DataSourceHelper helper(source);
+            if (SniffAMR(&helper, nullptr, confidence)) {
                 return [](
-                        DataSourceBase *source,
-                        void *) -> MediaExtractor* {
-                    return new AMRExtractor(source);};
+                        CDataSource *source,
+                        void *) -> CMediaExtractor* {
+                    return wrap(new AMRExtractor(new DataSourceHelper(source)));};
             }
             return NULL;
         }

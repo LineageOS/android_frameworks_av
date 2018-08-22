@@ -142,7 +142,7 @@ status_t MidiSource::init()
 
 // MidiEngine
 
-MidiEngine::MidiEngine(DataSourceBase *dataSource,
+MidiEngine::MidiEngine(CDataSource *dataSource,
         MetaDataBase *fileMetadata,
         MetaDataBase *trackMetadata) :
             mGroup(NULL),
@@ -263,7 +263,7 @@ MediaBufferBase* MidiEngine::readBuffer() {
 // MidiExtractor
 
 MidiExtractor::MidiExtractor(
-        DataSourceBase *dataSource)
+        CDataSource *dataSource)
     : mDataSource(dataSource),
       mInitCheck(false)
 {
@@ -310,7 +310,7 @@ status_t MidiExtractor::getMetaData(MetaDataBase &meta)
 
 // Sniffer
 
-bool SniffMidi(DataSourceBase *source, float *confidence)
+bool SniffMidi(CDataSource *source, float *confidence)
 {
     MidiEngine p(source, NULL, NULL);
     if (p.initCheck() == OK) {
@@ -326,22 +326,22 @@ bool SniffMidi(DataSourceBase *source, float *confidence)
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("ef6cca0a-f8a2-43e6-ba5f-dfcd7c9a7ef2"),
         1,
         "MIDI Extractor",
         [](
-                DataSourceBase *source,
+                CDataSource *source,
                 float *confidence,
                 void **,
-                MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
+                FreeMetaFunc *) -> CreatorFunc {
             if (SniffMidi(source, confidence)) {
                 return [](
-                        DataSourceBase *source,
-                        void *) -> MediaExtractor* {
-                    return new MidiExtractor(source);};
+                        CDataSource *source,
+                        void *) -> CMediaExtractor* {
+                    return wrap(new MidiExtractor(source));};
             }
             return NULL;
         }

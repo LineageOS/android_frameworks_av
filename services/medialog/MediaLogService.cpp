@@ -58,9 +58,10 @@ void MediaLogService::registerWriter(const sp<IMemory>& shared, size_t size, con
             shared->size() < NBLog::Timeline::sharedSize(size)) {
         return;
     }
-    sp<NBLog::Reader> reader(new NBLog::Reader(shared, size, name));
+    sp<NBLog::Reader> reader(new NBLog::Reader(shared, size, name)); // Reader handled by merger
+    sp<NBLog::DumpReader> dumpReader(new NBLog::DumpReader(shared, size, name)); // for dumpsys
     Mutex::Autolock _l(mLock);
-    mReaders.add(reader);
+    mDumpReaders.add(dumpReader);
     mMerger.addReader(reader);
 }
 
@@ -70,9 +71,10 @@ void MediaLogService::unregisterWriter(const sp<IMemory>& shared)
         return;
     }
     Mutex::Autolock _l(mLock);
-    for (size_t i = 0; i < mReaders.size(); ) {
-        if (mReaders[i]->isIMemory(shared)) {
-            mReaders.removeAt(i);
+    for (size_t i = 0; i < mDumpReaders.size(); ) {
+        if (mDumpReaders[i]->isIMemory(shared)) {
+            mDumpReaders.removeAt(i);
+            // TODO mMerger.removeReaders(shared)
         } else {
             i++;
         }
@@ -120,18 +122,18 @@ status_t MediaLogService::dump(int fd, const Vector<String16>& args __unused)
                 return NO_ERROR;
             }
 
-            for (auto reader : mReaders) {
+            for (const auto &dumpReader : mDumpReaders) {
                 if (fd >= 0) {
-                    dprintf(fd, "\n%s:\n", reader->name().c_str());
-                    reader->dump(fd, 0 /*indent*/);
+                    dprintf(fd, "\n%s:\n", dumpReader->name().c_str());
+                    dumpReader->dump(fd, 0 /*indent*/);
                 } else {
-                    ALOGI("%s:", reader->name().c_str());
+                    ALOGI("%s:", dumpReader->name().c_str());
                 }
             }
             mLock.unlock();
         }
     }
-    //mMergeReader.dump(fd);
+    mMergeReader.dump(fd);
     return NO_ERROR;
 }
 

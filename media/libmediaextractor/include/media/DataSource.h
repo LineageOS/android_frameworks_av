@@ -22,6 +22,7 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/DataSourceBase.h>
 #include <media/IDataSource.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 #include <utils/threads.h>
@@ -34,7 +35,7 @@ class String8;
 
 class DataSource : public DataSourceBase, public virtual RefBase {
 public:
-    DataSource() {}
+    DataSource() : mWrapper(NULL) {}
 
     // returns a pointer to IDataSource if it is wrapped.
     virtual sp<IDataSource> getIDataSource() const {
@@ -69,10 +70,35 @@ public:
         return String8("application/octet-stream");
     }
 
+    CDataSource *wrap() {
+        if (mWrapper) {
+            return mWrapper;
+        }
+        mWrapper = new CDataSource();
+        mWrapper->handle = this;
+
+        mWrapper->readAt = [](void *handle, off64_t offset, void *data, size_t size) -> ssize_t {
+            return ((DataSource*)handle)->readAt(offset, data, size);
+        };
+        mWrapper->getSize = [](void *handle, off64_t *size) -> status_t {
+            return ((DataSource*)handle)->getSize(size);
+        };
+        mWrapper->flags = [](void *handle) -> uint32_t {
+            return ((DataSource*)handle)->flags();
+        };
+        mWrapper->getUri = [](void *handle, char *uriString, size_t bufferSize) -> bool {
+            return ((DataSource*)handle)->getUri(uriString, bufferSize);
+        };
+        return mWrapper;
+    }
+
 protected:
-    virtual ~DataSource() {}
+    virtual ~DataSource() {
+        delete mWrapper;
+    }
 
 private:
+    CDataSource *mWrapper;
     DataSource(const DataSource &);
     DataSource &operator=(const DataSource &);
 };

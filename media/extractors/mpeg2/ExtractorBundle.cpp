@@ -19,35 +19,39 @@
 #include <utils/Log.h>
 
 #include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include "MPEG2PSExtractor.h"
 #include "MPEG2TSExtractor.h"
 
 namespace android {
 
+struct CDataSource;
+
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("3d1dcfeb-e40a-436d-a574-c2438a555e5f"),
         1,
         "MPEG2-PS/TS Extractor",
         [](
-                DataSourceBase *source,
+                CDataSource *source,
                 float *confidence,
                 void **,
-                MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
-            if (SniffMPEG2TS(source, confidence)) {
+                FreeMetaFunc *) -> CreatorFunc {
+            DataSourceHelper helper(source);
+            if (SniffMPEG2TS(&helper, confidence)) {
                 return [](
-                        DataSourceBase *source,
-                        void *) -> MediaExtractor* {
-                    return new MPEG2TSExtractor(source);};
-            } else if (SniffMPEG2PS(source, confidence)) {
+                        CDataSource *source,
+                        void *) -> CMediaExtractor* {
+                    return wrap(new MPEG2TSExtractor(new DataSourceHelper(source)));};
+            } else if (SniffMPEG2PS(&helper, confidence)) {
                         return [](
-                                DataSourceBase *source,
-                                void *) -> MediaExtractor* {
-                            return new MPEG2PSExtractor(source);};
+                                CDataSource *source,
+                                void *) -> CMediaExtractor* {
+                            return wrap(new MPEG2PSExtractor(new DataSourceHelper(source)));};
             }
             return NULL;
         }

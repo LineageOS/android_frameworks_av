@@ -19,7 +19,8 @@
 #define MPEG2_PS_EXTRACTOR_H_
 
 #include <media/stagefright/foundation/ABase.h>
-#include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MetaDataBase.h>
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
@@ -31,8 +32,8 @@ struct AMessage;
 struct Track;
 class String8;
 
-struct MPEG2PSExtractor : public MediaExtractor {
-    explicit MPEG2PSExtractor(DataSourceBase *source);
+struct MPEG2PSExtractor : public MediaExtractorPluginHelper {
+    explicit MPEG2PSExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
     virtual MediaTrack *getTrack(size_t index);
@@ -51,7 +52,7 @@ private:
     struct WrappedTrack;
 
     mutable Mutex mLock;
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
 
     off64_t mOffset;
     status_t mFinalResult;
@@ -72,7 +73,7 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(MPEG2PSExtractor);
 };
 
-bool SniffMPEG2PS(DataSourceBase *source, float *confidence);
+bool SniffMPEG2PS(DataSourceHelper *source, float *confidence);
 
 }  // namespace android
 

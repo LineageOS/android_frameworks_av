@@ -18,7 +18,8 @@
 #define FLAC_EXTRACTOR_H_
 
 #include <media/DataSourceBase.h>
-#include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MetaDataBase.h>
 #include <utils/String8.h>
 
@@ -26,10 +27,10 @@ namespace android {
 
 class FLACParser;
 
-class FLACExtractor : public MediaExtractor {
+class FLACExtractor : public MediaExtractorPluginHelper {
 
 public:
-    explicit FLACExtractor(DataSourceBase *source);
+    explicit FLACExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
     virtual MediaTrack *getTrack(size_t index);
@@ -42,7 +43,7 @@ protected:
     virtual ~FLACExtractor();
 
 private:
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     FLACParser *mParser;
     status_t mInitCheck;
     MetaDataBase mFileMetadata;
@@ -54,8 +55,6 @@ private:
     FLACExtractor &operator=(const FLACExtractor &);
 
 };
-
-bool SniffFLAC(DataSourceBase *source, float *confidence);
 
 }  // namespace android
 
