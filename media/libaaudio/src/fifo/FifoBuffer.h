@@ -17,6 +17,7 @@
 #ifndef FIFO_FIFO_BUFFER_H
 #define FIFO_FIFO_BUFFER_H
 
+#include <memory>
 #include <stdint.h>
 
 #include "FifoControllerBase.h"
@@ -77,23 +78,11 @@ public:
      */
     fifo_frames_t getEmptyRoomAvailable(WrappingBuffer *wrappingBuffer);
 
-    /**
-     * Copy data from the FIFO into the buffer.
-     * @param buffer
-     * @param numFrames
-     * @return
-     */
-    fifo_frames_t readNow(void *buffer, fifo_frames_t numFrames);
-
-    int64_t getNextReadTime(int32_t frameRate);
-
-    int32_t getUnderrunCount() const { return mUnderrunCount; }
-
-    FifoControllerBase *getFifoControllerBase() { return mFifo; }
-
     int32_t getBytesPerFrame() {
         return mBytesPerFrame;
     }
+
+    // Proxy methods for the internal FifoController
 
     fifo_counter_t getReadCounter() {
         return mFifo->getReadCounter();
@@ -111,6 +100,22 @@ public:
         mFifo->setWriteCounter(n);
     }
 
+    void advanceReadIndex(fifo_frames_t numFrames) {
+        mFifo->advanceReadIndex(numFrames);
+    }
+
+    void advanceWriteIndex(fifo_frames_t numFrames) {
+        mFifo->advanceWriteIndex(numFrames);
+    }
+
+    fifo_frames_t getEmptyFramesAvailable() {
+        return mFifo->getEmptyFramesAvailable();
+    }
+
+    fifo_frames_t getFullFramesAvailable() {
+        return mFifo->getFullFramesAvailable();
+    }
+
     /*
      * This is generally only called before or after the buffer is used.
      */
@@ -121,15 +126,12 @@ private:
     void fillWrappingBuffer(WrappingBuffer *wrappingBuffer,
                             int32_t framesAvailable, int32_t startIndex);
 
-    const fifo_frames_t mFrameCapacity;
-    const int32_t mBytesPerFrame;
-    uint8_t *mStorage;
-    bool mStorageOwned; // did this object allocate the storage?
-    FifoControllerBase *mFifo;
-    fifo_counter_t mFramesReadCount;
-    fifo_counter_t mFramesUnderrunCount;
-    int32_t mUnderrunCount; // need? just use frames
-    int32_t mLastReadSize;
+    const int32_t             mBytesPerFrame;
+    // We do not use a std::unique_ptr for mStorage because it is often a pointer to
+    // memory shared between processes and cannot be deleted trivially.
+    uint8_t                  *mStorage = nullptr;
+    bool                      mStorageOwned = false; // did this object allocate the storage?
+    std::unique_ptr<FifoControllerBase> mFifo{};
 };
 
 }  // android
