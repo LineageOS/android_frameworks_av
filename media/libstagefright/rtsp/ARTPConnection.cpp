@@ -417,7 +417,7 @@ void ARTPConnection::onPollStreams() {
             if (err == -ECONNRESET) {
                 // socket failure, this stream is dead, Jim.
                 sp<AMessage> notify = it->mNotifyMsg->dup();
-                notify->setInt32("IMS-Rx-notice", 1);
+                notify->setInt32("rtcp-event", 1);
                 notify->setInt32("payload-type", 400);
                 notify->setInt32("feedback-type", 1);
                 notify->setInt32("sender", it->mSources.valueAt(0)->getSelfID());
@@ -721,6 +721,13 @@ status_t ARTPConnection::parseRTCP(StreamInfo *s, const sp<ABuffer> &buffer) {
         sp<AMessage> notify = s->mNotifyMsg->dup();
         notify->setInt32("first-rtcp", true);
         notify->post();
+
+        ALOGI("send first-rtcp event to upper layer as ImsRxNotice");
+        sp<AMessage> imsNotify = s->mNotifyMsg->dup();
+        imsNotify->setInt32("rtcp-event", 1);
+        imsNotify->setInt32("payload-type", 101);
+        imsNotify->setInt32("feedback-type", 0);
+        imsNotify->post();
     }
 
     const uint8_t *data = buffer->data();
@@ -907,7 +914,7 @@ status_t ARTPConnection::parseTSFB(
                         MxTBRMantissa, MxTBRExp, bitRate);
 
                 sp<AMessage> notify = s->mNotifyMsg->dup();
-                notify->setInt32("IMS-Rx-notice", 1);
+                notify->setInt32("rtcp-event", 1);
                 notify->setInt32("payload-type", 205);
                 notify->setInt32("feedback-type", msgType);
                 notify->setInt32("sender", id);
@@ -945,7 +952,7 @@ status_t ARTPConnection::parsePSFB(
         {
             CHECK(size == 0);   // PLI does not need parameters
             sp<AMessage> notify = s->mNotifyMsg->dup();
-            notify->setInt32("IMS-Rx-notice", 1);
+            notify->setInt32("rtcp-event", 1);
             notify->setInt32("payload-type", 206);
             notify->setInt32("feedback-type", msgType);
             notify->setInt32("sender", id);
@@ -958,7 +965,7 @@ status_t ARTPConnection::parsePSFB(
             uint32_t requestedId = u32at(&data[12]);
             if (requestedId == (uint32_t)mSelfID) {
                 sp<AMessage> notify = s->mNotifyMsg->dup();
-                notify->setInt32("IMS-Rx-notice", 1);
+                notify->setInt32("rtcp-event", 1);
                 notify->setInt32("payload-type", 206);
                 notify->setInt32("feedback-type", msgType);
                 notify->setInt32("sender", id);
@@ -1046,7 +1053,7 @@ void ARTPConnection::checkRxBitrate(int64_t nowUs) {
                 source->addTMMBR(buffer);
                 if (source->isNeedToDowngrade()) {
                     sp<AMessage> notify = s->mNotifyMsg->dup();
-                    notify->setInt32("IMS-Rx-notice", 1);
+                    notify->setInt32("rtcp-event", 1);
                     notify->setInt32("payload-type", 400);
                     notify->setInt32("feedback-type", 1);
                     notify->setInt32("sender", source->getSelfID());

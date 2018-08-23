@@ -382,7 +382,7 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             int32_t IMSRxNotice;
-            if (msg->findInt32("IMS-Rx-notice", &IMSRxNotice)) {
+            if (msg->findInt32("rtcp-event", &IMSRxNotice)) {
                 int32_t payloadType, feedbackType;
                 CHECK(msg->findInt32("payload-type", &payloadType));
                 CHECK(msg->findInt32("feedback-type", &feedbackType));
