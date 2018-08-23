@@ -21,7 +21,6 @@
 #include <stdio.h>
 
 #include <media/IMediaExtractor.h>
-#include <media/MediaExtractor.h>
 
 namespace android {
 
