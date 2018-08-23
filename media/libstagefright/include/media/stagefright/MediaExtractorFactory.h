@@ -40,6 +40,7 @@ private:
     static Mutex gPluginMutex;
     static std::shared_ptr<std::list<sp<ExtractorPlugin>>> gPlugins;
     static bool gPluginsRegistered;
+    static bool gIgnoreVersion;
 
     static void RegisterExtractorsInApk(
             const char *apkPath, std::list<sp<ExtractorPlugin>> &pluginList);
