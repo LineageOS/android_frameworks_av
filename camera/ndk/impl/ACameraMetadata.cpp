@@ -32,6 +32,10 @@ ACameraMetadata::ACameraMetadata(camera_metadata_t* buffer, ACAMERA_METADATA_TYP
     if (mType == ACM_CHARACTERISTICS) {
         filterUnsupportedFeatures();
         filterStreamConfigurations();
+        filterDurations(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS);
+        filterDurations(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS);
+        filterDurations(ANDROID_DEPTH_AVAILABLE_DEPTH_MIN_FRAME_DURATIONS);
+        filterDurations(ANDROID_DEPTH_AVAILABLE_DEPTH_STALL_DURATIONS);
     }
     // TODO: filter request/result keys
 }
@@ -80,6 +84,72 @@ ACameraMetadata::filterUnsupportedFeatures() {
     mData.update(ANDROID_REQUEST_AVAILABLE_CAPABILITIES, capabilities);
 }
 
+
+void
+ACameraMetadata::filterDurations(uint32_t tag) {
+    const int STREAM_CONFIGURATION_SIZE = 4;
+    const int STREAM_FORMAT_OFFSET = 0;
+    const int STREAM_WIDTH_OFFSET = 1;
+    const int STREAM_HEIGHT_OFFSET = 2;
+    const int STREAM_DURATION_OFFSET = 3;
+    camera_metadata_entry entry = mData.find(tag);
+    if (entry.count == 0 || entry.count % 4 || entry.type != TYPE_INT64) {
+        ALOGE("%s: malformed duration key %d! count %zu, type %d",
+                __FUNCTION__, tag, entry.count, entry.type);
+        return;
+    }
+    Vector<int64_t> filteredDurations;
+    filteredDurations.setCapacity(entry.count * 2);
+
+    for (size_t i=0; i < entry.count; i += STREAM_CONFIGURATION_SIZE) {
+        int64_t format = entry.data.i64[i + STREAM_FORMAT_OFFSET];
+        int64_t width = entry.data.i64[i + STREAM_WIDTH_OFFSET];
+        int64_t height = entry.data.i64[i + STREAM_HEIGHT_OFFSET];
+        int64_t duration = entry.data.i32[i + STREAM_DURATION_OFFSET];
+
+        // Leave the unfiltered format in so apps depending on previous wrong
+        // filter behavior continue to work
+        filteredDurations.push_back(format);
+        filteredDurations.push_back(width);
+        filteredDurations.push_back(height);
+        filteredDurations.push_back(duration);
+
+        // Translate HAL formats to NDK format
+        switch (tag) {
+            case ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS:
+            case ANDROID_SCALER_AVAILABLE_STALL_DURATIONS:
+                if (format == HAL_PIXEL_FORMAT_BLOB) {
+                    format = AIMAGE_FORMAT_JPEG;
+                    filteredDurations.push_back(format);
+                    filteredDurations.push_back(width);
+                    filteredDurations.push_back(height);
+                    filteredDurations.push_back(duration);
+                }
+                break;
+            case ANDROID_DEPTH_AVAILABLE_DEPTH_MIN_FRAME_DURATIONS:
+            case ANDROID_DEPTH_AVAILABLE_DEPTH_STALL_DURATIONS:
+                if (format == HAL_PIXEL_FORMAT_BLOB) {
+                    format = AIMAGE_FORMAT_DEPTH_POINT_CLOUD;
+                    filteredDurations.push_back(format);
+                    filteredDurations.push_back(width);
+                    filteredDurations.push_back(height);
+                    filteredDurations.push_back(duration);
+                } else if (format == HAL_PIXEL_FORMAT_Y16) {
+                    format = AIMAGE_FORMAT_DEPTH16;
+                    filteredDurations.push_back(format);
+                    filteredDurations.push_back(width);
+                    filteredDurations.push_back(height);
+                    filteredDurations.push_back(duration);
+                }
+                break;
+            default:
+                // Should not reach here
+                ALOGE("%s: Unkown tag 0x%x", __FUNCTION__, tag);
+        }
+    }
+
+    mData.update(tag, filteredDurations);
+}
 
 void
 ACameraMetadata::filterStreamConfigurations() {
