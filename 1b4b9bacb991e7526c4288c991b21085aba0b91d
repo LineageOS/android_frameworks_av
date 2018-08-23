@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "da7d8f8e_e070a513",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 7
+      },
+      "lineNbr": 915,
+      "author": {
+        "id": 13589
+      },
+      "writtenOn": "2018-08-23T18:58:54Z",
+      "side": 1,
+      "message": "The issue was noticed by Arne.\n\nThis is the reason HAL1 was not working properly on Android 9.0 Pie with these commits.\n\nA better solution should be investigated if possible.",
+      "revId": "1b4b9bacb991e7526c4288c991b21085aba0b91d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
