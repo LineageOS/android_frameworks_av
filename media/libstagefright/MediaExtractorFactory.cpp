@@ -126,6 +126,7 @@ struct ExtractorPlugin : public RefBase {
 Mutex MediaExtractorFactory::gPluginMutex;
 std::shared_ptr<std::list<sp<ExtractorPlugin>>> MediaExtractorFactory::gPlugins;
 bool MediaExtractorFactory::gPluginsRegistered = false;
+bool MediaExtractorFactory::gIgnoreVersion = false;
 
 // static
 CreatorFunc MediaExtractorFactory::sniff(
@@ -192,7 +193,7 @@ void MediaExtractorFactory::RegisterExtractor(const sp<ExtractorPlugin> &plugin,
     for (auto it = pluginList.begin(); it != pluginList.end(); ++it) {
         if (memcmp(&((*it)->def.extractor_uuid), &plugin->def.extractor_uuid, 16) == 0) {
             // there's already an extractor with the same uuid
-            if ((*it)->def.extractor_version < plugin->def.extractor_version) {
+            if (gIgnoreVersion || (*it)->def.extractor_version < plugin->def.extractor_version) {
                 // this one is newer, replace the old one
                 ALOGW("replacing extractor '%s' version %u with version %u",
                         plugin->def.extractor_name,
@@ -306,6 +307,8 @@ void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
     if (gPluginsRegistered) {
         return;
     }
+
+    gIgnoreVersion = property_get_bool("debug.extractor.ignore_version", false);
 
     std::shared_ptr<std::list<sp<ExtractorPlugin>>> newList(new std::list<sp<ExtractorPlugin>>());
 
