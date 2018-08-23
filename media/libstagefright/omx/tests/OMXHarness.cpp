@@ -28,7 +28,6 @@
 #include <cutils/properties.h>
 #include <media/DataSource.h>
 #include <media/IMediaHTTPService.h>
-#include <media/MediaExtractor.h>
 #include <media/MediaSource.h>
 #include <media/OMXBuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
