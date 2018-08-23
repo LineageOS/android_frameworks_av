@@ -38,6 +38,7 @@ LOCAL_C_INCLUDES += \
 LOCAL_CFLAGS += -Wall -Wextra -Werror
 
 LOCAL_MODULE:= cameraservice_test
+LOCAL_COMPATIBILITY_SUITE := device-tests
 LOCAL_MODULE_TAGS := tests
 
 include $(BUILD_NATIVE_TEST)
