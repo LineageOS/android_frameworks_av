@@ -17,13 +17,15 @@
 
 #define LOG_TAG "PerformanceAnalysis"
 // #define LOG_NDEBUG 0
+// #define WRITE_TO_FILE
 
 #include <algorithm>
 #include <climits>
 #include <deque>
-#include <iostream>
 #include <math.h>
 #include <numeric>
+#include <sstream>
+#include <string>
 #include <vector>
 #include <stdarg.h>
 #include <stdint.h>
@@ -44,6 +46,97 @@
 #include <utility>
 
 namespace android {
+
+void Histogram::add(double value)
+{
+    // TODO Handle domain and range error exceptions?
+    const int binIndex = lround((value - mLow) / mBinSize);
+    if (binIndex < 0) {
+        mLowCount++;
+    } else if (binIndex >= mNumBins) {
+        mHighCount++;
+    } else {
+        mBins[binIndex]++;
+    }
+    mTotalCount++;
+}
+
+void Histogram::clear()
+{
+    std::fill(mBins.begin(), mBins.end(), 0);
+    mLowCount = 0;
+    mHighCount = 0;
+    mTotalCount = 0;
+}
+
+uint64_t Histogram::totalCount() const
+{
+    return mTotalCount;
+}
+
+std::string Histogram::serializeToString() const {
+    std::stringstream ss;
+    static constexpr char kDivider = '|';
+    ss << mBinSize << "," << mNumBins << "," << mLow << ",{";
+    bool first = true;
+    if (mLowCount != 0) {
+        ss << "-1" << kDivider << mLowCount;
+        first = false;
+    }
+    for (size_t i = 0; i < mNumBins; i++) {
+        if (mBins[i] != 0) {
+            if (!first) {
+                ss << ",";
+            }
+            ss << i << kDivider << mBins[i];
+            first = false;
+        }
+    }
+    if (mHighCount != 0) {
+        if (!first) {
+            ss << ",";
+        }
+        ss << mNumBins << kDivider << mHighCount;
+        first = false;
+    }
+    ss << "}";
+
+    return ss.str();
+}
+
+// TODO make a hash map from Event type to std::pair<HistConfig, unordered_map<int, Histogram>>
+// so that we don't have to create a "add histogram entry" method for every different metric.
+void PerformanceData::addCycleTimeEntry(int author, double cycleTimeMs)
+{
+    if (mCycleTimeMsHists.count(author) == 0) {
+        mCycleTimeMsHists.emplace(author, Histogram(kCycleTimeConfig));
+    }
+    mCycleTimeMsHists.at(author).add(cycleTimeMs);
+}
+
+void PerformanceData::addLatencyEntry(int author, double latencyMs)
+{
+    if (mLatencyMsHists.count(author) == 0) {
+        mLatencyMsHists.emplace(author, Histogram(kLatencyConfig));
+    }
+    mLatencyMsHists.at(author).add(latencyMs);
+}
+
+void PerformanceData::dump(int fd, int indent __unused)
+{
+    // TODO add thread metadata for better context.
+    // Also output in a more machine-readable friendly format.
+    dprintf(fd, "Thread cycle time histograms:\n");
+    for (const auto &item : mCycleTimeMsHists) {
+        dprintf(fd, "  Thread %d: %s\n", item.first, item.second.serializeToString().c_str());
+    }
+    dprintf(fd, "Latency histograms:\n");
+    for (const auto &item : mLatencyMsHists) {
+        dprintf(fd, "  Thread %d: %s\n", item.first, item.second.serializeToString().c_str());
+    }
+}
+
+//------------------------------------------------------------------------------
 
 namespace ReportPerformance {
 
@@ -277,7 +370,9 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int author, log_hash_
 // writes summary of performance into specified file descriptor
 void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis) {
     String8 body;
+#ifdef WRITE_TO_FILE
     const char* const kDirectory = "/data/misc/audioserver/";
+#endif
     for (auto & thread : threadPerformanceAnalysis) {
         for (auto & hash: thread.second) {
             PerformanceAnalysis& curr = hash.second;
@@ -287,9 +382,11 @@ void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis)
                 dumpLine(fd, indent, body);
                 body.clear();
             }
-            // write to file
+#ifdef WRITE_TO_FILE
+            // write to file. Enable by uncommenting macro at top of file.
             writeToFile(curr.mHists, curr.mOutlierData, curr.mPeakTimestamps,
                         kDirectory, false, thread.first, hash.first);
+#endif
         }
     }
 }

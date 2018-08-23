@@ -102,6 +102,9 @@ constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
 #define LOG_MONOTONIC_CYCLE_TIME(ns) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
         x->logMonotonicCycleTime(ns); } while (0)
 
+#define LOG_LATENCY(ms) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+        x->logLatency(ms); } while (0)
+
 namespace android {
 extern "C" {
 extern thread_local NBLog::Writer *tlNBLogWriter;

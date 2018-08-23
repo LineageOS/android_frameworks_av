@@ -478,12 +478,20 @@ void NBLog::Writer::logEventHistTs(Event event, log_hash_t hash)
     }
 }
 
+void NBLog::Writer::logLatency(double latencyMs)
+{
+    if (!mEnabled) {
+        return;
+    }
+    log(EVENT_LATENCY, &latencyMs, sizeof(latencyMs));
+}
+
 void NBLog::Writer::logMonotonicCycleTime(uint32_t monotonicNs)
 {
     if (!mEnabled) {
         return;
     }
-    log(EVENT_MONOTONIC_CYCLE_TIME, &monotonicNs, sizeof(&monotonicNs));
+    log(EVENT_MONOTONIC_CYCLE_TIME, &monotonicNs, sizeof(monotonicNs));
 }
 
 void NBLog::Writer::logFormat(const char *fmt, log_hash_t hash, ...)
@@ -713,12 +721,14 @@ const std::unordered_set<NBLog::Event> NBLog::Reader::startingTypes {
         NBLog::Event::EVENT_START_FMT,
         NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS,
         NBLog::Event::EVENT_AUDIO_STATE,
+        NBLog::Event::EVENT_LATENCY,
         NBLog::Event::EVENT_MONOTONIC_CYCLE_TIME
 };
 const std::unordered_set<NBLog::Event> NBLog::Reader::endingTypes   {
         NBLog::Event::EVENT_END_FMT,
         NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS,
         NBLog::Event::EVENT_AUDIO_STATE,
+        NBLog::Event::EVENT_LATENCY,
         NBLog::Event::EVENT_MONOTONIC_CYCLE_TIME
 };
 
@@ -873,6 +883,17 @@ void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Snapshot &snapshot, int au
             memcpy(&hash, &(data->hash), sizeof(hash));
             mThreadPerformanceAnalysis[author][0 /*hash*/].handleStateChange();
         } break;
+        case EVENT_LATENCY: {
+            double latencyMs;
+            memcpy(&latencyMs, etr.data, sizeof(latencyMs));
+            mPerformanceData.addLatencyEntry(author, latencyMs);
+        } break;
+        case EVENT_MONOTONIC_CYCLE_TIME: {
+            uint32_t monotonicNs;
+            memcpy(&monotonicNs, etr.data, sizeof(monotonicNs));
+            const double monotonicMs = monotonicNs * 1e-6;
+            mPerformanceData.addCycleTimeEntry(author, monotonicMs);
+        } break;
         case EVENT_END_FMT:
         case EVENT_RESERVED:
         case EVENT_UPPER_BOUND:
@@ -904,6 +925,7 @@ void NBLog::MergeReader::dump(int fd, int indent)
 {
     // TODO: add a mutex around media.log dump
     ReportPerformance::dump(fd, indent, mThreadPerformanceAnalysis);
+    mPerformanceData.dump(fd);
 }
 
 // TODO for future compatibility, would prefer to have a dump() go to string, and then go
@@ -926,7 +948,12 @@ void NBLog::DumpReader::dump(int fd, size_t indent)
         case EVENT_MONOTONIC_CYCLE_TIME: {
             uint32_t monotonicNs;
             memcpy(&monotonicNs, it->data, sizeof(monotonicNs));
-            body.appendFormat("Thread cycle took %u ns", monotonicNs);
+            body.appendFormat("Thread cycle: %u ns", monotonicNs);
+        } break;
+        case EVENT_LATENCY: {
+            double latencyMs;
+            memcpy(&latencyMs, it->data, sizeof(latencyMs));
+            body.appendFormat("latency: %.3f ms", latencyMs);
         } break;
         case EVENT_END_FMT:
         case EVENT_RESERVED:
