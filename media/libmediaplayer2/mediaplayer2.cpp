@@ -750,7 +750,7 @@ status_t MediaPlayer2::setAudioAttributes_l(const Parcel &parcel) {
 status_t MediaPlayer2::prepareAsync() {
     ALOGV("prepareAsync");
     Mutex::Autolock _l(mLock);
-    if ((mPlayer != 0) && (mCurrentState & (MEDIA_PLAYER2_INITIALIZED | MEDIA_PLAYER2_STOPPED))) {
+    if ((mPlayer != 0) && (mCurrentState & MEDIA_PLAYER2_INITIALIZED)) {
         if (mAudioAttributesParcel != NULL) {
             status_t err = setAudioAttributes_l(*mAudioAttributesParcel);
             if (err != OK) {
@@ -806,24 +806,6 @@ status_t MediaPlayer2::start() {
     return ret;
 }
 
-status_t MediaPlayer2::stop() {
-    ALOGV("stop");
-    Mutex::Autolock _l(mLock);
-    if (mCurrentState & MEDIA_PLAYER2_STOPPED) return NO_ERROR;
-    if ( (mPlayer != 0) && ( mCurrentState & ( MEDIA_PLAYER2_STARTED | MEDIA_PLAYER2_PREPARED |
-                    MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_PLAYBACK_COMPLETE ) ) ) {
-        status_t ret = mPlayer->stop();
-        if (ret != NO_ERROR) {
-            mCurrentState = MEDIA_PLAYER2_STATE_ERROR;
-        } else {
-            mCurrentState = MEDIA_PLAYER2_STOPPED;
-        }
-        return ret;
-    }
-    ALOGE("stop called in state %d, mPlayer(%p)", mCurrentState, mPlayer.get());
-    return INVALID_OPERATION;
-}
-
 status_t MediaPlayer2::pause() {
     ALOGV("pause");
     Mutex::Autolock _l(mLock);
@@ -873,8 +855,7 @@ mediaplayer2_states MediaPlayer2::getState() {
     if (mCurrentState & MEDIA_PLAYER2_STARTED) {
         return MEDIAPLAYER2_STATE_PLAYING;
     }
-    if (mCurrentState
-        & (MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_STOPPED | MEDIA_PLAYER2_PLAYBACK_COMPLETE)) {
+    if (mCurrentState & (MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_PLAYBACK_COMPLETE)) {
         return MEDIAPLAYER2_STATE_PAUSED;
     }
     // now only mCurrentState & MEDIA_PLAYER2_PREPARED is true
@@ -890,7 +871,7 @@ status_t MediaPlayer2::setPlaybackSettings(const AudioPlaybackRate& rate) {
         return BAD_VALUE;
     }
     Mutex::Autolock _l(mLock);
-    if (mPlayer == 0 || (mCurrentState & MEDIA_PLAYER2_STOPPED)) {
+    if (mPlayer == 0) {
         return INVALID_OPERATION;
     }
 
@@ -982,7 +963,7 @@ status_t MediaPlayer2::getDuration(int64_t *msec) {
     Mutex::Autolock _l(mLock);
     ALOGV("getDuration_l");
     bool isValidState = (mCurrentState & (MEDIA_PLAYER2_PREPARED | MEDIA_PLAYER2_STARTED |
-            MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_STOPPED | MEDIA_PLAYER2_PLAYBACK_COMPLETE));
+            MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_PLAYBACK_COMPLETE));
     if (mPlayer == 0 || !isValidState) {
         ALOGE("Attempt to call getDuration in wrong state: mPlayer=%p, mCurrentState=%u",
                 mPlayer.get(), mCurrentState);

@@ -65,7 +65,6 @@ public:
             status_t        setBufferingSettings(const BufferingSettings& buffering);
             status_t        prepareAsync();
             status_t        start();
-            status_t        stop();
             status_t        pause();
             bool            isPlaying();
             mediaplayer2_states getState();

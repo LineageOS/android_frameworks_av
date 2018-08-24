@@ -168,8 +168,7 @@ enum media_player2_internal_states {
     MEDIA_PLAYER2_PREPARED           = 1 << 3,
     MEDIA_PLAYER2_STARTED            = 1 << 4,
     MEDIA_PLAYER2_PAUSED             = 1 << 5,
-    MEDIA_PLAYER2_STOPPED            = 1 << 6,
-    MEDIA_PLAYER2_PLAYBACK_COMPLETE  = 1 << 7
+    MEDIA_PLAYER2_PLAYBACK_COMPLETE  = 1 << 6
 };
 
 // Keep KEY_PARAMETER_* in sync with MediaPlayer2.java.
