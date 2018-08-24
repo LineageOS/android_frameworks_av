@@ -20,9 +20,10 @@
 namespace android {
 
 extern "C" void __asan_init(void) __attribute__((weak));
+extern "C" void __hwasan_init(void) __attribute__((weak));
 
 static inline int running_with_asan() {
-    return &__asan_init != 0;
+    return &__asan_init != 0 || &__hwasan_init != 0;
 }
 
 /**
