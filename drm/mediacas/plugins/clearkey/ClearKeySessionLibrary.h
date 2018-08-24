@@ -32,6 +32,10 @@ class KeyFetcher;
 
 class ClearKeyCasSession : public RefBase {
 public:
+    explicit ClearKeyCasSession(CasPlugin *plugin);
+
+    virtual ~ClearKeyCasSession();
+
     ssize_t decrypt(
             bool secure,
             DescramblerPlugin::ScramblingControl scramblingControl,
@@ -58,8 +62,6 @@ private:
 
     friend class ClearKeySessionLibrary;
 
-    explicit ClearKeyCasSession(CasPlugin *plugin);
-    virtual ~ClearKeyCasSession();
     CasPlugin* getPlugin() const { return mPlugin; }
     status_t decryptPayload(
             const AES_KEY& key, size_t length, size_t offset, char* buffer) const;
@@ -73,7 +75,7 @@ public:
 
     status_t addSession(CasPlugin *plugin, CasSessionId *sessionId);
 
-    sp<ClearKeyCasSession> findSession(const CasSessionId& sessionId);
+    std::shared_ptr<ClearKeyCasSession> findSession(const CasSessionId& sessionId);
 
     void destroySession(const CasSessionId& sessionId);
 
@@ -85,7 +87,7 @@ private:
 
     Mutex mSessionsLock;
     uint32_t mNextSessionId;
-    KeyedVector<CasSessionId, sp<ClearKeyCasSession>> mIDToSessionMap;
+    KeyedVector<CasSessionId, std::shared_ptr<ClearKeyCasSession>> mIDToSessionMap;
 
     ClearKeySessionLibrary();
     DISALLOW_EVIL_CONSTRUCTORS(ClearKeySessionLibrary);
