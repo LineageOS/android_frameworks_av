@@ -56,7 +56,7 @@ status_t ClearKeySessionLibrary::addSession(
 
     Mutex::Autolock lock(mSessionsLock);
 
-    sp<ClearKeyCasSession> session = new ClearKeyCasSession(plugin);
+    std::shared_ptr<ClearKeyCasSession> session(new ClearKeyCasSession(plugin));
 
     uint8_t *byteArray = (uint8_t *) &mNextSessionId;
     sessionId->push_back(byteArray[3]);
@@ -69,7 +69,7 @@ status_t ClearKeySessionLibrary::addSession(
     return OK;
 }
 
-sp<ClearKeyCasSession> ClearKeySessionLibrary::findSession(
+std::shared_ptr<ClearKeyCasSession> ClearKeySessionLibrary::findSession(
         const CasSessionId& sessionId) {
     Mutex::Autolock lock(mSessionsLock);
 
@@ -88,7 +88,7 @@ void ClearKeySessionLibrary::destroySession(const CasSessionId& sessionId) {
         return;
     }
 
-    sp<ClearKeyCasSession> session = mIDToSessionMap.valueAt(index);
+    std::shared_ptr<ClearKeyCasSession> session = mIDToSessionMap.valueAt(index);
     mIDToSessionMap.removeItemsAt(index);
 }
 
@@ -96,7 +96,7 @@ void ClearKeySessionLibrary::destroyPlugin(CasPlugin *plugin) {
     Mutex::Autolock lock(mSessionsLock);
 
     for (ssize_t index = mIDToSessionMap.size() - 1; index >= 0; index--) {
-        sp<ClearKeyCasSession> session = mIDToSessionMap.valueAt(index);
+        std::shared_ptr<ClearKeyCasSession> session = mIDToSessionMap.valueAt(index);
         if (session->getPlugin() == plugin) {
             mIDToSessionMap.removeItemsAt(index);
         }
