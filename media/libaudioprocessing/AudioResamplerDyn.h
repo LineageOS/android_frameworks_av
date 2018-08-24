@@ -55,6 +55,11 @@ public:
     virtual size_t resample(int32_t* out, size_t outFrameCount,
             AudioBufferProvider* provider);
 
+    void reset() override {
+        AudioResampler::reset();
+        mInBuffer.reset();
+    }
+
     // Make available key design criteria for testing
     int getHalfLength() const {
         return mConstants.mHalfNumCoefs;
