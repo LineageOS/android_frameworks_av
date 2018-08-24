@@ -1684,6 +1684,7 @@ void NuPlayer2::onStart() {
     }
 
     startPlaybackTimer("onstart");
+    notifyListener(mSrcId, MEDIA2_INFO, MEDIA2_INFO_DATA_SOURCE_START, 0);
 
     postScanSources();
 }
