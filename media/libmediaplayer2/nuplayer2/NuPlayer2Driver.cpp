@@ -272,13 +272,6 @@ status_t NuPlayer2Driver::prepareAsync() {
             mState = STATE_PREPARING;
             mPlayer->prepareAsync();
             return OK;
-        case STATE_STOPPED:
-            // this is really just paused. handle as seek to start
-            mAtEOS = false;
-            mState = STATE_STOPPED_AND_PREPARING;
-            mPlayer->seekToAsync(0, MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC /* mode */,
-                    true /* needNotify */);
-            return OK;
         default:
             return INVALID_OPERATION;
     };
@@ -293,7 +286,6 @@ status_t NuPlayer2Driver::start() {
 status_t NuPlayer2Driver::start_l() {
     switch (mState) {
         case STATE_PAUSED:
-        case STATE_STOPPED_AND_PREPARED:
         case STATE_PREPARED:
         {
             mPlayer->start();
@@ -316,34 +308,6 @@ status_t NuPlayer2Driver::start_l() {
     }
 
     mState = STATE_RUNNING;
-
-    return OK;
-}
-
-status_t NuPlayer2Driver::stop() {
-    ALOGD("stop(%p)", this);
-    Mutex::Autolock autoLock(mLock);
-
-    switch (mState) {
-        case STATE_RUNNING:
-            mPlayer->pause();
-            // fall through
-
-        case STATE_PAUSED:
-            mState = STATE_STOPPED;
-            //notifyListener_l(MEDIA2_STOPPED);
-            break;
-
-        case STATE_PREPARED:
-        case STATE_STOPPED:
-        case STATE_STOPPED_AND_PREPARING:
-        case STATE_STOPPED_AND_PREPARED:
-            mState = STATE_STOPPED;
-            break;
-
-        default:
-            return INVALID_OPERATION;
-    }
 
     return OK;
 }
@@ -391,7 +355,6 @@ status_t NuPlayer2Driver::setPlaybackSettings(const AudioPlaybackRate &rate) {
             mState = STATE_PAUSED;
         } else if (rate.mSpeed != 0.f
                 && (mState == STATE_PAUSED
-                    || mState == STATE_STOPPED_AND_PREPARED
                     || mState == STATE_PREPARED)) {
             err = start_l();
         }
@@ -419,7 +382,6 @@ status_t NuPlayer2Driver::seekTo(int64_t msec, MediaPlayer2SeekMode mode) {
 
     switch (mState) {
         case STATE_PREPARED:
-        case STATE_STOPPED_AND_PREPARED:
         case STATE_PAUSED:
         case STATE_RUNNING:
         {
@@ -601,10 +563,6 @@ status_t NuPlayer2Driver::reset() {
             break;
     }
 
-    if (mState != STATE_STOPPED) {
-        // notifyListener_l(MEDIA2_STOPPED);
-    }
-
     mState = STATE_RESET_IN_PROGRESS;
     mPlayer->resetAsync();
 
@@ -780,20 +738,7 @@ void NuPlayer2Driver::notifySeekComplete(int64_t srcId) {
     ALOGV("notifySeekComplete(%p)", this);
     Mutex::Autolock autoLock(mLock);
     mSeekInProgress = false;
-    notifySeekComplete_l(srcId);
-}
-
-void NuPlayer2Driver::notifySeekComplete_l(int64_t srcId) {
-    bool wasSeeking = true;
-    if (mState == STATE_STOPPED_AND_PREPARING) {
-        wasSeeking = false;
-        mState = STATE_STOPPED_AND_PREPARED;
-        mCondition.broadcast();
-    } else if (mState == STATE_STOPPED) {
-        // no need to notify listener
-        return;
-    }
-    notifyListener_l(srcId, wasSeeking ? MEDIA2_SEEK_COMPLETE : MEDIA2_PREPARED);
+    notifyListener_l(srcId, MEDIA2_SEEK_COMPLETE);
 }
 
 status_t NuPlayer2Driver::dump(
@@ -1078,9 +1023,6 @@ std::string NuPlayer2Driver::stateString(State state) {
         case STATE_RUNNING: rval = "RUNNING"; break;
         case STATE_PAUSED: rval = "PAUSED"; break;
         case STATE_RESET_IN_PROGRESS: rval = "RESET_IN_PROGRESS"; break;
-        case STATE_STOPPED: rval = "STOPPED"; break;
-        case STATE_STOPPED_AND_PREPARING: rval = "STOPPED_AND_PREPARING"; break;
-        case STATE_STOPPED_AND_PREPARED: rval = "STOPPED_AND_PREPARED"; break;
         default:
             // yes, this buffer is shared and vulnerable to races
             snprintf(rawbuffer, sizeof(rawbuffer), "%d", state);
