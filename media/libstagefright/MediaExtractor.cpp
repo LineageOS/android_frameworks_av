@@ -19,8 +19,8 @@
 #include <utils/Log.h>
 #include <pwd.h>
 
-#include <media/MediaExtractor.h>
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MetaData.h>
 
 namespace android {

@@ -115,6 +115,7 @@ public:
 
     void                sendObjectAdded(MtpObjectHandle handle);
     void                sendObjectRemoved(MtpObjectHandle handle);
+    void                sendObjectInfoChanged(MtpObjectHandle handle);
     void                sendDevicePropertyChanged(MtpDeviceProperty property);
 
 private:

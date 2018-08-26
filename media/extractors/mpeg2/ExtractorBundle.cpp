@@ -18,7 +18,6 @@
 #define LOG_TAG "MPEG2ExtractorBundle"
 #include <utils/Log.h>
 
-#include <media/MediaExtractor.h>
 #include <media/MediaExtractorPluginHelper.h>
 #include "MPEG2PSExtractor.h"
 #include "MPEG2TSExtractor.h"

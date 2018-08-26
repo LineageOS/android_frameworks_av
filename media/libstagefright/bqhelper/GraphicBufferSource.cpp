@@ -767,7 +767,7 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
             double nFrames = (timeUs - mPrevCaptureUs) * mCaptureFps / 1000000;
             if (nFrames < 0.5 - kTimestampFluctuation) {
                 // skip this frame as it's too close to previous capture
-                ALOGV("skipping frame, timeUs %lld", static_cast<long long>(timeUs));
+                ALOGD("skipping frame, timeUs %lld", static_cast<long long>(timeUs));
                 return false;
             }
             if (nFrames <= 1.0) {

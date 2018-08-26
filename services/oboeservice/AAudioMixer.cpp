@@ -99,7 +99,7 @@ int32_t AAudioMixer::mix(int streamIndex, FifoBuffer *fifo, bool allowUnderflow)
         }
         partIndex++;
     }
-    fifo->getFifoControllerBase()->advanceReadIndex(framesDesired);
+    fifo->advanceReadIndex(framesDesired);
 
 #if AAUDIO_MIXER_ATRACE_ENABLED
     ATRACE_END();

@@ -28,7 +28,6 @@
 #include <media/IMediaExtractorService.h>
 #include <media/IMediaSource.h>
 #include <media/MediaHTTPService.h>
-#include <media/MediaExtractor.h>
 #include <media/MediaSource.h>
 #include <media/NdkWrapper.h>
 #include <media/stagefright/foundation/ABuffer.h>

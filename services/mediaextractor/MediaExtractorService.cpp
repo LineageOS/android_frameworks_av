@@ -21,7 +21,6 @@
 #include <utils/Vector.h>
 
 #include <media/DataSource.h>
-#include <media/MediaExtractor.h>
 #include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaExtractorFactory.h>

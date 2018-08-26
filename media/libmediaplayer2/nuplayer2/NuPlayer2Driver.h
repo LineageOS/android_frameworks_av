@@ -40,31 +40,31 @@ struct NuPlayer2Driver : public MediaPlayer2Interface {
             BufferingSettings* buffering /* nonnull */) override;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
 
-    virtual status_t prepareAsync();
-    virtual status_t start();
-    virtual status_t stop();
-    virtual status_t pause();
-    virtual bool isPlaying();
-    virtual status_t setPlaybackSettings(const AudioPlaybackRate &rate);
-    virtual status_t getPlaybackSettings(AudioPlaybackRate *rate);
-    virtual status_t setSyncSettings(const AVSyncSettings &sync, float videoFpsHint);
-    virtual status_t getSyncSettings(AVSyncSettings *sync, float *videoFps);
+    virtual status_t prepareAsync() override;
+    virtual status_t start() override;
+    virtual status_t pause() override;
+    virtual bool isPlaying() override;
+    virtual status_t setPlaybackSettings(const AudioPlaybackRate &rate) override;
+    virtual status_t getPlaybackSettings(AudioPlaybackRate *rate) override;
+    virtual status_t setSyncSettings(const AVSyncSettings &sync, float videoFpsHint) override;
+    virtual status_t getSyncSettings(AVSyncSettings *sync, float *videoFps) override;
     virtual status_t seekTo(
-            int64_t msec, MediaPlayer2SeekMode mode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC);
-    virtual status_t getCurrentPosition(int64_t *msec);
-    virtual status_t getDuration(int64_t *msec);
-    virtual status_t reset();
+            int64_t msec,
+            MediaPlayer2SeekMode mode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC) override;
+    virtual status_t getCurrentPosition(int64_t *msec) override;
+    virtual status_t getDuration(int64_t *msec) override;
+    virtual status_t reset() override;
     virtual status_t notifyAt(int64_t mediaTimeUs) override;
-    virtual status_t setLooping(int loop);
-    virtual status_t invoke(const Parcel &request, Parcel *reply);
-    virtual void setAudioSink(const sp<AudioSink> &audioSink);
-    virtual status_t setParameter(int key, const Parcel &request);
-    virtual status_t getParameter(int key, Parcel *reply);
+    virtual status_t setLooping(int loop) override;
+    virtual status_t invoke(const Parcel &request, Parcel *reply) override;
+    virtual void setAudioSink(const sp<AudioSink> &audioSink) override;
+    virtual status_t setParameter(int key, const Parcel &request) override;
+    virtual status_t getParameter(int key, Parcel *reply) override;
 
     virtual status_t getMetadata(
-            const media::Metadata::Filter& ids, Parcel *records);
+            const media::Metadata::Filter& ids, Parcel *records) override;
 
-    virtual status_t dump(int fd, const Vector<String16> &args) const;
+    virtual status_t dump(int fd, const Vector<String16> &args) const override;
 
     virtual void onMessageReceived(const sp<AMessage> &msg) override;
 
@@ -77,7 +77,6 @@ struct NuPlayer2Driver : public MediaPlayer2Interface {
     void notifyMoreRebufferingTimeUs(int64_t srcId, int64_t timeUs);
     void notifyRebufferingWhenExit(int64_t srcId, bool status);
     void notifySeekComplete(int64_t srcId);
-    void notifySeekComplete_l(int64_t srcId);
     void notifyListener(int64_t srcId, int msg, int ext1 = 0, int ext2 = 0,
                         const Parcel *in = NULL);
     void notifyFlagsChanged(int64_t srcId, uint32_t flags);
@@ -99,9 +98,6 @@ private:
         STATE_RUNNING,
         STATE_PAUSED,
         STATE_RESET_IN_PROGRESS,
-        STATE_STOPPED,                  // equivalent to PAUSED
-        STATE_STOPPED_AND_PREPARING,    // equivalent to PAUSED, but seeking
-        STATE_STOPPED_AND_PREPARED,     // equivalent to PAUSED, but seek complete
     };
 
     std::string stateString(State state);

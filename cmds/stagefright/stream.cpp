@@ -24,7 +24,6 @@
 #include <media/DataSource.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IStreamSource.h>
-#include <media/MediaExtractor.h>
 #include <media/mediaplayer.h>
 #include <media/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -32,6 +31,7 @@
 #include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MPEG2TSWriter.h>
+#include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 

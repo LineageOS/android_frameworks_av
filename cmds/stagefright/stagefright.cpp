@@ -32,7 +32,6 @@
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
 #include <media/DataSource.h>
-#include <media/MediaExtractor.h>
 #include <media/MediaSource.h>
 #include <media/ICrypto.h>
 #include <media/IMediaHTTPService.h>
@@ -50,6 +49,7 @@
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
+#include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/SimpleDecodingSource.h>
