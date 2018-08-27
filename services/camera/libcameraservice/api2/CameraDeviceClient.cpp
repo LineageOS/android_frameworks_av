@@ -19,6 +19,7 @@
 //#define LOG_NDEBUG 0
 
 #include <cutils/properties.h>
+#include <utils/CameraThreadState.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include <gui/Surface.h>
@@ -1724,7 +1725,7 @@ binder::Status CameraDeviceClient::checkPidStatus(const char* checkLocation) {
 // TODO: move to Camera2ClientBase
 bool CameraDeviceClient::enforceRequestPermissions(CameraMetadata& metadata) {
 
-    const int pid = IPCThreadState::self()->getCallingPid();
+    const int pid = CameraThreadState::getCallingPid();
     const int selfPid = getpid();
     camera_metadata_entry_t entry;
 
@@ -1763,7 +1764,7 @@ bool CameraDeviceClient::enforceRequestPermissions(CameraMetadata& metadata) {
         String16 permissionString =
             String16("android.permission.CAMERA_DISABLE_TRANSMIT_LED");
         if (!checkCallingPermission(permissionString)) {
-            const int uid = IPCThreadState::self()->getCallingUid();
+            const int uid = CameraThreadState::getCallingUid();
             ALOGE("Permission Denial: "
                   "can't disable transmit LED pid=%d, uid=%d", pid, uid);
             return false;
