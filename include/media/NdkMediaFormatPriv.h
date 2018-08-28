@@ -27,13 +27,23 @@
 #ifndef _NDK_MEDIA_FORMAT_PRIV_H
 #define _NDK_MEDIA_FORMAT_PRIV_H
 
-#include <media/NdkMediaFormat.h>
+#include <utils/String8.h>
+#include <utils/StrongPointer.h>
+#include <media/stagefright/foundation/AMessage.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-AMediaFormat* AMediaFormat_fromMsg(void*);
+using namespace android;
+
+struct AMediaFormat {
+    sp<AMessage> mFormat;
+    String8 mDebug;
+    KeyedVector<String8, String8> mStringCache;
+};
+
+AMediaFormat* AMediaFormat_fromMsg(const void*);
 void AMediaFormat_getFormat(const AMediaFormat* mData, void* dest);
 
 #ifdef __cplusplus
