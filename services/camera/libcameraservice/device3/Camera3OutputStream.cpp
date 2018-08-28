@@ -268,6 +268,11 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             mTraceFirstBuffer = false;
         }
 
+        if (timestamp == 0) {
+            ALOGE("%s: Stream %d: timestamp shouldn't be 0", __FUNCTION__, mId);
+            return BAD_VALUE;
+        }
+
         /* Certain consumers (such as AudioSource or HardwareComposer) use
          * MONOTONIC time, causing time misalignment if camera timestamp is
          * in BOOTTIME. Do the conversion if necessary. */

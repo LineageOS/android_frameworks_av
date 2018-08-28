@@ -320,7 +320,7 @@ class Camera3Stream :
      * For bidirectional streams, this method applies to the output-side buffers
      */
     status_t         returnBuffer(const camera3_stream_buffer &buffer,
-            nsecs_t timestamp);
+            nsecs_t timestamp, bool timestampIncreasing);
 
     /**
      * Fill in the camera3_stream_buffer with the next valid buffer for this
@@ -559,6 +559,7 @@ class Camera3Stream :
     android_dataspace mOriginalDataSpace;
 
     String8 mPhysicalCameraId;
+    nsecs_t mLastTimestamp;
 }; // class Camera3Stream
 
 }; // namespace camera3
