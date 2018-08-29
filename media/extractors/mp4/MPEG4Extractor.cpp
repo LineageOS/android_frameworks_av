@@ -393,7 +393,9 @@ MPEG4Extractor::~MPEG4Extractor() {
     }
     mPssh.clear();
 
-    delete mCachedSource;
+    if (mCachedSource != mDataSource) {
+        delete mCachedSource;
+    }
     delete mDataSource;
 }
 
