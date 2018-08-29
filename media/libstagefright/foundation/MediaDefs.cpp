@@ -55,7 +55,7 @@ const char *MEDIA_MIMETYPE_AUDIO_SCRAMBLED = "audio/scrambled";
 
 const char *MEDIA_MIMETYPE_CONTAINER_MPEG4 = "video/mp4";
 const char *MEDIA_MIMETYPE_CONTAINER_WAV = "audio/x-wav";
-const char *MEDIA_MIMETYPE_CONTAINER_OGG = "application/ogg";
+const char *MEDIA_MIMETYPE_CONTAINER_OGG = "audio/ogg";
 const char *MEDIA_MIMETYPE_CONTAINER_MATROSKA = "video/x-matroska";
 const char *MEDIA_MIMETYPE_CONTAINER_MPEG2TS = "video/mp2ts";
 const char *MEDIA_MIMETYPE_CONTAINER_AVI = "video/avi";
