@@ -426,6 +426,8 @@ private:
     void dumpClients(int fd, const Vector<String16>& args);
     void dumpInternals(int fd, const Vector<String16>& args);
 
+    SimpleLog mThreadLog{10}; // 10 Thread history limit
+
     // --- Client ---
     class Client : public RefBase {
     public:
