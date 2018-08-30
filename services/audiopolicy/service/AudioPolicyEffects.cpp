@@ -460,12 +460,13 @@ size_t AudioPolicyEffects::readParamValue(cnode *node,
         len = strnlen(node->value, EFFECT_STRING_LEN_MAX);
         if (*curSize + len + 1 > *totSize) {
             *totSize = *curSize + len + 1;
-            *param = (char *)realloc(*param, *totSize);
-            if (*param == NULL) {
+            char *newParam = (char *)realloc(*param, *totSize);
+            if (newParam == NULL) {
                 len = 0;
                 ALOGE("%s realloc error for string len %zu", __func__, *totSize);
                 goto exit;
             }
+            *param = newParam;
         }
         strncpy(*param + *curSize, node->value, len);
         *curSize += len;
