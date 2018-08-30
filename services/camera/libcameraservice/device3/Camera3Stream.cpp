@@ -66,7 +66,8 @@ Camera3Stream::Camera3Stream(int id,
     mBufferLimitLatency(kBufferLimitLatencyBinSize),
     mFormatOverridden(false),
     mOriginalFormat(-1),
-    mPhysicalCameraId(physicalCameraId) {
+    mPhysicalCameraId(physicalCameraId),
+    mLastTimestamp(0) {
 
     camera3_stream::stream_type = type;
     camera3_stream::width = width;
@@ -649,7 +650,7 @@ void Camera3Stream::removeOutstandingBuffer(const camera3_stream_buffer &buffer)
 }
 
 status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
-        nsecs_t timestamp) {
+        nsecs_t timestamp, bool timestampIncreasing) {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
 
@@ -660,6 +661,13 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
     }
 
     removeOutstandingBuffer(buffer);
+
+    if (timestampIncreasing && timestamp != 0 && timestamp <= mLastTimestamp) {
+        ALOGE("%s: Stream %d: timestamp %" PRId64 " is not increasing. Prev timestamp %" PRId64,
+                __FUNCTION__, mId, timestamp, mLastTimestamp);
+        return BAD_VALUE;
+    }
+    mLastTimestamp = timestamp;
 
     /**
      * TODO: Check that the state is valid first.
