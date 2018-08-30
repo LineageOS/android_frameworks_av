@@ -318,7 +318,6 @@ Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
                     for (const auto &instance : registered) {
                         auto factory = drm::V1_0::IDrmFactory::getService(instance);
                         if (factory != NULL) {
-                            ALOGD("found drm@1.0 IDrmFactory %s", instance.c_str());
                             factories.push_back(factory);
                         }
                     }
@@ -329,7 +328,6 @@ Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
                     for (const auto &instance : registered) {
                         auto factory = drm::V1_1::IDrmFactory::getService(instance);
                         if (factory != NULL) {
-                            ALOGD("found drm@1.1 IDrmFactory %s", instance.c_str());
                             factories.push_back(factory);
                         }
                     }
