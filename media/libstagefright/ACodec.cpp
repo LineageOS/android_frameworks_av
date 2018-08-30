@@ -4243,6 +4243,9 @@ int /* OMX_VIDEO_AVCLEVELTYPE */ ACodec::getAVCLevelFor(
         {  589824, 22080, 420, 135000, OMX_VIDEO_AVCLevel5  },
         {  983040, 36864, 543, 240000, OMX_VIDEO_AVCLevel51 },
         { 2073600, 36864, 543, 240000, OMX_VIDEO_AVCLevel52 },
+        { 4177920, 139264, 543, 240000, OMX_VIDEO_AVCLevel6  },
+        { 8355840, 139264, 543, 480000, OMX_VIDEO_AVCLevel61 },
+        { 16711680, 139264, 543, 800000, OMX_VIDEO_AVCLevel62 },
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(limits); i++) {

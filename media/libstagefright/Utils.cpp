@@ -190,6 +190,9 @@ static void parseAvcProfileLevelFromAvcc(const uint8_t *ptr, size_t size, sp<AMe
         { 50, OMX_VIDEO_AVCLevel5  },
         { 51, OMX_VIDEO_AVCLevel51 },
         { 52, OMX_VIDEO_AVCLevel52 },
+        { 60, OMX_VIDEO_AVCLevel6  },
+        { 61, OMX_VIDEO_AVCLevel61 },
+        { 62, OMX_VIDEO_AVCLevel62 },
     };
     const static ALookup<uint8_t, OMX_VIDEO_AVCPROFILETYPE> profiles {
         { 66, OMX_VIDEO_AVCProfileBaseline },
