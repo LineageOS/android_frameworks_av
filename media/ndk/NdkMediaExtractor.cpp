@@ -84,8 +84,17 @@ media_status_t AMediaExtractor_setDataSourceFd(AMediaExtractor *mData, int fd, o
 
 EXPORT
 media_status_t AMediaExtractor_setDataSource(AMediaExtractor *mData, const char *location) {
-    ALOGV("setDataSource(%s)", location);
-    // TODO: add header support
+    return AMediaExtractor_setDataSourceWithHeaders(mData, location, 0, NULL, NULL);
+}
+
+EXPORT
+media_status_t AMediaExtractor_setDataSourceWithHeaders(AMediaExtractor *mData,
+        const char *uri,
+        int numheaders,
+        const char * const *keys,
+        const char * const *values) {
+
+    ALOGV("setDataSource(%s)", uri);
 
     JNIEnv *env = AndroidRuntime::getJNIEnv();
     jobject service = NULL;
@@ -109,7 +118,7 @@ media_status_t AMediaExtractor_setDataSource(AMediaExtractor *mData, const char 
         return AMEDIA_ERROR_UNSUPPORTED;
     }
 
-    jstring jloc = env->NewStringUTF(location);
+    jstring jloc = env->NewStringUTF(uri);
 
     service = env->CallStaticObjectMethod(mediahttpclass, mediaHttpCreateMethod, jloc);
     env->DeleteLocalRef(jloc);
@@ -120,7 +129,15 @@ media_status_t AMediaExtractor_setDataSource(AMediaExtractor *mData, const char 
         httpService = interface_cast<IMediaHTTPService>(binder);
     }
 
-    status_t err = mData->mImpl->setDataSource(httpService, location, NULL);
+    KeyedVector<String8, String8> headers;
+    for (int i = 0; i < numheaders; ++i) {
+        String8 key8(keys[i]);
+        String8 value8(values[i]);
+        headers.add(key8, value8);
+    }
+
+    status_t err;
+    err = mData->mImpl->setDataSource(httpService, uri, numheaders > 0 ? &headers : NULL);
     env->ExceptionClear();
     return translate_error(err);
 }
