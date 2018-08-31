@@ -59,5 +59,10 @@ void FifoControllerBase::advanceWriteIndex(fifo_frames_t numFrames) {
 }
 
 void FifoControllerBase::setThreshold(fifo_frames_t threshold) {
+    if (threshold > mCapacity) {
+        threshold = mCapacity;
+    } else if (threshold < 0) {
+        threshold = 0;
+    }
     mThreshold = threshold;
 }
