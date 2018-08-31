@@ -768,7 +768,11 @@ c2_status_t C2SoftAvcEnc::setProfileParams() {
     s_profile_params_ip.e_sub_cmd = IVE_CMD_CTL_SET_PROFILE_PARAMS;
 
     s_profile_params_ip.e_profile = mIntf->getProfile_l();
-    s_profile_params_ip.u4_entropy_coding_mode = mEntropyMode;
+    if (s_profile_params_ip.e_profile == IV_PROFILE_BASE) {
+        s_profile_params_ip.u4_entropy_coding_mode = 0;
+    } else {
+        s_profile_params_ip.u4_entropy_coding_mode = 1;
+    }
     s_profile_params_ip.u4_timestamp_high = -1;
     s_profile_params_ip.u4_timestamp_low = -1;
 
