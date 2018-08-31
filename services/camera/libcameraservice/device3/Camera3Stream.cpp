@@ -663,9 +663,8 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
     removeOutstandingBuffer(buffer);
 
     if (timestampIncreasing && timestamp != 0 && timestamp <= mLastTimestamp) {
-        ALOGE("%s: Stream %d: timestamp %" PRId64 " is not increasing. Prev timestamp %" PRId64,
+        ALOGW("%s: Stream %d: timestamp %" PRId64 " is not increasing. Prev timestamp %" PRId64,
                 __FUNCTION__, mId, timestamp, mLastTimestamp);
-        return BAD_VALUE;
     }
     mLastTimestamp = timestamp;
 
