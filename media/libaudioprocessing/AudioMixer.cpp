@@ -337,6 +337,7 @@ status_t AudioMixer::Track::prepareForReformat()
 
 void AudioMixer::Track::reconfigureBufferProviders()
 {
+    // configure from upstream to downstream buffer providers.
     bufferProvider = mInputBufferProvider;
     if (mReformatBufferProvider.get() != nullptr) {
         mReformatBufferProvider->setBufferProvider(bufferProvider);
@@ -813,14 +814,15 @@ void AudioMixer::setBufferProvider(int name, AudioBufferProvider* bufferProvider
     if (track->mInputBufferProvider == bufferProvider) {
         return; // don't reset any buffer providers if identical.
     }
-    if (track->mReformatBufferProvider.get() != nullptr) {
-        track->mReformatBufferProvider->reset();
-    } else if (track->mDownmixerBufferProvider != nullptr) {
-        track->mDownmixerBufferProvider->reset();
+    // reset order from downstream to upstream buffer providers.
+    if (track->mTimestretchBufferProvider.get() != nullptr) {
+        track->mTimestretchBufferProvider->reset();
     } else if (track->mPostDownmixReformatBufferProvider.get() != nullptr) {
         track->mPostDownmixReformatBufferProvider->reset();
-    } else if (track->mTimestretchBufferProvider.get() != nullptr) {
-        track->mTimestretchBufferProvider->reset();
+    } else if (track->mDownmixerBufferProvider != nullptr) {
+        track->mDownmixerBufferProvider->reset();
+    } else if (track->mReformatBufferProvider.get() != nullptr) {
+        track->mReformatBufferProvider->reset();
     }
 
     track->mInputBufferProvider = bufferProvider;
