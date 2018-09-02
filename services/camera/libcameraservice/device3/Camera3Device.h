@@ -999,6 +999,9 @@ class Camera3Device :
         // Indicates a still capture request.
         bool stillCapture;
 
+        // Indicates a ZSL capture request
+        bool zslCapture;
+
         // Default constructor needed by KeyedVector
         InFlightRequest() :
                 shutterTimestamp(0),
@@ -1010,12 +1013,14 @@ class Camera3Device :
                 hasCallback(true),
                 maxExpectedDuration(kDefaultExpectedDuration),
                 skipResultMetadata(false),
-                stillCapture(false) {
+                stillCapture(false),
+                zslCapture(false) {
         }
 
         InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
                 bool hasAppCallback, nsecs_t maxDuration,
-                const std::set<String8>& physicalCameraIdSet, bool isStillCapture) :
+                const std::set<String8>& physicalCameraIdSet, bool isStillCapture, 
+                bool isZslCapture) :
                 shutterTimestamp(0),
                 sensorTimestamp(0),
                 requestStatus(OK),
@@ -1027,7 +1032,8 @@ class Camera3Device :
                 maxExpectedDuration(maxDuration),
                 skipResultMetadata(false),
                 physicalCameraIds(physicalCameraIdSet),
-                stillCapture(isStillCapture) {
+                stillCapture(isStillCapture),
+                zslCapture(isZslCapture) {
         }
     };
 
@@ -1044,7 +1050,7 @@ class Camera3Device :
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
             bool callback, nsecs_t maxExpectedDuration, std::set<String8>& physicalCameraIds,
-            bool isStillCapture);
+            bool isStillCapture, bool isZslCapture);
 
     /**
      * Returns the maximum expected time it'll take for all currently in-flight
@@ -1154,7 +1160,7 @@ class Camera3Device :
 
     // helper function to return the output buffers to the streams.
     void returnOutputBuffers(const camera3_stream_buffer_t *outputBuffers,
-            size_t numBuffers, nsecs_t timestamp);
+            size_t numBuffers, nsecs_t timestamp, bool timestampIncreasing = true);
 
     // Send a partial capture result.
     void sendPartialCaptureResult(const camera_metadata_t * partialResult,

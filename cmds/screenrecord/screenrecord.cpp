@@ -235,10 +235,10 @@ static status_t setDisplayProjection(
 
     // Set the region of the layer stack we're interested in, which in our
     // case is "all of it".
-    Rect layerStackRect(mainDpyInfo.w, mainDpyInfo.h);
+    Rect layerStackRect(mainDpyInfo.viewportW, mainDpyInfo.viewportH);
 
     // We need to preserve the aspect ratio of the display.
-    float displayAspect = (float) mainDpyInfo.h / (float) mainDpyInfo.w;
+    float displayAspect = (float) mainDpyInfo.viewportH / (float) mainDpyInfo.viewportW;
 
 
     // Set the way we map the output onto the display surface (which will
@@ -315,22 +315,6 @@ static status_t prepareVirtualDisplay(const DisplayInfo& mainDpyInfo,
 }
 
 /*
- * Set the main display width and height to the actual width and height
- */
-static status_t getActualDisplaySize(const sp<IBinder>& mainDpy, DisplayInfo* mainDpyInfo) {
-    Rect viewport;
-    status_t err = SurfaceComposerClient::getDisplayViewport(mainDpy, &viewport);
-    if (err != NO_ERROR) {
-        fprintf(stderr, "ERROR: unable to get display viewport\n");
-        return err;
-    }
-    mainDpyInfo->w = viewport.width();
-    mainDpyInfo->h = viewport.height();
-
-    return NO_ERROR;
-}
-
-/*
  * Runs the MediaCodec encoder, sending the output to the MediaMuxer.  The
  * input frames are coming from the virtual display as fast as SurfaceFlinger
  * wants to send them.
@@ -400,22 +384,14 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                     // useful stuff is hard to get at without a Dalvik VM.
                     err = SurfaceComposerClient::getDisplayInfo(mainDpy,
                             &mainDpyInfo);
-                    if (err == NO_ERROR) {
-                        err = getActualDisplaySize(mainDpy, &mainDpyInfo);
-                        if (err != NO_ERROR) {
-                            fprintf(stderr, "ERROR: unable to set actual display size\n");
-                            return err;
-                        }
-
-                        if (orientation != mainDpyInfo.orientation) {
-                            ALOGD("orientation changed, now %d", mainDpyInfo.orientation);
-                            SurfaceComposerClient::Transaction t;
-                            setDisplayProjection(t, virtualDpy, mainDpyInfo);
-                            t.apply();
-                            orientation = mainDpyInfo.orientation;
-                        }
-                    } else {
+                    if (err != NO_ERROR) {
                         ALOGW("getDisplayInfo(main) failed: %d", err);
+                    } else if (orientation != mainDpyInfo.orientation) {
+                        ALOGD("orientation changed, now %d", mainDpyInfo.orientation);
+                        SurfaceComposerClient::Transaction t;
+                        setDisplayProjection(t, virtualDpy, mainDpyInfo);
+                        t.apply();
+                        orientation = mainDpyInfo.orientation;
                     }
                 }
 
@@ -589,25 +565,19 @@ static status_t recordScreen(const char* fileName) {
         return err;
     }
 
-    err = getActualDisplaySize(mainDpy, &mainDpyInfo);
-    if (err != NO_ERROR) {
-        fprintf(stderr, "ERROR: unable to set actual display size\n");
-        return err;
-    }
-
     if (gVerbose) {
         printf("Main display is %dx%d @%.2ffps (orientation=%u)\n",
-                mainDpyInfo.w, mainDpyInfo.h, mainDpyInfo.fps,
+                mainDpyInfo.viewportW, mainDpyInfo.viewportH, mainDpyInfo.fps,
                 mainDpyInfo.orientation);
         fflush(stdout);
     }
 
     // Encoder can't take odd number as config
     if (gVideoWidth == 0) {
-        gVideoWidth = floorToEven(mainDpyInfo.w);
+        gVideoWidth = floorToEven(mainDpyInfo.viewportW);
     }
     if (gVideoHeight == 0) {
-        gVideoHeight = floorToEven(mainDpyInfo.h);
+        gVideoHeight = floorToEven(mainDpyInfo.viewportH);
     }
 
     // Configure and start the encoder.

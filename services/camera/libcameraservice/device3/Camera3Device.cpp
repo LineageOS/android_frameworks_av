@@ -2742,13 +2742,14 @@ void Camera3Device::setErrorStateLockedV(const char *fmt, va_list args) {
 status_t Camera3Device::registerInFlight(uint32_t frameNumber,
         int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
         bool hasAppCallback, nsecs_t maxExpectedDuration,
-        std::set<String8>& physicalCameraIds, bool isStillCapture) {
+        std::set<String8>& physicalCameraIds, bool isStillCapture,
+        bool isZslCapture) {
     ATRACE_CALL();
     Mutex::Autolock l(mInFlightLock);
 
     ssize_t res;
     res = mInFlightMap.add(frameNumber, InFlightRequest(numBuffers, resultExtras, hasInput,
-            hasAppCallback, maxExpectedDuration, physicalCameraIds, isStillCapture));
+            hasAppCallback, maxExpectedDuration, physicalCameraIds, isStillCapture, isZslCapture));
     if (res < 0) return res;
 
     if (mInFlightMap.size() == 1) {
@@ -2766,11 +2767,12 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
 
 void Camera3Device::returnOutputBuffers(
         const camera3_stream_buffer_t *outputBuffers, size_t numBuffers,
-        nsecs_t timestamp) {
+        nsecs_t timestamp, bool timestampIncreasing) {
+
     for (size_t i = 0; i < numBuffers; i++)
     {
         Camera3Stream *stream = Camera3Stream::cast(outputBuffers[i].stream);
-        status_t res = stream->returnBuffer(outputBuffers[i], timestamp);
+        status_t res = stream->returnBuffer(outputBuffers[i], timestamp, timestampIncreasing);
         // Note: stream may be deallocated at this point, if this buffer was
         // the last reference to it.
         if (res != OK) {
@@ -3214,8 +3216,9 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
             request.pendingOutputBuffers.appendArray(result->output_buffers,
                 result->num_output_buffers);
         } else {
+            bool timestampIncreasing = !(request.zslCapture || request.hasInputBuffer);
             returnOutputBuffers(result->output_buffers,
-                result->num_output_buffers, shutterTimestamp);
+                result->num_output_buffers, shutterTimestamp, timestampIncreasing);
         }
 
         if (result->result != NULL && !isPartialResult) {
@@ -3421,8 +3424,9 @@ void Camera3Device::notifyShutter(const camera3_shutter_msg_t &msg,
                     r.collectedPartialResult, msg.frame_number,
                     r.hasInputBuffer, r.physicalMetadatas);
             }
+            bool timestampIncreasing = !(r.zslCapture || r.hasInputBuffer);
             returnOutputBuffers(r.pendingOutputBuffers.array(),
-                r.pendingOutputBuffers.size(), r.shutterTimestamp);
+                r.pendingOutputBuffers.size(), r.shutterTimestamp, timestampIncreasing);
             r.pendingOutputBuffers.clear();
 
             removeInFlightRequestIfReadyLocked(idx);
@@ -4948,6 +4952,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             hasCallback = false;
         }
         bool isStillCapture = false;
+        bool isZslCapture = false;
         if (!mNextRequests[0].captureRequest->mSettingsList.begin()->metadata.isEmpty()) {
             camera_metadata_ro_entry_t e = camera_metadata_ro_entry_t();
             find_camera_metadata_ro_entry(halRequest->settings, ANDROID_CONTROL_CAPTURE_INTENT, &e);
@@ -4955,13 +4960,18 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 isStillCapture = true;
                 ATRACE_ASYNC_BEGIN("still capture", mNextRequests[i].halRequest.frame_number);
             }
+
+            find_camera_metadata_ro_entry(halRequest->settings, ANDROID_CONTROL_ENABLE_ZSL, &e);
+            if ((e.count > 0) && (e.data.u8[0] == ANDROID_CONTROL_ENABLE_ZSL_TRUE)) {
+                isZslCapture = true;
+            }
         }
         res = parent->registerInFlight(halRequest->frame_number,
                 totalNumBuffers, captureRequest->mResultExtras,
                 /*hasInput*/halRequest->input_buffer != NULL,
                 hasCallback,
                 calculateMaxExpectedDuration(halRequest->settings),
-                requestedPhysicalCameras, isStillCapture);
+                requestedPhysicalCameras, isStillCapture, isZslCapture);
         ALOGVV("%s: registered in flight requestId = %" PRId32 ", frameNumber = %" PRId64
                ", burstId = %" PRId32 ".",
                 __FUNCTION__,

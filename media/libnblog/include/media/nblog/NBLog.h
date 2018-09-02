@@ -350,6 +350,7 @@ public:
         virtual void    logFormat(const char *fmt, log_hash_t hash, ...);
         virtual void    logVFormat(const char *fmt, log_hash_t hash, va_list ap);
         virtual void    logEventHistTs(Event event, log_hash_t hash);
+        virtual void    logLatency(double latencyMs);
         virtual void    logMonotonicCycleTime(uint32_t monotonicNs);
         // End of functions that are not in LockedWriter yet.
 
@@ -546,6 +547,8 @@ public:
         // contains a separate instance for every author (thread), and for every source file
         // location within each author
         ReportPerformance::PerformanceAnalysisMap mThreadPerformanceAnalysis;
+
+        PerformanceData mPerformanceData;
 
         // handle author entry by looking up the author's name and appending it to the body
         // returns number of bytes read from fmtEntry
