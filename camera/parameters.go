@@ -1,4 +1,4 @@
-// Copyright (C) 2017 The Android Open Source Project
+// Copyright (C) 2017-2018 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,6 +14,8 @@
 package lineage;
 
 import (
+  "strings"
+
   "android/soong/android"
   "android/soong/cc"
 )
@@ -31,22 +33,32 @@ func cameraParametersFactory() android.Module {
 
 func cameraParameters(ctx android.LoadHookContext) {
   type props struct {
+    Include_dirs []string
     Whole_static_libs []string
   }
 
   p := &props{}
-  p.Whole_static_libs = globalDefaults(ctx)
+  p.Include_dirs, p.Whole_static_libs = globalDefaults(ctx)
 
   ctx.AppendProperties(p)
 }
 
-func globalDefaults(ctx android.BaseContext) ([]string) {
+func globalDefaults(ctx android.BaseContext) ([]string, []string) {
+  var includeDirs []string
   var staticLibs []string
 
+  camera_headers_include_dir := ctx.DeviceConfig().TargetSpecificHeadersIncludeDir()
+  if len(camera_headers_include_dir) > 0 {
+    camera_headers_include_dir_list := strings.Fields(camera_headers_include_dir)
+    for _, include_dir := range camera_headers_include_dir_list {
+      includeDirs = append(includeDirs, include_dir)
+    }
+  }
+
   device_camera_parameters_lib := ctx.DeviceConfig().SpecificCameraParametersLibrary()
-  if (len(device_camera_parameters_lib) > 0) {
+  if len(device_camera_parameters_lib) > 0 {
     staticLibs = append(staticLibs, device_camera_parameters_lib)
   }
 
-  return staticLibs
+  return includeDirs, staticLibs
 }
