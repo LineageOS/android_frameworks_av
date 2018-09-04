@@ -118,11 +118,16 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
         }
     }
 
-    // if SHARED requested or if EXCLUSIVE failed
-    if (sharingMode == AAUDIO_SHARING_MODE_SHARED
-         || (serviceStream.get() == nullptr && !sharingModeMatchRequired)) {
+    // If SHARED requested or if EXCLUSIVE failed.
+    if (sharingMode == AAUDIO_SHARING_MODE_SHARED) {
         serviceStream =  new AAudioServiceStreamShared(*this);
         result = serviceStream->open(request);
+    } else if (serviceStream.get() == nullptr && !sharingModeMatchRequired) {
+        aaudio::AAudioStreamRequest modifiedRequest = request;
+        // Overwrite the original EXCLUSIVE mode with SHARED.
+        modifiedRequest.getConfiguration().setSharingMode(AAUDIO_SHARING_MODE_SHARED);
+        serviceStream =  new AAudioServiceStreamShared(*this);
+        result = serviceStream->open(modifiedRequest);
     }
 
     if (result != AAUDIO_OK) {
