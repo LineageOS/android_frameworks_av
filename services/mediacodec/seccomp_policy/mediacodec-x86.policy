@@ -49,6 +49,8 @@ dup: 1
 set_tid_address: 1
 write: 1
 nanosleep: 1
+sched_setscheduler: 1
+uname: 1
 
 # Required by AddressSanitizer
 gettid: 1

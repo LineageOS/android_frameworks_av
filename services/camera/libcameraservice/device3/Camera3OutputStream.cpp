@@ -269,8 +269,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
         }
 
         if (timestamp == 0) {
-            ALOGE("%s: Stream %d: timestamp shouldn't be 0", __FUNCTION__, mId);
-            return BAD_VALUE;
+            ALOGW("%s: Stream %d: timestamp shouldn't be 0", __FUNCTION__, mId);
         }
 
         /* Certain consumers (such as AudioSource or HardwareComposer) use
