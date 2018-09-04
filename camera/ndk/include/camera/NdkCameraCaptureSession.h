@@ -45,8 +45,6 @@
 
 __BEGIN_DECLS
 
-#if __ANDROID_API__ >= 24
-
 /**
  * ACameraCaptureSession is an opaque type that manages frame captures of a camera device.
  *
@@ -434,7 +432,7 @@ typedef struct ACameraDevice ACameraDevice;
  *
  */
 camera_status_t ACameraCaptureSession_getDevice(
-        ACameraCaptureSession* session, /*out*/ACameraDevice** device);
+        ACameraCaptureSession* session, /*out*/ACameraDevice** device) __INTRODUCED_IN(24);
 
 /**
  * Submit an array of requests to be captured in sequence as a burst in the minimum of time possible.
@@ -472,7 +470,7 @@ camera_status_t ACameraCaptureSession_capture(
         ACameraCaptureSession* session,
         /*optional*/ACameraCaptureSession_captureCallbacks* callbacks,
         int numRequests, ACaptureRequest** requests,
-        /*optional*/int* captureSequenceId);
+        /*optional*/int* captureSequenceId) __INTRODUCED_IN(24);
 
 /**
  * Request endlessly repeating capture of a sequence of images by this capture session.
@@ -526,7 +524,7 @@ camera_status_t ACameraCaptureSession_setRepeatingRequest(
         ACameraCaptureSession* session,
         /*optional*/ACameraCaptureSession_captureCallbacks* callbacks,
         int numRequests, ACaptureRequest** requests,
-        /*optional*/int* captureSequenceId);
+        /*optional*/int* captureSequenceId) __INTRODUCED_IN(24);
 
 /**
  * Cancel any ongoing repeating capture set by {@link ACameraCaptureSession_setRepeatingRequest}.
@@ -549,7 +547,8 @@ camera_status_t ACameraCaptureSession_setRepeatingRequest(
  *         <li>{@link ACAMERA_ERROR_CAMERA_SERVICE} if the camera service encounters fatal error</li>
  *         <li>{@link ACAMERA_ERROR_UNKNOWN} if the method fails for some other reasons</li></ul>
  */
-camera_status_t ACameraCaptureSession_stopRepeating(ACameraCaptureSession* session);
+camera_status_t ACameraCaptureSession_stopRepeating(ACameraCaptureSession* session)
+        __INTRODUCED_IN(24);
 
 /**
  * Discard all captures currently pending and in-progress as fast as possible.
@@ -589,11 +588,8 @@ camera_status_t ACameraCaptureSession_stopRepeating(ACameraCaptureSession* sessi
  *         <li>{@link ACAMERA_ERROR_CAMERA_SERVICE} if the camera service encounters fatal error</li>
  *         <li>{@link ACAMERA_ERROR_UNKNOWN} if the method fails for some other reasons</li></ul>
  */
-camera_status_t ACameraCaptureSession_abortCaptures(ACameraCaptureSession* session);
-
-#endif /* __ANDROID_API__ >= 24 */
-
-#if __ANDROID_API__ >= 28
+camera_status_t ACameraCaptureSession_abortCaptures(ACameraCaptureSession* session)
+        __INTRODUCED_IN(24);
 
 typedef struct ACaptureSessionOutput ACaptureSessionOutput;
 
@@ -638,8 +634,7 @@ typedef struct ACaptureSessionOutput ACaptureSessionOutput;
  *         <li>{@link ACAMERA_ERROR_UNKNOWN} if the method fails for some other reasons</li></ul>
  */
 camera_status_t ACameraCaptureSession_updateSharedOutput(ACameraCaptureSession* session,
-        ACaptureSessionOutput* output);
-#endif /* __ANDROID_API__ >= 28 */
+        ACaptureSessionOutput* output) __INTRODUCED_IN(28);
 
 __END_DECLS
 
