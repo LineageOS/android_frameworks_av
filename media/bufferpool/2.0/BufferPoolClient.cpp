@@ -247,7 +247,7 @@ public:
 BufferPoolClient::Impl::Impl(const sp<Accessor> &accessor)
     : mLocal(true), mValid(false), mAccessor(accessor), mSeqId(0),
       mLastEvictCacheUs(getTimestampNow()) {
-    const QueueDescriptor *fmqDesc;
+    const StatusDescriptor *fmqDesc;
     ResultStatus status = accessor->connect(
             &mLocalConnection, &mConnectionId, &fmqDesc, true);
     if (status == ResultStatus::OK) {
@@ -269,7 +269,9 @@ BufferPoolClient::Impl::Impl(const sp<IAccessor> &accessor)
     Return<void> transResult = accessor->connect(
             [&valid, &outConnection, &id, &outChannel]
             (ResultStatus status, sp<IConnection> connection,
-             ConnectionId connectionId, const QueueDescriptor& desc) {
+             ConnectionId connectionId, const StatusDescriptor& desc,
+             const InvalidationDescriptor& invDesc) {
+                (void) invDesc;
                 if (status == ResultStatus::OK) {
                     outConnection = connection;
                     id = connectionId;
