@@ -63,6 +63,36 @@ LOCAL_INIT_RC := android.hardware.media.omx@1.0-service.rc
 
 include $(BUILD_EXECUTABLE)
 
+####################################################################
+
+# service executable
+include $(CLEAR_VARS)
+# seccomp is not required for coverage build.
+ifneq ($(NATIVE_COVERAGE),true)
+LOCAL_REQUIRED_MODULES_arm := crash_dump.policy mediacodec.policy
+LOCAL_REQUIRED_MODULES_x86 := crash_dump.policy mediacodec.policy
+endif
+LOCAL_SRC_FILES := main_swcodecservice.cpp
+LOCAL_SHARED_LIBRARIES := \
+    libavservices_minijail \
+    libbase \
+    libbinder \
+    libcutils \
+    libhidltransport \
+    libhwbinder \
+    liblog \
+    libmedia \
+    libutils \
+    libziparchive \
+
+LOCAL_MODULE := mediaswcodec
+LOCAL_INIT_RC := mediaswcodec.rc
+LOCAL_32_BIT_ONLY := true
+
+include $(BUILD_EXECUTABLE)
+
+####################################################################
+
 # service seccomp policy
 ifeq ($(TARGET_ARCH), $(filter $(TARGET_ARCH), x86 x86_64 arm arm64))
 include $(CLEAR_VARS)

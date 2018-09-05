@@ -1,0 +1,6 @@
+service media.swcodec /system/bin/mediaswcodec
+    class main
+    user mediacodec
+    group camera drmrpc mediadrm
+    ioprio rt 4
+    writepid /dev/cpuset/foreground/tasks
