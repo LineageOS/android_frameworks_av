@@ -97,13 +97,15 @@ constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
 #define LOG_AUDIO_STATE() do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
         x->logEventHistTs(NBLog::EVENT_AUDIO_STATE, hash(__FILE__, __LINE__)); } while(0)
 
-// Record a typed entry that represents a thread's cycle time in nanoseconds.
+// Record a typed entry that represents a thread's work time in nanoseconds.
 // Parameter ns should be of type uint32_t.
-#define LOG_MONOTONIC_CYCLE_TIME(ns) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
-        x->logMonotonicCycleTime(ns); } while (0)
+#define LOG_WORK_TIME(ns) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+        x->log<NBLog::EVENT_WORK_TIME>(ns); } while (0)
 
+// Log the difference bewteen frames presented by HAL and frames written to HAL output sink,
+// divided by the sample rate. Parameter ms is of type double.
 #define LOG_LATENCY(ms) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
-        x->logLatency(ms); } while (0)
+        x->log<NBLog::EVENT_LATENCY>(ms); } while (0)
 
 namespace android {
 extern "C" {
