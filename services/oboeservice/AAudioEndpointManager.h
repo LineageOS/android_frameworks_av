@@ -56,8 +56,7 @@ public:
      * @return endpoint or null
      */
     android::sp<AAudioServiceEndpoint> openEndpoint(android::AAudioService &audioService,
-                                        const aaudio::AAudioStreamRequest &request,
-                                        aaudio_sharing_mode_t sharingMode);
+                                        const aaudio::AAudioStreamRequest &request);
 
     void closeEndpoint(android::sp<AAudioServiceEndpoint> serviceEndpoint);
 

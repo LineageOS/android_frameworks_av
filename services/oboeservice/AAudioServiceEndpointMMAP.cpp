@@ -210,9 +210,6 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
         uid_t audioServiceUid = getuid();
         if ((mMmapClient.clientUid != audioServiceUid) &&
             getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {
-            // Fallback is handled by caller but indicate what is possible in case
-            // this is used in the future
-            setSharingMode(AAUDIO_SHARING_MODE_SHARED);
             ALOGW("%s() - exclusive FD cannot be used by client", __func__);
             result = AAUDIO_ERROR_UNAVAILABLE;
             goto error;

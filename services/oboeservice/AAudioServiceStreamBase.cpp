@@ -81,8 +81,7 @@ std::string AAudioServiceStreamBase::dump() const {
     return result.str();
 }
 
-aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest &request,
-                                              aaudio_sharing_mode_t sharingMode) {
+aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest &request) {
     AAudioEndpointManager &mEndpointManager = AAudioEndpointManager::getInstance();
     aaudio_result_t result = AAUDIO_OK;
 
@@ -109,8 +108,7 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
         // referenced until the service returns a handle to the client.
         // So only one thread can open a stream.
         mServiceEndpoint = mEndpointManager.openEndpoint(mAudioService,
-                                                         request,
-                                                         sharingMode);
+                                                         request);
         if (mServiceEndpoint == nullptr) {
             ALOGE("%s() openEndpoint() failed", __func__);
             result = AAUDIO_ERROR_UNAVAILABLE;
