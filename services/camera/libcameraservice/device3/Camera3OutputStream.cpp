@@ -237,12 +237,14 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
     /**
      * Return buffer back to ANativeWindow
      */
-    if (buffer.status == CAMERA3_BUFFER_STATUS_ERROR || mDropBuffers) {
+    if (buffer.status == CAMERA3_BUFFER_STATUS_ERROR || mDropBuffers || timestamp == 0) {
         // Cancel buffer
         if (mDropBuffers) {
             ALOGV("%s: Dropping a frame for stream %d.", __FUNCTION__, mId);
-        } else {
+        } else if (buffer.status == CAMERA3_BUFFER_STATUS_ERROR) {
             ALOGW("%s: A frame is dropped for stream %d due to buffer error.", __FUNCTION__, mId);
+        } else {
+            ALOGE("%s: Stream %d: timestamp shouldn't be 0", __FUNCTION__, mId);
         }
 
         res = currentConsumer->cancelBuffer(currentConsumer.get(),
@@ -266,10 +268,6 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
                 ATRACE_NAME(traceLog);
             }
             mTraceFirstBuffer = false;
-        }
-
-        if (timestamp == 0) {
-            ALOGW("%s: Stream %d: timestamp shouldn't be 0", __FUNCTION__, mId);
         }
 
         /* Certain consumers (such as AudioSource or HardwareComposer) use
