@@ -98,6 +98,17 @@ int native_handle_read_fd(native_handle_t const* nh, int index) {
  */
 
 /**
+ * \brief Convert `Return<void>` to `status_t`. This is for legacy binder calls.
+ *
+ * \param[in] t The source `Return<void>`.
+ * \return The corresponding `status_t`.
+ */
+// convert: Return<void> -> status_t
+status_t toStatusT(Return<void> const& t) {
+    return t.isOk() ? OK : (t.isDeadObject() ? DEAD_OBJECT : UNKNOWN_ERROR);
+}
+
+/**
  * \brief Convert `Return<void>` to `binder::Status`.
  *
  * \param[in] t The source `Return<void>`.
@@ -107,19 +118,8 @@ int native_handle_read_fd(native_handle_t const* nh, int index) {
 ::android::binder::Status toBinderStatus(
         Return<void> const& t) {
     return ::android::binder::Status::fromExceptionCode(
-            t.isOk() ? OK : UNKNOWN_ERROR,
+            toStatusT(t),
             t.description().c_str());
-}
-
-/**
- * \brief Convert `Return<void>` to `status_t`. This is for legacy binder calls.
- *
- * \param[in] t The source `Return<void>`.
- * \return The corresponding `status_t`.
- */
-// convert: Return<void> -> status_t
-status_t toStatusT(Return<void> const& t) {
-    return t.isOk() ? OK : UNKNOWN_ERROR;
 }
 
 /**
