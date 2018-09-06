@@ -44,6 +44,8 @@
 
 __BEGIN_DECLS
 
+#if __ANDROID_API__ >= 24
+
 /**
  * ACameraMetadata is opaque type that provides access to read-only camera metadata like camera
  * characteristics (via {@link ACameraManager_getCameraCharacteristics}) or capture results (via
@@ -228,6 +230,8 @@ ACameraMetadata* ACameraMetadata_copy(const ACameraMetadata* src) __INTRODUCED_I
  * @param metadata the {@link ACameraMetadata} to be freed.
  */
 void ACameraMetadata_free(ACameraMetadata* metadata) __INTRODUCED_IN(24);
+
+#endif /* __ANDROID_API__ >= 24 */
 
 __END_DECLS
 
