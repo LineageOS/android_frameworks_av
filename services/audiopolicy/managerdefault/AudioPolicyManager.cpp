@@ -2811,12 +2811,9 @@ bool AudioPolicyManager::isOffloadSupported(const audio_offload_info_t& offloadI
     }
 
     // Check if offload has been disabled
-    char propValue[PROPERTY_VALUE_MAX];
-    if (property_get("audio.offload.disable", propValue, "0")) {
-        if (atoi(propValue) != 0) {
-            ALOGV("offload disabled by audio.offload.disable=%s", propValue );
-            return false;
-        }
+    if (property_get_bool("audio.offload.disable", false /* default_value */)) {
+        ALOGV("offload disabled by audio.offload.disable");
+        return false;
     }
 
     // Check if stream type is music, then only allow offload as of now.
@@ -2835,9 +2832,12 @@ bool AudioPolicyManager::isOffloadSupported(const audio_offload_info_t& offloadI
     }
 
     //If duration is less than minimum value defined in property, return false
-    if (property_get("audio.offload.min.duration.secs", propValue, NULL)) {
-        if (offloadInfo.duration_us < (atoi(propValue) * 1000000 )) {
-            ALOGV("Offload denied by duration < audio.offload.min.duration.secs(=%s)", propValue);
+    const int min_duration_secs = property_get_int32(
+            "audio.offload.min.duration.secs", -1 /* default_value */);
+    if (min_duration_secs >= 0) {
+        if (offloadInfo.duration_us < min_duration_secs * 1000000LL) {
+            ALOGV("Offload denied by duration < audio.offload.min.duration.secs(=%d)",
+                    min_duration_secs);
             return false;
         }
     } else if (offloadInfo.duration_us < OFFLOAD_DEFAULT_MIN_DURATION_SECS * 1000000) {
