@@ -378,6 +378,7 @@ public:
 
     // At least one non offloadable effect in the chain is enabled
     bool isNonOffloadableEnabled();
+    bool isNonOffloadableEnabled_l();
 
     void syncHalEffectsState();
 
