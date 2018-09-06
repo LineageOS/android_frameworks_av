@@ -190,7 +190,12 @@ inline status_t toStatusT(Status const& t) {
  */
 // convert: Status -> status_t
 inline status_t toStatusT(Return<Status> const& t) {
-    return t.isOk() ? toStatusT(static_cast<Status>(t)) : UNKNOWN_ERROR;
+    if (t.isOk()) {
+        return toStatusT(static_cast<Status>(t));
+    } else if (t.isDeadObject()) {
+        return DEAD_OBJECT;
+    }
+    return UNKNOWN_ERROR;
 }
 
 /**
