@@ -319,12 +319,6 @@ void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
 #endif
             "/extractors", *newList);
 
-    RegisterExtractorsInSystem("/vendor/lib"
-#ifdef __LP64__
-            "64"
-#endif
-            "/extractors", *newList);
-
     if (newUpdateApkPath != nullptr) {
         RegisterExtractorsInApk(newUpdateApkPath, *newList);
     }

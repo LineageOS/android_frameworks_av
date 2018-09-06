@@ -339,7 +339,7 @@ bool FastThread::threadLoop()
                     // these stores #1, #2, #3 are not atomic with respect to each other,
                     // or with respect to store #4 below
                     mDumpState->mMonotonicNs[i] = monotonicNs;
-                    LOG_MONOTONIC_CYCLE_TIME(monotonicNs);
+                    LOG_WORK_TIME(monotonicNs);
                     mDumpState->mLoadNs[i] = loadNs;
 #ifdef CPU_FREQUENCY_STATISTICS
                     mDumpState->mCpukHz[i] = kHz;

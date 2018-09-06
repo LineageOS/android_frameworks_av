@@ -20,6 +20,7 @@
 #define ANDROID_MEDIA_NBLOG_H
 
 #include <map>
+#include <type_traits>
 #include <unordered_set>
 #include <vector>
 
@@ -45,32 +46,57 @@ public:
     class Writer;
     class Reader;
 
+    // TODO have a comment somewhere explaining the whole process for adding a new EVENT_
+
+    // NBLog Event types. The Events are named to provide contextual meaning for what is logged.
+    // If adding a new standalone Event here, update the event-to-type mapping by adding a
+    // MAP_EVENT_TO_TYPE statement below.
     enum Event : uint8_t {
         EVENT_RESERVED,
         EVENT_STRING,               // ASCII string, not NUL-terminated
                                     // TODO: make timestamp optional
         EVENT_TIMESTAMP,            // clock_gettime(CLOCK_MONOTONIC)
-        EVENT_INTEGER,              // integer value entry
-        EVENT_FLOAT,                // floating point value entry
-        EVENT_PID,                  // process ID and process name
-        EVENT_AUTHOR,               // author index (present in merged logs) tracks entry's
-                                    // original log
-        EVENT_START_FMT,            // logFormat start event: entry includes format string,
+
+        // Types for Format Entry, i.e. formatted entry
+        EVENT_FMT_START,            // logFormat start event: entry includes format string,
                                     // following entries contain format arguments
-        EVENT_HASH,                 // unique HASH of log origin, originates from hash of file name
+        // format arguments
+        EVENT_FMT_TIMESTAMP,        // timestamp value entry
+        EVENT_FMT_HASH,             // unique HASH of log origin, originates from hash of file name
                                     // and line number
+        EVENT_FMT_STRING,           // string value entry
+        EVENT_FMT_INTEGER,          // integer value entry
+        EVENT_FMT_FLOAT,            // floating point value entry
+        EVENT_FMT_PID,              // process ID and process name
+        EVENT_FMT_AUTHOR,           // author index (present in merged logs) tracks entry's
+                                    // original log
+        // end of format arguments
+        EVENT_FMT_END,              // end of logFormat argument list
+
+        // Types for wakeup timestamp histograms
         EVENT_HISTOGRAM_ENTRY_TS,   // single datum for timestamp histogram
         EVENT_AUDIO_STATE,          // audio on/off event: logged on FastMixer::onStateChange call
-        EVENT_END_FMT,              // end of logFormat argument list
 
         // Types representing audio performance metrics
-        EVENT_LATENCY,              // TODO classify specifically what this is
-        EVENT_CPU_FREQUENCY,        // instantaneous CPU frequency in kHz
-        EVENT_MONOTONIC_CYCLE_TIME, // thread per-cycle monotonic time
-        EVENT_CPU_CYCLE_TIME,       // thread per-cycle cpu time
+        EVENT_LATENCY,              // difference between frames presented by HAL and frames
+                                    // written to HAL output sink, divided by sample rate.
+        EVENT_WORK_TIME,            // the time a thread takes to do work, e.g. read, write, etc.
 
         EVENT_UPPER_BOUND,          // to check for invalid events
     };
+
+    template <Event E> struct get_mapped;
+#define MAP_EVENT_TO_TYPE(E, T) \
+    template<> struct get_mapped<E> { \
+        static_assert(std::is_trivially_copyable<T>::value \
+                && !std::is_pointer<T>::value, \
+                "NBLog::Event must map to trivially copyable, non-pointer type."); \
+        typedef T type; \
+    }
+
+    // Maps an NBLog Event type to a C++ POD type.
+    MAP_EVENT_TO_TYPE(EVENT_LATENCY, double);
+    MAP_EVENT_TO_TYPE(EVENT_WORK_TIME, uint64_t);
 
 private:
 
@@ -119,10 +145,24 @@ private:
         void            copyTo(std::unique_ptr<audio_utils_fifo_writer> &dst) const;
         void            copyData(uint8_t *dst) const;
 
+        // memcpy preferred to reinterpret_cast to avoid potentially unsupported
+        // unaligned memory access.
+#if 0
         template<typename T>
         inline const T& payload() {
             return *reinterpret_cast<const T *>(mPtr + offsetof(entry, data));
         }
+#else
+        template<typename T>
+        inline T payload() {
+            static_assert(std::is_trivially_copyable<T>::value
+                    && !std::is_pointer<T>::value,
+                    "NBLog::EntryIterator payload must be trivially copyable, non-pointer type.");
+            T payload;
+            memcpy(&payload, mPtr + offsetof(entry, data), sizeof(payload));
+            return payload;
+        }
+#endif
 
         inline operator const uint8_t*() const {
             return mPtr;
@@ -169,14 +209,14 @@ private:
     // API for handling format entry operations
 
     // a formatted entry has the following structure:
-    //    * START_FMT entry, containing the format string
+    //    * FMT_START entry, containing the format string
     //    * TIMESTAMP entry
     //    * HASH entry
     //    * author entry of the thread that generated it (optional, present in merged log)
     //    * format arg1
     //    * format arg2
     //    * ...
-    //    * END_FMT entry
+    //    * FMT_END entry
     class FormatEntry : public AbstractEntry {
     public:
         // explicit FormatEntry(const EntryIterator &it);
@@ -262,6 +302,7 @@ private:
             offsetof(ending, length);
     };
 
+    // TODO move these somewhere else
     struct HistTsEntry {
         log_hash_t hash;
         int64_t ts;
@@ -320,6 +361,8 @@ public:
     };
 
     // ---------------------------------------------------------------------------
+    // NBLog Writer API
+    // ---------------------------------------------------------------------------
 
     // Writer is thread-safe with respect to Reader, but not with respect to multiple threads
     // calling Writer methods.  If you need multi-thread safety for writing, use LockedWriter.
@@ -335,24 +378,22 @@ public:
         virtual ~Writer();
 
         // FIXME needs comments, and some should be private
-        virtual void    log(const char *string);
-        virtual void    logf(const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
-        virtual void    logvf(const char *fmt, va_list ap);
-        virtual void    logTimestamp();
-        virtual void    logTimestamp(const int64_t ts);
-        virtual void    logInteger(const int x);
-        virtual void    logFloat(const float x);
-        virtual void    logPID();
-        virtual void    logStart(const char *fmt);
-        virtual void    logEnd();
-        virtual void    logHash(log_hash_t hash);
-        // The functions below are not in LockedWriter yet.
-        virtual void    logFormat(const char *fmt, log_hash_t hash, ...);
-        virtual void    logVFormat(const char *fmt, log_hash_t hash, va_list ap);
-        virtual void    logEventHistTs(Event event, log_hash_t hash);
-        virtual void    logLatency(double latencyMs);
-        virtual void    logMonotonicCycleTime(uint32_t monotonicNs);
-        // End of functions that are not in LockedWriter yet.
+        void    log(const char *string);
+        void    logf(const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
+        void    logTimestamp();
+        void    logFormat(const char *fmt, log_hash_t hash, ...);
+        void    logEventHistTs(Event event, log_hash_t hash);
+
+        // Log data related to Event E. See the event-to-type mapping for the type of data
+        // corresponding to the event. For example, if you see a mapping statement:
+        //     MAP_TYPE_TO_EVENT(E, T);
+        // then the usage of this method would be:
+        //     T data = doComputation();
+        //     tlNBLogWriter->log<NBLog::E>(data);
+        template<Event E>
+        void    log(typename get_mapped<E>::type data) {
+            log(E, &data, sizeof(data));
+        }
 
         virtual bool    isEnabled() const;
 
@@ -363,12 +404,24 @@ public:
 
         sp<IMemory>     getIMemory() const  { return mIMemory; }
 
+        // Public logging function implementations should always use one of the
+        // two log() function calls below to write to shared memory.
+    protected:
+        // Writes a single Entry to the FIFO if the writer is enabled.
+        // This is protected and virtual because LockedWriter uses a lock to protect
+        // writing to the FIFO before writing to this function.
+        virtual void log(const Entry &entry, bool trusted = false);
+
     private:
         // 0 <= length <= kMaxLength
-        // writes a single Entry to the FIFO
+        // Log a single Entry with corresponding event, data, and length.
         void    log(Event event, const void *data, size_t length);
-        // checks validity of an event before calling log above this one
-        void    log(const Entry &entry, bool trusted = false);
+
+        void    logvf(const char *fmt, va_list ap);
+        // helper functions for logging parts of a formatted entry
+        void    logStart(const char *fmt);
+        void    logTimestampFormat();
+        void    logVFormat(const char *fmt, log_hash_t hash, va_list ap);
 
         Shared* const   mShared;    // raw pointer to shared memory
         sp<IMemory>     mIMemory;   // ref-counted version, initialized in constructor
@@ -393,54 +446,20 @@ public:
         LockedWriter();
         LockedWriter(void *shared, size_t size);
 
-        virtual void    log(const char *string);
-        virtual void    logf(const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
-        virtual void    logvf(const char *fmt, va_list ap);
-        virtual void    logTimestamp();
-        virtual void    logTimestamp(const int64_t ts);
-        virtual void    logInteger(const int x);
-        virtual void    logFloat(const float x);
-        virtual void    logPID();
-        virtual void    logStart(const char *fmt);
-        virtual void    logEnd();
-        virtual void    logHash(log_hash_t hash);
-
-        virtual bool    isEnabled() const;
-        virtual bool    setEnabled(bool enabled);
+        bool    isEnabled() const override;
+        bool    setEnabled(bool enabled) override;
 
     private:
+        // Lock needs to be obtained before writing to FIFO.
+        void log(const Entry &entry, bool trusted = false) override;
         mutable Mutex   mLock;
     };
 
     // ---------------------------------------------------------------------------
+    // NBLog Reader API
+    // ---------------------------------------------------------------------------
 
-    // A snapshot of a readers buffer
-    // This is raw data. No analysis has been done on it
-    class Snapshot {
-    public:
-        Snapshot() = default;
-
-        explicit Snapshot(size_t bufferSize) : mData(new uint8_t[bufferSize]) {}
-
-        ~Snapshot() { delete[] mData; }
-
-        // amount of data lost (given by audio_utils_fifo_reader)
-        size_t   lost() const { return mLost; }
-
-        // iterator to beginning of readable segment of snapshot
-        // data between begin and end has valid entries
-        EntryIterator begin() const { return mBegin; }
-
-        // iterator to end of readable segment of snapshot
-        EntryIterator end() const { return mEnd; }
-
-    private:
-        friend class Reader;
-        uint8_t * const       mData{};
-        size_t                mLost{0};
-        EntryIterator mBegin;
-        EntryIterator mEnd;
-    };
+    class Snapshot;     // Forward declaration needed for Reader::getSnapshot()
 
     class Reader : public RefBase {
     public:
@@ -456,10 +475,12 @@ public:
         const std::string &name() const { return mName; }
 
     private:
+        // Amount of tries for reader to catch up with writer in getSnapshot().
         static constexpr int kMaxObtainTries = 3;
-        // startingTypes and endingTypes are used to check for log corruption.
-        static const std::unordered_set<Event> startingTypes;
-        static const std::unordered_set<Event> endingTypes;
+        // invalidBeginTypes and invalidEndTypes are used to align the Snapshot::begin() and
+        // Snapshot::end() EntryIterators to valid entries.
+        static const std::unordered_set<Event> invalidBeginTypes;
+        static const std::unordered_set<Event> invalidEndTypes;
         // declared as const because audio_utils_fifo() constructor
         sp<IMemory> mIMemory;       // ref-counted version, assigned only in constructor
 
@@ -470,12 +491,39 @@ public:
         audio_utils_fifo_reader * const mFifoReader;    // used to read from FIFO,
                                                         // non-NULL unless constructor fails
 
-        // Searches for the last entry of type <type> in the range [front, back)
+        // Searches for the last valid entry in the range [front, back)
         // back has to be entry-aligned. Returns nullptr if none enconuntered.
-        static const uint8_t *findLastEntryOfTypes(const uint8_t *front, const uint8_t *back,
-                                                   const std::unordered_set<Event> &types);
+        static const uint8_t *findLastValidEntry(const uint8_t *front, const uint8_t *back,
+                                                   const std::unordered_set<Event> &invalidTypes);
     };
 
+    // A snapshot of a readers buffer
+    // This is raw data. No analysis has been done on it
+    class Snapshot {
+    public:
+        ~Snapshot() { delete[] mData; }
+
+        // amount of data lost (given by audio_utils_fifo_reader)
+        size_t   lost() const { return mLost; }
+
+        // iterator to beginning of readable segment of snapshot
+        // data between begin and end has valid entries
+        EntryIterator begin() const { return mBegin; }
+
+        // iterator to end of readable segment of snapshot
+        EntryIterator end() const { return mEnd; }
+
+    private:
+        Snapshot() = default;
+        explicit Snapshot(size_t bufferSize) : mData(new uint8_t[bufferSize]) {}
+        friend std::unique_ptr<Snapshot> Reader::getSnapshot();
+        uint8_t * const       mData = nullptr;
+        size_t                mLost = 0;
+        EntryIterator mBegin;
+        EntryIterator mEnd;
+    };
+
+    // TODO move this to MediaLogService?
     class DumpReader : public Reader {
     public:
         DumpReader(const void *shared, size_t size, const std::string &name)
@@ -491,7 +539,7 @@ public:
         static void    appendFloat(String8 *body, const void *data);
         static void    appendPID(String8 *body, const void *data, size_t length);
         static void    appendTimestamp(String8 *body, const void *data);
-        //static size_t  fmtEntryLength(const uint8_t *data);   // TODO Eric remove if not used
+        // The bufferDump functions are used for debugging only.
         static String8 bufferDump(const uint8_t *buffer, size_t size);
         static String8 bufferDump(const EntryIterator &it);
     };

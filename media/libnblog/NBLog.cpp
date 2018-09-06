@@ -68,7 +68,7 @@ std::unique_ptr<NBLog::AbstractEntry> NBLog::AbstractEntry::buildEntry(const uin
     }
     const uint8_t type = EntryIterator(ptr)->type;
     switch (type) {
-    case EVENT_START_FMT:
+    case EVENT_FMT_START:
         return std::make_unique<FormatEntry>(FormatEntry(ptr));
     case EVENT_AUDIO_STATE:
     case EVENT_HISTOGRAM_ENTRY_TS:
@@ -107,7 +107,7 @@ NBLog::EntryIterator NBLog::FormatEntry::args() const
     ++it; // skip timestamp
     ++it; // skip hash
     // Skip author if present
-    if (it->type == EVENT_AUTHOR) {
+    if (it->type == EVENT_FMT_AUTHOR) {
         ++it;
     }
     return it;
@@ -138,7 +138,7 @@ int NBLog::FormatEntry::author() const
     ++it; // skip timestamp
     ++it; // skip hash
     // if there is an author entry, return it, return -1 otherwise
-    return it->type == EVENT_AUTHOR ? it.payload<int>() : -1;
+    return it->type == EVENT_FMT_AUTHOR ? it.payload<int>() : -1;
 }
 
 NBLog::EntryIterator NBLog::FormatEntry::copyWithAuthor(
@@ -151,14 +151,14 @@ NBLog::EntryIterator NBLog::FormatEntry::copyWithAuthor(
     // insert author entry
     size_t authorEntrySize = Entry::kOverhead + sizeof(author);
     uint8_t authorEntry[authorEntrySize];
-    authorEntry[offsetof(entry, type)] = EVENT_AUTHOR;
+    authorEntry[offsetof(entry, type)] = EVENT_FMT_AUTHOR;
     authorEntry[offsetof(entry, length)] =
         authorEntry[authorEntrySize + Entry::kPreviousLengthOffset] =
         sizeof(author);
     *(int*) (&authorEntry[offsetof(entry, data)]) = author;
     dst->write(authorEntry, authorEntrySize);
     // copy rest of entries
-    while ((++it)->type != EVENT_END_FMT) {
+    while ((++it)->type != EVENT_FMT_END) {
         it.copyTo(dst);
     }
     it.copyTo(dst);
@@ -394,44 +394,10 @@ void NBLog::Writer::logTimestamp()
     if (!mEnabled) {
         return;
     }
-    int64_t ts = get_monotonic_ns();
-    if (ts > 0) {
+    struct timespec ts;
+    if (!clock_gettime(CLOCK_MONOTONIC, &ts)) {
         log(EVENT_TIMESTAMP, &ts, sizeof(ts));
-    } else {
-        ALOGE("Failed to get timestamp");
     }
-}
-
-void NBLog::Writer::logTimestamp(const int64_t ts)
-{
-    if (!mEnabled) {
-        return;
-    }
-    log(EVENT_TIMESTAMP, &ts, sizeof(ts));
-}
-
-void NBLog::Writer::logInteger(const int x)
-{
-    if (!mEnabled) {
-        return;
-    }
-    log(EVENT_INTEGER, &x, sizeof(x));
-}
-
-void NBLog::Writer::logFloat(const float x)
-{
-    if (!mEnabled) {
-        return;
-    }
-    log(EVENT_FLOAT, &x, sizeof(x));
-}
-
-void NBLog::Writer::logPID()
-{
-    if (!mEnabled) {
-        return;
-    }
-    log(EVENT_PID, mPidTag, mPidTagSize);
 }
 
 void NBLog::Writer::logStart(const char *fmt)
@@ -443,24 +409,20 @@ void NBLog::Writer::logStart(const char *fmt)
     if (length > Entry::kMaxLength) {
         length = Entry::kMaxLength;
     }
-    log(EVENT_START_FMT, fmt, length);
+    log(EVENT_FMT_START, fmt, length);
 }
 
-void NBLog::Writer::logEnd()
+void NBLog::Writer::logTimestampFormat()
 {
     if (!mEnabled) {
         return;
     }
-    Entry entry = Entry(EVENT_END_FMT, NULL, 0);
-    log(entry, true);
-}
-
-void NBLog::Writer::logHash(log_hash_t hash)
-{
-    if (!mEnabled) {
-        return;
+    int64_t ts = get_monotonic_ns();
+    if (ts > 0) {
+        log(EVENT_FMT_TIMESTAMP, &ts, sizeof(ts));
+    } else {
+        ALOGE("Failed to get timestamp");
     }
-    log(EVENT_HASH, &hash, sizeof(hash));
 }
 
 void NBLog::Writer::logEventHistTs(Event event, log_hash_t hash)
@@ -476,22 +438,6 @@ void NBLog::Writer::logEventHistTs(Event event, log_hash_t hash)
     } else {
         ALOGE("Failed to get timestamp");
     }
-}
-
-void NBLog::Writer::logLatency(double latencyMs)
-{
-    if (!mEnabled) {
-        return;
-    }
-    log(EVENT_LATENCY, &latencyMs, sizeof(latencyMs));
-}
-
-void NBLog::Writer::logMonotonicCycleTime(uint32_t monotonicNs)
-{
-    if (!mEnabled) {
-        return;
-    }
-    log(EVENT_MONOTONIC_CYCLE_TIME, &monotonicNs, sizeof(monotonicNs));
 }
 
 void NBLog::Writer::logFormat(const char *fmt, log_hash_t hash, ...)
@@ -512,11 +458,13 @@ void NBLog::Writer::logVFormat(const char *fmt, log_hash_t hash, va_list argp)
     }
     Writer::logStart(fmt);
     int i;
-    double f;
+    double d;
+    float f;
     char* s;
+    size_t length;
     int64_t t;
-    Writer::logTimestamp();
-    Writer::logHash(hash);
+    Writer::logTimestampFormat();
+    log(EVENT_FMT_HASH, &hash, sizeof(hash));
     for (const char *p = fmt; *p != '\0'; p++) {
         // TODO: implement more complex formatting such as %.3f
         if (*p != '%') {
@@ -525,26 +473,31 @@ void NBLog::Writer::logVFormat(const char *fmt, log_hash_t hash, va_list argp)
         switch(*++p) {
         case 's': // string
             s = va_arg(argp, char *);
-            Writer::log(s);
+            length = strlen(s);
+            if (length > Entry::kMaxLength) {
+                length = Entry::kMaxLength;
+            }
+            log(EVENT_FMT_STRING, s, length);
             break;
 
         case 't': // timestamp
             t = va_arg(argp, int64_t);
-            Writer::logTimestamp(t);
+            log(EVENT_FMT_TIMESTAMP, &t, sizeof(t));
             break;
 
         case 'd': // integer
             i = va_arg(argp, int);
-            Writer::logInteger(i);
+            log(EVENT_FMT_INTEGER, &i, sizeof(i));
             break;
 
         case 'f': // float
-            f = va_arg(argp, double); // float arguments are promoted to double in vararg lists
-            Writer::logFloat((float)f);
+            d = va_arg(argp, double); // float arguments are promoted to double in vararg lists
+            f = (float)d;
+            log(EVENT_FMT_FLOAT, &f, sizeof(f));
             break;
 
         case 'p': // pid
-            Writer::logPID();
+            log(EVENT_FMT_PID, mPidTag, mPidTagSize);
             break;
 
         // the "%\0" case finishes parsing
@@ -560,7 +513,8 @@ void NBLog::Writer::logVFormat(const char *fmt, log_hash_t hash, va_list argp)
             break;
         }
     }
-    Writer::logEnd();
+    Entry etr(EVENT_FMT_END, nullptr, 0);
+    log(etr, true);
 }
 
 void NBLog::Writer::log(Event event, const void *data, size_t length)
@@ -630,79 +584,6 @@ NBLog::LockedWriter::LockedWriter(void *shared, size_t size)
 {
 }
 
-void NBLog::LockedWriter::log(const char *string)
-{
-    Mutex::Autolock _l(mLock);
-    Writer::log(string);
-}
-
-void NBLog::LockedWriter::logf(const char *fmt, ...)
-{
-    // FIXME should not take the lock until after formatting is done
-    Mutex::Autolock _l(mLock);
-    va_list ap;
-    va_start(ap, fmt);
-    Writer::logvf(fmt, ap);
-    va_end(ap);
-}
-
-void NBLog::LockedWriter::logvf(const char *fmt, va_list ap)
-{
-    // FIXME should not take the lock until after formatting is done
-    Mutex::Autolock _l(mLock);
-    Writer::logvf(fmt, ap);
-}
-
-void NBLog::LockedWriter::logTimestamp()
-{
-    // FIXME should not take the lock until after the clock_gettime() syscall
-    Mutex::Autolock _l(mLock);
-    Writer::logTimestamp();
-}
-
-void NBLog::LockedWriter::logTimestamp(const int64_t ts)
-{
-    Mutex::Autolock _l(mLock);
-    Writer::logTimestamp(ts);
-}
-
-void NBLog::LockedWriter::logInteger(const int x)
-{
-    Mutex::Autolock _l(mLock);
-    Writer::logInteger(x);
-}
-
-void NBLog::LockedWriter::logFloat(const float x)
-{
-    Mutex::Autolock _l(mLock);
-    Writer::logFloat(x);
-}
-
-void NBLog::LockedWriter::logPID()
-{
-    Mutex::Autolock _l(mLock);
-    Writer::logPID();
-}
-
-void NBLog::LockedWriter::logStart(const char *fmt)
-{
-    Mutex::Autolock _l(mLock);
-    Writer::logStart(fmt);
-}
-
-
-void NBLog::LockedWriter::logEnd()
-{
-    Mutex::Autolock _l(mLock);
-    Writer::logEnd();
-}
-
-void NBLog::LockedWriter::logHash(log_hash_t hash)
-{
-    Mutex::Autolock _l(mLock);
-    Writer::logHash(hash);
-}
-
 bool NBLog::LockedWriter::isEnabled() const
 {
     Mutex::Autolock _l(mLock);
@@ -715,21 +596,47 @@ bool NBLog::LockedWriter::setEnabled(bool enabled)
     return Writer::setEnabled(enabled);
 }
 
+void NBLog::LockedWriter::log(const Entry &entry, bool trusted) {
+    Mutex::Autolock _l(mLock);
+    Writer::log(entry, trusted);
+}
+
 // ---------------------------------------------------------------------------
 
-const std::unordered_set<NBLog::Event> NBLog::Reader::startingTypes {
-        NBLog::Event::EVENT_START_FMT,
-        NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS,
-        NBLog::Event::EVENT_AUDIO_STATE,
-        NBLog::Event::EVENT_LATENCY,
-        NBLog::Event::EVENT_MONOTONIC_CYCLE_TIME
+// We make a set of the invalid types rather than the valid types when aligning
+// Snapshot EntryIterators to valid entries during log corruption checking.
+// This is done in order to avoid the maintenance overhead of adding a new NBLog::Event
+// type to the two sets below whenever a new NBLog::Event type is created, as it is
+// very likely that new types added will be valid types.
+// Currently, invalidBeginTypes and invalidEndTypes are used to handle the special
+// case of a Format Entry, which consists of a variable number of simple log entries.
+// If a new NBLog::Event is added that consists of a variable number of simple log entries,
+// then these sets need to be updated.
+
+// We want the beginning of a Snapshot to point to an entry that is not in
+// the middle of a formatted entry and not an FMT_END.
+const std::unordered_set<NBLog::Event> NBLog::Reader::invalidBeginTypes {
+    NBLog::Event::EVENT_FMT_TIMESTAMP,
+    NBLog::Event::EVENT_FMT_HASH,
+    NBLog::Event::EVENT_FMT_STRING,
+    NBLog::Event::EVENT_FMT_INTEGER,
+    NBLog::Event::EVENT_FMT_FLOAT,
+    NBLog::Event::EVENT_FMT_PID,
+    NBLog::Event::EVENT_FMT_AUTHOR,
+    NBLog::Event::EVENT_FMT_END
 };
-const std::unordered_set<NBLog::Event> NBLog::Reader::endingTypes   {
-        NBLog::Event::EVENT_END_FMT,
-        NBLog::Event::EVENT_HISTOGRAM_ENTRY_TS,
-        NBLog::Event::EVENT_AUDIO_STATE,
-        NBLog::Event::EVENT_LATENCY,
-        NBLog::Event::EVENT_MONOTONIC_CYCLE_TIME
+
+// We want the end of a Snapshot to point to an entry that is not in
+// the middle of a formatted entry and not a FMT_START.
+const std::unordered_set<NBLog::Event> NBLog::Reader::invalidEndTypes   {
+    NBLog::Event::EVENT_FMT_START,
+    NBLog::Event::EVENT_FMT_TIMESTAMP,
+    NBLog::Event::EVENT_FMT_HASH,
+    NBLog::Event::EVENT_FMT_STRING,
+    NBLog::Event::EVENT_FMT_INTEGER,
+    NBLog::Event::EVENT_FMT_FLOAT,
+    NBLog::Event::EVENT_FMT_PID,
+    NBLog::Event::EVENT_FMT_AUTHOR
 };
 
 NBLog::Reader::Reader(const void *shared, size_t size, const std::string &name)
@@ -754,17 +661,22 @@ NBLog::Reader::~Reader()
     delete mFifo;
 }
 
-const uint8_t *NBLog::Reader::findLastEntryOfTypes(const uint8_t *front, const uint8_t *back,
-                                            const std::unordered_set<Event> &types) {
+const uint8_t *NBLog::Reader::findLastValidEntry(const uint8_t *front, const uint8_t *back,
+                                            const std::unordered_set<Event> &invalidTypes) {
+    if (front == nullptr || back == nullptr) {
+        return nullptr;
+    }
     while (back + Entry::kPreviousLengthOffset >= front) {
         const uint8_t *prev = back - back[Entry::kPreviousLengthOffset] - Entry::kOverhead;
-        if (prev < front || prev + prev[offsetof(entry, length)] +
-                            Entry::kOverhead != back) {
-
+        const Event type = (const Event)prev[offsetof(entry, type)];
+        if (prev < front
+                || prev + prev[offsetof(entry, length)] + Entry::kOverhead != back
+                || type <= NBLog::EVENT_RESERVED || type >= NBLog::EVENT_UPPER_BOUND) {
             // prev points to an out of limits or inconsistent entry
             return nullptr;
         }
-        if (types.find((const Event) prev[offsetof(entry, type)]) != types.end()) {
+        // if invalidTypes does not contain the type, then the type is valid.
+        if (invalidTypes.find(type) == invalidTypes.end()) {
             return prev;
         }
         back = prev;
@@ -778,7 +690,7 @@ const uint8_t *NBLog::Reader::findLastEntryOfTypes(const uint8_t *front, const u
 std::unique_ptr<NBLog::Snapshot> NBLog::Reader::getSnapshot()
 {
     if (mFifoReader == NULL) {
-        return std::make_unique<Snapshot>();
+        return std::unique_ptr<Snapshot>(new Snapshot());
     }
 
     // This emulates the behaviour of audio_utils_fifo_reader::read, but without incrementing the
@@ -808,9 +720,20 @@ std::unique_ptr<NBLog::Snapshot> NBLog::Reader::getSnapshot()
 
     if (availToRead <= 0) {
         ALOGW_IF(availToRead < 0, "NBLog Reader %s failed to catch up with Writer", mName.c_str());
-        return std::make_unique<Snapshot>();
+        return std::unique_ptr<Snapshot>(new Snapshot());
     }
 
+    // Change to #if 1 for debugging. This statement is useful for checking buffer fullness levels
+    // (as seen by reader) and how much data was lost. If you find that the fullness level is
+    // getting close to full, or that data loss is happening to often, then you should
+    // probably try some of the following:
+    // - log less data
+    // - log less often
+    // - increase the initial shared memory allocation for the buffer
+#if 0
+    ALOGD("getSnapshot name=%s, availToRead=%zd, capacity=%zu, fullness=%.3f, lost=%zu",
+            name().c_str(), availToRead, capacity, (double)availToRead / (double)capacity, lost);
+#endif
     std::unique_ptr<Snapshot> snapshot(new Snapshot(availToRead));
     memcpy(snapshot->mData, (const char *) mFifo->buffer() + iovec[0].mOffset, iovec[0].mLength);
     if (iovec[1].mLength > 0) {
@@ -821,28 +744,28 @@ std::unique_ptr<NBLog::Snapshot> NBLog::Reader::getSnapshot()
     // Handle corrupted buffer
     // Potentially, a buffer has corrupted data on both beginning (due to overflow) and end
     // (due to incomplete format entry). But even if the end format entry is incomplete,
-    // it ends in a complete entry (which is not an END_FMT). So is safe to traverse backwards.
+    // it ends in a complete entry (which is not an FMT_END). So is safe to traverse backwards.
     // TODO: handle client corruption (in the middle of a buffer)
 
     const uint8_t *back = snapshot->mData + availToRead;
     const uint8_t *front = snapshot->mData;
 
-    // Find last END_FMT. <back> is sitting on an entry which might be the middle of a FormatEntry.
-    // We go backwards until we find an EVENT_END_FMT.
-    const uint8_t *lastEnd = findLastEntryOfTypes(front, back, endingTypes);
+    // Find last FMT_END. <back> is sitting on an entry which might be the middle of a FormatEntry.
+    // We go backwards until we find an EVENT_FMT_END.
+    const uint8_t *lastEnd = findLastValidEntry(front, back, invalidEndTypes);
     if (lastEnd == nullptr) {
         snapshot->mEnd = snapshot->mBegin = EntryIterator(front);
     } else {
-        // end of snapshot points to after last END_FMT entry
+        // end of snapshot points to after last FMT_END entry
         snapshot->mEnd = EntryIterator(lastEnd).next();
-        // find first START_FMT
+        // find first FMT_START
         const uint8_t *firstStart = nullptr;
         const uint8_t *firstStartTmp = snapshot->mEnd;
-        while ((firstStartTmp = findLastEntryOfTypes(front, firstStartTmp, startingTypes))
+        while ((firstStartTmp = findLastValidEntry(front, firstStartTmp, invalidBeginTypes))
                 != nullptr) {
             firstStart = firstStartTmp;
         }
-        // firstStart is null if no START_FMT entry was found before lastEnd
+        // firstStart is null if no FMT_START entry was found before lastEnd
         if (firstStart == nullptr) {
             snapshot->mBegin = snapshot->mEnd;
         } else {
@@ -861,43 +784,30 @@ std::unique_ptr<NBLog::Snapshot> NBLog::Reader::getSnapshot()
 // writes the data to a map of class PerformanceAnalysis, based on their thread ID.
 void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Snapshot &snapshot, int author)
 {
-    for (const entry &etr : snapshot) {
-        switch (etr.type) {
+    // We don't do "auto it" because it reduces readability in this case.
+    for (EntryIterator it = snapshot.begin(); it != snapshot.end(); ++it) {
+        switch (it->type) {
         case EVENT_HISTOGRAM_ENTRY_TS: {
-            HistTsEntry *data = (HistTsEntry *) (etr.data);
-            // TODO This memcpies are here to avoid unaligned memory access crash.
-            // There's probably a more efficient way to do it
-            log_hash_t hash;
-            memcpy(&hash, &(data->hash), sizeof(hash));
-            int64_t ts;
-            memcpy(&ts, &data->ts, sizeof(ts));
+            HistTsEntry payload = it.payload<HistTsEntry>();
             // TODO: hash for histogram ts and audio state need to match
             // and correspond to audio production source file location
-            mThreadPerformanceAnalysis[author][0 /*hash*/].logTsEntry(ts);
+            mThreadPerformanceAnalysis[author][0 /*hash*/].logTsEntry(payload.ts);
         } break;
         case EVENT_AUDIO_STATE: {
-            HistTsEntry *data = (HistTsEntry *) (etr.data);
-            // TODO This memcpies are here to avoid unaligned memory access crash.
-            // There's probably a more efficient way to do it
-            log_hash_t hash;
-            memcpy(&hash, &(data->hash), sizeof(hash));
             mThreadPerformanceAnalysis[author][0 /*hash*/].handleStateChange();
         } break;
         case EVENT_LATENCY: {
-            double latencyMs;
-            memcpy(&latencyMs, etr.data, sizeof(latencyMs));
+            double latencyMs = it.payload<double>();
             mPerformanceData.addLatencyEntry(author, latencyMs);
         } break;
-        case EVENT_MONOTONIC_CYCLE_TIME: {
-            uint32_t monotonicNs;
-            memcpy(&monotonicNs, etr.data, sizeof(monotonicNs));
+        case EVENT_WORK_TIME: {
+            uint64_t monotonicNs = it.payload<uint64_t>();
             const double monotonicMs = monotonicNs * 1e-6;
             mPerformanceData.addCycleTimeEntry(author, monotonicMs);
         } break;
-        case EVENT_END_FMT:
         case EVENT_RESERVED:
         case EVENT_UPPER_BOUND:
-            ALOGW("warning: unexpected event %d", etr.type);
+            ALOGW("warning: unexpected event %d", it->type);
         default:
             break;
         }
@@ -940,22 +850,20 @@ void NBLog::DumpReader::dump(int fd, size_t indent)
     String8 timestamp, body;
 
     // TODO all logged types should have a printable format.
-    for (auto it = snapshot->begin(); it != snapshot->end(); ++it) {
+    for (EntryIterator it = snapshot->begin(); it != snapshot->end(); ++it) {
         switch (it->type) {
-        case EVENT_START_FMT:
+        case EVENT_FMT_START:
             it = handleFormat(FormatEntry(it), &timestamp, &body);
             break;
-        case EVENT_MONOTONIC_CYCLE_TIME: {
-            uint32_t monotonicNs;
-            memcpy(&monotonicNs, it->data, sizeof(monotonicNs));
-            body.appendFormat("Thread cycle: %u ns", monotonicNs);
+        case EVENT_WORK_TIME: {
+            uint64_t monotonicNs = it.payload<uint64_t>();
+            body.appendFormat("Thread cycle: %lu ns", (unsigned long)monotonicNs);
         } break;
         case EVENT_LATENCY: {
-            double latencyMs;
-            memcpy(&latencyMs, it->data, sizeof(latencyMs));
+            double latencyMs = it.payload<double>();
             body.appendFormat("latency: %.3f ms", latencyMs);
         } break;
-        case EVENT_END_FMT:
+        case EVENT_FMT_END:
         case EVENT_RESERVED:
         case EVENT_UPPER_BOUND:
             body.appendFormat("warning: unexpected event %d", it->type);
@@ -1078,7 +986,7 @@ NBLog::EntryIterator NBLog::DumpReader::handleFormat(const FormatEntry &fmtEntry
 
         // TODO check length for event type is correct
 
-        if (event == EVENT_END_FMT) {
+        if (event == EVENT_FMT_END) {
             break;
         }
 
@@ -1087,31 +995,31 @@ NBLog::EntryIterator NBLog::DumpReader::handleFormat(const FormatEntry &fmtEntry
         switch(fmt[fmt_offset])
         {
         case 's': // string
-            ALOGW_IF(event != EVENT_STRING,
+            ALOGW_IF(event != EVENT_FMT_STRING,
                 "NBLog Reader incompatible event for string specifier: %d", event);
             body->append((const char*) datum, length);
             break;
 
         case 't': // timestamp
-            ALOGW_IF(event != EVENT_TIMESTAMP,
+            ALOGW_IF(event != EVENT_FMT_TIMESTAMP,
                 "NBLog Reader incompatible event for timestamp specifier: %d", event);
             appendTimestamp(body, datum);
             break;
 
         case 'd': // integer
-            ALOGW_IF(event != EVENT_INTEGER,
+            ALOGW_IF(event != EVENT_FMT_INTEGER,
                 "NBLog Reader incompatible event for integer specifier: %d", event);
             appendInt(body, datum);
             break;
 
         case 'f': // float
-            ALOGW_IF(event != EVENT_FLOAT,
+            ALOGW_IF(event != EVENT_FMT_FLOAT,
                 "NBLog Reader incompatible event for float specifier: %d", event);
             appendFloat(body, datum);
             break;
 
         case 'p': // pid
-            ALOGW_IF(event != EVENT_PID,
+            ALOGW_IF(event != EVENT_FMT_PID,
                 "NBLog Reader incompatible event for pid specifier: %d", event);
             appendPID(body, datum, length);
             break;
@@ -1121,7 +1029,7 @@ NBLog::EntryIterator NBLog::DumpReader::handleFormat(const FormatEntry &fmtEntry
         }
         ++arg;
     }
-    ALOGW_IF(arg->type != EVENT_END_FMT, "Expected end of format, got %d", arg->type);
+    ALOGW_IF(arg->type != EVENT_FMT_END, "Expected end of format, got %d", arg->type);
     return arg;
 }
 

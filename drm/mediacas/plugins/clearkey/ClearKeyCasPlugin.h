@@ -120,7 +120,7 @@ public:
             AString *errorDetailMsg) override;
 
 private:
-    sp<ClearKeyCasSession> mCASSession;
+    std::shared_ptr<ClearKeyCasSession> mCASSession;
 
     String8 subSamplesToString(
             SubSample const *subSamples,

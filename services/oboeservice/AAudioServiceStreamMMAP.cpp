@@ -64,8 +64,13 @@ aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest 
 
     sp<AAudioServiceStreamMMAP> keep(this);
 
-    aaudio_result_t result = AAudioServiceStreamBase::open(request,
-                                                           AAUDIO_SHARING_MODE_EXCLUSIVE);
+    if (request.getConstantConfiguration().getSharingMode() != AAUDIO_SHARING_MODE_EXCLUSIVE) {
+        ALOGE("%s() sharingMode mismatch %d", __func__,
+              request.getConstantConfiguration().getSharingMode());
+        return AAUDIO_ERROR_INTERNAL;
+    }
+
+    aaudio_result_t result = AAudioServiceStreamBase::open(request);
     if (result != AAUDIO_OK) {
         return result;
     }
