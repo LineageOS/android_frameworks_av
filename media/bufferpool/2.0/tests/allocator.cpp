@@ -15,6 +15,7 @@
  */
 
 #include <cutils/ashmem.h>
+#include <sys/mman.h>
 #include "allocator.h"
 
 union Params {
@@ -42,6 +43,8 @@ struct HandleAshmem : public native_handle_t {
         | size_t(uint64_t(unsigned(mInts.mSizeHi)) << 32);
   }
 
+  static bool isValid(const native_handle_t * const o);
+
 protected:
   struct {
     int mAshmem;
@@ -68,6 +71,14 @@ const native_handle_t HandleAshmem::cHeader = {
   HandleAshmem::numInts,
   {}
 };
+
+bool HandleAshmem::isValid(const native_handle_t * const o) {
+  if (!o || memcmp(o, &cHeader, sizeof(cHeader))) {
+    return false;
+  }
+  const HandleAshmem *other = static_cast<const HandleAshmem*>(o);
+  return other->mInts.mMagic == kMagic;
+}
 
 class AllocationAshmem {
 private:
@@ -146,6 +157,46 @@ bool TestBufferPoolAllocator::compatible(const std::vector<uint8_t> &newParams,
       }
     }
     return true;
+  }
+  return false;
+}
+
+bool TestBufferPoolAllocator::Fill(const native_handle_t *handle, const unsigned char val) {
+  if (!HandleAshmem::isValid(handle)) {
+    return false;
+  }
+  const HandleAshmem *o = static_cast<const HandleAshmem*>(handle);
+  unsigned char *ptr = (unsigned char *)mmap(
+      NULL, o->size(), PROT_READ|PROT_WRITE, MAP_SHARED, o->ashmemFd(), 0);
+
+  if (ptr != MAP_FAILED) {
+    for (size_t i = 0; i < o->size(); ++i) {
+      ptr[i] = val;
+    }
+    munmap(ptr, o->size());
+    return true;
+  }
+  return false;
+}
+
+bool TestBufferPoolAllocator::Verify(const native_handle_t *handle, const unsigned char val) {
+  if (!HandleAshmem::isValid(handle)) {
+    return false;
+  }
+  const HandleAshmem *o = static_cast<const HandleAshmem*>(handle);
+  unsigned char *ptr = (unsigned char *)mmap(
+      NULL, o->size(), PROT_READ, MAP_SHARED, o->ashmemFd(), 0);
+
+  if (ptr != MAP_FAILED) {
+    bool res = true;
+    for (size_t i = 0; i < o->size(); ++i) {
+      if (ptr[i] != val) {
+        res = false;
+        break;
+      }
+    }
+    munmap(ptr, o->size());
+    return res;
   }
   return false;
 }

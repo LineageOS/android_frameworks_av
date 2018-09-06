@@ -147,11 +147,13 @@ TEST_F(BufferpoolSingleTest, TransferBuffer) {
 
   status = mManager->allocate(mConnectionId, vecParams, &allocHandle, &sbuffer);
   ASSERT_TRUE(status == ResultStatus::OK);
+  ASSERT_TRUE(TestBufferPoolAllocator::Fill(allocHandle, 0x77));
   status = mManager->postSend(mReceiverId, sbuffer, &transactionId, &postUs);
   ASSERT_TRUE(status == ResultStatus::OK);
   status = mManager->receive(mReceiverId, transactionId, sbuffer->mId, postUs,
                              &recvHandle, &rbuffer);
   EXPECT_TRUE(status == ResultStatus::OK);
+  ASSERT_TRUE(TestBufferPoolAllocator::Verify(recvHandle, 0x77));
 }
 
 }  // anonymous namespace
