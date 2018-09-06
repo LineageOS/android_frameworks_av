@@ -1157,7 +1157,8 @@ void AudioFlinger::EffectChain::setVolumeForOutput_l(uint32_t left, uint32_t rig
 {
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0 &&
-        (thread->type() == ThreadBase::OFFLOAD || thread->type() == ThreadBase::DIRECT)) {
+        (thread->type() == ThreadBase::OFFLOAD || thread->type() == ThreadBase::DIRECT) &&
+        !isNonOffloadableEnabled_l()) {
         PlaybackThread *t = (PlaybackThread *)thread.get();
         float vol_l = (float)left / (1 << 24);
         float vol_r = (float)right / (1 << 24);
@@ -2552,6 +2553,11 @@ void AudioFlinger::EffectChain::checkSuspendOnEffectEnabled(const sp<EffectModul
 bool AudioFlinger::EffectChain::isNonOffloadableEnabled()
 {
     Mutex::Autolock _l(mLock);
+    return isNonOffloadableEnabled_l();
+}
+
+bool AudioFlinger::EffectChain::isNonOffloadableEnabled_l()
+{
     size_t size = mEffects.size();
     for (size_t i = 0; i < size; i++) {
         if (mEffects[i]->isEnabled() && !mEffects[i]->isOffloadable()) {
