@@ -40,6 +40,8 @@
 
 __BEGIN_DECLS
 
+#if __ANDROID_API__ >= 24
+
 typedef enum {
     ACAMERA_OK = 0,
 
@@ -129,6 +131,8 @@ typedef enum {
      */
     ACAMERA_ERROR_PERMISSION_DENIED     = ACAMERA_ERROR_BASE - 13,
 } camera_status_t;
+
+#endif /* __ANDROID_API__ >= 24 */
 
 __END_DECLS
 
