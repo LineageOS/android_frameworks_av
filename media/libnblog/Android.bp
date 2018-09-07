@@ -16,6 +16,10 @@ cc_library_shared {
         "libutils",
     ],
 
+    static_libs: [
+        "libjsoncpp",
+    ],
+
     cflags: [
         "-Werror",
         "-Wall",

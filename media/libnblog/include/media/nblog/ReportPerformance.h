@@ -19,9 +19,21 @@
 
 #include <deque>
 #include <map>
+#include <memory>
 #include <vector>
 
+namespace Json {
+class Value;
+}
+
 namespace android {
+
+struct PerformanceData;
+
+// Dumps performance data to a JSON format.
+// Return by pointer instead of by value to avoid dependency side effects of including
+// the header of an external library.
+std::unique_ptr<Json::Value> dumpToJson(const PerformanceData& data);
 
 namespace ReportPerformance {
 

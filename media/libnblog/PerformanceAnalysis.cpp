@@ -41,6 +41,7 @@
 #include <media/nblog/ReportPerformance.h>
 #include <utils/Log.h>
 #include <utils/String8.h>
+#include <utils/Timers.h>
 
 #include <queue>
 #include <utility>
@@ -74,7 +75,7 @@ uint64_t Histogram::totalCount() const
     return mTotalCount;
 }
 
-std::string Histogram::serializeToString() const {
+std::string Histogram::toString() const {
     std::stringstream ss;
     static constexpr char kDivider = '|';
     ss << mBinSize << "," << mNumBins << "," << mLow << ",{";
@@ -102,38 +103,6 @@ std::string Histogram::serializeToString() const {
     ss << "}";
 
     return ss.str();
-}
-
-// TODO make a hash map from Event type to std::pair<HistConfig, unordered_map<int, Histogram>>
-// so that we don't have to create a "add histogram entry" method for every different metric.
-void PerformanceData::addCycleTimeEntry(int author, double cycleTimeMs)
-{
-    if (mCycleTimeMsHists.count(author) == 0) {
-        mCycleTimeMsHists.emplace(author, Histogram(kCycleTimeConfig));
-    }
-    mCycleTimeMsHists.at(author).add(cycleTimeMs);
-}
-
-void PerformanceData::addLatencyEntry(int author, double latencyMs)
-{
-    if (mLatencyMsHists.count(author) == 0) {
-        mLatencyMsHists.emplace(author, Histogram(kLatencyConfig));
-    }
-    mLatencyMsHists.at(author).add(latencyMs);
-}
-
-void PerformanceData::dump(int fd, int indent __unused)
-{
-    // TODO add thread metadata for better context.
-    // Also output in a more machine-readable friendly format.
-    dprintf(fd, "Thread cycle time histograms:\n");
-    for (const auto &item : mCycleTimeMsHists) {
-        dprintf(fd, "  Thread %d: %s\n", item.first, item.second.serializeToString().c_str());
-    }
-    dprintf(fd, "Latency histograms:\n");
-    for (const auto &item : mLatencyMsHists) {
-        dprintf(fd, "  Thread %d: %s\n", item.first, item.second.serializeToString().c_str());
-    }
 }
 
 //------------------------------------------------------------------------------

@@ -18,6 +18,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <queue>
 #include <stdarg.h>
 #include <stdint.h>
@@ -27,6 +28,7 @@
 #include <sys/prctl.h>
 #include <sys/time.h>
 #include <utility>
+#include <json/json.h>
 #include <media/nblog/NBLog.h>
 #include <media/nblog/PerformanceAnalysis.h>
 #include <media/nblog/ReportPerformance.h>
@@ -35,8 +37,26 @@
 
 namespace android {
 
-namespace ReportPerformance {
+std::unique_ptr<Json::Value> dumpToJson(const PerformanceData& data)
+{
+    std::unique_ptr<Json::Value> rootPtr = std::make_unique<Json::Value>(Json::objectValue);
+    Json::Value& root = *rootPtr;
+    root["type"] = data.type;
+    root["frameCount"] = (Json::Value::Int)data.frameCount;
+    root["sampleRate"] = (Json::Value::Int)data.sampleRate;
+    root["workMsHist"] = data.workHist.toString();
+    root["latencyMsHist"] = data.latencyHist.toString();
+    root["warmupMsHist"] = data.warmupHist.toString();
+    root["underruns"] = (Json::Value::Int64)data.underruns;
+    root["overruns"] = (Json::Value::Int64)data.overruns;
+    root["activeMs"] = (Json::Value::Int64)ns2ms(data.active);
+    root["durationMs"] = (Json::Value::Int64)ns2ms(systemTime() - data.start);
+    return rootPtr;
+}
 
+//------------------------------------------------------------------------------
+
+namespace ReportPerformance {
 
 // TODO: use a function like this to extract logic from writeToFile
 // https://stackoverflow.com/a/9279620
