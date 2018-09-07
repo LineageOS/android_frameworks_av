@@ -48,6 +48,8 @@
 
 namespace android {
 
+namespace ReportPerformance {
+
 void Histogram::add(double value)
 {
     // TODO Handle domain and range error exceptions?
@@ -106,8 +108,6 @@ std::string Histogram::toString() const {
 }
 
 //------------------------------------------------------------------------------
-
-namespace ReportPerformance {
 
 // Given an audio processing wakeup timestamp, buckets the time interval
 // since the previous timestamp into a histogram, searches for

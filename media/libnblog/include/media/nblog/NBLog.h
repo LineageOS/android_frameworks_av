@@ -440,6 +440,7 @@ public:
         void    log(Event event, const void *data, size_t length);
 
         void    logvf(const char *fmt, va_list ap);
+
         // helper functions for logging parts of a formatted entry
         void    logStart(const char *fmt);
         void    logTimestampFormat();
@@ -499,10 +500,12 @@ public:
     private:
         // Amount of tries for reader to catch up with writer in getSnapshot().
         static constexpr int kMaxObtainTries = 3;
+
         // invalidBeginTypes and invalidEndTypes are used to align the Snapshot::begin() and
         // Snapshot::end() EntryIterators to valid entries.
         static const std::unordered_set<Event> invalidBeginTypes;
         static const std::unordered_set<Event> invalidEndTypes;
+
         // declared as const because audio_utils_fifo() constructor
         sp<IMemory> mIMemory;       // ref-counted version, assigned only in constructor
 
@@ -561,6 +564,7 @@ public:
         static void    appendFloat(String8 *body, const void *data);
         static void    appendPID(String8 *body, const void *data, size_t length);
         static void    appendTimestamp(String8 *body, const void *data);
+
         // The bufferDump functions are used for debugging only.
         static String8 bufferDump(const uint8_t *buffer, size_t size);
         static String8 bufferDump(const EntryIterator &it);
@@ -603,10 +607,16 @@ public:
         MergeReader(const void *shared, size_t size, Merger &merger);
 
         void dump(int fd, int indent = 0);
+
         // process a particular snapshot of the reader
         void processSnapshot(Snapshot &snap, int author);
+
         // call getSnapshot of the content of the reader's buffer and process the data
         void getAndProcessSnapshot();
+
+        // check for periodic push of performance data to media metrics, and perform
+        // the send if it is time to do so.
+        void checkPushToMediaMetrics();
 
     private:
         // FIXME Needs to be protected by a lock,
@@ -620,7 +630,11 @@ public:
         ReportPerformance::PerformanceAnalysisMap mThreadPerformanceAnalysis;
 
         // compresses and stores audio performance data from each thread's buffers.
-        std::map<int /*author, i.e. thread index*/, PerformanceData> mThreadPerformanceData;
+        // first parameter is author, i.e. thread index.
+        std::map<int, ReportPerformance::PerformanceData> mThreadPerformanceData;
+
+        // how often to push data to Media Metrics
+        static constexpr nsecs_t kPeriodicMediaMetricsPush = s2ns((nsecs_t)2 * 60 * 60); // 2 hours
 
         // handle author entry by looking up the author's name and appending it to the body
         // returns number of bytes read from fmtEntry

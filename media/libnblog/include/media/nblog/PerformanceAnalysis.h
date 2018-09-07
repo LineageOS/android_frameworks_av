@@ -29,6 +29,8 @@ namespace android {
 
 class String8;
 
+namespace ReportPerformance {
+
 // TODO make this a templated class and put it in a separate file.
 // The templated parameters would be bin size and low limit.
 /*
@@ -168,8 +170,6 @@ struct PerformanceData {
 
 //------------------------------------------------------------------------------
 
-namespace ReportPerformance {
-
 class PerformanceAnalysis;
 
 // a map of PerformanceAnalysis instances
@@ -223,7 +223,7 @@ private:
     std::deque<timestamp> mPeakTimestamps;
 
     // stores buffer period histograms with timestamp of first sample
-    std::deque<std::pair<timestamp, Histogram>> mHists;
+    std::deque<std::pair<timestamp, Hist>> mHists;
 
     // Parameters used when detecting outliers
     struct BufferPeriod {

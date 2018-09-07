@@ -788,7 +788,7 @@ std::unique_ptr<NBLog::Snapshot> NBLog::Reader::getSnapshot()
 // writes the data to a map of class PerformanceAnalysis, based on their thread ID.
 void NBLog::MergeReader::processSnapshot(NBLog::Snapshot &snapshot, int author)
 {
-    PerformanceData& data = mThreadPerformanceData[author];
+    ReportPerformance::PerformanceData& data = mThreadPerformanceData[author];
     // We don't do "auto it" because it reduces readability in this case.
     for (EntryIterator it = snapshot.begin(); it != snapshot.end(); ++it) {
         switch (it->type) {
@@ -856,6 +856,19 @@ void NBLog::MergeReader::getAndProcessSnapshot()
             processSnapshot(*(snapshots[i]), i);
         }
     }
+    checkPushToMediaMetrics();
+}
+
+void NBLog::MergeReader::checkPushToMediaMetrics()
+{
+    const nsecs_t now = systemTime();
+    for (auto& item : mThreadPerformanceData) {
+        ReportPerformance::PerformanceData& data = item.second;
+        if (now - data.start >= kPeriodicMediaMetricsPush) {
+            (void)ReportPerformance::sendToMediaMetrics(data);
+            data.reset();   // data is persistent per thread
+        }
+    }
 }
 
 void NBLog::MergeReader::dump(int fd, int indent)
@@ -864,8 +877,8 @@ void NBLog::MergeReader::dump(int fd, int indent)
     ReportPerformance::dump(fd, indent, mThreadPerformanceAnalysis);
     Json::Value root(Json::arrayValue);
     for (const auto& item : mThreadPerformanceData) {
-        const PerformanceData& data = item.second;
-        std::unique_ptr<Json::Value> threadData = dumpToJson(data);
+        const ReportPerformance::PerformanceData& data = item.second;
+        std::unique_ptr<Json::Value> threadData = ReportPerformance::dumpToJson(data);
         if (threadData == nullptr) {
             continue;
         }
