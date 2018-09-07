@@ -58,7 +58,11 @@ enum : ConnectionId {
 };
 
 typedef android::hardware::MessageQueue<BufferStatusMessage, kSynchronizedReadWrite> BufferStatusQueue;
-typedef BufferStatusQueue::Descriptor QueueDescriptor;
+typedef BufferStatusQueue::Descriptor StatusDescriptor;
+
+typedef android::hardware::MessageQueue<BufferInvalidationMessage, kSynchronizedReadWrite>
+        BufferInvalidationQueue;
+typedef BufferInvalidationQueue::Descriptor InvalidationDescriptor;
 
 /**
  * Allocation wrapper class for buffer pool.

@@ -41,7 +41,7 @@ static constexpr int kNumElementsInQueue = 1024*16;
 static constexpr int kMinElementsToSyncInQueue = 128;
 
 ResultStatus BufferStatusObserver::open(
-        ConnectionId id, const QueueDescriptor** fmqDescPtr) {
+        ConnectionId id, const StatusDescriptor** fmqDescPtr) {
     if (mBufferStatusQueues.find(id) != mBufferStatusQueues.end()) {
         // TODO: id collision log?
         return ResultStatus::CRITICAL_ERROR;
@@ -91,7 +91,7 @@ void BufferStatusObserver::getBufferStatusChanges(std::vector<BufferStatusMessag
 }
 
 BufferStatusChannel::BufferStatusChannel(
-        const QueueDescriptor &fmqDesc) {
+        const StatusDescriptor &fmqDesc) {
     std::unique_ptr<BufferStatusQueue> queue =
             std::make_unique<BufferStatusQueue>(fmqDesc);
     if (!queue || queue->isValid() == false) {
