@@ -39,6 +39,10 @@ class TestBufferPoolAllocator : public BufferPoolAllocator {
   bool compatible(const std::vector<uint8_t> &newParams,
                   const std::vector<uint8_t> &oldParams) override;
 
+  static bool Fill(const native_handle_t *handle, const unsigned char val);
+
+  static bool Verify(const native_handle_t *handle, const unsigned char val);
+
 };
 
 // retrieve buffer allocator paramters

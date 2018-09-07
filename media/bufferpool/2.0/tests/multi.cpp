@@ -161,9 +161,11 @@ class BufferpoolMultiTest : public ::testing::Test {
           message.data.bufferId, message.data.timestampUs, &rhandle, &rbuffer);
       mManager->close(message.data.connectionId);
       if (status != ResultStatus::OK) {
-        message.data.command = PipeCommand::RECEIVE_ERROR;
-        sendMessage(mResultPipeFds, message);
-        return;
+        if (!TestBufferPoolAllocator::Verify(rhandle, 0x77)) {
+          message.data.command = PipeCommand::RECEIVE_ERROR;
+          sendMessage(mResultPipeFds, message);
+          return;
+        }
       }
     }
     message.data.command = PipeCommand::RECEIVE_OK;
@@ -194,6 +196,8 @@ TEST_F(BufferpoolMultiTest, TransferBuffer) {
     getTestAllocatorParams(&vecParams);
     status = mManager->allocate(mConnectionId, vecParams, &shandle, &sbuffer);
     ASSERT_TRUE(status == ResultStatus::OK);
+
+    ASSERT_TRUE(TestBufferPoolAllocator::Fill(shandle, 0x77));
 
     status = mManager->postSend(receiverId, sbuffer, &transactionId, &postUs);
     ASSERT_TRUE(status == ResultStatus::OK);
