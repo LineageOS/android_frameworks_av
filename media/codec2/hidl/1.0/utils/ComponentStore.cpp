@@ -57,7 +57,7 @@ namespace utils {
 
 using namespace ::android;
 using ::android::GraphicBufferSource;
-using namespace ::android::hardware::media::bufferpool::V1_0::implementation;
+using namespace ::android::hardware::media::bufferpool::V2_0::implementation;
 
 namespace /* unnamed */ {
 

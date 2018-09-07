@@ -282,7 +282,7 @@ std::atomic<std::uint32_t> Accessor::Impl::BufferPool::Invalidation::sInvSeqId(0
 
 Accessor::Impl::Impl::BufferPool::~BufferPool() {
     std::lock_guard<std::mutex> lock(mMutex);
-    ALOGD("Destruction - bufferpool %p "
+    ALOGD("Destruction - bufferpool2 %p "
           "cached: %zu/%zuM, %zu/%d%% in use; "
           "allocs: %zu, %d%% recycled; "
           "transfers: %zu, %d%% unfetced",
@@ -353,12 +353,12 @@ void Accessor::Impl::BufferPool::Invalidation::onInvalidationRequest(
             msgId = ++mInvalidationId;
         }
     }
-    ALOGV("bufferpool invalidation requested and queued");
+    ALOGV("bufferpool2 invalidation requested and queued");
     if (left == 0) {
         channel.postInvalidation(msgId, from, to);
     } else {
         // TODO: sending hint message?
-        ALOGV("bufferpool invalidation requested and pending");
+        ALOGV("bufferpoo2 invalidation requested and pending");
         Pending pending(needsAck, from, to, left, impl);
         mPendings.push_back(pending);
     }
@@ -380,7 +380,7 @@ void Accessor::Impl::BufferPool::Invalidation::onHandleAck() {
                     // lost.
                     it->second = mInvalidationId;
                 } else {
-                    ALOGV("bufferpool observer died %lld", (long long)it->first);
+                    ALOGV("bufferpool2 observer died %lld", (long long)it->first);
                     deads.insert(it->first);
                 }
             }
@@ -682,7 +682,7 @@ void Accessor::Impl::BufferPool::cleanUp(bool clearCache) {
         mLastCleanUpUs = mTimestampUs;
         if (mTimestampUs > mLastLogUs + kLogDurationUs) {
             mLastLogUs = mTimestampUs;
-            ALOGD("bufferpool %p : %zu(%zu size) total buffers - "
+            ALOGD("bufferpool2 %p : %zu(%zu size) total buffers - "
                   "%zu(%zu size) used buffers - %zu/%zu (recycle/alloc) - "
                   "%zu/%zu (fetch/transfer)",
                   this, mStats.mBuffersCached, mStats.mSizeCached,
@@ -703,7 +703,7 @@ void Accessor::Impl::BufferPool::cleanUp(bool clearCache) {
                 freeIt = mFreeBuffers.erase(freeIt);
             } else {
                 ++freeIt;
-                ALOGW("bufferpool inconsistent!");
+                ALOGW("bufferpool2 inconsistent!");
             }
         }
     }
@@ -722,7 +722,7 @@ void Accessor::Impl::BufferPool::invalidate(
                 freeIt = mFreeBuffers.erase(freeIt);
                 continue;
             } else {
-                ALOGW("bufferpool inconsistent!");
+                ALOGW("bufferpool2 inconsistent!");
             }
         }
         ++freeIt;

@@ -34,7 +34,7 @@
 #include <media/stagefright/bqhelper/WGraphicBufferProducer.h>
 #undef LOG
 
-#include <android/hardware/media/bufferpool/1.0/IClientManager.h>
+#include <android/hardware/media/bufferpool/2.0/IClientManager.h>
 #include <android/hardware/media/c2/1.0/IComponent.h>
 #include <android/hardware/media/c2/1.0/IComponentInterface.h>
 #include <android/hardware/media/c2/1.0/IComponentListener.h>
@@ -55,8 +55,8 @@ using ::android::TWGraphicBufferProducer;
 
 using namespace ::android::hardware::media::c2::V1_0;
 using namespace ::android::hardware::media::c2::V1_0::utils;
-using namespace ::android::hardware::media::bufferpool::V1_0;
-using namespace ::android::hardware::media::bufferpool::V1_0::implementation;
+using namespace ::android::hardware::media::bufferpool::V2_0;
+using namespace ::android::hardware::media::bufferpool::V2_0::implementation;
 
 namespace /* unnamed */ {
 
