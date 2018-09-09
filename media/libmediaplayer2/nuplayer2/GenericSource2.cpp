@@ -1590,15 +1590,20 @@ status_t NuPlayer2::GenericSource2::checkDrmInfo()
         return OK; // source without DRM info
     }
 
-    sp<ABuffer> drmInfoBuffer = NuPlayer2Drm::retrieveDrmInfo(psshInfo);
-    ALOGV("checkDrmInfo: MEDIA_DRM_INFO PSSH drm info size: %d", (int)drmInfoBuffer->size());
+    PlayerMessage playerMsg;
+    status_t ret = NuPlayer2Drm::retrieveDrmInfo(psshInfo, &playerMsg);
+    ALOGV("checkDrmInfo: MEDIA_DRM_INFO PSSH drm info size: %d", (int)playerMsg.ByteSize());
 
-    if (drmInfoBuffer->size() == 0) {
-        ALOGE("checkDrmInfo: Unexpected parcel size: 0");
+    if (ret != OK) {
+        ALOGE("checkDrmInfo: failed to retrive DrmInfo %d", ret);
         return UNKNOWN_ERROR;
     }
 
-    notifyDrmInfo(drmInfoBuffer);
+    int size = playerMsg.ByteSize();
+    sp<ABuffer> drmInfoBuf = new ABuffer(size);
+    playerMsg.SerializeToArray(drmInfoBuf->data(), size);
+    drmInfoBuf->setRange(0, size);
+    notifyDrmInfo(drmInfoBuf);
 
     return OK;
 }

@@ -2145,7 +2145,8 @@ void NuPlayer2::updateVideoSize(
             displayHeight);
 }
 
-void NuPlayer2::notifyListener(int64_t srcId, int msg, int ext1, int ext2, const Parcel *in) {
+void NuPlayer2::notifyListener(
+        int64_t srcId, int msg, int ext1, int ext2, const PlayerMessage *in) {
     if (mDriver == NULL) {
         return;
     }
@@ -2616,15 +2617,15 @@ void NuPlayer2::onSourceNotify(const sp<AMessage> &msg) {
         // Modular DRM
         case Source::kWhatDrmInfo:
         {
-            Parcel parcel;
+            PlayerMessage playerMsg;
             sp<ABuffer> drmInfo;
             CHECK(msg->findBuffer("drmInfo", &drmInfo));
-            parcel.setData(drmInfo->data(), drmInfo->size());
+            playerMsg.ParseFromArray(drmInfo->data(), drmInfo->size());
 
-            ALOGV("onSourceNotify() kWhatDrmInfo MEDIA2_DRM_INFO drmInfo: %p  parcel size: %zu",
-                    drmInfo.get(), parcel.dataSize());
+            ALOGV("onSourceNotify() kWhatDrmInfo MEDIA2_DRM_INFO drmInfo: %p  playerMsg size: %d",
+                    drmInfo.get(), playerMsg.ByteSize());
 
-            notifyListener(srcId, MEDIA2_DRM_INFO, 0 /* ext1 */, 0 /* ext2 */, &parcel);
+            notifyListener(srcId, MEDIA2_DRM_INFO, 0 /* ext1 */, 0 /* ext2 */, &playerMsg);
 
             break;
         }
@@ -2845,28 +2846,24 @@ void NuPlayer2::sendSubtitleData(const sp<ABuffer> &buffer, int32_t baseIndex) {
     CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
     CHECK(buffer->meta()->findInt64("durationUs", &durationUs));
 
-    Parcel in;
-    in.writeInt32(trackIndex + baseIndex);
-    in.writeInt64(timeUs);
-    in.writeInt64(durationUs);
-    in.writeInt32(buffer->size());
-    in.writeInt32(buffer->size());
-    in.write(buffer->data(), buffer->size());
+    PlayerMessage playerMsg;
+    playerMsg.add_values()->set_int32_value(trackIndex + baseIndex);
+    playerMsg.add_values()->set_int64_value(timeUs);
+    playerMsg.add_values()->set_int64_value(durationUs);
+    playerMsg.add_values()->set_bytes_value(buffer->data(), buffer->size());
 
-    notifyListener(mSrcId, MEDIA2_SUBTITLE_DATA, 0, 0, &in);
+    notifyListener(mSrcId, MEDIA2_SUBTITLE_DATA, 0, 0, &playerMsg);
 }
 
 void NuPlayer2::sendTimedMetaData(const sp<ABuffer> &buffer) {
     int64_t timeUs;
     CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
 
-    Parcel in;
-    in.writeInt64(timeUs);
-    in.writeInt32(buffer->size());
-    in.writeInt32(buffer->size());
-    in.write(buffer->data(), buffer->size());
+    PlayerMessage playerMsg;
+    playerMsg.add_values()->set_int64_value(timeUs);
+    playerMsg.add_values()->set_bytes_value(buffer->data(), buffer->size());
 
-    notifyListener(mSrcId, MEDIA2_META_DATA, 0, 0, &in);
+    notifyListener(mSrcId, MEDIA2_META_DATA, 0, 0, &playerMsg);
 }
 
 void NuPlayer2::sendTimedTextData(const sp<ABuffer> &buffer) {
@@ -2896,7 +2893,8 @@ void NuPlayer2::sendTimedTextData(const sp<ABuffer> &buffer) {
     }
 
     if ((parcel.dataSize() > 0)) {
-        notifyListener(mSrcId, MEDIA2_TIMED_TEXT, 0, 0, &parcel);
+        // TODO: convert text data to PlayerMessage
+        // notifyListener(mSrcId, MEDIA2_TIMED_TEXT, 0, 0, &parcel);
     } else {  // send an empty timed text
         notifyListener(mSrcId, MEDIA2_TIMED_TEXT, 0, 0);
     }

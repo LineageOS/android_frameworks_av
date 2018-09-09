@@ -78,7 +78,7 @@ struct NuPlayer2Driver : public MediaPlayer2Interface {
     void notifyRebufferingWhenExit(int64_t srcId, bool status);
     void notifySeekComplete(int64_t srcId);
     void notifyListener(int64_t srcId, int msg, int ext1 = 0, int ext2 = 0,
-                        const Parcel *in = NULL);
+                        const PlayerMessage *in = NULL);
     void notifyFlagsChanged(int64_t srcId, uint32_t flags);
 
     // Modular DRM
@@ -145,7 +145,7 @@ private:
 
     status_t start_l();
     void notifyListener_l(int64_t srcId, int msg, int ext1 = 0, int ext2 = 0,
-                          const Parcel *in = NULL);
+                          const PlayerMessage *in = NULL);
 
     DISALLOW_EVIL_CONSTRUCTORS(NuPlayer2Driver);
 };
