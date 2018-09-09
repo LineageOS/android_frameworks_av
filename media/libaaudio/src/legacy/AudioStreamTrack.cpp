@@ -88,9 +88,9 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     int32_t notificationFrames = 0;
 
-    audio_format_t format = (getFormat() == AAUDIO_FORMAT_UNSPECIFIED)
+    const audio_format_t format = (getFormat() == AUDIO_FORMAT_DEFAULT)
             ? AUDIO_FORMAT_PCM_FLOAT
-            : AAudioConvert_aaudioToAndroidDataFormat(getFormat());
+            : getFormat();
 
     // Setup the callback if there is one.
     AudioTrack::callback_t callback = nullptr;
@@ -178,10 +178,8 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     // Get the actual values from the AudioTrack.
     setSamplesPerFrame(mAudioTrack->channelCount());
-    aaudio_format_t aaudioFormat =
-            AAudioConvert_androidToAAudioDataFormat(mAudioTrack->format());
-    setFormat(aaudioFormat);
-    setDeviceFormat(aaudioFormat);
+    setFormat(mAudioTrack->format());
+    setDeviceFormat(mAudioTrack->format());
 
     int32_t actualSampleRate = mAudioTrack->getSampleRate();
     ALOGW_IF(actualSampleRate != getSampleRate(),

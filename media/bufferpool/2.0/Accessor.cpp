@@ -117,14 +117,20 @@ sp<ConnectionDeathRecipient> Accessor::getConnectionDeathRecipient() {
 Return<void> Accessor::connect(connect_cb _hidl_cb) {
     sp<Connection> connection;
     ConnectionId connectionId;
-    const QueueDescriptor* fmqDesc;
+    const StatusDescriptor* fmqDesc;
 
     ResultStatus status = connect(&connection, &connectionId, &fmqDesc, false);
     if (status == ResultStatus::OK) {
-        _hidl_cb(status, connection, connectionId, *fmqDesc);
+        _hidl_cb(status, connection, connectionId, *fmqDesc,
+                 android::hardware::MQDescriptorSync<BufferInvalidationMessage>(
+                         std::vector<android::hardware::GrantorDescriptor>(),
+                         nullptr /* nhandle */, 0 /* size */));
     } else {
         _hidl_cb(status, nullptr, -1LL,
                  android::hardware::MQDescriptorSync<BufferStatusMessage>(
+                         std::vector<android::hardware::GrantorDescriptor>(),
+                         nullptr /* nhandle */, 0 /* size */),
+                 android::hardware::MQDescriptorSync<BufferInvalidationMessage>(
                          std::vector<android::hardware::GrantorDescriptor>(),
                          nullptr /* nhandle */, 0 /* size */));
     }
@@ -162,7 +168,7 @@ ResultStatus Accessor::fetch(
 
 ResultStatus Accessor::connect(
         sp<Connection> *connection, ConnectionId *pConnectionId,
-        const QueueDescriptor** fmqDescPtr, bool local) {
+        const StatusDescriptor** fmqDescPtr, bool local) {
     if (mImpl) {
         ResultStatus status = mImpl->connect(this, connection, pConnectionId, fmqDescPtr);
         if (!local && status == ResultStatus::OK) {

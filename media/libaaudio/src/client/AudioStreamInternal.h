@@ -27,7 +27,6 @@
 #include "client/AudioEndpoint.h"
 #include "core/AudioStream.h"
 #include "utility/AudioClock.h"
-#include "utility/LinearRamp.h"
 
 using android::sp;
 using android::IAAudioService;
@@ -193,6 +192,8 @@ private:
 
     int64_t                  mServiceLatencyNanos = 0;
 
+    // Sometimes the hardware is operating with a different channel count from the app.
+    // Then we require conversion in AAudio.
     int32_t                  mDeviceChannelCount = 0;
 };
 

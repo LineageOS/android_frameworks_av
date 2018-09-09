@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 
 #include <algorithm>
+#include <audio_utils/primitives.h>
 #include <aaudio/AAudio.h>
 
 #include "client/AudioStreamInternalCapture.h"
@@ -165,35 +166,36 @@ aaudio_result_t AudioStreamInternalCapture::readNowWithConversion(void *buffer,
     // Read data in one or two parts.
     for (int partIndex = 0; framesLeft > 0 && partIndex < WrappingBuffer::SIZE; partIndex++) {
         int32_t framesToProcess = framesLeft;
-        int32_t framesAvailable = wrappingBuffer.numFrames[partIndex];
+        const int32_t framesAvailable = wrappingBuffer.numFrames[partIndex];
         if (framesAvailable <= 0) break;
 
         if (framesToProcess > framesAvailable) {
             framesToProcess = framesAvailable;
         }
 
-        int32_t numBytes = getBytesPerFrame() * framesToProcess;
-        int32_t numSamples = framesToProcess * getSamplesPerFrame();
+        const int32_t numBytes = getBytesPerFrame() * framesToProcess;
+        const int32_t numSamples = framesToProcess * getSamplesPerFrame();
 
+        const audio_format_t sourceFormat = getDeviceFormat();
+        const audio_format_t destinationFormat = getFormat();
         // TODO factor this out into a utility function
-        if (getDeviceFormat() == getFormat()) {
+        if (sourceFormat == destinationFormat) {
             memcpy(destination, wrappingBuffer.data[partIndex], numBytes);
-        } else if (getDeviceFormat() == AAUDIO_FORMAT_PCM_I16
-                   && getFormat() == AAUDIO_FORMAT_PCM_FLOAT) {
-            AAudioConvert_pcm16ToFloat(
-                    (const int16_t *) wrappingBuffer.data[partIndex],
+        } else if (sourceFormat == AUDIO_FORMAT_PCM_16_BIT
+                   && destinationFormat == AUDIO_FORMAT_PCM_FLOAT) {
+            memcpy_to_float_from_i16(
                     (float *) destination,
-                    numSamples,
-                    1.0f);
-        } else if (getDeviceFormat() == AAUDIO_FORMAT_PCM_FLOAT
-                   && getFormat() == AAUDIO_FORMAT_PCM_I16) {
-            AAudioConvert_floatToPcm16(
-                    (const float *) wrappingBuffer.data[partIndex],
+                    (const int16_t *) wrappingBuffer.data[partIndex],
+                    numSamples);
+        } else if (sourceFormat == AUDIO_FORMAT_PCM_FLOAT
+                   && destinationFormat == AUDIO_FORMAT_PCM_16_BIT) {
+            memcpy_to_i16_from_float(
                     (int16_t *) destination,
-                    numSamples,
-                    1.0f);
+                    (const float *) wrappingBuffer.data[partIndex],
+                    numSamples);
         } else {
-            ALOGE("Format conversion not supported!");
+            ALOGE("%s() - Format conversion not supported! audio_format_t source = %u, dest = %u",
+                __func__, sourceFormat, destinationFormat);
             return AAUDIO_ERROR_INVALID_FORMAT;
         }
         destination += numBytes;

@@ -662,9 +662,12 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
 
     removeOutstandingBuffer(buffer);
 
+    // Buffer status may be changed, so make a copy of the stream_buffer struct.
+    camera3_stream_buffer b = buffer;
     if (timestampIncreasing && timestamp != 0 && timestamp <= mLastTimestamp) {
-        ALOGW("%s: Stream %d: timestamp %" PRId64 " is not increasing. Prev timestamp %" PRId64,
+        ALOGE("%s: Stream %d: timestamp %" PRId64 " is not increasing. Prev timestamp %" PRId64,
                 __FUNCTION__, mId, timestamp, mLastTimestamp);
+        b.status = CAMERA3_BUFFER_STATUS_ERROR;
     }
     mLastTimestamp = timestamp;
 
@@ -676,9 +679,9 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
      *
      * Do this for getBuffer as well.
      */
-    status_t res = returnBufferLocked(buffer, timestamp);
+    status_t res = returnBufferLocked(b, timestamp);
     if (res == OK) {
-        fireBufferListenersLocked(buffer, /*acquired*/false, /*output*/true);
+        fireBufferListenersLocked(b, /*acquired*/false, /*output*/true);
     }
 
     // Even if returning the buffer failed, we still want to signal whoever is waiting for the

@@ -147,7 +147,7 @@ struct Accessor : public IAccessor {
      */
     ResultStatus connect(
             sp<Connection> *connection, ConnectionId *pConnectionId,
-            const QueueDescriptor** fmqDescPtr, bool local);
+            const StatusDescriptor** fmqDescPtr, bool local);
 
     /**
      * Closes the specified connection to the client.

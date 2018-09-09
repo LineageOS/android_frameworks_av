@@ -139,7 +139,7 @@ Accessor::Impl::~Impl() {
 
 ResultStatus Accessor::Impl::connect(
         const sp<Accessor> &accessor, sp<Connection> *connection,
-        ConnectionId *pConnectionId, const QueueDescriptor** fmqDescPtr) {
+        ConnectionId *pConnectionId, const StatusDescriptor** fmqDescPtr) {
     sp<Connection> newConnection = new Connection();
     ResultStatus status = ResultStatus::CRITICAL_ERROR;
     {

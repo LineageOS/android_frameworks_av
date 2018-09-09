@@ -167,7 +167,9 @@ AAUDIO_API void AAudioStreamBuilder_setFormat(AAudioStreamBuilder* builder,
                                                    aaudio_format_t format)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
-    streamBuilder->setFormat(format);
+    // Use audio_format_t everywhere internally.
+    const audio_format_t internalFormat = AAudioConvert_aaudioToAndroidDataFormat(format);
+    streamBuilder->setFormat(internalFormat);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setSharingMode(AAudioStreamBuilder* builder,
@@ -408,7 +410,9 @@ AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream* stream)
 AAUDIO_API aaudio_format_t AAudioStream_getFormat(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    return audioStream->getFormat();
+    // Use audio_format_t internally.
+    audio_format_t internalFormat = audioStream->getFormat();
+    return AAudioConvert_androidToAAudioDataFormat(internalFormat);
 }
 
 AAUDIO_API aaudio_result_t AAudioStream_setBufferSizeInFrames(AAudioStream* stream,

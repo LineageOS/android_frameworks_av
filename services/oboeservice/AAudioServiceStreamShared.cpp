@@ -142,10 +142,10 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
 
     // Is the request compatible with the shared endpoint?
     setFormat(configurationInput.getFormat());
-    if (getFormat() == AAUDIO_FORMAT_UNSPECIFIED) {
-        setFormat(AAUDIO_FORMAT_PCM_FLOAT);
-    } else if (getFormat() != AAUDIO_FORMAT_PCM_FLOAT) {
-        ALOGD("%s() mAudioFormat = %d, need FLOAT", __func__, getFormat());
+    if (getFormat() == AUDIO_FORMAT_DEFAULT) {
+        setFormat(AUDIO_FORMAT_PCM_FLOAT);
+    } else if (getFormat() != AUDIO_FORMAT_PCM_FLOAT) {
+        ALOGE("%s() audio_format_t mAudioFormat = %d, need FLOAT", __func__, getFormat());
         result = AAUDIO_ERROR_INVALID_FORMAT;
         goto error;
     }
@@ -154,7 +154,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     if (getSampleRate() == AAUDIO_UNSPECIFIED) {
         setSampleRate(endpoint->getSampleRate());
     } else if (getSampleRate() != endpoint->getSampleRate()) {
-        ALOGD("%s() mSampleRate = %d, need %d",
+        ALOGE("%s() mSampleRate = %d, need %d",
               __func__, getSampleRate(), endpoint->getSampleRate());
         result = AAUDIO_ERROR_INVALID_RATE;
         goto error;
@@ -164,7 +164,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     if (getSamplesPerFrame() == AAUDIO_UNSPECIFIED) {
         setSamplesPerFrame(endpoint->getSamplesPerFrame());
     } else if (getSamplesPerFrame() != endpoint->getSamplesPerFrame()) {
-        ALOGD("%s() mSamplesPerFrame = %d, need %d",
+        ALOGE("%s() mSamplesPerFrame = %d, need %d",
               __func__, getSamplesPerFrame(), endpoint->getSamplesPerFrame());
         result = AAUDIO_ERROR_OUT_OF_RANGE;
         goto error;
@@ -191,8 +191,8 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
         }
     }
 
-    ALOGD("AAudioServiceStreamShared::open() actual rate = %d, channels = %d, deviceId = %d",
-          getSampleRate(), getSamplesPerFrame(), endpoint->getDeviceId());
+    ALOGD("%s() actual rate = %d, channels = %d, deviceId = %d",
+          __func__, getSampleRate(), getSamplesPerFrame(), endpoint->getDeviceId());
 
     result = endpoint->registerStream(keep);
     if (result != AAUDIO_OK) {

@@ -41,7 +41,7 @@ public:
 
     ResultStatus connect(
             const sp<Accessor> &accessor, sp<Connection> *connection,
-            ConnectionId *pConnectionId, const QueueDescriptor** fmqDescPtr);
+            ConnectionId *pConnectionId, const StatusDescriptor** fmqDescPtr);
 
     ResultStatus close(ConnectionId connectionId);
 

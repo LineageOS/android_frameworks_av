@@ -56,7 +56,7 @@ public:
      *         NO_MEMORY when there is no memory.
      *         CRITICAL_ERROR otherwise.
      */
-    ResultStatus open(ConnectionId id, const QueueDescriptor** fmqDescPtr);
+    ResultStatus open(ConnectionId id, const StatusDescriptor** fmqDescPtr);
 
     /** Closes an FMQ for the specified connection(client).
      *
@@ -89,7 +89,7 @@ public:
      *
      * @param fmqDesc   Descriptor of the created FMQ.
      */
-    BufferStatusChannel(const QueueDescriptor &fmqDesc);
+    BufferStatusChannel(const StatusDescriptor &fmqDesc);
 
     /** Returns whether the FMQ is connected successfully. */
     bool isValid();
