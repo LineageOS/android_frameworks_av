@@ -56,6 +56,8 @@ cc_library {
 
     static_libs: [
         "libmedia_helper",
+        "libmediaplayer2-protos",
+        "libprotobuf-cpp-lite",
         "libstagefright_nuplayer2",
         "libstagefright_rtsp",
         "libstagefright_timedtext",
