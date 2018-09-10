@@ -483,6 +483,7 @@ static std::string allowedKeys[] =
 {
     "audiopolicy",
     "audiorecord",
+    "audiothread",
     "audiotrack",
     "codec",
     "extractor",
