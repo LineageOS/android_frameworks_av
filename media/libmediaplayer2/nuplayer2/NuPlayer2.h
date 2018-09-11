@@ -296,7 +296,7 @@ private:
             const sp<AMessage> &inputFormat,
             const sp<AMessage> &outputFormat = NULL);
 
-    void notifyListener(int64_t srcId, int msg, int ext1, int ext2, const Parcel *in = NULL);
+    void notifyListener(int64_t srcId, int msg, int ext1, int ext2, const PlayerMessage *in = NULL);
 
     void handleFlushComplete(bool audio, bool isDecoder);
     void finishFlushIfPossible();
