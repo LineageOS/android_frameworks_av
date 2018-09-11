@@ -76,9 +76,11 @@ status_t RecordClientDescriptor::dump(String8& out, int spaces, int index)
 
 SourceClientDescriptor::SourceClientDescriptor(audio_port_handle_t portId, uid_t uid,
          audio_attributes_t attributes, const sp<AudioPatch>& patchDesc,
-         const sp<DeviceDescriptor>& srcDevice, audio_stream_type_t stream) :
+         const sp<DeviceDescriptor>& srcDevice, audio_stream_type_t stream,
+         routing_strategy strategy) :
     TrackClientDescriptor::TrackClientDescriptor(portId, uid, AUDIO_SESSION_NONE, attributes,
-        AUDIO_CONFIG_BASE_INITIALIZER, AUDIO_PORT_HANDLE_NONE, stream, AUDIO_OUTPUT_FLAG_NONE),
+        AUDIO_CONFIG_BASE_INITIALIZER, AUDIO_PORT_HANDLE_NONE,
+        stream, strategy, AUDIO_OUTPUT_FLAG_NONE),
         mPatchDesc(patchDesc), mSrcDevice(srcDevice)
 {
 }
