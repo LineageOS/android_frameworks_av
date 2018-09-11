@@ -1,9 +1,6 @@
 cc_library_shared {
     name: "libstagefright_soft_mpeg2dec",
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
 
     static_libs: ["libmpeg2dec"],
     srcs: ["SoftMPEG2.cpp"],
