@@ -33,6 +33,10 @@
 #include <media/stagefright/foundation/AHandler.h>
 #include <mediaplayer2/MediaPlayer2Types.h>
 
+#include "mediaplayer2.pb.h"
+
+using android::media::MediaPlayer2Proto::PlayerMessage;
+
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
 // global, and not in android::
 struct sockaddr_in;
@@ -217,7 +221,7 @@ public:
     //                data sent by the java layer.
     // @param[out] reply Parcel to hold the reply data. Cannot be null.
     // @return OK if the call was successful.
-    virtual status_t invoke(const Parcel& request, Parcel *reply) = 0;
+    virtual status_t invoke(const PlayerMessage &request, PlayerMessage *reply) = 0;
 
     // The Client in the MetadataPlayerService calls this method on
     // the native player to retrieve all or a subset of metadata.

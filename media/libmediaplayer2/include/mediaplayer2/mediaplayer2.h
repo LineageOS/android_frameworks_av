@@ -90,7 +90,7 @@ public:
             status_t        setVolume(float leftVolume, float rightVolume);
             void            notify(int64_t srcId, int msg, int ext1, int ext2,
                                    const Parcel *obj = NULL);
-            status_t        invoke(const Parcel& request, Parcel *reply);
+            status_t        invoke(const PlayerMessage &request, PlayerMessage *reply);
             status_t        setMetadataFilter(const Parcel& filter);
             status_t        getMetadata(bool update_only, bool apply_filter, Parcel *metadata);
             status_t        setAudioSessionId(audio_session_t sessionId);

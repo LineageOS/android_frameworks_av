@@ -23,6 +23,10 @@
 
 #include <mediaplayer2/MediaPlayer2Interface.h>
 
+#include "mediaplayer2.pb.h"
+
+using android::media::MediaPlayer2Proto::PlayerMessage;
+
 namespace android {
 
 struct ABuffer;
@@ -77,8 +81,8 @@ struct NuPlayer2 : public AHandler {
             bool needNotify = false);
 
     status_t setVideoScalingMode(int32_t mode);
-    status_t getTrackInfo(Parcel* reply) const;
-    status_t getSelectedTrack(int32_t type, Parcel* reply) const;
+    status_t getTrackInfo(PlayerMessage* reply) const;
+    status_t getSelectedTrack(int32_t type, PlayerMessage* reply) const;
     status_t selectTrack(size_t trackIndex, bool select, int64_t timeUs);
     status_t getCurrentPosition(int64_t *mediaUs);
     void getStats(Vector<sp<AMessage> > *mTrackStats);
@@ -333,7 +337,7 @@ private:
     void sendTimedMetaData(const sp<ABuffer> &buffer);
     void sendTimedTextData(const sp<ABuffer> &buffer);
 
-    void writeTrackInfo(Parcel* reply, const sp<AMessage>& format) const;
+    void writeTrackInfo(PlayerMessage* reply, const sp<AMessage>& format) const;
 
     status_t onPrepareDrm(const sp<AMessage> &msg);
     status_t onReleaseDrm();

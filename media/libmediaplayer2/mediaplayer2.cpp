@@ -565,16 +565,15 @@ status_t MediaPlayer2::playNextDataSource(int64_t srcId) {
     return mPlayer->playNextDataSource(srcId);
 }
 
-status_t MediaPlayer2::invoke(const Parcel& request, Parcel *reply) {
+status_t MediaPlayer2::invoke(const PlayerMessage &request, PlayerMessage *reply) {
     Mutex::Autolock _l(mLock);
     const bool hasBeenInitialized =
             (mCurrentState != MEDIA_PLAYER2_STATE_ERROR) &&
             ((mCurrentState & MEDIA_PLAYER2_IDLE) != MEDIA_PLAYER2_IDLE);
     if ((mPlayer == NULL) || !hasBeenInitialized) {
-        ALOGE("invoke failed: wrong state %X, mPlayer(%p)", mCurrentState, mPlayer.get());
+        ALOGE("invoke() failed: wrong state %X, mPlayer(%p)", mCurrentState, mPlayer.get());
         return INVALID_OPERATION;
     }
-    ALOGV("invoke %zu", request.dataSize());
     return mPlayer->invoke(request, reply);
 }
 
