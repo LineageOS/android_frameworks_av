@@ -33,7 +33,7 @@
 #include "NuPlayer2Source.h"
 #include "RTSPSource2.h"
 #include "GenericSource2.h"
-#include "TextDescriptions.h"
+#include "TextDescriptions2.h"
 
 #include "ATSParser.h"
 
@@ -2870,7 +2870,7 @@ void NuPlayer2::sendTimedTextData(const sp<ABuffer> &buffer) {
     const void *data;
     size_t size = 0;
     int64_t timeUs;
-    int32_t flag = TextDescriptions::IN_BAND_TEXT_3GPP;
+    int32_t flag = TextDescriptions2::IN_BAND_TEXT_3GPP;
 
     AString mime;
     CHECK(buffer->meta()->findString("mime", &mime));
@@ -2879,22 +2879,21 @@ void NuPlayer2::sendTimedTextData(const sp<ABuffer> &buffer) {
     data = buffer->data();
     size = buffer->size();
 
-    Parcel parcel;
+    PlayerMessage playerMsg;
     if (size > 0) {
         CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
         int32_t global = 0;
         if (buffer->meta()->findInt32("global", &global) && global) {
-            flag |= TextDescriptions::GLOBAL_DESCRIPTIONS;
+            flag |= TextDescriptions2::GLOBAL_DESCRIPTIONS;
         } else {
-            flag |= TextDescriptions::LOCAL_DESCRIPTIONS;
+            flag |= TextDescriptions2::LOCAL_DESCRIPTIONS;
         }
-        TextDescriptions::getParcelOfDescriptions(
-                (const uint8_t *)data, size, flag, timeUs / 1000, &parcel);
+        TextDescriptions2::getPlayerMessageOfDescriptions(
+                (const uint8_t *)data, size, flag, timeUs / 1000, &playerMsg);
     }
 
-    if ((parcel.dataSize() > 0)) {
-        // TODO: convert text data to PlayerMessage
-        // notifyListener(mSrcId, MEDIA2_TIMED_TEXT, 0, 0, &parcel);
+    if (playerMsg.values_size() > 0) {
+        notifyListener(mSrcId, MEDIA2_TIMED_TEXT, 0, 0, &playerMsg);
     } else {  // send an empty timed text
         notifyListener(mSrcId, MEDIA2_TIMED_TEXT, 0, 0);
     }
