@@ -20,6 +20,7 @@
 #define ANDROID_MEDIA_NBLOG_H
 
 #include <map>
+#include <memory>
 #include <type_traits>
 #include <unordered_set>
 #include <vector>
@@ -30,6 +31,7 @@
 #include <media/nblog/ReportPerformance.h>
 #include <utils/Mutex.h>
 #include <utils/threads.h>
+#include <utils/Timers.h>
 
 namespace android {
 
@@ -39,7 +41,7 @@ class NBLog {
 
 public:
 
-    using log_hash_t = ReportPerformance::log_hash_t;
+    using log_hash_t = uint64_t;
 
     // FIXME Everything needed for client (writer API and registration) should be isolated
     //       from the rest of the implementation.
@@ -78,11 +80,27 @@ public:
         EVENT_AUDIO_STATE,          // audio on/off event: logged on FastMixer::onStateChange call
 
         // Types representing audio performance metrics
+        EVENT_THREAD_INFO,          // thread type, frameCount and sampleRate, which give context
+                                    // for the metrics below.
         EVENT_LATENCY,              // difference between frames presented by HAL and frames
                                     // written to HAL output sink, divided by sample rate.
         EVENT_WORK_TIME,            // the time a thread takes to do work, e.g. read, write, etc.
+        EVENT_WARMUP_TIME,          // thread warmup time
+        EVENT_UNDERRUN,             // predicted thread underrun event timestamp
+        EVENT_OVERRUN,              // predicted thread overrun event timestamp
 
         EVENT_UPPER_BOUND,          // to check for invalid events
+    };
+
+    // NBLog custom-defined structs. Some NBLog Event types map to these structs.
+
+    // mapped from EVENT_THREAD_INFO
+    struct thread_info_t {
+        // TODO make type an enum
+        int type;               // Thread type: 0 for MIXER, 1 for CAPTURE,
+                                // 2 for FASTMIXER, 3 for FASTCAPTURE
+        size_t frameCount;      // number of frames per read or write buffer
+        unsigned sampleRate;    // in frames per second
     };
 
     template <Event E> struct get_mapped;
@@ -95,8 +113,12 @@ public:
     }
 
     // Maps an NBLog Event type to a C++ POD type.
+    MAP_EVENT_TO_TYPE(EVENT_THREAD_INFO, thread_info_t);
     MAP_EVENT_TO_TYPE(EVENT_LATENCY, double);
-    MAP_EVENT_TO_TYPE(EVENT_WORK_TIME, uint64_t);
+    MAP_EVENT_TO_TYPE(EVENT_WORK_TIME, int64_t);
+    MAP_EVENT_TO_TYPE(EVENT_WARMUP_TIME, double);
+    MAP_EVENT_TO_TYPE(EVENT_UNDERRUN, int64_t);
+    MAP_EVENT_TO_TYPE(EVENT_OVERRUN, int64_t);
 
 private:
 
@@ -154,7 +176,7 @@ private:
         }
 #else
         template<typename T>
-        inline T payload() {
+        inline T payload() const {
             static_assert(std::is_trivially_copyable<T>::value
                     && !std::is_pointer<T>::value,
                     "NBLog::EntryIterator payload must be trivially copyable, non-pointer type.");
@@ -418,6 +440,7 @@ public:
         void    log(Event event, const void *data, size_t length);
 
         void    logvf(const char *fmt, va_list ap);
+
         // helper functions for logging parts of a formatted entry
         void    logStart(const char *fmt);
         void    logTimestampFormat();
@@ -477,10 +500,12 @@ public:
     private:
         // Amount of tries for reader to catch up with writer in getSnapshot().
         static constexpr int kMaxObtainTries = 3;
+
         // invalidBeginTypes and invalidEndTypes are used to align the Snapshot::begin() and
         // Snapshot::end() EntryIterators to valid entries.
         static const std::unordered_set<Event> invalidBeginTypes;
         static const std::unordered_set<Event> invalidEndTypes;
+
         // declared as const because audio_utils_fifo() constructor
         sp<IMemory> mIMemory;       // ref-counted version, assigned only in constructor
 
@@ -539,12 +564,14 @@ public:
         static void    appendFloat(String8 *body, const void *data);
         static void    appendPID(String8 *body, const void *data, size_t length);
         static void    appendTimestamp(String8 *body, const void *data);
+
         // The bufferDump functions are used for debugging only.
         static String8 bufferDump(const uint8_t *buffer, size_t size);
         static String8 bufferDump(const EntryIterator &it);
     };
 
     // ---------------------------------------------------------------------------
+    // TODO move Merger, MergeReader, and MergeThread to a separate file.
 
     // This class is used to read data from each thread's individual FIFO in shared memory
     // and write it to a single FIFO in local memory.
@@ -580,10 +607,16 @@ public:
         MergeReader(const void *shared, size_t size, Merger &merger);
 
         void dump(int fd, int indent = 0);
+
         // process a particular snapshot of the reader
-        void getAndProcessSnapshot(Snapshot &snap, int author);
+        void processSnapshot(Snapshot &snap, int author);
+
         // call getSnapshot of the content of the reader's buffer and process the data
         void getAndProcessSnapshot();
+
+        // check for periodic push of performance data to media metrics, and perform
+        // the send if it is time to do so.
+        void checkPushToMediaMetrics();
 
     private:
         // FIXME Needs to be protected by a lock,
@@ -596,7 +629,12 @@ public:
         // location within each author
         ReportPerformance::PerformanceAnalysisMap mThreadPerformanceAnalysis;
 
-        PerformanceData mPerformanceData;
+        // compresses and stores audio performance data from each thread's buffers.
+        // first parameter is author, i.e. thread index.
+        std::map<int, ReportPerformance::PerformanceData> mThreadPerformanceData;
+
+        // how often to push data to Media Metrics
+        static constexpr nsecs_t kPeriodicMediaMetricsPush = s2ns((nsecs_t)2 * 60 * 60); // 2 hours
 
         // handle author entry by looking up the author's name and appending it to the body
         // returns number of bytes read from fmtEntry
@@ -644,15 +682,6 @@ public:
     };
 
 };  // class NBLog
-
-// TODO put somewhere else
-static inline int64_t get_monotonic_ns() {
-    timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
-        return (uint64_t) ts.tv_sec * 1000 * 1000 * 1000 + ts.tv_nsec;
-    }
-    return 0; // should not happen.
-}
 
 }   // namespace android
 

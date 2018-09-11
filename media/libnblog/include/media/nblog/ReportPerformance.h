@@ -19,11 +19,30 @@
 
 #include <deque>
 #include <map>
+#include <memory>
 #include <vector>
+
+namespace Json {
+class Value;
+}
 
 namespace android {
 
 namespace ReportPerformance {
+
+struct PerformanceData;
+
+// Dumps performance data to a JSON format.
+// Return by pointer instead of by value to avoid dependency side effects of including
+// the header of an external library.
+std::unique_ptr<Json::Value> dumpToJson(const PerformanceData& data);
+
+// Send one thread's data to media metrics, if the performance data is nontrivial (i.e. not
+// all zero values). Return true if data was sent, false if there is nothing to write
+// or an error occurred while writing.
+bool sendToMediaMetrics(const PerformanceData& data);
+
+//------------------------------------------------------------------------------
 
 constexpr int kMsPerSec = 1000;
 constexpr int kSecPerMin = 60;
@@ -31,7 +50,7 @@ constexpr int kSecPerMin = 60;
 constexpr int kJiffyPerMs = 10; // time unit for histogram as a multiple of milliseconds
 
 // stores a histogram: key: observed buffer period (multiple of jiffy). value: count
-using Histogram = std::map<int, int>;
+using Hist = std::map<int, int>;
 
 using msInterval = double;
 using jiffyInterval = double;
@@ -54,7 +73,7 @@ static inline uint32_t log2(uint32_t x) {
 }
 
 // Writes outlier intervals, timestamps, peaks timestamps, and histograms to a file.
-void writeToFile(const std::deque<std::pair<timestamp, Histogram>> &hists,
+void writeToFile(const std::deque<std::pair<timestamp, Hist>> &hists,
                  const std::deque<std::pair<msInterval, timestamp>> &outlierData,
                  const std::deque<timestamp> &peakTimestamps,
                  const char * kDirectory, bool append, int author, log_hash_t hash);

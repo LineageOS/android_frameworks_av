@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <climits>
 #include <math.h>
+#include <memory>
 #include <unordered_set>
 #include <vector>
 #include <stdarg.h>
@@ -31,12 +32,14 @@
 #include <time.h>
 #include <new>
 #include <audio_utils/roundup.h>
+#include <json/json.h>
 #include <media/nblog/NBLog.h>
 #include <media/nblog/PerformanceAnalysis.h>
 #include <media/nblog/ReportPerformance.h>
 #include <utils/CallStack.h>
 #include <utils/Log.h>
 #include <utils/String8.h>
+#include <utils/Timers.h>
 
 #include <queue>
 #include <utility>
@@ -417,7 +420,7 @@ void NBLog::Writer::logTimestampFormat()
     if (!mEnabled) {
         return;
     }
-    int64_t ts = get_monotonic_ns();
+    const nsecs_t ts = systemTime();
     if (ts > 0) {
         log(EVENT_FMT_TIMESTAMP, &ts, sizeof(ts));
     } else {
@@ -432,7 +435,7 @@ void NBLog::Writer::logEventHistTs(Event event, log_hash_t hash)
     }
     HistTsEntry data;
     data.hash = hash;
-    data.ts = get_monotonic_ns();
+    data.ts = systemTime();
     if (data.ts > 0) {
         log(event, &data, sizeof(data));
     } else {
@@ -780,15 +783,17 @@ std::unique_ptr<NBLog::Snapshot> NBLog::Reader::getSnapshot()
     return snapshot;
 }
 
+// TODO separate this method from the rest of NBLog
 // Takes raw content of the local merger FIFO, processes log entries, and
 // writes the data to a map of class PerformanceAnalysis, based on their thread ID.
-void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Snapshot &snapshot, int author)
+void NBLog::MergeReader::processSnapshot(NBLog::Snapshot &snapshot, int author)
 {
+    ReportPerformance::PerformanceData& data = mThreadPerformanceData[author];
     // We don't do "auto it" because it reduces readability in this case.
     for (EntryIterator it = snapshot.begin(); it != snapshot.end(); ++it) {
         switch (it->type) {
         case EVENT_HISTOGRAM_ENTRY_TS: {
-            HistTsEntry payload = it.payload<HistTsEntry>();
+            const HistTsEntry payload = it.payload<HistTsEntry>();
             // TODO: hash for histogram ts and audio state need to match
             // and correspond to audio production source file location
             mThreadPerformanceAnalysis[author][0 /*hash*/].logTsEntry(payload.ts);
@@ -796,15 +801,37 @@ void NBLog::MergeReader::getAndProcessSnapshot(NBLog::Snapshot &snapshot, int au
         case EVENT_AUDIO_STATE: {
             mThreadPerformanceAnalysis[author][0 /*hash*/].handleStateChange();
         } break;
+        case EVENT_THREAD_INFO: {
+            const thread_info_t info = it.payload<thread_info_t>();
+            // TODO make PerformanceData hold a type of thread_info_t.
+            // Currently, thread_info_t is defined in NBLog.h, which includes
+            // PerformanceAnalysis.h. PerformanceData is defined in PerformanceAnalysis.h,
+            // where including NBLog.h would result in circular includes. The organization
+            // of files will need to change to avoid this problem.
+            data.type = info.type;
+            data.frameCount = info.frameCount;
+            data.sampleRate = info.sampleRate;
+        } break;
         case EVENT_LATENCY: {
-            double latencyMs = it.payload<double>();
-            mPerformanceData.addLatencyEntry(author, latencyMs);
+            const double latencyMs = it.payload<double>();
+            data.latencyHist.add(latencyMs);
         } break;
         case EVENT_WORK_TIME: {
-            uint64_t monotonicNs = it.payload<uint64_t>();
+            const int64_t monotonicNs = it.payload<int64_t>();
             const double monotonicMs = monotonicNs * 1e-6;
-            mPerformanceData.addCycleTimeEntry(author, monotonicMs);
+            data.workHist.add(monotonicMs);
+            data.active += monotonicNs;
         } break;
+        case EVENT_WARMUP_TIME: {
+            const double timeMs = it.payload<double>();
+            data.warmupHist.add(timeMs);
+        } break;
+        case EVENT_UNDERRUN:
+            data.underruns++;
+            break;
+        case EVENT_OVERRUN:
+            data.overruns++;
+            break;
         case EVENT_RESERVED:
         case EVENT_UPPER_BOUND:
             ALOGW("warning: unexpected event %d", it->type);
@@ -826,7 +853,20 @@ void NBLog::MergeReader::getAndProcessSnapshot()
     // TODO unlock lock here
     for (size_t i = 0; i < nLogs; i++) {
         if (snapshots[i] != nullptr) {
-            getAndProcessSnapshot(*(snapshots[i]), i);
+            processSnapshot(*(snapshots[i]), i);
+        }
+    }
+    checkPushToMediaMetrics();
+}
+
+void NBLog::MergeReader::checkPushToMediaMetrics()
+{
+    const nsecs_t now = systemTime();
+    for (auto& item : mThreadPerformanceData) {
+        ReportPerformance::PerformanceData& data = item.second;
+        if (now - data.start >= kPeriodicMediaMetricsPush) {
+            (void)ReportPerformance::sendToMediaMetrics(data);
+            data.reset();   // data is persistent per thread
         }
     }
 }
@@ -835,7 +875,19 @@ void NBLog::MergeReader::dump(int fd, int indent)
 {
     // TODO: add a mutex around media.log dump
     ReportPerformance::dump(fd, indent, mThreadPerformanceAnalysis);
-    mPerformanceData.dump(fd);
+    Json::Value root(Json::arrayValue);
+    for (const auto& item : mThreadPerformanceData) {
+        const ReportPerformance::PerformanceData& data = item.second;
+        std::unique_ptr<Json::Value> threadData = ReportPerformance::dumpToJson(data);
+        if (threadData == nullptr) {
+            continue;
+        }
+        (*threadData)["threadNum"] = item.first;
+        root.append(*threadData);
+    }
+    Json::StyledWriter writer;
+    std::string rootStr = writer.write(root);
+    dprintf(fd, "%s", rootStr.c_str());
 }
 
 // TODO for future compatibility, would prefer to have a dump() go to string, and then go
@@ -856,13 +908,23 @@ void NBLog::DumpReader::dump(int fd, size_t indent)
             it = handleFormat(FormatEntry(it), &timestamp, &body);
             break;
         case EVENT_WORK_TIME: {
-            uint64_t monotonicNs = it.payload<uint64_t>();
-            body.appendFormat("Thread cycle: %lu ns", (unsigned long)monotonicNs);
+            const int64_t monotonicNs = it.payload<int64_t>();
+            body.appendFormat("Thread cycle: %ld ns", (long)monotonicNs);
         } break;
         case EVENT_LATENCY: {
-            double latencyMs = it.payload<double>();
+            const double latencyMs = it.payload<double>();
             body.appendFormat("latency: %.3f ms", latencyMs);
         } break;
+        case EVENT_WARMUP_TIME: {
+            const double timeMs = it.payload<double>();
+            body.appendFormat("warmup time: %.3f ms", timeMs);
+        } break;
+        case EVENT_UNDERRUN:
+            body.appendFormat("underrun");
+            break;
+        case EVENT_OVERRUN:
+            body.appendFormat("overrun");
+            break;
         case EVENT_FMT_END:
         case EVENT_RESERVED:
         case EVENT_UPPER_BOUND:
@@ -947,7 +1009,7 @@ NBLog::EntryIterator NBLog::DumpReader::handleFormat(const FormatEntry &fmtEntry
                                                            String8 *body)
 {
     // log timestamp
-    int64_t ts = fmtEntry.timestamp();
+    const int64_t ts = fmtEntry.timestamp();
     timestamp->clear();
     timestamp->appendFormat("[%d.%03d]", (int) (ts / (1000 * 1000 * 1000)),
                     (int) ((ts / (1000 * 1000)) % 1000));
