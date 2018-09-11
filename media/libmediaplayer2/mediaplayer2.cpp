@@ -53,97 +53,6 @@ namespace {
 const int kDumpLockRetries = 50;
 const int kDumpLockSleepUs = 20000;
 
-// Max number of entries in the filter.
-const int kMaxFilterSize = 64;  // I pulled that out of thin air.
-
-// FIXME: Move all the metadata related function in the Metadata.cpp
-
-// Unmarshall a filter from a Parcel.
-// Filter format in a parcel:
-//
-//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       number of entries (n)                   |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       metadata type 1                         |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       metadata type 2                         |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//  ....
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       metadata type n                         |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//
-// @param p Parcel that should start with a filter.
-// @param[out] filter On exit contains the list of metadata type to be
-//                    filtered.
-// @param[out] status On exit contains the status code to be returned.
-// @return true if the parcel starts with a valid filter.
-bool unmarshallFilter(const Parcel& p,
-                      media::Metadata::Filter *filter,
-                      status_t *status) {
-    int32_t val;
-    if (p.readInt32(&val) != OK) {
-        ALOGE("Failed to read filter's length");
-        *status = NOT_ENOUGH_DATA;
-        return false;
-    }
-
-    if (val > kMaxFilterSize || val < 0) {
-        ALOGE("Invalid filter len %d", val);
-        *status = BAD_VALUE;
-        return false;
-    }
-
-    const size_t num = val;
-
-    filter->clear();
-    filter->setCapacity(num);
-
-    size_t size = num * sizeof(media::Metadata::Type);
-
-
-    if (p.dataAvail() < size) {
-        ALOGE("Filter too short expected %zu but got %zu", size, p.dataAvail());
-        *status = NOT_ENOUGH_DATA;
-        return false;
-    }
-
-    const media::Metadata::Type *data =
-        static_cast<const media::Metadata::Type*>(p.readInplace(size));
-
-    if (NULL == data) {
-        ALOGE("Filter had no data");
-        *status = BAD_VALUE;
-        return false;
-    }
-
-    // TODO: The stl impl of vector would be more efficient here
-    // because it degenerates into a memcpy on pod types. Try to
-    // replace later or use stl::set.
-    for (size_t i = 0; i < num; ++i) {
-        filter->add(*data);
-        ++data;
-    }
-    *status = OK;
-    return true;
-}
-
-// @param filter Of metadata type.
-// @param val To be searched.
-// @return true if a match was found.
-bool findMetadata(const media::Metadata::Filter& filter, const int32_t val) {
-    // Deal with empty and ANY right away
-    if (filter.isEmpty()) {
-        return false;
-    }
-    if (filter[0] == media::Metadata::kAny) {
-        return true;
-    }
-
-    return filter.indexOf(val) >= 0;
-}
-
 // marshalling tag indicating flattened utf16 tags
 // keep in sync with frameworks/base/media/java/android/media/AudioAttributes.java
 const int32_t kAudioAttributesMarshallTagFlattenTags = 1;
@@ -576,66 +485,6 @@ status_t MediaPlayer2::invoke(const PlayerMessage &request, PlayerMessage *reply
         return INVALID_OPERATION;
     }
     return mPlayer->invoke(request, reply);
-}
-
-// This call doesn't need to access the native player.
-status_t MediaPlayer2::setMetadataFilter(const Parcel& filter) {
-    ALOGD("setMetadataFilter");
-
-    status_t status;
-    media::Metadata::Filter allow, drop;
-
-    if (unmarshallFilter(filter, &allow, &status) &&
-        unmarshallFilter(filter, &drop, &status)) {
-        Mutex::Autolock lock(mLock);
-
-        mMetadataAllow = allow;
-        mMetadataDrop = drop;
-    }
-    return status;
-}
-
-status_t MediaPlayer2::getMetadata(bool update_only, bool /* apply_filter */, Parcel *reply) {
-    ALOGD("getMetadata");
-    sp<MediaPlayer2Interface> player;
-    media::Metadata::Filter ids;
-    Mutex::Autolock lock(mLock);
-    {
-        if (mPlayer == NULL) {
-            return NO_INIT;
-        }
-
-        player = mPlayer;
-        // Placeholder for the return code, updated by the caller.
-        reply->writeInt32(-1);
-
-        // We don't block notifications while we fetch the data. We clear
-        // mMetadataUpdated first so we don't lose notifications happening
-        // during the rest of this call.
-        if (update_only) {
-            ids = mMetadataUpdated;
-        }
-        mMetadataUpdated.clear();
-    }
-
-    media::Metadata metadata(reply);
-
-    metadata.appendHeader();
-    status_t status = player->getMetadata(ids, reply);
-
-    if (status != OK) {
-        metadata.resetParcel();
-        ALOGE("getMetadata failed %d", status);
-        return status;
-    }
-
-    // FIXME: ement filtering on the result. Not critical since
-    // filtering takes place on the update notifications already. This
-    // would be when all the metadata are fetch and a filter is set.
-
-    // Everything is fine, update the metadata length.
-    metadata.updateLength();
-    return OK;
 }
 
 void MediaPlayer2::disconnectNativeWindow_l() {
@@ -1250,43 +1099,9 @@ status_t MediaPlayer2::getParameter(int key, Parcel *reply) {
     return status;
 }
 
-bool MediaPlayer2::shouldDropMetadata(media::Metadata::Type code) const {
-    Mutex::Autolock lock(mLock);
-
-    if (findMetadata(mMetadataDrop, code)) {
-        return true;
-    }
-
-    if (mMetadataAllow.isEmpty() || findMetadata(mMetadataAllow, code)) {
-        return false;
-    } else {
-        return true;
-    }
-}
-
-
-void MediaPlayer2::addNewMetadataUpdate(media::Metadata::Type metadata_type) {
-    Mutex::Autolock lock(mLock);
-    if (mMetadataUpdated.indexOf(metadata_type) < 0) {
-        mMetadataUpdated.add(metadata_type);
-    }
-}
-
 void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const PlayerMessage *obj) {
     ALOGV("message received srcId=%lld, msg=%d, ext1=%d, ext2=%d",
           (long long)srcId, msg, ext1, ext2);
-
-    if (MEDIA2_INFO == msg && MEDIA2_INFO_METADATA_UPDATE == ext1) {
-        const media::Metadata::Type metadata_type = ext2;
-
-        if(shouldDropMetadata(metadata_type)) {
-            return;
-        }
-
-        // Update the list of metadata that have changed. getMetadata
-        // also access mMetadataUpdated and clears it.
-        addNewMetadataUpdate(metadata_type);
-    }
 
     bool send = true;
     bool locked = false;
