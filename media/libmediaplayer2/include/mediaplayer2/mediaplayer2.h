@@ -92,8 +92,6 @@ public:
             void            notify(int64_t srcId, int msg, int ext1, int ext2,
                                    const PlayerMessage *obj = NULL);
             status_t        invoke(const PlayerMessage &request, PlayerMessage *reply);
-            status_t        setMetadataFilter(const Parcel& filter);
-            status_t        getMetadata(bool update_only, bool apply_filter, Parcel *metadata);
             status_t        setAudioSessionId(audio_session_t sessionId);
             audio_session_t getAudioSessionId();
             status_t        setAuxEffectSendLevel(float level);
@@ -114,16 +112,6 @@ public:
 private:
     MediaPlayer2();
     bool init();
-
-    // @param type Of the metadata to be tested.
-    // @return true if the metadata should be dropped according to
-    //              the filters.
-    bool shouldDropMetadata(media::Metadata::Type type) const;
-
-    // Add a new element to the set of metadata updated. Noop if
-    // the element exists already.
-    // @param type Of the metadata to be recorded.
-    void addNewMetadataUpdate(media::Metadata::Type type);
 
     // Disconnect from the currently connected ANativeWindow.
     void disconnectNativeWindow_l();
@@ -163,16 +151,6 @@ private:
     float                       mSendLevel;
 
     sp<ANativeWindowWrapper>    mConnectedWindow;
-
-    // Metadata filters.
-    media::Metadata::Filter mMetadataAllow;  // protected by mLock
-    media::Metadata::Filter mMetadataDrop;  // protected by mLock
-
-    // Metadata updated. For each MEDIA_INFO_METADATA_UPDATE
-    // notification we try to update mMetadataUpdated which is a
-    // set: no duplicate.
-    // getMetadata clears this set.
-    media::Metadata::Filter mMetadataUpdated;  // protected by mLock
 };
 
 }; // namespace android
