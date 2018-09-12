@@ -107,6 +107,23 @@ constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
 #define LOG_LATENCY(ms) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
         x->log<NBLog::EVENT_LATENCY>(ms); } while (0)
 
+// Record thread warmup time in milliseconds. Parameter ms is of type double.
+#define LOG_WARMUP_TIME(ms) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+        x->log<NBLog::EVENT_WARMUP_TIME>(ms); } while (0)
+
+// Record thread underrun event nanosecond timestamp. Parameter ns is an int64_t.
+#define LOG_UNDERRUN(ns) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+        x->log<NBLog::EVENT_UNDERRUN>(ns); } while (0)
+
+// Record thread overrun event nanosecond timestamp. Parameter ns is an int64_t.
+#define LOG_OVERRUN(ns) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+        x->log<NBLog::EVENT_OVERRUN>(ns); } while (0)
+
+// Record thread info. This currently includes type, frameCount, and sampleRate.
+// Parameter type is thread_info_t as defined in NBLog.h.
+#define LOG_THREAD_INFO(info) do { NBLog::Writer *x = tlNBLogWriter; \
+        if (x != nullptr) x->log<NBLog::EVENT_THREAD_INFO>(info); } while (0)
+
 namespace android {
 extern "C" {
 extern thread_local NBLog::Writer *tlNBLogWriter;

@@ -44,40 +44,39 @@ static const int kDumpLockSleepUs = 20000;
 
 namespace android {
 
-struct ParcelWrapper : public RefBase {
-    static sp<ParcelWrapper> Create(const Parcel *p) {
+struct PlayerMessageWrapper : public RefBase {
+    static sp<PlayerMessageWrapper> Create(const PlayerMessage *p) {
         if (p != NULL) {
-            sp<ParcelWrapper> pw = new ParcelWrapper();
-            if (pw->appendFrom(p) == OK) {
-                return pw;
-            }
+            sp<PlayerMessageWrapper> pw = new PlayerMessageWrapper();
+            pw->copyFrom(p);
+            return pw;
         }
         return NULL;
     }
 
-    const Parcel *getParcel() {
-        return mParcel;
+    const PlayerMessage *getPlayerMessage() {
+        return mPlayerMessage;
     }
 
 protected:
-    virtual ~ParcelWrapper() {
-        if (mParcel != NULL) {
-            delete mParcel;
+    virtual ~PlayerMessageWrapper() {
+        if (mPlayerMessage != NULL) {
+            delete mPlayerMessage;
         }
     }
 
 private:
-    ParcelWrapper()
-        : mParcel(NULL) { }
+    PlayerMessageWrapper()
+        : mPlayerMessage(NULL) { }
 
-    status_t appendFrom(const Parcel *p) {
-        if (mParcel == NULL) {
-            mParcel = new Parcel;
+    void copyFrom(const PlayerMessage *p) {
+        if (mPlayerMessage == NULL) {
+            mPlayerMessage = new PlayerMessage;
         }
-        return mParcel->appendFrom(p, 0 /* start */, p->dataSize());
+        mPlayerMessage->CopyFrom(*p);
     }
 
-    Parcel *mParcel;
+    PlayerMessage *mPlayerMessage;
 };
 
 // key for media statistics
@@ -828,12 +827,12 @@ void NuPlayer2Driver::onMessageReceived(const sp<AMessage> &msg) {
             CHECK(msg->findInt32("messageId", &msgId));
             msg->findInt32("ext1", &ext1);
             msg->findInt32("ext2", &ext2);
-            sp<ParcelWrapper> in;
+            sp<PlayerMessageWrapper> in;
             sp<RefBase> obj;
-            if (msg->findObject("parcel", &obj) && obj != NULL) {
-                in = static_cast<ParcelWrapper *>(obj.get());
+            if (msg->findObject("obj", &obj) && obj != NULL) {
+                in = static_cast<PlayerMessageWrapper *>(obj.get());
             }
-            sendEvent(srcId, msgId, ext1, ext2, (in == NULL ? NULL : in->getParcel()));
+            sendEvent(srcId, msgId, ext1, ext2, (in == NULL ? NULL : in->getPlayerMessage()));
             break;
         }
         default:
@@ -842,16 +841,16 @@ void NuPlayer2Driver::onMessageReceived(const sp<AMessage> &msg) {
 }
 
 void NuPlayer2Driver::notifyListener(
-        int64_t srcId, int msg, int ext1, int ext2, const Parcel *in) {
+        int64_t srcId, int msg, int ext1, int ext2, const PlayerMessage *in) {
     Mutex::Autolock autoLock(mLock);
     notifyListener_l(srcId, msg, ext1, ext2, in);
 }
 
 void NuPlayer2Driver::notifyListener_l(
-        int64_t srcId, int msg, int ext1, int ext2, const Parcel *in) {
+        int64_t srcId, int msg, int ext1, int ext2, const PlayerMessage *in) {
     ALOGD("notifyListener_l(%p), (%lld, %d, %d, %d, %d), loop setting(%d, %d)",
             this, (long long)srcId, msg, ext1, ext2,
-            (in == NULL ? -1 : (int)in->dataSize()), mAutoLoop, mLooping);
+            (in == NULL ? -1 : (int)in->ByteSize()), mAutoLoop, mLooping);
     if (srcId == mSrcId) {
         switch (msg) {
             case MEDIA2_PLAYBACK_COMPLETE:
@@ -918,7 +917,7 @@ void NuPlayer2Driver::notifyListener_l(
     notify->setInt32("messageId", msg);
     notify->setInt32("ext1", ext1);
     notify->setInt32("ext2", ext2);
-    notify->setObject("parcel", ParcelWrapper::Create(in));
+    notify->setObject("obj", PlayerMessageWrapper::Create((PlayerMessage*)in));
     notify->post();
 }
 

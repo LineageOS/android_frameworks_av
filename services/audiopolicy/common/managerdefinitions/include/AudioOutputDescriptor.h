@@ -59,7 +59,10 @@ public:
                            audio_devices_t device,
                            uint32_t delayMs,
                            bool force);
-    virtual void changeRefCount(audio_stream_type_t stream, int delta);
+    virtual void changeStreamActiveCount(audio_stream_type_t stream, int delta);
+            uint32_t streamActiveCount(audio_stream_type_t stream) const
+                            { return mActiveCount[stream]; }
+            void setClientActive(const sp<TrackClientDescriptor>& client, bool active);
 
     bool isActive(uint32_t inPastMs = 0) const;
     bool isStreamActive(audio_stream_type_t stream,
@@ -78,19 +81,23 @@ public:
     audio_patch_handle_t getPatchHandle() const override;
     void setPatchHandle(audio_patch_handle_t handle) override;
 
-    TrackClientMap& clients() { return mClients; }
+    TrackClientMap& clientsMap() { return mClients; }
+    TrackClientVector clientsList(bool activeOnly = false,
+        routing_strategy strategy = STRATEGY_NONE, bool preferredDeviceOnly = false) const;
 
     sp<AudioPort> mPort;
     audio_devices_t mDevice;                   // current device this output is routed to
-    uint32_t mRefCount[AUDIO_STREAM_CNT]; // number of streams of each type using this output
     nsecs_t mStopTime[AUDIO_STREAM_CNT];
     float mCurVolume[AUDIO_STREAM_CNT];   // current stream volume in dB
     int mMuteCount[AUDIO_STREAM_CNT];     // mute request counter
     bool mStrategyMutedByDevice[NUM_STRATEGIES]; // strategies muted because of incompatible
                                         // device selection. See checkDeviceMuteStrategies()
     AudioPolicyClientInterface *mClientInterface;
+    AudioMix *mPolicyMix;             // non NULL when used by a dynamic policy
 
 protected:
+    uint32_t mActiveCount[AUDIO_STREAM_CNT]; // number of streams of each type active on this output
+    uint32_t mGlobalActiveCount;  // non-client-specific active count
     audio_patch_handle_t mPatchHandle;
     audio_port_handle_t mId;
     TrackClientMap mClients;
@@ -114,7 +121,7 @@ public:
     virtual bool isFixedVolume(audio_devices_t device);
     virtual sp<AudioOutputDescriptor> subOutput1() { return mOutput1; }
     virtual sp<AudioOutputDescriptor> subOutput2() { return mOutput2; }
-    virtual void changeRefCount(audio_stream_type_t stream, int delta);
+    virtual void changeStreamActiveCount(audio_stream_type_t stream, int delta);
     virtual bool setVolume(float volume,
                            audio_stream_type_t stream,
                            audio_devices_t device,
@@ -132,10 +139,10 @@ public:
                           audio_output_flags_t flags,
                           audio_io_handle_t *output);
             // Called when a stream is about to be started
-            // Note: called before changeRefCount(1);
+            // Note: called before setClientActive(true);
             status_t start();
             // Called after a stream is stopped.
-            // Note: called after changeRefCount(-1);
+            // Note: called after setClientActive(false);
             void stop();
             void close();
             status_t openDuplicating(const sp<SwAudioOutputDescriptor>& output1,
@@ -146,12 +153,10 @@ public:
     audio_io_handle_t mIoHandle;           // output handle
     uint32_t mLatency;                  //
     audio_output_flags_t mFlags;   //
-    AudioMix *mPolicyMix;             // non NULL when used by a dynamic policy
     sp<SwAudioOutputDescriptor> mOutput1;    // used by duplicated outputs: first output
     sp<SwAudioOutputDescriptor> mOutput2;    // used by duplicated outputs: second output
     uint32_t mDirectOpenCount; // number of clients using this output (direct outputs only)
     audio_session_t mDirectClientSession; // session id of the direct output client
-    uint32_t mGlobalRefCount;  // non-stream-specific ref count
 };
 
 // Audio output driven by an input device directly.

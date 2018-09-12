@@ -27,6 +27,7 @@
 #include <utils/RefBase.h>
 #include <utils/String8.h>
 #include "AudioPatch.h"
+#include "RoutingStrategy.h"
 
 namespace android {
 
@@ -53,8 +54,14 @@ public:
     audio_attributes_t attributes() const { return mAttributes; }
     audio_config_base_t config() const { return mConfig; }
     audio_port_handle_t preferredDeviceId() const { return mPreferredDeviceId; };
+    void setPreferredDeviceId(audio_port_handle_t preferredDeviceId) {
+        mPreferredDeviceId = preferredDeviceId;
+    };
     void setActive(bool active) { mActive = active; }
     bool active() const { return mActive; }
+    bool hasPreferredDevice(bool activeOnly = false) const {
+        return mPreferredDeviceId != AUDIO_PORT_HANDLE_NONE && (!activeOnly || mActive);
+    }
 
 private:
     const audio_port_handle_t mPortId;  // unique Id for this client
@@ -62,7 +69,7 @@ private:
     const audio_session_t mSessionId;       // audio session ID
     const audio_attributes_t mAttributes; // usage...
     const audio_config_base_t mConfig;
-    const audio_port_handle_t mPreferredDeviceId;  // selected input device port ID
+          audio_port_handle_t mPreferredDeviceId;  // selected input device port ID
           bool mActive;
 
 protected:
@@ -75,10 +82,10 @@ class TrackClientDescriptor: public ClientDescriptor
 public:
     TrackClientDescriptor(audio_port_handle_t portId, uid_t uid, audio_session_t sessionId,
                    audio_attributes_t attributes, audio_config_base_t config,
-                   audio_port_handle_t preferredDeviceId,
-                   audio_stream_type_t stream, audio_output_flags_t flags) :
+                   audio_port_handle_t preferredDeviceId, audio_stream_type_t stream,
+                          routing_strategy strategy, audio_output_flags_t flags) :
         ClientDescriptor(portId, uid, sessionId, attributes, config, preferredDeviceId),
-        mStream(stream), mFlags(flags) {}
+        mStream(stream), mStrategy(strategy), mFlags(flags) {}
     ~TrackClientDescriptor() override = default;
 
     using ClientDescriptor::dump;
@@ -86,9 +93,11 @@ public:
 
     audio_output_flags_t flags() const { return mFlags; }
     audio_stream_type_t stream() const { return mStream; }
+    routing_strategy strategy() const { return mStrategy; }
 
 private:
     const audio_stream_type_t mStream;
+    const routing_strategy mStrategy;
     const audio_output_flags_t mFlags;
 };
 
@@ -98,9 +107,9 @@ public:
     RecordClientDescriptor(audio_port_handle_t portId, uid_t uid, audio_session_t sessionId,
                         audio_attributes_t attributes, audio_config_base_t config,
                         audio_port_handle_t preferredDeviceId,
-                        audio_source_t source, audio_input_flags_t flags) :
+                        audio_source_t source, audio_input_flags_t flags, bool isSoundTrigger) :
         ClientDescriptor(portId, uid, sessionId, attributes, config, preferredDeviceId),
-        mSource(source), mFlags(flags) {}
+        mSource(source), mFlags(flags), mIsSoundTrigger(isSoundTrigger), mSilenced(false) {}
     ~RecordClientDescriptor() override = default;
 
     using ClientDescriptor::dump;
@@ -108,10 +117,15 @@ public:
 
     audio_source_t source() const { return mSource; }
     audio_input_flags_t flags() const { return mFlags; }
+    bool isSoundTrigger() const { return mIsSoundTrigger; }
+    void setSilenced(bool silenced) { mSilenced = silenced; }
+    bool isSilenced() const { return mSilenced; }
 
 private:
     const audio_source_t mSource;
     const audio_input_flags_t mFlags;
+    const bool mIsSoundTrigger;
+          bool mSilenced;
 };
 
 class SourceClientDescriptor: public TrackClientDescriptor
@@ -119,7 +133,7 @@ class SourceClientDescriptor: public TrackClientDescriptor
 public:
     SourceClientDescriptor(audio_port_handle_t portId, uid_t uid, audio_attributes_t attributes,
                            const sp<AudioPatch>& patchDesc, const sp<DeviceDescriptor>& srcDevice,
-                           audio_stream_type_t stream);
+                           audio_stream_type_t stream, routing_strategy strategy);
     ~SourceClientDescriptor() override = default;
 
     sp<AudioPatch> patchDesc() const { return mPatchDesc; }

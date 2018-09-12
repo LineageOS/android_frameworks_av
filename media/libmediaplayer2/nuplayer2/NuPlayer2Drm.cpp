@@ -133,9 +133,8 @@ sp<ABuffer> NuPlayer2Drm::retrieveDrmInfo(const void *pssh, uint32_t psshsize)
     return drmInfoBuffer;
 }
 
-sp<ABuffer> NuPlayer2Drm::retrieveDrmInfo(PsshInfo *psshInfo)
+status_t NuPlayer2Drm::retrieveDrmInfo(PsshInfo *psshInfo, PlayerMessage *playerMsg)
 {
-
     std::ostringstream pssh, drmInfo;
 
     // 0) Generate PSSH bytes
@@ -153,22 +152,20 @@ sp<ABuffer> NuPlayer2Drm::retrieveDrmInfo(PsshInfo *psshInfo)
     ALOGV("retrieveDrmInfo: MEDIA_DRM_INFO  PSSH: size: %u %s", psshSize, psshHex);
 
     // 1) Write PSSH bytes
-    drmInfo.write(reinterpret_cast<const char *>(&psshSize), sizeof(psshSize));
-    drmInfo.write(reinterpret_cast<const char *>(pssh.str().c_str()), psshSize);
+    playerMsg->add_values()->set_bytes_value(
+            reinterpret_cast<const char *>(pssh.str().c_str()), psshSize);
 
     // 2) Write supportedDRMs
     uint32_t numentries = psshInfo->numentries;
-    drmInfo.write(reinterpret_cast<const char *>(&numentries), sizeof(numentries));
+    playerMsg->add_values()->set_int32_value(numentries);
     for (size_t i = 0; i < numentries; i++) {
         PsshEntry *entry = &psshInfo->entries[i];
-        drmInfo.write(reinterpret_cast<const char *>(&entry->uuid), sizeof(entry->uuid));
+        playerMsg->add_values()->set_bytes_value(
+                reinterpret_cast<const char *>(&entry->uuid), sizeof(entry->uuid));
         ALOGV("retrieveDrmInfo: MEDIA_DRM_INFO  supportedScheme[%zu] %s", i,
                 DrmUUID::arrayToHex((const uint8_t*)&entry->uuid, sizeof(AMediaUUID)).string());
     }
-
-    sp<ABuffer> drmInfoBuf = ABuffer::CreateAsCopy(drmInfo.str().c_str(), drmInfo.tellp());
-    drmInfoBuf->setRange(0, drmInfo.tellp());
-    return drmInfoBuf;
+    return OK;
 }
 
 }   // namespace android

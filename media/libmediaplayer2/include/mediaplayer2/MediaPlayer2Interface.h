@@ -60,7 +60,8 @@ struct ANativeWindowWrapper;
 class MediaPlayer2InterfaceListener: public RefBase
 {
 public:
-    virtual void notify(int64_t srcId, int msg, int ext1, int ext2, const Parcel *obj) = 0;
+    virtual void notify(int64_t srcId, int msg, int ext1, int ext2,
+           const PlayerMessage *obj) = 0;
 };
 
 class MediaPlayer2Interface : public AHandler {
@@ -240,7 +241,7 @@ public:
         mListener = listener;
     }
 
-    void sendEvent(int64_t srcId, int msg, int ext1=0, int ext2=0, const Parcel *obj=NULL) {
+    void sendEvent(int64_t srcId, int msg, int ext1=0, int ext2=0, const PlayerMessage *obj=NULL) {
         sp<MediaPlayer2InterfaceListener> listener;
         {
             Mutex::Autolock autoLock(mListenerLock);

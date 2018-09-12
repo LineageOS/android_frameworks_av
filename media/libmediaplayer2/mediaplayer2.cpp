@@ -223,7 +223,8 @@ public:
 
     ~proxyListener() { };
 
-    virtual void notify(int64_t srcId, int msg, int ext1, int ext2, const Parcel *obj) override {
+    virtual void notify(int64_t srcId, int msg, int ext1, int ext2,
+            const PlayerMessage *obj) override {
         sp<MediaPlayer2> player = mPlayer.promote();
         if (player != NULL) {
             player->notify(srcId, msg, ext1, ext2, obj);
@@ -1271,7 +1272,7 @@ void MediaPlayer2::addNewMetadataUpdate(media::Metadata::Type metadata_type) {
     }
 }
 
-void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Parcel *obj) {
+void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const PlayerMessage *obj) {
     ALOGV("message received srcId=%lld, msg=%d, ext1=%d, ext2=%d",
           (long long)srcId, msg, ext1, ext2);
 

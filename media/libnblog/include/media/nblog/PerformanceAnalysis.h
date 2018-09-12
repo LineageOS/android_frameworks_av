@@ -19,14 +19,17 @@
 
 #include <deque>
 #include <map>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <media/nblog/ReportPerformance.h>
+#include <utils/Timers.h>
 
 namespace android {
 
 class String8;
+
+namespace ReportPerformance {
 
 // TODO make this a templated class and put it in a separate file.
 // The templated parameters would be bin size and low limit.
@@ -106,7 +109,7 @@ public:
      *
      * \return the histogram serialized as a string.
      */
-    std::string serializeToString() const;
+    std::string toString() const;
 
 private:
     const double mBinSize;      // Size of each bucket
@@ -119,37 +122,53 @@ private:
     uint64_t mTotalCount = 0;   // Total number of values recorded
 };
 
-// TODO For now this is a holder of audio performance metrics. The idea is essentially the same
-// as PerformanceAnalysis, but the design structure is different. There is a PerformanceAnalysis
-// instance for each thread writer (see PerformanceAnalysisMap later in this file), while a
-// PerformanceData instance already takes into account each thread writer in its calculations.
-// Eventually, this class should be merged with PerformanceAnalysis into some single entity.
-/*
- * PerformanceData stores audio performance data from audioflinger threads as histograms,
- * time series, or counts, and outputs them in a machine-readable format.
- */
-class PerformanceData {
-public:
-    void addCycleTimeEntry(int author, double cycleTimeMs);
-    void addLatencyEntry(int author, double latencyMs);
-    void addWarmupTimeEntry(int author, double warmupTimeMs);
-    void addWarmupCyclesEntry(int author, double warmupCycles);
-    void dump(int fd, int indent = 0);
-private:
-    // Values based on mUnderrunNs and mOverrunNs in FastMixer.cpp for frameCount = 192 and
-    // mSampleRate = 48000, which correspond to 2 and 7 seconds.
-    static constexpr Histogram::Config kCycleTimeConfig = { 0.25, 20, 2.};
-    std::unordered_map<int /*author, i.e. thread number*/, Histogram> mCycleTimeMsHists;
+// This is essentially the same as class PerformanceAnalysis, but PerformanceAnalysis
+// also does some additional analyzing of data, while the purpose of this struct is
+// to hold data.
+struct PerformanceData {
+    // Values based on mUnderrunNs and mOverrunNs in FastMixer.cpp for frameCount = 192
+    // and mSampleRate = 48000, which correspond to 2 and 7 seconds.
+    static constexpr Histogram::Config kWorkConfig = { 0.25, 20, 2.};
 
     // Values based on trial and error logging. Need a better way to determine
     // bin size and lower/upper limits.
     static constexpr Histogram::Config kLatencyConfig = { 2., 10, 10.};
-    std::unordered_map<int, Histogram> mLatencyMsHists;
+
+    // Values based on trial and error logging. Need a better way to determine
+    // bin size and lower/upper limits.
+    static constexpr Histogram::Config kWarmupConfig = { 5., 10, 10.};
+
+    // Thread Info
+    // TODO make type an enum
+    int type = -1;              // Thread type: 0 for MIXER, 1 for CAPTURE,
+                                // 2 for FASTMIXER, 3 for FASTCAPTURE
+    size_t frameCount = 0;
+    unsigned sampleRate = 0;
+
+    // Performance Data
+    Histogram workHist{kWorkConfig};
+    Histogram latencyHist{kLatencyConfig};
+    Histogram warmupHist{kWarmupConfig};
+    int64_t underruns = 0;
+    int64_t overruns = 0;
+    nsecs_t active = 0;
+    nsecs_t start{systemTime()};
+
+    // Reset the performance data. This does not represent a thread state change.
+    // Thread info is not reset here because the data is meant to be a continuation of the thread
+    // that struct PerformanceData is associated with.
+    void reset() {
+        workHist.clear();
+        latencyHist.clear();
+        warmupHist.clear();
+        underruns = 0;
+        overruns = 0;
+        active = 0;
+        start = systemTime();
+    }
 };
 
 //------------------------------------------------------------------------------
-
-namespace ReportPerformance {
 
 class PerformanceAnalysis;
 
@@ -204,7 +223,7 @@ private:
     std::deque<timestamp> mPeakTimestamps;
 
     // stores buffer period histograms with timestamp of first sample
-    std::deque<std::pair<timestamp, Histogram>> mHists;
+    std::deque<std::pair<timestamp, Hist>> mHists;
 
     // Parameters used when detecting outliers
     struct BufferPeriod {

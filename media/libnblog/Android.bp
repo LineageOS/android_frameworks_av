@@ -13,7 +13,12 @@ cc_library_shared {
         "libbinder",
         "libcutils",
         "liblog",
+        "libmediametrics",
         "libutils",
+    ],
+
+    static_libs: [
+        "libjsoncpp",
     ],
 
     cflags: [

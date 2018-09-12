@@ -34,12 +34,12 @@ namespace android {
 
 AudioOutputDescriptor::AudioOutputDescriptor(const sp<AudioPort>& port,
                                              AudioPolicyClientInterface *clientInterface)
-    : mPort(port), mDevice(AUDIO_DEVICE_NONE),
-      mClientInterface(clientInterface), mPatchHandle(AUDIO_PATCH_HANDLE_NONE), mId(0)
+    : mPort(port), mDevice(AUDIO_DEVICE_NONE), mClientInterface(clientInterface),
+      mPolicyMix(NULL), mGlobalActiveCount(0), mPatchHandle(AUDIO_PATCH_HANDLE_NONE), mId(0)
 {
     // clear usage count for all stream types
     for (int i = 0; i < AUDIO_STREAM_CNT; i++) {
-        mRefCount[i] = 0;
+        mActiveCount[i] = 0;
         mCurVolume[i] = -1.0;
         mMuteCount[i] = 0;
         mStopTime[i] = 0;
@@ -103,17 +103,51 @@ bool AudioOutputDescriptor::sharesHwModuleWith(
     }
 }
 
-void AudioOutputDescriptor::changeRefCount(audio_stream_type_t stream,
+void AudioOutputDescriptor::changeStreamActiveCount(audio_stream_type_t stream,
                                                                    int delta)
 {
-    if ((delta + (int)mRefCount[stream]) < 0) {
-        ALOGW("changeRefCount() invalid delta %d for stream %d, refCount %d",
-              delta, stream, mRefCount[stream]);
-        mRefCount[stream] = 0;
+    if ((delta + (int)mActiveCount[stream]) < 0) {
+        ALOGW("%s invalid delta %d for stream %d, active count %d",
+              __FUNCTION__, delta, stream, mActiveCount[stream]);
+        mActiveCount[stream] = 0;
         return;
     }
-    mRefCount[stream] += delta;
-    ALOGV("changeRefCount() stream %d, count %d", stream, mRefCount[stream]);
+    mActiveCount[stream] += delta;
+    ALOGV("%s stream %d, count %d", __FUNCTION__, stream, mActiveCount[stream]);
+}
+
+void AudioOutputDescriptor::setClientActive(const sp<TrackClientDescriptor>& client, bool active)
+{
+    if (mClients.find(client->portId()) == mClients.end()
+        || active == client->active()) {
+        return;
+    }
+
+    changeStreamActiveCount(client->stream(), active ? 1 : -1);
+
+    // Handle non-client-specific activity ref count
+    int32_t oldGlobalActiveCount = mGlobalActiveCount;
+    if (!active && mGlobalActiveCount < 1) {
+        ALOGW("%s invalid deactivation with globalRefCount %d", __FUNCTION__, mGlobalActiveCount);
+        mGlobalActiveCount = 1;
+    }
+    mGlobalActiveCount += active ? 1 : -1;
+
+    if ((oldGlobalActiveCount == 0) && (mGlobalActiveCount > 0)) {
+        if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
+        {
+            mClientInterface->onDynamicPolicyMixStateUpdate(mPolicyMix->mDeviceAddress,
+                                                            MIX_STATE_MIXING);
+        }
+    } else if ((oldGlobalActiveCount > 0) && (mGlobalActiveCount == 0)) {
+        if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
+        {
+            mClientInterface->onDynamicPolicyMixStateUpdate(mPolicyMix->mDeviceAddress,
+                                                            MIX_STATE_IDLE);
+        }
+    }
+
+    client->setActive(active);
 }
 
 bool AudioOutputDescriptor::isActive(uint32_t inPastMs) const
@@ -137,7 +171,7 @@ bool AudioOutputDescriptor::isStreamActive(audio_stream_type_t stream,
                                            uint32_t inPastMs,
                                            nsecs_t sysTime) const
 {
-    if (mRefCount[stream] != 0) {
+    if (mActiveCount[stream] != 0) {
         return true;
     }
     if (inPastMs == 0) {
@@ -201,6 +235,20 @@ void AudioOutputDescriptor::toAudioPort(struct audio_port *port) const
     port->ext.mix.hw_module = getModuleHandle();
 }
 
+TrackClientVector AudioOutputDescriptor::clientsList(bool activeOnly, routing_strategy strategy,
+                                                     bool preferredDeviceOnly) const
+{
+    TrackClientVector clients;
+    for (const auto &client : mClients) {
+        if ((!activeOnly || client.second->active())
+            && (strategy == STRATEGY_NONE || strategy == client.second->strategy())
+            && (!preferredDeviceOnly || client.second->hasPreferredDevice())) {
+            clients.push_back(client.second);
+        }
+    }
+    return clients;
+}
+
 status_t AudioOutputDescriptor::dump(int fd)
 {
     const size_t SIZE = 256;
@@ -217,11 +265,11 @@ status_t AudioOutputDescriptor::dump(int fd)
     result.append(buffer);
     snprintf(buffer, SIZE, " Devices %08x\n", device());
     result.append(buffer);
-    snprintf(buffer, SIZE, " Stream volume refCount muteCount\n");
+    snprintf(buffer, SIZE, " Stream volume activeCount muteCount\n");
     result.append(buffer);
     for (int i = 0; i < (int)AUDIO_STREAM_CNT; i++) {
-        snprintf(buffer, SIZE, " %02d     %.03f     %02d       %02d\n",
-                 i, mCurVolume[i], mRefCount[i], mMuteCount[i]);
+        snprintf(buffer, SIZE, " %02d     %.03f     %02d          %02d\n",
+                 i, mCurVolume[i], streamActiveCount((audio_stream_type_t)i), mMuteCount[i]);
         result.append(buffer);
     }
 
@@ -247,9 +295,9 @@ SwAudioOutputDescriptor::SwAudioOutputDescriptor(const sp<IOProfile>& profile,
                                                  AudioPolicyClientInterface *clientInterface)
     : AudioOutputDescriptor(profile, clientInterface),
     mProfile(profile), mIoHandle(AUDIO_IO_HANDLE_NONE), mLatency(0),
-    mFlags((audio_output_flags_t)0), mPolicyMix(NULL),
+    mFlags((audio_output_flags_t)0),
     mOutput1(0), mOutput2(0), mDirectOpenCount(0),
-    mDirectClientSession(AUDIO_SESSION_NONE), mGlobalRefCount(0)
+    mDirectClientSession(AUDIO_SESSION_NONE)
 {
     if (profile != NULL) {
         mFlags = (audio_output_flags_t)profile->getFlags();
@@ -313,40 +361,16 @@ uint32_t SwAudioOutputDescriptor::latency()
     }
 }
 
-void SwAudioOutputDescriptor::changeRefCount(audio_stream_type_t stream,
+void SwAudioOutputDescriptor::changeStreamActiveCount(audio_stream_type_t stream,
                                                                    int delta)
 {
     // forward usage count change to attached outputs
     if (isDuplicated()) {
-        mOutput1->changeRefCount(stream, delta);
-        mOutput2->changeRefCount(stream, delta);
+        mOutput1->changeStreamActiveCount(stream, delta);
+        mOutput2->changeStreamActiveCount(stream, delta);
     }
-    AudioOutputDescriptor::changeRefCount(stream, delta);
-
-    // handle stream-independent ref count
-    uint32_t oldGlobalRefCount = mGlobalRefCount;
-    if ((delta + (int)mGlobalRefCount) < 0) {
-        ALOGW("changeRefCount() invalid delta %d globalRefCount %d", delta, mGlobalRefCount);
-        mGlobalRefCount = 0;
-    } else {
-        mGlobalRefCount += delta;
-    }
-    if ((oldGlobalRefCount == 0) && (mGlobalRefCount > 0)) {
-        if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
-        {
-            mClientInterface->onDynamicPolicyMixStateUpdate(mPolicyMix->mDeviceAddress,
-                    MIX_STATE_MIXING);
-        }
-
-    } else if ((oldGlobalRefCount > 0) && (mGlobalRefCount == 0)) {
-        if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
-        {
-            mClientInterface->onDynamicPolicyMixStateUpdate(mPolicyMix->mDeviceAddress,
-                    MIX_STATE_IDLE);
-        }
-    }
+    AudioOutputDescriptor::changeStreamActiveCount(stream, delta);
 }
-
 
 bool SwAudioOutputDescriptor::isFixedVolume(audio_devices_t device)
 {
@@ -523,7 +547,7 @@ void SwAudioOutputDescriptor::close()
 
         LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
                             __FUNCTION__, mProfile->curOpenCount);
-        // do not call stop() here as stop() is supposed to be called after changeRefCount(-1)
+        // do not call stop() here as stop() is supposed to be called after setClientActive(false)
         // and we don't know how many streams are still active at this time
         if (isActive()) {
             mProfile->curActiveCount--;
@@ -723,7 +747,7 @@ bool SwAudioOutputCollection::isAnyOutputActive(audio_stream_type_t streamToIgno
         }
         for (size_t i = 0; i < size(); i++) {
             const sp<SwAudioOutputDescriptor> outputDesc = valueAt(i);
-            if (outputDesc->mRefCount[s] != 0) {
+            if (outputDesc->streamActiveCount((audio_stream_type_t)s)!= 0) {
                 return true;
             }
         }
@@ -742,7 +766,7 @@ sp<SwAudioOutputDescriptor> SwAudioOutputCollection::getOutputForClient(audio_po
 {
     for (size_t i = 0; i < size(); i++) {
         sp<SwAudioOutputDescriptor> outputDesc = valueAt(i);
-        for (const auto& client : outputDesc->clients()) {
+        for (const auto& client : outputDesc->clientsMap()) {
             if (client.second->portId() == portId) {
                 return outputDesc;
             }
@@ -788,7 +812,7 @@ bool HwAudioOutputCollection::isAnyOutputActive(audio_stream_type_t streamToIgno
         }
         for (size_t i = 0; i < size(); i++) {
             const sp<HwAudioOutputDescriptor> outputDesc = valueAt(i);
-            if (outputDesc->mRefCount[s] != 0) {
+            if (outputDesc->streamActiveCount((audio_stream_type_t)s) != 0) {
                 return true;
             }
         }

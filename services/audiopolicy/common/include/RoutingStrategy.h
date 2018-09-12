@@ -23,6 +23,7 @@ namespace android {
 #define SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY 5000
 
 enum routing_strategy {
+    STRATEGY_NONE = -1,
     STRATEGY_MEDIA,
     STRATEGY_PHONE,
     STRATEGY_SONIFICATION,
