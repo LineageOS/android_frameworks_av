@@ -90,7 +90,7 @@ public:
         Accumulator<CHANNELS-1, TO>::acc(coef, data);
     }
     inline void volume(TO*& out, TO gain) {
-        *out++ = volumeAdjust(value, gain);
+        *out++ += volumeAdjust(value, gain);
         Accumulator<CHANNELS-1, TO>::volume(out, gain);
     }
 
