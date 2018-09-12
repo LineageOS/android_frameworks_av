@@ -15,6 +15,7 @@
  */
 
 #define LOG_TAG "ReportPerformance"
+//#define LOG_NDEBUG 0
 
 #include <fstream>
 #include <iostream>
@@ -30,23 +31,22 @@
 #include <utility>
 #include <json/json.h>
 #include <media/MediaAnalyticsItem.h>
-#include <media/nblog/NBLog.h>
+#include <media/nblog/Events.h>
 #include <media/nblog/PerformanceAnalysis.h>
 #include <media/nblog/ReportPerformance.h>
 #include <utils/Log.h>
 #include <utils/String8.h>
 
 namespace android {
-
 namespace ReportPerformance {
 
 std::unique_ptr<Json::Value> dumpToJson(const PerformanceData& data)
 {
     std::unique_ptr<Json::Value> rootPtr = std::make_unique<Json::Value>(Json::objectValue);
     Json::Value& root = *rootPtr;
-    root["type"] = data.type;
-    root["frameCount"] = (Json::Value::Int)data.frameCount;
-    root["sampleRate"] = (Json::Value::Int)data.sampleRate;
+    root["type"] = (Json::Value::Int)data.threadInfo.type;
+    root["frameCount"] = (Json::Value::Int)data.threadInfo.frameCount;
+    root["sampleRate"] = (Json::Value::Int)data.threadInfo.sampleRate;
     root["workMsHist"] = data.workHist.toString();
     root["latencyMsHist"] = data.latencyHist.toString();
     root["warmupMsHist"] = data.warmupHist.toString();
@@ -102,15 +102,10 @@ bool sendToMediaMetrics(const PerformanceData& data)
     // we want to send them only if there are performance metrics to send.
     if (item->count() > 0) {
         // Add thread info fields.
-        const int type = data.type;
-        // TODO have a int-to-string mapping defined somewhere else for other thread types.
-        if (type == 2) {
-            item->setCString(kThreadType, "FASTMIXER");
-        } else {
-            item->setCString(kThreadType, "UNKNOWN");
-        }
-        item->setInt32(kThreadFrameCount, data.frameCount);
-        item->setInt32(kThreadSampleRate, data.sampleRate);
+        const char * const typeString = NBLog::threadTypeToString(data.threadInfo.type);
+        item->setCString(kThreadType, typeString);
+        item->setInt32(kThreadFrameCount, data.threadInfo.frameCount);
+        item->setInt32(kThreadSampleRate, data.threadInfo.sampleRate);
         // Add time info fields.
         item->setInt64(kThreadActive, data.active / 1000000);
         item->setInt64(kThreadDuration, (systemTime() - data.start) / 1000000);
@@ -211,6 +206,5 @@ void writeToFile(const std::deque<std::pair<timestamp, Hist>> &hists,
     pfs.close();
 }
 
-} // namespace ReportPerformance
-
+}   // namespace ReportPerformance
 }   // namespace android
