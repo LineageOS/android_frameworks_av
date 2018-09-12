@@ -22,6 +22,7 @@
 
 #include <binder/IMemory.h>
 #include <binder/MemoryDealer.h>
+#include <media/MediaExtractorPluginApi.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
 #include <media/MediaExtractorPluginApi.h>
@@ -76,13 +77,23 @@ struct MediaTrack
             SEEK_FRAME_INDEX = CMediaTrackReadOptions::SEEK_FRAME_INDEX,
         };
 
-        ReadOptions();
+        ReadOptions() {
+            reset();
+        }
 
         // Reset everything back to defaults.
-        void reset();
+        void reset() {
+            mOptions = 0;
+            mSeekTimeUs = 0;
+            mNonBlocking = false;
+        }
 
         void setSeekTo(int64_t time_us, SeekMode mode = SEEK_CLOSEST_SYNC);
-        void clearSeekTo();
+        void clearSeekTo() {
+            mOptions &= ~kSeekTo_Option;
+            mSeekTimeUs = 0;
+            mSeekMode = SEEK_CLOSEST_SYNC;
+        }
         bool getSeekTo(int64_t *time_us, SeekMode *mode) const;
 
         void setNonBlocking();
@@ -144,6 +155,24 @@ protected:
 
 private:
     CMediaTrack *wrapper;
+};
+
+class MediaTrackCUnwrapperV2 : public MediaTrack {
+public:
+    explicit MediaTrackCUnwrapperV2(CMediaTrackV2 *wrapper);
+
+    virtual status_t start(MetaDataBase *params = NULL);
+    virtual status_t stop();
+    virtual status_t getFormat(MetaDataBase& format);
+    virtual status_t read(MediaBufferBase **buffer, const ReadOptions *options = NULL);
+
+    virtual bool supportNonblockingRead();
+
+protected:
+    virtual ~MediaTrackCUnwrapperV2();
+
+private:
+    CMediaTrackV2 *wrapper;
 };
 
 }  // namespace android

@@ -124,6 +124,7 @@ cc_library_shared {
         "MediaExtractor.cpp",
         "MediaExtractorFactory.cpp",
         "MediaSync.cpp",
+        "MediaTrack.cpp",
         "http/ClearMediaHTTP.cpp",
         "http/MediaHTTP.cpp",
         "MediaMuxer.cpp",

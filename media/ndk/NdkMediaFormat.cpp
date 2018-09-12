@@ -35,23 +35,6 @@ using namespace android;
 
 extern "C" {
 
-// private functions for conversion to/from AMessage
-AMediaFormat* AMediaFormat_fromMsg(const void* data) {
-    ALOGV("private ctor");
-    AMediaFormat* mData = new AMediaFormat();
-    mData->mFormat = *((sp<AMessage>*)data);
-    if (mData->mFormat == NULL) {
-        ALOGW("got NULL format");
-        mData->mFormat = new AMessage;
-    }
-    return mData;
-}
-
-void AMediaFormat_getFormat(const AMediaFormat* mData, void* dest) {
-    *((sp<AMessage>*)dest) = mData->mFormat;
-}
-
-
 /*
  * public function follow
  */

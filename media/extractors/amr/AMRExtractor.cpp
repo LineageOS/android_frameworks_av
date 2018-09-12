@@ -370,19 +370,21 @@ ExtractorDef GETEXTRACTORDEF() {
         UUID("c86639c9-2f31-40ac-a715-fa01b4493aaf"),
         1,
         "AMR Extractor",
-        [](
-                CDataSource *source,
-                float *confidence,
-                void **,
-                FreeMetaFunc *) -> CreatorFunc {
-            DataSourceHelper helper(source);
-            if (SniffAMR(&helper, nullptr, confidence)) {
-                return [](
-                        CDataSource *source,
-                        void *) -> CMediaExtractor* {
-                    return wrap(new AMRExtractor(new DataSourceHelper(source)));};
+        {
+           [](
+                    CDataSource *source,
+                    float *confidence,
+                    void **,
+                    FreeMetaFunc *) -> CreatorFunc {
+                DataSourceHelper helper(source);
+                if (SniffAMR(&helper, nullptr, confidence)) {
+                    return [](
+                            CDataSource *source,
+                            void *) -> CMediaExtractor* {
+                        return wrap(new AMRExtractor(new DataSourceHelper(source)));};
+                }
+                return NULL;
             }
-            return NULL;
         }
     };
 }

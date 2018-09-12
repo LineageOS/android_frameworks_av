@@ -332,18 +332,20 @@ ExtractorDef GETEXTRACTORDEF() {
         UUID("ef6cca0a-f8a2-43e6-ba5f-dfcd7c9a7ef2"),
         1,
         "MIDI Extractor",
-        [](
-                CDataSource *source,
-                float *confidence,
-                void **,
-                FreeMetaFunc *) -> CreatorFunc {
-            if (SniffMidi(source, confidence)) {
-                return [](
-                        CDataSource *source,
-                        void *) -> CMediaExtractor* {
-                    return wrap(new MidiExtractor(source));};
+        {
+            [](
+                    CDataSource *source,
+                    float *confidence,
+                    void **,
+                    FreeMetaFunc *) -> CreatorFunc {
+                if (SniffMidi(source, confidence)) {
+                    return [](
+                            CDataSource *source,
+                            void *) -> CMediaExtractor* {
+                        return wrap(new MidiExtractor(source));};
+                }
+                return NULL;
             }
-            return NULL;
         }
     };
 }

@@ -16,7 +16,12 @@
 
 #include <mutex>
 
+#include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/Utils.h>
+
 #include <media/MediaTrack.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/NdkMediaFormatPriv.h>
 
 namespace android {
 
@@ -25,16 +30,6 @@ MediaTrack::MediaTrack() {}
 MediaTrack::~MediaTrack() {}
 
 ////////////////////////////////////////////////////////////////////////////////
-
-MediaTrack::ReadOptions::ReadOptions() {
-    reset();
-}
-
-void MediaTrack::ReadOptions::reset() {
-    mOptions = 0;
-    mSeekTimeUs = 0;
-    mNonBlocking = false;
-}
 
 void MediaTrack::ReadOptions::setNonBlocking() {
     mNonBlocking = true;
@@ -54,18 +49,14 @@ void MediaTrack::ReadOptions::setSeekTo(int64_t time_us, SeekMode mode) {
     mSeekMode = mode;
 }
 
-void MediaTrack::ReadOptions::clearSeekTo() {
-    mOptions &= ~kSeekTo_Option;
-    mSeekTimeUs = 0;
-    mSeekMode = SEEK_CLOSEST_SYNC;
-}
-
 bool MediaTrack::ReadOptions::getSeekTo(
         int64_t *time_us, SeekMode *mode) const {
     *time_us = mSeekTimeUs;
     *mode = mSeekMode;
     return (mOptions & kSeekTo_Option) != 0;
 }
+
+/* -------------- unwrapper v1 --------------- */
 
 MediaTrackCUnwrapper::MediaTrackCUnwrapper(CMediaTrack *cmediatrack) {
     wrapper = cmediatrack;
@@ -108,6 +99,61 @@ status_t MediaTrackCUnwrapper::read(MediaBufferBase **buffer, const ReadOptions 
 }
 
 bool MediaTrackCUnwrapper::supportNonblockingRead() {
+    return wrapper->supportsNonBlockingRead(wrapper->data);
+}
+
+/* -------------- unwrapper v2 --------------- */
+
+MediaTrackCUnwrapperV2::MediaTrackCUnwrapperV2(CMediaTrackV2 *cmediatrack2) {
+    wrapper = cmediatrack2;
+}
+
+MediaTrackCUnwrapperV2::~MediaTrackCUnwrapperV2() {
+}
+
+status_t MediaTrackCUnwrapperV2::start(MetaDataBase *meta) {
+    sp<AMessage> msg;
+    convertMetaDataToMessage(meta, &msg);
+    AMediaFormat *format =  AMediaFormat_fromMsg(&msg);
+    status_t ret = wrapper->start(wrapper->data, format);
+    delete format;
+    return ret;
+}
+
+status_t MediaTrackCUnwrapperV2::stop() {
+    return wrapper->stop(wrapper->data);
+}
+
+status_t MediaTrackCUnwrapperV2::getFormat(MetaDataBase& format) {
+    sp<AMessage> msg = new AMessage();
+    AMediaFormat *tmpFormat =  AMediaFormat_fromMsg(&msg);
+    status_t ret = wrapper->getFormat(wrapper->data, tmpFormat);
+    sp<MetaData> newMeta = new MetaData();
+    convertMessageToMetaData(msg, newMeta);
+    delete tmpFormat;
+    format = *newMeta;
+    return ret;
+}
+
+status_t MediaTrackCUnwrapperV2::read(MediaBufferBase **buffer, const ReadOptions *options) {
+
+    uint32_t opts = 0;
+
+    if (options->getNonBlocking()) {
+        opts |= CMediaTrackReadOptions::NONBLOCKING;
+    }
+
+    int64_t seekPosition = 0;
+    MediaTrack::ReadOptions::SeekMode seekMode;
+    if (options->getSeekTo(&seekPosition, &seekMode)) {
+        opts |= SEEK;
+        opts |= (uint32_t) seekMode;
+    }
+
+    return wrapper->read(wrapper->data, buffer, opts, seekPosition);
+}
+
+bool MediaTrackCUnwrapperV2::supportNonblockingRead() {
     return wrapper->supportsNonBlockingRead(wrapper->data);
 }
 
