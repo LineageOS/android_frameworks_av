@@ -127,7 +127,7 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
     }
 
     std::vector<std::string> physicalCameraIds;
-    bool isLogical = CameraProviderManager::isLogicalCamera(mDeviceInfo, &physicalCameraIds);
+    bool isLogical = manager->isLogicalCamera(mId.string(), &physicalCameraIds);
     if (isLogical) {
         for (auto& physicalId : physicalCameraIds) {
             res = manager->getCameraCharacteristics(physicalId, &mPhysicalDeviceInfoMap[physicalId]);

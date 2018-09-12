@@ -301,6 +301,7 @@ private:
     std::unordered_map<int32_t, OutputStreamInfo> mStreamInfoMap;
 
     static const int32_t MAX_SURFACES_PER_STREAM = 2;
+    sp<CameraProviderManager> mProviderManager;
 };
 
 }; // namespace android

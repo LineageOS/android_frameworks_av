@@ -396,35 +396,46 @@ metadata_vendor_id_t CameraProviderManager::getProviderTagIdLocked(
     return ret;
 }
 
-bool CameraProviderManager::isLogicalCamera(const CameraMetadata& staticInfo,
-        std::vector<std::string>* physicalCameraIds) {
-    bool isLogicalCam = false;
-    camera_metadata_ro_entry_t entryCap;
+void CameraProviderManager::ProviderInfo::DeviceInfo3::queryPhysicalCameraIds() {
+    camera_metadata_entry_t entryCap;
 
-    entryCap = staticInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    entryCap = mCameraCharacteristics.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
     for (size_t i = 0; i < entryCap.count; ++i) {
         uint8_t capability = entryCap.data.u8[i];
         if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA) {
-            isLogicalCam = true;
+            mIsLogicalCamera = true;
             break;
         }
     }
-    if (!isLogicalCam) {
-        return false;
+    if (!mIsLogicalCamera) {
+        return;
     }
 
-    camera_metadata_ro_entry_t entryIds = staticInfo.find(ANDROID_LOGICAL_MULTI_CAMERA_PHYSICAL_IDS);
+    camera_metadata_entry_t entryIds = mCameraCharacteristics.find(
+            ANDROID_LOGICAL_MULTI_CAMERA_PHYSICAL_IDS);
     const uint8_t* ids = entryIds.data.u8;
     size_t start = 0;
     for (size_t i = 0; i < entryIds.count; ++i) {
         if (ids[i] == '\0') {
             if (start != i) {
-                physicalCameraIds->push_back((const char*)ids+start);
+                mPhysicalIds.push_back((const char*)ids+start);
             }
             start = i+1;
         }
     }
-    return true;
+}
+
+bool CameraProviderManager::isLogicalCamera(const std::string& id,
+        std::vector<std::string>* physicalCameraIds) {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+    auto deviceInfo = findDeviceInfoLocked(id);
+    if (deviceInfo == nullptr) return false;
+
+    if (deviceInfo->mIsLogicalCamera && physicalCameraIds != nullptr) {
+        *physicalCameraIds = deviceInfo->mPhysicalIds;
+    }
+    return deviceInfo->mIsLogicalCamera;
 }
 
 bool CameraProviderManager::isHiddenPhysicalCamera(const std::string& cameraId) {
@@ -449,9 +460,9 @@ bool CameraProviderManager::isHiddenPhysicalCamera(const std::string& cameraId) 
             }
 
             std::vector<std::string> physicalIds;
-            if (isLogicalCamera(info, &physicalIds)) {
-                if (std::find(physicalIds.begin(), physicalIds.end(), cameraId) !=
-                        physicalIds.end()) {
+            if (deviceInfo->mIsLogicalCamera) {
+                if (std::find(deviceInfo->mPhysicalIds.begin(), deviceInfo->mPhysicalIds.end(),
+                        cameraId) != deviceInfo->mPhysicalIds.end()) {
                     int deviceVersion = HARDWARE_DEVICE_API_VERSION(
                             deviceInfo->mVersion.get_major(), deviceInfo->mVersion.get_minor());
                     if (deviceVersion < CAMERA_DEVICE_API_VERSION_3_5) {
@@ -760,9 +771,8 @@ status_t CameraProviderManager::ProviderInfo::dump(int fd, const Vector<String16
         }
 
         // Dump characteristics of non-standalone physical camera
-        std::vector<std::string> physicalIds;
-        if (isLogicalCamera(info2, &physicalIds)) {
-            for (auto& id : physicalIds) {
+        if (device->mIsLogicalCamera) {
+            for (auto& id : device->mPhysicalIds) {
                 // Skip if physical id is an independent camera
                 if (std::find(mProviderPublicCameraIds.begin(), mProviderPublicCameraIds.end(), id)
                         != mProviderPublicCameraIds.end()) {
@@ -1130,6 +1140,7 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
         mHasFlashUnit = false;
     }
 
+    queryPhysicalCameraIds();
     // Get physical camera characteristics if applicable
     auto castResult = device::V3_5::ICameraDevice::castFrom(mInterface);
     if (!castResult.isOk()) {
@@ -1142,9 +1153,8 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
         return;
     }
 
-    std::vector<std::string> physicalIds;
-    if (CameraProviderManager::isLogicalCamera(mCameraCharacteristics, &physicalIds)) {
-        for (auto& id : physicalIds) {
+    if (mIsLogicalCamera) {
+        for (auto& id : mPhysicalIds) {
             if (std::find(mPublicCameraIds.begin(), mPublicCameraIds.end(), id) !=
                     mPublicCameraIds.end()) {
                 continue;
@@ -1622,20 +1632,14 @@ void CameraProviderManager::filterLogicalCameraIdsLocked(
     std::unordered_set<std::string> removedIds;
 
     for (auto& deviceId : deviceIds) {
-        CameraMetadata info;
-        status_t res = getCameraCharacteristicsLocked(deviceId, &info);
-        if (res != OK) {
-            ALOGE("%s: Failed to getCameraCharacteristics for id %s", __FUNCTION__,
-                    deviceId.c_str());
-            return;
-        }
+        auto deviceInfo = findDeviceInfoLocked(deviceId);
+        if (deviceInfo == nullptr) continue;
 
-        // idCombo contains the ids of a logical camera and its physical cameras
-        std::vector<std::string> idCombo;
-        bool logicalCamera = isLogicalCamera(info, &idCombo);
-        if (!logicalCamera) {
+        if (!deviceInfo->mIsLogicalCamera) {
             continue;
         }
+        // idCombo contains the ids of a logical camera and its physical cameras
+        std::vector<std::string> idCombo = deviceInfo->mPhysicalIds;
         idCombo.push_back(deviceId);
 
         for (auto& id : deviceIds) {
