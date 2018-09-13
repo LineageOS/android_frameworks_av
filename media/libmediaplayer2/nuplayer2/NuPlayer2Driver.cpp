@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NuPlayer2Driver"
 #include <inttypes.h>
+#include <android-base/macros.h>
 #include <utils/Log.h>
 #include <cutils/properties.h>
 
@@ -297,8 +298,7 @@ status_t NuPlayer2Driver::start_l() {
         case STATE_PREPARED:
         {
             mPlayer->start();
-
-            // fall through
+            FALLTHROUGH_INTENDED;
         }
 
         case STATE_RUNNING:
@@ -940,7 +940,7 @@ void NuPlayer2Driver::notifyListener_l(
                     mPlayer->pause();
                     mState = STATE_PAUSED;
                 }
-                // fall through
+                FALLTHROUGH_INTENDED;
             }
 
             case MEDIA2_ERROR:
