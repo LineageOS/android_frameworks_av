@@ -112,6 +112,9 @@ public:
     std::string toString() const;
 
 private:
+    // Histogram version number.
+    static constexpr int kVersion = 1;
+
     const double mBinSize;      // Size of each bucket
     const size_t mNumBins;      // Number of buckets in histogram range
     const double mLow;          // Lower bound of values

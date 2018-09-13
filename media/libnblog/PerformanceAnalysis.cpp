@@ -80,7 +80,7 @@ uint64_t Histogram::totalCount() const
 std::string Histogram::toString() const {
     std::stringstream ss;
     static constexpr char kDivider = '|';
-    ss << mBinSize << "," << mNumBins << "," << mLow << ",{";
+    ss << kVersion << "," << mBinSize << "," << mNumBins << "," << mLow << ",{";
     bool first = true;
     if (mLowCount != 0) {
         ss << "-1" << kDivider << mLowCount;
