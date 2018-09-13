@@ -598,7 +598,7 @@ String8 AudioFlinger::PatchPanel::Patch::dump(audio_patch_handle_t myHandle) con
     // add latency if it exists
     double latencyMs;
     if (getLatencyMs(&latencyMs) == OK) {
-        result.appendFormat("  latency: %.2lf", latencyMs);
+        result.appendFormat("  latency: %.2lf ms", latencyMs);
     }
     return result;
 }
