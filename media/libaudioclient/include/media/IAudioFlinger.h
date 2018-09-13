@@ -146,6 +146,7 @@ public:
             afSampleRate = parcel->readInt64();
             afLatencyMs = parcel->readInt32();
             (void)parcel->read(&outputId, sizeof(audio_io_handle_t));
+            (void)parcel->readInt32(&trackId);
             return NO_ERROR;
         }
 
@@ -163,6 +164,7 @@ public:
             (void)parcel->writeInt64(afSampleRate);
             (void)parcel->writeInt32(afLatencyMs);
             (void)parcel->write(&outputId, sizeof(audio_io_handle_t));
+            (void)parcel->writeInt32(trackId);
             return NO_ERROR;
         }
 
@@ -179,6 +181,7 @@ public:
         uint32_t afSampleRate;
         uint32_t afLatencyMs;
         audio_io_handle_t outputId;
+        int32_t trackId;
     };
 
     /* CreateRecordInput contains all input arguments sent by AudioRecord to AudioFlinger
