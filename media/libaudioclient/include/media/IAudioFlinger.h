@@ -274,6 +274,7 @@ public:
                     return BAD_VALUE;
                 }
             }
+            (void)parcel->readInt32(&trackId);
             return NO_ERROR;
         }
 
@@ -300,6 +301,7 @@ public:
             } else {
                 (void)parcel->writeInt32(0);
             }
+            (void)parcel->writeInt32(trackId);
 
             return NO_ERROR;
         }
@@ -316,6 +318,7 @@ public:
         audio_io_handle_t inputId;
         sp<IMemory> cblk;
         sp<IMemory> buffers;
+        int32_t trackId;
     };
 
     // invariant on exit for all APIs that return an sp<>:

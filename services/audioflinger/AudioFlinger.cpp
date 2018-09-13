@@ -1808,6 +1808,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
 
     output.cblk = recordTrack->getCblk();
     output.buffers = recordTrack->getBuffers();
+    output.trackId = recordTrack->id();
 
     // return handle to client
     recordHandle = new RecordHandle(recordTrack);
