@@ -16,6 +16,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "PlaylistFetcher"
+#include <android-base/macros.h>
 #include <utils/Log.h>
 #include <utils/misc.h>
 
@@ -267,7 +268,7 @@ int64_t PlaylistFetcher::delayUsToRefreshPlaylist() const {
                 break;
             }
 
-            // fall through
+            FALLTHROUGH_INTENDED;
         }
 
         case FIRST_UNCHANGED_RELOAD_ATTEMPT:

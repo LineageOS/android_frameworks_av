@@ -366,13 +366,13 @@ int main(int argc, char **argv) {
             case 'T':
             {
                 useTimestamp = true;
+                FALLTHROUGH_INTENDED;
             }
-            // fall through
             case 'R':
             {
                 renderSurface = true;
+                FALLTHROUGH_INTENDED;
             }
-            // fall through
             case 'S':
             {
                 useSurface = true;
