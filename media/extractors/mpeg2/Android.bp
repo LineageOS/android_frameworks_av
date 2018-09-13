@@ -25,6 +25,10 @@ cc_library_shared {
         "libstagefright_foundation",
     ],
 
+    header_libs: [
+        "libbase_headers",
+    ],
+
     static_libs: [
         "libstagefright_mpeg2support",
         "libutils",
