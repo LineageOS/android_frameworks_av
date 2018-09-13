@@ -1850,6 +1850,7 @@ void AudioFlinger::PlaybackThread::dumpInternals(int fd, const Vector<String16>&
 {
     dumpBase(fd, args);
 
+    dprintf(fd, "  Master mute: %s\n", mMasterMute ? "on" : "off");
     dprintf(fd, "  Normal frame count: %zu\n", mNormalFrameCount);
     dprintf(fd, "  Last write occurred (msecs): %llu\n",
             (unsigned long long) ns2ms(systemTime() - mLastWriteTime));
