@@ -22,7 +22,6 @@
 
 #include <binder/Parcel.h>
 #include <camera/CameraMetadata.h>
-#include <camera/VendorTagDescriptor.h>
 
 namespace android {
 
@@ -407,6 +406,79 @@ status_t CameraMetadata::erase(uint32_t tag) {
                 tag, strerror(-res), res);
     }
     return res;
+}
+
+status_t CameraMetadata::removePermissionEntries(metadata_vendor_id_t vendorId,
+        std::vector<int32_t> *tagsRemoved) {
+    uint32_t tagCount = 0;
+    std::vector<uint32_t> tagsToRemove;
+
+    if (tagsRemoved == nullptr) {
+        return BAD_VALUE;
+    }
+
+    sp<VendorTagDescriptor> vTags = VendorTagDescriptor::getGlobalVendorTagDescriptor();
+    if ((nullptr == vTags.get()) || (0 >= vTags->getTagCount())) {
+        sp<VendorTagDescriptorCache> cache =
+            VendorTagDescriptorCache::getGlobalVendorTagCache();
+        if (cache.get()) {
+            cache->getVendorTagDescriptor(vendorId, &vTags);
+        }
+    }
+
+    if ((nullptr != vTags.get()) && (vTags->getTagCount() > 0)) {
+        tagCount = vTags->getTagCount();
+        uint32_t *vendorTags = new uint32_t[tagCount];
+        if (nullptr == vendorTags) {
+            return NO_MEMORY;
+        }
+        vTags->getTagArray(vendorTags);
+
+        tagsToRemove.reserve(tagCount);
+        tagsToRemove.insert(tagsToRemove.begin(), vendorTags, vendorTags + tagCount);
+
+        delete [] vendorTags;
+        tagCount = 0;
+    }
+
+    auto tagsNeedingPermission = get_camera_metadata_permission_needed(&tagCount);
+    if (tagCount > 0) {
+        tagsToRemove.reserve(tagsToRemove.capacity() + tagCount);
+        tagsToRemove.insert(tagsToRemove.end(), tagsNeedingPermission,
+                tagsNeedingPermission + tagCount);
+    }
+
+    tagsRemoved->reserve(tagsToRemove.size());
+    for (const auto &it : tagsToRemove) {
+        if (exists(it)) {
+            auto rc = erase(it);
+            if (NO_ERROR != rc) {
+                ALOGE("%s: Failed to erase tag: %x", __func__, it);
+                return rc;
+            }
+            tagsRemoved->push_back(it);
+        }
+    }
+
+    // Update the available characterstics accordingly
+    if (exists(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS)) {
+        std::vector<uint32_t> currentKeys;
+
+        std::sort(tagsRemoved->begin(), tagsRemoved->end());
+        auto keys = find(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS);
+        currentKeys.reserve(keys.count);
+        currentKeys.insert(currentKeys.end(), keys.data.i32, keys.data.i32 + keys.count);
+        std::sort(currentKeys.begin(), currentKeys.end());
+
+        std::vector<int32_t> newKeys(keys.count);
+        auto end = std::set_difference(currentKeys.begin(), currentKeys.end(), tagsRemoved->begin(),
+                tagsRemoved->end(), newKeys.begin());
+        newKeys.resize(end - newKeys.begin());
+
+        update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS, newKeys.data(), newKeys.size());
+    }
+
+    return NO_ERROR;
 }
 
 void CameraMetadata::dump(int fd, int verbosity, int indentation) const {
