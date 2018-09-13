@@ -42,7 +42,6 @@ LOCAL_SHARED_LIBRARIES := \
 
 LOCAL_STATIC_LIBRARIES := \
     libcpustats \
-    libjsoncpp \
     libsndfile \
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
