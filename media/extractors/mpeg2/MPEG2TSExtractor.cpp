@@ -26,7 +26,6 @@
 
 #include <media/DataSourceBase.h>
 #include <media/IStreamSource.h>
-#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
@@ -51,7 +50,7 @@ static const size_t kTSPacketSize = 188;
 static const int kMaxDurationReadSize = 250000LL;
 static const int kMaxDurationRetry = 6;
 
-struct MPEG2TSSource : public MediaTrack {
+struct MPEG2TSSource : public MediaTrackHelper {
     MPEG2TSSource(
             MPEG2TSExtractor *extractor,
             const sp<AnotherPacketSource> &impl,
@@ -110,7 +109,7 @@ status_t MPEG2TSSource::read(
     ReadOptions::SeekMode seekMode;
     if (mDoesSeek && options && options->getSeekTo(&seekTimeUs, &seekMode)) {
         // seek is needed
-        status_t err = mExtractor->seek(seekTimeUs, seekMode);
+        status_t err = mExtractor->seek(seekTimeUs, (ReadOptions::SeekMode)seekMode);
         if (err != OK) {
             return err;
         }
@@ -120,7 +119,7 @@ status_t MPEG2TSSource::read(
         return ERROR_END_OF_STREAM;
     }
 
-    return mImpl->read(out, options);
+    return mImpl->read(out, (MediaSource::ReadOptions*) options);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -141,7 +140,7 @@ size_t MPEG2TSExtractor::countTracks() {
     return mSourceImpls.size();
 }
 
-MediaTrack *MPEG2TSExtractor::getTrack(size_t index) {
+MediaTrackHelper *MPEG2TSExtractor::getTrack(size_t index) {
     if (index >= mSourceImpls.size()) {
         return NULL;
     }
@@ -483,7 +482,7 @@ uint32_t MPEG2TSExtractor::flags() const {
 }
 
 status_t MPEG2TSExtractor::seek(int64_t seekTimeUs,
-        const MediaTrack::ReadOptions::SeekMode &seekMode) {
+        const MediaTrackHelper::ReadOptions::SeekMode &seekMode) {
     if (mSeekSyncPoints == NULL || mSeekSyncPoints->isEmpty()) {
         ALOGW("No sync point to seek to.");
         // ... and therefore we have nothing useful to do here.
@@ -504,18 +503,18 @@ status_t MPEG2TSExtractor::seek(int64_t seekTimeUs,
     }
 
     switch (seekMode) {
-        case MediaTrack::ReadOptions::SEEK_NEXT_SYNC:
+        case MediaTrackHelper::ReadOptions::SEEK_NEXT_SYNC:
             if (index == mSeekSyncPoints->size()) {
                 ALOGW("Next sync not found; starting from the latest sync.");
                 --index;
             }
             break;
-        case MediaTrack::ReadOptions::SEEK_CLOSEST_SYNC:
-        case MediaTrack::ReadOptions::SEEK_CLOSEST:
+        case MediaTrackHelper::ReadOptions::SEEK_CLOSEST_SYNC:
+        case MediaTrackHelper::ReadOptions::SEEK_CLOSEST:
             ALOGW("seekMode not supported: %d; falling back to PREVIOUS_SYNC",
                     seekMode);
             FALLTHROUGH_INTENDED;
-        case MediaTrack::ReadOptions::SEEK_PREVIOUS_SYNC:
+        case MediaTrackHelper::ReadOptions::SEEK_PREVIOUS_SYNC:
             if (index == 0) {
                 ALOGW("Previous sync not found; starting from the earliest "
                         "sync.");

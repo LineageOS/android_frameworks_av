@@ -20,7 +20,6 @@
 
 #include "AMRExtractor.h"
 
-#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
@@ -30,7 +29,7 @@
 
 namespace android {
 
-class AMRSource : public MediaTrack {
+class AMRSource : public MediaTrackHelper {
 public:
     AMRSource(
             DataSourceHelper *source,
@@ -208,7 +207,7 @@ size_t AMRExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrack *AMRExtractor::getTrack(size_t index) {
+MediaTrackHelper *AMRExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }

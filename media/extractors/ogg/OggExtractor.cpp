@@ -21,9 +21,9 @@
 #include "OggExtractor.h"
 
 #include <cutils/properties.h>
+#include <utils/Vector.h>
 #include <media/DataSourceBase.h>
 #include <media/ExtractorUtils.h>
-#include <media/MediaTrack.h>
 #include <media/VorbisComment.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -47,7 +47,7 @@ extern "C" {
 
 namespace android {
 
-struct OggSource : public MediaTrack {
+struct OggSource : public MediaTrackHelper {
     explicit OggSource(OggExtractor *extractor);
 
     virtual status_t getFormat(MetaDataBase &);
@@ -1227,7 +1227,7 @@ size_t OggExtractor::countTracks() {
     return mInitCheck != OK ? 0 : 1;
 }
 
-MediaTrack *OggExtractor::getTrack(size_t index) {
+MediaTrackHelper *OggExtractor::getTrack(size_t index) {
     if (index >= 1) {
         return NULL;
     }

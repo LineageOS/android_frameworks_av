@@ -230,7 +230,7 @@ cc_library_shared {
     },
 }
 
-cc_library {
+cc_library_static {
     name: "libstagefright_player2",
 
     srcs: [
@@ -259,7 +259,6 @@ cc_library {
         "libcutils",
         "libgui",
         "liblog",
-        "libmedia_player2_util",
         "libaudioclient",
         "libmediaextractor",
         "libmediametrics",
@@ -274,14 +273,11 @@ cc_library {
 
     static_libs: [
         "libstagefright_esds",
+        "libmedia_player2_util",
     ],
 
     header_libs:[
         "media_plugin_headers",
-    ],
-
-    export_shared_lib_headers: [
-        "libmedia_player2_util",
     ],
 
     export_include_dirs: [

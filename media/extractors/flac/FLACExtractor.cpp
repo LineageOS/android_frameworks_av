@@ -25,13 +25,13 @@
 #include "FLAC/stream_decoder.h"
 
 #include <media/MediaExtractorPluginApi.h>
-#include <media/MediaTrack.h>
 #include <media/VorbisComment.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/base64.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
+#include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaBufferBase.h>
 
@@ -39,7 +39,7 @@ namespace android {
 
 class FLACParser;
 
-class FLACSource : public MediaTrack {
+class FLACSource : public MediaTrackHelper {
 
 public:
     FLACSource(
@@ -812,7 +812,7 @@ size_t FLACExtractor::countTracks()
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrack *FLACExtractor::getTrack(size_t index)
+MediaTrackHelper *FLACExtractor::getTrack(size_t index)
 {
     if (mInitCheck != OK || index > 0) {
         return NULL;

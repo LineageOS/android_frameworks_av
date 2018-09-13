@@ -22,6 +22,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MetaData.h>
+#include <media/MediaTrack.h>
 
 namespace android {
 
@@ -54,7 +55,7 @@ size_t MediaExtractorCUnwrapper::countTracks() {
 }
 
 MediaTrack *MediaExtractorCUnwrapper::getTrack(size_t index) {
-    return wrapper->getTrack(wrapper->data, index);
+    return new MediaTrackCUnwrapper(wrapper->getTrack(wrapper->data, index));
 }
 
 status_t MediaExtractorCUnwrapper::getTrackMetaData(

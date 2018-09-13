@@ -20,7 +20,6 @@
 
 #include "AACExtractor.h"
 #include <media/MediaExtractorPluginApi.h>
-#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -33,7 +32,7 @@
 
 namespace android {
 
-class AACSource : public MediaTrack {
+class AACSource : public MediaTrackHelper {
 public:
     AACSource(
             DataSourceHelper *source,
@@ -196,7 +195,7 @@ size_t AACExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrack *AACExtractor::getTrack(size_t index) {
+MediaTrackHelper *AACExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }

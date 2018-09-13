@@ -22,7 +22,6 @@
 #include <media/stagefright/foundation/ABase.h>
 #include <media/MediaExtractorPluginApi.h>
 #include <media/MediaExtractorPluginHelper.h>
-#include <media/MediaTrack.h>
 #include <media/stagefright/MetaDataBase.h>
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
@@ -43,7 +42,7 @@ struct MPEG2TSExtractor : public MediaExtractorPluginHelper {
     explicit MPEG2TSExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
-    virtual MediaTrack *getTrack(size_t index);
+    virtual MediaTrackHelper *getTrack(size_t index);
     virtual status_t getTrackMetaData(MetaDataBase &meta, size_t index, uint32_t flags);
 
     virtual status_t getMetaData(MetaDataBase& meta);
@@ -91,7 +90,7 @@ private:
     // the data has syntax error during parsing, etc.
     status_t feedMore(bool isInit = false);
     status_t seek(int64_t seekTimeUs,
-            const MediaSource::ReadOptions::SeekMode& seekMode);
+            const MediaTrackHelper::ReadOptions::SeekMode& seekMode);
     status_t queueDiscontinuityForSeek(int64_t actualSeekTimeUs);
     status_t seekBeyond(int64_t seekTimeUs);
 
