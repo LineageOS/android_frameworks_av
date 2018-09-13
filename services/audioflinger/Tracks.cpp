@@ -377,7 +377,6 @@ AudioFlinger::PlaybackThread::Track::Track(
     // mRetryCount initialized later when needed
     mSharedBuffer(sharedBuffer),
     mStreamType(streamType),
-    mName(TRACK_NAME_FAILURE),  // set to TRACK_NAME_PENDING on constructor success.
     mMainBuffer(thread->sinkBuffer()),
     mAuxBuffer(NULL),
     mAuxEffectId(0), mHasVolumeController(false),
@@ -433,14 +432,12 @@ AudioFlinger::PlaybackThread::Track::Track(
         mFastIndex = i;
         thread->mFastTrackAvailMask &= ~(1 << i);
     }
-    mName = TRACK_NAME_PENDING;
 
     mServerLatencySupported = thread->type() == ThreadBase::MIXER
             || thread->type() == ThreadBase::DUPLICATING;
 #ifdef TEE_SINK
     mTee.setId(std::string("_") + std::to_string(mThreadIoHandle)
-            + "_" + std::to_string(mId) +
-            + "_PEND_T");
+            + "_" + std::to_string(mId));
 #endif
 }
 
@@ -460,7 +457,7 @@ AudioFlinger::PlaybackThread::Track::~Track()
 status_t AudioFlinger::PlaybackThread::Track::initCheck() const
 {
     status_t status = TrackBase::initCheck();
-    if (status == NO_ERROR && mName == TRACK_NAME_FAILURE) {
+    if (status == NO_ERROR && mCblk == nullptr) {
         status = NO_MEMORY;
     }
     return status;
@@ -493,7 +490,7 @@ void AudioFlinger::PlaybackThread::Track::destroy()
 
 void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
 {
-    result.appendFormat("T Name Active Client Session S  Flags "
+    result.appendFormat("Type     Id Active Client Session S  Flags "
                         "  Format Chn mask  SRate "
                         "ST Usg CT "
                         " G db  L dB  R dB  VS dB "
@@ -522,13 +519,9 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
     }
 
     if (isFastTrack()) {
-        result.appendFormat("F%c %3d", trackType, mFastIndex);
-    } else if (mName == TRACK_NAME_PENDING) {
-        result.appendFormat("%c pend", trackType);
-    } else if (mName == TRACK_NAME_FAILURE) {
-        result.appendFormat("%c fail", trackType);
+        result.appendFormat("F%d %c %6d", mFastIndex, trackType, mId);
     } else {
-        result.appendFormat("%c %4d", trackType, mName);
+        result.appendFormat("   %c %6d", trackType, mId);
     }
 
     char nowInUnderrun;
@@ -721,8 +714,8 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
                                                     audio_session_t triggerSession __unused)
 {
     status_t status = NO_ERROR;
-    ALOGV("start(%d), calling pid %d session %d",
-            mName, IPCThreadState::self()->getCallingPid(), mSessionId);
+    ALOGV("%s(%d): calling pid %d session %d",
+            __func__, mId, IPCThreadState::self()->getCallingPid(), mSessionId);
 
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0) {
@@ -748,14 +741,17 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
             if (mResumeToStopping) {
                 // happened we need to resume to STOPPING_1
                 mState = TrackBase::STOPPING_1;
-                ALOGV("PAUSED => STOPPING_1 (%d) on thread %p", mName, this);
+                ALOGV("%s(%d): PAUSED => STOPPING_1 on thread %d",
+                        __func__, mId, (int)mThreadIoHandle);
             } else {
                 mState = TrackBase::RESUMING;
-                ALOGV("PAUSED => RESUMING (%d) on thread %p", mName, this);
+                ALOGV("%s(%d): PAUSED => RESUMING on thread %d",
+                        __func__,  mId, (int)mThreadIoHandle);
             }
         } else {
             mState = TrackBase::ACTIVE;
-            ALOGV("? => ACTIVE (%d) on thread %p", mName, this);
+            ALOGV("%s(%d): ? => ACTIVE on thread %d",
+                    __func__, mId, (int)mThreadIoHandle);
         }
 
         // states to reset position info for non-offloaded/direct tracks
@@ -806,7 +802,7 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
 
 void AudioFlinger::PlaybackThread::Track::stop()
 {
-    ALOGV("stop(%d), calling pid %d", mName, IPCThreadState::self()->getCallingPid());
+    ALOGV("%s(%d): calling pid %d", __func__, mId, IPCThreadState::self()->getCallingPid());
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0) {
         Mutex::Autolock _l(thread->mLock);
@@ -830,15 +826,15 @@ void AudioFlinger::PlaybackThread::Track::stop()
                 }
             }
             playbackThread->broadcast_l();
-            ALOGV("not stopping/stopped => stopping/stopped (%d) on thread %p", mName,
-                    playbackThread);
+            ALOGV("%s(%d): not stopping/stopped => stopping/stopped on thread %d",
+                    __func__, mId, (int)mThreadIoHandle);
         }
     }
 }
 
 void AudioFlinger::PlaybackThread::Track::pause()
 {
-    ALOGV("pause(%d), calling pid %d", mName, IPCThreadState::self()->getCallingPid());
+    ALOGV("%s(%d): calling pid %d", __func__, mId, IPCThreadState::self()->getCallingPid());
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0) {
         Mutex::Autolock _l(thread->mLock);
@@ -857,7 +853,8 @@ void AudioFlinger::PlaybackThread::Track::pause()
         case ACTIVE:
         case RESUMING:
             mState = PAUSING;
-            ALOGV("ACTIVE/RESUMING => PAUSING (%d) on thread %p", mName, thread.get());
+            ALOGV("%s(%d): ACTIVE/RESUMING => PAUSING on thread %d",
+                    __func__, mId, (int)mThreadIoHandle);
             playbackThread->broadcast_l();
             break;
 
@@ -869,7 +866,7 @@ void AudioFlinger::PlaybackThread::Track::pause()
 
 void AudioFlinger::PlaybackThread::Track::flush()
 {
-    ALOGV("flush(%d)", mName);
+    ALOGV("%s(%d)", __func__, mId);
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0) {
         Mutex::Autolock _l(thread->mLock);
