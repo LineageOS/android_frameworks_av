@@ -54,6 +54,10 @@ status_t RemoteMediaSource::read(
     return mSource->read(buffer, reinterpret_cast<const MediaSource::ReadOptions*>(options));
 }
 
+bool RemoteMediaSource::supportNonblockingRead() {
+    return mSource->supportNonblockingRead();
+}
+
 status_t RemoteMediaSource::pause() {
     return ERROR_UNSUPPORTED;
 }
