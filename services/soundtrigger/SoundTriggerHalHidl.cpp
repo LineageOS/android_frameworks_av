@@ -356,6 +356,50 @@ int SoundTriggerHalHidl::stopAllRecognitions()
     return hidlReturn;
 }
 
+int SoundTriggerHalHidl::getModelState(sound_model_handle_t handle,
+                                       struct sound_trigger_recognition_event** event)
+{
+    sp<ISoundTriggerHw> soundtrigger = getService();
+    if (soundtrigger == 0) {
+        return -ENODEV;
+    }
+
+    sp<V2_2_ISoundTriggerHw> soundtrigger_2_2 = toService2_2(soundtrigger);
+    if (soundtrigger_2_2 == 0) {
+        ALOGE("getModelState not supported");
+        return -ENODEV;
+    }
+
+    sp<SoundModel> model = getModel(handle);
+    if (model == 0) {
+        ALOGE("getModelState model not found for handle %u", handle);
+        return -EINVAL;
+    }
+
+    int ret = NO_ERROR;
+    Return<void> hidlReturn;
+    {
+        AutoMutex lock(mHalLock);
+        hidlReturn = soundtrigger_2_2->getModelState(
+            model->mHalHandle,
+            [&](int r, const V2_0_ISoundTriggerHwCallback::RecognitionEvent& halEvent) {
+              ret = r;
+              if (ret != 0) {
+                  ALOGE("getModelState returned error code %d", ret);
+              } else {
+                  *event = convertRecognitionEventFromHal(&halEvent);
+              }
+            });
+    }
+    if (!hidlReturn.isOk()) {
+        ALOGE("getModelState error %s", hidlReturn.description().c_str());
+        free(*event);
+        *event = nullptr;
+        ret = FAILED_TRANSACTION;
+    }
+    return ret;
+}
+
 SoundTriggerHalHidl::SoundTriggerHalHidl(const char *moduleName)
     : mModuleName(moduleName), mNextUniqueId(1)
 {
@@ -386,6 +430,12 @@ sp<V2_1_ISoundTriggerHw> SoundTriggerHalHidl::toService2_1(const sp<ISoundTrigge
 {
     auto castResult_2_1 = V2_1_ISoundTriggerHw::castFrom(s);
     return castResult_2_1.isOk() ? static_cast<sp<V2_1_ISoundTriggerHw>>(castResult_2_1) : nullptr;
+}
+
+sp<V2_2_ISoundTriggerHw> SoundTriggerHalHidl::toService2_2(const sp<ISoundTriggerHw>& s)
+{
+    auto castResult_2_2 = V2_2_ISoundTriggerHw::castFrom(s);
+    return castResult_2_2.isOk() ? static_cast<sp<V2_2_ISoundTriggerHw>>(castResult_2_2) : nullptr;
 }
 
 sp<SoundTriggerHalHidl::SoundModel> SoundTriggerHalHidl::getModel(sound_model_handle_t handle)
