@@ -2267,8 +2267,8 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
                 return NULL;
             }
         }
-        // Check if stream is being prepared
-        if (mInputStream->isPreparing()) {
+        // Check if stream prepare is blocking requests.
+        if (mInputStream->isBlockedByPrepare()) {
             CLOGE("Request references an input stream that's being prepared!");
             return NULL;
         }
@@ -2318,8 +2318,8 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
                 return NULL;
             }
         }
-        // Check if stream is being prepared
-        if (stream->isPreparing()) {
+        // Check if stream prepare is blocking requests.
+        if (stream->isBlockedByPrepare()) {
             CLOGE("Request references an output stream that's being prepared!");
             return NULL;
         }
@@ -4890,7 +4890,8 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 // Only try to prepare video stream on the first video request.
                 mPrepareVideoStream = false;
 
-                res = outputStream->startPrepare(Camera3StreamInterface::ALLOCATE_PIPELINE_MAX);
+                res = outputStream->startPrepare(Camera3StreamInterface::ALLOCATE_PIPELINE_MAX,
+                        false /*blockRequest*/);
                 while (res == NOT_ENOUGH_DATA) {
                     res = outputStream->prepareNextBuffer();
                 }
@@ -5555,7 +5556,7 @@ status_t Camera3Device::PreparerThread::prepare(int maxCount, sp<Camera3StreamIn
     Mutex::Autolock l(mLock);
     sp<NotificationListener> listener = mListener.promote();
 
-    res = stream->startPrepare(maxCount);
+    res = stream->startPrepare(maxCount, true /*blockRequest*/);
     if (res == OK) {
         // No preparation needed, fire listener right off
         ALOGV("%s: Stream %d already prepared", __FUNCTION__, stream->getId());
@@ -5643,7 +5644,7 @@ status_t Camera3Device::PreparerThread::resume() {
 
     auto it = mPendingStreams.begin();
     for (; it != mPendingStreams.end();) {
-        res = it->second->startPrepare(it->first);
+        res = it->second->startPrepare(it->first, true /*blockRequest*/);
         if (res == OK) {
             if (listener != NULL) {
                 listener->notifyPrepared(it->second->getId());

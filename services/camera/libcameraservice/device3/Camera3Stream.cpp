@@ -61,6 +61,7 @@ Camera3Stream::Camera3Stream(int id,
     mOldUsage(0),
     mOldMaxBuffers(0),
     mPrepared(false),
+    mPrepareBlockRequest(true),
     mPreparedBufferIdx(0),
     mLastMaxCount(Camera3StreamInterface::ALLOCATE_PIPELINE_MAX),
     mBufferLimitLatency(kBufferLimitLatencyBinSize),
@@ -327,6 +328,7 @@ status_t Camera3Stream::finishConfiguration() {
     // Reset prepared state, since buffer config has changed, and existing
     // allocations are no longer valid
     mPrepared = false;
+    mPrepareBlockRequest = true;
     mStreamUnpreparable = false;
 
     status_t res;
@@ -388,7 +390,7 @@ bool Camera3Stream::isUnpreparable() {
     return mStreamUnpreparable;
 }
 
-status_t Camera3Stream::startPrepare(int maxCount) {
+status_t Camera3Stream::startPrepare(int maxCount, bool blockRequest) {
     ATRACE_CALL();
 
     Mutex::Autolock l(mLock);
@@ -420,8 +422,6 @@ status_t Camera3Stream::startPrepare(int maxCount) {
         return INVALID_OPERATION;
     }
 
-
-
     size_t pipelineMax = getBufferCountLocked();
     size_t clampedCount = (pipelineMax < static_cast<size_t>(maxCount)) ?
             pipelineMax : static_cast<size_t>(maxCount);
@@ -429,6 +429,7 @@ status_t Camera3Stream::startPrepare(int maxCount) {
             pipelineMax : clampedCount;
 
     mPrepared = bufferCount <= mLastMaxCount;
+    mPrepareBlockRequest = blockRequest;
 
     if (mPrepared) return OK;
 
@@ -442,9 +443,9 @@ status_t Camera3Stream::startPrepare(int maxCount) {
     return NOT_ENOUGH_DATA;
 }
 
-bool Camera3Stream::isPreparing() const {
+bool Camera3Stream::isBlockedByPrepare() const {
     Mutex::Autolock l(mLock);
-    return mState == STATE_PREPARING;
+    return mState == STATE_PREPARING && mPrepareBlockRequest;
 }
 
 bool Camera3Stream::isAbandoned() const {
