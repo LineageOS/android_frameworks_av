@@ -17,6 +17,7 @@
 #define LOG_TAG "BufferPoolStatus"
 //#define LOG_NDEBUG 0
 
+#include <thread>
 #include <time.h>
 #include "BufferStatus.h"
 
@@ -35,6 +36,18 @@ int64_t getTimestampNow() {
     stamp = ts.tv_nsec / 1000;
     stamp += (ts.tv_sec * 1000000LL);
     return stamp;
+}
+
+bool isMessageLater(uint32_t curMsgId, uint32_t prevMsgId) {
+    return curMsgId != prevMsgId && curMsgId - prevMsgId < prevMsgId - curMsgId;
+}
+
+bool isBufferInRange(BufferId from, BufferId to, BufferId bufferId) {
+    if (from < to) {
+        return from <= bufferId && bufferId < to;
+    } else { // wrap happens
+        return from <= bufferId || bufferId < to;
+    }
 }
 
 static constexpr int kNumElementsInQueue = 1024*16;
@@ -139,6 +152,29 @@ void BufferStatusChannel::postBufferRelease(
     }
 }
 
+void BufferStatusChannel::postBufferInvalidateAck(
+        ConnectionId connectionId,
+        uint32_t invalidateId,
+        bool *invalidated) {
+    if (mValid && !*invalidated) {
+        size_t avail = mBufferStatusQueue->availableToWrite();
+        if (avail > 0) {
+            BufferStatusMessage message;
+            message.newStatus = BufferStatus::INVALIDATION_ACK;
+            message.bufferId = invalidateId;
+            message.connectionId = connectionId;
+            if (!mBufferStatusQueue->write(&message, 1)) {
+                // Since avaliable # of writes are already confirmed,
+                // this should not happen.
+                // TODO: error handing?
+                ALOGW("FMQ message cannot be sent from %lld", (long long)connectionId);
+                return;
+            }
+            *invalidated = true;
+        }
+    }
+}
+
 bool BufferStatusChannel::postBufferStatusMessage(
         TransactionId transactionId, BufferId bufferId,
         BufferStatus status, ConnectionId connectionId, ConnectionId targetId,
@@ -180,6 +216,83 @@ bool BufferStatusChannel::postBufferStatusMessage(
         }
     }
     return false;
+}
+
+BufferInvalidationListener::BufferInvalidationListener(
+        const InvalidationDescriptor &fmqDesc) {
+    std::unique_ptr<BufferInvalidationQueue> queue =
+            std::make_unique<BufferInvalidationQueue>(fmqDesc);
+    if (!queue || queue->isValid() == false) {
+        mValid = false;
+        return;
+    }
+    mValid  = true;
+    mBufferInvalidationQueue = std::move(queue);
+    // drain previous messages
+    size_t avail = std::min(
+            mBufferInvalidationQueue->availableToRead(), (size_t) kNumElementsInQueue);
+    std::vector<BufferInvalidationMessage> temp(avail);
+    if (avail > 0) {
+        mBufferInvalidationQueue->read(temp.data(), avail);
+    }
+}
+
+void BufferInvalidationListener::getInvalidations(
+        std::vector<BufferInvalidationMessage> &messages) {
+    // Try twice in case of overflow.
+    // TODO: handling overflow though it may not happen.
+    for (int i = 0; i < 2; ++i) {
+        size_t avail = std::min(
+                mBufferInvalidationQueue->availableToRead(), (size_t) kNumElementsInQueue);
+        if (avail > 0) {
+            std::vector<BufferInvalidationMessage> temp(avail);
+            if (mBufferInvalidationQueue->read(temp.data(), avail)) {
+                messages.reserve(messages.size() + avail);
+                for (auto it = temp.begin(); it != temp.end(); ++it) {
+                    messages.push_back(*it);
+                }
+                break;
+            }
+        } else {
+            return;
+        }
+    }
+}
+
+bool BufferInvalidationListener::isValid() {
+    return mValid;
+}
+
+BufferInvalidationChannel::BufferInvalidationChannel()
+    : mValid(true),
+      mBufferInvalidationQueue(
+              std::make_unique<BufferInvalidationQueue>(kNumElementsInQueue, true)) {
+    if (!mBufferInvalidationQueue || mBufferInvalidationQueue->isValid() == false) {
+        mValid = false;
+    }
+}
+
+bool BufferInvalidationChannel::isValid() {
+    return mValid;
+}
+
+void BufferInvalidationChannel::getDesc(const InvalidationDescriptor **fmqDescPtr) {
+    if (mValid) {
+        *fmqDescPtr = mBufferInvalidationQueue->getDesc();
+    } else {
+        *fmqDescPtr = nullptr;
+    }
+}
+
+void BufferInvalidationChannel::postInvalidation(
+        uint32_t msgId, BufferId fromId, BufferId toId) {
+    BufferInvalidationMessage message;
+
+    message.messageId = msgId;
+    message.fromBufferId = fromId;
+    message.toBufferId = toId;
+    // TODO: handle failure (it does not happen normally.)
+    mBufferInvalidationQueue->write(&message);
 }
 
 }  // namespace implementation

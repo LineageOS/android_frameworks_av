@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <utils/Log.h>
 #include "BufferPoolClient.h"
+#include "Observer.h"
 
 namespace android {
 namespace hardware {
@@ -106,6 +107,8 @@ public:
 
     ResultStatus close(ConnectionId connectionId);
 
+    ResultStatus flush(ConnectionId connectionId);
+
     ResultStatus allocate(ConnectionId connectionId,
                           const std::vector<uint8_t> &params,
                           native_handle_t **handle,
@@ -153,10 +156,13 @@ private:
                 mClients;
     } mActive;
 
+    sp<Observer> mObserver;
+
     ClientManagerCookieHolder mRemoteClientCookies;
 };
 
-ClientManager::Impl::Impl() {}
+ClientManager::Impl::Impl()
+    : mObserver(new Observer()) {}
 
 ResultStatus ClientManager::Impl::registerSender(
         const sp<IAccessor> &accessor, ConnectionId *pConnectionId) {
@@ -185,7 +191,7 @@ ResultStatus ClientManager::Impl::registerSender(
             lock.unlock();
             ResultStatus result = ResultStatus::OK;
             const std::shared_ptr<BufferPoolClient> client =
-                    std::make_shared<BufferPoolClient>(accessor);
+                    std::make_shared<BufferPoolClient>(accessor, mObserver);
             lock.lock();
             if (!client) {
                 result = ResultStatus::NO_MEMORY;
@@ -197,6 +203,7 @@ ResultStatus ClientManager::Impl::registerSender(
                 const std::weak_ptr<BufferPoolClient> wclient = client;
                 mCache.mClients.push_back(std::make_pair(accessor, wclient));
                 ConnectionId conId = client->getConnectionId();
+                mObserver->addClient(conId, wclient);
                 {
                     std::lock_guard<std::mutex> lock(mActive.mMutex);
                     mActive.mClients.insert(std::make_pair(conId, client));
@@ -266,8 +273,9 @@ ResultStatus ClientManager::Impl::create(
     if (!accessor || !accessor->isValid()) {
         return ResultStatus::CRITICAL_ERROR;
     }
+    // TODO: observer is local. use direct call instead of hidl call.
     std::shared_ptr<BufferPoolClient> client =
-            std::make_shared<BufferPoolClient>(accessor);
+            std::make_shared<BufferPoolClient>(accessor, mObserver);
     if (!client || !client->isValid()) {
         return ResultStatus::CRITICAL_ERROR;
     }
@@ -280,6 +288,7 @@ ResultStatus ClientManager::Impl::create(
         const std::weak_ptr<BufferPoolClient> wclient = client;
         mCache.mClients.push_back(std::make_pair(accessor, wclient));
         ConnectionId conId = client->getConnectionId();
+        mObserver->addClient(conId, wclient);
         {
             std::lock_guard<std::mutex> lock(mActive.mMutex);
             mActive.mClients.insert(std::make_pair(conId, client));
@@ -291,12 +300,13 @@ ResultStatus ClientManager::Impl::create(
 }
 
 ResultStatus ClientManager::Impl::close(ConnectionId connectionId) {
-    std::lock_guard<std::mutex> lock1(mCache.mMutex);
-    std::lock_guard<std::mutex> lock2(mActive.mMutex);
+    std::unique_lock<std::mutex> lock1(mCache.mMutex);
+    std::unique_lock<std::mutex> lock2(mActive.mMutex);
     auto it = mActive.mClients.find(connectionId);
     if (it != mActive.mClients.end()) {
         sp<IAccessor> accessor;
         it->second->getAccessor(&accessor);
+        std::shared_ptr<BufferPoolClient> closing = it->second;
         mActive.mClients.erase(connectionId);
         for (auto cit = mCache.mClients.begin(); cit != mCache.mClients.end();) {
             // clean up dead client caches
@@ -307,9 +317,25 @@ ResultStatus ClientManager::Impl::close(ConnectionId connectionId) {
                 cit++;
             }
         }
+        lock2.unlock();
+        lock1.unlock();
+        closing->flush();
         return ResultStatus::OK;
     }
     return ResultStatus::NOT_FOUND;
+}
+
+ResultStatus ClientManager::Impl::flush(ConnectionId connectionId) {
+    std::shared_ptr<BufferPoolClient> client;
+    {
+        std::lock_guard<std::mutex> lock(mActive.mMutex);
+        auto it = mActive.mClients.find(connectionId);
+        if (it == mActive.mClients.end()) {
+            return ResultStatus::NOT_FOUND;
+        }
+        client = it->second;
+    }
+    return client->flush();
 }
 
 ResultStatus ClientManager::Impl::allocate(
@@ -457,6 +483,13 @@ ResultStatus ClientManager::registerSender(
 ResultStatus ClientManager::close(ConnectionId connectionId) {
     if (mImpl) {
         return mImpl->close(connectionId);
+    }
+    return ResultStatus::CRITICAL_ERROR;
+}
+
+ResultStatus ClientManager::flush(ConnectionId connectionId) {
+    if (mImpl) {
+        return mImpl->flush(connectionId);
     }
     return ResultStatus::CRITICAL_ERROR;
 }
