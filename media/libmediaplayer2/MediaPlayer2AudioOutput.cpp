@@ -559,7 +559,7 @@ status_t MediaPlayer2AudioOutput::setPlaybackRate(const AudioPlaybackRate &rate)
 }
 
 status_t MediaPlayer2AudioOutput::getPlaybackRate(AudioPlaybackRate *rate) {
-    ALOGV("setPlaybackRate");
+    ALOGV("getPlaybackRate");
     Mutex::Autolock lock(mLock);
     if (mTrack == 0) {
         return NO_INIT;
