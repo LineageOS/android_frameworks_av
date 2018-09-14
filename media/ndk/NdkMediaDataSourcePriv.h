@@ -32,6 +32,7 @@
 #include <sys/types.h>
 
 #include <media/DataSource.h>
+#include <media/MediaHTTPService.h>
 #include <media/NdkMediaDataSource.h>
 #include <utils/Mutex.h>
 #include <utils/String8.h>
@@ -58,6 +59,8 @@ private:
     AMediaDataSource *mDataSource;
 
 };
+
+sp<MediaHTTPService> createMediaHttpService(const char *uri, int version);
 
 #endif // _NDK_MEDIA_DATASOURCE_PRIV_H
 

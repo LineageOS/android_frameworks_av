@@ -82,6 +82,7 @@ cc_library_shared {
         "libbinder",
         "libgui",
         "libui",
+        "libmedia2_jni_core",
     ],
 
     export_include_dirs: ["include"],
