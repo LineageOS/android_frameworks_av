@@ -1058,6 +1058,19 @@ protected:
         STATE_STOPPING,
     }                       mState;
 
+    static constexpr const char *stateToString(State state)
+    {
+        switch (state) {
+        case STATE_ACTIVE:          return "STATE_ACTIVE";
+        case STATE_STOPPED:         return "STATE_STOPPED";
+        case STATE_PAUSED:          return "STATE_PAUSED";
+        case STATE_PAUSED_STOPPING: return "STATE_PAUSED_STOPPING";
+        case STATE_FLUSHED:         return "STATE_FLUSHED";
+        case STATE_STOPPING:        return "STATE_STOPPING";
+        default:                    return "UNKNOWN";
+        }
+    }
+
     // for client callback handler
     callback_t              mCbf;                   // callback handler for events, or NULL
     void*                   mUserData;
@@ -1148,6 +1161,7 @@ protected:
 
     audio_session_t         mSessionId;
     int                     mAuxEffectId;
+    int                     mId;                    // Id from AudioFlinger.
 
     mutable Mutex           mLock;
 

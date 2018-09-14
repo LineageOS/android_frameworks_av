@@ -788,6 +788,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
         output.afFrameCount = thread->frameCount();
         output.afSampleRate = thread->sampleRate();
         output.afLatencyMs = thread->latency();
+        output.trackId = track->id();
 
         // move effect chain to this output thread if an effect on same session was waiting
         // for a track to be created
@@ -1807,6 +1808,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
 
     output.cblk = recordTrack->getCblk();
     output.buffers = recordTrack->getBuffers();
+    output.trackId = recordTrack->id();
 
     // return handle to client
     recordHandle = new RecordHandle(recordTrack);

@@ -962,16 +962,19 @@ private:
     virtual void dumpInternals(int fd, const Vector<String16>& args);
     void        dumpTracks(int fd, const Vector<String16>& args);
 
-    // The Tracks class manages names for all tracks
-    // added and removed from the Thread.
+    // The Tracks class manages tracks added and removed from the Thread.
     template <typename T>
     class Tracks {
     public:
-        Tracks(bool saveDeletedTrackNames) :
-            mSaveDeletedTrackNames(saveDeletedTrackNames) { }
+        Tracks(bool saveDeletedTrackIds) :
+            mSaveDeletedTrackIds(saveDeletedTrackIds) { }
 
         // SortedVector methods
-        ssize_t         add(const sp<T> &track);
+        ssize_t         add(const sp<T> &track) {
+            const ssize_t index = mTracks.add(track);
+            LOG_ALWAYS_FATAL_IF(index < 0, "cannot add track");
+            return index;
+        }
         ssize_t         remove(const sp<T> &track);
         size_t          size() const {
             return mTracks.size();
@@ -992,28 +995,19 @@ private:
             return mTracks.end();
         }
 
-        size_t          processDeletedTrackNames(std::function<void(int)> f) {
-            const size_t size = mDeletedTrackNames.size();
-            if (size > 0) {
-                for (const int name : mDeletedTrackNames) {
-                    f(name);
-                }
+        size_t          processDeletedTrackIds(std::function<void(int)> f) {
+            for (const int trackId : mDeletedTrackIds) {
+                f(trackId);
             }
-            return size;
+            return mDeletedTrackIds.size();
         }
 
-        void            clearDeletedTrackNames() { mDeletedTrackNames.clear(); }
+        void            clearDeletedTrackIds() { mDeletedTrackIds.clear(); }
 
     private:
-        // Track names pending deletion for MIXER type threads
-        const bool mSaveDeletedTrackNames; // true to enable tracking
-        std::set<int> mDeletedTrackNames;
-
-        // Fast lookup of previously deleted track names for reuse.
-        // This is an arbitrary decision (actually any non-negative
-        // integer that isn't in mTracks[*]->names() could be used) - we attempt
-        // to use the smallest possible available name.
-        std::set<int> mUnusedTrackNames;
+        // Tracks pending deletion for MIXER type threads
+        const bool mSaveDeletedTrackIds; // true to enable tracking
+        std::set<int> mDeletedTrackIds;
 
         SortedVector<sp<T>> mTracks; // wrapped SortedVector.
     };
