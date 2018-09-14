@@ -19,6 +19,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 
 #include <hidl/Status.h>
 #include <libxml/parser.h>
@@ -41,7 +42,7 @@ using hardware::Status;
 using utilities::convertTo;
 
 template<typename E, typename C>
-struct BaseSerializerTraits {
+struct AndroidCollectionTraits {
     typedef sp<E> Element;
     typedef C Collection;
     typedef void* PtrSerializingCtx;
@@ -51,7 +52,19 @@ struct BaseSerializerTraits {
     }
 };
 
-struct AudioGainTraits : public BaseSerializerTraits<AudioGain, AudioGainCollection>
+template<typename C>
+struct StdCollectionTraits {
+    typedef C Collection;
+    typedef typename C::value_type Element;
+    typedef void* PtrSerializingCtx;
+
+    static status_t addElementToCollection(const Element &element, Collection *collection) {
+        auto pair = collection->insert(element);
+        return pair.second ? NO_ERROR : BAD_VALUE;
+    }
+};
+
+struct AudioGainTraits : public AndroidCollectionTraits<AudioGain, AudioGainCollection>
 {
     static constexpr const char *tag = "gain";
     static constexpr const char *collectionTag = "gains";
@@ -79,7 +92,7 @@ struct AudioGainTraits : public BaseSerializerTraits<AudioGain, AudioGainCollect
 
 // A profile section contains a name,  one audio format and the list of supported sampling rates
 // and channel masks for this format
-struct AudioProfileTraits : public BaseSerializerTraits<AudioProfile, AudioProfileVector>
+struct AudioProfileTraits : public AndroidCollectionTraits<AudioProfile, AudioProfileVector>
 {
     static constexpr const char *tag = "profile";
     static constexpr const char *collectionTag = "profiles";
@@ -94,7 +107,7 @@ struct AudioProfileTraits : public BaseSerializerTraits<AudioProfile, AudioProfi
     static Return<Element> deserialize(const xmlNode *cur, PtrSerializingCtx serializingContext);
 };
 
-struct MixPortTraits : public BaseSerializerTraits<IOProfile, IOProfileCollection>
+struct MixPortTraits : public AndroidCollectionTraits<IOProfile, IOProfileCollection>
 {
     static constexpr const char *tag = "mixPort";
     static constexpr const char *collectionTag = "mixPorts";
@@ -113,7 +126,7 @@ struct MixPortTraits : public BaseSerializerTraits<IOProfile, IOProfileCollectio
     // Children: GainTraits
 };
 
-struct DevicePortTraits : public BaseSerializerTraits<DeviceDescriptor, DeviceVector>
+struct DevicePortTraits : public AndroidCollectionTraits<DeviceDescriptor, DeviceVector>
 {
     static constexpr const char *tag = "devicePort";
     static constexpr const char *collectionTag = "devicePorts";
@@ -133,7 +146,7 @@ struct DevicePortTraits : public BaseSerializerTraits<DeviceDescriptor, DeviceVe
     // Children: GainTraits (optional)
 };
 
-struct RouteTraits : public BaseSerializerTraits<AudioRoute, AudioRouteVector>
+struct RouteTraits : public AndroidCollectionTraits<AudioRoute, AudioRouteVector>
 {
     static constexpr const char *tag = "route";
     static constexpr const char *collectionTag = "routes";
@@ -152,7 +165,7 @@ struct RouteTraits : public BaseSerializerTraits<AudioRoute, AudioRouteVector>
     static Return<Element> deserialize(const xmlNode *cur, PtrSerializingCtx serializingContext);
 };
 
-struct ModuleTraits : public BaseSerializerTraits<HwModule, HwModuleCollection>
+struct ModuleTraits : public AndroidCollectionTraits<HwModule, HwModuleCollection>
 {
     static constexpr const char *tag = "module";
     static constexpr const char *collectionTag = "modules";
@@ -186,7 +199,7 @@ struct GlobalConfigTraits
     static status_t deserialize(const xmlNode *root, AudioPolicyConfig *config);
 };
 
-struct VolumeTraits : public BaseSerializerTraits<VolumeCurve, VolumeCurvesCollection>
+struct VolumeTraits : public AndroidCollectionTraits<VolumeCurve, VolumeCurvesCollection>
 {
     static constexpr const char *tag = "volume";
     static constexpr const char *collectionTag = "volumes";
@@ -203,6 +216,28 @@ struct VolumeTraits : public BaseSerializerTraits<VolumeCurve, VolumeCurvesColle
 
     static Return<Element> deserialize(const xmlNode *cur, PtrSerializingCtx serializingContext);
     // No Children
+};
+
+struct SurroundSoundTraits
+{
+    static constexpr const char *tag = "surroundSound";
+
+    static status_t deserialize(const xmlNode *root, AudioPolicyConfig *config);
+    // Children: SurroundSoundFormatTraits
+};
+
+struct SurroundSoundFormatTraits : public StdCollectionTraits<AudioPolicyConfig::SurroundFormats>
+{
+    static constexpr const char *tag = "format";
+    static constexpr const char *collectionTag = "formats";
+
+    struct Attributes
+    {
+        static constexpr const char *name = "name";
+        static constexpr const char *subformats = "subformats";
+    };
+
+    static Return<Element> deserialize(const xmlNode *cur, PtrSerializingCtx serializingContext);
 };
 
 class PolicySerializer
@@ -224,7 +259,7 @@ private:
 
     const std::string mVersion;
 
-    // Children: ModulesTraits, VolumeTraits
+    // Children: ModulesTraits, VolumeTraits, SurroundSoundTraits (optional)
 };
 
 template <class T>
@@ -721,6 +756,52 @@ Return<VolumeTraits::Element> VolumeTraits::deserialize(const xmlNode *cur,
     return volCurve;
 }
 
+status_t SurroundSoundTraits::deserialize(const xmlNode *root, AudioPolicyConfig *config)
+{
+    config->setDefaultSurroundFormats();
+
+    for (const xmlNode *cur = root->xmlChildrenNode; cur != NULL; cur = cur->next) {
+        if (!xmlStrcmp(cur->name, reinterpret_cast<const xmlChar*>(tag))) {
+            AudioPolicyConfig::SurroundFormats formats;
+            status_t status = deserializeCollection<SurroundSoundFormatTraits>(
+                    cur, &formats, nullptr);
+            if (status == NO_ERROR) {
+                config->setSurroundFormats(formats);
+            }
+            return NO_ERROR;
+        }
+    }
+    return NO_ERROR;
+}
+
+Return<SurroundSoundFormatTraits::Element> SurroundSoundFormatTraits::deserialize(
+        const xmlNode *cur, PtrSerializingCtx /*serializingContext*/)
+{
+    std::string formatLiteral = getXmlAttribute(cur, Attributes::name);
+    if (formatLiteral.empty()) {
+        ALOGE("%s: No %s found for a surround format", __func__, Attributes::name);
+        return Status::fromStatusT(BAD_VALUE);
+    }
+    audio_format_t format = formatFromString(formatLiteral);
+    if (format == AUDIO_FORMAT_DEFAULT) {
+        ALOGE("%s: Unrecognized format %s", __func__, formatLiteral.c_str());
+        return Status::fromStatusT(BAD_VALUE);
+    }
+    Element pair = std::make_pair(format, Collection::mapped_type{});
+
+    std::string subformatsLiteral = getXmlAttribute(cur, Attributes::subformats);
+    if (subformatsLiteral.empty()) return pair;
+    FormatVector subformats = formatsFromString(subformatsLiteral, " ");
+    for (const auto& subformat : subformats) {
+        auto result = pair.second.insert(subformat);
+        if (!result.second) {
+            ALOGE("%s: could not add subformat %x to collection", __func__, subformat);
+            return Status::fromStatusT(BAD_VALUE);
+        }
+    }
+    return pair;
+}
+
 status_t PolicySerializer::deserialize(const char *configFile, AudioPolicyConfig *config)
 {
     auto doc = make_xmlUnique(xmlParseFile(configFile));
@@ -772,6 +853,9 @@ status_t PolicySerializer::deserialize(const char *configFile, AudioPolicyConfig
 
     // Global Configuration
     GlobalConfigTraits::deserialize(root, config);
+
+    // Surround configuration
+    SurroundSoundTraits::deserialize(root, config);
 
     return android::OK;
 }
