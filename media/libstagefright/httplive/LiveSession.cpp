@@ -445,7 +445,7 @@ status_t LiveSession::dequeueAccessUnit(
                return -EAGAIN;
             };
             (*accessUnit)->meta()->setInt32(
-                    "trackIndex", mPlaylist->getSelectedIndex());
+                    "track-index", mPlaylist->getSelectedIndex());
             (*accessUnit)->meta()->setInt64("baseUs", mRealTimeBaseUs);
         } else if (stream == STREAMTYPE_METADATA) {
             HLSTime mdTime((*accessUnit)->meta());
