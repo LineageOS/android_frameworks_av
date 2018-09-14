@@ -16,6 +16,7 @@ cc_library_static {
     ],
 
     header_libs: [
+        "libbase_headers",
         "libmediaplayer2_headers",
         "media_plugin_headers",
     ],
