@@ -113,12 +113,6 @@ struct MediaTrack
     virtual status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL) = 0;
 
-    // Returns true if |read| supports nonblocking option, otherwise false.
-    // |readMultiple| if supported, always allows the nonblocking option.
-    virtual bool supportNonblockingRead() {
-        return false;
-    }
-
     virtual ~MediaTrack();
 
 private:
