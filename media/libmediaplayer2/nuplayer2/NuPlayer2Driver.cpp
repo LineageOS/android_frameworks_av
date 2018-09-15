@@ -352,14 +352,6 @@ status_t NuPlayer2Driver::setPlaybackSettings(const AudioPlaybackRate &rate) {
         // try to update position
         int64_t unused;
         getCurrentPosition(&unused);
-        Mutex::Autolock autoLock(mLock);
-        if (rate.mSpeed == 0.f && mState == STATE_RUNNING) {
-            mState = STATE_PAUSED;
-        } else if (rate.mSpeed != 0.f
-                && (mState == STATE_PAUSED
-                    || mState == STATE_PREPARED)) {
-            err = start_l();
-        }
     }
     return err;
 }

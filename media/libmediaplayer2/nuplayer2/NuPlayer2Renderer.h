@@ -167,7 +167,6 @@ private:
     int32_t mAudioEOSGeneration;
 
     const sp<MediaClock> mMediaClock;
-    float mPlaybackRate; // audio track rate
 
     AudioPlaybackRate mPlaybackSettings;
     AVSyncSettings mSyncSettings;
