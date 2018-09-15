@@ -47,7 +47,6 @@
 #include <utility>
 
 namespace android {
-
 namespace ReportPerformance {
 
 void Histogram::add(double value)
@@ -367,5 +366,4 @@ void dumpLine(int fd, int indent, const String8 &body) {
 }
 
 } // namespace ReportPerformance
-
 }   // namespace android

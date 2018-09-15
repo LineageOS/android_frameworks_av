@@ -19,6 +19,7 @@
 
 #include <binder/BinderService.h>
 #include <media/IMediaLogService.h>
+#include <media/nblog/Merger.h>
 #include <media/nblog/NBLog.h>
 
 namespace android {
