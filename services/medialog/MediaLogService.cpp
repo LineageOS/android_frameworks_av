@@ -20,6 +20,7 @@
 #include <sys/mman.h>
 #include <utils/Log.h>
 #include <binder/PermissionCache.h>
+#include <media/nblog/Merger.h>
 #include <media/nblog/NBLog.h>
 #include <mediautils/ServiceUtilities.h>
 #include "MediaLogService.h"

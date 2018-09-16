@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include <media/nblog/Events.h>
 #include <media/nblog/ReportPerformance.h>
 #include <utils/Timers.h>
 
@@ -112,6 +113,9 @@ public:
     std::string toString() const;
 
 private:
+    // Histogram version number.
+    static constexpr int kVersion = 1;
+
     const double mBinSize;      // Size of each bucket
     const size_t mNumBins;      // Number of buckets in histogram range
     const double mLow;          // Lower bound of values
@@ -139,11 +143,9 @@ struct PerformanceData {
     static constexpr Histogram::Config kWarmupConfig = { 5., 10, 10.};
 
     // Thread Info
-    // TODO make type an enum
-    int type = -1;              // Thread type: 0 for MIXER, 1 for CAPTURE,
-                                // 2 for FASTMIXER, 3 for FASTCAPTURE
-    size_t frameCount = 0;
-    unsigned sampleRate = 0;
+    NBLog::thread_info_t threadInfo{
+        NBLog::UNKNOWN /*threadType*/, 0 /*frameCount*/, 0 /*sampleRate*/
+    };
 
     // Performance Data
     Histogram workHist{kWorkConfig};
@@ -262,8 +264,7 @@ private:
 void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis);
 void dumpLine(int fd, int indent, const String8 &body);
 
-} // namespace ReportPerformance
-
+}   // namespace ReportPerformance
 }   // namespace android
 
 #endif  // ANDROID_MEDIA_PERFORMANCEANALYSIS_H

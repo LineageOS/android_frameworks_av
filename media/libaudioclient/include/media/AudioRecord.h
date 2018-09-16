@@ -654,6 +654,7 @@ private:
     audio_input_flags_t     mOrigFlags;             // as specified in constructor or set(), const
 
     audio_session_t         mSessionId;
+    int                     mId;                    // Id from AudioFlinger
     transfer_type           mTransfer;
 
     // Next 5 fields may be changed if IAudioRecord is re-created, but always != 0

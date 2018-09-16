@@ -160,6 +160,11 @@ class Camera3StreamInterface : public virtual RefBase {
      * PREPARING state. Otherwise, returns NOT_ENOUGH_DATA and transitions
      * to PREPARING.
      *
+     * blockRequest specifies whether prepare will block upcoming capture
+     * request. This flag should only be set to false if the caller guarantees
+     * the whole buffer preparation process is done before capture request
+     * comes in.
+     *
      * Returns:
      *    OK if no more buffers need to be preallocated
      *    NOT_ENOUGH_DATA if calls to prepareNextBuffer are needed to finish
@@ -168,12 +173,12 @@ class Camera3StreamInterface : public virtual RefBase {
      *    INVALID_OPERATION if called when not in CONFIGURED state, or a
      *        valid buffer has already been returned to this stream.
      */
-    virtual status_t startPrepare(int maxCount) = 0;
+    virtual status_t startPrepare(int maxCount, bool blockRequest) = 0;
 
     /**
-     * Check if the stream is mid-preparing.
+     * Check if the request on a stream is blocked by prepare.
      */
-    virtual bool     isPreparing() const = 0;
+    virtual bool     isBlockedByPrepare() const = 0;
 
     /**
      * Continue stream buffer preparation by allocating the next
@@ -237,6 +242,7 @@ class Camera3StreamInterface : public virtual RefBase {
      *
      */
     virtual status_t getBuffer(camera3_stream_buffer *buffer,
+            nsecs_t waitBufferTimeout,
             const std::vector<size_t>& surface_ids = std::vector<size_t>()) = 0;
 
     /**

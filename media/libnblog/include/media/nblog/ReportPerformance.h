@@ -27,7 +27,6 @@ class Value;
 }
 
 namespace android {
-
 namespace ReportPerformance {
 
 struct PerformanceData;
@@ -78,8 +77,7 @@ void writeToFile(const std::deque<std::pair<timestamp, Hist>> &hists,
                  const std::deque<timestamp> &peakTimestamps,
                  const char * kDirectory, bool append, int author, log_hash_t hash);
 
-} // namespace ReportPerformance
-
+}   // namespace ReportPerformance
 }   // namespace android
 
 #endif  // ANDROID_MEDIA_REPORTPERFORMANCE_H

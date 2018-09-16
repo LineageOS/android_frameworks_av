@@ -2272,8 +2272,8 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
                 return NULL;
             }
         }
-        // Check if stream is being prepared
-        if (mInputStream->isPreparing()) {
+        // Check if stream prepare is blocking requests.
+        if (mInputStream->isBlockedByPrepare()) {
             CLOGE("Request references an input stream that's being prepared!");
             return NULL;
         }
@@ -2323,8 +2323,8 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
                 return NULL;
             }
         }
-        // Check if stream is being prepared
-        if (stream->isPreparing()) {
+        // Check if stream prepare is blocking requests.
+        if (stream->isBlockedByPrepare()) {
             CLOGE("Request references an output stream that's being prepared!");
             return NULL;
         }
@@ -4891,6 +4891,15 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 captureRequest->mOutputStreams.size());
         halRequest->output_buffers = outputBuffers->array();
         std::set<String8> requestedPhysicalCameras;
+
+        sp<Camera3Device> parent = mParent.promote();
+        if (parent == NULL) {
+            // Should not happen, and nowhere to send errors to, so just log it
+            CLOGE("RequestThread: Parent is gone");
+            return INVALID_OPERATION;
+        }
+        nsecs_t waitDuration = kBaseGetBufferWait + parent->getExpectedInFlightDuration();
+
         for (size_t j = 0; j < captureRequest->mOutputStreams.size(); j++) {
             sp<Camera3OutputStreamInterface> outputStream = captureRequest->mOutputStreams.editItemAt(j);
 
@@ -4899,7 +4908,8 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 // Only try to prepare video stream on the first video request.
                 mPrepareVideoStream = false;
 
-                res = outputStream->startPrepare(Camera3StreamInterface::ALLOCATE_PIPELINE_MAX);
+                res = outputStream->startPrepare(Camera3StreamInterface::ALLOCATE_PIPELINE_MAX,
+                        false /*blockRequest*/);
                 while (res == NOT_ENOUGH_DATA) {
                     res = outputStream->prepareNextBuffer();
                 }
@@ -4911,6 +4921,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             }
 
             res = outputStream->getBuffer(&outputBuffers->editItemAt(j),
+                    waitDuration,
                     captureRequest->mOutputSurfaces[j]);
             if (res != OK) {
                 // Can't get output buffer from gralloc queue - this could be due to
@@ -4937,13 +4948,6 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         totalNumBuffers += halRequest->num_output_buffers;
 
         // Log request in the in-flight queue
-        sp<Camera3Device> parent = mParent.promote();
-        if (parent == NULL) {
-            // Should not happen, and nowhere to send errors to, so just log it
-            CLOGE("RequestThread: Parent is gone");
-            return INVALID_OPERATION;
-        }
-
         // If this request list is for constrained high speed recording (not
         // preview), and the current request is not the last one in the batch,
         // do not send callback to the app.
@@ -5585,7 +5589,7 @@ status_t Camera3Device::PreparerThread::prepare(int maxCount, sp<Camera3StreamIn
     Mutex::Autolock l(mLock);
     sp<NotificationListener> listener = mListener.promote();
 
-    res = stream->startPrepare(maxCount);
+    res = stream->startPrepare(maxCount, true /*blockRequest*/);
     if (res == OK) {
         // No preparation needed, fire listener right off
         ALOGV("%s: Stream %d already prepared", __FUNCTION__, stream->getId());
@@ -5673,7 +5677,7 @@ status_t Camera3Device::PreparerThread::resume() {
 
     auto it = mPendingStreams.begin();
     for (; it != mPendingStreams.end();) {
-        res = it->second->startPrepare(it->first);
+        res = it->second->startPrepare(it->first, true /*blockRequest*/);
         if (res == OK) {
             if (listener != NULL) {
                 listener->notifyPrepared(it->second->getId());

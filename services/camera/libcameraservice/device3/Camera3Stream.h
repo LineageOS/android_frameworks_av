@@ -232,6 +232,11 @@ class Camera3Stream :
      *
      * This call performs no allocation, so is quick to call.
      *
+     * blockRequest specifies whether prepare will block upcoming capture
+     * request. This flag should only be set to false if the caller guarantees
+     * the whole buffer preparation process is done before capture request
+     * comes in.
+     *
      * Returns:
      *    OK if no more buffers need to be preallocated
      *    NOT_ENOUGH_DATA if calls to prepareNextBuffer are needed to finish
@@ -240,12 +245,12 @@ class Camera3Stream :
      *    INVALID_OPERATION if called when not in CONFIGURED state, or a
      *        valid buffer has already been returned to this stream.
      */
-    status_t         startPrepare(int maxCount);
+    status_t         startPrepare(int maxCount, bool blockRequest);
 
     /**
-     * Check if the stream is mid-preparing.
+     * Check if the request on a stream is blocked by prepare.
      */
-    bool             isPreparing() const;
+    bool             isBlockedByPrepare() const;
 
     /**
      * Continue stream buffer preparation by allocating the next
@@ -311,6 +316,7 @@ class Camera3Stream :
      *
      */
     status_t         getBuffer(camera3_stream_buffer *buffer,
+            nsecs_t waitBufferTimeout,
             const std::vector<size_t>& surface_ids = std::vector<size_t>());
 
     /**
@@ -534,6 +540,7 @@ class Camera3Stream :
     // has been called sufficient number of times, or stream configuration
     // had to register buffers with the HAL
     bool mPrepared;
+    bool mPrepareBlockRequest;
 
     Vector<camera3_stream_buffer_t> mPreparedBuffers;
     size_t mPreparedBufferIdx;

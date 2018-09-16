@@ -18,17 +18,18 @@
 #ifndef ANDROID_AUDIO_MIXER_H
 #define ANDROID_AUDIO_MIXER_H
 
+#include <map>
 #include <pthread.h>
 #include <sstream>
 #include <stdint.h>
 #include <sys/types.h>
 #include <unordered_map>
+#include <vector>
 
 #include <media/AudioBufferProvider.h>
 #include <media/AudioResampler.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/BufferProviders.h>
-#include <media/nblog/NBLog.h>
 #include <system/audio.h>
 #include <utils/Compat.h>
 #include <utils/threads.h>
@@ -40,6 +41,10 @@
 #define FLOAT_AUX
 
 namespace android {
+
+namespace NBLog {
+class Writer;
+}   // namespace NBLog
 
 // ----------------------------------------------------------------------------
 

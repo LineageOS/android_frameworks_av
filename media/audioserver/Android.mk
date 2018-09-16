@@ -18,6 +18,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libmedia \
 	libmedialogservice \
 	libnbaio \
+	libnblog \
 	libsoundtriggerservice \
 	libutils
 

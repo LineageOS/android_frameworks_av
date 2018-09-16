@@ -2696,6 +2696,19 @@ status_t AudioPolicyManager::dump(int fd)
     mPolicyMixes.dump(fd);
     mAudioSources.dump(fd);
 
+    if (!mSurroundFormats.empty()) {
+        result = String8("\nManually Enabled Surround Formats:\n");
+        size_t i = 0;
+        for (const auto& fmt : mSurroundFormats) {
+            result.append(i++ == 0 ? "  " : ", ");
+            std::string sfmt;
+            FormatConverter::toString(fmt, sfmt);
+            result.appendFormat("%s", sfmt.c_str());
+        }
+        result.append("\n");
+        write(fd, result.string(), result.size());
+    }
+
     return NO_ERROR;
 }
 
@@ -3594,8 +3607,8 @@ status_t AudioPolicyManager::getSurroundFormats(unsigned int *numSurroundFormats
             (surroundFormats == NULL || surroundFormatsEnabled == NULL))) {
         return BAD_VALUE;
     }
-    ALOGV("getSurroundFormats() numSurroundFormats %d surroundFormats %p surroundFormatsEnabled %p",
-            *numSurroundFormats, surroundFormats, surroundFormatsEnabled);
+    ALOGV("getSurroundFormats() numSurroundFormats %d surroundFormats %p surroundFormatsEnabled %p"
+            " reported %d", *numSurroundFormats, surroundFormats, surroundFormatsEnabled, reported);
 
     // Only return value if there is HDMI output.
     if ((mAvailableOutputDevices.types() & AUDIO_DEVICE_OUT_HDMI) == 0) {
@@ -3698,6 +3711,7 @@ status_t AudioPolicyManager::getSurroundFormats(unsigned int *numSurroundFormats
 
 status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled)
 {
+    ALOGV("%s() format 0x%X enabled %d", __func__, audioFormat, enabled);
     // Check if audio format is a surround formats.
     bool isSurroundFormat = false;
     for (size_t i = 0; i < ARRAY_SIZE(SURROUND_FORMATS); i++) {
@@ -3707,6 +3721,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
         }
     }
     if (!isSurroundFormat) {
+        ALOGW("%s() format 0x%X is not a known surround format", __func__, audioFormat);
         return BAD_VALUE;
     }
 
@@ -3714,6 +3729,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
     audio_policy_forced_cfg_t forceUse = mEngine->getForceUse(
                 AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND);
     if (forceUse != AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL) {
+        ALOGW("%s() not in manual mode for surround sound format selection", __func__);
         return INVALID_OPERATION;
     }
 
@@ -3724,6 +3740,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
 
     // The operation is valid only when there is HDMI output available.
     if ((mAvailableOutputDevices.types() & AUDIO_DEVICE_OUT_HDMI) == 0) {
+        ALOGW("%s() no HDMI out devices found", __func__);
         return INVALID_OPERATION;
     }
 
@@ -3788,6 +3805,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
 
     // Undo the surround formats change due to no audio profiles updated.
     if (!profileUpdated) {
+        ALOGW("%s() no audio profiles updated, undoing surround formats change", __func__);
         if (enabled) {
             if (audioFormat == AUDIO_FORMAT_AAC_LC) {
                 for (size_t i = 0; i < ARRAY_SIZE(AAC_FORMATS); i++) {

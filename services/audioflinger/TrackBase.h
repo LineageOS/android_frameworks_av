@@ -54,11 +54,6 @@ public:
         TYPE_PATCH,
     };
 
-    enum {
-        TRACK_NAME_PENDING = -1,
-        TRACK_NAME_FAILURE = -2,
-    };
-
                         TrackBase(ThreadBase *thread,
                                 const sp<Client>& client,
                                 const audio_attributes_t& mAttr,
@@ -199,6 +194,7 @@ public:
                         }
 
            audio_format_t format() const { return mFormat; }
+           int id() const { return mId; }
 
 protected:
     DISALLOW_COPY_AND_ASSIGN(TrackBase);
