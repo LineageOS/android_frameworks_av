@@ -313,14 +313,13 @@ bool AudioInputCollection::isSourceActive(audio_source_t source) const
 
 sp<AudioInputDescriptor> AudioInputCollection::getInputFromId(audio_port_handle_t id) const
 {
-    sp<AudioInputDescriptor> inputDesc = NULL;
     for (size_t i = 0; i < size(); i++) {
-        inputDesc = valueAt(i);
-        if (inputDesc->getId() == id) {
-            break;
+        const sp<AudioInputDescriptor> inputDescriptor = valueAt(i);
+        if (inputDescriptor->getId() == id) {
+            return inputDescriptor;
         }
     }
-    return inputDesc;
+    return NULL;
 }
 
 uint32_t AudioInputCollection::activeInputsCountOnDevices(audio_devices_t devices) const
