@@ -3921,10 +3921,9 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
 
     for (const char* fileName : fileNames) {
         for (int i = 0; i < kConfigLocationListSize; i++) {
-            PolicySerializer serializer;
             snprintf(audioPolicyXmlConfigFile, sizeof(audioPolicyXmlConfigFile),
                      "%s/%s", kConfigLocationList[i], fileName);
-            ret = serializer.deserialize(audioPolicyXmlConfigFile, config);
+            ret = deserializeAudioPolicyFile(audioPolicyXmlConfigFile, &config);
             if (ret == NO_ERROR) {
                 config.setSource(audioPolicyXmlConfigFile);
                 return ret;
