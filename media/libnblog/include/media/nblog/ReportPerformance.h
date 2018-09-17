@@ -19,22 +19,18 @@
 
 #include <deque>
 #include <map>
-#include <memory>
 #include <vector>
-
-namespace Json {
-class Value;
-}
 
 namespace android {
 namespace ReportPerformance {
 
 struct PerformanceData;
 
-// Dumps performance data to a JSON format.
-// Return by pointer instead of by value to avoid dependency side effects of including
-// the header of an external library.
-std::unique_ptr<Json::Value> dumpToJson(const PerformanceData& data);
+// Dumps performance data in a JSON format.
+void dumpJson(int fd, const std::map<int, PerformanceData>& threadDataMap);
+
+//Dumps performance data as visualized plots.
+void dumpPlots(int fd, const std::map<int, PerformanceData>& threadDataMap);
 
 // Send one thread's data to media metrics, if the performance data is nontrivial (i.e. not
 // all zero values). Return true if data was sent, false if there is nothing to write

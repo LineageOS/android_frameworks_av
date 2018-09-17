@@ -19,6 +19,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <system/audio.h>
 #include <type_traits>
 
 namespace android {
@@ -62,11 +63,11 @@ enum Event : uint8_t {
     EVENT_LATENCY,              // difference between frames presented by HAL and frames
                                 // written to HAL output sink, divided by sample rate.
     EVENT_OVERRUN,              // predicted thread overrun event timestamp
-    EVENT_THREAD_INFO,          // thread type, frameCount and sampleRate, which give context
-                                // for the metrics below.
+    EVENT_THREAD_INFO,          // see thread_info_t below
     EVENT_UNDERRUN,             // predicted thread underrun event timestamp
     EVENT_WARMUP_TIME,          // thread warmup time
     EVENT_WORK_TIME,            // the time a thread takes to do work, e.g. read, write, etc.
+    EVENT_THREAD_PARAMS,        // see thread_params_t below
 
     EVENT_UPPER_BOUND,          // to check for invalid events
 };
@@ -113,10 +114,22 @@ inline const char *threadTypeToString(ThreadType type) {
 }
 
 // mapped from EVENT_THREAD_INFO
+// These fields always stay the same throughout a thread's lifetime and
+// should only need to be logged once upon thread initialization.
+// There is currently no recovery mechanism if the log event corresponding
+// to this type is lost.
+// TODO add this information when adding a reader to MediaLogService?
 struct thread_info_t {
-    ThreadType type;
-    size_t frameCount;      // number of frames per read or write buffer
-    unsigned sampleRate;    // in frames per second
+    audio_io_handle_t id = -1;      // Thread I/O handle
+    ThreadType type = UNKNOWN;      // See enum ThreadType above
+};
+
+// mapped from EVENT_THREAD_PARAMS
+// These fields are not necessarily constant throughout a thread's lifetime and
+// can be logged whenever a thread receives new configurations or parameters.
+struct thread_params_t {
+    size_t frameCount = 0;          // number of frames per read or write buffer
+    unsigned sampleRate = 0;        // in frames per second
 };
 
 template <Event E> struct get_mapped;
@@ -135,6 +148,7 @@ MAP_EVENT_TO_TYPE(EVENT_THREAD_INFO, thread_info_t);
 MAP_EVENT_TO_TYPE(EVENT_UNDERRUN, int64_t);
 MAP_EVENT_TO_TYPE(EVENT_WARMUP_TIME, double);
 MAP_EVENT_TO_TYPE(EVENT_WORK_TIME, int64_t);
+MAP_EVENT_TO_TYPE(EVENT_THREAD_PARAMS, thread_params_t);
 
 }   // namespace NBLog
 }   // namespace android

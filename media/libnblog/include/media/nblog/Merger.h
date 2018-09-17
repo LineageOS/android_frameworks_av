@@ -29,9 +29,12 @@
 #include <utils/Mutex.h>
 #include <utils/RefBase.h>
 #include <utils/Thread.h>
+#include <utils/Timers.h>
+#include <utils/Vector.h>
 
 namespace android {
 
+class String16;
 class String8;
 
 namespace NBLog {
@@ -83,7 +86,7 @@ public:
     // the send if it is time to do so.
     void checkPushToMediaMetrics();
 
-    void dump(int fd, int indent = 0);
+    void dump(int fd, const Vector<String16>& args);
 
 private:
     // FIXME Needs to be protected by a lock,
