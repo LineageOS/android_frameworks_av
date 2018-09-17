@@ -4357,7 +4357,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     isActive = false;
                     break;
                 }
-                // fall through
+                FALLTHROUGH_INTENDED;
             case TrackBase::STOPPING_2:
             case TrackBase::PAUSED:
             case TrackBase::STOPPED:

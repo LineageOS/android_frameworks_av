@@ -27,6 +27,7 @@
 #include <math.h>
 #include <audio_utils/primitives.h>
 #include <audio_utils/sndfile.h>
+#include <android-base/macros.h>
 #include <utils/Vector.h>
 #include <media/AudioBufferProvider.h>
 #include <media/AudioResampler.h>
@@ -87,14 +88,14 @@ int parseCSV(const char *string, Vector<int>& values)
                 }
                 return numValues;
             }
-            // fall through
+            FALLTHROUGH_INTENDED;
         case ',':
             if (hadDigit) {
                 hadDigit = false;
                 numValues++;
                 break;
             }
-            // fall through
+            FALLTHROUGH_INTENDED;
         default:
             return -1;
         }
