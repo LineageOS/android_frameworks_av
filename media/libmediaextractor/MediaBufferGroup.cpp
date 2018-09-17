@@ -157,11 +157,15 @@ status_t MediaBufferGroup::acquire_buffer(
     Mutex::Autolock autoLock(mInternal->mLock);
     for (;;) {
         size_t smallest = requestedSize;
+        size_t biggest = requestedSize;
         MediaBufferBase *buffer = nullptr;
         auto free = mInternal->mBuffers.end();
         for (auto it = mInternal->mBuffers.begin(); it != mInternal->mBuffers.end(); ++it) {
+            const size_t size = (*it)->size();
+            if (size > biggest) {
+                biggest = size;
+            }
             if ((*it)->refcount() == 0) {
-                const size_t size = (*it)->size();
                 if (size >= requestedSize) {
                     buffer = *it;
                     break;
@@ -176,7 +180,8 @@ status_t MediaBufferGroup::acquire_buffer(
                 && (free != mInternal->mBuffers.end()
                     || mInternal->mBuffers.size() < mInternal->mGrowthLimit)) {
             // We alloc before we free so failure leaves group unchanged.
-            const size_t allocateSize = requestedSize < SIZE_MAX / 3 * 2 /* NB: ordering */ ?
+            const size_t allocateSize = requestedSize == 0 ? biggest :
+                    requestedSize < SIZE_MAX / 3 * 2 /* NB: ordering */ ?
                     requestedSize * 3 / 2 : requestedSize;
             buffer = new MediaBuffer(allocateSize);
             if (buffer->data() == nullptr) {
