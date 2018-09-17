@@ -78,6 +78,8 @@ LOCAL_SHARED_LIBRARIES := \
     liblog \
     libutils \
 
+LOCAL_HEADER_LIBRARIES := libbase_headers
+
 LOCAL_MODULE := test-resampler
 
 LOCAL_MODULE_TAGS := optional
