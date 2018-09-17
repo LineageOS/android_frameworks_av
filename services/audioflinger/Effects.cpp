@@ -248,7 +248,7 @@ bool AudioFlinger::EffectModule::updateState() {
     switch (mState) {
     case RESTART:
         reset_l();
-        // FALL THROUGH
+        FALLTHROUGH_INTENDED;
 
     case STARTING:
         // clear auxiliary effect input buffer for next accumulation

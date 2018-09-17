@@ -34,6 +34,8 @@ LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 LOCAL_MODULE := libaudiopolicyenginedefault
 LOCAL_MODULE_TAGS := optional
 
+LOCAL_HEADER_LIBRARIES := libbase_headers
+
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents \
 

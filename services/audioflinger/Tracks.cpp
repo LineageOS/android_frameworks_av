@@ -857,7 +857,7 @@ void AudioFlinger::PlaybackThread::Track::pause()
 
             // Offloaded track was draining, we need to carry on draining when resumed
             mResumeToStopping = true;
-            // fall through...
+            FALLTHROUGH_INTENDED;
         case ACTIVE:
         case RESUMING:
             mState = PAUSING;
