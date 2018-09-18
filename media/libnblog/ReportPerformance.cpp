@@ -40,13 +40,14 @@
 namespace android {
 namespace ReportPerformance {
 
-std::unique_ptr<Json::Value> dumpToJson(const PerformanceData& data)
+static std::unique_ptr<Json::Value> dumpToJson(const PerformanceData& data)
 {
     std::unique_ptr<Json::Value> rootPtr = std::make_unique<Json::Value>(Json::objectValue);
     Json::Value& root = *rootPtr;
-    root["type"] = (Json::Value::Int)data.threadInfo.type;
-    root["frameCount"] = (Json::Value::Int)data.threadInfo.frameCount;
-    root["sampleRate"] = (Json::Value::Int)data.threadInfo.sampleRate;
+    root["ioHandle"] = data.threadInfo.id;
+    root["type"] = NBLog::threadTypeToString(data.threadInfo.type);
+    root["frameCount"] = (Json::Value::Int)data.threadParams.frameCount;
+    root["sampleRate"] = (Json::Value::Int)data.threadParams.sampleRate;
     root["workMsHist"] = data.workHist.toString();
     root["latencyMsHist"] = data.latencyHist.toString();
     root["warmupMsHist"] = data.warmupHist.toString();
@@ -55,6 +56,61 @@ std::unique_ptr<Json::Value> dumpToJson(const PerformanceData& data)
     root["activeMs"] = (Json::Value::Int64)ns2ms(data.active);
     root["durationMs"] = (Json::Value::Int64)ns2ms(systemTime() - data.start);
     return rootPtr;
+}
+
+static std::string dumpHistogramsToString(const PerformanceData& data)
+{
+    std::stringstream ss;
+    ss << "==========================================\n";
+    ss << "Thread type=" << NBLog::threadTypeToString(data.threadInfo.type)
+            << " handle=" << data.threadInfo.id
+            << " sampleRate=" << data.threadParams.sampleRate
+            << " frameCount=" << data.threadParams.frameCount << "\n";
+    ss << "  Thread work times in ms:\n" << data.workHist.asciiArtString(4 /*indent*/);
+    ss << "  Thread latencies in ms:\n" << data.latencyHist.asciiArtString(4 /*indent*/);
+    ss << "  Thread warmup times in ms:\n" << data.warmupHist.asciiArtString(4 /*indent*/);
+    return ss.str();
+}
+
+void dumpJson(int fd, const std::map<int, PerformanceData>& threadDataMap)
+{
+    if (fd < 0) {
+        return;
+    }
+
+    Json::Value root(Json::arrayValue);
+    for (const auto& item : threadDataMap) {
+        const ReportPerformance::PerformanceData& data = item.second;
+        // Skip threads that do not have performance data recorded yet.
+        if (data.empty()) {
+            continue;
+        }
+        std::unique_ptr<Json::Value> dataJson = ReportPerformance::dumpToJson(data);
+        if (dataJson == nullptr) {
+            continue;
+        }
+        (*dataJson)["threadNum"] = item.first;
+        root.append(*dataJson);
+    }
+    Json::StyledWriter writer;
+    std::string rootStr = writer.write(root);
+    write(fd, rootStr.c_str(), rootStr.size());
+}
+
+void dumpPlots(int fd, const std::map<int, PerformanceData>& threadDataMap)
+{
+    if (fd < 0) {
+        return;
+    }
+
+    for (const auto &item : threadDataMap) {
+        const ReportPerformance::PerformanceData& data = item.second;
+        if (data.empty()) {
+            continue;
+        }
+        std::string hists = ReportPerformance::dumpHistogramsToString(data);
+        write(fd, hists.c_str(), hists.size());
+    }
 }
 
 bool sendToMediaMetrics(const PerformanceData& data)
@@ -71,6 +127,11 @@ bool sendToMediaMetrics(const PerformanceData& data)
     static constexpr char kThreadOverruns[] = "android.media.audiothread.overruns";
     static constexpr char kThreadActive[] = "android.media.audiothread.activeMs";
     static constexpr char kThreadDuration[] = "android.media.audiothread.durationMs";
+
+    // Currently, we only allow FastMixer thread data to be sent to Media Metrics.
+    if (data.threadInfo.type != NBLog::FASTMIXER) {
+        return false;
+    }
 
     std::unique_ptr<MediaAnalyticsItem> item(new MediaAnalyticsItem("audiothread"));
 
@@ -104,8 +165,8 @@ bool sendToMediaMetrics(const PerformanceData& data)
         // Add thread info fields.
         const char * const typeString = NBLog::threadTypeToString(data.threadInfo.type);
         item->setCString(kThreadType, typeString);
-        item->setInt32(kThreadFrameCount, data.threadInfo.frameCount);
-        item->setInt32(kThreadSampleRate, data.threadInfo.sampleRate);
+        item->setInt32(kThreadFrameCount, data.threadParams.frameCount);
+        item->setInt32(kThreadSampleRate, data.threadParams.sampleRate);
         // Add time info fields.
         item->setInt64(kThreadActive, data.active / 1000000);
         item->setInt64(kThreadDuration, (systemTime() - data.start) / 1000000);

@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <climits>
 #include <deque>
+#include <iomanip>
 #include <math.h>
 #include <numeric>
 #include <sstream>
@@ -51,23 +52,21 @@ namespace ReportPerformance {
 
 void Histogram::add(double value)
 {
-    // TODO Handle domain and range error exceptions?
-    const int binIndex = lround((value - mLow) / mBinSize);
-    if (binIndex < 0) {
-        mLowCount++;
-    } else if (binIndex >= mNumBins) {
-        mHighCount++;
-    } else {
-        mBins[binIndex]++;
+    if (mBinSize <= 0 || mBins.size() < 2) {
+        return;
     }
+    // TODO Handle domain and range error exceptions?
+    const int unboundedIndex = lround((value - mLow) / mBinSize) + 1;
+    // std::clamp is introduced in C++17
+    //const int index = std::clamp(unboundedIndex, 0, (int)(mBins.size() - 1));
+    const int index = std::max(0, std::min((int)(mBins.size() - 1), unboundedIndex));
+    mBins[index]++;
     mTotalCount++;
 }
 
 void Histogram::clear()
 {
     std::fill(mBins.begin(), mBins.end(), 0);
-    mLowCount = 0;
-    mHighCount = 0;
     mTotalCount = 0;
 }
 
@@ -81,27 +80,75 @@ std::string Histogram::toString() const {
     static constexpr char kDivider = '|';
     ss << kVersion << "," << mBinSize << "," << mNumBins << "," << mLow << ",{";
     bool first = true;
-    if (mLowCount != 0) {
-        ss << "-1" << kDivider << mLowCount;
-        first = false;
-    }
-    for (size_t i = 0; i < mNumBins; i++) {
+    for (size_t i = 0; i < mBins.size(); i++) {
         if (mBins[i] != 0) {
             if (!first) {
                 ss << ",";
             }
-            ss << i << kDivider << mBins[i];
+            ss << static_cast<int>(i) - 1 << kDivider << mBins[i];
             first = false;
         }
     }
-    if (mHighCount != 0) {
-        if (!first) {
-            ss << ",";
-        }
-        ss << mNumBins << kDivider << mHighCount;
-        first = false;
-    }
     ss << "}";
+
+    return ss.str();
+}
+
+std::string Histogram::asciiArtString(size_t indent) const {
+    if (totalCount() == 0 || mBinSize <= 0 || mBins.size() < 2) {
+        return "";
+    }
+
+    static constexpr char kMarker = '-';
+    // One increment is considered one step of a bin's height.
+    static constexpr size_t kMarkersPerIncrement = 2;
+    static constexpr size_t kMaxIncrements = 64 + 1;
+    static constexpr size_t kMaxNumberWidth = 7;
+    static const std::string kMarkers(kMarkersPerIncrement * kMaxIncrements, kMarker);
+    static const std::string kSpaces(kMarkersPerIncrement * kMaxIncrements, ' ');
+    // get the last n characters of s, or the whole string if it is shorter
+    auto getTail = [](const size_t n, const std::string &s) {
+        return s.c_str() + s.size() - std::min(n, s.size());
+    };
+
+    // Since totalCount() > 0, mBins is not empty and maxCount > 0.
+    const unsigned maxCount = *std::max_element(mBins.begin(), mBins.end());
+    const size_t maxIncrements = log2(maxCount) + 1;
+
+    std::stringstream ss;
+
+    // Non-zero bins must exist at this point because totalCount() > 0.
+    size_t firstNonZeroBin = 0;
+    // If firstNonZeroBin reaches mBins.size() - 1, then it must be a nonzero bin.
+    for (; firstNonZeroBin < mBins.size() - 1 && mBins[firstNonZeroBin] == 0; firstNonZeroBin++) {}
+    const size_t firstBinToPrint = firstNonZeroBin == 0 ? 0 : firstNonZeroBin - 1;
+
+    size_t lastNonZeroBin = mBins.size() - 1;
+    // If lastNonZeroBin reaches 0, then it must be a nonzero bin.
+    for (; lastNonZeroBin > 0 && mBins[lastNonZeroBin] == 0; lastNonZeroBin--) {}
+    const size_t lastBinToPrint = lastNonZeroBin == mBins.size() - 1 ? lastNonZeroBin
+            : lastNonZeroBin + 1;
+
+    for (size_t bin = firstBinToPrint; bin <= lastBinToPrint; bin++) {
+        ss << std::setw(indent + kMaxNumberWidth);
+        if (bin == 0) {
+            ss << "<";
+        } else if (bin == mBins.size() - 1) {
+            ss << ">";
+        } else {
+            ss << mLow + (bin - 1) * mBinSize;
+        }
+        ss << " |";
+        size_t increments = 0;
+        const uint64_t binCount = mBins[bin];
+        if (binCount > 0) {
+            increments = log2(binCount) + 1;
+            ss << getTail(increments * kMarkersPerIncrement, kMarkers);
+        }
+        ss << getTail((maxIncrements - increments + 1) * kMarkersPerIncrement, kSpaces)
+                << binCount << "\n";
+    }
+    ss << "\n";
 
     return ss.str();
 }

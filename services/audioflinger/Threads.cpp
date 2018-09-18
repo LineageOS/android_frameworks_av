@@ -4033,6 +4033,11 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         sq->end();
         sq->push(FastMixerStateQueue::BLOCK_UNTIL_PUSHED);
 
+        NBLog::thread_info_t info;
+        info.id = mId;
+        info.type = NBLog::FASTMIXER;
+        mFastMixerNBLogWriter->log<NBLog::EVENT_THREAD_INFO>(info);
+
         // start the fast mixer
         mFastMixer->run("FastMixer", PRIORITY_URGENT_AUDIO);
         pid_t tid = mFastMixer->getTid();
