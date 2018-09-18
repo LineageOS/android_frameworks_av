@@ -397,6 +397,8 @@ public:
 
                 bool                isMsdDevice() const { return mIsMsdDevice; }
 
+    virtual     void                dump(int fd, const Vector<String16>& args) = 0;
+
     mutable     Mutex                   mLock;
 
 protected:
@@ -665,7 +667,7 @@ public:
                    audio_io_handle_t id, audio_devices_t device, type_t type, bool systemReady);
     virtual             ~PlaybackThread();
 
-                void        dump(int fd, const Vector<String16>& args);
+                void        dump(int fd, const Vector<String16>& args) override;
                 // returns a string of audio performance related data in JSON format.
     virtual     Json::Value getJsonDump() const;
 
@@ -1480,7 +1482,7 @@ public:
             // return true if the caller should then do it's part of the stopping process
             bool        stop(RecordTrack* recordTrack);
 
-            void        dump(int fd, const Vector<String16>& args);
+            void        dump(int fd, const Vector<String16>& args) override;
             AudioStreamIn* clearInput();
             virtual sp<StreamHalInterface> stream() const;
 
@@ -1689,7 +1691,7 @@ class MmapThread : public ThreadBase
                 // Sets the UID records silence
     virtual     void        setRecordSilenced(uid_t uid __unused, bool silenced __unused) {}
 
-                void        dump(int fd, const Vector<String16>& args);
+                void        dump(int fd, const Vector<String16>& args) override;
     virtual     void        dumpInternals(int fd, const Vector<String16>& args);
                 void        dumpTracks(int fd, const Vector<String16>& args);
 

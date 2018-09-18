@@ -56,7 +56,6 @@
 #include <system/audio_effects/effect_ns.h>
 #include <system/audio_effects/effect_aec.h>
 
-#include <audio_utils/FdToString.h>
 #include <audio_utils/primitives.h>
 
 #include <json/json.h>
@@ -2300,15 +2299,7 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
         if (playbackThread != NULL) {
             ALOGV("closeOutput() %d", output);
 
-            {
-                // Dump thread before deleting for history
-                audio_utils::FdToString fdToString;
-                const int fd = fdToString.fd();
-                if (fd >= 0) {
-                    playbackThread->dump(fd, {} /* args */);
-                    mThreadLog.logs(-1 /* time */, fdToString.getStringAndClose());
-                }
-            }
+            dumpToThreadLog_l(playbackThread);
 
             if (playbackThread->type() == ThreadBase::MIXER) {
                 for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
@@ -2341,6 +2332,7 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
             if (mmapThread == 0) {
                 return BAD_VALUE;
             }
+            dumpToThreadLog_l(mmapThread);
             mMmapThreads.removeItem(output);
             ALOGD("closing mmapThread %p", mmapThread.get());
         }
@@ -2549,15 +2541,7 @@ status_t AudioFlinger::closeInput_nonvirtual(audio_io_handle_t input)
         if (recordThread != 0) {
             ALOGV("closeInput() %d", input);
 
-            {
-                // Dump thread before deleting for history
-                audio_utils::FdToString fdToString;
-                const int fd = fdToString.fd();
-                if (fd >= 0) {
-                    recordThread->dump(fd, {} /* args */);
-                    mThreadLog.logs(-1 /* time */, fdToString.getStringAndClose());
-                }
-            }
+            dumpToThreadLog_l(recordThread);
 
             // If we still have effect chains, it means that a client still holds a handle
             // on at least one effect. We must either move the chain to an existing thread with the
@@ -2601,6 +2585,7 @@ status_t AudioFlinger::closeInput_nonvirtual(audio_io_handle_t input)
             if (mmapThread == 0) {
                 return BAD_VALUE;
             }
+            dumpToThreadLog_l(mmapThread);
             mMmapThreads.removeItem(input);
         }
         const sp<AudioIoDescriptor> ioDesc = new AudioIoDescriptor();
@@ -2797,6 +2782,17 @@ void AudioFlinger::purgeStaleEffects_l() {
         }
     }
     return;
+}
+
+// dumpToThreadLog_l() must be called with AudioFlinger::mLock held
+void AudioFlinger::dumpToThreadLog_l(const sp<ThreadBase> &thread)
+{
+    audio_utils::FdToString fdToString;
+    const int fd = fdToString.fd();
+    if (fd >= 0) {
+        thread->dump(fd, {} /* args */);
+        mThreadLog.logs(-1 /* time */, fdToString.getStringAndClose());
+    }
 }
 
 // checkThread_l() must be called with AudioFlinger::mLock held
