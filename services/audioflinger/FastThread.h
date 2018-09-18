@@ -78,12 +78,13 @@ protected:
     unsigned        mColdGen;       // last observed mColdGen
     bool            mIsWarm;        // true means ready to mix,
                                     // false means wait for warmup before mixing
-    struct timespec mMeasuredWarmupTs;  // how long did it take for warmup to complete
-    uint32_t        mWarmupCycles;  // counter of number of loop cycles during warmup phase
-    uint32_t        mWarmupConsecutiveInRangeCycles;    // number of consecutive cycles in range
-    NBLog::Writer   mDummyNBLogWriter;
-    NBLog::Writer*  mNBLogWriter;   // always non-nullptr: real NBLog::Writer* or &mDummyNBLogWriter
-    status_t        mTimestampStatus;
+    struct timespec   mMeasuredWarmupTs;  // how long did it take for warmup to complete
+    uint32_t          mWarmupCycles;  // counter of number of loop cycles during warmup phase
+    uint32_t          mWarmupConsecutiveInRangeCycles;    // number of consecutive cycles in range
+    sp<NBLog::Writer> mDummyNBLogWriter;
+    NBLog::Writer*    mNBLogWriter;   // always non-nullptr: real NBLog::Writer* or
+                                      // mDummyNBLogWriter.get()
+    status_t          mTimestampStatus;
 
     FastThreadState::Command mCommand;
     bool            mAttemptedWrite;
