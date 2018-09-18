@@ -2549,6 +2549,16 @@ status_t AudioFlinger::closeInput_nonvirtual(audio_io_handle_t input)
         if (recordThread != 0) {
             ALOGV("closeInput() %d", input);
 
+            {
+                // Dump thread before deleting for history
+                audio_utils::FdToString fdToString;
+                const int fd = fdToString.fd();
+                if (fd >= 0) {
+                    recordThread->dump(fd, {} /* args */);
+                    mThreadLog.logs(-1 /* time */, fdToString.getStringAndClose());
+                }
+            }
+
             // If we still have effect chains, it means that a client still holds a handle
             // on at least one effect. We must either move the chain to an existing thread with the
             // same session ID or put it aside in case a new record thread is opened for a
