@@ -60,9 +60,8 @@ status_t Camera3SharedOutputStream::connectStreamSplitterLocked() {
         }
     }
 
-    android::PixelFormat format = isFormatOverridden() ? getOriginalFormat() : getFormat();
     res = mStreamSplitter->connect(initialSurfaces, usage, mUsage, camera3_stream::max_buffers,
-            getWidth(), getHeight(), format, &mConsumer);
+            getWidth(), getHeight(), getFormat(), &mConsumer);
     if (res != OK) {
         ALOGE("%s: Failed to connect to stream splitter: %s(%d)",
                 __FUNCTION__, strerror(-res), res);
