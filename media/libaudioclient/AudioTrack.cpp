@@ -22,6 +22,7 @@
 #include <math.h>
 #include <sys/resource.h>
 
+#include <android-base/macros.h>
 #include <audio_utils/clock.h>
 #include <audio_utils/primitives.h>
 #include <binder/IPCThreadState.h>
@@ -2964,7 +2965,7 @@ bool AudioTrack::hasStarted()
         if (mProxy->getStreamEndDone()) {
             return true;
         }
-        // fall through
+        FALLTHROUGH_INTENDED;
     case STATE_ACTIVE:
     case STATE_STOPPING:
         break;
@@ -3083,7 +3084,7 @@ bool AudioTrack::AudioTrackThread::threadLoop()
     case NS_WHENEVER:
         // Event driven: call wake() when callback notifications conditions change.
         ns = INT64_MAX;
-        // fall through
+        FALLTHROUGH_INTENDED;
     default:
         LOG_ALWAYS_FATAL_IF(ns < 0, "processAudioBuffer() returned %" PRId64, ns);
         pauseInternal(ns);

@@ -17,6 +17,7 @@
 #define LOG_TAG "AudioTrackShared"
 //#define LOG_NDEBUG 0
 
+#include <android-base/macros.h>
 #include <private/media/AudioTrackShared.h>
 #include <utils/Log.h>
 
@@ -247,7 +248,7 @@ status_t ClientProxy::obtainBuffer(Buffer* buffer, const struct timespec *reques
                 ts = requested;
                 break;
             }
-            // fall through
+            FALLTHROUGH_INTENDED;
         case TIMEOUT_CONTINUE:
             // FIXME we do not retry if requested < 10ms? needs documentation on this state machine
             if (!measure || requested->tv_sec < total.tv_sec ||
@@ -505,7 +506,7 @@ status_t AudioTrackClientProxy::waitStreamEndDone(const struct timespec *request
                 ts = requested;
                 break;
             }
-            // fall through
+            FALLTHROUGH_INTENDED;
         case TIMEOUT_CONTINUE:
             // FIXME we do not retry if requested < 10ms? needs documentation on this state machine
             if (requested->tv_sec < total.tv_sec ||
