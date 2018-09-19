@@ -58,16 +58,16 @@ public:
     /**
      * \brief Creates a Histogram object.
      *
-     * \param binSize the width of each bin of the histogram.
+     * \param binSize the width of each bin of the histogram, must be greater than 0.
      *                Units are whatever data the caller decides to store.
-     * \param numBins the number of bins desired in the histogram range.
+     * \param numBins the number of bins desired in the histogram range, must be greater than 0.
      * \param low     the lower bound of the histogram bucket values.
      *                Units are whatever data the caller decides to store.
      *                Note that the upper bound can be calculated by the following:
      *                  upper = lower + binSize * numBins.
      */
     Histogram(double binSize, size_t numBins, double low = 0.)
-        : mBinSize(binSize), mNumBins(numBins), mLow(low), mBins(mNumBins) {}
+        : mBinSize(binSize), mNumBins(numBins), mLow(low), mBins(mNumBins + 2) {}
 
     Histogram(const Config &c)
         : Histogram(c.binSize, c.numBins, c.low) {}
@@ -112,24 +112,33 @@ public:
      */
     std::string toString() const;
 
+    // Draw log scale sideways histogram as ASCII art and store as a std::string.
+    // Empty string is returned if totalCount() == 0.
+    std::string asciiArtString(size_t indent = 0) const;
+
 private:
     // Histogram version number.
     static constexpr int kVersion = 1;
 
-    const double mBinSize;      // Size of each bucket
-    const size_t mNumBins;      // Number of buckets in histogram range
-    const double mLow;          // Lower bound of values
-    std::vector<int> mBins;     // Data structure to store the actual histogram
+    const double mBinSize;          // Size of each bucket
+    const size_t mNumBins;          // Number of buckets in range (excludes low and high)
+    const double mLow;              // Lower bound of values
 
-    int mLowCount = 0;          // Number of values less than mLow
-    int mHighCount = 0;         // Number of values >= mLow + mBinSize * mNumBins
-    uint64_t mTotalCount = 0;   // Total number of values recorded
+    // Data structure to store the actual histogram. Counts of bin values less than mLow
+    // are stored in mBins[0]. Bin index i corresponds to mBins[i+1]. Counts of bin values
+    // >= high are stored in mBins[mNumBins + 1].
+    std::vector<uint64_t> mBins;
+
+    uint64_t mTotalCount = 0;       // Total number of values recorded
 };
 
 // This is essentially the same as class PerformanceAnalysis, but PerformanceAnalysis
 // also does some additional analyzing of data, while the purpose of this struct is
 // to hold data.
 struct PerformanceData {
+    // TODO the Histogram::Config numbers below are for FastMixer.
+    // Specify different numbers for other thread types.
+
     // Values based on mUnderrunNs and mOverrunNs in FastMixer.cpp for frameCount = 192
     // and mSampleRate = 48000, which correspond to 2 and 7 seconds.
     static constexpr Histogram::Config kWorkConfig = { 0.25, 20, 2.};
@@ -142,10 +151,8 @@ struct PerformanceData {
     // bin size and lower/upper limits.
     static constexpr Histogram::Config kWarmupConfig = { 5., 10, 10.};
 
-    // Thread Info
-    NBLog::thread_info_t threadInfo{
-        NBLog::UNKNOWN /*threadType*/, 0 /*frameCount*/, 0 /*sampleRate*/
-    };
+    NBLog::thread_info_t threadInfo{};
+    NBLog::thread_params_t threadParams{};
 
     // Performance Data
     Histogram workHist{kWorkConfig};
@@ -167,6 +174,13 @@ struct PerformanceData {
         overruns = 0;
         active = 0;
         start = systemTime();
+    }
+
+    // Return true if performance data has not been recorded yet, false otherwise.
+    bool empty() const {
+        return workHist.totalCount() == 0 && latencyHist.totalCount() == 0
+                && warmupHist.totalCount() == 0 && underruns == 0 && overruns == 0
+                && active == 0;
     }
 };
 

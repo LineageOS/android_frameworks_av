@@ -66,6 +66,7 @@
 #include <media/VolumeShaper.h>
 
 #include <audio_utils/clock.h>
+#include <audio_utils/FdToString.h>
 #include <audio_utils/SimpleLog.h>
 #include <audio_utils/TimestampVerifier.h>
 
@@ -426,7 +427,10 @@ private:
     void dumpClients(int fd, const Vector<String16>& args);
     void dumpInternals(int fd, const Vector<String16>& args);
 
-    SimpleLog mThreadLog{10}; // 10 Thread history limit
+    SimpleLog mThreadLog{16}; // 16 Thread history limit
+
+    class ThreadBase;
+    void dumpToThreadLog_l(const sp<ThreadBase> &thread);
 
     // --- Client ---
     class Client : public RefBase {

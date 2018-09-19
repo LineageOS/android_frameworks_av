@@ -66,8 +66,8 @@ FastThread::FastThread(const char *cycleMs, const char *loadUs) : Thread(false /
     /* mMeasuredWarmupTs({0, 0}), */
     mWarmupCycles(0),
     mWarmupConsecutiveInRangeCycles(0),
-    // mDummyNBLogWriter
-    mNBLogWriter(&mDummyNBLogWriter),
+    mDummyNBLogWriter(new NBLog::Writer()),
+    mNBLogWriter(mDummyNBLogWriter.get()),
     mTimestampStatus(INVALID_OPERATION),
 
     mCommand(FastThreadState::INITIAL),
@@ -94,7 +94,7 @@ bool FastThread::threadLoop()
 {
     // LOGT now works even if tlNBLogWriter is nullptr, but we're considering changing that,
     // so this initialization permits a future change to remove the check for nullptr.
-    tlNBLogWriter = &mDummyNBLogWriter;
+    tlNBLogWriter = mDummyNBLogWriter.get();
     for (;;) {
 
         // either nanosleep, sched_yield, or busy wait
@@ -124,7 +124,8 @@ bool FastThread::threadLoop()
 
             // As soon as possible of learning of a new dump area, start using it
             mDumpState = next->mDumpState != NULL ? next->mDumpState : mDummyDumpState;
-            mNBLogWriter = next->mNBLogWriter != NULL ? next->mNBLogWriter : &mDummyNBLogWriter;
+            mNBLogWriter = next->mNBLogWriter != NULL ?
+                    next->mNBLogWriter : mDummyNBLogWriter.get();
             setNBLogWriter(mNBLogWriter);   // FastMixer informs its AudioMixer, FastCapture ignores
             tlNBLogWriter = mNBLogWriter;
 

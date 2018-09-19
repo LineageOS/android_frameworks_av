@@ -195,8 +195,10 @@ void FastMixer::onStateChange()
             //       to avoid blocking here and to prevent possible priority inversion
             mMixer = new AudioMixer(frameCount, mSampleRate);
             // FIXME See the other FIXME at FastMixer::setNBLogWriter()
-            const NBLog::thread_info_t info = { NBLog::FASTMIXER, frameCount, mSampleRate };
-            LOG_THREAD_INFO(info);
+            NBLog::thread_params_t params;
+            params.frameCount = frameCount;
+            params.sampleRate = mSampleRate;
+            LOG_THREAD_PARAMS(params);
             const size_t mixerFrameSize = mSinkChannelCount
                     * audio_bytes_per_sample(mMixerBufferFormat);
             mMixerBufferSize = mixerFrameSize * frameCount;

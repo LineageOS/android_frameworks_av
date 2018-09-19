@@ -34,9 +34,11 @@
 #include <utils/Log.h>
 #include <utils/Mutex.h>
 #include <utils/RefBase.h>
+#include <utils/String16.h>
 #include <utils/String8.h>
-#include <utils/Timers.h>
 #include <utils/Thread.h>
+#include <utils/Timers.h>
+#include <utils/Vector.h>
 
 namespace android {
 namespace NBLog {
@@ -145,12 +147,11 @@ void MergeReader::processSnapshot(Snapshot &snapshot, int author)
         } break;
         case EVENT_THREAD_INFO: {
             const thread_info_t info = it.payload<thread_info_t>();
-            // TODO make PerformanceData hold a type of thread_info_t.
-            // Currently, thread_info_t is defined in NBLog.h, which includes
-            // PerformanceAnalysis.h. PerformanceData is defined in PerformanceAnalysis.h,
-            // where including NBLog.h would result in circular includes. The organization
-            // of files will need to change to avoid this problem.
             data.threadInfo = info;
+        } break;
+        case EVENT_THREAD_PARAMS: {
+            const thread_params_t params = it.payload<thread_params_t>();
+            data.threadParams = params;
         } break;
         case EVENT_LATENCY: {
             const double latencyMs = it.payload<double>();
@@ -211,23 +212,29 @@ void MergeReader::checkPushToMediaMetrics()
     }
 }
 
-void MergeReader::dump(int fd, int indent)
+void MergeReader::dump(int fd, const Vector<String16>& args)
 {
     // TODO: add a mutex around media.log dump
-    ReportPerformance::dump(fd, indent, mThreadPerformanceAnalysis);
-    Json::Value root(Json::arrayValue);
-    for (const auto& item : mThreadPerformanceData) {
-        const ReportPerformance::PerformanceData& data = item.second;
-        std::unique_ptr<Json::Value> threadData = ReportPerformance::dumpToJson(data);
-        if (threadData == nullptr) {
-            continue;
+    // Options for dumpsys
+    bool pa = false, json = false, plots = false;
+    for (const auto &arg : args) {
+        if (arg == String16("--pa")) {
+            pa = true;
+        } else if (arg == String16("--json")) {
+            json = true;
+        } else if (arg == String16("--plots")) {
+            plots = true;
         }
-        (*threadData)["threadNum"] = item.first;
-        root.append(*threadData);
     }
-    Json::StyledWriter writer;
-    std::string rootStr = writer.write(root);
-    write(fd, rootStr.c_str(), rootStr.size());
+    if (pa) {
+        ReportPerformance::dump(fd, 0 /*indent*/, mThreadPerformanceAnalysis);
+    }
+    if (json) {
+        ReportPerformance::dumpJson(fd, mThreadPerformanceData);
+    }
+    if (plots) {
+        ReportPerformance::dumpPlots(fd, mThreadPerformanceData);
+    }
 }
 
 void MergeReader::handleAuthor(const AbstractEntry &entry, String8 *body)

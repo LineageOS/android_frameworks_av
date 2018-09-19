@@ -16,6 +16,7 @@
 #ifndef AUDIO_POLICY_HELPER_H_
 #define AUDIO_POLICY_HELPER_H_
 
+#include <android-base/macros.h>
 #include <system/audio.h>
 
 static inline
@@ -87,7 +88,7 @@ void stream_type_to_audio_attributes(audio_stream_type_t streamType,
         break;
     case AUDIO_STREAM_ENFORCED_AUDIBLE:
         attr->flags  |= AUDIO_FLAG_AUDIBILITY_ENFORCED;
-        // intended fall through, attributes in common with STREAM_SYSTEM
+        FALLTHROUGH_INTENDED; // attributes in common with STREAM_SYSTEM
     case AUDIO_STREAM_SYSTEM:
         attr->content_type = AUDIO_CONTENT_TYPE_SONIFICATION;
         attr->usage = AUDIO_USAGE_ASSISTANCE_SONIFICATION;

@@ -19,6 +19,7 @@
 #define LOG_TAG "AudioRecord"
 
 #include <inttypes.h>
+#include <android-base/macros.h>
 #include <sys/resource.h>
 
 #include <binder/IPCThreadState.h>
@@ -1462,7 +1463,7 @@ bool AudioRecord::AudioRecordThread::threadLoop()
     case NS_WHENEVER:
         // Event driven: call wake() when callback notifications conditions change.
         ns = INT64_MAX;
-        // fall through
+        FALLTHROUGH_INTENDED;
     default:
         LOG_ALWAYS_FATAL_IF(ns < 0, "%s() returned %lld", __func__, (long long)ns);
         pauseInternal(ns);
