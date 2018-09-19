@@ -69,7 +69,7 @@ status_t Parameters::initialize(CameraDeviceBase *device, int deviceVersion) {
     res = buildQuirks();
     if (res != OK) return res;
 
-    const Size MAX_PREVIEW_SIZE = { MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT };
+    Size maxPreviewSize = { MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT };
     // Treat the H.264 max size as the max supported video size.
     MediaProfiles *videoEncoderProfiles = MediaProfiles::getInstance();
     Vector<video_encoder> encoders = videoEncoderProfiles->getVideoEncoders();
@@ -90,11 +90,16 @@ status_t Parameters::initialize(CameraDeviceBase *device, int deviceVersion) {
         }
     }
     // This is just an upper bound and may not be an actually valid video size
-    const Size VIDEO_SIZE_UPPER_BOUND = {maxVideoWidth, maxVideoHeight};
+    Size videoSizeUpperBound = {maxVideoWidth, maxVideoHeight};
 
-    res = getFilteredSizes(MAX_PREVIEW_SIZE, &availablePreviewSizes);
+    if (fastInfo.supportsPreferredConfigs) {
+        maxPreviewSize = getMaxSize(getPreferredPreviewSizes());
+        videoSizeUpperBound = getMaxSize(getPreferredVideoSizes());
+    }
+
+    res = getFilteredSizes(maxPreviewSize, &availablePreviewSizes);
     if (res != OK) return res;
-    res = getFilteredSizes(VIDEO_SIZE_UPPER_BOUND, &availableVideoSizes);
+    res = getFilteredSizes(videoSizeUpperBound, &availableVideoSizes);
     if (res != OK) return res;
 
     // Select initial preview and video size that's under the initial bound and
@@ -296,9 +301,13 @@ status_t Parameters::initialize(CameraDeviceBase *device, int deviceVersion) {
     Vector<Size> availableJpegSizes = getAvailableJpegSizes();
     if (!availableJpegSizes.size()) return NO_INIT;
 
-    // TODO: Pick maximum
     pictureWidth = availableJpegSizes[0].width;
     pictureHeight = availableJpegSizes[0].height;
+    if (fastInfo.supportsPreferredConfigs) {
+        Size suggestedJpegSize = getMaxSize(getPreferredJpegSizes());
+        pictureWidth = suggestedJpegSize.width;
+        pictureHeight = suggestedJpegSize.height;
+    }
     pictureWidthLastSet = pictureWidth;
     pictureHeightLastSet = pictureHeight;
     pictureSizeOverriden = false;
@@ -1010,6 +1019,9 @@ status_t Parameters::buildFastInfo(CameraDeviceBase *device) {
         arrayHeight = activeArraySize.data.i32[3];
     } else return NO_INIT;
 
+    fastInfo.supportsPreferredConfigs =
+        info->exists(ANDROID_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS);
+
     // We'll set the target FPS range for still captures to be as wide
     // as possible to give the HAL maximum latitude for exposure selection
     camera_metadata_ro_entry_t availableFpsRanges =
@@ -1021,8 +1033,11 @@ status_t Parameters::buildFastInfo(CameraDeviceBase *device) {
     // Get supported preview fps ranges, up to default maximum.
     Vector<Size> supportedPreviewSizes;
     Vector<FpsRange> supportedPreviewFpsRanges;
-    const Size PREVIEW_SIZE_BOUND = { MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT };
-    status_t res = getFilteredSizes(PREVIEW_SIZE_BOUND, &supportedPreviewSizes);
+    Size previewSizeBound = { MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT };
+    if (fastInfo.supportsPreferredConfigs) {
+        previewSizeBound = getMaxSize(getPreferredPreviewSizes());
+    }
+    status_t res = getFilteredSizes(previewSizeBound, &supportedPreviewSizes);
     if (res != OK) return res;
     for (size_t i=0; i < availableFpsRanges.count; i += 2) {
         if (!isFpsSupported(supportedPreviewSizes,
@@ -3104,6 +3119,67 @@ Vector<Parameters::Size> Parameters::getAvailableJpegSizes() {
     }
 
     return jpegSizes;
+}
+
+Vector<Parameters::StreamConfiguration> Parameters::getPreferredStreamConfigurations(
+        int32_t usecaseId) const {
+    const size_t STREAM_CONFIGURATION_SIZE = 5;
+    const size_t STREAM_WIDTH_OFFSET = 0;
+    const size_t STREAM_HEIGHT_OFFSET = 1;
+    const size_t STREAM_FORMAT_OFFSET = 2;
+    const size_t STREAM_IS_INPUT_OFFSET = 3;
+    const size_t STREAM_USECASE_BITMAP_OFFSET = 4;
+    Vector<StreamConfiguration> scs;
+
+    if (fastInfo.supportsPreferredConfigs) {
+        camera_metadata_ro_entry_t availableStreamConfigs = staticInfo(
+                ANDROID_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS);
+        for (size_t i = 0; i < availableStreamConfigs.count; i+= STREAM_CONFIGURATION_SIZE) {
+            int32_t width = availableStreamConfigs.data.i32[i + STREAM_WIDTH_OFFSET];
+            int32_t height = availableStreamConfigs.data.i32[i + STREAM_HEIGHT_OFFSET];
+            int32_t format = availableStreamConfigs.data.i32[i + STREAM_FORMAT_OFFSET];
+            int32_t isInput = availableStreamConfigs.data.i32[i + STREAM_IS_INPUT_OFFSET];
+            int32_t supportedUsecases =
+                    availableStreamConfigs.data.i32[i + STREAM_USECASE_BITMAP_OFFSET];
+            if (supportedUsecases & (1 << usecaseId)) {
+                StreamConfiguration sc = {format, width, height, isInput};
+                scs.add(sc);
+            }
+        }
+    }
+
+    return scs;
+}
+
+Vector<Parameters::Size> Parameters::getPreferredFilteredSizes(int32_t usecaseId,
+        int32_t format) const {
+    Vector<Parameters::Size> sizes;
+    Vector<StreamConfiguration> scs = getPreferredStreamConfigurations(usecaseId);
+    for (const auto &it : scs) {
+        if (it.format == format) {
+            sizes.add({it.width, it.height});
+        }
+    }
+
+    return sizes;
+}
+
+Vector<Parameters::Size> Parameters::getPreferredJpegSizes() const {
+    return getPreferredFilteredSizes(
+            ANDROID_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_SNAPSHOT,
+            HAL_PIXEL_FORMAT_BLOB);
+}
+
+Vector<Parameters::Size> Parameters::getPreferredPreviewSizes() const {
+    return getPreferredFilteredSizes(
+            ANDROID_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_PREVIEW,
+            HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED);
+}
+
+Vector<Parameters::Size> Parameters::getPreferredVideoSizes() const {
+    return getPreferredFilteredSizes(
+            ANDROID_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_RECORD,
+            HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED);
 }
 
 Parameters::CropRegion Parameters::calculateCropRegion(bool previewOnly) const {

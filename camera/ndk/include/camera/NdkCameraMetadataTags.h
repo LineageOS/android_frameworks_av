@@ -3288,6 +3288,81 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_SCALER_CROPPING_TYPE =                              // byte (acamera_metadata_enum_android_scaler_cropping_type_t)
             ACAMERA_SCALER_START + 13,
+    /**
+     * <p>Recommended stream configurations for common client use cases.</p>
+     *
+     * <p>Type: int32[n*5] (acamera_metadata_enum_android_scaler_available_recommended_stream_configurations_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>Optional subset of the ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS that contains
+     * similar tuples listed as
+     * (i.e. width, height, format, output/input stream, usecase bit field).
+     * Camera devices will be able to suggest particular stream configurations which are
+     * power and performance efficient for specific use cases. For more information about
+     * retrieving the suggestions see
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#getRecommendedStreamConfigurationMap">CameraCharacteristics#getRecommendedStreamConfigurationMap</a>.</p>
+     * <p>The data representation is int[5], which maps to
+     * (width, height, format, output/input stream, usecase bit field). The array can be
+     * parsed using the following pseudo code:</p>
+     * <p>struct StreamConfiguration {
+     * int32_t format;
+     * int32_t width;
+     * int32_t height;
+     * int32_t isInput; };</p>
+     * <p>void getPreferredStreamConfigurations(
+     *     int32_t *array, size_t count, int32_t usecaseId,
+     *     Vector &lt; StreamConfiguration &gt; * scs) {
+     *     const size_t STREAM_CONFIGURATION_SIZE = 5;
+     *     const size_t STREAM_WIDTH_OFFSET = 0;
+     *     const size_t STREAM_HEIGHT_OFFSET = 1;
+     *     const size_t STREAM_FORMAT_OFFSET = 2;
+     *     const size_t STREAM_IS_INPUT_OFFSET = 3;
+     *     const size_t STREAM_USECASE_BITMAP_OFFSET = 4;</p>
+     * <pre><code>for (size_t i = 0; i &lt; count; i+= STREAM_CONFIGURATION_SIZE) {
+     *     int32_t width = array[i + STREAM_WIDTH_OFFSET];
+     *     int32_t height = array[i + STREAM_HEIGHT_OFFSET];
+     *     int32_t format = array[i + STREAM_FORMAT_OFFSET];
+     *     int32_t isInput = array[i + STREAM_IS_INPUT_OFFSET];
+     *     int32_t supportedUsecases = array[i + STREAM_USECASE_BITMAP_OFFSET];
+     *     if (supportedUsecases &amp; (1 &lt;&lt; usecaseId)) {
+     *         StreamConfiguration sc = {format, width, height, isInput};
+     *         scs-&gt;add(sc);
+     *     }
+     * }
+     * </code></pre>
+     * <p>}</p>
+     *
+     * @see ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS
+     */
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS = 
+                                                                // int32[n*5] (acamera_metadata_enum_android_scaler_available_recommended_stream_configurations_t)
+            ACAMERA_SCALER_START + 14,
+    /**
+     * <p>Recommended mappings of image formats that are supported by this
+     * camera device for input streams, to their corresponding output formats.</p>
+     *
+     * <p>Type: int32</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>This is a recommended subset of the complete list of mappings found in
+     * android.scaler.availableInputOutputFormatsMap. The same requirements apply here as well.
+     * The list however doesn't need to contain all available and supported mappings. Instead of
+     * this developers must list only recommended and efficient entries.
+     * If set, the information will be available in the ZERO_SHUTTER_LAG recommended stream
+     * configuration see
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#getRecommendedStreamConfigurationMap">CameraCharacteristics#getRecommendedStreamConfigurationMap</a>.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_INPUT_OUTPUT_FORMATS_MAP = 
+                                                                // int32
+            ACAMERA_SCALER_START + 15,
     ACAMERA_SCALER_END,
 
     /**
@@ -5411,6 +5486,32 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_DEPTH_DEPTH_IS_EXCLUSIVE =                          // byte (acamera_metadata_enum_android_depth_depth_is_exclusive_t)
             ACAMERA_DEPTH_START + 4,
+    /**
+     * <p>Recommended depth stream configurations for common client use cases.</p>
+     *
+     * <p>Type: int32[n*5]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>Optional subset of the ACAMERA_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS that
+     * contains similar tuples listed as
+     * (i.e. width, height, format, output/input stream, usecase bit field).
+     * Camera devices will be able to suggest particular depth stream configurations which are
+     * power and performance efficient for specific use cases. For more information about
+     * retrieving the suggestions see
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#getRecommendedStreamConfigurationMap">CameraCharacteristics#getRecommendedStreamConfigurationMap</a>.</p>
+     * <p>For data representation please refer to
+     * ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS</p>
+     *
+     * @see ACAMERA_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS
+     * @see ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS
+     */
+    ACAMERA_DEPTH_AVAILABLE_RECOMMENDED_DEPTH_STREAM_CONFIGURATIONS = 
+                                                                // int32[n*5]
+            ACAMERA_DEPTH_START + 5,
     ACAMERA_DEPTH_END,
 
     /**
@@ -7299,6 +7400,67 @@ typedef enum acamera_metadata_enum_acamera_scaler_cropping_type {
     ACAMERA_SCALER_CROPPING_TYPE_FREEFORM                            = 1,
 
 } acamera_metadata_enum_android_scaler_cropping_type_t;
+
+// ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS
+typedef enum acamera_metadata_enum_acamera_scaler_available_recommended_stream_configurations {
+    /**
+     * <p>Preview must only include non-stalling processed stream configurations with
+     * output formats like YUV_420_888, IMPLEMENTATION_DEFINED, etc.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_PREVIEW
+                                                                      = 0x0,
+
+    /**
+     * <p>Video record must include stream configurations that match the advertised
+     * supported media profiles <a href="https://developer.android.com/reference/android/media/CamcorderProfile.html">CamcorderProfile</a> with
+     * IMPLEMENTATION_DEFINED format.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_RECORD
+                                                                      = 0x1,
+
+    /**
+     * <p>Video snapshot must include stream configurations at least as big as
+     * the maximum RECORD resolutions and only with format BLOB + DATASPACE_JFIF
+     * format/dataspace combination (JPEG). Additionally the configurations shouldn't cause
+     * preview glitches and also be able to run at 30 fps.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_VIDEO_SNAPSHOT
+                                                                      = 0x2,
+
+    /**
+     * <p>Recommended snapshot stream configurations must include at least one with
+     * size close to ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE with BLOB + DATASPACE_JFIF
+     * format/dataspace combination (JPEG). Taking into account restrictions on aspect
+     * ratio, alignment etc. the area of the maximum suggested size shouldn’t be less than
+     * 97% of the sensor array size area.</p>
+     *
+     * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
+     */
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_SNAPSHOT
+                                                                      = 0x3,
+
+    /**
+     * <p>If supported, recommended input stream configurations must only be advertised with
+     * ZSL along with other processed and/or stalling output formats.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_ZSL   = 0x4,
+
+    /**
+     * <p>If supported, recommended raw stream configurations must only include RAW based
+     * output formats.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_RAW   = 0x5,
+
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_PUBLIC_END
+                                                                      = 0x6,
+
+    /**
+     * <p>Vendor defined use cases. These depend on the vendor implementation.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_VENDOR_START
+                                                                      = 0x18,
+
+} acamera_metadata_enum_android_scaler_available_recommended_stream_configurations_t;
 
 
 // ACAMERA_SENSOR_REFERENCE_ILLUMINANT1
