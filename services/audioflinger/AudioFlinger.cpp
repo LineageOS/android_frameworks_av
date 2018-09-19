@@ -746,7 +746,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
         output.afFrameCount = thread->frameCount();
         output.afSampleRate = thread->sampleRate();
         output.afLatencyMs = thread->latency();
-        output.trackId = track->id();
+        output.trackId = track == nullptr ? -1 : track->id();
 
         // move effect chain to this output thread if an effect on same session was waiting
         // for a track to be created
