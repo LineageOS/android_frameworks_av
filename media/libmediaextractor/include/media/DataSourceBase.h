@@ -66,6 +66,12 @@ public:
 
     virtual void close() {};
 
+    virtual void disconnect() {}
+
+    virtual ssize_t getAvailableSize(status_t * /*err*/) {
+        return -1;
+    }
+
 protected:
     virtual ~DataSourceBase() {}
 

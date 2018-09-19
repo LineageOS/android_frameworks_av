@@ -21,7 +21,6 @@
 #include <media/stagefright/NuMediaExtractor.h>
 
 #include "include/ESDS.h"
-#include "include/NuCachedSource2.h"
 
 #include <media/DataSource.h>
 #include <media/MediaSource.h>
@@ -207,10 +206,7 @@ status_t NuMediaExtractor::setMediaCas(const HInterfaceToken &casToken) {
 
 void NuMediaExtractor::disconnect() {
     if (mDataSource != NULL) {
-        // disconnect data source
-        if (mDataSource->flags() & DataSource::kIsCachingDataSource) {
-            static_cast<NuCachedSource2 *>(mDataSource.get())->disconnect();
-        }
+        mDataSource->disconnect();
     }
 }
 
@@ -790,16 +786,13 @@ bool NuMediaExtractor::getCachedDuration(
         int64_t *durationUs, bool *eos) const {
     Mutex::Autolock autoLock(mLock);
 
+    status_t finalStatus;
+    ssize_t cachedDataRemaining =
+        mDataSource->getAvailableSize(&finalStatus);
+
     int64_t bitrate;
-    if ((mDataSource->flags() & DataSource::kIsCachingDataSource)
+    if (cachedDataRemaining >= 0
             && getTotalBitrate(&bitrate)) {
-        sp<NuCachedSource2> cachedSource =
-            static_cast<NuCachedSource2 *>(mDataSource.get());
-
-        status_t finalStatus;
-        size_t cachedDataRemaining =
-            cachedSource->approxDataRemaining(&finalStatus);
-
         *durationUs = cachedDataRemaining * 8000000ll / bitrate;
         *eos = (finalStatus != OK);
         return true;
