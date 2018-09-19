@@ -342,15 +342,15 @@ status_t StagefrightMetadataRetriever::getFrameInternal(
 
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
         const AString &componentName = matchingCodecs[i];
-        VideoFrameDecoder decoder(componentName, trackMeta, source);
-        if (decoder.init(timeUs, numFrames, option, colorFormat) == OK) {
+        sp<VideoFrameDecoder> decoder = new VideoFrameDecoder(componentName, trackMeta, source);
+        if (decoder->init(timeUs, numFrames, option, colorFormat) == OK) {
             if (outFrame != NULL) {
-                *outFrame = decoder.extractFrame();
+                *outFrame = decoder->extractFrame();
                 if (*outFrame != NULL) {
                     return OK;
                 }
             } else if (outFrames != NULL) {
-                status_t err = decoder.extractFrames(outFrames);
+                status_t err = decoder->extractFrames(outFrames);
                 if (err == OK) {
                     return OK;
                 }
