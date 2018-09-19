@@ -42,7 +42,6 @@
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
 #include <audio_utils/minifloat.h>
-#include <json/json.h>
 #include <system/audio_effects/effect_ns.h>
 #include <system/audio_effects/effect_aec.h>
 #include <system/audio.h>
@@ -1774,11 +1773,6 @@ void AudioFlinger::PlaybackThread::dump(int fd, const Vector<String16>& args)
     dumpEffectChains(fd, args);
     dprintf(fd, "  Local log:\n");
     mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
-}
-
-Json::Value AudioFlinger::PlaybackThread::getJsonDump() const
-{
-    return Json::Value(Json::objectValue);
 }
 
 void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& args __unused)
@@ -5182,7 +5176,8 @@ void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& ar
         // while we are dumping it.  It may be inconsistent, but it won't mutate!
         // This is a large object so we place it on the heap.
         // FIXME 25972958: Need an intelligent copy constructor that does not touch unused pages.
-        const std::unique_ptr<FastMixerDumpState> copy(new FastMixerDumpState(mFastMixerDumpState));
+        const std::unique_ptr<FastMixerDumpState> copy =
+                std::make_unique<FastMixerDumpState>(mFastMixerDumpState);
         copy->dump(fd);
 
 #ifdef STATE_QUEUE_DUMP
@@ -5204,22 +5199,6 @@ void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& ar
     } else {
         dprintf(fd, "  No FastMixer\n");
     }
-}
-
-Json::Value AudioFlinger::MixerThread::getJsonDump() const
-{
-    Json::Value root;
-    if (hasFastMixer()) {
-        // Make a non-atomic copy of fast mixer dump state so it won't change underneath us
-        // while we are dumping it.  It may be inconsistent, but it won't mutate!
-        // This is a large object so we place it on the heap.
-        // FIXME 25972958: Need an intelligent copy constructor that does not touch unused pages.
-        const std::unique_ptr<FastMixerDumpState> copy(new FastMixerDumpState(mFastMixerDumpState));
-        root["fastmixer_stats"] = copy->getJsonDump();
-    } else {
-        root["fastmixer_stats"] = "no_fastmixer";
-    }
-    return root;
 }
 
 uint32_t AudioFlinger::MixerThread::idleSleepTimeUs() const
@@ -7570,7 +7549,8 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
     // while we are dumping it.  It may be inconsistent, but it won't mutate!
     // This is a large object so we place it on the heap.
     // FIXME 25972958: Need an intelligent copy constructor that does not touch unused pages.
-    std::unique_ptr<FastCaptureDumpState> copy(new FastCaptureDumpState(mFastCaptureDumpState));
+    const std::unique_ptr<FastCaptureDumpState> copy =
+            std::make_unique<FastCaptureDumpState>(mFastCaptureDumpState);
     copy->dump(fd);
 }
 

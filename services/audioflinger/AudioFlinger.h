@@ -23,7 +23,6 @@
 #include <mutex>
 #include <deque>
 #include <map>
-#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -81,7 +80,6 @@
 
 #include <powermanager/IPowerManager.h>
 
-#include <json/json.h>
 #include <media/nblog/NBLog.h>
 #include <private/media/AudioEffectShared.h>
 #include <private/media/AudioTrackShared.h>
@@ -117,7 +115,6 @@ public:
     static const char* getServiceName() ANDROID_API { return "media.audio_flinger"; }
 
     virtual     status_t    dump(int fd, const Vector<String16>& args);
-                Json::Value getJsonDump();
 
     // IAudioFlinger interface, in binder opcode order
     virtual sp<IAudioTrack> createTrack(const CreateTrackInput& input,

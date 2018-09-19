@@ -24,8 +24,6 @@
 #include <cpustats/ThreadCpuUsage.h>
 #endif
 #endif
-#include <json/json.h>
-#include <string>
 #include <utils/Debug.h>
 #include <utils/Log.h>
 #include "FastMixerDumpState.h"
@@ -204,51 +202,6 @@ void FastMixerDumpState::dump(int fd) const
                 mostRecent, ftDump->mFramesReady,
                 (long long)ftDump->mFramesWritten);
     }
-}
-
-Json::Value FastMixerDumpState::getJsonDump() const
-{
-    Json::Value root(Json::objectValue);
-    if (mCommand == FastMixerState::INITIAL) {
-        root["status"] = "uninitialized";
-        return root;
-    }
-#ifdef FAST_THREAD_STATISTICS
-    // find the interval of valid samples
-    const uint32_t bounds = mBounds;
-    const uint32_t newestOpen = bounds & 0xFFFF;
-    uint32_t oldestClosed = bounds >> 16;
-
-    //uint32_t n = (newestOpen - oldestClosed) & 0xFFFF;
-    uint32_t n;
-    __builtin_sub_overflow(newestOpen, oldestClosed, &n);
-    n &= 0xFFFF;
-
-    if (n > mSamplingN) {
-        ALOGE("too many samples %u", n);
-        n = mSamplingN;
-    }
-    // statistics for monotonic (wall clock) time, thread raw CPU load in time, CPU clock frequency,
-    // and adjusted CPU load in MHz normalized for CPU clock frequency
-    Json::Value jsonWall(Json::arrayValue);
-    Json::Value jsonLoadNs(Json::arrayValue);
-    // loop over all the samples
-    for (uint32_t j = 0; j < n; ++j) {
-        size_t i = oldestClosed++ & (mSamplingN - 1);
-        uint32_t wallNs = mMonotonicNs[i];
-        jsonWall.append(wallNs);
-        uint32_t sampleLoadNs = mLoadNs[i];
-        jsonLoadNs.append(sampleLoadNs);
-    }
-    if (n) {
-        root["wall_clock_time_ns"] = jsonWall;
-        root["raw_cpu_load_ns"] = jsonLoadNs;
-        root["status"] = "ok";
-    } else {
-        root["status"] = "unavailable";
-    }
-#endif
-    return root;
 }
 
 }   // android
