@@ -81,9 +81,7 @@ protected:
     struct timespec   mMeasuredWarmupTs;  // how long did it take for warmup to complete
     uint32_t          mWarmupCycles;  // counter of number of loop cycles during warmup phase
     uint32_t          mWarmupConsecutiveInRangeCycles;    // number of consecutive cycles in range
-    sp<NBLog::Writer> mDummyNBLogWriter;
-    NBLog::Writer*    mNBLogWriter;   // always non-nullptr: real NBLog::Writer* or
-                                      // mDummyNBLogWriter.get()
+    const sp<NBLog::Writer> mDummyNBLogWriter{new NBLog::Writer()};
     status_t          mTimestampStatus;
 
     FastThreadState::Command mCommand;
