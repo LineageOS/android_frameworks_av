@@ -23,13 +23,18 @@
 #include <jni.h>
 #include <unistd.h>
 
+#include <android_runtime/AndroidRuntime.h>
+#include <android_util_Binder.h>
 #include <binder/IServiceManager.h>
 #include <cutils/properties.h>
 #include <utils/Log.h>
 #include <utils/StrongPointer.h>
+#include <media/IMediaHTTPService.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaDataSource.h>
 #include <media/stagefright/InterfaceUtils.h>
+#include <mediaplayer2/JavaVMHelper.h>
+#include <mediaplayer2/JMedia2HTTPService.h>
 
 #include "../../libstagefright/include/HTTPBase.h"
 #include "../../libstagefright/include/NuCachedSource2.h"
@@ -90,6 +95,84 @@ void NdkDataSource::close() {
     if (mDataSource->close != NULL && mDataSource->userdata != NULL) {
         mDataSource->close(mDataSource->userdata);
     }
+}
+
+static sp<MediaHTTPService> createMediaHttpServiceFromJavaObj(JNIEnv *env, jobject obj, int version) {
+    if (obj == NULL) {
+        return NULL;
+    }
+    switch (version) {
+        case 1:
+            return interface_cast<IMediaHTTPService>(ibinderForJavaObject(env, obj));
+        case 2:
+            return new JMedia2HTTPService(env, obj);
+        default:
+            return NULL;
+    }
+}
+
+static sp<MediaHTTPService> createMediaHttpServiceTemplate(
+        JNIEnv *env,
+        const char *uri,
+        const char *clazz,
+        const char *method,
+        const char *signature,
+        int version) {
+    jobject service = NULL;
+    if (env == NULL) {
+        ALOGE("http service must be created from Java thread");
+        return NULL;
+    }
+
+    jclass mediahttpclass = env->FindClass(clazz);
+    if (mediahttpclass == NULL) {
+        ALOGE("can't find Media(2)HttpService");
+        env->ExceptionClear();
+        return NULL;
+    }
+
+    jmethodID mediaHttpCreateMethod = env->GetStaticMethodID(mediahttpclass, method, signature);
+    if (mediaHttpCreateMethod == NULL) {
+        ALOGE("can't find method");
+        env->ExceptionClear();
+        return NULL;
+    }
+
+    jstring juri = env->NewStringUTF(uri);
+
+    service = env->CallStaticObjectMethod(mediahttpclass, mediaHttpCreateMethod, juri);
+    env->DeleteLocalRef(juri);
+
+    env->ExceptionClear();
+    sp<MediaHTTPService> httpService = createMediaHttpServiceFromJavaObj(env, service, version);
+    return httpService;
+
+}
+
+sp<MediaHTTPService> createMediaHttpService(const char *uri, int version) {
+
+    JNIEnv *env;
+    const char *clazz, *method, *signature;
+
+    switch (version) {
+        case 1:
+            env = AndroidRuntime::getJNIEnv();
+            clazz = "android/media/MediaHTTPService";
+            method = "createHttpServiceBinderIfNecessary";
+            signature = "(Ljava/lang/String;)Landroid/os/IBinder;";
+            break;
+        case 2:
+            env = JavaVMHelper::getJNIEnv();
+            clazz = "android/media/Media2HTTPService";
+            method = "createHTTPService";
+            signature = "(Ljava/lang/String;)Landroid/media/Media2HTTPService;";
+            break;
+        default:
+            return NULL;
+    }
+
+    return createMediaHttpServiceTemplate(env, uri, clazz, method, signature, version);
+
 }
 
 extern "C" {

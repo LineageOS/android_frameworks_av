@@ -96,37 +96,10 @@ media_status_t AMediaExtractor_setDataSourceWithHeaders(AMediaExtractor *mData,
 
     ALOGV("setDataSource(%s)", uri);
 
-    JNIEnv *env = AndroidRuntime::getJNIEnv();
-    jobject service = NULL;
-    if (env == NULL) {
-        ALOGE("setDataSource(path) must be called from Java thread");
+    sp<MediaHTTPService> httpService = createMediaHttpService(uri, /* version = */ 1);
+    if (httpService == NULL) {
+        ALOGE("can't create http service");
         return AMEDIA_ERROR_UNSUPPORTED;
-    }
-
-    jclass mediahttpclass = env->FindClass("android/media/MediaHTTPService");
-    if (mediahttpclass == NULL) {
-        ALOGE("can't find MediaHttpService");
-        env->ExceptionClear();
-        return AMEDIA_ERROR_UNSUPPORTED;
-    }
-
-    jmethodID mediaHttpCreateMethod = env->GetStaticMethodID(mediahttpclass,
-            "createHttpServiceBinderIfNecessary", "(Ljava/lang/String;)Landroid/os/IBinder;");
-    if (mediaHttpCreateMethod == NULL) {
-        ALOGE("can't find method");
-        env->ExceptionClear();
-        return AMEDIA_ERROR_UNSUPPORTED;
-    }
-
-    jstring jloc = env->NewStringUTF(uri);
-
-    service = env->CallStaticObjectMethod(mediahttpclass, mediaHttpCreateMethod, jloc);
-    env->DeleteLocalRef(jloc);
-
-    sp<IMediaHTTPService> httpService;
-    if (service != NULL) {
-        sp<IBinder> binder = ibinderForJavaObject(env, service);
-        httpService = interface_cast<IMediaHTTPService>(binder);
     }
 
     KeyedVector<String8, String8> headers;
@@ -138,7 +111,6 @@ media_status_t AMediaExtractor_setDataSourceWithHeaders(AMediaExtractor *mData,
 
     status_t err;
     err = mData->mImpl->setDataSource(httpService, uri, numheaders > 0 ? &headers : NULL);
-    env->ExceptionClear();
     return translate_error(err);
 }
 
