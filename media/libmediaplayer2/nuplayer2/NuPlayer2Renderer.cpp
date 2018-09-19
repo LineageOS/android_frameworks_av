@@ -133,8 +133,7 @@ NuPlayer2::Renderer::Renderer(
       mUseAudioCallback(false),
       mWakeLock(new JWakeLock()) {
     CHECK(mediaClock != NULL);
-    mPlaybackRate = mPlaybackSettings.mSpeed;
-    mMediaClock->setPlaybackRate(mPlaybackRate);
+    mMediaClock->setPlaybackRate(mPlaybackSettings.mSpeed);
 }
 
 NuPlayer2::Renderer::~Renderer() {
@@ -190,26 +189,20 @@ status_t NuPlayer2::Renderer::setPlaybackSettings(const AudioPlaybackRate &rate)
 }
 
 status_t NuPlayer2::Renderer::onConfigPlayback(const AudioPlaybackRate &rate /* sanitized */) {
-    if (rate.mSpeed == 0.f) {
-        onPause();
-        // don't call audiosink's setPlaybackRate if pausing, as pitch does not
-        // have to correspond to the any non-0 speed (e.g old speed). Keep
-        // settings nonetheless, using the old speed, in case audiosink changes.
-        AudioPlaybackRate newRate = rate;
-        newRate.mSpeed = mPlaybackSettings.mSpeed;
-        mPlaybackSettings = newRate;
-        return OK;
+    if (rate.mSpeed <= 0.f) {
+        ALOGW("playback rate cannot be %f", rate.mSpeed);
+        return BAD_VALUE;
     }
 
     if (mAudioSink != NULL && mAudioSink->ready()) {
         status_t err = mAudioSink->setPlaybackRate(rate);
         if (err != OK) {
+            ALOGW("failed to get playback rate from audio sink, err(%d)", err);
             return err;
         }
     }
     mPlaybackSettings = rate;
-    mPlaybackRate = rate.mSpeed;
-    mMediaClock->setPlaybackRate(mPlaybackRate);
+    mMediaClock->setPlaybackRate(mPlaybackSettings.mSpeed);
     return OK;
 }
 
@@ -236,9 +229,6 @@ status_t NuPlayer2::Renderer::onGetPlaybackSettings(AudioPlaybackRate *rate /* n
             // get playback settings used by audiosink, as it may be
             // slightly off due to audiosink not taking small changes.
             mPlaybackSettings = *rate;
-            if (mPaused) {
-                rate->mSpeed = 0.f;
-            }
         }
         return err;
     }
@@ -560,8 +550,8 @@ void NuPlayer2::Renderer::onMessageReceived(const sp<AMessage> &msg) {
                 int64_t delayUs =
                     mAudioSink->msecsPerFrame()
                         * numFramesPendingPlayout * 1000ll;
-                if (mPlaybackRate > 1.0f) {
-                    delayUs /= mPlaybackRate;
+                if (mPlaybackSettings.mSpeed > 1.0f) {
+                    delayUs /= mPlaybackSettings.mSpeed;
                 }
 
                 // Let's give it more data after about half that time
@@ -1773,7 +1763,7 @@ void NuPlayer2::Renderer::onResume() {
             mAudioSink->setPlaybackRate(mPlaybackSettings);
         }
 
-        mMediaClock->setPlaybackRate(mPlaybackRate);
+        mMediaClock->setPlaybackRate(mPlaybackSettings.mSpeed);
 
         if (!mAudioQueue.empty()) {
             postDrainAudioQueue_l();
