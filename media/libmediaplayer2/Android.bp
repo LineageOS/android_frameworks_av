@@ -8,8 +8,6 @@ cc_library {
     name: "libmediaplayer2",
 
     srcs: [
-        "JAudioTrack.cpp",
-        "JavaVMHelper.cpp",
         "MediaPlayer2AudioOutput.cpp",
         "mediaplayer2.cpp",
     ],
@@ -83,4 +81,56 @@ cc_library {
             cfi: true,
         },
     },
+}
+
+cc_library {
+    name: "libmedia2_jni_core",
+
+    srcs: [
+        "JavaVMHelper.cpp",
+        "JAudioTrack.cpp",
+        "JMedia2HTTPService.cpp",
+        "JMedia2HTTPConnection.cpp",
+    ],
+
+    shared_libs: [
+        "android.hidl.token@1.0-utils",
+        "liblog",
+        "libcutils",
+        "libutils",
+        "libbinder",
+        "libstagefright_foundation",
+        "libmediaextractor",
+        "libdl",
+        "libaudioutils",
+        "libaudioclient",
+        "libnativehelper",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/libmedia/include",
+        "frameworks/base/core/jni",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+        diag: {
+            cfi: true,
+        },
+    },
+
 }
