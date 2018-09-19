@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NdkMediaDataSourceCallbacks"
 
+#include "NdkMediaErrorPriv.h"
 #include "NdkMediaDataSourceCallbacksPriv.h"
 #include <media/DataSource.h>
 
