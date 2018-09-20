@@ -66,8 +66,6 @@ FastThread::FastThread(const char *cycleMs, const char *loadUs) : Thread(false /
     /* mMeasuredWarmupTs({0, 0}), */
     mWarmupCycles(0),
     mWarmupConsecutiveInRangeCycles(0),
-    mDummyNBLogWriter(new NBLog::Writer()),
-    mNBLogWriter(mDummyNBLogWriter.get()),
     mTimestampStatus(INVALID_OPERATION),
 
     mCommand(FastThreadState::INITIAL),
@@ -124,10 +122,9 @@ bool FastThread::threadLoop()
 
             // As soon as possible of learning of a new dump area, start using it
             mDumpState = next->mDumpState != NULL ? next->mDumpState : mDummyDumpState;
-            mNBLogWriter = next->mNBLogWriter != NULL ?
+            tlNBLogWriter = next->mNBLogWriter != NULL ?
                     next->mNBLogWriter : mDummyNBLogWriter.get();
-            setNBLogWriter(mNBLogWriter);   // FastMixer informs its AudioMixer, FastCapture ignores
-            tlNBLogWriter = mNBLogWriter;
+            setNBLogWriter(tlNBLogWriter); // FastMixer informs its AudioMixer, FastCapture ignores
 
             // We want to always have a valid reference to the previous (non-idle) state.
             // However, the state queue only guarantees access to current and previous states.

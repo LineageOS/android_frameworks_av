@@ -18,9 +18,7 @@
 #define ANDROID_AUDIO_FAST_MIXER_DUMP_STATE_H
 
 #include <stdint.h>
-#include <string>
 #include <audio_utils/TimestampVerifier.h>
-#include <json/json.h>
 #include "Configuration.h"
 #include "FastThreadDumpState.h"
 #include "FastMixerState.h"
@@ -67,8 +65,7 @@ struct FastMixerDumpState : FastThreadDumpState {
     FastMixerDumpState();
     /*virtual*/ ~FastMixerDumpState();
 
-    void dump(int fd) const;             // should only be called on a stable copy, not the original
-    Json::Value getJsonDump() const;     // should only be called on a stable copy, not the original
+    void dump(int fd) const;    // should only be called on a stable copy, not the original
 
     double   mLatencyMs = 0.;   // measured latency, default of 0 if no valid timestamp read.
     uint32_t mWriteSequence;    // incremented before and after each write()

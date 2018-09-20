@@ -487,7 +487,7 @@ void NuPlayer2::start() {
 status_t NuPlayer2::setPlaybackSettings(const AudioPlaybackRate &rate) {
     // do some cursory validation of the settings here. audio modes are
     // only validated when set on the audiosink.
-     if ((rate.mSpeed != 0.f && rate.mSpeed < AUDIO_TIMESTRETCH_SPEED_MIN)
+     if (rate.mSpeed < AUDIO_TIMESTRETCH_SPEED_MIN
             || rate.mSpeed > AUDIO_TIMESTRETCH_SPEED_MAX
             || rate.mPitch < AUDIO_TIMESTRETCH_SPEED_MIN
             || rate.mPitch > AUDIO_TIMESTRETCH_SPEED_MAX) {
@@ -986,8 +986,7 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
             if (mRenderer != NULL) {
                 // AudioSink allows only 1.f and 0.f for offload mode.
                 // For other speed, switch to non-offload mode.
-                if (mOffloadAudio && ((rate.mSpeed != 0.f && rate.mSpeed != 1.f)
-                        || rate.mPitch != 1.f)) {
+                if (mOffloadAudio && (rate.mSpeed != 1.f || rate.mPitch != 1.f)) {
                     int64_t currentPositionUs;
                     if (getCurrentPosition(&currentPositionUs) != OK) {
                         currentPositionUs = mPreviousSeekTimeUs;
@@ -1010,34 +1009,13 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
                 err = mRenderer->setPlaybackSettings(rate);
             }
             if (err == OK) {
-                if (rate.mSpeed == 0.f) {
-                    onPause();
-                    notifyListener(mSrcId, MEDIA2_PAUSED, 0, 0);
-                    mPausedByClient = true;
-                    // save all other settings (using non-paused speed)
-                    // so we can restore them on start
-                    AudioPlaybackRate newRate = rate;
-                    newRate.mSpeed = mPlaybackSettings.mSpeed;
-                    mPlaybackSettings = newRate;
-                } else { /* rate.mSpeed != 0.f */
-                    mPlaybackSettings = rate;
-                    if (mStarted) {
-                        // do not resume yet if the source is still buffering
-                        if (!mPausedForBuffering) {
-                            onResume();
-                        }
-                    } else if (mPrepared) {
-                        onStart();
-                    }
+                mPlaybackSettings = rate;
 
-                    mPausedByClient = false;
+                if (mVideoDecoder != NULL) {
+                    sp<AMessage> params = new AMessage();
+                    params->setFloat("playback-speed", mPlaybackSettings.mSpeed);
+                    mVideoDecoder->setParameters(params);
                 }
-            }
-
-            if (mVideoDecoder != NULL) {
-                sp<AMessage> params = new AMessage();
-                params->setFloat("playback-speed", mPlaybackSettings.mSpeed);
-                mVideoDecoder->setParameters(params);
             }
 
             sp<AMessage> response = new AMessage;
@@ -1059,9 +1037,6 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
                 // get playback settings used by renderer, as it may be
                 // slightly off due to audiosink not taking small changes.
                 mPlaybackSettings = rate;
-                if (mPaused) {
-                    rate.mSpeed = 0.f;
-                }
             }
             sp<AMessage> response = new AMessage;
             if (err == OK) {
