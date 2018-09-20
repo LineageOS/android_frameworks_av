@@ -55,13 +55,9 @@ LOCAL_AIDL_INCLUDES := \
 #   both    to build both 32 bit and 64 bit libraries,
 #           and use primary target architecture (32 or 64) for audioserver.
 #   first   to build libraries and audioserver for the primary target architecture only.
-#   <empty> to build both 32 and 64 bit libraries and 32 bit audioserver.
+#   <empty> to build both 32 and 64 bit libraries and primary target audioserver.
 
-ifeq ($(strip $(AUDIOSERVER_MULTILIB)),)
-LOCAL_MULTILIB := 32
-else
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
-endif
 
 LOCAL_MODULE := audioserver
 
