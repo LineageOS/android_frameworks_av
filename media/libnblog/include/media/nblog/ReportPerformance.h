@@ -32,6 +32,9 @@ void dumpJson(int fd, const std::map<int, PerformanceData>& threadDataMap);
 //Dumps performance data as visualized plots.
 void dumpPlots(int fd, const std::map<int, PerformanceData>& threadDataMap);
 
+// Dumps snapshots at important events in the past.
+void dumpRetro(int fd, const std::map<int, PerformanceData>& threadDataMap);
+
 // Send one thread's data to media metrics, if the performance data is nontrivial (i.e. not
 // all zero values). Return true if data was sent, false if there is nothing to write
 // or an error occurred while writing.

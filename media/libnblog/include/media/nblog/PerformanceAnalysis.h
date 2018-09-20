@@ -19,6 +19,7 @@
 
 #include <deque>
 #include <map>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -159,6 +160,8 @@ struct PerformanceData {
     Histogram latencyHist{kLatencyConfig};
     Histogram warmupHist{kWarmupConfig};
     int64_t underruns = 0;
+    static constexpr size_t kMaxSnapshotsToStore = 256;
+    std::deque<std::pair<NBLog::Event, int64_t /*timestamp*/>> snapshots;
     int64_t overruns = 0;
     nsecs_t active = 0;
     nsecs_t start{systemTime()};
