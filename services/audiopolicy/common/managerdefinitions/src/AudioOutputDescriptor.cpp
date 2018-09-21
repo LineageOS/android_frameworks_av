@@ -103,16 +103,37 @@ bool AudioOutputDescriptor::sharesHwModuleWith(
     }
 }
 
-void AudioOutputDescriptor::changeStreamActiveCount(audio_stream_type_t stream,
-                                                                   int delta)
+void AudioOutputDescriptor::changeStreamActiveCount(const sp<TrackClientDescriptor>& client,
+                                                    int delta)
 {
+    if (delta == 0) return;
+    const audio_stream_type_t stream = client->stream();
     if ((delta + (int)mActiveCount[stream]) < 0) {
-        ALOGW("%s invalid delta %d for stream %d, active count %d",
-              __FUNCTION__, delta, stream, mActiveCount[stream]);
-        mActiveCount[stream] = 0;
-        return;
+        // any mismatched active count will abort.
+        LOG_ALWAYS_FATAL("%s(%s) invalid delta %d, active stream count %d",
+              __func__, client->toShortString().c_str(), delta, mActiveCount[stream]);
+        // mActiveCount[stream] = 0;
+        // return;
     }
     mActiveCount[stream] += delta;
+
+    if (delta > 0) {
+        mActiveClients[client] += delta;
+    } else {
+        auto it = mActiveClients.find(client);
+        if (it == mActiveClients.end()) { // client not found!
+            LOG_ALWAYS_FATAL("%s(%s) invalid delta %d, inactive client",
+                    __func__, client->toShortString().c_str(), delta);
+        } else if (it->second < -delta) { // invalid delta!
+            LOG_ALWAYS_FATAL("%s(%s) invalid delta %d, active client count %zu",
+                    __func__, client->toShortString().c_str(), delta, it->second);
+        }
+        it->second += delta;
+        if (it->second == 0) {
+            (void)mActiveClients.erase(it);
+        }
+    }
+
     ALOGV("%s stream %d, count %d", __FUNCTION__, stream, mActiveCount[stream]);
 }
 
@@ -120,15 +141,24 @@ void AudioOutputDescriptor::setClientActive(const sp<TrackClientDescriptor>& cli
 {
     if (mClients.find(client->portId()) == mClients.end()
         || active == client->active()) {
+
+        mLocalLog.log("%s(%s): ignored active: %d, current stream count %d",
+                __func__, client->toShortString().c_str(),
+                active, mActiveCount[client->stream()]);
         return;
     }
 
-    changeStreamActiveCount(client->stream(), active ? 1 : -1);
+    changeStreamActiveCount(client, active ? 1 : -1);
+
+    mLocalLog.log("%s(%s): active: %d, current stream count %d",
+            __func__, client->toShortString().c_str(),
+             active, mActiveCount[client->stream()]);
 
     // Handle non-client-specific activity ref count
     int32_t oldGlobalActiveCount = mGlobalActiveCount;
     if (!active && mGlobalActiveCount < 1) {
-        ALOGW("%s invalid deactivation with globalRefCount %d", __FUNCTION__, mGlobalActiveCount);
+        ALOGW("%s(%s): invalid deactivation with globalRefCount %d",
+                __func__, client->toShortString().c_str(), mGlobalActiveCount);
         mGlobalActiveCount = 1;
     }
     mGlobalActiveCount += active ? 1 : -1;
@@ -279,8 +309,21 @@ status_t AudioOutputDescriptor::dump(int fd)
         client.second->dump(result, 2, index++);
     }
     result.append(" \n");
+
+    if (mActiveClients.size() > 0) {
+        result.append(" AudioTrack active clients:\n");
+        index = 0;
+        for (const auto& clientPair : mActiveClients) {
+            result.appendFormat(" Refcount: %zu", clientPair.second);
+            clientPair.first->dump(result, 2, index++);
+        }
+        result.append(" \n");
+    }
+
     write(fd, result.string(), result.size());
 
+    // write local log
+    mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
     return NO_ERROR;
 }
 
@@ -361,15 +404,15 @@ uint32_t SwAudioOutputDescriptor::latency()
     }
 }
 
-void SwAudioOutputDescriptor::changeStreamActiveCount(audio_stream_type_t stream,
-                                                                   int delta)
+void SwAudioOutputDescriptor::changeStreamActiveCount(const sp<TrackClientDescriptor>& client,
+                                                       int delta)
 {
     // forward usage count change to attached outputs
     if (isDuplicated()) {
-        mOutput1->changeStreamActiveCount(stream, delta);
-        mOutput2->changeStreamActiveCount(stream, delta);
+        mOutput1->changeStreamActiveCount(client, delta);
+        mOutput2->changeStreamActiveCount(client, delta);
     }
-    AudioOutputDescriptor::changeStreamActiveCount(stream, delta);
+    AudioOutputDescriptor::changeStreamActiveCount(client, delta);
 }
 
 bool SwAudioOutputDescriptor::isFixedVolume(audio_devices_t device)

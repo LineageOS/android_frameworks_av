@@ -17,6 +17,8 @@
 #pragma once
 
 #include <sys/types.h>
+
+#include <audio_utils/SimpleLog.h>
 #include <utils/Errors.h>
 #include <utils/Timers.h>
 #include <utils/KeyedVector.h>
@@ -59,7 +61,7 @@ public:
                            audio_devices_t device,
                            uint32_t delayMs,
                            bool force);
-    virtual void changeStreamActiveCount(audio_stream_type_t stream, int delta);
+    virtual void changeStreamActiveCount(const sp<TrackClientDescriptor>& client, int delta);
             uint32_t streamActiveCount(audio_stream_type_t stream) const
                             { return mActiveCount[stream]; }
             void setClientActive(const sp<TrackClientDescriptor>& client, bool active);
@@ -73,6 +75,12 @@ public:
                            const struct audio_port_config *srcConfig = NULL) const;
     virtual sp<AudioPort> getAudioPort() const { return mPort; }
     virtual void toAudioPort(struct audio_port *port) const;
+
+    using ActiveClientMap = std::map<sp<TrackClientDescriptor>, size_t /* count */>;
+
+    const ActiveClientMap& getActiveClients() const {
+        return mActiveClients;
+    }
 
     audio_module_handle_t getModuleHandle() const;
 
@@ -101,6 +109,8 @@ protected:
     audio_patch_handle_t mPatchHandle;
     audio_port_handle_t mId;
     TrackClientMap mClients;
+    ActiveClientMap mActiveClients;
+    SimpleLog mLocalLog;
 };
 
 // Audio output driven by a software mixer in audio flinger.
@@ -121,7 +131,8 @@ public:
     virtual bool isFixedVolume(audio_devices_t device);
     virtual sp<AudioOutputDescriptor> subOutput1() { return mOutput1; }
     virtual sp<AudioOutputDescriptor> subOutput2() { return mOutput2; }
-    virtual void changeStreamActiveCount(audio_stream_type_t stream, int delta);
+            void changeStreamActiveCount(
+                    const sp<TrackClientDescriptor>& client, int delta) override;
     virtual bool setVolume(float volume,
                            audio_stream_type_t stream,
                            audio_devices_t device,

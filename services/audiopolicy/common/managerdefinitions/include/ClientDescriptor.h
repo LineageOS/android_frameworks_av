@@ -47,6 +47,7 @@ public:
 
     status_t dump(int fd, int spaces, int index);
     virtual status_t dump(String8& dst, int spaces, int index);
+    virtual std::string toShortString() const;
 
     audio_port_handle_t portId() const { return mPortId; }
     uid_t uid() const { return mUid; }
@@ -90,6 +91,7 @@ public:
 
     using ClientDescriptor::dump;
     status_t dump(String8& dst, int spaces, int index) override;
+    std::string toShortString() const override;
 
     audio_output_flags_t flags() const { return mFlags; }
     audio_stream_type_t stream() const { return mStream; }

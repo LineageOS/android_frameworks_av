@@ -4529,10 +4529,9 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
             // and as they were also referenced on the other output, the reference
             // count for their stream type must be adjusted accordingly on
             // the other output.
-            bool wasActive = outputDesc2->isActive();
-            for (int j = 0; j < AUDIO_STREAM_CNT; j++) {
-                int activeCount = dupOutputDesc->streamActiveCount((audio_stream_type_t)j);
-                outputDesc2->changeStreamActiveCount((audio_stream_type_t)j,-activeCount);
+            const bool wasActive = outputDesc2->isActive();
+            for (const auto &clientPair : dupOutputDesc->getActiveClients()) {
+                outputDesc2->changeStreamActiveCount(clientPair.first, -clientPair.second);
             }
             // stop() will be a no op if the output is still active but is needed in case all
             // active streams refcounts where cleared above
