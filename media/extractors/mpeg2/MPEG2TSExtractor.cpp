@@ -20,6 +20,8 @@
 #include <inttypes.h>
 #include <utils/Log.h>
 
+#include <android-base/macros.h>
+
 #include "MPEG2TSExtractor.h"
 
 #include <media/DataSourceBase.h>
@@ -508,7 +510,7 @@ status_t MPEG2TSExtractor::seek(int64_t seekTimeUs,
         case MediaTrack::ReadOptions::SEEK_CLOSEST:
             ALOGW("seekMode not supported: %d; falling back to PREVIOUS_SYNC",
                     seekMode);
-            // fall-through
+            FALLTHROUGH_INTENDED;
         case MediaTrack::ReadOptions::SEEK_PREVIOUS_SYNC:
             if (index == 0) {
                 ALOGW("Previous sync not found; starting from the earliest "
