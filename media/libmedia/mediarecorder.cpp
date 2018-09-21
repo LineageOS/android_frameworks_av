@@ -20,6 +20,7 @@
 
 #include <inttypes.h>
 
+#include <android-base/macros.h>
 #include <utils/Log.h>
 #include <media/mediarecorder.h>
 #include <binder/IServiceManager.h>
@@ -597,7 +598,8 @@ status_t MediaRecorder::reset()
             if (OK != ret) {
                 return ret;  // No need to continue
             }
-        }  // Intentional fall through
+            FALLTHROUGH_INTENDED;
+        }
         case MEDIA_RECORDER_INITIALIZED:
             ret = close();
             break;
