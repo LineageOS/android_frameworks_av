@@ -232,8 +232,9 @@ template <class T>
 constexpr void (*xmlDeleter)(T* t);
 template <>
 constexpr auto xmlDeleter<xmlDoc> = xmlFreeDoc;
+// http://b/111067277 - Add back constexpr when we switch to C++17.
 template <>
-constexpr auto xmlDeleter<xmlChar> = [](xmlChar *s) { xmlFree(s); };
+auto xmlDeleter<xmlChar> = [](xmlChar *s) { xmlFree(s); };
 
 /** @return a unique_ptr with the correct deleter for the libxml2 object. */
 template <class T>
