@@ -113,6 +113,41 @@ void dumpPlots(int fd, const std::map<int, PerformanceData>& threadDataMap)
     }
 }
 
+static std::string dumpRetroString(const PerformanceData& data, int64_t now)
+{
+    std::stringstream ss;
+    ss << NBLog::threadTypeToString(data.threadInfo.type) << "," << data.threadInfo.id << "\n";
+    for (const auto &item : data.snapshots) {
+        // TODO use an enum to string conversion method. One good idea:
+        // https://stackoverflow.com/a/238157
+        if (item.first == NBLog::EVENT_UNDERRUN) {
+            ss << "EVENT_UNDERRUN,";
+        } else if (item.first == NBLog::EVENT_OVERRUN) {
+            ss << "EVENT_OVERRUN,";
+        }
+        ss << now - item.second << "\n";
+    }
+    ss << "\n";
+    return ss.str();
+}
+
+void dumpRetro(int fd, const std::map<int, PerformanceData>& threadDataMap)
+{
+    if (fd < 0) {
+        return;
+    }
+
+    const nsecs_t now = systemTime();
+    for (const auto &item : threadDataMap) {
+        const ReportPerformance::PerformanceData& data = item.second;
+        if (data.snapshots.empty()) {
+            continue;
+        }
+        const std::string retroStr = dumpRetroString(data, now);
+        write(fd, retroStr.c_str(), retroStr.size());
+    }
+}
+
 bool sendToMediaMetrics(const PerformanceData& data)
 {
     // See documentation for these metrics here:

@@ -167,12 +167,24 @@ void MergeReader::processSnapshot(Snapshot &snapshot, int author)
             const double timeMs = it.payload<double>();
             data.warmupHist.add(timeMs);
         } break;
-        case EVENT_UNDERRUN:
+        case EVENT_UNDERRUN: {
+            const int64_t ts = it.payload<int64_t>();
             data.underruns++;
-            break;
-        case EVENT_OVERRUN:
+            data.snapshots.emplace_front(EVENT_UNDERRUN, ts);
+            // TODO have a data structure to automatically handle resizing
+            if (data.snapshots.size() > ReportPerformance::PerformanceData::kMaxSnapshotsToStore) {
+                data.snapshots.pop_back();
+            }
+        } break;
+        case EVENT_OVERRUN: {
+            const int64_t ts = it.payload<int64_t>();
             data.overruns++;
-            break;
+            data.snapshots.emplace_front(EVENT_UNDERRUN, ts);
+            // TODO have a data structure to automatically handle resizing
+            if (data.snapshots.size() > ReportPerformance::PerformanceData::kMaxSnapshotsToStore) {
+                data.snapshots.pop_back();
+            }
+        } break;
         case EVENT_RESERVED:
         case EVENT_UPPER_BOUND:
             ALOGW("warning: unexpected event %d", it->type);
@@ -216,7 +228,7 @@ void MergeReader::dump(int fd, const Vector<String16>& args)
 {
     // TODO: add a mutex around media.log dump
     // Options for dumpsys
-    bool pa = false, json = false, plots = false;
+    bool pa = false, json = false, plots = false, retro = false;
     for (const auto &arg : args) {
         if (arg == String16("--pa")) {
             pa = true;
@@ -224,6 +236,8 @@ void MergeReader::dump(int fd, const Vector<String16>& args)
             json = true;
         } else if (arg == String16("--plots")) {
             plots = true;
+        } else if (arg == String16("--retro")) {
+            retro = true;
         }
     }
     if (pa) {
@@ -234,6 +248,9 @@ void MergeReader::dump(int fd, const Vector<String16>& args)
     }
     if (plots) {
         ReportPerformance::dumpPlots(fd, mThreadPerformanceData);
+    }
+    if (retro) {
+        ReportPerformance::dumpRetro(fd, mThreadPerformanceData);
     }
 }
 

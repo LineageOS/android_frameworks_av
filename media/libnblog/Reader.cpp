@@ -59,7 +59,7 @@ Reader::~Reader()
 // Copies content of a Reader FIFO into its Snapshot
 // The Snapshot has the same raw data, but represented as a sequence of entries
 // and an EntryIterator making it possible to process the data.
-std::unique_ptr<Snapshot> Reader::getSnapshot()
+std::unique_ptr<Snapshot> Reader::getSnapshot(bool flush)
 {
     if (mFifoReader == NULL) {
         return std::unique_ptr<Snapshot>(new Snapshot());
@@ -146,7 +146,9 @@ std::unique_ptr<Snapshot> Reader::getSnapshot()
     }
 
     // advance fifo reader index to after last entry read.
-    mFifoReader->release(snapshot->mEnd - front);
+    if (flush) {
+        mFifoReader->release(snapshot->mEnd - front);
+    }
 
     snapshot->mLost = lost;
     return snapshot;
@@ -221,36 +223,48 @@ const uint8_t *Reader::findLastValidEntry(const uint8_t *front, const uint8_t *b
 void DumpReader::dump(int fd, size_t indent)
 {
     if (fd < 0) return;
-    std::unique_ptr<Snapshot> snapshot = getSnapshot();
+    std::unique_ptr<Snapshot> snapshot = getSnapshot(false /*flush*/);
     if (snapshot == nullptr) {
         return;
     }
     String8 timestamp, body;
 
     // TODO all logged types should have a printable format.
+    // TODO can we make the printing generic?
     for (EntryIterator it = snapshot->begin(); it != snapshot->end(); ++it) {
         switch (it->type) {
         case EVENT_FMT_START:
             it = handleFormat(FormatEntry(it), &timestamp, &body);
             break;
-        case EVENT_WORK_TIME: {
-            const int64_t monotonicNs = it.payload<int64_t>();
-            body.appendFormat("Thread cycle: %ld ns", (long)monotonicNs);
-        } break;
         case EVENT_LATENCY: {
             const double latencyMs = it.payload<double>();
-            body.appendFormat("latency: %.3f ms", latencyMs);
+            body.appendFormat("EVENT_LATENCY,%.3f", latencyMs);
+        } break;
+        case EVENT_OVERRUN: {
+            const int64_t ts = it.payload<int64_t>();
+            body.appendFormat("EVENT_OVERRUN,%lld", static_cast<long long>(ts));
+        } break;
+        case EVENT_THREAD_INFO: {
+            const thread_info_t info = it.payload<thread_info_t>();
+            body.appendFormat("EVENT_THREAD_INFO,%d,%s", static_cast<int>(info.id),
+                    threadTypeToString(info.type));
+        } break;
+        case EVENT_UNDERRUN: {
+            const int64_t ts = it.payload<int64_t>();
+            body.appendFormat("EVENT_UNDERRUN,%lld", static_cast<long long>(ts));
         } break;
         case EVENT_WARMUP_TIME: {
             const double timeMs = it.payload<double>();
-            body.appendFormat("warmup time: %.3f ms", timeMs);
+            body.appendFormat("EVENT_WARMUP_TIME,%.3f", timeMs);
         } break;
-        case EVENT_UNDERRUN:
-            body.appendFormat("underrun");
-            break;
-        case EVENT_OVERRUN:
-            body.appendFormat("overrun");
-            break;
+        case EVENT_WORK_TIME: {
+            const int64_t monotonicNs = it.payload<int64_t>();
+            body.appendFormat("EVENT_WORK_TIME,%lld", static_cast<long long>(monotonicNs));
+        } break;
+        case EVENT_THREAD_PARAMS: {
+            const thread_params_t params = it.payload<thread_params_t>();
+            body.appendFormat("EVENT_THREAD_PARAMS,%zu,%u", params.frameCount, params.sampleRate);
+        } break;
         case EVENT_FMT_END:
         case EVENT_RESERVED:
         case EVENT_UPPER_BOUND:
