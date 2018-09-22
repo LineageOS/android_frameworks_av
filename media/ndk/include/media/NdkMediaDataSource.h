@@ -43,14 +43,9 @@ typedef struct AMediaDataSource AMediaDataSource;
 /*
  * AMediaDataSource's callbacks will be invoked on an implementation-defined thread
  * or thread pool. No guarantees are provided about which thread(s) will be used for
- * callbacks. However, it is guaranteed that AMediaDataSource's callbacks will only
- * ever be invoked by a single thread at a time.
- *
- * There will be a thread synchronization point between each call to ensure that
- * modifications to the state of your AMediaDataSource are visible to future
- * calls. This means you don't need to do your own synchronization unless you're
- * modifying the AMediaDataSource from another thread while it's being used by the
- * framework.
+ * callbacks. For example, |close| can be invoked from a different thread than the
+ * thread invoking |readAt|. As such, the Implementations of AMediaDataSource callbacks
+ * must be threadsafe.
  */
 
 /**
@@ -74,9 +69,19 @@ typedef ssize_t (*AMediaDataSourceReadAt)(
 typedef ssize_t (*AMediaDataSourceGetSize)(void *userdata);
 
 /**
- * Called to close the data source and release associated resources.
- * The NDK media framework guarantees that after |close| is called
- * no future callbacks will be invoked on the data source.
+ * Called to close the data source, unblock reads, and release associated
+ * resources.
+ *
+ * The NDK media framework guarantees that after the first |close| is
+ * called, no future callbacks will be invoked on the data source except
+ * for |close| itself.
+ *
+ * Closing a data source allows readAt calls that were blocked waiting
+ * for I/O data to return promptly.
+ *
+ * When using AMediaDataSource as input to AMediaExtractor, closing
+ * has the effect of unblocking slow reads inside of setDataSource
+ * and readSampleData.
  */
 typedef void (*AMediaDataSourceClose)(void *userdata);
 
@@ -160,6 +165,18 @@ void AMediaDataSource_setClose(
         AMediaDataSourceClose) __INTRODUCED_IN(28);
 
 #endif  /*__ANDROID_API__ >= 28 */
+
+#if __ANDROID_API__ >= 29
+
+/**
+ * Close the data source, unblock reads, and release associated resources.
+ *
+ * Please refer to the definition of AMediaDataSourceClose for
+ * additional details.
+ */
+void AMediaDataSource_close(AMediaDataSource*) __INTRODUCED_IN(29);
+
+#endif  /*__ANDROID_API__ >= 29 */
 
 __END_DECLS
 
