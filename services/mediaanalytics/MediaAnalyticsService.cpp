@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <dirent.h>
+#include <pthread.h>
 #include <unistd.h>
 
 #include <string.h>
@@ -80,11 +81,18 @@ namespace android {
     using namespace android::content::pm;
 
 // individual records kept in memory: age or count
-// age: <= 36 hours (1.5 days)
+// age: <= 28 hours (1 1/6 days)
 // count: hard limit of # records
 // (0 for either of these disables that threshold)
-static const nsecs_t kMaxRecordAgeNs =  36 * 3600 * (1000*1000*1000ll);
-static const int kMaxRecords    = 0;
+//
+static constexpr nsecs_t kMaxRecordAgeNs =  28 * 3600 * (1000*1000*1000ll);
+static constexpr int kMaxRecords    = 0;
+
+// max we expire in a single call, to constrain how long we hold the
+// mutex, which also constrains how long a client might wait.
+static constexpr int kMaxExpiredAtOnce = 50;
+
+// TODO: need to look at tuning kMaxRecords and friends for low-memory devices
 
 static const char *kServiceName = "media.metrics";
 
@@ -96,6 +104,7 @@ void MediaAnalyticsService::instantiate() {
 MediaAnalyticsService::MediaAnalyticsService()
         : mMaxRecords(kMaxRecords),
           mMaxRecordAgeNs(kMaxRecordAgeNs),
+          mMaxRecordsExpiredAtOnce(kMaxExpiredAtOnce),
           mDumpProto(MediaAnalyticsItem::PROTO_V1),
           mDumpProtoDefault(MediaAnalyticsItem::PROTO_V1) {
 
@@ -432,23 +441,29 @@ String8 MediaAnalyticsService::dumpQueue(nsecs_t ts_since, const char * only) {
 //
 // Our Cheap in-core, non-persistent records management.
 
-// insert appropriately into queue
-void MediaAnalyticsService::saveItem(MediaAnalyticsItem * item)
+
+// we hold mLock when we get here
+// if item != NULL, it's the item we just inserted
+// true == more items eligible to be recovered
+bool MediaAnalyticsService::expirations_l(MediaAnalyticsItem *item)
 {
-
-    Mutex::Autolock _l(mLock);
-    // mutex between insertion and dumping the contents
-
-    // we want to dump 'in FIFO order', so insert at the end
-    mItems.push_back(item);
+    bool more = false;
+    int handled = 0;
 
     // keep removing old records the front until we're in-bounds (count)
+    // since we invoke this with each insertion, it should be 0/1 iterations.
     if (mMaxRecords > 0) {
         while (mItems.size() > (size_t) mMaxRecords) {
             MediaAnalyticsItem * oitem = *(mItems.begin());
             if (oitem == item) {
                 break;
             }
+            if (handled >= mMaxRecordsExpiredAtOnce) {
+                // unlikely in this loop
+                more = true;
+                break;
+            }
+            handled++;
             mItems.erase(mItems.begin());
             delete oitem;
             mItemsDiscarded++;
@@ -456,8 +471,8 @@ void MediaAnalyticsService::saveItem(MediaAnalyticsItem * item)
         }
     }
 
-    // keep removing old records the front until we're in-bounds (count)
-    // NB: expired entries aren't removed until the next insertion, which could be a while
+    // keep removing old records the front until we're in-bounds (age)
+    // limited to mMaxRecordsExpiredAtOnce items per invocation.
     if (mMaxRecordAgeNs > 0) {
         nsecs_t now = systemTime(SYSTEM_TIME_REALTIME);
         while (mItems.size() > 0) {
@@ -471,10 +486,63 @@ void MediaAnalyticsService::saveItem(MediaAnalyticsItem * item)
                 // this (and the rest) are recent enough to keep
                 break;
             }
+            if (handled >= mMaxRecordsExpiredAtOnce) {
+                // this represents "one too many"; tell caller there are
+                // more to be reclaimed.
+                more = true;
+                break;
+            }
+            handled++;
             mItems.erase(mItems.begin());
             delete oitem;
             mItemsDiscarded++;
             mItemsDiscardedExpire++;
+        }
+    }
+
+    // we only indicate whether there's more to clean;
+    // caller chooses whether to schedule further cleanup.
+    return more;
+}
+
+// process expirations in bite sized chunks, allowing new insertions through
+// runs in a pthread specifically started for this (which then exits)
+bool MediaAnalyticsService::processExpirations()
+{
+    bool more;
+    do {
+        sleep(1);
+        {
+            Mutex::Autolock _l(mLock);
+            more = expirations_l(NULL);
+            if (!more) {
+                break;
+            }
+        }
+    } while (more);
+    return true;        // value is for std::future thread synchronization
+}
+
+// insert appropriately into queue
+void MediaAnalyticsService::saveItem(MediaAnalyticsItem * item)
+{
+
+    Mutex::Autolock _l(mLock);
+    // mutex between insertion and dumping the contents
+
+    // we want to dump 'in FIFO order', so insert at the end
+    mItems.push_back(item);
+
+    // clean old stuff from the queue
+    bool more = expirations_l(item);
+
+    // consider scheduling some asynchronous cleaning, if not running
+    if (more) {
+        if (!mExpireFuture.valid()
+            || mExpireFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+
+            mExpireFuture = std::async(std::launch::async, [this]()
+                                       {return this->processExpirations();});
         }
     }
 }

@@ -51,7 +51,7 @@ public:
     ~Reader() override;
 
     // get snapshot of readers fifo buffer, effectively consuming the buffer
-    std::unique_ptr<Snapshot> getSnapshot();
+    std::unique_ptr<Snapshot> getSnapshot(bool flush = true);
     bool     isIMemory(const sp<IMemory>& iMemory) const;
     const std::string &name() const { return mName; }
 
@@ -99,7 +99,7 @@ public:
 private:
     Snapshot() = default;
     explicit Snapshot(size_t bufferSize) : mData(new uint8_t[bufferSize]) {}
-    friend std::unique_ptr<Snapshot> Reader::getSnapshot();
+    friend std::unique_ptr<Snapshot> Reader::getSnapshot(bool flush);
 
     uint8_t * const       mData = nullptr;
     size_t                mLost = 0;
