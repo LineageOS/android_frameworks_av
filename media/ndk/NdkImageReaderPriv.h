@@ -69,6 +69,8 @@ struct AImageReader : public RefBase {
     media_status_t acquireNextImage(/*out*/AImage** image, /*out*/int* fenceFd);
     media_status_t acquireLatestImage(/*out*/AImage** image, /*out*/int* fenceFd);
 
+    media_status_t getWindowNativeHandle(/*out*/native_handle_t **handle);
+
     ANativeWindow* getWindow()    const { return mWindow.get(); };
     int32_t        getWidth()     const { return mWidth; };
     int32_t        getHeight()    const { return mHeight; };
@@ -160,10 +162,17 @@ struct AImageReader : public RefBase {
     sp<Surface>                mSurface;
     sp<BufferItemConsumer>     mBufferItemConsumer;
     sp<ANativeWindow>          mWindow;
+    native_handle_t*           mWindowHandle = nullptr;
 
     List<AImage*>              mAcquiredImages;
 
     Mutex                      mLock;
 };
+
+// Retrieves HGraphicBufferProducer corresponding to the native_handle_t
+// provided. This method also deletes the HalToken corresponding to the
+// native_handle_t. Thus, if it is used twice in succession, the second call
+// returns nullptr;
+sp<HGraphicBufferProducer> AImageReader_getHGBPFromHandle(const native_handle_t *handle);
 
 #endif // _NDK_IMAGE_READER_PRIV_H

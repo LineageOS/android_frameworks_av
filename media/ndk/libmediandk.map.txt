@@ -4,6 +4,7 @@ LIBMEDIANDK {
     AImageReader_acquireLatestImageAsync; # introduced=26
     AImageReader_acquireNextImage; # introduced=24
     AImageReader_acquireNextImageAsync; # introduced=26
+    AImageReader_getWindowNativeHandle; #vndk
     AImageReader_delete; # introduced=24
     AImageReader_getFormat; # introduced=24
     AImageReader_getHeight; # introduced=24
