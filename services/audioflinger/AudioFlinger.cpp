@@ -2500,7 +2500,9 @@ status_t AudioFlinger::closeInput_nonvirtual(audio_io_handle_t input)
         if (recordThread != 0) {
             ALOGV("closeInput() %d", input);
 
+#if 0
             dumpToThreadLog_l(recordThread);
+#endif
 
             // If we still have effect chains, it means that a client still holds a handle
             // on at least one effect. We must either move the chain to an existing thread with the
@@ -2544,7 +2546,9 @@ status_t AudioFlinger::closeInput_nonvirtual(audio_io_handle_t input)
             if (mmapThread == 0) {
                 return BAD_VALUE;
             }
+#if 0
             dumpToThreadLog_l(mmapThread);
+#endif
             mMmapThreads.removeItem(input);
         }
         const sp<AudioIoDescriptor> ioDesc = new AudioIoDescriptor();
