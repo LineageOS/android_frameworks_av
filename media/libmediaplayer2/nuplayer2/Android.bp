@@ -48,7 +48,6 @@ cc_library_static {
         "libui",
         "libgui",
         "libmedia",
-        "libmediadrm",
         "libmediandk",
         "libpowermanager",
     ],

@@ -27,7 +27,6 @@ cc_library {
         "libutils",
 
         "libcrypto",
-        "libmediadrm",
         "libmediametrics",
         "libmediandk",
         "libmediautils",
