@@ -51,6 +51,10 @@ struct NuCachedSource2 : public DataSource {
         return mName;
     }
 
+    ssize_t getAvailableSize(status_t *finalStatus) {
+        return approxDataRemaining(finalStatus);
+    }
+
     ////////////////////////////////////////////////////////////////////////////
 
     size_t cachedSize();
