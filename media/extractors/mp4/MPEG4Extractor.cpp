@@ -198,13 +198,14 @@ private:
 // possibly wrapping multiple times to cover all tracks, i.e.
 // Each CachedRangedDataSource caches the sampletable metadata for a single track.
 
-struct CachedRangedDataSource : public DataSourceHelper {
+class CachedRangedDataSource : public DataSourceHelper {
+public:
     explicit CachedRangedDataSource(DataSourceHelper *source);
     virtual ~CachedRangedDataSource();
 
-    virtual ssize_t readAt(off64_t offset, void *data, size_t size);
-    virtual status_t getSize(off64_t *size);
-    virtual uint32_t flags();
+    ssize_t readAt(off64_t offset, void *data, size_t size) override;
+    status_t getSize(off64_t *size) override;
+    uint32_t flags() override;
 
     status_t setCachedRange(off64_t offset, size_t size, bool assumeSourceOwnershipOnSuccess);
 
@@ -236,7 +237,7 @@ CachedRangedDataSource::CachedRangedDataSource(DataSourceHelper *source)
 CachedRangedDataSource::~CachedRangedDataSource() {
     clearCache();
     if (mOwnsDataSource) {
-        delete (CachedRangedDataSource*)mSource;
+        delete mSource;
     }
 }
 
@@ -366,7 +367,6 @@ MPEG4Extractor::MPEG4Extractor(DataSourceHelper *source, const char *mime)
       mMoofFound(false),
       mMdatFound(false),
       mDataSource(source),
-      mCachedSource(NULL),
       mInitCheck(NO_INIT),
       mHeaderTimescale(0),
       mIsQT(false),
@@ -393,9 +393,6 @@ MPEG4Extractor::~MPEG4Extractor() {
     }
     mPssh.clear();
 
-    if (mCachedSource != mDataSource) {
-        delete mCachedSource;
-    }
     delete mDataSource;
 }
 
@@ -909,8 +906,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
                     if (cachedSource->setCachedRange(
                             *offset, chunk_size,
-                            mCachedSource != NULL /* assume ownership on success */) == OK) {
-                        mDataSource = mCachedSource = cachedSource;
+                            true /* assume ownership on success */) == OK) {
+                        mDataSource = cachedSource;
                     } else {
                         delete cachedSource;
                     }
