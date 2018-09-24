@@ -32,12 +32,14 @@
 #include <media/IMediaHTTPService.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaDataSource.h>
+#include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <mediaplayer2/JavaVMHelper.h>
 #include <mediaplayer2/JMedia2HTTPService.h>
 
 #include "../../libstagefright/include/HTTPBase.h"
 #include "../../libstagefright/include/NuCachedSource2.h"
+#include "NdkMediaDataSourceCallbacksPriv.h"
 
 using namespace android;
 
@@ -185,6 +187,24 @@ AMediaDataSource* AMediaDataSource_new() {
     mSource->getSize = NULL;
     mSource->close = NULL;
     return mSource;
+}
+
+EXPORT
+AMediaDataSource* AMediaDataSource_newUri(
+        const char *uri,
+        int numheaders,
+        const char * const *key_values) {
+
+    sp<MediaHTTPService> service = createMediaHttpService(uri, /* version = */ 1);
+    KeyedVector<String8, String8> headers;
+    for (int i = 0; i < numheaders; ++i) {
+        String8 key8(key_values[i * 2]);
+        String8 value8(key_values[i * 2 + 1]);
+        headers.add(key8, value8);
+    }
+
+    sp<DataSource> source = DataSourceFactory::CreateFromURI(service, uri, &headers);
+    return convertDataSourceToAMediaDataSource(source);
 }
 
 EXPORT

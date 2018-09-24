@@ -141,6 +141,7 @@ LIBMEDIANDK {
     AMediaDataSource_setGetSize;  # introduced=28
     AMediaDataSource_setReadAt;   # introduced=28
     AMediaDataSource_setUserdata; # introduced=28
+    AMediaDataSource_newUri;      # introduced=29
     AMediaDrm_closeSession;
     AMediaDrm_createByUUID;
     AMediaDrm_decrypt;

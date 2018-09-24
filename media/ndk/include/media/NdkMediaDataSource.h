@@ -86,6 +86,30 @@ typedef void (*AMediaDataSourceClose)(void *userdata);
  */
 AMediaDataSource* AMediaDataSource_new() __INTRODUCED_IN(28);
 
+#if __ANDROID_API__ >= 29
+
+/**
+ * Create new media data source. Returns NULL if memory allocation
+ * for the new data source object fails.
+ *
+ * Set the |uri| from which the data source will read,
+ * plus additional http headers when initiating the request.
+ *
+ * Headers will contain corresponding items from |key_values|
+ * in the following fashion:
+ *
+ * key_values[0]:key_values[1]
+ * key_values[2]:key_values[3]
+ * ...
+ * key_values[(numheaders - 1) * 2]:key_values[(numheaders - 1) * 2 + 1]
+ *
+ */
+AMediaDataSource* AMediaDataSource_newUri(const char *uri,
+        int numheaders,
+        const char * const *key_values) __INTRODUCED_IN(29);
+
+#endif  /*__ANDROID_API__ >= 29 */
+
 /**
  * Delete a previously created media data source.
  */
