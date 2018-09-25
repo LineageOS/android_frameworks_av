@@ -33,7 +33,6 @@ namespace android {
 struct AMessage;
 struct CDataSource;
 class DataSourceHelper;
-struct CachedRangedDataSource;
 class SampleTable;
 class String8;
 namespace heif {
@@ -99,7 +98,6 @@ private:
     Vector<Trex> mTrex;
 
     DataSourceHelper *mDataSource;
-    CachedRangedDataSource *mCachedSource;
     status_t mInitCheck;
     uint32_t mHeaderTimescale;
     bool mIsQT;
