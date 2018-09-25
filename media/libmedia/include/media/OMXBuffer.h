@@ -137,7 +137,7 @@ private:
     hidl_memory mHidlMemory;
 
     // Move assignment
-    OMXBuffer &operator=(OMXBuffer&&);
+    OMXBuffer &operator=(OMXBuffer&&) noexcept;
 
     // Deleted copy constructor and assignment.
     OMXBuffer(const OMXBuffer&) = delete;
