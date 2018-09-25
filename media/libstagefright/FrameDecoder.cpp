@@ -501,10 +501,15 @@ status_t VideoFrameDecoder::onOutputReceived(
         return ERROR_MALFORMED;
     }
 
-    int32_t width, height, stride;
-    CHECK(outputFormat->findInt32("width", &width));
-    CHECK(outputFormat->findInt32("height", &height));
-    CHECK(outputFormat->findInt32("stride", &stride));
+    int32_t width, height, stride, srcFormat;
+    if (!outputFormat->findInt32("width", &width) ||
+            !outputFormat->findInt32("height", &height) ||
+            !outputFormat->findInt32("stride", &stride) ||
+            !outputFormat->findInt32("color-format", &srcFormat)) {
+        ALOGE("format missing dimension or color: %s",
+                outputFormat->debugString().c_str());
+        return ERROR_MALFORMED;
+    }
 
     int32_t crop_left, crop_top, crop_right, crop_bottom;
     if (!outputFormat->findRect("crop", &crop_left, &crop_top, &crop_right, &crop_bottom)) {
@@ -522,9 +527,6 @@ status_t VideoFrameDecoder::onOutputReceived(
             dstBpp());
     addFrame(frameMem);
     VideoFrame* frame = static_cast<VideoFrame*>(frameMem->pointer());
-
-    int32_t srcFormat;
-    CHECK(outputFormat->findInt32("color-format", &srcFormat));
 
     ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, dstFormat());
 
