@@ -2014,6 +2014,13 @@ status_t Camera3Device::flush(int64_t *frameNumber) {
 
     {
         Mutex::Autolock l(mLock);
+
+        // b/116514106 "disconnect()" can get called twice for the same device. The
+        // camera device will not be initialized during the second run.
+        if (mStatus == STATUS_UNINITIALIZED) {
+            return OK;
+        }
+
         mRequestThread->clear(/*out*/frameNumber);
     }
 
