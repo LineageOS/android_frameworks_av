@@ -281,7 +281,6 @@ status_t Camera3Device::disconnect() {
 status_t Camera3Device::disconnectImpl() {
     ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
-    Mutex::Autolock stLock(mTrackerLock);
 
     ALOGI("%s: E", __FUNCTION__);
 
@@ -346,6 +345,7 @@ status_t Camera3Device::disconnectImpl() {
     {
         Mutex::Autolock l(mLock);
         mRequestThread.clear();
+        Mutex::Autolock stLock(mTrackerLock);
         mStatusTracker.clear();
         interface = mInterface.get();
     }
