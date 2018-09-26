@@ -17,6 +17,7 @@
 #define LOG_TAG "APM_ClientDescriptor"
 //#define LOG_NDEBUG 0
 
+#include <sstream>
 #include <utils/Log.h>
 #include <utils/String8.h>
 #include "AudioGain.h"
