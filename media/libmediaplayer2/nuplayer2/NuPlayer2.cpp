@@ -969,7 +969,7 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
                     onResume();
                 }
             } else {
-                onStart();
+                onStart(true /* play */);
             }
             mPausedByClient = false;
             notifyListener(mSrcId, MEDIA2_STARTED, 0, 0);
@@ -1502,6 +1502,9 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
 
         case kWhatPause:
         {
+            if (!mStarted) {
+                onStart(false /* play */);
+            }
             onPause();
             notifyListener(mSrcId, MEDIA2_PAUSED, 0, 0);
             mPausedByClient = true;
@@ -1575,7 +1578,7 @@ void NuPlayer2::onResume() {
     startPlaybackTimer("onresume");
 }
 
-void NuPlayer2::onStart() {
+void NuPlayer2::onStart(bool play) {
     ALOGV("onStart: mCrypto: %p", mCrypto.get());
 
     if (!mSourceStarted) {
@@ -1647,6 +1650,11 @@ void NuPlayer2::onStart() {
     float rate = getFrameRate();
     if (rate > 0) {
         mRenderer->setVideoFrameRate(rate);
+    }
+
+    // Renderer is created in paused state.
+    if (play) {
+        mRenderer->resume();
     }
 
     if (mVideoDecoder != NULL) {
@@ -2472,7 +2480,7 @@ void NuPlayer2::performPlayNextDataSource() {
         mRenderer->resume();
     }
 
-    onStart();
+    onStart(true /* play */);
     mPausedByClient = false;
     notifyListener(mSrcId, MEDIA2_STARTED, 0, 0);
 }

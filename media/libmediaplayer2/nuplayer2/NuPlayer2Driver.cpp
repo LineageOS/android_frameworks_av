@@ -327,9 +327,9 @@ status_t NuPlayer2Driver::pause() {
 
     switch (mState) {
         case STATE_PAUSED:
-        case STATE_PREPARED:
             return OK;
 
+        case STATE_PREPARED:
         case STATE_RUNNING:
             mState = STATE_PAUSED;
             mPlayer->pause();
