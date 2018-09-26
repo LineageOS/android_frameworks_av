@@ -58,7 +58,36 @@
 #include "Overlay.h"
 #include "FrameOutput.h"
 
-using namespace android;
+using android::ABuffer;
+using android::ALooper;
+using android::AMessage;
+using android::AString;
+using android::DisplayInfo;
+using android::FrameOutput;
+using android::IBinder;
+using android::IGraphicBufferProducer;
+using android::ISurfaceComposer;
+using android::MediaCodec;
+using android::MediaCodecBuffer;
+using android::MediaMuxer;
+using android::Overlay;
+using android::PersistentSurface;
+using android::ProcessState;
+using android::Rect;
+using android::String8;
+using android::SurfaceComposerClient;
+using android::Vector;
+using android::sp;
+using android::status_t;
+
+using android::DISPLAY_ORIENTATION_0;
+using android::DISPLAY_ORIENTATION_180;
+using android::DISPLAY_ORIENTATION_90;
+using android::INFO_FORMAT_CHANGED;
+using android::INFO_OUTPUT_BUFFERS_CHANGED;
+using android::INVALID_OPERATION;
+using android::NO_ERROR;
+using android::UNKNOWN_ERROR;
 
 static const uint32_t kMinBitRate = 100000;         // 0.1Mbps
 static const uint32_t kMaxBitRate = 200 * 1000000;  // 200Mbps
