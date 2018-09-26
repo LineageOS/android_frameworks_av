@@ -63,38 +63,21 @@ inline static const char *asString(status_t i, const char *def = "??") {
             __FILE__ ":" LITERAL_TO_STRING(__LINE__)    \
             " CHECK(" #condition ") failed.")
 
-#define MAKE_COMPARATOR(suffix,op)                          \
-    template<class A, class B>                              \
-    AString Compare_##suffix(const A &a, const B &b) {      \
-        AString res;                                        \
-        if (!(a op b)) {                                    \
-            res.append(a);                                  \
-            res.append(" vs. ");                            \
-            res.append(b);                                  \
-        }                                                   \
-        return res;                                         \
-    }
-
-MAKE_COMPARATOR(EQ,==)
-MAKE_COMPARATOR(NE,!=)
-MAKE_COMPARATOR(LE,<=)
-MAKE_COMPARATOR(GE,>=)
-MAKE_COMPARATOR(LT,<)
-MAKE_COMPARATOR(GT,>)
-
 #ifdef CHECK_OP
 #undef CHECK_OP
 #endif
 
 #define CHECK_OP(x,y,suffix,op)                                         \
     do {                                                                \
-        AString ___res = Compare_##suffix(x, y);                        \
-        if (!___res.empty()) {                                          \
+        const auto &a = x;                                              \
+        const auto &b = y;                                              \
+        if (!(a op b)) {                                                \
             AString ___full =                                           \
                 __FILE__ ":" LITERAL_TO_STRING(__LINE__)                \
                     " CHECK_" #suffix "( " #x "," #y ") failed: ";      \
-            ___full.append(___res);                                     \
-                                                                        \
+            ___full.append(a);                                          \
+            ___full.append(" vs. ");                                    \
+            ___full.append(b);                                          \
             LOG_ALWAYS_FATAL("%s", ___full.c_str());                    \
         }                                                               \
     } while (false)

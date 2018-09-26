@@ -129,11 +129,13 @@ public:
         mSource = source->mSource;
     }
 
-    ssize_t readAt(off64_t offset, void *data, size_t size) {
+    virtual ~DataSourceHelper() {}
+
+    virtual ssize_t readAt(off64_t offset, void *data, size_t size) {
         return mSource->readAt(mSource->handle, offset, data, size);
     }
 
-    status_t getSize(off64_t *size) {
+    virtual status_t getSize(off64_t *size) {
         return mSource->getSize(mSource->handle, size);
     }
 
@@ -141,7 +143,7 @@ public:
         return mSource->getUri(mSource->handle, uriString, bufferSize);
     }
 
-    uint32_t flags() {
+    virtual uint32_t flags() {
         return mSource->flags(mSource->handle);
     }
 
