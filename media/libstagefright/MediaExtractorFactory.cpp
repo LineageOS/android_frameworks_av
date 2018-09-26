@@ -271,6 +271,9 @@ void MediaExtractorFactory::RegisterExtractorsInSystem(
     if (libDir) {
         struct dirent* libEntry;
         while ((libEntry = readdir(libDir))) {
+            if (libEntry->d_name[0] == '.') {
+                continue;
+            }
             String8 libPath = String8(libDirPath) + "/" + libEntry->d_name;
             void *libHandle = dlopen(libPath.string(), RTLD_NOW | RTLD_LOCAL);
             if (libHandle) {
