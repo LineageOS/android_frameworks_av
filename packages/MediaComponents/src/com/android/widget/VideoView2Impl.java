@@ -33,8 +33,7 @@ import android.media.MediaMetadata;
 import android.media.MediaMetadata2;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer2;
-import android.media.MediaPlayer2.MediaPlayer2EventCallback;
-import android.media.MediaPlayer2.OnSubtitleDataListener;
+import android.media.MediaPlayer2.EventCallback;
 import android.media.MediaPlayer2Impl;
 import android.media.Metadata;
 import android.media.PlaybackParams;
@@ -733,12 +732,11 @@ public class VideoView2Impl extends BaseLayout
                     runnable.run();
                 }
             };
-            mMediaPlayer.setMediaPlayer2EventCallback(executor, mMediaPlayer2Callback);
+            mMediaPlayer.registerEventCallback(executor, mMediaPlayer2Callback);
 
             mCurrentBufferPercentage = -1;
             mMediaPlayer.setDataSource(dsd);
             mMediaPlayer.setAudioAttributes(mAudioAttributes);
-            mMediaPlayer.setOnSubtitleDataListener(mSubtitleListener);
             // we don't set the target state here either, but preserve the
             // target state that was there before.
             mCurrentState = STATE_PREPARING;
@@ -1106,10 +1104,10 @@ public class VideoView2Impl extends BaseLayout
         mInstance.addView(mMusicView, 0);
     }
 
-    OnSubtitleDataListener mSubtitleListener =
-            new OnSubtitleDataListener() {
+    EventCallback mMediaPlayer2Callback =
+            new EventCallback() {
                 @Override
-                public void onSubtitleData(MediaPlayer2 mp, SubtitleData data) {
+                public void onSubtitleData(MediaPlayer2 mp, DataSourceDesc dsd, SubtitleData data) {
                     if (DEBUG) {
                         Log.d(TAG, "onSubtitleData(): getTrackIndex: " + data.getTrackIndex()
                                 + ", getCurrentPosition: " + mp.getCurrentPosition()
@@ -1133,10 +1131,7 @@ public class VideoView2Impl extends BaseLayout
                         }
                     }
                 }
-            };
 
-    MediaPlayer2EventCallback mMediaPlayer2Callback =
-            new MediaPlayer2EventCallback() {
                 @Override
                 public void onVideoSizeChanged(
                         MediaPlayer2 mp, DataSourceDesc dsd, int width, int height) {
@@ -1169,7 +1164,7 @@ public class VideoView2Impl extends BaseLayout
                         extractTracks();
                     } else if (what == MediaPlayer2.MEDIA_INFO_PREPARED) {
                         this.onPrepared(mp, dsd);
-                    } else if (what == MediaPlayer2.MEDIA_INFO_PLAYBACK_COMPLETE) {
+                    } else if (what == MediaPlayer2.MEDIA_INFO_DATA_SOURCE_END) {
                         this.onCompletion(mp, dsd);
                     } else if (what == MediaPlayer2.MEDIA_INFO_BUFFERING_UPDATE) {
                         this.onBufferingUpdate(mp, dsd, extra);
