@@ -448,6 +448,9 @@ bool MtpServer::handleRequest() {
             break;
     }
 
+    if (response != MTP_RESPONSE_OK)
+      ALOGW("[MTP] got response 0x%X in command %s (%x)", response,
+            MtpDebug::getOperationCodeName(operation), operation);
     if (response == MTP_RESPONSE_TRANSACTION_CANCELLED)
         return false;
     mResponse.setResponseCode(response);
@@ -658,8 +661,8 @@ MtpResponseCode MtpServer::doGetObjectPropValue() {
         return MTP_RESPONSE_INVALID_PARAMETER;
     MtpObjectHandle handle = mRequest.getParameter(1);
     MtpObjectProperty property = mRequest.getParameter(2);
-    ALOGV("GetObjectPropValue %d %s\n", handle,
-            MtpDebug::getObjectPropCodeName(property));
+    ALOGV("GetObjectPropValue %d %s (0x%04X)\n", handle,
+          MtpDebug::getObjectPropCodeName(property), property);
 
     return mDatabase->getObjectPropertyValue(handle, property, mData);
 }
@@ -952,7 +955,8 @@ MtpResponseCode MtpServer::doSendObjectInfo() {
     if (!mData.getString(modified)) return MTP_RESPONSE_INVALID_PARAMETER;     // date modified
     // keywords follow
 
-    ALOGV("name: %s format: %04X\n", (const char *)name, format);
+    ALOGV("name: %s format: 0x%04X (%s)\n", (const char*)name, format,
+          MtpDebug::getFormatCodeName(format));
     time_t modifiedTime;
     if (!parseDateTime(modified, modifiedTime))
         modifiedTime = 0;
@@ -973,9 +977,10 @@ MtpResponseCode MtpServer::doSendObjectInfo() {
             return MTP_RESPONSE_OBJECT_TOO_LARGE;
     }
 
-    ALOGD("path: %s parent: %d storageID: %08X", (const char*)path, parent, storageID);
+    ALOGV("path: %s parent: %d storageID: %08X", (const char*)path, parent, storageID);
     MtpObjectHandle handle = mDatabase->beginSendObject((const char*)path, format,
             parent, storageID);
+    ALOGD("handle: %d, parent: %d, storageID: %08X", handle, parent, storageID);
     if (handle == kInvalidObjectHandle) {
         return MTP_RESPONSE_GENERAL_ERROR;
     }
