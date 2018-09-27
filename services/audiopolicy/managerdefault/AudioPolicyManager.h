@@ -613,8 +613,6 @@ private:
         void filterSurroundFormats(FormatVector *formatsPtr);
         void filterSurroundChannelMasks(ChannelsVector *channelMasksPtr);
 
-        status_t getSupportedFormats(audio_io_handle_t ioHandle, FormatVector& formats);
-
         // Support for Multi-Stream Decoder (MSD) module
         sp<DeviceDescriptor> getMsdAudioInDevice() const;
         audio_devices_t getMsdAudioOutDeviceTypes() const;
