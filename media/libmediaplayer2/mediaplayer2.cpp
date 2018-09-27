@@ -660,7 +660,7 @@ status_t MediaPlayer2::pause() {
     Mutex::Autolock _l(mLock);
     if (mCurrentState & (MEDIA_PLAYER2_PAUSED|MEDIA_PLAYER2_PLAYBACK_COMPLETE))
         return NO_ERROR;
-    if ((mPlayer != 0) && (mCurrentState & MEDIA_PLAYER2_STARTED)) {
+    if ((mPlayer != 0) && (mCurrentState & (MEDIA_PLAYER2_STARTED | MEDIA_PLAYER2_PREPARED))) {
         status_t ret = mPlayer->pause();
         if (ret != NO_ERROR) {
             mCurrentState = MEDIA_PLAYER2_STATE_ERROR;

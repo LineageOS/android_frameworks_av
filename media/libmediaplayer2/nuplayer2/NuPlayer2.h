@@ -301,7 +301,7 @@ private:
     void handleFlushComplete(bool audio, bool isDecoder);
     void finishFlushIfPossible();
 
-    void onStart();
+    void onStart(bool play);
     void onResume();
     void onPause();
 

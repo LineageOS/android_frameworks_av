@@ -115,7 +115,7 @@ NuPlayer2::Renderer::Renderer(
       mNotifyCompleteAudio(false),
       mNotifyCompleteVideo(false),
       mSyncQueues(false),
-      mPaused(false),
+      mPaused(true),
       mPauseDrainAudioAllowedUs(0),
       mVideoSampleReceived(false),
       mVideoRenderingStarted(false),
