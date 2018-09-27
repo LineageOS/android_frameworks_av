@@ -2794,22 +2794,18 @@ bool AudioFlinger::PlaybackThread::isValidSyncEvent(const sp<SyncEvent>& event) 
 void AudioFlinger::PlaybackThread::threadLoop_removeTracks(
         const Vector< sp<Track> >& tracksToRemove)
 {
-    size_t count = tracksToRemove.size();
-    if (count > 0) {
-        for (size_t i = 0 ; i < count ; i++) {
-            const sp<Track>& track = tracksToRemove.itemAt(i);
-            if (track->isExternalTrack()) {
-                AudioSystem::stopOutput(track->portId());
+    // Miscellaneous track cleanup when removed from the active list,
+    // called without Thread lock but synchronized with threadLoop processing.
 #ifdef ADD_BATTERY_DATA
-                // to track the speaker usage
-                addBatteryData(IMediaPlayerService::kBatteryDataAudioFlingerStop);
-#endif
-                if (track->isTerminated()) {
-                    AudioSystem::releaseOutput(track->portId());
-                }
-            }
+    for (const auto& track : tracksToRemove) {
+        if (track->isExternalTrack()) {
+            // to track the speaker usage
+            addBatteryData(IMediaPlayerService::kBatteryDataAudioFlingerStop);
         }
     }
+#else
+    (void)tracksToRemove; // suppress unused warning
+#endif
 }
 
 void AudioFlinger::PlaybackThread::checkSilentMode_l()
@@ -3710,24 +3706,28 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 // removeTracks_l() must be called with ThreadBase::mLock held
 void AudioFlinger::PlaybackThread::removeTracks_l(const Vector< sp<Track> >& tracksToRemove)
 {
-    size_t count = tracksToRemove.size();
-    if (count > 0) {
-        for (size_t i=0 ; i<count ; i++) {
-            const sp<Track>& track = tracksToRemove.itemAt(i);
-            mActiveTracks.remove(track);
-            ALOGV("removeTracks_l removing track on session %d", track->sessionId());
-            sp<EffectChain> chain = getEffectChain_l(track->sessionId());
-            if (chain != 0) {
-                ALOGV("stopping track on chain %p for session Id: %d", chain.get(),
-                        track->sessionId());
-                chain->decActiveTrackCnt();
-            }
+    for (const auto& track : tracksToRemove) {
+        mActiveTracks.remove(track);
+        ALOGV("%s(%d): removing track on session %d", __func__, track->id(), track->sessionId());
+        sp<EffectChain> chain = getEffectChain_l(track->sessionId());
+        if (chain != 0) {
+            ALOGV("%s(%d): stopping track on chain %p for session Id: %d",
+                    __func__, track->id(), chain.get(), track->sessionId());
+            chain->decActiveTrackCnt();
+        }
+        // If an external client track, inform APM we're no longer active, and remove if needed.
+        // We do this under lock so that the state is consistent if the Track is destroyed.
+        if (track->isExternalTrack()) {
+            AudioSystem::stopOutput(track->portId());
             if (track->isTerminated()) {
-                removeTrack_l(track);
+                AudioSystem::releaseOutput(track->portId());
             }
         }
+        if (track->isTerminated()) {
+            // remove from our tracks vector
+            removeTrack_l(track);
+        }
     }
-
 }
 
 status_t AudioFlinger::PlaybackThread::getTimestamp_l(AudioTimestamp& timestamp)
@@ -4113,12 +4113,6 @@ uint32_t AudioFlinger::MixerThread::correctLatency_l(uint32_t latency) const
         latency += (pipe->getAvgFrames() * 1000) / mSampleRate;
     }
     return latency;
-}
-
-
-void AudioFlinger::MixerThread::threadLoop_removeTracks(const Vector< sp<Track> >& tracksToRemove)
-{
-    PlaybackThread::threadLoop_removeTracks(tracksToRemove);
 }
 
 ssize_t AudioFlinger::MixerThread::threadLoop_write()
