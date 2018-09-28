@@ -2697,7 +2697,7 @@ status_t AudioPolicyManager::dump(int fd)
     mAudioSources.dump(fd);
 
     if (!mSurroundFormats.empty()) {
-        result = String8("\nManually Enabled Surround Formats:\n");
+        result = String8("\nEnabled Surround Formats:\n");
         size_t i = 0;
         for (const auto& fmt : mSurroundFormats) {
             result.append(i++ == 0 ? "  " : ", ");
@@ -3554,50 +3554,6 @@ float AudioPolicyManager::getStreamVolumeDB(
     return computeVolume(stream, index, device);
 }
 
-status_t AudioPolicyManager::getSupportedFormats(audio_io_handle_t ioHandle,
-                                                 FormatVector& formats) {
-    if (ioHandle == AUDIO_IO_HANDLE_NONE) {
-        return BAD_VALUE;
-    }
-    String8 reply;
-    reply = mpClientInterface->getParameters(
-            ioHandle, String8(AudioParameter::keyStreamSupportedFormats));
-    ALOGV("%s: supported formats %s", __FUNCTION__, reply.string());
-    AudioParameter repliedParameters(reply);
-    if (repliedParameters.get(
-            String8(AudioParameter::keyStreamSupportedFormats), reply) != NO_ERROR) {
-        ALOGE("%s: failed to retrieve format, bailing out", __FUNCTION__);
-        return BAD_VALUE;
-    }
-    for (auto format : formatsFromString(reply.string())) {
-        // Only AUDIO_FORMAT_AAC_LC will be used in Settings UI for all AAC formats.
-        for (size_t i = 0; i < ARRAY_SIZE(AAC_FORMATS); i++) {
-            if (format == AAC_FORMATS[i]) {
-                format = AUDIO_FORMAT_AAC_LC;
-                break;
-            }
-        }
-        bool exist = false;
-        for (size_t i = 0; i < formats.size(); i++) {
-            if (format == formats[i]) {
-                exist = true;
-                break;
-            }
-        }
-        bool isSurroundFormat = false;
-        for (size_t i = 0; i < ARRAY_SIZE(SURROUND_FORMATS); i++) {
-            if (SURROUND_FORMATS[i] == format) {
-                isSurroundFormat = true;
-                break;
-            }
-        }
-        if (!exist && isSurroundFormat) {
-            formats.add(format);
-        }
-    }
-    return NO_ERROR;
-}
-
 status_t AudioPolicyManager::getSurroundFormats(unsigned int *numSurroundFormats,
                                                 audio_format_t *surroundFormats,
                                                 bool *surroundFormatsEnabled,
@@ -3618,89 +3574,45 @@ status_t AudioPolicyManager::getSurroundFormats(unsigned int *numSurroundFormats
     size_t formatsWritten = 0;
     size_t formatsMax = *numSurroundFormats;
     *numSurroundFormats = 0;
-    FormatVector formats;
+    std::unordered_set<audio_format_t> formats;
     if (reported) {
-        // Only get surround formats which are reported by device.
-        // First list already open outputs that can be routed to this device
-        audio_devices_t device = AUDIO_DEVICE_OUT_HDMI;
-        SortedVector<audio_io_handle_t> outputs;
-        bool reportedFormatFound = false;
-        status_t status;
-        sp<SwAudioOutputDescriptor> desc;
-        for (size_t i = 0; i < mOutputs.size(); i++) {
-            desc = mOutputs.valueAt(i);
-            if (!desc->isDuplicated() && (desc->supportedDevices() & device)) {
-                outputs.add(mOutputs.keyAt(i));
-            }
-        }
-        // Open an output to query dynamic parameters.
-        DeviceVector hdmiOutputDevices = mAvailableOutputDevices.getDevicesFromTypeMask(
-                AUDIO_DEVICE_OUT_HDMI);
-        for (size_t i = 0; i < hdmiOutputDevices.size(); i++) {
-            String8 address = hdmiOutputDevices[i]->mAddress;
-            for (const auto& hwModule : mHwModules) {
-                for (size_t i = 0; i < hwModule->getOutputProfiles().size(); i++) {
-                    sp<IOProfile> profile = hwModule->getOutputProfiles()[i];
-                    if (profile->supportDevice(AUDIO_DEVICE_OUT_HDMI) &&
-                            profile->supportDeviceAddress(address)) {
-                        size_t j;
-                        for (j = 0; j < outputs.size(); j++) {
-                            desc = mOutputs.valueFor(outputs.itemAt(j));
-                            if (!desc->isDuplicated() && desc->mProfile == profile) {
-                                break;
-                            }
-                        }
-                        if (j != outputs.size()) {
-                            status = getSupportedFormats(outputs.itemAt(j), formats);
-                            reportedFormatFound |= (status == NO_ERROR);
-                            continue;
-                        }
-
-                        if (!profile->canOpenNewIo()) {
-                            ALOGW("Max Output number %u already opened for this profile %s",
-                                  profile->maxOpenCount, profile->getTagName().c_str());
-                            continue;
-                        }
-
-                        ALOGV("opening output for device %08x with params %s profile %p name %s",
-                              device, address.string(), profile.get(), profile->getName().string());
-                        desc = new SwAudioOutputDescriptor(profile, mpClientInterface);
-                        audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-                        status_t status = desc->open(nullptr, device, address,
-                                                     AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE,
-                                                     &output);
-
-                        if (status == NO_ERROR) {
-                            status = getSupportedFormats(output, formats);
-                            reportedFormatFound |= (status == NO_ERROR);
-                            desc->close();
-                            output = AUDIO_IO_HANDLE_NONE;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (!reportedFormatFound) {
-            return UNKNOWN_ERROR;
+        // Return formats from HDMI profiles, that have already been resolved by
+        // checkOutputsForDevice().
+        DeviceVector hdmiOutputDevs = mAvailableOutputDevices.getDevicesFromTypeMask(
+              AUDIO_DEVICE_OUT_HDMI);
+        for (size_t i = 0; i < hdmiOutputDevs.size(); i++) {
+             FormatVector supportedFormats =
+                 hdmiOutputDevs[i]->getAudioPort()->getAudioProfiles().getSupportedFormats();
+             for (size_t j = 0; j < supportedFormats.size(); j++) {
+                 if (std::find(std::begin(SURROUND_FORMATS),
+                                 std::end(SURROUND_FORMATS),
+                                 supportedFormats[j]) != std::end(SURROUND_FORMATS)) {
+                     formats.insert(supportedFormats[j]);
+                 } else if (std::find(std::begin(AAC_FORMATS),
+                                 std::end(AAC_FORMATS),
+                                 supportedFormats[j]) != std::end(AAC_FORMATS)) {
+                     // if any format in AAC_FORMATS is reported, insert AUDIO_FORMAT_AAC_LC as this
+                     // is the only AAC format used in the TvSettings UI for all AAC formats.
+                     formats.insert(AUDIO_FORMAT_AAC_LC);
+                 }
+             }
         }
     } else {
         for (size_t i = 0; i < ARRAY_SIZE(SURROUND_FORMATS); i++) {
-            formats.add(SURROUND_FORMATS[i]);
+            formats.insert(SURROUND_FORMATS[i]);
         }
     }
-    for (size_t i = 0; i < formats.size(); i++) {
+    for (const auto& format: formats) {
         if (formatsWritten < formatsMax) {
-            surroundFormats[formatsWritten] = formats[i];
+            surroundFormats[formatsWritten] = format;
             bool formatEnabled = false;
-            if (formats[i] == AUDIO_FORMAT_AAC_LC) {
-                for (size_t j = 0; j < ARRAY_SIZE(AAC_FORMATS); j++) {
+            if (format == AUDIO_FORMAT_AAC_LC) {
+                for (size_t j = 0; j < ARRAY_SIZE(AAC_FORMATS) && !formatEnabled; j++) {
                     formatEnabled =
-                            mSurroundFormats.find(AAC_FORMATS[i]) != mSurroundFormats.end();
-                    break;
+                            mSurroundFormats.find(AAC_FORMATS[j]) != mSurroundFormats.end();
                 }
             } else {
-                formatEnabled = mSurroundFormats.find(formats[i]) != mSurroundFormats.end();
+                formatEnabled = mSurroundFormats.find(format) != mSurroundFormats.end();
             }
             surroundFormatsEnabled[formatsWritten++] = formatEnabled;
         }
@@ -3744,6 +3656,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
         return INVALID_OPERATION;
     }
 
+    std::unordered_set<audio_format_t> surroundFormatsBackup(mSurroundFormats);
     if (enabled) {
         if (audioFormat == AUDIO_FORMAT_AAC_LC) {
             for (size_t i = 0; i < ARRAY_SIZE(AAC_FORMATS); i++) {
@@ -3806,23 +3719,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
     // Undo the surround formats change due to no audio profiles updated.
     if (!profileUpdated) {
         ALOGW("%s() no audio profiles updated, undoing surround formats change", __func__);
-        if (enabled) {
-            if (audioFormat == AUDIO_FORMAT_AAC_LC) {
-                for (size_t i = 0; i < ARRAY_SIZE(AAC_FORMATS); i++) {
-                    mSurroundFormats.erase(AAC_FORMATS[i]);
-                }
-            } else {
-                mSurroundFormats.erase(audioFormat);
-            }
-        } else {
-            if (audioFormat == AUDIO_FORMAT_AAC_LC) {
-                for (size_t i = 0; i < ARRAY_SIZE(AAC_FORMATS); i++) {
-                    mSurroundFormats.insert(AAC_FORMATS[i]);
-                }
-            } else {
-                mSurroundFormats.insert(audioFormat);
-            }
-        }
+        mSurroundFormats = std::move(surroundFormatsBackup);
     }
 
     return profileUpdated ? NO_ERROR : INVALID_OPERATION;
