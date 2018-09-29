@@ -48,6 +48,7 @@ namespace V2_0 {
 namespace implementation {
 
 using ::android::hardware::kSynchronizedReadWrite;
+using ::android::hardware::kUnsynchronizedWrite;
 
 typedef uint32_t BufferId;
 typedef uint64_t TransactionId;
@@ -60,7 +61,7 @@ enum : ConnectionId {
 typedef android::hardware::MessageQueue<BufferStatusMessage, kSynchronizedReadWrite> BufferStatusQueue;
 typedef BufferStatusQueue::Descriptor StatusDescriptor;
 
-typedef android::hardware::MessageQueue<BufferInvalidationMessage, kSynchronizedReadWrite>
+typedef android::hardware::MessageQueue<BufferInvalidationMessage, kUnsynchronizedWrite>
         BufferInvalidationQueue;
 typedef BufferInvalidationQueue::Descriptor InvalidationDescriptor;
 
