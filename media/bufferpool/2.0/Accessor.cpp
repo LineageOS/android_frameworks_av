@@ -122,7 +122,7 @@ Return<void> Accessor::connect(connect_cb _hidl_cb) {
     ResultStatus status = connect(&connection, &connectionId, &fmqDesc, false);
     if (status == ResultStatus::OK) {
         _hidl_cb(status, connection, connectionId, *fmqDesc,
-                 android::hardware::MQDescriptorSync<BufferInvalidationMessage>(
+                 android::hardware::MQDescriptorUnsync<BufferInvalidationMessage>(
                          std::vector<android::hardware::GrantorDescriptor>(),
                          nullptr /* nhandle */, 0 /* size */));
     } else {
@@ -130,7 +130,7 @@ Return<void> Accessor::connect(connect_cb _hidl_cb) {
                  android::hardware::MQDescriptorSync<BufferStatusMessage>(
                          std::vector<android::hardware::GrantorDescriptor>(),
                          nullptr /* nhandle */, 0 /* size */),
-                 android::hardware::MQDescriptorSync<BufferInvalidationMessage>(
+                 android::hardware::MQDescriptorUnsync<BufferInvalidationMessage>(
                          std::vector<android::hardware::GrantorDescriptor>(),
                          nullptr /* nhandle */, 0 /* size */));
     }

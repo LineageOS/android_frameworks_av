@@ -6963,7 +6963,7 @@ reacquire_wakelock:
                                 framesIn, mSampleRate, activeTrack->mSampleRate));
 
                 if (activeTrack->isDirect()) {
-                    // No RecordBufferConverter used for compressed formats. Pass
+                    // No RecordBufferConverter used for direct streams. Pass
                     // straight from RecordThread buffer to RecordTrack buffer.
                     AudioBufferProvider::Buffer buffer;
                     buffer.frameCount = framesOut;
@@ -6973,7 +6973,7 @@ reacquire_wakelock:
                                 "%s() read less than expected (%zu vs %zu)",
                                 __func__, buffer.frameCount, framesOut);
                         framesOut = buffer.frameCount;
-                        memcpy(activeTrack->mSink.raw, buffer.raw, buffer.frameCount);
+                        memcpy(activeTrack->mSink.raw, buffer.raw, buffer.frameCount * mFrameSize);
                         activeTrack->mResamplerBufferProvider->releaseBuffer(&buffer);
                     } else {
                         framesOut = 0;
