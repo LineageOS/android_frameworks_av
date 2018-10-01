@@ -16,6 +16,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "ColorConverter"
+#include <android-base/macros.h>
 #include <utils/Log.h>
 
 #include <media/stagefright/foundation/ADebug.h>
@@ -62,7 +63,7 @@ bool ColorConverter::isValid() const {
             if (mDstFormat == OMX_COLOR_FormatYUV444Y410) {
                 return true;
             }
-            // fall-thru
+            FALLTHROUGH_INTENDED;
         case OMX_COLOR_FormatYUV420Planar:
             return mDstFormat == OMX_COLOR_Format16bitRGB565
                     || mDstFormat == OMX_COLOR_Format32BitRGBA8888

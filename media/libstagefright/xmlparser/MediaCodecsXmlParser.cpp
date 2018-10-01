@@ -19,6 +19,7 @@
 
 #include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 
+#include <android-base/macros.h>
 #include <utils/Log.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/omx/OMXUtils.h>
@@ -340,7 +341,7 @@ void MediaCodecsXmlParser::startElementHandler(
             }
         }
         inType = false;
-        // fall through
+        FALLTHROUGH_INTENDED;
 
         case SECTION_DECODER_TYPE:
         case SECTION_ENCODER_TYPE:

@@ -30,6 +30,7 @@ cc_library_shared {
         "liblog",
     ],
 
+    header_libs: ["libbase_headers"],
     static_libs: ["libFLAC"],
 
     name: "libstagefright_soft_flacenc",
