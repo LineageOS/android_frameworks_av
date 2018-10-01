@@ -52,13 +52,13 @@ typedef unsigned int uint;
 
 #ifndef _PV_TYPES_
 #define _PV_TYPES_
-typedef unsigned char UChar;
-typedef char Char;
+typedef uint8_t UChar;
+typedef int8_t Char;
 typedef unsigned int UInt;
 typedef int Int;
-typedef unsigned short UShort;
-typedef short Short;
-typedef short int SInt;
+typedef uint16_t UShort;
+typedef int16_t Short;
+typedef int16_t SInt;
 typedef unsigned int Bool;
 typedef uint32_t ULong;
 typedef void Void;

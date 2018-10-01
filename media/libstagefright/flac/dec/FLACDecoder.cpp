@@ -120,7 +120,7 @@ void FLACDecoder::errorCallback(FLAC__StreamDecoderErrorStatus status)
 // Copy samples from FLAC native 32-bit non-interleaved to 16-bit interleaved.
 // These are candidates for optimization if needed.
 static void copyMono8(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACDecoder::kMaxChannels],
         unsigned nSamples,
         unsigned /* nChannels */) {
@@ -130,7 +130,7 @@ static void copyMono8(
 }
 
 static void copyStereo8(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACDecoder::kMaxChannels],
         unsigned nSamples,
         unsigned /* nChannels */) {
@@ -141,7 +141,7 @@ static void copyStereo8(
 }
 
 static void copyMultiCh8(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACDecoder::kMaxChannels],
         unsigned nSamples,
         unsigned nChannels) {
@@ -153,7 +153,7 @@ static void copyMultiCh8(
 }
 
 static void copyMono16(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACDecoder::kMaxChannels],
         unsigned nSamples,
         unsigned /* nChannels */) {
@@ -163,7 +163,7 @@ static void copyMono16(
 }
 
 static void copyStereo16(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACDecoder::kMaxChannels],
         unsigned nSamples,
         unsigned /* nChannels */) {
@@ -174,7 +174,7 @@ static void copyStereo16(
 }
 
 static void copyMultiCh16(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACDecoder::kMaxChannels],
         unsigned nSamples,
         unsigned nChannels) {
@@ -187,7 +187,7 @@ static void copyMultiCh16(
 
 // TODO: 24-bit versions should do dithering or noise-shaping, here or in AudioFlinger
 static void copyMono24(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACDecoder::kMaxChannels],
         unsigned nSamples,
         unsigned /* nChannels */) {
@@ -197,7 +197,7 @@ static void copyMono24(
 }
 
 static void copyStereo24(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACDecoder::kMaxChannels],
         unsigned nSamples,
         unsigned /* nChannels */) {
@@ -208,7 +208,7 @@ static void copyStereo24(
 }
 
 static void copyMultiCh24(
-        short *dst,
+        int16_t *dst,
         const int * src[FLACDecoder::kMaxChannels],
         unsigned nSamples,
         unsigned nChannels) {
@@ -391,7 +391,7 @@ status_t FLACDecoder::parseMetadata(const uint8_t *inBuffer, size_t inBufferLen)
     static const struct {
         unsigned mChannels;
         unsigned mBitsPerSample;
-        void (*mCopy)(short *dst, const int * src[kMaxChannels],
+        void (*mCopy)(int16_t *dst, const int * src[kMaxChannels],
                 unsigned nSamples, unsigned nChannels);
     } table[] = {
         { 1,  8, copyMono8     },
@@ -420,7 +420,7 @@ status_t FLACDecoder::parseMetadata(const uint8_t *inBuffer, size_t inBufferLen)
 }
 
 status_t FLACDecoder::decodeOneFrame(const uint8_t *inBuffer, size_t inBufferLen,
-        short *outBuffer, size_t *outBufferLen) {
+        int16_t *outBuffer, size_t *outBufferLen) {
     ALOGV("decodeOneFrame: input size(%zu)", inBufferLen);
 
     if (!mStreamInfoValid) {
@@ -469,12 +469,12 @@ status_t FLACDecoder::decodeOneFrame(const uint8_t *inBuffer, size_t inBufferLen
         return ERROR_MALFORMED;
     }
 
-    size_t bufferSize = blocksize * getChannels() * sizeof(short);
+    size_t bufferSize = blocksize * getChannels() * sizeof(int16_t);
     if (bufferSize > *outBufferLen) {
         ALOGW("decodeOneFrame: output buffer holds only partial frame %zu:%zu",
                 *outBufferLen, bufferSize);
-        blocksize = *outBufferLen / (getChannels() * sizeof(short));
-        bufferSize = blocksize * getChannels() * sizeof(short);
+        blocksize = *outBufferLen / (getChannels() * sizeof(int16_t));
+        bufferSize = blocksize * getChannels() * sizeof(int16_t);
     }
 
     if (mCopy == nullptr) {

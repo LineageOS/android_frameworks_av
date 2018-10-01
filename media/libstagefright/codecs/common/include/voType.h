@@ -22,6 +22,8 @@
 #ifndef __voType_H__
 #define __voType_H__
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
@@ -62,28 +64,28 @@ extern "C" {
 typedef void VO_VOID;
 
 /** VO_U8 is an 8 bit unsigned quantity that is byte aligned */
-typedef unsigned char VO_U8;
+typedef uint8_t VO_U8;
 
 /** VO_BYTE is an 8 bit unsigned quantity that is byte aligned */
-typedef unsigned char VO_BYTE;
+typedef uint8_t VO_BYTE;
 
 /** VO_S8 is an 8 bit signed quantity that is byte aligned */
-typedef signed char VO_S8;
+typedef int8_t VO_S8;
 
 /** VO_CHAR is an 8 bit signed quantity that is byte aligned */
-typedef char VO_CHAR;
+typedef int8_t VO_CHAR;
 
 /** VO_U16 is a 16 bit unsigned quantity that is 16 bit word aligned */
-typedef unsigned short VO_U16;
+typedef uint16_t VO_U16;
 
 /** VO_S16 is a 16 bit signed quantity that is 16 bit word aligned */
-typedef signed short VO_S16;
+typedef int16_t VO_S16;
 
 /** VO_U32 is a 32 bit unsigned quantity that is 32 bit word aligned */
-typedef unsigned long VO_U32;
+typedef uint32_t VO_U32;
 
 /** VO_S32 is a 32 bit signed quantity that is 32 bit word aligned */
-typedef signed long VO_S32;
+typedef int32_t VO_S32;
 
 /* Users with compilers that cannot accept the "long long" designation should
    define the VO_SKIP64BIT macro.  It should be noted that this may cause
@@ -94,14 +96,14 @@ typedef signed long VO_S32;
 #ifndef VO_SKIP64BIT
 #ifdef _MSC_VER
 /** VO_U64 is a 64 bit unsigned quantity that is 64 bit word aligned */
-typedef unsigned __int64  VO_U64;
+typedef uint64_t  VO_U64;
 /** VO_S64 is a 64 bit signed quantity that is 64 bit word aligned */
-typedef signed   __int64  VO_S64;
+typedef int64_t  VO_S64;
 #else // WIN32
 /** VO_U64 is a 64 bit unsigned quantity that is 64 bit word aligned */
-typedef unsigned long long VO_U64;
+typedef uint64_t VO_U64;
 /** VO_S64 is a 64 bit signed quantity that is 64 bit word aligned */
-typedef signed long long VO_S64;
+typedef int64_t VO_S64;
 #endif // WIN32
 #endif // VO_SKIP64BIT
 
