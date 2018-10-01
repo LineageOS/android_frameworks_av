@@ -19,6 +19,10 @@ cc_library_shared {
         "libstagefright_omx_utils",
     ],
 
+    header_libs: [
+        "libbase_headers",
+    ],
+
     cflags: [
         "-Werror",
         "-Wall",
