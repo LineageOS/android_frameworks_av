@@ -120,8 +120,8 @@ std::vector<std::string> CameraProviderManager::getAPI1CompatibleCameraDeviceIds
         std::vector<std::string> providerDeviceIds = provider->mUniqueAPI1CompatibleCameraIds;
 
         // API1 app doesn't handle logical and physical camera devices well. So
-        // for each [logical, physical1, physical2, ...] id combo, only take the
-        // first id advertised by HAL, and filter out the rest.
+        // for each camera facing, only take the first id advertised by HAL in
+        // all [logical, physical1, physical2, ...] id combos, and filter out the rest.
         filterLogicalCameraIdsLocked(providerDeviceIds);
 
         deviceIds.insert(deviceIds.end(), providerDeviceIds.begin(), providerDeviceIds.end());
@@ -2500,8 +2500,11 @@ status_t CameraProviderManager::getCameraCharacteristicsLocked(const std::string
 void CameraProviderManager::filterLogicalCameraIdsLocked(
         std::vector<std::string>& deviceIds) const
 {
-    std::unordered_set<std::string> removedIds;
+    // Map between camera facing and camera IDs related to logical camera.
+    std::map<int, std::unordered_set<std::string>> idCombos;
 
+    // Collect all logical and its underlying physical camera IDs for each
+    // facing.
     for (auto& deviceId : deviceIds) {
         auto deviceInfo = findDeviceInfoLocked(deviceId);
         if (deviceInfo == nullptr) continue;
@@ -2509,25 +2512,38 @@ void CameraProviderManager::filterLogicalCameraIdsLocked(
         if (!deviceInfo->mIsLogicalCamera) {
             continue;
         }
-        // idCombo contains the ids of a logical camera and its physical cameras
-        std::vector<std::string> idCombo = deviceInfo->mPhysicalIds;
-        idCombo.push_back(deviceId);
 
+        // combo contains the ids of a logical camera and its physical cameras
+        std::vector<std::string> combo = deviceInfo->mPhysicalIds;
+        combo.push_back(deviceId);
+
+        hardware::CameraInfo info;
+        status_t res = deviceInfo->getCameraInfo(&info);
+        if (res != OK) {
+            ALOGE("%s: Error reading camera info: %s (%d)", __FUNCTION__, strerror(-res), res);
+            continue;
+        }
+        idCombos[info.facing].insert(combo.begin(), combo.end());
+    }
+
+    // Only expose one camera ID per facing for all logical and underlying
+    // physical camera IDs.
+    for (auto& r : idCombos) {
+        auto& removedIds = r.second;
         for (auto& id : deviceIds) {
-            auto foundId = std::find(idCombo.begin(), idCombo.end(), id);
-            if (foundId == idCombo.end()) {
+            auto foundId = std::find(removedIds.begin(), removedIds.end(), id);
+            if (foundId == removedIds.end()) {
                 continue;
             }
 
-            idCombo.erase(foundId);
-            removedIds.insert(idCombo.begin(), idCombo.end());
+            removedIds.erase(foundId);
             break;
         }
+        deviceIds.erase(std::remove_if(deviceIds.begin(), deviceIds.end(),
+                [&removedIds](const std::string& s) {
+                return removedIds.find(s) != removedIds.end();}),
+                deviceIds.end());
     }
-
-    deviceIds.erase(std::remove_if(deviceIds.begin(), deviceIds.end(),
-            [&removedIds](const std::string& s) {return removedIds.find(s) != removedIds.end();}),
-            deviceIds.end());
 }
 
 } // namespace android
