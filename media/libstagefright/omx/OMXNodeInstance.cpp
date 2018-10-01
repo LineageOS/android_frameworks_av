@@ -16,6 +16,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "OMXNodeInstance"
+#include <android-base/macros.h>
 #include <utils/Log.h>
 
 #include <inttypes.h>
@@ -459,7 +460,7 @@ status_t OMXNodeInstance::freeNode() {
                 break;
             }
 
-            // fall through
+            FALLTHROUGH_INTENDED;
         }
 
         case OMX_StateIdle:
@@ -486,7 +487,7 @@ status_t OMXNodeInstance::freeNode() {
             }
             CHECK_EQ(err, OMX_ErrorNone);
 
-            // fall through
+            FALLTHROUGH_INTENDED;
         }
 
         case OMX_StateLoaded:
@@ -2192,8 +2193,8 @@ void OMXNodeInstance::onEvent(
                     // bump internal-state debug level for 2 input and output frames
                     Mutex::Autolock _l(mDebugLock);
                     bumpDebugLevel_l(2 /* numInputBuffers */, 2 /* numOutputBuffers */);
+                    FALLTHROUGH_INTENDED;
                 }
-                // fall through
                 default:
                     arg2String = portString(arg2);
             }
@@ -2204,7 +2205,7 @@ void OMXNodeInstance::onEvent(
             break;
         case OMX_EventPortSettingsChanged:
             arg2String = asString((OMX_INDEXEXTTYPE)arg2);
-            // fall through
+            FALLTHROUGH_INTENDED;
         default:
             arg1String = portString(arg1);
     }

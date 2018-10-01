@@ -19,6 +19,7 @@
 
 #include <string.h>
 
+#include <android-base/macros.h>
 #include <media/stagefright/omx/OMXUtils.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AUtils.h>
@@ -273,6 +274,7 @@ bool DescribeDefaultColorFormat(DescribeColorFormat2Params &params) {
                 break;
             } else {
                 // fall through as YV12 is used for YUV420Planar by some codecs
+                FALLTHROUGH_INTENDED;
             }
 
         case OMX_COLOR_FormatYUV420Planar:

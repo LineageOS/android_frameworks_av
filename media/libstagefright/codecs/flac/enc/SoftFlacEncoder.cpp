@@ -16,6 +16,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "SoftFlacEncoder"
+#include <android-base/macros.h>
 #include <utils/Log.h>
 
 #include "SoftFlacEncoder.h"
@@ -335,7 +336,7 @@ OMX_ERRORTYPE SoftFlacEncoder::internalSetParameter(
                 }
             }
 
-            // fall through
+            FALLTHROUGH_INTENDED;
         }
 
         default:
