@@ -289,6 +289,11 @@ class Camera3StreamInterface : public virtual RefBase {
      */
     virtual bool     hasOutstandingBuffers() const = 0;
 
+    /**
+     * Get number of buffers currently handed out to HAL
+     */
+    virtual size_t   getOutstandingBuffersCount() const = 0;
+
     enum {
         TIMEOUT_NEVER = -1
     };
