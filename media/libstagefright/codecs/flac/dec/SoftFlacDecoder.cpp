@@ -305,7 +305,7 @@ void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
     while ((!inQueue.empty() || mSawInputEOS) && !outQueue.empty() && !mFinishedDecoder) {
         BufferInfo *outInfo = *outQueue.begin();
         OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
-        short *outBuffer = reinterpret_cast<short *>(outHeader->pBuffer + outHeader->nOffset);
+        int16_t *outBuffer = reinterpret_cast<int16_t *>(outHeader->pBuffer + outHeader->nOffset);
         size_t outBufferSize = outHeader->nAllocLen - outHeader->nOffset;
         int64_t timeStamp = 0;
 
