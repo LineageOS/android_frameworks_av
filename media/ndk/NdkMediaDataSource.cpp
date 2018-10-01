@@ -48,14 +48,18 @@ struct AMediaDataSource {
     AMediaDataSourceReadAt readAt;
     AMediaDataSourceGetSize getSize;
     AMediaDataSourceClose close;
+    sp<DataSource> mImpl;
+    uint32_t mFlags;
 };
 
 NdkDataSource::NdkDataSource(AMediaDataSource *dataSource)
     : mDataSource(AMediaDataSource_new()) {
-      AMediaDataSource_setReadAt(mDataSource, dataSource->readAt);
-      AMediaDataSource_setGetSize(mDataSource, dataSource->getSize);
-      AMediaDataSource_setClose(mDataSource, dataSource->close);
-      AMediaDataSource_setUserdata(mDataSource, dataSource->userdata);
+    AMediaDataSource_setReadAt(mDataSource, dataSource->readAt);
+    AMediaDataSource_setGetSize(mDataSource, dataSource->getSize);
+    AMediaDataSource_setClose(mDataSource, dataSource->close);
+    AMediaDataSource_setUserdata(mDataSource, dataSource->userdata);
+    mDataSource->mImpl = dataSource->mImpl;
+    mDataSource->mFlags = dataSource->mFlags;
 }
 
 NdkDataSource::~NdkDataSource() {
@@ -66,9 +70,13 @@ status_t NdkDataSource::initCheck() const {
     return OK;
 }
 
+uint32_t NdkDataSource::flags() {
+    return mDataSource->mFlags;
+}
+
 ssize_t NdkDataSource::readAt(off64_t offset, void *data, size_t size) {
     Mutex::Autolock l(mLock);
-    if (mDataSource->getSize == NULL || mDataSource->userdata == NULL) {
+    if (mDataSource->readAt == NULL || mDataSource->userdata == NULL) {
         return -1;
     }
     return mDataSource->readAt(mDataSource->userdata, offset, data, size);
@@ -204,7 +212,10 @@ AMediaDataSource* AMediaDataSource_newUri(
     }
 
     sp<DataSource> source = DataSourceFactory::CreateFromURI(service, uri, &headers);
-    return convertDataSourceToAMediaDataSource(source);
+    AMediaDataSource* aSource = convertDataSourceToAMediaDataSource(source);
+    aSource->mImpl = source;
+    aSource->mFlags = source->flags();
+    return aSource;
 }
 
 EXPORT

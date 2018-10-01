@@ -44,6 +44,7 @@ struct NdkDataSource : public DataSource {
     NdkDataSource(AMediaDataSource *);
 
     virtual status_t initCheck() const;
+    virtual uint32_t flags();
     virtual ssize_t readAt(off64_t offset, void *data, size_t size);
     virtual status_t getSize(off64_t *);
     virtual String8 toString();
