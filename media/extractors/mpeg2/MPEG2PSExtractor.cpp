@@ -24,7 +24,6 @@
 #include "mpeg2ts/ESQueue.h"
 
 #include <media/DataSourceBase.h>
-#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -40,7 +39,7 @@
 
 namespace android {
 
-struct MPEG2PSExtractor::Track : public MediaTrack, public RefBase {
+struct MPEG2PSExtractor::Track : public MediaTrackHelper, public RefBase {
     Track(MPEG2PSExtractor *extractor,
           unsigned stream_id, unsigned stream_type);
 
@@ -72,7 +71,7 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(Track);
 };
 
-struct MPEG2PSExtractor::WrappedTrack : public MediaTrack {
+struct MPEG2PSExtractor::WrappedTrack : public MediaTrackHelper {
     WrappedTrack(MPEG2PSExtractor *extractor, const sp<Track> &track);
 
     virtual status_t start(MetaDataBase *params);
@@ -127,7 +126,7 @@ size_t MPEG2PSExtractor::countTracks() {
     return mTracks.size();
 }
 
-MediaTrack *MPEG2PSExtractor::getTrack(size_t index) {
+MediaTrackHelper *MPEG2PSExtractor::getTrack(size_t index) {
     if (index >= mTracks.size()) {
         return NULL;
     }
@@ -681,7 +680,7 @@ status_t MPEG2PSExtractor::Track::read(
         }
     }
 
-    return mSource->read(buffer, options);
+    return mSource->read(buffer, (MediaSource::ReadOptions*)options);
 }
 
 status_t MPEG2PSExtractor::Track::appendPESData(

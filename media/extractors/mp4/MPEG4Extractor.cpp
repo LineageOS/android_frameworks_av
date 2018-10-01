@@ -34,7 +34,6 @@
 
 #include <media/DataSourceBase.h>
 #include <media/ExtractorUtils.h>
-#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -68,7 +67,7 @@ enum {
     kMaxAtomSize = 64 * 1024 * 1024,
 };
 
-class MPEG4Source : public MediaTrack {
+class MPEG4Source : public MediaTrackHelper {
 static const size_t  kMaxPcmFrameSize = 8192;
 public:
     // Caller retains ownership of both "dataSource" and "sampleTable".
@@ -3616,7 +3615,7 @@ void MPEG4Extractor::parseID3v2MetaData(off64_t offset) {
     }
 }
 
-MediaTrack *MPEG4Extractor::getTrack(size_t index) {
+MediaTrackHelper *MPEG4Extractor::getTrack(size_t index) {
     status_t err;
     if ((err = readMetaData()) != OK) {
         return NULL;

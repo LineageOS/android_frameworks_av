@@ -33,6 +33,75 @@ class DataSourceBase;
 class MetaDataBase;
 struct MediaTrack;
 
+
+class MediaTrackHelper {
+public:
+    virtual ~MediaTrackHelper() {};
+    virtual status_t start(MetaDataBase *params = NULL) = 0;
+    virtual status_t stop() = 0;
+    virtual status_t getFormat(MetaDataBase& format) = 0;
+
+    class ReadOptions {
+    public:
+        enum SeekMode : int32_t {
+            SEEK_PREVIOUS_SYNC,
+            SEEK_NEXT_SYNC,
+            SEEK_CLOSEST_SYNC,
+            SEEK_CLOSEST,
+            SEEK_FRAME_INDEX,
+        };
+
+        ReadOptions(uint32_t options, int64_t seekPosUs) {
+            mOptions = options;
+            mSeekPosUs = seekPosUs;
+        }
+        bool getSeekTo(int64_t *time_us, SeekMode *mode) const {
+            if ((mOptions & CMediaTrackReadOptions::SEEK) == 0) {
+                return false;
+            }
+            *time_us = mSeekPosUs;
+            *mode = (SeekMode) (mOptions & 7);
+            return true;
+        }
+        bool getNonBlocking() const {
+            return mOptions & CMediaTrackReadOptions::NONBLOCKING;
+        }
+    private:
+        uint32_t mOptions;
+        int64_t mSeekPosUs;
+    };
+
+    virtual status_t read(
+            MediaBufferBase **buffer, const ReadOptions *options = NULL) = 0;
+    virtual bool supportsNonBlockingRead() { return false; }
+};
+
+inline CMediaTrack *wrap(MediaTrackHelper *track) {
+    CMediaTrack *wrapper = (CMediaTrack*) malloc(sizeof(CMediaTrack));
+    wrapper->data = track;
+    wrapper->free = [](void *data) -> void {
+        delete (MediaTrackHelper*)(data);
+    };
+    wrapper->start = [](void *data, MetaDataBase *params) -> status_t {
+        return ((MediaTrackHelper*)data)->start(params);
+    };
+    wrapper->stop = [](void *data) -> status_t {
+        return ((MediaTrackHelper*)data)->stop();
+    };
+    wrapper->getFormat = [](void *data, MetaDataBase &meta) -> status_t {
+        return ((MediaTrackHelper*)data)->getFormat(meta);
+    };
+    wrapper->read = [](void *data, MediaBufferBase **buffer,  uint32_t options, int64_t seekPosUs)
+            -> status_t {
+        MediaTrackHelper::ReadOptions opts(options, seekPosUs);
+        return ((MediaTrackHelper*)data)->read(buffer, &opts);
+    };
+    wrapper->supportsNonBlockingRead = [](void *data) -> bool {
+                return ((MediaTrackHelper*)data)->supportsNonBlockingRead();
+    };
+    return wrapper;
+}
+
 // extractor plugins can derive from this class which looks remarkably
 // like MediaExtractor and can be easily wrapped in the required C API
 class MediaExtractorPluginHelper
@@ -40,7 +109,7 @@ class MediaExtractorPluginHelper
 public:
     virtual ~MediaExtractorPluginHelper() {}
     virtual size_t countTracks() = 0;
-    virtual MediaTrack *getTrack(size_t index) = 0;
+    virtual MediaTrackHelper *getTrack(size_t index) = 0;
 
     enum GetTrackMetaDataFlags {
         kIncludeExtensiveMetaData = 1
@@ -89,8 +158,8 @@ inline CMediaExtractor *wrap(MediaExtractorPluginHelper *extractor) {
     wrapper->countTracks = [](void *data) -> size_t {
         return ((MediaExtractorPluginHelper*)data)->countTracks();
     };
-    wrapper->getTrack = [](void *data, size_t index) -> MediaTrack* {
-        return ((MediaExtractorPluginHelper*)data)->getTrack(index);
+    wrapper->getTrack = [](void *data, size_t index) -> CMediaTrack* {
+        return wrap(((MediaExtractorPluginHelper*)data)->getTrack(index));
     };
     wrapper->getTrackMetaData = [](
             void *data,

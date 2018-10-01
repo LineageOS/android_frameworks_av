@@ -23,6 +23,7 @@ namespace android {
 
 struct MediaTrack;
 class MetaDataBase;
+class MediaBufferBase;
 
 extern "C" {
 
@@ -34,12 +35,33 @@ struct CDataSource {
     void *handle;
 };
 
+enum CMediaTrackReadOptions : uint32_t {
+    SEEK_PREVIOUS_SYNC = 0,
+    SEEK_NEXT_SYNC = 1,
+    SEEK_CLOSEST_SYNC = 2,
+    SEEK_CLOSEST = 3,
+    SEEK_FRAME_INDEX = 4,
+    SEEK = 8,
+    NONBLOCKING = 16
+};
+
+struct CMediaTrack {
+    void *data;
+    void (*free)(void *data);
+
+    status_t (*start)(void *data, MetaDataBase *params);
+    status_t (*stop)(void *data);
+    status_t (*getFormat)(void *data, MetaDataBase &format);
+    status_t (*read)(void *data, MediaBufferBase **buffer, uint32_t options, int64_t seekPosUs);
+    bool     (*supportsNonBlockingRead)(void *data);
+};
+
 struct CMediaExtractor {
     void *data;
 
     void (*free)(void *data);
     size_t (*countTracks)(void *data);
-    MediaTrack* (*getTrack)(void *data, size_t index);
+    CMediaTrack* (*getTrack)(void *data, size_t index);
     status_t (*getTrackMetaData)(
             void *data,
             MetaDataBase& meta,

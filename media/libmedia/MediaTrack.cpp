@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <mutex>
+
 #include <media/MediaTrack.h>
 
 namespace android {
@@ -63,6 +65,50 @@ bool MediaTrack::ReadOptions::getSeekTo(
     *time_us = mSeekTimeUs;
     *mode = mSeekMode;
     return (mOptions & kSeekTo_Option) != 0;
+}
+
+MediaTrackCUnwrapper::MediaTrackCUnwrapper(CMediaTrack *cmediatrack) {
+    wrapper = cmediatrack;
+}
+
+MediaTrackCUnwrapper::~MediaTrackCUnwrapper() {
+    wrapper->free(wrapper->data);
+    free(wrapper);
+}
+
+status_t MediaTrackCUnwrapper::start(MetaDataBase *params) {
+    return wrapper->start(wrapper->data, params);
+}
+
+status_t MediaTrackCUnwrapper::stop() {
+    return wrapper->stop(wrapper->data);
+}
+
+status_t MediaTrackCUnwrapper::getFormat(MetaDataBase& format) {
+    return wrapper->getFormat(wrapper->data, format);
+}
+
+status_t MediaTrackCUnwrapper::read(MediaBufferBase **buffer, const ReadOptions *options) {
+
+    uint32_t opts = 0;
+
+    if (options->getNonBlocking()) {
+        opts |= CMediaTrackReadOptions::NONBLOCKING;
+    }
+
+    int64_t seekPosition = 0;
+    MediaTrack::ReadOptions::SeekMode seekMode;
+    if (options->getSeekTo(&seekPosition, &seekMode)) {
+        opts |= SEEK;
+        opts |= (uint32_t) seekMode;
+    }
+
+
+    return wrapper->read(wrapper->data, buffer, opts, seekPosition);
+}
+
+bool MediaTrackCUnwrapper::supportNonblockingRead() {
+    return wrapper->supportsNonBlockingRead(wrapper->data);
 }
 
 }  // namespace android

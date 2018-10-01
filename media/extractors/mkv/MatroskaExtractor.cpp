@@ -23,7 +23,6 @@
 
 #include <media/DataSourceBase.h>
 #include <media/ExtractorUtils.h>
-#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -124,7 +123,7 @@ private:
     BlockIterator &operator=(const BlockIterator &);
 };
 
-struct MatroskaSource : public MediaTrack {
+struct MatroskaSource : public MediaTrackHelper {
     MatroskaSource(MatroskaExtractor *extractor, size_t index);
 
     virtual status_t start(MetaDataBase *params);
@@ -1002,7 +1001,7 @@ size_t MatroskaExtractor::countTracks() {
     return mTracks.size();
 }
 
-MediaTrack *MatroskaExtractor::getTrack(size_t index) {
+MediaTrackHelper *MatroskaExtractor::getTrack(size_t index) {
     if (index >= mTracks.size()) {
         return NULL;
     }
