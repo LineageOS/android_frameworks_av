@@ -135,6 +135,15 @@ void CameraService::onFirstRef()
     res = enumerateProviders();
     if (res == OK) {
         mInitialized = true;
+
+        std::vector<std::string> deviceIds;
+        deviceIds = mCameraProviderManager->getCameraDeviceIds();
+
+        for (auto& cameraId : deviceIds) {
+            int idInt = atoi(cameraId.c_str());
+            CameraParameters shimParams;
+            getLegacyParametersLazy(idInt, /*out*/&shimParams);
+        }
     }
 
     CameraService::pingCameraServiceProxy();
