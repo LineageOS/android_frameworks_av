@@ -74,6 +74,10 @@ status_t ClearMediaHTTP::connect(
     return success ? OK : UNKNOWN_ERROR;
 }
 
+void ClearMediaHTTP::close() {
+    disconnect();
+}
+
 void ClearMediaHTTP::disconnect() {
     mName = String8("ClearMediaHTTP(<disconnected>)");
     if (mInitCheck != OK) {

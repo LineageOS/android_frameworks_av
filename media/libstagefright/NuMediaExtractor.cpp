@@ -204,12 +204,6 @@ status_t NuMediaExtractor::setMediaCas(const HInterfaceToken &casToken) {
     return OK;
 }
 
-void NuMediaExtractor::disconnect() {
-    if (mDataSource != NULL) {
-        mDataSource->disconnect();
-    }
-}
-
 status_t NuMediaExtractor::updateDurationAndBitrate() {
     if (mImpl->countTracks() > kMaxTrackCount) {
         return ERROR_UNSUPPORTED;

@@ -37,6 +37,8 @@ struct NuCachedSource2 : public DataSource {
 
     virtual ssize_t readAt(off64_t offset, void *data, size_t size);
 
+    virtual void close();
+
     virtual void disconnect();
 
     virtual status_t getSize(off64_t *size);
