@@ -41,7 +41,7 @@ public:
 
     status_t parseMetadata(const uint8_t *inBuffer, size_t inBufferLen);
     status_t decodeOneFrame(const uint8_t *inBuffer, size_t inBufferLen,
-            short *outBuffer, size_t *outBufferLen);
+            int16_t *outBuffer, size_t *outBufferLen);
     void flush();
     virtual ~FLACDecoder();
 
@@ -89,7 +89,7 @@ private:
     // most recent error reported by libFLAC decoder
     FLAC__StreamDecoderErrorStatus mErrorStatus;
 
-    void (*mCopy)(short *dst, const int *src[kMaxChannels], unsigned nSamples, unsigned nChannels);
+    void (*mCopy)(int16_t *dst, const int *src[kMaxChannels], unsigned nSamples, unsigned nChannels);
 
     status_t init();
 

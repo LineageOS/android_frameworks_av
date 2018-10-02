@@ -147,7 +147,7 @@ status_t SoftAAC2::initDecoder() {
     mEndOfOutput = false;
     mOutputDelayCompensated = 0;
     mOutputDelayRingBufferSize = 2048 * MAX_CHANNEL_COUNT * kNumDelayBlocksMax;
-    mOutputDelayRingBuffer = new short[mOutputDelayRingBufferSize];
+    mOutputDelayRingBuffer = new int16_t[mOutputDelayRingBufferSize];
     mOutputDelayRingBufferWritePos = 0;
     mOutputDelayRingBufferReadPos = 0;
     mOutputDelayRingBufferFilled = 0;
