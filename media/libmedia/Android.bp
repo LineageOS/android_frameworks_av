@@ -176,6 +176,7 @@ cc_library {
         "IResourceManagerClient.cpp",
         "IResourceManagerService.cpp",
         "IStreamSource.cpp",
+        "MediaTrack.cpp",
         "MediaUtils.cpp",
         "Metadata.cpp",
         "mediarecorder.cpp",
@@ -266,18 +267,13 @@ cc_library {
     },
 }
 
-cc_library {
+cc_library_static {
     name: "libmedia_player2_util",
 
     srcs: [
         "BufferingSettings.cpp",
         "DataSourceDesc.cpp",
-        "IDataSource.cpp",
-        "IMediaExtractor.cpp",
-        "IMediaExtractorService.cpp",
-        "IMediaSource.cpp",
         "MediaCodecBuffer.cpp",
-        "MediaUtils.cpp",
         "Metadata.cpp",
         "NdkWrapper.cpp",
     ],

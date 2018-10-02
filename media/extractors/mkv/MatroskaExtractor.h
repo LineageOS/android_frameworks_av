@@ -40,7 +40,7 @@ struct MatroskaExtractor : public MediaExtractorPluginHelper {
 
     virtual size_t countTracks();
 
-    virtual MediaTrack *getTrack(size_t index);
+    virtual MediaTrackHelper *getTrack(size_t index);
 
     virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
 

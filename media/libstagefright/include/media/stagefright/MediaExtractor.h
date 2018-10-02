@@ -104,7 +104,6 @@ private:
     CMediaExtractor *wrapper;
 };
 
-
 }  // namespace android
 
 #endif  // MEDIA_EXTRACTOR_H_

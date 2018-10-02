@@ -28,7 +28,6 @@ cc_library {
         "MediaBufferBase.cpp",
         "MediaBufferGroup.cpp",
         "MediaSource.cpp",
-        "MediaTrack.cpp",
         "MetaData.cpp",
         "MetaDataBase.cpp",
         "VorbisComment.cpp",

@@ -24,7 +24,6 @@
 #include "VBRISeeker.h"
 #include "XINGSeeker.h"
 
-#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/avc_utils.h>
@@ -208,7 +207,7 @@ static bool Resync(
     return valid;
 }
 
-class MP3Source : public MediaTrack {
+class MP3Source : public MediaTrackHelper {
 public:
     MP3Source(
             MetaDataBase &meta, DataSourceHelper *source,
@@ -411,7 +410,7 @@ size_t MP3Extractor::countTracks() {
     return mInitCheck != OK ? 0 : 1;
 }
 
-MediaTrack *MP3Extractor::getTrack(size_t index) {
+MediaTrackHelper *MP3Extractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }
