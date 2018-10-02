@@ -90,7 +90,22 @@ private:
 
 class MediaExtractorCUnwrapper : public MediaExtractor {
 public:
-    explicit MediaExtractorCUnwrapper(CMediaExtractor *wrapper);
+    MediaExtractorCUnwrapper() {};
+    virtual size_t countTracks() = 0;
+    virtual MediaTrack *getTrack(size_t index) = 0;
+    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags = 0) = 0;
+    virtual status_t getMetaData(MetaDataBase& meta) = 0;
+    virtual const char * name() = 0;
+    virtual uint32_t flags() const = 0;
+    virtual status_t setMediaCas(const uint8_t* casToken, size_t size) = 0;
+protected:
+    virtual ~MediaExtractorCUnwrapper() {};
+};
+
+
+class MediaExtractorCUnwrapperV1 : public MediaExtractorCUnwrapper {
+public:
+    explicit MediaExtractorCUnwrapperV1(CMediaExtractor *plugin);
     virtual size_t countTracks();
     virtual MediaTrack *getTrack(size_t index);
     virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags = 0);
@@ -99,9 +114,25 @@ public:
     virtual uint32_t flags() const;
     virtual status_t setMediaCas(const uint8_t* casToken, size_t size);
 protected:
-    virtual ~MediaExtractorCUnwrapper();
+    virtual ~MediaExtractorCUnwrapperV1();
 private:
-    CMediaExtractor *wrapper;
+    CMediaExtractor *plugin;
+};
+
+class MediaExtractorCUnwrapperV2 : public MediaExtractorCUnwrapper {
+public:
+    explicit MediaExtractorCUnwrapperV2(CMediaExtractorV2 *plugin);
+    virtual size_t countTracks();
+    virtual MediaTrack *getTrack(size_t index);
+    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags = 0);
+    virtual status_t getMetaData(MetaDataBase& meta);
+    virtual const char * name();
+    virtual uint32_t flags() const;
+    virtual status_t setMediaCas(const uint8_t* casToken, size_t size);
+protected:
+    virtual ~MediaExtractorCUnwrapperV2();
+private:
+    CMediaExtractorV2 *plugin;
 };
 
 }  // namespace android

@@ -102,6 +102,77 @@ inline CMediaTrack *wrap(MediaTrackHelper *track) {
     return wrapper;
 }
 
+
+class MediaTrackHelperV2 {
+public:
+    virtual ~MediaTrackHelperV2() {};
+    virtual status_t start(AMediaFormat *params = NULL) = 0;
+    virtual status_t stop() = 0;
+    virtual status_t getFormat(AMediaFormat *format) = 0;
+
+    class ReadOptions {
+    public:
+        enum SeekMode : int32_t {
+            SEEK_PREVIOUS_SYNC,
+            SEEK_NEXT_SYNC,
+            SEEK_CLOSEST_SYNC,
+            SEEK_CLOSEST,
+            SEEK_FRAME_INDEX,
+        };
+
+        ReadOptions(uint32_t options, int64_t seekPosUs) {
+            mOptions = options;
+            mSeekPosUs = seekPosUs;
+        }
+        bool getSeekTo(int64_t *time_us, SeekMode *mode) const {
+            if ((mOptions & CMediaTrackReadOptions::SEEK) == 0) {
+                return false;
+            }
+            *time_us = mSeekPosUs;
+            *mode = (SeekMode) (mOptions & 7);
+            return true;
+        }
+        bool getNonBlocking() const {
+            return mOptions & CMediaTrackReadOptions::NONBLOCKING;
+        }
+    private:
+        uint32_t mOptions;
+        int64_t mSeekPosUs;
+    };
+
+    virtual status_t read(
+            MediaBufferBase **buffer, const ReadOptions *options = NULL) = 0;
+    virtual bool supportsNonBlockingRead() { return false; }
+};
+
+inline CMediaTrackV2 *wrapV2(MediaTrackHelperV2 *track) {
+    CMediaTrackV2 *wrapper = (CMediaTrackV2*) malloc(sizeof(CMediaTrackV2));
+    wrapper->data = track;
+    wrapper->free = [](void *data) -> void {
+        delete (MediaTrackHelperV2*)(data);
+    };
+    wrapper->start = [](void *data, AMediaFormat *params) -> status_t {
+        return ((MediaTrackHelperV2*)data)->start(params);
+    };
+    wrapper->stop = [](void *data) -> status_t {
+        return ((MediaTrackHelperV2*)data)->stop();
+    };
+    wrapper->getFormat = [](void *data, AMediaFormat *meta) -> status_t {
+        return ((MediaTrackHelperV2*)data)->getFormat(meta);
+    };
+    wrapper->read = [](void *data, MediaBufferBase **buffer,  uint32_t options, int64_t seekPosUs)
+            -> status_t {
+        MediaTrackHelperV2::ReadOptions opts(options, seekPosUs);
+        return ((MediaTrackHelperV2*)data)->read(buffer, &opts);
+    };
+    wrapper->supportsNonBlockingRead = [](void *data) -> bool {
+                return ((MediaTrackHelperV2*)data)->supportsNonBlockingRead();
+    };
+    return wrapper;
+}
+
+
+
 // extractor plugins can derive from this class which looks remarkably
 // like MediaExtractor and can be easily wrapped in the required C API
 class MediaExtractorPluginHelper
@@ -183,6 +254,89 @@ inline CMediaExtractor *wrap(MediaExtractorPluginHelper *extractor) {
     wrapper->name = [](
             void *data) -> const char * {
         return ((MediaExtractorPluginHelper*)data)->name();
+    };
+    return wrapper;
+}
+
+class MediaExtractorPluginHelperV2
+{
+public:
+    virtual ~MediaExtractorPluginHelperV2() {}
+    virtual size_t countTracks() = 0;
+    virtual MediaTrackHelperV2 *getTrack(size_t index) = 0;
+
+    enum GetTrackMetaDataFlags {
+        kIncludeExtensiveMetaData = 1
+    };
+    virtual status_t getTrackMetaData(
+            AMediaFormat *meta,
+            size_t index, uint32_t flags = 0) = 0;
+
+    // Return container specific meta-data. The default implementation
+    // returns an empty metadata object.
+    virtual status_t getMetaData(AMediaFormat *meta) = 0;
+
+    enum Flags {
+        CAN_SEEK_BACKWARD  = 1,  // the "seek 10secs back button"
+        CAN_SEEK_FORWARD   = 2,  // the "seek 10secs forward button"
+        CAN_PAUSE          = 4,
+        CAN_SEEK           = 8,  // the "seek bar"
+    };
+
+    // If subclasses do _not_ override this, the default is
+    // CAN_SEEK_BACKWARD | CAN_SEEK_FORWARD | CAN_SEEK | CAN_PAUSE
+    virtual uint32_t flags() const {
+        return CAN_SEEK_BACKWARD | CAN_SEEK_FORWARD | CAN_SEEK | CAN_PAUSE;
+    };
+
+    virtual status_t setMediaCas(const uint8_t* /*casToken*/, size_t /*size*/) {
+        return INVALID_OPERATION;
+    }
+
+    virtual const char * name() { return "<unspecified>"; }
+
+protected:
+    MediaExtractorPluginHelperV2() {}
+
+private:
+    MediaExtractorPluginHelperV2(const MediaExtractorPluginHelperV2 &);
+    MediaExtractorPluginHelperV2 &operator=(const MediaExtractorPluginHelperV2 &);
+};
+
+inline CMediaExtractorV2 *wrapV2(MediaExtractorPluginHelperV2 *extractor) {
+    CMediaExtractorV2 *wrapper = (CMediaExtractorV2*) malloc(sizeof(CMediaExtractorV2));
+    wrapper->data = extractor;
+    wrapper->free = [](void *data) -> void {
+        delete (MediaExtractorPluginHelperV2*)(data);
+    };
+    wrapper->countTracks = [](void *data) -> size_t {
+        return ((MediaExtractorPluginHelperV2*)data)->countTracks();
+    };
+    wrapper->getTrack = [](void *data, size_t index) -> CMediaTrackV2* {
+        return wrapV2(((MediaExtractorPluginHelperV2*)data)->getTrack(index));
+    };
+    wrapper->getTrackMetaData = [](
+            void *data,
+            AMediaFormat *meta,
+            size_t index, uint32_t flags) -> status_t {
+        return ((MediaExtractorPluginHelperV2*)data)->getTrackMetaData(meta, index, flags);
+    };
+    wrapper->getMetaData = [](
+            void *data,
+            AMediaFormat *meta) -> status_t {
+        return ((MediaExtractorPluginHelperV2*)data)->getMetaData(meta);
+    };
+    wrapper->flags = [](
+            void *data) -> uint32_t {
+        return ((MediaExtractorPluginHelperV2*)data)->flags();
+    };
+    wrapper->setMediaCas = [](
+            void *data, const uint8_t *casToken, size_t size) -> status_t {
+        return ((MediaExtractorPluginHelperV2*)data)->setMediaCas(casToken, size);
+    };
+    wrapper->name = [](
+            void *data) -> const char * {
+        return ((MediaExtractorPluginHelperV2*)data)->name();
     };
     return wrapper;
 }

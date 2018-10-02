@@ -30,6 +30,8 @@ namespace android {
 
 struct AMessage;
 status_t convertMetaDataToMessage(
+        const MetaDataBase *meta, sp<AMessage> *format);
+status_t convertMetaDataToMessage(
         const sp<MetaData> &meta, sp<AMessage> *format);
 void convertMessageToMetaData(
         const sp<AMessage> &format, sp<MetaData> &meta);
