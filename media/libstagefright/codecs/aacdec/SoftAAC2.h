@@ -81,7 +81,7 @@ private:
     bool mEndOfOutput;
     int32_t mOutputDelayCompensated;
     int32_t mOutputDelayRingBufferSize;
-    short *mOutputDelayRingBuffer;
+    int16_t *mOutputDelayRingBuffer;
     int32_t mOutputDelayRingBufferWritePos;
     int32_t mOutputDelayRingBufferReadPos;
     int32_t mOutputDelayRingBufferFilled;
