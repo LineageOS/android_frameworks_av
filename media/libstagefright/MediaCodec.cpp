@@ -1829,8 +1829,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                             // the shutdown complete notification. If we
                             // don't, we'll timeout and force release.
                             sendErrorResponse = false;
+                            FALLTHROUGH_INTENDED;
                         }
-                        // fall-thru
                         case STOPPING:
                         {
                             if (mFlags & kFlagSawMediaServerDie) {

@@ -29,6 +29,7 @@ cc_library_shared {
     ],
 
     header_libs: [
+        "libbase_headers",
         "media_plugin_headers",
     ],
 
