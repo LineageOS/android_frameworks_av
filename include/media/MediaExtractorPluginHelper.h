@@ -37,7 +37,7 @@ struct MediaTrack;
 class MediaTrackHelper {
 public:
     virtual ~MediaTrackHelper() {};
-    virtual status_t start(MetaDataBase *params = NULL) = 0;
+    virtual status_t start() = 0;
     virtual status_t stop() = 0;
     virtual status_t getFormat(MetaDataBase& format) = 0;
 
@@ -82,8 +82,8 @@ inline CMediaTrack *wrap(MediaTrackHelper *track) {
     wrapper->free = [](void *data) -> void {
         delete (MediaTrackHelper*)(data);
     };
-    wrapper->start = [](void *data, MetaDataBase *params) -> status_t {
-        return ((MediaTrackHelper*)data)->start(params);
+    wrapper->start = [](void *data) -> status_t {
+        return ((MediaTrackHelper*)data)->start();
     };
     wrapper->stop = [](void *data) -> status_t {
         return ((MediaTrackHelper*)data)->stop();
@@ -106,7 +106,7 @@ inline CMediaTrack *wrap(MediaTrackHelper *track) {
 class MediaTrackHelperV2 {
 public:
     virtual ~MediaTrackHelperV2() {};
-    virtual status_t start(AMediaFormat *params = NULL) = 0;
+    virtual status_t start() = 0;
     virtual status_t stop() = 0;
     virtual status_t getFormat(AMediaFormat *format) = 0;
 
@@ -151,8 +151,8 @@ inline CMediaTrackV2 *wrapV2(MediaTrackHelperV2 *track) {
     wrapper->free = [](void *data) -> void {
         delete (MediaTrackHelperV2*)(data);
     };
-    wrapper->start = [](void *data, AMediaFormat *params) -> status_t {
-        return ((MediaTrackHelperV2*)data)->start(params);
+    wrapper->start = [](void *data) -> status_t {
+        return ((MediaTrackHelperV2*)data)->start();
     };
     wrapper->stop = [](void *data) -> status_t {
         return ((MediaTrackHelperV2*)data)->stop();

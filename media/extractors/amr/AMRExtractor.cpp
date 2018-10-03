@@ -38,7 +38,7 @@ public:
             const off64_t *offset_table,
             size_t offset_table_length);
 
-    virtual status_t start(MetaDataBase *params = NULL);
+    virtual status_t start();
     virtual status_t stop();
 
     virtual status_t getFormat(MetaDataBase &);
@@ -249,7 +249,7 @@ AMRSource::~AMRSource() {
     }
 }
 
-status_t AMRSource::start(MetaDataBase * /* params */) {
+status_t AMRSource::start() {
     CHECK(!mStarted);
 
     mOffset = mIsWide ? 9 : 6;

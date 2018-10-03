@@ -52,7 +52,7 @@ struct OggSource : public MediaTrackHelper {
 
     virtual status_t getFormat(MetaDataBase &);
 
-    virtual status_t start(MetaDataBase *params = NULL);
+    virtual status_t start();
     virtual status_t stop();
 
     virtual status_t read(
@@ -241,7 +241,7 @@ status_t OggSource::getFormat(MetaDataBase &meta) {
     return mExtractor->mImpl->getFormat(meta);
 }
 
-status_t OggSource::start(MetaDataBase * /* params */) {
+status_t OggSource::start() {
     if (mStarted) {
         return INVALID_OPERATION;
     }

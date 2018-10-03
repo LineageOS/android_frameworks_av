@@ -43,7 +43,7 @@ public:
 
 private:
     sp<RemoteMediaExtractor> mExtractor;
-    MediaTrack *mSource;
+    MediaTrack *mTrack;
     sp<RefBase> mExtractorPlugin;
 
     explicit RemoteMediaSource(
