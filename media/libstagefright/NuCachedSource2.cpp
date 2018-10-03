@@ -571,12 +571,19 @@ size_t NuCachedSource2::cachedSize() {
     return mCacheOffset + mCache->totalSize();
 }
 
-size_t NuCachedSource2::approxDataRemaining(status_t *finalStatus) const {
+status_t NuCachedSource2::getAvailableSize(off64_t offset, off64_t *size) {
     Mutex::Autolock autoLock(mLock);
-    return approxDataRemaining_l(finalStatus);
+    status_t finalStatus = UNKNOWN_ERROR;
+    *size = approxDataRemaining_l(offset, &finalStatus);
+    return finalStatus;
 }
 
-size_t NuCachedSource2::approxDataRemaining_l(status_t *finalStatus) const {
+size_t NuCachedSource2::approxDataRemaining(status_t *finalStatus) const {
+    Mutex::Autolock autoLock(mLock);
+    return approxDataRemaining_l(mLastAccessPos, finalStatus);
+}
+
+size_t NuCachedSource2::approxDataRemaining_l(off64_t offset, status_t *finalStatus) const {
     *finalStatus = mFinalStatus;
 
     if (mFinalStatus != OK && mNumRetriesLeft > 0) {
@@ -584,9 +591,10 @@ size_t NuCachedSource2::approxDataRemaining_l(status_t *finalStatus) const {
         *finalStatus = OK;
     }
 
+    offset = offset >= 0 ? offset : mLastAccessPos;
     off64_t lastBytePosCached = mCacheOffset + mCache->totalSize();
-    if (mLastAccessPos < lastBytePosCached) {
-        return lastBytePosCached - mLastAccessPos;
+    if (offset < lastBytePosCached) {
+        return lastBytePosCached - offset;
     }
     return 0;
 }

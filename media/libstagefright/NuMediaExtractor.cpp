@@ -780,9 +780,8 @@ bool NuMediaExtractor::getCachedDuration(
         int64_t *durationUs, bool *eos) const {
     Mutex::Autolock autoLock(mLock);
 
-    status_t finalStatus;
-    ssize_t cachedDataRemaining =
-        mDataSource->getAvailableSize(&finalStatus);
+    off64_t cachedDataRemaining = -1;
+    status_t finalStatus = mDataSource->getAvailableSize(-1, &cachedDataRemaining);
 
     int64_t bitrate;
     if (cachedDataRemaining >= 0
