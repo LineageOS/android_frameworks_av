@@ -256,6 +256,10 @@ status_t NuCachedSource2::getEstimatedBandwidthKbps(int32_t *kbps) {
     return ERROR_UNSUPPORTED;
 }
 
+void NuCachedSource2::close() {
+    disconnect();
+}
+
 void NuCachedSource2::disconnect() {
     if (mSource->flags() & kIsHTTPBasedSource) {
         ALOGV("disconnecting HTTPBasedSource");

@@ -31,18 +31,6 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <utils/Errors.h>
 
-// TODO: remove forward declaration when AMediaExtractor_disconnect is offcially added to NDK
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-media_status_t AMediaExtractor_disconnect(AMediaExtractor *);
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
-
 namespace android {
 
 static const size_t kAESBlockSize = 16;  // AES_BLOCK_SIZE
@@ -1078,14 +1066,6 @@ status_t AMediaExtractorWrapper::release() {
         return translateErrorCode(err);
     }
     return OK;
-}
-
-status_t AMediaExtractorWrapper::disconnect() {
-    if (mAMediaExtractor != NULL) {
-        media_status_t err = AMediaExtractor_disconnect(mAMediaExtractor);
-        return translateErrorCode(err);
-    }
-    return DEAD_OBJECT;
 }
 
 AMediaExtractor *AMediaExtractorWrapper::getAMediaExtractor() const {
