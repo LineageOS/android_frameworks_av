@@ -677,21 +677,27 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                     VolumeData *data = (VolumeData *)command->mParam.get();
                     ALOGV("AudioCommandThread() processing set volume stream %d, \
                             volume %f, output %d", data->mStream, data->mVolume, data->mIO);
+                    mLock.unlock();
                     command->mStatus = AudioSystem::setStreamVolume(data->mStream,
                                                                     data->mVolume,
                                                                     data->mIO);
+                    mLock.lock();
                     }break;
                 case SET_PARAMETERS: {
                     ParametersData *data = (ParametersData *)command->mParam.get();
                     ALOGV("AudioCommandThread() processing set parameters string %s, io %d",
                             data->mKeyValuePairs.string(), data->mIO);
+                    mLock.unlock();
                     command->mStatus = AudioSystem::setParameters(data->mIO, data->mKeyValuePairs);
+                    mLock.lock();
                     }break;
                 case SET_VOICE_VOLUME: {
                     VoiceVolumeData *data = (VoiceVolumeData *)command->mParam.get();
                     ALOGV("AudioCommandThread() processing set voice volume volume %f",
                             data->mVolume);
+                    mLock.unlock();
                     command->mStatus = AudioSystem::setVoiceVolume(data->mVolume);
+                    mLock.lock();
                     }break;
                 case STOP_OUTPUT: {
                     StopOutputData *data = (StopOutputData *)command->mParam.get();
@@ -724,7 +730,9 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                     if (af == 0) {
                         command->mStatus = PERMISSION_DENIED;
                     } else {
+                        mLock.unlock();
                         command->mStatus = af->createAudioPatch(&data->mPatch, &data->mHandle);
+                        mLock.lock();
                     }
                     } break;
                 case RELEASE_AUDIO_PATCH: {
@@ -734,7 +742,9 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                     if (af == 0) {
                         command->mStatus = PERMISSION_DENIED;
                     } else {
+                        mLock.unlock();
                         command->mStatus = af->releaseAudioPatch(data->mHandle);
+                        mLock.lock();
                     }
                     } break;
                 case UPDATE_AUDIOPORT_LIST: {
@@ -764,7 +774,9 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                     if (af == 0) {
                         command->mStatus = PERMISSION_DENIED;
                     } else {
+                        mLock.unlock();
                         command->mStatus = af->setAudioPortConfig(&data->mConfig);
+                        mLock.lock();
                     }
                     } break;
                 case DYN_POLICY_MIX_STATE_UPDATE: {
