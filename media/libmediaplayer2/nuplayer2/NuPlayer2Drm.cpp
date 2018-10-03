@@ -147,9 +147,10 @@ status_t NuPlayer2Drm::retrieveDrmInfo(PsshInfo *psshInfo, PlayerMessage *player
     }
 
     uint32_t psshSize = pssh.tellp();
-    const uint8_t* psshPtr = reinterpret_cast<const uint8_t*>(pssh.str().c_str());
-    const char *psshHex = DrmUUID::arrayToHex(psshPtr, psshSize).string();
-    ALOGV("retrieveDrmInfo: MEDIA_DRM_INFO  PSSH: size: %u %s", psshSize, psshHex);
+    std::string psshBase = pssh.str();
+    const auto* psshPtr = reinterpret_cast<const uint8_t*>(psshBase.c_str());
+    ALOGV("retrieveDrmInfo: MEDIA_DRM_INFO  PSSH: size: %u %s", psshSize,
+            DrmUUID::arrayToHex(psshPtr, psshSize).string());
 
     // 1) Write PSSH bytes
     playerMsg->add_values()->set_bytes_value(
