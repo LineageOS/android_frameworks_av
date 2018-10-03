@@ -718,7 +718,7 @@ ExtractorDef GETEXTRACTORDEF() {
         UUID("812a3f6c-c8cf-46de-b529-3774b14103d4"),
         1, // version
         "MP3 Extractor",
-        Sniff
+        { Sniff }
     };
 }
 

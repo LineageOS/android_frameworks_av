@@ -22,7 +22,8 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MetaData.h>
-#include <media/MediaTrack.h>
+#include <media/stagefright/Utils.h>
+#include <media/NdkMediaFormatPriv.h>
 
 namespace android {
 
@@ -41,42 +42,95 @@ uint32_t MediaExtractor::flags() const {
 }
 
 // --------------------------------------------------------------------------------
-MediaExtractorCUnwrapper::MediaExtractorCUnwrapper(CMediaExtractor *wrapper) {
-    this->wrapper = wrapper;
+MediaExtractorCUnwrapperV1::MediaExtractorCUnwrapperV1(CMediaExtractor *plugin) {
+    this->plugin = plugin;
 }
 
-MediaExtractorCUnwrapper::~MediaExtractorCUnwrapper() {
-    wrapper->free(wrapper->data);
-    free(wrapper);
+MediaExtractorCUnwrapperV1::~MediaExtractorCUnwrapperV1() {
+    plugin->free(plugin->data);
+    free(plugin);
 }
 
-size_t MediaExtractorCUnwrapper::countTracks() {
-    return wrapper->countTracks(wrapper->data);
+size_t MediaExtractorCUnwrapperV1::countTracks() {
+    return plugin->countTracks(plugin->data);
 }
 
-MediaTrack *MediaExtractorCUnwrapper::getTrack(size_t index) {
-    return new MediaTrackCUnwrapper(wrapper->getTrack(wrapper->data, index));
+MediaTrack *MediaExtractorCUnwrapperV1::getTrack(size_t index) {
+    return new MediaTrackCUnwrapper(plugin->getTrack(plugin->data, index));
 }
 
-status_t MediaExtractorCUnwrapper::getTrackMetaData(
+status_t MediaExtractorCUnwrapperV1::getTrackMetaData(
         MetaDataBase& meta, size_t index, uint32_t flags) {
-    return wrapper->getTrackMetaData(wrapper->data, meta, index, flags);
+    return plugin->getTrackMetaData(plugin->data, meta, index, flags);
 }
 
-status_t MediaExtractorCUnwrapper::getMetaData(MetaDataBase& meta) {
-    return wrapper->getMetaData(wrapper->data, meta);
+status_t MediaExtractorCUnwrapperV1::getMetaData(MetaDataBase& meta) {
+    return plugin->getMetaData(plugin->data, meta);
 }
 
-const char * MediaExtractorCUnwrapper::name() {
-    return wrapper->name(wrapper->data);
+const char * MediaExtractorCUnwrapperV1::name() {
+    return plugin->name(plugin->data);
 }
 
-uint32_t MediaExtractorCUnwrapper::flags() const {
-    return wrapper->flags(wrapper->data);
+uint32_t MediaExtractorCUnwrapperV1::flags() const {
+    return plugin->flags(plugin->data);
 }
 
-status_t MediaExtractorCUnwrapper::setMediaCas(const uint8_t* casToken, size_t size) {
-    return wrapper->setMediaCas(wrapper->data, casToken, size);
+status_t MediaExtractorCUnwrapperV1::setMediaCas(const uint8_t* casToken, size_t size) {
+    return plugin->setMediaCas(plugin->data, casToken, size);
+}
+
+// --------------------------------------------------------------------------------
+MediaExtractorCUnwrapperV2::MediaExtractorCUnwrapperV2(CMediaExtractorV2 *plugin) {
+    this->plugin = plugin;
+}
+
+MediaExtractorCUnwrapperV2::~MediaExtractorCUnwrapperV2() {
+    plugin->free(plugin->data);
+    free(plugin);
+}
+
+size_t MediaExtractorCUnwrapperV2::countTracks() {
+    return plugin->countTracks(plugin->data);
+}
+
+MediaTrack *MediaExtractorCUnwrapperV2::getTrack(size_t index) {
+    return new MediaTrackCUnwrapperV2(plugin->getTrack(plugin->data, index));
+}
+
+status_t MediaExtractorCUnwrapperV2::getTrackMetaData(
+        MetaDataBase& meta, size_t index, uint32_t flags) {
+    sp<AMessage> msg = new AMessage();
+    AMediaFormat *format =  AMediaFormat_fromMsg(&msg);
+    status_t ret = plugin->getTrackMetaData(plugin->data, format, index, flags);
+    sp<MetaData> newMeta = new MetaData();
+    convertMessageToMetaData(msg, newMeta);
+    delete format;
+    meta = *newMeta;
+    return ret;
+}
+
+status_t MediaExtractorCUnwrapperV2::getMetaData(MetaDataBase& meta) {
+    sp<AMessage> msg = new AMessage();
+    AMediaFormat *format =  AMediaFormat_fromMsg(&msg);
+    status_t ret = plugin->getMetaData(plugin->data, format);
+    sp<MetaData> newMeta = new MetaData();
+    convertMessageToMetaData(msg, newMeta);
+    delete format;
+    meta = *newMeta;
+    return ret;
+}
+
+const char * MediaExtractorCUnwrapperV2::name() {
+    return plugin->name(plugin->data);
+}
+
+uint32_t MediaExtractorCUnwrapperV2::flags() const {
+    return plugin->flags(plugin->data);
+}
+
+status_t MediaExtractorCUnwrapperV2::setMediaCas(const uint8_t* casToken, size_t size) {
+    return plugin->setMediaCas(plugin->data, casToken, size);
 }
 
 }  // namespace android

@@ -54,17 +54,17 @@ static uint16_t U16_LE_AT(const uint8_t *ptr) {
     return ptr[1] << 8 | ptr[0];
 }
 
-struct WAVSource : public MediaTrackHelper {
+struct WAVSource : public MediaTrackHelperV2 {
     WAVSource(
             DataSourceHelper *dataSource,
-            MetaDataBase &meta,
+            AMediaFormat *meta,
             uint16_t waveFormat,
             int32_t bitsPerSample,
             off64_t offset, size_t size);
 
-    virtual status_t start(MetaDataBase *params = NULL);
+    virtual status_t start(AMediaFormat *params = NULL);
     virtual status_t stop();
-    virtual status_t getFormat(MetaDataBase &meta);
+    virtual status_t getFormat(AMediaFormat *meta);
 
     virtual status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL);
@@ -78,7 +78,7 @@ private:
     static const size_t kMaxFrameSize;
 
     DataSourceHelper *mDataSource;
-    MetaDataBase &mMeta;
+    AMediaFormat *mMeta;
     uint16_t mWaveFormat;
     int32_t mSampleRate;
     int32_t mNumChannels;
@@ -97,17 +97,19 @@ WAVExtractor::WAVExtractor(DataSourceHelper *source)
     : mDataSource(source),
       mValidFormat(false),
       mChannelMask(CHANNEL_MASK_USE_CHANNEL_ORDER) {
+    mTrackMeta = AMediaFormat_new();
     mInitCheck = init();
 }
 
 WAVExtractor::~WAVExtractor() {
     delete mDataSource;
+    AMediaFormat_delete(mTrackMeta);
 }
 
-status_t WAVExtractor::getMetaData(MetaDataBase &meta) {
-    meta.clear();
+status_t WAVExtractor::getMetaData(AMediaFormat *meta) {
+    AMediaFormat_clear(meta);
     if (mInitCheck == OK) {
-        meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_CONTAINER_WAV);
+        AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_CONTAINER_WAV);
     }
 
     return OK;
@@ -117,7 +119,7 @@ size_t WAVExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrackHelper *WAVExtractor::getTrack(size_t index) {
+MediaTrackHelperV2 *WAVExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index > 0) {
         return NULL;
     }
@@ -128,13 +130,13 @@ MediaTrackHelper *WAVExtractor::getTrack(size_t index) {
 }
 
 status_t WAVExtractor::getTrackMetaData(
-        MetaDataBase &meta,
+        AMediaFormat *meta,
         size_t index, uint32_t /* flags */) {
     if (mInitCheck != OK || index > 0) {
         return UNKNOWN_ERROR;
     }
 
-    meta = mTrackMeta;
+    AMediaFormat_copy(meta, mTrackMeta);
     return OK;
 }
 
@@ -284,33 +286,34 @@ status_t WAVExtractor::init() {
                 mDataOffset = offset;
                 mDataSize = chunkSize;
 
-                mTrackMeta.clear();
+                AMediaFormat_clear(mTrackMeta);
 
                 switch (mWaveFormat) {
                     case WAVE_FORMAT_PCM:
                     case WAVE_FORMAT_IEEE_FLOAT:
-                        mTrackMeta.setCString(
-                                kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_RAW);
+                        AMediaFormat_setString(mTrackMeta,
+                                AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_RAW);
                         break;
                     case WAVE_FORMAT_ALAW:
-                        mTrackMeta.setCString(
-                                kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_G711_ALAW);
+                        AMediaFormat_setString(mTrackMeta,
+                                AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_G711_ALAW);
                         break;
                     case WAVE_FORMAT_MSGSM:
-                        mTrackMeta.setCString(
-                                kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MSGSM);
+                        AMediaFormat_setString(mTrackMeta,
+                                AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MSGSM);
                         break;
                     default:
                         CHECK_EQ(mWaveFormat, (uint16_t)WAVE_FORMAT_MULAW);
-                        mTrackMeta.setCString(
-                                kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_G711_MLAW);
+                        AMediaFormat_setString(mTrackMeta,
+                                AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_G711_MLAW);
                         break;
                 }
 
-                mTrackMeta.setInt32(kKeyChannelCount, mNumChannels);
-                mTrackMeta.setInt32(kKeyChannelMask, mChannelMask);
-                mTrackMeta.setInt32(kKeySampleRate, mSampleRate);
-                mTrackMeta.setInt32(kKeyPcmEncoding, kAudioEncodingPcm16bit);
+                AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, mNumChannels);
+                AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_CHANNEL_MASK, mChannelMask);
+                AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, mSampleRate);
+                AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_PCM_ENCODING,
+                        kAudioEncodingPcm16bit);
 
                 int64_t durationUs = 0;
                 if (mWaveFormat == WAVE_FORMAT_MSGSM) {
@@ -332,7 +335,7 @@ status_t WAVExtractor::init() {
                         1000000LL * num_samples / mSampleRate;
                 }
 
-                mTrackMeta.setInt64(kKeyDuration, durationUs);
+                AMediaFormat_setInt64(mTrackMeta, AMEDIAFORMAT_KEY_DURATION, durationUs);
 
                 return OK;
             }
@@ -348,7 +351,7 @@ const size_t WAVSource::kMaxFrameSize = 32768;
 
 WAVSource::WAVSource(
         DataSourceHelper *dataSource,
-        MetaDataBase &meta,
+        AMediaFormat *meta,
         uint16_t waveFormat,
         int32_t bitsPerSample,
         off64_t offset, size_t size)
@@ -362,10 +365,10 @@ WAVSource::WAVSource(
       mSize(size),
       mStarted(false),
       mGroup(NULL) {
-    CHECK(mMeta.findInt32(kKeySampleRate, &mSampleRate));
-    CHECK(mMeta.findInt32(kKeyChannelCount, &mNumChannels));
+    CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, &mSampleRate));
+    CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, &mNumChannels));
 
-    mMeta.setInt32(kKeyMaxInputSize, kMaxFrameSize);
+    AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, kMaxFrameSize);
 }
 
 WAVSource::~WAVSource() {
@@ -374,7 +377,7 @@ WAVSource::~WAVSource() {
     }
 }
 
-status_t WAVSource::start(MetaDataBase * /* params */) {
+status_t WAVSource::start(AMediaFormat * /* params */) {
     ALOGV("WAVSource::start");
 
     CHECK(!mStarted);
@@ -407,10 +410,10 @@ status_t WAVSource::stop() {
     return OK;
 }
 
-status_t WAVSource::getFormat(MetaDataBase &meta) {
+status_t WAVSource::getFormat(AMediaFormat *meta) {
     ALOGV("WAVSource::getFormat");
 
-    meta = mMeta;
+    AMediaFormat_copy(meta, mMeta);
     return OK;
 }
 
@@ -544,13 +547,13 @@ status_t WAVSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static CMediaExtractor* CreateExtractor(
+static CMediaExtractorV2* CreateExtractor(
         CDataSource *source,
         void *) {
-    return wrap(new WAVExtractor(new DataSourceHelper(source)));
+    return wrapV2(new WAVExtractor(new DataSourceHelper(source)));
 }
 
-static CreatorFunc Sniff(
+static CreatorFuncV2 Sniff(
         CDataSource *source,
         float *confidence,
         void **,
@@ -584,11 +587,11 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION_CURRENT,
         UUID("7d613858-5837-4a38-84c5-332d1cddee27"),
         1, // version
         "WAV Extractor",
-        Sniff
+        { .v2 = Sniff }
     };
 }
 

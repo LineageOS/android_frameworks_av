@@ -46,6 +46,10 @@ cc_library {
         "android.hardware.cas.native@1.0",
     ],
 
+    header_libs: [
+        "libbase_headers",
+    ],
+
     static_libs: [
         "libstagefright_id3",
         "libstagefright_metadatautils",

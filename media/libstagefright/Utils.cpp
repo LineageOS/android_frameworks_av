@@ -74,7 +74,7 @@ static void convertMetaDataToMessageInt32(
 }
 #endif
 
-static void convertMetaDataToMessageColorAspects(const sp<MetaData> &meta, sp<AMessage> &msg) {
+static void convertMetaDataToMessageColorAspects(const MetaDataBase *meta, sp<AMessage> &msg) {
     // 0 values are unspecified
     int32_t range = 0;
     int32_t primaries = 0;
@@ -568,8 +568,14 @@ static void parseVp9ProfileLevelFromCsd(const sp<ABuffer> &csd, sp<AMessage> &fo
     }
 }
 
+
 status_t convertMetaDataToMessage(
         const sp<MetaData> &meta, sp<AMessage> *format) {
+    return convertMetaDataToMessage(meta.get(), format);
+}
+
+status_t convertMetaDataToMessage(
+        const MetaDataBase *meta, sp<AMessage> *format) {
 
     format->clear();
 

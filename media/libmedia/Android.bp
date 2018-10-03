@@ -176,7 +176,6 @@ cc_library {
         "IResourceManagerClient.cpp",
         "IResourceManagerService.cpp",
         "IStreamSource.cpp",
-        "MediaTrack.cpp",
         "MediaUtils.cpp",
         "Metadata.cpp",
         "mediarecorder.cpp",

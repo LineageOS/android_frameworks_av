@@ -393,7 +393,7 @@ ExtractorDef GETEXTRACTORDEF() {
         UUID("4fd80eae-03d2-4d72-9eb9-48fa6bb54613"),
         1, // version
         "AAC Extractor",
-        Sniff
+        { Sniff }
     };
 }
 

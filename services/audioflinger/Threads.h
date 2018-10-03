@@ -1137,7 +1137,6 @@ protected:
     virtual     void        threadLoop_standby();
     virtual     void        threadLoop_mix();
     virtual     void        threadLoop_sleepTime();
-    virtual     void        threadLoop_removeTracks(const Vector< sp<Track> >& tracksToRemove);
     virtual     uint32_t    correctLatency_l(uint32_t latency) const;
 
     virtual     status_t    createAudioPatch_l(const struct audio_patch *patch,

@@ -19,6 +19,8 @@
 
 #include <utils/Errors.h> // for status_t
 
+struct AMediaFormat;
+
 namespace android {
 
 struct MediaTrack;
@@ -56,7 +58,19 @@ struct CMediaTrack {
     bool     (*supportsNonBlockingRead)(void *data);
 };
 
-struct CMediaExtractor {
+struct CMediaTrackV2 {
+    void *data;
+    void (*free)(void *data);
+
+    status_t (*start)(void *data, AMediaFormat *params);
+    status_t (*stop)(void *data);
+    status_t (*getFormat)(void *data, AMediaFormat *format);
+    status_t (*read)(void *data, MediaBufferBase **buffer, uint32_t options, int64_t seekPosUs);
+    bool     (*supportsNonBlockingRead)(void *data);
+};
+
+
+struct CMediaExtractorV1 {
     void *data;
 
     void (*free)(void *data);
@@ -73,22 +87,49 @@ struct CMediaExtractor {
     const char * (*name)(void *data);
 };
 
-typedef CMediaExtractor* (*CreatorFunc)(CDataSource *source, void *meta);
+struct CMediaExtractorV2 {
+    void *data;
+
+    void (*free)(void *data);
+    size_t (*countTracks)(void *data);
+    CMediaTrackV2* (*getTrack)(void *data, size_t index);
+    status_t (*getTrackMetaData)(
+            void *data,
+            AMediaFormat *meta,
+            size_t index, uint32_t flags);
+
+    status_t (*getMetaData)(void *data, AMediaFormat *meta);
+    uint32_t (*flags)(void *data);
+    status_t (*setMediaCas)(void *data, const uint8_t* casToken, size_t size);
+    const char * (*name)(void *data);
+};
+
+typedef CMediaExtractorV1* (*CreatorFuncV1)(CDataSource *source, void *meta);
 typedef void (*FreeMetaFunc)(void *meta);
 
 // The sniffer can optionally fill in an opaque object, "meta", that helps
 // the corresponding extractor initialize its state without duplicating
 // effort already exerted by the sniffer. If "freeMeta" is given, it will be
 // called against the opaque object when it is no longer used.
-typedef CreatorFunc (*SnifferFunc)(
+typedef CreatorFuncV1 (*SnifferFuncV1)(
         CDataSource *source, float *confidence,
         void **meta, FreeMetaFunc *freeMeta);
+
+typedef CMediaExtractorV2* (*CreatorFuncV2)(CDataSource *source, void *meta);
+
+typedef CreatorFuncV2 (*SnifferFuncV2)(
+        CDataSource *source, float *confidence,
+        void **meta, FreeMetaFunc *freeMeta);
+
+typedef CMediaExtractorV1 CMediaExtractor;
+typedef CreatorFuncV1 CreatorFunc;
+
 
 typedef struct {
     const uint8_t b[16];
 } media_uuid_t;
 
-typedef struct {
+struct ExtractorDef {
     // version number of this structure
     const uint32_t def_version;
 
@@ -104,11 +145,16 @@ typedef struct {
     // a human readable name
     const char *extractor_name;
 
-    // the sniffer function
-    const SnifferFunc sniff;
-} ExtractorDef;
+    union {
+        SnifferFuncV1 v1;
+        SnifferFuncV2 v2;
+    } sniff;
+};
 
-const uint32_t EXTRACTORDEF_VERSION = 1;
+const uint32_t EXTRACTORDEF_VERSION_LEGACY = 1;
+const uint32_t EXTRACTORDEF_VERSION_CURRENT = 2;
+
+const uint32_t EXTRACTORDEF_VERSION = EXTRACTORDEF_VERSION_LEGACY;
 
 // each plugin library exports one function of this type
 typedef ExtractorDef (*GetExtractorDef)();

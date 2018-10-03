@@ -455,7 +455,7 @@ int32 pvDecoder_AmrWb(
                              &exc2[i_subfr],
                              0,
                              &synth16k[i_subfr *5/4],
-                             (short) 1,
+                             1,
                              HfIsf,
                              nb_bits,
                              newDTXState,

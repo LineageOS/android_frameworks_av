@@ -74,22 +74,32 @@ sp<IMediaExtractor> MediaExtractorFactory::CreateFromService(
     source->DrmInitialization(nullptr /* mime */);
 
     void *meta = nullptr;
-    CreatorFunc creator = NULL;
+    void *creator = NULL;
     FreeMetaFunc freeMeta = nullptr;
     float confidence;
     sp<ExtractorPlugin> plugin;
-    creator = sniff(source, &confidence, &meta, &freeMeta, plugin);
+    uint32_t creatorVersion = 0;
+    creator = sniff(source, &confidence, &meta, &freeMeta, plugin, &creatorVersion);
     if (!creator) {
         ALOGV("FAILED to autodetect media content.");
         return NULL;
     }
 
-    CMediaExtractor *ret = creator(source->wrap(), meta);
-    if (meta != nullptr && freeMeta != nullptr) {
-        freeMeta(meta);
+    MediaExtractor *ex = nullptr;
+    if (creatorVersion == 1) {
+        CMediaExtractor *ret = ((CreatorFuncV1)creator)(source->wrap(), meta);
+        if (meta != nullptr && freeMeta != nullptr) {
+            freeMeta(meta);
+        }
+        ex = ret != nullptr ? new MediaExtractorCUnwrapperV1(ret) : nullptr;
+    } else if (creatorVersion == 2) {
+        CMediaExtractorV2 *ret = ((CreatorFuncV2)creator)(source->wrap(), meta);
+        if (meta != nullptr && freeMeta != nullptr) {
+            freeMeta(meta);
+        }
+        ex = ret != nullptr ? new MediaExtractorCUnwrapperV2(ret) : nullptr;
     }
 
-    MediaExtractor *ex = ret != nullptr ? new MediaExtractorCUnwrapper(ret) : nullptr;
     ALOGV("Created an extractor '%s' with confidence %.2f",
          ex != nullptr ? ex->name() : "<null>", confidence);
 
@@ -129,9 +139,9 @@ bool MediaExtractorFactory::gPluginsRegistered = false;
 bool MediaExtractorFactory::gIgnoreVersion = false;
 
 // static
-CreatorFunc MediaExtractorFactory::sniff(
+void *MediaExtractorFactory::sniff(
         const sp<DataSource> &source, float *confidence, void **meta,
-        FreeMetaFunc *freeMeta, sp<ExtractorPlugin> &plugin) {
+        FreeMetaFunc *freeMeta, sp<ExtractorPlugin> &plugin, uint32_t *creatorVersion) {
     *confidence = 0.0f;
     *meta = nullptr;
 
@@ -144,15 +154,23 @@ CreatorFunc MediaExtractorFactory::sniff(
         plugins = gPlugins;
     }
 
-    CreatorFunc curCreator = NULL;
-    CreatorFunc bestCreator = NULL;
+    void *bestCreator = NULL;
     for (auto it = plugins->begin(); it != plugins->end(); ++it) {
         ALOGV("sniffing %s", (*it)->def.extractor_name);
         float newConfidence;
         void *newMeta = nullptr;
         FreeMetaFunc newFreeMeta = nullptr;
-        if ((curCreator = (*it)->def.sniff(
-                        source->wrap(), &newConfidence, &newMeta, &newFreeMeta))) {
+
+        void *curCreator = NULL;
+        if ((*it)->def.def_version == 1) {
+            curCreator = (void*) (*it)->def.sniff.v1(
+                    source->wrap(), &newConfidence, &newMeta, &newFreeMeta);
+        } else if ((*it)->def.def_version == 2) {
+            curCreator = (void*) (*it)->def.sniff.v2(
+                    source->wrap(), &newConfidence, &newMeta, &newFreeMeta);
+        }
+
+        if (curCreator) {
             if (newConfidence > *confidence) {
                 *confidence = newConfidence;
                 if (*meta != nullptr && *freeMeta != nullptr) {
@@ -162,6 +180,7 @@ CreatorFunc MediaExtractorFactory::sniff(
                 *freeMeta = newFreeMeta;
                 plugin = *it;
                 bestCreator = curCreator;
+                *creatorVersion = (*it)->def.def_version;
             } else {
                 if (newMeta != nullptr && newFreeMeta != nullptr) {
                     newFreeMeta(newMeta);
@@ -178,7 +197,7 @@ void MediaExtractorFactory::RegisterExtractor(const sp<ExtractorPlugin> &plugin,
         std::list<sp<ExtractorPlugin>> &pluginList) {
     // sanity check check struct version, uuid, name
     if (plugin->def.def_version == 0
-            || plugin->def.def_version > EXTRACTORDEF_VERSION) {
+            || plugin->def.def_version > EXTRACTORDEF_VERSION_CURRENT) {
         ALOGE("don't understand extractor format %u, ignoring.", plugin->def.def_version);
         return;
     }
@@ -337,8 +356,9 @@ status_t MediaExtractorFactory::dump(int fd, const Vector<String16>&) {
     out.append("Available extractors:\n");
     if (gPluginsRegistered) {
         for (auto it = gPlugins->begin(); it != gPlugins->end(); ++it) {
-            out.appendFormat("  %25s: uuid(%s), version(%u), path(%s)\n",
+            out.appendFormat("  %25s: plugin_version(%d), uuid(%s), version(%u), path(%s)\n",
                     (*it)->def.extractor_name,
+                    (*it)->def.def_version,
                     (*it)->uuidString.c_str(),
                     (*it)->def.extractor_version,
                     (*it)->libPath.c_str());

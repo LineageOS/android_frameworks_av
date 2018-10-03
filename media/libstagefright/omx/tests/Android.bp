@@ -27,6 +27,10 @@ cc_test {
         "frameworks/native/include/media/openmax",
     ],
 
+    header_libs: [
+        "libbase_headers",
+    ],
+
     cflags: [
         "-Werror",
         "-Wall",

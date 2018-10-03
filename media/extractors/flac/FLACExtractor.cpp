@@ -866,19 +866,21 @@ ExtractorDef GETEXTRACTORDEF() {
             UUID("1364b048-cc45-4fda-9934-327d0ebf9829"),
             1,
             "FLAC Extractor",
-            [](
-                    CDataSource *source,
-                    float *confidence,
-                    void **,
-                    FreeMetaFunc *) -> CreatorFunc {
-                DataSourceHelper helper(source);
-                if (SniffFLAC(&helper, confidence)) {
-                    return [](
-                            CDataSource *source,
-                            void *) -> CMediaExtractor* {
-                        return wrap(new FLACExtractor(new DataSourceHelper(source)));};
+            {
+                [](
+                        CDataSource *source,
+                        float *confidence,
+                        void **,
+                        FreeMetaFunc *) -> CreatorFunc {
+                    DataSourceHelper helper(source);
+                    if (SniffFLAC(&helper, confidence)) {
+                        return [](
+                                CDataSource *source,
+                                void *) -> CMediaExtractor* {
+                            return wrap(new FLACExtractor(new DataSourceHelper(source)));};
+                    }
+                    return NULL;
                 }
-                return NULL;
             }
      };
 }

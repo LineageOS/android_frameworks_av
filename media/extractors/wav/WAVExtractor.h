@@ -21,7 +21,7 @@
 #include <utils/Errors.h>
 #include <media/MediaExtractorPluginApi.h>
 #include <media/MediaExtractorPluginHelper.h>
-#include <media/stagefright/MetaDataBase.h>
+#include <media/NdkMediaFormat.h>
 
 namespace android {
 
@@ -29,15 +29,15 @@ struct AMessage;
 struct CDataSource;
 class String8;
 
-class WAVExtractor : public MediaExtractorPluginHelper {
+class WAVExtractor : public MediaExtractorPluginHelperV2 {
 public:
     explicit WAVExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
-    virtual MediaTrackHelper *getTrack(size_t index);
-    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
+    virtual MediaTrackHelperV2 *getTrack(size_t index);
+    virtual status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
-    virtual status_t getMetaData(MetaDataBase& meta);
+    virtual status_t getMetaData(AMediaFormat *meta);
     virtual const char * name() { return "WAVExtractor"; }
 
     virtual ~WAVExtractor();
@@ -53,7 +53,7 @@ private:
     uint16_t mBitsPerSample;
     off64_t mDataOffset;
     size_t mDataSize;
-    MetaDataBase mTrackMeta;
+    AMediaFormat *mTrackMeta;
 
     status_t init();
 
