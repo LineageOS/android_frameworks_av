@@ -910,7 +910,7 @@ exit:
                                   getStrategyForAttr(&attributes),
                                   *flags);
     sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(*output);
-    outputDesc->clientsMap().emplace(*portId, clientDesc);
+    outputDesc->addClient(clientDesc);
 
     ALOGV("  getOutputForAttr() returns output %d selectedDeviceId %d for port ID %d",
           *output, *selectedDeviceId, *portId);
@@ -1337,7 +1337,7 @@ status_t AudioPolicyManager::startOutput(audio_port_handle_t portId)
         ALOGW("startOutput() no output for client %d", portId);
         return BAD_VALUE;
     }
-    sp<TrackClientDescriptor> client = outputDesc->clientsMap()[portId];
+    sp<TrackClientDescriptor> client = outputDesc->getClient(portId);
 
     ALOGV("startOutput() output %d, stream %d, session %d",
           outputDesc->mIoHandle, client->stream(), client->session());
@@ -1530,7 +1530,7 @@ status_t AudioPolicyManager::stopOutput(audio_port_handle_t portId)
         ALOGW("stopOutput() no output for client %d", portId);
         return BAD_VALUE;
     }
-    sp<TrackClientDescriptor> client = outputDesc->clientsMap()[portId];
+    sp<TrackClientDescriptor> client = outputDesc->getClient(portId);
 
     ALOGV("stopOutput() output %d, stream %d, session %d",
           outputDesc->mIoHandle, client->stream(), client->session());
@@ -1631,10 +1631,15 @@ void AudioPolicyManager::releaseOutput(audio_port_handle_t portId)
 
     sp<SwAudioOutputDescriptor> outputDesc = mOutputs.getOutputForClient(portId);
     if (outputDesc == 0) {
+        // If an output descriptor is closed due to a device routing change,
+        // then there are race conditions with releaseOutput from tracks
+        // that may be destroyed (with no PlaybackThread) or a PlaybackThread
+        // destroyed shortly thereafter.
+        //
+        // Here we just log a warning, instead of a fatal error.
         ALOGW("releaseOutput() no output for client %d", portId);
         return;
     }
-    sp<TrackClientDescriptor> client = outputDesc->clientsMap()[portId];
 
     ALOGV("releaseOutput() %d", outputDesc->mIoHandle);
 
@@ -1649,9 +1654,11 @@ void AudioPolicyManager::releaseOutput(audio_port_handle_t portId)
             mpClientInterface->onAudioPortListUpdate();
         }
     }
-    outputDesc->clientsMap().erase(portId);
+    // stopOutput() needs to be successfully called before releaseOutput()
+    // otherwise there may be inaccurate stream reference counts.
+    // This is checked in outputDesc->removeClient below.
+    outputDesc->removeClient(portId);
 }
-
 
 status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
                                              audio_io_handle_t *input,
@@ -1810,7 +1817,7 @@ exit:
                                   *attr, *config, requestedDeviceId,
                                   inputSource,flags, isSoundTrigger);
     inputDesc = mInputs.valueFor(*input);
-    inputDesc->clientsMap().emplace(*portId, clientDesc);
+    inputDesc->addClient(clientDesc);
 
     ALOGV("getInputForAttr() returns input %d type %d selectedDeviceId %d for port ID %d",
             *input, *inputType, *selectedDeviceId, *portId);
@@ -1985,7 +1992,7 @@ status_t AudioPolicyManager::startInput(audio_port_handle_t portId,
         return BAD_VALUE;
     }
     audio_io_handle_t input = inputDesc->mIoHandle;
-    sp<RecordClientDescriptor> client = inputDesc->clientsMap()[portId];
+    sp<RecordClientDescriptor> client = inputDesc->getClient(portId);
     if (client->active()) {
         ALOGW("%s input %d client %d already started", __FUNCTION__, input, client->portId());
         return INVALID_OPERATION;
@@ -2154,7 +2161,7 @@ status_t AudioPolicyManager::stopInput(audio_port_handle_t portId)
         return BAD_VALUE;
     }
     audio_io_handle_t input = inputDesc->mIoHandle;
-    sp<RecordClientDescriptor> client = inputDesc->clientsMap()[portId];
+    sp<RecordClientDescriptor> client = inputDesc->getClient(portId);
     if (!client->active()) {
         ALOGW("%s input %d client %d already stopped", __FUNCTION__, input, client->portId());
         return INVALID_OPERATION;
@@ -2213,15 +2220,15 @@ void AudioPolicyManager::releaseInput(audio_port_handle_t portId)
         ALOGW("%s no input for client %d", __FUNCTION__, portId);
         return;
     }
-    sp<RecordClientDescriptor> client = inputDesc->clientsMap()[portId];
+    sp<RecordClientDescriptor> client = inputDesc->getClient(portId);
     audio_io_handle_t input = inputDesc->mIoHandle;
 
     ALOGV("%s %d", __FUNCTION__, input);
 
-    inputDesc->clientsMap().erase(portId);
+    inputDesc->removeClient(portId);
 
-    if (inputDesc->clientsMap().size() > 0) {
-        ALOGV("%s %zu clients remaining", __FUNCTION__, inputDesc->clientsMap().size());
+    if (inputDesc->getClientCount() > 0) {
+        ALOGV("%s(%d) %zu clients remaining", __func__, portId, inputDesc->getClientCount());
         return;
     }
 
@@ -3328,11 +3335,10 @@ void AudioPolicyManager::clearSessionRoutes(uid_t uid)
     SortedVector<routing_strategy> affectedStrategies;
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<AudioOutputDescriptor> outputDesc = mOutputs.valueAt(i);
-        TrackClientMap clients = outputDesc->clientsMap();
-        for (const auto& client : clients) {
-            if (client.second->hasPreferredDevice() && client.second->uid() == uid) {
-                client.second->setPreferredDeviceId(AUDIO_PORT_HANDLE_NONE);
-                affectedStrategies.add(getStrategy(client.second->stream()));
+        for (const auto& client : outputDesc->getClientIterable()) {
+            if (client->hasPreferredDevice() && client->uid() == uid) {
+                client->setPreferredDeviceId(AUDIO_PORT_HANDLE_NONE);
+                affectedStrategies.add(getStrategy(client->stream()));
             }
         }
     }
@@ -3345,11 +3351,10 @@ void AudioPolicyManager::clearSessionRoutes(uid_t uid)
     SortedVector<audio_source_t> affectedSources;
     for (size_t i = 0; i < mInputs.size(); i++) {
         sp<AudioInputDescriptor> inputDesc = mInputs.valueAt(i);
-        RecordClientMap clients = inputDesc->clientsMap();
-        for (const auto& client : clients) {
-            if (client.second->hasPreferredDevice() && client.second->uid() == uid) {
-                client.second->setPreferredDeviceId(AUDIO_PORT_HANDLE_NONE);
-                affectedSources.add(client.second->source());
+        for (const auto& client : inputDesc->getClientIterable()) {
+            if (client->hasPreferredDevice() && client->uid() == uid) {
+                client->setPreferredDeviceId(AUDIO_PORT_HANDLE_NONE);
+                affectedSources.add(client->source());
             }
         }
     }
@@ -4546,10 +4551,9 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
             // and as they were also referenced on the other output, the reference
             // count for their stream type must be adjusted accordingly on
             // the other output.
-            bool wasActive = outputDesc2->isActive();
-            for (int j = 0; j < AUDIO_STREAM_CNT; j++) {
-                int activeCount = dupOutputDesc->streamActiveCount((audio_stream_type_t)j);
-                outputDesc2->changeStreamActiveCount((audio_stream_type_t)j,-activeCount);
+            const bool wasActive = outputDesc2->isActive();
+            for (const auto &clientPair : dupOutputDesc->getActiveClients()) {
+                outputDesc2->changeStreamActiveCount(clientPair.first, -clientPair.second);
             }
             // stop() will be a no op if the output is still active but is needed in case all
             // active streams refcounts where cleared above
