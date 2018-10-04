@@ -55,6 +55,7 @@
 #include <utils/Errors.h>
 #include <utils/Log.h>
 #include <utils/String16.h>
+#include <utils/SystemClock.h>
 #include <utils/Trace.h>
 #include <private/android_filesystem_config.h>
 #include <system/camera_vendor_tags.h>
@@ -2433,6 +2434,9 @@ bool CameraService::UidPolicy::isUidActive(uid_t uid, String16 callingPackage) {
     return isUidActiveLocked(uid, callingPackage);
 }
 
+static const int64_t kPollUidActiveTimeoutTotalMillis = 300;
+static const int64_t kPollUidActiveTimeoutMillis = 50;
+
 bool CameraService::UidPolicy::isUidActiveLocked(uid_t uid, String16 callingPackage) {
     // Non-app UIDs are considered always active
     // If activity manager is unreachable, assume everything is active
@@ -2452,7 +2456,33 @@ bool CameraService::UidPolicy::isUidActiveLocked(uid_t uid, String16 callingPack
         ActivityManager am;
         // Okay to access with a lock held as UID changes are dispatched without
         // a lock and we are a higher level component.
-        active = am.isUidActive(uid, callingPackage);
+        int64_t startTimeMillis = 0;
+        do {
+            // TODO: Fix this b/109950150!
+            // Okay this is a hack. There is a race between the UID turning active and
+            // activity being resumed. The proper fix is very risky, so we temporary add
+            // some polling which should happen pretty rarely anyway as the race is hard
+            // to hit.
+            active = mActiveUids.find(uid) != mActiveUids.end();
+            if (!active) active = am.isUidActive(uid, callingPackage);
+            if (active) {
+                break;
+            }
+            if (startTimeMillis <= 0) {
+                startTimeMillis = uptimeMillis();
+            }
+            int64_t ellapsedTimeMillis = uptimeMillis() - startTimeMillis;
+            int64_t remainingTimeMillis = kPollUidActiveTimeoutTotalMillis - ellapsedTimeMillis;
+            if (remainingTimeMillis <= 0) {
+                break;
+            }
+            remainingTimeMillis = std::min(kPollUidActiveTimeoutMillis, remainingTimeMillis);
+
+            mUidLock.unlock();
+            usleep(remainingTimeMillis * 1000);
+            mUidLock.lock();
+        } while (true);
+
         if (active) {
             // Now that we found out the UID is actually active, cache that
             mActiveUids.insert(uid);
