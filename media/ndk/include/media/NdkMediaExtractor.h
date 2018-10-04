@@ -73,27 +73,6 @@ media_status_t AMediaExtractor_setDataSourceFd(AMediaExtractor*, int fd, off64_t
 media_status_t AMediaExtractor_setDataSource(AMediaExtractor*,
         const char *location) __INTRODUCED_IN(21);
 
-#if __ANDROID_API__ >= 29
-/**
- * Set the |uri| from which the extractor will read,
- * plus additional http headers when initiating the request.
- *
- * Headers will contain corresponding items from |keys| & |values|
- * from indices 0 (inclusive) to numheaders-1 (inclusive):
- *
- * keys[0]:values[0]
- * ...
- * keys[numheaders - 1]:values[numheaders - 1]
- *
- */
-media_status_t AMediaExtractor_setDataSourceWithHeaders(AMediaExtractor*,
-        const char *uri,
-        int numheaders,
-        const char * const *keys,
-        const char * const *values) __INTRODUCED_IN(29);
-
-#endif /* __ANDROID_API__ >= 29 */
-
 #if __ANDROID_API__ >= 28
 
 /**
