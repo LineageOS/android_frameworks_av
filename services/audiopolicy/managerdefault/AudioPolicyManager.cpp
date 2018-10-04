@@ -1110,16 +1110,16 @@ audio_devices_t AudioPolicyManager::getMsdAudioOutDeviceTypes() const {
 
 const AudioPatchCollection AudioPolicyManager::getMsdPatches() const {
     AudioPatchCollection msdPatches;
-    audio_module_handle_t msdModuleHandle = mHwModules.getModuleFromName(
-            AUDIO_HARDWARE_MODULE_ID_MSD)->getHandle();
-    if (msdModuleHandle == AUDIO_MODULE_HANDLE_NONE) return msdPatches;
-    for (size_t i = 0; i < mAudioPatches.size(); ++i) {
-        sp<AudioPatch> patch = mAudioPatches.valueAt(i);
-        for (size_t j = 0; j < patch->mPatch.num_sources; ++j) {
-            const struct audio_port_config *source = &patch->mPatch.sources[j];
-            if (source->type == AUDIO_PORT_TYPE_DEVICE &&
-                    source->ext.device.hw_module == msdModuleHandle) {
-                msdPatches.addAudioPatch(patch->mHandle, patch);
+    sp<HwModule> msdModule = mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_MSD);
+    if (msdModule != 0) {
+        for (size_t i = 0; i < mAudioPatches.size(); ++i) {
+            sp<AudioPatch> patch = mAudioPatches.valueAt(i);
+            for (size_t j = 0; j < patch->mPatch.num_sources; ++j) {
+                const struct audio_port_config *source = &patch->mPatch.sources[j];
+                if (source->type == AUDIO_PORT_TYPE_DEVICE &&
+                        source->ext.device.hw_module == msdModule->getHandle()) {
+                    msdPatches.addAudioPatch(patch->mHandle, patch);
+                }
             }
         }
     }
