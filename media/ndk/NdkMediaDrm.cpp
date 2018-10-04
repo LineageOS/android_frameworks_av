@@ -698,7 +698,7 @@ media_status_t AMediaDrm_setPropertyByteArray(AMediaDrm *mObj,
     Vector<uint8_t> byteArray;
     byteArray.appendArray(value, valueSize);
 
-    return translateStatus(mObj->mDrm->getPropertyByteArray(String8(propertyName),
+    return translateStatus(mObj->mDrm->setPropertyByteArray(String8(propertyName),
                     byteArray));
 }
 
