@@ -267,7 +267,7 @@ int DrmManager::checkRightsStatus(int uniqueId, const String8& path, int action)
 }
 
 status_t DrmManager::consumeRights(
-    int uniqueId, DecryptHandle* decryptHandle, int action, bool reserve) {
+    int uniqueId, sp<DecryptHandle>& decryptHandle, int action, bool reserve) {
     status_t result = DRM_ERROR_UNKNOWN;
     Mutex::Autolock _l(mDecryptLock);
     if (mDecryptSessionMap.indexOfKey(decryptHandle->decryptId) != NAME_NOT_FOUND) {
@@ -278,7 +278,7 @@ status_t DrmManager::consumeRights(
 }
 
 status_t DrmManager::setPlaybackStatus(
-    int uniqueId, DecryptHandle* decryptHandle, int playbackStatus, int64_t position) {
+    int uniqueId, sp<DecryptHandle>& decryptHandle, int playbackStatus, int64_t position) {
     status_t result = DRM_ERROR_UNKNOWN;
     Mutex::Autolock _l(mDecryptLock);
     if (mDecryptSessionMap.indexOfKey(decryptHandle->decryptId) != NAME_NOT_FOUND) {
@@ -396,15 +396,15 @@ status_t DrmManager::getAllSupportInfo(
     return DRM_NO_ERROR;
 }
 
-DecryptHandle* DrmManager::openDecryptSession(
+sp<DecryptHandle> DrmManager::openDecryptSession(
         int uniqueId, int fd, off64_t offset, off64_t length, const char* mime) {
 
     Mutex::Autolock _l(mDecryptLock);
     status_t result = DRM_ERROR_CANNOT_HANDLE;
     Vector<String8> plugInIdList = mPlugInManager.getPlugInIdList();
 
-    DecryptHandle* handle = new DecryptHandle();
-    if (NULL != handle) {
+    sp<DecryptHandle> handle = new DecryptHandle();
+    if (NULL != handle.get()) {
         handle->decryptId = mDecryptSessionId + 1;
 
         for (size_t index = 0; index < plugInIdList.size(); index++) {
@@ -420,19 +420,19 @@ DecryptHandle* DrmManager::openDecryptSession(
         }
     }
     if (DRM_NO_ERROR != result) {
-        delete handle; handle = NULL;
+        handle.clear();
     }
     return handle;
 }
 
-DecryptHandle* DrmManager::openDecryptSession(
+sp<DecryptHandle> DrmManager::openDecryptSession(
         int uniqueId, const char* uri, const char* mime) {
     Mutex::Autolock _l(mDecryptLock);
     status_t result = DRM_ERROR_CANNOT_HANDLE;
     Vector<String8> plugInIdList = mPlugInManager.getPlugInIdList();
 
-    DecryptHandle* handle = new DecryptHandle();
-    if (NULL != handle) {
+    sp<DecryptHandle> handle = new DecryptHandle();
+    if (NULL != handle.get()) {
         handle->decryptId = mDecryptSessionId + 1;
 
         for (size_t index = 0; index < plugInIdList.size(); index++) {
@@ -448,20 +448,20 @@ DecryptHandle* DrmManager::openDecryptSession(
         }
     }
     if (DRM_NO_ERROR != result) {
-        delete handle; handle = NULL;
+        handle.clear();
         ALOGV("DrmManager::openDecryptSession: no capable plug-in found");
     }
     return handle;
 }
 
-DecryptHandle* DrmManager::openDecryptSession(
+sp<DecryptHandle> DrmManager::openDecryptSession(
         int uniqueId, const DrmBuffer& buf, const String8& mimeType) {
     Mutex::Autolock _l(mDecryptLock);
     status_t result = DRM_ERROR_CANNOT_HANDLE;
     Vector<String8> plugInIdList = mPlugInManager.getPlugInIdList();
 
-    DecryptHandle* handle = new DecryptHandle();
-    if (NULL != handle) {
+    sp<DecryptHandle> handle = new DecryptHandle();
+    if (NULL != handle.get()) {
         handle->decryptId = mDecryptSessionId + 1;
 
         for (size_t index = 0; index < plugInIdList.size(); index++) {
@@ -477,20 +477,19 @@ DecryptHandle* DrmManager::openDecryptSession(
         }
     }
     if (DRM_NO_ERROR != result) {
-        delete handle;
-        handle = NULL;
+        handle.clear();
         ALOGV("DrmManager::openDecryptSession: no capable plug-in found");
     }
     return handle;
 }
 
-status_t DrmManager::closeDecryptSession(int uniqueId, DecryptHandle* decryptHandle) {
+status_t DrmManager::closeDecryptSession(int uniqueId, sp<DecryptHandle>& decryptHandle) {
     Mutex::Autolock _l(mDecryptLock);
     status_t result = DRM_ERROR_UNKNOWN;
     if (mDecryptSessionMap.indexOfKey(decryptHandle->decryptId) != NAME_NOT_FOUND) {
         IDrmEngine* drmEngine = mDecryptSessionMap.valueFor(decryptHandle->decryptId);
         result = drmEngine->closeDecryptSession(uniqueId, decryptHandle);
-        if (DRM_NO_ERROR == result) {
+        if (DRM_NO_ERROR == result && NULL != decryptHandle.get()) {
             mDecryptSessionMap.removeItem(decryptHandle->decryptId);
         }
     }
@@ -498,7 +497,8 @@ status_t DrmManager::closeDecryptSession(int uniqueId, DecryptHandle* decryptHan
 }
 
 status_t DrmManager::initializeDecryptUnit(
-    int uniqueId, DecryptHandle* decryptHandle, int decryptUnitId, const DrmBuffer* headerInfo) {
+        int uniqueId, sp<DecryptHandle>& decryptHandle, int decryptUnitId,
+        const DrmBuffer* headerInfo) {
     status_t result = DRM_ERROR_UNKNOWN;
     Mutex::Autolock _l(mDecryptLock);
     if (mDecryptSessionMap.indexOfKey(decryptHandle->decryptId) != NAME_NOT_FOUND) {
@@ -508,7 +508,7 @@ status_t DrmManager::initializeDecryptUnit(
     return result;
 }
 
-status_t DrmManager::decrypt(int uniqueId, DecryptHandle* decryptHandle, int decryptUnitId,
+status_t DrmManager::decrypt(int uniqueId, sp<DecryptHandle>& decryptHandle, int decryptUnitId,
             const DrmBuffer* encBuffer, DrmBuffer** decBuffer, DrmBuffer* IV) {
     status_t result = DRM_ERROR_UNKNOWN;
 
@@ -522,7 +522,7 @@ status_t DrmManager::decrypt(int uniqueId, DecryptHandle* decryptHandle, int dec
 }
 
 status_t DrmManager::finalizeDecryptUnit(
-            int uniqueId, DecryptHandle* decryptHandle, int decryptUnitId) {
+            int uniqueId, sp<DecryptHandle>& decryptHandle, int decryptUnitId) {
     status_t result = DRM_ERROR_UNKNOWN;
     Mutex::Autolock _l(mDecryptLock);
     if (mDecryptSessionMap.indexOfKey(decryptHandle->decryptId) != NAME_NOT_FOUND) {
@@ -532,7 +532,7 @@ status_t DrmManager::finalizeDecryptUnit(
     return result;
 }
 
-ssize_t DrmManager::pread(int uniqueId, DecryptHandle* decryptHandle,
+ssize_t DrmManager::pread(int uniqueId, sp<DecryptHandle>& decryptHandle,
             void* buffer, ssize_t numBytes, off64_t offset) {
     ssize_t result = DECRYPT_FILE_ERROR;
 
