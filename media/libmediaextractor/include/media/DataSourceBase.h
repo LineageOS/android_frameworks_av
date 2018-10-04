@@ -66,9 +66,7 @@ public:
 
     virtual void close() {};
 
-    virtual void disconnect() {}
-
-    virtual ssize_t getAvailableSize(status_t * /*err*/) {
+    virtual status_t getAvailableSize(off64_t /*offset*/, off64_t * /*size*/) {
         return -1;
     }
 

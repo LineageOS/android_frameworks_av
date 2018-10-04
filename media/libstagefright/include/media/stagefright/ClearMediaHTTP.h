@@ -34,6 +34,8 @@ struct ClearMediaHTTP : public HTTPBase {
             const KeyedVector<String8, String8> *headers,
             off64_t offset);
 
+    virtual void close();
+
     virtual void disconnect();
 
     virtual status_t initCheck() const;

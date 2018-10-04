@@ -33,16 +33,16 @@ namespace android {
 // how many Sonivox output buffers to aggregate into one MediaBufferBase
 static const int NUM_COMBINE_BUFFERS = 4;
 
-class MidiSource : public MediaTrackHelper {
+class MidiSource : public MediaTrackHelperV2 {
 
 public:
     MidiSource(
             MidiEngine &engine,
-            MetaDataBase &trackMetadata);
+            AMediaFormat *trackMetadata);
 
-    virtual status_t start(MetaDataBase *params);
+    virtual status_t start(AMediaFormat *params);
     virtual status_t stop();
-    virtual status_t getFormat(MetaDataBase&);
+    virtual status_t getFormat(AMediaFormat *);
 
     virtual status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL);
@@ -52,7 +52,7 @@ protected:
 
 private:
     MidiEngine &mEngine;
-    MetaDataBase &mTrackMetadata;
+    AMediaFormat *mTrackMetadata;
     bool mInitCheck;
     bool mStarted;
 
@@ -69,7 +69,7 @@ private:
 
 MidiSource::MidiSource(
         MidiEngine &engine,
-        MetaDataBase &trackMetadata)
+        AMediaFormat *trackMetadata)
     : mEngine(engine),
       mTrackMetadata(trackMetadata),
       mInitCheck(false),
@@ -87,7 +87,7 @@ MidiSource::~MidiSource()
     }
 }
 
-status_t MidiSource::start(MetaDataBase * /* params */)
+status_t MidiSource::start(AMediaFormat * /* params */)
 {
     ALOGV("MidiSource::start");
 
@@ -108,9 +108,9 @@ status_t MidiSource::stop()
     return OK;
 }
 
-status_t MidiSource::getFormat(MetaDataBase &meta)
+status_t MidiSource::getFormat(AMediaFormat *meta)
 {
-    meta = mTrackMetadata;
+    AMediaFormat_copy(meta, mTrackMetadata);
     return OK;
 }
 
@@ -143,8 +143,8 @@ status_t MidiSource::init()
 // MidiEngine
 
 MidiEngine::MidiEngine(CDataSource *dataSource,
-        MetaDataBase *fileMetadata,
-        MetaDataBase *trackMetadata) :
+        AMediaFormat *fileMetadata,
+        AMediaFormat *trackMetadata) :
             mGroup(NULL),
             mEasData(NULL),
             mEasHandle(NULL),
@@ -170,16 +170,20 @@ MidiEngine::MidiEngine(CDataSource *dataSource,
     }
 
     if (fileMetadata != NULL) {
-        fileMetadata->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MIDI);
+        AMediaFormat_setString(fileMetadata, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MIDI);
     }
 
     if (trackMetadata != NULL) {
-        trackMetadata->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_RAW);
-        trackMetadata->setInt64(kKeyDuration, 1000ll * temp); // milli->micro
+        AMediaFormat_setString(trackMetadata, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_RAW);
+        AMediaFormat_setInt64(
+                trackMetadata, AMEDIAFORMAT_KEY_DURATION, 1000ll * temp); // milli->micro
         mEasConfig = EAS_Config();
-        trackMetadata->setInt32(kKeySampleRate, mEasConfig->sampleRate);
-        trackMetadata->setInt32(kKeyChannelCount, mEasConfig->numChannels);
-        trackMetadata->setInt32(kKeyPcmEncoding, kAudioEncodingPcm16bit);
+        AMediaFormat_setInt32(
+                trackMetadata, AMEDIAFORMAT_KEY_SAMPLE_RATE, mEasConfig->sampleRate);
+        AMediaFormat_setInt32(
+                trackMetadata, AMEDIAFORMAT_KEY_CHANNEL_COUNT, mEasConfig->numChannels);
+        AMediaFormat_setInt32(
+                trackMetadata, AMEDIAFORMAT_KEY_PCM_ENCODING, kAudioEncodingPcm16bit);
     }
     mIsInitialized = true;
 }
@@ -268,13 +272,17 @@ MidiExtractor::MidiExtractor(
       mInitCheck(false)
 {
     ALOGV("MidiExtractor ctor");
-    mEngine = new MidiEngine(mDataSource, &mFileMetadata, &mTrackMetadata);
+    mFileMetadata = AMediaFormat_new();
+    mTrackMetadata = AMediaFormat_new();
+    mEngine = new MidiEngine(mDataSource, mFileMetadata, mTrackMetadata);
     mInitCheck = mEngine->initCheck();
 }
 
 MidiExtractor::~MidiExtractor()
 {
     ALOGV("MidiExtractor dtor");
+    AMediaFormat_delete(mFileMetadata);
+    AMediaFormat_delete(mTrackMetadata);
 }
 
 size_t MidiExtractor::countTracks()
@@ -282,7 +290,7 @@ size_t MidiExtractor::countTracks()
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrackHelper *MidiExtractor::getTrack(size_t index)
+MediaTrackHelperV2 *MidiExtractor::getTrack(size_t index)
 {
     if (mInitCheck != OK || index > 0) {
         return NULL;
@@ -291,20 +299,20 @@ MediaTrackHelper *MidiExtractor::getTrack(size_t index)
 }
 
 status_t MidiExtractor::getTrackMetaData(
-        MetaDataBase &meta,
+        AMediaFormat *meta,
         size_t index, uint32_t /* flags */) {
     ALOGV("MidiExtractor::getTrackMetaData");
     if (mInitCheck != OK || index > 0) {
         return UNKNOWN_ERROR;
     }
-    meta = mTrackMetadata;
+    AMediaFormat_copy(meta, mTrackMetadata);
     return OK;
 }
 
-status_t MidiExtractor::getMetaData(MetaDataBase &meta)
+status_t MidiExtractor::getMetaData(AMediaFormat *meta)
 {
     ALOGV("MidiExtractor::getMetaData");
-    meta = mFileMetadata;
+    AMediaFormat_copy(meta, mFileMetadata);
     return OK;
 }
 
@@ -323,26 +331,27 @@ bool SniffMidi(CDataSource *source, float *confidence)
 
 }
 
+
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION_CURRENT,
         UUID("ef6cca0a-f8a2-43e6-ba5f-dfcd7c9a7ef2"),
         1,
         "MIDI Extractor",
         {
-            [](
-                    CDataSource *source,
-                    float *confidence,
-                    void **,
-                    FreeMetaFunc *) -> CreatorFunc {
+            .v2 = [](
+                CDataSource *source,
+                float *confidence,
+                void **,
+                FreeMetaFunc *) -> CreatorFuncV2 {
                 if (SniffMidi(source, confidence)) {
                     return [](
                             CDataSource *source,
-                            void *) -> CMediaExtractor* {
-                        return wrap(new MidiExtractor(source));};
+                            void *) -> CMediaExtractorV2* {
+                        return wrapV2(new MidiExtractor(source));};
                 }
                 return NULL;
             }

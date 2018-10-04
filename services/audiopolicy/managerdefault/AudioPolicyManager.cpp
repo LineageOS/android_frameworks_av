@@ -1013,6 +1013,23 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
         String8 address = outputDevices.size() > 0 ? outputDevices.itemAt(0)->mAddress
                 : String8("");
 
+        // MSD patch may be using the only output stream that can service this request. Release
+        // MSD patch to prioritize this request over any active output on MSD.
+        AudioPatchCollection msdPatches = getMsdPatches();
+        for (size_t i = 0; i < msdPatches.size(); i++) {
+            const auto& patch = msdPatches[i];
+            for (size_t j = 0; j < patch->mPatch.num_sinks; ++j) {
+                const struct audio_port_config *sink = &patch->mPatch.sinks[j];
+                if (sink->type == AUDIO_PORT_TYPE_DEVICE &&
+                        (sink->ext.device.type & device) != AUDIO_DEVICE_NONE &&
+                        (address.isEmpty() || strncmp(sink->ext.device.address, address.string(),
+                                AUDIO_DEVICE_MAX_ADDRESS_LEN) == 0)) {
+                    releaseAudioPatch(patch->mHandle, mUidCached);
+                    break;
+                }
+            }
+        }
+
         status = outputDesc->open(config, device, address, stream, *flags, &output);
 
         // only accept an output with the requested parameters
@@ -4561,6 +4578,22 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
 
     removeOutput(output);
     mPreviousOutputs = mOutputs;
+
+    // MSD patches may have been released to support a non-MSD direct output. Reset MSD patch if
+    // no direct outputs are open.
+    if (getMsdAudioOutDeviceTypes() != AUDIO_DEVICE_NONE) {
+        bool directOutputOpen = false;
+        for (size_t i = 0; i < mOutputs.size(); i++) {
+            if (mOutputs[i]->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) {
+                directOutputOpen = true;
+                break;
+            }
+        }
+        if (!directOutputOpen) {
+            ALOGV("no direct outputs open, reset MSD patch");
+            setMsdPatch();
+        }
+    }
 }
 
 void AudioPolicyManager::closeInput(audio_io_handle_t input)

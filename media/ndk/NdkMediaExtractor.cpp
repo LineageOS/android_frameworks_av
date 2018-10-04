@@ -21,6 +21,7 @@
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaExtractor.h>
 #include <media/NdkMediaFormatPriv.h>
+#include "NdkMediaErrorPriv.h"
 #include "NdkMediaDataSourcePriv.h"
 
 
@@ -39,19 +40,6 @@
 #include <jni.h>
 
 using namespace android;
-
-static media_status_t translate_error(status_t err) {
-    if (err == OK) {
-        return AMEDIA_OK;
-    } else if (err == ERROR_END_OF_STREAM) {
-        return AMEDIA_ERROR_END_OF_STREAM;
-    } else if (err == ERROR_IO) {
-        return AMEDIA_ERROR_IO;
-    }
-
-    ALOGE("sf error code: %d", err);
-    return AMEDIA_ERROR_UNKNOWN;
-}
 
 struct AMediaExtractor {
     sp<NuMediaExtractor> mImpl;
@@ -461,12 +449,6 @@ media_status_t AMediaExtractor_getSampleFormat(AMediaExtractor *ex, AMediaFormat
         meta->setBuffer(AMEDIAFORMAT_KEY_MPEG_USER_DATA, mpegUserData);
     }
 
-    return AMEDIA_OK;
-}
-
-EXPORT
-media_status_t AMediaExtractor_disconnect(AMediaExtractor * ex) {
-    ex->mImpl->disconnect();
     return AMEDIA_OK;
 }
 

@@ -22,8 +22,8 @@
 #include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MediaBufferBase.h>
 #include <media/stagefright/MediaBufferGroup.h>
-#include <media/stagefright/MetaDataBase.h>
 #include <media/MidiIoWrapper.h>
+#include <media/NdkMediaFormat.h>
 #include <utils/String8.h>
 #include <libsonivox/eas.h>
 
@@ -32,8 +32,8 @@ namespace android {
 class MidiEngine {
 public:
     explicit MidiEngine(CDataSource *dataSource,
-            MetaDataBase *fileMetadata,
-            MetaDataBase *trackMetadata);
+            AMediaFormat *fileMetadata,
+            AMediaFormat *trackMetadata);
     ~MidiEngine();
 
     status_t initCheck();
@@ -51,16 +51,16 @@ private:
     bool mIsInitialized;
 };
 
-class MidiExtractor : public MediaExtractorPluginHelper {
+class MidiExtractor : public MediaExtractorPluginHelperV2 {
 
 public:
     explicit MidiExtractor(CDataSource *source);
 
     virtual size_t countTracks();
-    virtual MediaTrackHelper *getTrack(size_t index);
-    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
+    virtual MediaTrackHelperV2 *getTrack(size_t index);
+    virtual status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
-    virtual status_t getMetaData(MetaDataBase& meta);
+    virtual status_t getMetaData(AMediaFormat *meta);
     virtual const char * name() { return "MidiExtractor"; }
 
 protected:
@@ -69,10 +69,10 @@ protected:
 private:
     CDataSource *mDataSource;
     status_t mInitCheck;
-    MetaDataBase mFileMetadata;
+    AMediaFormat *mFileMetadata;
 
     // There is only one track
-    MetaDataBase mTrackMetadata;
+    AMediaFormat *mTrackMetadata;
 
     MidiEngine *mEngine;
 

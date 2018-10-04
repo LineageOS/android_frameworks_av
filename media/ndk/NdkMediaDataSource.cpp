@@ -246,5 +246,10 @@ void AMediaDataSource_setClose(AMediaDataSource *mSource, AMediaDataSourceClose 
     mSource->close = close;
 }
 
+EXPORT
+void AMediaDataSource_close(AMediaDataSource *mSource) {
+    return mSource->close(mSource->userdata);
+}
+
 } // extern "C"
 

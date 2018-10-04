@@ -39,6 +39,7 @@ cc_library_shared {
         "NdkMediaCrypto.cpp",
         "NdkMediaDataSource.cpp",
         "NdkMediaExtractor.cpp",
+        "NdkMediaError.cpp",
         "NdkMediaFormat.cpp",
         "NdkMediaMuxer.cpp",
         "NdkMediaDrm.cpp",
@@ -106,6 +107,7 @@ cc_library {
 
     srcs: [
         "NdkMediaDataSourceCallbacks.cpp",
+        "NdkMediaError.cpp",
     ],
 
     include_dirs: [
