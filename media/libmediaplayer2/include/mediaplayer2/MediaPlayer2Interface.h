@@ -47,7 +47,6 @@ struct DataSourceDesc;
 class Parcel;
 struct ANativeWindowWrapper;
 
-#define DEFAULT_AUDIOSINK_BUFFERCOUNT 4
 #define DEFAULT_AUDIOSINK_BUFFERSIZE 1200
 #define DEFAULT_AUDIOSINK_SAMPLERATE 44100
 
@@ -103,7 +102,6 @@ public:
         virtual status_t open(
                 uint32_t sampleRate, int channelCount, audio_channel_mask_t channelMask,
                 audio_format_t format=AUDIO_FORMAT_PCM_16_BIT,
-                int bufferCount=DEFAULT_AUDIOSINK_BUFFERCOUNT,
                 AudioCallback cb = NULL,
                 void *cookie = NULL,
                 audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
