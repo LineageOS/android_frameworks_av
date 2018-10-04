@@ -67,8 +67,8 @@ MediaTrackCUnwrapper::~MediaTrackCUnwrapper() {
     free(wrapper);
 }
 
-status_t MediaTrackCUnwrapper::start(MetaDataBase *params) {
-    return wrapper->start(wrapper->data, params);
+status_t MediaTrackCUnwrapper::start() {
+    return wrapper->start(wrapper->data);
 }
 
 status_t MediaTrackCUnwrapper::stop() {
@@ -111,13 +111,8 @@ MediaTrackCUnwrapperV2::MediaTrackCUnwrapperV2(CMediaTrackV2 *cmediatrack2) {
 MediaTrackCUnwrapperV2::~MediaTrackCUnwrapperV2() {
 }
 
-status_t MediaTrackCUnwrapperV2::start(MetaDataBase *meta) {
-    sp<AMessage> msg;
-    convertMetaDataToMessage(meta, &msg);
-    AMediaFormat *format =  AMediaFormat_fromMsg(&msg);
-    status_t ret = wrapper->start(wrapper->data, format);
-    delete format;
-    return ret;
+status_t MediaTrackCUnwrapperV2::start() {
+    return wrapper->start(wrapper->data);
 }
 
 status_t MediaTrackCUnwrapperV2::stop() {

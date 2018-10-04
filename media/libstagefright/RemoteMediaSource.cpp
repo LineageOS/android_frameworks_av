@@ -25,25 +25,29 @@ RemoteMediaSource::RemoteMediaSource(
         MediaTrack *source,
         const sp<RefBase> &plugin)
     : mExtractor(extractor),
-      mSource(source),
+      mTrack(source),
       mExtractorPlugin(plugin) {}
 
 RemoteMediaSource::~RemoteMediaSource() {
-    delete mSource;
+    delete mTrack;
     mExtractorPlugin = nullptr;
 }
 
 status_t RemoteMediaSource::start(MetaData *params) {
-    return mSource->start(params);
+    if (params) {
+        ALOGW("dropping start parameters:");
+        params->dumpToLog();
+    }
+    return mTrack->start();
 }
 
 status_t RemoteMediaSource::stop() {
-    return mSource->stop();
+    return mTrack->stop();
 }
 
 sp<MetaData> RemoteMediaSource::getFormat() {
     sp<MetaData> meta = new MetaData();
-    if (mSource->getFormat(*meta.get()) == OK) {
+    if (mTrack->getFormat(*meta.get()) == OK) {
         return meta;
     }
     return nullptr;
@@ -51,11 +55,11 @@ sp<MetaData> RemoteMediaSource::getFormat() {
 
 status_t RemoteMediaSource::read(
         MediaBufferBase **buffer, const MediaSource::ReadOptions *options) {
-    return mSource->read(buffer, reinterpret_cast<const MediaSource::ReadOptions*>(options));
+    return mTrack->read(buffer, reinterpret_cast<const MediaSource::ReadOptions*>(options));
 }
 
 bool RemoteMediaSource::supportNonblockingRead() {
-    return mSource->supportNonblockingRead();
+    return mTrack->supportNonblockingRead();
 }
 
 status_t RemoteMediaSource::pause() {

@@ -40,7 +40,7 @@ public:
             MidiEngine &engine,
             AMediaFormat *trackMetadata);
 
-    virtual status_t start(AMediaFormat *params);
+    virtual status_t start();
     virtual status_t stop();
     virtual status_t getFormat(AMediaFormat *);
 
@@ -87,7 +87,7 @@ MidiSource::~MidiSource()
     }
 }
 
-status_t MidiSource::start(AMediaFormat * /* params */)
+status_t MidiSource::start()
 {
     ALOGV("MidiSource::start");
 

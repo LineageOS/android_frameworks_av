@@ -214,7 +214,7 @@ public:
             off64_t first_frame_pos, uint32_t fixed_header,
             MP3Seeker *seeker);
 
-    virtual status_t start(MetaDataBase *params = NULL);
+    virtual status_t start();
     virtual status_t stop();
 
     virtual status_t getFormat(MetaDataBase &meta);
@@ -462,7 +462,7 @@ MP3Source::~MP3Source() {
     }
 }
 
-status_t MP3Source::start(MetaDataBase *) {
+status_t MP3Source::start() {
     CHECK(!mStarted);
 
     mGroup = new MediaBufferGroup;

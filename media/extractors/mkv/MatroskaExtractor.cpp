@@ -126,7 +126,7 @@ private:
 struct MatroskaSource : public MediaTrackHelper {
     MatroskaSource(MatroskaExtractor *extractor, size_t index);
 
-    virtual status_t start(MetaDataBase *params);
+    virtual status_t start();
     virtual status_t stop();
 
     virtual status_t getFormat(MetaDataBase &);
@@ -268,7 +268,7 @@ MatroskaSource::~MatroskaSource() {
     clearPendingFrames();
 }
 
-status_t MatroskaSource::start(MetaDataBase * /* params */) {
+status_t MatroskaSource::start() {
     if (mType == AVC && mNALSizeLen < 0) {
         return ERROR_MALFORMED;
     }

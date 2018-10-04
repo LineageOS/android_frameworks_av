@@ -43,7 +43,7 @@ struct MPEG2PSExtractor::Track : public MediaTrackHelper, public RefBase {
     Track(MPEG2PSExtractor *extractor,
           unsigned stream_id, unsigned stream_type);
 
-    virtual status_t start(MetaDataBase *params);
+    virtual status_t start();
     virtual status_t stop();
     virtual status_t getFormat(MetaDataBase &);
 
@@ -74,7 +74,7 @@ private:
 struct MPEG2PSExtractor::WrappedTrack : public MediaTrackHelper {
     WrappedTrack(MPEG2PSExtractor *extractor, const sp<Track> &track);
 
-    virtual status_t start(MetaDataBase *params);
+    virtual status_t start();
     virtual status_t stop();
     virtual status_t getFormat(MetaDataBase &);
 
@@ -635,7 +635,7 @@ MPEG2PSExtractor::Track::~Track() {
     mQueue = NULL;
 }
 
-status_t MPEG2PSExtractor::Track::start(MetaDataBase *) {
+status_t MPEG2PSExtractor::Track::start() {
     if (mSource == NULL) {
         return NO_INIT;
     }
@@ -734,8 +734,8 @@ MPEG2PSExtractor::WrappedTrack::WrappedTrack(
 MPEG2PSExtractor::WrappedTrack::~WrappedTrack() {
 }
 
-status_t MPEG2PSExtractor::WrappedTrack::start(MetaDataBase *params) {
-    return mTrack->start(params);
+status_t MPEG2PSExtractor::WrappedTrack::start() {
+    return mTrack->start();
 }
 
 status_t MPEG2PSExtractor::WrappedTrack::stop() {

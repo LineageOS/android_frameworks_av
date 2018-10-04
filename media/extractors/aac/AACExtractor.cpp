@@ -40,7 +40,7 @@ public:
             const Vector<uint64_t> &offset_vector,
             int64_t frame_duration_us);
 
-    virtual status_t start(MetaDataBase *params = NULL);
+    virtual status_t start();
     virtual status_t stop();
 
     virtual status_t getFormat(MetaDataBase&);
@@ -238,7 +238,7 @@ AACSource::~AACSource() {
     }
 }
 
-status_t AACSource::start(MetaDataBase * /* params */) {
+status_t AACSource::start() {
     CHECK(!mStarted);
 
     if (mOffsetVector.empty()) {
