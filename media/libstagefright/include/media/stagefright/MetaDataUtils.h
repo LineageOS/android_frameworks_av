@@ -34,6 +34,9 @@ bool MakeAACCodecSpecificData(MetaDataBase &meta, unsigned profile, unsigned sam
 bool MakeAACCodecSpecificData(AMediaFormat *meta, unsigned profile, unsigned sampling_freq_index,
         unsigned channel_configuration);
 
+void parseVorbisComment(
+        AMediaFormat *fileMeta, const char *comment, size_t commentLength);
+
 }  // namespace android
 
 #endif  // META_DATA_UTILS_H_

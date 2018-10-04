@@ -10,11 +10,14 @@ cc_library_shared {
     shared_libs: [
         "liblog",
         "libmediaextractor",
+        "libmediandk",
     ],
 
     static_libs: [
         "libFLAC",
         "libstagefright_foundation",
+        "libstagefright_metadatautils",
+        "libutils",
     ],
 
     name: "libflacextractor",

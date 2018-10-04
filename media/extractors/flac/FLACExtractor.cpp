@@ -25,7 +25,7 @@
 #include "FLAC/stream_decoder.h"
 
 #include <media/MediaExtractorPluginApi.h>
-#include <media/VorbisComment.h>
+#include <media/NdkMediaFormat.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/base64.h>
@@ -33,24 +33,25 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/MetaDataUtils.h>
 #include <media/stagefright/MediaBufferBase.h>
 
 namespace android {
 
 class FLACParser;
 
-class FLACSource : public MediaTrackHelper {
+class FLACSource : public MediaTrackHelperV2 {
 
 public:
     FLACSource(
             DataSourceHelper *dataSource,
-            MetaDataBase &meta);
+            AMediaFormat *meta);
 
-    virtual status_t start();
-    virtual status_t stop();
-    virtual status_t getFormat(MetaDataBase &meta);
+    virtual media_status_t start();
+    virtual media_status_t stop();
+    virtual media_status_t getFormat(AMediaFormat *meta);
 
-    virtual status_t read(
+    virtual media_status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
 protected:
@@ -58,7 +59,7 @@ protected:
 
 private:
     DataSourceHelper *mDataSource;
-    MetaDataBase mTrackMetadata;
+    AMediaFormat *mTrackMetadata;
     FLACParser *mParser;
     bool mInitCheck;
     bool mStarted;
@@ -81,8 +82,8 @@ public:
     explicit FLACParser(
         DataSourceHelper *dataSource,
         // If metadata pointers aren't provided, we don't fill them
-        MetaDataBase *fileMetadata = 0,
-        MetaDataBase *trackMetadata = 0);
+        AMediaFormat *fileMetadata = 0,
+        AMediaFormat *trackMetadata = 0);
 
     virtual ~FLACParser();
 
@@ -119,8 +120,8 @@ public:
 
 private:
     DataSourceHelper *mDataSource;
-    MetaDataBase *mFileMetadata;
-    MetaDataBase *mTrackMetadata;
+    AMediaFormat *mFileMetadata;
+    AMediaFormat *mTrackMetadata;
     bool mInitCheck;
 
     // media buffers
@@ -364,8 +365,8 @@ void FLACParser::metadataCallback(const FLAC__StreamMetadata *metadata)
     case FLAC__METADATA_TYPE_PICTURE:
         if (mFileMetadata != 0) {
             const FLAC__StreamMetadata_Picture *p = &metadata->data.picture;
-            mFileMetadata->setData(kKeyAlbumArt,
-                    MetaData::TYPE_NONE, p->data, p->data_length);
+            AMediaFormat_setBuffer(mFileMetadata, AMEDIAFORMAT_KEY_ALBUMART,
+                   p->data, p->data_length);
         }
         break;
     default:
@@ -487,8 +488,8 @@ static void copyTrespass(
 
 FLACParser::FLACParser(
         DataSourceHelper *dataSource,
-        MetaDataBase *fileMetadata,
-        MetaDataBase *trackMetadata)
+        AMediaFormat *fileMetadata,
+        AMediaFormat *trackMetadata)
     : mDataSource(dataSource),
       mFileMetadata(fileMetadata),
       mTrackMetadata(trackMetadata),
@@ -614,20 +615,25 @@ status_t FLACParser::init()
         }
         // populate track metadata
         if (mTrackMetadata != 0) {
-            mTrackMetadata->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_RAW);
-            mTrackMetadata->setInt32(kKeyChannelCount, getChannels());
-            mTrackMetadata->setInt32(kKeySampleRate, getSampleRate());
-            mTrackMetadata->setInt32(kKeyPcmEncoding, kAudioEncodingPcm16bit);
+            AMediaFormat_setString(mTrackMetadata,
+                    AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_RAW);
+            AMediaFormat_setInt32(mTrackMetadata,
+                    AMEDIAFORMAT_KEY_CHANNEL_COUNT, getChannels());
+            AMediaFormat_setInt32(mTrackMetadata,
+                    AMEDIAFORMAT_KEY_SAMPLE_RATE, getSampleRate());
+            AMediaFormat_setInt32(mTrackMetadata,
+                    AMEDIAFORMAT_KEY_PCM_ENCODING, kAudioEncodingPcm16bit);
             // sample rate is non-zero, so division by zero not possible
-            mTrackMetadata->setInt64(kKeyDuration,
-                    (getTotalSamples() * 1000000LL) / getSampleRate());
+            AMediaFormat_setInt64(mTrackMetadata,
+                    AMEDIAFORMAT_KEY_DURATION, (getTotalSamples() * 1000000LL) / getSampleRate());
         }
     } else {
         ALOGE("missing STREAMINFO");
         return NO_INIT;
     }
     if (mFileMetadata != 0) {
-        mFileMetadata->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_FLAC);
+        AMediaFormat_setString(mFileMetadata,
+                AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_FLAC);
     }
     return OK;
 }
@@ -708,7 +714,7 @@ MediaBufferBase *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
 
 FLACSource::FLACSource(
         DataSourceHelper *dataSource,
-        MetaDataBase &trackMetadata)
+        AMediaFormat *trackMetadata)
     : mDataSource(dataSource),
       mTrackMetadata(trackMetadata),
       mParser(0),
@@ -730,7 +736,7 @@ FLACSource::~FLACSource()
     delete mParser;
 }
 
-status_t FLACSource::start()
+media_status_t FLACSource::start()
 {
     ALOGV("FLACSource::start");
 
@@ -738,10 +744,10 @@ status_t FLACSource::start()
     mParser->allocateBuffers();
     mStarted = true;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t FLACSource::stop()
+media_status_t FLACSource::stop()
 {
     ALOGV("FLACSource::stop");
 
@@ -749,16 +755,15 @@ status_t FLACSource::stop()
     mParser->releaseBuffers();
     mStarted = false;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t FLACSource::getFormat(MetaDataBase &meta)
+media_status_t FLACSource::getFormat(AMediaFormat *meta)
 {
-    meta = mTrackMetadata;
-    return OK;
+    return AMediaFormat_copy(meta, mTrackMetadata);
 }
 
-status_t FLACSource::read(
+media_status_t FLACSource::read(
         MediaBufferBase **outBuffer, const ReadOptions *options)
 {
     MediaBufferBase *buffer;
@@ -782,7 +787,7 @@ status_t FLACSource::read(
         buffer = mParser->readBuffer();
     }
     *outBuffer = buffer;
-    return buffer != NULL ? (status_t) OK : (status_t) ERROR_END_OF_STREAM;
+    return buffer != NULL ? AMEDIA_OK : AMEDIA_ERROR_END_OF_STREAM;
 }
 
 // FLACExtractor
@@ -795,7 +800,9 @@ FLACExtractor::FLACExtractor(
 {
     ALOGV("FLACExtractor::FLACExtractor");
     // FLACParser will fill in the metadata for us
-    mParser = new FLACParser(mDataSource, &mFileMetadata, &mTrackMetadata);
+    mFileMetadata = AMediaFormat_new();
+    mTrackMetadata = AMediaFormat_new();
+    mParser = new FLACParser(mDataSource, mFileMetadata, mTrackMetadata);
     mInitCheck = mParser->initCheck();
 }
 
@@ -804,6 +811,8 @@ FLACExtractor::~FLACExtractor()
     ALOGV("~FLACExtractor::FLACExtractor");
     delete mParser;
     delete mDataSource;
+    AMediaFormat_delete(mFileMetadata);
+    AMediaFormat_delete(mTrackMetadata);
 }
 
 size_t FLACExtractor::countTracks()
@@ -811,7 +820,7 @@ size_t FLACExtractor::countTracks()
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrackHelper *FLACExtractor::getTrack(size_t index)
+MediaTrackHelperV2 *FLACExtractor::getTrack(size_t index)
 {
     if (mInitCheck != OK || index > 0) {
         return NULL;
@@ -819,20 +828,18 @@ MediaTrackHelper *FLACExtractor::getTrack(size_t index)
     return new FLACSource(mDataSource, mTrackMetadata);
 }
 
-status_t FLACExtractor::getTrackMetaData(
-        MetaDataBase &meta,
+media_status_t FLACExtractor::getTrackMetaData(
+        AMediaFormat *meta,
         size_t index, uint32_t /* flags */) {
     if (mInitCheck != OK || index > 0) {
-        return UNKNOWN_ERROR;
+        return AMEDIA_ERROR_UNKNOWN;
     }
-    meta = mTrackMetadata;
-    return OK;
+    return AMediaFormat_copy(meta, mTrackMetadata);
 }
 
-status_t FLACExtractor::getMetaData(MetaDataBase &meta)
+media_status_t FLACExtractor::getMetaData(AMediaFormat *meta)
 {
-    meta = mFileMetadata;
-    return OK;
+    return AMediaFormat_copy(meta, mFileMetadata);
 }
 
 // Sniffer
@@ -861,22 +868,22 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION,
+            EXTRACTORDEF_VERSION_CURRENT,
             UUID("1364b048-cc45-4fda-9934-327d0ebf9829"),
             1,
             "FLAC Extractor",
             {
-                [](
+                .v2 = [](
                         CDataSource *source,
                         float *confidence,
                         void **,
-                        FreeMetaFunc *) -> CreatorFunc {
+                        FreeMetaFunc *) -> CreatorFuncV2 {
                     DataSourceHelper helper(source);
                     if (SniffFLAC(&helper, confidence)) {
                         return [](
                                 CDataSource *source,
-                                void *) -> CMediaExtractor* {
-                            return wrap(new FLACExtractor(new DataSourceHelper(source)));};
+                                void *) -> CMediaExtractorV2* {
+                            return wrapV2(new FLACExtractor(new DataSourceHelper(source)));};
                     }
                     return NULL;
                 }

@@ -24,7 +24,6 @@
 #include <utils/Vector.h>
 #include <media/DataSourceBase.h>
 #include <media/ExtractorUtils.h>
-#include <media/VorbisComment.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/base64.h>
@@ -34,6 +33,7 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaDataBase.h>
+#include <media/stagefright/MetaDataUtils.h>
 #include <utils/String8.h>
 
 extern "C" {
@@ -47,15 +47,15 @@ extern "C" {
 
 namespace android {
 
-struct OggSource : public MediaTrackHelper {
+struct OggSource : public MediaTrackHelperV2 {
     explicit OggSource(OggExtractor *extractor);
 
-    virtual status_t getFormat(MetaDataBase &);
+    virtual media_status_t getFormat(AMediaFormat *);
 
-    virtual status_t start();
-    virtual status_t stop();
+    virtual media_status_t start();
+    virtual media_status_t stop();
 
-    virtual status_t read(
+    virtual media_status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
 protected:
@@ -77,7 +77,7 @@ struct MyOggExtractor {
             int64_t seekPreRollUs);
     virtual ~MyOggExtractor();
 
-    status_t getFormat(MetaDataBase &) const;
+    media_status_t getFormat(AMediaFormat *) const;
 
     // Returns an approximate bitrate in bits per second.
     virtual uint64_t approxBitrate() const = 0;
@@ -88,9 +88,8 @@ struct MyOggExtractor {
 
     status_t init();
 
-    status_t getFileMetaData(MetaDataBase &meta) {
-        meta = mFileMeta;
-        return OK;
+    media_status_t getFileMetaData(AMediaFormat *meta) {
+        return AMediaFormat_copy(meta, mFileMeta);
     }
 
 protected:
@@ -129,8 +128,8 @@ protected:
     vorbis_info mVi;
     vorbis_comment mVc;
 
-    MetaDataBase mMeta;
-    MetaDataBase mFileMeta;
+    AMediaFormat *mMeta;
+    AMediaFormat *mFileMeta;
 
     Vector<TOCEntry> mTableOfContents;
 
@@ -237,27 +236,27 @@ OggSource::~OggSource() {
     }
 }
 
-status_t OggSource::getFormat(MetaDataBase &meta) {
+media_status_t OggSource::getFormat(AMediaFormat *meta) {
     return mExtractor->mImpl->getFormat(meta);
 }
 
-status_t OggSource::start() {
+media_status_t OggSource::start() {
     if (mStarted) {
-        return INVALID_OPERATION;
+        return AMEDIA_ERROR_INVALID_OPERATION;
     }
 
     mStarted = true;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t OggSource::stop() {
+media_status_t OggSource::stop() {
     mStarted = false;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t OggSource::read(
+media_status_t OggSource::read(
         MediaBufferBase **out, const ReadOptions *options) {
     *out = NULL;
 
@@ -266,7 +265,7 @@ status_t OggSource::read(
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
         status_t err = mExtractor->mImpl->seekToTime(seekTimeUs);
         if (err != OK) {
-            return err;
+            return AMEDIA_ERROR_UNKNOWN;
         }
     }
 
@@ -274,7 +273,7 @@ status_t OggSource::read(
     status_t err = mExtractor->mImpl->readNextPacket(&packet);
 
     if (err != OK) {
-        return err;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
 #if 0
@@ -290,7 +289,7 @@ status_t OggSource::read(
 
     *out = packet;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -316,16 +315,19 @@ MyOggExtractor::MyOggExtractor(
 
     vorbis_info_init(&mVi);
     vorbis_comment_init(&mVc);
+    mMeta = AMediaFormat_new();
+    mFileMeta = AMediaFormat_new();
 }
 
 MyOggExtractor::~MyOggExtractor() {
+    AMediaFormat_delete(mFileMeta);
+    AMediaFormat_delete(mMeta);
     vorbis_comment_clear(&mVc);
     vorbis_info_clear(&mVi);
 }
 
-status_t MyOggExtractor::getFormat(MetaDataBase &meta) const {
-    meta = mMeta;
-    return OK;
+media_status_t MyOggExtractor::getFormat(AMediaFormat *meta) const {
+    return AMediaFormat_copy(meta, mMeta);
 }
 
 status_t MyOggExtractor::findNextPage(
@@ -832,7 +834,7 @@ status_t MyOggExtractor::_readNextPacket(MediaBufferBase **out, bool calcVorbisT
 }
 
 status_t MyOggExtractor::init() {
-    mMeta.setCString(kKeyMIMEType, mMimeType);
+    AMediaFormat_setString(mMeta, AMEDIAFORMAT_KEY_MIME, mMimeType);
 
     status_t err;
     MediaBufferBase *packet;
@@ -865,7 +867,7 @@ status_t MyOggExtractor::init() {
 
         int64_t durationUs = getTimeUsOfGranule(lastGranulePosition);
 
-        mMeta.setInt64(kKeyDuration, durationUs);
+        AMediaFormat_setInt64(mMeta, AMEDIAFORMAT_KEY_DURATION, durationUs);
 
         buildTableOfContents();
     }
@@ -981,11 +983,14 @@ status_t MyOpusExtractor::verifyOpusHeader(MediaBufferBase *buffer) {
     mChannelCount = data[9];
     mCodecDelay = U16LE_AT(&data[10]);
 
-    mMeta.setData(kKeyOpusHeader, 0, data, size);
-    mMeta.setInt32(kKeySampleRate, kOpusSampleRate);
-    mMeta.setInt32(kKeyChannelCount, mChannelCount);
-    mMeta.setInt64(kKeyOpusSeekPreRoll /* ns */, kOpusSeekPreRollUs * 1000 /* = 80 ms*/);
-    mMeta.setInt64(kKeyOpusCodecDelay /* ns */,
+    // kKeyOpusHeader is csd-0
+    AMediaFormat_setBuffer(mMeta, AMEDIAFORMAT_KEY_CSD_0, data, size);
+    AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, kOpusSampleRate);
+    AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, mChannelCount);
+    // are these actually used anywhere?
+    // (they are kKeyOpusSeekPreRoll and kKeyOpusCodecDelay respectively)
+    AMediaFormat_setInt64(mMeta, AMEDIAFORMAT_KEY_CSD_2, kOpusSeekPreRollUs * 1000 /* = 80 ms*/);
+    AMediaFormat_setInt64(mMeta, AMEDIAFORMAT_KEY_CSD_1,
             mCodecDelay /* sample/s */ * 1000000000ll / kOpusSampleRate);
 
     return OK;
@@ -1122,10 +1127,10 @@ status_t MyVorbisExtractor::verifyHeader(
                 return ERROR_MALFORMED;
             }
 
-            mMeta.setData(kKeyVorbisInfo, 0, data, size);
-            mMeta.setInt32(kKeySampleRate, mVi.rate);
-            mMeta.setInt32(kKeyChannelCount, mVi.channels);
-            mMeta.setInt32(kKeyBitRate, mVi.bitrate_nominal);
+            AMediaFormat_setBuffer(mMeta, AMEDIAFORMAT_KEY_CSD_0, data, size);
+            AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, mVi.rate);
+            AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, mVi.channels);
+            AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_BIT_RATE, mVi.bitrate_nominal);
 
             ALOGV("lower-bitrate = %ld", mVi.bitrate_lower);
             ALOGV("upper-bitrate = %ld", mVi.bitrate_upper);
@@ -1140,7 +1145,7 @@ status_t MyVorbisExtractor::verifyHeader(
             if (mSource->getSize(&size) == OK) {
                 uint64_t bps = approxBitrate();
                 if (bps != 0) {
-                    mMeta.setInt64(kKeyDuration, size * 8000000ll / bps);
+                    AMediaFormat_setInt64(mMeta, AMEDIAFORMAT_KEY_DURATION, size * 8000000ll / bps);
                 }
             }
             break;
@@ -1162,7 +1167,7 @@ status_t MyVorbisExtractor::verifyHeader(
                 return ERROR_MALFORMED;
             }
 
-            mMeta.setData(kKeyVorbisBooks, 0, data, size);
+            AMediaFormat_setBuffer(mMeta, AMEDIAFORMAT_KEY_CSD_1, data, size);
             break;
         }
     }
@@ -1180,12 +1185,12 @@ uint64_t MyVorbisExtractor::approxBitrate() const {
 
 
 void MyOggExtractor::parseFileMetaData() {
-    mFileMeta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_CONTAINER_OGG);
+    AMediaFormat_setString(mFileMeta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_CONTAINER_OGG);
 
     for (int i = 0; i < mVc.comments; ++i) {
         const char *comment = mVc.user_comments[i];
         size_t commentLength = mVc.comment_lengths[i];
-        parseVorbisComment(&mFileMeta, comment, commentLength);
+        parseVorbisComment(mFileMeta, comment, commentLength);
         //ALOGI("comment #%d: '%s'", i + 1, mVc.user_comments[i]);
     }
 }
@@ -1227,7 +1232,7 @@ size_t OggExtractor::countTracks() {
     return mInitCheck != OK ? 0 : 1;
 }
 
-MediaTrackHelper *OggExtractor::getTrack(size_t index) {
+MediaTrackHelperV2 *OggExtractor::getTrack(size_t index) {
     if (index >= 1) {
         return NULL;
     }
@@ -1235,27 +1240,27 @@ MediaTrackHelper *OggExtractor::getTrack(size_t index) {
     return new OggSource(this);
 }
 
-status_t OggExtractor::getTrackMetaData(
-        MetaDataBase &meta,
+media_status_t OggExtractor::getTrackMetaData(
+        AMediaFormat *meta,
         size_t index, uint32_t /* flags */) {
     if (index >= 1) {
-        return UNKNOWN_ERROR;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
     return mImpl->getFormat(meta);
 }
 
-status_t OggExtractor::getMetaData(MetaDataBase &meta) {
+media_status_t OggExtractor::getMetaData(AMediaFormat *meta) {
     return mImpl->getFileMetaData(meta);
 }
 
-static CMediaExtractor* CreateExtractor(
+static CMediaExtractorV2* CreateExtractor(
         CDataSource *source,
         void *) {
-    return wrap(new OggExtractor(new DataSourceHelper(source)));
+    return wrapV2(new OggExtractor(new DataSourceHelper(source)));
 }
 
-static CreatorFunc Sniff(
+static CreatorFuncV2 Sniff(
         CDataSource *source,
         float *confidence,
         void **,
@@ -1276,11 +1281,11 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION_CURRENT,
         UUID("8cc5cd06-f772-495e-8a62-cba9649374e9"),
         1, // version
         "Ogg Extractor",
-        { Sniff }
+        { .v2 = Sniff }
     };
 }
 
