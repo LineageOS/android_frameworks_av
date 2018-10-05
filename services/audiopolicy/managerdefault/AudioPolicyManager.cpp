@@ -62,26 +62,6 @@ namespace android {
 // media / notification / system volume.
 constexpr float IN_CALL_EARPIECE_HEADROOM_DB = 3.f;
 
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-// Array of all surround formats.
-static const audio_format_t SURROUND_FORMATS[] = {
-    AUDIO_FORMAT_AC3,
-    AUDIO_FORMAT_E_AC3,
-    AUDIO_FORMAT_DTS,
-    AUDIO_FORMAT_DTS_HD,
-    AUDIO_FORMAT_AAC_LC,
-    AUDIO_FORMAT_DOLBY_TRUEHD,
-    AUDIO_FORMAT_E_AC3_JOC,
-};
-// Array of all AAC formats. When AAC is enabled by users, all AAC formats should be enabled.
-static const audio_format_t AAC_FORMATS[] = {
-    AUDIO_FORMAT_AAC_LC,
-    AUDIO_FORMAT_AAC_HE_V1,
-    AUDIO_FORMAT_AAC_HE_V2,
-    AUDIO_FORMAT_AAC_ELD,
-    AUDIO_FORMAT_AAC_XHE,
-};
-
 // Compressed formats for MSD module, ordered from most preferred to least preferred.
 static const std::vector<audio_format_t> compressedFormatsOrder = {{
         AUDIO_FORMAT_MAT_2_1, AUDIO_FORMAT_MAT_2_0, AUDIO_FORMAT_E_AC3,
@@ -3606,35 +3586,38 @@ status_t AudioPolicyManager::getSurroundFormats(unsigned int *numSurroundFormats
              FormatVector supportedFormats =
                  hdmiOutputDevs[i]->getAudioPort()->getAudioProfiles().getSupportedFormats();
              for (size_t j = 0; j < supportedFormats.size(); j++) {
-                 if (std::find(std::begin(SURROUND_FORMATS),
-                                 std::end(SURROUND_FORMATS),
-                                 supportedFormats[j]) != std::end(SURROUND_FORMATS)) {
+                 if (mConfig.getSurroundFormats().count(supportedFormats[j]) != 0) {
                      formats.insert(supportedFormats[j]);
-                 } else if (std::find(std::begin(AAC_FORMATS),
-                                 std::end(AAC_FORMATS),
-                                 supportedFormats[j]) != std::end(AAC_FORMATS)) {
-                     // if any format in AAC_FORMATS is reported, insert AUDIO_FORMAT_AAC_LC as this
-                     // is the only AAC format used in the TvSettings UI for all AAC formats.
-                     formats.insert(AUDIO_FORMAT_AAC_LC);
+                 } else {
+                     for (const auto& pair : mConfig.getSurroundFormats()) {
+                         if (pair.second.count(supportedFormats[j]) != 0) {
+                             formats.insert(pair.first);
+                             break;
+                         }
+                     }
                  }
              }
         }
     } else {
-        for (size_t i = 0; i < ARRAY_SIZE(SURROUND_FORMATS); i++) {
-            formats.insert(SURROUND_FORMATS[i]);
+        for (const auto& pair : mConfig.getSurroundFormats()) {
+            formats.insert(pair.first);
         }
     }
     for (const auto& format: formats) {
         if (formatsWritten < formatsMax) {
             surroundFormats[formatsWritten] = format;
             bool formatEnabled = false;
-            if (format == AUDIO_FORMAT_AAC_LC) {
-                for (size_t j = 0; j < ARRAY_SIZE(AAC_FORMATS) && !formatEnabled; j++) {
-                    formatEnabled =
-                            mSurroundFormats.find(AAC_FORMATS[j]) != mSurroundFormats.end();
+            if (mConfig.getSurroundFormats().count(format) == 0) {
+                // Check sub-formats
+                for (const auto& pair : mConfig.getSurroundFormats()) {
+                    for (const auto& subformat : pair.second) {
+                        formatEnabled = mSurroundFormats.count(subformat) != 0;
+                        if (formatEnabled) break;
+                    }
+                    if (formatEnabled) break;
                 }
             } else {
-                formatEnabled = mSurroundFormats.find(format) != mSurroundFormats.end();
+                formatEnabled = mSurroundFormats.count(format) != 0;
             }
             surroundFormatsEnabled[formatsWritten++] = formatEnabled;
         }
@@ -3647,14 +3630,8 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
 {
     ALOGV("%s() format 0x%X enabled %d", __func__, audioFormat, enabled);
     // Check if audio format is a surround formats.
-    bool isSurroundFormat = false;
-    for (size_t i = 0; i < ARRAY_SIZE(SURROUND_FORMATS); i++) {
-        if (audioFormat == SURROUND_FORMATS[i]) {
-            isSurroundFormat = true;
-            break;
-        }
-    }
-    if (!isSurroundFormat) {
+    const auto& formatIter = mConfig.getSurroundFormats().find(audioFormat);
+    if (formatIter == mConfig.getSurroundFormats().end()) {
         ALOGW("%s() format 0x%X is not a known surround format", __func__, audioFormat);
         return BAD_VALUE;
     }
@@ -3667,8 +3644,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
         return INVALID_OPERATION;
     }
 
-    if ((mSurroundFormats.find(audioFormat) != mSurroundFormats.end() && enabled)
-            || (mSurroundFormats.find(audioFormat) == mSurroundFormats.end() && !enabled)) {
+    if ((mSurroundFormats.count(audioFormat) != 0) == enabled) {
         return NO_ERROR;
     }
 
@@ -3680,20 +3656,14 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
 
     std::unordered_set<audio_format_t> surroundFormatsBackup(mSurroundFormats);
     if (enabled) {
-        if (audioFormat == AUDIO_FORMAT_AAC_LC) {
-            for (size_t i = 0; i < ARRAY_SIZE(AAC_FORMATS); i++) {
-                mSurroundFormats.insert(AAC_FORMATS[i]);
-            }
-        } else {
-            mSurroundFormats.insert(audioFormat);
+        mSurroundFormats.insert(audioFormat);
+        for (const auto& subFormat : formatIter->second) {
+            mSurroundFormats.insert(subFormat);
         }
     } else {
-        if (audioFormat == AUDIO_FORMAT_AAC_LC) {
-            for (size_t i = 0; i < ARRAY_SIZE(AAC_FORMATS); i++) {
-                mSurroundFormats.erase(AAC_FORMATS[i]);
-            }
-        } else {
-            mSurroundFormats.erase(audioFormat);
+        mSurroundFormats.erase(audioFormat);
+        for (const auto& subFormat : formatIter->second) {
+            mSurroundFormats.erase(subFormat);
         }
     }
 
@@ -3738,7 +3708,6 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
         profileUpdated |= (status == NO_ERROR);
     }
 
-    // Undo the surround formats change due to no audio profiles updated.
     if (!profileUpdated) {
         ALOGW("%s() no audio profiles updated, undoing surround formats change", __func__);
         mSurroundFormats = std::move(surroundFormatsBackup);

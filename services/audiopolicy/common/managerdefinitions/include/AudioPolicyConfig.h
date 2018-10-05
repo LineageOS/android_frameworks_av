@@ -16,6 +16,9 @@
 
 #pragma once
 
+#include <unordered_map>
+#include <unordered_set>
+
 #include <AudioGain.h>
 #include <VolumeCurve.h>
 #include <AudioPort.h>
@@ -145,6 +148,35 @@ public:
         inProfile->addAudioProfile(micProfile);
         inProfile->addSupportedDevice(defaultInputDevice);
         module->addInputProfile(inProfile);
+
+        setDefaultSurroundFormats();
+    }
+
+    // Surround formats, with an optional list of subformats that are equivalent from users' POV.
+    using SurroundFormats = std::unordered_map<audio_format_t, std::unordered_set<audio_format_t>>;
+
+    const SurroundFormats &getSurroundFormats() const
+    {
+        return mSurroundFormats;
+    }
+
+    void setSurroundFormats(const SurroundFormats &surroundFormats)
+    {
+        mSurroundFormats = surroundFormats;
+    }
+
+    void setDefaultSurroundFormats()
+    {
+        mSurroundFormats = {
+            {AUDIO_FORMAT_AC3, {}},
+            {AUDIO_FORMAT_E_AC3, {}},
+            {AUDIO_FORMAT_DTS, {}},
+            {AUDIO_FORMAT_DTS_HD, {}},
+            {AUDIO_FORMAT_AAC_LC, {
+                    AUDIO_FORMAT_AAC_HE_V1, AUDIO_FORMAT_AAC_HE_V2, AUDIO_FORMAT_AAC_ELD,
+                    AUDIO_FORMAT_AAC_XHE}},
+            {AUDIO_FORMAT_DOLBY_TRUEHD, {}},
+            {AUDIO_FORMAT_E_AC3_JOC, {}}};
     }
 
 private:
@@ -158,6 +190,7 @@ private:
     // DEVICE_CATEGORY_SPEAKER path to boost soft sounds, used to adjust volume curves accordingly.
     // Note: remove also speaker_drc_enabled from global configuration of XML config file.
     bool mIsSpeakerDrcEnabled;
+    SurroundFormats mSurroundFormats;
 };
 
 } // namespace android

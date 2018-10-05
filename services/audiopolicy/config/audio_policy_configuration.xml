@@ -198,4 +198,26 @@
 
     <!-- End of Volume section -->
 
+    <?disabledUntilHalV4_1
+    <!-- Surround configuration -->
+
+    <surroundSound>
+      <!-- Each of the listed formats gets an entry in Surround Settings dialog.
+           There must be a corresponding Java ENCODING_... contant defined in AudioFormat.java,
+           and a display name defined in AudioFormat.toDisplayName. For the formats that don't
+           need a dedicated Surrond Settings dialog entry, a subformats list should be used. -->
+      <formats>
+        <format name="AUDIO_FORMAT_AC3" />
+        <format name="AUDIO_FORMAT_E_AC3" />
+        <format name="AUDIO_FORMAT_E_AC3_JOC" />
+        <format name="AUDIO_FORMAT_DOLBY_TRUEHD" />
+        <format name="AUDIO_FORMAT_DTS" />
+        <format name="AUDIO_FORMAT_DTS_HD" />
+        <format name="AUDIO_FORMAT_AAC_LC" subformats="AUDIO_FORMAT_AAC_HE_V1 AUDIO_FORMAT_AAC_HE_V2 AUDIO_FORMAT_AAC_ELD AUDIO_FORMAT_AAC_XHE" />
+      </formats>
+    </surroundSound>
+
+    <!-- End of Surround configuration -->
+    ?>
+
 </audioPolicyConfiguration>
