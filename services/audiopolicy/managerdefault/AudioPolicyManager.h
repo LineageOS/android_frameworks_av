@@ -242,7 +242,7 @@ public:
         // return the strategy corresponding to a given stream type
         routing_strategy getStrategy(audio_stream_type_t stream) const;
 
-        virtual void setRecordSilenced(uid_t uid, bool silenced);
+        virtual void setAppState(uid_t uid, app_state_t state);
 
 protected:
         // A constructor that allows more fine-grained control over initialization process,
