@@ -73,7 +73,7 @@ public:
                              uint32_t flags,
                              bool exactMatchRequiredForInputFlags = false) const;
 
-    void dump(int fd);
+    void dump(String8 *dst) const;
     void log();
 
     bool hasSupportedDevices() const { return !mSupportedDevices.isEmpty(); }

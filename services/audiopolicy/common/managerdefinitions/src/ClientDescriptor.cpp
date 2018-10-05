@@ -30,21 +30,6 @@
 
 namespace android {
 
-status_t ClientDescriptor::dump(int fd, int spaces, int index)
-{
-    String8 out;
-
-    // FIXME: use until other descriptor classes have a dump to String8 method
-    mDumpFd = fd;
-
-    status_t status = dump(out, spaces, index);
-    if (status == NO_ERROR) {
-        write(fd, out.string(), out.size());
-    }
-
-    return status;
-}
-
 std::string ClientDescriptor::toShortString() const
 {
     std::stringstream ss;
@@ -53,25 +38,21 @@ std::string ClientDescriptor::toShortString() const
     return ss.str();
 }
 
-status_t ClientDescriptor::dump(String8& out, int spaces, int index)
+void ClientDescriptor::dump(String8 *dst, int spaces, int index) const
 {
-    out.appendFormat("%*sClient %d:\n", spaces, "", index+1);
-    out.appendFormat("%*s- Port Id: %d Session Id: %d UID: %d\n", spaces, "",
+    dst->appendFormat("%*sClient %d:\n", spaces, "", index+1);
+    dst->appendFormat("%*s- Port Id: %d Session Id: %d UID: %d\n", spaces, "",
              mPortId, mSessionId, mUid);
-    out.appendFormat("%*s- Format: %08x Sampling rate: %d Channels: %08x\n", spaces, "",
+    dst->appendFormat("%*s- Format: %08x Sampling rate: %d Channels: %08x\n", spaces, "",
              mConfig.format, mConfig.sample_rate, mConfig.channel_mask);
-    out.appendFormat("%*s- Preferred Device Id: %08x\n", spaces, "", mPreferredDeviceId);
-    out.appendFormat("%*s- State: %s\n", spaces, "", mActive ? "Active" : "Inactive");
-    return NO_ERROR;
+    dst->appendFormat("%*s- Preferred Device Id: %08x\n", spaces, "", mPreferredDeviceId);
+    dst->appendFormat("%*s- State: %s\n", spaces, "", mActive ? "Active" : "Inactive");
 }
 
-status_t TrackClientDescriptor::dump(String8& out, int spaces, int index)
+void TrackClientDescriptor::dump(String8 *dst, int spaces, int index) const
 {
-    ClientDescriptor::dump(out, spaces, index);
-
-    out.appendFormat("%*s- Stream: %d flags: %08x\n", spaces, "", mStream, mFlags);
-
-    return NO_ERROR;
+    ClientDescriptor::dump(dst, spaces, index);
+    dst->appendFormat("%*s- Stream: %d flags: %08x\n", spaces, "", mStream, mFlags);
 }
 
 std::string TrackClientDescriptor::toShortString() const
@@ -82,13 +63,10 @@ std::string TrackClientDescriptor::toShortString() const
     return ss.str();
 }
 
-status_t RecordClientDescriptor::dump(String8& out, int spaces, int index)
+void RecordClientDescriptor::dump(String8 *dst, int spaces, int index) const
 {
-    ClientDescriptor::dump(out, spaces, index);
-
-    out.appendFormat("%*s- Source: %d flags: %08x\n", spaces, "", mSource, mFlags);
-
-    return NO_ERROR;
+    ClientDescriptor::dump(dst, spaces, index);
+    dst->appendFormat("%*s- Source: %d flags: %08x\n", spaces, "", mSource, mFlags);
 }
 
 SourceClientDescriptor::SourceClientDescriptor(audio_port_handle_t portId, uid_t uid,
@@ -112,31 +90,19 @@ void SourceClientDescriptor::setHwOutput(const sp<HwAudioOutputDescriptor>& hwOu
     mHwOutput = hwOutput;
 }
 
-status_t SourceClientDescriptor::dump(String8& out, int spaces, int index)
+void SourceClientDescriptor::dump(String8 *dst, int spaces, int index) const
 {
-    TrackClientDescriptor::dump(out, spaces, index);
-
-    if (mDumpFd >= 0) {
-        out.appendFormat("%*s- Device:\n", spaces, "");
-        write(mDumpFd, out.string(), out.size());
-
-        mSrcDevice->dump(mDumpFd, 2, 0);
-        mDumpFd = -1;
-    }
-
-    return NO_ERROR;
+    TrackClientDescriptor::dump(dst, spaces, index);
+    dst->appendFormat("%*s- Device:\n", spaces, "");
+    mSrcDevice->dump(dst, 2, 0);
 }
 
-status_t SourceClientCollection::dump(int fd) const
+void SourceClientCollection::dump(String8 *dst) const
 {
-    String8 out;
-    out.append("\nAudio sources:\n");
-    write(fd, out.string(), out.size());
+    dst->append("\nAudio sources:\n");
     for (size_t i = 0; i < size(); i++) {
-        valueAt(i)->dump(fd, 2, i);
+        valueAt(i)->dump(dst, 2, i);
     }
-
-    return NO_ERROR;
 }
 
 }; //namespace android

@@ -112,7 +112,7 @@ public:
 
     bool isDynamic() { return mIsDynamicFormat || mIsDynamicChannels || mIsDynamicRate; }
 
-    void dump(int fd, int spaces) const;
+    void dump(String8 *dst, int spaces) const;
 
 private:
     String8  mName;
@@ -165,7 +165,7 @@ public:
     // One audio profile will be added for each format supported by Audio HAL
     void setFormats(const FormatVector &formats);
 
-    void dump(int fd, int spaces) const;
+    void dump(String8 *dst, int spaces) const;
 
 private:
     sp<AudioProfile> getProfileFor(audio_format_t format) const;

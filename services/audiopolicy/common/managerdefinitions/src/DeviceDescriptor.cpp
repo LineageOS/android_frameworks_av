@@ -199,20 +199,15 @@ sp<DeviceDescriptor> DeviceVector::getDeviceFromTagName(const String8 &tagName) 
     return nullptr;
 }
 
-status_t DeviceVector::dump(int fd, const String8 &tag, int spaces, bool verbose) const
+void DeviceVector::dump(String8 *dst, const String8 &tag, int spaces, bool verbose) const
 {
     if (isEmpty()) {
-        return NO_ERROR;
+        return;
     }
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-
-    snprintf(buffer, SIZE, "%*s- %s devices:\n", spaces, "", tag.string());
-    write(fd, buffer, strlen(buffer));
+    dst->appendFormat("%*s- %s devices:\n", spaces, "", tag.string());
     for (size_t i = 0; i < size(); i++) {
-        itemAt(i)->dump(fd, spaces + 2, i, verbose);
+        itemAt(i)->dump(dst, spaces + 2, i, verbose);
     }
-    return NO_ERROR;
 }
 
 void DeviceDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
@@ -269,35 +264,23 @@ void DeviceDescriptor::importAudioPort(const sp<AudioPort>& port, bool force) {
     port->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
 }
 
-status_t DeviceDescriptor::dump(int fd, int spaces, int index, bool verbose) const
+void DeviceDescriptor::dump(String8 *dst, int spaces, int index, bool verbose) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
-    snprintf(buffer, SIZE, "%*sDevice %d:\n", spaces, "", index+1);
-    result.append(buffer);
+    dst->appendFormat("%*sDevice %d:\n", spaces, "", index + 1);
     if (mId != 0) {
-        snprintf(buffer, SIZE, "%*s- id: %2d\n", spaces, "", mId);
-        result.append(buffer);
+        dst->appendFormat("%*s- id: %2d\n", spaces, "", mId);
     }
     if (!mTagName.isEmpty()) {
-        snprintf(buffer, SIZE, "%*s- tag name: %s\n", spaces, "", mTagName.string());
-        result.append(buffer);
+        dst->appendFormat("%*s- tag name: %s\n", spaces, "", mTagName.string());
     }
     std::string deviceLiteral;
     if (deviceToString(mDeviceType, deviceLiteral)) {
-        snprintf(buffer, SIZE, "%*s- type: %-48s\n", spaces, "", deviceLiteral.c_str());
-        result.append(buffer);
+        dst->appendFormat("%*s- type: %-48s\n", spaces, "", deviceLiteral.c_str());
     }
     if (mAddress.size() != 0) {
-        snprintf(buffer, SIZE, "%*s- address: %-32s\n", spaces, "", mAddress.string());
-        result.append(buffer);
+        dst->appendFormat("%*s- address: %-32s\n", spaces, "", mAddress.string());
     }
-    write(fd, result.string(), result.size());
-    AudioPort::dump(fd, spaces, verbose);
-
-    return NO_ERROR;
+    AudioPort::dump(dst, spaces, verbose);
 }
 
 void DeviceDescriptor::log() const

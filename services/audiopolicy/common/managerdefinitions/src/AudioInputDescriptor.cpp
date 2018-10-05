@@ -336,20 +336,16 @@ RecordClientVector AudioInputDescriptor::clientsList(bool activeOnly, audio_sour
     return clients;
 }
 
-status_t AudioInputDescriptor::dump(int fd)
+void AudioInputDescriptor::dump(String8 *dst) const
 {
-    String8 result;
-
-    result.appendFormat(" ID: %d\n", getId());
-    result.appendFormat(" Sampling rate: %d\n", mSamplingRate);
-    result.appendFormat(" Format: %d\n", mFormat);
-    result.appendFormat(" Channels: %08x\n", mChannelMask);
-    result.appendFormat(" Devices %08x\n", mDevice);
-    result.append(" AudioRecord Clients:\n");
-    result.append(ClientMapHandler<RecordClientDescriptor>::dump());
-    result.append("\n");
-    write(fd, result.string(), result.size());
-    return NO_ERROR;
+    dst->appendFormat(" ID: %d\n", getId());
+    dst->appendFormat(" Sampling rate: %d\n", mSamplingRate);
+    dst->appendFormat(" Format: %d\n", mFormat);
+    dst->appendFormat(" Channels: %08x\n", mChannelMask);
+    dst->appendFormat(" Devices %08x\n", mDevice);
+    dst->append(" AudioRecord Clients:\n");
+    ClientMapHandler<RecordClientDescriptor>::dump(dst);
+    dst->append("\n");
 }
 
 bool AudioInputCollection::isSourceActive(audio_source_t source) const
@@ -421,20 +417,13 @@ sp<AudioInputDescriptor> AudioInputCollection::getInputForClient(audio_port_hand
     return 0;
 }
 
-status_t AudioInputCollection::dump(int fd) const
+void AudioInputCollection::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-
-    snprintf(buffer, SIZE, "\nInputs dump:\n");
-    write(fd, buffer, strlen(buffer));
+    dst->append("\nInputs dump:\n");
     for (size_t i = 0; i < size(); i++) {
-        snprintf(buffer, SIZE, "- Input %d dump:\n", keyAt(i));
-        write(fd, buffer, strlen(buffer));
-        valueAt(i)->dump(fd);
+        dst->appendFormat("- Input %d dump:\n", keyAt(i));
+        valueAt(i)->dump(dst);
     }
-
-    return NO_ERROR;
 }
 
 }; //namespace android
