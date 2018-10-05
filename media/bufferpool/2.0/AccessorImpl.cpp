@@ -399,6 +399,9 @@ void Accessor::Impl::BufferPool::processStatusMessages() {
             case BufferStatus::TRANSFER_ERROR:
                 ret = handleTransferResult(message);
                 break;
+            case BufferStatus::INVALIDATION_ACK:
+                // TODO
+                break;
         }
         if (ret == false) {
             ALOGW("buffer status message processing failure - message : %d connection : %lld",

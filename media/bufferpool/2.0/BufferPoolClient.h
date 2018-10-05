@@ -20,6 +20,7 @@
 #include <memory>
 #include <android/hardware/media/bufferpool/2.0/IAccessor.h>
 #include <android/hardware/media/bufferpool/2.0/IConnection.h>
+#include <android/hardware/media/bufferpool/2.0/IObserver.h>
 #include <bufferpool/BufferPoolTypes.h>
 #include <cutils/native_handle.h>
 #include "Accessor.h"
@@ -33,6 +34,7 @@ namespace implementation {
 
 using ::android::hardware::media::bufferpool::V2_0::IAccessor;
 using ::android::hardware::media::bufferpool::V2_0::IConnection;
+using ::android::hardware::media::bufferpool::V2_0::IObserver;
 using ::android::hardware::media::bufferpool::V2_0::ResultStatus;
 using ::android::sp;
 
