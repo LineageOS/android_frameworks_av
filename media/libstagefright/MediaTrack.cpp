@@ -83,13 +83,13 @@ status_t MediaTrackCUnwrapper::read(MediaBufferBase **buffer, const ReadOptions 
 
     uint32_t opts = 0;
 
-    if (options->getNonBlocking()) {
+    if (options && options->getNonBlocking()) {
         opts |= CMediaTrackReadOptions::NONBLOCKING;
     }
 
     int64_t seekPosition = 0;
     MediaTrack::ReadOptions::SeekMode seekMode;
-    if (options->getSeekTo(&seekPosition, &seekMode)) {
+    if (options && options->getSeekTo(&seekPosition, &seekMode)) {
         opts |= SEEK;
         opts |= (uint32_t) seekMode;
     }
