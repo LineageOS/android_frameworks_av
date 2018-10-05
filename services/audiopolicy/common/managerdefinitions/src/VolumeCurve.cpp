@@ -68,81 +68,56 @@ float VolumeCurve::volIndexToDb(int indexInUi, int volIndexMin, int volIndexMax)
     return decibels;
 }
 
-void VolumeCurve::dump(int fd) const
+void VolumeCurve::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-    snprintf(buffer, SIZE, " {");
-    result.append(buffer);
+    dst->append(" {");
     for (size_t i = 0; i < mCurvePoints.size(); i++) {
-        snprintf(buffer, SIZE, "(%3d, %5d)",
+        dst->appendFormat("(%3d, %5d)",
                  mCurvePoints[i].mIndex, mCurvePoints[i].mAttenuationInMb);
-        result.append(buffer);
-        result.append(i == (mCurvePoints.size() - 1) ? " }\n" : ", ");
+        dst->append(i == (mCurvePoints.size() - 1) ? " }\n" : ", ");
     }
-    write(fd, result.string(), result.size());
 }
 
-void VolumeCurvesForStream::dump(int fd, int spaces = 0, bool curvePoints) const
+void VolumeCurvesForStream::dump(String8 *dst, int spaces = 0, bool curvePoints) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
     if (!curvePoints) {
-        snprintf(buffer, SIZE, "%s         %02d         %02d         ",
+        dst->appendFormat("%s         %02d         %02d         ",
                  mCanBeMuted ? "true " : "false", mIndexMin, mIndexMax);
-        result.append(buffer);
         for (size_t i = 0; i < mIndexCur.size(); i++) {
-            snprintf(buffer, SIZE, "%04x : %02d, ", mIndexCur.keyAt(i), mIndexCur.valueAt(i));
-            result.append(buffer);
+            dst->appendFormat("%04x : %02d, ", mIndexCur.keyAt(i), mIndexCur.valueAt(i));
         }
-        result.append("\n");
-        write(fd, result.string(), result.size());
+        dst->append("\n");
         return;
     }
 
     for (size_t i = 0; i < size(); i++) {
         std::string deviceCatLiteral;
         DeviceCategoryConverter::toString(keyAt(i), deviceCatLiteral);
-        snprintf(buffer, SIZE, "%*s %s :",
+        dst->appendFormat("%*s %s :",
                  spaces, "", deviceCatLiteral.c_str());
-        write(fd, buffer, strlen(buffer));
-        valueAt(i)->dump(fd);
+        valueAt(i)->dump(dst);
     }
-    result.append("\n");
-    write(fd, result.string(), result.size());
+    dst->append("\n");
 }
 
-status_t VolumeCurvesCollection::dump(int fd) const
+void VolumeCurvesCollection::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-
-    snprintf(buffer, SIZE, "\nStreams dump:\n");
-    write(fd, buffer, strlen(buffer));
-    snprintf(buffer, SIZE,
+    dst->append("\nStreams dump:\n");
+    dst->append(
              " Stream  Can be muted  Index Min  Index Max  Index Cur [device : index]...\n");
-    write(fd, buffer, strlen(buffer));
     for (size_t i = 0; i < size(); i++) {
-        snprintf(buffer, SIZE, " %02zu      ", i);
-        write(fd, buffer, strlen(buffer));
-        valueAt(i).dump(fd);
+        dst->appendFormat(" %02zu      ", i);
+        valueAt(i).dump(dst);
     }
-    snprintf(buffer, SIZE, "\nVolume Curves for Use Cases (aka Stream types) dump:\n");
-    write(fd, buffer, strlen(buffer));
+    dst->append("\nVolume Curves for Use Cases (aka Stream types) dump:\n");
     for (size_t i = 0; i < size(); i++) {
         std::string streamTypeLiteral;
         StreamTypeConverter::toString(keyAt(i), streamTypeLiteral);
-        snprintf(buffer, SIZE,
+        dst->appendFormat(
                  " %s (%02zu): Curve points for device category (index, attenuation in millibel)\n",
                  streamTypeLiteral.c_str(), i);
-        write(fd, buffer, strlen(buffer));
-        valueAt(i).dump(fd, 2, true);
+        valueAt(i).dump(dst, 2, true);
     }
-
-    return NO_ERROR;
 }
 
 } // namespace android

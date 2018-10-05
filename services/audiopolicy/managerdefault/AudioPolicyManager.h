@@ -186,7 +186,9 @@ public:
 
         virtual bool isSourceActive(audio_source_t source) const;
 
-        virtual status_t dump(int fd);
+        void dump(String8 *dst) const; // helper for dump(int fd)
+
+        status_t dump(int fd) override;
 
         virtual bool isOffloadSupported(const audio_offload_info_t& offloadInfo);
 

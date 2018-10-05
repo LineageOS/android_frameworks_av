@@ -22,25 +22,13 @@
 
 namespace android {
 
-status_t EffectDescriptor::dump(int fd)
+void EffectDescriptor::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
-    snprintf(buffer, SIZE, " I/O: %d\n", mIo);
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Strategy: %d\n", mStrategy);
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Session: %d\n", mSession);
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Name: %s\n",  mDesc.name);
-    result.append(buffer);
-    snprintf(buffer, SIZE, " %s\n",  mEnabled ? "Enabled" : "Disabled");
-    result.append(buffer);
-    write(fd, result.string(), result.size());
-
-    return NO_ERROR;
+    dst->appendFormat(" I/O: %d\n", mIo);
+    dst->appendFormat(" Strategy: %d\n", mStrategy);
+    dst->appendFormat(" Session: %d\n", mSession);
+    dst->appendFormat(" Name: %s\n",  mDesc.name);
+    dst->appendFormat(" %s\n",  mEnabled ? "Enabled" : "Disabled");
 }
 
 EffectDescriptorCollection::EffectDescriptorCollection() :
@@ -174,24 +162,16 @@ uint32_t EffectDescriptorCollection::getMaxEffectsMemory() const
     return MAX_EFFECTS_MEMORY;
 }
 
-status_t EffectDescriptorCollection::dump(int fd)
+void EffectDescriptorCollection::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-
-    snprintf(buffer, SIZE,
+    dst->appendFormat(
             "\nTotal Effects CPU: %f MIPS, Total Effects memory: %d KB, Max memory used: %d KB\n",
              (float)mTotalEffectsCpuLoad/10, mTotalEffectsMemory, mTotalEffectsMemoryMaxUsed);
-    write(fd, buffer, strlen(buffer));
-
-    snprintf(buffer, SIZE, "Registered effects:\n");
-    write(fd, buffer, strlen(buffer));
+    dst->append("Registered effects:\n");
     for (size_t i = 0; i < size(); i++) {
-        snprintf(buffer, SIZE, "- Effect %d dump:\n", keyAt(i));
-        write(fd, buffer, strlen(buffer));
-        valueAt(i)->dump(fd);
+        dst->appendFormat("- Effect %d dump:\n", keyAt(i));
+        valueAt(i)->dump(dst);
     }
-    return NO_ERROR;
 }
 
 }; //namespace android

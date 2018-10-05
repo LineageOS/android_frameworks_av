@@ -21,6 +21,7 @@
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
 #include <utils/Errors.h>
+#include <utils/String8.h>
 
 namespace android {
 
@@ -28,7 +29,7 @@ namespace android {
 class EffectDescriptor : public RefBase
 {
 public:
-    status_t dump(int fd);
+    void dump(String8 *dst) const;
 
     int mIo;                // io the effect is attached to
     routing_strategy mStrategy; // routing strategy the effect is associated to
@@ -50,7 +51,7 @@ public:
     uint32_t getMaxEffectsMemory() const;
     bool isNonOffloadableEffectEnabled();
 
-    status_t dump(int fd);
+    void dump(String8 *dst) const;
 
 private:
     status_t setEffectEnabled(const sp<EffectDescriptor> &effectDesc, bool enabled);
