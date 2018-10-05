@@ -23,6 +23,8 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaDataUtils.h>
+#include <media/stagefright/Utils.h>
+#include <media/NdkMediaFormat.h>
 
 namespace android {
 
@@ -91,20 +93,21 @@ bool MakeAACCodecSpecificData(MetaDataBase &meta, const uint8_t *data, size_t si
 }
 
 bool MakeAACCodecSpecificData(
-        MetaDataBase &meta,
-        unsigned profile, unsigned sampling_freq_index,
-        unsigned channel_configuration) {
+        uint8_t *csd, /* out */
+        size_t *esds_size, /* in/out */
+        unsigned profile, /* in */
+        unsigned sampling_freq_index, /* in */
+        unsigned channel_configuration, /* in */
+        int32_t *sampling_rate /* out */
+) {
     if(sampling_freq_index > 11u) {
         return false;
     }
-    int32_t sampleRate;
-    int32_t channelCount;
     static const int32_t kSamplingFreq[] = {
         96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050,
         16000, 12000, 11025, 8000
     };
-    sampleRate = kSamplingFreq[sampling_freq_index];
-    channelCount = channel_configuration;
+    *sampling_rate = kSamplingFreq[sampling_freq_index];
 
     static const uint8_t kStaticESDS[] = {
         0x03, 22,
@@ -127,7 +130,9 @@ bool MakeAACCodecSpecificData(
     };
 
     size_t csdSize = sizeof(kStaticESDS) + 2;
-    uint8_t *csd = new uint8_t[csdSize];
+    if (csdSize > *esds_size) {
+        return false;
+    }
     memcpy(csd, kStaticESDS, sizeof(kStaticESDS));
 
     csd[sizeof(kStaticESDS)] =
@@ -136,13 +141,54 @@ bool MakeAACCodecSpecificData(
     csd[sizeof(kStaticESDS) + 1] =
         ((sampling_freq_index << 7) & 0x80) | (channel_configuration << 3);
 
+    *esds_size = csdSize;
+    return true;
+}
+
+bool MakeAACCodecSpecificData(AMediaFormat *meta, unsigned profile, unsigned sampling_freq_index,
+        unsigned channel_configuration) {
+
+    if(sampling_freq_index > 11u) {
+        return false;
+    }
+
+    uint8_t csd[2];
+    csd[0] = ((profile + 1) << 3) | (sampling_freq_index >> 1);
+    csd[1] = ((sampling_freq_index << 7) & 0x80) | (channel_configuration << 3);
+
+    static const int32_t kSamplingFreq[] = {
+        96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050,
+        16000, 12000, 11025, 8000
+    };
+    int32_t sampleRate = kSamplingFreq[sampling_freq_index];
+
+    AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CSD_0, csd, sizeof(csd));
+    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_AAC);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_SAMPLE_RATE, sampleRate);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, channel_configuration);
+
+    return true;
+}
+
+bool MakeAACCodecSpecificData(
+        MetaDataBase &meta,
+        unsigned profile, unsigned sampling_freq_index,
+        unsigned channel_configuration) {
+
+    uint8_t csd[24];
+    size_t csdSize = sizeof(csd);
+    int32_t sampleRate;
+
+    if (!MakeAACCodecSpecificData(csd, &csdSize, profile, sampling_freq_index,
+            channel_configuration, &sampleRate)) {
+        return false;
+    }
+
     meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC);
 
     meta.setInt32(kKeySampleRate, sampleRate);
-    meta.setInt32(kKeyChannelCount, channelCount);
-
+    meta.setInt32(kKeyChannelCount, channel_configuration);
     meta.setData(kKeyESDS, 0, csd, csdSize);
-    delete [] csd;
     return true;
 }
 

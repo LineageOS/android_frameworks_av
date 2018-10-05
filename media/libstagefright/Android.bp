@@ -45,7 +45,7 @@ cc_library_static {
         },
     },
 
-    shared_libs: ["libmedia"],
+    shared_libs: ["libmedia", "libmediandk"],
 }
 
 cc_library_shared {

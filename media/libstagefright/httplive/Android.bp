@@ -37,6 +37,7 @@ cc_library {
         "libcutils",
         "libmedia",
         "libmediaextractor",
+        "libmediandk",
         "libstagefright",
         "libstagefright_foundation",
         "libutils",
