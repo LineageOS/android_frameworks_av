@@ -212,6 +212,12 @@ private:
         // IRELAND Supervisory tones
         TONE_IE_RINGTONE,           // Ring Tone: A 400Hz + 450Hz tone repeated in a 0.4s on, 0.2s off, 0.4s on, 2.0s off pattern.
         TONE_IE_CALL_WAITING,       // Call waiting tone: 425Hz tone repeated in a 0.18s on, 0.2s off, 0.2s on, 4.5s off pattern.
+        // INDIA supervisory tones
+        TONE_INDIA_DIAL,            // Dial tone: 400 Hz tone modulated with 25Hz, continuous
+        TONE_INDIA_BUSY,            // Busy tone: 400 Hz, 750ms ON, 750ms OFF...
+        TONE_INDIA_CONGESTION,      // Congestion tone: 400 Hz, 250ms ON, 250ms OFF...
+        TONE_INDIA_CALL_WAITING,    // Call waiting tone: 400 Hz, tone repeated in a 0.2s on, 0.1s off, 0.2s on, 7.5s off pattern.
+        TONE_INDIA_RINGTONE,        // Ring tone: 400 Hz tone modulated with 25Hz, 0.4 on 0.2 off 0.4 on 2..0 off
         NUM_ALTERNATE_TONES
     };
 
@@ -223,6 +229,7 @@ private:
         SINGAPORE,
         HONGKONG,
         IRELAND,
+        INDIA,
         CEPT,
         NUM_REGIONS
     };
