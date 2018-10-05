@@ -826,6 +826,34 @@ const ToneGenerator::ToneDescriptor ToneGenerator::sToneDescriptors[] = {
                         { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
           .repeatCnt = ToneGenerator::TONEGEN_INF,
           .repeatSegment = 0 },                              // TONE_IE_CALL_WAITING
+        { .segments = { { .duration = ToneGenerator::TONEGEN_INF, .waveFreq = { 375, 400, 425, 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_INDIA_DIAL
+        { .segments = { { .duration = 750, .waveFreq = { 400, 0 }, 0, 0 },
+                      { .duration = 750, .waveFreq = { 0 }, 0, 0 },
+                      { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                               // TONE_INDIA_BUSY
+        { .segments = { { .duration = 250, .waveFreq = { 400, 0 }, 0, 0 },
+                        { .duration = 250, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_INDIA_CONGESTION
+        { .segments = { { .duration = 200, .waveFreq = { 400, 0 }, 0, 0 },
+                        { .duration = 100, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 200, .waveFreq = { 400, 0 }, 0, 0 },
+                        { .duration = 7500, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_INDIA_CALL_WAITING
+        { .segments = { { .duration = 400, .waveFreq = { 375, 400, 425, 0 }, 0, 0 },
+                      { .duration = 200, .waveFreq = { 0 }, 0, 0 },
+                      { .duration = 400, .waveFreq = { 375, 400, 425, 0 }, 0, 0 },
+                      { .duration = 2000, .waveFreq = { 0 }, 0, 0 },
+                      { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                               // TONE_INDIA_RINGTONE
 };
 
 // Used by ToneGenerator::getToneForRegion() to convert user specified supervisory tone type
@@ -900,6 +928,16 @@ const unsigned char /*tone_type*/ ToneGenerator::sToneMappingTable[NUM_REGIONS-1
             TONE_SUP_ERROR,              // TONE_SUP_ERROR
             TONE_IE_CALL_WAITING,        // TONE_SUP_CALL_WAITING
             TONE_IE_RINGTONE             // TONE_SUP_RINGTONE
+        },
+        {   // INDIA
+            TONE_INDIA_DIAL,             // TONE_SUP_DIAL
+            TONE_INDIA_BUSY,             // TONE_SUP_BUSY
+            TONE_INDIA_CONGESTION,       // TONE_SUP_CONGESTION
+            TONE_SUP_RADIO_ACK,          // TONE_SUP_RADIO_ACK
+            TONE_SUP_RADIO_NOTAVAIL,     // TONE_SUP_RADIO_NOTAVAIL
+            TONE_SUP_ERROR,              // TONE_SUP_ERROR
+            TONE_INDIA_CALL_WAITING,     // TONE_SUP_CALL_WAITING
+            TONE_INDIA_RINGTONE          // TONE_SUP_RINGTONE
         }
 };
 
@@ -971,6 +1009,8 @@ ToneGenerator::ToneGenerator(audio_stream_type_t streamType, float volume, bool 
         mRegion = HONGKONG;
     } else if (strstr(value, "ie") != NULL) {
         mRegion = IRELAND;
+    } else if (strstr(value, "in") != NULL) {
+        mRegion = INDIA;
     } else {
         mRegion = CEPT;
     }
