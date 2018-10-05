@@ -836,10 +836,6 @@ private:
     // Prints the shell command help
     status_t printHelp(int out);
 
-    static int getCallingPid();
-
-    static int getCallingUid();
-
     /**
      * Get the current system time as a formatted string.
      */
