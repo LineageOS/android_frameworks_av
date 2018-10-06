@@ -286,7 +286,11 @@ MediaProfiles::createAudioEncoderCap(const char **atts)
 
     const size_t nMappings = sizeof(sAudioEncoderNameMap)/sizeof(sAudioEncoderNameMap[0]);
     const int codec = findTagForName(sAudioEncoderNameMap, nMappings, atts[1]);
-    CHECK(codec != -1);
+
+    if (codec == -1) {
+        ALOGW("Unsupported audio encoder name %s.", atts[1]);
+        return nullptr;
+    }
 
     MediaProfiles::AudioEncoderCap *cap =
         new MediaProfiles::AudioEncoderCap(static_cast<audio_encoder>(codec), atoi(atts[5]),
@@ -326,7 +330,11 @@ MediaProfiles::createCamcorderProfile(int cameraId, const char **atts, Vector<in
     const size_t nProfileMappings = sizeof(sCamcorderQualityNameMap)/
             sizeof(sCamcorderQualityNameMap[0]);
     const int quality = findTagForName(sCamcorderQualityNameMap, nProfileMappings, atts[1]);
-    CHECK(quality != -1);
+
+    if (quality == -1) {
+        ALOGW("Unsupported camcorder profile quality %s on camera id %d.", atts[1], cameraId);
+        return nullptr;
+    }
 
     const size_t nFormatMappings = sizeof(sFileFormatMap)/sizeof(sFileFormatMap[0]);
     const int fileFormat = findTagForName(sFileFormatMap, nFormatMappings, atts[3]);
@@ -405,7 +413,11 @@ MediaProfiles::startElementHandler(void *userData, const char *name, const char 
         profiles->mVideoEncoders.add(createVideoEncoderCap(atts));
     } else if (strcmp("AudioEncoderCap", name) == 0 &&
                strcmp("true", atts[3]) == 0) {
-        profiles->mAudioEncoders.add(createAudioEncoderCap(atts));
+        auto profile = createAudioEncoderCap(atts);
+
+        if (profile) {
+            profiles->mAudioEncoders.add(profile);
+        }
     } else if (strcmp("VideoDecoderCap", name) == 0 &&
                strcmp("true", atts[3]) == 0) {
         profiles->mVideoDecoders.add(createVideoDecoderCap(atts));
@@ -418,8 +430,11 @@ MediaProfiles::startElementHandler(void *userData, const char *name, const char 
         profiles->mCurrentCameraId = getCameraId(atts);
         profiles->addStartTimeOffset(profiles->mCurrentCameraId, atts);
     } else if (strcmp("EncoderProfile", name) == 0) {
-        profiles->mCamcorderProfiles.add(
-            createCamcorderProfile(profiles->mCurrentCameraId, atts, profiles->mCameraIds));
+        auto profile = createCamcorderProfile(profiles->mCurrentCameraId, atts, profiles->mCameraIds);
+
+        if (profile) {
+            profiles->mCamcorderProfiles.add(profile);
+        }
     } else if (strcmp("ImageEncoding", name) == 0) {
         profiles->addImageEncodingQualityLevel(profiles->mCurrentCameraId, atts);
     }
