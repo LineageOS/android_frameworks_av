@@ -25,13 +25,13 @@ class TrackBase : public ExtendedAudioBufferProvider, public RefBase {
 public:
     enum track_state {
         IDLE,
-        FLUSHED,
+        FLUSHED,        // for PlaybackTracks only
         STOPPED,
         // next 2 states are currently used for fast tracks
         // and offloaded tracks only
         STOPPING_1,     // waiting for first underrun
         STOPPING_2,     // waiting for presentation complete
-        RESUMING,
+        RESUMING,       // for PlaybackTracks only
         ACTIVE,
         PAUSING,
         PAUSED,
