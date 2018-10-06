@@ -40,4 +40,11 @@ void DataSource_close(void *userdata) {
     source->close();
 }
 
+ssize_t DataSource_getAvailableSize(void *userdata, off64_t offset) {
+    off64_t size = -1;
+    DataSource *source = static_cast<DataSource *>(userdata);
+    status_t err = source->getAvailableSize(offset, &size);
+    return  err == OK ? size : -1;
+}
+
 }  // namespace android
