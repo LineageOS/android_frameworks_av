@@ -18,6 +18,7 @@
 #define ANDROID_HARDWARE_MEDIA_BUFFERPOOL_V2_0_ACCESSOR_H
 
 #include <android/hardware/media/bufferpool/2.0/IAccessor.h>
+#include <android/hardware/media/bufferpool/2.0/IObserver.h>
 #include <bufferpool/BufferPoolTypes.h>
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
@@ -79,7 +80,7 @@ private:
  */
 struct Accessor : public IAccessor {
     // Methods from ::android::hardware::media::bufferpool::V2_0::IAccessor follow.
-    Return<void> connect(connect_cb _hidl_cb) override;
+    Return<void> connect(const sp<::android::hardware::media::bufferpool::V2_0::IObserver>& observer, connect_cb _hidl_cb) override;
 
     /**
      * Creates a buffer pool accessor which uses the specified allocator.

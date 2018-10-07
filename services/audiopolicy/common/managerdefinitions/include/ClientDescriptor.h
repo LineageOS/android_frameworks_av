@@ -47,6 +47,7 @@ public:
 
     status_t dump(int fd, int spaces, int index);
     virtual status_t dump(String8& dst, int spaces, int index);
+    virtual std::string toShortString() const;
 
     audio_port_handle_t portId() const { return mPortId; }
     uid_t uid() const { return mUid; }
@@ -90,6 +91,7 @@ public:
 
     using ClientDescriptor::dump;
     status_t dump(String8& dst, int spaces, int index) override;
+    std::string toShortString() const override;
 
     audio_output_flags_t flags() const { return mFlags; }
     audio_stream_type_t stream() const { return mStream; }
@@ -161,8 +163,87 @@ public:
 };
 
 typedef std::vector< sp<TrackClientDescriptor> > TrackClientVector;
-typedef std::map< audio_port_handle_t, sp<TrackClientDescriptor> > TrackClientMap;
 typedef std::vector< sp<RecordClientDescriptor> > RecordClientVector;
-typedef std::map< audio_port_handle_t, sp<RecordClientDescriptor> > RecordClientMap;
+
+// A Map that associates a portId with a client (type T)
+// which is either TrackClientDescriptor or RecordClientDescriptor.
+
+template<typename T>
+class ClientMapHandler {
+public:
+    virtual ~ClientMapHandler() = default;
+
+    // Track client management
+    void addClient(const sp<T> &client) {
+        const audio_port_handle_t portId = client->portId();
+        LOG_ALWAYS_FATAL_IF(!mClients.emplace(portId, client).second,
+                "%s(%d): attempting to add client that already exists", __func__, portId);
+    }
+    sp<T> getClient(audio_port_handle_t portId) const {
+        auto it = mClients.find(portId);
+        if (it == mClients.end()) return nullptr;
+        return it->second;
+    }
+    virtual void removeClient(audio_port_handle_t portId) {
+        LOG_ALWAYS_FATAL_IF(mClients.erase(portId) == 0,
+                "%s(%d): client does not exist", __func__, portId);
+    }
+    size_t getClientCount() const {
+        return mClients.size();
+    }
+    String8 dump() const {
+        String8 result;
+        size_t index = 0;
+        for (const auto& client: getClientIterable()) {
+            client->dump(result, 2, index++);
+        }
+        return result;
+    }
+
+    // helper types
+    using ClientMap = std::map<audio_port_handle_t, sp<T>>;
+    using ClientMapIterator = typename ClientMap::const_iterator;  // ClientMap is const qualified
+    class ClientIterable {
+    public:
+        explicit ClientIterable(const ClientMapHandler<T> &ref) : mClientMapHandler(ref) { }
+
+        class iterator {
+        public:
+            // traits
+            using iterator_category = std::forward_iterator_tag;
+            using value_type = sp<T>;
+            using difference_type = ptrdiff_t;
+            using pointer = const sp<T>*;    // Note: const
+            using reference = const sp<T>&;  // Note: const
+
+            // implementation
+            explicit iterator(const ClientMapIterator &it) : mIt(it) { }
+            iterator& operator++()    /* prefix */     { ++mIt; return *this; }
+            reference operator* () const               { return mIt->second; }
+            reference operator->() const               { return mIt->second; } // as if sp<>
+            difference_type operator-(const iterator& rhs) {return mIt - rhs.mIt; }
+            bool operator==(const iterator& rhs) const { return mIt == rhs.mIt; }
+            bool operator!=(const iterator& rhs) const { return mIt != rhs.mIt; }
+        private:
+            ClientMapIterator mIt;
+        };
+
+        iterator begin() const { return iterator{mClientMapHandler.mClients.begin()}; }
+        iterator end() const { return iterator{mClientMapHandler.mClients.end()}; }
+
+    private:
+        const ClientMapHandler<T>& mClientMapHandler; // iterating does not modify map.
+    };
+
+    // return an iterable object that can be used in a range-based-for to enumerate clients.
+    // this iterable does not allow modification, it should be used as a temporary.
+    ClientIterable getClientIterable() const {
+        return ClientIterable{*this};
+    }
+
+private:
+    // ClientMap maps a portId to a client descriptor (both uniquely identify each other).
+    ClientMap mClients;
+};
 
 } // namespace android

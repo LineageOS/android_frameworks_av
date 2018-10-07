@@ -51,7 +51,7 @@ struct CMediaTrack {
     void *data;
     void (*free)(void *data);
 
-    status_t (*start)(void *data, MetaDataBase *params);
+    status_t (*start)(void *data);
     status_t (*stop)(void *data);
     status_t (*getFormat)(void *data, MetaDataBase &format);
     status_t (*read)(void *data, MediaBufferBase **buffer, uint32_t options, int64_t seekPosUs);
@@ -62,7 +62,7 @@ struct CMediaTrackV2 {
     void *data;
     void (*free)(void *data);
 
-    status_t (*start)(void *data, AMediaFormat *params);
+    status_t (*start)(void *data);
     status_t (*stop)(void *data);
     status_t (*getFormat)(void *data, AMediaFormat *format);
     status_t (*read)(void *data, MediaBufferBase **buffer, uint32_t options, int64_t seekPosUs);

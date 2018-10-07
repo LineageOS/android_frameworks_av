@@ -262,11 +262,13 @@ BufferPoolClient::Impl::Impl(const sp<IAccessor> &accessor)
     : mLocal(false), mValid(false), mAccessor(accessor), mSeqId(0),
       mLastEvictCacheUs(getTimestampNow()) {
     bool valid = false;
+    sp<IObserver> observer; // TODO
     sp<IConnection>& outConnection = mRemoteConnection;
     ConnectionId& id = mConnectionId;
     std::unique_ptr<BufferStatusChannel>& outChannel =
             mReleasing.mStatusChannel;
     Return<void> transResult = accessor->connect(
+            observer,
             [&valid, &outConnection, &id, &outChannel]
             (ResultStatus status, sp<IConnection> connection,
              ConnectionId connectionId, const StatusDescriptor& desc,

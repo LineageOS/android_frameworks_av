@@ -81,7 +81,7 @@ public:
                 const sp<ItemTable> &itemTable);
     virtual status_t init();
 
-    virtual status_t start(MetaDataBase *params = NULL);
+    virtual status_t start();
     virtual status_t stop();
 
     virtual status_t getFormat(MetaDataBase &);
@@ -136,8 +136,6 @@ private:
     MediaBufferGroup *mGroup;
 
     MediaBufferBase *mBuffer;
-
-    bool mWantsNALFragments;
 
     uint8_t *mSrcBuffer;
 
@@ -4122,7 +4120,6 @@ MPEG4Source::MPEG4Source(
       mStarted(false),
       mGroup(NULL),
       mBuffer(NULL),
-      mWantsNALFragments(false),
       mSrcBuffer(NULL),
       mIsHeif(itemTable != NULL),
       mItemTable(itemTable) {
@@ -4221,18 +4218,10 @@ MPEG4Source::~MPEG4Source() {
     free(mCurrentSampleInfoOffsets);
 }
 
-status_t MPEG4Source::start(MetaDataBase *params) {
+status_t MPEG4Source::start() {
     Mutex::Autolock autoLock(mLock);
 
     CHECK(!mStarted);
-
-    int32_t val;
-    if (params && params->findInt32(kKeyWantsNALFragments, &val)
-        && val != 0) {
-        mWantsNALFragments = true;
-    } else {
-        mWantsNALFragments = false;
-    }
 
     int32_t tmp;
     CHECK(mFormat.findInt32(kKeyMaxInputSize, &tmp));
@@ -5113,7 +5102,7 @@ status_t MPEG4Source::read(
         }
     }
 
-    if ((!mIsAVC && !mIsHEVC && !mIsAC4) || mWantsNALFragments) {
+    if ((!mIsAVC && !mIsHEVC && !mIsAC4)) {
         if (newBuffer) {
             if (mIsPcm) {
                 // The twos' PCM block reader assumes that all samples has the same size.
@@ -5541,7 +5530,7 @@ status_t MPEG4Source::fragmentedRead(
 
     }
 
-    if ((!mIsAVC && !mIsHEVC)|| mWantsNALFragments) {
+    if ((!mIsAVC && !mIsHEVC)) {
         if (newBuffer) {
             if (!isInRange((size_t)0u, mBuffer->size(), size)) {
                 mBuffer->release();

@@ -114,7 +114,10 @@ sp<ConnectionDeathRecipient> Accessor::getConnectionDeathRecipient() {
 }
 
 // Methods from ::android::hardware::media::bufferpool::V2_0::IAccessor follow.
-Return<void> Accessor::connect(connect_cb _hidl_cb) {
+Return<void> Accessor::connect(
+        const sp<::android::hardware::media::bufferpool::V2_0::IObserver>& observer,
+        connect_cb _hidl_cb) {
+    (void)observer;
     sp<Connection> connection;
     ConnectionId connectionId;
     const StatusDescriptor* fmqDesc;

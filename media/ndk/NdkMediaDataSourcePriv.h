@@ -50,6 +50,7 @@ struct NdkDataSource : public DataSource {
     virtual String8 toString();
     virtual String8 getMIMEType() const;
     virtual void close();
+    virtual status_t getAvailableSize(off64_t offset, off64_t *size);
 
 protected:
     virtual ~NdkDataSource();

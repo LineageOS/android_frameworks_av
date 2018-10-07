@@ -56,6 +56,7 @@
 #include "device3/Camera3DummyStream.h"
 #include "device3/Camera3SharedOutputStream.h"
 #include "CameraService.h"
+#include "utils/CameraThreadState.h"
 
 using namespace android::camera3;
 using namespace android::hardware::camera;
@@ -1701,7 +1702,7 @@ status_t Camera3Device::createDefaultRequest(int templateId,
 
     if (templateId <= 0 || templateId >= CAMERA3_TEMPLATE_COUNT) {
         android_errorWriteWithInfoLog(CameraService::SN_EVENT_LOG_ID, "26866110",
-                IPCThreadState::self()->getCallingUid(), nullptr, 0);
+                CameraThreadState::getCallingUid(), nullptr, 0);
         return BAD_VALUE;
     }
 

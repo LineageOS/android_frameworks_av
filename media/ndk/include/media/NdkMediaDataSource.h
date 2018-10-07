@@ -94,6 +94,14 @@ AMediaDataSource* AMediaDataSource_new() __INTRODUCED_IN(28);
 #if __ANDROID_API__ >= 29
 
 /**
+ * Called to get an estimate of the number of bytes that can be read from this data source
+ * starting at |offset| without blocking for I/O.
+ *
+ * Return -1 when such an estimate is not possible.
+ */
+typedef ssize_t (*AMediaDataSourceGetAvailableSize)(void *userdata, off64_t offset);
+
+/**
  * Create new media data source. Returns NULL if memory allocation
  * for the new data source object fails.
  *
@@ -175,6 +183,18 @@ void AMediaDataSource_setClose(
  * additional details.
  */
 void AMediaDataSource_close(AMediaDataSource*) __INTRODUCED_IN(29);
+
+/**
+ * Set a custom callback for supplying the estimated number of bytes
+ * that can be read from this data source starting at an offset without
+ * blocking for I/O.
+ *
+ * Please refer to the definition of AMediaDataSourceGetAvailableSize
+ * for additional details.
+ */
+void AMediaDataSource_setGetAvailableSize(
+        AMediaDataSource*,
+        AMediaDataSourceGetAvailableSize) __INTRODUCED_IN(29);
 
 #endif  /*__ANDROID_API__ >= 29 */
 

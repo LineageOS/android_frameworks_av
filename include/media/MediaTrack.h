@@ -52,7 +52,7 @@ struct MediaTrack
 
     // To be called before any other methods on this object, except
     // getFormat().
-    virtual status_t start(MetaDataBase *params = NULL) = 0;
+    virtual status_t start() = 0;
 
     // Any blocking read call returns immediately with a result of NO_INIT.
     // It is an error to call any methods other than start after this call
@@ -143,7 +143,7 @@ class MediaTrackCUnwrapper : public MediaTrack {
 public:
     explicit MediaTrackCUnwrapper(CMediaTrack *wrapper);
 
-    virtual status_t start(MetaDataBase *params = NULL);
+    virtual status_t start();
     virtual status_t stop();
     virtual status_t getFormat(MetaDataBase& format);
     virtual status_t read(MediaBufferBase **buffer, const ReadOptions *options = NULL);
@@ -161,7 +161,7 @@ class MediaTrackCUnwrapperV2 : public MediaTrack {
 public:
     explicit MediaTrackCUnwrapperV2(CMediaTrackV2 *wrapper);
 
-    virtual status_t start(MetaDataBase *params = NULL);
+    virtual status_t start();
     virtual status_t stop();
     virtual status_t getFormat(MetaDataBase& format);
     virtual status_t read(MediaBufferBase **buffer, const ReadOptions *options = NULL);

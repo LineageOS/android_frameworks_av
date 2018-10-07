@@ -62,26 +62,6 @@ namespace android {
 // media / notification / system volume.
 constexpr float IN_CALL_EARPIECE_HEADROOM_DB = 3.f;
 
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-// Array of all surround formats.
-static const audio_format_t SURROUND_FORMATS[] = {
-    AUDIO_FORMAT_AC3,
-    AUDIO_FORMAT_E_AC3,
-    AUDIO_FORMAT_DTS,
-    AUDIO_FORMAT_DTS_HD,
-    AUDIO_FORMAT_AAC_LC,
-    AUDIO_FORMAT_DOLBY_TRUEHD,
-    AUDIO_FORMAT_E_AC3_JOC,
-};
-// Array of all AAC formats. When AAC is enabled by users, all AAC formats should be enabled.
-static const audio_format_t AAC_FORMATS[] = {
-    AUDIO_FORMAT_AAC_LC,
-    AUDIO_FORMAT_AAC_HE_V1,
-    AUDIO_FORMAT_AAC_HE_V2,
-    AUDIO_FORMAT_AAC_ELD,
-    AUDIO_FORMAT_AAC_XHE,
-};
-
 // Compressed formats for MSD module, ordered from most preferred to least preferred.
 static const std::vector<audio_format_t> compressedFormatsOrder = {{
         AUDIO_FORMAT_MAT_2_1, AUDIO_FORMAT_MAT_2_0, AUDIO_FORMAT_E_AC3,
@@ -910,7 +890,7 @@ exit:
                                   getStrategyForAttr(&attributes),
                                   *flags);
     sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(*output);
-    outputDesc->clientsMap().emplace(*portId, clientDesc);
+    outputDesc->addClient(clientDesc);
 
     ALOGV("  getOutputForAttr() returns output %d selectedDeviceId %d for port ID %d",
           *output, *selectedDeviceId, *portId);
@@ -1110,16 +1090,16 @@ audio_devices_t AudioPolicyManager::getMsdAudioOutDeviceTypes() const {
 
 const AudioPatchCollection AudioPolicyManager::getMsdPatches() const {
     AudioPatchCollection msdPatches;
-    audio_module_handle_t msdModuleHandle = mHwModules.getModuleFromName(
-            AUDIO_HARDWARE_MODULE_ID_MSD)->getHandle();
-    if (msdModuleHandle == AUDIO_MODULE_HANDLE_NONE) return msdPatches;
-    for (size_t i = 0; i < mAudioPatches.size(); ++i) {
-        sp<AudioPatch> patch = mAudioPatches.valueAt(i);
-        for (size_t j = 0; j < patch->mPatch.num_sources; ++j) {
-            const struct audio_port_config *source = &patch->mPatch.sources[j];
-            if (source->type == AUDIO_PORT_TYPE_DEVICE &&
-                    source->ext.device.hw_module == msdModuleHandle) {
-                msdPatches.addAudioPatch(patch->mHandle, patch);
+    sp<HwModule> msdModule = mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_MSD);
+    if (msdModule != 0) {
+        for (size_t i = 0; i < mAudioPatches.size(); ++i) {
+            sp<AudioPatch> patch = mAudioPatches.valueAt(i);
+            for (size_t j = 0; j < patch->mPatch.num_sources; ++j) {
+                const struct audio_port_config *source = &patch->mPatch.sources[j];
+                if (source->type == AUDIO_PORT_TYPE_DEVICE &&
+                        source->ext.device.hw_module == msdModule->getHandle()) {
+                    msdPatches.addAudioPatch(patch->mHandle, patch);
+                }
             }
         }
     }
@@ -1337,7 +1317,7 @@ status_t AudioPolicyManager::startOutput(audio_port_handle_t portId)
         ALOGW("startOutput() no output for client %d", portId);
         return BAD_VALUE;
     }
-    sp<TrackClientDescriptor> client = outputDesc->clientsMap()[portId];
+    sp<TrackClientDescriptor> client = outputDesc->getClient(portId);
 
     ALOGV("startOutput() output %d, stream %d, session %d",
           outputDesc->mIoHandle, client->stream(), client->session());
@@ -1530,7 +1510,7 @@ status_t AudioPolicyManager::stopOutput(audio_port_handle_t portId)
         ALOGW("stopOutput() no output for client %d", portId);
         return BAD_VALUE;
     }
-    sp<TrackClientDescriptor> client = outputDesc->clientsMap()[portId];
+    sp<TrackClientDescriptor> client = outputDesc->getClient(portId);
 
     ALOGV("stopOutput() output %d, stream %d, session %d",
           outputDesc->mIoHandle, client->stream(), client->session());
@@ -1631,10 +1611,15 @@ void AudioPolicyManager::releaseOutput(audio_port_handle_t portId)
 
     sp<SwAudioOutputDescriptor> outputDesc = mOutputs.getOutputForClient(portId);
     if (outputDesc == 0) {
+        // If an output descriptor is closed due to a device routing change,
+        // then there are race conditions with releaseOutput from tracks
+        // that may be destroyed (with no PlaybackThread) or a PlaybackThread
+        // destroyed shortly thereafter.
+        //
+        // Here we just log a warning, instead of a fatal error.
         ALOGW("releaseOutput() no output for client %d", portId);
         return;
     }
-    sp<TrackClientDescriptor> client = outputDesc->clientsMap()[portId];
 
     ALOGV("releaseOutput() %d", outputDesc->mIoHandle);
 
@@ -1649,9 +1634,11 @@ void AudioPolicyManager::releaseOutput(audio_port_handle_t portId)
             mpClientInterface->onAudioPortListUpdate();
         }
     }
-    outputDesc->clientsMap().erase(portId);
+    // stopOutput() needs to be successfully called before releaseOutput()
+    // otherwise there may be inaccurate stream reference counts.
+    // This is checked in outputDesc->removeClient below.
+    outputDesc->removeClient(portId);
 }
-
 
 status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
                                              audio_io_handle_t *input,
@@ -1810,7 +1797,7 @@ exit:
                                   *attr, *config, requestedDeviceId,
                                   inputSource,flags, isSoundTrigger);
     inputDesc = mInputs.valueFor(*input);
-    inputDesc->clientsMap().emplace(*portId, clientDesc);
+    inputDesc->addClient(clientDesc);
 
     ALOGV("getInputForAttr() returns input %d type %d selectedDeviceId %d for port ID %d",
             *input, *inputType, *selectedDeviceId, *portId);
@@ -1985,7 +1972,7 @@ status_t AudioPolicyManager::startInput(audio_port_handle_t portId,
         return BAD_VALUE;
     }
     audio_io_handle_t input = inputDesc->mIoHandle;
-    sp<RecordClientDescriptor> client = inputDesc->clientsMap()[portId];
+    sp<RecordClientDescriptor> client = inputDesc->getClient(portId);
     if (client->active()) {
         ALOGW("%s input %d client %d already started", __FUNCTION__, input, client->portId());
         return INVALID_OPERATION;
@@ -2154,7 +2141,7 @@ status_t AudioPolicyManager::stopInput(audio_port_handle_t portId)
         return BAD_VALUE;
     }
     audio_io_handle_t input = inputDesc->mIoHandle;
-    sp<RecordClientDescriptor> client = inputDesc->clientsMap()[portId];
+    sp<RecordClientDescriptor> client = inputDesc->getClient(portId);
     if (!client->active()) {
         ALOGW("%s input %d client %d already stopped", __FUNCTION__, input, client->portId());
         return INVALID_OPERATION;
@@ -2213,15 +2200,15 @@ void AudioPolicyManager::releaseInput(audio_port_handle_t portId)
         ALOGW("%s no input for client %d", __FUNCTION__, portId);
         return;
     }
-    sp<RecordClientDescriptor> client = inputDesc->clientsMap()[portId];
+    sp<RecordClientDescriptor> client = inputDesc->getClient(portId);
     audio_io_handle_t input = inputDesc->mIoHandle;
 
     ALOGV("%s %d", __FUNCTION__, input);
 
-    inputDesc->clientsMap().erase(portId);
+    inputDesc->removeClient(portId);
 
-    if (inputDesc->clientsMap().size() > 0) {
-        ALOGV("%s %zu clients remaining", __FUNCTION__, inputDesc->clientsMap().size());
+    if (inputDesc->getClientCount() > 0) {
+        ALOGV("%s(%d) %zu clients remaining", __func__, portId, inputDesc->getClientCount());
         return;
     }
 
@@ -3328,11 +3315,10 @@ void AudioPolicyManager::clearSessionRoutes(uid_t uid)
     SortedVector<routing_strategy> affectedStrategies;
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<AudioOutputDescriptor> outputDesc = mOutputs.valueAt(i);
-        TrackClientMap clients = outputDesc->clientsMap();
-        for (const auto& client : clients) {
-            if (client.second->hasPreferredDevice() && client.second->uid() == uid) {
-                client.second->setPreferredDeviceId(AUDIO_PORT_HANDLE_NONE);
-                affectedStrategies.add(getStrategy(client.second->stream()));
+        for (const auto& client : outputDesc->getClientIterable()) {
+            if (client->hasPreferredDevice() && client->uid() == uid) {
+                client->setPreferredDeviceId(AUDIO_PORT_HANDLE_NONE);
+                affectedStrategies.add(getStrategy(client->stream()));
             }
         }
     }
@@ -3345,11 +3331,10 @@ void AudioPolicyManager::clearSessionRoutes(uid_t uid)
     SortedVector<audio_source_t> affectedSources;
     for (size_t i = 0; i < mInputs.size(); i++) {
         sp<AudioInputDescriptor> inputDesc = mInputs.valueAt(i);
-        RecordClientMap clients = inputDesc->clientsMap();
-        for (const auto& client : clients) {
-            if (client.second->hasPreferredDevice() && client.second->uid() == uid) {
-                client.second->setPreferredDeviceId(AUDIO_PORT_HANDLE_NONE);
-                affectedSources.add(client.second->source());
+        for (const auto& client : inputDesc->getClientIterable()) {
+            if (client->hasPreferredDevice() && client->uid() == uid) {
+                client->setPreferredDeviceId(AUDIO_PORT_HANDLE_NONE);
+                affectedSources.add(client->source());
             }
         }
     }
@@ -3601,35 +3586,38 @@ status_t AudioPolicyManager::getSurroundFormats(unsigned int *numSurroundFormats
              FormatVector supportedFormats =
                  hdmiOutputDevs[i]->getAudioPort()->getAudioProfiles().getSupportedFormats();
              for (size_t j = 0; j < supportedFormats.size(); j++) {
-                 if (std::find(std::begin(SURROUND_FORMATS),
-                                 std::end(SURROUND_FORMATS),
-                                 supportedFormats[j]) != std::end(SURROUND_FORMATS)) {
+                 if (mConfig.getSurroundFormats().count(supportedFormats[j]) != 0) {
                      formats.insert(supportedFormats[j]);
-                 } else if (std::find(std::begin(AAC_FORMATS),
-                                 std::end(AAC_FORMATS),
-                                 supportedFormats[j]) != std::end(AAC_FORMATS)) {
-                     // if any format in AAC_FORMATS is reported, insert AUDIO_FORMAT_AAC_LC as this
-                     // is the only AAC format used in the TvSettings UI for all AAC formats.
-                     formats.insert(AUDIO_FORMAT_AAC_LC);
+                 } else {
+                     for (const auto& pair : mConfig.getSurroundFormats()) {
+                         if (pair.second.count(supportedFormats[j]) != 0) {
+                             formats.insert(pair.first);
+                             break;
+                         }
+                     }
                  }
              }
         }
     } else {
-        for (size_t i = 0; i < ARRAY_SIZE(SURROUND_FORMATS); i++) {
-            formats.insert(SURROUND_FORMATS[i]);
+        for (const auto& pair : mConfig.getSurroundFormats()) {
+            formats.insert(pair.first);
         }
     }
     for (const auto& format: formats) {
         if (formatsWritten < formatsMax) {
             surroundFormats[formatsWritten] = format;
             bool formatEnabled = false;
-            if (format == AUDIO_FORMAT_AAC_LC) {
-                for (size_t j = 0; j < ARRAY_SIZE(AAC_FORMATS) && !formatEnabled; j++) {
-                    formatEnabled =
-                            mSurroundFormats.find(AAC_FORMATS[j]) != mSurroundFormats.end();
+            if (mConfig.getSurroundFormats().count(format) == 0) {
+                // Check sub-formats
+                for (const auto& pair : mConfig.getSurroundFormats()) {
+                    for (const auto& subformat : pair.second) {
+                        formatEnabled = mSurroundFormats.count(subformat) != 0;
+                        if (formatEnabled) break;
+                    }
+                    if (formatEnabled) break;
                 }
             } else {
-                formatEnabled = mSurroundFormats.find(format) != mSurroundFormats.end();
+                formatEnabled = mSurroundFormats.count(format) != 0;
             }
             surroundFormatsEnabled[formatsWritten++] = formatEnabled;
         }
@@ -3642,14 +3630,8 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
 {
     ALOGV("%s() format 0x%X enabled %d", __func__, audioFormat, enabled);
     // Check if audio format is a surround formats.
-    bool isSurroundFormat = false;
-    for (size_t i = 0; i < ARRAY_SIZE(SURROUND_FORMATS); i++) {
-        if (audioFormat == SURROUND_FORMATS[i]) {
-            isSurroundFormat = true;
-            break;
-        }
-    }
-    if (!isSurroundFormat) {
+    const auto& formatIter = mConfig.getSurroundFormats().find(audioFormat);
+    if (formatIter == mConfig.getSurroundFormats().end()) {
         ALOGW("%s() format 0x%X is not a known surround format", __func__, audioFormat);
         return BAD_VALUE;
     }
@@ -3662,8 +3644,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
         return INVALID_OPERATION;
     }
 
-    if ((mSurroundFormats.find(audioFormat) != mSurroundFormats.end() && enabled)
-            || (mSurroundFormats.find(audioFormat) == mSurroundFormats.end() && !enabled)) {
+    if ((mSurroundFormats.count(audioFormat) != 0) == enabled) {
         return NO_ERROR;
     }
 
@@ -3675,20 +3656,14 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
 
     std::unordered_set<audio_format_t> surroundFormatsBackup(mSurroundFormats);
     if (enabled) {
-        if (audioFormat == AUDIO_FORMAT_AAC_LC) {
-            for (size_t i = 0; i < ARRAY_SIZE(AAC_FORMATS); i++) {
-                mSurroundFormats.insert(AAC_FORMATS[i]);
-            }
-        } else {
-            mSurroundFormats.insert(audioFormat);
+        mSurroundFormats.insert(audioFormat);
+        for (const auto& subFormat : formatIter->second) {
+            mSurroundFormats.insert(subFormat);
         }
     } else {
-        if (audioFormat == AUDIO_FORMAT_AAC_LC) {
-            for (size_t i = 0; i < ARRAY_SIZE(AAC_FORMATS); i++) {
-                mSurroundFormats.erase(AAC_FORMATS[i]);
-            }
-        } else {
-            mSurroundFormats.erase(audioFormat);
+        mSurroundFormats.erase(audioFormat);
+        for (const auto& subFormat : formatIter->second) {
+            mSurroundFormats.erase(subFormat);
         }
     }
 
@@ -3733,7 +3708,6 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
         profileUpdated |= (status == NO_ERROR);
     }
 
-    // Undo the surround formats change due to no audio profiles updated.
     if (!profileUpdated) {
         ALOGW("%s() no audio profiles updated, undoing surround formats change", __func__);
         mSurroundFormats = std::move(surroundFormatsBackup);
@@ -4546,10 +4520,9 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
             // and as they were also referenced on the other output, the reference
             // count for their stream type must be adjusted accordingly on
             // the other output.
-            bool wasActive = outputDesc2->isActive();
-            for (int j = 0; j < AUDIO_STREAM_CNT; j++) {
-                int activeCount = dupOutputDesc->streamActiveCount((audio_stream_type_t)j);
-                outputDesc2->changeStreamActiveCount((audio_stream_type_t)j,-activeCount);
+            const bool wasActive = outputDesc2->isActive();
+            for (const auto &clientPair : dupOutputDesc->getActiveClients()) {
+                outputDesc2->changeStreamActiveCount(clientPair.first, -clientPair.second);
             }
             // stop() will be a no op if the output is still active but is needed in case all
             // active streams refcounts where cleared above

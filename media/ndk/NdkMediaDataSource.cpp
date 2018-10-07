@@ -48,6 +48,7 @@ struct AMediaDataSource {
     AMediaDataSourceReadAt readAt;
     AMediaDataSourceGetSize getSize;
     AMediaDataSourceClose close;
+    AMediaDataSourceGetAvailableSize getAvailableSize;
     sp<DataSource> mImpl;
     uint32_t mFlags;
 };
@@ -105,6 +106,17 @@ void NdkDataSource::close() {
     if (mDataSource->close != NULL && mDataSource->userdata != NULL) {
         mDataSource->close(mDataSource->userdata);
     }
+}
+
+status_t NdkDataSource::getAvailableSize(off64_t offset, off64_t *sizeptr) {
+    off64_t size = -1;
+    if (mDataSource->getAvailableSize != NULL
+            && mDataSource->userdata != NULL
+            && sizeptr != NULL) {
+        size = mDataSource->getAvailableSize(mDataSource->userdata, offset);
+        *sizeptr = size;
+    }
+    return size >= 0 ? OK : UNKNOWN_ERROR;
 }
 
 static sp<MediaHTTPService> createMediaHttpServiceFromJavaObj(JNIEnv *env, jobject obj, int version) {
@@ -249,6 +261,12 @@ void AMediaDataSource_setClose(AMediaDataSource *mSource, AMediaDataSourceClose 
 EXPORT
 void AMediaDataSource_close(AMediaDataSource *mSource) {
     return mSource->close(mSource->userdata);
+}
+
+EXPORT
+void AMediaDataSource_setGetAvailableSize(AMediaDataSource *mSource,
+        AMediaDataSourceGetAvailableSize getAvailableSize) {
+    mSource->getAvailableSize = getAvailableSize;
 }
 
 } // extern "C"

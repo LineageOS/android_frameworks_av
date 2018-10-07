@@ -46,7 +46,7 @@ public:
             DataSourceHelper *dataSource,
             MetaDataBase &meta);
 
-    virtual status_t start(MetaDataBase *params);
+    virtual status_t start();
     virtual status_t stop();
     virtual status_t getFormat(MetaDataBase &meta);
 
@@ -731,7 +731,7 @@ FLACSource::~FLACSource()
     delete mParser;
 }
 
-status_t FLACSource::start(MetaDataBase * /* params */)
+status_t FLACSource::start()
 {
     ALOGV("FLACSource::start");
 

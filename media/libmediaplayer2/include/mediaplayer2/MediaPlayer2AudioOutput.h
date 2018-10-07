@@ -58,7 +58,7 @@ public:
 
     virtual status_t open(
             uint32_t sampleRate, int channelCount, audio_channel_mask_t channelMask,
-            audio_format_t format, int bufferCount,
+            audio_format_t format,
             AudioCallback cb, void *cookie,
             audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
             const audio_offload_info_t *offloadInfo = NULL,

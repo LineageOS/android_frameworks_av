@@ -70,12 +70,6 @@ media_status_t AMediaExtractor_setDataSourceFd(AMediaExtractor *mData, int fd, o
     return translate_error(mData->mImpl->setDataSource(fd, offset, length));
 }
 
-EXPORT
-media_status_t AMediaExtractor_setDataSource(AMediaExtractor *mData, const char *location) {
-    return AMediaExtractor_setDataSourceWithHeaders(mData, location, 0, NULL, NULL);
-}
-
-EXPORT
 media_status_t AMediaExtractor_setDataSourceWithHeaders(AMediaExtractor *mData,
         const char *uri,
         int numheaders,
@@ -100,6 +94,11 @@ media_status_t AMediaExtractor_setDataSourceWithHeaders(AMediaExtractor *mData,
     status_t err;
     err = mData->mImpl->setDataSource(httpService, uri, numheaders > 0 ? &headers : NULL);
     return translate_error(err);
+}
+
+EXPORT
+media_status_t AMediaExtractor_setDataSource(AMediaExtractor *mData, const char *location) {
+    return AMediaExtractor_setDataSourceWithHeaders(mData, location, 0, NULL, NULL);
 }
 
 EXPORT

@@ -32,13 +32,10 @@
 #include "api2/CameraDeviceClient.h"
 
 #include "device3/Camera3Device.h"
+#include "utils/CameraThreadState.h"
 
 namespace android {
 using namespace camera2;
-
-static int getCallingPid() {
-    return IPCThreadState::self()->getCallingPid();
-}
 
 // Interface used by CameraService
 
@@ -71,7 +68,7 @@ template <typename TClientBase>
 status_t Camera2ClientBase<TClientBase>::checkPid(const char* checkLocation)
         const {
 
-    int callingPid = getCallingPid();
+    int callingPid = CameraThreadState::getCallingPid();
     if (callingPid == TClientBase::mClientPid) return NO_ERROR;
 
     ALOGE("%s: attempt to use a locked camera from a different process"
@@ -186,7 +183,7 @@ binder::Status Camera2ClientBase<TClientBase>::disconnect() {
 
     binder::Status res = binder::Status::ok();
     // Allow both client and the media server to disconnect at all times
-    int callingPid = getCallingPid();
+    int callingPid = CameraThreadState::getCallingPid();
     if (callingPid != TClientBase::mClientPid &&
         callingPid != TClientBase::mServicePid) return res;
 
@@ -217,18 +214,18 @@ status_t Camera2ClientBase<TClientBase>::connect(
     Mutex::Autolock icl(mBinderSerializationLock);
 
     if (TClientBase::mClientPid != 0 &&
-        getCallingPid() != TClientBase::mClientPid) {
+        CameraThreadState::getCallingPid() != TClientBase::mClientPid) {
 
         ALOGE("%s: Camera %s: Connection attempt from pid %d; "
                 "current locked to pid %d",
                 __FUNCTION__,
                 TClientBase::mCameraIdStr.string(),
-                getCallingPid(),
+                CameraThreadState::getCallingPid(),
                 TClientBase::mClientPid);
         return BAD_VALUE;
     }
 
-    TClientBase::mClientPid = getCallingPid();
+    TClientBase::mClientPid = CameraThreadState::getCallingPid();
 
     TClientBase::mRemoteCallback = client;
     mSharedCameraCallbacks = client;

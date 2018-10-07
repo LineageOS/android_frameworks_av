@@ -73,6 +73,7 @@ endif # ifeq ($(USE_CONFIGURABLE_AUDIO_POLICY), 1)
 LOCAL_C_INCLUDES += \
     frameworks/av/services/audiopolicy/common/include \
     frameworks/av/services/audiopolicy/engine/interface \
+    $(call include-path-for, audio-utils) \
 
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents
@@ -109,7 +110,8 @@ LOCAL_STATIC_LIBRARIES := \
 
 LOCAL_C_INCLUDES += \
     frameworks/av/services/audiopolicy/common/include \
-    frameworks/av/services/audiopolicy/engine/interface
+    frameworks/av/services/audiopolicy/engine/interface \
+    $(call include-path-for, audio-utils) \
 
 LOCAL_CFLAGS := -Wall -Werror
 

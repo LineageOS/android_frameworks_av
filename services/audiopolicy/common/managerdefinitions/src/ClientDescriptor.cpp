@@ -17,6 +17,7 @@
 #define LOG_TAG "APM_ClientDescriptor"
 //#define LOG_NDEBUG 0
 
+#include <sstream>
 #include <utils/Log.h>
 #include <utils/String8.h>
 #include "AudioGain.h"
@@ -44,10 +45,18 @@ status_t ClientDescriptor::dump(int fd, int spaces, int index)
     return status;
 }
 
+std::string ClientDescriptor::toShortString() const
+{
+    std::stringstream ss;
+
+    ss << "PortId: " << mPortId << " SessionId: " << mSessionId << " Uid: " << mUid;
+    return ss.str();
+}
+
 status_t ClientDescriptor::dump(String8& out, int spaces, int index)
 {
     out.appendFormat("%*sClient %d:\n", spaces, "", index+1);
-    out.appendFormat("%*s- Port ID: %d Session Id: %d UID: %d\n", spaces, "",
+    out.appendFormat("%*s- Port Id: %d Session Id: %d UID: %d\n", spaces, "",
              mPortId, mSessionId, mUid);
     out.appendFormat("%*s- Format: %08x Sampling rate: %d Channels: %08x\n", spaces, "",
              mConfig.format, mConfig.sample_rate, mConfig.channel_mask);
@@ -63,6 +72,14 @@ status_t TrackClientDescriptor::dump(String8& out, int spaces, int index)
     out.appendFormat("%*s- Stream: %d flags: %08x\n", spaces, "", mStream, mFlags);
 
     return NO_ERROR;
+}
+
+std::string TrackClientDescriptor::toShortString() const
+{
+    std::stringstream ss;
+
+    ss << ClientDescriptor::toShortString() << " Stream: " << mStream;
+    return ss.str();
 }
 
 status_t RecordClientDescriptor::dump(String8& out, int spaces, int index)

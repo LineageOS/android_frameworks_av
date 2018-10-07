@@ -33,16 +33,13 @@
 #include "api1/client2/CaptureSequencer.h"
 #include "api1/client2/CallbackProcessor.h"
 #include "api1/client2/ZslProcessor.h"
+#include "utils/CameraThreadState.h"
 
 #define ALOG1(...) ALOGD_IF(gLogLevel >= 1, __VA_ARGS__);
 #define ALOG2(...) ALOGD_IF(gLogLevel >= 2, __VA_ARGS__);
 
 namespace android {
 using namespace camera2;
-
-static int getCallingPid() {
-    return IPCThreadState::self()->getCallingPid();
-}
 
 // Interface used by CameraService
 
@@ -398,7 +395,7 @@ binder::Status Camera2Client::disconnect() {
 
     binder::Status res = binder::Status::ok();
     // Allow both client and the cameraserver to disconnect at all times
-    int callingPid = getCallingPid();
+    int callingPid = CameraThreadState::getCallingPid();
     if (callingPid != mClientPid && callingPid != mServicePid) return res;
 
     if (mDevice == 0) return res;
@@ -463,14 +460,14 @@ status_t Camera2Client::connect(const sp<hardware::ICameraClient>& client) {
     ALOGV("%s: E", __FUNCTION__);
     Mutex::Autolock icl(mBinderSerializationLock);
 
-    if (mClientPid != 0 && getCallingPid() != mClientPid) {
+    if (mClientPid != 0 && CameraThreadState::getCallingPid() != mClientPid) {
         ALOGE("%s: Camera %d: Connection attempt from pid %d; "
                 "current locked to pid %d", __FUNCTION__,
-                mCameraId, getCallingPid(), mClientPid);
+                mCameraId, CameraThreadState::getCallingPid(), mClientPid);
         return BAD_VALUE;
     }
 
-    mClientPid = getCallingPid();
+    mClientPid = CameraThreadState::getCallingPid();
 
     mRemoteCallback = client;
     mSharedCameraCallbacks = client;
@@ -483,16 +480,16 @@ status_t Camera2Client::lock() {
     ALOGV("%s: E", __FUNCTION__);
     Mutex::Autolock icl(mBinderSerializationLock);
     ALOGV("%s: Camera %d: Lock call from pid %d; current client pid %d",
-            __FUNCTION__, mCameraId, getCallingPid(), mClientPid);
+            __FUNCTION__, mCameraId, CameraThreadState::getCallingPid(), mClientPid);
 
     if (mClientPid == 0) {
-        mClientPid = getCallingPid();
+        mClientPid = CameraThreadState::getCallingPid();
         return OK;
     }
 
-    if (mClientPid != getCallingPid()) {
+    if (mClientPid != CameraThreadState::getCallingPid()) {
         ALOGE("%s: Camera %d: Lock call from pid %d; currently locked to pid %d",
-                __FUNCTION__, mCameraId, getCallingPid(), mClientPid);
+                __FUNCTION__, mCameraId, CameraThreadState::getCallingPid(), mClientPid);
         return EBUSY;
     }
 
@@ -504,9 +501,9 @@ status_t Camera2Client::unlock() {
     ALOGV("%s: E", __FUNCTION__);
     Mutex::Autolock icl(mBinderSerializationLock);
     ALOGV("%s: Camera %d: Unlock call from pid %d; current client pid %d",
-            __FUNCTION__, mCameraId, getCallingPid(), mClientPid);
+            __FUNCTION__, mCameraId, CameraThreadState::getCallingPid(), mClientPid);
 
-    if (mClientPid == getCallingPid()) {
+    if (mClientPid == CameraThreadState::getCallingPid()) {
         SharedParameters::Lock l(mParameters);
         if (l.mParameters.state == Parameters::RECORD ||
                 l.mParameters.state == Parameters::VIDEO_SNAPSHOT) {
@@ -520,7 +517,7 @@ status_t Camera2Client::unlock() {
     }
 
     ALOGE("%s: Camera %d: Unlock call from pid %d; currently locked to pid %d",
-            __FUNCTION__, mCameraId, getCallingPid(), mClientPid);
+            __FUNCTION__, mCameraId, CameraThreadState::getCallingPid(), mClientPid);
     return EBUSY;
 }
 
@@ -1574,7 +1571,7 @@ String8 Camera2Client::getParameters() const {
     ALOGV("%s: Camera %d", __FUNCTION__, mCameraId);
     Mutex::Autolock icl(mBinderSerializationLock);
     // The camera service can unconditionally get the parameters at all times
-    if (getCallingPid() != mServicePid && checkPid(__FUNCTION__) != OK) return String8();
+    if (CameraThreadState::getCallingPid() != mServicePid && checkPid(__FUNCTION__) != OK) return String8();
 
     SharedParameters::ReadLock l(mParameters);
 

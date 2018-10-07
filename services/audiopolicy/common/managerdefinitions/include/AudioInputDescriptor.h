@@ -33,6 +33,7 @@ class AudioPolicyClientInterface;
 // descriptor for audio inputs. Used to maintain current configuration of each opened audio input
 // and keep track of the usage of this input.
 class AudioInputDescriptor: public AudioPortConfig, public AudioIODescriptorInterface
+    , public ClientMapHandler<RecordClientDescriptor>
 {
 public:
     explicit AudioInputDescriptor(const sp<IOProfile>& profile,
@@ -42,10 +43,10 @@ public:
 
     status_t    dump(int fd);
 
-    audio_io_handle_t             mIoHandle;       // input handle
-    audio_devices_t               mDevice;         // current device this input is routed to
-    AudioMix                      *mPolicyMix;     // non NULL when used by a dynamic policy
-    const sp<IOProfile>           mProfile;        // I/O profile this output derives from
+    audio_io_handle_t   mIoHandle = AUDIO_IO_HANDLE_NONE; // input handle
+    audio_devices_t     mDevice = AUDIO_DEVICE_NONE;  // current device this input is routed to
+    AudioMix            *mPolicyMix = nullptr;        // non NULL when used by a dynamic policy
+    const sp<IOProfile> mProfile;                     // I/O profile this output derives from
 
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
             const struct audio_port_config *srcConfig = NULL) const;
@@ -82,7 +83,6 @@ public:
     void stop();
     void close();
 
-    RecordClientMap& clientsMap() { return mClients; }
     RecordClientVector getClientsForSession(audio_session_t session);
     RecordClientVector clientsList(bool activeOnly = false,
         audio_source_t source = AUDIO_SOURCE_DEFAULT, bool preferredDeviceOnly = false) const;
@@ -91,8 +91,8 @@ public:
 
     void updateClientRecordingConfiguration(int event, const sp<RecordClientDescriptor>& client);
 
-    audio_patch_handle_t          mPatchHandle;
-    audio_port_handle_t           mId;
+    audio_patch_handle_t mPatchHandle = AUDIO_PATCH_HANDLE_NONE;
+    audio_port_handle_t  mId = AUDIO_PORT_HANDLE_NONE;
     // Because a preemptible capture session can preempt another one, we end up in an endless loop
     // situation were each session is allowed to restart after being preempted,
     // thus preempting the other one which restarts and so on.
@@ -100,10 +100,8 @@ public:
     // a particular input started and prevent preemption of this active input by this session.
     // We also inherit sessions from the preempted input to avoid a 3 way preemption loop etc...
     SortedVector<audio_session_t> mPreemptedSessions;
-    AudioPolicyClientInterface *mClientInterface;
-    int32_t mGlobalActiveCount;  // non-client-specific activity ref count
-
-    RecordClientMap mClients;
+    AudioPolicyClientInterface * const mClientInterface;
+    int32_t mGlobalActiveCount = 0;  // non-client-specific activity ref count
 };
 
 class AudioInputCollection :

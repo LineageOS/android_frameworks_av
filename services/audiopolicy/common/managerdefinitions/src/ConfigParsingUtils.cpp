@@ -407,6 +407,8 @@ status_t ConfigParsingUtils::loadConfig(const char *path, AudioPolicyConfig &con
 
     config.setHwModules(hwModules);
 
+    config.setDefaultSurroundFormats();
+
     config_free(root);
     free(root);
     free(data);

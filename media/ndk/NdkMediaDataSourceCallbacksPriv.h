@@ -31,6 +31,8 @@ ssize_t DataSource_readAt(void *userdata, off64_t offset, void * buf, size_t siz
 
 void DataSource_close(void *userdata);
 
+ssize_t DataSource_getAvailableSize(void *userdata, off64_t offset);
+
 static inline AMediaDataSource* convertDataSourceToAMediaDataSource(const sp<DataSource> &source) {
     if (source == NULL) {
         return NULL;
@@ -40,6 +42,7 @@ static inline AMediaDataSource* convertDataSourceToAMediaDataSource(const sp<Dat
     AMediaDataSource_setReadAt(mSource, DataSource_readAt);
     AMediaDataSource_setGetSize(mSource, DataSource_getSize);
     AMediaDataSource_setClose(mSource, DataSource_close);
+    AMediaDataSource_setGetAvailableSize(mSource, DataSource_getAvailableSize);
     return mSource;
 }
 

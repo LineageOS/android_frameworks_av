@@ -57,7 +57,7 @@ struct MPEG2TSSource : public MediaTrackHelper {
             bool doesSeek);
     virtual ~MPEG2TSSource();
 
-    virtual status_t start(MetaDataBase *params = NULL);
+    virtual status_t start();
     virtual status_t stop();
     virtual status_t getFormat(MetaDataBase &);
 
@@ -87,7 +87,7 @@ MPEG2TSSource::MPEG2TSSource(
 MPEG2TSSource::~MPEG2TSSource() {
 }
 
-status_t MPEG2TSSource::start(MetaDataBase *) {
+status_t MPEG2TSSource::start() {
     return mImpl->start(NULL); // AnotherPacketSource::start() doesn't use its argument
 }
 

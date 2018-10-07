@@ -62,7 +62,7 @@ struct WAVSource : public MediaTrackHelperV2 {
             int32_t bitsPerSample,
             off64_t offset, size_t size);
 
-    virtual status_t start(AMediaFormat *params = NULL);
+    virtual status_t start();
     virtual status_t stop();
     virtual status_t getFormat(AMediaFormat *meta);
 
@@ -377,7 +377,7 @@ WAVSource::~WAVSource() {
     }
 }
 
-status_t WAVSource::start(AMediaFormat * /* params */) {
+status_t WAVSource::start() {
     ALOGV("WAVSource::start");
 
     CHECK(!mStarted);
