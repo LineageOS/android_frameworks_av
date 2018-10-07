@@ -220,6 +220,7 @@ class Camera3Device :
     static const size_t        kInFlightWarnLimitHighSpeed = 256; // batch size 32 * pipe depth 8
     static const nsecs_t       kDefaultExpectedDuration = 100000000; // 100 ms
     static const nsecs_t       kMinInflightDuration = 5000000000; // 5 s
+    static const nsecs_t       kBaseGetBufferWait = 3000000000; // 3 sec.
     // SCHED_FIFO priority for request submission thread in HFR mode
     static const int           kRequestThreadPriority = 1;
 
