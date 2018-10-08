@@ -195,8 +195,13 @@ IMPLEMENT_META_INTERFACE(Crypto, "android.hardware.ICrypto");
 
 void BnCrypto::readVector(const Parcel &data, Vector<uint8_t> &vector) const {
     uint32_t size = data.readInt32();
-    vector.insertAt((size_t)0, size);
-    data.read(vector.editArray(), size);
+    if (vector.insertAt((size_t)0, size) < 0) {
+        vector.clear();
+    }
+    if (data.read(vector.editArray(), size) != NO_ERROR) {
+        vector.clear();
+        ALOGE("62872384");
+    }
 }
 
 void BnCrypto::writeVector(Parcel *reply, Vector<uint8_t> const &vector) const {
