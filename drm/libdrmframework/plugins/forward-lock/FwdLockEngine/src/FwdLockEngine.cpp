@@ -294,7 +294,7 @@ int FwdLockEngine::onCheckRightsStatus(int uniqueId,
 }
 
 status_t FwdLockEngine::onConsumeRights(int /* uniqueId */,
-                                        DecryptHandle* /* decryptHandle */,
+                                        sp<DecryptHandle>& /* decryptHandle */,
                                         int /* action */,
                                         bool /* reserve */) {
     // No rights consumption
@@ -372,11 +372,13 @@ status_t FwdLockEngine::onRemoveAllRights(int /* uniqueId */) {
 }
 
 #ifdef USE_64BIT_DRM_API
-status_t FwdLockEngine::onSetPlaybackStatus(int /* uniqueId */, DecryptHandle* /* decryptHandle */,
-                                            int /* playbackStatus */, int64_t /* position */) {
+status_t FwdLockEngine::onSetPlaybackStatus(int /* uniqueId */,
+        sp<DecryptHandle>& /* decryptHandle */, int /* playbackStatus */,
+        int64_t /* position */) {
 #else
-status_t FwdLockEngine::onSetPlaybackStatus(int /* uniqueId */, DecryptHandle* /* decryptHandle */,
-                                            int /* playbackStatus */, int /* position */) {
+status_t FwdLockEngine::onSetPlaybackStatus(int /* uniqueId */,
+        sp<DecryptHandle>& /* decryptHandle */,
+        int /* playbackStatus */, int /* position */) {
 #endif
     // Not used
     LOG_VERBOSE("FwdLockEngine::onSetPlaybackStatus");
@@ -470,13 +472,13 @@ DrmConvertedStatus* FwdLockEngine::onCloseConvertSession(int /* uniqueId */,
 
 #ifdef USE_64BIT_DRM_API
 status_t FwdLockEngine::onOpenDecryptSession(int /* uniqueId */,
-                                             DecryptHandle* decryptHandle,
+                                             sp<DecryptHandle>& decryptHandle,
                                              int fd,
                                              off64_t offset,
                                              off64_t /* length */) {
 #else
 status_t FwdLockEngine::onOpenDecryptSession(int /* uniqueId */,
-                                             DecryptHandle* decryptHandle,
+                                             sp<DecryptHandle>& decryptHandle,
                                              int fd,
                                              int offset,
                                              int /* length */) {
@@ -487,7 +489,7 @@ status_t FwdLockEngine::onOpenDecryptSession(int /* uniqueId */,
     LOG_VERBOSE("FwdLockEngine::onOpenDecryptSession");
 
     if ((-1 < fd) &&
-        (NULL != decryptHandle) &&
+        (NULL != decryptHandle.get()) &&
         (!decodeSessionMap.isCreated(decryptHandle->decryptId))) {
         fileDesc = dup(fd);
     } else {
@@ -533,12 +535,12 @@ status_t FwdLockEngine::onOpenDecryptSession(int /* uniqueId */,
 }
 
 status_t FwdLockEngine::onOpenDecryptSession(int uniqueId,
-                                             DecryptHandle* decryptHandle,
+                                             sp<DecryptHandle>& decryptHandle,
                                              const char* uri) {
     status_t result = DRM_ERROR_CANNOT_HANDLE;
     const char fileTag [] = "file://";
 
-    if (NULL != decryptHandle && NULL != uri && strlen(uri) > sizeof(fileTag)) {
+    if (NULL != decryptHandle.get() && NULL != uri && strlen(uri) > sizeof(fileTag)) {
         String8 uriTag = String8(uri);
         uriTag.toLower();
 
@@ -562,11 +564,11 @@ status_t FwdLockEngine::onOpenDecryptSession(int uniqueId,
 }
 
 status_t FwdLockEngine::onCloseDecryptSession(int /* uniqueId */,
-                                              DecryptHandle* decryptHandle) {
+                                              sp<DecryptHandle>& decryptHandle) {
     status_t result = DRM_ERROR_UNKNOWN;
     LOG_VERBOSE("FwdLockEngine::onCloseDecryptSession");
 
-    if (NULL != decryptHandle && decodeSessionMap.isCreated(decryptHandle->decryptId)) {
+    if (NULL != decryptHandle.get() && decodeSessionMap.isCreated(decryptHandle->decryptId)) {
         DecodeSession* session = decodeSessionMap.getValue(decryptHandle->decryptId);
         if (NULL != session && session->fileDesc > -1) {
             FwdLockFile_detach(session->fileDesc);
@@ -576,7 +578,7 @@ status_t FwdLockEngine::onCloseDecryptSession(int /* uniqueId */,
         }
     }
 
-    if (NULL != decryptHandle) {
+    if (NULL != decryptHandle.get()) {
         if (NULL != decryptHandle->decryptInfo) {
             delete decryptHandle->decryptInfo;
             decryptHandle->decryptInfo = NULL;
@@ -584,9 +586,7 @@ status_t FwdLockEngine::onCloseDecryptSession(int /* uniqueId */,
 
         decryptHandle->copyControlVector.clear();
         decryptHandle->extendedData.clear();
-
-        delete decryptHandle;
-        decryptHandle = NULL;
+        decryptHandle.clear();
     }
 
     LOG_VERBOSE("FwdLockEngine::onCloseDecryptSession Exit");
@@ -594,7 +594,7 @@ status_t FwdLockEngine::onCloseDecryptSession(int /* uniqueId */,
 }
 
 status_t FwdLockEngine::onInitializeDecryptUnit(int /* uniqueId */,
-                                                DecryptHandle* /* decryptHandle */,
+                                                sp<DecryptHandle>& /* decryptHandle */,
                                                 int /* decryptUnitId */,
                                                 const DrmBuffer* /* headerInfo */) {
     ALOGE("FwdLockEngine::onInitializeDecryptUnit is not supported for this DRM scheme");
@@ -603,7 +603,7 @@ status_t FwdLockEngine::onInitializeDecryptUnit(int /* uniqueId */,
 
 status_t FwdLockEngine::onDecrypt(
             int /* uniqueId */,
-            DecryptHandle* /* decryptHandle */,
+            sp<DecryptHandle>& /* decryptHandle */,
             int /* decryptUnitId */,
             const DrmBuffer* /* encBuffer */,
             DrmBuffer** /* decBuffer */,
@@ -613,7 +613,7 @@ status_t FwdLockEngine::onDecrypt(
 }
 
 status_t FwdLockEngine::onDecrypt(int /* uniqueId */,
-                                  DecryptHandle* /* decryptHandle */,
+                                  sp<DecryptHandle>& /* decryptHandle */,
                                   int /* decryptUnitId */,
                                   const DrmBuffer* /* encBuffer */,
                                   DrmBuffer** /* decBuffer */) {
@@ -622,19 +622,19 @@ status_t FwdLockEngine::onDecrypt(int /* uniqueId */,
 }
 
 status_t FwdLockEngine::onFinalizeDecryptUnit(int /* uniqueId */,
-                                              DecryptHandle* /* decryptHandle */,
+                                              sp<DecryptHandle>& /* decryptHandle */,
                                               int /* decryptUnitId */) {
     ALOGE("FwdLockEngine::onFinalizeDecryptUnit is not supported for this DRM scheme");
     return DRM_ERROR_UNKNOWN;
 }
 
 ssize_t FwdLockEngine::onRead(int /* uniqueId */,
-                              DecryptHandle* decryptHandle,
+                              sp<DecryptHandle>& decryptHandle,
                               void* buffer,
                               int numBytes) {
     ssize_t size = -1;
 
-    if (NULL != decryptHandle &&
+    if (NULL != decryptHandle.get() &&
         decodeSessionMap.isCreated(decryptHandle->decryptId) &&
         NULL != buffer &&
         numBytes > -1) {
@@ -654,15 +654,15 @@ ssize_t FwdLockEngine::onRead(int /* uniqueId */,
 }
 
 #ifdef USE_64BIT_DRM_API
-off64_t FwdLockEngine::onLseek(int /* uniqueId */, DecryptHandle* decryptHandle,
+off64_t FwdLockEngine::onLseek(int /* uniqueId */, sp<DecryptHandle>& decryptHandle,
                                off64_t offset, int whence) {
 #else
-off_t FwdLockEngine::onLseek(int /* uniqueId */, DecryptHandle* decryptHandle,
+off_t FwdLockEngine::onLseek(int /* uniqueId */, sp<DecryptHandle>& decryptHandle,
                              off_t offset, int whence) {
 #endif
     off_t offval = -1;
 
-    if (NULL != decryptHandle && decodeSessionMap.isCreated(decryptHandle->decryptId)) {
+    if (NULL != decryptHandle.get() && decodeSessionMap.isCreated(decryptHandle->decryptId)) {
         DecodeSession* session = decodeSessionMap.getValue(decryptHandle->decryptId);
         if (NULL != session && session->fileDesc > -1) {
             offval = FwdLockFile_lseek(session->fileDesc, offset, whence);
@@ -675,13 +675,13 @@ off_t FwdLockEngine::onLseek(int /* uniqueId */, DecryptHandle* decryptHandle,
 
 #ifdef USE_64BIT_DRM_API
 ssize_t FwdLockEngine::onPread(int uniqueId,
-                               DecryptHandle* decryptHandle,
+                               sp<DecryptHandle>& decryptHandle,
                                void* buffer,
                                ssize_t numBytes,
                                off64_t offset) {
 #else
 ssize_t FwdLockEngine::onPread(int uniqueId,
-                               DecryptHandle* decryptHandle,
+                               sp<DecryptHandle>& decryptHandle,
                                void* buffer,
                                ssize_t numBytes,
                                off_t offset) {
@@ -690,7 +690,7 @@ ssize_t FwdLockEngine::onPread(int uniqueId,
 
     DecodeSession* decoderSession = NULL;
 
-    if ((NULL != decryptHandle) &&
+    if ((NULL != decryptHandle.get()) &&
         (NULL != (decoderSession = decodeSessionMap.getValue(decryptHandle->decryptId))) &&
         (NULL != buffer) &&
         (numBytes > -1) &&

@@ -53,10 +53,11 @@ protected:
 
     int onCheckRightsStatus(int uniqueId, const String8& path, int action);
 
-    status_t onConsumeRights(int uniqueId, DecryptHandle* decryptHandle, int action, bool reserve);
+    status_t onConsumeRights(int uniqueId, sp<DecryptHandle>& decryptHandle,
+            int action, bool reserve);
 
     status_t onSetPlaybackStatus(
-            int uniqueId, DecryptHandle* decryptHandle, int playbackStatus, int64_t position);
+            int uniqueId, sp<DecryptHandle>& decryptHandle, int playbackStatus, int64_t position);
 
     bool onValidateAction(
             int uniqueId, const String8& path, int action, const ActionDescription& description);
@@ -74,26 +75,25 @@ protected:
     DrmSupportInfo* onGetSupportInfo(int uniqueId);
 
     status_t onOpenDecryptSession(
-            int uniqueId, DecryptHandle* decryptHandle, int fd, off64_t offset, off64_t length);
+            int uniqueId, sp<DecryptHandle>& decryptHandle, int fd, off64_t offset,
+            off64_t length);
 
     status_t onOpenDecryptSession(
-            int uniqueId, DecryptHandle* decryptHandle, const char* uri);
+            int uniqueId, sp<DecryptHandle>& decryptHandle, const char* uri);
 
-    status_t onCloseDecryptSession(int uniqueId, DecryptHandle* decryptHandle);
+    status_t onCloseDecryptSession(int uniqueId, sp<DecryptHandle>& decryptHandle);
 
-    status_t onInitializeDecryptUnit(int uniqueId, DecryptHandle* decryptHandle,
+    status_t onInitializeDecryptUnit(int uniqueId, sp<DecryptHandle>& decryptHandle,
             int decryptUnitId, const DrmBuffer* headerInfo);
 
-    status_t onDecrypt(int uniqueId, DecryptHandle* decryptHandle, int decryptUnitId,
+    status_t onDecrypt(int uniqueId, sp<DecryptHandle>& decryptHandle, int decryptUnitId,
             const DrmBuffer* encBuffer, DrmBuffer** decBuffer, DrmBuffer* IV);
 
-    status_t onFinalizeDecryptUnit(int uniqueId, DecryptHandle* decryptHandle, int decryptUnitId);
+    status_t onFinalizeDecryptUnit(int uniqueId, sp<DecryptHandle>& decryptHandle,
+            int decryptUnitId);
 
-    ssize_t onPread(int uniqueId, DecryptHandle* decryptHandle,
+    ssize_t onPread(int uniqueId, sp<DecryptHandle>& decryptHandle,
             void* buffer, ssize_t numBytes, off64_t offset);
-
-private:
-    DecryptHandle* openDecryptSessionImpl();
 };
 
 };
