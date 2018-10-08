@@ -2783,7 +2783,7 @@ typedef enum acamera_metadata_tag {
      *   {@link AIMAGE_FORMAT_RAW12 RAW12}.</li>
      * <li>Processed (but not-stalling): any non-RAW format without a stall duration.  Typically
      *   {@link AIMAGE_FORMAT_YUV_420_888 YUV_420_888},
-     *   <a href="https://developer.android.com/reference/android/graphics/ImageFormat.html#NV21">NV21</a>, or <a href="https://developer.android.com/reference/android/graphics/ImageFormat.html#YV12">YV12</a>.</li>
+     *   <a href="https://developer.android.com/reference/android/graphics/ImageFormat.html#NV21">NV21</a>, <a href="https://developer.android.com/reference/android/graphics/ImageFormat.html#YV12">YV12</a>, or {@link AIMAGE_FORMAT_Y8 Y8} .</li>
      * </ul>
      *
      * @see ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS
@@ -3251,6 +3251,7 @@ typedef enum acamera_metadata_tag {
      * <li>{@link AIMAGE_FORMAT_YUV_420_888 }</li>
      * <li>{@link AIMAGE_FORMAT_RAW10 }</li>
      * <li>{@link AIMAGE_FORMAT_RAW12 }</li>
+     * <li>{@link AIMAGE_FORMAT_Y8 }</li>
      * </ul>
      * <p>All other formats may or may not have an allowed stall duration on
      * a per-capability basis; refer to ACAMERA_REQUEST_AVAILABLE_CAPABILITIES
@@ -5457,8 +5458,8 @@ typedef enum acamera_metadata_tag {
      * will not slow down capture rate when applying correction. FAST may be the same as OFF if
      * any correction at all would slow down capture rate.  Every output stream will have a
      * similar amount of enhancement applied.</p>
-     * <p>The correction only applies to processed outputs such as YUV, JPEG, or DEPTH16; it is not
-     * applied to any RAW output.</p>
+     * <p>The correction only applies to processed outputs such as YUV, Y8, JPEG, or DEPTH16; it is
+     * not applied to any RAW output.</p>
      * <p>This control will be on by default on devices that support this control. Applications
      * disabling distortion correction need to pay extra attention with the coordinate system of
      * metering regions, crop region, and face rectangles. When distortion correction is OFF,
@@ -7143,7 +7144,7 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * camera device can capture this size for at least 10 frames per second.  Also the
      * ACAMERA_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES entry lists at least one FPS range where
      * the minimum FPS is &gt;= 1 / minimumFrameDuration for the largest YUV_420_888 size.</p>
-     * <p>If the device supports the {@link AIMAGE_FORMAT_RAW10 }, {@link AIMAGE_FORMAT_RAW12 }, then those can also be
+     * <p>If the device supports the {@link AIMAGE_FORMAT_RAW10 }, {@link AIMAGE_FORMAT_RAW12 }, {@link AIMAGE_FORMAT_Y8 }, then those can also be
      * captured at the same rate as the maximum-size YUV_420_888 resolution is.</p>
      * <p>In addition, the ACAMERA_SYNC_MAX_LATENCY field is guaranted to have a value between 0
      * and 4, inclusive. ACAMERA_CONTROL_AE_LOCK_AVAILABLE and ACAMERA_CONTROL_AWB_LOCK_AVAILABLE
@@ -7177,8 +7178,8 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * <li>The ACAMERA_DEPTH_DEPTH_IS_EXCLUSIVE entry is listed by this device.</li>
      * <li>As of Android P, the ACAMERA_LENS_POSE_REFERENCE entry is listed by this device.</li>
      * <li>A LIMITED camera with only the DEPTH_OUTPUT capability does not have to support
-     *   normal YUV_420_888, JPEG, and PRIV-format outputs. It only has to support the DEPTH16
-     *   format.</li>
+     *   normal YUV_420_888, Y8, JPEG, and PRIV-format outputs. It only has to support the
+     *   DEPTH16 format.</li>
      * </ul>
      * <p>Generally, depth output operates at a slower frame rate than standard color capture,
      * so the DEPTH16 and DEPTH_POINT_CLOUD formats will commonly have a stall duration that
@@ -7272,6 +7273,10 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
     /**
      * <p>The camera device is a monochrome camera that doesn't contain a color filter array,
      * and the pixel values on U and V planes are all 128.</p>
+     * <p>A MONOCHROME camera must support the guaranteed stream combinations required for
+     * its device level and capabilities. Additionally, if the monochrome camera device
+     * supports Y8 format, all mandatory stream combination requirements related to {@link AIMAGE_FORMAT_YUV_420_888 YUV_420_888} apply
+     * to {@link AIMAGE_FORMAT_Y8 Y8} as well.</p>
      */
     ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_MONOCHROME                = 12,
 
