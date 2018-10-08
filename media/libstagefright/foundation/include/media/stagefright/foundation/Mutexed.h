@@ -103,7 +103,7 @@ public:
     class Locked {
     public:
         inline Locked(Mutexed<T> &mParent);
-        inline Locked(Locked &&from) :
+        inline Locked(Locked &&from) noexcept :
             mLock(from.mLock),
             mTreasure(from.mTreasure),
             mLocked(from.mLocked) {}
