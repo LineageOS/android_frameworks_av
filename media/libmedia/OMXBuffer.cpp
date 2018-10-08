@@ -172,7 +172,7 @@ status_t OMXBuffer::readFromParcel(const Parcel *parcel) {
     return OK;
 }
 
-OMXBuffer& OMXBuffer::operator=(OMXBuffer&& source) {
+OMXBuffer& OMXBuffer::operator=(OMXBuffer&& source) noexcept {
     mBufferType = std::move(source.mBufferType);
     mRangeOffset = std::move(source.mRangeOffset);
     mRangeLength = std::move(source.mRangeLength);
