@@ -182,10 +182,17 @@ status_t Camera3StreamSplitter::addOutputLocked(size_t surfaceId, const sp<Surfa
         return BAD_VALUE;
     }
 
-  status_t res = native_window_set_buffers_dimensions(outputQueue.get(),
+    status_t res = native_window_set_buffers_dimensions(outputQueue.get(),
             mWidth, mHeight);
     if (res != NO_ERROR) {
         SP_LOGE("addOutput: failed to set buffer dimensions (%d)", res);
+        return res;
+    }
+    res = native_window_set_buffers_format(outputQueue.get(),
+            mFormat);
+    if (res != OK) {
+        ALOGE("%s: Unable to configure stream buffer format %#x for surfaceId %zu",
+                __FUNCTION__, mFormat, surfaceId);
         return res;
     }
 
