@@ -774,7 +774,7 @@ public:
         /**
          * Move assignment operator.
          */
-        Custom& operator=(Custom &&o) {
+        Custom& operator=(Custom &&o) noexcept {
             if (&o != this) {
                 if (this->used() && !this->clear()) {
                     __builtin_trap();
@@ -795,7 +795,7 @@ public:
         /**
          * Move constructor.
          */
-        Custom(Custom &&o) : Custom() {
+        Custom(Custom &&o) noexcept : Custom() {
             *this = std::move(o);
         }
 
