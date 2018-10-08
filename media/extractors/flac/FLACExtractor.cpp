@@ -366,7 +366,6 @@ void FLACParser::metadataCallback(const FLAC__StreamMetadata *metadata)
             const FLAC__StreamMetadata_Picture *p = &metadata->data.picture;
             mFileMetadata->setData(kKeyAlbumArt,
                     MetaData::TYPE_NONE, p->data, p->data_length);
-            mFileMetadata->setCString(kKeyAlbumArtMIME, p->mime_type);
         }
         break;
     default:
