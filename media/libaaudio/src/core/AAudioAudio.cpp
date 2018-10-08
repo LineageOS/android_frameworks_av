@@ -241,7 +241,7 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* 
 {
     AudioStream *audioStream = nullptr;
     // Please leave these logs because they are very helpful when debugging.
-    ALOGD("AAudioStreamBuilder_openStream() called ----------------------------------------");
+    ALOGD("%s() called ----------------------------------------", __func__);
     AudioStreamBuilder *streamBuilder = COMMON_GET_FROM_BUILDER_OR_RETURN(streamPtr);
     aaudio_result_t result = streamBuilder->build(&audioStream);
     ALOGD("AAudioStreamBuilder_openStream() returns %d = %s for (%p) ----------------",
@@ -269,7 +269,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
 {
     aaudio_result_t result = AAUDIO_ERROR_NULL;
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("AAudioStream_close(%p) called ---------------", stream);
+    ALOGD("%s(%p) called ---------------", __func__, stream);
     if (audioStream != nullptr) {
         result = audioStream->safeClose();
         // Close will only fail if called illegally, for example, from a callback.
@@ -284,7 +284,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
     // We're potentially freeing `stream` above, so its use here makes some
     // static analysis tools unhappy. Casting to uintptr_t helps assure
     // said tools that we're not doing anything bad here.
-    ALOGD("AAudioStream_close(%#" PRIxPTR ") returned %d ---------",
+    ALOGD("%s(%#" PRIxPTR ") returned %d ---------", __func__,
           reinterpret_cast<uintptr_t>(stream), result);
     return result;
 }
@@ -292,30 +292,30 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
 AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("AAudioStream_requestStart(%p) called --------------", stream);
+    ALOGD("%s(%p) called --------------", __func__, stream);
     aaudio_result_t result = audioStream->systemStart();
-    ALOGD("AAudioStream_requestStart(%p) returned %d ---------", stream, result);
+    ALOGD("%s(%p) returned %d ---------", __func__, stream, result);
     return result;
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestPause(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("AAudioStream_requestPause(%p)", stream);
+    ALOGD("%s(%p) called", __func__, stream);
     return audioStream->systemPause();
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestFlush(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("AAudioStream_requestFlush(%p)", stream);
+    ALOGD("%s(%p) called", __func__, stream);
     return audioStream->safeFlush();
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestStop(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("AAudioStream_requestStop(%p)", stream);
+    ALOGD("%s(%p) called", __func__, stream);
     return audioStream->systemStop();
 }
 

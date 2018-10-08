@@ -51,7 +51,6 @@ AAudioServiceStreamBase::AAudioServiceStreamBase(AAudioService &audioService)
 }
 
 AAudioServiceStreamBase::~AAudioServiceStreamBase() {
-    ALOGD("~AAudioServiceStreamBase() destroying %p", this);
     // If the stream is deleted when OPEN or in use then audio resources will leak.
     // This would indicate an internal error. So we want to find this ASAP.
     LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED
@@ -110,7 +109,6 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
         mServiceEndpoint = mEndpointManager.openEndpoint(mAudioService,
                                                          request);
         if (mServiceEndpoint == nullptr) {
-            ALOGE("%s() openEndpoint() failed", __func__);
             result = AAUDIO_ERROR_UNAVAILABLE;
             goto error;
         }

@@ -37,7 +37,6 @@ AudioStream::AudioStream()
 }
 
 AudioStream::~AudioStream() {
-    ALOGD("destroying %p, state = %s", this, AAudio_convertStreamStateToText(getState()));
     // If the stream is deleted when OPEN or in use then audio resources will leak.
     // This would indicate an internal error. So we want to find this ASAP.
     LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED

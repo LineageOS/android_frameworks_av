@@ -41,7 +41,7 @@ class AAudioServiceEndpoint
         , public AAudioStreamParameters {
 public:
 
-    virtual ~AAudioServiceEndpoint();
+    virtual ~AAudioServiceEndpoint() = default;
 
     virtual std::string dump() const;
 

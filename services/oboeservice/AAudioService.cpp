@@ -118,7 +118,7 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
         }
     }
 
-    // If SHARED requested or if EXCLUSIVE failed.
+    // Try SHARED if SHARED requested or if EXCLUSIVE failed.
     if (sharingMode == AAUDIO_SHARING_MODE_SHARED) {
         serviceStream =  new AAudioServiceStreamShared(*this);
         result = serviceStream->open(request);
@@ -132,8 +132,7 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
 
     if (result != AAUDIO_OK) {
         serviceStream.clear();
-        ALOGE("openStream(): failed, return %d = %s",
-              result, AAudio_convertResultToText(result));
+        ALOGW("openStream(): failed, return %d = %s", result, AAudio_convertResultToText(result));
         return result;
     } else {
         aaudio_handle_t handle = mStreamTracker.addStreamForHandle(serviceStream.get());

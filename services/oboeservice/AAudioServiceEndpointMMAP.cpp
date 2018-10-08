@@ -101,8 +101,6 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
             .flags = AUDIO_FLAG_LOW_LATENCY,
             .tags = ""
     };
-    ALOGD("%s(%p) MMAP attributes.usage = %d, content_type = %d, source = %d",
-          __func__, this, attributes.usage, attributes.content_type, attributes.source);
 
     mMmapClient.clientUid = request.getUserId();
     mMmapClient.clientPid = request.getProcessId();
@@ -163,12 +161,12 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     ALOGD("%s() mMapClient.uid = %d, pid = %d => portHandle = %d\n",
           __func__, mMmapClient.clientUid,  mMmapClient.clientPid, mPortHandle);
     if (status != OK) {
-        ALOGE("%s() openMmapStream() returned status %d",  __func__, status);
+        ALOGE("%s() - openMmapStream() returned status %d",  __func__, status);
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
     if (deviceId == AAUDIO_UNSPECIFIED) {
-        ALOGW("%s() openMmapStream() failed to set deviceId", __func__);
+        ALOGW("%s() - openMmapStream() failed to set deviceId", __func__);
     }
     setDeviceId(deviceId);
 

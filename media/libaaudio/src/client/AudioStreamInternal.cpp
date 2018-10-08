@@ -131,7 +131,6 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         mServiceStreamHandle = mServiceInterface.openStream(request, configurationOutput);
     }
     if (mServiceStreamHandle < 0) {
-        ALOGE("%s - openStream() returned %d", __func__, mServiceStreamHandle);
         return mServiceStreamHandle;
     }
 
@@ -693,7 +692,6 @@ aaudio_result_t AudioStreamInternal::setBufferSize(int32_t requestedFrames) {
     }
 
     aaudio_result_t result = mAudioEndpoint.setBufferSizeInFrames(adjustedFrames, &actualFrames);
-    ALOGD("setBufferSize() req = %d => %d", requestedFrames, actualFrames);
     if (result < 0) {
         return result;
     } else {

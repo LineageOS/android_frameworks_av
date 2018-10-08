@@ -38,10 +38,6 @@
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
 
-AAudioServiceEndpoint::~AAudioServiceEndpoint() {
-    ALOGD("%s(%p) destroyed", __func__, this);
-}
-
 std::string AAudioServiceEndpoint::dump() const {
     std::stringstream result;
 
