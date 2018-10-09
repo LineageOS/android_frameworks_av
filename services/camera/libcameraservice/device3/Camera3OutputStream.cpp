@@ -271,6 +271,13 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
         /* Certain consumers (such as AudioSource or HardwareComposer) use
          * MONOTONIC time, causing time misalignment if camera timestamp is
          * in BOOTTIME. Do the conversion if necessary. */
+#ifdef TARGET_CAMERA_BOOTTIME_TIMESTAMP
+        if (mUseMonoTimestamp && mTimestampOffset == 0) {
+            // If that happens something is clearly wrong with the one using this
+            mTimestampOffset =
+                    abs(systemTime(SYSTEM_TIME_BOOTTIME) - systemTime(SYSTEM_TIME_MONOTONIC));
+        }
+#endif
         res = native_window_set_buffers_timestamp(mConsumer.get(),
                 mUseMonoTimestamp ? timestamp - mTimestampOffset : timestamp);
         if (res != OK) {
