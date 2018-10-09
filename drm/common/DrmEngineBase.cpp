@@ -79,12 +79,12 @@ int DrmEngineBase::checkRightsStatus(int uniqueId, const String8& path, int acti
 }
 
 status_t DrmEngineBase::consumeRights(
-    int uniqueId, DecryptHandle* decryptHandle, int action, bool reserve) {
+    int uniqueId, sp<DecryptHandle>& decryptHandle, int action, bool reserve) {
     return onConsumeRights(uniqueId, decryptHandle, action, reserve);
 }
 
 status_t DrmEngineBase::setPlaybackStatus(
-    int uniqueId, DecryptHandle* decryptHandle, int playbackStatus, int64_t position) {
+    int uniqueId, sp<DecryptHandle>& decryptHandle, int playbackStatus, int64_t position) {
     return onSetPlaybackStatus(uniqueId, decryptHandle, playbackStatus, position);
 }
 
@@ -120,7 +120,7 @@ DrmSupportInfo* DrmEngineBase::getSupportInfo(int uniqueId) {
 }
 
 status_t DrmEngineBase::openDecryptSession(
-    int uniqueId, DecryptHandle* decryptHandle,
+    int uniqueId, sp<DecryptHandle>& decryptHandle,
     int fd, off64_t offset, off64_t length, const char* mime) {
 
     if (!mime || mime[0] == '\0') {
@@ -131,7 +131,7 @@ status_t DrmEngineBase::openDecryptSession(
 }
 
 status_t DrmEngineBase::openDecryptSession(
-    int uniqueId, DecryptHandle* decryptHandle,
+    int uniqueId, sp<DecryptHandle>& decryptHandle,
     const char* uri, const char* mime) {
     if (!mime || mime[0] == '\0') {
         return onOpenDecryptSession(uniqueId, decryptHandle, uri);
@@ -139,33 +139,33 @@ status_t DrmEngineBase::openDecryptSession(
     return onOpenDecryptSession(uniqueId, decryptHandle, uri, mime);
 }
 
-status_t DrmEngineBase::openDecryptSession(int uniqueId, DecryptHandle* decryptHandle,
+status_t DrmEngineBase::openDecryptSession(int uniqueId, sp<DecryptHandle>& decryptHandle,
         const DrmBuffer& buf, const String8& mimeType) {
     return onOpenDecryptSession(uniqueId, decryptHandle, buf, mimeType);
 }
 
-status_t DrmEngineBase::closeDecryptSession(int uniqueId, DecryptHandle* decryptHandle) {
+status_t DrmEngineBase::closeDecryptSession(int uniqueId, sp<DecryptHandle>& decryptHandle) {
     return onCloseDecryptSession(uniqueId, decryptHandle);
 }
 
 status_t DrmEngineBase::initializeDecryptUnit(
-    int uniqueId, DecryptHandle* decryptHandle, int decryptUnitId, const DrmBuffer* headerInfo) {
+    int uniqueId, sp<DecryptHandle>& decryptHandle, int decryptUnitId, const DrmBuffer* headerInfo) {
     return onInitializeDecryptUnit(uniqueId, decryptHandle, decryptUnitId, headerInfo);
 }
 
 status_t DrmEngineBase::decrypt(
-    int uniqueId, DecryptHandle* decryptHandle, int decryptUnitId,
+    int uniqueId, sp<DecryptHandle>& decryptHandle, int decryptUnitId,
     const DrmBuffer* encBuffer, DrmBuffer** decBuffer, DrmBuffer* IV) {
     return onDecrypt(uniqueId, decryptHandle, decryptUnitId, encBuffer, decBuffer, IV);
 }
 
 status_t DrmEngineBase::finalizeDecryptUnit(
-    int uniqueId, DecryptHandle* decryptHandle, int decryptUnitId) {
+    int uniqueId, sp<DecryptHandle>& decryptHandle, int decryptUnitId) {
     return onFinalizeDecryptUnit(uniqueId, decryptHandle, decryptUnitId);
 }
 
 ssize_t DrmEngineBase::pread(
-    int uniqueId, DecryptHandle* decryptHandle, void* buffer, ssize_t numBytes, off64_t offset) {
+    int uniqueId, sp<DecryptHandle>& decryptHandle, void* buffer, ssize_t numBytes, off64_t offset) {
     return onPread(uniqueId, decryptHandle, buffer, numBytes, offset);
 }
 

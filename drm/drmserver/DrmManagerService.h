@@ -95,10 +95,11 @@ public:
 
     int checkRightsStatus(int uniqueId, const String8& path,int action);
 
-    status_t consumeRights(int uniqueId, DecryptHandle* decryptHandle, int action, bool reserve);
+    status_t consumeRights(int uniqueId, sp<DecryptHandle>& decryptHandle, int action,
+            bool reserve);
 
     status_t setPlaybackStatus(
-            int uniqueId, DecryptHandle* decryptHandle, int playbackStatus, int64_t position);
+            int uniqueId, sp<DecryptHandle>& decryptHandle, int playbackStatus, int64_t position);
 
     bool validateAction(int uniqueId, const String8& path,
             int action, const ActionDescription& description);
@@ -115,26 +116,27 @@ public:
 
     status_t getAllSupportInfo(int uniqueId, int* length, DrmSupportInfo** drmSupportInfoArray);
 
-    DecryptHandle* openDecryptSession(
+    sp<DecryptHandle> openDecryptSession(
         int uniqueId, int fd, off64_t offset, off64_t length, const char *mime);
 
-    DecryptHandle* openDecryptSession(
+    sp<DecryptHandle> openDecryptSession(
         int uniqueId, const char* uri, const char* mime);
 
-    DecryptHandle* openDecryptSession(int uniqueId, const DrmBuffer& buf,
+    sp<DecryptHandle> openDecryptSession(int uniqueId, const DrmBuffer& buf,
             const String8& mimeType);
 
-    status_t closeDecryptSession(int uniqueId, DecryptHandle* decryptHandle);
+    status_t closeDecryptSession(int uniqueId, sp<DecryptHandle>& decryptHandle);
 
-    status_t initializeDecryptUnit(int uniqueId, DecryptHandle* decryptHandle,
+    status_t initializeDecryptUnit(int uniqueId, sp<DecryptHandle>& decryptHandle,
             int decryptUnitId, const DrmBuffer* headerInfo);
 
-    status_t decrypt(int uniqueId, DecryptHandle* decryptHandle, int decryptUnitId,
+    status_t decrypt(int uniqueId, sp<DecryptHandle>& decryptHandle, int decryptUnitId,
             const DrmBuffer* encBuffer, DrmBuffer** decBuffer, DrmBuffer* IV);
 
-    status_t finalizeDecryptUnit(int uniqueId, DecryptHandle* decryptHandle, int decryptUnitId);
+    status_t finalizeDecryptUnit(int uniqueId, sp<DecryptHandle>& decryptHandle,
+            int decryptUnitId);
 
-    ssize_t pread(int uniqueId, DecryptHandle* decryptHandle,
+    ssize_t pread(int uniqueId, sp<DecryptHandle>& decryptHandle,
             void* buffer, ssize_t numBytes, off64_t offset);
 
     virtual status_t dump(int fd, const Vector<String16>& args);
