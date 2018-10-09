@@ -1751,15 +1751,14 @@ int Reverb_getParameter(ReverbContext *pContext,
             //        *(int16_t *)pValue);
             break;
         case REVERB_PARAM_DENSITY:
-            *(uint16_t *)pValue = 0;
             *(int16_t *)pValue = ReverbGetDensity(pContext);
             //ALOGV("\tReverb_getParameter() REVERB_PARAM_DENSITY Value is %d",
             //        *(uint32_t *)pValue);
             break;
         case REVERB_PARAM_REFLECTIONS_LEVEL:
             *(uint16_t *)pValue = 0;
+            break;
         case REVERB_PARAM_REFLECTIONS_DELAY:
-            *(uint32_t *)pValue = 0;
         case REVERB_PARAM_REVERB_DELAY:
             *(uint32_t *)pValue = 0;
             break;
