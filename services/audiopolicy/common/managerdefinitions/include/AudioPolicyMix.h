@@ -43,7 +43,7 @@ public:
 
     void setMix(AudioMix &mix);
 
-    status_t dump(int fd, int spaces, int index) const;
+    void dump(String8 *dst, int spaces, int index) const;
 
 private:
     AudioMix    mMix;                   // Audio policy mix descriptor
@@ -80,7 +80,7 @@ public:
 
     status_t getInputMixForAttr(audio_attributes_t attr, AudioMix **policyMix);
 
-    status_t dump(int fd) const;
+    void dump(String8 *dst) const;
 };
 
 } // namespace android

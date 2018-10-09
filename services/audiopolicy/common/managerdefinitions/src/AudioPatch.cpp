@@ -34,34 +34,29 @@ AudioPatch::AudioPatch(const struct audio_patch *patch, uid_t uid) :
 {
 }
 
-static String8 dumpPatchEndpoints(
-        int spaces, const char *prefix, int count, const audio_port_config *cfgs)
+static void dumpPatchEndpoints(
+        String8 *dst, int spaces, const char *prefix, int count, const audio_port_config *cfgs)
 {
-    String8 result;
     for (int i = 0; i < count; ++i) {
         const audio_port_config &cfg = cfgs[i];
-        result.appendFormat("%*s  [%s %d] ", spaces, "", prefix, i + 1);
+        dst->appendFormat("%*s  [%s %d] ", spaces, "", prefix, i + 1);
         if (cfg.type == AUDIO_PORT_TYPE_DEVICE) {
             std::string device;
             deviceToString(cfg.ext.device.type, device);
-            result.appendFormat("Device ID %d %s", cfg.id, device.c_str());
+            dst->appendFormat("Device ID %d %s", cfg.id, device.c_str());
         } else {
-            result.appendFormat("Mix ID %d I/O handle %d", cfg.id, cfg.ext.mix.handle);
+            dst->appendFormat("Mix ID %d I/O handle %d", cfg.id, cfg.ext.mix.handle);
         }
-        result.append("\n");
+        dst->append("\n");
     }
-    return result;
 }
 
-status_t AudioPatch::dump(int fd, int spaces, int index) const
+void AudioPatch::dump(String8 *dst, int spaces, int index) const
 {
-    String8 result;
-    result.appendFormat("%*sPatch %d: owner uid %4d, handle %2d, af handle %2d\n",
+    dst->appendFormat("%*sPatch %d: owner uid %4d, handle %2d, af handle %2d\n",
             spaces, "", index + 1, mUid, mHandle, mAfPatchHandle);
-    result.append(dumpPatchEndpoints(spaces, "src ", mPatch.num_sources, mPatch.sources));
-    result.append(dumpPatchEndpoints(spaces, "sink", mPatch.num_sinks, mPatch.sinks));
-    write(fd, result.string(), result.size());
-    return NO_ERROR;
+    dumpPatchEndpoints(dst, spaces, "src ", mPatch.num_sources, mPatch.sources);
+    dumpPatchEndpoints(dst, spaces, "sink", mPatch.num_sinks, mPatch.sinks);
 }
 
 status_t AudioPatchCollection::addAudioPatch(audio_patch_handle_t handle,
@@ -142,16 +137,12 @@ status_t AudioPatchCollection::listAudioPatches(unsigned int *num_patches,
     return NO_ERROR;
 }
 
-status_t AudioPatchCollection::dump(int fd) const
+void AudioPatchCollection::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    snprintf(buffer, SIZE, "\nAudio Patches:\n");
-    write(fd, buffer, strlen(buffer));
+    dst->append("\nAudio Patches:\n");
     for (size_t i = 0; i < size(); i++) {
-        valueAt(i)->dump(fd, 2, i);
+        valueAt(i)->dump(dst, 2, i);
     }
-    return NO_ERROR;
 }
 
 } // namespace android

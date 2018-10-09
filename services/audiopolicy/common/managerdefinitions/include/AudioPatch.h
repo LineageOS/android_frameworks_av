@@ -22,6 +22,7 @@
 #include <utils/RefBase.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
+#include <utils/String8.h>
 
 namespace android {
 
@@ -30,7 +31,7 @@ class AudioPatch : public RefBase, private HandleGenerator<audio_patch_handle_t>
 public:
     AudioPatch(const struct audio_patch *patch, uid_t uid);
 
-    status_t dump(int fd, int spaces, int index) const;
+    void dump(String8 *dst, int spaces, int index) const;
 
     audio_patch_handle_t mHandle;
     struct audio_patch mPatch;
@@ -47,7 +48,7 @@ public:
 
     status_t listAudioPatches(unsigned int *num_patches, struct audio_patch *patches) const;
 
-    status_t dump(int fd) const;
+    void dump(String8 *dst) const;
 };
 
 } // namespace android
