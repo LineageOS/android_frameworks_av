@@ -1081,13 +1081,12 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
     for (audio_io_handle_t output : outputs) {
         sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
         if (!outputDesc->isDuplicated()) {
+            if (outputDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) {
+                continue;
+            }
             // if a valid format is specified, skip output if not compatible
             if (format != AUDIO_FORMAT_INVALID) {
-                if (outputDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) {
-                    if (format != outputDesc->mFormat) {
-                        continue;
-                    }
-                } else if (!audio_is_linear_pcm(format)) {
+                if (!audio_is_linear_pcm(format)) {
                     continue;
                 }
                 if (AudioPort::isBetterFormatMatch(
