@@ -86,6 +86,10 @@ LOCAL_SHARED_LIBRARIES += \
     vendor.qti.hardware.camera.device@1.0
 endif
 
+ifeq ($(TARGET_CAMERA_BOOTTIME_TIMESTAMP),true)
+LOCAL_CFLAGS += -DTARGET_CAMERA_BOOTTIME_TIMESTAMP
+endif
+
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libbinder libcamera_client libfmq
 
 LOCAL_C_INCLUDES += \
