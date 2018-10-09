@@ -257,6 +257,9 @@ void AudioInputDescriptor::close()
             mProfile->curActiveCount--;
         }
         mProfile->curOpenCount--;
+        LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount <  mProfile->curActiveCount,
+                "%s(%d): mProfile->curOpenCount %d < mProfile->curActiveCount %d.",
+                __func__, mId, mProfile->curOpenCount, mProfile->curActiveCount);
         mIoHandle = AUDIO_IO_HANDLE_NONE;
     }
 }
@@ -272,8 +275,9 @@ void AudioInputDescriptor::setClientActive(const sp<RecordClientDescriptor>& cli
     // Handle non-client-specific activity ref count
     int32_t oldGlobalActiveCount = mGlobalActiveCount;
     if (!active && mGlobalActiveCount < 1) {
-        ALOGW("%s invalid deactivation with globalRefCount %d", __FUNCTION__, mGlobalActiveCount);
-        mGlobalActiveCount = 1;
+        LOG_ALWAYS_FATAL("%s(%d) invalid deactivation with globalActiveCount %d",
+               __func__, client->portId(), mGlobalActiveCount);
+        // mGlobalActiveCount = 1;
     }
     const int delta = active ? 1 : -1;
     mGlobalActiveCount += delta;

@@ -180,8 +180,12 @@ public:
         return it->second;
     }
     virtual void removeClient(audio_port_handle_t portId) {
-        LOG_ALWAYS_FATAL_IF(mClients.erase(portId) == 0,
+        auto it = mClients.find(portId);
+        LOG_ALWAYS_FATAL_IF(it == mClients.end(),
                 "%s(%d): client does not exist", __func__, portId);
+        LOG_ALWAYS_FATAL_IF(it->second->active(),
+                "%s(%d): removing client still active!", __func__, portId);
+        (void)mClients.erase(it);
     }
     size_t getClientCount() const {
         return mClients.size();
