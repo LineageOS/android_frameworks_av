@@ -35,22 +35,16 @@ sp<AudioPort> AudioPortVector::findByTagName(const String8 &tagName) const
     return nullptr;
 }
 
-status_t AudioRouteVector::dump(int fd, int spaces) const
+void AudioRouteVector::dump(String8 *dst, int spaces) const
 {
     if (isEmpty()) {
-        return NO_ERROR;
+        return;
     }
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-
-    snprintf(buffer, SIZE, "\n%*sAudio Routes (%zu):\n", spaces, "", size());
-    write(fd, buffer, strlen(buffer));
+    dst->appendFormat("\n%*sAudio Routes (%zu):\n", spaces, "", size());
     for (size_t i = 0; i < size(); i++) {
-        snprintf(buffer, SIZE, "%*s- Route %zu:\n", spaces, "", i + 1);
-        write(fd, buffer, strlen(buffer));
-        itemAt(i)->dump(fd, 4);
+        dst->appendFormat("%*s- Route %zu:\n", spaces, "", i + 1);
+        itemAt(i)->dump(dst, 4);
     }
-    return NO_ERROR;
 }
 
 } // namespace android

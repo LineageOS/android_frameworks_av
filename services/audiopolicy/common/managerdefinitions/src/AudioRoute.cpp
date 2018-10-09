@@ -24,29 +24,17 @@
 namespace android
 {
 
-void AudioRoute::dump(int fd, int spaces) const
+void AudioRoute::dump(String8 *dst, int spaces) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
-    snprintf(buffer, SIZE, "%*s- Type: %s\n", spaces, "", mType == AUDIO_ROUTE_MUX ? "Mux" : "Mix");
-    result.append(buffer);
-
-    snprintf(buffer, SIZE, "%*s- Sink: %s\n", spaces, "", mSink->getTagName().string());
-    result.append(buffer);
-
+    dst->appendFormat("%*s- Type: %s\n", spaces, "", mType == AUDIO_ROUTE_MUX ? "Mux" : "Mix");
+    dst->appendFormat("%*s- Sink: %s\n", spaces, "", mSink->getTagName().string());
     if (mSources.size() != 0) {
-        snprintf(buffer, SIZE, "%*s- Sources: \n", spaces, "");
-        result.append(buffer);
+        dst->appendFormat("%*s- Sources: \n", spaces, "");
         for (size_t i = 0; i < mSources.size(); i++) {
-            snprintf(buffer, SIZE, "%*s%s \n", spaces + 4, "", mSources[i]->getTagName().string());
-            result.append(buffer);
+            dst->appendFormat("%*s%s \n", spaces + 4, "", mSources[i]->getTagName().string());
         }
     }
-    result.append("\n");
-
-    write(fd, result.string(), result.size());
+    dst->append("\n");
 }
 
 }

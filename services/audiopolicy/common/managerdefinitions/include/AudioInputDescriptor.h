@@ -41,7 +41,7 @@ public:
     audio_port_handle_t getId() const;
     audio_module_handle_t getModuleHandle() const;
 
-    status_t    dump(int fd);
+    void dump(String8 *dst) const override;
 
     audio_io_handle_t   mIoHandle = AUDIO_IO_HANDLE_NONE; // input handle
     audio_devices_t     mDevice = AUDIO_DEVICE_NONE;  // current device this input is routed to
@@ -127,7 +127,7 @@ public:
 
     sp<AudioInputDescriptor> getInputForClient(audio_port_handle_t portId);
 
-    status_t dump(int fd) const;
+    void dump(String8 *dst) const;
 };
 
 

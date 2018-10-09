@@ -46,7 +46,7 @@ public:
 
     audio_route_type_t getType() const { return mType; }
 
-    void dump(int fd, int spaces) const;
+    void dump(String8 *dst, int spaces) const;
 
 private:
     AudioPortVector mSources;

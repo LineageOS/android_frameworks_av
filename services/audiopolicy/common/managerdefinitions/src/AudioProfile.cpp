@@ -253,47 +253,35 @@ status_t AudioProfile::checkCompatibleChannelMask(audio_channel_mask_t channelMa
     return bestMatch > 0 ? NO_ERROR : BAD_VALUE;
 }
 
-void AudioProfile::dump(int fd, int spaces) const
+void AudioProfile::dump(String8 *dst, int spaces) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
-    snprintf(buffer, SIZE, "%s%s%s\n", mIsDynamicFormat ? "[dynamic format]" : "",
+    dst->appendFormat("%s%s%s\n", mIsDynamicFormat ? "[dynamic format]" : "",
              mIsDynamicChannels ? "[dynamic channels]" : "",
              mIsDynamicRate ? "[dynamic rates]" : "");
-    result.append(buffer);
     if (mName.length() != 0) {
-        snprintf(buffer, SIZE, "%*s- name: %s\n", spaces, "", mName.string());
-        result.append(buffer);
+        dst->appendFormat("%*s- name: %s\n", spaces, "", mName.string());
     }
     std::string formatLiteral;
     if (FormatConverter::toString(mFormat, formatLiteral)) {
-        snprintf(buffer, SIZE, "%*s- format: %s\n", spaces, "", formatLiteral.c_str());
-        result.append(buffer);
+        dst->appendFormat("%*s- format: %s\n", spaces, "", formatLiteral.c_str());
     }
     if (!mSamplingRates.isEmpty()) {
-        snprintf(buffer, SIZE, "%*s- sampling rates:", spaces, "");
-        result.append(buffer);
+        dst->appendFormat("%*s- sampling rates:", spaces, "");
         for (size_t i = 0; i < mSamplingRates.size(); i++) {
-            snprintf(buffer, SIZE, "%d", mSamplingRates[i]);
-            result.append(buffer);
-            result.append(i == (mSamplingRates.size() - 1) ? "" : ", ");
+            dst->appendFormat("%d", mSamplingRates[i]);
+            dst->append(i == (mSamplingRates.size() - 1) ? "" : ", ");
         }
-        result.append("\n");
+        dst->append("\n");
     }
 
     if (!mChannelMasks.isEmpty()) {
-        snprintf(buffer, SIZE, "%*s- channel masks:", spaces, "");
-        result.append(buffer);
+        dst->appendFormat("%*s- channel masks:", spaces, "");
         for (size_t i = 0; i < mChannelMasks.size(); i++) {
-            snprintf(buffer, SIZE, "0x%04x", mChannelMasks[i]);
-            result.append(buffer);
-            result.append(i == (mChannelMasks.size() - 1) ? "" : ", ");
+            dst->appendFormat("0x%04x", mChannelMasks[i]);
+            dst->append(i == (mChannelMasks.size() - 1) ? "" : ", ");
         }
-        result.append("\n");
+        dst->append("\n");
     }
-    write(fd, result.string(), result.size());
 }
 
 ssize_t AudioProfileVector::add(const sp<AudioProfile> &profile)
@@ -559,17 +547,12 @@ void AudioProfileVector::setFormats(const FormatVector &formats)
     }
 }
 
-void AudioProfileVector::dump(int fd, int spaces) const
+void AudioProfileVector::dump(String8 *dst, int spaces) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-
-    snprintf(buffer, SIZE, "%*s- Profiles:\n", spaces, "");
-    write(fd, buffer, strlen(buffer));
+    dst->appendFormat("%*s- Profiles:\n", spaces, "");
     for (size_t i = 0; i < size(); i++) {
-        snprintf(buffer, SIZE, "%*sProfile %zu:", spaces + 4, "", i);
-        write(fd, buffer, strlen(buffer));
-        itemAt(i)->dump(fd, spaces + 8);
+        dst->appendFormat("%*sProfile %zu:", spaces + 4, "", i);
+        itemAt(i)->dump(dst, spaces + 8);
     }
 }
 

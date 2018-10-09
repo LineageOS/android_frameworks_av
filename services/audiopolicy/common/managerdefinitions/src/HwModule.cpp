@@ -218,37 +218,27 @@ void HwModule::setHandle(audio_module_handle_t handle) {
     mHandle = handle;
 }
 
-void HwModule::dump(int fd)
+void HwModule::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
-    snprintf(buffer, SIZE, "  - name: %s\n", getName());
-    result.append(buffer);
-    snprintf(buffer, SIZE, "  - handle: %d\n", mHandle);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "  - version: %u.%u\n", getHalVersionMajor(), getHalVersionMinor());
-    result.append(buffer);
-    write(fd, result.string(), result.size());
+    dst->appendFormat("  - name: %s\n", getName());
+    dst->appendFormat("  - handle: %d\n", mHandle);
+    dst->appendFormat("  - version: %u.%u\n", getHalVersionMajor(), getHalVersionMinor());
     if (mOutputProfiles.size()) {
-        write(fd, "  - outputs:\n", strlen("  - outputs:\n"));
+        dst->append("  - outputs:\n");
         for (size_t i = 0; i < mOutputProfiles.size(); i++) {
-            snprintf(buffer, SIZE, "    output %zu:\n", i);
-            write(fd, buffer, strlen(buffer));
-            mOutputProfiles[i]->dump(fd);
+            dst->appendFormat("    output %zu:\n", i);
+            mOutputProfiles[i]->dump(dst);
         }
     }
     if (mInputProfiles.size()) {
-        write(fd, "  - inputs:\n", strlen("  - inputs:\n"));
+        dst->append("  - inputs:\n");
         for (size_t i = 0; i < mInputProfiles.size(); i++) {
-            snprintf(buffer, SIZE, "    input %zu:\n", i);
-            write(fd, buffer, strlen(buffer));
-            mInputProfiles[i]->dump(fd);
+            dst->appendFormat("    input %zu:\n", i);
+            mInputProfiles[i]->dump(dst);
         }
     }
-    mDeclaredDevices.dump(fd, String8("Declared"),  2, true);
-    mRoutes.dump(fd, 2);
+    mDeclaredDevices.dump(dst, String8("Declared"), 2, true);
+    mRoutes.dump(dst, 2);
 }
 
 sp <HwModule> HwModuleCollection::getModuleFromName(const char *name) const
@@ -301,19 +291,13 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
     return devDesc;
 }
 
-status_t HwModuleCollection::dump(int fd) const
+void HwModuleCollection::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-
-    snprintf(buffer, SIZE, "\nHW Modules dump:\n");
-    write(fd, buffer, strlen(buffer));
+    dst->append("\nHW Modules dump:\n");
     for (size_t i = 0; i < size(); i++) {
-        snprintf(buffer, SIZE, "- HW Module %zu:\n", i + 1);
-        write(fd, buffer, strlen(buffer));
-        itemAt(i)->dump(fd);
+        dst->appendFormat("- HW Module %zu:\n", i + 1);
+        itemAt(i)->dump(dst);
     }
-    return NO_ERROR;
 }
 
 

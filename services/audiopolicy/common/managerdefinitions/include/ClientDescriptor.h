@@ -45,8 +45,7 @@ public:
         mConfig(config), mPreferredDeviceId(preferredDeviceId), mActive(false) {}
     ~ClientDescriptor() override = default;
 
-    status_t dump(int fd, int spaces, int index);
-    virtual status_t dump(String8& dst, int spaces, int index);
+    virtual void dump(String8 *dst, int spaces, int index) const;
     virtual std::string toShortString() const;
 
     audio_port_handle_t portId() const { return mPortId; }
@@ -72,10 +71,6 @@ private:
     const audio_config_base_t mConfig;
           audio_port_handle_t mPreferredDeviceId;  // selected input device port ID
           bool mActive;
-
-protected:
-    // FIXME: use until other descriptor classes have a dump to String8 method
-    int mDumpFd;
 };
 
 class TrackClientDescriptor: public ClientDescriptor
@@ -90,7 +85,7 @@ public:
     ~TrackClientDescriptor() override = default;
 
     using ClientDescriptor::dump;
-    status_t dump(String8& dst, int spaces, int index) override;
+    void dump(String8 *dst, int spaces, int index) const override;
     std::string toShortString() const override;
 
     audio_output_flags_t flags() const { return mFlags; }
@@ -115,7 +110,7 @@ public:
     ~RecordClientDescriptor() override = default;
 
     using ClientDescriptor::dump;
-    status_t dump(String8& dst, int spaces, int index) override;
+    void dump(String8 *dst, int spaces, int index) const override;
 
     audio_source_t source() const { return mSource; }
     audio_input_flags_t flags() const { return mFlags; }
@@ -146,7 +141,7 @@ public:
     void setHwOutput(const sp<HwAudioOutputDescriptor>& hwOutput);
 
     using ClientDescriptor::dump;
-    status_t dump(String8& dst, int spaces, int index) override;
+    void dump(String8 *dst, int spaces, int index) const override;
 
  private:
     const sp<AudioPatch> mPatchDesc;
@@ -159,7 +154,7 @@ class SourceClientCollection :
     public DefaultKeyedVector< audio_port_handle_t, sp<SourceClientDescriptor> >
 {
 public:
-    status_t dump(int fd) const;
+    void dump(String8 *dst) const;
 };
 
 typedef std::vector< sp<TrackClientDescriptor> > TrackClientVector;
@@ -191,13 +186,11 @@ public:
     size_t getClientCount() const {
         return mClients.size();
     }
-    String8 dump() const {
-        String8 result;
+    virtual void dump(String8 *dst) const {
         size_t index = 0;
         for (const auto& client: getClientIterable()) {
-            client->dump(result, 2, index++);
+            client->dump(dst, 2, index++);
         }
-        return result;
     }
 
     // helper types

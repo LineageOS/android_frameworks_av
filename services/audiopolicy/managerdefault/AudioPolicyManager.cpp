@@ -2687,32 +2687,33 @@ status_t AudioPolicyManager::dump(int fd)
     result.appendFormat(" TTS output %savailable\n", mTtsOutputAvailable ? "" : "not ");
     result.appendFormat(" Master mono: %s\n", mMasterMono ? "on" : "off");
     result.appendFormat(" Config source: %s\n", getConfig().getSource().c_str());
+    mAvailableOutputDevices.dump(&result, String8("Available output"));
+    mAvailableInputDevices.dump(&result, String8("Available input"));
+    mHwModulesAll.dump(&result);
+    mOutputs.dump(&result);
+    mInputs.dump(&result);
     write(fd, result.string(), result.size());
 
-    mAvailableOutputDevices.dump(fd, String8("Available output"));
-    mAvailableInputDevices.dump(fd, String8("Available input"));
-    mHwModulesAll.dump(fd);
-    mOutputs.dump(fd);
-    mInputs.dump(fd);
+    // TODO convert these to dump to string.
     mVolumeCurves->dump(fd);
     mEffects.dump(fd);
     mAudioPatches.dump(fd);
     mPolicyMixes.dump(fd);
-    mAudioSources.dump(fd);
 
+    result.clear();
+    mAudioSources.dump(&result);
     if (!mSurroundFormats.empty()) {
-        result = String8("\nEnabled Surround Formats:\n");
+        result.append("\nEnabled Surround Formats:\n");
         size_t i = 0;
         for (const auto& fmt : mSurroundFormats) {
             result.append(i++ == 0 ? "  " : ", ");
             std::string sfmt;
             FormatConverter::toString(fmt, sfmt);
-            result.appendFormat("%s", sfmt.c_str());
+            result.append(sfmt.c_str());
         }
         result.append("\n");
-        write(fd, result.string(), result.size());
     }
-
+    write(fd, result.string(), result.size());
     return NO_ERROR;
 }
 
