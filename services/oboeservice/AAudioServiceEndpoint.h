@@ -121,7 +121,7 @@ protected:
     mutable std::mutex       mLockStreams;
     std::vector<android::sp<AAudioServiceStreamBase>> mRegisteredStreams;
 
-    SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
+    SimpleDoubleBuffer<Timestamp>  mAtomicEndpointTimestamp;
 
     android::AudioClient     mMmapClient;   // set in open, used in open and startStream
 

@@ -163,7 +163,7 @@ protected:
 
     AAudioServiceInterface  &mServiceInterface;   // abstract interface to the service
 
-    SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
+    SimpleDoubleBuffer<Timestamp>  mAtomicInternalTimestamp;
 
     AtomicRequestor          mNeedCatchUp;   // Ask read() or write() to sync on first timestamp.
 

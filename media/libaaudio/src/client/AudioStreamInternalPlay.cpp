@@ -71,7 +71,7 @@ aaudio_result_t AudioStreamInternalPlay::requestPause()
 
     mClockModel.stop(AudioClock::getNanoseconds());
     setState(AAUDIO_STREAM_STATE_PAUSING);
-    mAtomicTimestamp.clear();
+    mAtomicInternalTimestamp.clear();
     return mServiceInterface.pauseStream(mServiceStreamHandle);
 }
 

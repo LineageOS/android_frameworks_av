@@ -238,15 +238,15 @@ aaudio_result_t AAudioServiceStreamShared::getAudioDataDescription(
 }
 
 void AAudioServiceStreamShared::markTransferTime(Timestamp &timestamp) {
-    mAtomicTimestamp.write(timestamp);
+    mAtomicStreamTimestamp.write(timestamp);
 }
 
 // Get timestamp that was written by mixer or distributor.
 aaudio_result_t AAudioServiceStreamShared::getFreeRunningPosition(int64_t *positionFrames,
                                                                   int64_t *timeNanos) {
     // TODO Get presentation timestamp from the HAL
-    if (mAtomicTimestamp.isValid()) {
-        Timestamp timestamp = mAtomicTimestamp.read();
+    if (mAtomicStreamTimestamp.isValid()) {
+        Timestamp timestamp = mAtomicStreamTimestamp.read();
         *positionFrames = timestamp.getPosition();
         *timeNanos = timestamp.getNanoseconds();
         return AAUDIO_OK;

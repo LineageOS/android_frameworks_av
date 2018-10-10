@@ -301,7 +301,7 @@ protected:
     // TODO rename mClientHandle to mPortHandle to be more consistent with AudioFlinger.
     audio_port_handle_t     mClientHandle = AUDIO_PORT_HANDLE_NONE;
 
-    SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
+    SimpleDoubleBuffer<Timestamp>  mAtomicStreamTimestamp;
 
     android::AAudioService &mAudioService;
 

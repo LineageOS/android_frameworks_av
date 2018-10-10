@@ -62,7 +62,7 @@ AudioStreamInternal::AudioStreamInternal(AAudioServiceInterface  &serviceInterfa
         , mServiceStreamHandle(AAUDIO_HANDLE_INVALID)
         , mInService(inService)
         , mServiceInterface(serviceInterface)
-        , mAtomicTimestamp()
+        , mAtomicInternalTimestamp()
         , mWakeupDelayNanos(AAudioProperty_getWakeupDelayMicros() * AAUDIO_NANOS_PER_MICROSECOND)
         , mMinimumSleepNanos(AAudioProperty_getMinimumSleepMicros() * AAUDIO_NANOS_PER_MICROSECOND)
         {
@@ -363,7 +363,7 @@ aaudio_result_t AudioStreamInternal::requestStop() {
 
     mClockModel.stop(AudioClock::getNanoseconds());
     setState(AAUDIO_STREAM_STATE_STOPPING);
-    mAtomicTimestamp.clear();
+    mAtomicInternalTimestamp.clear();
 
     return mServiceInterface.stopStream(mServiceStreamHandle);
 }
@@ -412,8 +412,8 @@ aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t clockId,
                            int64_t *framePosition,
                            int64_t *timeNanoseconds) {
     // Generated in server and passed to client. Return latest.
-    if (mAtomicTimestamp.isValid()) {
-        Timestamp timestamp = mAtomicTimestamp.read();
+    if (mAtomicInternalTimestamp.isValid()) {
+        Timestamp timestamp = mAtomicInternalTimestamp.read();
         int64_t position = timestamp.getPosition() + mFramesOffsetFromService;
         if (position >= 0) {
             *framePosition = position;
@@ -460,7 +460,7 @@ aaudio_result_t AudioStreamInternal::onTimestampService(AAudioServiceMessage *me
 
 aaudio_result_t AudioStreamInternal::onTimestampHardware(AAudioServiceMessage *message) {
     Timestamp timestamp(message->timestamp.position, message->timestamp.timestamp);
-    mAtomicTimestamp.write(timestamp);
+    mAtomicInternalTimestamp.write(timestamp);
     return AAUDIO_OK;
 }
 
