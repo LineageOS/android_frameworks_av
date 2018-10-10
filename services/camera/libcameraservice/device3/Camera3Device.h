@@ -406,9 +406,21 @@ class Camera3Device :
     // Tracking cause of fatal errors when in STATUS_ERROR
     String8                    mErrorCause;
 
-    // Mapping of stream IDs to stream instances
-    typedef KeyedVector<int, sp<camera3::Camera3OutputStreamInterface> >
-            StreamSet;
+    // Synchronized mapping of stream IDs to stream instances
+    class StreamSet {
+      public:
+        status_t add(int streamId, sp<camera3::Camera3OutputStreamInterface>);
+        ssize_t remove(int streamId);
+        sp<camera3::Camera3OutputStreamInterface> get(int streamId);
+        // get by (underlying) vector index
+        sp<camera3::Camera3OutputStreamInterface> operator[] (size_t index);
+        size_t size() const;
+        void clear();
+
+      private:
+        mutable std::mutex mLock;
+        KeyedVector<int, sp<camera3::Camera3OutputStreamInterface>> mData;
+    };
 
     StreamSet                  mOutputStreams;
     sp<camera3::Camera3Stream> mInputStream;

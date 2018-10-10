@@ -986,14 +986,13 @@ hardware::Return<void> Camera3Device::requestStreamBuffers(
         const auto& bufReq = bufReqs[i];
         auto& bufRet = bufRets[i];
         int32_t streamId = bufReq.streamId;
-        ssize_t idx = mOutputStreams.indexOfKey(streamId);
-        if (idx == NAME_NOT_FOUND) {
+        sp<Camera3OutputStreamInterface> outputStream = mOutputStreams.get(streamId);
+        if (outputStream == nullptr) {
             ALOGE("%s: Output stream id %d not found!", __FUNCTION__, streamId);
             hardware::hidl_vec<StreamBufferRet> emptyBufRets;
             _hidl_cb(BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS, emptyBufRets);
             return hardware::Void();
         }
-        sp<Camera3OutputStreamInterface> outputStream = mOutputStreams.valueAt(idx);
 
         bufRet.streamId = streamId;
         uint32_t numBuffersRequested = bufReq.numBuffersRequested;
@@ -1126,15 +1125,12 @@ hardware::Return<void> Camera3Device::returnStreamBuffers(
             continue;
         }
 
-        // Need to lock mLock here if we were to allow HAL to return buffer during
-        // stream configuration. This is not currently possible because we only
-        // do stream configuration when there is no inflight buffers in HAL.
-        ssize_t idx = mOutputStreams.indexOfKey(buf.streamId);
-        if (idx == NAME_NOT_FOUND) {
+        sp<Camera3StreamInterface> stream = mOutputStreams.get(buf.streamId);
+        if (stream == nullptr) {
             ALOGE("%s: Output stream id %d not found!", __FUNCTION__, buf.streamId);
             continue;
         }
-        streamBuffer.stream = mOutputStreams.valueAt(idx)->asHalStream();
+        streamBuffer.stream = stream->asHalStream();
         returnOutputBuffers(&streamBuffer, /*size*/1, /*timestamp*/ 0);
     }
     return hardware::Void();
@@ -1288,13 +1284,13 @@ void Camera3Device::processOneCaptureResultLocked(
         auto& bDst = outputBuffers[i];
         const StreamBuffer &bSrc = result.outputBuffers[i];
 
-        ssize_t idx = mOutputStreams.indexOfKey(bSrc.streamId);
-        if (idx == NAME_NOT_FOUND) {
+        sp<Camera3StreamInterface> stream = mOutputStreams.get(bSrc.streamId);
+        if (stream == nullptr) {
             ALOGE("%s: Frame %d: Buffer %zu: Invalid output stream id %d",
                     __FUNCTION__, result.frameNumber, i, bSrc.streamId);
             return;
         }
-        bDst.stream = mOutputStreams.valueAt(idx)->asHalStream();
+        bDst.stream = stream->asHalStream();
 
         buffer_handle_t *buffer;
         if (mUseHalBufManager) {
@@ -1395,13 +1391,13 @@ void Camera3Device::notify(
             m.type = CAMERA3_MSG_ERROR;
             m.message.error.frame_number = msg.msg.error.frameNumber;
             if (msg.msg.error.errorStreamId >= 0) {
-                ssize_t idx = mOutputStreams.indexOfKey(msg.msg.error.errorStreamId);
-                if (idx == NAME_NOT_FOUND) {
-                    ALOGE("%s: Frame %d: Invalid error stream id %d",
-                            __FUNCTION__, m.message.error.frame_number, msg.msg.error.errorStreamId);
+                sp<Camera3StreamInterface> stream = mOutputStreams.get(msg.msg.error.errorStreamId);
+                if (stream == nullptr) {
+                    ALOGE("%s: Frame %d: Invalid error stream id %d", __FUNCTION__,
+                            m.message.error.frame_number, msg.msg.error.errorStreamId);
                     return;
                 }
-                m.message.error.error_stream = mOutputStreams.valueAt(idx)->asHalStream();
+                m.message.error.error_stream = stream->asHalStream();
             } else {
                 m.message.error.error_stream = nullptr;
             }
@@ -1580,6 +1576,47 @@ status_t Camera3Device::createInputStream(
 
     ALOGV("Camera %s: Created input stream", mId.string());
     return OK;
+}
+
+status_t Camera3Device::StreamSet::add(
+        int streamId, sp<camera3::Camera3OutputStreamInterface> stream) {
+    if (stream == nullptr) {
+        ALOGE("%s: cannot add null stream", __FUNCTION__);
+        return BAD_VALUE;
+    }
+    std::lock_guard<std::mutex> lock(mLock);
+    return mData.add(streamId, stream);
+}
+
+ssize_t Camera3Device::StreamSet::remove(int streamId) {
+    std::lock_guard<std::mutex> lock(mLock);
+    return mData.removeItem(streamId);
+}
+
+sp<camera3::Camera3OutputStreamInterface>
+Camera3Device::StreamSet::get(int streamId) {
+    std::lock_guard<std::mutex> lock(mLock);
+    ssize_t idx = mData.indexOfKey(streamId);
+    if (idx == NAME_NOT_FOUND) {
+        return nullptr;
+    }
+    return mData.editValueAt(idx);
+}
+
+sp<camera3::Camera3OutputStreamInterface>
+Camera3Device::StreamSet::operator[] (size_t index) {
+    std::lock_guard<std::mutex> lock(mLock);
+    return mData.editValueAt(index);
+}
+
+size_t Camera3Device::StreamSet::size() const {
+    std::lock_guard<std::mutex> lock(mLock);
+    return mData.size();
+}
+
+void Camera3Device::StreamSet::clear() {
+    std::lock_guard<std::mutex> lock(mLock);
+    return mData.clear();
 }
 
 status_t Camera3Device::createStream(sp<Surface> consumer,
@@ -1765,20 +1802,20 @@ status_t Camera3Device::getStreamInfo(int id, StreamInfo *streamInfo) {
             return INVALID_OPERATION;
     }
 
-    ssize_t idx = mOutputStreams.indexOfKey(id);
-    if (idx == NAME_NOT_FOUND) {
+    sp<Camera3StreamInterface> stream = mOutputStreams.get(id);
+    if (stream == nullptr) {
         CLOGE("Stream %d is unknown", id);
-        return idx;
+        return BAD_VALUE;
     }
 
-    streamInfo->width  = mOutputStreams[idx]->getWidth();
-    streamInfo->height = mOutputStreams[idx]->getHeight();
-    streamInfo->format = mOutputStreams[idx]->getFormat();
-    streamInfo->dataSpace = mOutputStreams[idx]->getDataSpace();
-    streamInfo->formatOverridden = mOutputStreams[idx]->isFormatOverridden();
-    streamInfo->originalFormat = mOutputStreams[idx]->getOriginalFormat();
-    streamInfo->dataSpaceOverridden = mOutputStreams[idx]->isDataSpaceOverridden();
-    streamInfo->originalDataSpace = mOutputStreams[idx]->getOriginalDataSpace();
+    streamInfo->width  = stream->getWidth();
+    streamInfo->height = stream->getHeight();
+    streamInfo->format = stream->getFormat();
+    streamInfo->dataSpace = stream->getDataSpace();
+    streamInfo->formatOverridden = stream->isFormatOverridden();
+    streamInfo->originalFormat = stream->getOriginalFormat();
+    streamInfo->dataSpaceOverridden = stream->isDataSpaceOverridden();
+    streamInfo->originalDataSpace = stream->getOriginalDataSpace();
     return OK;
 }
 
@@ -1805,14 +1842,12 @@ status_t Camera3Device::setStreamTransform(int id,
             return INVALID_OPERATION;
     }
 
-    ssize_t idx = mOutputStreams.indexOfKey(id);
-    if (idx == NAME_NOT_FOUND) {
-        CLOGE("Stream %d does not exist",
-                id);
+    sp<Camera3OutputStreamInterface> stream = mOutputStreams.get(id);
+    if (stream == nullptr) {
+        CLOGE("Stream %d does not exist", id);
         return BAD_VALUE;
     }
-
-    return mOutputStreams.editValueAt(idx)->setTransform(transform);
+    return stream->setTransform(transform);
 }
 
 status_t Camera3Device::deleteStream(int id) {
@@ -1837,21 +1872,21 @@ status_t Camera3Device::deleteStream(int id) {
     }
 
     sp<Camera3StreamInterface> deletedStream;
-    ssize_t outputStreamIdx = mOutputStreams.indexOfKey(id);
+    sp<Camera3StreamInterface> stream = mOutputStreams.get(id);
     if (mInputStream != NULL && id == mInputStream->getId()) {
         deletedStream = mInputStream;
         mInputStream.clear();
     } else {
-        if (outputStreamIdx == NAME_NOT_FOUND) {
+        if (stream == nullptr) {
             CLOGE("Stream %d does not exist", id);
             return BAD_VALUE;
         }
     }
 
     // Delete output stream or the output part of a bi-directional stream.
-    if (outputStreamIdx != NAME_NOT_FOUND) {
-        deletedStream = mOutputStreams.editValueAt(outputStreamIdx);
-        mOutputStreams.removeItem(id);
+    if (stream != nullptr) {
+        deletedStream = stream;
+        mOutputStreams.remove(id);
     }
 
     // Free up the stream endpoint so that it can be used by some other stream
@@ -2270,14 +2305,11 @@ status_t Camera3Device::prepare(int maxCount, int streamId) {
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
-    sp<Camera3StreamInterface> stream;
-    ssize_t outputStreamIdx = mOutputStreams.indexOfKey(streamId);
-    if (outputStreamIdx == NAME_NOT_FOUND) {
+    sp<Camera3StreamInterface> stream = mOutputStreams.get(streamId);
+    if (stream == nullptr) {
         CLOGE("Stream %d does not exist", streamId);
         return BAD_VALUE;
     }
-
-    stream = mOutputStreams.editValueAt(outputStreamIdx);
 
     if (stream->isUnpreparable() || stream->hasOutstandingBuffers() ) {
         CLOGE("Stream %d has already been a request target", streamId);
@@ -2298,14 +2330,11 @@ status_t Camera3Device::tearDown(int streamId) {
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
-    sp<Camera3StreamInterface> stream;
-    ssize_t outputStreamIdx = mOutputStreams.indexOfKey(streamId);
-    if (outputStreamIdx == NAME_NOT_FOUND) {
+    sp<Camera3StreamInterface> stream = mOutputStreams.get(streamId);
+    if (stream == nullptr) {
         CLOGE("Stream %d does not exist", streamId);
         return BAD_VALUE;
     }
-
-    stream = mOutputStreams.editValueAt(outputStreamIdx);
 
     if (stream->hasOutstandingBuffers() || mRequestThread->isStreamPending(stream)) {
         CLOGE("Stream %d is a target of a in-progress request", streamId);
@@ -2322,14 +2351,11 @@ status_t Camera3Device::addBufferListenerForStream(int streamId,
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
-    sp<Camera3StreamInterface> stream;
-    ssize_t outputStreamIdx = mOutputStreams.indexOfKey(streamId);
-    if (outputStreamIdx == NAME_NOT_FOUND) {
+    sp<Camera3StreamInterface> stream = mOutputStreams.get(streamId);
+    if (stream == nullptr) {
         CLOGE("Stream %d does not exist", streamId);
         return BAD_VALUE;
     }
-
-    stream = mOutputStreams.editValueAt(outputStreamIdx);
     stream->addBufferListener(listener);
 
     return OK;
@@ -2388,12 +2414,11 @@ status_t Camera3Device::setConsumerSurfaces(int streamId,
         return BAD_VALUE;
     }
 
-    ssize_t idx = mOutputStreams.indexOfKey(streamId);
-    if (idx == NAME_NOT_FOUND) {
+    sp<Camera3OutputStreamInterface> stream = mOutputStreams.get(streamId);
+    if (stream == nullptr) {
         CLOGE("Stream %d is unknown", streamId);
-        return idx;
+        return BAD_VALUE;
     }
-    sp<Camera3OutputStreamInterface> stream = mOutputStreams[idx];
     status_t res = stream->setConsumers(consumers);
     if (res != OK) {
         CLOGE("Stream %d set consumer failed (error %d %s) ", streamId, res, strerror(-res));
@@ -2438,10 +2463,10 @@ status_t Camera3Device::updateStream(int streamId, const std::vector<sp<Surface>
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
-    ssize_t idx = mOutputStreams.indexOfKey(streamId);
-    if (idx == NAME_NOT_FOUND) {
+    sp<Camera3OutputStreamInterface> stream = mOutputStreams.get(streamId);
+    if (stream == nullptr) {
         CLOGE("Stream %d is unknown", streamId);
-        return idx;
+        return BAD_VALUE;
     }
 
     for (const auto &it : removedSurfaceIds) {
@@ -2451,7 +2476,6 @@ status_t Camera3Device::updateStream(int streamId, const std::vector<sp<Surface>
         }
     }
 
-    sp<Camera3OutputStreamInterface> stream = mOutputStreams[idx];
     status_t res = stream->updateStream(newSurfaces, outputInfo, removedSurfaceIds, outputMap);
     if (res != OK) {
         CLOGE("Stream %d failed to update stream (error %d %s) ",
@@ -2470,13 +2494,11 @@ status_t Camera3Device::dropStreamBuffers(bool dropping, int streamId) {
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
-    int idx = mOutputStreams.indexOfKey(streamId);
-    if (idx == NAME_NOT_FOUND) {
+    sp<Camera3OutputStreamInterface> stream = mOutputStreams.get(streamId);
+    if (stream == nullptr) {
         ALOGE("%s: Stream %d is not found.", __FUNCTION__, streamId);
         return BAD_VALUE;
     }
-
-    sp<Camera3OutputStreamInterface> stream = mOutputStreams.editValueAt(idx);
     return stream->dropBuffers(dropping);
 }
 
@@ -2530,15 +2552,12 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
     }
 
     for (size_t i = 0; i < streams.count; i++) {
-        int idx = mOutputStreams.indexOfKey(streams.data.i32[i]);
-        if (idx == NAME_NOT_FOUND) {
+        sp<Camera3OutputStreamInterface> stream = mOutputStreams.get(streams.data.i32[i]);
+        if (stream == nullptr) {
             CLOGE("Request references unknown stream %d",
-                    streams.data.u8[i]);
+                    streams.data.i32[i]);
             return NULL;
         }
-        sp<Camera3OutputStreamInterface> stream =
-                mOutputStreams.editValueAt(idx);
-
         // It is illegal to include a deferred consumer output stream into a request
         auto iter = surfaceMap.find(streams.data.i32[i]);
         if (iter != surfaceMap.end()) {
@@ -2599,7 +2618,7 @@ void Camera3Device::cancelStreamsConfigurationLocked() {
     }
 
     for (size_t i = 0; i < mOutputStreams.size(); i++) {
-        sp<Camera3OutputStreamInterface> outputStream = mOutputStreams.editValueAt(i);
+        sp<Camera3OutputStreamInterface> outputStream = mOutputStreams[i];
         if (outputStream->isConfiguring()) {
             res = outputStream->cancelConfiguration();
             if (res != OK) {
@@ -2734,7 +2753,7 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         }
 
         camera3_stream_t *outputStream;
-        outputStream = mOutputStreams.editValueAt(i)->startConfiguration();
+        outputStream = mOutputStreams[i]->startConfiguration();
         if (outputStream == NULL) {
             CLOGE("Can't start output stream configuration");
             cancelStreamsConfigurationLocked();
@@ -2792,8 +2811,7 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
     }
 
     for (size_t i = 0; i < mOutputStreams.size(); i++) {
-        sp<Camera3OutputStreamInterface> outputStream =
-            mOutputStreams.editValueAt(i);
+        sp<Camera3OutputStreamInterface> outputStream = mOutputStreams[i];
         if (outputStream->isConfiguring() && !outputStream->isConsumerConfigurationDeferred()) {
             res = outputStream->finishConfiguration();
             if (res != OK) {
@@ -2900,15 +2918,12 @@ status_t Camera3Device::tryRemoveDummyStreamLocked() {
     // Ok, have a dummy stream and there's at least one other output stream,
     // so remove the dummy
 
-    sp<Camera3StreamInterface> deletedStream;
-    ssize_t outputStreamIdx = mOutputStreams.indexOfKey(mDummyStreamId);
-    if (outputStreamIdx == NAME_NOT_FOUND) {
+    sp<Camera3StreamInterface> deletedStream = mOutputStreams.get(mDummyStreamId);
+    if (deletedStream == nullptr) {
         SET_ERR_L("Dummy stream %d does not appear to exist", mDummyStreamId);
         return INVALID_OPERATION;
     }
-
-    deletedStream = mOutputStreams.editValueAt(outputStreamIdx);
-    mOutputStreams.removeItemsAt(outputStreamIdx);
+    mOutputStreams.remove(mDummyStreamId);
 
     // Free up the stream endpoint so that it can be used by some other stream
     res = deletedStream->disconnect();
@@ -3175,12 +3190,12 @@ void Camera3Device::flushInflightRequests() {
                       frameNumber, streamId, strerror(-res), res);
             }
         } else {
-            ssize_t idx = mOutputStreams.indexOfKey(streamId);
-            if (idx == NAME_NOT_FOUND) {
+            sp<Camera3StreamInterface> stream = mOutputStreams.get(streamId);
+            if (stream == nullptr) {
                 ALOGE("%s: Output stream id %d not found!", __FUNCTION__, streamId);
                 continue;
             }
-            streamBuffer.stream = mOutputStreams.valueAt(idx)->asHalStream();
+            streamBuffer.stream = stream->asHalStream();
             returnOutputBuffers(&streamBuffer, /*size*/1, /*timestamp*/ 0);
         }
     }
