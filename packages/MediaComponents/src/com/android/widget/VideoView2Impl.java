@@ -715,13 +715,14 @@ public class VideoView2Impl extends BaseLayout
         }
 
         try {
+            final Context context = mInstance.getContext();
+
             Log.d(TAG, "openVideo(): creating new MediaPlayer2 instance.");
-            mMediaPlayer = new MediaPlayer2Impl();
+            mMediaPlayer = new MediaPlayer2Impl(context);
             mSurfaceView.setMediaPlayer(mMediaPlayer);
             mTextureView.setMediaPlayer(mMediaPlayer);
             mCurrentView.assignSurfaceToMediaPlayer(mMediaPlayer);
 
-            final Context context = mInstance.getContext();
             // TODO: Add timely firing logic for more accurate sync between CC and video frame
             mSubtitleController = new SubtitleController(context);
             mSubtitleController.registerRenderer(new ClosedCaptionRenderer(context));
