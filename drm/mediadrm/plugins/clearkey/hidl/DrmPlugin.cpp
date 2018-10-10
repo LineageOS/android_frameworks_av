@@ -346,6 +346,9 @@ Return<Status> DrmPlugin::setPropertyByteArray(
    if (name == kDeviceIdKey) {
       ALOGD("Cannot set immutable property: %s", name.c_str());
       return Status::BAD_VALUE;
+   } else if (name == kClientIdKey) {
+       mByteArrayProperties[kClientIdKey] = toVector(value);
+       return Status::OK;
    }
 
    // Setting of undefined properties is not supported

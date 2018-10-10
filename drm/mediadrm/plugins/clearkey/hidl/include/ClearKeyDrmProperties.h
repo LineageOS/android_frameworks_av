@@ -40,6 +40,10 @@ static const std::string kDeviceIdKey("deviceId");
 static const uint8_t kTestDeviceIdData[] =
         {0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7,
          0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf};
+
+// settable byte array property
+static const std::string kClientIdKey("clientId");
+
 // TODO stub out metrics for nw
 static const std::string kMetricsKey("metrics");
 static const uint8_t kMetricsData[] = { 0 };
