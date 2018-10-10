@@ -269,6 +269,7 @@ void DumpReader::dump(int fd, size_t indent)
         case EVENT_RESERVED:
         case EVENT_UPPER_BOUND:
             body.appendFormat("warning: unexpected event %d", it->type);
+            break;
         default:
             break;
         }
