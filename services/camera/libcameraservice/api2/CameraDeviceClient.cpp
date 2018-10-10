@@ -123,6 +123,7 @@ status_t CameraDeviceClient::initializeImpl(TProviderPtr providerPtr, const Stri
                 physicalKeysEntry.data.i32 + physicalKeysEntry.count);
     }
 
+    mProviderManager = providerPtr;
     return OK;
 }
 
@@ -627,12 +628,11 @@ binder::Status CameraDeviceClient::createStream(
 
     if (physicalCameraId.size() > 0) {
         std::vector<std::string> physicalCameraIds;
-        std::string physicalId(physicalCameraId.string());
         bool logicalCamera =
-                CameraProviderManager::isLogicalCamera(mDevice->info(), &physicalCameraIds);
+                mProviderManager->isLogicalCamera(mCameraIdStr.string(), &physicalCameraIds);
         if (!logicalCamera ||
-                std::find(physicalCameraIds.begin(), physicalCameraIds.end(), physicalId) ==
-                physicalCameraIds.end()) {
+                std::find(physicalCameraIds.begin(), physicalCameraIds.end(),
+                physicalCameraId.string()) == physicalCameraIds.end()) {
             String8 msg = String8::format("Camera %s: Camera doesn't support physicalCameraId %s.",
                     mCameraIdStr.string(), physicalCameraId.string());
             ALOGE("%s: %s", __FUNCTION__, msg.string());
