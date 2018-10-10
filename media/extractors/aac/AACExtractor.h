@@ -20,7 +20,7 @@
 
 #include <media/MediaExtractorPluginApi.h>
 #include <media/MediaExtractorPluginHelper.h>
-#include <media/stagefright/MetaDataBase.h>
+#include <media/NdkMediaFormat.h>
 
 #include <utils/Vector.h>
 
@@ -29,15 +29,15 @@ namespace android {
 struct AMessage;
 class String8;
 
-class AACExtractor : public MediaExtractorPluginHelper {
+class AACExtractor : public MediaExtractorPluginHelperV2 {
 public:
     AACExtractor(DataSourceHelper *source, off64_t offset);
 
     virtual size_t countTracks();
-    virtual MediaTrackHelper *getTrack(size_t index);
-    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
+    virtual MediaTrackHelperV2 *getTrack(size_t index);
+    virtual status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
-    virtual status_t getMetaData(MetaDataBase& meta);
+    virtual status_t getMetaData(AMediaFormat *meta);
     virtual const char * name() { return "AACExtractor"; }
 
 protected:
@@ -45,7 +45,7 @@ protected:
 
 private:
     DataSourceHelper *mDataSource;
-    MetaDataBase mMeta;
+    AMediaFormat *mMeta;
     status_t mInitCheck;
 
     Vector<uint64_t> mOffsetVector;
