@@ -132,7 +132,8 @@ public:
     void addRoute(const sp<AudioRoute> &route) { mRoutes.add(route); }
     const AudioRouteVector &getRoutes() const { return mRoutes; }
 
-    void dump(int fd, int spaces, bool verbose = true) const;
+    void dump(String8 *dst, int spaces, bool verbose = true) const;
+
     void log(const char* indent) const;
 
     AudioGainCollection mGains; // gain controllers

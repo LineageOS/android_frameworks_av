@@ -59,7 +59,7 @@ public:
 
     float volIndexToDb(int indexInUi, int volIndexMin, int volIndexMax) const;
 
-    void dump(int fd) const;
+    void dump(String8 *result) const;
 
 private:
     SortedVector<CurvePoint> mCurvePoints;
@@ -144,7 +144,7 @@ public:
         }
     }
 
-    void dump(int fd, int spaces, bool curvePoints = false) const;
+    void dump(String8 *dst, int spaces, bool curvePoints = false) const;
 
 private:
     KeyedVector<device_category, sp<VolumeCurve> > mOriginVolumeCurves;
@@ -217,7 +217,7 @@ public:
         return getCurvesFor(stream).hasVolumeIndexForDevice(device);
     }
 
-    virtual status_t dump(int fd) const;
+    void dump(String8 *dst) const override;
 
     ssize_t add(const sp<VolumeCurve> &volumeCurve)
     {

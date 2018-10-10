@@ -98,32 +98,17 @@ status_t AudioGain::checkConfig(const struct audio_gain_config *config)
     return NO_ERROR;
 }
 
-void AudioGain::dump(int fd, int spaces, int index) const
+void AudioGain::dump(String8 *dst, int spaces, int index) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
-    snprintf(buffer, SIZE, "%*sGain %d:\n", spaces, "", index+1);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- mode: %08x\n", spaces, "", mGain.mode);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- channel_mask: %08x\n", spaces, "", mGain.channel_mask);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- min_value: %d mB\n", spaces, "", mGain.min_value);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- max_value: %d mB\n", spaces, "", mGain.max_value);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- default_value: %d mB\n", spaces, "", mGain.default_value);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- step_value: %d mB\n", spaces, "", mGain.step_value);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- min_ramp_ms: %d ms\n", spaces, "", mGain.min_ramp_ms);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- max_ramp_ms: %d ms\n", spaces, "", mGain.max_ramp_ms);
-    result.append(buffer);
-
-    write(fd, result.string(), result.size());
+    dst->appendFormat("%*sGain %d:\n", spaces, "", index+1);
+    dst->appendFormat("%*s- mode: %08x\n", spaces, "", mGain.mode);
+    dst->appendFormat("%*s- channel_mask: %08x\n", spaces, "", mGain.channel_mask);
+    dst->appendFormat("%*s- min_value: %d mB\n", spaces, "", mGain.min_value);
+    dst->appendFormat("%*s- max_value: %d mB\n", spaces, "", mGain.max_value);
+    dst->appendFormat("%*s- default_value: %d mB\n", spaces, "", mGain.default_value);
+    dst->appendFormat("%*s- step_value: %d mB\n", spaces, "", mGain.step_value);
+    dst->appendFormat("%*s- min_ramp_ms: %d ms\n", spaces, "", mGain.min_ramp_ms);
+    dst->appendFormat("%*s- max_ramp_ms: %d ms\n", spaces, "", mGain.max_ramp_ms);
 }
 
 } // namespace android

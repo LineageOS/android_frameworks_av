@@ -276,36 +276,31 @@ TrackClientVector AudioOutputDescriptor::clientsList(bool activeOnly, routing_st
     return clients;
 }
 
-status_t AudioOutputDescriptor::dump(int fd)
+void AudioOutputDescriptor::dump(String8 *dst) const
 {
-    String8 result;
-
-    result.appendFormat(" ID: %d\n", mId);
-    result.appendFormat(" Sampling rate: %d\n", mSamplingRate);
-    result.appendFormat(" Format: %08x\n", mFormat);
-    result.appendFormat(" Channels: %08x\n", mChannelMask);
-    result.appendFormat(" Devices: %08x\n", device());
-    result.appendFormat(" Global active count: %u\n", mGlobalActiveCount);
-    result.append(" Stream volume activeCount muteCount\n");
+    dst->appendFormat(" ID: %d\n", mId);
+    dst->appendFormat(" Sampling rate: %d\n", mSamplingRate);
+    dst->appendFormat(" Format: %08x\n", mFormat);
+    dst->appendFormat(" Channels: %08x\n", mChannelMask);
+    dst->appendFormat(" Devices: %08x\n", device());
+    dst->appendFormat(" Global active count: %u\n", mGlobalActiveCount);
+    dst->append(" Stream volume activeCount muteCount\n");
     for (int i = 0; i < (int)AUDIO_STREAM_CNT; i++) {
-        result.appendFormat(" %02d     %.03f     %02d          %02d\n",
+        dst->appendFormat(" %02d     %.03f     %02d          %02d\n",
                  i, mCurVolume[i], streamActiveCount((audio_stream_type_t)i), mMuteCount[i]);
     }
-    result.append(" AudioTrack Clients:\n");
-    result.append(ClientMapHandler<TrackClientDescriptor>::dump());
-    result.append("\n");
+    dst->append(" AudioTrack Clients:\n");
+    ClientMapHandler<TrackClientDescriptor>::dump(dst);
+    dst->append("\n");
     if (mActiveClients.size() > 0) {
-        result.append(" AudioTrack active (stream) clients:\n");
+        dst->append(" AudioTrack active (stream) clients:\n");
         size_t index = 0;
         for (const auto& clientPair : mActiveClients) {
-            result.appendFormat(" Refcount: %zu", clientPair.second);
-            clientPair.first->dump(result, 2, index++);
+            dst->appendFormat(" Refcount: %zu", clientPair.second);
+            clientPair.first->dump(dst, 2, index++);
         }
-        result.append(" \n");
+        dst->append(" \n");
     }
-    write(fd, result.string(), result.size());
-
-    return NO_ERROR;
 }
 
 void AudioOutputDescriptor::log(const char* indent)
@@ -328,17 +323,11 @@ SwAudioOutputDescriptor::SwAudioOutputDescriptor(const sp<IOProfile>& profile,
     }
 }
 
-status_t SwAudioOutputDescriptor::dump(int fd)
+void SwAudioOutputDescriptor::dump(String8 *dst) const
 {
-    String8 result;
-
-    result.appendFormat(" Latency: %d\n", mLatency);
-    result.appendFormat(" Flags %08x\n", mFlags);
-    write(fd, result.string(), result.size());
-
-    AudioOutputDescriptor::dump(fd);
-
-    return NO_ERROR;
+    dst->appendFormat(" Latency: %d\n", mLatency);
+    dst->appendFormat(" Flags %08x\n", mFlags);
+    AudioOutputDescriptor::dump(dst);
 }
 
 audio_devices_t SwAudioOutputDescriptor::device() const
@@ -609,20 +598,11 @@ HwAudioOutputDescriptor::HwAudioOutputDescriptor(const sp<SourceClientDescriptor
 {
 }
 
-status_t HwAudioOutputDescriptor::dump(int fd)
+void HwAudioOutputDescriptor::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
-    AudioOutputDescriptor::dump(fd);
-
-    snprintf(buffer, SIZE, "Source:\n");
-    result.append(buffer);
-    write(fd, result.string(), result.size());
-    mSource->dump(fd, 0, 0);
-
-    return NO_ERROR;
+    AudioOutputDescriptor::dump(dst);
+    dst->append("Source:\n");
+    mSource->dump(dst, 0, 0);
 }
 
 audio_devices_t HwAudioOutputDescriptor::supportedDevices()
@@ -792,20 +772,13 @@ sp<SwAudioOutputDescriptor> SwAudioOutputCollection::getOutputForClient(audio_po
     return 0;
 }
 
-status_t SwAudioOutputCollection::dump(int fd) const
+void SwAudioOutputCollection::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-
-    snprintf(buffer, SIZE, "\nOutputs dump:\n");
-    write(fd, buffer, strlen(buffer));
+    dst->append("\nOutputs dump:\n");
     for (size_t i = 0; i < size(); i++) {
-        snprintf(buffer, SIZE, "- Output %d dump:\n", keyAt(i));
-        write(fd, buffer, strlen(buffer));
-        valueAt(i)->dump(fd);
+        dst->appendFormat("- Output %d dump:\n", keyAt(i));
+        valueAt(i)->dump(dst);
     }
-
-    return NO_ERROR;
 }
 
 // HwAudioOutputCollection implementation
@@ -837,20 +810,13 @@ bool HwAudioOutputCollection::isAnyOutputActive(audio_stream_type_t streamToIgno
     return false;
 }
 
-status_t HwAudioOutputCollection::dump(int fd) const
+void HwAudioOutputCollection::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-
-    snprintf(buffer, SIZE, "\nOutputs dump:\n");
-    write(fd, buffer, strlen(buffer));
+    dst->append("\nOutputs dump:\n");
     for (size_t i = 0; i < size(); i++) {
-        snprintf(buffer, SIZE, "- Output %d dump:\n", keyAt(i));
-        write(fd, buffer, strlen(buffer));
-        valueAt(i)->dump(fd);
+        dst->appendFormat("- Output %d dump:\n", keyAt(i));
+        valueAt(i)->dump(dst);
     }
-
-    return NO_ERROR;
 }
 
 }; //namespace android

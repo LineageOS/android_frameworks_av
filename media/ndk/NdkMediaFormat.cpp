@@ -59,6 +59,9 @@ void AMediaFormat_clear(AMediaFormat *format) {
 
 EXPORT
 media_status_t AMediaFormat_copy(AMediaFormat *to, AMediaFormat *from) {
+    if (!to || !from) {
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
     to->mFormat->clear();
     to->mFormat->extend(from->mFormat);
     return AMEDIA_OK;

@@ -2666,53 +2666,53 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
     return res;
 }
 
-
-status_t AudioPolicyManager::dump(int fd)
+void AudioPolicyManager::dump(String8 *dst) const
 {
-    String8 result;
-    result.appendFormat("\nAudioPolicyManager Dump: %p\n", this);
-    result.appendFormat(" Primary Output: %d\n",
+    dst->appendFormat("\nAudioPolicyManager Dump: %p\n", this);
+    dst->appendFormat(" Primary Output: %d\n",
              hasPrimaryOutput() ? mPrimaryOutput->mIoHandle : AUDIO_IO_HANDLE_NONE);
     std::string stateLiteral;
     AudioModeConverter::toString(mEngine->getPhoneState(), stateLiteral);
-    result.appendFormat(" Phone state: %s\n", stateLiteral.c_str());
+    dst->appendFormat(" Phone state: %s\n", stateLiteral.c_str());
     const char* forceUses[AUDIO_POLICY_FORCE_USE_CNT] = {
         "communications", "media", "record", "dock", "system",
         "HDMI system audio", "encoded surround output", "vibrate ringing" };
     for (audio_policy_force_use_t i = AUDIO_POLICY_FORCE_FOR_COMMUNICATION;
          i < AUDIO_POLICY_FORCE_USE_CNT; i = (audio_policy_force_use_t)((int)i + 1)) {
-        result.appendFormat(" Force use for %s: %d\n",
+        dst->appendFormat(" Force use for %s: %d\n",
                 forceUses[i], mEngine->getForceUse(i));
     }
-    result.appendFormat(" TTS output %savailable\n", mTtsOutputAvailable ? "" : "not ");
-    result.appendFormat(" Master mono: %s\n", mMasterMono ? "on" : "off");
-    result.appendFormat(" Config source: %s\n", getConfig().getSource().c_str());
-    write(fd, result.string(), result.size());
-
-    mAvailableOutputDevices.dump(fd, String8("Available output"));
-    mAvailableInputDevices.dump(fd, String8("Available input"));
-    mHwModulesAll.dump(fd);
-    mOutputs.dump(fd);
-    mInputs.dump(fd);
-    mVolumeCurves->dump(fd);
-    mEffects.dump(fd);
-    mAudioPatches.dump(fd);
-    mPolicyMixes.dump(fd);
-    mAudioSources.dump(fd);
-
+    dst->appendFormat(" TTS output %savailable\n", mTtsOutputAvailable ? "" : "not ");
+    dst->appendFormat(" Master mono: %s\n", mMasterMono ? "on" : "off");
+    dst->appendFormat(" Config source: %s\n", mConfig.getSource().c_str()); // getConfig not const
+    mAvailableOutputDevices.dump(dst, String8("Available output"));
+    mAvailableInputDevices.dump(dst, String8("Available input"));
+    mHwModulesAll.dump(dst);
+    mOutputs.dump(dst);
+    mInputs.dump(dst);
+    mVolumeCurves->dump(dst);
+    mEffects.dump(dst);
+    mAudioPatches.dump(dst);
+    mPolicyMixes.dump(dst);
+    mAudioSources.dump(dst);
     if (!mSurroundFormats.empty()) {
-        result = String8("\nEnabled Surround Formats:\n");
+        dst->append("\nEnabled Surround Formats:\n");
         size_t i = 0;
         for (const auto& fmt : mSurroundFormats) {
-            result.append(i++ == 0 ? "  " : ", ");
+            dst->append(i++ == 0 ? "  " : ", ");
             std::string sfmt;
             FormatConverter::toString(fmt, sfmt);
-            result.appendFormat("%s", sfmt.c_str());
+            dst->append(sfmt.c_str());
         }
-        result.append("\n");
-        write(fd, result.string(), result.size());
+        dst->append("\n");
     }
+}
 
+status_t AudioPolicyManager::dump(int fd)
+{
+    String8 result;
+    dump(&result);
+    write(fd, result.string(), result.size());
     return NO_ERROR;
 }
 

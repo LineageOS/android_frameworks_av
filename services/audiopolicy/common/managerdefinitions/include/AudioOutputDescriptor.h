@@ -44,7 +44,7 @@ public:
                           AudioPolicyClientInterface *clientInterface);
     virtual ~AudioOutputDescriptor() {}
 
-    status_t    dump(int fd);
+    void dump(String8 *dst) const override;
     void        log(const char* indent);
 
     audio_port_handle_t getId() const;
@@ -150,8 +150,7 @@ public:
                             AudioPolicyClientInterface *clientInterface);
     virtual ~SwAudioOutputDescriptor() {}
 
-    status_t    dump(int fd);
-
+            void dump(String8 *dst) const override;
     virtual audio_devices_t device() const;
     virtual bool sharesHwModuleWith(const sp<AudioOutputDescriptor>& outputDesc);
     virtual audio_devices_t supportedDevices();
@@ -207,7 +206,7 @@ public:
                             AudioPolicyClientInterface *clientInterface);
     virtual ~HwAudioOutputDescriptor() {}
 
-    status_t    dump(int fd);
+            void dump(String8 *dst) const override;
 
     virtual audio_devices_t supportedDevices();
     virtual bool setVolume(float volume,
@@ -276,7 +275,7 @@ public:
 
     sp<SwAudioOutputDescriptor> getOutputForClient(audio_port_handle_t portId);
 
-    status_t dump(int fd) const;
+    void dump(String8 *dst) const;
 };
 
 class HwAudioOutputCollection :
@@ -290,7 +289,7 @@ public:
      */
     bool isAnyOutputActive(audio_stream_type_t streamToIgnore) const;
 
-    status_t dump(int fd) const;
+    void dump(String8 *dst) const;
 };
 
 

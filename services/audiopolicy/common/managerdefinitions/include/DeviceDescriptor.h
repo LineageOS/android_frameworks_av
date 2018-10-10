@@ -51,7 +51,7 @@ public:
     virtual void importAudioPort(const sp<AudioPort>& port, bool force = false);
 
     audio_port_handle_t getId() const;
-    status_t dump(int fd, int spaces, int index, bool verbose = true) const;
+    void dump(String8 *dst, int spaces, int index, bool verbose = true) const;
     void log() const;
 
     String8 mAddress;
@@ -85,7 +85,7 @@ public:
     DeviceVector getDevicesFromHwModule(audio_module_handle_t moduleHandle) const;
     audio_devices_t getDeviceTypesFromHwModule(audio_module_handle_t moduleHandle) const;
 
-    status_t dump(int fd, const String8 &tag, int spaces = 0, bool verbose = true) const;
+    void dump(String8 *dst, const String8 &tag, int spaces = 0, bool verbose = true) const;
 
 private:
     void refreshTypes();

@@ -354,26 +354,18 @@ status_t AudioPort::checkGain(const struct audio_gain_config *gainConfig, int in
     return mGains[index]->checkConfig(gainConfig);
 }
 
-void AudioPort::dump(int fd, int spaces, bool verbose) const
+void AudioPort::dump(String8 *dst, int spaces, bool verbose) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
     if (!mName.isEmpty()) {
-        snprintf(buffer, SIZE, "%*s- name: %s\n", spaces, "", mName.string());
-        result.append(buffer);
-        write(fd, result.string(), result.size());
+        dst->appendFormat("%*s- name: %s\n", spaces, "", mName.string());
     }
     if (verbose) {
-        mProfiles.dump(fd, spaces);
+        mProfiles.dump(dst, spaces);
 
         if (mGains.size() != 0) {
-            snprintf(buffer, SIZE, "%*s- gains:\n", spaces, "");
-            result = buffer;
-            write(fd, result.string(), result.size());
+            dst->appendFormat("%*s- gains:\n", spaces, "");
             for (size_t i = 0; i < mGains.size(); i++) {
-                mGains[i]->dump(fd, spaces + 2, i);
+                mGains[i]->dump(dst, spaces + 2, i);
             }
         }
     }

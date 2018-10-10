@@ -19,6 +19,7 @@
 #include <system/audio.h>
 #include <Volume.h>
 #include <utils/Errors.h>
+#include <utils/String8.h>
 
 namespace android {
 
@@ -47,7 +48,7 @@ public:
     virtual bool hasVolumeIndexForDevice(audio_stream_type_t stream,
                                          audio_devices_t device) const = 0;
 
-    virtual status_t dump(int fd) const = 0;
+    virtual void dump(String8 *dst) const = 0;
 };
 
 } // namespace android
