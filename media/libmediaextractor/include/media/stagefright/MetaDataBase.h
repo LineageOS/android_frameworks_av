@@ -198,9 +198,6 @@ enum {
     // MPEG user data offsets
     kKeyMpegUserData      = 'mpud', // size_t[]
 
-    // Size of NALU length in mkv/mp4
-    kKeyNalLengthSize     = 'nals', // int32_t
-
     // HDR related
     kKeyHdrStaticInfo    = 'hdrS', // HDRStaticInfo
 

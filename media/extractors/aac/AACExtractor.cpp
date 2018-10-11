@@ -26,24 +26,23 @@
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MetaData.h>
 #include <media/stagefright/MetaDataUtils.h>
 #include <utils/String8.h>
 
 namespace android {
 
-class AACSource : public MediaTrackHelper {
+class AACSource : public MediaTrackHelperV2 {
 public:
     AACSource(
             DataSourceHelper *source,
-            MetaDataBase &meta,
+            AMediaFormat *meta,
             const Vector<uint64_t> &offset_vector,
             int64_t frame_duration_us);
 
     virtual status_t start();
     virtual status_t stop();
 
-    virtual status_t getFormat(MetaDataBase&);
+    virtual status_t getFormat(AMediaFormat*);
 
     virtual status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL);
@@ -54,7 +53,7 @@ protected:
 private:
     static const size_t kMaxFrameSize;
     DataSourceHelper *mDataSource;
-    MetaDataBase mMeta;
+    AMediaFormat *mMeta;
 
     off64_t mOffset;
     int64_t mCurrentTimeUs;
@@ -150,6 +149,7 @@ AACExtractor::AACExtractor(
     }
     channel = (header[0] & 0x1) << 2 | (header[1] >> 6);
 
+    mMeta = AMediaFormat_new();
     MakeAACCodecSpecificData(mMeta, profile, sf_index, channel);
 
     off64_t streamSize, numFrames = 0;
@@ -173,19 +173,20 @@ AACExtractor::AACExtractor(
         // Round up and get the duration
         mFrameDurationUs = (1024 * 1000000ll + (sr - 1)) / sr;
         duration = numFrames * mFrameDurationUs;
-        mMeta.setInt64(kKeyDuration, duration);
+        AMediaFormat_setInt64(mMeta, AMEDIAFORMAT_KEY_DURATION, duration);
     }
 
     mInitCheck = OK;
 }
 
 AACExtractor::~AACExtractor() {
+    AMediaFormat_delete(mMeta);
 }
 
-status_t AACExtractor::getMetaData(MetaDataBase &meta) {
-    meta.clear();
+status_t AACExtractor::getMetaData(AMediaFormat *meta) {
+    AMediaFormat_clear(meta);
     if (mInitCheck == OK) {
-        meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC_ADTS);
+        AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_AAC_ADTS);
     }
 
     return OK;
@@ -195,7 +196,7 @@ size_t AACExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrackHelper *AACExtractor::getTrack(size_t index) {
+MediaTrackHelperV2 *AACExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }
@@ -203,12 +204,12 @@ MediaTrackHelper *AACExtractor::getTrack(size_t index) {
     return new AACSource(mDataSource, mMeta, mOffsetVector, mFrameDurationUs);
 }
 
-status_t AACExtractor::getTrackMetaData(MetaDataBase &meta, size_t index, uint32_t /* flags */) {
+status_t AACExtractor::getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t /* flags */) {
     if (mInitCheck != OK || index != 0) {
         return UNKNOWN_ERROR;
     }
 
-    meta = mMeta;
+    AMediaFormat_copy(meta, mMeta);
     return OK;
 }
 
@@ -219,7 +220,7 @@ const size_t AACSource::kMaxFrameSize = 8192;
 
 AACSource::AACSource(
         DataSourceHelper *source,
-        MetaDataBase &meta,
+        AMediaFormat *meta,
         const Vector<uint64_t> &offset_vector,
         int64_t frame_duration_us)
     : mDataSource(source),
@@ -265,8 +266,8 @@ status_t AACSource::stop() {
     return OK;
 }
 
-status_t AACSource::getFormat(MetaDataBase &meta) {
-    meta = mMeta;
+status_t AACSource::getFormat(AMediaFormat *meta) {
+    AMediaFormat_copy(meta, mMeta);
     return OK;
 }
 
@@ -322,14 +323,14 @@ status_t AACSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static CMediaExtractor* CreateExtractor(
+static CMediaExtractorV2* CreateExtractor(
         CDataSource *source,
         void *meta) {
     off64_t offset = *static_cast<off64_t*>(meta);
-    return wrap(new AACExtractor(new DataSourceHelper(source), offset));
+    return wrapV2(new AACExtractor(new DataSourceHelper(source), offset));
 }
 
-static CreatorFunc Sniff(
+static CreatorFuncV2 Sniff(
         CDataSource *source, float *confidence, void **meta,
         FreeMetaFunc *freeMeta) {
     off64_t pos = 0;
@@ -389,11 +390,11 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION_CURRENT,
         UUID("4fd80eae-03d2-4d72-9eb9-48fa6bb54613"),
         1, // version
         "AAC Extractor",
-        { Sniff }
+        { .v2 = Sniff }
     };
 }
 

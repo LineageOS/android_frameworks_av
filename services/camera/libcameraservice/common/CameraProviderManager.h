@@ -231,11 +231,10 @@ public:
             hardware::hidl_version maxVersion = hardware::hidl_version{1000,0}) const;
 
     /*
-     * Check if a camera with staticInfo is a logical camera. And if yes, return
+     * Check if a camera is a logical camera. And if yes, return
      * the physical camera ids.
      */
-    static bool isLogicalCamera(const CameraMetadata& staticInfo,
-            std::vector<std::string>* physicalCameraIds);
+    bool isLogicalCamera(const std::string& id, std::vector<std::string>* physicalCameraIds);
 
     bool isHiddenPhysicalCamera(const std::string& cameraId);
 private:
@@ -293,6 +292,8 @@ private:
             const std::string mId;    // ID section of full name
             const hardware::hidl_version mVersion;
             const metadata_vendor_id_t mProviderTagid;
+            bool mIsLogicalCamera;
+            std::vector<std::string> mPhysicalIds;
 
             const hardware::camera::common::V1_0::CameraResourceCost mResourceCost;
 
@@ -319,7 +320,7 @@ private:
                     const std::vector<std::string>& publicCameraIds,
                     const hardware::camera::common::V1_0::CameraResourceCost& resourceCost) :
                     mName(name), mId(id), mVersion(version), mProviderTagid(tagId),
-                    mResourceCost(resourceCost),
+                    mIsLogicalCamera(false), mResourceCost(resourceCost),
                     mStatus(hardware::camera::common::V1_0::CameraDeviceStatus::PRESENT),
                     mHasFlashUnit(false), mPublicCameraIds(publicCameraIds) {}
             virtual ~DeviceInfo();
@@ -383,6 +384,7 @@ private:
         private:
             CameraMetadata mCameraCharacteristics;
             std::unordered_map<std::string, CameraMetadata> mPhysicalCameraCharacteristics;
+            void queryPhysicalCameraIds();
         };
 
     private:

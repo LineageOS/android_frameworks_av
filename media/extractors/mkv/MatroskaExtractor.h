@@ -69,6 +69,7 @@ private:
         // in ~MatroskaExtractor.
         unsigned char *mHeader;
         size_t mHeaderLen;
+        int32_t mNalLengthSize;
 
         const mkvparser::Track* getTrack() const;
         const mkvparser::CuePoint::TrackPosition *find(long long timeNs) const;

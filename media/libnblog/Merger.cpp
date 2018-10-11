@@ -188,6 +188,7 @@ void MergeReader::processSnapshot(Snapshot &snapshot, int author)
         case EVENT_RESERVED:
         case EVENT_UPPER_BOUND:
             ALOGW("warning: unexpected event %d", it->type);
+            break;
         default:
             break;
         }
