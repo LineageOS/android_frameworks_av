@@ -1619,6 +1619,15 @@ void Camera3Device::StreamSet::clear() {
     return mData.clear();
 }
 
+std::vector<int> Camera3Device::StreamSet::getStreamIds() {
+    std::lock_guard<std::mutex> lock(mLock);
+    std::vector<int> streamIds(mData.size());
+    for (size_t i = 0; i < mData.size(); i++) {
+        streamIds[i] = mData.keyAt(i);
+    }
+    return streamIds;
+}
+
 status_t Camera3Device::createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera3_stream_rotation_t rotation, int *id,
@@ -2128,6 +2137,12 @@ status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout) {
         if (active == (mStatus == STATUS_ACTIVE)) {
             // Desired state is current
             break;
+        }
+
+        // Notify HAL to start draining
+        if (!active && mUseHalBufManager) {
+            auto streamIds = mOutputStreams.getStreamIds();
+            mRequestThread->signalPipelineDrain(streamIds);
         }
 
         res = mStatusChanged.waitRelative(mLock, timeout);
@@ -3902,26 +3917,49 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
 
     // Invoke configureStreams
     device::V3_3::HalStreamConfiguration finalConfiguration;
+    device::V3_4::HalStreamConfiguration finalConfiguration3_4;
     common::V1_0::Status status;
 
-    // See if we have v3.4 or v3.3 HAL
-    if (mHidlSession_3_4 != nullptr) {
-        // We do; use v3.4 for the call
-        ALOGV("%s: v3.4 device found", __FUNCTION__);
-        device::V3_4::HalStreamConfiguration finalConfiguration3_4;
-        auto err = mHidlSession_3_4->configureStreams_3_4(requestedConfiguration3_4,
-            [&status, &finalConfiguration3_4]
+    auto configStream34Cb = [&status, &finalConfiguration3_4]
             (common::V1_0::Status s, const device::V3_4::HalStreamConfiguration& halConfiguration) {
                 finalConfiguration3_4 = halConfiguration;
                 status = s;
-            });
-        if (!err.isOk()) {
-            ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
-            return DEAD_OBJECT;
+            };
+
+    auto postprocConfigStream34 = [&finalConfiguration, &finalConfiguration3_4]
+            (hardware::Return<void>& err) -> status_t {
+                if (!err.isOk()) {
+                    ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
+                    return DEAD_OBJECT;
+                }
+                finalConfiguration.streams.resize(finalConfiguration3_4.streams.size());
+                for (size_t i = 0; i < finalConfiguration3_4.streams.size(); i++) {
+                    finalConfiguration.streams[i] = finalConfiguration3_4.streams[i].v3_3;
+                }
+                return OK;
+            };
+
+    // See if we have v3.4 or v3.3 HAL
+    if (mHidlSession_3_5 != nullptr) {
+        ALOGV("%s: v3.5 device found", __FUNCTION__);
+        device::V3_5::StreamConfiguration requestedConfiguration3_5;
+        requestedConfiguration3_5.v3_4 = requestedConfiguration3_4;
+        requestedConfiguration3_5.streamConfigCounter = mNextStreamConfigCounter++;
+        auto err = mHidlSession_3_5->configureStreams_3_5(
+                requestedConfiguration3_5, configStream34Cb);
+        res = postprocConfigStream34(err);
+        if (res != OK) {
+            return res;
         }
-        finalConfiguration.streams.resize(finalConfiguration3_4.streams.size());
-        for (size_t i = 0; i < finalConfiguration3_4.streams.size(); i++) {
-            finalConfiguration.streams[i] = finalConfiguration3_4.streams[i].v3_3;
+    } else if (mHidlSession_3_4 != nullptr) {
+        // We do; use v3.4 for the call
+        ALOGV("%s: v3.4 device found", __FUNCTION__);
+        device::V3_4::HalStreamConfiguration finalConfiguration3_4;
+        auto err = mHidlSession_3_4->configureStreams_3_4(
+                requestedConfiguration3_4, configStream34Cb);
+        res = postprocConfigStream34(err);
+        if (res != OK) {
+            return res;
         }
     } else if (mHidlSession_3_3 != nullptr) {
         // We do; use v3.3 for the call
@@ -4292,6 +4330,20 @@ status_t Camera3Device::HalInterface::close() {
     return res;
 }
 
+void Camera3Device::HalInterface::signalPipelineDrain(const std::vector<int>& streamIds) {
+    ATRACE_NAME("CameraHal::signalPipelineDrain");
+    if (!valid() || mHidlSession_3_5 == nullptr) {
+        ALOGE("%s called on invalid camera!", __FUNCTION__);
+        return;
+    }
+
+    auto err = mHidlSession_3_5->signalStreamFlush(streamIds, mNextStreamConfigCounter);
+    if (!err.isOk()) {
+        ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
+        return;
+    }
+}
+
 void Camera3Device::HalInterface::getInflightBufferKeys(
         std::vector<std::pair<int32_t, int32_t>>* out) {
     std::lock_guard<std::mutex> lock(mInflightLock);
@@ -4418,6 +4470,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mReconfigured(false),
         mDoPause(false),
         mPaused(true),
+        mNotifyPipelineDrain(false),
         mFrameNumber(0),
         mLatestRequestId(NAME_NOT_FOUND),
         mCurrentAfTriggerId(0),
@@ -5369,6 +5422,21 @@ bool Camera3Device::RequestThread::isOutputSurfacePending(int streamId, size_t s
     return false;
 }
 
+void Camera3Device::RequestThread::signalPipelineDrain(const std::vector<int>& streamIds) {
+    if (!mUseHalBufManager) {
+        ALOGE("%s called for camera device not supporting HAL buffer management", __FUNCTION__);
+        return;
+    }
+
+    Mutex::Autolock pl(mPauseLock);
+    if (mPaused) {
+        return mInterface->signalPipelineDrain(streamIds);
+    }
+    // If request thread is still busy, wait until paused then notify HAL
+    mNotifyPipelineDrain = true;
+    mStreamIdsToBeDrained = streamIds;
+}
+
 nsecs_t Camera3Device::getExpectedInFlightDuration() {
     ATRACE_CALL();
     Mutex::Autolock al(mInFlightLock);
@@ -5546,6 +5614,11 @@ sp<Camera3Device::CaptureRequest>
                 if (statusTracker != 0) {
                     statusTracker->markComponentIdle(mStatusId, Fence::NO_FENCE);
                 }
+                if (mNotifyPipelineDrain) {
+                    mInterface->signalPipelineDrain(mStreamIdsToBeDrained);
+                    mNotifyPipelineDrain = false;
+                    mStreamIdsToBeDrained.clear();
+                }
             }
             // Stop waiting for now and let thread management happen
             return NULL;
@@ -5629,6 +5702,11 @@ bool Camera3Device::RequestThread::waitIfPaused() {
             sp<StatusTracker> statusTracker = mStatusTracker.promote();
             if (statusTracker != 0) {
                 statusTracker->markComponentIdle(mStatusId, Fence::NO_FENCE);
+            }
+            if (mNotifyPipelineDrain) {
+                mInterface->signalPipelineDrain(mStreamIdsToBeDrained);
+                mNotifyPipelineDrain = false;
+                mStreamIdsToBeDrained.clear();
             }
         }
 

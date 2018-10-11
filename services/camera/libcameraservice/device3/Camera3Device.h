@@ -285,6 +285,8 @@ class Camera3Device :
         status_t dump(int fd);
         status_t close();
 
+        void signalPipelineDrain(const std::vector<int>& streamIds);
+
         // method to extract buffer's unique ID
         // return pair of (newlySeenBuffer?, bufferId)
         std::pair<bool, uint64_t> getBufferId(const buffer_handle_t& buf, int streamId);
@@ -372,6 +374,8 @@ class Camera3Device :
         // Buffers given to HAL through requestStreamBuffer API
         std::mutex mRequestedBuffersLock;
         std::unordered_map<uint64_t, buffer_handle_t*> mRequestedBuffers;
+
+        uint32_t mNextStreamConfigCounter = 1;
     };
 
     sp<HalInterface> mInterface;
@@ -415,6 +419,7 @@ class Camera3Device :
         // get by (underlying) vector index
         sp<camera3::Camera3OutputStreamInterface> operator[] (size_t index);
         size_t size() const;
+        std::vector<int> getStreamIds();
         void clear();
 
       private:
@@ -808,6 +813,8 @@ class Camera3Device :
             mRequestLatency.dump(fd, name);
         }
 
+        void signalPipelineDrain(const std::vector<int>& streamIds);
+
       protected:
 
         virtual bool threadLoop();
@@ -917,12 +924,13 @@ class Camera3Device :
 
         bool               mReconfigured;
 
-        // Used by waitIfPaused, waitForNextRequest, and waitUntilPaused
+        // Used by waitIfPaused, waitForNextRequest, waitUntilPaused, and signalPipelineDrain
         Mutex              mPauseLock;
         bool               mDoPause;
         Condition          mDoPauseSignal;
         bool               mPaused;
-        Condition          mPausedSignal;
+        bool               mNotifyPipelineDrain;
+        std::vector<int>   mStreamIdsToBeDrained;
 
         sp<CaptureRequest> mPrevRequest;
         int32_t            mPrevTriggers;
