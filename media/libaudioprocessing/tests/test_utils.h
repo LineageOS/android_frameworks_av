@@ -23,6 +23,7 @@
 
 #include <log/log.h>
 
+#include <android-base/macros.h>
 #include <audio_utils/sndfile.h>
 
 #ifndef ARRAY_SIZE
@@ -77,14 +78,14 @@ static inline int parseCSV(const char *string, std::vector<int>& values)
                 }
                 return numValues;
             }
-            // fall through
+            FALLTHROUGH_INTENDED;
         case ',':
             if (hadDigit) {
                 hadDigit = false;
                 numValues++;
                 break;
             }
-            // fall through
+            FALLTHROUGH_INTENDED;
         default:
             return -1;
         }
