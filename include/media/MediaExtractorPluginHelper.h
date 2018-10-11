@@ -106,9 +106,9 @@ inline CMediaTrack *wrap(MediaTrackHelper *track) {
 class MediaTrackHelperV2 {
 public:
     virtual ~MediaTrackHelperV2() {};
-    virtual status_t start() = 0;
-    virtual status_t stop() = 0;
-    virtual status_t getFormat(AMediaFormat *format) = 0;
+    virtual media_status_t start() = 0;
+    virtual media_status_t stop() = 0;
+    virtual media_status_t getFormat(AMediaFormat *format) = 0;
 
     class ReadOptions {
     public:
@@ -140,7 +140,7 @@ public:
         int64_t mSeekPosUs;
     };
 
-    virtual status_t read(
+    virtual media_status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL) = 0;
     virtual bool supportsNonBlockingRead() { return false; }
 };
@@ -151,17 +151,17 @@ inline CMediaTrackV2 *wrapV2(MediaTrackHelperV2 *track) {
     wrapper->free = [](void *data) -> void {
         delete (MediaTrackHelperV2*)(data);
     };
-    wrapper->start = [](void *data) -> status_t {
+    wrapper->start = [](void *data) -> media_status_t {
         return ((MediaTrackHelperV2*)data)->start();
     };
-    wrapper->stop = [](void *data) -> status_t {
+    wrapper->stop = [](void *data) -> media_status_t {
         return ((MediaTrackHelperV2*)data)->stop();
     };
-    wrapper->getFormat = [](void *data, AMediaFormat *meta) -> status_t {
+    wrapper->getFormat = [](void *data, AMediaFormat *meta) -> media_status_t {
         return ((MediaTrackHelperV2*)data)->getFormat(meta);
     };
     wrapper->read = [](void *data, MediaBufferBase **buffer,  uint32_t options, int64_t seekPosUs)
-            -> status_t {
+            -> media_status_t {
         MediaTrackHelperV2::ReadOptions opts(options, seekPosUs);
         return ((MediaTrackHelperV2*)data)->read(buffer, &opts);
     };
@@ -268,13 +268,13 @@ public:
     enum GetTrackMetaDataFlags {
         kIncludeExtensiveMetaData = 1
     };
-    virtual status_t getTrackMetaData(
+    virtual media_status_t getTrackMetaData(
             AMediaFormat *meta,
             size_t index, uint32_t flags = 0) = 0;
 
     // Return container specific meta-data. The default implementation
     // returns an empty metadata object.
-    virtual status_t getMetaData(AMediaFormat *meta) = 0;
+    virtual media_status_t getMetaData(AMediaFormat *meta) = 0;
 
     enum Flags {
         CAN_SEEK_BACKWARD  = 1,  // the "seek 10secs back button"
@@ -289,8 +289,8 @@ public:
         return CAN_SEEK_BACKWARD | CAN_SEEK_FORWARD | CAN_SEEK | CAN_PAUSE;
     };
 
-    virtual status_t setMediaCas(const uint8_t* /*casToken*/, size_t /*size*/) {
-        return INVALID_OPERATION;
+    virtual media_status_t setMediaCas(const uint8_t* /*casToken*/, size_t /*size*/) {
+        return AMEDIA_ERROR_INVALID_OPERATION;
     }
 
     virtual const char * name() { return "<unspecified>"; }
@@ -318,12 +318,12 @@ inline CMediaExtractorV2 *wrapV2(MediaExtractorPluginHelperV2 *extractor) {
     wrapper->getTrackMetaData = [](
             void *data,
             AMediaFormat *meta,
-            size_t index, uint32_t flags) -> status_t {
+            size_t index, uint32_t flags) -> media_status_t {
         return ((MediaExtractorPluginHelperV2*)data)->getTrackMetaData(meta, index, flags);
     };
     wrapper->getMetaData = [](
             void *data,
-            AMediaFormat *meta) -> status_t {
+            AMediaFormat *meta) -> media_status_t {
         return ((MediaExtractorPluginHelperV2*)data)->getMetaData(meta);
     };
     wrapper->flags = [](
@@ -331,7 +331,7 @@ inline CMediaExtractorV2 *wrapV2(MediaExtractorPluginHelperV2 *extractor) {
         return ((MediaExtractorPluginHelperV2*)data)->flags();
     };
     wrapper->setMediaCas = [](
-            void *data, const uint8_t *casToken, size_t size) -> status_t {
+            void *data, const uint8_t *casToken, size_t size) -> media_status_t {
         return ((MediaExtractorPluginHelperV2*)data)->setMediaCas(casToken, size);
     };
     wrapper->name = [](

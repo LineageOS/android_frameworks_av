@@ -20,8 +20,8 @@
 
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaExtractor.h>
+#include <media/NdkMediaErrorPriv.h>
 #include <media/NdkMediaFormatPriv.h>
-#include "NdkMediaErrorPriv.h"
 #include "NdkMediaDataSourcePriv.h"
 
 

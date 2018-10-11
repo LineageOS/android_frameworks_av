@@ -62,11 +62,11 @@ struct WAVSource : public MediaTrackHelperV2 {
             int32_t bitsPerSample,
             off64_t offset, size_t size);
 
-    virtual status_t start();
-    virtual status_t stop();
-    virtual status_t getFormat(AMediaFormat *meta);
+    virtual media_status_t start();
+    virtual media_status_t stop();
+    virtual media_status_t getFormat(AMediaFormat *meta);
 
-    virtual status_t read(
+    virtual media_status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
     virtual bool supportNonblockingRead() { return true; }
@@ -106,13 +106,13 @@ WAVExtractor::~WAVExtractor() {
     AMediaFormat_delete(mTrackMeta);
 }
 
-status_t WAVExtractor::getMetaData(AMediaFormat *meta) {
+media_status_t WAVExtractor::getMetaData(AMediaFormat *meta) {
     AMediaFormat_clear(meta);
     if (mInitCheck == OK) {
         AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_CONTAINER_WAV);
     }
 
-    return OK;
+    return AMEDIA_OK;
 }
 
 size_t WAVExtractor::countTracks() {
@@ -129,15 +129,14 @@ MediaTrackHelperV2 *WAVExtractor::getTrack(size_t index) {
             mWaveFormat, mBitsPerSample, mDataOffset, mDataSize);
 }
 
-status_t WAVExtractor::getTrackMetaData(
+media_status_t WAVExtractor::getTrackMetaData(
         AMediaFormat *meta,
         size_t index, uint32_t /* flags */) {
     if (mInitCheck != OK || index > 0) {
-        return UNKNOWN_ERROR;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
-    AMediaFormat_copy(meta, mTrackMeta);
-    return OK;
+    return AMediaFormat_copy(meta, mTrackMeta);
 }
 
 status_t WAVExtractor::init() {
@@ -187,7 +186,7 @@ status_t WAVExtractor::init() {
                     && mWaveFormat != WAVE_FORMAT_MULAW
                     && mWaveFormat != WAVE_FORMAT_MSGSM
                     && mWaveFormat != WAVE_FORMAT_EXTENSIBLE) {
-                return ERROR_UNSUPPORTED;
+                return AMEDIA_ERROR_UNSUPPORTED;
             }
 
             uint8_t fmtSize = 16;
@@ -202,7 +201,7 @@ status_t WAVExtractor::init() {
 
             if (mNumChannels < 1 || mNumChannels > 8) {
                 ALOGE("Unsupported number of channels (%d)", mNumChannels);
-                return ERROR_UNSUPPORTED;
+                return AMEDIA_ERROR_UNSUPPORTED;
             }
 
             if (mWaveFormat != WAVE_FORMAT_EXTENSIBLE) {
@@ -226,7 +225,7 @@ status_t WAVExtractor::init() {
                     if (validBitsPerSample != 0) {
                         ALOGE("validBits(%d) != bitsPerSample(%d) are not supported",
                                 validBitsPerSample, mBitsPerSample);
-                        return ERROR_UNSUPPORTED;
+                        return AMEDIA_ERROR_UNSUPPORTED;
                     } else {
                         // we only support valitBitsPerSample == bitsPerSample but some WAV_EXT
                         // writers don't correctly set the valid bits value, and leave it at 0.
@@ -324,12 +323,12 @@ status_t WAVExtractor::init() {
                     size_t bytesPerSample = mBitsPerSample >> 3;
 
                     if (!bytesPerSample || !mNumChannels)
-                        return ERROR_MALFORMED;
+                        return AMEDIA_ERROR_MALFORMED;
 
                     size_t num_samples = mDataSize / (mNumChannels * bytesPerSample);
 
                     if (!mSampleRate)
-                        return ERROR_MALFORMED;
+                        return AMEDIA_ERROR_MALFORMED;
 
                     durationUs =
                         1000000LL * num_samples / mSampleRate;
@@ -377,7 +376,7 @@ WAVSource::~WAVSource() {
     }
 }
 
-status_t WAVSource::start() {
+media_status_t WAVSource::start() {
     ALOGV("WAVSource::start");
 
     CHECK(!mStarted);
@@ -394,10 +393,10 @@ status_t WAVSource::start() {
 
     mStarted = true;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t WAVSource::stop() {
+media_status_t WAVSource::stop() {
     ALOGV("WAVSource::stop");
 
     CHECK(mStarted);
@@ -407,22 +406,21 @@ status_t WAVSource::stop() {
 
     mStarted = false;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t WAVSource::getFormat(AMediaFormat *meta) {
+media_status_t WAVSource::getFormat(AMediaFormat *meta) {
     ALOGV("WAVSource::getFormat");
 
-    AMediaFormat_copy(meta, mMeta);
-    return OK;
+    return AMediaFormat_copy(meta, mMeta);
 }
 
-status_t WAVSource::read(
+media_status_t WAVSource::read(
         MediaBufferBase **out, const ReadOptions *options) {
     *out = NULL;
 
     if (options != nullptr && options->getNonBlocking() && !mGroup->has_buffers()) {
-        return WOULD_BLOCK;
+        return AMEDIA_ERROR_WOULD_BLOCK;
     }
 
     int64_t seekTimeUs;
@@ -447,7 +445,7 @@ status_t WAVSource::read(
     MediaBufferBase *buffer;
     status_t err = mGroup->acquire_buffer(&buffer);
     if (err != OK) {
-        return err;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
     // make sure that maxBytesToRead is multiple of 3, in 24-bit case
@@ -484,7 +482,7 @@ status_t WAVSource::read(
         buffer->release();
         buffer = NULL;
 
-        return ERROR_END_OF_STREAM;
+        return AMEDIA_ERROR_END_OF_STREAM;
     }
 
     buffer->set_range(0, n);
@@ -542,7 +540,7 @@ status_t WAVSource::read(
 
     *out = buffer;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

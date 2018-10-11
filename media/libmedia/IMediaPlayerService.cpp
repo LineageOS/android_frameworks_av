@@ -23,6 +23,7 @@
 #include <media/IMediaCodecList.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IMediaPlayerService.h>
+#include <media/IMediaPlayer.h>
 #include <media/IMediaRecorder.h>
 #include <media/IOMX.h>
 #include <media/IRemoteDisplay.h>

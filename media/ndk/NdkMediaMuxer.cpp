@@ -20,8 +20,8 @@
 
 #include <media/NdkMediaMuxer.h>
 #include <media/NdkMediaCodec.h>
+#include <media/NdkMediaErrorPriv.h>
 #include <media/NdkMediaFormatPriv.h>
-#include "NdkMediaErrorPriv.h"
 
 
 #include <utils/Log.h>

@@ -21,6 +21,7 @@
 
 #include <media/MediaTrack.h>
 #include <media/MediaExtractorPluginApi.h>
+#include <media/NdkMediaErrorPriv.h>
 #include <media/NdkMediaFormatPriv.h>
 
 namespace android {
@@ -112,22 +113,22 @@ MediaTrackCUnwrapperV2::~MediaTrackCUnwrapperV2() {
 }
 
 status_t MediaTrackCUnwrapperV2::start() {
-    return wrapper->start(wrapper->data);
+    return reverse_translate_error(wrapper->start(wrapper->data));
 }
 
 status_t MediaTrackCUnwrapperV2::stop() {
-    return wrapper->stop(wrapper->data);
+    return reverse_translate_error(wrapper->stop(wrapper->data));
 }
 
 status_t MediaTrackCUnwrapperV2::getFormat(MetaDataBase& format) {
     sp<AMessage> msg = new AMessage();
     AMediaFormat *tmpFormat =  AMediaFormat_fromMsg(&msg);
-    status_t ret = wrapper->getFormat(wrapper->data, tmpFormat);
+    media_status_t ret = wrapper->getFormat(wrapper->data, tmpFormat);
     sp<MetaData> newMeta = new MetaData();
     convertMessageToMetaData(msg, newMeta);
     delete tmpFormat;
     format = *newMeta;
-    return ret;
+    return reverse_translate_error(ret);
 }
 
 status_t MediaTrackCUnwrapperV2::read(MediaBufferBase **buffer, const ReadOptions *options) {
@@ -145,7 +146,7 @@ status_t MediaTrackCUnwrapperV2::read(MediaBufferBase **buffer, const ReadOption
         opts |= (uint32_t) seekMode;
     }
 
-    return wrapper->read(wrapper->data, buffer, opts, seekPosition);
+    return reverse_translate_error(wrapper->read(wrapper->data, buffer, opts, seekPosition));
 }
 
 bool MediaTrackCUnwrapperV2::supportNonblockingRead() {
