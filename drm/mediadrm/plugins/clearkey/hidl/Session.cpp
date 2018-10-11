@@ -42,9 +42,10 @@ using android::Mutex;
 Status Session::getKeyRequest(
         const std::vector<uint8_t>& initData,
         const std::string& mimeType,
+        V1_0::KeyType keyType,
         std::vector<uint8_t>* keyRequest) const {
     InitDataParser parser;
-    return parser.parse(initData, mimeType, keyRequest);
+    return parser.parse(initData, mimeType, keyType, keyRequest);
 }
 
 Status Session::provideKeyResponse(const std::vector<uint8_t>& response) {

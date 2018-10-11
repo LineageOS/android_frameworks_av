@@ -25,10 +25,12 @@ cc_binary {
         "CreatePluginFactories.cpp",
         "CryptoFactory.cpp",
         "CryptoPlugin.cpp",
+        "DeviceFiles.cpp",
         "DrmFactory.cpp",
         "DrmPlugin.cpp",
         "InitDataParser.cpp",
         "JsonWebKey.cpp",
+        "MemoryFileSystem.cpp",
         "Session.cpp",
         "SessionLibrary.cpp",
         "service.cpp",
@@ -49,11 +51,13 @@ cc_binary {
         "libhidlmemory",
         "libhidltransport",
         "liblog",
+        "libprotobuf-cpp-lite",
         "libutils",
     ],
 
     static_libs: [
         "libclearkeycommon",
+        "libclearkeydevicefiles-protos",
         "libjsmn",
     ],
 
@@ -66,3 +70,13 @@ cc_binary {
     },
 }
 
+cc_library_static {
+    name: "libclearkeydevicefiles-protos",
+    vendor: true,
+
+    proto: {
+        export_proto_headers: true,
+        type: "lite",
+    },
+    srcs: ["protos/DeviceFiles.proto"],
+}

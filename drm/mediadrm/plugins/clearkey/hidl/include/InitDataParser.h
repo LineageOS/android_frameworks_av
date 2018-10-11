@@ -34,7 +34,8 @@ public:
     InitDataParser() {}
 
     Status parse(const std::vector<uint8_t>& initData,
-            const std::string& type,
+            const std::string& mimeType,
+            V1_0::KeyType keyType,
             std::vector<uint8_t>* licenseRequest);
 
 private:
@@ -43,7 +44,7 @@ private:
     Status parsePssh(const std::vector<uint8_t>& initData,
             std::vector<const uint8_t*>* keyIds);
 
-    std::string generateRequest(
+    std::string generateRequest(V1_0::KeyType keyType,
             const std::vector<const uint8_t*>& keyIds);
 };
 
