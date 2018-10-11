@@ -77,6 +77,13 @@ public:
      */
     virtual aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) = 0;
 
+    /**
+     * Set time that the associated frame was presented to the hardware.
+     *
+     * @param positionFrames receive position, input value is ignored
+     * @param timeNanos receive time, input value is ignored
+     * @return AAUDIO_OK or AAUDIO_ERROR_UNAVAILABLE or other negative error
+     */
     virtual aaudio_result_t getTimestamp(int64_t *positionFrames, int64_t *timeNanos) = 0;
 
     int32_t getFramesPerBurst() const {
