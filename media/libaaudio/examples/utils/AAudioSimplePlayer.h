@@ -223,6 +223,22 @@ public:
         return result;
     }
 
+    aaudio_result_t waitUntilPaused() {
+        aaudio_result_t result = AAUDIO_OK;
+        aaudio_stream_state_t currentState = AAudioStream_getState(mStream);
+        aaudio_stream_state_t inputState = AAUDIO_STREAM_STATE_PAUSING;
+        while (result == AAUDIO_OK && currentState == AAUDIO_STREAM_STATE_PAUSING) {
+            result = AAudioStream_waitForStateChange(mStream, inputState,
+                                                     &currentState, NANOS_PER_SECOND);
+            inputState = currentState;
+        }
+        if (result != AAUDIO_OK) {
+            return result;
+        }
+        return (currentState == AAUDIO_STREAM_STATE_PAUSED)
+               ? AAUDIO_OK : AAUDIO_ERROR_INVALID_STATE;
+    }
+
     // Flush the stream. AAudio will stop calling your callback function.
     aaudio_result_t flush() {
         aaudio_result_t result = AAudioStream_requestFlush(mStream);
