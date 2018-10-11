@@ -6327,7 +6327,7 @@ typedef enum acamera_metadata_enum_acamera_control_scene_mode {
 
     /**
      * <p>Optimized for dim settings where the main light source
-     * is a flame.</p>
+     * is a candle.</p>
      */
     ACAMERA_CONTROL_SCENE_MODE_CANDLELIGHT                           = 15,
 
