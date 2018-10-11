@@ -38,12 +38,12 @@ public:
             const off64_t *offset_table,
             size_t offset_table_length);
 
-    virtual status_t start();
-    virtual status_t stop();
+    virtual media_status_t start();
+    virtual media_status_t stop();
 
-    virtual status_t getFormat(AMediaFormat *);
+    virtual media_status_t getFormat(AMediaFormat *);
 
-    virtual status_t read(
+    virtual media_status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
 protected:
@@ -96,23 +96,23 @@ static size_t getFrameSize(bool isWide, unsigned FT) {
     return frameSize;
 }
 
-static status_t getFrameSizeByOffset(DataSourceHelper *source,
+static media_status_t getFrameSizeByOffset(DataSourceHelper *source,
         off64_t offset, bool isWide, size_t *frameSize) {
     uint8_t header;
     ssize_t count = source->readAt(offset, &header, 1);
     if (count == 0) {
-        return ERROR_END_OF_STREAM;
+        return AMEDIA_ERROR_END_OF_STREAM;
     } else if (count < 0) {
-        return ERROR_IO;
+        return AMEDIA_ERROR_IO;
     }
 
     unsigned FT = (header >> 3) & 0x0f;
 
     *frameSize = getFrameSize(isWide, FT);
     if (*frameSize == 0) {
-        return ERROR_MALFORMED;
+        return AMEDIA_ERROR_MALFORMED;
     }
-    return OK;
+    return AMEDIA_OK;
 }
 
 static bool SniffAMR(
@@ -194,7 +194,7 @@ AMRExtractor::~AMRExtractor() {
     AMediaFormat_delete(mMeta);
 }
 
-status_t AMRExtractor::getMetaData(AMediaFormat *meta) {
+media_status_t AMRExtractor::getMetaData(AMediaFormat *meta) {
     AMediaFormat_clear(meta);
 
     if (mInitCheck == OK) {
@@ -202,7 +202,7 @@ status_t AMRExtractor::getMetaData(AMediaFormat *meta) {
                 AMEDIAFORMAT_KEY_MIME, mIsWide ? "audio/amr-wb" : "audio/amr");
     }
 
-    return OK;
+    return AMEDIA_OK;
 }
 
 size_t AMRExtractor::countTracks() {
@@ -218,13 +218,12 @@ MediaTrackHelperV2 *AMRExtractor::getTrack(size_t index) {
             mOffsetTable, mOffsetTableLength);
 }
 
-status_t AMRExtractor::getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t /* flags */) {
+media_status_t AMRExtractor::getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t /* flags */) {
     if (mInitCheck != OK || index != 0) {
-        return UNKNOWN_ERROR;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
-    AMediaFormat_copy(meta, mMeta);
-    return OK;
+    return AMediaFormat_copy(meta, mMeta);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -251,7 +250,7 @@ AMRSource::~AMRSource() {
     }
 }
 
-status_t AMRSource::start() {
+media_status_t AMRSource::start() {
     CHECK(!mStarted);
 
     mOffset = mIsWide ? 9 : 6;
@@ -260,25 +259,24 @@ status_t AMRSource::start() {
     mGroup->add_buffer(MediaBufferBase::Create(128));
     mStarted = true;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t AMRSource::stop() {
+media_status_t AMRSource::stop() {
     CHECK(mStarted);
 
     delete mGroup;
     mGroup = NULL;
 
     mStarted = false;
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t AMRSource::getFormat(AMediaFormat *meta) {
-    AMediaFormat_copy(meta, mMeta);
-    return OK;
+media_status_t AMRSource::getFormat(AMediaFormat *meta) {
+    return AMediaFormat_copy(meta, mMeta);
 }
 
-status_t AMRSource::read(
+media_status_t AMRSource::read(
         MediaBufferBase **out, const ReadOptions *options) {
     *out = NULL;
 
@@ -297,7 +295,7 @@ status_t AMRSource::read(
         mOffset = mOffsetTable[index] + (mIsWide ? 9 : 6);
 
         for (size_t i = 0; i< seekFrame - index * 50; i++) {
-            status_t err;
+            media_status_t err;
             if ((err = getFrameSizeByOffset(mDataSource, mOffset,
                             mIsWide, &size)) != OK) {
                 return err;
@@ -310,7 +308,7 @@ status_t AMRSource::read(
     ssize_t n = mDataSource->readAt(mOffset, &header, 1);
 
     if (n < 1) {
-        return ERROR_END_OF_STREAM;
+        return AMEDIA_ERROR_END_OF_STREAM;
     }
 
     if (header & 0x83) {
@@ -318,20 +316,20 @@ status_t AMRSource::read(
 
         ALOGE("padding bits must be 0, header is 0x%02x", header);
 
-        return ERROR_MALFORMED;
+        return AMEDIA_ERROR_MALFORMED;
     }
 
     unsigned FT = (header >> 3) & 0x0f;
 
     size_t frameSize = getFrameSize(mIsWide, FT);
     if (frameSize == 0) {
-        return ERROR_MALFORMED;
+        return AMEDIA_ERROR_MALFORMED;
     }
 
     MediaBufferBase *buffer;
     status_t err = mGroup->acquire_buffer(&buffer);
     if (err != OK) {
-        return err;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
     n = mDataSource->readAt(mOffset, buffer->data(), frameSize);
@@ -341,11 +339,11 @@ status_t AMRSource::read(
         buffer = NULL;
 
         if (n < 0) {
-            return ERROR_IO;
+            return AMEDIA_ERROR_IO;
         } else {
             // only partial frame is available, treat it as EOS.
             mOffset += n;
-            return ERROR_END_OF_STREAM;
+            return AMEDIA_ERROR_END_OF_STREAM;
         }
     }
 
@@ -358,7 +356,7 @@ status_t AMRSource::read(
 
     *out = buffer;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

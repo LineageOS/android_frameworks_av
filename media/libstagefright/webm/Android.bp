@@ -34,4 +34,8 @@ cc_library_static {
         "libutils",
         "liblog",
     ],
+
+    header_libs: [
+        "media_ndk_headers",
+    ],
 }

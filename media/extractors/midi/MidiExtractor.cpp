@@ -40,11 +40,11 @@ public:
             MidiEngine &engine,
             AMediaFormat *trackMetadata);
 
-    virtual status_t start();
-    virtual status_t stop();
-    virtual status_t getFormat(AMediaFormat *);
+    virtual media_status_t start();
+    virtual media_status_t stop();
+    virtual media_status_t getFormat(AMediaFormat *);
 
-    virtual status_t read(
+    virtual media_status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
 protected:
@@ -87,17 +87,17 @@ MidiSource::~MidiSource()
     }
 }
 
-status_t MidiSource::start()
+media_status_t MidiSource::start()
 {
     ALOGV("MidiSource::start");
 
     CHECK(!mStarted);
     mStarted = true;
     mEngine.allocateBuffers();
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t MidiSource::stop()
+media_status_t MidiSource::stop()
 {
     ALOGV("MidiSource::stop");
 
@@ -105,16 +105,15 @@ status_t MidiSource::stop()
     mStarted = false;
     mEngine.releaseBuffers();
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t MidiSource::getFormat(AMediaFormat *meta)
+media_status_t MidiSource::getFormat(AMediaFormat *meta)
 {
-    AMediaFormat_copy(meta, mTrackMetadata);
-    return OK;
+    return AMediaFormat_copy(meta, mTrackMetadata);
 }
 
-status_t MidiSource::read(
+media_status_t MidiSource::read(
         MediaBufferBase **outBuffer, const ReadOptions *options)
 {
     ALOGV("MidiSource::read");
@@ -131,7 +130,7 @@ status_t MidiSource::read(
     buffer = mEngine.readBuffer();
     *outBuffer = buffer;
     ALOGV("MidiSource::read %p done", this);
-    return buffer != NULL ? (status_t) OK : (status_t) ERROR_END_OF_STREAM;
+    return buffer != NULL ? AMEDIA_OK : AMEDIA_ERROR_END_OF_STREAM;
 }
 
 status_t MidiSource::init()
@@ -298,22 +297,20 @@ MediaTrackHelperV2 *MidiExtractor::getTrack(size_t index)
     return new MidiSource(*mEngine, mTrackMetadata);
 }
 
-status_t MidiExtractor::getTrackMetaData(
+media_status_t MidiExtractor::getTrackMetaData(
         AMediaFormat *meta,
         size_t index, uint32_t /* flags */) {
     ALOGV("MidiExtractor::getTrackMetaData");
     if (mInitCheck != OK || index > 0) {
-        return UNKNOWN_ERROR;
+        return AMEDIA_ERROR_UNKNOWN;
     }
-    AMediaFormat_copy(meta, mTrackMetadata);
-    return OK;
+    return AMediaFormat_copy(meta, mTrackMetadata);
 }
 
-status_t MidiExtractor::getMetaData(AMediaFormat *meta)
+media_status_t MidiExtractor::getMetaData(AMediaFormat *meta)
 {
     ALOGV("MidiExtractor::getMetaData");
-    AMediaFormat_copy(meta, mFileMetadata);
-    return OK;
+    return AMediaFormat_copy(meta, mFileMetadata);
 }
 
 // Sniffer

@@ -3,6 +3,10 @@ cc_library_static {
 
     srcs: ["ID3.cpp"],
 
+    header_libs: [
+        "media_ndk_headers",
+    ],
+
     cflags: [
         "-Werror",
         "-Wall",

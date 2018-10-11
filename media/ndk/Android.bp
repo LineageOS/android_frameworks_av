@@ -31,6 +31,13 @@ ndk_headers {
     license: "NOTICE",
 }
 
+// for use with header_libs
+cc_library_headers {
+    name: "media_ndk_headers",
+    vendor_available: true,
+    export_include_dirs: ["include"]
+}
+
 cc_library_shared {
     name: "libmediandk",
 
@@ -39,7 +46,6 @@ cc_library_shared {
         "NdkMediaCrypto.cpp",
         "NdkMediaDataSource.cpp",
         "NdkMediaExtractor.cpp",
-        "NdkMediaError.cpp",
         "NdkMediaFormat.cpp",
         "NdkMediaMuxer.cpp",
         "NdkMediaDrm.cpp",
@@ -107,7 +113,6 @@ cc_library {
 
     srcs: [
         "NdkMediaDataSourceCallbacks.cpp",
-        "NdkMediaError.cpp",
     ],
 
     include_dirs: [

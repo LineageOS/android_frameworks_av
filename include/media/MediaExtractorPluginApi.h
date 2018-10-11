@@ -18,7 +18,7 @@
 #define MEDIA_EXTRACTOR_PLUGIN_API_H_
 
 #include <utils/Errors.h> // for status_t
-
+#include <media/NdkMediaError.h>
 struct AMediaFormat;
 
 namespace android {
@@ -62,10 +62,10 @@ struct CMediaTrackV2 {
     void *data;
     void (*free)(void *data);
 
-    status_t (*start)(void *data);
-    status_t (*stop)(void *data);
-    status_t (*getFormat)(void *data, AMediaFormat *format);
-    status_t (*read)(void *data, MediaBufferBase **buffer, uint32_t options, int64_t seekPosUs);
+    media_status_t (*start)(void *data);
+    media_status_t (*stop)(void *data);
+    media_status_t (*getFormat)(void *data, AMediaFormat *format);
+    media_status_t (*read)(void *data, MediaBufferBase **buffer, uint32_t options, int64_t seekPosUs);
     bool     (*supportsNonBlockingRead)(void *data);
 };
 
@@ -93,14 +93,14 @@ struct CMediaExtractorV2 {
     void (*free)(void *data);
     size_t (*countTracks)(void *data);
     CMediaTrackV2* (*getTrack)(void *data, size_t index);
-    status_t (*getTrackMetaData)(
+    media_status_t (*getTrackMetaData)(
             void *data,
             AMediaFormat *meta,
             size_t index, uint32_t flags);
 
-    status_t (*getMetaData)(void *data, AMediaFormat *meta);
+    media_status_t (*getMetaData)(void *data, AMediaFormat *meta);
     uint32_t (*flags)(void *data);
-    status_t (*setMediaCas)(void *data, const uint8_t* casToken, size_t size);
+    media_status_t (*setMediaCas)(void *data, const uint8_t* casToken, size_t size);
     const char * (*name)(void *data);
 };
 
