@@ -17,9 +17,9 @@
 package android.media;
 
 /**
- * Service to reload extractor plugins when update package is installed/uninstalled.
+ * Service to reload media component plugins when update package is installed/uninstalled.
  * @hide
  */
-interface IMediaExtractorUpdateService {
+interface IMediaUpdateService {
     void loadPlugins(@utf8InCpp String apkPath);
 }
