@@ -486,19 +486,11 @@ status_t JAudioTrack::dump(int fd, const Vector<String16>& args __unused) const
     return NO_ERROR;
 }
 
-audio_port_handle_t JAudioTrack::getRoutedDeviceId() {
+jobject JAudioTrack::getRoutedDevice() {
     JNIEnv *env = JavaVMHelper::getJNIEnv();
     jmethodID jGetRoutedDevice = env->GetMethodID(mAudioTrackCls, "getRoutedDevice",
             "()Landroid/media/AudioDeviceInfo;");
-    jobject jAudioDeviceInfoObj = env->CallObjectMethod(mAudioTrackObj, jGetRoutedDevice);
-    if (env->IsSameObject(jAudioDeviceInfoObj, NULL)) {
-        return AUDIO_PORT_HANDLE_NONE;
-    }
-
-    jclass jAudioDeviceInfoCls = env->FindClass("android/media/AudioDeviceInfo");
-    jmethodID jGetId = env->GetMethodID(jAudioDeviceInfoCls, "getId", "()I");
-    jint routedDeviceId = env->CallIntMethod(jAudioDeviceInfoObj, jGetId);
-    return routedDeviceId;
+    return env->CallObjectMethod(mAudioTrackObj, jGetRoutedDevice);
 }
 
 audio_session_t JAudioTrack::getAudioSessionId() {
@@ -508,13 +500,11 @@ audio_session_t JAudioTrack::getAudioSessionId() {
     return (audio_session_t) sessionId;
 }
 
-status_t JAudioTrack::setOutputDevice(audio_port_handle_t deviceId) {
+status_t JAudioTrack::setPreferredDevice(jobject device) {
     JNIEnv *env = JavaVMHelper::getJNIEnv();
-    jclass jMP2ImplCls = env->FindClass("android/media/MediaPlayer2Impl");
-    jmethodID jSetAudioOutputDeviceById = env->GetStaticMethodID(
-            jMP2ImplCls, "setAudioOutputDeviceById", "(Landroid/media/AudioTrack;I)Z");
-    jboolean result = env->CallStaticBooleanMethod(
-            jMP2ImplCls, jSetAudioOutputDeviceById, mAudioTrackObj, deviceId);
+    jmethodID jSetPreferredDeviceId = env->GetMethodID(mAudioTrackCls, "setPreferredDevice",
+            "(Landroid/media/AudioDeviceInfo;)Z");
+    jboolean result = env->CallBooleanMethod(mAudioTrackObj, jSetPreferredDeviceId, device);
     return result == true ? NO_ERROR : BAD_VALUE;
 }
 
@@ -522,7 +512,7 @@ audio_stream_type_t JAudioTrack::getAudioStreamType() {
     JNIEnv *env = JavaVMHelper::getJNIEnv();
     jclass jAudioAttributesCls = env->FindClass("android/media/AudioAttributes");
     jmethodID jGetVolumeControlStream = env->GetMethodID(jAudioAttributesCls,
-                                        "getVolumeControlStream", "()I");
+            "getVolumeControlStream", "()I");
     int javaAudioStreamType = env->CallIntMethod(mAudioAttributesObj, jGetVolumeControlStream);
     return (audio_stream_type_t)javaAudioStreamType;
 }
