@@ -67,8 +67,12 @@ struct DataSourceBaseReader : public mkvparser::IMkvReader {
     virtual int Length(long long* total, long long* available) {
         off64_t size;
         if (mSource->getSize(&size) != OK) {
-            *total = -1;
-            *available = (long long)((1ull << 63) - 1);
+            if (total) {
+                *total = -1;
+            }
+            if (available) {
+                *available = (long long)((1ull << 63) - 1);
+            }
 
             return 0;
         }
