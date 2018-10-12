@@ -150,6 +150,7 @@ AACExtractor::AACExtractor(
 
     mMeta = AMediaFormat_new();
     MakeAACCodecSpecificData(mMeta, profile, sf_index, channel);
+    AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_AAC_PROFILE, profile + 1);
 
     off64_t streamSize, numFrames = 0;
     size_t frameSize = 0;

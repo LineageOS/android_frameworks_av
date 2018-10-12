@@ -1693,6 +1693,11 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             meta->setInt32(kKeyIsADTS, isADTS);
         }
 
+        int32_t aacProfile = -1;
+        if (msg->findInt32("aac-profile", &aacProfile)) {
+            meta->setInt32(kKeyAACAOT, aacProfile);
+        }
+
         int32_t pcmEncoding;
         if (msg->findInt32("pcm-encoding", &pcmEncoding)) {
             meta->setInt32(kKeyPcmEncoding, pcmEncoding);
