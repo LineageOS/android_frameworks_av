@@ -1,6 +1,6 @@
 /*
 **
-** Copyright 2016, The Android Open Source Project
+** Copyright 2018, The Android Open Source Project
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -22,47 +22,44 @@
 
 #include <binder/ProcessState.h>
 #include <hidl/HidlTransportSupport.h>
-#include <media/stagefright/omx/1.0/Omx.h>
-#include <media/stagefright/omx/1.0/OmxStore.h>
-
 #include <media/CodecServiceRegistrant.h>
 #include <dlfcn.h>
 
 using namespace android;
 
+// TODO: replace policy with software codec-only policies
 // Must match location in Android.mk.
 static const char kSystemSeccompPolicyPath[] =
         "/system/etc/seccomp_policy/mediacodec.policy";
 static const char kVendorSeccompPolicyPath[] =
         "/vendor/etc/seccomp_policy/mediacodec.policy";
 
-int main(int argc __unused, char** argv)
+int main(int argc __unused, char** /*argv*/)
 {
-    strcpy(argv[0], "media.codec");
-    LOG(INFO) << "mediacodecservice starting";
+    LOG(INFO) << "media swcodec service starting";
     signal(SIGPIPE, SIG_IGN);
     SetUpMinijail(kSystemSeccompPolicyPath, kVendorSeccompPolicyPath);
 
-    android::ProcessState::initWithDriver("/dev/vndbinder");
     android::ProcessState::self()->startThreadPool();
 
     ::android::hardware::configureRpcThreadpool(64, false);
 
-    // Default codec services
-    using namespace ::android::hardware::media::omx::V1_0;
-    sp<IOmxStore> omxStore = new implementation::OmxStore();
-    if (omxStore == nullptr) {
-        LOG(ERROR) << "Cannot create IOmxStore HAL service.";
-    } else if (omxStore->registerAsService() != OK) {
-        LOG(ERROR) << "Cannot register IOmxStore HAL service.";
-    }
-    sp<IOmx> omx = new implementation::Omx();
-    if (omx == nullptr) {
-        LOG(ERROR) << "Cannot create IOmx HAL service.";
-    } else if (omx->registerAsService() != OK) {
-        LOG(ERROR) << "Cannot register IOmx HAL service.";
+    // Registration of customized codec services
+    void *registrantLib = dlopen(
+            "libmedia_codecserviceregistrant.so",
+            RTLD_NOW | RTLD_LOCAL);
+    if (registrantLib) {
+        RegisterCodecServicesFunc registerCodecServices =
+                reinterpret_cast<RegisterCodecServicesFunc>(
+                dlsym(registrantLib, "RegisterCodecServices"));
+        if (registerCodecServices) {
+            registerCodecServices();
+        } else {
+            LOG(WARNING) << "Cannot register codec services "
+                    "-- corrupted library.";
+        }
     } else {
-        LOG(INFO) << "IOmx HAL service created.";
+        LOG(ERROR) << "Cannot find codec service registrant.";
     }
 
     ::android::hardware::joinRpcThreadpool();
