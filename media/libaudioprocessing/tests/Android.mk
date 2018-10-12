@@ -20,6 +20,8 @@ LOCAL_C_INCLUDES := \
 LOCAL_SRC_FILES := \
     resampler_tests.cpp
 
+LOCAL_HEADER_LIBRARIES := libbase_headers
+
 LOCAL_MODULE := resampler_tests
 
 LOCAL_MODULE_TAGS := tests
@@ -48,6 +50,8 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     liblog \
     libutils \
+
+LOCAL_HEADER_LIBRARIES := libbase_headers
 
 LOCAL_MODULE := test-mixer
 
