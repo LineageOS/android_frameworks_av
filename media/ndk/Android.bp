@@ -63,7 +63,6 @@ cc_library_shared {
     cflags: [
         "-fvisibility=hidden",
         "-DEXPORT=__attribute__((visibility(\"default\")))",
-
         "-Werror",
         "-Wall",
     ],
@@ -73,6 +72,8 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "android.hardware.graphics.bufferqueue@1.0",
+        "android.hidl.token@1.0-utils",
         "libbinder",
         "libmedia",
         "libmedia_omx",
@@ -81,12 +82,15 @@ cc_library_shared {
         "libmediaextractor",
         "libstagefright",
         "libstagefright_foundation",
+        "libstagefright_bufferqueue_helper",
         "liblog",
         "libutils",
         "libcutils",
         "libandroid",
         "libandroid_runtime",
         "libbinder",
+        "libhwbinder",
+        "libhidlbase",
         "libgui",
         "libui",
         "libmedia2_jni_core",
@@ -105,7 +109,9 @@ cc_library_shared {
 llndk_library {
     name: "libmediandk",
     symbol_file: "libmediandk.map.txt",
-    export_include_dirs: ["include"],
+    export_include_dirs: [
+        "include",
+    ],
 }
 
 cc_library {
@@ -147,4 +153,25 @@ cc_library {
             cfi: true,
         },
     },
+}
+
+cc_test {
+    name: "AImageReaderWindowHandleTest",
+    srcs: ["tests/AImageReaderWindowHandleTest.cpp"],
+    shared_libs: [
+        "libbinder",
+        "libmediandk",
+        "libnativewindow",
+        "libgui",
+        "libutils",
+        "libui",
+        "libcutils",
+        "android.hardware.graphics.bufferqueue@1.0",
+    ],
+    cflags: [
+        "-D__ANDROID_VNDK__",
+    ],
+    include_dirs: [
+        "frameworks/av/media/ndk/",
+    ],
 }
