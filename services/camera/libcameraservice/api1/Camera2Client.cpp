@@ -37,6 +37,10 @@
 #define ALOG1(...) ALOGD_IF(gLogLevel >= 1, __VA_ARGS__);
 #define ALOG2(...) ALOGD_IF(gLogLevel >= 2, __VA_ARGS__);
 
+#ifndef FALLTHROUGH_INTENDED
+#define FALLTHROUGH_INTENDED [[fallthrough]]
+#endif
+
 namespace android {
 using namespace camera2;
 
@@ -959,7 +963,7 @@ void Camera2Client::stopPreviewL() {
         case Parameters::VIDEO_SNAPSHOT:
         case Parameters::STILL_CAPTURE:
             mCaptureSequencer->waitUntilIdle(kStopCaptureTimeout);
-            // no break
+            FALLTHROUGH_INTENDED;
         case Parameters::RECORD:
         case Parameters::PREVIEW:
             syncWithDevice();
@@ -989,7 +993,7 @@ void Camera2Client::stopPreviewL() {
                         "stop preview: %s (%d)",
                         __FUNCTION__, mCameraId, strerror(-res), res);
             }
-            // no break
+            FALLTHROUGH_INTENDED;
         case Parameters::WAITING_FOR_PREVIEW_WINDOW: {
             SharedParameters::Lock l(mParameters);
             l.mParameters.state = Parameters::STOPPED;
@@ -1835,7 +1839,7 @@ void Camera2Client::notifyAutoFocus(uint8_t newState, int triggerId) {
                 switch (newState) {
                     case ANDROID_CONTROL_AF_STATE_FOCUSED_LOCKED:
                         success = true;
-                        // no break
+                        FALLTHROUGH_INTENDED;
                     case ANDROID_CONTROL_AF_STATE_NOT_FOCUSED_LOCKED:
                         sendCompletedMessage = true;
                         l.mParameters.currentAfTriggerId = -1;
@@ -1859,7 +1863,7 @@ void Camera2Client::notifyAutoFocus(uint8_t newState, int triggerId) {
                 switch (newState) {
                     case ANDROID_CONTROL_AF_STATE_FOCUSED_LOCKED:
                         success = true;
-                        // no break
+                        FALLTHROUGH_INTENDED;
                     case ANDROID_CONTROL_AF_STATE_NOT_FOCUSED_LOCKED:
                         // Don't send notifications upstream if they're not for
                         // the current AF trigger. For example, if cancel was
@@ -1887,7 +1891,7 @@ void Camera2Client::notifyAutoFocus(uint8_t newState, int triggerId) {
                     case ANDROID_CONTROL_AF_STATE_PASSIVE_SCAN:
                         // Start passive scan, inform upstream
                         afInMotion = true;
-                        // no break
+                        FALLTHROUGH_INTENDED;
                     case ANDROID_CONTROL_AF_STATE_PASSIVE_FOCUSED:
                     case ANDROID_CONTROL_AF_STATE_PASSIVE_UNFOCUSED:
                         // Stop passive scan, inform upstream
