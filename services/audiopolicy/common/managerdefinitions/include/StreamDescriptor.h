@@ -44,7 +44,7 @@ public:
         return mIndexCur.indexOfKey(device) >= 0;
     }
 
-    void dump(int fd) const;
+    void dump(String8 *dst) const;
 
     void setVolumeCurvePoint(device_category deviceCategory, const VolumeCurvePoint *point);
     const VolumeCurvePoint *getVolumeCurvePoint(device_category deviceCategory) const
@@ -96,7 +96,7 @@ public:
         return valueFor(stream).hasVolumeIndexForDevice(device);
     }
 
-    virtual status_t dump(int fd) const;
+    void dump(String8 *dst) const override;
 
 private:
     void setVolumeCurvePoint(audio_stream_type_t stream, device_category deviceCategory,

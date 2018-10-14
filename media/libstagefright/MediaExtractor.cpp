@@ -24,6 +24,7 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 #include <media/NdkMediaFormatPriv.h>
+#include <media/NdkMediaErrorPriv.h>
 
 namespace android {
 
@@ -102,23 +103,23 @@ status_t MediaExtractorCUnwrapperV2::getTrackMetaData(
         MetaDataBase& meta, size_t index, uint32_t flags) {
     sp<AMessage> msg = new AMessage();
     AMediaFormat *format =  AMediaFormat_fromMsg(&msg);
-    status_t ret = plugin->getTrackMetaData(plugin->data, format, index, flags);
+    media_status_t ret = plugin->getTrackMetaData(plugin->data, format, index, flags);
     sp<MetaData> newMeta = new MetaData();
     convertMessageToMetaData(msg, newMeta);
     delete format;
     meta = *newMeta;
-    return ret;
+    return reverse_translate_error(ret);
 }
 
 status_t MediaExtractorCUnwrapperV2::getMetaData(MetaDataBase& meta) {
     sp<AMessage> msg = new AMessage();
     AMediaFormat *format =  AMediaFormat_fromMsg(&msg);
-    status_t ret = plugin->getMetaData(plugin->data, format);
+    media_status_t ret = plugin->getMetaData(plugin->data, format);
     sp<MetaData> newMeta = new MetaData();
     convertMessageToMetaData(msg, newMeta);
     delete format;
     meta = *newMeta;
-    return ret;
+    return reverse_translate_error(ret);
 }
 
 const char * MediaExtractorCUnwrapperV2::name() {

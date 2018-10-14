@@ -79,24 +79,16 @@ void StreamDescriptor::setVolumeCurvePoint(device_category deviceCategory,
     mVolumeCurve[deviceCategory] = point;
 }
 
-void StreamDescriptor::dump(int fd) const
+void StreamDescriptor::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
-    snprintf(buffer, SIZE, "%s         %02d         %02d         ",
+    dst->appendFormat("%s         %02d         %02d         ",
              mCanBeMuted ? "true " : "false", mIndexMin, mIndexMax);
-    result.append(buffer);
     for (size_t i = 0; i < mIndexCur.size(); i++) {
-        snprintf(buffer, SIZE, "%04x : %02d, ",
+        dst->appendFormat("%04x : %02d, ",
                  mIndexCur.keyAt(i),
                  mIndexCur.valueAt(i));
-        result.append(buffer);
     }
-    result.append("\n");
-
-    write(fd, result.string(), result.size());
+    dst->append("\n");
 }
 
 StreamDescriptorCollection::StreamDescriptorCollection()
@@ -204,23 +196,15 @@ void StreamDescriptorCollection::switchVolumeCurve(audio_stream_type_t streamSrc
     }
 }
 
-status_t StreamDescriptorCollection::dump(int fd) const
+void StreamDescriptorCollection::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-
-    snprintf(buffer, SIZE, "\nStreams dump:\n");
-    write(fd, buffer, strlen(buffer));
-    snprintf(buffer, SIZE,
+    dst->append("\nStreams dump:\n");
+    dst->append(
              " Stream  Can be muted  Index Min  Index Max  Index Cur [device : index]...\n");
-    write(fd, buffer, strlen(buffer));
     for (size_t i = 0; i < size(); i++) {
-        snprintf(buffer, SIZE, " %02zu      ", i);
-        write(fd, buffer, strlen(buffer));
-        valueAt(i).dump(fd);
+        dst->appendFormat(" %02zu      ", i);
+        valueAt(i).dump(dst);
     }
-
-    return NO_ERROR;
 }
 
 } // namespace android

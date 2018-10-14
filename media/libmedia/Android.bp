@@ -128,6 +128,10 @@ cc_library_static {
         "libsonivox",
     ],
 
+    header_libs: [
+        "media_ndk_headers",
+    ],
+
     cflags: [
         "-Werror",
         "-Wno-error=deprecated-declarations",
@@ -193,6 +197,7 @@ cc_library {
         "Visualizer.cpp",
         "StringArray.cpp",
         "NdkMediaFormatPriv.cpp",
+        "NdkMediaErrorPriv.cpp",
     ],
 
     aidl: {
@@ -202,10 +207,12 @@ cc_library {
 
     header_libs: [
         "libstagefright_headers",
+        "media_ndk_headers",
     ],
 
     export_header_lib_headers: [
         "libstagefright_headers",
+        "media_ndk_headers",
     ],
 
     shared_libs: [

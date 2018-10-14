@@ -29,6 +29,7 @@ cc_test {
 
     header_libs: [
         "libbase_headers",
+        "media_ndk_headers",
     ],
 
     cflags: [

@@ -22,6 +22,14 @@ cc_library {
         "liblog",
     ],
 
+    header_libs: [
+        "media_ndk_headers",
+    ],
+
+    export_header_lib_headers: [
+        "media_ndk_headers",
+    ],
+
     srcs: [
         "DataSourceBase.cpp",
         "MediaBuffer.cpp",

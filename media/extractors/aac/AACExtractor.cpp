@@ -39,12 +39,12 @@ public:
             const Vector<uint64_t> &offset_vector,
             int64_t frame_duration_us);
 
-    virtual status_t start();
-    virtual status_t stop();
+    virtual media_status_t start();
+    virtual media_status_t stop();
 
-    virtual status_t getFormat(AMediaFormat*);
+    virtual media_status_t getFormat(AMediaFormat*);
 
-    virtual status_t read(
+    virtual media_status_t read(
             MediaBufferBase **buffer, const ReadOptions *options = NULL);
 
 protected:
@@ -183,13 +183,13 @@ AACExtractor::~AACExtractor() {
     AMediaFormat_delete(mMeta);
 }
 
-status_t AACExtractor::getMetaData(AMediaFormat *meta) {
+media_status_t AACExtractor::getMetaData(AMediaFormat *meta) {
     AMediaFormat_clear(meta);
     if (mInitCheck == OK) {
         AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_AAC_ADTS);
     }
 
-    return OK;
+    return AMEDIA_OK;
 }
 
 size_t AACExtractor::countTracks() {
@@ -204,13 +204,12 @@ MediaTrackHelperV2 *AACExtractor::getTrack(size_t index) {
     return new AACSource(mDataSource, mMeta, mOffsetVector, mFrameDurationUs);
 }
 
-status_t AACExtractor::getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t /* flags */) {
+media_status_t AACExtractor::getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t /* flags */) {
     if (mInitCheck != OK || index != 0) {
-        return UNKNOWN_ERROR;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
-    AMediaFormat_copy(meta, mMeta);
-    return OK;
+    return AMediaFormat_copy(meta, mMeta);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -239,7 +238,7 @@ AACSource::~AACSource() {
     }
 }
 
-status_t AACSource::start() {
+media_status_t AACSource::start() {
     CHECK(!mStarted);
 
     if (mOffsetVector.empty()) {
@@ -253,25 +252,24 @@ status_t AACSource::start() {
     mGroup->add_buffer(MediaBufferBase::Create(kMaxFrameSize));
     mStarted = true;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t AACSource::stop() {
+media_status_t AACSource::stop() {
     CHECK(mStarted);
 
     delete mGroup;
     mGroup = NULL;
 
     mStarted = false;
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t AACSource::getFormat(AMediaFormat *meta) {
-    AMediaFormat_copy(meta, mMeta);
-    return OK;
+media_status_t AACSource::getFormat(AMediaFormat *meta) {
+    return AMediaFormat_copy(meta, mMeta);
 }
 
-status_t AACSource::read(
+media_status_t AACSource::read(
         MediaBufferBase **out, const ReadOptions *options) {
     *out = NULL;
 
@@ -282,7 +280,7 @@ status_t AACSource::read(
             int64_t seekFrame = seekTimeUs / mFrameDurationUs;
             if (seekFrame < 0 || seekFrame >= (int64_t)mOffsetVector.size()) {
                 android_errorWriteLog(0x534e4554, "70239507");
-                return ERROR_MALFORMED;
+                return AMEDIA_ERROR_MALFORMED;
             }
             mCurrentTimeUs = seekFrame * mFrameDurationUs;
 
@@ -292,13 +290,13 @@ status_t AACSource::read(
 
     size_t frameSize, frameSizeWithoutHeader, headerSize;
     if ((frameSize = getAdtsFrameLength(mDataSource, mOffset, &headerSize)) == 0) {
-        return ERROR_END_OF_STREAM;
+        return AMEDIA_ERROR_END_OF_STREAM;
     }
 
     MediaBufferBase *buffer;
     status_t err = mGroup->acquire_buffer(&buffer);
     if (err != OK) {
-        return err;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
     frameSizeWithoutHeader = frameSize - headerSize;
@@ -307,7 +305,7 @@ status_t AACSource::read(
         buffer->release();
         buffer = NULL;
 
-        return ERROR_IO;
+        return AMEDIA_ERROR_IO;
     }
 
     buffer->set_range(0, frameSizeWithoutHeader);
@@ -318,7 +316,7 @@ status_t AACSource::read(
     mCurrentTimeUs += mFrameDurationUs;
 
     *out = buffer;
-    return OK;
+    return AMEDIA_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -28,6 +28,7 @@
 #include <android_runtime/android_view_Surface.h>
 #include <android_runtime/android_hardware_HardwareBuffer.h>
 #include <grallocusage/GrallocUsageConversion.h>
+#include <media/stagefright/bqhelper/WGraphicBufferProducer.h>
 
 using namespace android;
 
@@ -42,6 +43,10 @@ namespace {
 const char* AImageReader::kCallbackFpKey = "Callback";
 const char* AImageReader::kContextKey    = "Context";
 const char* AImageReader::kGraphicBufferKey = "GraphicBuffer";
+
+static constexpr int kWindowHalTokenSizeMax = 256;
+
+static native_handle_t *convertHalTokenToNativeHandle(const HalToken &halToken);
 
 bool
 AImageReader::isSupportedFormatAndUsage(int32_t format, uint64_t usage) {
@@ -363,6 +368,15 @@ AImageReader::~AImageReader() {
         mBufferItemConsumer->abandon();
         mBufferItemConsumer->setFrameAvailableListener(nullptr);
     }
+
+    if (mWindowHandle != nullptr) {
+        int size = mWindowHandle->data[0];
+        hidl_vec<uint8_t> halToken;
+        halToken.setToExternal(
+            reinterpret_cast<uint8_t *>(&mWindowHandle->data[1]), size);
+        deleteHalToken(halToken);
+        native_handle_delete(mWindowHandle);
+    }
 }
 
 media_status_t
@@ -522,6 +536,25 @@ AImageReader::releaseImageLocked(AImage* image, int releaseFenceFd) {
     }
 }
 
+media_status_t AImageReader::getWindowNativeHandle(native_handle **handle) {
+    if (mWindowHandle != nullptr) {
+        *handle = mWindowHandle;
+        return AMEDIA_OK;
+    }
+    sp<HGraphicBufferProducer> hgbp =
+        new TWGraphicBufferProducer<HGraphicBufferProducer>(mProducer);
+    HalToken halToken;
+    if (!createHalToken(hgbp, &halToken)) {
+        return AMEDIA_ERROR_UNKNOWN;
+    }
+    mWindowHandle = convertHalTokenToNativeHandle(halToken);
+    if (!mWindowHandle) {
+        return AMEDIA_ERROR_UNKNOWN;
+    }
+    *handle = mWindowHandle;
+    return AMEDIA_OK;
+}
+
 int
 AImageReader::getBufferWidth(BufferItem* buffer) {
     if (buffer == NULL) return -1;
@@ -585,6 +618,58 @@ AImageReader::acquireLatestImage(/*out*/AImage** image, /*out*/int* acquireFence
     }
 }
 
+static native_handle_t *convertHalTokenToNativeHandle(
+        const HalToken &halToken) {
+    // We attempt to store halToken in the ints of the native_handle_t after its
+    // size. The first int stores the size of the token. We store this in an int
+    // to avoid alignment issues where size_t and int do not have the same
+    // alignment.
+    size_t nhDataByteSize = halToken.size();
+    if (nhDataByteSize > kWindowHalTokenSizeMax) {
+        // The size of the token isn't reasonable..
+        return nullptr;
+    }
+    size_t numInts = ceil(nhDataByteSize / sizeof(int)) + 1;
+
+    // We don't check for overflow, whether numInts can fit in an int, since we
+    // expect kWindowHalTokenSizeMax to be a reasonable limit.
+    // create a native_handle_t with 0 numFds and numInts number of ints.
+    native_handle_t *nh =
+        native_handle_create(0, numInts);
+    if (!nh) {
+        return nullptr;
+    }
+    // Store the size of the token in the first int.
+    nh->data[0] = nhDataByteSize;
+    memcpy(&(nh->data[1]), halToken.data(), nhDataByteSize);
+    return nh;
+}
+
+static sp<HGraphicBufferProducer> convertNativeHandleToHGBP (
+        const native_handle_t *handle) {
+    // Read the size of the halToken vec<uint8_t>
+    hidl_vec<uint8_t> halToken;
+    halToken.setToExternal(
+        reinterpret_cast<uint8_t *>(const_cast<int *>(&(handle->data[1]))),
+        handle->data[0]);
+    sp<HGraphicBufferProducer> hgbp =
+        HGraphicBufferProducer::castFrom(retrieveHalInterface(halToken));
+    return hgbp;
+}
+
+EXPORT
+sp<HGraphicBufferProducer> AImageReader_getHGBPFromHandle(
+    const native_handle_t *handle) {
+    if (handle == nullptr) {
+        return nullptr;
+    }
+    if (handle->numFds != 0  ||
+        handle->numInts < ceil(sizeof(size_t) / sizeof(int))) {
+        return nullptr;
+    }
+    return convertNativeHandleToHGBP(handle);
+}
+
 EXPORT
 media_status_t AImageReader_new(
         int32_t width, int32_t height, int32_t format, int32_t maxImages,
@@ -593,6 +678,19 @@ media_status_t AImageReader_new(
     return AImageReader_newWithUsage(
             width, height, format, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, maxImages, reader);
 }
+
+extern "C" {
+
+EXPORT
+media_status_t AImageReader_getWindowNativeHandle(
+        AImageReader *reader, /*out*/native_handle_t **handle) {
+    if (reader == nullptr || handle == nullptr) {
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+    return reader->getWindowNativeHandle(handle);
+}
+
+} //extern "C"
 
 EXPORT
 media_status_t AImageReader_newWithUsage(

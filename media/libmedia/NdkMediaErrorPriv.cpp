@@ -43,6 +43,8 @@ status_t reverse_translate_error(media_status_t err) {
         return ERROR_END_OF_STREAM;
     } else if (err == AMEDIA_ERROR_IO) {
         return ERROR_IO;
+    } else if (err == AMEDIA_ERROR_WOULD_BLOCK) {
+        return WOULD_BLOCK;
     }
 
     ALOGE("ndk error code: %d", err);
