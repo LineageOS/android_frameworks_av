@@ -125,7 +125,7 @@ status_t CameraFlashlight::findFlashUnits() {
     status_t res;
 
     std::vector<String8> cameraIds;
-    std::vector<std::string> ids = mProviderManager->getAPI1CompatibleCameraDeviceIds();
+    std::vector<std::string> ids = mProviderManager->getCameraDeviceIds();
     int numberOfCameras = static_cast<int>(ids.size());
     cameraIds.resize(numberOfCameras);
     // No module, must be provider
@@ -217,7 +217,7 @@ status_t CameraFlashlight::prepareDeviceOpen(const String8& cameraId) {
 
         if (mOpenedCameraIds.size() == 0) {
             // notify torch unavailable for all cameras with a flash
-            std::vector<std::string> ids = mProviderManager->getAPI1CompatibleCameraDeviceIds();
+            std::vector<std::string> ids = mProviderManager->getCameraDeviceIds();
             int numCameras = static_cast<int>(ids.size());
             for (int i = 0; i < numCameras; i++) {
                 String8 id8(ids[i].c_str());
@@ -263,7 +263,7 @@ status_t CameraFlashlight::deviceClosed(const String8& cameraId) {
 
     if (isBackwardCompatibleMode(cameraId)) {
         // notify torch available for all cameras with a flash
-        std::vector<std::string> ids = mProviderManager->getAPI1CompatibleCameraDeviceIds();
+        std::vector<std::string> ids = mProviderManager->getCameraDeviceIds();
         int numCameras = static_cast<int>(ids.size());
         for (int i = 0; i < numCameras; i++) {
             String8 id8(ids[i].c_str());

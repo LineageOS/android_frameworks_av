@@ -4825,6 +4825,15 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 captureRequest->mOutputStreams.size());
         halRequest->output_buffers = outputBuffers->array();
         std::set<String8> requestedPhysicalCameras;
+
+        sp<Camera3Device> parent = mParent.promote();
+        if (parent == NULL) {
+            // Should not happen, and nowhere to send errors to, so just log it
+            CLOGE("RequestThread: Parent is gone");
+            return INVALID_OPERATION;
+        }
+        nsecs_t waitDuration = kBaseGetBufferWait + parent->getExpectedInFlightDuration();
+
         for (size_t j = 0; j < captureRequest->mOutputStreams.size(); j++) {
             sp<Camera3OutputStreamInterface> outputStream = captureRequest->mOutputStreams.editItemAt(j);
 
@@ -4845,6 +4854,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             }
 
             res = outputStream->getBuffer(&outputBuffers->editItemAt(j),
+                    waitDuration,
                     captureRequest->mOutputSurfaces[j]);
             if (res != OK) {
                 // Can't get output buffer from gralloc queue - this could be due to
@@ -4871,13 +4881,6 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         totalNumBuffers += halRequest->num_output_buffers;
 
         // Log request in the in-flight queue
-        sp<Camera3Device> parent = mParent.promote();
-        if (parent == NULL) {
-            // Should not happen, and nowhere to send errors to, so just log it
-            CLOGE("RequestThread: Parent is gone");
-            return INVALID_OPERATION;
-        }
-
         // If this request list is for constrained high speed recording (not
         // preview), and the current request is not the last one in the batch,
         // do not send callback to the app.
