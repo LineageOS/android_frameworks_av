@@ -150,6 +150,8 @@ void Camera3StreamSplitter::disconnect() {
     SP_LOGV("%s: Disconnected", __FUNCTION__);
 }
 
+Camera3StreamSplitter::Camera3StreamSplitter(bool useHalBufManager) :
+        mUseHalBufManager(useHalBufManager) {}
 
 Camera3StreamSplitter::~Camera3StreamSplitter() {
     disconnect();
@@ -237,7 +239,9 @@ status_t Camera3StreamSplitter::addOutputLocked(size_t surfaceId, const sp<Surfa
     uint64_t usage = 0;
     res = native_window_get_consumer_usage(static_cast<ANativeWindow*>(outputQueue.get()), &usage);
     if (!(usage & (GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_TEXTURE))) {
-        outputQueue->setDequeueTimeout(kDequeueBufferTimeout);
+        nsecs_t timeout = mUseHalBufManager ?
+                kHalBufMgrDequeueBufferTimeout : kNormalDequeueBufferTimeout;
+        outputQueue->setDequeueTimeout(timeout);
     }
 
     res = gbp->allowAllocation(false);
@@ -430,8 +434,9 @@ status_t Camera3StreamSplitter::attachBufferToOutputs(ANativeWindowBuffer* anb,
         res = gbp->attachBuffer(&slot, gb);
         mMutex.lock();
         if (res != OK) {
-            SP_LOGE("%s: Cannot acquireBuffer from GraphicBufferProducer %p: %s (%d)",
+            SP_LOGE("%s: Cannot attachBuffer from GraphicBufferProducer %p: %s (%d)",
                     __FUNCTION__, gbp.get(), strerror(-res), res);
+            // TODO: might need to detach/cleanup the already attached buffers before return?
             return res;
         }
         if ((slot < 0) || (slot > BufferQueue::NUM_BUFFER_SLOTS)) {

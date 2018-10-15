@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "Camera3-SharedOuStrm"
+#define ATRACE_TAG ATRACE_TAG_CAMERA
+//#define LOG_NDEBUG 0
+
 #include "Camera3SharedOutputStream.h"
 
 namespace android {
@@ -28,16 +32,17 @@ Camera3SharedOutputStream::Camera3SharedOutputStream(int id,
         uint64_t consumerUsage, android_dataspace dataSpace,
         camera3_stream_rotation_t rotation,
         nsecs_t timestampOffset, const String8& physicalCameraId,
-        int setId) :
+        int setId, bool useHalBufManager) :
         Camera3OutputStream(id, CAMERA3_STREAM_OUTPUT, width, height,
                             format, dataSpace, rotation, physicalCameraId,
-                            consumerUsage, timestampOffset, setId) {
+                            consumerUsage, timestampOffset, setId),
+        mUseHalBufManager(useHalBufManager) {
     size_t consumerCount = std::min(surfaces.size(), kMaxOutputs);
     if (surfaces.size() > consumerCount) {
         ALOGE("%s: Trying to add more consumers than the maximum ", __func__);
     }
     for (size_t i = 0; i < consumerCount; i++) {
-        mSurfaces[i] = surfaces[i];
+        mSurfaceUniqueIds[i] = std::make_pair(surfaces[i], mNextUniqueSurfaceId++);
     }
 }
 
@@ -48,15 +53,15 @@ Camera3SharedOutputStream::~Camera3SharedOutputStream() {
 status_t Camera3SharedOutputStream::connectStreamSplitterLocked() {
     status_t res = OK;
 
-    mStreamSplitter = new Camera3StreamSplitter();
+    mStreamSplitter = new Camera3StreamSplitter(mUseHalBufManager);
 
     uint64_t usage;
     getEndpointUsage(&usage);
 
     std::unordered_map<size_t, sp<Surface>> initialSurfaces;
     for (size_t i = 0; i < kMaxOutputs; i++) {
-        if (mSurfaces[i] != nullptr) {
-            initialSurfaces.emplace(i, mSurfaces[i]);
+        if (mSurfaceUniqueIds[i].first != nullptr) {
+            initialSurfaces.emplace(i, mSurfaceUniqueIds[i].first);
         }
     }
 
@@ -70,6 +75,31 @@ status_t Camera3SharedOutputStream::connectStreamSplitterLocked() {
 
     return res;
 }
+
+status_t Camera3SharedOutputStream::attachBufferToSplitterLocked(
+        ANativeWindowBuffer* anb,
+        const std::vector<size_t>& surface_ids) {
+    status_t res = OK;
+
+    // Attach the buffer to the splitter output queues. This could block if
+    // the output queue doesn't have any empty slot. So unlock during the course
+    // of attachBufferToOutputs.
+    sp<Camera3StreamSplitter> splitter = mStreamSplitter;
+    mLock.unlock();
+    res = splitter->attachBufferToOutputs(anb, surface_ids);
+    mLock.lock();
+    if (res != OK) {
+        ALOGE("%s: Stream %d: Cannot attach stream splitter buffer to outputs: %s (%d)",
+                __FUNCTION__, mId, strerror(-res), res);
+        // Only transition to STATE_ABANDONED from STATE_CONFIGURED. (If it is STATE_PREPARING,
+        // let prepareNextBuffer handle the error.)
+        if (res == NO_INIT && mState == STATE_CONFIGURED) {
+            mState = STATE_ABANDONED;
+        }
+    }
+    return res;
+}
+
 
 status_t Camera3SharedOutputStream::notifyBufferReleased(ANativeWindowBuffer *anwBuffer) {
     Mutex::Autolock l(mLock);
@@ -89,7 +119,7 @@ bool Camera3SharedOutputStream::isConsumerConfigurationDeferred(size_t surface_i
         return true;
     }
 
-    return (mSurfaces[surface_id] == nullptr);
+    return (mSurfaceUniqueIds[surface_id].first == nullptr);
 }
 
 status_t Camera3SharedOutputStream::setConsumers(const std::vector<sp<Surface>>& surfaces) {
@@ -112,7 +142,7 @@ status_t Camera3SharedOutputStream::setConsumers(const std::vector<sp<Surface>>&
             return NO_MEMORY;
         }
 
-        mSurfaces[id] = surface;
+        mSurfaceUniqueIds[id] = std::make_pair(surface, mNextUniqueSurfaceId++);
 
         // Only call addOutput if the splitter has been connected.
         if (mStreamSplitter != nullptr) {
@@ -128,7 +158,7 @@ status_t Camera3SharedOutputStream::setConsumers(const std::vector<sp<Surface>>&
 }
 
 status_t Camera3SharedOutputStream::getBufferLocked(camera3_stream_buffer *buffer,
-        const std::vector<size_t>& surface_ids) {
+        const std::vector<size_t>& surfaceIds) {
     ANativeWindowBuffer* anb;
     int fenceFd = -1;
 
@@ -138,27 +168,11 @@ status_t Camera3SharedOutputStream::getBufferLocked(camera3_stream_buffer *buffe
         return res;
     }
 
-    // TODO: need to refactor this to support requestStreamBuffers API
-    // Need to wait until processCaptureResult to decide the source buffer
-    // to attach to output...
-
-    // Attach the buffer to the splitter output queues. This could block if
-    // the output queue doesn't have any empty slot. So unlock during the course
-    // of attachBufferToOutputs.
-    sp<Camera3StreamSplitter> splitter = mStreamSplitter;
-    mLock.unlock();
-    res = splitter->attachBufferToOutputs(anb, surface_ids);
-    mLock.lock();
-    if (res != OK) {
-        ALOGE("%s: Stream %d: Cannot attach stream splitter buffer to outputs: %s (%d)",
-                __FUNCTION__, mId, strerror(-res), res);
-        // Only transition to STATE_ABANDONED from STATE_CONFIGURED. (If it is STATE_PREPARING,
-        // let prepareNextBuffer handle the error.)
-        if (res == NO_INIT && mState == STATE_CONFIGURED) {
-            mState = STATE_ABANDONED;
+    if (!mUseHalBufManager) {
+        res = attachBufferToSplitterLocked(anb, surfaceIds);
+        if (res != OK) {
+            return res;
         }
-
-        return res;
     }
 
     /**
@@ -172,8 +186,38 @@ status_t Camera3SharedOutputStream::getBufferLocked(camera3_stream_buffer *buffe
 }
 
 status_t Camera3SharedOutputStream::queueBufferToConsumer(sp<ANativeWindow>& consumer,
-            ANativeWindowBuffer* buffer, int anwReleaseFence) {
-    status_t res = consumer->queueBuffer(consumer.get(), buffer, anwReleaseFence);
+            ANativeWindowBuffer* buffer, int anwReleaseFence,
+            const std::vector<size_t>& uniqueSurfaceIds) {
+    status_t res = OK;
+    if (mUseHalBufManager) {
+        if (uniqueSurfaceIds.size() == 0) {
+            ALOGE("%s: uniqueSurfaceIds must not be empty!", __FUNCTION__);
+            return BAD_VALUE;
+        }
+        Mutex::Autolock l(mLock);
+        std::vector<size_t> surfaceIds;
+        for (const auto& uniqueId : uniqueSurfaceIds) {
+            bool uniqueIdFound = false;
+            for (size_t i = 0; i < kMaxOutputs; i++) {
+                if (mSurfaceUniqueIds[i].second == uniqueId) {
+                    surfaceIds.push_back(i);
+                    uniqueIdFound = true;
+                    break;
+                }
+            }
+            if (!uniqueIdFound) {
+                ALOGV("%s: unknown unique surface ID %zu for stream %d: "
+                        "output might have been removed.",
+                        __FUNCTION__, uniqueId, mId);
+            }
+        }
+        res = attachBufferToSplitterLocked(buffer, surfaceIds);
+        if (res != OK) {
+            return res;
+        }
+    }
+
+    res = consumer->queueBuffer(consumer.get(), buffer, anwReleaseFence);
 
     // After queuing buffer to the internal consumer queue, check whether the buffer is
     // successfully queued to the output queues.
@@ -232,8 +276,8 @@ status_t Camera3SharedOutputStream::getEndpointUsage(uint64_t *usage) const {
         *usage = getPresetConsumerUsage();
 
         for (size_t id = 0; id < kMaxOutputs; id++) {
-            if (mSurfaces[id] != nullptr) {
-                res = getEndpointUsageForSurface(&u, mSurfaces[id]);
+            if (mSurfaceUniqueIds[id].first != nullptr) {
+                res = getEndpointUsageForSurface(&u, mSurfaceUniqueIds[id].first);
                 *usage |= u;
             }
         }
@@ -249,7 +293,7 @@ status_t Camera3SharedOutputStream::getEndpointUsage(uint64_t *usage) const {
 ssize_t Camera3SharedOutputStream::getNextSurfaceIdLocked() {
     ssize_t id = -1;
     for (size_t i = 0; i < kMaxOutputs; i++) {
-        if (mSurfaces[i] == nullptr) {
+        if (mSurfaceUniqueIds[i].first == nullptr) {
             id = i;
             break;
         }
@@ -262,13 +306,33 @@ ssize_t Camera3SharedOutputStream::getSurfaceId(const sp<Surface> &surface) {
     Mutex::Autolock l(mLock);
     ssize_t id = -1;
     for (size_t i = 0; i < kMaxOutputs; i++) {
-        if (mSurfaces[i] == surface) {
+        if (mSurfaceUniqueIds[i].first == surface) {
             id = i;
             break;
         }
     }
 
     return id;
+}
+
+status_t Camera3SharedOutputStream::getUniqueSurfaceIds(
+        const std::vector<size_t>& surfaceIds,
+        /*out*/std::vector<size_t>* outUniqueIds) {
+    Mutex::Autolock l(mLock);
+    if (outUniqueIds == nullptr || surfaceIds.size() > kMaxOutputs) {
+        return BAD_VALUE;
+    }
+
+    outUniqueIds->clear();
+    outUniqueIds->reserve(surfaceIds.size());
+
+    for (const auto& surfaceId : surfaceIds) {
+        if (surfaceId >= kMaxOutputs) {
+            return BAD_VALUE;
+        }
+        outUniqueIds->push_back(mSurfaceUniqueIds[surfaceId].second);
+    }
+    return OK;
 }
 
 status_t Camera3SharedOutputStream::revertPartialUpdateLocked(
@@ -284,7 +348,7 @@ status_t Camera3SharedOutputStream::revertPartialUpdateLocked(
                 return UNKNOWN_ERROR;
             }
         }
-        mSurfaces[index] = nullptr;
+        mSurfaceUniqueIds[index] = std::make_pair(nullptr, mNextUniqueSurfaceId++);
     }
 
     for (size_t i = 0; i < removedSurfaces.size(); i++) {
@@ -295,7 +359,8 @@ status_t Camera3SharedOutputStream::revertPartialUpdateLocked(
                 return UNKNOWN_ERROR;
             }
         }
-        mSurfaces[index] = removedSurfaces.keyAt(i);
+        mSurfaceUniqueIds[index] = std::make_pair(
+                removedSurfaces.keyAt(i), mNextUniqueSurfaceId++);
     }
 
     return ret;
@@ -347,8 +412,8 @@ status_t Camera3SharedOutputStream::updateStream(const std::vector<sp<Surface>> 
 
             }
         }
-        mSurfaces[it] = nullptr;
-        removedSurfaces.add(mSurfaces[it], it);
+        removedSurfaces.add(mSurfaceUniqueIds[it].first, it);
+        mSurfaceUniqueIds[it] = std::make_pair(nullptr, mNextUniqueSurfaceId++);
     }
 
     //Next add the new outputs
@@ -373,7 +438,7 @@ status_t Camera3SharedOutputStream::updateStream(const std::vector<sp<Surface>> 
                 return ret;
             }
         }
-        mSurfaces[surfaceId] = it;
+        mSurfaceUniqueIds[surfaceId] = std::make_pair(it, mNextUniqueSurfaceId++);
         outputMap->add(it, surfaceId);
     }
 

@@ -190,6 +190,9 @@ class Camera3OutputStream :
      */
     virtual ssize_t getSurfaceId(const sp<Surface> &/*surface*/) { return 0; }
 
+    virtual status_t getUniqueSurfaceIds(const std::vector<size_t>&,
+            /*out*/std::vector<size_t>*) { return INVALID_OPERATION; };
+
     /**
      * Update the stream output surfaces.
      */
@@ -213,6 +216,7 @@ class Camera3OutputStream :
             const camera3_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
+            const std::vector<size_t>& surface_ids,
             /*out*/
             sp<Fence> *releaseFenceOut);
 
@@ -285,10 +289,11 @@ class Camera3OutputStream :
 
     virtual status_t returnBufferLocked(
             const camera3_stream_buffer &buffer,
-            nsecs_t timestamp);
+            nsecs_t timestamp, const std::vector<size_t>& surface_ids);
 
     virtual status_t queueBufferToConsumer(sp<ANativeWindow>& consumer,
-            ANativeWindowBuffer* buffer, int anwReleaseFence);
+            ANativeWindowBuffer* buffer, int anwReleaseFence,
+            const std::vector<size_t>& surface_ids);
 
     virtual status_t configureQueueLocked();
 
