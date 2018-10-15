@@ -2318,7 +2318,7 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
                     return NULL;
                 }
             }
-            newRequest->mOutputSurfaces[i] = surfaces;
+            newRequest->mOutputSurfaces[streams.data.i32[i]] = surfaces;
         }
 
         // Lazy completion of stream configuration (allocation/registration)
@@ -4930,14 +4930,13 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
 
             res = outputStream->getBuffer(&outputBuffers->editItemAt(j),
                     waitDuration,
-                    captureRequest->mOutputSurfaces[j]);
+                    captureRequest->mOutputSurfaces[outputStream->getId()]);
             if (res != OK) {
                 // Can't get output buffer from gralloc queue - this could be due to
                 // abandoned queue or other consumer misbehavior, so not a fatal
                 // error
                 ALOGE("RequestThread: Can't get output buffer, skipping request:"
                         " %s (%d)", strerror(-res), res);
-
                 return TIMED_OUT;
             }
 
