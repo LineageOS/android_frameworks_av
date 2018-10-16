@@ -186,6 +186,7 @@ routing_strategy Engine::getStrategyForStream(audio_stream_type_t stream)
         return STRATEGY_DTMF;
     default:
         ALOGE("unknown stream type %d", stream);
+        FALLTHROUGH_INTENDED;
     case AUDIO_STREAM_SYSTEM:
         // NOTE: SYSTEM stream uses MEDIA strategy because muting music and switching outputs
         // while key clicks are played produces a poor result

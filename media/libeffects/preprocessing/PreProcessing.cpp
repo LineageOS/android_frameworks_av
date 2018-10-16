@@ -698,6 +698,7 @@ int Effect_SetState(preproc_effect_t *effect, uint32_t state)
         case PREPROC_EFFECT_STATE_ACTIVE:
             effect->ops->disable(effect);
             Session_SetProcEnabled(effect->session, effect->procId, false);
+            break;
         case PREPROC_EFFECT_STATE_CONFIG:
         case PREPROC_EFFECT_STATE_CREATED:
         case PREPROC_EFFECT_STATE_INIT:
