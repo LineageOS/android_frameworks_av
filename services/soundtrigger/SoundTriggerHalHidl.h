@@ -27,6 +27,7 @@
 #include "SoundTriggerHalInterface.h"
 #include <android/hardware/soundtrigger/2.0/types.h>
 #include <android/hardware/soundtrigger/2.1/ISoundTriggerHw.h>
+#include <android/hardware/soundtrigger/2.2/ISoundTriggerHw.h>
 #include <android/hardware/soundtrigger/2.0/ISoundTriggerHwCallback.h>
 #include <android/hardware/soundtrigger/2.1/ISoundTriggerHwCallback.h>
 
@@ -46,6 +47,8 @@ using V2_1_ISoundTriggerHw =
 using V2_1_ISoundTriggerHwCallback =
         ::android::hardware::soundtrigger::V2_1::ISoundTriggerHwCallback;
 using ::android::hidl::memory::V1_0::IMemory;
+using V2_2_ISoundTriggerHw =
+        ::android::hardware::soundtrigger::V2_2::ISoundTriggerHw;
 
 class SoundTriggerHalHidl : public SoundTriggerHalInterface,
                             public virtual V2_1_ISoundTriggerHwCallback
@@ -91,6 +94,14 @@ public:
          * If no implementation is provided, stop_recognition will be called for each running model.
          */
         virtual int stopAllRecognitions();
+
+        /* Get the current state of a given model.
+         * Returns 0 or an error code. If successful it also sets indicated the event pointer
+         * and expectes that the caller will free the memory.
+         * Only supported for device api versions SOUND_TRIGGER_DEVICE_API_VERSION_1_2 or above.
+         */
+        virtual int getModelState(sound_model_handle_t handle,
+                                  struct sound_trigger_recognition_event** event);
 
         // ISoundTriggerHwCallback
         virtual ::android::hardware::Return<void> recognitionCallback(
@@ -182,6 +193,7 @@ private:
         uint32_t nextUniqueId();
         sp<ISoundTriggerHw> getService();
         sp<V2_1_ISoundTriggerHw> toService2_1(const sp<ISoundTriggerHw>& s);
+        sp<V2_2_ISoundTriggerHw> toService2_2(const sp<ISoundTriggerHw>& s);
         sp<SoundModel> getModel(sound_model_handle_t handle);
         sp<SoundModel> removeModel(sound_model_handle_t handle);
 
