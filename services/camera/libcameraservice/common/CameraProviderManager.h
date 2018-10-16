@@ -385,6 +385,9 @@ private:
             CameraMetadata mCameraCharacteristics;
             std::unordered_map<std::string, CameraMetadata> mPhysicalCameraCharacteristics;
             void queryPhysicalCameraIds();
+            status_t fixupMonochromeTags();
+            status_t removeAvailableKeys(CameraMetadata& c, const std::vector<uint32_t>& keys,
+                    uint32_t keyTag);
         };
 
     private:

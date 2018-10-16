@@ -79,7 +79,8 @@ Camera3Device::Camera3Device(const String8 &id):
         mNextReprocessShutterFrameNumber(0),
         mListener(NULL),
         mVendorTagId(CAMERA_METADATA_INVALID_VENDOR_ID),
-        mLastTemplateId(-1)
+        mLastTemplateId(-1),
+        mNeedFixupMonochromeTags(false)
 {
     ATRACE_CALL();
     ALOGV("%s: Created device for camera %s", __FUNCTION__, mId.string());
@@ -187,6 +188,28 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
     if (!monitorTags.isEmpty()) {
         mTagMonitor.parseTagsToMonitor(String8(monitorTags));
     }
+
+    // Metadata tags needs fixup for monochrome camera device version less
+    // than 3.5.
+    hardware::hidl_version maxVersion{0,0};
+    res = manager->getHighestSupportedVersion(mId.string(), &maxVersion);
+    if (res != OK) {
+        ALOGE("%s: Error in getting camera device version id: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+        return res;
+    }
+    int deviceVersion = HARDWARE_DEVICE_API_VERSION(
+            maxVersion.get_major(), maxVersion.get_minor());
+
+    bool isMonochrome = false;
+    camera_metadata_entry_t entry = mDeviceInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    for (size_t i = 0; i < entry.count; i++) {
+        uint8_t capability = entry.data.u8[i];
+        if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_MONOCHROME) {
+            isMonochrome = true;
+        }
+    }
+    mNeedFixupMonochromeTags = (isMonochrome && deviceVersion < CAMERA_DEVICE_API_VERSION_3_5);
 
     return initializeCommonLocked();
 }
@@ -3276,6 +3299,13 @@ void Camera3Device::sendPartialCaptureResult(const camera_metadata_t * partialRe
     captureResult.mResultExtras = resultExtras;
     captureResult.mMetadata = partialResult;
 
+    // Fix up result metadata for monochrome camera.
+    status_t res = fixupMonochromeTags(mDeviceInfo, captureResult.mMetadata);
+    if (res != OK) {
+        SET_ERR("Failed to override result metadata: %s (%d)", strerror(-res), res);
+        return;
+    }
+
     insertResultLocked(&captureResult, frameNumber);
 }
 
@@ -3346,6 +3376,21 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
         SET_ERR("Unable to correct capture result metadata for frame %d: %s (%d)",
                 frameNumber, strerror(res), res);
         return;
+    }
+    // Fix up result metadata for monochrome camera.
+    res = fixupMonochromeTags(mDeviceInfo, captureResult.mMetadata);
+    if (res != OK) {
+        SET_ERR("Failed to override result metadata: %s (%d)", strerror(-res), res);
+        return;
+    }
+    for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
+        String8 cameraId8(physicalMetadata.mPhysicalCameraId);
+        res = fixupMonochromeTags(mPhysicalDeviceInfoMap.at(cameraId8.c_str()),
+                physicalMetadata.mPhysicalCameraMetadata);
+        if (res != OK) {
+            SET_ERR("Failed to override result metadata: %s (%d)", strerror(-res), res);
+            return;
+        }
     }
 
     mTagMonitor.monitorMetadata(TagMonitor::RESULT,
@@ -3519,7 +3564,7 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
             if (shutterTimestamp == 0) {
                 request.pendingMetadata = result->result;
                 request.collectedPartialResult = collectedPartialResult;
-           } else if (request.hasCallback) {
+            } else if (request.hasCallback) {
                 CameraMetadata metadata;
                 metadata = result->result;
                 sendCaptureResult(metadata, request.resultExtras,
@@ -6296,6 +6341,77 @@ bool Camera3Device::RequestBufferStateMachine::checkSwitchToStopLocked() {
         return true;
     }
     return false;
+}
+
+status_t Camera3Device::fixupMonochromeTags(const CameraMetadata& deviceInfo,
+        CameraMetadata& resultMetadata) {
+    status_t res = OK;
+    if (!mNeedFixupMonochromeTags) {
+        return res;
+    }
+
+    // Remove tags that are not applicable to monochrome camera.
+    int32_t tagsToRemove[] = {
+           ANDROID_SENSOR_GREEN_SPLIT,
+           ANDROID_SENSOR_NEUTRAL_COLOR_POINT,
+           ANDROID_COLOR_CORRECTION_MODE,
+           ANDROID_COLOR_CORRECTION_TRANSFORM,
+           ANDROID_COLOR_CORRECTION_GAINS,
+    };
+    for (auto tag : tagsToRemove) {
+        res = resultMetadata.erase(tag);
+        if (res != OK) {
+            ALOGE("%s: Failed to remove tag %d for monochrome camera", __FUNCTION__, tag);
+            return res;
+        }
+    }
+
+    // ANDROID_SENSOR_DYNAMIC_BLACK_LEVEL
+    camera_metadata_entry blEntry = resultMetadata.find(ANDROID_SENSOR_DYNAMIC_BLACK_LEVEL);
+    for (size_t i = 1; i < blEntry.count; i++) {
+        blEntry.data.f[i] = blEntry.data.f[0];
+    }
+
+    // ANDROID_SENSOR_NOISE_PROFILE
+    camera_metadata_entry npEntry = resultMetadata.find(ANDROID_SENSOR_NOISE_PROFILE);
+    if (npEntry.count > 0 && npEntry.count % 2 == 0) {
+        double np[] = {npEntry.data.d[0], npEntry.data.d[1]};
+        res = resultMetadata.update(ANDROID_SENSOR_NOISE_PROFILE, np, 2);
+        if (res != OK) {
+             ALOGE("%s: Failed to update SENSOR_NOISE_PROFILE: %s (%d)",
+                    __FUNCTION__, strerror(-res), res);
+            return res;
+        }
+    }
+
+    // ANDROID_STATISTICS_LENS_SHADING_MAP
+    camera_metadata_ro_entry lsSizeEntry = deviceInfo.find(ANDROID_LENS_INFO_SHADING_MAP_SIZE);
+    camera_metadata_entry lsEntry = resultMetadata.find(ANDROID_STATISTICS_LENS_SHADING_MAP);
+    if (lsSizeEntry.count == 2 && lsEntry.count > 0
+            && (int32_t)lsEntry.count == 4 * lsSizeEntry.data.i32[0] * lsSizeEntry.data.i32[1]) {
+        for (int32_t i = 0; i < lsSizeEntry.data.i32[0] * lsSizeEntry.data.i32[1]; i++) {
+            lsEntry.data.f[4*i+1] = lsEntry.data.f[4*i];
+            lsEntry.data.f[4*i+2] = lsEntry.data.f[4*i];
+            lsEntry.data.f[4*i+3] = lsEntry.data.f[4*i];
+        }
+    }
+
+    // ANDROID_TONEMAP_CURVE_BLUE
+    // ANDROID_TONEMAP_CURVE_GREEN
+    // ANDROID_TONEMAP_CURVE_RED
+    camera_metadata_entry tcbEntry = resultMetadata.find(ANDROID_TONEMAP_CURVE_BLUE);
+    camera_metadata_entry tcgEntry = resultMetadata.find(ANDROID_TONEMAP_CURVE_GREEN);
+    camera_metadata_entry tcrEntry = resultMetadata.find(ANDROID_TONEMAP_CURVE_RED);
+    if (tcbEntry.count > 0
+            && tcbEntry.count == tcgEntry.count
+            && tcbEntry.count == tcrEntry.count) {
+        for (size_t i = 0; i < tcbEntry.count; i++) {
+            tcbEntry.data.f[i] = tcrEntry.data.f[i];
+            tcgEntry.data.f[i] = tcrEntry.data.f[i];
+        }
+    }
+
+    return res;
 }
 
 }; // namespace android

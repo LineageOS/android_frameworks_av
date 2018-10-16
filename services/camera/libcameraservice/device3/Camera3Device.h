@@ -1324,6 +1324,9 @@ class Camera3Device :
         int  mRequestBufferStatusId;
     } mRequestBufferSM;
 
+    // Fix up result metadata for monochrome camera.
+    bool mNeedFixupMonochromeTags;
+    status_t fixupMonochromeTags(const CameraMetadata& deviceInfo, CameraMetadata& resultMetadata);
 }; // class Camera3Device
 
 }; // namespace android
