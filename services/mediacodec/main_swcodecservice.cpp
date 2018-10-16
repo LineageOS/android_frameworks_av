@@ -20,10 +20,13 @@
 // from LOCAL_C_INCLUDES
 #include "minijail.h"
 
+#include <android-base/properties.h>
 #include <binder/ProcessState.h>
+#include <dlfcn.h>
 #include <hidl/HidlTransportSupport.h>
 #include <media/CodecServiceRegistrant.h>
-#include <dlfcn.h>
+
+#include "MediaCodecUpdateService.h"
 
 using namespace android;
 
@@ -39,6 +42,11 @@ int main(int argc __unused, char** /*argv*/)
     LOG(INFO) << "media swcodec service starting";
     signal(SIGPIPE, SIG_IGN);
     SetUpMinijail(kSystemSeccompPolicyPath, kVendorSeccompPolicyPath);
+
+    std::string value = base::GetProperty("ro.build.type", "unknown");
+    if (value == "userdebug" || value == "eng") {
+        media::MediaCodecUpdateService::instantiate();
+    }
 
     android::ProcessState::self()->startThreadPool();
 
