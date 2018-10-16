@@ -1823,17 +1823,34 @@ void AudioFlinger::RecordThread::RecordTrack::destroy()
     // see comments at AudioFlinger::PlaybackThread::Track::destroy()
     sp<RecordTrack> keep(this);
     {
-        if (isExternalTrack()) {
-            if (mState == ACTIVE || mState == RESUMING) {
-                AudioSystem::stopInput(mPortId);
-            }
-            AudioSystem::releaseInput(mPortId);
-        }
+        track_state priorState = mState;
         sp<ThreadBase> thread = mThread.promote();
         if (thread != 0) {
             Mutex::Autolock _l(thread->mLock);
             RecordThread *recordThread = (RecordThread *) thread.get();
-            recordThread->destroyTrack_l(this);
+            priorState = mState;
+            recordThread->destroyTrack_l(this); // move mState to STOPPED, terminate
+        }
+        // APM portid/client management done outside of lock.
+        // NOTE: if thread doesn't exist, the input descriptor probably doesn't either.
+        if (isExternalTrack()) {
+            switch (priorState) {
+            case ACTIVE:     // invalidated while still active
+            case STARTING_2: // invalidated/start-aborted after startInput successfully called
+            case PAUSING:    // invalidated while in the middle of stop() pausing (still active)
+                AudioSystem::stopInput(mPortId);
+                break;
+
+            case STARTING_1: // invalidated/start-aborted and startInput not successful
+            case PAUSED:     // OK, not active
+            case IDLE:       // OK, not active
+                break;
+
+            case STOPPED:    // unexpected (destroyed)
+            default:
+                LOG_ALWAYS_FATAL("%s(%d): invalid prior state: %d", __func__, mId, priorState);
+            }
+            AudioSystem::releaseInput(mPortId);
         }
     }
 }
