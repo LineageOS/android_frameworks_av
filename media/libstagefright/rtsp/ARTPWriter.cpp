@@ -400,8 +400,10 @@ void ARTPWriter::addSDES(const sp<ABuffer> &buffer) {
         switch (count) {
             case 3:
                 data[offset++] = 0;
+                [[fallthrough]];
             case 2:
                 data[offset++] = 0;
+                [[fallthrough]];
             case 1:
                 data[offset++] = 0;
         }
