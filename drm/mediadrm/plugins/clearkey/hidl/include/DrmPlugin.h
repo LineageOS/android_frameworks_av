@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <map>
 
+#include "DeviceFiles.h"
 #include "SessionLibrary.h"
 #include "Utils.h"
 
@@ -53,7 +54,7 @@ using ::android::sp;
 struct DrmPlugin : public IDrmPlugin {
     explicit DrmPlugin(SessionLibrary* sessionLibrary);
 
-    virtual ~DrmPlugin() {}
+    virtual ~DrmPlugin() { mFileHandle.DeleteAllLicenses(); }
 
     Return<void> openSession(openSession_cb _hidl_cb) override;
     Return<void> openSession_1_1(SecurityLevel securityLevel,
@@ -91,13 +92,7 @@ struct DrmPlugin : public IDrmPlugin {
 
     Return<Status> restoreKeys(
         const hidl_vec<uint8_t>& sessionId,
-        const hidl_vec<uint8_t>& keySetId) {
-
-        if (sessionId.size() == 0 || keySetId.size() == 0) {
-            return Status::BAD_VALUE;
-        }
-        return Status::ERROR_DRM_CANNOT_HANDLE;
-    }
+        const hidl_vec<uint8_t>& keySetId) override;
 
     Return<void> queryKeyStatus(
         const hidl_vec<uint8_t>& sessionId,
@@ -300,6 +295,7 @@ struct DrmPlugin : public IDrmPlugin {
 private:
     void initProperties();
     void installSecureStop(const hidl_vec<uint8_t>& sessionId);
+    bool makeKeySetId(std::string* keySetId);
     void setPlayPolicy();
 
     Return<Status> setSecurityLevel(const hidl_vec<uint8_t>& sessionId,
@@ -330,6 +326,8 @@ private:
     int64_t mCloseSessionOkCount;
     int64_t mCloseSessionNotOpenedCount;
     uint32_t mNextSecureStopId;
+
+    DeviceFiles mFileHandle;
 
     CLEARKEY_DISALLOW_COPY_AND_ASSIGN_AND_NEW(DrmPlugin);
 };

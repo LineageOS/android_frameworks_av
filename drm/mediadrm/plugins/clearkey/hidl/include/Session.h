@@ -42,8 +42,9 @@ public:
     const std::vector<uint8_t>& sessionId() const { return mSessionId; }
 
     Status getKeyRequest(
-            const std::vector<uint8_t>& mimeType,
-            const std::string& initDataType,
+            const std::vector<uint8_t>& initDataType,
+            const std::string& mimeType,
+            V1_0::KeyType keyType,
             std::vector<uint8_t>* keyRequest) const;
 
     Status provideKeyResponse(

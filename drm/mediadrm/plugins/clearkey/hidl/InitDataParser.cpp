@@ -45,21 +45,22 @@ std::vector<uint8_t> StrToVector(const std::string& str) {
 }
 
 Status InitDataParser::parse(const std::vector<uint8_t>& initData,
-        const std::string& type,
+        const std::string& mimeType,
+        V1_0::KeyType keyType,
         std::vector<uint8_t>* licenseRequest) {
     // Build a list of the key IDs
     std::vector<const uint8_t*> keyIds;
 
-    if (type == kIsoBmffVideoMimeType ||
-        type == kIsoBmffAudioMimeType ||
-        type == kCencInitDataFormat) {
+    if (mimeType == kIsoBmffVideoMimeType ||
+        mimeType == kIsoBmffAudioMimeType ||
+        mimeType == kCencInitDataFormat) {
         Status res = parsePssh(initData, &keyIds);
         if (res != Status::OK) {
             return res;
         }
-    } else if (type == kWebmVideoMimeType ||
-        type == kWebmAudioMimeType ||
-        type == kWebmInitDataFormat) {
+    } else if (mimeType == kWebmVideoMimeType ||
+        mimeType == kWebmAudioMimeType ||
+        mimeType == kWebmInitDataFormat) {
         // WebM "init data" is just a single key ID
         if (initData.size() != kKeyIdSize) {
             return Status::ERROR_DRM_CANNOT_HANDLE;
@@ -69,8 +70,12 @@ Status InitDataParser::parse(const std::vector<uint8_t>& initData,
         return Status::ERROR_DRM_CANNOT_HANDLE;
     }
 
+    if (keyType == V1_0::KeyType::RELEASE) {
+        // restore key
+    }
+
     // Build the request
-    std::string requestJson = generateRequest(keyIds);
+    std::string requestJson = generateRequest(keyType, keyIds);
     std::vector<uint8_t> requestJsonVec = StrToVector(requestJson);
 
     licenseRequest->clear();
@@ -131,9 +136,11 @@ Status InitDataParser::parsePssh(const std::vector<uint8_t>& initData,
     return Status::OK;
 }
 
-std::string InitDataParser::generateRequest(const std::vector<const uint8_t*>& keyIds) {
+std::string InitDataParser::generateRequest(V1_0::KeyType keyType,
+        const std::vector<const uint8_t*>& keyIds) {
     const std::string kRequestPrefix("{\"kids\":[");
-    const std::string kRequestSuffix("],\"type\":\"temporary\"}");
+    const std::string kTemporarySession("],\"type\":\"temporary\"}");
+    const std::string kPersistentSession("],\"type\":\"persistent-license\"}");
 
     std::string request(kRequestPrefix);
     std::string encodedId;
@@ -147,7 +154,11 @@ std::string InitDataParser::generateRequest(const std::vector<const uint8_t*>& k
         request.append(encodedId);
         request.push_back('\"');
     }
-    request.append(kRequestSuffix);
+    if (keyType == V1_0::KeyType::STREAMING) {
+        request.append(kTemporarySession);
+    } else if (keyType == V1_0::KeyType::OFFLINE) {
+            request.append(kPersistentSession);
+    }
 
     // Android's Base64 encoder produces padding. EME forbids padding.
     const char kBase64Padding = '=';

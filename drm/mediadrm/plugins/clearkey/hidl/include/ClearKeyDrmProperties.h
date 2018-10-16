@@ -28,7 +28,7 @@ namespace clearkey {
 static const std::string kVendorKey("vendor");
 static const std::string kVendorValue("Google");
 static const std::string kVersionKey("version");
-static const std::string kVersionValue("1.1");
+static const std::string kVersionValue("1.2");
 static const std::string kPluginDescriptionKey("description");
 static const std::string kPluginDescriptionValue("ClearKey CDM");
 static const std::string kAlgorithmsKey("algorithms");
