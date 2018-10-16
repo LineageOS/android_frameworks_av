@@ -321,7 +321,7 @@ MediaPlayer2::MediaPlayer2() {
     mSeekMode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC;
     mCurrentState = MEDIA_PLAYER2_IDLE;
     mLoop = false;
-    mLeftVolume = mRightVolume = 1.0;
+    mVolume = 1.0;
     mVideoWidth = mVideoHeight = 0;
     mAudioSessionId = (audio_session_t) AudioSystem::newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
     AudioSystem::acquireAudioSessionId(mAudioSessionId, -1);
@@ -630,7 +630,7 @@ status_t MediaPlayer2::start() {
         mPlayer->setLooping(mLoop);
 
         if (mAudioOutput != 0) {
-            mAudioOutput->setVolume(mLeftVolume, mRightVolume);
+            mAudioOutput->setVolume(mVolume);
         }
 
         if (mAudioOutput != 0) {
@@ -968,13 +968,12 @@ bool MediaPlayer2::isLooping() {
     return false;
 }
 
-status_t MediaPlayer2::setVolume(float leftVolume, float rightVolume) {
-    ALOGV("MediaPlayer2::setVolume(%f, %f)", leftVolume, rightVolume);
+status_t MediaPlayer2::setVolume(float volume) {
+    ALOGV("MediaPlayer2::setVolume(%f)", volume);
     Mutex::Autolock _l(mLock);
-    mLeftVolume = leftVolume;
-    mRightVolume = rightVolume;
+    mVolume = volume;
     if (mAudioOutput != 0) {
-        mAudioOutput->setVolume(leftVolume, rightVolume);
+        mAudioOutput->setVolume(volume);
     }
     return OK;
 }

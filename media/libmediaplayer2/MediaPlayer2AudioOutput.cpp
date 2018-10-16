@@ -44,8 +44,8 @@ status_t MediaPlayer2AudioOutput::dump(int fd, const Vector<String16>& args) con
     String8 result;
 
     result.append(" MediaPlayer2AudioOutput\n");
-    snprintf(buffer, 255, "  stream type(%d), left - right volume(%f, %f)\n",
-            mStreamType, mLeftVolume, mRightVolume);
+    snprintf(buffer, 255, "  stream type(%d), volume(%f)\n",
+            mStreamType, mVolume);
     result.append(buffer);
     snprintf(buffer, 255, "  msec per frame(%f), latency (%d)\n",
             mMsecsPerFrame, (mTrack != 0) ? mTrack->latency() : -1);
@@ -67,8 +67,7 @@ MediaPlayer2AudioOutput::MediaPlayer2AudioOutput(audio_session_t sessionId, uid_
       mCallbackCookie(NULL),
       mCallbackData(NULL),
       mStreamType(AUDIO_STREAM_MUSIC),
-      mLeftVolume(1.0),
-      mRightVolume(1.0),
+      mVolume(1.0),
       mPlaybackRate(AUDIO_PLAYBACK_RATE_DEFAULT),
       mSampleRateHz(0),
       mMsecsPerFrame(0),
@@ -402,7 +401,7 @@ status_t MediaPlayer2AudioOutput::open(
 
     mCallbackData = newcbd;
     ALOGV("setVolume");
-    t->setVolume(mLeftVolume, mRightVolume);
+    t->setVolume(mVolume);
 
     mSampleRateHz = sampleRate;
     mFlags = flags;
@@ -444,7 +443,7 @@ status_t MediaPlayer2AudioOutput::start() {
         mCallbackData->endTrackSwitch();
     }
     if (mTrack != 0) {
-        mTrack->setVolume(mLeftVolume, mRightVolume);
+        mTrack->setVolume(mVolume);
         mTrack->setAuxEffectSendLevel(mSendLevel);
         status_t status = mTrack->start();
         return status;
@@ -498,13 +497,12 @@ void MediaPlayer2AudioOutput::close() {
     // destruction of the track occurs outside of mutex.
 }
 
-void MediaPlayer2AudioOutput::setVolume(float left, float right) {
-    ALOGV("setVolume(%f, %f)", left, right);
+void MediaPlayer2AudioOutput::setVolume(float volume) {
+    ALOGV("setVolume(%f)", volume);
     Mutex::Autolock lock(mLock);
-    mLeftVolume = left;
-    mRightVolume = right;
+    mVolume = volume;
     if (mTrack != 0) {
-        mTrack->setVolume(left, right);
+        mTrack->setVolume(volume);
     }
 }
 
