@@ -6076,6 +6076,7 @@ void AudioPolicyManager::filterSurroundFormats(FormatVector *formatsPtr) {
                     case AUDIO_FORMAT_DOLBY_TRUEHD:
                     case AUDIO_FORMAT_E_AC3_JOC:
                         mSurroundFormats.insert(format);
+                        break;
                     default:
                         break;
                 }
