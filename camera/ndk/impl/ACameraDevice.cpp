@@ -1290,7 +1290,7 @@ CameraDevice::ServiceCallback::onDeviceError(
         }
         default:
             ALOGE("Unknown error from camera device: %d", errorCode);
-            // no break
+            [[fallthrough]];
         case ERROR_CAMERA_DEVICE:
         case ERROR_CAMERA_SERVICE:
         {
