@@ -234,6 +234,7 @@ void dec_acelp_4p_in_64(
                 dec_6p_6N_2(L_index, 4, 0, pos);
                 add_pulses(pos, 6, k, code);
             }
+            break;
         default:
             break;
     }
