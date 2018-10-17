@@ -153,7 +153,7 @@ cc_library_static {
 filegroup {
     name: "mediaupdateservice_aidl",
     srcs: [
-        "aidl/android/media/IMediaExtractorUpdateService.aidl",
+        "aidl/android/media/IMediaUpdateService.aidl",
     ],
 }
 

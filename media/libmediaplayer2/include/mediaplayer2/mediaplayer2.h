@@ -88,7 +88,7 @@ public:
             status_t        getAudioStreamType(audio_stream_type_t *type);
             status_t        setLooping(int loop);
             bool            isLooping();
-            status_t        setVolume(float leftVolume, float rightVolume);
+            status_t        setVolume(float volume);
             void            notify(int64_t srcId, int msg, int ext1, int ext2,
                                    const PlayerMessage *obj = NULL);
             status_t        invoke(const PlayerMessage &request, PlayerMessage *reply);
@@ -142,8 +142,7 @@ private:
     audio_stream_type_t         mStreamType;
     Parcel*                     mAudioAttributesParcel;
     bool                        mLoop;
-    float                       mLeftVolume;
-    float                       mRightVolume;
+    float                       mVolume;
     int                         mVideoWidth;
     int                         mVideoHeight;
     audio_session_t             mAudioSessionId;

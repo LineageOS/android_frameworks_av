@@ -77,7 +77,7 @@ public:
     }
     void setAudioAttributes(const audio_attributes_t * attributes);
 
-    void setVolume(float left, float right);
+    void setVolume(float volume);
     virtual status_t setPlaybackRate(const AudioPlaybackRate& rate);
     virtual status_t getPlaybackRate(AudioPlaybackRate* rate /* nonnull */);
 
@@ -113,8 +113,7 @@ private:
     CallbackData *          mCallbackData;
     audio_stream_type_t     mStreamType;
     audio_attributes_t *    mAttributes;
-    float                   mLeftVolume;
-    float                   mRightVolume;
+    float                   mVolume;
     AudioPlaybackRate       mPlaybackRate;
     uint32_t                mSampleRateHz; // sample rate of the content, as set in open()
     float                   mMsecsPerFrame;

@@ -25,11 +25,15 @@
 #include "ClearKeyDrmProperties.h"
 #include "Session.h"
 #include "TypeConvert.h"
+#include "Utils.h"
 
 namespace {
+const std::string kKeySetIdPrefix("ckid");
+const int kKeySetIdLength = 16;
 const int kSecureStopIdStart = 100;
+const std::string kOfflineLicense("\"type\":\"persistent-license\"");
 const std::string kStreaming("Streaming");
-const std::string kOffline("Offline");
+const std::string kTemporaryLicense("\"type\":\"temporary\"");
 const std::string kTrue("True");
 
 const std::string kQueryKeyLicenseType("LicenseType");
@@ -66,6 +70,7 @@ DrmPlugin::DrmPlugin(SessionLibrary* sessionLibrary)
     mPlayPolicy.clear();
     initProperties();
     mSecureStops.clear();
+    std::srand(std::time(nullptr));
 }
 
 void DrmPlugin::initProperties() {
@@ -147,25 +152,53 @@ Status DrmPlugin::getKeyRequestCommon(const hidl_vec<uint8_t>& scope,
         std::string *defaultUrl) {
         UNUSED(optionalParameters);
 
+    // GetKeyRequestOfflineKeyTypeNotSupported() in vts 1.0 and 1.1 expects
+    // KeyType::OFFLINE to return ERROR_DRM_CANNOT_HANDLE in clearkey plugin.
+    // Those tests pass in an empty initData, we use the empty initData to
+    // signal the specific use case.
+    if (keyType == KeyType::OFFLINE && 0 == initData.size()) {
+        return Status::ERROR_DRM_CANNOT_HANDLE;
+    }
+
     *defaultUrl = "";
     *keyRequestType = KeyRequestType::UNKNOWN;
     *request = std::vector<uint8_t>();
 
-    if (scope.size() == 0) {
+    if (scope.size() == 0 ||
+            (keyType != KeyType::STREAMING &&
+            keyType != KeyType::OFFLINE &&
+            keyType != KeyType::RELEASE)) {
         return Status::BAD_VALUE;
     }
 
-    if (keyType != KeyType::STREAMING) {
-        return Status::ERROR_DRM_CANNOT_HANDLE;
+    const std::vector<uint8_t> scopeId = toVector(scope);
+    sp<Session> session;
+    if (keyType == KeyType::STREAMING || keyType == KeyType::OFFLINE) {
+        std::vector<uint8_t> sessionId(scopeId.begin(), scopeId.end());
+        session = mSessionLibrary->findSession(sessionId);
+        if (!session.get()) {
+            return Status::ERROR_DRM_SESSION_NOT_OPENED;
+        }
+        *keyRequestType = KeyRequestType::INITIAL;
     }
 
-    sp<Session> session = mSessionLibrary->findSession(toVector(scope));
-    if (!session.get()) {
-        return Status::ERROR_DRM_SESSION_NOT_OPENED;
-    }
+    Status status = session->getKeyRequest(initData, mimeType, keyType, request);
 
-    Status status = session->getKeyRequest(initData, mimeType, request);
-    *keyRequestType = KeyRequestType::INITIAL;
+    if (keyType == KeyType::RELEASE) {
+        std::vector<uint8_t> keySetId(scopeId.begin(), scopeId.end());
+        std::string requestString(request->begin(), request->end());
+        if (requestString.find(kOfflineLicense) != std::string::npos) {
+            std::string emptyResponse;
+            std::string keySetIdString(keySetId.begin(), keySetId.end());
+            if (!mFileHandle.StoreLicense(keySetIdString,
+                    DeviceFiles::kLicenseStateReleasing,
+                    emptyResponse)) {
+                ALOGE("Problem releasing offline license");
+                return Status::ERROR_DRM_UNKNOWN;
+            }
+        }
+        *keyRequestType = KeyRequestType::RELEASE;
+    }
     return status;
 }
 
@@ -227,6 +260,30 @@ void DrmPlugin::setPlayPolicy() {
     mPlayPolicy.push_back(policy);
 }
 
+bool DrmPlugin::makeKeySetId(std::string* keySetId) {
+    if (!keySetId) {
+        ALOGE("keySetId destination not provided");
+        return false;
+    }
+    std::vector<uint8_t> ksid(kKeySetIdPrefix.begin(), kKeySetIdPrefix.end());
+    ksid.resize(kKeySetIdLength);
+    std::vector<uint8_t> randomData((kKeySetIdLength - kKeySetIdPrefix.size()) / 2, 0);
+
+    while (keySetId->empty()) {
+        for (auto itr = randomData.begin(); itr != randomData.end(); ++itr) {
+            *itr = std::rand() % 0xff;
+        }
+        *keySetId = kKeySetIdPrefix + ByteArrayToHexString(
+                reinterpret_cast<const uint8_t*>(randomData.data()), randomData.size());
+        if (mFileHandle.LicenseExists(*keySetId)) {
+            // collision, regenerate
+            ALOGV("Retry generating KeySetId");
+            keySetId->clear();
+        }
+    }
+    return true;
+}
+
 Return<void> DrmPlugin::provideKeyResponse(
         const hidl_vec<uint8_t>& scope,
         const hidl_vec<uint8_t>& response,
@@ -237,44 +294,107 @@ Return<void> DrmPlugin::provideKeyResponse(
         return Void();
     }
 
-    sp<Session> session = mSessionLibrary->findSession(toVector(scope));
-    if (!session.get()) {
-        _hidl_cb(Status::ERROR_DRM_SESSION_NOT_OPENED, hidl_vec<uint8_t>());
-        return Void();
-    }
+    std::string responseString(
+            reinterpret_cast<const char*>(response.data()), response.size());
+    const std::vector<uint8_t> scopeId = toVector(scope);
+    std::vector<uint8_t> sessionId;
+    std::string keySetId;
 
-    setPlayPolicy();
-    std::vector<uint8_t> keySetId;
-    keySetId.clear();
+    Status status = Status::OK;
+    bool isOfflineLicense = responseString.find(kOfflineLicense) != std::string::npos;
+    bool isRelease = (memcmp(scopeId.data(), kKeySetIdPrefix.data(), kKeySetIdPrefix.size()) == 0);
+    if (isRelease) {
+        keySetId.assign(scopeId.begin(), scopeId.end());
+    } else {
+        sessionId.assign(scopeId.begin(), scopeId.end());
+        sp<Session> session = mSessionLibrary->findSession(sessionId);
+        if (!session.get()) {
+            _hidl_cb(Status::ERROR_DRM_SESSION_NOT_OPENED, hidl_vec<uint8_t>());
+            return Void();
+        }
 
-    Status status = session->provideKeyResponse(response);
-    if (status == Status::OK) {
-        // Test calling AMediaDrm listeners.
-        sendEvent(EventType::VENDOR_DEFINED, toVector(scope), toVector(scope));
+        setPlayPolicy();
+        // non offline license returns empty keySetId
+        keySetId.clear();
 
-        sendExpirationUpdate(toVector(scope), 100);
+        status = session->provideKeyResponse(response);
+        if (status == Status::OK) {
+            if (isOfflineLicense) {
+                if (!makeKeySetId(&keySetId)) {
+                    _hidl_cb(Status::ERROR_DRM_UNKNOWN, hidl_vec<uint8_t>());
+                    return Void();
+                }
+                bool ok = mFileHandle.StoreLicense(
+                        keySetId,
+                        DeviceFiles::kLicenseStateActive,
+                        std::string(response.begin(), response.end()));
+                if (!ok) {
+                    ALOGE("Failed to store offline license");
+                }
+            }
 
-        std::vector<KeyStatus> keysStatus;
-        KeyStatus keyStatus;
+            // Test calling AMediaDrm listeners.
+            sendEvent(EventType::VENDOR_DEFINED, sessionId, sessionId);
 
-        std::vector<uint8_t> keyId1 = { 0xA, 0xB, 0xC };
-        keyStatus.keyId = keyId1;
-        keyStatus.type = V1_0::KeyStatusType::USABLE;
-        keysStatus.push_back(keyStatus);
+            sendExpirationUpdate(sessionId, 100);
 
-        std::vector<uint8_t> keyId2 = { 0xD, 0xE, 0xF };
-        keyStatus.keyId = keyId2;
-        keyStatus.type = V1_0::KeyStatusType::EXPIRED;
-        keysStatus.push_back(keyStatus);
+            std::vector<KeyStatus> keysStatus;
+            KeyStatus keyStatus;
 
-        sendKeysChange(toVector(scope), keysStatus, true);
-    }
+            std::vector<uint8_t> keyId1 = { 0xA, 0xB, 0xC };
+            keyStatus.keyId = keyId1;
+            keyStatus.type = V1_0::KeyStatusType::USABLE;
+            keysStatus.push_back(keyStatus);
 
-    installSecureStop(scope);
+            std::vector<uint8_t> keyId2 = { 0xD, 0xE, 0xF };
+            keyStatus.keyId = keyId2;
+            keyStatus.type = V1_0::KeyStatusType::EXPIRED;
+            keysStatus.push_back(keyStatus);
 
-    // Returns status and empty keySetId
-    _hidl_cb(status, toHidlVec(keySetId));
+            sendKeysChange(sessionId, keysStatus, true);
+
+            installSecureStop(sessionId);
+        } else {
+            ALOGE("Failed to add key, error=%d", status);
+        }
+    } // keyType::STREAMING || keyType::OFFLINE
+
+    std::vector<uint8_t> keySetIdVec(keySetId.begin(), keySetId.end());
+    _hidl_cb(status, toHidlVec(keySetIdVec));
     return Void();
+}
+
+Return<Status> DrmPlugin::restoreKeys(
+        const hidl_vec<uint8_t>& sessionId, const hidl_vec<uint8_t>& keySetId) {
+        if (sessionId.size() == 0 || keySetId.size() == 0) {
+            return Status::BAD_VALUE;
+        }
+
+        DeviceFiles::LicenseState licenseState;
+        std::string keySetIdString(keySetId.begin(), keySetId.end());
+        std::string offlineLicense;
+        Status status = Status::OK;
+        if (!mFileHandle.RetrieveLicense(keySetIdString, &licenseState, &offlineLicense)) {
+            ALOGE("Failed to restore offline license");
+            return Status::ERROR_DRM_NO_LICENSE;
+        }
+
+        if (DeviceFiles::kLicenseStateUnknown == licenseState ||
+                DeviceFiles::kLicenseStateReleasing == licenseState) {
+            ALOGE("Invalid license state=%d", licenseState);
+            return Status::ERROR_DRM_NO_LICENSE;
+        }
+
+        sp<Session> session = mSessionLibrary->findSession(toVector(sessionId));
+        if (!session.get()) {
+            return Status::ERROR_DRM_SESSION_NOT_OPENED;
+        }
+        status = session->provideKeyResponse(std::vector<uint8_t>(offlineLicense.begin(),
+                offlineLicense.end()));
+        if (status != Status::OK) {
+            ALOGE("Failed to restore keys");
+        }
+        return status;
 }
 
 Return<void> DrmPlugin::getPropertyString(

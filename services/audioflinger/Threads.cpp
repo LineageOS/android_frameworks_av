@@ -6654,6 +6654,7 @@ reacquire_wakelock:
 
                 case TrackBase::PAUSING:
                     mActiveTracks.remove(activeTrack);
+                    activeTrack->mState = TrackBase::PAUSED;
                     doBroadcast = true;
                     size--;
                     continue;
@@ -6675,12 +6676,12 @@ reacquire_wakelock:
                     allStopped = false;
                     break;
 
-                case TrackBase::IDLE:
-                    i++;
-                    continue;
-
+                case TrackBase::IDLE:    // cannot be on ActiveTracks if idle
+                case TrackBase::PAUSED:  // cannot be on ActiveTracks if paused
+                case TrackBase::STOPPED: // cannot be on ActiveTracks if destroyed/terminated
                 default:
-                    LOG_ALWAYS_FATAL("Unexpected activeTrackState %d", activeTrackState);
+                    LOG_ALWAYS_FATAL("%s: Unexpected active track state:%d, id:%d, tracks:%zu",
+                            __func__, activeTrackState, activeTrack->id(), size);
                 }
 
                 activeTracks.add(activeTrack);
@@ -7323,8 +7324,14 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
     {
         // This section is a rendezvous between binder thread executing start() and RecordThread
         AutoMutex lock(mLock);
+        if (recordTrack->isInvalid()) {
+            recordTrack->clearSyncStartEvent();
+            return INVALID_OPERATION;
+        }
         if (mActiveTracks.indexOf(recordTrack) >= 0) {
             if (recordTrack->mState == TrackBase::PAUSING) {
+                // We haven't stopped yet (moved to PAUSED and not in mActiveTracks)
+                // so no need to startInput().
                 ALOGV("active record track PAUSING -> ACTIVE");
                 recordTrack->mState = TrackBase::ACTIVE;
             } else {
@@ -7344,11 +7351,30 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
             bool silenced;
             status = AudioSystem::startInput(recordTrack->portId(), &silenced);
             mLock.lock();
-            // FIXME should verify that recordTrack is still in mActiveTracks
+            if (recordTrack->isInvalid()) {
+                recordTrack->clearSyncStartEvent();
+                if (status == NO_ERROR && recordTrack->mState == TrackBase::STARTING_1) {
+                    recordTrack->mState = TrackBase::STARTING_2;
+                    // STARTING_2 forces destroy to call stopInput.
+                }
+                return INVALID_OPERATION;
+            }
+            if (recordTrack->mState != TrackBase::STARTING_1) {
+                ALOGW("%s(%d): unsynchronized mState:%d change",
+                    __func__, recordTrack->id(), recordTrack->mState);
+                // Someone else has changed state, let them take over,
+                // leave mState in the new state.
+                recordTrack->clearSyncStartEvent();
+                return INVALID_OPERATION;
+            }
+            // we're ok, but perhaps startInput has failed
             if (status != NO_ERROR) {
+                ALOGW("%s(%d): startInput failed, status %d",
+                    __func__, recordTrack->id(), status);
+                // We are in ActiveTracks if STARTING_1 and valid, so remove from ActiveTracks,
+                // leave in STARTING_1, so destroy() will not call stopInput.
                 mActiveTracks.remove(recordTrack);
                 recordTrack->clearSyncStartEvent();
-                ALOGV("RecordThread::start error %d", status);
                 return status;
             }
             recordTrack->setSilenced(silenced);
@@ -7366,21 +7392,8 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
         recordTrack->mState = TrackBase::STARTING_2;
         // signal thread to start
         mWaitWorkCV.broadcast();
-        if (mActiveTracks.indexOf(recordTrack) < 0) {
-            ALOGV("Record failed to start");
-            status = BAD_VALUE;
-            goto startError;
-        }
         return status;
     }
-
-startError:
-    if (recordTrack->isExternalTrack()) {
-        AudioSystem::stopInput(recordTrack->portId());
-    }
-    recordTrack->clearSyncStartEvent();
-    // FIXME I wonder why we do not reset the state here?
-    return status;
 }
 
 void AudioFlinger::RecordThread::syncStartEventCallback(const wp<SyncEvent>& event)
@@ -7399,24 +7412,26 @@ void AudioFlinger::RecordThread::syncStartEventCallback(const wp<SyncEvent>& eve
 bool AudioFlinger::RecordThread::stop(RecordThread::RecordTrack* recordTrack) {
     ALOGV("RecordThread::stop");
     AutoMutex _l(mLock);
+    // if we're invalid, we can't be on the ActiveTracks.
     if (mActiveTracks.indexOf(recordTrack) < 0 || recordTrack->mState == TrackBase::PAUSING) {
         return false;
     }
     // note that threadLoop may still be processing the track at this point [without lock]
     recordTrack->mState = TrackBase::PAUSING;
-    // signal thread to stop
-    mWaitWorkCV.broadcast();
-    // do not wait for mStartStopCond if exiting
-    if (exitPending()) {
-        return true;
+
+    while (recordTrack->mState == TrackBase::PAUSING && !recordTrack->isInvalid()) {
+        mWaitWorkCV.broadcast(); // signal thread to stop
+        mStartStopCond.wait(mLock);
     }
-    // FIXME incorrect usage of wait: no explicit predicate or loop
-    mStartStopCond.wait(mLock);
-    // if we have been restarted, recordTrack is in mActiveTracks here
-    if (exitPending() || mActiveTracks.indexOf(recordTrack) < 0) {
+
+    if (recordTrack->mState == TrackBase::PAUSED) { // successful stop
         ALOGV("Record stopped OK");
         return true;
     }
+
+    // don't handle anything - we've been invalidated or restarted and in a different state
+    ALOGW_IF("%s(%d): unsynchronized stop, state: %d",
+            __func__, recordTrack->id(), recordTrack->mState);
     return false;
 }
 
