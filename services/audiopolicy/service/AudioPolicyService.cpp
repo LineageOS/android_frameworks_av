@@ -637,6 +637,12 @@ void AudioPolicyService::UidPolicy::updateUidLocked(std::unordered_map<uid_t, bo
     }
 }
 
+bool AudioPolicyService::UidPolicy::isA11yUid(uid_t uid)
+{
+    std::vector<uid_t>::iterator it = find(mA11yUids.begin(), mA11yUids.end(), uid);
+    return it != mA11yUids.end();
+}
+
 // -----------  AudioPolicyService::AudioCommandThread implementation ----------
 
 AudioPolicyService::AudioCommandThread::AudioCommandThread(String8 name,
