@@ -14,6 +14,8 @@
 # limitations under the License.
 #
 
+# TODO(b/118434782): Remove this file and change name of the libcamera2
+# module in the existing Android.bp file to libcamera2ndk.
 LOCAL_PATH:= $(call my-dir)
 
 ifneq ($(TARGET_BUILD_PDK), true)
