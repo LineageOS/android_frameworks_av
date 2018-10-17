@@ -84,12 +84,12 @@ sanitizer_runtime_libraries := $(call normalize-path-list,$(addsuffix .so,\
   $(2ND_UBSAN_RUNTIME_LIBRARY) \
   $(2ND_TSAN_RUNTIME_LIBRARY)))
 
-$(info Sanitizer:  $(sanitizer_runtime_libraries))
+# $(info Sanitizer:  $(sanitizer_runtime_libraries))
 
 llndk_libraries := $(call normalize-path-list,$(addsuffix .so,\
   $(LLNDK_LIBRARIES)))
 
-$(info LLNDK:  $(llndk_libraries))
+# $(info LLNDK:  $(llndk_libraries))
 
 LOCAL_CFLAGS := -DLINKED_LIBRARIES='"$(sanitizer_runtime_libraries):$(llndk_libraries)"'
 
