@@ -1748,29 +1748,32 @@ status_t ACodec::configureCodec(
     }
 
     int32_t storeMeta;
-    if (encoder
-            && msg->findInt32("android._input-metadata-buffer-type", &storeMeta)
-            && storeMeta != kMetadataBufferTypeInvalid) {
-        IOMX::PortMode mode;
-        if (storeMeta == kMetadataBufferTypeNativeHandleSource) {
-            mode = IOMX::kPortModeDynamicNativeHandle;
-        } else if (storeMeta == kMetadataBufferTypeANWBuffer ||
-                storeMeta == kMetadataBufferTypeGrallocSource) {
-            mode = IOMX::kPortModeDynamicANWBuffer;
-        } else {
-            return BAD_VALUE;
+    if (encoder) {
+        IOMX::PortMode mode = IOMX::kPortModePresetByteBuffer;
+        if (msg->findInt32("android._input-metadata-buffer-type", &storeMeta)
+                && storeMeta != kMetadataBufferTypeInvalid) {
+            if (storeMeta == kMetadataBufferTypeNativeHandleSource) {
+                mode = IOMX::kPortModeDynamicNativeHandle;
+            } else if (storeMeta == kMetadataBufferTypeANWBuffer ||
+                    storeMeta == kMetadataBufferTypeGrallocSource) {
+                mode = IOMX::kPortModeDynamicANWBuffer;
+            } else {
+                return BAD_VALUE;
+            }
         }
         err = setPortMode(kPortIndexInput, mode);
         if (err != OK) {
             return err;
         }
 
-        uint32_t usageBits;
-        if (mOMXNode->getParameter(
-                (OMX_INDEXTYPE)OMX_IndexParamConsumerUsageBits,
-                &usageBits, sizeof(usageBits)) == OK) {
-            inputFormat->setInt32(
-                    "using-sw-read-often", !!(usageBits & GRALLOC_USAGE_SW_READ_OFTEN));
+        if (mode != IOMX::kPortModePresetByteBuffer) {
+            uint32_t usageBits;
+            if (mOMXNode->getParameter(
+                    (OMX_INDEXTYPE)OMX_IndexParamConsumerUsageBits,
+                    &usageBits, sizeof(usageBits)) == OK) {
+                inputFormat->setInt32(
+                        "using-sw-read-often", !!(usageBits & GRALLOC_USAGE_SW_READ_OFTEN));
+            }
         }
     }
 
