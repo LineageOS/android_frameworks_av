@@ -28,7 +28,6 @@ namespace android {
 // TODO: Store Java class/methodID as a member variable in the class.
 // TODO: Add NULL && Exception checks after every JNI call.
 JAudioTrack::JAudioTrack(                             // < Usages of the arguments are below >
-        audio_stream_type_t streamType,               // AudioAudioAttributes
         uint32_t sampleRate,                          // AudioFormat && bufferSizeInBytes
         audio_format_t format,                        // AudioFormat && bufferSizeInBytes
         audio_channel_mask_t channelMask,             // AudioFormat && bufferSizeInBytes
@@ -40,8 +39,10 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
         float maxRequiredSpeed) {                     // bufferSizeInBytes
 
     JNIEnv *env = JavaVMHelper::getJNIEnv();
+
     jclass jAudioTrackCls = env->FindClass("android/media/AudioTrack");
-    mAudioTrackCls = (jclass) env->NewGlobalRef(jAudioTrackCls);
+    mAudioTrackCls = reinterpret_cast<jclass>(env->NewGlobalRef(jAudioTrackCls));
+    env->DeleteLocalRef(jAudioTrackCls);
 
     maxRequiredSpeed = std::min(std::max(maxRequiredSpeed, 1.0f), AUDIO_TIMESTRETCH_SPEED_MAX);
 
@@ -64,10 +65,13 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
     jmethodID jBuilderCtor = env->GetMethodID(jBuilderCls, "<init>", "()V");
     jobject jBuilderObj = env->NewObject(jBuilderCls, jBuilderCtor);
 
+    jobject jAudioAttributesObj = JAudioAttributes::createAudioAttributesObj(env, pAttributes);
+    mAudioAttributesObj = reinterpret_cast<jobject>(env->NewGlobalRef(jAudioAttributesObj));
+    env->DeleteLocalRef(jAudioAttributesObj);
+
     jmethodID jSetAudioAttributes = env->GetMethodID(jBuilderCls, "setAudioAttributes",
             "(Landroid/media/AudioAttributes;)Landroid/media/AudioTrack$Builder;");
-    jBuilderObj = env->CallObjectMethod(jBuilderObj, jSetAudioAttributes,
-            JAudioAttributes::createAudioAttributesObj(env, pAttributes, streamType));
+    jBuilderObj = env->CallObjectMethod(jBuilderObj, jSetAudioAttributes, mAudioAttributesObj);
 
     jmethodID jSetAudioFormat = env->GetMethodID(jBuilderCls, "setAudioFormat",
             "(Landroid/media/AudioFormat;)Landroid/media/AudioTrack$Builder;");
@@ -100,7 +104,9 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
     }
 
     jmethodID jBuild = env->GetMethodID(jBuilderCls, "build", "()Landroid/media/AudioTrack;");
-    mAudioTrackObj = env->CallObjectMethod(jBuilderObj, jBuild);
+    jobject jAudioTrackObj = env->CallObjectMethod(jBuilderObj, jBuild);
+    mAudioTrackObj = reinterpret_cast<jobject>(env->NewGlobalRef(jAudioTrackObj));
+    env->DeleteLocalRef(jBuilderObj);
 
     if (cbf != NULL) {
         // Set offload mode callback
@@ -118,6 +124,8 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
 JAudioTrack::~JAudioTrack() {
     JNIEnv *env = JavaVMHelper::getJNIEnv();
     env->DeleteGlobalRef(mAudioTrackCls);
+    env->DeleteGlobalRef(mAudioTrackObj);
+    env->DeleteGlobalRef(mAudioAttributesObj);
 }
 
 size_t JAudioTrack::frameCount() {
@@ -151,21 +159,21 @@ status_t JAudioTrack::getPosition(uint32_t *position) {
     return NO_ERROR;
 }
 
-bool JAudioTrack::getTimestamp(AudioTimestamp& timestamp) {
+status_t JAudioTrack::getTimestamp(AudioTimestamp& timestamp) {
     JNIEnv *env = JavaVMHelper::getJNIEnv();
 
     jclass jAudioTimeStampCls = env->FindClass("android/media/AudioTimestamp");
     jobject jAudioTimeStampObj = env->AllocObject(jAudioTimeStampCls);
 
-    jfieldID jFramePosition = env->GetFieldID(jAudioTimeStampCls, "framePosition", "L");
-    jfieldID jNanoTime = env->GetFieldID(jAudioTimeStampCls, "nanoTime", "L");
+    jfieldID jFramePosition = env->GetFieldID(jAudioTimeStampCls, "framePosition", "J");
+    jfieldID jNanoTime = env->GetFieldID(jAudioTimeStampCls, "nanoTime", "J");
 
     jmethodID jGetTimestamp = env->GetMethodID(mAudioTrackCls,
-            "getTimestamp", "(Landroid/media/AudioTimestamp)B");
+            "getTimestamp", "(Landroid/media/AudioTimestamp;)Z");
     bool success = env->CallBooleanMethod(mAudioTrackObj, jGetTimestamp, jAudioTimeStampObj);
 
     if (!success) {
-        return false;
+        return NO_INIT;
     }
 
     long long framePosition = env->GetLongField(jAudioTimeStampObj, jFramePosition);
@@ -178,7 +186,7 @@ bool JAudioTrack::getTimestamp(AudioTimestamp& timestamp) {
     timestamp.mTime = ts;
     timestamp.mPosition = (uint32_t) framePosition;
 
-    return true;
+    return NO_ERROR;
 }
 
 status_t JAudioTrack::getTimestamp(ExtendedTimestamp *timestamp __unused) {
@@ -423,6 +431,35 @@ audio_format_t JAudioTrack::format() {
     return audioFormatToNative(javaFormat);
 }
 
+size_t JAudioTrack::frameSize() {
+    JNIEnv *env = JavaVMHelper::getJNIEnv();
+
+    // TODO: Calculated here implementing the logic in AudioTrack.java
+    // wait for AudioTrack.java exposing this parameter (i.e. getFrameSizeInBtytes())
+    jmethodID jGetAudioFormat = env->GetMethodID(mAudioTrackCls, "getAudioFormat", "()I");
+    int javaFormat = env->CallIntMethod(mAudioTrackObj, jGetAudioFormat);
+
+    jclass jAudioFormatCls = env->FindClass("android/media/AudioFormat");
+    jmethodID jIsEncodingLinearFrames = env->GetStaticMethodID(
+            jAudioFormatCls, "isEncodingLinearFrames", "(I)Z");
+    jboolean javaIsEncodingLinearFrames = env->CallStaticBooleanMethod(
+            jAudioFormatCls, jIsEncodingLinearFrames, javaFormat);
+
+    if (javaIsEncodingLinearFrames == false) {
+        return 1;
+    }
+
+    jmethodID jGetBytesPerSample = env->GetStaticMethodID(jAudioFormatCls,
+            "getBytesPerSample", "(I)I");
+    int javaBytesPerSample = env->CallStaticIntMethod(jAudioFormatCls,
+            jGetBytesPerSample, javaFormat);
+
+    jmethodID jGetChannelCount = env->GetMethodID(mAudioTrackCls, "getChannelCount", "()I");
+    int javaChannelCount = env->CallIntMethod(mAudioTrackObj, jGetChannelCount);
+
+    return javaChannelCount * javaBytesPerSample;
+}
+
 status_t JAudioTrack::dump(int fd, const Vector<String16>& args __unused) const
 {
     String8 result;
@@ -432,10 +469,6 @@ status_t JAudioTrack::dump(int fd, const Vector<String16>& args __unused) const
     // TODO: Remove logs that includes unavailable information from below.
 //    result.appendFormat("  status(%d), state(%d), session Id(%d), flags(%#x)\n",
 //                        mStatus, mState, mSessionId, mFlags);
-//    result.appendFormat("  stream type(%d), left - right volume(%f, %f)\n",
-//                        (mStreamType == AUDIO_STREAM_DEFAULT) ?
-//                                audio_attributes_to_stream_type(&mAttributes) : mStreamType,
-//                        mVolume[AUDIO_INTERLEAVE_LEFT], mVolume[AUDIO_INTERLEAVE_RIGHT]);
 //    result.appendFormat("  format(%#x), channel mask(%#x), channel count(%u)\n",
 //                  format(), mChannelMask, channelCount());
 //    result.appendFormat("  sample rate(%u), original sample rate(%u), speed(%f)\n",
@@ -462,7 +495,7 @@ audio_port_handle_t JAudioTrack::getRoutedDeviceId() {
         return AUDIO_PORT_HANDLE_NONE;
     }
 
-    jclass jAudioDeviceInfoCls = env->FindClass("Landroid/media/AudioDeviceInfo");
+    jclass jAudioDeviceInfoCls = env->FindClass("android/media/AudioDeviceInfo");
     jmethodID jGetId = env->GetMethodID(jAudioDeviceInfoCls, "getId", "()I");
     jint routedDeviceId = env->CallIntMethod(jAudioDeviceInfoObj, jGetId);
     return routedDeviceId;
@@ -478,11 +511,20 @@ audio_session_t JAudioTrack::getAudioSessionId() {
 status_t JAudioTrack::setOutputDevice(audio_port_handle_t deviceId) {
     JNIEnv *env = JavaVMHelper::getJNIEnv();
     jclass jMP2ImplCls = env->FindClass("android/media/MediaPlayer2Impl");
-    jmethodID jSetAudioOutputDeviceById = env->GetMethodID(
+    jmethodID jSetAudioOutputDeviceById = env->GetStaticMethodID(
             jMP2ImplCls, "setAudioOutputDeviceById", "(Landroid/media/AudioTrack;I)Z");
     jboolean result = env->CallStaticBooleanMethod(
             jMP2ImplCls, jSetAudioOutputDeviceById, mAudioTrackObj, deviceId);
     return result == true ? NO_ERROR : BAD_VALUE;
+}
+
+audio_stream_type_t JAudioTrack::getAudioStreamType() {
+    JNIEnv *env = JavaVMHelper::getJNIEnv();
+    jclass jAudioAttributesCls = env->FindClass("android/media/AudioAttributes");
+    jmethodID jGetVolumeControlStream = env->GetMethodID(jAudioAttributesCls,
+                                        "getVolumeControlStream", "()I");
+    int javaAudioStreamType = env->CallIntMethod(mAudioAttributesObj, jGetVolumeControlStream);
+    return (audio_stream_type_t)javaAudioStreamType;
 }
 
 status_t JAudioTrack::pendingDuration(int32_t *msec) {
@@ -526,16 +568,83 @@ status_t JAudioTrack::pendingDuration(int32_t *msec) {
     return NO_ERROR;
 }
 
-status_t JAudioTrack::addAudioDeviceCallback(
-        const sp<AudioSystem::AudioDeviceCallback>& callback __unused) {
-    // TODO: Implement this after appropriate Java AudioTrack method is available.
+status_t JAudioTrack::addAudioDeviceCallback(jobject listener, jobject handler) {
+    JNIEnv *env = JavaVMHelper::getJNIEnv();
+    jmethodID jAddOnRoutingChangedListener = env->GetMethodID(mAudioTrackCls,
+            "addOnRoutingChangedListener",
+            "(Landroid/media/AudioRouting$OnRoutingChangedListener;Landroid/os/Handler;)V");
+    env->CallVoidMethod(mAudioTrackObj, jAddOnRoutingChangedListener, listener, handler);
     return NO_ERROR;
 }
 
-status_t JAudioTrack::removeAudioDeviceCallback(
-        const sp<AudioSystem::AudioDeviceCallback>& callback __unused) {
-    // TODO: Implement this after appropriate Java AudioTrack method is available.
+status_t JAudioTrack::removeAudioDeviceCallback(jobject listener) {
+    JNIEnv *env = JavaVMHelper::getJNIEnv();
+    jmethodID jRemoveOnRoutingChangedListener = env->GetMethodID(mAudioTrackCls,
+            "removeOnRoutingChangedListener",
+            "(Landroid/media/AudioRouting$OnRoutingChangedListener;)V");
+    env->CallVoidMethod(mAudioTrackObj, jRemoveOnRoutingChangedListener, listener);
     return NO_ERROR;
+}
+
+void JAudioTrack::registerRoutingDelegates(
+        std::vector<std::pair<jobject, jobject>>& routingDelegates) {
+    for (std::vector<std::pair<jobject, jobject>>::iterator it = routingDelegates.begin();
+            it != routingDelegates.end(); it++) {
+        addAudioDeviceCallback(it->second, getHandler(it->second));
+    }
+}
+
+/////////////////////////////////////////////////////////////
+///                Static methods begin                   ///
+/////////////////////////////////////////////////////////////
+jobject JAudioTrack::getListener(const jobject routingDelegateObj) {
+    JNIEnv *env = JavaVMHelper::getJNIEnv();
+    jclass jRoutingDelegateCls = env->FindClass("android/media/RoutingDelegate");
+    jmethodID jGetListener = env->GetMethodID(jRoutingDelegateCls,
+            "getListener", "()Landroid/media/AudioRouting$OnRoutingChangedListener;");
+    return env->CallObjectMethod(routingDelegateObj, jGetListener);
+}
+
+jobject JAudioTrack::getHandler(const jobject routingDelegateObj) {
+    JNIEnv *env = JavaVMHelper::getJNIEnv();
+    jclass jRoutingDelegateCls = env->FindClass("android/media/RoutingDelegate");
+    jmethodID jGetHandler = env->GetMethodID(jRoutingDelegateCls,
+        "getHandler", "()Landroid/os/Handler;");
+    return env->CallObjectMethod(routingDelegateObj, jGetHandler);
+}
+
+jobject JAudioTrack::addGlobalRef(const jobject obj) {
+    JNIEnv *env = JavaVMHelper::getJNIEnv();
+    return reinterpret_cast<jobject>(env->NewGlobalRef(obj));
+}
+
+status_t JAudioTrack::removeGlobalRef(const jobject obj) {
+    if (obj == NULL) {
+        return BAD_VALUE;
+    }
+    JNIEnv *env = JavaVMHelper::getJNIEnv();
+    env->DeleteGlobalRef(obj);
+    return NO_ERROR;
+}
+
+jobject JAudioTrack::findByKey(std::vector<std::pair<jobject, jobject>>& mp, const jobject key) {
+    JNIEnv *env = JavaVMHelper::getJNIEnv();
+    for (std::vector<std::pair<jobject, jobject>>::iterator it = mp.begin(); it != mp.end(); it++) {
+        if (env->IsSameObject(it->first, key)) {
+            return it->second;
+        }
+    }
+    return nullptr;
+}
+
+void JAudioTrack::eraseByKey(std::vector<std::pair<jobject, jobject>>& mp, const jobject key) {
+    JNIEnv *env = JavaVMHelper::getJNIEnv();
+    for (std::vector<std::pair<jobject, jobject>>::iterator it = mp.begin(); it != mp.end(); it++) {
+        if (env->IsSameObject(it->first, key)) {
+            mp.erase(it);
+            return;
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////
