@@ -253,7 +253,7 @@ private:
     virtual status_t shellCommand(int in, int out, int err, Vector<String16>& args);
 
     // Sets whether the given UID records only silence
-    virtual void setAppState(uid_t uid, app_state_t state);
+    virtual void setAppState_l(uid_t uid, app_state_t state);
 
     // Overrides the UID state as if it is idle
     status_t handleSetUidState(Vector<String16>& args, int err);
@@ -270,6 +270,11 @@ private:
     std::string getDeviceTypeStrForPortId(audio_port_handle_t portId);
 
     status_t getAudioPolicyEffects(sp<AudioPolicyEffects>& audioPolicyEffects);
+
+    app_state_t apmStatFromAmState(int amState);
+
+    void updateUidStates();
+    void updateUidStates_l();
 
     // If recording we need to make sure the UID is allowed to do that. If the UID is idle
     // then it cannot record and gets buffers with zeros - silence. As soon as the UID
@@ -289,6 +294,7 @@ private:
         void binderDied(const wp<IBinder> &who) override;
 
         bool isUidActive(uid_t uid);
+        int getUidState(uid_t uid);
         void setAssistantUid(uid_t uid) { mAssistantUid = uid; }
         bool isAssistantUid(uid_t uid) { return uid == mAssistantUid; }
         void setA11yUids(const std::vector<uid_t>& uids) { mA11yUids.clear(); mA11yUids = uids; }
@@ -298,22 +304,26 @@ private:
         void onUidActive(uid_t uid) override;
         void onUidGone(uid_t uid, bool disabled) override;
         void onUidIdle(uid_t uid, bool disabled) override;
+        void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq);
 
         void addOverrideUid(uid_t uid, bool active) { updateOverrideUid(uid, active, true); }
         void removeOverrideUid(uid_t uid) { updateOverrideUid(uid, false, false); }
 
-    private:
-        void notifyService(uid_t uid, bool active);
+        void updateUid(std::unordered_map<uid_t, std::pair<bool, int>> *uids,
+                       uid_t uid, bool active, int state, bool insert);
+
+     private:
+        void notifyService();
         void updateOverrideUid(uid_t uid, bool active, bool insert);
-        void updateUidCache(uid_t uid, bool active, bool insert);
-        void updateUidLocked(std::unordered_map<uid_t, bool> *uids,
-                uid_t uid, bool active, bool insert, bool *wasThere, bool *wasActive);
+        void updateUidLocked(std::unordered_map<uid_t, std::pair<bool, int>> *uids,
+                             uid_t uid, bool active, int state, bool insert);
+        void checkRegistered();
 
         wp<AudioPolicyService> mService;
         Mutex mLock;
         bool mObserverRegistered;
-        std::unordered_map<uid_t, bool> mOverrideUids;
-        std::unordered_map<uid_t, bool> mCachedUids;
+        std::unordered_map<uid_t, std::pair<bool, int>> mOverrideUids;
+        std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids;
         uid_t mAssistantUid;
         std::vector<uid_t> mA11yUids;
     };

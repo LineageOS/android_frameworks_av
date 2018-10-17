@@ -340,14 +340,41 @@ status_t AudioPolicyService::dumpInternals(int fd)
     return NO_ERROR;
 }
 
-void AudioPolicyService::setAppState(uid_t uid, app_state_t state)
+void AudioPolicyService::updateUidStates()
 {
-    {
-        Mutex::Autolock _l(mLock);
-        if (mAudioPolicyManager) {
-            AutoCallerClear acc;
-            mAudioPolicyManager->setAppState(uid, state);
-        }
+    Mutex::Autolock _l(mLock);
+    updateUidStates_l();
+}
+
+void AudioPolicyService::updateUidStates_l()
+{
+    //TODO: implement real concurrent capture policy: for now just apply each app state directly
+    for (size_t i =0; i < mAudioRecordClients.size(); i++) {
+        sp<AudioRecordClient> current = mAudioRecordClients[i];
+        if (!current->active) continue;
+        setAppState_l(current->uid, apmStatFromAmState(mUidPolicy->getUidState(current->uid)));
+    }
+}
+
+/* static */
+app_state_t AudioPolicyService::apmStatFromAmState(int amState) {
+    switch (amState) {
+    case ActivityManager::PROCESS_STATE_UNKNOWN:
+        return APP_STATE_IDLE;
+    case ActivityManager::PROCESS_STATE_TOP:
+        return APP_STATE_TOP;
+    default:
+        break;
+    }
+    return APP_STATE_FOREGROUND;
+}
+
+void AudioPolicyService::setAppState_l(uid_t uid, app_state_t state)
+{
+    AutoCallerClear acc;
+
+    if (mAudioPolicyManager) {
+        mAudioPolicyManager->setAppState(uid, state);
     }
     sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
     if (af) {
@@ -511,7 +538,8 @@ void AudioPolicyService::UidPolicy::registerSelf() {
     ActivityManager am;
     am.registerUidObserver(this, ActivityManager::UID_OBSERVER_GONE
             | ActivityManager::UID_OBSERVER_IDLE
-            | ActivityManager::UID_OBSERVER_ACTIVE,
+            | ActivityManager::UID_OBSERVER_ACTIVE
+            | ActivityManager::UID_OBSERVER_PROCSTATE,
             ActivityManager::PROCESS_STATE_UNKNOWN,
             String16("audioserver"));
     status_t res = am.linkToDeath(this);
@@ -538,8 +566,7 @@ void AudioPolicyService::UidPolicy::binderDied(__unused const wp<IBinder> &who) 
     mObserverRegistered = false;
 }
 
-bool AudioPolicyService::UidPolicy::isUidActive(uid_t uid) {
-    if (isServiceUid(uid)) return true;
+void AudioPolicyService::UidPolicy::checkRegistered() {
     bool needToReregister = false;
     {
         Mutex::Autolock _l(mLock);
@@ -549,91 +576,157 @@ bool AudioPolicyService::UidPolicy::isUidActive(uid_t uid) {
         // Looks like ActivityManager has died previously, attempt to re-register.
         registerSelf();
     }
+}
+
+bool AudioPolicyService::UidPolicy::isUidActive(uid_t uid) {
+    if (isServiceUid(uid)) return true;
+    checkRegistered();
     {
         Mutex::Autolock _l(mLock);
         auto overrideIter = mOverrideUids.find(uid);
         if (overrideIter != mOverrideUids.end()) {
-            return overrideIter->second;
+            return overrideIter->second.first;
         }
         // In an absense of the ActivityManager, assume everything to be active.
         if (!mObserverRegistered) return true;
         auto cacheIter = mCachedUids.find(uid);
         if (cacheIter != mCachedUids.end()) {
-            return cacheIter->second;
+            return cacheIter->second.first;
         }
     }
     ActivityManager am;
     bool active = am.isUidActive(uid, String16("audioserver"));
     {
         Mutex::Autolock _l(mLock);
-        mCachedUids.insert(std::pair<uid_t, bool>(uid, active));
+        mCachedUids.insert(std::pair<uid_t,
+                           std::pair<bool, int>>(uid, std::pair<bool, int>(active,
+                                                      ActivityManager::PROCESS_STATE_UNKNOWN)));
     }
     return active;
 }
 
+int AudioPolicyService::UidPolicy::getUidState(uid_t uid) {
+    if (isServiceUid(uid)) {
+        return ActivityManager::PROCESS_STATE_TOP;
+    }
+    checkRegistered();
+    {
+        Mutex::Autolock _l(mLock);
+        auto overrideIter = mOverrideUids.find(uid);
+        if (overrideIter != mOverrideUids.end()) {
+            if (overrideIter->second.first) {
+                if (overrideIter->second.second != ActivityManager::PROCESS_STATE_UNKNOWN) {
+                    return overrideIter->second.second;
+                } else {
+                    auto cacheIter = mCachedUids.find(uid);
+                    if (cacheIter != mCachedUids.end()) {
+                        return cacheIter->second.second;
+                    }
+                }
+            }
+            return ActivityManager::PROCESS_STATE_UNKNOWN;
+        }
+        // In an absense of the ActivityManager, assume everything to be active.
+        if (!mObserverRegistered) {
+            return ActivityManager::PROCESS_STATE_TOP;
+        }
+        auto cacheIter = mCachedUids.find(uid);
+        if (cacheIter != mCachedUids.end()) {
+            if (cacheIter->second.first) {
+                return cacheIter->second.second;
+            } else {
+                return ActivityManager::PROCESS_STATE_UNKNOWN;
+            }
+        }
+    }
+    ActivityManager am;
+    bool active = am.isUidActive(uid, String16("audioserver"));
+    int state = ActivityManager::PROCESS_STATE_UNKNOWN;
+    if (active) {
+        state = am.getUidProcessState(uid, String16("audioserver"));
+    }
+    {
+        Mutex::Autolock _l(mLock);
+        mCachedUids.insert(std::pair<uid_t,
+                           std::pair<bool, int>>(uid, std::pair<bool, int>(active, state)));
+    }
+    return state;
+}
+
 void AudioPolicyService::UidPolicy::onUidActive(uid_t uid) {
-    updateUidCache(uid, true, true);
+    updateUid(&mCachedUids, uid, true, ActivityManager::PROCESS_STATE_UNKNOWN, true);
 }
 
 void AudioPolicyService::UidPolicy::onUidGone(uid_t uid, __unused bool disabled) {
-    updateUidCache(uid, false, false);
+    updateUid(&mCachedUids, uid, false, ActivityManager::PROCESS_STATE_UNKNOWN, false);
 }
 
 void AudioPolicyService::UidPolicy::onUidIdle(uid_t uid, __unused bool disabled) {
-    updateUidCache(uid, false, true);
+    updateUid(&mCachedUids, uid, false, ActivityManager::PROCESS_STATE_UNKNOWN, true);
 }
 
-void AudioPolicyService::UidPolicy::notifyService(uid_t uid, bool active) {
-    sp<AudioPolicyService> service = mService.promote();
-    if (service != nullptr) {
-        service->setAppState(uid, active ?
-                              APP_STATE_FOREGROUND :
-                              APP_STATE_IDLE);
+void AudioPolicyService::UidPolicy::onUidStateChanged(uid_t uid,
+                                                      int32_t procState,
+                                                      int64_t procStateSeq __unused) {
+    if (procState != ActivityManager::PROCESS_STATE_UNKNOWN) {
+        updateUid(&mCachedUids, uid, true, procState, true);
     }
 }
 
 void AudioPolicyService::UidPolicy::updateOverrideUid(uid_t uid, bool active, bool insert) {
-    if (isServiceUid(uid)) return;
-    bool wasOverridden = false, wasActive = false;
-    {
-        Mutex::Autolock _l(mLock);
-        updateUidLocked(&mOverrideUids, uid, active, insert, &wasOverridden, &wasActive);
-    }
-    if (!wasOverridden && insert) {
-        notifyService(uid, active);  // Started to override.
-    } else if (wasOverridden && !insert) {
-        notifyService(uid, isUidActive(uid));  // Override ceased, notify with ground truth.
-    } else if (wasActive != active) {
-        notifyService(uid, active);  // Override updated.
+    updateUid(&mOverrideUids, uid, active, ActivityManager::PROCESS_STATE_UNKNOWN, insert);
+}
+
+void AudioPolicyService::UidPolicy::notifyService() {
+    sp<AudioPolicyService> service = mService.promote();
+    if (service != nullptr) {
+        service->updateUidStates();
     }
 }
 
-void AudioPolicyService::UidPolicy::updateUidCache(uid_t uid, bool active, bool insert) {
-    if (isServiceUid(uid)) return;
-    bool wasActive = false;
+void AudioPolicyService::UidPolicy::updateUid(std::unordered_map<uid_t,
+                                              std::pair<bool, int>> *uids,
+                                              uid_t uid,
+                                              bool active,
+                                              int state,
+                                              bool insert) {
+    if (isServiceUid(uid)) {
+        return;
+    }
+    bool wasActive = isUidActive(uid);
+    int previousState = getUidState(uid);
     {
         Mutex::Autolock _l(mLock);
-        updateUidLocked(&mCachedUids, uid, active, insert, nullptr, &wasActive);
-        // Do not notify service if currently overridden.
-        if (mOverrideUids.find(uid) != mOverrideUids.end()) return;
+        updateUidLocked(uids, uid, active, state, insert);
     }
-    bool nowActive = active && insert;
-    if (wasActive != nowActive) notifyService(uid, nowActive);
+    if (wasActive != isUidActive(uid) || state != previousState) {
+        notifyService();
+    }
 }
 
-void AudioPolicyService::UidPolicy::updateUidLocked(std::unordered_map<uid_t, bool> *uids,
-        uid_t uid, bool active, bool insert, bool *wasThere, bool *wasActive) {
+void AudioPolicyService::UidPolicy::updateUidLocked(std::unordered_map<uid_t,
+                                                    std::pair<bool, int>> *uids,
+                                                    uid_t uid,
+                                                    bool active,
+                                                    int state,
+                                                    bool insert) {
     auto it = uids->find(uid);
     if (it != uids->end()) {
-        if (wasThere != nullptr) *wasThere = true;
-        if (wasActive != nullptr) *wasActive = it->second;
         if (insert) {
-            it->second = active;
+            if (state == ActivityManager::PROCESS_STATE_UNKNOWN) {
+                it->second.first = active;
+            }
+            if (it->second.first) {
+                it->second.second = state;
+            } else {
+                it->second.second = ActivityManager::PROCESS_STATE_UNKNOWN;
+            }
         } else {
             uids->erase(it);
         }
-    } else if (insert) {
-        uids->insert(std::pair<uid_t, bool>(uid, active));
+    } else if (insert && (state == ActivityManager::PROCESS_STATE_UNKNOWN)) {
+        uids->insert(std::pair<uid_t, std::pair<bool, int>>(uid,
+                                      std::pair<bool, int>(active, state)));
     }
 }
 
