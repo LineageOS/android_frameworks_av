@@ -1106,6 +1106,14 @@ status_t GraphicBufferSource::configure(
         consumerUsage |= GRALLOC_USAGE_HW_VIDEO_ENCODER;
         mConsumer->setConsumerUsageBits(consumerUsage);
 
+        // Set impl. defined format as default. Depending on the usage flags
+        // the device-specific implementation will derive the exact format.
+        err = mConsumer->setDefaultBufferFormat(HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED);
+        if (err != NO_ERROR) {
+            ALOGE("Failed to configure surface default format ret: %d", err);
+            return err;
+        }
+
         // Sets the default buffer data space
         ALOGD("setting dataspace: %#x, acquired=%d", dataSpace, mNumOutstandingAcquires);
         mConsumer->setDefaultBufferDataSpace((android_dataspace)dataSpace);
