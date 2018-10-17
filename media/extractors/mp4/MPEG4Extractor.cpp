@@ -3608,7 +3608,6 @@ void MPEG4Extractor::parseID3v2MetaData(off64_t offset) {
 
         if (data) {
             mFileMetaData.setData(kKeyAlbumArt, MetaData::TYPE_NONE, data, dataSize);
-            mFileMetaData.setCString(kKeyAlbumArtMIME, mime.string());
         }
     }
 }

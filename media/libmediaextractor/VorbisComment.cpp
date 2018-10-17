@@ -100,8 +100,6 @@ static void extractAlbumArt(
 
     fileMeta->setData(
             kKeyAlbumArt, 0, &flac[8 + typeLen + 4 + descLen + 20], dataLen);
-
-    fileMeta->setCString(kKeyAlbumArtMIME, type);
 }
 
 void parseVorbisComment(
