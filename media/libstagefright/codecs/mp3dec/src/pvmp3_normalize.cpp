@@ -160,6 +160,7 @@ int32 pvmp3_normalize(int32 x)
         case 0x38000000:
         case 0x30000000:
             i++;
+            break;
 
         default:
             ;
