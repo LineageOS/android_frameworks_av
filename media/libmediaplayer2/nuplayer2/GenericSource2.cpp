@@ -335,7 +335,7 @@ NuPlayer2::GenericSource2::~GenericSource2() {
     resetDataSource();
 }
 
-void NuPlayer2::GenericSource2::prepareAsync() {
+void NuPlayer2::GenericSource2::prepareAsync(int64_t startTimeUs) {
     Mutex::Autolock _l(mLock);
     ALOGV("prepareAsync: (looper: %d)", (mLooper != NULL));
 
@@ -350,10 +350,12 @@ void NuPlayer2::GenericSource2::prepareAsync() {
     }
 
     sp<AMessage> msg = new AMessage(kWhatPrepareAsync, this);
+    msg->setInt64("startTimeUs", startTimeUs);
+
     msg->post();
 }
 
-void NuPlayer2::GenericSource2::onPrepareAsync() {
+void NuPlayer2::GenericSource2::onPrepareAsync(int64_t startTimeUs) {
     ALOGV("onPrepareAsync: mDataSource: %d", (mDataSource != NULL));
 
     // delayed data source creation
@@ -429,6 +431,7 @@ void NuPlayer2::GenericSource2::onPrepareAsync() {
             FLAG_CAN_SEEK_FORWARD |
             FLAG_CAN_SEEK);
 
+    doSeek(startTimeUs, MediaPlayer2SeekMode::SEEK_CLOSEST);
     finishPrepareAsync();
 
     ALOGV("onPrepareAsync: Done");
@@ -440,6 +443,7 @@ void NuPlayer2::GenericSource2::finishPrepareAsync() {
     if (mIsStreaming) {
         mCachedSource->resumeFetchingIfNecessary();
         mPreparing = true;
+        ++mPollBufferingGeneration;
         schedulePollBuffering();
     } else {
         notifyPrepared();
@@ -544,7 +548,9 @@ void NuPlayer2::GenericSource2::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
       case kWhatPrepareAsync:
       {
-          onPrepareAsync();
+          int64_t startTimeUs;
+          CHECK(msg->findInt64("startTimeUs", &startTimeUs));
+          onPrepareAsync(startTimeUs);
           break;
       }
       case kWhatFetchSubtitleData:
@@ -1443,10 +1449,12 @@ void NuPlayer2::GenericSource2::notifyBufferingUpdate(int32_t percentage) {
 }
 
 void NuPlayer2::GenericSource2::schedulePollBuffering() {
-    sp<AMessage> msg = new AMessage(kWhatPollBuffering, this);
-    msg->setInt32("generation", mPollBufferingGeneration);
-    // Enquires buffering status every second.
-    msg->post(1000000ll);
+    if (mIsStreaming) {
+        sp<AMessage> msg = new AMessage(kWhatPollBuffering, this);
+        msg->setInt32("generation", mPollBufferingGeneration);
+        // Enquires buffering status every second.
+        msg->post(1000000ll);
+    }
 }
 
 void NuPlayer2::GenericSource2::onPollBuffering() {
