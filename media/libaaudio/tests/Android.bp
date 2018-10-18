@@ -19,6 +19,18 @@ cc_test {
 }
 
 cc_test {
+    name: "test_clock_model",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_clock_model.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libaudioutils",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
     name: "test_block_adapter",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_block_adapter.cpp"],
