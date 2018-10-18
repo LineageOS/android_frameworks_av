@@ -22,7 +22,7 @@
 
 #include <media/MediaExtractorPluginApi.h>
 #include <media/MediaExtractorPluginHelper.h>
-#include <media/stagefright/MetaDataBase.h>
+#include <media/NdkMediaFormat.h>
 #include <utils/Vector.h>
 #include <utils/threads.h>
 
@@ -35,16 +35,16 @@ class MetaData;
 struct DataSourceBaseReader;
 struct MatroskaSource;
 
-struct MatroskaExtractor : public MediaExtractorPluginHelper {
+struct MatroskaExtractor : public MediaExtractorPluginHelperV2 {
     explicit MatroskaExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
 
-    virtual MediaTrackHelper *getTrack(size_t index);
+    virtual MediaTrackHelperV2 *getTrack(size_t index);
 
-    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
+    virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
-    virtual status_t getMetaData(MetaDataBase& meta);
+    virtual media_status_t getMetaData(AMediaFormat *meta);
 
     virtual uint32_t flags() const;
 
@@ -58,9 +58,17 @@ private:
     friend struct BlockIterator;
 
     struct TrackInfo {
+        TrackInfo() {
+            mMeta = NULL;
+        }
+        ~TrackInfo() {
+            if (mMeta) {
+                AMediaFormat_delete(mMeta);
+            }
+        }
         unsigned long mTrackNum;
         bool mEncrypted;
-        MetaDataBase mMeta;
+        AMediaFormat *mMeta;
         const MatroskaExtractor *mExtractor;
         Vector<const mkvparser::CuePoint*> mCuePoints;
 
@@ -89,13 +97,13 @@ private:
     status_t synthesizeAVCC(TrackInfo *trackInfo, size_t index);
     status_t initTrackInfo(
             const mkvparser::Track *track,
-            MetaDataBase &meta,
+            AMediaFormat *meta,
             TrackInfo *trackInfo);
     void addTracks();
     void findThumbnails();
     void getColorInformation(
             const mkvparser::VideoTrack *vtrack,
-            MetaDataBase &meta);
+            AMediaFormat *meta);
     bool isLiveStreaming() const;
 
     MatroskaExtractor(const MatroskaExtractor &);
