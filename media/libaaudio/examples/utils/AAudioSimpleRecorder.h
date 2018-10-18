@@ -201,8 +201,10 @@ public:
      aaudio_result_t start() {
         aaudio_result_t result = AAudioStream_requestStart(mStream);
         if (result != AAUDIO_OK) {
-            fprintf(stderr, "ERROR - AAudioStream_requestStart() returned %d %s\n",
+            fprintf(stderr, "ERROR - AAudioStream_requestStart(input) returned %d %s\n",
                     result, AAudio_convertResultToText(result));
+            fprintf(stderr, "        Did you remember to enter:   adb root    ????\n");
+
         }
         return result;
     }
@@ -211,8 +213,9 @@ public:
     aaudio_result_t stop() {
         aaudio_result_t result = AAudioStream_requestStop(mStream);
         if (result != AAUDIO_OK) {
-            fprintf(stderr, "ERROR - AAudioStream_requestStop() returned %d %s\n",
+            fprintf(stderr, "ERROR - AAudioStream_requestStop(input) returned %d %s\n",
                     result, AAudio_convertResultToText(result));
+
         }
         return result;
     }
@@ -221,7 +224,7 @@ public:
     aaudio_result_t pause() {
         aaudio_result_t result = AAudioStream_requestPause(mStream);
         if (result != AAUDIO_OK) {
-            fprintf(stderr, "ERROR - AAudioStream_requestPause() returned %d %s\n",
+            fprintf(stderr, "ERROR - AAudioStream_requestPause(input) returned %d %s\n",
                     result, AAudio_convertResultToText(result));
         }
         return result;

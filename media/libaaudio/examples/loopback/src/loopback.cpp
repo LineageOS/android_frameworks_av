@@ -37,13 +37,12 @@
 
 // Tag for machine readable results as property = value pairs
 #define RESULT_TAG              "RESULT: "
-#define NUM_SECONDS             5
-#define PERIOD_MILLIS           1000
-#define NUM_INPUT_CHANNELS      1
 #define FILENAME_ALL            "/data/loopback_all.wav"
 #define FILENAME_ECHOS          "/data/loopback_echos.wav"
-#define APP_VERSION             "0.2.04"
+#define APP_VERSION             "0.3.00"
 
+constexpr int kLogPeriodMillis       = 1000;
+constexpr int kNumInputChannels      = 1;
 constexpr int kNumCallbacksToDrain   = 20;
 constexpr int kNumCallbacksToDiscard = 20;
 
@@ -336,7 +335,7 @@ int main(int argc, const char **argv)
 
     aaudio_result_t       result = AAUDIO_OK;
     aaudio_sharing_mode_t requestedInputSharingMode  = AAUDIO_SHARING_MODE_SHARED;
-    int                   requestedInputChannelCount = NUM_INPUT_CHANNELS;
+    int                   requestedInputChannelCount = kNumInputChannels;
     aaudio_format_t       requestedInputFormat       = AAUDIO_FORMAT_UNSPECIFIED;
     int32_t               requestedInputCapacity     = AAUDIO_UNSPECIFIED;
     aaudio_performance_mode_t inputPerformanceLevel  = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
@@ -459,7 +458,9 @@ int main(int argc, const char **argv)
     argParser.setPerformanceMode(inputPerformanceLevel);
     argParser.setChannelCount(requestedInputChannelCount);
     argParser.setSharingMode(requestedInputSharingMode);
-    // Warning! If you change input capacity then you may not get a FAST track on Legacy path.
+    if (requestedInputCapacity != AAUDIO_UNSPECIFIED) {
+        printf("Warning! If you set input capacity then maybe no FAST track on Legacy path!\n");
+    }
     argParser.setBufferCapacity(requestedInputCapacity);
 
     result = recorder.open(argParser);
@@ -510,15 +511,11 @@ int main(int argc, const char **argv)
     // Start OUTPUT first so INPUT does not overflow.
     result = player.start();
     if (result != AAUDIO_OK) {
-        printf("ERROR - AAudioStream_requestStart(output) returned %d = %s\n",
-               result, AAudio_convertResultToText(result));
         goto finish;
     }
 
     result = recorder.start();
     if (result != AAUDIO_OK) {
-        printf("ERROR - AAudioStream_requestStart(input) returned %d = %s\n",
-               result, AAudio_convertResultToText(result));
         goto finish;
     }
 
@@ -561,7 +558,7 @@ int main(int argc, const char **argv)
                    AAudioStream_getXRunCount(outputStream)
             );
         }
-        int32_t periodMillis = (timeMillis < 2000) ? PERIOD_MILLIS / 4 : PERIOD_MILLIS;
+        int32_t periodMillis = (timeMillis < 2000) ? kLogPeriodMillis / 4 : kLogPeriodMillis;
         usleep(periodMillis * 1000);
         timeMillis += periodMillis;
     }
@@ -586,12 +583,12 @@ int main(int argc, const char **argv)
     if (loopbackData.inputError == AAUDIO_OK) {
         if (testMode == TEST_SINE_MAGNITUDE) {
             printAudioGraph(loopbackData.audioRecording, 200);
+            // Print again so we don't have to scroll past waveform.
+            printf("OUTPUT Stream ----------------------------------------\n");
+            argParser.compareWithStream(outputStream);
+            printf("INPUT  Stream ----------------------------------------\n");
+            argParser.compareWithStream(inputStream);
         }
-        // Print again so we don't have to scroll past waveform.
-        printf("OUTPUT Stream ----------------------------------------\n");
-        argParser.compareWithStream(outputStream);
-        printf("INPUT  Stream ----------------------------------------\n");
-        argParser.compareWithStream(inputStream);
 
         loopbackData.loopbackProcessor->report();
     }
@@ -600,21 +597,21 @@ int main(int argc, const char **argv)
         int32_t framesRead = AAudioStream_getFramesRead(inputStream);
         int32_t framesWritten = AAudioStream_getFramesWritten(inputStream);
         printf("Callback Results ---------------------------------------- INPUT\n");
-        printf("  input overruns   = %d\n", AAudioStream_getXRunCount(inputStream));
+        printf("  input overruns   = %8d\n", AAudioStream_getXRunCount(inputStream));
         printf("  framesWritten    = %8d\n", framesWritten);
         printf("  framesRead       = %8d\n", framesRead);
         printf("  myFramesRead     = %8d\n", (int) loopbackData.framesReadTotal);
         printf("  written - read   = %8d\n", (int) (framesWritten - framesRead));
         printf("  insufficient #   = %8d\n", (int) loopbackData.insufficientReadCount);
         if (loopbackData.insufficientReadCount > 0) {
-            printf("  insufficient frames = %8d\n", (int) loopbackData.insufficientReadFrames);
+            printf("  insuffic. frames = %8d\n", (int) loopbackData.insufficientReadFrames);
         }
     }
     {
         int32_t framesRead = AAudioStream_getFramesRead(outputStream);
         int32_t framesWritten = AAudioStream_getFramesWritten(outputStream);
         printf("Callback Results ---------------------------------------- OUTPUT\n");
-        printf("  output underruns = %d\n", AAudioStream_getXRunCount(outputStream));
+        printf("  output underruns = %8d\n", AAudioStream_getXRunCount(outputStream));
         printf("  myFramesWritten  = %8d\n", (int) loopbackData.framesWrittenTotal);
         printf("  framesWritten    = %8d\n", framesWritten);
         printf("  framesRead       = %8d\n", framesRead);
@@ -659,4 +656,3 @@ finish:
         return EXIT_SUCCESS;
     }
 }
-
