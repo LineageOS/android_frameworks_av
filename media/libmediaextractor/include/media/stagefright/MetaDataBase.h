@@ -101,7 +101,6 @@ enum {
     kKeyTitle             = 'titl',  // cstring
     kKeyYear              = 'year',  // cstring
     kKeyAlbumArt          = 'albA',  // compressed image data
-    kKeyAlbumArtMIME      = 'alAM',  // cstring
     kKeyAuthor            = 'auth',  // cstring
     kKeyCDTrackNumber     = 'cdtr',  // cstring
     kKeyDiscNumber        = 'dnum',  // cstring

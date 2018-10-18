@@ -35,7 +35,6 @@ import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer2;
 import android.media.MediaPlayer2.EventCallback;
 import android.media.MediaPlayer2Impl;
-import android.media.Metadata;
 import android.media.PlaybackParams;
 import android.media.SessionToken2;
 import android.media.SubtitleData;
@@ -125,7 +124,7 @@ public class VideoView2Impl extends BaseLayout
     private MediaControlView2 mMediaControlView;
     private MediaSession mMediaSession;
     private MediaController mMediaController;
-    private Metadata mMetadata;
+    private boolean mSeekable;
     private MediaMetadata2 mMediaMetadata;
     private MediaMetadataRetriever mRetriever;
     private boolean mNeedUpdateMediaType;
@@ -262,6 +261,7 @@ public class VideoView2Impl extends BaseLayout
         mSpeed = 1.0f;
         mFallbackSpeed = mSpeed;
         mSelectedSubtitleTrackIndex = INVALID_TRACK_INDEX;
+        mSeekable = true;
         // TODO: add attributes to get this value.
         mShowControllerIntervalMs = DEFAULT_SHOW_CONTROLLER_INTERVAL_MS;
 
@@ -795,33 +795,11 @@ public class VideoView2Impl extends BaseLayout
 
     private void updatePlaybackState() {
         if (mStateBuilder == null) {
-            // Get the capabilities of the player for this stream
-            mMetadata = mMediaPlayer.getMetadata(MediaPlayer2.METADATA_ALL,
-                    MediaPlayer2.BYPASS_METADATA_FILTER);
-
             // Add Play action as default
-            long playbackActions = PlaybackState.ACTION_PLAY;
-            if (mMetadata != null) {
-                if (!mMetadata.has(Metadata.PAUSE_AVAILABLE)
-                        || mMetadata.getBoolean(Metadata.PAUSE_AVAILABLE)) {
-                    playbackActions |= PlaybackState.ACTION_PAUSE;
-                }
-                if (!mMetadata.has(Metadata.SEEK_BACKWARD_AVAILABLE)
-                        || mMetadata.getBoolean(Metadata.SEEK_BACKWARD_AVAILABLE)) {
-                    playbackActions |= PlaybackState.ACTION_REWIND;
-                }
-                if (!mMetadata.has(Metadata.SEEK_FORWARD_AVAILABLE)
-                        || mMetadata.getBoolean(Metadata.SEEK_FORWARD_AVAILABLE)) {
-                    playbackActions |= PlaybackState.ACTION_FAST_FORWARD;
-                }
-                if (!mMetadata.has(Metadata.SEEK_AVAILABLE)
-                        || mMetadata.getBoolean(Metadata.SEEK_AVAILABLE)) {
-                    playbackActions |= PlaybackState.ACTION_SEEK_TO;
-                }
-            } else {
-                playbackActions |= (PlaybackState.ACTION_PAUSE |
-                        PlaybackState.ACTION_REWIND | PlaybackState.ACTION_FAST_FORWARD |
-                        PlaybackState.ACTION_SEEK_TO);
+            long playbackActions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE;
+            if (mSeekable) {
+                playbackActions |= (PlaybackState.ACTION_REWIND |
+                        PlaybackState.ACTION_FAST_FORWARD | PlaybackState.ACTION_SEEK_TO);
             }
             mStateBuilder = new PlaybackState.Builder();
             mStateBuilder.setActions(playbackActions);
@@ -1004,9 +982,6 @@ public class VideoView2Impl extends BaseLayout
     private void extractMetadata() {
         // Get and set duration and title values as MediaMetadata for MediaControlView2
         MediaMetadata.Builder builder = new MediaMetadata.Builder();
-        if (mMetadata != null && mMetadata.has(Metadata.TITLE)) {
-            mTitle = mMetadata.getString(Metadata.TITLE);
-        }
         builder.putString(MediaMetadata.METADATA_KEY_TITLE, mTitle);
         builder.putLong(
                 MediaMetadata.METADATA_KEY_DURATION, mMediaPlayer.getDuration());
@@ -1169,6 +1144,8 @@ public class VideoView2Impl extends BaseLayout
                         this.onCompletion(mp, dsd);
                     } else if (what == MediaPlayer2.MEDIA_INFO_BUFFERING_UPDATE) {
                         this.onBufferingUpdate(mp, dsd, extra);
+                    } else if (what == MediaPlayer2.MEDIA_INFO_NOT_SEEKABLE) {
+                        mSeekable = false;
                     }
                 }
 
@@ -1180,6 +1157,7 @@ public class VideoView2Impl extends BaseLayout
                     }
                     mCurrentState = STATE_ERROR;
                     mTargetState = STATE_ERROR;
+                    mSeekable = true;
                     updatePlaybackState();
 
                     if (mMediaControlView != null) {
@@ -1254,6 +1232,7 @@ public class VideoView2Impl extends BaseLayout
                 private void onCompletion(MediaPlayer2 mp, DataSourceDesc dsd) {
                     mCurrentState = STATE_PLAYBACK_COMPLETED;
                     mTargetState = STATE_PLAYBACK_COMPLETED;
+                    mSeekable = true;
                     updatePlaybackState();
                     if (mAudioFocusType != AudioManager.AUDIOFOCUS_NONE) {
                         mAudioManager.abandonAudioFocus(null);

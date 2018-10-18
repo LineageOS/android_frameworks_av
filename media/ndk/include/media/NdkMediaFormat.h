@@ -86,10 +86,6 @@ void AMediaFormat_setString(AMediaFormat*, const char* name, const char* value) 
 void AMediaFormat_setBuffer(AMediaFormat*, const char* name, const void* data, size_t size) __INTRODUCED_IN(21);
 
 
-
-/**
- * XXX should these be ints/enums that we look up in a table as needed?
- */
 extern const char* AMEDIAFORMAT_KEY_AAC_DRC_ATTENUATION_FACTOR __INTRODUCED_IN(28);
 extern const char* AMEDIAFORMAT_KEY_AAC_DRC_BOOST_FACTOR __INTRODUCED_IN(28);
 extern const char* AMEDIAFORMAT_KEY_AAC_DRC_HEAVY_COMPRESSION __INTRODUCED_IN(28);
@@ -156,7 +152,6 @@ extern const char* AMEDIAFORMAT_KEY_TIME_US __INTRODUCED_IN(28);
 extern const char* AMEDIAFORMAT_KEY_TRACK_ID __INTRODUCED_IN(28);
 extern const char* AMEDIAFORMAT_KEY_TRACK_INDEX __INTRODUCED_IN(28);
 extern const char* AMEDIAFORMAT_KEY_WIDTH __INTRODUCED_IN(21);
-
 #endif /* __ANDROID_API__ >= 21 */
 
 #if __ANDROID_API__ >= 28
@@ -180,6 +175,22 @@ void AMediaFormat_clear(AMediaFormat*) __INTRODUCED_IN(29);
  * copy one AMediaFormat to another
  */
 media_status_t AMediaFormat_copy(AMediaFormat *to, AMediaFormat *from) __INTRODUCED_IN(29);
+
+extern const char* AMEDIAFORMAT_KEY_ALBUM __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_ALBUMART __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_ALBUMARTIST __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_ARTIST __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_AUTHOR __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_CDTRACKNUMBER __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_COMPILATION __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_COMPOSER __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_DISCNUMBER __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_ENCODER_DELAY __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_ENCODER_PADDING __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_GENRE __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_TITLE __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_YEAR __INTRODUCED_IN(29);
+
 #endif /* __ANDROID_API__ >= 29 */
 
 __END_DECLS
