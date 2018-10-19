@@ -35,59 +35,49 @@
 
 #define MAX_MEM_ALLOCS 100
 
-extern "C" IA_ERRORCODE ixheaacd_dec_api(pVOID p_ia_module_obj,
-                        WORD32 i_cmd, WORD32 i_idx, pVOID pv_value);
-extern "C" IA_ERRORCODE ia_drc_dec_api(pVOID p_ia_module_obj,
-                        WORD32 i_cmd, WORD32 i_idx, pVOID pv_value);
-extern "C"  IA_ERRORCODE ixheaacd_get_config_param(pVOID p_ia_process_api_obj,
-                                       pWORD32 pi_samp_freq,
-                                       pWORD32 pi_num_chan,
-                                       pWORD32 pi_pcm_wd_sz,
-                                       pWORD32 pi_channel_mask);
+extern "C" IA_ERRORCODE ixheaacd_dec_api(pVOID p_ia_module_obj, WORD32 i_cmd, WORD32 i_idx,
+                                         pVOID pv_value);
+extern "C" IA_ERRORCODE ia_drc_dec_api(pVOID p_ia_module_obj, WORD32 i_cmd, WORD32 i_idx,
+                                       pVOID pv_value);
+extern "C" IA_ERRORCODE ixheaacd_get_config_param(pVOID p_ia_process_api_obj, pWORD32 pi_samp_freq,
+                                                  pWORD32 pi_num_chan, pWORD32 pi_pcm_wd_sz,
+                                                  pWORD32 pi_channel_mask);
 
 namespace android {
 
 struct SoftXAAC : public SimpleSoftOMXComponent {
-    SoftXAAC(const char *name,
-            const OMX_CALLBACKTYPE *callbacks,
-            OMX_PTR appData,
-            OMX_COMPONENTTYPE **component);
+    SoftXAAC(const char* name, const OMX_CALLBACKTYPE* callbacks, OMX_PTR appData,
+             OMX_COMPONENTTYPE** component);
 
-protected:
+   protected:
     virtual ~SoftXAAC();
 
-    virtual OMX_ERRORTYPE internalGetParameter(
-            OMX_INDEXTYPE index, OMX_PTR params);
+    virtual OMX_ERRORTYPE internalGetParameter(OMX_INDEXTYPE index, OMX_PTR params);
 
-    virtual OMX_ERRORTYPE internalSetParameter(
-            OMX_INDEXTYPE index, const OMX_PTR params);
+    virtual OMX_ERRORTYPE internalSetParameter(OMX_INDEXTYPE index, const OMX_PTR params);
 
     virtual void onQueueFilled(OMX_U32 portIndex);
     virtual void onPortFlushCompleted(OMX_U32 portIndex);
     virtual void onPortEnableCompleted(OMX_U32 portIndex, bool enabled);
     virtual void onReset();
 
-private:
+   private:
     enum {
-        kNumInputBuffers        = 4,
-        kNumOutputBuffers       = 4,
-        kNumDelayBlocksMax      = 8,
+        kNumInputBuffers = 4,
+        kNumOutputBuffers = 4,
+        kNumDelayBlocksMax = 8,
     };
 
     bool mIsADTS;
     size_t mInputBufferCount;
     size_t mOutputBufferCount;
     bool mSignalledError;
-    OMX_BUFFERHEADERTYPE *mLastInHeader;
+    OMX_BUFFERHEADERTYPE* mLastInHeader;
     int64_t mPrevTimestamp;
     int64_t mCurrentTimestamp;
     uint32_t mBufSize;
 
-    enum {
-        NONE,
-        AWAITING_DISABLED,
-        AWAITING_ENABLED
-    } mOutputPortSettingsChange;
+    enum { NONE, AWAITING_DISABLED, AWAITING_ENABLED } mOutputPortSettingsChange;
 
     void initPorts();
     status_t initDecoder();
@@ -98,48 +88,43 @@ private:
 
     int configXAACDecoder(uint8_t* inBuffer, uint32_t inBufferLength);
     int configMPEGDDrc();
-    int decodeXAACStream(uint8_t* inBuffer,
-                         uint32_t inBufferLength,
-                         int32_t *bytesConsumed,
-                         int32_t *outBytes);
+    int decodeXAACStream(uint8_t* inBuffer, uint32_t inBufferLength, int32_t* bytesConsumed,
+                         int32_t* outBytes);
 
     int configflushDecode();
     IA_ERRORCODE getXAACStreamInfo();
-    IA_ERRORCODE setXAACDRCInfo(int32_t drcCut,
-                                int32_t drcBoost,
-                                int32_t drcRefLevel,
+    IA_ERRORCODE setXAACDRCInfo(int32_t drcCut, int32_t drcBoost, int32_t drcRefLevel,
                                 int32_t drcHeavyCompression
 #ifdef ENABLE_MPEG_D_DRC
-                                ,int32_t drEffectType
+                                ,
+                                int32_t drEffectType
 #endif
-                               );
+    );
 
     bool mEndOfInput;
     bool mEndOfOutput;
 
-    void*       mXheaacCodecHandle;
-    void*       mMpegDDrcHandle;
-    uint32_t    mInputBufferSize;
-    uint32_t    mOutputFrameLength;
-    int8_t*     mInputBuffer;
-    int8_t*     mOutputBuffer;
-    int32_t     mSampFreq;
-    int32_t     mNumChannels;
-    int32_t     mPcmWdSz;
-    int32_t     mChannelMask;
-    bool        mIsCodecInitialized;
-    bool        mIsCodecConfigFlushRequired;
-    int8_t *mDrcInBuf;
-    int8_t *mDrcOutBuf;
+    void* mXheaacCodecHandle;
+    void* mMpegDDrcHandle;
+    uint32_t mInputBufferSize;
+    uint32_t mOutputFrameLength;
+    int8_t* mInputBuffer;
+    int8_t* mOutputBuffer;
+    int32_t mSampFreq;
+    int32_t mNumChannels;
+    int32_t mPcmWdSz;
+    int32_t mChannelMask;
+    bool mIsCodecInitialized;
+    bool mIsCodecConfigFlushRequired;
+    int8_t* mDrcInBuf;
+    int8_t* mDrcOutBuf;
     int32_t mMpegDDRCPresent;
     int32_t mDRCFlag;
 
-
-    void*       mMemoryArray[MAX_MEM_ALLOCS];
-    int32_t     mMallocCount;
+    void* mMemoryArray[MAX_MEM_ALLOCS];
+    int32_t mMallocCount;
 
     DISALLOW_EVIL_CONSTRUCTORS(SoftXAAC);
-
 };
 
 }  // namespace android

@@ -83,6 +83,7 @@ public:
      * successful only when validation is successful.
      */
     static constexpr char const * const xmlFiles[] = {
+            "odm/etc/media_profiles_V1_0.xml",
             "vendor/etc/media_profiles_V1_0.xml",
             "system/etc/media_profiles.xml"
             };
