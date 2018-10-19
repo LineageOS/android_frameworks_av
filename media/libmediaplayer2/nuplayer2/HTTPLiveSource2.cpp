@@ -99,7 +99,8 @@ status_t NuPlayer2::HTTPLiveSource2::setBufferingSettings(const BufferingSetting
     return OK;
 }
 
-void NuPlayer2::HTTPLiveSource2::prepareAsync() {
+// TODO: fetch data starting from |startTimeUs|
+void NuPlayer2::HTTPLiveSource2::prepareAsync(int64_t /* startTimeUs */) {
     if (mLiveLooper == NULL) {
         mLiveLooper = new ALooper;
         mLiveLooper->setName("http live");
