@@ -327,7 +327,7 @@ status_t NuPlayer2Driver::stop() {
     switch (mState) {
         case STATE_RUNNING:
             mPlayer->pause();
-            // fall through
+            [[fallthrough]];
 
         case STATE_PAUSED:
             mState = STATE_STOPPED;
