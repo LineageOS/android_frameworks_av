@@ -860,7 +860,15 @@ static CodecBase *CreateCCodec() {
 }
 
 //static
-sp<CodecBase> MediaCodec::GetCodecBase(const AString &name) {
+sp<CodecBase> MediaCodec::GetCodecBase(const AString &name, const char *owner) {
+    if (owner) {
+        if (strncmp(owner, "default", 8) == 0) {
+            return new ACodec;
+        } else if (strncmp(owner, "codec2", 7) == 0) {
+            return CreateCCodec();
+        }
+    }
+
     if (name.startsWithIgnoreCase("c2.")) {
         return CreateCCodec();
     } else if (name.startsWithIgnoreCase("omx.")) {
@@ -883,11 +891,6 @@ status_t MediaCodec::init(const AString &name) {
     // quickly, violating the OpenMAX specs, until that is remedied
     // we need to invest in an extra looper to free the main event
     // queue.
-
-    mCodec = GetCodecBase(name);
-    if (mCodec == NULL) {
-        return NAME_NOT_FOUND;
-    }
 
     mCodecInfo.clear();
 
@@ -919,6 +922,11 @@ status_t MediaCodec::init(const AString &name) {
         break;
     }
     if (mCodecInfo == nullptr) {
+        return NAME_NOT_FOUND;
+    }
+
+    mCodec = GetCodecBase(name, mCodecInfo->getOwnerName());
+    if (mCodec == NULL) {
         return NAME_NOT_FOUND;
     }
 
@@ -1935,7 +1943,9 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         mAnalyticsItem->setCString(kCodecCodec, mComponentName.c_str());
                     }
 
-                    if (mComponentName.startsWith("OMX.google.")) {
+                    const char *owner = mCodecInfo->getOwnerName();
+                    if (mComponentName.startsWith("OMX.google.")
+                            && (owner == nullptr || strncmp(owner, "default", 8) == 0)) {
                         mFlags |= kFlagUsesSoftwareRenderer;
                     } else {
                         mFlags &= ~kFlagUsesSoftwareRenderer;
