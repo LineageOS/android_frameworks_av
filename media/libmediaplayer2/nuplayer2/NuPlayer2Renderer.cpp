@@ -1563,6 +1563,7 @@ void NuPlayer2::Renderer::onFlush(const sp<AMessage> &msg) {
         } else {
             notifyComplete = mNotifyCompleteVideo;
             mNotifyCompleteVideo = false;
+            mVideoRenderingStarted = false;
         }
 
         // If we're currently syncing the queues, i.e. dropping audio while
