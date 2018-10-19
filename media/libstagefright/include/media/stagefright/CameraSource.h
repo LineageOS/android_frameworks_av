@@ -204,6 +204,7 @@ protected:
     int32_t mNumFramesReceived;
     int64_t mLastFrameTimestampUs;
     bool mStarted;
+    bool mEos;
     int32_t mNumFramesEncoded;
 
     // Time between capture of two frames.

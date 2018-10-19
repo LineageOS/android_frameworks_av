@@ -1613,12 +1613,15 @@ status_t OMXNodeInstance::freeBuffer(
     }
     BufferMeta *buffer_meta = static_cast<BufferMeta *>(header->pAppPrivate);
 
+    // Invalidate buffers in the client side first before calling OMX_FreeBuffer.
+    // If not, pending events in the client side might access the buffers after free.
+    invalidateBufferID(buffer);
+
     OMX_ERRORTYPE err = OMX_FreeBuffer(mHandle, portIndex, header);
     CLOG_IF_ERROR(freeBuffer, err, "%s:%u %#x", portString(portIndex), portIndex, buffer);
 
     delete buffer_meta;
     buffer_meta = NULL;
-    invalidateBufferID(buffer);
 
     return StatusFromOMXError(err);
 }
