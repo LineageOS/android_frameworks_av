@@ -1300,10 +1300,7 @@ retry:
     mNewPosition = position + mUpdatePeriod;
     status_t result = createRecord_l(position, mOpPackageName);
 
-    if (result != NO_ERROR) {
-        ALOGW("%s(%d): createRecord_l failed, do not retry", __func__, mId);
-        retries = 0;
-    } else {
+    if (result == NO_ERROR) {
         if (mActive) {
             // callback thread or sync event hasn't changed
             // FIXME this fails if we have a new AudioFlinger instance
@@ -1316,13 +1313,15 @@ retry:
     if (result != NO_ERROR) {
         ALOGW("%s(%d): failed status %d, retries %d", __func__, mId, result, retries);
         if (--retries > 0) {
+            // leave time for an eventual race condition to clear before retrying
+            usleep(500000);
             goto retry;
         }
-    }
-
-    if (result != NO_ERROR) {
-        ALOGW("%s(%d): failed status %d", __func__, mId, result);
-        mActive = false;
+        // if no retries left, set invalid bit to force restoring at next occasion
+        // and avoid inconsistent active state on client and server sides
+        if (mCblk != nullptr) {
+            android_atomic_or(CBLK_INVALID, &mCblk->mFlags);
+        }
     }
 
     return result;
