@@ -21,6 +21,7 @@
 #include <utils/Errors.h>
 #include <media/MediaExtractorPluginApi.h>
 #include <media/MediaExtractorPluginHelper.h>
+#include <media/NdkMediaFormat.h>
 
 namespace android {
 
@@ -30,14 +31,14 @@ class String8;
 struct MyOggExtractor;
 struct OggSource;
 
-struct OggExtractor : public MediaExtractorPluginHelper {
+struct OggExtractor : public MediaExtractorPluginHelperV2 {
     explicit OggExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
-    virtual MediaTrackHelper *getTrack(size_t index);
-    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
+    virtual MediaTrackHelperV2 *getTrack(size_t index);
+    virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
-    virtual status_t getMetaData(MetaDataBase& meta);
+    virtual media_status_t getMetaData(AMediaFormat *meta);
     virtual const char * name() { return "OggExtractor"; }
 
 protected:

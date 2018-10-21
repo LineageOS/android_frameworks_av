@@ -26,6 +26,9 @@ struct ABuffer;
 struct AString;
 
 sp<ABuffer> decodeBase64(const AString &s);
+
+bool decodeBase64(uint8_t *out, size_t *inOutBufSize, const char* s);
+
 void encodeBase64(const void *data, size_t size, AString *out);
 
 void encodeBase64Url(const void *data, size_t size, AString *out);

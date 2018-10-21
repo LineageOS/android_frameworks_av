@@ -2308,10 +2308,7 @@ retry:
     // If a new IAudioTrack cannot be created, the previous (dead) instance will be left intact.
     status_t result = createTrack_l();
 
-    if (result != NO_ERROR) {
-        ALOGW("%s(%d): createTrack_l failed, do not retry", __func__, mId);
-        retries = 0;
-    } else {
+    if (result == NO_ERROR) {
         // take the frames that will be lost by track recreation into account in saved position
         // For streaming tracks, this is the amount we obtained from the user/client
         // (not the number actually consumed at the server - those are already lost).
@@ -2358,12 +2355,16 @@ retry:
     if (result != NO_ERROR) {
         ALOGW("%s(%d): failed status %d, retries %d", __func__, mId, result, retries);
         if (--retries > 0) {
+            // leave time for an eventual race condition to clear before retrying
+            usleep(500000);
             goto retry;
         }
-        mState = STATE_STOPPED;
-        mReleased = 0;
+        // if no retries left, set invalid bit to force restoring at next occasion
+        // and avoid inconsistent active state on client and server sides
+        if (mCblk != nullptr) {
+            android_atomic_or(CBLK_INVALID, &mCblk->mFlags);
+        }
     }
-
     return result;
 }
 

@@ -43,7 +43,7 @@ struct NuPlayer2::RTSPSource2 : public NuPlayer2::Source {
             BufferingSettings* buffering /* nonnull */) override;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
 
-    virtual void prepareAsync();
+    virtual void prepareAsync(int64_t startTimeUs);
     virtual void start();
     virtual void stop();
 

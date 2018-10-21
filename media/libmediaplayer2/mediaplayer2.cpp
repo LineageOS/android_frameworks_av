@@ -403,6 +403,15 @@ status_t MediaPlayer2::setDataSource(const sp<DataSourceDesc> &dsd) {
     if (dsd == NULL) {
         return BAD_VALUE;
     }
+    // Microsecond is used in NuPlayer2.
+    if (dsd->mStartPositionMs > INT64_MAX / 1000) {
+        dsd->mStartPositionMs = INT64_MAX / 1000;
+        ALOGW("setDataSource, start poistion clamped to %lld ms", (long long)dsd->mStartPositionMs);
+    }
+    if (dsd->mEndPositionMs > INT64_MAX / 1000) {
+        dsd->mEndPositionMs = INT64_MAX / 1000;
+        ALOGW("setDataSource, end poistion clamped to %lld ms", (long long)dsd->mStartPositionMs);
+    }
     ALOGV("setDataSource type(%d), srcId(%lld)", dsd->mType, (long long)dsd->mId);
 
     sp<MediaPlayer2Interface> oldPlayer;

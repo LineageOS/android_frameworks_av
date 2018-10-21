@@ -28,14 +28,31 @@ sp<ABuffer> decodeBase64(const AString &s) {
         return NULL;
     }
 
+    size_t bufSize = n / 4 * 3;
+    sp<ABuffer> buf = new ABuffer(bufSize);
+
+    if (decodeBase64(buf->data(), &bufSize, s.c_str())) {
+        buf->setRange(0, bufSize);
+        return buf;
+    }
+    return NULL;
+}
+
+bool decodeBase64(uint8_t *out, size_t *inOutBufSize, const char* s) {
+    size_t n = strlen(s);
+
+    if ((n % 4) != 0) {
+        return false;
+    }
+
     size_t padding = 0;
-    if (n >= 1 && s.c_str()[n - 1] == '=') {
+    if (n >= 1 && s[n - 1] == '=') {
         padding = 1;
 
-        if (n >= 2 && s.c_str()[n - 2] == '=') {
+        if (n >= 2 && s[n - 2] == '=') {
             padding = 2;
 
-            if (n >= 3 && s.c_str()[n - 3] == '=') {
+            if (n >= 3 && s[n - 3] == '=') {
                 padding = 3;
             }
         }
@@ -45,15 +62,13 @@ sp<ABuffer> decodeBase64(const AString &s) {
     // already made sure that n % 4 == 0.
     size_t outLen = (n / 4) * 3 - padding;
 
-    sp<ABuffer> buffer = new ABuffer(outLen);
-    uint8_t *out = buffer->data();
-    if (out == NULL || buffer->size() < outLen) {
-        return NULL;
+    if (out == NULL || *inOutBufSize < outLen) {
+        return false;
     }
     size_t j = 0;
     uint32_t accum = 0;
     for (size_t i = 0; i < n; ++i) {
-        char c = s.c_str()[i];
+        char c = s[i];
         unsigned value;
         if (c >= 'A' && c <= 'Z') {
             value = c - 'A';
@@ -66,10 +81,10 @@ sp<ABuffer> decodeBase64(const AString &s) {
         } else if (c == '/' || c == '_') {
             value = 63;
         } else if (c != '=') {
-            return NULL;
+            return false;
         } else {
             if (i < n - padding) {
-                return NULL;
+                return false;
             }
 
             value = 0;
@@ -86,7 +101,8 @@ sp<ABuffer> decodeBase64(const AString &s) {
         }
     }
 
-    return buffer;
+    *inOutBufSize = j;
+    return true;
 }
 
 static char encode6Bit(unsigned x) {

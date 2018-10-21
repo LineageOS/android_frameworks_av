@@ -19,8 +19,10 @@
 #include <utils/Log.h>
 
 #include <media/stagefright/foundation/avc_utils.h>
+#include <media/stagefright/foundation/base64.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
+#include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaDataUtils.h>
 #include <media/stagefright/Utils.h>
@@ -190,6 +192,137 @@ bool MakeAACCodecSpecificData(
     meta.setInt32(kKeyChannelCount, channel_configuration);
     meta.setData(kKeyESDS, 0, csd, csdSize);
     return true;
+}
+
+
+static void extractAlbumArt(
+        AMediaFormat *fileMeta, const void *data, size_t size) {
+    ALOGV("extractAlbumArt from '%s'", (const char *)data);
+
+    size_t inLen = strnlen((const char *)data, size);
+    size_t flacSize = inLen / 4 * 3;
+    uint8_t *flac = new uint8_t[flacSize];
+    if (!decodeBase64(flac, &flacSize, (const char*)data)) {
+        ALOGE("malformed base64 encoded data.");
+        delete[] flac;
+        return;
+    }
+
+    ALOGV("got flac of size %zu", flacSize);
+
+    uint32_t picType;
+    uint32_t typeLen;
+    uint32_t descLen;
+    uint32_t dataLen;
+    char type[128];
+
+    if (flacSize < 8) {
+        delete[] flac;
+        return;
+    }
+
+    picType = U32_AT(flac);
+
+    if (picType != 3) {
+        // This is not a front cover.
+        delete[] flac;
+        return;
+    }
+
+    typeLen = U32_AT(&flac[4]);
+    if (typeLen > sizeof(type) - 1) {
+        delete[] flac;
+        return;
+    }
+
+    // we've already checked above that flacSize >= 8
+    if (flacSize - 8 < typeLen) {
+        delete[] flac;
+        return;
+    }
+
+    memcpy(type, &flac[8], typeLen);
+    type[typeLen] = '\0';
+
+    ALOGV("picType = %d, type = '%s'", picType, type);
+
+    if (!strcmp(type, "-->")) {
+        // This is not inline cover art, but an external url instead.
+        delete[] flac;
+        return;
+    }
+
+    if (flacSize < 32 || flacSize - 32 < typeLen) {
+        delete[] flac;
+        return;
+    }
+
+    descLen = U32_AT(&flac[8 + typeLen]);
+    if (flacSize - 32 - typeLen < descLen) {
+        delete[] flac;
+        return;
+    }
+
+    dataLen = U32_AT(&flac[8 + typeLen + 4 + descLen + 16]);
+
+    // we've already checked above that (flacSize - 32 - typeLen - descLen) >= 0
+    if (flacSize - 32 - typeLen - descLen < dataLen) {
+        delete[] flac;
+        return;
+    }
+
+    ALOGV("got image data, %zu trailing bytes",
+         flacSize - 32 - typeLen - descLen - dataLen);
+
+    AMediaFormat_setBuffer(fileMeta, AMEDIAFORMAT_KEY_ALBUMART,
+            &flac[8 + typeLen + 4 + descLen + 20], dataLen);
+
+    delete[] flac;
+}
+
+void parseVorbisComment(
+        AMediaFormat *fileMeta, const char *comment, size_t commentLength) {
+    struct {
+        const char *const mTag;
+        const char *mKey;
+    } kMap[] = {
+        { "TITLE", AMEDIAFORMAT_KEY_TITLE },
+        { "ARTIST", AMEDIAFORMAT_KEY_ARTIST },
+        { "ALBUMARTIST", AMEDIAFORMAT_KEY_ALBUMARTIST },
+        { "ALBUM ARTIST", AMEDIAFORMAT_KEY_ALBUMARTIST },
+        { "COMPILATION", AMEDIAFORMAT_KEY_COMPILATION },
+        { "ALBUM", AMEDIAFORMAT_KEY_ALBUM },
+        { "COMPOSER", AMEDIAFORMAT_KEY_COMPOSER },
+        { "GENRE", AMEDIAFORMAT_KEY_GENRE },
+        { "AUTHOR", AMEDIAFORMAT_KEY_AUTHOR },
+        { "TRACKNUMBER", AMEDIAFORMAT_KEY_CDTRACKNUMBER },
+        { "DISCNUMBER", AMEDIAFORMAT_KEY_DISCNUMBER },
+        { "DATE", AMEDIAFORMAT_KEY_DATE },
+        { "YEAR", AMEDIAFORMAT_KEY_YEAR },
+        { "LYRICIST", AMEDIAFORMAT_KEY_LYRICIST },
+        { "METADATA_BLOCK_PICTURE", AMEDIAFORMAT_KEY_ALBUMART },
+        { "ANDROID_LOOP", AMEDIAFORMAT_KEY_LOOP },
+    };
+
+        for (size_t j = 0; j < sizeof(kMap) / sizeof(kMap[0]); ++j) {
+            size_t tagLen = strlen(kMap[j].mTag);
+            if (!strncasecmp(kMap[j].mTag, comment, tagLen)
+                    && comment[tagLen] == '=') {
+                if (kMap[j].mKey == AMEDIAFORMAT_KEY_ALBUMART) {
+                    extractAlbumArt(
+                            fileMeta,
+                            &comment[tagLen + 1],
+                            commentLength - tagLen - 1);
+                } else if (kMap[j].mKey == AMEDIAFORMAT_KEY_LOOP) {
+                    if (!strcasecmp(&comment[tagLen + 1], "true")) {
+                        AMediaFormat_setInt32(fileMeta, AMEDIAFORMAT_KEY_LOOP, 1);
+                    }
+                } else {
+                    AMediaFormat_setString(fileMeta, kMap[j].mKey, &comment[tagLen + 1]);
+                }
+            }
+        }
+
 }
 
 }  // namespace android

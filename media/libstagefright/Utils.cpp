@@ -578,8 +578,10 @@ std::vector<std::pair<const char *, uint32_t>> tagMappings {
         { "cdtracknum", kKeyCDTrackNumber },
         { "compilation", kKeyCompilation },
         { "composer", kKeyComposer },
+        { "date", kKeyDate },
         { "discnum", kKeyDiscNumber },
         { "genre", kKeyGenre },
+        { "lyricist", kKeyWriter },
         { "title", kKeyTitle },
         { "year", kKeyYear },
     }
@@ -596,6 +598,11 @@ void convertMessageToMetaDataTags(const sp<AMessage> &msg, sp<MetaData> &meta) {
     if (msg->findBuffer("albumart", &buf)) {
         meta->setData(kKeyAlbumArt, MetaDataBase::Type::TYPE_NONE, buf->data(), buf->size());
     }
+
+    int32_t loop;
+    if (msg->findInt32("loop", &loop)) {
+        meta->setInt32(kKeyAutoLoop, loop);
+    }
 }
 
 void convertMetaDataToMessageTags(const MetaDataBase *meta, sp<AMessage> format) {
@@ -611,6 +618,10 @@ void convertMetaDataToMessageTags(const MetaDataBase *meta, sp<AMessage> format)
     if (meta->findData(kKeyAlbumArt, &type, &data, &size)) {
         sp<ABuffer> buf = ABuffer::CreateAsCopy(data, size);
         format->setBuffer("albumart", buf);
+    }
+    int32_t loop;
+    if (meta->findInt32(kKeyAutoLoop, &loop)) {
+        format->setInt32("loop", loop);
     }
 }
 

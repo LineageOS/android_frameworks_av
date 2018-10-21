@@ -156,17 +156,33 @@ private:
         kWhatReleaseDrm                 = 'rDrm',
     };
 
+    typedef enum {
+        DATA_SOURCE_TYPE_NONE,
+        DATA_SOURCE_TYPE_HTTP_LIVE,
+        DATA_SOURCE_TYPE_RTSP,
+        DATA_SOURCE_TYPE_GENERIC_URL,
+        DATA_SOURCE_TYPE_GENERIC_FD,
+        DATA_SOURCE_TYPE_MEDIA,
+    } DATA_SOURCE_TYPE;
+
+    struct SourceInfo {
+        SourceInfo();
+
+        sp<Source> mSource;
+        std::atomic<DATA_SOURCE_TYPE> mDataSourceType;
+        int64_t mSrcId;
+        uint32_t mSourceFlags;
+        int64_t mStartTimeUs;
+        int64_t mEndTimeUs;
+    };
+
     wp<NuPlayer2Driver> mDriver;
     pid_t mPID;
     uid_t mUID;
     const sp<MediaClock> mMediaClock;
     Mutex mSourceLock;  // guard |mSource|.
-    sp<Source> mSource;
-    int64_t mSrcId;
-    uint32_t mSourceFlags;
-    sp<Source> mNextSource;
-    int64_t mNextSrcId;
-    uint32_t mNextSourceFlags;
+    SourceInfo mCurrentSourceInfo;
+    SourceInfo mNextSourceInfo;
     sp<ANativeWindowWrapper> mNativeWindow;
     sp<MediaPlayer2Interface::AudioSink> mAudioSink;
     sp<DecoderBase> mVideoDecoder;
@@ -251,18 +267,6 @@ private:
     // Modular DRM
     sp<AMediaCryptoWrapper> mCrypto;
     bool mIsDrmProtected;
-
-    typedef enum {
-        DATA_SOURCE_TYPE_NONE,
-        DATA_SOURCE_TYPE_HTTP_LIVE,
-        DATA_SOURCE_TYPE_RTSP,
-        DATA_SOURCE_TYPE_GENERIC_URL,
-        DATA_SOURCE_TYPE_GENERIC_FD,
-        DATA_SOURCE_TYPE_MEDIA,
-    } DATA_SOURCE_TYPE;
-
-    std::atomic<DATA_SOURCE_TYPE> mDataSourceType;
-    std::atomic<DATA_SOURCE_TYPE> mNextDataSourceType;
 
     inline const sp<DecoderBase> &getDecoder(bool audio) {
         return audio ? mAudioDecoder : mVideoDecoder;

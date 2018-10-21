@@ -62,7 +62,7 @@ struct NuPlayer2::GenericSource2 : public NuPlayer2::Source,
             BufferingSettings* buffering /* nonnull */) override;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
 
-    virtual void prepareAsync();
+    virtual void prepareAsync(int64_t startTimeUs);
 
     virtual void start();
     virtual void stop();
@@ -194,7 +194,7 @@ private:
     void onSeek(const sp<AMessage>& msg);
     status_t doSeek(int64_t seekTimeUs, MediaPlayer2SeekMode mode);
 
-    void onPrepareAsync();
+    void onPrepareAsync(int64_t startTimeUs);
 
     void fetchTextData(
             uint32_t what, media_track_type type,

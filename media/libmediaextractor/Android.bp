@@ -38,7 +38,6 @@ cc_library {
         "MediaSource.cpp",
         "MetaData.cpp",
         "MetaDataBase.cpp",
-        "VorbisComment.cpp",
     ],
 
     clang: true,

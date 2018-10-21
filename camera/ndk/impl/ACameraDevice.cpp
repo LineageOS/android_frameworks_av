@@ -1294,12 +1294,17 @@ CameraDevice::ServiceCallback::onDeviceError(
         case ERROR_CAMERA_DEVICE:
         case ERROR_CAMERA_SERVICE:
         {
+            int32_t errorVal = ::ERROR_CAMERA_DEVICE;
+            // We keep this switch since this block might be encountered with
+            // more than just 2 states. The default fallthrough could have us
+            // handling more unmatched error cases.
             switch (errorCode) {
                 case ERROR_CAMERA_DEVICE:
                     dev->setCameraDeviceErrorLocked(ACAMERA_ERROR_CAMERA_DEVICE);
                     break;
                 case ERROR_CAMERA_SERVICE:
                     dev->setCameraDeviceErrorLocked(ACAMERA_ERROR_CAMERA_SERVICE);
+                    errorVal = ::ERROR_CAMERA_SERVICE;
                     break;
                 default:
                     dev->setCameraDeviceErrorLocked(ACAMERA_ERROR_UNKNOWN);
@@ -1309,7 +1314,7 @@ CameraDevice::ServiceCallback::onDeviceError(
             msg->setPointer(kContextKey, dev->mAppCallbacks.context);
             msg->setPointer(kDeviceKey, (void*) dev->getWrapper());
             msg->setPointer(kCallbackFpKey, (void*) dev->mAppCallbacks.onError);
-            msg->setInt32(kErrorCodeKey, errorCode);
+            msg->setInt32(kErrorCodeKey, errorVal);
             msg->post();
             break;
         }
