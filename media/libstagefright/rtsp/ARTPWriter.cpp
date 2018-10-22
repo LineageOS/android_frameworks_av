@@ -498,7 +498,9 @@ void ARTPWriter::send(const sp<ABuffer> &buffer, bool isRTCP) {
     ssize_t n = sendto(isRTCP ? mRTCPSocket : mRTPSocket,
             buffer->data(), buffer->size(), 0, remAddr, sizeSockSt);
 
-    CHECK_EQ(n, (ssize_t)buffer->size());
+    if (n != (ssize_t)buffer->size()) {
+        ALOGW("packets can not be sent. ret=%d, buf=%d", (int)n, (int)buffer->size());
+    }
 
 #if LOG_TO_FILES
     int fd = isRTCP ? mRTCPFd : mRTPFd;
