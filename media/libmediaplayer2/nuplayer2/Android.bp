@@ -33,6 +33,8 @@ cc_library_static {
     cflags: [
         "-Werror",
         "-Wall",
+        // Allow implicit fallthroughs in NuPlayer2Driver.cpp until they are fixed.
+        "-Wno-error=implicit-fallthrough",
     ],
 
     product_variables: {
