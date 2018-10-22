@@ -138,7 +138,7 @@ static int decode(
 
     CHECK(!stateByTrack.isEmpty());
 
-    int64_t startTimeUs = ALooper::GetNowUs();
+    int64_t startTimeUs = android::ALooper::GetNowUs();
     int64_t startTimeRender = -1;
 
     for (size_t i = 0; i < stateByTrack.size(); ++i) {
@@ -307,7 +307,7 @@ static int decode(
         }
     }
 
-    int64_t elapsedTimeUs = ALooper::GetNowUs() - startTimeUs;
+    int64_t elapsedTimeUs = android::ALooper::GetNowUs() - startTimeUs;
 
     for (size_t i = 0; i < stateByTrack.size(); ++i) {
         CodecState *state = &stateByTrack.editValueAt(i);
@@ -400,7 +400,7 @@ int main(int argc, char **argv) {
 
     ProcessState::self()->startThreadPool();
 
-    sp<ALooper> looper = new ALooper;
+    sp<android::ALooper> looper = new android::ALooper;
     looper->start();
 
     sp<SurfaceComposerClient> composerClient;
