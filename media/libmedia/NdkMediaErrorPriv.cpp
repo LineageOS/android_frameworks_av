@@ -29,6 +29,12 @@ media_status_t translate_error(status_t err) {
         return AMEDIA_ERROR_END_OF_STREAM;
     } else if (err == ERROR_IO) {
         return AMEDIA_ERROR_IO;
+    } else if (err == ERROR_MALFORMED) {
+        return AMEDIA_ERROR_MALFORMED;
+    } else if (err == INVALID_OPERATION) {
+        return AMEDIA_ERROR_INVALID_OPERATION;
+    } else if (err == UNKNOWN_ERROR) {
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
     ALOGE("sf error code: %d", err);
@@ -45,6 +51,12 @@ status_t reverse_translate_error(media_status_t err) {
         return ERROR_IO;
     } else if (err == AMEDIA_ERROR_WOULD_BLOCK) {
         return WOULD_BLOCK;
+    } else if (err == AMEDIA_ERROR_MALFORMED) {
+        return ERROR_MALFORMED;
+    } else if (err == AMEDIA_ERROR_INVALID_OPERATION) {
+        return INVALID_OPERATION;
+    } else if (err == AMEDIA_ERROR_UNKNOWN) {
+        return UNKNOWN_ERROR;
     }
 
     ALOGE("ndk error code: %d", err);
