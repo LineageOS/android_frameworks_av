@@ -79,6 +79,7 @@ struct NuPlayer2 : public AHandler {
             int64_t seekTimeUs,
             MediaPlayer2SeekMode mode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC,
             bool needNotify = false);
+    void rewind();
 
     status_t setVideoScalingMode(int32_t mode);
     status_t getTrackInfo(PlayerMessage* reply) const;
@@ -154,6 +155,8 @@ private:
         kWhatSetBufferingSettings       = 'sBuS',
         kWhatPrepareDrm                 = 'pDrm',
         kWhatReleaseDrm                 = 'rDrm',
+        kWhatRewind                     = 'reWd',
+        kWhatEOSMonitor                 = 'eosM',
     };
 
     typedef enum {
@@ -167,6 +170,7 @@ private:
 
     struct SourceInfo {
         SourceInfo();
+        SourceInfo &operator=(const SourceInfo &);
 
         sp<Source> mSource;
         std::atomic<DATA_SOURCE_TYPE> mDataSourceType;
@@ -194,6 +198,7 @@ private:
     int32_t mAudioDecoderGeneration;
     int32_t mVideoDecoderGeneration;
     int32_t mRendererGeneration;
+    int32_t mEOSMonitorGeneration;
 
     Mutex mPlayingTimeLock;
     int64_t mLastStartedPlayingTimeNs;
@@ -301,6 +306,8 @@ private:
             const sp<AMessage> &outputFormat = NULL);
 
     void notifyListener(int64_t srcId, int msg, int ext1, int ext2, const PlayerMessage *in = NULL);
+
+    void addEndTimeMonitor();
 
     void handleFlushComplete(bool audio, bool isDecoder);
     void finishFlushIfPossible();

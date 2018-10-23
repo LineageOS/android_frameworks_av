@@ -298,7 +298,7 @@ status_t NuPlayer2Driver::start_l() {
         case STATE_RUNNING:
         {
             if (mAtEOS) {
-                mPlayer->seekToAsync(0);
+                mPlayer->rewind();
                 mAtEOS = false;
                 mPositionUs = -1;
             }
@@ -859,7 +859,7 @@ void NuPlayer2Driver::notifyListener_l(
                         }
                     }
                     if (mLooping || mAutoLoop) {
-                        mPlayer->seekToAsync(0);
+                        mPlayer->rewind();
                         if (mAudioSink != NULL) {
                             // The renderer has stopped the sink at the end in order to play out
                             // the last little bit of audio. In looping mode, we need to restart it.
