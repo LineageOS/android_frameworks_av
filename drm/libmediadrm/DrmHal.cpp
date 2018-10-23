@@ -23,7 +23,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 
-#include <android/hardware/drm/1.0/types.h>
+#include <android/hardware/drm/1.2/types.h>
 #include <android/hidl/manager/1.0/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
 
@@ -43,12 +43,13 @@ using drm::V1_0::KeyedVector;
 using drm::V1_0::KeyStatusType;
 using drm::V1_0::KeyType;
 using drm::V1_0::KeyValue;
-using drm::V1_1::HdcpLevel;;
 using drm::V1_0::SecureStop;
-using drm::V1_1::SecureStopRelease;
 using drm::V1_0::SecureStopId;
-using drm::V1_1::SecurityLevel;
 using drm::V1_0::Status;
+using drm::V1_1::HdcpLevel;
+using drm::V1_1::SecureStopRelease;
+using drm::V1_1::SecurityLevel;
+using drm::V1_2::KeySetId;
 using ::android::hardware::drm::V1_1::DrmMetricGroup;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_string;
@@ -139,6 +140,18 @@ static DrmPlugin::SecurityLevel toSecurityLevel(SecurityLevel level) {
     }
 }
 
+static DrmPlugin::OfflineLicenseState toOfflineLicenseState(
+        OfflineLicenseState licenseState) {
+    switch(licenseState) {
+    case OfflineLicenseState::USABLE:
+        return DrmPlugin::kOfflineLicenseStateUsable;
+    case OfflineLicenseState::INACTIVE:
+        return DrmPlugin::kOfflineLicenseStateInactive;
+    default:
+        return DrmPlugin::kOfflineLicenseStateUnknown;
+    }
+}
+
 static DrmPlugin::HdcpLevel toHdcpLevel(HdcpLevel level) {
     switch(level) {
     case HdcpLevel::HDCP_NONE:
@@ -197,6 +210,15 @@ static List<Vector<uint8_t>> toSecureStopIds(const hidl_vec<SecureStopId>&
         secureStopIds.push_back(toVector(hSecureStopIds[i]));
     }
     return secureStopIds;
+}
+
+static List<Vector<uint8_t>> toKeySetIds(const hidl_vec<KeySetId>&
+        hKeySetIds) {
+    List<Vector<uint8_t>> keySetIds;
+    for (size_t i = 0; i < hKeySetIds.size(); i++) {
+        keySetIds.push_back(toVector(hKeySetIds[i]));
+    }
+    return keySetIds;
 }
 
 static status_t toStatusT(Status status) {
@@ -305,6 +327,7 @@ void DrmHal::cleanup() {
     }
     mPlugin.clear();
     mPluginV1_1.clear();
+    mPluginV1_2.clear();
 }
 
 Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
@@ -327,6 +350,16 @@ Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
                 [&factories](const hidl_vec<hidl_string> &registered) {
                     for (const auto &instance : registered) {
                         auto factory = drm::V1_1::IDrmFactory::getService(instance);
+                        if (factory != NULL) {
+                            factories.push_back(factory);
+                        }
+                    }
+                }
+            );
+        manager->listByInterface(drm::V1_2::IDrmFactory::descriptor,
+                [&factories](const hidl_vec<hidl_string> &registered) {
+                    for (const auto &instance : registered) {
+                        auto factory = drm::V1_2::IDrmFactory::getService(instance);
                         if (factory != NULL) {
                             factories.push_back(factory);
                         }
@@ -525,6 +558,7 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
             mPlugin = makeDrmPlugin(mFactories[i], uuid, appPackageName);
             if (mPlugin != NULL) {
                 mPluginV1_1 = drm::V1_1::IDrmPlugin::castFrom(mPlugin);
+                mPluginV1_2 = drm::V1_2::IDrmPlugin::castFrom(mPlugin);
             }
         }
     }
@@ -1055,6 +1089,73 @@ status_t DrmHal::getSecurityLevel(Vector<uint8_t> const &sessionId,
             [&](Status status, SecurityLevel hLevel) {
                 if (status == Status::OK) {
                     *level = toSecurityLevel(hLevel);
+                }
+                err = toStatusT(status);
+            }
+    );
+
+    return hResult.isOk() ? err : DEAD_OBJECT;
+}
+
+status_t DrmHal::getOfflineLicenseKeySetIds(List<Vector<uint8_t>> &keySetIds) const {
+    Mutex::Autolock autoLock(mLock);
+
+    if (mInitCheck != OK) {
+        return mInitCheck;
+    }
+
+    if (mPluginV1_2 == NULL) {
+        return ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    status_t err = UNKNOWN_ERROR;
+
+    Return<void> hResult = mPluginV1_2->getOfflineLicenseKeySetIds(
+            [&](Status status, const hidl_vec<KeySetId>& hKeySetIds) {
+                if (status == Status::OK) {
+                    keySetIds = toKeySetIds(hKeySetIds);
+                }
+                err = toStatusT(status);
+            }
+    );
+
+    return hResult.isOk() ? err : DEAD_OBJECT;
+}
+
+status_t DrmHal::removeOfflineLicense(Vector<uint8_t> const &keySetId) {
+    Mutex::Autolock autoLock(mLock);
+
+    if (mInitCheck != OK) {
+        return mInitCheck;
+    }
+
+    if (mPluginV1_2 == NULL) {
+        return ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    Return<Status> status = mPluginV1_2->removeOfflineLicense(toHidlVec(keySetId));
+    return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
+}
+
+status_t DrmHal::getOfflineLicenseState(Vector<uint8_t> const &keySetId,
+        DrmPlugin::OfflineLicenseState *licenseState) const {
+    Mutex::Autolock autoLock(mLock);
+
+    if (mInitCheck != OK) {
+        return mInitCheck;
+    }
+
+    if (mPluginV1_2 == NULL) {
+        return ERROR_DRM_CANNOT_HANDLE;
+    }
+    *licenseState = DrmPlugin::kOfflineLicenseStateUnknown;
+
+    status_t err = UNKNOWN_ERROR;
+
+    Return<void> hResult = mPluginV1_2->getOfflineLicenseState(toHidlVec(keySetId),
+            [&](Status status, OfflineLicenseState hLicenseState) {
+                if (status == Status::OK) {
+                    *licenseState = toOfflineLicenseState(hLicenseState);
                 }
                 err = toStatusT(status);
             }

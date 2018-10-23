@@ -61,7 +61,10 @@ enum {
     GET_NUMBER_OF_SESSIONS,
     GET_SECURITY_LEVEL,
     REMOVE_SECURE_STOP,
-    GET_SECURE_STOP_IDS
+    GET_SECURE_STOP_IDS,
+    GET_OFFLINE_LICENSE_KEYSET_IDS,
+    REMOVE_OFFLINE_LICENSE,
+    GET_OFFLINE_LICENSE_STATE
 };
 
 struct BpDrm : public BpInterface<IDrm> {
@@ -373,6 +376,52 @@ struct BpDrm : public BpInterface<IDrm> {
             return status;
         }
 
+        return reply.readInt32();
+    }
+
+    virtual status_t getOfflineLicenseKeySetIds(List<Vector<uint8_t> > &keySetIds) const {
+        Parcel data, reply;
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(GET_OFFLINE_LICENSE_KEYSET_IDS, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
+        keySetIds.clear();
+        uint32_t count = reply.readInt32();
+        for (size_t i = 0; i < count; i++) {
+            Vector<uint8_t> keySetId;
+            readVector(reply, keySetId);
+            keySetIds.push_back(keySetId);
+        }
+        return reply.readInt32();
+    }
+
+    virtual status_t removeOfflineLicense(Vector<uint8_t> const &keySetId) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        writeVector(data, keySetId);
+        status_t status = remote()->transact(REMOVE_OFFLINE_LICENSE, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+        return reply.readInt32();
+    }
+
+    virtual status_t getOfflineLicenseState(Vector<uint8_t> const &keySetId,
+            DrmPlugin::OfflineLicenseState *licenseState) const {
+        Parcel data, reply;
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        writeVector(data, keySetId);
+        status_t status = remote()->transact(GET_OFFLINE_LICENSE_STATE, data, &reply);
+        if (status != OK) {
+            *licenseState = DrmPlugin::OfflineLicenseState::kOfflineLicenseStateUnknown;
+            return status;
+        }
+        *licenseState = static_cast<DrmPlugin::OfflineLicenseState>(reply.readInt32());
         return reply.readInt32();
     }
 
@@ -976,6 +1025,45 @@ status_t BnDrm::onTransact(
             DrmPlugin::SecurityLevel level = DrmPlugin::kSecurityLevelUnknown;
             status_t result = getSecurityLevel(sessionId, &level);
             reply->writeInt32(level);
+            reply->writeInt32(result);
+            return OK;
+        }
+
+        case GET_OFFLINE_LICENSE_KEYSET_IDS:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            List<Vector<uint8_t> > keySetIds;
+            status_t result = getOfflineLicenseKeySetIds(keySetIds);
+            size_t count = keySetIds.size();
+            reply->writeInt32(count);
+            List<Vector<uint8_t> >::iterator iter = keySetIds.begin();
+            while(iter != keySetIds.end()) {
+                size_t size = iter->size();
+                reply->writeInt32(size);
+                reply->write(iter->array(), iter->size());
+                iter++;
+            }
+            reply->writeInt32(result);
+            return OK;
+        }
+
+        case REMOVE_OFFLINE_LICENSE:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            Vector<uint8_t> keySetId;
+            readVector(data, keySetId);
+            reply->writeInt32(removeOfflineLicense(keySetId));
+            return OK;
+        }
+
+        case GET_OFFLINE_LICENSE_STATE:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            Vector<uint8_t> keySetId;
+            readVector(data, keySetId);
+            DrmPlugin::OfflineLicenseState state;
+            status_t result = getOfflineLicenseState(keySetId, &state);
+            reply->writeInt32(static_cast<DrmPlugin::OfflineLicenseState>(state));
             reply->writeInt32(result);
             return OK;
         }
