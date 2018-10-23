@@ -13,11 +13,11 @@
 #include <openssl/sha.h>
 
 // Protobuf generated classes.
-using android::hardware::drm::V1_1::clearkey::OfflineFile;
-using android::hardware::drm::V1_1::clearkey::HashedFile;
-using android::hardware::drm::V1_1::clearkey::License;
-using android::hardware::drm::V1_1::clearkey::License_LicenseState_ACTIVE;
-using android::hardware::drm::V1_1::clearkey::License_LicenseState_RELEASING;
+using android::hardware::drm::V1_2::clearkey::OfflineFile;
+using android::hardware::drm::V1_2::clearkey::HashedFile;
+using android::hardware::drm::V1_2::clearkey::License;
+using android::hardware::drm::V1_2::clearkey::License_LicenseState_ACTIVE;
+using android::hardware::drm::V1_2::clearkey::License_LicenseState_RELEASING;
 
 namespace {
 const char kLicenseFileNameExt[] = ".lic";
@@ -38,7 +38,7 @@ bool Hash(const std::string& data, std::string* hash) {
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
 
 bool DeviceFiles::StoreLicense(
@@ -158,6 +158,15 @@ bool DeviceFiles::LicenseExists(const std::string& keySetId) {
     return mFileHandle.FileExists(keySetId + kLicenseFileNameExt);
 }
 
+std::vector<std::string> DeviceFiles::ListLicenses() const {
+    std::vector<std::string> licenses = mFileHandle.ListFiles();
+    for (size_t i = 0; i < licenses.size(); i++) {
+        std::string& license = licenses[i];
+        license = license.substr(0, license.size() - strlen(kLicenseFileNameExt));
+    }
+    return licenses;
+}
+
 bool DeviceFiles::RetrieveHashedFile(const std::string& fileName, OfflineFile* deSerializedFile) {
     if (!deSerializedFile) {
         ALOGE("RetrieveHashedFile: invalid file parameter");
@@ -237,7 +246,7 @@ ssize_t DeviceFiles::GetFileSize(const std::string& fileName) const {
 }
 
 } // namespace clearkey
-} // namespace V1_1
+} // namespace V1_2
 } // namespace drm
 } // namespace hardware
 } // namespace android

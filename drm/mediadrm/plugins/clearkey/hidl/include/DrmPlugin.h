@@ -17,10 +17,12 @@
 #ifndef CLEARKEY_DRM_PLUGIN_H_
 #define CLEARKEY_DRM_PLUGIN_H_
 
-#include <android/hardware/drm/1.1/IDrmPlugin.h>
+#include <android/hardware/drm/1.2/IDrmPlugin.h>
 
-#include <stdio.h>
 #include <map>
+#include <stdio.h>
+
+#include <utils/List.h>
 
 #include "DeviceFiles.h"
 #include "SessionLibrary.h"
@@ -29,7 +31,7 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
 
 using ::android::hardware::drm::V1_0::EventType;
@@ -42,8 +44,12 @@ using ::android::hardware::drm::V1_0::SecureStopId;
 using ::android::hardware::drm::V1_0::SessionId;
 using ::android::hardware::drm::V1_0::Status;
 using ::android::hardware::drm::V1_1::DrmMetricGroup;
-using ::android::hardware::drm::V1_1::IDrmPlugin;
+using ::android::hardware::drm::V1_1::HdcpLevel;
 using ::android::hardware::drm::V1_1::KeyRequestType;
+using ::android::hardware::drm::V1_1::SecureStopRelease;
+using ::android::hardware::drm::V1_1::SecurityLevel;
+using ::android::hardware::drm::V1_2::IDrmPlugin;
+using ::android::hardware::drm::V1_2::OfflineLicenseState;
 
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
@@ -135,6 +141,13 @@ struct DrmPlugin : public IDrmPlugin {
             getSecurityLevel_cb _hidl_cb) override;
 
     Return<void> getMetrics(getMetrics_cb _hidl_cb) override;
+
+    Return<void> getOfflineLicenseKeySetIds(getOfflineLicenseKeySetIds_cb _hidl_cb) override;
+
+    Return<Status> removeOfflineLicense(const KeySetId &keySetId) override;
+
+    Return<void> getOfflineLicenseState(const KeySetId &keySetId,
+            getOfflineLicenseState_cb _hidl_cb) override;
 
     Return<void> getPropertyString(
         const hidl_string& name,
@@ -334,7 +347,7 @@ private:
 };
 
 } // namespace clearkey
-} // namespace V1_1
+} // namespace V1_2
 } // namespace drm
 } // namespace hardware
 } // namespace android

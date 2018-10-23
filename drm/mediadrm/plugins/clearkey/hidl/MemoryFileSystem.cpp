@@ -11,7 +11,7 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
 
 std::string MemoryFileSystem::GetFileName(const std::string& path) {
@@ -36,6 +36,14 @@ ssize_t MemoryFileSystem::GetFileSize(const std::string& fileName) const {
         ALOGE("Failed to get size for %s", fileName.c_str());
         return -1;
     }
+}
+
+std::vector<std::string> MemoryFileSystem::ListFiles() const {
+    std::vector<std::string> list;
+    for (const auto& filename : mMemoryFileSystem) {
+        list.push_back(filename.first);
+    }
+    return list;
 }
 
 size_t MemoryFileSystem::Read(const std::string& path, std::string* buffer) {
@@ -78,7 +86,7 @@ bool MemoryFileSystem::RemoveAllFiles() {
 }
 
 } // namespace clearkey
-} // namespace V1_1
+} // namespace V1_2
 } // namespace drm
 } // namespace hardware
 } // namespace android
