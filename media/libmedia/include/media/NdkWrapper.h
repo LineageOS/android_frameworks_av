@@ -278,6 +278,30 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(AMediaCodecWrapper);
 };
 
+struct AMediaDataSourceWrapper : public RefBase {
+
+    AMediaDataSourceWrapper(AMediaDataSource*);
+    AMediaDataSourceWrapper(int fd, int64_t offset, int64_t length);
+
+    AMediaDataSource *getAMediaDataSource();
+    int getFd() { return mFd; }
+    int64_t getOffset() { return mOffset; }
+    int64_t getLength() { return mLength; }
+
+    void close();
+
+protected:
+    virtual ~AMediaDataSourceWrapper();
+
+private:
+    AMediaDataSource *mAMediaDataSource;
+    int mFd;
+    int64_t mOffset;
+    int64_t mLength;
+
+    DISALLOW_EVIL_CONSTRUCTORS(AMediaDataSourceWrapper);
+};
+
 struct AMediaExtractorWrapper : public RefBase {
 
     AMediaExtractorWrapper(AMediaExtractor *aMediaExtractor);
@@ -335,31 +359,6 @@ private:
     AMediaExtractor *mAMediaExtractor;
 
     DISALLOW_EVIL_CONSTRUCTORS(AMediaExtractorWrapper);
-};
-
-struct AMediaDataSourceWrapper : public RefBase {
-
-    static status_t translate_error(media_status_t err);
-
-    static ssize_t AMediaDataSourceWrapper_getSize(void *userdata);
-
-    static ssize_t AMediaDataSourceWrapper_readAt(void *userdata, off64_t offset, void * buf, size_t size);
-
-    static void AMediaDataSourceWrapper_close(void *userdata);
-
-    AMediaDataSourceWrapper(const sp<DataSource> &dataSource);
-
-    AMediaDataSource *getAMediaDataSource();
-
-protected:
-    virtual ~AMediaDataSourceWrapper();
-
-private:
-    sp<DataSource> mDataSource;
-
-    AMediaDataSource *mAMediaDataSource;
-
-    DISALLOW_EVIL_CONSTRUCTORS(AMediaDataSourceWrapper);
 };
 
 }  // namespace android

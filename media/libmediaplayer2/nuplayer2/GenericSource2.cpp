@@ -21,29 +21,20 @@
 #include "NuPlayer2Drm.h"
 
 #include "AnotherPacketSource.h"
-#include <binder/IServiceManager.h>
 #include <cutils/properties.h>
 #include <media/DataSource.h>
 #include <media/MediaBufferHolder.h>
-#include <media/IMediaExtractorService.h>
-#include <media/IMediaSource.h>
-#include <media/MediaHTTPService.h>
-#include <media/MediaSource.h>
 #include <media/NdkWrapper.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/ClearDataSourceFactory.h>
-#include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MediaDefs.h>
-#include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/NdkUtils.h>
 #include <media/stagefright/Utils.h>
-#include "../../libstagefright/include/NuCachedSource2.h"
-#include "../../libstagefright/include/HTTPBase.h"
+#include "NdkMediaDataSourceCallbacksPriv.h"
 
 namespace android {
 
@@ -88,9 +79,6 @@ NuPlayer2::GenericSource2::GenericSource2(
 void NuPlayer2::GenericSource2::resetDataSource() {
     ALOGV("resetDataSource");
 
-    mHTTPService.clear();
-    mHttpSource.clear();
-    mDisconnected = false;
     mUri.clear();
     mUriHeaders.clear();
     if (mFd >= 0) {
@@ -109,7 +97,6 @@ void NuPlayer2::GenericSource2::resetDataSource() {
 }
 
 status_t NuPlayer2::GenericSource2::setDataSource(
-        const sp<MediaHTTPService> &httpService,
         const char *url,
         const KeyedVector<String8, String8> *headers) {
     Mutex::Autolock _l(mLock);
@@ -117,7 +104,6 @@ status_t NuPlayer2::GenericSource2::setDataSource(
 
     resetDataSource();
 
-    mHTTPService = httpService;
     mUri = url;
 
     if (headers) {
@@ -150,7 +136,8 @@ status_t NuPlayer2::GenericSource2::setDataSource(const sp<DataSource>& source) 
     ALOGV("setDataSource (source: %p)", source.get());
 
     resetDataSource();
-    mDataSource = source;
+    AMediaDataSource *aSource = convertDataSourceToAMediaDataSource(source);
+    mDataSourceWrapper = new AMediaDataSourceWrapper(aSource);
     return OK;
 }
 
@@ -161,24 +148,21 @@ sp<MetaData> NuPlayer2::GenericSource2::getFileFormatMeta() const {
 
 status_t NuPlayer2::GenericSource2::initFromDataSource() {
     mExtractor = new AMediaExtractorWrapper(AMediaExtractor_new());
-    CHECK(mDataSource != NULL || mFd != -1);
-    sp<DataSource> dataSource = mDataSource;
+    CHECK(mFd >=0 || mDataSourceWrapper != NULL);
+    sp<AMediaDataSourceWrapper> aSourceWrapper = mDataSourceWrapper;
     const int fd = mFd;
-    const int64_t offset = mOffset;
-    const int64_t length = mLength;
 
     mLock.unlock();
     // This might take long time if data source is not reliable.
     status_t err;
-    if (dataSource != nullptr) {
-        mDataSourceWrapper = new AMediaDataSourceWrapper(dataSource);
-        err = mExtractor->setDataSource(mDataSourceWrapper->getAMediaDataSource());
+    if (aSourceWrapper != NULL) {
+        err = mExtractor->setDataSource(aSourceWrapper->getAMediaDataSource());
     } else {
-        err = mExtractor->setDataSource(fd, offset, length);
+        err = mExtractor->setDataSource(fd, mOffset, mLength);
     }
 
     if (err != OK) {
-        ALOGE("initFromDataSource, failed to create data source!");
+        ALOGE("initFromDataSource, failed to set extractor data source!");
         mLock.lock();
         return UNKNOWN_ERROR;
     }
@@ -190,10 +174,8 @@ status_t NuPlayer2::GenericSource2::initFromDataSource() {
         return UNKNOWN_ERROR;
     }
 
-    mLock.lock();
-    mFd = -1;
-    mDataSource = dataSource;
     mFileMeta = convertMediaFormatWrapperToMetaData(mExtractor->getFormat());
+    mLock.lock();
     if (mFileMeta != NULL) {
         int64_t duration;
         if (mFileMeta->findInt64(kKeyDuration, &duration)) {
@@ -214,11 +196,7 @@ status_t NuPlayer2::GenericSource2::initFromDataSource() {
         }
 
         sp<AMediaExtractorWrapper> trackExtractor = new AMediaExtractorWrapper(AMediaExtractor_new());
-        if (mDataSourceWrapper != nullptr) {
-            err = trackExtractor->setDataSource(mDataSourceWrapper->getAMediaDataSource());
-        } else {
-            err = trackExtractor->setDataSource(fd, offset, length);
-        }
+        trackExtractor->setDataSource(mDataSourceWrapper->getAMediaDataSource());
 
         const char *mime;
         sp<MetaData> meta = convertMediaFormatWrapperToMetaData(trackFormat);
@@ -329,8 +307,8 @@ NuPlayer2::GenericSource2::~GenericSource2() {
         mLooper->unregisterHandler(id());
         mLooper->stop();
     }
-    if (mDataSource != NULL) {
-        mDataSource->close();
+    if (mDataSourceWrapper != NULL) {
+        mDataSourceWrapper->close();
     }
     resetDataSource();
 }
@@ -356,55 +334,39 @@ void NuPlayer2::GenericSource2::prepareAsync(int64_t startTimeUs) {
 }
 
 void NuPlayer2::GenericSource2::onPrepareAsync(int64_t startTimeUs) {
-    ALOGV("onPrepareAsync: mDataSource: %d", (mDataSource != NULL));
+    ALOGV("onPrepareAsync: mFd %d mUri %s mDataSourceWrapper: %p",
+            mFd, mUri.c_str(), mDataSourceWrapper.get());
 
-    // delayed data source creation
-    if (mDataSource == NULL) {
-        // set to false first, if the extractor
-        // comes back as secure, set it to true then.
-        mIsSecure = false;
-
-        if (!mUri.empty()) {
-            const char* uri = mUri.c_str();
-            String8 contentType;
-
-            if (!strncasecmp("http://", uri, 7) || !strncasecmp("https://", uri, 8)) {
-                mHttpSource = ClearDataSourceFactory::CreateMediaHTTP(mHTTPService);
-                if (mHttpSource == NULL) {
-                    ALOGE("Failed to create http source!");
-                    notifyPreparedAndCleanup(UNKNOWN_ERROR);
-                    return;
-                }
-            }
-
-            mLock.unlock();
-            // This might take long time if connection has some issue.
-            sp<DataSource> dataSource = ClearDataSourceFactory::CreateFromURI(
-                   mHTTPService, uri, &mUriHeaders, &contentType,
-                   static_cast<HTTPBase *>(mHttpSource.get()));
-            mLock.lock();
-            if (!mDisconnected) {
-                mDataSource = dataSource;
-            }
+    if (!mUri.empty()) {
+        const char* uri = mUri.c_str();
+        size_t numheaders = mUriHeaders.size();
+        const char **key_values = numheaders ? new const char *[numheaders * 2] : NULL;
+        for (size_t i = 0; i < numheaders; ++i) {
+            key_values[i * 2] = mUriHeaders.keyAt(i).c_str();
+            key_values[i * 2 + 1] =  mUriHeaders.valueAt(i).c_str();
         }
-
-        if (mFd == -1 && mDataSource == NULL) {
-            ALOGE("Failed to create data source!");
-            notifyPreparedAndCleanup(UNKNOWN_ERROR);
-            return;
-        }
+        mLock.unlock();
+        AMediaDataSource *aSource = AMediaDataSource_newUri(uri, numheaders, key_values);
+        mLock.lock();
+        mDataSourceWrapper = aSource ? new AMediaDataSourceWrapper(aSource) : NULL;
+        delete[] key_values;
+        // For cached streaming cases, we need to wait for enough
+        // buffering before reporting prepared.
+        mIsStreaming = !strncasecmp("http://", uri, 7) || !strncasecmp("https://", uri, 8);
     }
 
-    if (mDataSource != nullptr && mDataSource->flags() & DataSource::kIsCachingDataSource) {
-        mCachedSource = static_cast<NuCachedSource2 *>(mDataSource.get());
+    if (mDisconnected || (mFd < 0 && mDataSourceWrapper == NULL)) {
+        ALOGE("mDisconnected(%d) or Failed to create data source!", mDisconnected);
+        notifyPreparedAndCleanup(UNKNOWN_ERROR);
+        return;
     }
-
-    // For cached streaming cases, we need to wait for enough
-    // buffering before reporting prepared.
-    mIsStreaming = (mCachedSource != NULL);
 
     // init extractor from data source
     status_t err = initFromDataSource();
+    if (mFd >= 0) {
+        close(mFd);
+        mFd = -1;
+    }
 
     if (err != OK) {
         ALOGE("Failed to init from data source!");
@@ -441,7 +403,6 @@ void NuPlayer2::GenericSource2::finishPrepareAsync() {
     ALOGV("finishPrepareAsync");
 
     if (mIsStreaming) {
-        mCachedSource->resumeFetchingIfNecessary();
         mPreparing = true;
         ++mPollBufferingGeneration;
         schedulePollBuffering();
@@ -460,9 +421,7 @@ void NuPlayer2::GenericSource2::finishPrepareAsync() {
 
 void NuPlayer2::GenericSource2::notifyPreparedAndCleanup(status_t err) {
     if (err != OK) {
-        mDataSource.clear();
-        mCachedSource.clear();
-        mHttpSource.clear();
+        mDataSourceWrapper.clear();
 
         mBitrate = -1;
         mPrevBufferPercentage = -1;
@@ -502,45 +461,17 @@ void NuPlayer2::GenericSource2::resume() {
 }
 
 void NuPlayer2::GenericSource2::disconnect() {
-    sp<DataSource> dataSource, httpSource;
     {
         Mutex::Autolock _l(mLock);
-        dataSource = mDataSource;
-        httpSource = mHttpSource;
         mDisconnected = true;
     }
-
-    if (dataSource != NULL) {
-        // disconnect data source
-        if (dataSource->flags() & DataSource::kIsCachingDataSource) {
-            static_cast<NuCachedSource2 *>(dataSource.get())->disconnect();
-        }
-    } else if (httpSource != NULL) {
-        static_cast<HTTPBase *>(httpSource.get())->disconnect();
+    if (mDataSourceWrapper != NULL) {
+        mDataSourceWrapper->close();
     }
-
-    mDataSourceWrapper = NULL;
-
 }
 
 status_t NuPlayer2::GenericSource2::feedMoreTSData() {
     return OK;
-}
-
-void NuPlayer2::GenericSource2::sendCacheStats() {
-    int32_t kbps = 0;
-    status_t err = UNKNOWN_ERROR;
-
-    if (mCachedSource != NULL) {
-        err = mCachedSource->getEstimatedBandwidthKbps(&kbps);
-    }
-
-    if (err == OK) {
-        sp<AMessage> notify = dupNotify();
-        notify->setInt32("what", kWhatCacheStats);
-        notify->setInt32("bandwidth", kbps);
-        notify->post();
-    }
 }
 
 void NuPlayer2::GenericSource2::onMessageReceived(const sp<AMessage> &msg) {
@@ -840,8 +771,6 @@ status_t NuPlayer2::GenericSource2::dequeueAccessUnit(
             }
             if (track->mPackets->getAvailableBufferCount(&finalResult) < 2
                 && !mSentPauseOnBuffering && !mPreparing) {
-                mCachedSource->resumeFetchingIfNecessary();
-                sendCacheStats();
                 mSentPauseOnBuffering = true;
                 sp<AMessage> notify = dupNotify();
                 notify->setInt32("what", kWhatPauseOnBufferingStart);
@@ -1397,7 +1326,6 @@ void NuPlayer2::GenericSource2::readBuffer(
                         notifyPrepared();
                         mPreparing = false;
                     } else {
-                        sendCacheStats();
                         mSentPauseOnBuffering = false;
                         sp<AMessage> notify = dupNotify();
                         notify->setInt32("what", kWhatResumeOnBufferingEnd);
@@ -1458,40 +1386,22 @@ void NuPlayer2::GenericSource2::schedulePollBuffering() {
 }
 
 void NuPlayer2::GenericSource2::onPollBuffering() {
-    status_t finalStatus = UNKNOWN_ERROR;
     int64_t cachedDurationUs = -1ll;
-    ssize_t cachedDataRemaining = -1;
 
-    if (mCachedSource != NULL) {
-        cachedDataRemaining = mCachedSource->approxDataRemaining(&finalStatus);
-
-        if (finalStatus == OK) {
-            off64_t size;
-            int64_t bitrate = 0ll;
-            if (mDurationUs > 0 && mCachedSource->getSize(&size) == OK) {
-                // |bitrate| uses bits/second unit, while size is number of bytes.
-                bitrate = size * 8000000ll / mDurationUs;
-            } else if (mBitrate > 0) {
-                bitrate = mBitrate;
-            }
-            if (bitrate > 0) {
-                cachedDurationUs = cachedDataRemaining * 8000000ll / bitrate;
-            }
-        }
+    sp<AMediaExtractorWrapper> extractor;
+    if (mVideoTrack.mExtractor != NULL) {
+        extractor = mVideoTrack.mExtractor;
+    } else if (mAudioTrack.mExtractor != NULL) {
+        extractor = mAudioTrack.mExtractor;
     }
 
-    if (finalStatus != OK) {
-        ALOGV("onPollBuffering: EOS (finalStatus = %d)", finalStatus);
-
-        if (finalStatus == ERROR_END_OF_STREAM) {
-            notifyBufferingUpdate(100);
-        }
-
-        return;
+    if (extractor != NULL) {
+        cachedDurationUs = extractor->getCachedDuration();
     }
 
     if (cachedDurationUs >= 0ll) {
-        if (mDurationUs > 0ll) {
+        ssize_t sampleSize = extractor->getSampleSize();
+        if (sampleSize >= 0ll) {
             int64_t cachedPosUs = getLastReadPosition() + cachedDurationUs;
             int percentage = 100.0 * cachedPosUs / mDurationUs;
             if (percentage > 100) {
@@ -1499,9 +1409,11 @@ void NuPlayer2::GenericSource2::onPollBuffering() {
             }
 
             notifyBufferingUpdate(percentage);
+            ALOGV("onPollBuffering: cachedDurationUs %.1f sec", cachedDurationUs / 1000000.0f);
+        } else {
+            notifyBufferingUpdate(100);
+            ALOGV("onPollBuffering: EOS");
         }
-
-        ALOGV("onPollBuffering: cachedDurationUs %.1f sec", cachedDurationUs / 1000000.0f);
     }
 
     schedulePollBuffering();

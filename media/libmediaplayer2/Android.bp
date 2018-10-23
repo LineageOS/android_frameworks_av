@@ -28,6 +28,7 @@ cc_library_static {
         "libcrypto",
         "libmediametrics",
         "libmediandk",
+        "libmediandk_utils",
         "libmediautils",
         "libmemunreachable",
         "libnativewindow",

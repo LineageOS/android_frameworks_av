@@ -28,6 +28,7 @@ cc_library_static {
         "frameworks/av/media/libstagefright/mpeg2ts",
         "frameworks/av/media/libstagefright/rtsp",
         "frameworks/av/media/libstagefright/timedtext",
+        "frameworks/av/media/ndk",
     ],
 
     cflags: [
@@ -49,6 +50,7 @@ cc_library_static {
         "libgui",
         "libmedia",
         "libmediandk",
+        "libmediandk_utils",
         "libpowermanager",
     ],
 

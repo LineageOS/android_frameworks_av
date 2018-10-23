@@ -224,6 +224,11 @@ AMediaDataSource* AMediaDataSource_newUri(
     }
 
     sp<DataSource> source = DataSourceFactory::CreateFromURI(service, uri, &headers);
+    if (source == NULL) {
+        ALOGE("AMediaDataSource_newUri source is null");
+        return NULL;
+    }
+    ALOGI("AMediaDataSource_newUri source %s flags %u", source->toString().c_str(), source->flags());
     AMediaDataSource* aSource = convertDataSourceToAMediaDataSource(source);
     aSource->mImpl = source;
     aSource->mFlags = source->flags();

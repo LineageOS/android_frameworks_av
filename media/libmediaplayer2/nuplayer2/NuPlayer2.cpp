@@ -216,6 +216,7 @@ NuPlayer2::NuPlayer2(pid_t pid, uid_t uid, const sp<MediaClock> &mediaClock)
       mAudioDecoderGeneration(0),
       mVideoDecoderGeneration(0),
       mRendererGeneration(0),
+      mEOSMonitorGeneration(0),
       mLastStartedPlayingTimeNs(0),
       mPreviousSeekTimeUs(0),
       mAudioEOS(false),
@@ -307,7 +308,7 @@ status_t NuPlayer2::createNuPlayer2Source(const sp<DataSourceDesc> &dsd,
                 sp<GenericSource2> genericSource =
                         new GenericSource2(notify, mUID, mMediaClock);
 
-                err = genericSource->setDataSource(httpService, url, headers);
+                err = genericSource->setDataSource(url, headers);
 
                 if (err == OK) {
                     *source = genericSource;
@@ -586,6 +587,11 @@ void NuPlayer2::seekToAsync(int64_t seekTimeUs, MediaPlayer2SeekMode mode, bool 
     msg->post();
 }
 
+void NuPlayer2::rewind() {
+    sp<AMessage> msg = new AMessage(kWhatRewind, this);
+    msg->post();
+}
+
 void NuPlayer2::writeTrackInfo(
         PlayerMessage* reply, const sp<AMessage>& format) const {
     if (format == NULL) {
@@ -710,6 +716,22 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
                     new SimpleAction(&NuPlayer2::performPlayNextDataSource));
 
             processDeferredActions();
+            break;
+        }
+
+        case kWhatEOSMonitor:
+        {
+            int32_t generation;
+            CHECK(msg->findInt32("generation", &generation));
+            int32_t reason;
+            CHECK(msg->findInt32("reason", &reason));
+
+            if (generation != mEOSMonitorGeneration || reason != MediaClock::TIMER_REASON_REACHED) {
+                break;  // stale or reset
+            }
+
+            ALOGV("kWhatEOSMonitor");
+            notifyListener(mCurrentSourceInfo.mSrcId, MEDIA2_PLAYBACK_COMPLETE, 0, 0);
             break;
         }
 
@@ -1522,6 +1544,42 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatRewind:
+        {
+            ALOGV("kWhatRewind");
+
+            int64_t seekTimeUs = mCurrentSourceInfo.mStartTimeUs;
+            int32_t mode = MediaPlayer2SeekMode::SEEK_CLOSEST;
+
+            if (!mStarted) {
+                if (!mSourceStarted) {
+                    mSourceStarted = true;
+                    mCurrentSourceInfo.mSource->start();
+                }
+                performSeek(seekTimeUs, (MediaPlayer2SeekMode)mode);
+                break;
+            }
+
+            // seeks can take a while, so we essentially paused
+            notifyListener(mCurrentSourceInfo.mSrcId, MEDIA2_PAUSED, 0, 0);
+
+            mDeferredActions.push_back(
+                    new FlushDecoderAction(FLUSH_CMD_FLUSH /* audio */,
+                                           FLUSH_CMD_FLUSH /* video */));
+
+            mDeferredActions.push_back(
+                    new SeekAction(seekTimeUs, (MediaPlayer2SeekMode)mode));
+
+            // After a flush without shutdown, decoder is paused.
+            // Don't resume it until source seek is done, otherwise it could
+            // start pulling stale data too soon.
+            mDeferredActions.push_back(
+                    new ResumeDecoderAction(false /* needNotify */));
+
+            processDeferredActions();
+            break;
+        }
+
         case kWhatPause:
         {
             if (!mStarted) {
@@ -1675,6 +1733,7 @@ void NuPlayer2::onStart(bool play) {
         mRenderer->setVideoFrameRate(rate);
     }
 
+    addEndTimeMonitor();
     // Renderer is created in paused state.
     if (play) {
         mRenderer->resume();
@@ -1691,6 +1750,13 @@ void NuPlayer2::onStart(bool play) {
     notifyListener(mCurrentSourceInfo.mSrcId, MEDIA2_INFO, MEDIA2_INFO_DATA_SOURCE_START, 0);
 
     postScanSources();
+}
+
+void NuPlayer2::addEndTimeMonitor() {
+    sp<AMessage> msg = new AMessage(kWhatEOSMonitor, this);
+    ++mEOSMonitorGeneration;
+    msg->setInt32("generation", mEOSMonitorGeneration);
+    mMediaClock->addTimer(msg, mCurrentSourceInfo.mEndTimeUs);
 }
 
 void NuPlayer2::startPlaybackTimer(const char *where) {
@@ -2473,17 +2539,22 @@ void NuPlayer2::performPlayNextDataSource() {
     long previousSrcId;
     {
         Mutex::Autolock autoLock(mSourceLock);
-        mCurrentSourceInfo.mSource = mNextSourceInfo.mSource;
-        mNextSourceInfo.mSource = NULL;
         previousSrcId = mCurrentSourceInfo.mSrcId;
-        mCurrentSourceInfo.mSrcId = mNextSourceInfo.mSrcId;
-        ++mNextSourceInfo.mSrcId;  // to distinguish the two sources.
+
+        mCurrentSourceInfo = mNextSourceInfo;
+        mNextSourceInfo = SourceInfo();
+        mNextSourceInfo.mSrcId = ~mCurrentSourceInfo.mSrcId;  // to distinguish the two sources.
     }
 
     if (mDriver != NULL) {
         sp<NuPlayer2Driver> driver = mDriver.promote();
         if (driver != NULL) {
             notifyListener(previousSrcId, MEDIA2_INFO, MEDIA2_INFO_DATA_SOURCE_END, 0);
+
+            int64_t durationUs;
+            if (mCurrentSourceInfo.mSource->getDuration(&durationUs) == OK) {
+                driver->notifyDuration(mCurrentSourceInfo.mSrcId, durationUs);
+            }
             notifyListener(
                     mCurrentSourceInfo.mSrcId, MEDIA2_INFO, MEDIA2_INFO_DATA_SOURCE_START, 0);
         }
@@ -2493,6 +2564,8 @@ void NuPlayer2::performPlayNextDataSource() {
     mPrepared = true;  // TODO: what if it's not prepared
     mResetting = false;
     mSourceStarted = false;
+
+    addEndTimeMonitor();
 
     // Modular DRM
     if (mCrypto != NULL) {
@@ -2589,37 +2662,50 @@ void NuPlayer2::onSourceNotify(const sp<AMessage> &msg) {
     switch (what) {
         case Source::kWhatPrepared:
         {
-            ALOGV("NuPlayer2::onSourceNotify Source::kWhatPrepared source: %p",
-                  mCurrentSourceInfo.mSource.get());
-            if (mCurrentSourceInfo.mSource == NULL) {
-                // This is a stale notification from a source that was
-                // asynchronously preparing when the client called reset().
-                // We handled the reset, the source is gone.
-                break;
-            }
-
-            int32_t err;
-            CHECK(msg->findInt32("err", &err));
-
-            if (err != OK) {
-                // shut down potential secure codecs in case client never calls reset
-                mDeferredActions.push_back(
-                        new FlushDecoderAction(FLUSH_CMD_SHUTDOWN /* audio */,
-                                               FLUSH_CMD_SHUTDOWN /* video */));
-                processDeferredActions();
-            } else {
-                mPrepared = true;
-            }
-
-            sp<NuPlayer2Driver> driver = mDriver.promote();
-            if (driver != NULL) {
-                // notify duration first, so that it's definitely set when
-                // the app received the "prepare complete" callback.
-                int64_t durationUs;
-                if (mCurrentSourceInfo.mSource->getDuration(&durationUs) == OK) {
-                    driver->notifyDuration(srcId, durationUs);
+            ALOGV("NuPlayer2::onSourceNotify Source::kWhatPrepared source:%p, Id(%lld)",
+                  mCurrentSourceInfo.mSource.get(), (long long)srcId);
+            if (srcId == mCurrentSourceInfo.mSrcId) {
+                if (mCurrentSourceInfo.mSource == NULL) {
+                    // This is a stale notification from a source that was
+                    // asynchronously preparing when the client called reset().
+                    // We handled the reset, the source is gone.
+                    break;
                 }
-                driver->notifyPrepareCompleted(srcId, err);
+
+                int32_t err;
+                CHECK(msg->findInt32("err", &err));
+
+                if (err != OK) {
+                    // shut down potential secure codecs in case client never calls reset
+                    mDeferredActions.push_back(
+                            new FlushDecoderAction(FLUSH_CMD_SHUTDOWN /* audio */,
+                                                   FLUSH_CMD_SHUTDOWN /* video */));
+                    processDeferredActions();
+                } else {
+                    mPrepared = true;
+                }
+
+                sp<NuPlayer2Driver> driver = mDriver.promote();
+                if (driver != NULL) {
+                    // notify duration first, so that it's definitely set when
+                    // the app received the "prepare complete" callback.
+                    int64_t durationUs;
+                    if (mCurrentSourceInfo.mSource->getDuration(&durationUs) == OK) {
+                        driver->notifyDuration(srcId, durationUs);
+                    }
+                    driver->notifyPrepareCompleted(srcId, err);
+                }
+            } else if (srcId == mNextSourceInfo.mSrcId) {
+                if (mNextSourceInfo.mSource == NULL) {
+                    break;  // stale
+                }
+
+                sp<NuPlayer2Driver> driver = mDriver.promote();
+                if (driver != NULL) {
+                    int32_t err;
+                    CHECK(msg->findInt32("err", &err));
+                    driver->notifyPrepareCompleted(srcId, err);
+                }
             }
 
             break;
@@ -2665,7 +2751,9 @@ void NuPlayer2::onSourceNotify(const sp<AMessage> &msg) {
                     driver->notifyListener(
                             srcId, MEDIA2_INFO, MEDIA2_INFO_NOT_SEEKABLE, 0);
                 }
-                driver->notifyFlagsChanged(srcId, flags);
+                if (srcId == mCurrentSourceInfo.mSrcId) {
+                    driver->notifyFlagsChanged(srcId, flags);
+                }
             }
 
             if (srcId == mCurrentSourceInfo.mSrcId) {
@@ -3129,6 +3217,16 @@ NuPlayer2::SourceInfo::SourceInfo()
       mSourceFlags(0),
       mStartTimeUs(0),
       mEndTimeUs(INT64_MAX) {
+}
+
+NuPlayer2::SourceInfo & NuPlayer2::SourceInfo::operator=(const NuPlayer2::SourceInfo &other) {
+    mSource = other.mSource;
+    mDataSourceType = (DATA_SOURCE_TYPE)other.mDataSourceType;
+    mSrcId = other.mSrcId;
+    mSourceFlags = other.mSourceFlags;
+    mStartTimeUs = other.mStartTimeUs;
+    mEndTimeUs = other.mEndTimeUs;
+    return *this;
 }
 
 }  // namespace android
