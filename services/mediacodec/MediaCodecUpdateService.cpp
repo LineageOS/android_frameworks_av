@@ -71,10 +71,10 @@ binder::Status MediaCodecUpdateService::loadPlugins(const ::std::string& apkPath
         String8 libPathInApk = String8("lib/") + String8(abis[0].c_str());
         String8 defaultLibPath = String8(apkPath.c_str()) + "!/" + libPathInApk;
         String8 libPath = defaultLibPath + "/libmedia_codecserviceregistrant.so";
+        String8 zipEntryPath = libPathInApk + "/libmedia_codecserviceregistrant.so";
 
         ZipEntry entry;
-        ZipString name(libPathInApk + "/libmedia_codecserviceregistrant.so");
-        ret = FindEntry(zipHandle, name, &entry);
+        ret = FindEntry(zipHandle, ZipString(zipEntryPath), &entry);
 
         if (ret == 0) {
             android_namespace_t *codecNs = android_create_namespace("codecs",
