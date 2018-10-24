@@ -18,6 +18,8 @@
 #define LOG_TAG "MediaExtractorFactory"
 #include <utils/Log.h>
 
+#include <binder/IPCThreadState.h>
+#include <binder/PermissionCache.h>
 #include <binder/IServiceManager.h>
 #include <media/DataSource.h>
 #include <media/MediaAnalyticsItem.h>
@@ -353,18 +355,29 @@ void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
 status_t MediaExtractorFactory::dump(int fd, const Vector<String16>&) {
     Mutex::Autolock autoLock(gPluginMutex);
     String8 out;
-    out.append("Available extractors:\n");
-    if (gPluginsRegistered) {
-        for (auto it = gPlugins->begin(); it != gPlugins->end(); ++it) {
-            out.appendFormat("  %25s: plugin_version(%d), uuid(%s), version(%u), path(%s)\n",
-                    (*it)->def.extractor_name,
-                    (*it)->def.def_version,
-                    (*it)->uuidString.c_str(),
-                    (*it)->def.extractor_version,
-                    (*it)->libPath.c_str());
-        }
+
+    const IPCThreadState* ipc = IPCThreadState::self();
+    const int pid = ipc->getCallingPid();
+    const int uid = ipc->getCallingUid();
+    if (!PermissionCache::checkPermission(String16("android.permission.DUMP"), pid, uid)) {
+        // dumpExtractors() will append the following string.
+        // out.appendFormat("Permission Denial: "
+        //        "can't dump MediaExtractor from pid=%d, uid=%d\n", pid, uid);
+        ALOGE("Permission Denial: can't dump MediaExtractor from pid=%d, uid=%d", pid, uid);
     } else {
-        out.append("  (no plugins registered)\n");
+        out.append("Available extractors:\n");
+        if (gPluginsRegistered) {
+            for (auto it = gPlugins->begin(); it != gPlugins->end(); ++it) {
+                out.appendFormat("  %25s: plugin_version(%d), uuid(%s), version(%u), path(%s)\n",
+                        (*it)->def.extractor_name,
+                    (*it)->def.def_version,
+                        (*it)->uuidString.c_str(),
+                        (*it)->def.extractor_version,
+                        (*it)->libPath.c_str());
+            }
+        } else {
+            out.append("  (no plugins registered)\n");
+        }
     }
     write(fd, out.string(), out.size());
     return OK;
