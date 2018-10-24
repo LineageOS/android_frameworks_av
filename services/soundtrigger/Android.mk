@@ -55,6 +55,7 @@ LOCAL_SHARED_LIBRARIES += \
     libaudiohal_deathhandler \
     android.hardware.soundtrigger@2.0 \
     android.hardware.soundtrigger@2.1 \
+    android.hardware.soundtrigger@2.2 \
     android.hardware.audio.common@2.0 \
     android.hidl.allocator@1.0 \
     android.hidl.memory@1.0

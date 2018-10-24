@@ -71,6 +71,14 @@ public:
          */
         virtual int stopAllRecognitions() = 0;
 
+        /* Get the current state of a given model.
+         * Returns 0 or an error code. If successful it also sets indicated the event pointer
+         * and expectes that the caller will free the memory.
+         * Only supported for device api versions SOUND_TRIGGER_DEVICE_API_VERSION_1_2 or above.
+         */
+        virtual int getModelState(sound_model_handle_t handle,
+                                  struct sound_trigger_recognition_event** event) = 0;
+
 protected:
         SoundTriggerHalInterface() {}
 };

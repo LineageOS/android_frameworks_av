@@ -122,6 +122,8 @@ public:
        virtual status_t startRecognition(sound_model_handle_t handle,
                                          const sp<IMemory>& dataMemory);
        virtual status_t stopRecognition(sound_model_handle_t handle);
+       virtual status_t getModelState(sound_model_handle_t handle,
+                                      sp<IMemory>& eventMemory);
 
        sp<SoundTriggerHalInterface> halInterface() const { return mHalInterface; }
        struct sound_trigger_module_descriptor descriptor() { return mDescriptor; }
@@ -169,6 +171,8 @@ public:
        virtual status_t startRecognition(sound_model_handle_t handle,
                                          const sp<IMemory>& dataMemory);
        virtual status_t stopRecognition(sound_model_handle_t handle);
+       virtual status_t getModelState(sound_model_handle_t handle,
+                                      sp<IMemory>& eventMemory);
 
        virtual status_t dump(int fd, const Vector<String16>& args);
 

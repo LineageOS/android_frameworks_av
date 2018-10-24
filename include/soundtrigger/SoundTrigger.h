@@ -52,6 +52,7 @@ public:
 
             status_t startRecognition(sound_model_handle_t handle, const sp<IMemory>& dataMemory);
             status_t stopRecognition(sound_model_handle_t handle);
+            status_t getModelState(sound_model_handle_t handle, sp<IMemory>& eventMemory);
 
             // BpSoundTriggerClient
             virtual void onRecognitionEvent(const sp<IMemory>& eventMemory);
