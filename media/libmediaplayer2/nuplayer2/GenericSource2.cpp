@@ -79,6 +79,7 @@ NuPlayer2::GenericSource2::GenericSource2(
 void NuPlayer2::GenericSource2::resetDataSource() {
     ALOGV("resetDataSource");
 
+    mDisconnected = false;
     mUri.clear();
     mUriHeaders.clear();
     if (mFd >= 0) {
@@ -196,7 +197,11 @@ status_t NuPlayer2::GenericSource2::initFromDataSource() {
         }
 
         sp<AMediaExtractorWrapper> trackExtractor = new AMediaExtractorWrapper(AMediaExtractor_new());
-        trackExtractor->setDataSource(mDataSourceWrapper->getAMediaDataSource());
+        if (aSourceWrapper != NULL) {
+            trackExtractor->setDataSource(aSourceWrapper->getAMediaDataSource());
+        } else {
+            trackExtractor->setDataSource(fd, mOffset, mLength);
+        }
 
         const char *mime;
         sp<MetaData> meta = convertMediaFormatWrapperToMetaData(trackFormat);
