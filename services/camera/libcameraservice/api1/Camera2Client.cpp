@@ -1446,6 +1446,7 @@ status_t Camera2Client::takePicture(int /*msgType*/) {
     if ( (res = checkPid(__FUNCTION__) ) != OK) return res;
 
     int takePictureCounter;
+    bool shouldSyncWithDevice = true;
     {
         SharedParameters::Lock l(mParameters);
         switch (l.mParameters.state) {
@@ -1531,12 +1532,23 @@ status_t Camera2Client::takePicture(int /*msgType*/) {
                     __FUNCTION__, mCameraId);
             mZslProcessor->clearZslQueue();
         }
+
+        // We should always sync with the device in case flash is turned on,
+        // the camera device suggests that flash is needed (AE state FLASH_REQUIRED)
+        // or we are in some other AE state different from CONVERGED that may need
+        // precapture trigger.
+        if (l.mParameters.flashMode != Parameters::FLASH_MODE_ON &&
+                (l.mParameters.aeState == ANDROID_CONTROL_AE_STATE_CONVERGED)) {
+            shouldSyncWithDevice  = false;
+        }
     }
 
     ATRACE_ASYNC_BEGIN(kTakepictureLabel, takePictureCounter);
 
-    // Need HAL to have correct settings before (possibly) triggering precapture
-    syncWithDevice();
+    // Make sure HAL has correct settings in case precapture trigger is needed.
+    if (shouldSyncWithDevice) {
+        syncWithDevice();
+    }
 
     res = mCaptureSequencer->startCapture();
     if (res != OK) {
@@ -1905,6 +1917,11 @@ void Camera2Client::notifyAutoFocus(uint8_t newState, int triggerId) {
 void Camera2Client::notifyAutoExposure(uint8_t newState, int triggerId) {
     ALOGV("%s: Autoexposure state now %d, last trigger %d",
             __FUNCTION__, newState, triggerId);
+    {
+        SharedParameters::Lock l(mParameters);
+        // Update state
+        l.mParameters.aeState = newState;
+    }
     mCaptureSequencer->notifyAutoExposure(newState, triggerId);
 }
 
