@@ -1753,8 +1753,13 @@ void NuPlayer2::onStart(bool play) {
 }
 
 void NuPlayer2::addEndTimeMonitor() {
-    sp<AMessage> msg = new AMessage(kWhatEOSMonitor, this);
     ++mEOSMonitorGeneration;
+
+    if (mCurrentSourceInfo.mEndTimeUs == DataSourceDesc::kMaxTimeUs) {
+        return;
+    }
+
+    sp<AMessage> msg = new AMessage(kWhatEOSMonitor, this);
     msg->setInt32("generation", mEOSMonitorGeneration);
     mMediaClock->addTimer(msg, mCurrentSourceInfo.mEndTimeUs);
 }
@@ -3216,7 +3221,7 @@ NuPlayer2::SourceInfo::SourceInfo()
       mSrcId(0),
       mSourceFlags(0),
       mStartTimeUs(0),
-      mEndTimeUs(INT64_MAX) {
+      mEndTimeUs(DataSourceDesc::kMaxTimeUs) {
 }
 
 NuPlayer2::SourceInfo & NuPlayer2::SourceInfo::operator=(const NuPlayer2::SourceInfo &other) {
