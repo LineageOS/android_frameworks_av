@@ -74,6 +74,8 @@ public:
                                     // in the mapping from frame position to presentation time.
                                     // See AudioTimestamp for the information included with event.
 #endif
+        EVENT_CAN_WRITE_MORE_DATA = 9,// Notification that more data can be given by write()
+                                    // This event only occurs for TRANSFER_SYNC_NOTIF_CALLBACK.
     };
 
     /* Client should declare a Buffer and pass the address to obtainBuffer()
@@ -153,6 +155,7 @@ public:
         TRANSFER_OBTAIN,    // call obtainBuffer() and releaseBuffer()
         TRANSFER_SYNC,      // synchronous write()
         TRANSFER_SHARED,    // shared memory
+        TRANSFER_SYNC_NOTIF_CALLBACK, // synchronous write(), notif EVENT_CAN_WRITE_MORE_DATA
     };
 
     /* Constructs an uninitialized AudioTrack. No connection with
@@ -295,6 +298,8 @@ public:
      * Parameters not listed in the AudioTrack constructors above:
      *
      * threadCanCallJava:  Whether callbacks are made from an attached thread and thus can call JNI.
+     *      Only set to true when AudioTrack object is used for a java android.media.AudioTrack
+     *      in its JNI code.
      *
      * Internal state post condition:
      *      (mStreamType == AUDIO_STREAM_DEFAULT) implies this AudioTrack has valid attributes
