@@ -157,7 +157,7 @@ int MtpPacket::transfer(struct usb_request* request) {
                             request->endpoint,
                             request->buffer,
                             request->buffer_length,
-                            0);
+                            1000);
     request->actual_length = result;
     return result;
 }

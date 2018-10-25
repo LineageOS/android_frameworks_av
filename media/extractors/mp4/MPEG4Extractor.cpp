@@ -150,6 +150,8 @@ private:
     status_t parseSampleAuxiliaryInformationOffsets(off64_t offset, off64_t size);
     status_t parseClearEncryptedSizes(off64_t offset, bool isSubsampleEncryption, uint32_t flags);
     status_t parseSampleEncryption(off64_t offset);
+    // returns -1 for invalid layer ID
+    int32_t parseHEVCLayerId(const uint8_t *data, size_t size);
 
     struct TrackFragmentHeaderInfo {
         enum Flags {
@@ -4935,6 +4937,35 @@ size_t MPEG4Source::parseNALSize(const uint8_t *data) const {
     return 0;
 }
 
+int32_t MPEG4Source::parseHEVCLayerId(const uint8_t *data, size_t size) {
+    CHECK(data != nullptr && size >= (mNALLengthSize + 2));
+
+    // HEVC NAL-header (16-bit)
+    //  1   6      6     3
+    // |-|uuuuuu|------|iii|
+    //      ^            ^
+    //  NAL_type        layer_id + 1
+    //
+    // Layer-id is non-zero only for Temporal Sub-layer Access pictures (TSA)
+    enum {
+        TSA_N = 2,
+        TSA_R = 3,
+        STSA_N = 4,
+        STSA_R = 5,
+    };
+
+    data += mNALLengthSize;
+    uint16_t nalHeader = data[0] << 8 | data[1];
+
+    uint16_t nalType = (nalHeader >> 9) & 0x3Fu;
+    if (nalType == TSA_N || nalType == TSA_R || nalType == STSA_N || nalType == STSA_R) {
+        int32_t layerIdPlusOne = nalHeader & 0x7u;
+        ALOGD_IF(layerIdPlusOne == 0, "got layerId 0 for TSA picture");
+        return layerIdPlusOne - 1;
+    }
+    return 0;
+}
+
 status_t MPEG4Source::read(
         MediaBufferBase **out, const ReadOptions *options) {
     Mutex::Autolock autoLock(mLock);
@@ -5368,6 +5399,12 @@ status_t MPEG4Source::read(
             uint32_t layerId = FindAVCLayerId(
                     (const uint8_t *)mBuffer->data(), mBuffer->range_length());
             mBuffer->meta_data().setInt32(kKeyTemporalLayerId, layerId);
+        } else if (mIsHEVC) {
+            int32_t layerId = parseHEVCLayerId(
+                    (const uint8_t *)mBuffer->data(), mBuffer->range_length());
+            if (layerId >= 0) {
+                mBuffer->meta_data().setInt32(kKeyTemporalLayerId, layerId);
+            }
         }
 
         if (isSyncSample) {
@@ -5566,6 +5603,12 @@ status_t MPEG4Source::fragmentedRead(
                 uint32_t layerId = FindAVCLayerId(
                         (const uint8_t *)mBuffer->data(), mBuffer->range_length());
                 mBuffer->meta_data().setInt32(kKeyTemporalLayerId, layerId);
+            } else if (mIsHEVC) {
+                int32_t layerId = parseHEVCLayerId(
+                        (const uint8_t *)mBuffer->data(), mBuffer->range_length());
+                if (layerId >= 0) {
+                    mBuffer->meta_data().setInt32(kKeyTemporalLayerId, layerId);
+                }
             }
 
             if (isSyncSample) {
