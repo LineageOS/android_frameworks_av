@@ -35,6 +35,7 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/Utils.h>
 #include <media/CharacterEncodingDetector.h>
 
 namespace android {
@@ -402,6 +403,25 @@ const char *StagefrightMetadataRetriever::extractMetadata(int keyCode) {
     return mMetaData.valueAt(index).string();
 }
 
+void StagefrightMetadataRetriever::parseColorAspects(const sp<MetaData>& meta) {
+    sp<AMessage> format = new AMessage();
+    if (convertMetaDataToMessage(meta, &format) != OK) {
+        return;
+    }
+
+    int32_t standard, transfer, range;
+    if (format->findInt32("color-standard", &standard)
+            && format->findInt32("color-transfer", &transfer)
+            && format->findInt32("color-range", &range)) {
+        ALOGV("found color aspects : standard=%d, transfer=%d, range=%d",
+                standard, transfer, range);
+
+        mMetaData.add(METADATA_KEY_COLOR_STANDARD, String8::format("%d", standard));
+        mMetaData.add(METADATA_KEY_COLOR_TRANSFER, String8::format("%d", transfer));
+        mMetaData.add(METADATA_KEY_COLOR_RANGE, String8::format("%d", range));
+    }
+}
+
 void StagefrightMetadataRetriever::parseMetaData() {
     sp<MetaData> meta = mExtractor->getMetaData();
 
@@ -541,6 +561,8 @@ void StagefrightMetadataRetriever::parseMetaData() {
                 if (!trackMeta->findInt32(kKeyFrameCount, &videoFrameCount)) {
                     videoFrameCount = 0;
                 }
+
+                parseColorAspects(trackMeta);
             } else if (!strncasecmp("image/", mime, 6)) {
                 int32_t isPrimary;
                 if (trackMeta->findInt32(
