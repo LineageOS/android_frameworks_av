@@ -49,10 +49,6 @@
 #include <system/audio.h>
 #include <audio_policy_conf.h>
 #include "AudioPolicyManager.h"
-#ifndef USE_XML_AUDIO_POLICY_CONF
-#include <ConfigParsingUtils.h>
-#include <StreamDescriptor.h>
-#endif
 #include <Serializer.h>
 #include "TypeConverter.h"
 #include <policy.h>
@@ -3794,7 +3790,6 @@ uint32_t AudioPolicyManager::nextAudioPortGeneration()
     return mAudioPortGeneration++;
 }
 
-#ifdef USE_XML_AUDIO_POLICY_CONF
 // Treblized audio policy xml config will be located in /odm/etc or /vendor/etc.
 static const char *kConfigLocationList[] =
         {"/odm/etc", "/vendor/etc", "/system/etc"};
@@ -3826,7 +3821,6 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
     }
     return ret;
 }
-#endif
 
 AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterface,
                                        bool /*forTesting*/)
@@ -3835,15 +3829,9 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     mpClientInterface(clientInterface),
     mLimitRingtoneVolume(false), mLastVoiceVolume(-1.0f),
     mA2dpSuspended(false),
-#ifdef USE_XML_AUDIO_POLICY_CONF
     mVolumeCurves(new VolumeCurvesCollection()),
     mConfig(mHwModulesAll, mAvailableOutputDevices, mAvailableInputDevices,
             mDefaultOutputDevice, static_cast<VolumeCurvesCollection*>(mVolumeCurves.get())),
-#else
-    mVolumeCurves(new StreamDescriptorCollection()),
-    mConfig(mHwModulesAll, mAvailableOutputDevices, mAvailableInputDevices,
-            mDefaultOutputDevice),
-#endif
     mAudioPortGeneration(1),
     mBeaconMuteRefCount(0),
     mBeaconPlayingRefCount(0),
@@ -3862,13 +3850,16 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     initialize();
 }
 
-void AudioPolicyManager::loadConfig() {
-#ifdef USE_XML_AUDIO_POLICY_CONF
-    if (deserializeAudioPolicyXmlConfig(getConfig()) != NO_ERROR) {
-#else
-    if ((ConfigParsingUtils::loadConfig(AUDIO_POLICY_VENDOR_CONFIG_FILE, getConfig()) != NO_ERROR)
-           && (ConfigParsingUtils::loadConfig(AUDIO_POLICY_CONFIG_FILE, getConfig()) != NO_ERROR)) {
+//  This check is to catch any legacy platform updating to Q without having
+//  switched to XML since its deprecation on O.
+// TODO: after Q release, remove this check and flag as XML is now the only
+//        option and all legacy platform should have transitioned to XML.
+#ifndef USE_XML_AUDIO_POLICY_CONF
+#error Audio policy no longer supports legacy .conf configuration format
 #endif
+
+void AudioPolicyManager::loadConfig() {
+    if (deserializeAudioPolicyXmlConfig(getConfig()) != NO_ERROR) {
         ALOGE("could not load audio policy configuration file, setting defaults");
         getConfig().setDefault();
     }
