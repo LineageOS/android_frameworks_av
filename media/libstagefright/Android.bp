@@ -239,50 +239,27 @@ cc_library_static {
     name: "libstagefright_player2",
 
     srcs: [
-        "CallbackDataSource.cpp",
-        "CallbackMediaSource.cpp",
-        "ClearDataSourceFactory.cpp",
         "ClearFileSource.cpp",
         "DataURISource.cpp",
         "HTTPBase.cpp",
         "HevcUtils.cpp",
-        "InterfaceUtils.cpp",
         "MediaClock.cpp",
-        "MediaExtractor.cpp",
-        "MediaExtractorFactory.cpp",
         "NdkUtils.cpp",
-        "NuCachedSource2.cpp",
-        "RemoteMediaExtractor.cpp",
-        "RemoteMediaSource.cpp",
         "Utils.cpp",
         "VideoFrameScheduler.cpp",
         "http/ClearMediaHTTP.cpp",
     ],
 
     shared_libs: [
-        "libbinder",
-        "libcutils",
         "libgui",
         "liblog",
-        "libaudioclient",
-        "libmediaextractor",
-        "libmediametrics",
-        "libmediautils",
         "libnetd_client",
-        "libui",
         "libutils",
-        "libmedia_helper",
         "libstagefright_foundation",
-        "libziparchive",
     ],
 
     static_libs: [
-        "libstagefright_esds",
         "libmedia_player2_util",
-    ],
-
-    header_libs:[
-        "media_plugin_headers",
     ],
 
     export_include_dirs: [
