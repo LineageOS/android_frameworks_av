@@ -193,7 +193,7 @@ Word16 shr_r (Word16 var1, Word16 var2)
 /*----------------------------------------------------------------------------
 ; FUNCTION CODE
 ----------------------------------------------------------------------------*/
-Word16 shr_r(register Word16 var1, register Word16 var2, Flag *pOverflow)
+Word16 shr_r(Word16 var1, Word16 var2, Flag *pOverflow)
 {
     /*----------------------------------------------------------------------------
     ; Define all local variables
