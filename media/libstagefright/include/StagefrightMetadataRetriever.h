@@ -65,6 +65,7 @@ private:
     sp<ImageDecoder> mImageDecoder;
     int mLastImageIndex;
     void parseMetaData();
+    void parseColorAspects(const sp<MetaData>& meta);
     // Delete album art and clear metadata.
     void clearMetadata();
 

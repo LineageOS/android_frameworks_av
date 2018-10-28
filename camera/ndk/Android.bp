@@ -30,3 +30,42 @@ ndk_headers {
     srcs: ["include/camera/**/*.h"],
     license: "NOTICE",
 }
+
+cc_library_shared {
+    name: "libcamera2",
+    srcs: [
+        "NdkCameraManager.cpp",
+        "NdkCameraMetadata.cpp",
+        "NdkCameraDevice.cpp",
+        "NdkCaptureRequest.cpp",
+        "NdkCameraCaptureSession.cpp",
+        "impl/ACameraManager.cpp",
+        "impl/ACameraMetadata.cpp",
+        "impl/ACameraDevice.cpp",
+        "impl/ACameraCaptureSession.cpp",
+    ],
+    shared_libs: [
+        "libbinder",
+        "liblog",
+        "libgui",
+        "libutils",
+        "libandroid_runtime",
+        "libcamera_client",
+        "libstagefright_foundation",
+        "libcutils",
+        "libcamera_metadata",
+        "libmediandk",
+        "libnativewindow",
+    ],
+    cflags: [
+        "-fvisibility=hidden",
+        "-DEXPORT=__attribute__ ((visibility (\"default\")))",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+    export_include_dirs: ["include"],
+    export_shared_lib_headers: [
+        "libnativewindow",
+    ]
+}

@@ -987,11 +987,10 @@ media_status_t MyOpusExtractor::verifyOpusHeader(MediaBufferBase *buffer) {
     AMediaFormat_setBuffer(mMeta, AMEDIAFORMAT_KEY_CSD_0, data, size);
     AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, kOpusSampleRate);
     AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, mChannelCount);
-    // are these actually used anywhere?
-    // (they are kKeyOpusSeekPreRoll and kKeyOpusCodecDelay respectively)
-    AMediaFormat_setInt64(mMeta, AMEDIAFORMAT_KEY_CSD_2, kOpusSeekPreRollUs * 1000 /* = 80 ms*/);
-    AMediaFormat_setInt64(mMeta, AMEDIAFORMAT_KEY_CSD_1,
-            mCodecDelay /* sample/s */ * 1000000000ll / kOpusSampleRate);
+    int64_t codecdelay = mCodecDelay /* sample/s */ * 1000000000ll / kOpusSampleRate;
+    AMediaFormat_setBuffer(mMeta, AMEDIAFORMAT_KEY_CSD_1, &codecdelay, sizeof(codecdelay));
+    int64_t preroll = kOpusSeekPreRollUs * 1000 /* = 80 ms*/;
+    AMediaFormat_setBuffer(mMeta, AMEDIAFORMAT_KEY_CSD_2, &preroll, sizeof(preroll));
 
     return AMEDIA_OK;
 }

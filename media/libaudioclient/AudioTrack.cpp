@@ -399,9 +399,10 @@ status_t AudioTrack::set(
         }
         break;
     case TRANSFER_CALLBACK:
+    case TRANSFER_SYNC_NOTIF_CALLBACK:
         if (cbf == NULL || sharedBuffer != 0) {
-            ALOGE("%s(): Transfer type TRANSFER_CALLBACK but cbf == NULL || sharedBuffer != 0",
-                    __func__);
+            ALOGE("%s(): Transfer type %s but cbf == NULL || sharedBuffer != 0",
+                    convertTransferToText(transferType), __func__);
             status = BAD_VALUE;
             goto exit;
         }
@@ -1406,6 +1407,7 @@ const char * AudioTrack::convertTransferToText(transfer_type transferType) {
         MEDIA_CASE_ENUM(TRANSFER_OBTAIN);
         MEDIA_CASE_ENUM(TRANSFER_SYNC);
         MEDIA_CASE_ENUM(TRANSFER_SHARED);
+        MEDIA_CASE_ENUM(TRANSFER_SYNC_NOTIF_CALLBACK);
         default:
             return "UNRECOGNIZED";
     }
@@ -1438,7 +1440,8 @@ status_t AudioTrack::createTrack_l()
             // use case 3: obtain/release mode
             (mTransfer == TRANSFER_OBTAIN) ||
             // use case 4: synchronous write
-            ((mTransfer == TRANSFER_SYNC) && mThreadCanCallJava);
+            ((mTransfer == TRANSFER_SYNC || mTransfer == TRANSFER_SYNC_NOTIF_CALLBACK)
+                    && mThreadCanCallJava);
 
         bool fastAllowed = sharedBuffer || transferAllowed;
         if (!fastAllowed) {
@@ -1795,7 +1798,7 @@ void AudioTrack::restartIfDisabled()
 
 ssize_t AudioTrack::write(const void* buffer, size_t userSize, bool blocking)
 {
-    if (mTransfer != TRANSFER_SYNC) {
+    if (mTransfer != TRANSFER_SYNC && mTransfer != TRANSFER_SYNC_NOTIF_CALLBACK) {
         return INVALID_OPERATION;
     }
 
@@ -1846,7 +1849,17 @@ ssize_t AudioTrack::write(const void* buffer, size_t userSize, bool blocking)
 
     if (written > 0) {
         mFramesWritten += written / mFrameSize;
+
+        if (mTransfer == TRANSFER_SYNC_NOTIF_CALLBACK) {
+            const sp<AudioTrackThread> t = mAudioTrackThread;
+            if (t != 0) {
+                // causes wake up of the playback thread, that will callback the client for
+                // more data (with EVENT_CAN_WRITE_MORE_DATA) in processAudioBuffer()
+                t->wake();
+            }
+        }
     }
+
     return written;
 }
 
@@ -2100,8 +2113,8 @@ nsecs_t AudioTrack::processAudioBuffer()
         if (ns < 0) ns = 0;
     }
 
-    // If not supplying data by EVENT_MORE_DATA, then we're done
-    if (mTransfer != TRANSFER_CALLBACK) {
+    // If not supplying data by EVENT_MORE_DATA or EVENT_CAN_WRITE_MORE_DATA, then we're done
+    if (mTransfer != TRANSFER_CALLBACK && mTransfer != TRANSFER_SYNC_NOTIF_CALLBACK) {
         return ns;
     }
 
@@ -2163,7 +2176,13 @@ nsecs_t AudioTrack::processAudioBuffer()
         }
 
         size_t reqSize = audioBuffer.size;
-        mCbf(EVENT_MORE_DATA, mUserData, &audioBuffer);
+        if (mTransfer == TRANSFER_SYNC_NOTIF_CALLBACK) {
+            // when notifying client it can write more data, pass the total size that can be
+            // written in the next write() call, since it's not passed through the callback
+            audioBuffer.size += nonContig;
+        }
+        mCbf(mTransfer == TRANSFER_CALLBACK ? EVENT_MORE_DATA : EVENT_CAN_WRITE_MORE_DATA,
+                mUserData, &audioBuffer);
         size_t writtenSize = audioBuffer.size;
 
         // Sanity check on returned size
@@ -2174,6 +2193,14 @@ nsecs_t AudioTrack::processAudioBuffer()
         }
 
         if (writtenSize == 0) {
+            if (mTransfer == TRANSFER_SYNC_NOTIF_CALLBACK) {
+                // The callback EVENT_CAN_WRITE_MORE_DATA was processed in the JNI of
+                // android.media.AudioTrack. The JNI is not using the callback to provide data,
+                // it only signals to the Java client that it can provide more data, which
+                // this track is read to accept now.
+                // The playback thread will be awaken at the next ::write()
+                return NS_WHENEVER;
+            }
             // The callback is done filling buffers
             // Keep this thread going to handle timed events and
             // still try to get more data in intervals of WAIT_PERIOD_MS

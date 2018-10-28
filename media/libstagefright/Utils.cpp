@@ -1014,6 +1014,56 @@ status_t convertMetaDataToMessage(
             msg->setInt32("android._is-hdr", (info & hvcc.kInfoIsHdr) != 0);
         }
 
+        uint32_t isoPrimaries, isoTransfer, isoMatrix, isoRange;
+        if (hvcc.findParam32(kColourPrimaries, &isoPrimaries)
+                && hvcc.findParam32(kTransferCharacteristics, &isoTransfer)
+                && hvcc.findParam32(kMatrixCoeffs, &isoMatrix)
+                && hvcc.findParam32(kVideoFullRangeFlag, &isoRange)) {
+            ALOGV("found iso color aspects : primaris=%d, transfer=%d, matrix=%d, range=%d",
+                    isoPrimaries, isoTransfer, isoMatrix, isoRange);
+
+            ColorAspects aspects;
+            ColorUtils::convertIsoColorAspectsToCodecAspects(
+                    isoPrimaries, isoTransfer, isoMatrix, isoRange, aspects);
+
+            if (aspects.mPrimaries == ColorAspects::PrimariesUnspecified) {
+                int32_t primaries;
+                if (meta->findInt32(kKeyColorPrimaries, &primaries)) {
+                    ALOGV("unspecified primaries found, replaced to %d", primaries);
+                    aspects.mPrimaries = static_cast<ColorAspects::Primaries>(primaries);
+                }
+            }
+            if (aspects.mTransfer == ColorAspects::TransferUnspecified) {
+                int32_t transferFunction;
+                if (meta->findInt32(kKeyTransferFunction, &transferFunction)) {
+                    ALOGV("unspecified transfer found, replaced to %d", transferFunction);
+                    aspects.mTransfer = static_cast<ColorAspects::Transfer>(transferFunction);
+                }
+            }
+            if (aspects.mMatrixCoeffs == ColorAspects::MatrixUnspecified) {
+                int32_t colorMatrix;
+                if (meta->findInt32(kKeyColorMatrix, &colorMatrix)) {
+                    ALOGV("unspecified matrix found, replaced to %d", colorMatrix);
+                    aspects.mMatrixCoeffs = static_cast<ColorAspects::MatrixCoeffs>(colorMatrix);
+                }
+            }
+            if (aspects.mRange == ColorAspects::RangeUnspecified) {
+                int32_t range;
+                if (meta->findInt32(kKeyColorRange, &range)) {
+                    ALOGV("unspecified range found, replaced to %d", range);
+                    aspects.mRange = static_cast<ColorAspects::Range>(range);
+                }
+            }
+
+            int32_t standard, transfer, range;
+            if (ColorUtils::convertCodecColorAspectsToPlatformAspects(
+                    aspects, &range, &standard, &transfer) == OK) {
+                msg->setInt32("color-standard", standard);
+                msg->setInt32("color-transfer", transfer);
+                msg->setInt32("color-range", range);
+            }
+        }
+
         parseHevcProfileLevelFromHvcc((const uint8_t *)data, dataSize, msg);
     } else if (meta->findData(kKeyESDS, &type, &data, &size)) {
         ESDS esds((const char *)data, size);
