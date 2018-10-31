@@ -309,8 +309,8 @@ void AudioFlinger::EffectModule::process()
     // input and output effect buffers without an intermediary effect process.
     // TODO: consider implementing channel conversion.
     const size_t safeInputOutputSampleCount =
-            inChannelCount != outChannelCount ? 0
-                    : outChannelCount * std::min(
+            mInChannelCountRequested != mOutChannelCountRequested ? 0
+                    : mOutChannelCountRequested * std::min(
                             mConfig.inputCfg.buffer.frameCount,
                             mConfig.outputCfg.buffer.frameCount);
     const auto accumulateInputToOutput = [this, safeInputOutputSampleCount]() {
