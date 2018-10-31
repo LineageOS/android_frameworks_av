@@ -480,7 +480,12 @@ void AudioFlinger::EffectModule::process()
         // accumulate input onto output
         sp<EffectChain> chain = mChain.promote();
         if (chain.get() != nullptr && chain->activeTrackCnt() != 0) {
-            accumulateInputToOutput();
+            // similar handling with data_bypass above.
+            if (mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
+                accumulateInputToOutput();
+            } else { // EFFECT_BUFFER_ACCESS_WRITE
+                copyInputToOutput();
+            }
         }
     }
 }
