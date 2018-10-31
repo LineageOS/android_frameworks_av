@@ -156,7 +156,8 @@ std::string InitDataParser::generateRequest(V1_0::KeyType keyType,
     }
     if (keyType == V1_0::KeyType::STREAMING) {
         request.append(kTemporarySession);
-    } else if (keyType == V1_0::KeyType::OFFLINE) {
+    } else if (keyType == V1_0::KeyType::OFFLINE ||
+                   keyType == V1_0::KeyType::RELEASE) {
             request.append(kPersistentSession);
     }
 

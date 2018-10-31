@@ -26,9 +26,9 @@ namespace clearkey {
 class DeviceFiles {
  public:
     typedef enum {
+        kLicenseStateUnknown,
         kLicenseStateActive,
         kLicenseStateReleasing,
-        kLicenseStateUnknown,
     } LicenseState;
 
     DeviceFiles() {};
@@ -41,6 +41,8 @@ class DeviceFiles {
             const std::string& key_set_id, LicenseState* state, std::string* offlineLicense);
 
     virtual bool LicenseExists(const std::string& keySetId);
+
+    virtual bool DeleteLicense(const std::string& keySetId);
 
     virtual bool DeleteAllLicenses();
 

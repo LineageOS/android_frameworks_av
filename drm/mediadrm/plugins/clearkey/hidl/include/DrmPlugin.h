@@ -319,6 +319,7 @@ private:
     std::vector<KeyValue> mPlayPolicy;
     std::map<std::string, std::string> mStringProperties;
     std::map<std::string, std::vector<uint8_t> > mByteArrayProperties;
+    std::map<std::string, std::vector<uint8_t> > mReleaseKeysMap;
     std::map<std::vector<uint8_t>, SecurityLevel> mSecurityLevel;
     sp<IDrmPluginListener> mListener;
     SessionLibrary *mSessionLibrary;

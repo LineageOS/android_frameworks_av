@@ -59,7 +59,8 @@ sp<Session> SessionLibrary::createSession() {
 
     mSessions.insert(std::pair<std::vector<uint8_t>,
             sp<Session> >(sessionId, new Session(sessionId)));
-    std::map<std::vector<uint8_t>, sp<Session> >::iterator itr = mSessions.find(sessionId);
+    std::map<std::vector<uint8_t>, sp<Session> >::iterator itr =
+            mSessions.find(sessionId);
     if (itr != mSessions.end()) {
         return itr->second;
     } else {
@@ -70,7 +71,8 @@ sp<Session> SessionLibrary::createSession() {
 sp<Session> SessionLibrary::findSession(
         const std::vector<uint8_t>& sessionId) {
     Mutex::Autolock lock(mSessionsLock);
-    std::map<std::vector<uint8_t>, sp<Session> >::iterator itr = mSessions.find(sessionId);
+    std::map<std::vector<uint8_t>, sp<Session> >::iterator itr =
+            mSessions.find(sessionId);
     if (itr != mSessions.end()) {
         return itr->second;
     } else {
