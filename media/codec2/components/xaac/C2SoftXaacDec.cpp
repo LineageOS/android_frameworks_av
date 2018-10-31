@@ -1067,6 +1067,8 @@ int C2SoftXaacDec::configMPEGDDrc() {
     int i_loud_norm;
     int i_target_loudness;
     unsigned int i_sbr_mode;
+    uint32_t ui_proc_mem_tabs_size = 0;
+    pVOID pv_alloc_ptr = NULL;
 
     /* Sampling Frequency */
     err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
@@ -1114,6 +1116,24 @@ int C2SoftXaacDec::configMPEGDDrc() {
     err_code = ixheaacd_dec_api(mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
                                 IA_ENHAACPLUS_DEC_CONFIG_PARAM_SBR_MODE, &i_sbr_mode);
     RETURN_IF_FATAL(err_code, "IA_ENHAACPLUS_DEC_CONFIG_PARAM_SBR_MODE");
+
+    /* Get memory info tables size */
+    err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_GET_MEMTABS_SIZE, 0,
+                              &ui_proc_mem_tabs_size);
+    RETURN_IF_FATAL(err_code, "IA_API_CMD_GET_MEMTABS_SIZE");
+
+    pv_alloc_ptr = memalign(4, ui_proc_mem_tabs_size);
+    if (pv_alloc_ptr == NULL) {
+        ALOGE(" Cannot create requested memory  %d", ui_proc_mem_tabs_size);
+        return IA_FATAL_ERROR;
+    }
+    memset(pv_alloc_ptr, 0, ui_proc_mem_tabs_size);
+    mMemoryVec.push(pv_alloc_ptr);
+
+    /* Set pointer for process memory tables */
+    err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_MEMTABS_PTR, 0,
+                              pv_alloc_ptr);
+    RETURN_IF_FATAL(err_code, "IA_API_CMD_SET_MEMTABS_PTR");
 
     err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_INIT,
                               IA_CMD_TYPE_INIT_API_POST_CONFIG_PARAMS, nullptr);
