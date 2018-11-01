@@ -569,7 +569,7 @@ static void parseVp9ProfileLevelFromCsd(const sp<ABuffer> &csd, sp<AMessage> &fo
 }
 
 
-std::vector<std::pair<const char *, uint32_t>> tagMappings {
+static std::vector<std::pair<const char *, uint32_t>> stringMappings {
     {
         { "album", kKeyAlbum },
         { "albumartist", kKeyAlbumArtist },
@@ -581,47 +581,108 @@ std::vector<std::pair<const char *, uint32_t>> tagMappings {
         { "date", kKeyDate },
         { "discnum", kKeyDiscNumber },
         { "genre", kKeyGenre },
+        { "location", kKeyLocation },
         { "lyricist", kKeyWriter },
         { "title", kKeyTitle },
         { "year", kKeyYear },
     }
 };
 
-void convertMessageToMetaDataTags(const sp<AMessage> &msg, sp<MetaData> &meta) {
-    for (auto elem : tagMappings) {
+static std::vector<std::pair<const char *, uint32_t>> int64Mappings {
+    {
+        { "exif-offset", kKeyExifOffset },
+        { "exif-size", kKeyExifSize },
+    }
+};
+
+static std::vector<std::pair<const char *, uint32_t>> int32Mappings {
+    {
+        { "loop", kKeyAutoLoop },
+        { "time-scale", kKeyTimeScale },
+        { "crypto-mode", kKeyCryptoMode },
+        { "crypto-default-iv-size", kKeyCryptoDefaultIVSize },
+        { "crypto-encrypted-byte-block", kKeyEncryptedByteBlock },
+        { "crypto-skip-byte-block", kKeySkipByteBlock },
+        { "max-bitrate", kKeyMaxBitRate },
+        { "pcm-big-endian", kKeyPcmBigEndian },
+        { "temporal-layer-count", kKeyTemporalLayerCount },
+        { "thumbnail-width", kKeyThumbnailWidth },
+        { "thumbnail-height", kKeyThumbnailHeight },
+    }
+};
+
+static std::vector<std::pair<const char *, uint32_t>> bufferMappings {
+    {
+        { "albumart", kKeyAlbumArt },
+        { "pssh", kKeyPssh },
+        { "crypto-iv", kKeyCryptoIV },
+        { "crypto-key", kKeyCryptoKey },
+        { "icc-profile", kKeyIccProfile },
+        { "text-format-data", kKeyTextFormatData },
+    }
+};
+
+void convertMessageToMetaDataFromMappings(const sp<AMessage> &msg, sp<MetaData> &meta) {
+    for (auto elem : stringMappings) {
         AString value;
         if (msg->findString(elem.first, &value)) {
             meta->setCString(elem.second, value.c_str());
         }
     }
-    sp<ABuffer> buf;
-    if (msg->findBuffer("albumart", &buf)) {
-        meta->setData(kKeyAlbumArt, MetaDataBase::Type::TYPE_NONE, buf->data(), buf->size());
+
+    for (auto elem : int64Mappings) {
+        int64_t value;
+        if (msg->findInt64(elem.first, &value)) {
+            meta->setInt64(elem.second, value);
+        }
     }
 
-    int32_t loop;
-    if (msg->findInt32("loop", &loop)) {
-        meta->setInt32(kKeyAutoLoop, loop);
+    for (auto elem : int32Mappings) {
+        int32_t value;
+        if (msg->findInt32(elem.first, &value)) {
+            meta->setInt32(elem.second, value);
+        }
+    }
+
+    for (auto elem : bufferMappings) {
+        sp<ABuffer> value;
+        if (msg->findBuffer(elem.first, &value)) {
+            meta->setData(elem.second,
+                    MetaDataBase::Type::TYPE_NONE, value->data(), value->size());
+        }
     }
 }
 
-void convertMetaDataToMessageTags(const MetaDataBase *meta, sp<AMessage> format) {
-    for (auto elem : tagMappings) {
+void convertMetaDataToMessageFromMappings(const MetaDataBase *meta, sp<AMessage> format) {
+    for (auto elem : stringMappings) {
         const char *value;
         if (meta->findCString(elem.second, &value)) {
             format->setString(elem.first, value, strlen(value));
         }
     }
-    uint32_t type;
-    const void* data;
-    size_t size;
-    if (meta->findData(kKeyAlbumArt, &type, &data, &size)) {
-        sp<ABuffer> buf = ABuffer::CreateAsCopy(data, size);
-        format->setBuffer("albumart", buf);
+
+    for (auto elem : int64Mappings) {
+        int64_t value;
+        if (meta->findInt64(elem.second, &value)) {
+            format->setInt64(elem.first, value);
+        }
     }
-    int32_t loop;
-    if (meta->findInt32(kKeyAutoLoop, &loop)) {
-        format->setInt32("loop", loop);
+
+    for (auto elem : int32Mappings) {
+        int32_t value;
+        if (meta->findInt32(elem.second, &value)) {
+            format->setInt32(elem.first, value);
+        }
+    }
+
+    for (auto elem : bufferMappings) {
+        uint32_t type;
+        const void* data;
+        size_t size;
+        if (meta->findData(elem.second, &type, &data, &size)) {
+            sp<ABuffer> buf = ABuffer::CreateAsCopy(data, size);
+            format->setBuffer(elem.first, buf);
+        }
     }
 }
 
@@ -648,7 +709,7 @@ status_t convertMetaDataToMessage(
     sp<AMessage> msg = new AMessage;
     msg->setString("mime", mime);
 
-    convertMetaDataToMessageTags(meta, msg);
+    convertMetaDataToMessageFromMappings(meta, msg);
 
     uint32_t type;
     const void *data;
@@ -1117,7 +1178,7 @@ status_t convertMetaDataToMessage(
                 msg->setInt32("max-bitrate", (int32_t)maxBitrate);
             }
         }
-    } else if (meta->findData(kTypeD263, &type, &data, &size)) {
+    } else if (meta->findData(kKeyD263, &type, &data, &size)) {
         const uint8_t *ptr = (const uint8_t *)data;
         parseH263ProfileLevelFromD263(ptr, size, msg);
     } else if (meta->findData(kKeyVorbisInfo, &type, &data, &size)) {
@@ -1215,13 +1276,6 @@ status_t convertMetaDataToMessage(
         buffer->meta()->setInt32("csd", true);
         buffer->meta()->setInt64("timeUs", 0);
         msg->setBuffer("csd-0", buffer);
-    }
-
-    // TODO expose "crypto-key"/kKeyCryptoKey through public api
-    if (meta->findData(kKeyCryptoKey, &type, &data, &size)) {
-        sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
-        msg->setBuffer("crypto-key", buffer);
-        memcpy(buffer->data(), data, size);
     }
 
     *format = msg;
@@ -1422,7 +1476,7 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         ALOGW("did not find mime type");
     }
 
-    convertMessageToMetaDataTags(msg, meta);
+    convertMessageToMetaDataFromMappings(msg, meta);
 
     int64_t durationUs;
     if (msg->findInt64("durationUs", &durationUs)) {
@@ -1455,7 +1509,7 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             meta->setInt32(kKeyWidth, width);
             meta->setInt32(kKeyHeight, height);
         } else {
-            ALOGW("did not find width and/or height");
+            ALOGV("did not find width and/or height");
         }
 
         int32_t sarWidth, sarHeight;
@@ -1611,7 +1665,7 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             // The written ESDS is actually for an audio stream, but it's enough
             // for transporting the CSD to muxers.
             reassembleESDS(csd0, esds.data());
-            meta->setData(kKeyESDS, kKeyESDS, esds.data(), esds.size());
+            meta->setData(kKeyESDS, kTypeESDS, esds.data(), esds.size());
         } else if (mime == MEDIA_MIMETYPE_VIDEO_HEVC ||
                    mime == MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC) {
             std::vector<uint8_t> hvcc(csd0size + 1024);
@@ -1640,11 +1694,12 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     } else if ((mime == MEDIA_MIMETYPE_VIDEO_HEVC || mime == MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC)
             && msg->findBuffer("csd-hevc", &csd0)) {
         meta->setData(kKeyHVCC, kTypeHVCC, csd0->data(), csd0->size());
-    }
-
-    int32_t timeScale;
-    if (msg->findInt32("time-scale", &timeScale)) {
-        meta->setInt32(kKeyTimeScale, timeScale);
+    } else if (msg->findBuffer("esds", &csd0)) {
+        meta->setData(kKeyESDS, kTypeESDS, csd0->data(), csd0->size());
+    } else if (msg->findBuffer("mpeg2-stream-header", &csd0)) {
+        meta->setData(kKeyStreamHeader, 'mdat', csd0->data(), csd0->size());
+    } else if (msg->findBuffer("d263", &csd0)) {
+        meta->setData(kKeyD263, kTypeD263, csd0->data(), csd0->size());
     }
 
     // XXX TODO add whatever other keys there are
