@@ -502,7 +502,8 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::internalSetParameter(
             // These values were chosen to prevent integer overflows further down the line, and do
             // not indicate support for 32kx32k video.
             if (newWidth > 32768 || newHeight > 32768
-                    || video_def->nStride > 32768 || video_def->nSliceHeight > 32768) {
+                    || video_def->nStride > 32768 || video_def->nStride < -32768
+                    || video_def->nSliceHeight > 32768) {
                 ALOGE("b/22885421");
                 return OMX_ErrorBadParameter;
             }
