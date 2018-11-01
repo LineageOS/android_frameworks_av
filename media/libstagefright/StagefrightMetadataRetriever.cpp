@@ -276,12 +276,6 @@ status_t StagefrightMetadataRetriever::getFrameInternal(
         return NO_INIT;
     }
 
-    int32_t drm = 0;
-    if (fileMeta->findInt32(kKeyIsDRM, &drm) && drm != 0) {
-        ALOGE("frame grab not allowed.");
-        return ERROR_DRM_UNKNOWN;
-    }
-
     size_t n = mExtractor->countTracks();
     size_t i;
     for (i = 0; i < n; ++i) {
