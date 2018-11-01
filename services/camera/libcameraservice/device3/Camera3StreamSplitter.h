@@ -269,6 +269,9 @@ private:
     // Latest onFrameAvailable return value
     std::atomic<status_t> mOnFrameAvailableRes{0};
 
+    // Currently acquired input buffers
+    size_t mAcquiredInputBuffers;
+
     String8 mConsumerName;
 };
 
