@@ -757,6 +757,7 @@ status_t Parameters::initialize(CameraDeviceBase *device, int deviceVersion) {
     focusState = ANDROID_CONTROL_AF_STATE_INACTIVE;
     shadowFocusMode = FOCUS_MODE_INVALID;
 
+    aeState = ANDROID_CONTROL_AE_STATE_INACTIVE;
     camera_metadata_ro_entry_t max3aRegions = staticInfo(ANDROID_CONTROL_MAX_REGIONS,
             Parameters::NUM_REGION, Parameters::NUM_REGION);
     if (max3aRegions.count != Parameters::NUM_REGION) return NO_INIT;
