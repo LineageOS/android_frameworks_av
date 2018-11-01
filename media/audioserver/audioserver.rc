@@ -8,7 +8,7 @@ service audioserver /system/bin/audioserver
     onrestart restart vendor.audio-hal-2-0
     # Keep the original service name for backward compatibility when upgrading
     # O-MR1 devices with framework-only.
-    onrestart restart audio-hal-2-0
+    onrestart restart vendor.audio-hal-2-0
 
 on property:vts.native_server.on=1
     stop audioserver
