@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (C) 2018 The Android Open Source Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<Subsystem xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:xi="http://www.w3.org/2001/XInclude"
+           xsi:noNamespaceSchemaLocation="Schemas/Subsystem.xsd"
+           Name="policy" Type="Policy">
+
+    <ComponentLibrary>
+        <!--#################### GLOBAL COMPONENTS BEGIN ####################-->
+        <!-- Common Types defintion -->
+        <xi:include href="PolicySubsystem-CommonTypes.xml"/>
+        <xi:include href="ProductStrategies.xml"/>
+
+
+        <!--#################### GLOBAL COMPONENTS END ####################-->
+
+        <!--#################### STRATEGY BEGIN ####################-->
+
+        <ComponentType Name="Strategies">
+            <Component Name="media" Type="StrategyConfig" Mapping="Name:STRATEGY_MEDIA"/>
+            <Component Name="phone" Type="StrategyConfig" Mapping="Name:STRATEGY_PHONE"/>
+            <Component Name="sonification" Type="StrategyConfig" Mapping="Name:STRATEGY_SONIFICATION"/>
+            <Component Name="sonification_respectful" Type="StrategyConfig" Mapping="Name:STRATEGY_SONIFICATION_RESPECTFUL"/>
+            <Component Name="dtmf" Type="StrategyConfig" Mapping="Name:STRATEGY_DTMF"/>
+            <Component Name="enforced_audible" Type="StrategyConfig" Mapping="Name:STRATEGY_ENFORCED_AUDIBLE"/>
+            <Component Name="transmitted_through_speaker" Type="StrategyConfig" Mapping="Name:STRATEGY_TRANSMITTED_THROUGH_SPEAKER"/>
+            <Component Name="accessibility" Type="StrategyConfig" Mapping="Name:STRATEGY_ACCESSIBILITY"/>
+            <Component Name="rerouting" Type="StrategyConfig" Mapping=",Name:STRATEGY_REROUTING"/>
+        </ComponentType>
+
+        <!--#################### STRATEGY END ####################-->
+
+        <!--#################### STREAM BEGIN ####################-->
+
+        <ComponentType Name="Streams" Description="associated to audio_stream_type_t definition">
+            <Component Name="voice_call" Type="Stream" Mapping="Name:AUDIO_STREAM_VOICE_CALL"/>
+            <Component Name="system" Type="Stream" Mapping="Name:AUDIO_STREAM_SYSTEM"/>
+            <Component Name="ring" Type="Stream" Mapping="Name:AUDIO_STREAM_RING"/>
+            <Component Name="music" Type="Stream" Mapping="Name:AUDIO_STREAM_MUSIC"/>
+            <Component Name="alarm" Type="Stream" Mapping="Name:AUDIO_STREAM_ALARM"/>
+            <Component Name="notification" Type="Stream" Mapping="Name:AUDIO_STREAM_NOTIFICATION"/>
+            <Component Name="bluetooth_sco" Type="Stream" Mapping="Name:AUDIO_STREAM_BLUETOOTH_SCO"/>
+            <Component Name="enforced_audible" Type="Stream" Mapping="Name:AUDIO_STREAM_ENFORCED_AUDIBLE"
+                       Description="Sounds that cannot be muted by user and must be routed to speaker"/>
+            <Component Name="dtmf" Type="Stream" Mapping="Name:AUDIO_STREAM_DTMF"/>
+            <Component Name="tts" Type="Stream" Mapping="Name:AUDIO_STREAM_TTS"
+                             Description="Transmitted Through Speaker. Plays over speaker only, silent on other devices"/>
+            <Component Name="accessibility" Type="Stream" Mapping="Name:AUDIO_STREAM_ACCESSIBILITY"
+                             Description="For accessibility talk back prompts"/>
+            <Component Name="rerouting" Type="Stream" Mapping="Name:AUDIO_STREAM_REROUTING"
+                             Description="For dynamic policy output mixes"/>
+            <Component Name="patch" Type="Stream" Mapping="Name:AUDIO_STREAM_PATCH"
+                             Description="For internal audio flinger tracks. Fixed volume"/>
+        </ComponentType>
+
+        <!--#################### STREAM END ####################-->
+
+        <!--#################### USAGE BEGIN ####################-->
+
+        <ComponentType Name="Usages" Description="associated to audio_usage_t definition">
+            <Component Name="unknown" Type="Usage" Mapping="Name:AUDIO_USAGE_UNKNOWN"/>
+            <Component Name="media" Type="Usage" Mapping="Name:AUDIO_USAGE_MEDIA"/>
+            <Component Name="voice_communication" Type="Usage"
+                       Mapping="Name:AUDIO_USAGE_VOICE_COMMUNICATION"/>
+            <Component Name="voice_communication_signalling" Type="Usage"
+                       Mapping="Name:AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING"/>
+            <Component Name="alarm" Type="Usage" Mapping="Name:AUDIO_USAGE_ALARM"/>
+            <Component Name="notification" Type="Usage" Mapping="Name:AUDIO_USAGE_NOTIFICATION"/>
+            <Component Name="notification_telephony_ringtone" Type="Usage"
+                       Mapping="Name:AUDIO_USAGE_NOTIFICATION_TELEPHONY_RINGTONE"/>
+            <Component Name="notification_communication_request" Type="Usage"
+                       Mapping="Name:AUDIO_USAGE_NOTIFICATION_COMMUNICATION_REQUEST"/>
+            <Component Name="notification_communication_instant" Type="Usage"
+                       Mapping="Name:AUDIO_USAGE_NOTIFICATION_COMMUNICATION_INSTANT"/>
+            <Component Name="notification_communication_delayed" Type="Usage"
+                       Mapping="Name:AUDIO_USAGE_NOTIFICATION_COMMUNICATION_DELAYED"/>
+            <Component Name="notification_event" Type="Usage"
+                       Mapping="Name:AUDIO_USAGE_NOTIFICATION_EVENT"/>
+            <Component Name="assistance_accessibility" Type="Usage"
+                       Mapping="Name:AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY"/>
+            <Component Name="assistance_navigation_guidance" Type="Usage"
+                       Mapping="Name:AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE"/>
+            <Component Name="assistance_sonification" Type="Usage"
+                       Mapping="Name:AUDIO_USAGE_ASSISTANCE_SONIFICATION"/>
+            <Component Name="game" Type="Usage" Mapping="Name:AUDIO_USAGE_GAME"/>
+            <Component Name="virtual_source" Type="Usage" Mapping="Name:AUDIO_USAGE_VIRTUAL_SOURCE"/>
+            <Component Name="assistant" Type="Usage" Mapping="Name:AUDIO_USAGE_ASSISTANT"/>
+        </ComponentType>
+
+        <!--#################### USAGE END ####################-->
+
+        <!--#################### INPUT SOURCE BEGIN ####################-->
+
+        <ComponentType Name="InputSources" Description="associated to audio_source_t definition,
+                             identifier mapping must match the value of the enum">
+            <Component Name="default" Type="InputSource" Mapping="Name:AUDIO_SOURCE_DEFAULT"/>
+            <Component Name="mic" Type="InputSource" Mapping="Name:AUDIO_SOURCE_MIC"/>
+            <Component Name="voice_uplink" Type="InputSource"
+                                           Mapping="Name:AUDIO_SOURCE_VOICE_UPLINK"/>
+            <Component Name="voice_downlink" Type="InputSource"
+                                             Mapping="Name:AUDIO_SOURCE_VOICE_DOWNLINK"/>
+            <Component Name="voice_call" Type="InputSource"
+                                         Mapping="Name:AUDIO_SOURCE_VOICE_CALL"/>
+            <Component Name="camcorder" Type="InputSource" Mapping="Name:AUDIO_SOURCE_CAMCORDER"/>
+            <Component Name="voice_recognition" Type="InputSource"
+                                                Mapping="Name:AUDIO_SOURCE_VOICE_RECOGNITION"/>
+            <Component Name="voice_communication" Type="InputSource"
+                                                  Mapping="Name:AUDIO_SOURCE_VOICE_COMMUNICATION"/>
+            <Component Name="remote_submix" Type="InputSource"
+                                            Mapping="Name:AUDIO_SOURCE_REMOTE_SUBMIX"/>
+            <Component Name="unprocessed" Type="InputSource"
+                                            Mapping="Name:AUDIO_SOURCE_UNPROCESSED"/>
+            <Component Name="fm_tuner" Type="InputSource" Mapping="Name:AUDIO_SOURCE_FM_TUNER"/>
+            <Component Name="hotword" Type="InputSource" Mapping="Name:AUDIO_SOURCE_HOTWORD"/>
+        </ComponentType>
+
+        <!--#################### INPUT SOURCE END ####################-->
+    </ComponentLibrary>
+
+    <InstanceDefinition>
+        <Component Name="streams" Type="Streams"/>
+        <Component Name="strategies" Type="Strategies"/>
+        <Component Name="input_sources" Type="InputSources"/>
+        <Component Name="usages" Type="Usages"/>
+
+        <Component Name="product_strategies" Type="ProductStrategies"/>
+    </InstanceDefinition>
+</Subsystem>

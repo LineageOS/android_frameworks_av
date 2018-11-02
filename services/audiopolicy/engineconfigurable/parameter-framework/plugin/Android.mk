@@ -11,7 +11,8 @@ LOCAL_SRC_FILES := \
     Strategy.cpp \
     InputSource.cpp \
     Stream.cpp \
-    Usage.cpp
+    Usage.cpp \
+    ProductStrategy.cpp
 
 LOCAL_CFLAGS += \
     -Wall \
@@ -22,7 +23,7 @@ LOCAL_CFLAGS += \
 
 LOCAL_C_INCLUDES := \
     frameworks/av/services/audiopolicy/engineconfigurable/include \
-    frameworks/av/services/audiopolicy/engineconfigurable/interface \
+    frameworks/av/services/audiopolicy/engineconfigurable/interface
 
 LOCAL_SHARED_LIBRARIES := \
     libaudiopolicyengineconfigurable  \
@@ -31,7 +32,9 @@ LOCAL_SHARED_LIBRARIES := \
     liblog \
 
 LOCAL_HEADER_LIBRARIES := \
-    libaudiopolicycommon
+    libaudiopolicycommon \
+    libaudioclient_headers \
+    libbase_headers
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 

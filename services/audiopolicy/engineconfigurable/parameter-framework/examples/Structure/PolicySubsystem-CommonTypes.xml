@@ -202,4 +202,14 @@
 
     <!--#################### INPUT SOURCE COMMON TYPES END ####################-->
 
+    <!--#################### PRODUCT STRATEGY COMMON TYPES BEGIN ####################-->
+
+    <ComponentType Name="ProductStrategy" Mapping="ProductStrategy">
+        <Component Name="selected_output_devices" Type="OutputDevicesMask"/>
+        <StringParameter Name="device_address" MaxLength="256"
+                         Description="if any, device address associated"/>
+    </ComponentType>
+
+    <!--#################### PRODUCT STRATEGY COMMON TYPES END ####################-->
+
 </ComponentTypeSet>

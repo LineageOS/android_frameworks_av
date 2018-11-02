@@ -25,7 +25,6 @@ LOCAL_SRC_FILES:= \
 LOCAL_SHARED_LIBRARIES := \
     libparameter \
     libmedia_helper \
-    libicuuc \
     libxml2
 
 LOCAL_HEADER_LIBRARIES := \

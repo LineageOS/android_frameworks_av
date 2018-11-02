@@ -30,103 +30,61 @@ LOCAL_MODULE := ParameterFrameworkConfigurationPolicy.xml
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
-LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_ETC)/parameter-framework
+LOCAL_MODULE_RELATIVE_PATH := parameter-framework
 LOCAL_SRC_FILES := $(LOCAL_MODULE).in
 
+# external/parameter-framework prevents from using debug interface
 AUDIO_PATTERN = @TUNING_ALLOWED@
-ifeq ($(TARGET_BUILD_VARIANT),user)
+#ifeq ($(TARGET_BUILD_VARIANT),user)
 AUDIO_VALUE = false
-else
-AUDIO_VALUE = true
-endif
+#else
+#AUDIO_VALUE = true
+#endif
 
-LOCAL_POST_INSTALL_CMD := $(hide) sed -i -e 's|$(AUDIO_PATTERN)|$(AUDIO_VALUE)|g' $(LOCAL_MODULE_PATH)/$(LOCAL_MODULE)
+LOCAL_POST_INSTALL_CMD := $(hide) sed -i -e 's|$(AUDIO_PATTERN)|$(AUDIO_VALUE)|g' $(TARGET_OUT_VENDOR_ETC)/$(LOCAL_MODULE_RELATIVE_PATH)/$(LOCAL_MODULE)
 
 include $(BUILD_PREBUILT)
 
-
-########## Policy PFW Structures #########
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := PolicyClass.xml
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE_CLASS := ETC
-LOCAL_VENDOR_MODULE := true
-LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/Structure/Policy
-LOCAL_SRC_FILES := Structure/$(LOCAL_MODULE)
-include $(BUILD_PREBUILT)
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := PolicySubsystem.xml
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE_CLASS := ETC
-LOCAL_VENDOR_MODULE := true
-LOCAL_REQUIRED_MODULES := \
-    PolicySubsystem-CommonTypes.xml \
-    libpolicy-subsystem
-
-LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/Structure/Policy
-LOCAL_SRC_FILES := Structure/$(LOCAL_MODULE)
-include $(BUILD_PREBUILT)
+########## Policy PFW Common Structures #########
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := PolicySubsystem-CommonTypes.xml
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
-LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/Structure/Policy
+LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Structure/Policy
 LOCAL_SRC_FILES := Structure/$(LOCAL_MODULE)
 include $(BUILD_PREBUILT)
 
-######### Policy PFW Settings #########
 include $(CLEAR_VARS)
-LOCAL_MODULE := parameter-framework.policy
-LOCAL_MODULE_STEM := PolicyConfigurableDomains.xml
+LOCAL_MODULE := PolicyClass.xml
+LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
-LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Settings/Policy
-LOCAL_REQUIRED_MODULES := \
-    policy_criteria.xml \
-    policy_criterion_types.xml \
-    PolicySubsystem.xml \
-    PolicyClass.xml \
-    ParameterFrameworkConfigurationPolicy.xml
-
-ifeq ($(pfw_rebuild_settings),true)
-PFW_EDD_FILES := \
-        $(LOCAL_PATH)/Settings/device_for_strategy_media.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_phone.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_sonification.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_sonification_respectful.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_dtmf.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_enforced_audible.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_transmitted_through_speaker.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_accessibility.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_rerouting.pfw \
-        $(LOCAL_PATH)/Settings/strategy_for_stream.pfw \
-        $(LOCAL_PATH)/Settings/strategy_for_usage.pfw \
-        $(LOCAL_PATH)/Settings/device_for_input_source.pfw \
-        $(LOCAL_PATH)/Settings/volumes.pfw
-
-LOCAL_ADDITIONAL_DEPENDENCIES := \
-    $(PFW_EDD_FILES)
-
-
-PFW_CRITERION_TYPES_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criterion_types.xml
-PFW_CRITERIA_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criteria.xml
-
-PFW_TOPLEVEL_FILE := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/ParameterFrameworkConfigurationPolicy.xml
-
-PFW_SCHEMAS_DIR := $(PFW_DEFAULT_SCHEMAS_DIR)
-
-include $(BUILD_PFW_SETTINGS)
-else
-# Use the existing file
-LOCAL_SRC_FILES := Settings/$(LOCAL_MODULE_STEM)
+LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Structure/Policy
+LOCAL_SRC_FILES := Structure/$(LOCAL_MODULE)
 include $(BUILD_PREBUILT)
-endif # pfw_rebuild_settings
 
-endif # ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), 0)
+endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),1)
+
+########## Policy PFW Example Structures #########
+ifeq (0, 1)
+include $(CLEAR_VARS)
+LOCAL_MODULE := PolicySubsystem.xml.common
+LOCAL_MODULE_STEM := PolicySubsystem.xml
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_VENDOR_MODULE := true
+LOCAL_REQUIRED_MODULES := \
+    PolicySubsystem-CommonTypes.xml \
+    PolicySubsystem-Volume.xml \
+    libpolicy-subsystem \
+
+LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Structure/Policy
+LOCAL_SRC_FILES := Structure/$(LOCAL_MODULE_STEM)
+include $(BUILD_PREBUILT)
+
+endif # ifeq (0, 1)
 
 ######### Policy PFW Settings - No Output #########
 ifeq (0, 1)
@@ -140,7 +98,7 @@ LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Settings/Policy
 LOCAL_REQUIRED_MODULES := \
     policy_criteria.xml \
     policy_criterion_types.xml \
-    PolicySubsystem.xml \
+    PolicySubsystem.xml.common \
     PolicyClass.xml \
     ParameterFrameworkConfigurationPolicy.xml
 
@@ -168,7 +126,7 @@ LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Settings/Policy
 LOCAL_REQUIRED_MODULES := \
     policy_criteria.xml \
     policy_criterion_types.xml \
-    PolicySubsystem.xml \
+    PolicySubsystem.xml.common \
     PolicyClass.xml \
     ParameterFrameworkConfigurationPolicy.xml
 
@@ -192,10 +150,11 @@ PFW_EDD_FILES := \
 
 include $(BUILD_PFW_SETTINGS)
 
-endif # ifeq (1, 0)
-
+endif #ifeq (0, 1)
 #######################################################################
 # Recursive call sub-folder Android.mk
 #######################################################################
 
 include $(call all-makefiles-under,$(LOCAL_PATH))
+
+

@@ -56,4 +56,5 @@ private:
     static const char *const mStrategyComponentName;
     static const char *const mInputSourceComponentName;
     static const char *const mUsageComponentName;
+    static const char *const mProductStrategyComponentName;
 };

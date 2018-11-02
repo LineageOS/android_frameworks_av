@@ -119,6 +119,16 @@ public:
     {
         return setPropertyForKey<audio_devices_t, audio_source_t>(device, inputSource);
     }
+    void setDeviceAddressForProductStrategy(product_strategy_t strategy,
+                                                    const std::string &address) override;
+
+    bool setDeviceTypesForProductStrategy(product_strategy_t strategy,
+                                                  audio_devices_t devices) override;
+
+    product_strategy_t getProductStrategyByName(const std::string &name) override
+    {
+        return EngineBase::getProductStrategyByName(name);
+    }
 
 private:
     /* Copy facilities are put private to disable copy. */

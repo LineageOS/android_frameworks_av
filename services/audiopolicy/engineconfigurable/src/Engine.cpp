@@ -353,6 +353,27 @@ void Engine::updateDeviceSelectionCache()
     }
 }
 
+void Engine::setDeviceAddressForProductStrategy(product_strategy_t strategy,
+                                                const std::string &address)
+{
+    if (getProductStrategies().find(strategy) == getProductStrategies().end()) {
+        ALOGE("%s: Trying to set address %s on invalid strategy %d", __FUNCTION__, address.c_str(),
+              strategy);
+        return;
+    }
+    getProductStrategies().at(strategy)->setDeviceAddress(address);
+}
+
+bool Engine::setDeviceTypesForProductStrategy(product_strategy_t strategy, audio_devices_t devices)
+{
+    if (getProductStrategies().find(strategy) == getProductStrategies().end()) {
+        ALOGE("%s: set device %d on invalid strategy %d", __FUNCTION__, devices, strategy);
+        return false;
+    }
+    getProductStrategies().at(strategy)->setDeviceTypes(devices);
+    return true;
+}
+
 template <>
 AudioPolicyManagerInterface *Engine::queryInterface()
 {

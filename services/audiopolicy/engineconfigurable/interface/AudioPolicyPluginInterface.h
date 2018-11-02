@@ -16,10 +16,12 @@
 
 #pragma once
 
+#include <policy.h>
 #include <RoutingStrategy.h>
 #include <EngineDefinition.h>
 #include <Volume.h>
 #include <system/audio.h>
+#include <media/AudioCommonTypes.h>
 #include <utils/Errors.h>
 #include <string>
 #include <vector>
@@ -138,6 +140,22 @@ public:
      */
     virtual bool setDeviceForInputSource(const audio_source_t &inputSource,
                                          audio_devices_t device) = 0;
+
+    virtual void setDeviceAddressForProductStrategy(product_strategy_t strategy,
+                                                    const std::string &address) = 0;
+
+    /**
+     * Set the device to be used by a product strategy.
+     *
+     * @param[in] strategy: name of the product strategy for which the device to use has to be set
+     * @param[in] devices; mask of devices to be used for the given strategy.
+     *
+     * @return true if the devices were set correclty for this strategy, false otherwise.
+     */
+    virtual bool setDeviceTypesForProductStrategy(product_strategy_t strategy,
+                                                  audio_devices_t devices) = 0;
+
+    virtual product_strategy_t getProductStrategyByName(const std::string &address) = 0;
 
 protected:
     virtual ~AudioPolicyPluginInterface() {}
