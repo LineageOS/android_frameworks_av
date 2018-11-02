@@ -29,6 +29,7 @@ cc_library_shared {
         "libmediametrics",
         "libmediautils",
         "libmemunreachable",
+        "libnetd_client",
         "libpowermanager",
         "libstagefright",
         "libstagefright_foundation",
