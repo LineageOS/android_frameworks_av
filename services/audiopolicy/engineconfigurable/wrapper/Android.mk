@@ -14,6 +14,7 @@ LOCAL_C_INCLUDES := \
     frameworks/av/services/audiopolicy/engineconfigurable/include \
     frameworks/av/services/audiopolicy/engineconfigurable/interface \
     frameworks/av/services/audiopolicy/common/include \
+    frameworks/av/services/audiopolicy/utilities/convert \
     external/libxml2/include \
     external/icu/icu4c/source/common
 
@@ -26,6 +27,9 @@ LOCAL_SHARED_LIBRARIES := \
     libmedia_helper \
     libicuuc \
     libxml2
+
+LOCAL_HEADER_LIBRARIES := \
+    libaudiopolicycommon
 
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents

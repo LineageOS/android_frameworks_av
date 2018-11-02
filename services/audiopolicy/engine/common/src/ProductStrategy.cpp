@@ -1,0 +1,257 @@
+/*
+ * Copyright (C) 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#define LOG_TAG "APM::AudioPolicyEngine/ProductStrategy"
+//#define LOG_NDEBUG 0
+
+#include "ProductStrategy.h"
+
+#include <media/TypeConverter.h>
+#include <utils/String8.h>
+#include <cstdint>
+#include <string>
+
+#include <log/log.h>
+
+
+namespace android {
+
+ProductStrategy::ProductStrategy(const std::string &name) :
+    mName(name),
+    mId(static_cast<product_strategy_t>(HandleGenerator<uint32_t>::getNextHandle()))
+{
+}
+
+void ProductStrategy::addAttributes(const AudioAttributes &audioAttributes)
+{
+    mAttributesVector.push_back(audioAttributes);
+}
+
+AttributesVector ProductStrategy::getAudioAttributes() const
+{
+    AttributesVector attrVector;
+    for (const auto &attrGroup : mAttributesVector) {
+        attrVector.push_back(attrGroup.mAttributes);
+    }
+    if (not attrVector.empty()) {
+        return attrVector;
+    }
+    return { AUDIO_ATTRIBUTES_INITIALIZER };
+}
+
+// @todo: all flags required to match?
+//        all tags required to match?
+/* static */
+bool ProductStrategy::attributesMatches(const audio_attributes_t refAttributes,
+                                        const audio_attributes_t clientAttritubes)
+{
+    if (refAttributes == defaultAttr) {
+        // The default product strategy is the strategy that holds default attributes by convention.
+        // All attributes that fail to match will follow the default strategy for routing.
+        // Choosing the default must be done as a fallback, the attributes match shall not
+        // selects the default.
+        return false;
+    }
+    return ((refAttributes.usage == AUDIO_USAGE_UNKNOWN) ||
+            (clientAttritubes.usage == refAttributes.usage)) &&
+            ((refAttributes.content_type == AUDIO_CONTENT_TYPE_UNKNOWN) ||
+             (clientAttritubes.content_type == refAttributes.content_type)) &&
+            ((refAttributes.flags == AUDIO_OUTPUT_FLAG_NONE) ||
+             (clientAttritubes.flags != AUDIO_OUTPUT_FLAG_NONE &&
+            (clientAttritubes.flags & refAttributes.flags) == clientAttritubes.flags)) &&
+            ((strlen(refAttributes.tags) == 0) ||
+             (std::strcmp(clientAttritubes.tags, refAttributes.tags) == 0));
+}
+
+bool ProductStrategy::matches(const audio_attributes_t attr) const
+{
+    return std::find_if(begin(mAttributesVector), end(mAttributesVector),
+                        [&attr](const auto &supportedAttr) {
+        return attributesMatches(supportedAttr.mAttributes, attr); }) != end(mAttributesVector);
+}
+
+audio_stream_type_t ProductStrategy::getStreamTypeForAttributes(const audio_attributes_t &attr) const
+{
+    const auto iter = std::find_if(begin(mAttributesVector), end(mAttributesVector),
+                                   [&attr](const auto &supportedAttr) {
+        return attributesMatches(supportedAttr.mAttributes, attr); });
+    return iter != end(mAttributesVector) ? iter->mStream : AUDIO_STREAM_DEFAULT;
+}
+
+audio_attributes_t ProductStrategy::getAttributesForStreamType(audio_stream_type_t streamType) const
+{
+    const auto iter = std::find_if(begin(mAttributesVector), end(mAttributesVector),
+                                   [&streamType](const auto &supportedAttr) {
+        return supportedAttr.mStream == streamType; });
+    return iter != end(mAttributesVector) ? iter->mAttributes : AUDIO_ATTRIBUTES_INITIALIZER;
+}
+
+bool ProductStrategy::isDefault() const
+{
+    return std::find_if(begin(mAttributesVector), end(mAttributesVector), [](const auto &attr) {
+        return attr.mAttributes == defaultAttr; }) != end(mAttributesVector);
+}
+
+StreamTypeVector ProductStrategy::getSupportedStreams() const
+{
+    StreamTypeVector streams;
+    for (const auto &supportedAttr : mAttributesVector) {
+        if (std::find(begin(streams), end(streams), supportedAttr.mStream) == end(streams) &&
+                supportedAttr.mStream != AUDIO_STREAM_DEFAULT) {
+            streams.push_back(supportedAttr.mStream);
+        }
+    }
+    return streams;
+}
+
+bool ProductStrategy::supportStreamType(const audio_stream_type_t &streamType) const
+{
+    return std::find_if(begin(mAttributesVector), end(mAttributesVector),
+                        [&streamType](const auto &supportedAttr) {
+        return supportedAttr.mStream == streamType; }) != end(mAttributesVector);
+}
+
+void ProductStrategy::dump(String8 *dst, int spaces) const
+{
+    dst->appendFormat("\n%*s-%s (id: %d)\n", spaces, "", mName.c_str(), mId);
+    std::string deviceLiteral;
+    if (!OutputDeviceConverter::toString(mApplicableDevices, deviceLiteral)) {
+        ALOGE("%s: failed to convert device %d", __FUNCTION__, mApplicableDevices);
+    }
+    dst->appendFormat("%*sSelected Device: {type:%s, @:%s}\n", spaces + 2, "",
+                       deviceLiteral.c_str(), mDeviceAddress.c_str());
+
+    for (const auto &attr : mAttributesVector) {
+        dst->appendFormat("%*sGroup: %d stream: %s\n", spaces + 3, "", attr.mGroupId,
+                          android::toString(attr.mStream).c_str());
+        dst->appendFormat("%*s Attributes: ", spaces + 3, "");
+        std::string attStr =
+                attr.mAttributes == defaultAttr ? "{ Any }" : android::toString(attr.mAttributes);
+        dst->appendFormat("%s\n", attStr.c_str());
+    }
+}
+
+product_strategy_t ProductStrategyMap::getProductStrategyForAttributes(
+        const audio_attributes_t &attr) const
+{
+    for (const auto &iter : *this) {
+        if (iter.second->matches(attr)) {
+            return iter.second->getId();
+        }
+    }
+    ALOGV("%s: No matching product strategy for attributes %s, return default", __FUNCTION__,
+          toString(attr).c_str());
+    return getDefault();
+}
+
+audio_attributes_t ProductStrategyMap::getAttributesForStreamType(audio_stream_type_t stream) const
+{
+    for (const auto &iter : *this) {
+        const auto strategy = iter.second;
+        if (strategy->supportStreamType(stream)) {
+            return strategy->getAttributesForStreamType(stream);
+        }
+    }
+    ALOGV("%s: No product strategy for stream %s, using default", __FUNCTION__,
+          toString(stream).c_str());
+    return {};
+}
+
+audio_stream_type_t ProductStrategyMap::getStreamTypeForAttributes(
+        const audio_attributes_t &attr) const
+{
+    for (const auto &iter : *this) {
+        audio_stream_type_t stream = iter.second->getStreamTypeForAttributes(attr);
+        if (stream != AUDIO_STREAM_DEFAULT) {
+            return stream;
+        }
+    }
+    ALOGV("%s: No product strategy for attributes %s, using default (aka MUSIC)", __FUNCTION__,
+          toString(attr).c_str());
+    return  AUDIO_STREAM_MUSIC;
+}
+
+product_strategy_t ProductStrategyMap::getDefault() const
+{
+    for (const auto &iter : *this) {
+        if (iter.second->isDefault()) {
+            ALOGV("%s: using default %s", __FUNCTION__, iter.second->getName().c_str());
+            return iter.second->getId();
+        }
+    }
+    ALOGE("%s: No default product strategy defined", __FUNCTION__);
+    return PRODUCT_STRATEGY_NONE;
+}
+
+audio_attributes_t ProductStrategyMap::getAttributesForProductStrategy(
+        product_strategy_t strategy) const
+{
+    if (find(strategy) == end()) {
+        ALOGE("Invalid %d strategy requested", strategy);
+        return AUDIO_ATTRIBUTES_INITIALIZER;
+    }
+    return at(strategy)->getAudioAttributes()[0];
+}
+
+product_strategy_t ProductStrategyMap::getProductStrategyForStream(audio_stream_type_t stream) const
+{
+    for (const auto &iter : *this) {
+        if (iter.second->supportStreamType(stream)) {
+            return iter.second->getId();
+        }
+    }
+    ALOGV("%s: No product strategy for stream %d, using default", __FUNCTION__, stream);
+    return getDefault();
+}
+
+
+audio_devices_t ProductStrategyMap::getDeviceTypesForProductStrategy(
+        product_strategy_t strategy) const
+{
+    if (find(strategy) == end()) {
+        ALOGE("Invalid %d strategy requested, returning device for default strategy", strategy);
+        product_strategy_t defaultStrategy = getDefault();
+        if (defaultStrategy == PRODUCT_STRATEGY_NONE) {
+            return AUDIO_DEVICE_NONE;
+        }
+        return at(getDefault())->getDeviceTypes();
+    }
+    return at(strategy)->getDeviceTypes();
+}
+
+std::string ProductStrategyMap::getDeviceAddressForProductStrategy(product_strategy_t psId) const
+{
+    if (find(psId) == end()) {
+        ALOGE("Invalid %d strategy requested, returning device for default strategy", psId);
+        product_strategy_t defaultStrategy = getDefault();
+        if (defaultStrategy == PRODUCT_STRATEGY_NONE) {
+            return {};
+        }
+        return at(getDefault())->getDeviceAddress();
+    }
+    return at(psId)->getDeviceAddress();
+}
+
+void ProductStrategyMap::dump(String8 *dst, int spaces) const
+{
+    dst->appendFormat("%*sProduct Strategies dump:", spaces, "");
+    for (const auto &iter : *this) {
+        iter.second->dump(dst, spaces + 2);
+    }
+}
+
+}
+

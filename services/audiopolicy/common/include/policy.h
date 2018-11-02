@@ -17,8 +17,20 @@
 #pragma once
 
 #include <system/audio.h>
+#include <vector>
+
+namespace android {
+
+using StreamTypeVector = std::vector<audio_stream_type_t>;
+
+
+static const audio_attributes_t defaultAttr = AUDIO_ATTRIBUTES_INITIALIZER;
+
+} // namespace android
 
 static const audio_format_t gDynamicFormat = AUDIO_FORMAT_DEFAULT;
+
+static const uint32_t SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY = 5000;
 
 // For mixed output and inputs, the policy will use max mixer sampling rates.
 // Do not limit sampling rate otherwise
@@ -150,4 +162,10 @@ static inline bool audio_formats_match(audio_format_t format1,
         return true;
     }
     return format1 == format2;
+}
+
+constexpr bool operator==(const audio_attributes_t &lhs, const audio_attributes_t &rhs)
+{
+    return lhs.usage == rhs.usage && lhs.content_type == rhs.content_type &&
+            lhs.flags == rhs.flags && (std::strcmp(lhs.tags, rhs.tags) == 0);
 }

@@ -289,7 +289,7 @@ status_t ParameterManagerWrapper::setDeviceConnectionState(const sp<DeviceDescri
     std::string criterionName = audio_is_output_device(devDesc->type()) ?
                 gOutputDeviceAddressCriterionName : gInputDeviceAddressCriterionName;
 
-    ALOGV("%s: device with address %s %s", __FUNCTION__, devDesc->mAddress.string(),
+    ALOGV("%s: device with address %s %s", __FUNCTION__, devDesc->address().string(),
           state != AUDIO_POLICY_DEVICE_STATE_AVAILABLE? "disconnected" : "connected");
     ISelectionCriterionInterface *criterion =
             getElement<ISelectionCriterionInterface>(criterionName, mPolicyCriteria);

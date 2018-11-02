@@ -14,11 +14,12 @@ LOCAL_SRC_FILES := \
     src/Strategy.cpp \
     src/Usage.cpp \
     src/InputSource.cpp \
+    ../engine/common/src/ProductStrategy.cpp \
+    ../engine/common/src/EngineBase.cpp
 
 audio_policy_engine_includes_common := \
     frameworks/av/services/audiopolicy/engineconfigurable/include \
-    frameworks/av/services/audiopolicy/engineconfigurable/interface \
-    frameworks/av/services/audiopolicy/engine/interface
+    frameworks/av/services/audiopolicy/engineconfigurable/interface
 
 LOCAL_CFLAGS += \
     -Wall \
@@ -32,8 +33,12 @@ LOCAL_C_INCLUDES := \
     $(audio_policy_engine_includes_common) \
     $(TARGET_OUT_HEADERS)/hw \
     $(call include-path-for, frameworks-av) \
-    $(call include-path-for, audio-utils) \
-    frameworks/av/services/audiopolicy/common/include
+    $(call include-path-for, audio-utils)
+
+LOCAL_HEADER_LIBRARIES := \
+    libaudiopolicycommon \
+    libaudiopolicyengine_common_headers \
+    libaudiopolicyengine_interface_headers
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 
@@ -45,8 +50,8 @@ LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents
 
 LOCAL_SHARED_LIBRARIES := \
+    libaudiopolicyengineconfig \
     liblog \
-    libcutils \
     libutils \
     liblog \
     libaudioutils \

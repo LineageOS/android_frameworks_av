@@ -4,7 +4,6 @@ include $(CLEAR_VARS)
 
 LOCAL_C_INCLUDES := \
   frameworks/av/services/audiopolicy \
-  frameworks/av/services/audiopolicy/common/include \
   frameworks/av/services/audiopolicy/engine/interface \
   $(call include-path-for, audio-utils) \
 
@@ -17,6 +16,9 @@ LOCAL_SHARED_LIBRARIES := \
 
 LOCAL_STATIC_LIBRARIES := \
   libaudiopolicycomponents \
+
+LOCAL_HEADER_LIBRARIES := \
+    libaudiopolicycommon
 
 LOCAL_SRC_FILES := \
   audiopolicymanager_tests.cpp \

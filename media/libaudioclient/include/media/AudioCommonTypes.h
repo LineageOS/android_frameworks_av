@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,22 +14,21 @@
  * limitations under the License.
  */
 
+
 #pragma once
+
+#include <system/audio.h>
+#include <system/audio_policy.h>
+#include <binder/Parcel.h>
+#include <utils/String8.h>
+#include <utils/Vector.h>
 
 namespace android {
 
-enum routing_strategy {
-    STRATEGY_NONE = -1,
-    STRATEGY_MEDIA,
-    STRATEGY_PHONE,
-    STRATEGY_SONIFICATION,
-    STRATEGY_SONIFICATION_RESPECTFUL,
-    STRATEGY_DTMF,
-    STRATEGY_ENFORCED_AUDIBLE,
-    STRATEGY_TRANSMITTED_THROUGH_SPEAKER,
-    STRATEGY_ACCESSIBILITY,
-    STRATEGY_REROUTING,
-    NUM_STRATEGIES
-};
+enum product_strategy_t : uint32_t;
+const product_strategy_t PRODUCT_STRATEGY_NONE = static_cast<product_strategy_t>(-1);
 
-}; //namespace android
+using AttributesVector = std::vector<audio_attributes_t>;
+
+} // namespace android
+
