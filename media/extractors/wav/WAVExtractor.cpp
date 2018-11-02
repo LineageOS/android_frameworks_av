@@ -311,6 +311,7 @@ status_t WAVExtractor::init() {
                 AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, mNumChannels);
                 AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_CHANNEL_MASK, mChannelMask);
                 AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, mSampleRate);
+                AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_BITS_PER_SAMPLE, mBitsPerSample);
                 AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_PCM_ENCODING,
                         kAudioEncodingPcm16bit);
 

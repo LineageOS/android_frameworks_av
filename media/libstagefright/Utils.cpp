@@ -787,6 +787,11 @@ status_t convertMetaDataToMessage(
         msg->setInt32("channel-count", numChannels);
         msg->setInt32("sample-rate", sampleRate);
 
+        int32_t bitsPerSample;
+        if (meta->findInt32(kKeyBitsPerSample, &bitsPerSample)) {
+            msg->setInt32("bits-per-sample", bitsPerSample);
+        }
+
         int32_t channelMask;
         if (meta->findInt32(kKeyChannelMask, &channelMask)) {
             msg->setInt32("channel-mask", channelMask);
@@ -1525,6 +1530,10 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         int32_t sampleRate;
         if (msg->findInt32("sample-rate", &sampleRate)) {
             meta->setInt32(kKeySampleRate, sampleRate);
+        }
+        int32_t bitsPerSample;
+        if (msg->findInt32("bits-per-sample", &bitsPerSample)) {
+            meta->setInt32(kKeyBitsPerSample, bitsPerSample);
         }
         int32_t channelMask;
         if (msg->findInt32("channel-mask", &channelMask)) {
