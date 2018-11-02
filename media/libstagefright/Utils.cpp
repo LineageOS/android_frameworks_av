@@ -1584,7 +1584,7 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             if (msg->findBuffer("csd-1", &csd1)) {
                 std::vector<char> avcc(csd0size + csd1->size() + 1024);
                 size_t outsize = reassembleAVCC(csd0, csd1, avcc.data());
-                meta->setData(kKeyAVCC, kKeyAVCC, avcc.data(), outsize);
+                meta->setData(kKeyAVCC, kTypeAVCC, avcc.data(), outsize);
             }
         } else if (mime == MEDIA_MIMETYPE_AUDIO_AAC || mime == MEDIA_MIMETYPE_VIDEO_MPEG4) {
             std::vector<char> esds(csd0size + 31);
@@ -1596,7 +1596,7 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
                    mime == MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC) {
             std::vector<uint8_t> hvcc(csd0size + 1024);
             size_t outsize = reassembleHVCC(csd0, hvcc.data(), hvcc.size(), 4);
-            meta->setData(kKeyHVCC, kKeyHVCC, hvcc.data(), outsize);
+            meta->setData(kKeyHVCC, kTypeHVCC, hvcc.data(), outsize);
         } else if (mime == MEDIA_MIMETYPE_VIDEO_VP9) {
             meta->setData(kKeyVp9CodecPrivate, 0, csd0->data(), csd0->size());
         } else if (mime == MEDIA_MIMETYPE_AUDIO_OPUS) {
@@ -1613,6 +1613,11 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
                 meta->setData(kKeyVorbisBooks, 0, csd1->data(), csd1->size());
             }
         }
+    } else if (mime == MEDIA_MIMETYPE_VIDEO_AVC && msg->findBuffer("csd-avc", &csd0)) {
+        meta->setData(kKeyAVCC, kTypeAVCC, csd0->data(), csd0->size());
+    } else if ((mime == MEDIA_MIMETYPE_VIDEO_HEVC || mime == MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC)
+            && msg->findBuffer("csd-hevc", &csd0)) {
+        meta->setData(kKeyHVCC, kTypeHVCC, csd0->data(), csd0->size());
     }
 
     int32_t timeScale;

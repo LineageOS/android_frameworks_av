@@ -56,6 +56,32 @@ bool MakeAVCCodecSpecificData(MetaDataBase &meta, const uint8_t *data, size_t si
     return true;
 }
 
+bool MakeAVCCodecSpecificData(AMediaFormat *meta, const uint8_t *data, size_t size) {
+    if (meta == nullptr || data == nullptr || size == 0) {
+        return false;
+    }
+
+    int32_t width;
+    int32_t height;
+    int32_t sarWidth;
+    int32_t sarHeight;
+    sp<ABuffer> accessUnit = new ABuffer((void*)data,  size);
+    sp<ABuffer> csd = MakeAVCCodecSpecificData(accessUnit, &width, &height, &sarWidth, &sarHeight);
+    if (csd == nullptr) {
+        return false;
+    }
+    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_AVC);
+
+    AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CSD_AVC, csd->data(), csd->size());
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_WIDTH, width);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_HEIGHT, height);
+    if (sarWidth > 0 && sarHeight > 0) {
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_SAR_WIDTH, sarWidth);
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_SAR_HEIGHT, sarHeight);
+    }
+    return true;
+}
+
 bool MakeAACCodecSpecificData(MetaDataBase &meta, const uint8_t *data, size_t size) {
     if (data == nullptr || size < 7) {
         return false;
