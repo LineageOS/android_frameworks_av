@@ -4,7 +4,7 @@ LOCAL_PATH := $(call my-dir)
 # CONFIGURATION TOP FILE
 ##################################################################
 
-ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), phone_configurable)
+ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), phone_default)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := audio_policy_engine_configuration_phone.xml
@@ -29,4 +29,4 @@ LOCAL_VENDOR_MODULE := true
 LOCAL_SRC_FILES := phone/$(LOCAL_MODULE_STEM)
 include $(BUILD_PREBUILT)
 
-endif # ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), phone_configurable)
+endif # ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), phone_default)

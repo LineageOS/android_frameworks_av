@@ -18,7 +18,6 @@
 //#define LOG_NDEBUG 0
 
 #include "ParameterManagerWrapper.h"
-#include "ParameterManagerWrapperConfig.h"
 #include <ParameterMgrPlatformConnector.h>
 #include <SelectionCriterionTypeInterface.h>
 #include <SelectionCriterionInterface.h>
@@ -38,7 +37,6 @@
 using std::string;
 using std::map;
 using std::vector;
-using CriterionTypes = std::map<std::string, ISelectionCriterionTypeInterface *>;
 
 /// PFW related definitions
 // Logger
@@ -106,63 +104,35 @@ ParameterManagerWrapper::ParameterManagerWrapper()
 
     // Logger
     mPfwConnector->setLogger(mPfwConnectorLogger);
-
-    status_t loadResult = loadConfig();
-    if (loadResult < 0) {
-        ALOGE("Policy Wrapper configuration is partially invalid.");
-    }
 }
 
-status_t ParameterManagerWrapper::loadConfig()
+status_t ParameterManagerWrapper::addCriterion(const std::string &name, bool isInclusive,
+                                               ValuePairs pairs, const std::string &defaultValue)
 {
-    auto result = wrapper_config::parse();
-    if (result.parsedConfig == nullptr) {
-        return -ENOENT;
+    ALOG_ASSERT(not isStarted(), "Cannot add a criterion if PFW is already started");
+    auto criterionType = mPfwConnector->createSelectionCriterionType(isInclusive);
+
+    for (auto pair : pairs) {
+        std::string error;
+        ALOGV("%s: Adding pair %d,%s for criterionType %s", __FUNCTION__, pair.first,
+              pair.second.c_str(), name.c_str());
+        criterionType->addValuePair(pair.first, pair.second, error);
     }
-    ALOGE_IF(result.nbSkippedElement != 0, "skipped %zu elements", result.nbSkippedElement);
+    ALOG_ASSERT(mPolicyCriteria.find(name) == mPolicyCriteria.end(),
+                "%s: Criterion %s already added", __FUNCTION__, name.c_str());
 
-    CriterionTypes criterionTypes;
-    for (auto criterionType : result.parsedConfig->criterionTypes) {
-        ALOG_ASSERT(criterionTypes.find(criterionType.name) == criterionTypes.end(),
-                          "CriterionType %s already added", criterionType.name.c_str());
-        ALOGV("%s: Adding new criterionType %s", __FUNCTION__, criterionType.name.c_str());
+    auto criterion = mPfwConnector->createSelectionCriterion(name, criterionType);
+    mPolicyCriteria[name] = criterion;
 
-        auto criterionTypePfw =
-                mPfwConnector->createSelectionCriterionType(criterionType.isInclusive);
-
-        for (auto pair : criterionType.valuePairs) {
-            std::string error;
-            ALOGV("%s: Adding pair %d,%s for criterionType %s", __FUNCTION__, pair.first,
-                  pair.second.c_str(), criterionType.name.c_str());
-            criterionTypePfw->addValuePair(pair.first, pair.second, error);
+    if (not defaultValue.empty()) {
+        int numericalValue = 0;
+        if (not criterionType->getNumericalValue(defaultValue.c_str(), numericalValue)) {
+            ALOGE("%s; trying to apply invalid default literal value (%s)", __FUNCTION__,
+                  defaultValue.c_str());
         }
-        criterionTypes[criterionType.name] = criterionTypePfw;
+        criterion->setCriterionState(numericalValue);
     }
-
-    for (auto criterion : result.parsedConfig->criteria) {
-        ALOG_ASSERT(mPolicyCriteria.find(criterion.name) == mPolicyCriteria.end(),
-                    "%s: Criterion %s already added", __FUNCTION__, criterion.name.c_str());
-
-        auto criterionType =
-                getElement<ISelectionCriterionTypeInterface>(criterion.typeName, criterionTypes);
-        ALOG_ASSERT(criterionType != nullptr, "No %s Criterion type found for criterion %s",
-                    criterion.typeName.c_str(), criterion.name.c_str());
-
-        auto criterionPfw = mPfwConnector->createSelectionCriterion(criterion.name, criterionType);
-        mPolicyCriteria[criterion.name] = criterionPfw;
-
-        if (not criterion.defaultLiteralValue.empty()) {
-            int numericalValue = 0;
-            if (not criterionType->getNumericalValue(criterion.defaultLiteralValue.c_str(),
-                                                     numericalValue)) {
-                ALOGE("%s; trying to apply invalid default literal value (%s)", __FUNCTION__,
-                      criterion.defaultLiteralValue.c_str());
-                continue;
-            }
-            criterionPfw->setCriterionState(numericalValue);
-        }
-    }
-    return result.nbSkippedElement == 0? NO_ERROR : BAD_VALUE;
+    return NO_ERROR;
 }
 
 ParameterManagerWrapper::~ParameterManagerWrapper()

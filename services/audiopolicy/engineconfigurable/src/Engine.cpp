@@ -237,6 +237,25 @@ status_t Engine::loadAudioPolicyEngineConfig()
 {
     auto result = EngineBase::loadAudioPolicyEngineConfig();
 
+    // Custom XML Parsing
+    auto loadCriteria= [this](const auto& configCriteria, const auto& configCriterionTypes) {
+        for (auto& criterion : configCriteria) {
+            engineConfig::CriterionType criterionType;
+            for (auto &configCriterionType : configCriterionTypes) {
+                if (configCriterionType.name == criterion.typeName) {
+                    criterionType = configCriterionType;
+                    break;
+                }
+            }
+            ALOG_ASSERT(not criterionType.name.empty(), "Invalid criterion type for %s",
+                        criterion.name.c_str());
+            mPolicyParameterMgr->addCriterion(criterion.name, criterionType.isInclusive,
+                                              criterionType.valuePairs,
+                                              criterion.defaultLiteralValue);
+        }
+    };
+
+    loadCriteria(result.parsedConfig->criteria, result.parsedConfig->criterionTypes);
     return result.nbSkippedElement == 0? NO_ERROR : BAD_VALUE;
 }
 

@@ -52,9 +52,32 @@ struct ProductStrategy {
 
 using ProductStrategies = std::vector<ProductStrategy>;
 
+using ValuePair = std::pair<uint32_t, std::string>;
+using ValuePairs = std::vector<ValuePair>;
+
+struct CriterionType
+{
+    std::string name;
+    bool isInclusive;
+    ValuePairs valuePairs;
+};
+
+using CriterionTypes = std::vector<CriterionType>;
+
+struct Criterion
+{
+    std::string name;
+    std::string typeName;
+    std::string defaultLiteralValue;
+};
+
+using Criteria = std::vector<Criterion>;
+
 struct Config {
     float version;
     ProductStrategies productStrategies;
+    Criteria criteria;
+    CriterionTypes criterionTypes;
 };
 
 /** Result of `parse(const char*)` */

@@ -133,6 +133,8 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
 
 const engineConfig::Config gDefaultEngineConfig = {
     1.0,
-    gOrderedStrategies
+    gOrderedStrategies,
+    {},
+    {}
 };
 } // namespace android

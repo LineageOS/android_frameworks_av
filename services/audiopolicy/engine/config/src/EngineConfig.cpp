@@ -70,6 +70,43 @@ struct ProductStrategyTraits : public BaseSerializerTraits<ProductStrategy, Prod
     };
     static android::status_t deserialize(_xmlDoc *doc, const _xmlNode *root, Collection &ps);
 };
+struct ValueTraits : public BaseSerializerTraits<ValuePair, ValuePairs> {
+    static constexpr const char *tag = "value";
+    static constexpr const char *collectionTag = "values";
+
+    struct Attributes {
+        static constexpr const char *literal = "literal";
+        static constexpr const char *numerical = "numerical";
+    };
+
+    static android::status_t deserialize(_xmlDoc *doc, const _xmlNode *root,
+                                         Collection &collection);
+};
+struct CriterionTypeTraits : public BaseSerializerTraits<CriterionType, CriterionTypes> {
+    static constexpr const char *tag = "criterion_type";
+    static constexpr const char *collectionTag = "criterion_types";
+
+    struct Attributes {
+        static constexpr const char *name = "name";
+        static constexpr const char *type = "type";
+    };
+
+    static android::status_t deserialize(_xmlDoc *doc, const _xmlNode *root,
+                                         Collection &collection);
+};
+struct CriterionTraits : public BaseSerializerTraits<Criterion, Criteria> {
+    static constexpr const char *tag = "criterion";
+    static constexpr const char *collectionTag = "criteria";
+
+    struct Attributes {
+        static constexpr const char *name = "name";
+        static constexpr const char *type = "type";
+        static constexpr const char *defaultVal = "default";
+    };
+
+    static android::status_t deserialize(_xmlDoc *doc, const _xmlNode *root,
+                                         Collection &collection);
+};
 
 using xmlCharUnique = std::unique_ptr<xmlChar, decltype(xmlFree)>;
 
@@ -254,6 +291,80 @@ status_t AttributesGroupTraits::deserialize(_xmlDoc *doc, const _xmlNode *child,
     return NO_ERROR;
 }
 
+status_t ValueTraits::deserialize(_xmlDoc */*doc*/, const _xmlNode *child, Collection &values)
+{
+    std::string literal = getXmlAttribute(child, Attributes::literal);
+    if (literal.empty()) {
+        ALOGE("%s: No attribute %s found", __FUNCTION__, Attributes::literal);
+        return BAD_VALUE;
+    }
+    uint32_t numerical = 0;
+    std::string numericalTag = getXmlAttribute(child, Attributes::numerical);
+    if (numericalTag.empty()) {
+        ALOGE("%s: No attribute %s found", __FUNCTION__, Attributes::literal);
+        return BAD_VALUE;
+    }
+    if (!convertTo(numericalTag, numerical)) {
+        ALOGE("%s: : Invalid value(%s)", __FUNCTION__, numericalTag.c_str());
+        return BAD_VALUE;
+    }
+    values.push_back({numerical, literal});
+    return NO_ERROR;
+}
+
+status_t CriterionTypeTraits::deserialize(_xmlDoc *doc, const _xmlNode *child,
+                                          Collection &criterionTypes)
+{
+    std::string name = getXmlAttribute(child, Attributes::name);
+    if (name.empty()) {
+        ALOGE("%s: No attribute %s found", __FUNCTION__, Attributes::name);
+        return BAD_VALUE;
+    }
+    ALOGV("%s: %s %s = %s", __FUNCTION__, tag, Attributes::name, name.c_str());
+
+    std::string type = getXmlAttribute(child, Attributes::type);
+    if (type.empty()) {
+        ALOGE("%s: No attribute %s found", __FUNCTION__, Attributes::type);
+        return BAD_VALUE;
+    }
+    ALOGV("%s: %s %s = %s", __FUNCTION__, tag, Attributes::type, type.c_str());
+    bool isInclusive(type == "inclusive");
+
+    ValuePairs pairs;
+    size_t nbSkippedElements = 0;
+    deserializeCollection<ValueTraits>(doc, child, pairs, nbSkippedElements);
+    criterionTypes.push_back({name, isInclusive, pairs});
+    return NO_ERROR;
+}
+
+status_t CriterionTraits::deserialize(_xmlDoc */*doc*/, const _xmlNode *child,
+                                      Collection &criteria)
+{
+    std::string name = getXmlAttribute(child, Attributes::name);
+    if (name.empty()) {
+        ALOGE("%s: No attribute %s found", __FUNCTION__, Attributes::name);
+        return BAD_VALUE;
+    }
+    ALOGV("%s: %s = %s", __FUNCTION__, Attributes::name, name.c_str());
+
+    std::string defaultValue = getXmlAttribute(child, Attributes::defaultVal);
+    if (defaultValue.empty()) {
+        // Not mandatory to provide a default value for a criterion, even it is recommanded...
+        ALOGV("%s: No attribute %s found (but recommanded)", __FUNCTION__, Attributes::defaultVal);
+    }
+    ALOGV("%s: %s = %s", __FUNCTION__, Attributes::defaultVal, defaultValue.c_str());
+
+    std::string typeName = getXmlAttribute(child, Attributes::type);
+    if (typeName.empty()) {
+        ALOGE("%s: No attribute %s found", __FUNCTION__, Attributes::name);
+        return BAD_VALUE;
+    }
+    ALOGV("%s: %s = %s", __FUNCTION__, Attributes::type, typeName.c_str());
+
+    criteria.push_back({name, typeName, defaultValue});
+    return NO_ERROR;
+}
+
 status_t ProductStrategyTraits::deserialize(_xmlDoc *doc, const _xmlNode *child,
                                             Collection &strategies)
 {
@@ -299,7 +410,10 @@ ParsingResult parse(const char* path) {
     config->version = std::stof(version);
     deserializeCollection<ProductStrategyTraits>(
                 doc, cur, config->productStrategies, nbSkippedElements);
-
+    deserializeCollection<CriterionTraits>(
+                doc, cur, config->criteria, nbSkippedElements);
+    deserializeCollection<CriterionTypeTraits>(
+                doc, cur, config->criterionTypes, nbSkippedElements);
     return {std::move(config), nbSkippedElements};
 }
 

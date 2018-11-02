@@ -7,7 +7,7 @@
 #
 ################################################################################################
 
-ifeq ($(BUILD_AUDIO_POLICY_AUTOMOTIVE_CONFIGURATION), 1)
+ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), automotive_configurable)
 LOCAL_PATH := $(call my-dir)
 
 PFW_CORE := external/parameter-framework
@@ -21,48 +21,6 @@ BUILD_PFW_SETTINGS := $(TOOLS)/build_audio_pfw_settings.mk
 ##################################################################
 # CONFIGURATION FILES
 ##################################################################
-
-######### Policy PFW top level file #########
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := ParameterFrameworkConfigurationPolicy.xml.car
-LOCAL_MODULE_STEM := ParameterFrameworkConfigurationPolicy.xml
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE_CLASS := ETC
-LOCAL_VENDOR_MODULE := true
-LOCAL_MODULE_RELATIVE_PATH := parameter-framework
-LOCAL_SRC_FILES := ../$(LOCAL_MODULE_STEM).in
-
-AUDIO_PATTERN = @TUNING_ALLOWED@
-ifeq ($(TARGET_BUILD_VARIANT),user)
-AUDIO_VALUE = false
-else
-AUDIO_VALUE = true
-endif
-
-LOCAL_POST_INSTALL_CMD := $(hide) sed -i -e 's|$(AUDIO_PATTERN)|$(AUDIO_VALUE)|g' $(TARGET_OUT_VENDOR_ETC)/$(LOCAL_MODULE_RELATIVE_PATH)/$(LOCAL_MODULE_STEM)
-
-include $(BUILD_PREBUILT)
-
-########## Policy PFW Common Structures #########
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := PolicySubsystem-CommonTypes.xml
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE_CLASS := ETC
-LOCAL_VENDOR_MODULE := true
-LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Structure/Policy
-LOCAL_SRC_FILES := ../Structure/$(LOCAL_MODULE)
-include $(BUILD_PREBUILT)
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := PolicyClass.xml
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE_CLASS := ETC
-LOCAL_VENDOR_MODULE := true
-LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Structure/Policy
-LOCAL_SRC_FILES := ../Structure/$(LOCAL_MODULE)
-include $(BUILD_PREBUILT)
 
 ########## Policy PFW Structures #########
 
@@ -123,12 +81,12 @@ LOCAL_ADDITIONAL_DEPENDENCIES := \
 LOCAL_REQUIRED_MODULES := \
     PolicySubsystem.xml.car \
     PolicyClass.xml \
-    policy_criteria.xml \
-    policy_criterion_types.xml \
-    ParameterFrameworkConfigurationPolicy.xml.car
+    audio_policy_engine_criteria.xml \
+    audio_policy_engine_criterion_types.xml \
+    ParameterFrameworkConfigurationPolicy.xml
 
-PFW_CRITERION_TYPES_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criterion_types.xml
-PFW_CRITERIA_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criteria.xml
+PFW_CRITERION_TYPES_FILE := $(TARGET_OUT_VENDOR_ETC)/audio_policy_engine_criterion_types.xml
+PFW_CRITERIA_FILE := $(TARGET_OUT_VENDOR_ETC)/audio_policy_engine_criteria.xml
 
 PFW_TOPLEVEL_FILE := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/ParameterFrameworkConfigurationPolicy.xml
 
@@ -136,4 +94,4 @@ PFW_SCHEMAS_DIR := $(PFW_DEFAULT_SCHEMAS_DIR)
 
 include $(BUILD_PFW_SETTINGS)
 
-endif #ifeq ($(BUILD_AUDIO_POLICY_AUTOMOTIVE_CONFIGURATION), 1)
+endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), automotive_configurable)
