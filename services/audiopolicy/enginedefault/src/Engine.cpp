@@ -322,7 +322,7 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
             // a primary device
             // FIXME: this is not the right way of solving this problem
             audio_devices_t availPrimaryOutputDevices =
-                (primaryOutput->supportedDevices() | AUDIO_DEVICE_OUT_HEARING_AID) &
+                (primaryOutput->supportedDevices().types() | AUDIO_DEVICE_OUT_HEARING_AID) &
                 availableOutputDevices.types();
 
             if (((availableInputDevices.types() &
@@ -475,7 +475,7 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
             // compressed format as they would likely not be mixed and dropped.
             for (size_t i = 0; i < outputs.size(); i++) {
                 sp<AudioOutputDescriptor> desc = outputs.valueAt(i);
-                audio_devices_t devices = desc->device() &
+                audio_devices_t devices = desc->devices().types() &
                     (AUDIO_DEVICE_OUT_HDMI | AUDIO_DEVICE_OUT_SPDIF | AUDIO_DEVICE_OUT_HDMI_ARC);
                 if (desc->isActive() && !audio_is_linear_pcm(desc->mFormat) &&
                         devices != AUDIO_DEVICE_NONE) {

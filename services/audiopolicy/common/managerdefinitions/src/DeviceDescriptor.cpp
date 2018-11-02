@@ -335,6 +335,17 @@ DeviceVector DeviceVector::filter(const DeviceVector &devices) const
     return filteredDevices;
 }
 
+DeviceVector DeviceVector::filter(audio_devices_t deviceTypes) const
+{
+    DeviceVector filteredDevices;
+    for (const auto &device : *this) {
+        if ((device->type() & deviceTypes) == device->type()) {
+            filteredDevices.add(device);
+        }
+    }
+    return filteredDevices;
+}
+
 bool DeviceVector::containsAtLeastOne(const DeviceVector &devices) const
 {
     return !filter(devices).isEmpty();

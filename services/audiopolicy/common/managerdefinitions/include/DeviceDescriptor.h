@@ -125,6 +125,8 @@ public:
      */
     DeviceVector filter(const DeviceVector &devices) const;
 
+    DeviceVector filter(audio_devices_t deviceTypes) const;
+
     /**
      * @brief merge two vectors. As SortedVector Implementation is buggy (it does not check the size
      * of the destination vector, only of the source, it provides a safe implementation
@@ -162,6 +164,23 @@ public:
     bool operator!=(const DeviceVector &right) const
     {
         return !operator==(right);
+    }
+
+    /**
+     * @brief getFirstValidAddress
+     * @return the first valid address of a list of device, "" if no device with valid address
+     * found.
+     * This helper function helps maintaining compatibility with legacy where we used to have a
+     * devices mask and an address.
+     */
+    String8 getFirstValidAddress() const
+    {
+        for (const auto &device : *this) {
+            if (device->address() != "") {
+                return device->address();
+            }
+        }
+        return String8("");
     }
 
     std::string toString() const;

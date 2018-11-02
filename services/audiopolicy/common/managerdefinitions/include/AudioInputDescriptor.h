@@ -23,11 +23,12 @@
 #include "AudioIODescriptorInterface.h"
 #include "AudioPort.h"
 #include "ClientDescriptor.h"
+#include "DeviceDescriptor.h"
 #include "EffectDescriptor.h"
+#include "IOProfile.h"
 
 namespace android {
 
-class IOProfile;
 class AudioMix;
 class AudioPolicyClientInterface;
 
@@ -42,10 +43,16 @@ public:
     audio_port_handle_t getId() const;
     audio_module_handle_t getModuleHandle() const;
 
+    audio_devices_t getDeviceType() const { return (mDevice != nullptr) ?
+                    mDevice->type() : AUDIO_DEVICE_NONE; }
+    sp<DeviceDescriptor> getDevice() const { return mDevice; }
+    void setDevice(const sp<DeviceDescriptor> &device) { mDevice = device; }
+    DeviceVector supportedDevices() const  {
+        return mProfile != nullptr ? mProfile->getSupportedDevices() :  DeviceVector(); }
+
     void dump(String8 *dst) const override;
 
     audio_io_handle_t   mIoHandle = AUDIO_IO_HANDLE_NONE; // input handle
-    audio_devices_t     mDevice = AUDIO_DEVICE_NONE;  // current device this input is routed to
     AudioMix            *mPolicyMix = nullptr;        // non NULL when used by a dynamic policy
     const sp<IOProfile> mProfile;                     // I/O profile this output derives from
 
@@ -71,8 +78,7 @@ public:
     void setPatchHandle(audio_patch_handle_t handle) override;
 
     status_t open(const audio_config_t *config,
-                  audio_devices_t device,
-                  const String8& address,
+                  const sp<DeviceDescriptor> &device,
                   audio_source_t source,
                   audio_input_flags_t flags,
                   audio_io_handle_t *input);
@@ -99,6 +105,8 @@ public:
 
     audio_patch_handle_t mPatchHandle = AUDIO_PATCH_HANDLE_NONE;
     audio_port_handle_t  mId = AUDIO_PORT_HANDLE_NONE;
+    sp<DeviceDescriptor> mDevice = nullptr; /**< current device this input is routed to */
+
     // Because a preemptible capture session can preempt another one, we end up in an endless loop
     // situation were each session is allowed to restart after being preempted,
     // thus preempting the other one which restarts and so on.
@@ -120,8 +128,8 @@ public:
     sp<AudioInputDescriptor> getInputFromId(audio_port_handle_t id) const;
 
     // count active capture sessions using one of the specified devices.
-    // ignore devices if AUDIO_DEVICE_IN_DEFAULT is passed
-    uint32_t activeInputsCountOnDevices(audio_devices_t devices = AUDIO_DEVICE_IN_DEFAULT) const;
+    // ignore devices if empty vector is passed
+    uint32_t activeInputsCountOnDevices(const DeviceVector &devices) const;
 
     /**
      * return io handle of active input or 0 if no input is active
@@ -129,8 +137,6 @@ public:
      * ignoreVirtualInputs is true.
      */
     Vector<sp <AudioInputDescriptor> > getActiveInputs();
-
-    audio_devices_t getSupportedDevices(audio_io_handle_t handle) const;
 
     sp<AudioInputDescriptor> getInputForClient(audio_port_handle_t portId);
 

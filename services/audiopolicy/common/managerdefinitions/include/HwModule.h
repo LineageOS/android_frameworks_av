@@ -113,7 +113,12 @@ class HwModuleCollection : public Vector<sp<HwModule> >
 public:
     sp<HwModule> getModuleFromName(const char *name) const;
 
-    sp<HwModule> getModuleForDevice(audio_devices_t device) const;
+    sp<HwModule> getModuleForDeviceTypes(audio_devices_t device) const;
+
+    sp<HwModule> getModuleForDevice(const sp<DeviceDescriptor> &device) const;
+
+    DeviceVector getAvailableDevicesFromModuleName(const char *name,
+                                                   const DeviceVector &availableDevices) const;
 
     sp<DeviceDescriptor> getDeviceDescriptor(const audio_devices_t device,
                                              const char *device_address,

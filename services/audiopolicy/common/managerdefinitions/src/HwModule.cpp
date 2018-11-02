@@ -260,18 +260,42 @@ sp <HwModule> HwModuleCollection::getModuleFromName(const char *name) const
     return nullptr;
 }
 
-sp <HwModule> HwModuleCollection::getModuleForDevice(audio_devices_t device) const
+sp <HwModule> HwModuleCollection::getModuleForDeviceTypes(audio_devices_t device) const
 {
     for (const auto& module : *this) {
         const auto& profiles = audio_is_output_device(device) ?
                 module->getOutputProfiles() : module->getInputProfiles();
         for (const auto& profile : profiles) {
-            if (profile->supportDevice(device)) {
+            if (profile->supportsDeviceTypes(device)) {
                 return module;
             }
         }
     }
     return nullptr;
+}
+
+sp <HwModule> HwModuleCollection::getModuleForDevice(const sp<DeviceDescriptor> &device) const
+{
+    for (const auto& module : *this) {
+        const auto& profiles = audio_is_output_device(device->type()) ?
+                module->getOutputProfiles() : module->getInputProfiles();
+        for (const auto& profile : profiles) {
+            if (profile->supportsDevice(device)) {
+                return module;
+            }
+        }
+    }
+    return nullptr;
+}
+
+DeviceVector HwModuleCollection::getAvailableDevicesFromModuleName(
+        const char *name, const DeviceVector &availableDevices) const
+{
+    sp<HwModule> module = getModuleFromName(name);
+    if (module == nullptr) {
+        return DeviceVector();
+    }
+    return availableDevices.getDevicesFromHwModule(module->getHandle());
 }
 
 sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices_t device,
