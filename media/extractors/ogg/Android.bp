@@ -7,6 +7,10 @@ cc_library_shared {
         "external/tremolo",
     ],
 
+    header_libs: [
+        "libaudio_system_headers",
+    ],
+
     shared_libs: [
         "liblog",
         "libmediaextractor",

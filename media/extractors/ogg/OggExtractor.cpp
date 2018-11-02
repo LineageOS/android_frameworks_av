@@ -34,6 +34,7 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaDataBase.h>
 #include <media/stagefright/MetaDataUtils.h>
+#include <system/audio.h>
 #include <utils/String8.h>
 
 extern "C" {
@@ -133,6 +134,8 @@ protected:
 
     Vector<TOCEntry> mTableOfContents;
 
+    int32_t mHapticChannelCount;
+
     ssize_t readPage(off64_t offset, Page *page);
     status_t findNextPage(off64_t startOffset, off64_t *pageOffset);
 
@@ -162,6 +165,8 @@ protected:
     status_t findPrevGranulePosition(off64_t pageOffset, uint64_t *granulePos);
 
     void buildTableOfContents();
+
+    void setChannelMask(int channelCount);
 
     MyOggExtractor(const MyOggExtractor &);
     MyOggExtractor &operator=(const MyOggExtractor &);
@@ -310,7 +315,8 @@ MyOggExtractor::MyOggExtractor(
       mMimeType(mimeType),
       mNumHeaders(numHeaders),
       mSeekPreRollUs(seekPreRollUs),
-      mFirstDataOffset(-1) {
+      mFirstDataOffset(-1),
+      mHapticChannelCount(0) {
     mCurrentPage.mNumSegments = 0;
 
     vorbis_info_init(&mVi);
@@ -1083,6 +1089,7 @@ media_status_t MyOpusExtractor::verifyOpusComments(MediaBufferBase *buffer) {
     }
 
     parseFileMetaData();
+    setChannelMask(mChannelCount);
     return AMEDIA_OK;
 }
 
@@ -1157,6 +1164,7 @@ media_status_t MyVorbisExtractor::verifyHeader(
             }
 
             parseFileMetaData();
+            setChannelMask(mVi.channels);
             break;
         }
 
@@ -1191,6 +1199,29 @@ void MyOggExtractor::parseFileMetaData() {
         size_t commentLength = mVc.comment_lengths[i];
         parseVorbisComment(mFileMeta, comment, commentLength);
         //ALOGI("comment #%d: '%s'", i + 1, mVc.user_comments[i]);
+    }
+
+    AMediaFormat_getInt32(mFileMeta, "haptic", &mHapticChannelCount);
+}
+
+void MyOggExtractor::setChannelMask(int channelCount) {
+    // Set channel mask according to channel count. When haptic channel count is found in
+    // file meta, set haptic channel mask to try haptic playback.
+    if (mHapticChannelCount > 0) {
+        const audio_channel_mask_t hapticChannelMask =
+                haptic_channel_mask_from_count(mHapticChannelCount);
+        const int32_t audioChannelCount = channelCount - mHapticChannelCount;
+        if (hapticChannelMask == AUDIO_CHANNEL_INVALID
+                || audioChannelCount <= 0 || audioChannelCount > FCC_8) {
+            ALOGE("Invalid haptic channel count found in metadata: %d", mHapticChannelCount);
+        } else {
+            const audio_channel_mask_t channelMask = audio_channel_out_mask_from_count(
+                    audioChannelCount) | hapticChannelMask;
+            AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_MASK, channelMask);
+        }
+    } else {
+        AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_MASK,
+                audio_channel_out_mask_from_count(channelCount));
     }
 }
 
