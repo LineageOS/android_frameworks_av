@@ -1315,6 +1315,13 @@ status_t AudioSystem::setA11yServicesUids(const std::vector<uid_t>& uids)
     return aps->setA11yServicesUids(uids);
 }
 
+bool AudioSystem::isHapticPlaybackSupported()
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return false;
+    return aps->isHapticPlaybackSupported();
+}
+
 
 // ---------------------------------------------------------------------------
 

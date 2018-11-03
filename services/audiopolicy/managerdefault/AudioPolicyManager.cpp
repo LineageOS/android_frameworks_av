@@ -3736,6 +3736,23 @@ void AudioPolicyManager::setAppState(uid_t uid, app_state_t state)
     }
 }
 
+bool AudioPolicyManager::isHapticPlaybackSupported()
+{
+    for (const auto& hwModule : mHwModules) {
+        const OutputProfileCollection &outputProfiles = hwModule->getOutputProfiles();
+        for (const auto &outProfile : outputProfiles) {
+            struct audio_port audioPort;
+            outProfile->toAudioPort(&audioPort);
+            for (size_t i = 0; i < audioPort.num_channel_masks; i++) {
+                if (audioPort.channel_masks[i] & AUDIO_CHANNEL_HAPTIC_ALL) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 status_t AudioPolicyManager::disconnectAudioSource(const sp<SourceClientDescriptor>& sourceDesc)
 {
     ALOGV("%s port Id %d", __FUNCTION__, sourceDesc->portId());

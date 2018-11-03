@@ -244,6 +244,8 @@ public:
 
         virtual void setAppState(uid_t uid, app_state_t state);
 
+        virtual bool isHapticPlaybackSupported();
+
 protected:
         // A constructor that allows more fine-grained control over initialization process,
         // used in automatic tests.

@@ -88,6 +88,7 @@ enum {
     REMOVE_SOURCE_DEFAULT_EFFECT,
     SET_ASSISTANT_UID,
     SET_A11Y_SERVICES_UIDS,
+    IS_HAPTIC_PLAYBACK_SUPPORTED,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -970,6 +971,17 @@ public:
         return static_cast <status_t> (reply.readInt32());
     }
 
+    virtual bool isHapticPlaybackSupported()
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        status_t status = remote()->transact(IS_HAPTIC_PLAYBACK_SUPPORTED, data, &reply);
+        if (status != NO_ERROR) {
+            return false;
+        }
+        return reply.readBool();
+    }
+
 };
 
 IMPLEMENT_META_INTERFACE(AudioPolicyService, "android.media.IAudioPolicyService");
@@ -1774,6 +1786,13 @@ status_t BnAudioPolicyService::onTransact(
             }
             status = setA11yServicesUids(uids);
             reply->writeInt32(static_cast <int32_t>(status));
+            return NO_ERROR;
+        }
+
+        case IS_HAPTIC_PLAYBACK_SUPPORTED: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            bool isSupported = isHapticPlaybackSupported();
+            reply->writeBool(isSupported);
             return NO_ERROR;
         }
 

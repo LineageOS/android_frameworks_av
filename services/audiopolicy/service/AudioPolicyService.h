@@ -217,6 +217,8 @@ public:
     virtual status_t setAssistantUid(uid_t uid);
     virtual status_t setA11yServicesUids(const std::vector<uid_t>& uids);
 
+    virtual bool     isHapticPlaybackSupported();
+
             status_t doStopOutput(audio_port_handle_t portId);
             void doReleaseOutput(audio_port_handle_t portId);
 
