@@ -1,5 +1,5 @@
-cc_library_static {
-    name: "libstagefright_rtsp",
+cc_defaults {
+    name: "libstagefright_rtsp_defaults",
 
     srcs: [
         "AAMRAssembler.cpp",
@@ -50,6 +50,21 @@ cc_library_static {
             cfi: true,
         },
     },
+}
+
+cc_library_static {
+    name: "libstagefright_rtsp",
+
+    srcs: ["NetworkUtils.cpp"],
+    header_libs: ["libnetd_client_headers"],
+    defaults: ["libstagefright_rtsp_defaults"],
+}
+
+cc_library_static {
+    name: "libstagefright_rtsp_player2",
+
+    srcs: ["NetworkUtilsForAppProc.cpp"],
+    defaults: ["libstagefright_rtsp_defaults"],
 }
 
 //###############################################################################

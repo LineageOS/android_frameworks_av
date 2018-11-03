@@ -31,6 +31,7 @@
 #include "ARTPConnection.h"
 #include "ARTSPConnection.h"
 #include "ASessionDescription.h"
+#include "NetworkUtils.h"
 
 #include <ctype.h>
 #include <cutils/properties.h>
@@ -757,10 +758,10 @@ struct MyHandler : public AHandler {
                         if (!track->mUsingInterleavedTCP) {
                             // Clear the tag
                             if (mUIDValid) {
-                                HTTPBase::UnRegisterSocketUserTag(track->mRTPSocket);
-                                HTTPBase::UnRegisterSocketUserMark(track->mRTPSocket);
-                                HTTPBase::UnRegisterSocketUserTag(track->mRTCPSocket);
-                                HTTPBase::UnRegisterSocketUserMark(track->mRTCPSocket);
+                                NetworkUtils::UnRegisterSocketUserTag(track->mRTPSocket);
+                                NetworkUtils::UnRegisterSocketUserMark(track->mRTPSocket);
+                                NetworkUtils::UnRegisterSocketUserTag(track->mRTCPSocket);
+                                NetworkUtils::UnRegisterSocketUserMark(track->mRTCPSocket);
                             }
 
                             close(track->mRTPSocket);
@@ -886,10 +887,10 @@ struct MyHandler : public AHandler {
 
                         // Clear the tag
                         if (mUIDValid) {
-                            HTTPBase::UnRegisterSocketUserTag(info->mRTPSocket);
-                            HTTPBase::UnRegisterSocketUserMark(info->mRTPSocket);
-                            HTTPBase::UnRegisterSocketUserTag(info->mRTCPSocket);
-                            HTTPBase::UnRegisterSocketUserMark(info->mRTCPSocket);
+                            NetworkUtils::UnRegisterSocketUserTag(info->mRTPSocket);
+                            NetworkUtils::UnRegisterSocketUserMark(info->mRTPSocket);
+                            NetworkUtils::UnRegisterSocketUserTag(info->mRTCPSocket);
+                            NetworkUtils::UnRegisterSocketUserMark(info->mRTCPSocket);
                         }
 
                         close(info->mRTPSocket);
@@ -1665,12 +1666,12 @@ private:
                     &info->mRTPSocket, &info->mRTCPSocket, &rtpPort);
 
             if (mUIDValid) {
-                HTTPBase::RegisterSocketUserTag(info->mRTPSocket, mUID,
-                                                (uint32_t)*(uint32_t*) "RTP_");
-                HTTPBase::RegisterSocketUserTag(info->mRTCPSocket, mUID,
-                                                (uint32_t)*(uint32_t*) "RTP_");
-                HTTPBase::RegisterSocketUserMark(info->mRTPSocket, mUID);
-                HTTPBase::RegisterSocketUserMark(info->mRTCPSocket, mUID);
+                NetworkUtils::RegisterSocketUserTag(info->mRTPSocket, mUID,
+                        (uint32_t)*(uint32_t*) "RTP_");
+                NetworkUtils::RegisterSocketUserTag(info->mRTCPSocket, mUID,
+                        (uint32_t)*(uint32_t*) "RTP_");
+                NetworkUtils::RegisterSocketUserMark(info->mRTPSocket, mUID);
+                NetworkUtils::RegisterSocketUserMark(info->mRTCPSocket, mUID);
             }
 
             request.append("Transport: RTP/AVP/UDP;unicast;client_port=");

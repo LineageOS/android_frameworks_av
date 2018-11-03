@@ -114,30 +114,4 @@ void HTTPBase::setBandwidthHistorySize(size_t numHistoryItems) {
     mMaxBandwidthHistoryItems = numHistoryItems;
 }
 
-// static
-void HTTPBase::RegisterSocketUserTag(int sockfd, uid_t uid, uint32_t kTag) {
-    int res = qtaguid_tagSocket(sockfd, kTag, uid);
-    if (res != 0) {
-        ALOGE("Failed tagging socket %d for uid %d (My UID=%d)", sockfd, uid, geteuid());
-    }
-}
-
-// static
-void HTTPBase::UnRegisterSocketUserTag(int sockfd) {
-    int res = qtaguid_untagSocket(sockfd);
-    if (res != 0) {
-        ALOGE("Failed untagging socket %d (My UID=%d)", sockfd, geteuid());
-    }
-}
-
-// static
-void HTTPBase::RegisterSocketUserMark(int sockfd, uid_t uid) {
-    setNetworkForUser(uid, sockfd);
-}
-
-// static
-void HTTPBase::UnRegisterSocketUserMark(int sockfd) {
-    RegisterSocketUserMark(sockfd, geteuid());
-}
-
 }  // namespace android
