@@ -309,8 +309,8 @@ void AudioFlinger::EffectModule::process()
     // input and output effect buffers without an intermediary effect process.
     // TODO: consider implementing channel conversion.
     const size_t safeInputOutputSampleCount =
-            inChannelCount != outChannelCount ? 0
-                    : outChannelCount * std::min(
+            mInChannelCountRequested != mOutChannelCountRequested ? 0
+                    : mOutChannelCountRequested * std::min(
                             mConfig.inputCfg.buffer.frameCount,
                             mConfig.outputCfg.buffer.frameCount);
     const auto accumulateInputToOutput = [this, safeInputOutputSampleCount]() {
@@ -480,7 +480,12 @@ void AudioFlinger::EffectModule::process()
         // accumulate input onto output
         sp<EffectChain> chain = mChain.promote();
         if (chain.get() != nullptr && chain->activeTrackCnt() != 0) {
-            accumulateInputToOutput();
+            // similar handling with data_bypass above.
+            if (mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
+                accumulateInputToOutput();
+            } else { // EFFECT_BUFFER_ACCESS_WRITE
+                copyInputToOutput();
+            }
         }
     }
 }

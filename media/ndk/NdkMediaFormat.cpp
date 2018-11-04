@@ -276,6 +276,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_AUDIO_SESSION_ID = "audio-session-id";
 EXPORT const char* AMEDIAFORMAT_KEY_AUTHOR = "author";
 EXPORT const char* AMEDIAFORMAT_KEY_BITRATE_MODE = "bitrate-mode";
 EXPORT const char* AMEDIAFORMAT_KEY_BIT_RATE = "bitrate";
+EXPORT const char* AMEDIAFORMAT_KEY_BITS_PER_SAMPLE = "bits-per-sample";
 EXPORT const char* AMEDIAFORMAT_KEY_CAPTURE_RATE = "capture-rate";
 EXPORT const char* AMEDIAFORMAT_KEY_CDTRACKNUMBER = "cdtracknum";
 EXPORT const char* AMEDIAFORMAT_KEY_CHANNEL_COUNT = "channel-count";
@@ -287,10 +288,13 @@ EXPORT const char* AMEDIAFORMAT_KEY_COLOR_TRANSFER = "color-transfer";
 EXPORT const char* AMEDIAFORMAT_KEY_COMPILATION = "compilation";
 EXPORT const char* AMEDIAFORMAT_KEY_COMPLEXITY = "complexity";
 EXPORT const char* AMEDIAFORMAT_KEY_COMPOSER = "composer";
+EXPORT const char* AMEDIAFORMAT_KEY_CRYPTO_KEY = "crypto-key";
 EXPORT const char* AMEDIAFORMAT_KEY_CSD = "csd";
 EXPORT const char* AMEDIAFORMAT_KEY_CSD_0 = "csd-0";
 EXPORT const char* AMEDIAFORMAT_KEY_CSD_1 = "csd-1";
 EXPORT const char* AMEDIAFORMAT_KEY_CSD_2 = "csd-2";
+EXPORT const char* AMEDIAFORMAT_KEY_CSD_AVC = "csd-avc";
+EXPORT const char* AMEDIAFORMAT_KEY_CSD_HEVC = "csd-hevc";
 EXPORT const char* AMEDIAFORMAT_KEY_DATE = "date";
 EXPORT const char* AMEDIAFORMAT_KEY_DISCNUMBER = "discnum";
 EXPORT const char* AMEDIAFORMAT_KEY_DISPLAY_CROP = "crop";
@@ -330,11 +334,14 @@ EXPORT const char* AMEDIAFORMAT_KEY_PUSH_BLANK_BUFFERS_ON_STOP = "push-blank-buf
 EXPORT const char* AMEDIAFORMAT_KEY_REPEAT_PREVIOUS_FRAME_AFTER = "repeat-previous-frame-after";
 EXPORT const char* AMEDIAFORMAT_KEY_ROTATION = "rotation-degrees";
 EXPORT const char* AMEDIAFORMAT_KEY_SAMPLE_RATE = "sample-rate";
+EXPORT const char* AMEDIAFORMAT_KEY_SAR_HEIGHT = "sar-height";
+EXPORT const char* AMEDIAFORMAT_KEY_SAR_WIDTH = "sar-width";
 EXPORT const char* AMEDIAFORMAT_KEY_SEI = "sei";
 EXPORT const char* AMEDIAFORMAT_KEY_SLICE_HEIGHT = "slice-height";
 EXPORT const char* AMEDIAFORMAT_KEY_STRIDE = "stride";
 EXPORT const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYER_ID = "temporal-layer-id";
 EXPORT const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYERING = "ts-schema";
+EXPORT const char* AMEDIAFORMAT_KEY_THUMBNAIL_TIME = "thumbnail-time";
 EXPORT const char* AMEDIAFORMAT_KEY_TILE_HEIGHT = "tile-height";
 EXPORT const char* AMEDIAFORMAT_KEY_TILE_WIDTH = "tile-width";
 EXPORT const char* AMEDIAFORMAT_KEY_TIME_US = "timeUs";
@@ -343,7 +350,6 @@ EXPORT const char* AMEDIAFORMAT_KEY_TRACK_ID = "track-id";
 EXPORT const char* AMEDIAFORMAT_KEY_TRACK_INDEX = "track-index";
 EXPORT const char* AMEDIAFORMAT_KEY_WIDTH = "width";
 EXPORT const char* AMEDIAFORMAT_KEY_YEAR = "year";
-
 
 } // extern "C"
 

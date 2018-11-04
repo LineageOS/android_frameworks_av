@@ -622,6 +622,8 @@ status_t FLACParser::init()
             AMediaFormat_setInt32(mTrackMetadata,
                     AMEDIAFORMAT_KEY_SAMPLE_RATE, getSampleRate());
             AMediaFormat_setInt32(mTrackMetadata,
+                    AMEDIAFORMAT_KEY_BITS_PER_SAMPLE, getBitsPerSample());
+            AMediaFormat_setInt32(mTrackMetadata,
                     AMEDIAFORMAT_KEY_PCM_ENCODING, kAudioEncodingPcm16bit);
             // sample rate is non-zero, so division by zero not possible
             AMediaFormat_setInt64(mTrackMetadata,

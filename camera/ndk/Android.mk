@@ -41,6 +41,8 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 LOCAL_CFLAGS += -fvisibility=hidden -D EXPORT='__attribute__ ((visibility ("default")))'
 LOCAL_CFLAGS += -Wall -Wextra -Werror
 
+LOCAL_LDFLAGS += -Wl,--version-script=$(LOCAL_PATH)/libcamera2ndk.map.txt
+
 LOCAL_SHARED_LIBRARIES := \
     libbinder \
     liblog \
