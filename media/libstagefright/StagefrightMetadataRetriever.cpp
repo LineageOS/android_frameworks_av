@@ -545,6 +545,19 @@ void StagefrightMetadataRetriever::parseMetaData() {
                 if (!trackMeta->findInt32(kKeyBitRate, &audioBitrate)) {
                     audioBitrate = -1;
                 }
+
+                int32_t bitsPerSample = -1;
+                int32_t sampleRate = -1;
+                trackMeta->findInt32(kKeyBitsPerSample, &bitsPerSample);
+                trackMeta->findInt32(kKeySampleRate, &sampleRate);
+                if (bitsPerSample >= 0) {
+                    sprintf(tmp, "%d", bitsPerSample);
+                    mMetaData.add(METADATA_KEY_BITS_PER_SAMPLE, String8(tmp));
+                }
+                if (sampleRate >= 0) {
+                    sprintf(tmp, "%d", sampleRate);
+                    mMetaData.add(METADATA_KEY_SAMPLERATE, String8(tmp));
+                }
             } else if (!hasVideo && !strncasecmp("video/", mime, 6)) {
                 hasVideo = true;
 
