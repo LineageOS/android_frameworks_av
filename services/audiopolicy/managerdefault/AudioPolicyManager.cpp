@@ -486,6 +486,7 @@ status_t AudioPolicyManager::getHwOffloadEncodingFormatsSupportedForA2DP(
 uint32_t AudioPolicyManager::updateCallRouting(const DeviceVector &rxDevices, uint32_t delayMs)
 {
     bool createTxPatch = false;
+    bool createRxPatch = false;
     uint32_t muteWaitMs = 0;
 
     if(!hasPrimaryOutput() || mPrimaryOutput->devices().types() == AUDIO_DEVICE_OUT_STUB) {
@@ -494,9 +495,10 @@ uint32_t AudioPolicyManager::updateCallRouting(const DeviceVector &rxDevices, ui
     ALOG_ASSERT(!rxDevices.isEmpty(), "updateCallRouting() no selected output device");
 
     audio_attributes_t attr = { .source = AUDIO_SOURCE_VOICE_COMMUNICATION };
-    auto txDevice = getDeviceAndMixForAttributes(attr);
+    auto txSourceDevice = getDeviceAndMixForAttributes(attr);
+    ALOG_ASSERT(txSourceDevice != 0, "updateCallRouting() input selected device not available");
     ALOGV("updateCallRouting device rxDevice %s txDevice %s", 
-          rxDevices.toString().c_str(), txDevice->toString().c_str());
+          rxDevices.itemAt(0)->toString().c_str(), txSourceDevice->toString().c_str());
 
     // release existing RX patch if any
     if (mCallRxPatch != 0) {
@@ -509,22 +511,54 @@ uint32_t AudioPolicyManager::updateCallRouting(const DeviceVector &rxDevices, ui
         mCallTxPatch.clear();
     }
 
-    // If the RX device is on the primary HW module, then use legacy routing method for voice calls
-    // via setOutputDevice() on primary output.
-    // Otherwise, create two audio patches for TX and RX path.
-    if (availablePrimaryOutputDevices().contains(rxDevices.itemAt(0))) {
-        muteWaitMs = setOutputDevices(mPrimaryOutput, rxDevices, true, delayMs);
+    auto telephonyRxModule =
+        mHwModules.getModuleForDeviceTypes(AUDIO_DEVICE_IN_TELEPHONY_RX, AUDIO_FORMAT_DEFAULT);
+    auto telephonyTxModule =
+        mHwModules.getModuleForDeviceTypes(AUDIO_DEVICE_OUT_TELEPHONY_TX, AUDIO_FORMAT_DEFAULT);
+    // retrieve Rx Source and Tx Sink device descriptors
+    sp<DeviceDescriptor> rxSourceDevice =
+        mAvailableInputDevices.getDevice(AUDIO_DEVICE_IN_TELEPHONY_RX,
+                                         String8(),
+                                         AUDIO_FORMAT_DEFAULT);
+    sp<DeviceDescriptor> txSinkDevice =
+        mAvailableOutputDevices.getDevice(AUDIO_DEVICE_OUT_TELEPHONY_TX,
+                                          String8(),
+                                          AUDIO_FORMAT_DEFAULT);
+
+    // RX and TX Telephony device are declared by Primary Audio HAL
+    if (isPrimaryModule(telephonyRxModule) && isPrimaryModule(telephonyTxModule) &&
+            (telephonyRxModule->getHalVersionMajor() >= 3)) {
+        if (rxSourceDevice == 0 || txSinkDevice == 0) {
+            // RX / TX Telephony device(s) is(are) not currently available
+            ALOGE("updateCallRouting() no telephony Tx and/or RX device");
+            return muteWaitMs;
+        }
+        // do not create a patch (aka Sw Bridging) if Primary HW module has declared supporting a
+        // route between telephony RX to Sink device and Source device to telephony TX
+        const auto &primaryModule = telephonyRxModule;
+        createRxPatch = !primaryModule->supportsPatch(rxSourceDevice, rxDevices.itemAt(0));
+        createTxPatch = !primaryModule->supportsPatch(txSourceDevice, txSinkDevice);
+    } else {
+        // If the RX device is on the primary HW module, then use legacy routing method for
+        // voice calls via setOutputDevice() on primary output.
+        // Otherwise, create two audio patches for TX and RX path.
+        createRxPatch = !(availablePrimaryOutputDevices().contains(rxDevices.itemAt(0))) &&
+                (rxSourceDevice != 0);
         // If the TX device is also on the primary HW module, setOutputDevice() will take care
         // of it due to legacy implementation. If not, create a patch.
-        if (!availablePrimaryModuleInputDevices().contains(txDevice)) {
-            createTxPatch = true;
-        }
+        createTxPatch = !(availablePrimaryModuleInputDevices().contains(txSourceDevice)) &&
+                (txSinkDevice != 0);
+    }
+    // Use legacy routing method for voice calls via setOutputDevice() on primary output.
+    // Otherwise, create two audio patches for TX and RX path.
+    if (!createRxPatch) {
+        muteWaitMs = setOutputDevices(mPrimaryOutput, rxDevices, true, delayMs);
     } else { // create RX path audio patch
         mCallRxPatch = createTelephonyPatch(true /*isRx*/, rxDevices.itemAt(0), delayMs);
-        createTxPatch = true;
+        ALOG_ASSERT(createTxPatch, "No Tx Patch will be created, nor legacy routing done");
     }
     if (createTxPatch) { // create TX path audio patch
-        mCallTxPatch = createTelephonyPatch(false /*isRx*/, txDevice, delayMs);
+        mCallTxPatch = createTelephonyPatch(false /*isRx*/, txSourceDevice, delayMs);
     }
 
     return muteWaitMs;
