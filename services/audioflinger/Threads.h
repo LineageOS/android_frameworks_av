@@ -1082,6 +1082,8 @@ private:
     static const size_t     kFastMixerLogSize = 8 * 1024;
     sp<NBLog::Writer>       mFastMixerNBLogWriter;
 
+    // Downstream patch latency, available if mDownstreamLatencyStatMs.getN() > 0.
+    audio_utils::Statistics<double> mDownstreamLatencyStatMs{0.999};
 
 public:
     virtual     bool        hasFastMixer() const = 0;
