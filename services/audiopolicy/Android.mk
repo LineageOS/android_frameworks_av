@@ -53,7 +53,7 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libutils \
     liblog \
-    libaudioclient \
+    libaudiopolicy \
     libsoundtrigger
 
 ifeq ($(USE_CONFIGURABLE_AUDIO_POLICY), 1)

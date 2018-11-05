@@ -40,6 +40,15 @@ void ProductStrategy::addAttributes(const AudioAttributes &audioAttributes)
     mAttributesVector.push_back(audioAttributes);
 }
 
+std::vector<android::AudioAttributes> ProductStrategy::listAudioAttributes() const
+{
+    std::vector<android::AudioAttributes> androidAa;
+    for (const auto &attr : mAttributesVector) {
+        androidAa.push_back({attr.mGroupId, attr.mStream, attr.mAttributes});
+    }
+    return androidAa;
+}
+
 AttributesVector ProductStrategy::getAudioAttributes() const
 {
     AttributesVector attrVector;
@@ -52,42 +61,19 @@ AttributesVector ProductStrategy::getAudioAttributes() const
     return { AUDIO_ATTRIBUTES_INITIALIZER };
 }
 
-// @todo: all flags required to match?
-//        all tags required to match?
-/* static */
-bool ProductStrategy::attributesMatches(const audio_attributes_t refAttributes,
-                                        const audio_attributes_t clientAttritubes)
-{
-    if (refAttributes == defaultAttr) {
-        // The default product strategy is the strategy that holds default attributes by convention.
-        // All attributes that fail to match will follow the default strategy for routing.
-        // Choosing the default must be done as a fallback, the attributes match shall not
-        // selects the default.
-        return false;
-    }
-    return ((refAttributes.usage == AUDIO_USAGE_UNKNOWN) ||
-            (clientAttritubes.usage == refAttributes.usage)) &&
-            ((refAttributes.content_type == AUDIO_CONTENT_TYPE_UNKNOWN) ||
-             (clientAttritubes.content_type == refAttributes.content_type)) &&
-            ((refAttributes.flags == AUDIO_OUTPUT_FLAG_NONE) ||
-             (clientAttritubes.flags != AUDIO_OUTPUT_FLAG_NONE &&
-            (clientAttritubes.flags & refAttributes.flags) == clientAttritubes.flags)) &&
-            ((strlen(refAttributes.tags) == 0) ||
-             (std::strcmp(clientAttritubes.tags, refAttributes.tags) == 0));
-}
-
 bool ProductStrategy::matches(const audio_attributes_t attr) const
 {
     return std::find_if(begin(mAttributesVector), end(mAttributesVector),
                         [&attr](const auto &supportedAttr) {
-        return attributesMatches(supportedAttr.mAttributes, attr); }) != end(mAttributesVector);
+        return AudioProductStrategy::attributesMatches(supportedAttr.mAttributes, attr);
+    }) != end(mAttributesVector);
 }
 
 audio_stream_type_t ProductStrategy::getStreamTypeForAttributes(const audio_attributes_t &attr) const
 {
     const auto iter = std::find_if(begin(mAttributesVector), end(mAttributesVector),
                                    [&attr](const auto &supportedAttr) {
-        return attributesMatches(supportedAttr.mAttributes, attr); });
+        return AudioProductStrategy::attributesMatches(supportedAttr.mAttributes, attr); });
     return iter != end(mAttributesVector) ? iter->mStream : AUDIO_STREAM_DEFAULT;
 }
 

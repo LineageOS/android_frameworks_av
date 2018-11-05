@@ -49,6 +49,8 @@ public:
 
     void addAttributes(const AudioAttributes &audioAttributes);
 
+    std::vector<android::AudioAttributes> listAudioAttributes() const;
+
     std::string getName() const { return mName; }
     AttributesVector getAudioAttributes() const;
     product_strategy_t getId() const { return mId; }
@@ -87,20 +89,6 @@ public:
 
     void dump(String8 *dst, int spaces = 0) const;
 
-    /**
-     * @brief attributesMatches: checks if client attributes matches with a reference attributes
-     * "matching" means the usage shall match if reference attributes has a defined usage, AND
-     * content type shall match if reference attributes has a defined content type AND
-     * flags shall match if reference attributes has defined flags AND
-     * tags shall match if reference attributes has defined tags.
-     * Reference attributes "default" shall not be considered as a "true" case. This convention
-     * is used to identify the default strategy.
-     * @param refAttributes to be considered
-     * @param clientAttritubes to be considered
-     * @return true if matching, false otherwise
-     */
-    static bool attributesMatches(const audio_attributes_t refAttributes,
-                                  const audio_attributes_t clientAttritubes);
 private:
     std::string mName;
 

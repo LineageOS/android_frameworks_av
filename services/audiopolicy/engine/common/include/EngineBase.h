@@ -65,6 +65,8 @@ public:
 
     StrategyVector getOrderedProductStrategies() const override;
 
+    status_t listAudioProductStrategies(AudioProductStrategyVector &strategies) const override;
+
     void dump(String8 *dst) const override;
 
 

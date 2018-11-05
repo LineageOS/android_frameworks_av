@@ -18,7 +18,7 @@
 
 #include <AudioPolicyManagerObserver.h>
 #include <RoutingStrategy.h>
-#include <media/AudioCommonTypes.h>
+#include <media/AudioProductStrategy.h>
 #include <policy.h>
 #include <Volume.h>
 #include <HwModule.h>
@@ -269,6 +269,16 @@ public:
      * needs to update the cache upon this function call.
      */
     virtual void updateDeviceSelectionCache() = 0;
+
+    /**
+     * @brief listAudioProductStrategies. Introspection API to retrieve a collection of
+     * AudioProductStrategyVector that allows to build AudioAttributes according to a
+     * product_strategy which is just an index. It has also a human readable name to help the
+     * Car/Oem/AudioManager identiying the use case.
+     * @param strategies collection.
+     * @return OK if the list has been retrieved, error code otherwise
+     */
+    virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies) const = 0;
 
     virtual void dump(String8 *dst) const = 0;
 

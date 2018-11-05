@@ -163,9 +163,3 @@ static inline bool audio_formats_match(audio_format_t format1,
     }
     return format1 == format2;
 }
-
-constexpr bool operator==(const audio_attributes_t &lhs, const audio_attributes_t &rhs)
-{
-    return lhs.usage == rhs.usage && lhs.content_type == rhs.content_type &&
-            lhs.flags == rhs.flags && (std::strcmp(lhs.tags, rhs.tags) == 0);
-}

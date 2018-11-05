@@ -80,7 +80,6 @@ private:
 
     void updateDeviceSelectionCache() override;
 
-
 private:
     /* Copy facilities are put private to disable copy. */
     Engine(const Engine &object);

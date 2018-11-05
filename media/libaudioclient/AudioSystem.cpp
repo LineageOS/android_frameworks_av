@@ -25,6 +25,7 @@
 #include <media/AudioSystem.h>
 #include <media/IAudioFlinger.h>
 #include <media/IAudioPolicyService.h>
+#include <media/TypeConverter.h>
 #include <math.h>
 
 #include <system/audio.h>
@@ -970,7 +971,7 @@ status_t AudioSystem::getStreamVolumeIndex(audio_stream_type_t stream,
 uint32_t AudioSystem::getStrategyForStream(audio_stream_type_t stream)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
-    if (aps == 0) return 0;
+    if (aps == 0) return PRODUCT_STRATEGY_NONE;
     return aps->getStrategyForStream(stream);
 }
 
@@ -1327,7 +1328,6 @@ status_t AudioSystem::setSurroundFormatEnabled(audio_format_t audioFormat, bool 
     return aps->setSurroundFormatEnabled(audioFormat, enabled);
 }
 
-
 status_t AudioSystem::setAssistantUid(uid_t uid)
 {
     const sp <IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
@@ -1352,11 +1352,62 @@ bool AudioSystem::isHapticPlaybackSupported()
 }
 
 status_t AudioSystem::getHwOffloadEncodingFormatsSupportedForA2DP(
-                                std::vector<audio_format_t> *formats)
+                                std::vector<audio_format_t> *formats) {
+    const sp <IAudioPolicyService>
+        & aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->getHwOffloadEncodingFormatsSupportedForA2DP(formats);
+}
+
+status_t AudioSystem::listAudioProductStrategies(AudioProductStrategyVector &strategies)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
-    return aps->getHwOffloadEncodingFormatsSupportedForA2DP(formats);
+    return aps->listAudioProductStrategies(strategies);
+}
+
+audio_attributes_t AudioSystem::streamTypeToAttributes(audio_stream_type_t stream)
+{
+    AudioProductStrategyVector strategies;
+    listAudioProductStrategies(strategies);
+    for (const auto &strategy : strategies) {
+        auto attrVect = strategy.getAudioAttributes();
+        auto iter = std::find_if(begin(attrVect), end(attrVect), [&stream](const auto &attributes) {
+                         return attributes.getStreamType() == stream; });
+        if (iter != end(attrVect)) {
+            return iter->getAttributes();
+        }
+    }
+    ALOGE("invalid stream type %s when converting to attributes",  toString(stream).c_str());
+    return AUDIO_ATTRIBUTES_INITIALIZER;
+}
+
+audio_stream_type_t AudioSystem::attributesToStreamType(const audio_attributes_t &attr)
+{
+    product_strategy_t strategyId =
+            AudioSystem::getProductStrategyFromAudioAttributes(AudioAttributes(attr));
+    AudioProductStrategyVector strategies;
+    listAudioProductStrategies(strategies);
+    for (const auto &strategy : strategies) {
+        if (strategy.getId() == strategyId) {
+            auto attrVect = strategy.getAudioAttributes();
+            auto iter = std::find_if(begin(attrVect), end(attrVect), [&attr](const auto &refAttr) {
+                             return AudioProductStrategy::attributesMatches(
+                                 refAttr.getAttributes(), attr); });
+            if (iter != end(attrVect)) {
+                return iter->getStreamType();
+            }
+        }
+    }
+    ALOGE("invalid attributes %s when converting to stream",  toString(attr).c_str());
+    return AUDIO_STREAM_MUSIC;
+}
+
+product_strategy_t AudioSystem::getProductStrategyFromAudioAttributes(const AudioAttributes &aa)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PRODUCT_STRATEGY_NONE;
+    return aps->getProductStrategyFromAudioAttributes(aa);
 }
 
 // ---------------------------------------------------------------------------

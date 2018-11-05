@@ -162,6 +162,17 @@ AttributesVector EngineBase::getAllAttributesForProductStrategy(product_strategy
                 mProductStrategies.at(ps)->getAudioAttributes() : AttributesVector();
 }
 
+status_t EngineBase::listAudioProductStrategies(AudioProductStrategyVector &strategies) const
+{
+    for (const auto &iter : mProductStrategies) {
+        const auto &productStrategy = iter.second;
+        strategies.push_back(
+        {productStrategy->getName(), productStrategy->listAudioAttributes(),
+         productStrategy->getId()});
+    }
+    return NO_ERROR;
+}
+
 void EngineBase::dump(String8 *dst) const
 {
     mProductStrategies.dump(dst, 2);

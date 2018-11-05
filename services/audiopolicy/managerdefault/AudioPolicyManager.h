@@ -251,6 +251,16 @@ public:
 
         virtual bool isHapticPlaybackSupported();
 
+        virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies)
+        {
+            return mEngine->listAudioProductStrategies(strategies);
+        }
+
+        virtual product_strategy_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa)
+        {
+            return mEngine->getProductStrategyForAttributes(aa.getAttributes());
+        }
+
 protected:
         // A constructor that allows more fine-grained control over initialization process,
         // used in automatic tests.

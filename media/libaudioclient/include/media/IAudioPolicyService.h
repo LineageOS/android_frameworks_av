@@ -196,6 +196,8 @@ public:
     virtual status_t setA11yServicesUids(const std::vector<uid_t>& uids) = 0;
 
     virtual bool     isHapticPlaybackSupported() = 0;
+    virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies) = 0;
+    virtual product_strategy_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa) = 0;
 };
 
 

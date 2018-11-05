@@ -57,6 +57,7 @@ LOCAL_SHARED_LIBRARIES := \
     libaudioutils \
     libparameter \
     libmedia_helper \
+    libaudiopolicy \
     libxml2
 
 include $(BUILD_SHARED_LIBRARY)

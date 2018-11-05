@@ -19,9 +19,7 @@
 
 #include <system/audio.h>
 #include <system/audio_policy.h>
-#include <binder/Parcel.h>
-#include <utils/String8.h>
-#include <utils/Vector.h>
+#include <binder/Parcelable.h>
 
 namespace android {
 
@@ -29,6 +27,13 @@ enum product_strategy_t : uint32_t;
 const product_strategy_t PRODUCT_STRATEGY_NONE = static_cast<product_strategy_t>(-1);
 
 using AttributesVector = std::vector<audio_attributes_t>;
+using StreamTypes = std::vector<audio_stream_type_t>;
+
+constexpr bool operator==(const audio_attributes_t &lhs, const audio_attributes_t &rhs)
+{
+    return lhs.usage == rhs.usage && lhs.content_type == rhs.content_type &&
+            lhs.flags == rhs.flags && (std::strcmp(lhs.tags, rhs.tags) == 0);
+}
 
 } // namespace android
 

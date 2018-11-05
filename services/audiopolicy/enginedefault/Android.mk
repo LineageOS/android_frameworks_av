@@ -44,7 +44,8 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libutils \
     libmedia_helper \
-    libaudiopolicyengineconfig
+    libaudiopolicyengineconfig \
+    libaudiopolicy
 
 LOCAL_HEADER_LIBRARIES := \
     libaudiopolicycommon \

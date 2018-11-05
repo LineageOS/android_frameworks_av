@@ -1186,4 +1186,22 @@ bool AudioPolicyService::isHapticPlaybackSupported()
     return mAudioPolicyManager->isHapticPlaybackSupported();
 }
 
+status_t AudioPolicyService::listAudioProductStrategies(AudioProductStrategyVector &strategies)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->listAudioProductStrategies(strategies);
+}
+
+product_strategy_t AudioPolicyService::getProductStrategyFromAudioAttributes(
+        const AudioAttributes &aa)
+{
+    if (mAudioPolicyManager == NULL) {
+        return PRODUCT_STRATEGY_NONE;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->getProductStrategyFromAudioAttributes(aa);
+}
 } // namespace android

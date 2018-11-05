@@ -229,6 +229,9 @@ public:
 
     virtual bool     isHapticPlaybackSupported();
 
+    virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies);
+    virtual product_strategy_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa);
+
             status_t doStopOutput(audio_port_handle_t portId);
             void doReleaseOutput(audio_port_handle_t portId);
 
