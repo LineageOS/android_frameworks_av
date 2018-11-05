@@ -790,6 +790,9 @@ void AudioPolicyManager::setForceUse(audio_policy_force_use_t usage,
         sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueAt(i);
         DeviceVector newDevices = getNewOutputDevices(outputDesc, true /*fromCache*/);
         if ((mEngine->getPhoneState() != AUDIO_MODE_IN_CALL) || (outputDesc != mPrimaryOutput)) {
+            // As done in setDeviceConnectionState, we could also fix default device issue by
+            // preventing the force re-routing in case of default dev that distinguishes on address.
+            // Let's give back to engine full device choice decision however.
             waitMs = setOutputDevices(outputDesc, newDevices, !newDevices.isEmpty(), delayMs);
         }
         if (forceVolumeReeval && !newDevices.isEmpty()) {
@@ -4965,6 +4968,13 @@ DeviceVector AudioPolicyManager::getNewOutputDevices(const sp<SwAudioOutputDescr
     bool active; // unused
     sp<DeviceDescriptor> device =
         findPreferredDevice(outputDesc, STRATEGY_NONE, active, mAvailableOutputDevices);
+    if (device != nullptr) {
+        return DeviceVector(device);
+    }
+
+    // Legacy Engine cannot take care of bus devices and mix, so we need to handle the conflict
+    // of setForceUse / Default Bus device here
+    device = mPolicyMixes.getDeviceAndMixForOutput(outputDesc, mAvailableOutputDevices);
     if (device != nullptr) {
         return DeviceVector(device);
     }
