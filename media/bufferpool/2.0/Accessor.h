@@ -95,6 +95,9 @@ struct Accessor : public IAccessor {
     /** Returns whether the accessor is valid. */
     bool isValid();
 
+    /** Invalidates all buffers which are owned by bufferpool */
+    ResultStatus flush();
+
     /** Allocates a buffer from a buffer pool.
      *
      * @param connectionId  the connection id of the client.
@@ -135,20 +138,28 @@ struct Accessor : public IAccessor {
      * created connection in order to communicate with the buffer pool. An
      * FMQ for buffer status message is also created for the client.
      *
-     * @param connection    created connection
-     * @param pConnectionId the id of the created connection
-     * @param fmqDescPtr    FMQ descriptor for shared buffer status message
-     *                      queue between a buffer pool and the client.
+     * @param observer      client observer for buffer invalidation
      * @param local         true when a connection request comes from local process,
      *                      false otherwise.
+     * @param connection    created connection
+     * @param pConnectionId the id of the created connection
+     * @param pMsgId        the id of the recent buffer pool message
+     * @param statusDescPtr FMQ descriptor for shared buffer status message
+     *                      queue between a buffer pool and the client.
+     * @param invDescPtr    FMQ descriptor for buffer invalidation message
+     *                      queue from a buffer pool to the client.
      *
      * @return OK when a connection is successfully made.
      *         NO_MEMORY when there is no memory.
      *         CRITICAL_ERROR otherwise.
      */
     ResultStatus connect(
+            const sp<IObserver>& observer,
+            bool local,
             sp<Connection> *connection, ConnectionId *pConnectionId,
-            const StatusDescriptor** fmqDescPtr, bool local);
+            uint32_t *pMsgId,
+            const StatusDescriptor** statusDescPtr,
+            const InvalidationDescriptor** invDescPtr);
 
     /**
      * Closes the specified connection to the client.
@@ -176,7 +187,7 @@ struct Accessor : public IAccessor {
 
 private:
     class Impl;
-    std::unique_ptr<Impl> mImpl;
+    std::shared_ptr<Impl> mImpl;
 };
 
 }  // namespace implementation

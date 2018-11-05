@@ -49,7 +49,8 @@ public:
      * Creates a buffer pool client from a local buffer pool
      * (via ClientManager#create).
      */
-    explicit BufferPoolClient(const sp<Accessor> &accessor);
+    explicit BufferPoolClient(const sp<Accessor> &accessor,
+                              const sp<IObserver> &observer);
 
     /**
      * Creates a buffer pool client from a remote buffer pool
@@ -57,7 +58,8 @@ public:
      * Note: A buffer pool client created with remote buffer pool cannot
      * allocate a buffer.
      */
-    explicit BufferPoolClient(const sp<IAccessor> &accessor);
+    explicit BufferPoolClient(const sp<IAccessor> &accessor,
+                              const sp<IObserver> &observer);
 
     /** Destructs a buffer pool client. */
     ~BufferPoolClient();
@@ -72,6 +74,10 @@ private:
     ConnectionId getConnectionId();
 
     ResultStatus getAccessor(sp<IAccessor> *accessor);
+
+    void receiveInvalidation(uint32_t msgId);
+
+    ResultStatus flush();
 
     ResultStatus allocate(const std::vector<uint8_t> &params,
                           native_handle_t **handle,
@@ -92,6 +98,7 @@ private:
     std::shared_ptr<Impl> mImpl;
 
     friend struct ClientManager;
+    friend struct Observer;
 };
 
 }  // namespace implementation

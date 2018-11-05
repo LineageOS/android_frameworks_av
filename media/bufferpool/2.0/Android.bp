@@ -8,6 +8,7 @@ cc_library {
         "BufferStatus.cpp",
         "ClientManager.cpp",
         "Connection.cpp",
+        "Observer.cpp",
     ],
     export_include_dirs: [
         "include",

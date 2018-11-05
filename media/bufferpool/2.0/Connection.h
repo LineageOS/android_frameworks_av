@@ -44,6 +44,11 @@ struct Connection : public IConnection {
     Return<void> fetch(uint64_t transactionId, uint32_t bufferId, fetch_cb _hidl_cb) override;
 
     /**
+     * Invalidates all buffers which are active and/or are ready to be recycled.
+     */
+    ResultStatus flush();
+
+    /**
      * Allocates a buffer using the specified parameters. Recycles a buffer if
      * it is possible. The returned buffer can be transferred to other remote
      * clients(Connection).

@@ -92,6 +92,18 @@ struct ClientManager : public IClientManager {
     ResultStatus close(ConnectionId connectionId);
 
     /**
+     * Evicts cached allocations. If it's local connection, release the
+     * previous allocations and do not recycle current active allocations.
+     *
+     * @param connectionId The id of the connection.
+     *
+     * @return OK when the connection is resetted.
+     *         NOT_FOUND when the specified connection was not found.
+     *         CRITICAL_ERROR otherwise.
+     */
+    ResultStatus flush(ConnectionId connectionId);
+
+    /**
      * Allocates a buffer from the specified connection.
      *
      * @param connectionId  The id of the connection.

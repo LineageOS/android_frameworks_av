@@ -19,6 +19,7 @@
 
 #include <map>
 #include <set>
+#include <condition_variable>
 #include "Accessor.h"
 
 namespace android {
@@ -33,15 +34,20 @@ struct TransactionStatus;
 
 /**
  * An implementation of a buffer pool accessor(or a buffer pool implementation.) */
-class Accessor::Impl {
+class Accessor::Impl 
+    : public std::enable_shared_from_this<Accessor::Impl> {
 public:
     Impl(const std::shared_ptr<BufferPoolAllocator> &allocator);
 
     ~Impl();
 
     ResultStatus connect(
-            const sp<Accessor> &accessor, sp<Connection> *connection,
-            ConnectionId *pConnectionId, const StatusDescriptor** fmqDescPtr);
+            const sp<Accessor> &accessor, const sp<IObserver> &observer,
+            sp<Connection> *connection,
+            ConnectionId *pConnectionId,
+            uint32_t *pMsgId,
+            const StatusDescriptor** statusDescPtr,
+            const InvalidationDescriptor** invDescPtr);
 
     ResultStatus close(ConnectionId connectionId);
 
@@ -55,7 +61,13 @@ public:
                        BufferId bufferId,
                        const native_handle_t** handle);
 
+    void flush();
+
     void cleanUp(bool clearCache);
+
+    bool isValid();
+
+    void handleInvalidateAck();
 
 private:
     // ConnectionId = pid : (timestamp_created + seqId)
@@ -78,7 +90,10 @@ private:
         int64_t mLastCleanUpUs;
         int64_t mLastLogUs;
         BufferId mSeq;
+        BufferId mStartSeq;
+        bool mValid;
         BufferStatusObserver mObserver;
+        BufferInvalidationChannel mInvalidationChannel;
 
         std::map<ConnectionId, std::set<BufferId>> mUsingBuffers;
         std::map<BufferId, std::set<ConnectionId>> mUsingConnections;
@@ -95,6 +110,54 @@ private:
         std::map<BufferId, std::unique_ptr<InternalBuffer>> mBuffers;
         std::set<BufferId> mFreeBuffers;
 
+        struct Invalidation {
+            static std::atomic<std::uint32_t> sSeqId;
+
+            struct Pending {
+                bool mNeedsAck;
+                uint32_t mFrom;
+                uint32_t mTo;
+                size_t mLeft;
+                const std::weak_ptr<Accessor::Impl> mImpl;
+                Pending(bool needsAck, uint32_t from, uint32_t to, size_t left,
+                        const std::shared_ptr<Accessor::Impl> &impl)
+                        : mNeedsAck(needsAck),
+                          mFrom(from),
+                          mTo(to),
+                          mLeft(left),
+                          mImpl(impl)
+                {}
+
+                bool invalidate(uint32_t bufferId) {
+                    return isBufferInRange(mFrom, mTo, bufferId) && --mLeft == 0;
+                }
+            };
+
+            std::list<Pending> mPendings;
+            std::map<ConnectionId, uint32_t> mAcks;
+            std::map<ConnectionId, const wp<IObserver>> mObservers;
+            uint32_t mInvalidationId;
+            uint32_t mId;
+
+            Invalidation() : mInvalidationId(0), mId(sSeqId.fetch_add(1)) {}
+
+            void onConnect(ConnectionId conId, const sp<IObserver> &observer);
+
+            void onClose(ConnectionId conId);
+
+            void onAck(ConnectionId conId, uint32_t msgId);
+
+            void onBufferInvalidated(
+                    BufferId bufferId,
+                    BufferInvalidationChannel &channel);
+
+            void onInvalidationRequest(
+                    bool needsAck, uint32_t from, uint32_t to, size_t left,
+                    BufferInvalidationChannel &channel,
+                    const std::shared_ptr<Accessor::Impl> &impl);
+
+            void onHandleAck();
+        } mInvalidation;
         /// Buffer pool statistics which tracks allocation and transfer statistics.
         struct Stats {
             /// Total size of allocations which are used or available to use.
@@ -163,6 +226,13 @@ private:
                 mTotalFetches++;
             }
         } mStats;
+
+        bool isValid() {
+            return mValid;
+        }
+
+        void invalidate(bool needsAck, BufferId from, BufferId to,
+                        const std::shared_ptr<Accessor::Impl> &impl);
 
     public:
         /** Creates a buffer pool. */
@@ -286,8 +356,33 @@ private:
          */
         void cleanUp(bool clearCache = false);
 
+        /**
+         * Processes pending buffer status messages and invalidate all current
+         * free buffers. Active buffers are invalidated after being inactive.
+         */
+        void flush(const std::shared_ptr<Accessor::Impl> &impl);
+
         friend class Accessor::Impl;
     } mBufferPool;
+
+    struct  AccessorInvalidator {
+        std::map<uint32_t, const std::weak_ptr<Accessor::Impl>> mAccessors;
+        std::mutex mMutex;
+        std::condition_variable mCv;
+        bool mReady;
+
+        AccessorInvalidator();
+        void addAccessor(uint32_t accessorId, const std::weak_ptr<Accessor::Impl> &impl);
+        void delAccessor(uint32_t accessorId);
+    };
+
+    static AccessorInvalidator sInvalidator;
+
+    static void invalidatorThread(
+        std::map<uint32_t, const std::weak_ptr<Accessor::Impl>> &accessors,
+        std::mutex &mutex,
+        std::condition_variable &cv,
+        bool &ready);
 };
 
 }  // namespace implementation
