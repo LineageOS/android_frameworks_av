@@ -34,12 +34,123 @@
 
 // Tag for machine readable results as property = value pairs
 #define LOOPBACK_RESULT_TAG      "RESULT: "
-#define LOOPBACK_SAMPLE_RATE     48000
 
-#define MILLIS_PER_SECOND        1000
+constexpr int32_t kDefaultSampleRate = 48000;
+constexpr int32_t kMillisPerSecond   = 1000;
+constexpr int32_t kMinLatencyMillis  = 4;    // arbitrary and very low
+constexpr int32_t kMaxLatencyMillis  = 400;  // arbitrary and generous
+constexpr double  kMaxEchoGain       = 10.0; // based on experiments, otherwise too noisy
+constexpr double  kMinimumConfidence = 0.5;
 
-#define MAX_ZEROTH_PARTIAL_BINS  40
-constexpr double MAX_ECHO_GAIN = 10.0; // based on experiments, otherwise autocorrelation too noisy
+static void printAudioScope(float sample) {
+    const int maxStars = 80; // arbitrary, fits on one line
+    char c = '*';
+    if (sample < -1.0) {
+        sample = -1.0;
+        c = '$';
+    } else if (sample > 1.0) {
+        sample = 1.0;
+        c = '$';
+    }
+    int numSpaces = (int) (((sample + 1.0) * 0.5) * maxStars);
+    for (int i = 0; i < numSpaces; i++) {
+        putchar(' ');
+    }
+    printf("%c\n", c);
+}
+
+/*
+
+FIR filter designed with
+http://t-filter.appspot.com
+
+sampling frequency: 48000 Hz
+
+* 0 Hz - 8000 Hz
+  gain = 1.2
+  desired ripple = 5 dB
+  actual ripple = 5.595266169703693 dB
+
+* 12000 Hz - 20000 Hz
+  gain = 0
+  desired attenuation = -40 dB
+  actual attenuation = -37.58691566571914 dB
+
+*/
+
+#define FILTER_TAP_NUM 11
+
+static const float sFilterTaps8000[FILTER_TAP_NUM] = {
+        -0.05944219353343189f,
+        -0.07303434839503208f,
+        -0.037690487672689066f,
+        0.1870480506596512f,
+        0.3910337357836833f,
+        0.5333672385425637f,
+        0.3910337357836833f,
+        0.1870480506596512f,
+        -0.037690487672689066f,
+        -0.07303434839503208f,
+        -0.05944219353343189f
+};
+
+class LowPassFilter {
+public:
+
+    /*
+     * Filter one input sample.
+     * @return filtered output
+     */
+    float filter(float input) {
+        float output = 0.0f;
+        mX[mCursor] = input;
+        // Index backwards over x.
+        int xIndex = mCursor + FILTER_TAP_NUM;
+        // Write twice so we avoid having to wrap in the middle of the convolution.
+        mX[xIndex] = input;
+        for (int i = 0; i < FILTER_TAP_NUM; i++) {
+            output += sFilterTaps8000[i] * mX[xIndex--];
+        }
+        if (++mCursor >= FILTER_TAP_NUM) {
+            mCursor = 0;
+        }
+        return output;
+    }
+
+    /**
+     * @return true if PASSED
+     */
+    bool test() {
+        // Measure the impulse of the filter at different phases so we exercise
+        // all the wraparound cases in the FIR.
+        for (int offset = 0; offset < (FILTER_TAP_NUM * 2); offset++ ) {
+            // printf("LowPassFilter: cursor = %d\n", mCursor);
+            // Offset by one each time.
+            if (filter(0.0f) != 0.0f) {
+                printf("ERROR: filter should return 0.0 before impulse response\n");
+                return false;
+            }
+            for (int i = 0; i < FILTER_TAP_NUM; i++) {
+                float output = filter((i == 0) ? 1.0f : 0.0f); // impulse
+                if (output != sFilterTaps8000[i]) {
+                    printf("ERROR: filter should return impulse response\n");
+                    return false;
+                }
+            }
+            for (int i = 0; i < FILTER_TAP_NUM; i++) {
+                if (filter(0.0f) != 0.0f) {
+                    printf("ERROR: filter should return 0.0 after impulse response\n");
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+private:
+    float   mX[FILTER_TAP_NUM * 2]{}; // twice as big as needed to avoid wrapping
+    int32_t mCursor = 0;
+};
 
 // A narrow impulse seems to have better immunity against over estimating the
 // latency due to detecting subharmonics by the auto-correlator.
@@ -78,6 +189,12 @@ private:
     int64_t mSeed = 99887766;
 };
 
+
+typedef struct LatencyReport_s {
+    double latencyInFrames;
+    double confidence;
+} LatencyReport;
+
 static double calculateCorrelation(const float *a,
                                    const float *b,
                                    int windowSize)
@@ -101,127 +218,75 @@ static double calculateCorrelation(const float *a,
     return correlation;
 }
 
-static int calculateCorrelations(const float *haystack, int haystackSize,
-                                 const float *needle, int needleSize,
-                                 float *results, int resultSize)
-{
-    int maxCorrelations = haystackSize - needleSize;
-    int numCorrelations = std::min(maxCorrelations, resultSize);
-
-    for (int ic = 0; ic < numCorrelations; ic++) {
-        double correlation = calculateCorrelation(&haystack[ic], needle, needleSize);
-        results[ic] = correlation;
-    }
-
-    return numCorrelations;
-}
-
-/*==========================================================================================*/
-/**
- * Scan until we get a correlation of a single scan that goes over the tolerance level,
- * peaks then drops back down.
- */
-static double findFirstMatch(const float *haystack, int haystackSize,
-                             const float *needle, int needleSize, double threshold  )
-{
-    int ic;
-    // How many correlations can we calculate?
-    int numCorrelations = haystackSize - needleSize;
-    double maxCorrelation = 0.0;
-    int peakIndex = -1;
-    double location = -1.0;
-    const double backThresholdScaler = 0.5;
-
-    for (ic = 0; ic < numCorrelations; ic++) {
-        double correlation = calculateCorrelation(&haystack[ic], needle, needleSize);
-
-        if( (correlation > maxCorrelation) ) {
-            maxCorrelation = correlation;
-            peakIndex = ic;
-        }
-
-        //printf("PaQa_FindFirstMatch: ic = %4d, correlation = %8f, maxSum = %8f\n",
-        //    ic, correlation, maxSum );
-        // Are we past what we were looking for?
-        if((maxCorrelation > threshold) && (correlation < backThresholdScaler * maxCorrelation)) {
-            location = peakIndex;
-            break;
-        }
-    }
-
-    return location;
-}
-
-typedef struct LatencyReport_s {
-    double latencyInFrames;
-    double confidence;
-} LatencyReport;
-
-// Apply a technique similar to Harmonic Product Spectrum Analysis to find echo fundamental.
-// Using first echo instead of the original impulse for a better match.
-static int measureLatencyFromEchos(const float *haystack, int haystackSize,
-                            const float *needle, int needleSize,
-                            LatencyReport *report) {
-    const double threshold = 0.1;
-    // printf("%s: haystackSize = %d, needleSize = %d\n", __func__, haystackSize, needleSize);
-
-    // Find first peak
-    int first = (int) (findFirstMatch(haystack,
-                                      haystackSize,
-                                      needle,
-                                      needleSize,
-                                      threshold) + 0.5);
-
-    // Use first echo as the needle for the other echos because
-    // it will be more similar.
-    needle = &haystack[first];
-    int again = (int) (findFirstMatch(haystack,
-                                      haystackSize,
-                                      needle,
-                                      needleSize,
-                                      threshold) + 0.5);
-    first = again;
-
+static int measureLatencyFromEchos(const float *data,
+                                   int32_t numFloats,
+                                   int32_t sampleRate,
+                                   LatencyReport *report) {
     // Allocate results array
-    int remaining = haystackSize - first;
-    const int maxReasonableLatencyFrames = 48000 * 2; // arbitrary but generous value
-    int numCorrelations = std::min(remaining, maxReasonableLatencyFrames);
-    float *correlations = new float[numCorrelations];
-    float *harmonicSums = new float[numCorrelations](); // set to zero
+    const int minReasonableLatencyFrames = sampleRate * kMinLatencyMillis / kMillisPerSecond;
+    const int maxReasonableLatencyFrames = sampleRate * kMaxLatencyMillis / kMillisPerSecond;
+    int32_t maxCorrelationSize = maxReasonableLatencyFrames * 3;
+    int numCorrelations = std::min(numFloats, maxCorrelationSize);
+    float *correlations = new float[numCorrelations]{};
+    float *harmonicSums = new float[numCorrelations]{};
 
-    // Generate correlation for every position.
-    numCorrelations = calculateCorrelations(&haystack[first], remaining,
-                                            needle, needleSize,
-                                            correlations, numCorrelations);
+    // Perform sliding auto-correlation.
+    // Skip first frames to avoid huge peak at zero offset.
+    for (int i = minReasonableLatencyFrames; i < numCorrelations; i++) {
+        int32_t remaining = numFloats - i;
+        float correlation = (float) calculateCorrelation(&data[i], data, remaining);
+        correlations[i] = correlation;
+        // printf("correlation[%d] = %f\n", ic, correlation);
+    }
 
-    // Add higher harmonics mapped onto lower harmonics.
-    // This reinforces the "fundamental" echo.
+    // Apply a technique similar to Harmonic Product Spectrum Analysis to find echo fundamental.
+    // Add higher harmonics mapped onto lower harmonics. This reinforces the "fundamental" echo.
     const int numEchoes = 8;
     for (int partial = 1; partial < numEchoes; partial++) {
-        for (int i = 0; i < numCorrelations; i++) {
+        for (int i = minReasonableLatencyFrames; i < numCorrelations; i++) {
             harmonicSums[i / partial] += correlations[i] / partial;
         }
     }
 
     // Find highest peak in correlation array.
     float maxCorrelation = 0.0;
-    float sumOfPeaks = 0.0;
     int peakIndex = 0;
-    const int skip = MAX_ZEROTH_PARTIAL_BINS; // skip low bins
-    for (int i = skip; i < numCorrelations; i++) {
+    for (int i = 0; i < numCorrelations; i++) {
         if (harmonicSums[i] > maxCorrelation) {
             maxCorrelation = harmonicSums[i];
-            sumOfPeaks += maxCorrelation;
             peakIndex = i;
             // printf("maxCorrelation = %f at %d\n", maxCorrelation, peakIndex);
         }
     }
-
     report->latencyInFrames = peakIndex;
-    if (sumOfPeaks < 0.0001) {
+/*
+    {
+        int32_t topPeak = peakIndex * 7 / 2;
+        for (int i = 0; i < topPeak; i++) {
+            float sample = harmonicSums[i];
+            printf("%4d: %7.5f ", i, sample);
+            printAudioScope(sample);
+        }
+    }
+*/
+
+    // Calculate confidence.
+    if (maxCorrelation < 0.001) {
         report->confidence = 0.0;
     } else {
-        report->confidence = maxCorrelation / sumOfPeaks;
+        // Compare peak to average value around peak.
+        int32_t numSamples = std::min(numCorrelations, peakIndex * 2);
+        if (numSamples <= 0) {
+            report->confidence = 0.0;
+        } else {
+            double sum = 0.0;
+            for (int i = 0; i < numSamples; i++) {
+                sum += harmonicSums[i];
+            }
+            const double average = sum / numSamples;
+            const double ratio = average / maxCorrelation; // will be < 1.0
+            report->confidence = 1.0 - sqrt(ratio);
+        }
     }
 
     delete[] correlations;
@@ -317,7 +382,9 @@ public:
         }
 
         assert(info.channels == 1);
+        assert(info.format == SF_FORMAT_FLOAT);
 
+        setSampleRate(info.samplerate);
         allocate(info.frames);
         mFrameCounter = sf_readf_float(sndFile, mData, info.frames);
 
@@ -325,11 +392,49 @@ public:
         return mFrameCounter;
     }
 
+    /**
+     * Square the samples so they are all positive and so the peaks are emphasized.
+     */
+    void square() {
+        for (int i = 0; i < mFrameCounter; i++) {
+            const float sample = mData[i];
+            mData[i] = sample * sample;
+        }
+    }
+
+    /**
+     * Low pass filter the recording using a simple FIR filter.
+     * Note that the lowpass filter cutoff tracks the sample rate.
+     * That is OK because the impulse width is a fixed number of samples.
+     */
+    void lowPassFilter() {
+        for (int i = 0; i < mFrameCounter; i++) {
+            mData[i] = mLowPassFilter.filter(mData[i]);
+        }
+    }
+
+    /**
+     * Remove DC offset using a one-pole one-zero IIR filter.
+     */
+    void dcBlocker() {
+        const float R = 0.996; // narrow notch at zero Hz
+        float x1 = 0.0;
+        float y1 = 0.0;
+        for (int i = 0; i < mFrameCounter; i++) {
+            const float x = mData[i];
+            const float y = x - x1 + (R * y1);
+            mData[i] = y;
+            y1 = y;
+            x1 = x;
+        }
+    }
+
 private:
-    float  *mData = nullptr;
-    int32_t mFrameCounter = 0;
-    int32_t mMaxFrames = 0;
-    int32_t mSampleRate = 48000; // common default
+    float        *mData = nullptr;
+    int32_t       mFrameCounter = 0;
+    int32_t       mMaxFrames = 0;
+    int32_t       mSampleRate = kDefaultSampleRate; // common default
+    LowPassFilter mLowPassFilter;
 };
 
 // ====================================================================================
@@ -349,8 +454,12 @@ public:
 
     virtual void printStatus() {};
 
-    virtual int getResult() {
-        return -1;
+    int32_t getResult() {
+        return mResult;
+    }
+
+    void setResult(int32_t result) {
+        mResult = result;
     }
 
     virtual bool isDone() {
@@ -379,7 +488,7 @@ public:
     static float measurePeakAmplitude(float *inputData, int inputChannelCount, int numFrames) {
         float peak = 0.0f;
         for (int i = 0; i < numFrames; i++) {
-            float pos = fabs(*inputData);
+            const float pos = fabs(*inputData);
             if (pos > peak) {
                 peak = pos;
             }
@@ -390,7 +499,8 @@ public:
 
 
 private:
-    int32_t mSampleRate = LOOPBACK_SAMPLE_RATE;
+    int32_t mSampleRate = kDefaultSampleRate;
+    int32_t mResult = 0;
 };
 
 class PeakDetector {
@@ -408,24 +518,6 @@ private:
     float  mDecay = 0.99f;
     float  mPrevious = 0.0f;
 };
-
-
-static void printAudioScope(float sample) {
-    const int maxStars = 80; // arbitrary, fits on one line
-    char c = '*';
-    if (sample < -1.0) {
-        sample = -1.0;
-        c = '$';
-    } else if (sample > 1.0) {
-        sample = 1.0;
-        c = '$';
-    }
-    int numSpaces = (int) (((sample + 1.0) * 0.5) * maxStars);
-    for (int i = 0; i < numSpaces; i++) {
-        putchar(' ');
-    }
-    printf("%c\n", c);
-}
 
 // ====================================================================================
 /**
@@ -447,15 +539,11 @@ public:
     }
 
     void reset() override {
-        mDownCounter = 200;
+        mDownCounter = getSampleRate() / 2;
         mLoopCounter = 0;
         mMeasuredLoopGain = 0.0f;
         mEchoGain = 1.0f;
         mState = STATE_INITIAL_SILENCE;
-    }
-
-    virtual int getResult() {
-        return mState == STATE_DONE ? 0 : -1;
     }
 
     virtual bool isDone() {
@@ -470,34 +558,57 @@ public:
         return mEchoGain;
     }
 
-    void report() override {
+    bool testLowPassFilter() {
+        LowPassFilter filter;
+        return filter.test();
+    }
 
+    void report() override {
         printf("EchoAnalyzer ---------------\n");
+        if (getResult() != 0) {
+            printf(LOOPBACK_RESULT_TAG "result          = %d\n", getResult());
+            return;
+        }
+
+        // printf("LowPassFilter test %s\n", testLowPassFilter() ? "PASSED" : "FAILED");
+
         printf(LOOPBACK_RESULT_TAG "measured.gain          = %8f\n", mMeasuredLoopGain);
         printf(LOOPBACK_RESULT_TAG "echo.gain              = %8f\n", mEchoGain);
         printf(LOOPBACK_RESULT_TAG "test.state             = %8d\n", mState);
         printf(LOOPBACK_RESULT_TAG "test.state.name        = %8s\n", convertStateToText(mState));
+
         if (mState == STATE_WAITING_FOR_SILENCE) {
             printf("WARNING - Stuck waiting for silence. Input may be too noisy!\n");
-        }
-        if (mMeasuredLoopGain >= 0.9999) {
+            setResult(ERROR_NOISY);
+        } else if (mMeasuredLoopGain >= 0.9999) {
             printf("   ERROR - clipping, turn down volume slightly\n");
+            setResult(ERROR_CLIPPING);
+        } else if (mState != STATE_DONE && mState != STATE_GATHERING_ECHOS) {
+            printf("WARNING - Bad state. Check volume on device.\n");
+            setResult(ERROR_INVALID_STATE);
         } else {
-            const float *needle = s_Impulse;
-            int needleSize = (int) (sizeof(s_Impulse) / sizeof(float));
-            float *haystack = mAudioRecording.getData();
-            int haystackSize = mAudioRecording.size();
-            measureLatencyFromEchos(haystack, haystackSize, needle, needleSize, &mLatencyReport);
-            if (mLatencyReport.confidence < 0.01) {
-                printf("   ERROR - confidence too low = %f\n", mLatencyReport.confidence);
-            } else {
-                double latencyMillis = 1000.0 * mLatencyReport.latencyInFrames / getSampleRate();
-                printf(LOOPBACK_RESULT_TAG "latency.frames         = %8.2f\n",
-                       mLatencyReport.latencyInFrames);
-                printf(LOOPBACK_RESULT_TAG "latency.msec           = %8.2f\n",
-                       latencyMillis);
-                printf(LOOPBACK_RESULT_TAG "latency.confidence     = %8.6f\n",
-                       mLatencyReport.confidence);
+            // Cleanup the signal to improve the auto-correlation.
+            mAudioRecording.dcBlocker();
+            mAudioRecording.square();
+            mAudioRecording.lowPassFilter();
+
+            printf("Please wait several seconds for auto-correlation to complete.\n");
+            measureLatencyFromEchos(mAudioRecording.getData(),
+                                    mAudioRecording.size(),
+                                    getSampleRate(),
+                                    &mLatencyReport);
+
+            double latencyMillis = kMillisPerSecond * (double) mLatencyReport.latencyInFrames
+                                   / getSampleRate();
+            printf(LOOPBACK_RESULT_TAG "latency.frames         = %8.2f\n",
+                   mLatencyReport.latencyInFrames);
+            printf(LOOPBACK_RESULT_TAG "latency.msec           = %8.2f\n",
+                   latencyMillis);
+            printf(LOOPBACK_RESULT_TAG "latency.confidence     = %8.6f\n",
+                   mLatencyReport.confidence);
+            if (mLatencyReport.confidence < kMinimumConfidence) {
+                printf("   ERROR - confidence too low!\n");
+                setResult(ERROR_CONFIDENCE);
             }
         }
     }
@@ -523,6 +634,11 @@ public:
         sendImpulses(outputData, outputChannelCount, kImpulseSizeInFrames);
     }
 
+    // @return number of frames for a typical block of processing
+    int32_t getBlockFrames() {
+        return getSampleRate() / 8;
+    }
+
     void process(float *inputData, int inputChannelCount,
                  float *outputData, int outputChannelCount,
                  int numFrames) override {
@@ -540,10 +656,11 @@ public:
                 for (int i = 0; i < numSamples; i++) {
                     outputData[i] = 0;
                 }
-                if (mDownCounter-- <= 0) {
+                mDownCounter -= numFrames;
+                if (mDownCounter <= 0) {
                     nextState = STATE_MEASURING_GAIN;
                     //printf("%5d: switch to STATE_MEASURING_GAIN\n", mLoopCounter);
-                    mDownCounter = 8;
+                    mDownCounter = getBlockFrames() * 2;
                 }
                 break;
 
@@ -552,15 +669,16 @@ public:
                 peak = measurePeakAmplitude(inputData, inputChannelCount, numFrames);
                 // If we get several in a row then go to next state.
                 if (peak > mPulseThreshold) {
-                    if (mDownCounter-- <= 0) {
+                    mDownCounter -= numFrames;
+                    if (mDownCounter <= 0) {
                         //printf("%5d: switch to STATE_WAITING_FOR_SILENCE, measured peak = %f\n",
                         //       mLoopCounter, peak);
-                        mDownCounter = 8;
+                        mDownCounter = getBlockFrames();
                         mMeasuredLoopGain = peak;  // assumes original pulse amplitude is one
                         mSilenceThreshold = peak * 0.1; // scale silence to measured pulse
                         // Calculate gain that will give us a nice decaying echo.
                         mEchoGain = mDesiredEchoGain / mMeasuredLoopGain;
-                        if (mEchoGain > MAX_ECHO_GAIN) {
+                        if (mEchoGain > kMaxEchoGain) {
                             printf("ERROR - loop gain too low. Increase the volume.\n");
                             nextState = STATE_FAILED;
                         } else {
@@ -568,7 +686,7 @@ public:
                         }
                     }
                 } else if (numFrames > kImpulseSizeInFrames){ // ignore short callbacks
-                    mDownCounter = 8;
+                    mDownCounter = getBlockFrames();
                 }
                 break;
 
@@ -581,13 +699,14 @@ public:
                 peak = measurePeakAmplitude(inputData, inputChannelCount, numFrames);
                 // If we get several in a row then go to next state.
                 if (peak < mSilenceThreshold) {
-                    if (mDownCounter-- <= 0) {
+                    mDownCounter -= numFrames;
+                    if (mDownCounter <= 0) {
                         nextState = STATE_SENDING_PULSE;
                         //printf("%5d: switch to STATE_SENDING_PULSE\n", mLoopCounter);
-                        mDownCounter = 8;
+                        mDownCounter = getBlockFrames();
                     }
                 } else {
-                    mDownCounter = 8;
+                    mDownCounter = getBlockFrames();
                 }
                 break;
 
@@ -620,11 +739,11 @@ public:
                 }
                 if (numWritten  < numFrames) {
                     nextState = STATE_DONE;
-                    //printf("%5d: switch to STATE_DONE\n", mLoopCounter);
                 }
                 break;
 
             case STATE_DONE:
+            case STATE_FAILED:
             default:
                 break;
         }
@@ -638,10 +757,21 @@ public:
     }
 
     int load(const char *fileName) override {
-        return mAudioRecording.load(fileName);
+        int result = mAudioRecording.load(fileName);
+        setSampleRate(mAudioRecording.getSampleRate());
+        mState = STATE_DONE;
+        return result;
     }
 
 private:
+
+    enum error_code {
+        ERROR_OK = 0,
+        ERROR_NOISY = -99,
+        ERROR_CLIPPING,
+        ERROR_CONFIDENCE,
+        ERROR_INVALID_STATE
+    };
 
     enum echo_state {
         STATE_INITIAL_SILENCE,
@@ -708,10 +838,6 @@ private:
 class SineAnalyzer : public LoopbackProcessor {
 public:
 
-    virtual int getResult() {
-        return mState == STATE_LOCKED ? 0 : -1;
-    }
-
     void report() override {
         printf("SineAnalyzer ------------------\n");
         printf(LOOPBACK_RESULT_TAG "peak.amplitude     = %8f\n", mPeakAmplitude);
@@ -724,10 +850,9 @@ public:
         float signalToNoiseDB = 10.0 * log(signalToNoise);
         printf(LOOPBACK_RESULT_TAG "signal.to.noise.db = %8.2f\n", signalToNoiseDB);
         if (signalToNoiseDB < MIN_SNRATIO_DB) {
-            printf("WARNING - signal to noise ratio is too low! < %d dB\n", MIN_SNRATIO_DB);
+            printf("ERROR - signal to noise ratio is too low! < %d dB. Adjust volume.\n", MIN_SNRATIO_DB);
+            setResult(ERROR_NOISY);
         }
-        printf(LOOPBACK_RESULT_TAG "phase.offset       = %8.5f\n", mPhaseOffset);
-        printf(LOOPBACK_RESULT_TAG "ref.phase          = %8.5f\n", mPhase);
         printf(LOOPBACK_RESULT_TAG "frames.accumulated = %8d\n", mFramesAccumulated);
         printf(LOOPBACK_RESULT_TAG "sine.period        = %8d\n", mSinePeriod);
         printf(LOOPBACK_RESULT_TAG "test.state         = %8d\n", mState);
@@ -736,10 +861,15 @@ public:
         bool gotLock = (mState == STATE_LOCKED) || (mGlitchCount > 0);
         if (!gotLock) {
             printf("ERROR - failed to lock on reference sine tone\n");
+            setResult(ERROR_NO_LOCK);
         } else {
             // Only print if meaningful.
             printf(LOOPBACK_RESULT_TAG "glitch.count       = %8d\n", mGlitchCount);
             printf(LOOPBACK_RESULT_TAG "max.glitch         = %8f\n", mMaxGlitchDelta);
+            if (mGlitchCount > 0) {
+                printf("ERROR - number of glitches > 0\n");
+                setResult(ERROR_GLITCHES);
+            }
         }
     }
 
@@ -913,6 +1043,13 @@ public:
 
 private:
 
+    enum error_code {
+        OK,
+        ERROR_NO_LOCK = -80,
+        ERROR_GLITCHES,
+        ERROR_NOISY
+    };
+
     enum sine_state_t {
         STATE_IDLE,
         STATE_MEASURE_NOISE,
@@ -963,8 +1100,6 @@ private:
     sine_state_t  mState = STATE_IDLE;
 };
 
-
-#undef LOOPBACK_SAMPLE_RATE
 #undef LOOPBACK_RESULT_TAG
 
 #endif /* AAUDIO_EXAMPLES_LOOPBACK_ANALYSER_H */
