@@ -552,8 +552,10 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
                 hasStreamCA = true;
                 streamCA.mSystemID = br->getBits(16);
                 streamCA.mPID = br->getBits(16) & 0x1fff;
-                ES_info_length -= 4;
-                streamCA.mPrivateData.assign(br->data(), br->data() + descriptor_length - 4);
+                ES_info_length -= descriptor_length;
+                descriptor_length -= 4;
+                streamCA.mPrivateData.assign(br->data(), br->data() + descriptor_length);
+                br->skipBits(descriptor_length * 8);
             } else if (info.mType == STREAMTYPE_PES_PRIVATE_DATA &&
                        descriptor_tag == DESCRIPTOR_DVB_EXTENSION && descriptor_length >= 1) {
                 unsigned descTagExt = br->getBits(8);
