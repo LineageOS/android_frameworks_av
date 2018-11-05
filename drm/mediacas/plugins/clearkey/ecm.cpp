@@ -17,6 +17,8 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "ecm"
 
+#include <inttypes.h>
+
 #include "ecm.h"
 #include "ecm_generator.h"
 #include "protos/license_protos.pb.h"
@@ -76,7 +78,7 @@ status_t Ecm::Decrypt(
         return status;
     }
     if (asset.id() != asset_from_emm.id()) {
-        ALOGE("Asset_id from Emm (%llu) does not match asset_id from Ecm (%llu).",
+        ALOGE("Asset_id from Emm (%" PRIu64 ") does not match asset_id from Ecm (%" PRIu64 ").",
                 asset_from_emm.id(), asset.id());
         return CLEARKEY_STATUS_INVALID_PARAMETER;
     }
