@@ -23,7 +23,6 @@ namespace android {
 
 using StreamTypeVector = std::vector<audio_stream_type_t>;
 
-
 static const audio_attributes_t defaultAttr = AUDIO_ATTRIBUTES_INITIALIZER;
 
 } // namespace android
@@ -162,4 +161,26 @@ static inline bool audio_formats_match(audio_format_t format1,
         return true;
     }
     return format1 == format2;
+}
+
+/**
+ * @brief hasStream checks if a given stream type is found in the list of streams
+ * @param streams collection of stream types to consider.
+ * @param streamType to consider
+ * @return true if voice stream is found in the given streams, false otherwise
+ */
+static inline bool hasStream(const android::StreamTypeVector &streams,
+                             audio_stream_type_t streamType)
+{
+    return std::find(begin(streams), end(streams), streamType) != end(streams);
+}
+
+/**
+ * @brief hasVoiceStream checks if a voice stream is found in the list of streams
+ * @param streams collection to consider.
+ * @return true if voice stream is found in the given streams, false otherwise
+ */
+static inline bool hasVoiceStream(const android::StreamTypeVector &streams)
+{
+    return hasStream(streams, AUDIO_STREAM_VOICE_CALL);
 }

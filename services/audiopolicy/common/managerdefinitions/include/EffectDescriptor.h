@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <RoutingStrategy.h>
+#include <policy.h>
 #include <system/audio_effect.h>
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
@@ -28,14 +28,26 @@ namespace android {
 class EffectDescriptor : public RefBase
 {
 public:
+    EffectDescriptor(const effect_descriptor_t *desc, bool isMusicEffect,
+                     int id, int io, int session) :
+        mId(id), mIo(io), mSession(session), mEnabled(false),
+        mIsMusicEffect(isMusicEffect)
+    {
+        memcpy (&mDesc, desc, sizeof(effect_descriptor_t));
+    }
+
     void dump(String8 *dst, int spaces = 0) const;
 
     int mId;                // effect unique ID
     int mIo;                // io the effect is attached to
-    routing_strategy mStrategy; // routing strategy the effect is associated to
     int mSession;               // audio session the effect is on
     effect_descriptor_t mDesc;  // effect descriptor
     bool mEnabled;              // enabled state: CPU load being used or not
+
+    bool isMusicEffect() const { return mIsMusicEffect; }
+
+private:
+    bool mIsMusicEffect;
 };
 
 class EffectDescriptorCollection : public KeyedVector<int, sp<EffectDescriptor> >
@@ -44,7 +56,7 @@ public:
     EffectDescriptorCollection();
 
     status_t registerEffect(const effect_descriptor_t *desc, audio_io_handle_t io,
-                            uint32_t strategy, int session, int id);
+                            int session, int id, bool isMusicEffect);
     status_t unregisterEffect(int id);
     sp<EffectDescriptor> getEffect(int id) const;
     status_t setEffectEnabled(int id, bool enabled);

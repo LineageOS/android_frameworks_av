@@ -29,6 +29,7 @@
 #include <AudioPolicyManagerObserver.h>
 #include <AudioPort.h>
 #include <IOProfile.h>
+#include <AudioIODescriptorInterface.h>
 #include <policy.h>
 #include <utils/String8.h>
 #include <utils/Log.h>
@@ -241,7 +242,8 @@ audio_devices_t Engine::getDeviceForStrategy(routing_strategy strategy) const
 
     const SwAudioOutputCollection &outputs = getApmObserver()->getOutputs();
 
-    return getDeviceForStrategyInt(static_cast<legacy_strategy>(strategy), availableOutputDevices,
+    return getDeviceForStrategyInt(static_cast<legacy_strategy>(strategy),
+                                   availableOutputDevices,
                                    availableInputDevices, outputs, (uint32_t)AUDIO_DEVICE_NONE);
 }
 
@@ -808,14 +810,19 @@ DeviceVector Engine::getOutputDevicesForAttributes(const audio_attributes_t &att
         ALOGV("%s explicit Routing on device %s", __func__, preferredDevice->toString().c_str());
         return DeviceVector(preferredDevice);
     }
+    product_strategy_t strategy = getProductStrategyForAttributes(attributes);
+    const DeviceVector &availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
+    const SwAudioOutputCollection &outputs = getApmObserver()->getOutputs();
     //
     // @TODO: what is the priority of explicit routing? Shall it be considered first as it used to
     // be by APM?
     //
-    product_strategy_t strategy = getProductStrategyForAttributes(attributes);
-    //
-    // @TODO: manage dynamic mix
-    //
+    // Honor explicit routing requests only if all active clients have a preferred route in which
+    // case the last active client route is used
+    sp<DeviceDescriptor> device = findPreferredDevice(outputs, strategy, availableOutputDevices);
+    if (device != nullptr) {
+        return DeviceVector(device);
+    }
 
     return fromCache? mDevicesForStrategies.at(strategy) : getDevicesForProductStrategy(strategy);
 }
@@ -827,13 +834,29 @@ DeviceVector Engine::getOutputDevicesForStream(audio_stream_type_t stream, bool 
 }
 
 sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_t &attr,
-                                                         AudioMix **/*mix*/) const
+                                                         AudioMix **mix) const
 {
+    const auto &policyMixes = getApmObserver()->getAudioPolicyMixCollection();
     const auto &availableInputDevices = getApmObserver()->getAvailableInputDevices();
+    const auto &inputs = getApmObserver()->getInputs();
     std::string address;
+
     //
-    // @TODO: manage explicit routing and dynamic mix
+    // Explicit Routing ??? what is the priority of explicit routing? Shall it be considered
+    // first as it used to be by APM?
     //
+    // Honor explicit routing requests only if all active clients have a preferred route in which
+    // case the last active client route is used
+    sp<DeviceDescriptor> device =
+            findPreferredDevice(inputs, attr.source, availableInputDevices);
+    if (device != nullptr) {
+        return device;
+    }
+
+    device = policyMixes.getDeviceAndMixForInputSource(attr.source, availableInputDevices, mix);
+    if (device != nullptr) {
+        return device;
+    }
     audio_devices_t deviceType = getDeviceForInputSource(attr.source);
 
     if (audio_is_remote_submix_device(deviceType)) {

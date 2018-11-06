@@ -414,7 +414,7 @@ public:
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.writeInt32(static_cast <uint32_t>(stream));
         remote()->transact(GET_STRATEGY_FOR_STREAM, data, &reply);
-        return reply.readInt32();
+        return reply.readUint32();
     }
 
     virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream)
@@ -1126,7 +1126,6 @@ status_t BnAudioPolicyService::onTransact(
         case START_INPUT:
         case STOP_INPUT:
         case RELEASE_INPUT:
-        case GET_STRATEGY_FOR_STREAM:
         case GET_OUTPUT_FOR_EFFECT:
         case REGISTER_EFFECT:
         case UNREGISTER_EFFECT:
@@ -1422,7 +1421,7 @@ status_t BnAudioPolicyService::onTransact(
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             audio_stream_type_t stream =
                     static_cast <audio_stream_type_t>(data.readInt32());
-            reply->writeInt32(getStrategyForStream(stream));
+            reply->writeUint32(getStrategyForStream(stream));
             return NO_ERROR;
         } break;
 

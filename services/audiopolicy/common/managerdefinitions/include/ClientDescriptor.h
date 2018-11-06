@@ -22,14 +22,14 @@
 #include <sys/types.h>
 
 #include <system/audio.h>
-#include <system/audio_policy.h>
+#include <media/AudioProductStrategy.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
 #include <utils/String8.h>
+#include <policy.h>
 #include "AudioPatch.h"
 #include "EffectDescriptor.h"
-#include "RoutingStrategy.h"
 
 namespace android {
 
@@ -81,7 +81,7 @@ public:
     TrackClientDescriptor(audio_port_handle_t portId, uid_t uid, audio_session_t sessionId,
                    audio_attributes_t attributes, audio_config_base_t config,
                    audio_port_handle_t preferredDeviceId, audio_stream_type_t stream,
-                          routing_strategy strategy, audio_output_flags_t flags) :
+                          product_strategy_t strategy, audio_output_flags_t flags) :
         ClientDescriptor(portId, uid, sessionId, attributes, config, preferredDeviceId),
         mStream(stream), mStrategy(strategy), mFlags(flags) {}
     ~TrackClientDescriptor() override = default;
@@ -92,11 +92,11 @@ public:
 
     audio_output_flags_t flags() const { return mFlags; }
     audio_stream_type_t stream() const { return mStream; }
-    routing_strategy strategy() const { return mStrategy; }
+    product_strategy_t strategy() const { return mStrategy; }
 
 private:
     const audio_stream_type_t mStream;
-    const routing_strategy mStrategy;
+    const product_strategy_t mStrategy;
     const audio_output_flags_t mFlags;
 };
 
@@ -136,7 +136,7 @@ class SourceClientDescriptor: public TrackClientDescriptor
 public:
     SourceClientDescriptor(audio_port_handle_t portId, uid_t uid, audio_attributes_t attributes,
                            const sp<AudioPatch>& patchDesc, const sp<DeviceDescriptor>& srcDevice,
-                           audio_stream_type_t stream, routing_strategy strategy);
+                           audio_stream_type_t stream, product_strategy_t strategy);
     ~SourceClientDescriptor() override = default;
 
     sp<AudioPatch> patchDesc() const { return mPatchDesc; }

@@ -78,7 +78,7 @@ public:
 
     sp<DeviceDescriptor> getDeviceAndMixForInputSource(audio_source_t inputSource,
                                                        const DeviceVector &availableDeviceTypes,
-                                                       AudioMix **policyMix);
+                                                       AudioMix **policyMix) const;
 
     /**
      * @brief try to find a matching mix for a given output descriptor and returns the associated

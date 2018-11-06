@@ -153,9 +153,15 @@ public:
                                               audio_devices_t device);
 
         // return the strategy corresponding to a given stream type
-        virtual uint32_t getStrategyForStream(audio_stream_type_t stream);
-        // return the strategy corresponding to the given audio attributes
-        virtual routing_strategy getStrategyForAttr(const audio_attributes_t *attr);
+        virtual uint32_t getStrategyForStream(audio_stream_type_t stream)
+        {
+            return streamToStrategy(stream);
+        }
+        product_strategy_t streamToStrategy(audio_stream_type_t stream) const
+        {
+            auto attributes = mEngine->getAttributesForStreamType(stream);
+            return mEngine->getProductStrategyForAttributes(attributes);
+        }
 
         // return the enabled output devices for the given stream type
         virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream);
@@ -244,9 +250,6 @@ public:
         virtual status_t getHwOffloadEncodingFormatsSupportedForA2DP(
                     std::vector<audio_format_t> *formats);
 
-        // return the strategy corresponding to a given stream type
-        routing_strategy getStrategy(audio_stream_type_t stream) const;
-
         virtual void setAppState(uid_t uid, app_state_t state);
 
         virtual bool isHapticPlaybackSupported();
@@ -316,32 +319,6 @@ protected:
         void removeOutput(audio_io_handle_t output);
         void addInput(audio_io_handle_t input, const sp<AudioInputDescriptor>& inputDesc);
 
-        // return appropriate device for streams handled by the specified strategy according to current
-        // phone state, connected devices...
-        // if fromCache is true, the device is returned from mDeviceForStrategy[],
-        // otherwise it is determine by current state
-        // (device connected,phone state, force use, a2dp output...)
-        // This allows to:
-        //  1 speed up process when the state is stable (when starting or stopping an output)
-        //  2 access to either current device selection (fromCache == true) or
-        // "future" device selection (fromCache == false) when called from a context
-        //  where conditions are changing (setDeviceConnectionState(), setPhoneState()...) AND
-        //  before updateDevicesAndOutputs() is called.
-        virtual audio_devices_t getDeviceForStrategy(routing_strategy strategy,
-                                                     bool fromCache)
-        {
-            return getDevicesForStrategy(strategy, fromCache).types();
-        }
-
-        DeviceVector getDevicesForStrategy(routing_strategy strategy, bool fromCache);
-
-        bool isStrategyActive(const sp<AudioOutputDescriptor>& outputDesc, routing_strategy strategy,
-                              uint32_t inPastMs = 0, nsecs_t sysTime = 0) const;
-
-        bool isStrategyActiveOnSameModule(const sp<SwAudioOutputDescriptor>& outputDesc,
-                                          routing_strategy strategy, uint32_t inPastMs = 0,
-                                          nsecs_t sysTime = 0) const;
-
         // change the route of the specified output. Returns the number of ms we have slept to
         // allow new routing to take effect in certain cases.
         uint32_t setOutputDevices(const sp<SwAudioOutputDescriptor>& outputDesc,
@@ -359,9 +336,6 @@ protected:
                                 audio_patch_handle_t *patchHandle = NULL);
         status_t resetInputDevice(audio_io_handle_t input,
                                   audio_patch_handle_t *patchHandle = NULL);
-
-        // select input device corresponding to requested audio source
-        sp<DeviceDescriptor> getDeviceForAttributes(const audio_attributes_t &attributes);
 
         // compute the actual volume for a given stream according to the requested index and a particular
         // device
@@ -383,8 +357,16 @@ protected:
         void applyStreamVolumes(const sp<AudioOutputDescriptor>& outputDesc,
                                 audio_devices_t device, int delayMs = 0, bool force = false);
 
-        // Mute or unmute all streams handled by the specified strategy on the specified output
-        void setStrategyMute(routing_strategy strategy,
+        /**
+         * @brief setStrategyMute Mute or unmute all active clients on the considered output
+         * following the given strategy.
+         * @param strategy to be considered
+         * @param on true for mute, false for unmute
+         * @param outputDesc to be considered
+         * @param delayMs
+         * @param device
+         */
+        void setStrategyMute(product_strategy_t strategy,
                              bool on,
                              const sp<AudioOutputDescriptor>& outputDesc,
                              int delayMs = 0,
@@ -430,25 +412,27 @@ protected:
         // A2DP suspend status is rechecked.
         void checkForDeviceAndOutputChanges(std::function<bool()> onOutputsChecked = nullptr);
 
-        // checks and if necessary changes outputs used for all strategies.
-        // must be called every time a condition that affects the output choice for a given strategy
-        // changes: connected device, phone state, force use...
-        // Must be called before updateDevicesAndOutputs()
-        void checkOutputForStrategy(routing_strategy strategy);
+        /**
+         * @brief checkOutputForAttributes checks and if necessary changes outputs used for the
+         * given audio attributes.
+         * must be called every time a condition that affects the output choice for a given
+         * attributes changes: connected device, phone state, force use...
+         * Must be called before updateDevicesAndOutputs()
+         * @param attr to be considered
+         */
+        void checkOutputForAttributes(const audio_attributes_t &attr);
 
-        // Same as checkOutputForStrategy() but for a all strategies in order of priority
+        bool followsSameRouting(const audio_attributes_t &lAttr,
+                                const audio_attributes_t &rAttr) const;
+
+        /**
+         * @brief checkOutputForAllStrategies Same as @see checkOutputForAttributes()
+         *      but for a all product strategies in order of priority
+         */
         void checkOutputForAllStrategies();
 
         // manages A2DP output suspend/restore according to phone state and BT SCO usage
         void checkA2dpSuspend();
-
-        template <class IoDescriptor, class Filter>
-        sp<DeviceDescriptor> findPreferredDevice(IoDescriptor& desc, Filter filter,
-                                                bool& active, const DeviceVector& devices);
-
-        template <class IoCollection, class Filter>
-        sp<DeviceDescriptor> findPreferredDevice(IoCollection& ioCollection, Filter filter,
-                                                const DeviceVector& devices);
 
         // selects the most appropriate device on output for current state
         // must be called every time a condition that affects the device choice for a given output is
@@ -457,11 +441,14 @@ protected:
         DeviceVector getNewOutputDevices(const sp<SwAudioOutputDescriptor>& outputDesc,
                                          bool fromCache);
 
-        // updates cache of device used by all strategies (mDeviceForStrategy[])
-        // must be called every time a condition that affects the device choice for a given strategy is
-        // changed: connected device, phone state, force use...
-        // cached values are used by getDeviceForStrategy() if parameter fromCache is true.
-         // Must be called after checkOutputForAllStrategies()
+        /**
+         * @brief updateDevicesAndOutputs: updates cache of devices of the engine
+         * must be called every time a condition that affects the device choice is changed:
+         * connected device, phone state, force use...
+         * cached values are used by getOutputDevicesForStream()/getDevicesForAttributes if
+         * parameter fromCache is true.
+         * Must be called after checkOutputForAllStrategies()
+         */
         void updateDevicesAndOutputs();
 
         // selects the most appropriate device on input for current state
@@ -480,13 +467,19 @@ protected:
         SortedVector<audio_io_handle_t> getOutputsForDevices(
                 const DeviceVector &devices, const SwAudioOutputCollection& openOutputs);
 
-        // mute/unmute strategies using an incompatible device combination
-        // if muting, wait for the audio in pcm buffer to be drained before proceeding
-        // if unmuting, unmute only after the specified delay
-        // Returns the number of ms waited
-        virtual uint32_t  checkDeviceMuteStrategies(const sp<AudioOutputDescriptor>& outputDesc,
-                                                    audio_devices_t prevDeviceType,
-                                                    uint32_t delayMs);
+        /**
+         * @brief checkDeviceMuteStrategies mute/unmute strategies
+         *      using an incompatible device combination.
+         *      if muting, wait for the audio in pcm buffer to be drained before proceeding
+         *      if unmuting, unmute only after the specified delay
+         * @param outputDesc
+         * @param prevDevice
+         * @param delayMs
+         * @return the number of ms waited
+         */
+        virtual uint32_t checkDeviceMuteStrategies(const sp<AudioOutputDescriptor>& outputDesc,
+                                                   const DeviceVector &prevDevices,
+                                                   uint32_t delayMs);
 
         audio_io_handle_t selectOutput(const SortedVector<audio_io_handle_t>& outputs,
                                        audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
@@ -580,15 +573,22 @@ protected:
 
         void clearAudioPatches(uid_t uid);
         void clearSessionRoutes(uid_t uid);
-        void checkStrategyRoute(routing_strategy strategy, audio_io_handle_t ouptutToSkip);
+
+        /**
+         * @brief checkStrategyRoute: when an output is beeing rerouted, reconsider each output
+         * that may host a strategy playing on the considered output.
+         * @param ps product strategy that initiated the rerouting
+         * @param ouptutToSkip output that initiated the rerouting
+         */
+        void checkStrategyRoute(product_strategy_t ps, audio_io_handle_t ouptutToSkip);
 
         status_t hasPrimaryOutput() const { return mPrimaryOutput != 0; }
 
         status_t connectAudioSource(const sp<SourceClientDescriptor>& sourceDesc);
         status_t disconnectAudioSource(const sp<SourceClientDescriptor>& sourceDesc);
 
-        sp<SourceClientDescriptor> getSourceForStrategyOnOutput(audio_io_handle_t output,
-                                                               routing_strategy strategy);
+        sp<SourceClientDescriptor> getSourceForAttributesOnOutput(audio_io_handle_t output,
+                                                                  const audio_attributes_t &attr);
 
         void cleanUpForDevice(const sp<DeviceDescriptor>& deviceDesc);
 
@@ -615,15 +615,6 @@ protected:
         DeviceVector  mAvailableInputDevices;  // all available input devices
 
         bool    mLimitRingtoneVolume;        // limit ringtone volume to music volume if headset connected
-
-        /**
-         * @brief mDevicesForStrategy vector of devices that are assigned for a given strategy.
-         * Note: in case of removal of device (@see setDeviceConnectionState), the device descriptor
-         * will be removed from the @see mAvailableOutputDevices or @see mAvailableInputDevices
-         * but the devices for strategies will be reevaluated within the
-         * @see setDeviceConnectionState function.
-         */
-        DeviceVector mDevicesForStrategy[NUM_STRATEGIES];
 
         float   mLastVoiceVolume;            // last voice volume value sent to audio HAL
         bool    mA2dpSuspended;  // true if A2DP output is suspended
@@ -727,27 +718,32 @@ private:
                 audio_stream_type_t stream,
                 const audio_config_t *config,
                 audio_output_flags_t *flags);
-        // internal method to return the input handle for the given device and format
+
+        /**
+         * @brief getInputForDevice selects an input handle for a given input device and
+         * requester context
+         * @param device to be used by requester, selected by policy mix rules or engine
+         * @param session requester session id
+         * @param uid requester uid
+         * @param attributes requester audio attributes (e.g. input source and tags matter)
+         * @param config requester audio configuration (e.g. sample rate, format, channel mask).
+         * @param flags requester input flags
+         * @param policyMix may be null, policy rules to be followed by the requester
+         * @return input io handle aka unique input identifier selected for this device.
+         */
         audio_io_handle_t getInputForDevice(const sp<DeviceDescriptor> &device,
                 audio_session_t session,
-                audio_source_t inputSource,
+                const audio_attributes_t &attributes,
                 const audio_config_base_t *config,
                 audio_input_flags_t flags,
                 AudioMix *policyMix);
 
-        // internal function to derive a stream type value from audio attributes
-        audio_stream_type_t streamTypefromAttributesInt(const audio_attributes_t *attr);
         // event is one of STARTING_OUTPUT, STARTING_BEACON, STOPPING_OUTPUT, STOPPING_BEACON
         // returns 0 if no mute/unmute event happened, the largest latency of the device where
         //   the mute/unmute happened
         uint32_t handleEventForBeacon(int event);
         uint32_t setBeaconMute(bool mute);
         bool     isValidAttributes(const audio_attributes_t *paa);
-
-        // select input device corresponding to requested audio source and return associated policy
-        // mix if any. Calls getDeviceForInputSource().
-        sp<DeviceDescriptor> getDeviceAndMixForAttributes(const audio_attributes_t &attributes,
-                                                          AudioMix **policyMix = NULL);
 
         // Called by setDeviceConnectionState().
         status_t setDeviceConnectionStateInt(audio_devices_t deviceType,

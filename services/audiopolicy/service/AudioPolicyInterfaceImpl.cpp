@@ -703,11 +703,12 @@ status_t AudioPolicyService::getStreamVolumeIndex(audio_stream_type_t stream,
 uint32_t AudioPolicyService::getStrategyForStream(audio_stream_type_t stream)
 {
     if (uint32_t(stream) >= AUDIO_STREAM_PUBLIC_CNT) {
-        return 0;
+        return PRODUCT_STRATEGY_NONE;
     }
     if (mAudioPolicyManager == NULL) {
-        return 0;
+        return PRODUCT_STRATEGY_NONE;
     }
+    // DO NOT LOCK, may be called from AudioFlinger with lock held, reaching deadlock
     AutoCallerClear acc;
     return mAudioPolicyManager->getStrategyForStream(stream);
 }

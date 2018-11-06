@@ -34,6 +34,9 @@ constexpr bool operator==(const audio_attributes_t &lhs, const audio_attributes_
     return lhs.usage == rhs.usage && lhs.content_type == rhs.content_type &&
             lhs.flags == rhs.flags && (std::strcmp(lhs.tags, rhs.tags) == 0);
 }
-
+constexpr bool operator!=(const audio_attributes_t &lhs, const audio_attributes_t &rhs)
+{
+    return !(lhs==rhs);
+}
 } // namespace android
 
