@@ -280,13 +280,10 @@ private:
 
 struct AMediaDataSourceWrapper : public RefBase {
 
+    AMediaDataSourceWrapper(const sp<DataSource>&);
     AMediaDataSourceWrapper(AMediaDataSource*);
-    AMediaDataSourceWrapper(int fd, int64_t offset, int64_t length);
 
     AMediaDataSource *getAMediaDataSource();
-    int getFd() { return mFd; }
-    int64_t getOffset() { return mOffset; }
-    int64_t getLength() { return mLength; }
 
     void close();
 
@@ -294,10 +291,8 @@ protected:
     virtual ~AMediaDataSourceWrapper();
 
 private:
+    sp<DataSource> mDataSource;
     AMediaDataSource *mAMediaDataSource;
-    int mFd;
-    int64_t mOffset;
-    int64_t mLength;
 
     DISALLOW_EVIL_CONSTRUCTORS(AMediaDataSourceWrapper);
 };
