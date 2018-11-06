@@ -170,9 +170,7 @@ struct AImageReader : public RefBase {
 };
 
 // Retrieves HGraphicBufferProducer corresponding to the native_handle_t
-// provided. This method also deletes the HalToken corresponding to the
-// native_handle_t. Thus, if it is used twice in succession, the second call
-// returns nullptr;
+// provided (this native handle MUST have been obtained by AImageReader_getWindowNativeHandle()).
 sp<HGraphicBufferProducer> AImageReader_getHGBPFromHandle(const native_handle_t *handle);
 
 #endif // _NDK_IMAGE_READER_PRIV_H
