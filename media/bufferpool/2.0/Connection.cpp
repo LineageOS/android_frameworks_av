@@ -60,6 +60,13 @@ void Connection::initialize(
     }
 }
 
+ResultStatus Connection::flush() {
+    if (mInitialized && mAccessor) {
+        return mAccessor->flush();
+    }
+    return ResultStatus::CRITICAL_ERROR;
+}
+
 ResultStatus Connection::allocate(
         const std::vector<uint8_t> &params, BufferId *bufferId,
         const native_handle_t **handle) {

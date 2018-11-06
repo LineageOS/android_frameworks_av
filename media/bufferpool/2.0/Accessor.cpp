@@ -117,19 +117,18 @@ sp<ConnectionDeathRecipient> Accessor::getConnectionDeathRecipient() {
 Return<void> Accessor::connect(
         const sp<::android::hardware::media::bufferpool::V2_0::IObserver>& observer,
         connect_cb _hidl_cb) {
-    (void)observer;
     sp<Connection> connection;
     ConnectionId connectionId;
+    uint32_t msgId;
     const StatusDescriptor* fmqDesc;
+    const InvalidationDescriptor* invDesc;
 
-    ResultStatus status = connect(&connection, &connectionId, &fmqDesc, false);
+    ResultStatus status = connect(
+            observer, false, &connection, &connectionId, &msgId, &fmqDesc, &invDesc);
     if (status == ResultStatus::OK) {
-        _hidl_cb(status, connection, connectionId, *fmqDesc,
-                 android::hardware::MQDescriptorUnsync<BufferInvalidationMessage>(
-                         std::vector<android::hardware::GrantorDescriptor>(),
-                         nullptr /* nhandle */, 0 /* size */));
+        _hidl_cb(status, connection, connectionId, msgId, *fmqDesc, *invDesc);
     } else {
-        _hidl_cb(status, nullptr, -1LL,
+        _hidl_cb(status, nullptr, -1LL, 0,
                  android::hardware::MQDescriptorSync<BufferStatusMessage>(
                          std::vector<android::hardware::GrantorDescriptor>(),
                          nullptr /* nhandle */, 0 /* size */),
@@ -147,7 +146,15 @@ Accessor::~Accessor() {
 }
 
 bool Accessor::isValid() {
-    return (bool)mImpl;
+    return (bool)mImpl && mImpl->isValid();
+}
+
+ResultStatus Accessor::flush() {
+    if (mImpl) {
+        mImpl->flush();
+        return ResultStatus::OK;
+    }
+    return ResultStatus::CRITICAL_ERROR;
 }
 
 ResultStatus Accessor::allocate(
@@ -170,10 +177,15 @@ ResultStatus Accessor::fetch(
 }
 
 ResultStatus Accessor::connect(
+        const sp<IObserver> &observer, bool local,
         sp<Connection> *connection, ConnectionId *pConnectionId,
-        const StatusDescriptor** fmqDescPtr, bool local) {
+        uint32_t *pMsgId,
+        const StatusDescriptor** statusDescPtr,
+        const InvalidationDescriptor** invDescPtr) {
     if (mImpl) {
-        ResultStatus status = mImpl->connect(this, connection, pConnectionId, fmqDescPtr);
+        ResultStatus status = mImpl->connect(
+                this, observer, connection, pConnectionId, pMsgId,
+                statusDescPtr, invDescPtr);
         if (!local && status == ResultStatus::OK) {
             sp<Accessor> accessor(this);
             sConnectionDeathRecipient->add(*pConnectionId, accessor);

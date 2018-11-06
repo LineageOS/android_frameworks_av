@@ -37,9 +37,13 @@ namespace implementation {
 /** Returns monotonic timestamp in Us since fixed point in time. */
 int64_t getTimestampNow();
 
+bool isMessageLater(uint32_t curMsgId, uint32_t prevMsgId);
+
+bool isBufferInRange(BufferId from, BufferId to, BufferId bufferId);
+
 /**
- * A collection of FMQ for a buffer pool. buffer ownership/status change
- * messages are sent via the FMQs from the clients.
+ * A collection of buffer status message FMQ for a buffer pool. buffer
+ * ownership/status change messages are sent via the FMQs from the clients.
  */
 class BufferStatusObserver {
 private:
@@ -47,7 +51,8 @@ private:
             mBufferStatusQueues;
 
 public:
-    /** Creates an FMQ for the specified connection(client).
+    /** Creates a buffer status message FMQ for the specified
+     * connection(client).
      *
      * @param connectionId  connection Id of the specified client.
      * @param fmqDescPtr    double ptr of created FMQ's descriptor.
@@ -58,7 +63,8 @@ public:
      */
     ResultStatus open(ConnectionId id, const StatusDescriptor** fmqDescPtr);
 
-    /** Closes an FMQ for the specified connection(client).
+    /** Closes a buffer status message FMQ for the specified
+     * connection(client).
      *
      * @param connectionId  connection Id of the specified client.
      *
@@ -75,8 +81,8 @@ public:
 };
 
 /**
- * An FMQ for a buffer pool client. Buffer ownership/status change messages
- * are sent via the fmq to the buffer pool.
+ * A buffer status message FMQ for a buffer pool client. Buffer ownership/status
+ * change messages are sent via the fmq to the buffer pool.
  */
 class BufferStatusChannel {
 private:
@@ -85,7 +91,8 @@ private:
 
 public:
     /**
-     * Connects to an FMQ from a descriptor of the created FMQ.
+     * Connects to a buffer status message FMQ from a descriptor of
+     * the created FMQ.
      *
      * @param fmqDesc   Descriptor of the created FMQ.
      */
@@ -131,6 +138,86 @@ public:
             ConnectionId connectionId,
             ConnectionId targetId,
             std::list<BufferId> &pending, std::list<BufferId> &posted);
+
+    /**
+     * Posts a buffer invaliadation messge to the buffer pool.
+     *
+     * @param connectionId  connection Id of the client.
+     * @param invalidateId  invalidation ack to the buffer pool.
+     *                      if invalidation id is zero, the ack will not be
+     *                      posted.
+     * @param invalidated   sets {@code true} only when the invalidation ack is
+     *                      posted.
+     */
+    void postBufferInvalidateAck(
+            ConnectionId connectionId,
+            uint32_t invalidateId,
+            bool *invalidated);
+};
+
+/**
+ * A buffer invalidation FMQ for a buffer pool client. Buffer invalidation
+ * messages are received via the fmq from the buffer pool. Buffer invalidation
+ * messages are handled as soon as possible.
+ */
+class BufferInvalidationListener {
+private:
+    bool mValid;
+    std::unique_ptr<BufferInvalidationQueue> mBufferInvalidationQueue;
+
+public:
+    /**
+     * Connects to a buffer invalidation FMQ from a descriptor of the created FMQ.
+     *
+     * @param fmqDesc   Descriptor of the created FMQ.
+     */
+    BufferInvalidationListener(const InvalidationDescriptor &fmqDesc);
+
+    /** Retrieves all pending buffer invalidation messages from the buffer pool.
+     *
+     * @param messages  retrieved pending messages.
+     */
+    void getInvalidations(std::vector<BufferInvalidationMessage> &messages);
+
+    /** Returns whether the FMQ is connected succesfully. */
+    bool isValid();
+};
+
+/**
+ * A buffer invalidation FMQ for a buffer pool. A buffer pool will send buffer
+ * invalidation messages to the clients via the FMQ. The FMQ is shared among
+ * buffer pool clients.
+ */
+class BufferInvalidationChannel {
+private:
+    bool mValid;
+    std::unique_ptr<BufferInvalidationQueue> mBufferInvalidationQueue;
+
+public:
+    /**
+     * Creates a buffer invalidation FMQ for a buffer pool.
+     */
+    BufferInvalidationChannel();
+
+    /** Returns whether the FMQ is connected succesfully. */
+    bool isValid();
+
+    /**
+     * Retrieves the descriptor of a buffer invalidation FMQ. the descriptor may
+     * be passed to the client for buffer invalidation handling.
+     *
+     * @param fmqDescPtr    double ptr of created FMQ's descriptor.
+     */
+    void getDesc(const InvalidationDescriptor **fmqDescPtr);
+
+    /** Posts a buffer invalidation for invalidated buffers.
+     *
+     * @param msgId     Invalidation message id which is used when clients send
+     *                  acks back via BufferStatusMessage
+     * @param fromId    The start bufferid of the invalidated buffers(inclusive)
+     * @param toId      The end bufferId of the invalidated buffers(inclusive)
+     */
+    void postInvalidation(uint32_t msgId, BufferId fromId, BufferId toId);
 };
 
 }  // namespace implementation

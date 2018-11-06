@@ -163,8 +163,7 @@ static int measureLatencyFromEchos(const float *haystack, int haystackSize,
                             const float *needle, int needleSize,
                             LatencyReport *report) {
     const double threshold = 0.1;
-    printf("measureLatencyFromEchos: haystackSize = %d, needleSize = %d\n",
-           haystackSize, needleSize);
+    // printf("%s: haystackSize = %d, needleSize = %d\n", __func__, haystackSize, needleSize);
 
     // Find first peak
     int first = (int) (findFirstMatch(haystack,
@@ -181,8 +180,6 @@ static int measureLatencyFromEchos(const float *haystack, int haystackSize,
                                       needle,
                                       needleSize,
                                       threshold) + 0.5);
-
-    printf("measureLatencyFromEchos: first = %d, again at %d\n", first, again);
     first = again;
 
     // Allocate results array
@@ -199,7 +196,7 @@ static int measureLatencyFromEchos(const float *haystack, int haystackSize,
 
     // Add higher harmonics mapped onto lower harmonics.
     // This reinforces the "fundamental" echo.
-    const int numEchoes = 10;
+    const int numEchoes = 8;
     for (int partial = 1; partial < numEchoes; partial++) {
         for (int i = 0; i < numCorrelations; i++) {
             harmonicSums[i / partial] += correlations[i] / partial;
@@ -216,7 +213,7 @@ static int measureLatencyFromEchos(const float *haystack, int haystackSize,
             maxCorrelation = harmonicSums[i];
             sumOfPeaks += maxCorrelation;
             peakIndex = i;
-            printf("maxCorrelation = %f at %d\n", maxCorrelation, peakIndex);
+            // printf("maxCorrelation = %f at %d\n", maxCorrelation, peakIndex);
         }
     }
 
@@ -476,9 +473,13 @@ public:
     void report() override {
 
         printf("EchoAnalyzer ---------------\n");
-        printf(LOOPBACK_RESULT_TAG "measured.gain          = %f\n", mMeasuredLoopGain);
-        printf(LOOPBACK_RESULT_TAG "echo.gain              = %f\n", mEchoGain);
-        printf(LOOPBACK_RESULT_TAG "test.state             = %d\n", mState);
+        printf(LOOPBACK_RESULT_TAG "measured.gain          = %8f\n", mMeasuredLoopGain);
+        printf(LOOPBACK_RESULT_TAG "echo.gain              = %8f\n", mEchoGain);
+        printf(LOOPBACK_RESULT_TAG "test.state             = %8d\n", mState);
+        printf(LOOPBACK_RESULT_TAG "test.state.name        = %8s\n", convertStateToText(mState));
+        if (mState == STATE_WAITING_FOR_SILENCE) {
+            printf("WARNING - Stuck waiting for silence. Input may be too noisy!\n");
+        }
         if (mMeasuredLoopGain >= 0.9999) {
             printf("   ERROR - clipping, turn down volume slightly\n");
         } else {
@@ -491,9 +492,12 @@ public:
                 printf("   ERROR - confidence too low = %f\n", mLatencyReport.confidence);
             } else {
                 double latencyMillis = 1000.0 * mLatencyReport.latencyInFrames / getSampleRate();
-                printf(LOOPBACK_RESULT_TAG "latency.frames        = %8.2f\n", mLatencyReport.latencyInFrames);
-                printf(LOOPBACK_RESULT_TAG "latency.msec          = %8.2f\n", latencyMillis);
-                printf(LOOPBACK_RESULT_TAG "latency.confidence    = %8.6f\n", mLatencyReport.confidence);
+                printf(LOOPBACK_RESULT_TAG "latency.frames         = %8.2f\n",
+                       mLatencyReport.latencyInFrames);
+                printf(LOOPBACK_RESULT_TAG "latency.msec           = %8.2f\n",
+                       latencyMillis);
+                printf(LOOPBACK_RESULT_TAG "latency.confidence     = %8.6f\n",
+                       mLatencyReport.confidence);
             }
         }
     }
@@ -527,7 +531,7 @@ public:
         int numWritten;
         int numSamples;
 
-        echo_state_t nextState = mState;
+        echo_state nextState = mState;
 
         switch (mState) {
             case STATE_INITIAL_SILENCE:
@@ -553,6 +557,7 @@ public:
                         //       mLoopCounter, peak);
                         mDownCounter = 8;
                         mMeasuredLoopGain = peak;  // assumes original pulse amplitude is one
+                        mSilenceThreshold = peak * 0.1; // scale silence to measured pulse
                         // Calculate gain that will give us a nice decaying echo.
                         mEchoGain = mDesiredEchoGain / mMeasuredLoopGain;
                         if (mEchoGain > MAX_ECHO_GAIN) {
@@ -638,7 +643,7 @@ public:
 
 private:
 
-    enum echo_state_t {
+    enum echo_state {
         STATE_INITIAL_SILENCE,
         STATE_MEASURING_GAIN,
         STATE_WAITING_FOR_SILENCE,
@@ -648,6 +653,35 @@ private:
         STATE_FAILED
     };
 
+    const char *convertStateToText(echo_state state) {
+        const char *result = "Unknown";
+        switch(state) {
+            case STATE_INITIAL_SILENCE:
+                result = "INIT";
+                break;
+            case STATE_MEASURING_GAIN:
+                result = "GAIN";
+                break;
+            case STATE_WAITING_FOR_SILENCE:
+                result = "SILENCE";
+                break;
+            case STATE_SENDING_PULSE:
+                result = "PULSE";
+                break;
+            case STATE_GATHERING_ECHOS:
+                result = "ECHOS";
+                break;
+            case STATE_DONE:
+                result = "DONE";
+                break;
+            case STATE_FAILED:
+                result = "FAILED";
+                break;
+        }
+        return result;
+    }
+
+
     int32_t         mDownCounter = 500;
     int32_t         mLoopCounter = 0;
     int32_t         mSampleIndex = 0;
@@ -656,7 +690,7 @@ private:
     float           mMeasuredLoopGain = 0.0f;
     float           mDesiredEchoGain = 0.95f;
     float           mEchoGain = 1.0f;
-    echo_state_t    mState = STATE_INITIAL_SILENCE;
+    echo_state      mState = STATE_INITIAL_SILENCE;
 
     AudioRecording  mAudioRecording; // contains only the input after the gain detection burst
     LatencyReport   mLatencyReport;
@@ -680,21 +714,32 @@ public:
 
     void report() override {
         printf("SineAnalyzer ------------------\n");
-        printf(LOOPBACK_RESULT_TAG "peak.amplitude     = %7.5f\n", mPeakAmplitude);
-        printf(LOOPBACK_RESULT_TAG "sine.magnitude     = %7.5f\n", mMagnitude);
-        printf(LOOPBACK_RESULT_TAG "phase.offset       = %7.5f\n", mPhaseOffset);
-        printf(LOOPBACK_RESULT_TAG "ref.phase          = %7.5f\n", mPhase);
-        printf(LOOPBACK_RESULT_TAG "frames.accumulated = %6d\n", mFramesAccumulated);
-        printf(LOOPBACK_RESULT_TAG "sine.period        = %6d\n", mSinePeriod);
-        printf(LOOPBACK_RESULT_TAG "test.state         = %6d\n", mState);
-        printf(LOOPBACK_RESULT_TAG "frame.count        = %6d\n", mFrameCounter);
+        printf(LOOPBACK_RESULT_TAG "peak.amplitude     = %8f\n", mPeakAmplitude);
+        printf(LOOPBACK_RESULT_TAG "sine.magnitude     = %8f\n", mMagnitude);
+        printf(LOOPBACK_RESULT_TAG "peak.noise         = %8f\n", mPeakNoise);
+        printf(LOOPBACK_RESULT_TAG "rms.noise          = %8f\n", mRootMeanSquareNoise);
+        float amplitudeRatio = mMagnitude / mPeakNoise;
+        float signalToNoise = amplitudeRatio * amplitudeRatio;
+        printf(LOOPBACK_RESULT_TAG "signal.to.noise    = %8.2f\n", signalToNoise);
+        float signalToNoiseDB = 10.0 * log(signalToNoise);
+        printf(LOOPBACK_RESULT_TAG "signal.to.noise.db = %8.2f\n", signalToNoiseDB);
+        if (signalToNoiseDB < MIN_SNRATIO_DB) {
+            printf("WARNING - signal to noise ratio is too low! < %d dB\n", MIN_SNRATIO_DB);
+        }
+        printf(LOOPBACK_RESULT_TAG "phase.offset       = %8.5f\n", mPhaseOffset);
+        printf(LOOPBACK_RESULT_TAG "ref.phase          = %8.5f\n", mPhase);
+        printf(LOOPBACK_RESULT_TAG "frames.accumulated = %8d\n", mFramesAccumulated);
+        printf(LOOPBACK_RESULT_TAG "sine.period        = %8d\n", mSinePeriod);
+        printf(LOOPBACK_RESULT_TAG "test.state         = %8d\n", mState);
+        printf(LOOPBACK_RESULT_TAG "frame.count        = %8d\n", mFrameCounter);
         // Did we ever get a lock?
         bool gotLock = (mState == STATE_LOCKED) || (mGlitchCount > 0);
         if (!gotLock) {
             printf("ERROR - failed to lock on reference sine tone\n");
         } else {
             // Only print if meaningful.
-            printf(LOOPBACK_RESULT_TAG "glitch.count       = %6d\n", mGlitchCount);
+            printf(LOOPBACK_RESULT_TAG "glitch.count       = %8d\n", mGlitchCount);
+            printf(LOOPBACK_RESULT_TAG "max.glitch         = %8f\n", mMaxGlitchDelta);
         }
     }
 
@@ -732,15 +777,48 @@ public:
         }
 
         for (int i = 0; i < numFrames; i++) {
+            bool sineEnabled = true;
             float sample = inputData[i * inputChannelCount];
 
             float sinOut = sinf(mPhase);
 
             switch (mState) {
                 case STATE_IDLE:
-                case STATE_IMMUNE:
-                case STATE_WAITING_FOR_SIGNAL:
+                    sineEnabled = false;
+                    mDownCounter--;
+                    if (mDownCounter <= 0) {
+                        mState = STATE_MEASURE_NOISE;
+                        mDownCounter = NOISE_FRAME_COUNT;
+                    }
                     break;
+                case STATE_MEASURE_NOISE:
+                    sineEnabled = false;
+                    mPeakNoise = std::max(abs(sample), mPeakNoise);
+                    mNoiseSumSquared += sample * sample;
+                    mDownCounter--;
+                    if (mDownCounter <= 0) {
+                        mState = STATE_WAITING_FOR_SIGNAL;
+                        mRootMeanSquareNoise = sqrt(mNoiseSumSquared / NOISE_FRAME_COUNT);
+                        mTolerance = std::max(MIN_TOLERANCE, mPeakNoise * 2.0f);
+                        mPhase = 0.0; // prevent spike at start
+                    }
+                    break;
+
+                case STATE_IMMUNE:
+                    mDownCounter--;
+                    if (mDownCounter <= 0) {
+                        mState = STATE_WAITING_FOR_SIGNAL;
+                    }
+                    break;
+
+                case STATE_WAITING_FOR_SIGNAL:
+                    if (peak > mThreshold) {
+                        mState = STATE_WAITING_FOR_LOCK;
+                        //printf("%5d: switch to STATE_WAITING_FOR_LOCK\n", mFrameCounter);
+                        resetAccumulator();
+                    }
+                    break;
+
                 case STATE_WAITING_FOR_LOCK:
                     mSinAccumulator += sample * sinOut;
                     mCosAccumulator += sample * cosf(mPhase);
@@ -766,13 +844,14 @@ public:
                     // printf("    predicted = %f, actual = %f\n", predicted, sample);
 
                     float diff = predicted - sample;
-                    if (fabs(diff) > mTolerance) {
+                    float absDiff = fabs(diff);
+                    mMaxGlitchDelta = std::max(mMaxGlitchDelta, absDiff);
+                    if (absDiff > mTolerance) {
                         mGlitchCount++;
                         //printf("%5d: Got a glitch # %d, predicted = %f, actual = %f\n",
                         //       mFrameCounter, mGlitchCount, predicted, sample);
                         mState = STATE_IMMUNE;
-                        //printf("%5d: switch to STATE_IMMUNE\n", mFrameCounter);
-                        mDownCounter = mSinePeriod;  // Set duration of IMMUNE state.
+                        mDownCounter = mSinePeriod * PERIODS_IMMUNE;
                     }
 
                     // Track incoming signal and slowly adjust magnitude to account
@@ -792,44 +871,23 @@ public:
                 } break;
             }
 
+            float output = 0.0f;
             // Output sine wave so we can measure it.
-            outputData[i * outputChannelCount] = (sinOut * mOutputAmplitude)
-                    + (mWhiteNoise.nextRandomDouble() * mNoiseAmplitude);
-            // printf("%5d: sin(%f) = %f, %f\n", i, mPhase, sinOut,  mPhaseIncrement);
-
-            // advance and wrap phase
-            mPhase += mPhaseIncrement;
-            if (mPhase > M_PI) {
-                mPhase -= (2.0 * M_PI);
+            if (sineEnabled) {
+                output = (sinOut * mOutputAmplitude)
+                         + (mWhiteNoise.nextRandomDouble() * mNoiseAmplitude);
+                // printf("%5d: sin(%f) = %f, %f\n", i, mPhase, sinOut,  mPhaseIncrement);
+                // advance and wrap phase
+                mPhase += mPhaseIncrement;
+                if (mPhase > M_PI) {
+                    mPhase -= (2.0 * M_PI);
+                }
             }
+            outputData[i * outputChannelCount] = output;
+
 
             mFrameCounter++;
         }
-
-        // Do these once per buffer.
-        switch (mState) {
-            case STATE_IDLE:
-                mState = STATE_IMMUNE; // so we can tell when
-                break;
-            case STATE_IMMUNE:
-                mDownCounter -= numFrames;
-                if (mDownCounter <= 0) {
-                    mState = STATE_WAITING_FOR_SIGNAL;
-                    //printf("%5d: switch to STATE_WAITING_FOR_SIGNAL\n", mFrameCounter);
-                }
-                break;
-            case STATE_WAITING_FOR_SIGNAL:
-                if (peak > mThreshold) {
-                    mState = STATE_WAITING_FOR_LOCK;
-                    //printf("%5d: switch to STATE_WAITING_FOR_LOCK\n", mFrameCounter);
-                    resetAccumulator();
-                }
-                break;
-            case STATE_WAITING_FOR_LOCK:
-            case STATE_LOCKED:
-                break;
-        }
-
     }
 
     void resetAccumulator() {
@@ -840,18 +898,24 @@ public:
 
     void reset() override {
         mGlitchCount = 0;
-        mState = STATE_IMMUNE;
-        mDownCounter = IMMUNE_FRAME_COUNT;
+        mState = STATE_IDLE;
+        mDownCounter = IDLE_FRAME_COUNT;
         mPhaseIncrement = 2.0 * M_PI / mSinePeriod;
         printf("phaseInc = %f for period %d\n", mPhaseIncrement, mSinePeriod);
         resetAccumulator();
         mProcessCount = 0;
+        mPeakNoise = 0.0f;
+        mNoiseSumSquared = 0.0;
+        mRootMeanSquareNoise = 0.0;
+        mPhase = 0.0f;
+        mMaxGlitchDelta = 0.0;
     }
 
 private:
 
     enum sine_state_t {
         STATE_IDLE,
+        STATE_MEASURE_NOISE,
         STATE_IMMUNE,
         STATE_WAITING_FOR_SIGNAL,
         STATE_WAITING_FOR_LOCK,
@@ -859,9 +923,15 @@ private:
     };
 
     enum constants {
-        IMMUNE_FRAME_COUNT = 48 * 500,
-        PERIODS_NEEDED_FOR_LOCK = 8
+        // Arbitrary durations, assuming 48000 Hz
+        IDLE_FRAME_COUNT = 48 * 100,
+        NOISE_FRAME_COUNT = 48 * 600,
+        PERIODS_NEEDED_FOR_LOCK = 8,
+        PERIODS_IMMUNE = 2,
+        MIN_SNRATIO_DB = 65
     };
+
+    static constexpr float MIN_TOLERANCE = 0.01;
 
     int     mSinePeriod = 79;
     double  mPhaseIncrement = 0.0;
@@ -870,16 +940,22 @@ private:
     double  mPreviousPhaseOffset = 0.0;
     double  mMagnitude = 0.0;
     double  mThreshold = 0.005;
-    double  mTolerance = 0.01;
+    double  mTolerance = MIN_TOLERANCE;
     int32_t mFramesAccumulated = 0;
     int32_t mProcessCount = 0;
     double  mSinAccumulator = 0.0;
     double  mCosAccumulator = 0.0;
+    float   mMaxGlitchDelta = 0.0f;
     int32_t mGlitchCount = 0;
     double  mPeakAmplitude = 0.0;
-    int     mDownCounter = IMMUNE_FRAME_COUNT;
+    int     mDownCounter = IDLE_FRAME_COUNT;
     int32_t mFrameCounter = 0;
     float   mOutputAmplitude = 0.75;
+
+    // measure background noise
+    float   mPeakNoise = 0.0f;
+    double  mNoiseSumSquared = 0.0;
+    double  mRootMeanSquareNoise = 0.0;
 
     PseudoRandom  mWhiteNoise;
     float   mNoiseAmplitude = 0.00; // Used to experiment with warbling caused by DRC.
