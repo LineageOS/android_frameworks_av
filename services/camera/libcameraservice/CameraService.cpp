@@ -2442,7 +2442,8 @@ bool CameraService::UidPolicy::isUidActive(uid_t uid, String16 callingPackage) {
     return isUidActiveLocked(uid, callingPackage);
 }
 
-static const int kPollUidActiveTimeoutMillis = 50;
+static const int64_t kPollUidActiveTimeoutTotalMillis = 300;
+static const int64_t kPollUidActiveTimeoutMillis = 50;
 
 bool CameraService::UidPolicy::isUidActiveLocked(uid_t uid, String16 callingPackage) {
     // Non-app UIDs are considered always active
@@ -2470,7 +2471,8 @@ bool CameraService::UidPolicy::isUidActiveLocked(uid_t uid, String16 callingPack
             // activity being resumed. The proper fix is very risky, so we temporary add
             // some polling which should happen pretty rarely anyway as the race is hard
             // to hit.
-            active = am.isUidActive(uid, callingPackage);
+            active = mActiveUids.find(uid) != mActiveUids.end();
+            if (!active) active = am.isUidActive(uid, callingPackage);
             if (active) {
                 break;
             }
@@ -2478,11 +2480,15 @@ bool CameraService::UidPolicy::isUidActiveLocked(uid_t uid, String16 callingPack
                 startTimeMillis = uptimeMillis();
             }
             int64_t ellapsedTimeMillis = uptimeMillis() - startTimeMillis;
-            int64_t remainingTimeMillis = kPollUidActiveTimeoutMillis - ellapsedTimeMillis;
+            int64_t remainingTimeMillis = kPollUidActiveTimeoutTotalMillis - ellapsedTimeMillis;
             if (remainingTimeMillis <= 0) {
                 break;
             }
+            remainingTimeMillis = std::min(kPollUidActiveTimeoutMillis, remainingTimeMillis);
+
+            mUidLock.unlock();
             usleep(remainingTimeMillis * 1000);
+            mUidLock.lock();
         } while (true);
 
         if (active) {
