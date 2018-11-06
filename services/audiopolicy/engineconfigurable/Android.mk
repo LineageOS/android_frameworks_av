@@ -11,8 +11,6 @@ LOCAL_SRC_FILES := \
     src/Engine.cpp \
     src/EngineInstance.cpp \
     src/Stream.cpp \
-    src/Strategy.cpp \
-    src/Usage.cpp \
     src/InputSource.cpp \
     ../engine/common/src/ProductStrategy.cpp \
     ../engine/common/src/EngineBase.cpp

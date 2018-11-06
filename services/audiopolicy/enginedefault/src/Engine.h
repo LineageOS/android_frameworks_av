@@ -55,14 +55,6 @@ private:
     ///
     /// from EngineBase, so from AudioPolicyManagerInterface
     ///
-    audio_devices_t getDeviceForInputSource(audio_source_t inputSource) const override;
-
-    audio_devices_t getDeviceForStrategy(routing_strategy strategy) const override;
-
-    routing_strategy getStrategyForStream(audio_stream_type_t stream) override;
-
-    routing_strategy getStrategyForUsage(audio_usage_t usage) override;
-
     status_t setPhoneState(audio_mode_t mode) override;
 
     status_t setForceUse(audio_policy_force_use_t usage,
@@ -94,6 +86,8 @@ private:
                                             uint32_t outputDeviceTypesToIgnore) const;
 
     DeviceVector getDevicesForProductStrategy(product_strategy_t strategy) const;
+
+    audio_devices_t getDeviceForInputSource(audio_source_t inputSource) const;
 
     DeviceStrategyMap mDevicesForStrategies;
 

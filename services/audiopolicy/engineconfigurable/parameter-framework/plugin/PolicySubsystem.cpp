@@ -17,10 +17,8 @@
 #include "PolicySubsystem.h"
 #include "SubsystemObjectFactory.h"
 #include "PolicyMappingKeys.h"
-#include "Strategy.h"
 #include "Stream.h"
 #include "InputSource.h"
-#include "Usage.h"
 #include "ProductStrategy.h"
 #include <AudioPolicyPluginInterface.h>
 #include <AudioPolicyEngineInstance.h>
@@ -37,9 +35,7 @@ const char *const PolicySubsystem::mKeyAmend3 = "Amend3";
 
 
 const char *const PolicySubsystem::mStreamComponentName = "Stream";
-const char *const PolicySubsystem::mStrategyComponentName = "Strategy";
 const char *const PolicySubsystem::mInputSourceComponentName = "InputSource";
-const char *const PolicySubsystem::mUsageComponentName = "Usage";
 const char *const PolicySubsystem::mProductStrategyComponentName = "ProductStrategy";
 
 PolicySubsystem::PolicySubsystem(const std::string &name, core::log::Logger &logger)
@@ -67,16 +63,6 @@ PolicySubsystem::PolicySubsystem(const std::string &name, core::log::Logger &log
     addSubsystemObjectFactory(
         new TSubsystemObjectFactory<Stream>(
             mStreamComponentName,
-            (1 << MappingKeyName))
-        );
-    addSubsystemObjectFactory(
-        new TSubsystemObjectFactory<Strategy>(
-            mStrategyComponentName,
-            0)
-        );
-    addSubsystemObjectFactory(
-        new TSubsystemObjectFactory<Usage>(
-            mUsageComponentName,
             (1 << MappingKeyName))
         );
     addSubsystemObjectFactory(

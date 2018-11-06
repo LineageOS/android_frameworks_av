@@ -17,7 +17,6 @@
 #pragma once
 
 #include <AudioPolicyManagerObserver.h>
-#include <RoutingStrategy.h>
 #include <media/AudioProductStrategy.h>
 #include <policy.h>
 #include <Volume.h>
@@ -54,51 +53,6 @@ public:
      * @param[in] observer handle on the manager.
      */
     virtual void setObserver(AudioPolicyManagerObserver *observer) = 0;
-
-    /**
-     * Get the input device selected for a given input source.
-     *
-     * @param[in] inputSource to get the selected input device associated to
-     *
-     * @return selected input device for the given input source, may be none if error.
-     *
-     * @deprecated use getInputDeviceForAttributes
-     */
-    virtual audio_devices_t getDeviceForInputSource(audio_source_t inputSource) const = 0;
-
-    /**
-     * Get the output device associated to a given strategy.
-     *
-     * @param[in] stream type for which the selected ouput device is requested.
-     *
-     * @return selected ouput device for the given strategy, may be none if error.
-     *
-     * @deprecated use getOutputDeviceForAttributes
-     */
-    virtual audio_devices_t getDeviceForStrategy(routing_strategy stategy) const = 0;
-
-    /**
-     * Get the strategy selected for a given stream type.
-     *
-     * @param[in] stream: for which the selected strategy followed by is requested.
-     *
-     * @return strategy to be followed.
-     *
-     * @deprecated use getOrderedStreams() / getLinkedStreams() to apply operation on stream
-     * following same former routing_strategy
-     */
-    virtual routing_strategy getStrategyForStream(audio_stream_type_t stream) = 0;
-
-    /**
-     * Get the strategy selected for a given usage.
-     *
-     * @param[in] usage to get the selected strategy followed by.
-     *
-     * @return strategy to be followed.
-     *
-     * @deprecated use getProductStrategyForAttributes
-     */
-    virtual routing_strategy getStrategyForUsage(audio_usage_t usage) = 0;
 
     /**
      * Set the Telephony Mode.

@@ -61,19 +61,8 @@ LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Settings/Policy
 
 PFW_EDD_FILES := \
         $(LOCAL_PATH)/Settings/device_for_product_strategies.pfw \
-        $(LOCAL_PATH)/../Settings/strategy_for_stream.pfw \
-        $(LOCAL_PATH)/../Settings/strategy_for_usage.pfw \
         $(LOCAL_PATH)/../Settings/device_for_input_source.pfw \
-        $(LOCAL_PATH)/../Settings/volumes.pfw \
-        $(LOCAL_PATH)/../Settings/device_for_strategy_media.pfw \
-        $(LOCAL_PATH)/../Settings/device_for_strategy_phone.pfw \
-        $(LOCAL_PATH)/../Settings/device_for_strategy_sonification.pfw \
-        $(LOCAL_PATH)/../Settings/device_for_strategy_sonification_respectful.pfw \
-        $(LOCAL_PATH)/../Settings/device_for_strategy_dtmf.pfw \
-        $(LOCAL_PATH)/../Settings/device_for_strategy_enforced_audible.pfw \
-        $(LOCAL_PATH)/../Settings/device_for_strategy_transmitted_through_speaker.pfw \
-        $(LOCAL_PATH)/../Settings/device_for_strategy_accessibility.pfw \
-        $(LOCAL_PATH)/../Settings/device_for_strategy_rerouting.pfw
+        $(LOCAL_PATH)/../Settings/volumes.pfw
 
 LOCAL_ADDITIONAL_DEPENDENCIES := \
     $(PFW_EDD_FILES)

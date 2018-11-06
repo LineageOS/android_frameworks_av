@@ -112,8 +112,6 @@ PFW_CRITERION_TYPES_FILE := $(TARGET_OUT_VENDOR_ETC)/audio_policy_engine_criteri
 PFW_CRITERIA_FILE := $(TARGET_OUT_VENDOR_ETC)/audio_policy_engine_criteria.xml
 PFW_EDD_FILES := \
         $(LOCAL_PATH)/SettingsNoOutput/device_for_strategies.pfw \
-        $(LOCAL_PATH)/Settings/strategy_for_stream.pfw \
-        $(LOCAL_PATH)/Settings/strategy_for_usage.pfw \
         $(LOCAL_PATH)/Settings/device_for_input_source.pfw \
         $(LOCAL_PATH)/Settings/volumes.pfw
 
@@ -139,17 +137,6 @@ PFW_TOPLEVEL_FILE := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/ParameterFrame
 PFW_CRITERION_TYPES_FILE := $(TARGET_OUT_VENDOR_ETC)/audio_policy_engine_criterion_types.xml
 PFW_CRITERIA_FILE := $(TARGET_OUT_VENDOR_ETC)/audio_policy_engine_criteria.xml
 PFW_EDD_FILES := \
-        $(LOCAL_PATH)/Settings/device_for_strategy_media.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_phone.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_sonification.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_sonification_respectful.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_dtmf.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_enforced_audible.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_transmitted_through_speaker.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_accessibility.pfw \
-        $(LOCAL_PATH)/Settings/device_for_strategy_rerouting.pfw \
-        $(LOCAL_PATH)/Settings/strategy_for_stream.pfw \
-        $(LOCAL_PATH)/Settings/strategy_for_usage.pfw \
         $(LOCAL_PATH)/SettingsNoInput/device_for_input_source.pfw \
         $(LOCAL_PATH)/Settings/volumes.pfw
 

@@ -43,20 +43,6 @@ public:
     ///
     android::status_t initCheck() override;
 
-    audio_devices_t getDeviceForInputSource(audio_source_t inputSource) const override
-    {
-        return getPropertyForKey<audio_devices_t, audio_source_t>(inputSource);
-    }
-
-    audio_devices_t getDeviceForStrategy(routing_strategy stategy) const override;
-
-    routing_strategy getStrategyForStream(audio_stream_type_t stream) override
-    {
-        return getPropertyForKey<routing_strategy, audio_stream_type_t>(stream);
-    }
-
-    routing_strategy getStrategyForUsage(audio_usage_t usage) override;
-
     status_t setPhoneState(audio_mode_t mode) override;
 
     audio_mode_t getPhoneState() const override;
@@ -83,38 +69,17 @@ public:
     ///
     /// from AudioPolicyPluginInterface
     ///
-    status_t addStrategy(const std::string &name, routing_strategy strategy) override
-    {
-        return add<routing_strategy>(name, strategy);
-    }
     status_t addStream(const std::string &name, audio_stream_type_t stream) override
     {
         return add<audio_stream_type_t>(name, stream);
-    }
-    status_t addUsage(const std::string &name, audio_usage_t usage) override
-    {
-        return add<audio_usage_t>(name, usage);
     }
     status_t addInputSource(const std::string &name, audio_source_t source) override
     {
         return add<audio_source_t>(name, source);
     }
-    bool setDeviceForStrategy(const routing_strategy &strategy, audio_devices_t devices) override
-    {
-        return setPropertyForKey<audio_devices_t, routing_strategy>(devices, strategy);
-    }
-    bool setStrategyForStream(const audio_stream_type_t &stream,
-                              routing_strategy strategy) override
-    {
-        return setPropertyForKey<routing_strategy, audio_stream_type_t>(strategy, stream);
-    }
     bool setVolumeProfileForStream(const audio_stream_type_t &stream,
                                    const audio_stream_type_t &volumeProfile) override;
 
-    bool setStrategyForUsage(const audio_usage_t &usage, routing_strategy strategy) override
-    {
-        return setPropertyForKey<routing_strategy, audio_usage_t>(strategy, usage);
-    }
     bool setDeviceForInputSource(const audio_source_t &inputSource, audio_devices_t device) override
     {
         return setPropertyForKey<audio_devices_t, audio_source_t>(device, inputSource);
@@ -135,9 +100,7 @@ private:
     Engine(const Engine &object);
     Engine &operator=(const Engine &object);
 
-    StrategyCollection mStrategyCollection; /**< Strategies indexed by their enum id. */
     StreamCollection mStreamCollection; /**< Streams indexed by their enum id.  */
-    UsageCollection mUsageCollection; /**< Usages indexed by their enum id. */
     InputSourceCollection mInputSourceCollection; /**< Input sources indexed by their enum id. */
 
     template <typename Key>

@@ -25,10 +25,8 @@
 #endif
 
 #include "Engine.h"
-#include "Strategy.h"
 #include "Stream.h"
 #include "InputSource.h"
-#include "Usage.h"
 
 #include <EngineConfig.h>
 #include <policy.h>
@@ -42,19 +40,9 @@ namespace android {
 namespace audio_policy {
 
 template <>
-StrategyCollection &Engine::getCollection<routing_strategy>()
-{
-    return mStrategyCollection;
-}
-template <>
 StreamCollection &Engine::getCollection<audio_stream_type_t>()
 {
     return mStreamCollection;
-}
-template <>
-UsageCollection &Engine::getCollection<audio_usage_t>()
-{
-    return mUsageCollection;
 }
 template <>
 InputSourceCollection &Engine::getCollection<audio_source_t>()
@@ -63,19 +51,9 @@ InputSourceCollection &Engine::getCollection<audio_source_t>()
 }
 
 template <>
-const StrategyCollection &Engine::getCollection<routing_strategy>() const
-{
-    return mStrategyCollection;
-}
-template <>
 const StreamCollection &Engine::getCollection<audio_stream_type_t>() const
 {
     return mStreamCollection;
-}
-template <>
-const UsageCollection &Engine::getCollection<audio_usage_t>() const
-{
-    return mUsageCollection;
 }
 template <>
 const InputSourceCollection &Engine::getCollection<audio_source_t>() const
@@ -93,10 +71,8 @@ Engine::Engine() : mPolicyParameterMgr(new ParameterManagerWrapper())
 
 Engine::~Engine()
 {
-    mStrategyCollection.clear();
     mStreamCollection.clear();
     mInputSourceCollection.clear();
-    mUsageCollection.clear();
 }
 
 status_t Engine::initCheck()
@@ -131,42 +107,6 @@ Property Engine::getPropertyForKey(Key key) const
         return static_cast<Property>(0);
     }
     return element->template get<Property>();
-}
-
-routing_strategy Engine::getStrategyForUsage(audio_usage_t usage)
-{
-    return getPropertyForKey<routing_strategy, audio_usage_t>(usage);
-}
-
-audio_devices_t Engine::getDeviceForStrategy(routing_strategy strategy) const
-{
-    const SwAudioOutputCollection &outputs = getApmObserver()->getOutputs();
-
-    /** This is the only case handled programmatically because the PFW is unable to know the
-     * activity of streams.
-     *
-     * -While media is playing on a remote device, use the the sonification behavior.
-     * Note that we test this usecase before testing if media is playing because
-     * the isStreamActive() method only informs about the activity of a stream, not
-     * if it's for local playback. Note also that we use the same delay between both tests
-     *
-     * -When media is not playing anymore, fall back on the sonification behavior
-     */
-    if (strategy == STRATEGY_SONIFICATION_RESPECTFUL &&
-            !is_state_in_call(getPhoneState()) &&
-            !outputs.isStreamActiveRemotely(AUDIO_STREAM_MUSIC,
-                                    SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY) &&
-            outputs.isStreamActive(AUDIO_STREAM_MUSIC, SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)) {
-        return getPropertyForKey<audio_devices_t, routing_strategy>(STRATEGY_MEDIA);
-    }
-    if (strategy == STRATEGY_ACCESSIBILITY &&
-        (outputs.isStreamActive(AUDIO_STREAM_RING) || outputs.isStreamActive(AUDIO_STREAM_ALARM))) {
-            // do not route accessibility prompts to a digital output currently configured with a
-            // compressed format as they would likely not be mixed and dropped.
-            // Device For Sonification conf file has HDMI, SPDIF and HDMI ARC unreacheable.
-        return getPropertyForKey<audio_devices_t, routing_strategy>(STRATEGY_SONIFICATION);
-    }
-    return getPropertyForKey<audio_devices_t, routing_strategy>(strategy);
 }
 
 bool Engine::setVolumeProfileForStream(const audio_stream_type_t &stream,

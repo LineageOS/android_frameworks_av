@@ -53,8 +53,6 @@ private:
     static const char *const mKeyAmend3; /**< amend3 key mapping string. */
 
     static const char *const mStreamComponentName;
-    static const char *const mStrategyComponentName;
     static const char *const mInputSourceComponentName;
-    static const char *const mUsageComponentName;
     static const char *const mProductStrategyComponentName;
 };

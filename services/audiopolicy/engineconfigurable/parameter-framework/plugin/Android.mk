@@ -8,10 +8,8 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := \
     PolicySubsystemBuilder.cpp \
     PolicySubsystem.cpp \
-    Strategy.cpp \
     InputSource.cpp \
     Stream.cpp \
-    Usage.cpp \
     ProductStrategy.cpp
 
 LOCAL_CFLAGS += \
