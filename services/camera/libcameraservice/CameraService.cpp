@@ -265,6 +265,7 @@ status_t CameraService::enumerateProviders() {
 
         if (mFlashlight->hasFlashUnit(id8)) {
             mTorchStatusMap.add(id8, TorchModeStatus::AVAILABLE_OFF);
+            broadcastTorchModeStatus(id8, TorchModeStatus::AVAILABLE_OFF);
         }
     }
 
@@ -290,6 +291,14 @@ void CameraService::pingCameraServiceProxy() {
     sp<ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
     if (proxyBinder == nullptr) return;
     proxyBinder->pingForUserUpdate();
+}
+
+void CameraService::broadcastTorchModeStatus(const String8& cameraId, TorchModeStatus status) {
+    Mutex::Autolock lock(mStatusListenerLock);
+
+    for (auto& i : mListenerList) {
+        i->onTorchStatusChanged(mapToInterface(status), String16{cameraId});
+    }
 }
 
 CameraService::~CameraService() {
@@ -426,12 +435,7 @@ void CameraService::onTorchStatusChangedLocked(const String8& cameraId,
         }
     }
 
-    {
-        Mutex::Autolock lock(mStatusListenerLock);
-        for (auto& i : mListenerList) {
-            i->onTorchStatusChanged(mapToInterface(newStatus), String16{cameraId});
-        }
-    }
+    broadcastTorchModeStatus(cameraId, newStatus);
 }
 
 Status CameraService::getNumberOfCameras(int32_t type, int32_t* numCameras) {
