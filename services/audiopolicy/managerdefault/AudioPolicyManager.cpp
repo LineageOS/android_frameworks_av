@@ -44,7 +44,6 @@
 #include <cutils/properties.h>
 #include <utils/Log.h>
 #include <media/AudioParameter.h>
-#include <media/AudioPolicyHelper.h>
 #include <private/android_filesystem_config.h>
 #include <soundtrigger/SoundTrigger.h>
 #include <system/audio.h>
@@ -2948,7 +2947,7 @@ bool AudioPolicyManager::isOffloadSupported(const audio_offload_info_t& offloadI
 bool AudioPolicyManager::isDirectOutputSupported(const audio_config_base_t& config,
                                                  const audio_attributes_t& attributes) {
     audio_output_flags_t output_flags = AUDIO_OUTPUT_FLAG_NONE;
-    audio_attributes_flags_to_audio_output_flags(attributes.flags, output_flags);
+    audio_flags_to_audio_output_flags(attributes.flags, &output_flags);
     sp<IOProfile> profile = getProfileForOutput(DeviceVector() /*ignore device */,
                                             config.sample_rate,
                                             config.format,

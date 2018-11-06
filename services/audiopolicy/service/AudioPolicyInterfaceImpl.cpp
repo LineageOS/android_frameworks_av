@@ -19,7 +19,6 @@
 
 #include "AudioPolicyService.h"
 #include "TypeConverter.h"
-#include <media/AudioPolicyHelper.h>
 #include <media/MediaAnalyticsItem.h>
 #include <mediautils/ServiceUtilities.h>
 #include <utils/Log.h>

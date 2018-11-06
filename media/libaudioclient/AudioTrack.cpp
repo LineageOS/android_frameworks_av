@@ -33,7 +33,6 @@
 #include <media/IAudioFlinger.h>
 #include <media/IAudioPolicyService.h>
 #include <media/AudioParameter.h>
-#include <media/AudioPolicyHelper.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/MediaAnalyticsItem.h>
@@ -487,7 +486,7 @@ status_t AudioTrack::set(
                 __func__,
                  mAttributes.usage, mAttributes.content_type, mAttributes.flags, mAttributes.tags);
         mStreamType = AUDIO_STREAM_DEFAULT;
-        audio_attributes_flags_to_audio_output_flags(mAttributes.flags, flags);
+        audio_flags_to_audio_output_flags(mAttributes.flags, &flags);
     }
 
     // these below should probably come from the audioFlinger too...
@@ -1390,7 +1389,7 @@ status_t AudioTrack::attachAuxEffect(int effectId)
 audio_stream_type_t AudioTrack::streamType() const
 {
     if (mStreamType == AUDIO_STREAM_DEFAULT) {
-        return audio_attributes_to_stream_type(&mAttributes);
+        return AudioSystem::attributesToStreamType(mAttributes);
     }
     return mStreamType;
 }
@@ -1473,7 +1472,7 @@ status_t AudioTrack::createTrack_l()
 
     IAudioFlinger::CreateTrackInput input;
     if (mStreamType != AUDIO_STREAM_DEFAULT) {
-        stream_type_to_audio_attributes(mStreamType, &input.attr);
+        input.attr = AudioSystem::streamTypeToAttributes(mStreamType);
     } else {
         input.attr = mAttributes;
     }
@@ -2891,7 +2890,8 @@ status_t AudioTrack::dump(int fd, const Vector<String16>& args __unused) const
                         mPortId, mStatus, mState, mSessionId, mFlags);
     result.appendFormat("  stream type(%d), left - right volume(%f, %f)\n",
                         (mStreamType == AUDIO_STREAM_DEFAULT) ?
-                                audio_attributes_to_stream_type(&mAttributes) : mStreamType,
+                            AudioSystem::attributesToStreamType(mAttributes) :
+                            mStreamType,
                         mVolume[AUDIO_INTERLEAVE_LEFT], mVolume[AUDIO_INTERLEAVE_RIGHT]);
     result.appendFormat("  format(%#x), channel mask(%#x), channel count(%u)\n",
                   mFormat, mChannelMask, mChannelCount);

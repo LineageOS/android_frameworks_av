@@ -22,7 +22,6 @@
 #include <cutils/properties.h> // for property_get
 #include <utils/Log.h>
 
-#include <media/AudioPolicyHelper.h>
 #include <media/stagefright/foundation/ADebug.h>
 
 namespace {
