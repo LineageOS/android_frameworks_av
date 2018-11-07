@@ -35,10 +35,10 @@
 #include <sys/cdefs.h>
 #include <stdbool.h>
 
-#include <android/native_window.h>
 #include "NdkCameraError.h"
 #include "NdkCameraMetadata.h"
 #include "NdkCaptureRequest.h"
+#include "NdkCameraWindowType.h"
 
 #ifndef _NDK_CAMERA_CAPTURE_SESSION_H
 #define _NDK_CAMERA_CAPTURE_SESSION_H
@@ -246,7 +246,7 @@ typedef void (*ACameraCaptureSession_captureCallback_sequenceAbort)(
  */
 typedef void (*ACameraCaptureSession_captureCallback_bufferLost)(
         void* context, ACameraCaptureSession* session,
-        ACaptureRequest* request, ANativeWindow* window, int64_t frameNumber);
+        ACaptureRequest* request, ACameraWindowType* window, int64_t frameNumber);
 
 typedef struct ACameraCaptureSession_captureCallbacks {
     /// optional application context.

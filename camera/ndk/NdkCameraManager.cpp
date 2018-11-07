@@ -22,10 +22,15 @@
 #include <utils/Trace.h>
 
 #include <camera/NdkCameraManager.h>
+
+#ifdef __ANDROID_VNDK__
+#include "ndk_vendor/impl/ACameraManager.h"
+#else
 #include "impl/ACameraManager.h"
+#endif
 #include "impl/ACameraMetadata.h"
 
-using namespace android;
+using namespace android::acam;
 
 EXPORT
 ACameraManager* ACameraManager_create() {

@@ -27,7 +27,7 @@
 
 EXPORT
 camera_status_t ACameraOutputTarget_create(
-        ANativeWindow* window, ACameraOutputTarget** out) {
+        ACameraWindowType* window, ACameraOutputTarget** out) {
     ATRACE_CALL();
     if (window == nullptr) {
         ALOGE("%s: Error: input window is null", __FUNCTION__);
