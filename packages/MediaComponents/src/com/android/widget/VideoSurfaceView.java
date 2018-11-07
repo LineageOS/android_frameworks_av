@@ -21,6 +21,7 @@ import static android.widget.VideoView2.VIEW_TYPE_SURFACEVIEW;
 import android.content.Context;
 import android.graphics.Rect;
 import android.media.MediaPlayer2;
+import android.media.VideoSize;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.SurfaceHolder;
@@ -149,8 +150,8 @@ class VideoSurfaceView extends SurfaceView implements VideoViewInterface, Surfac
     // TODO: Investigate the way to move onMeasure() code into FrameLayout.
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int videoWidth = (mMediaPlayer == null) ? 0 : mMediaPlayer.getVideoWidth();
-        int videoHeight = (mMediaPlayer == null) ? 0 : mMediaPlayer.getVideoHeight();
+        int videoWidth = (mMediaPlayer == null) ? 0 : mMediaPlayer.getVideoSize().getWidth();
+        int videoHeight = (mMediaPlayer == null) ? 0 : mMediaPlayer.getVideoSize().getHeight();
         if (DEBUG) {
             Log.d(TAG, "onMeasure(" + MeasureSpec.toString(widthMeasureSpec) + ", "
                     + MeasureSpec.toString(heightMeasureSpec) + ")");
