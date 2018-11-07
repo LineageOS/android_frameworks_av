@@ -19,6 +19,7 @@
     <xi:include href="audio_policy_engine_product_strategies.xml"/>
     <xi:include href="audio_policy_engine_criterion_types.xml"/>
     <xi:include href="audio_policy_engine_criteria.xml"/>
+    <xi:include href="audio_policy_engine_volumes.xml"/>
 
 </configuration>
 

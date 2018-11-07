@@ -16,7 +16,7 @@
 <!-- Volume section defines a volume curve for a given use case and device category.
 It contains a list of points of this curve expressing the attenuation in Millibels for a given
 volume index from 0 to 100.
-<volume stream=”AUDIO_STREAM_MUSIC” deviceCategory=””>
+<volume deviceCategory=””>
 <point>0,-9600</point>
 <point>100,0</point>
 </volume>
@@ -24,7 +24,7 @@ volume index from 0 to 100.
 
 <volumeGroups>
     <volumeGroup>
-        <stream>AUDIO_STREAM_VOICE_CALL</stream>
+        <name>voice_call</name>
         <indexMin>1</indexMin>
         <indexMax>7</indexMax>
         <volume deviceCategory="DEVICE_CATEGORY_HEADSET">
@@ -50,7 +50,7 @@ volume index from 0 to 100.
     </volumeGroup>
 
     <volumeGroup>
-        <stream>AUDIO_STREAM_SYSTEM</stream>
+        <name>system</name>
         <indexMin>0</indexMin>
         <indexMax>7</indexMax>
         <volume deviceCategory="DEVICE_CATEGORY_HEADSET">
@@ -73,7 +73,7 @@ volume index from 0 to 100.
     </volumeGroup>
 
     <volumeGroup>
-        <stream>AUDIO_STREAM_RING</stream>
+        <name>ring</name>
         <indexMin>0</indexMin>
         <indexMax>7</indexMax>
         <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="DEFAULT_DEVICE_CATEGORY_HEADSET_VOLUME_CURVE"/>
@@ -84,7 +84,7 @@ volume index from 0 to 100.
     </volumeGroup>
 
     <volumeGroup>
-        <stream>AUDIO_STREAM_MUSIC</stream>
+        <name>music</name>
         <indexMin>0</indexMin>
         <indexMax>25</indexMax>
         <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="DEFAULT_MEDIA_VOLUME_CURVE"/>
@@ -95,7 +95,7 @@ volume index from 0 to 100.
     </volumeGroup>
 
     <volumeGroup>
-        <stream>AUDIO_STREAM_ALARM</stream>
+        <name>alarm</name>
         <indexMin>1</indexMin>
         <indexMax>7</indexMax>
         <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="DEFAULT_NON_MUTABLE_HEADSET_VOLUME_CURVE"/>
@@ -106,7 +106,7 @@ volume index from 0 to 100.
     </volumeGroup>
 
     <volumeGroup>
-        <stream>AUDIO_STREAM_NOTIFICATION</stream>
+        <name>notification</name>
         <indexMin>0</indexMin>
         <indexMax>7</indexMax>
         <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="DEFAULT_DEVICE_CATEGORY_HEADSET_VOLUME_CURVE"/>
@@ -117,7 +117,7 @@ volume index from 0 to 100.
     </volumeGroup>
 
     <volumeGroup>
-        <stream>AUDIO_STREAM_BLUETOOTH_SCO</stream>
+        <name>bluetooth_sco</name>
         <indexMin>0</indexMin>
         <indexMax>15</indexMax>
         <volume deviceCategory="DEVICE_CATEGORY_HEADSET">
@@ -143,7 +143,7 @@ volume index from 0 to 100.
     </volumeGroup>
 
     <volumeGroup>
-        <stream>AUDIO_STREAM_ENFORCED_AUDIBLE</stream>
+        <name>enforced_audible</name>
         <indexMin>0</indexMin>
         <indexMax>7</indexMax>
         <volume deviceCategory="DEVICE_CATEGORY_HEADSET">
@@ -164,7 +164,7 @@ volume index from 0 to 100.
     </volumeGroup>
 
     <volumeGroup>
-        <stream>AUDIO_STREAM_DTMF</stream>
+        <name>dtmf</name>
         <indexMin>0</indexMin>
         <indexMax>15</indexMax>
         <volume deviceCategory="DEVICE_CATEGORY_HEADSET">
@@ -185,7 +185,7 @@ volume index from 0 to 100.
     </volumeGroup>
 
     <volumeGroup>
-        <stream>AUDIO_STREAM_TTS</stream>
+        <name>tts</name>
         <indexMin>0</indexMin>
         <indexMax>15</indexMax>
         <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="SILENT_VOLUME_CURVE"/>
@@ -196,7 +196,7 @@ volume index from 0 to 100.
     </volumeGroup>
 
     <volumeGroup>
-        <stream>AUDIO_STREAM_ACCESSIBILITY</stream>
+        <name>accessibility</name>
         <indexMin>1</indexMin>
         <indexMax>15</indexMax>
         <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="DEFAULT_NON_MUTABLE_VOLUME_CURVE"/>
@@ -207,7 +207,7 @@ volume index from 0 to 100.
     </volumeGroup>
 
     <volumeGroup>
-        <stream>AUDIO_STREAM_REROUTING</stream>
+        <name>rerouting</name>
         <indexMin>0</indexMin>
         <indexMax>1</indexMax>
         <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="FULL_SCALE_VOLUME_CURVE"/>
@@ -218,7 +218,7 @@ volume index from 0 to 100.
     </volumeGroup>
 
     <volumeGroup>
-        <stream>AUDIO_STREAM_PATCH</stream>
+        <name>patch</name>
         <indexMin>0</indexMin>
         <indexMax>1</indexMax>
         <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="FULL_SCALE_VOLUME_CURVE"/>

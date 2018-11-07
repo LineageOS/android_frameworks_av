@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <media/AudioCommonTypes.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
 #include <binder/Parcelable.h>
@@ -28,7 +29,7 @@ class AudioAttributes : public Parcelable
 public:
     AudioAttributes() = default;
     AudioAttributes(const audio_attributes_t &attributes) : mAttributes(attributes) {}
-    AudioAttributes(uint32_t groupId,
+    AudioAttributes(volume_group_t groupId,
                     audio_stream_type_t stream,
                     const audio_attributes_t &attributes) :
          mAttributes(attributes), mStreamType(stream), mGroupId(groupId) {}
@@ -39,7 +40,7 @@ public:
     status_t writeToParcel(Parcel *parcel) const override;
 
     audio_stream_type_t getStreamType() const { return mStreamType; }
-    uint32_t getGroupId() const { return mGroupId; }
+    volume_group_t getGroupId() const { return mGroupId; }
 
 private:
     audio_attributes_t mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
@@ -53,7 +54,7 @@ private:
      * @brief mGroupId: for future volume management, define groups within a strategy that follows
      * the same curves of volume (extension of stream types to manage volume)
      */
-    uint32_t mGroupId = 0;
+    volume_group_t mGroupId = VOLUME_GROUP_NONE;
 };
 
 } // namespace android

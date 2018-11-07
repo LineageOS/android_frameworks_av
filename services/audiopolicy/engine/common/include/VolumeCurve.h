@@ -18,7 +18,9 @@
 
 #include "IVolumeCurves.h"
 #include <policy.h>
+#include <AudioPolicyManagerInterface.h>
 #include <utils/RefBase.h>
+#include <HandleGenerator.h>
 #include <utils/String8.h>
 #include <utils/SortedVector.h>
 #include <utils/KeyedVector.h>
@@ -71,18 +73,11 @@ class VolumeCurves : public KeyedVector<device_category, sp<VolumeCurve> >,
 {
 public:
     VolumeCurves(int indexMin = 0, int indexMax = 100) :
-        mIndexMin(indexMin), mIndexMax(indexMax), mStream(AUDIO_STREAM_DEFAULT)
+        mIndexMin(indexMin), mIndexMax(indexMax)
     {
         addCurrentVolumeIndex(AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME, 0);
     }
-    VolumeCurves(audio_stream_type_t stream, int indexMin, int indexMax) :
-        mIndexMin(indexMin), mIndexMax(indexMax), mStream(stream)
-    {
-        addCurrentVolumeIndex(AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME, 0);
-    }
-
-    // Once XML has been parsed, must be call first to sanity check table and initialize indexes
-    virtual status_t initVolume(int indexMin, int indexMax)
+    status_t initVolume(int indexMin, int indexMax) override
     {
         mIndexMin = indexMin;
         mIndexMax = indexMax;
@@ -174,8 +169,16 @@ public:
             return 0.0f;
         }
     }
-
-    audio_stream_type_t getStreamType() const { return mStream; }
+    void addAttributes(const audio_attributes_t &attr)
+    {
+        mAttributes.push_back(attr);
+    }
+    AttributesVector getAttributes() const override { return mAttributes; }
+    void addStreamType(audio_stream_type_t stream)
+    {
+        mStreams.push_back(stream);
+    }
+    StreamTypeVector getStreamTypes() const override { return mStreams; }
 
     void dump(String8 *dst, int spaces = 0, bool curvePoints = false) const override;
 
@@ -186,7 +189,8 @@ private:
     int mIndexMax; /**< max volume index. */
     const bool mCanBeMuted = true; /**< true is the stream can be muted. */
 
-    const audio_stream_type_t mStream; /**< Keep it for legacy. */
+    AttributesVector mAttributes;
+    StreamTypeVector mStreams; /**< Keep it for legacy. */
 };
 
 } // namespace android

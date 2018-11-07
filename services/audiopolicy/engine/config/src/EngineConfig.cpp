@@ -59,6 +59,7 @@ struct AttributesGroupTraits : public BaseSerializerTraits<AttributesGroup, Attr
     struct Attributes {
         static constexpr const char *name = "name";
         static constexpr const char *streamType = "streamType";
+        static constexpr const char *volumeGroup = "volumeGroup";
     };
     static android::status_t deserialize(_xmlDoc *doc, const _xmlNode *root, Collection &ps);
 };
@@ -116,6 +117,7 @@ struct VolumeTraits : public BaseSerializerTraits<VolumeCurve, VolumeCurves> {
 
     struct Attributes {
         static constexpr const char *deviceCategory = "deviceCategory";
+        static constexpr const char *stream = "stream"; // For legacy volume curves
         static constexpr const char *reference = "ref"; /**< For volume curves factorization. */
     };
 
@@ -136,8 +138,6 @@ struct VolumeGroupTraits : public BaseSerializerTraits<VolumeGroup, VolumeGroups
     static android::status_t deserialize(_xmlDoc *doc, const _xmlNode *root,
                                          Collection &collection);
 };
-
-using xmlCharUnique = std::unique_ptr<xmlChar, decltype(xmlFree)>;
 
 using xmlCharUnique = std::unique_ptr<xmlChar, decltype(xmlFree)>;
 
@@ -304,6 +304,12 @@ status_t AttributesGroupTraits::deserialize(_xmlDoc *doc, const _xmlNode *child,
     }
     ALOGV("%s: %s = %s", __FUNCTION__, Attributes::name, name.c_str());
 
+    std::string volumeGroup = getXmlAttribute(child, Attributes::volumeGroup);
+    if (volumeGroup.empty()) {
+        ALOGE("%s: No attribute %s found", __FUNCTION__, Attributes::volumeGroup);
+    }
+    ALOGV("%s: %s = %s", __FUNCTION__, Attributes::volumeGroup, volumeGroup.c_str());
+
     audio_stream_type_t streamType = AUDIO_STREAM_DEFAULT;
     std::string streamTypeXml = getXmlAttribute(child, Attributes::streamType);
     if (streamTypeXml.empty()) {
@@ -318,7 +324,7 @@ status_t AttributesGroupTraits::deserialize(_xmlDoc *doc, const _xmlNode *child,
     AttributesVector attributesVect;
     deserializeAttributesCollection(doc, child, attributesVect);
 
-    attributesGroup.push_back({name, streamType, attributesVect});
+    attributesGroup.push_back({name, streamType, volumeGroup, attributesVect});
     return NO_ERROR;
 }
 
@@ -420,7 +426,6 @@ status_t VolumeTraits::deserialize(_xmlDoc *doc, const _xmlNode *root, Collectio
     if (deviceCategory.empty()) {
         ALOGW("%s: No %s found", __FUNCTION__, Attributes::deviceCategory);
     }
-
     std::string referenceName = getXmlAttribute(root, Attributes::reference);
     const _xmlNode *ref = NULL;
     if (!referenceName.empty()) {
@@ -458,9 +463,10 @@ status_t VolumeTraits::deserialize(_xmlDoc *doc, const _xmlNode *root, Collectio
 status_t VolumeGroupTraits::deserialize(_xmlDoc *doc, const _xmlNode *root, Collection &volumes)
 {
     std::string name;
-    std::string stream = {};
     int indexMin = 0;
     int indexMax = 0;
+    StreamVector streams = {};
+    AttributesVector attributesVect = {};
 
     for (const xmlNode *child = root->xmlChildrenNode; child != NULL; child = child->next) {
         if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::name)) {
@@ -469,13 +475,6 @@ status_t VolumeGroupTraits::deserialize(_xmlDoc *doc, const _xmlNode *root, Coll
                 return BAD_VALUE;
             }
             name = reinterpret_cast<const char*>(nameXml.get());
-        }
-        if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::stream)) {
-            xmlCharUnique streamXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
-            if (streamXml == nullptr) {
-                return BAD_VALUE;
-            }
-            stream = reinterpret_cast<const char*>(streamXml.get());
         }
         if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::indexMin)) {
             xmlCharUnique indexMinXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
@@ -498,13 +497,23 @@ status_t VolumeGroupTraits::deserialize(_xmlDoc *doc, const _xmlNode *root, Coll
             }
         }
     }
-    ALOGV("%s: group=%s stream=%s indexMin=%d, indexMax=%d",
-          __func__, name.c_str(), stream.c_str(), indexMin, indexMax);
+    deserializeAttributesCollection(doc, root, attributesVect);
+
+    std::string streamNames;
+    for (const auto &stream : streams) {
+        streamNames += android::toString(stream) + " ";
+    }
+    std::string attrmNames;
+    for (const auto &attr : attributesVect) {
+        attrmNames += android::toString(attr) + "\n";
+    }
+    ALOGV("%s: group=%s indexMin=%d, indexMax=%d streams=%s attributes=%s",
+          __func__, name.c_str(), indexMin, indexMax, streamNames.c_str(), attrmNames.c_str( ));
 
     VolumeCurves groupVolumeCurves;
     size_t skipped = 0;
     deserializeCollection<VolumeTraits>(doc, root, groupVolumeCurves, skipped);
-    volumes.push_back({ name, stream, indexMin, indexMax, groupVolumeCurves });
+    volumes.push_back({ name, indexMin, indexMax, groupVolumeCurves });
     return NO_ERROR;
 }
 
@@ -580,8 +589,16 @@ static status_t deserializeLegacyVolumeCollection(_xmlDoc *doc, const _xmlNode *
         }
     }
     for (const auto &volumeMapIter : legacyVolumeMap) {
-        volumeGroups.push_back({ volumeMapIter.first, volumeMapIter.first, 0, 100,
-                                 volumeMapIter.second });
+        // In order to let AudioService setting the min and max (compatibility), set Min and Max
+        // to -1 except for private streams
+        audio_stream_type_t streamType;
+        if (!StreamTypeConverter::fromString(volumeMapIter.first, streamType)) {
+            ALOGE("%s: Invalid stream %s", __func__, volumeMapIter.first.c_str());
+            return BAD_VALUE;
+        }
+        int indexMin = streamType >= AUDIO_STREAM_PUBLIC_CNT ? 0 : -1;
+        int indexMax = streamType >= AUDIO_STREAM_PUBLIC_CNT ? 100 : -1;
+        volumeGroups.push_back({ volumeMapIter.first, indexMin, indexMax, volumeMapIter.second });
     }
     return NO_ERROR;
 }
