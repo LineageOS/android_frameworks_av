@@ -18,6 +18,7 @@
 
 #include <AudioPolicyManagerObserver.h>
 #include <media/AudioProductStrategy.h>
+#include <media/AudioVolumeGroup.h>
 #include <IVolumeCurves.h>
 #include <policy.h>
 #include <Volume.h>
@@ -285,6 +286,15 @@ public:
     virtual StreamTypeVector getStreamTypesForVolumeGroup(volume_group_t volumeGroup) const = 0;
 
     virtual AttributesVector getAllAttributesForVolumeGroup(volume_group_t volumeGroup) const = 0;
+
+    /**
+     * @brief listAudioVolumeGroups introspection API to get the Audio Volume Groups, aka
+     * former stream aliases in Audio Service, defining volume curves attached to one or more
+     * Audio Attributes.
+     * @param groups
+     * @return NO_ERROR if the volume groups were retrieved successfully, error code otherwise
+     */
+    virtual status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups) const = 0;
 
     virtual void dump(String8 *dst) const = 0;
 

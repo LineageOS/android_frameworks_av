@@ -1204,13 +1204,32 @@ status_t AudioPolicyService::listAudioProductStrategies(AudioProductStrategyVect
     return mAudioPolicyManager->listAudioProductStrategies(strategies);
 }
 
-product_strategy_t AudioPolicyService::getProductStrategyFromAudioAttributes(
-        const AudioAttributes &aa)
+status_t AudioPolicyService::getProductStrategyFromAudioAttributes(
+        const AudioAttributes &aa, product_strategy_t &productStrategy)
 {
     if (mAudioPolicyManager == NULL) {
-        return PRODUCT_STRATEGY_NONE;
+        return NO_INIT;
     }
     Mutex::Autolock _l(mLock);
-    return mAudioPolicyManager->getProductStrategyFromAudioAttributes(aa);
+    return mAudioPolicyManager->getProductStrategyFromAudioAttributes(aa, productStrategy);
+}
+
+status_t AudioPolicyService::listAudioVolumeGroups(AudioVolumeGroupVector &groups)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->listAudioVolumeGroups(groups);
+}
+
+status_t AudioPolicyService::getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
+                                                               volume_group_t &volumeGroup)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->getVolumeGroupFromAudioAttributes(aa, volumeGroup);
 }
 } // namespace android

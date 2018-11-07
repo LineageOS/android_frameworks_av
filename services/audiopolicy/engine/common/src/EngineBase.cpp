@@ -274,6 +274,15 @@ AttributesVector EngineBase::getAllAttributesForVolumeGroup(volume_group_t volum
                 mVolumeGroups.at(volumeGroup)->getSupportedAttributes() : AttributesVector();
 }
 
+status_t EngineBase::listAudioVolumeGroups(AudioVolumeGroupVector &groups) const
+{
+    for (const auto &iter : mVolumeGroups) {
+        groups.push_back({iter.second->getName(), iter.second->getId(),
+                          iter.second->getSupportedAttributes(), iter.second->getStreamTypes()});
+    }
+    return NO_ERROR;
+}
+
 void EngineBase::dump(String8 *dst) const
 {
     mProductStrategies.dump(dst, 2);

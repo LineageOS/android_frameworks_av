@@ -198,7 +198,12 @@ public:
 
     virtual bool     isHapticPlaybackSupported() = 0;
     virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies) = 0;
-    virtual product_strategy_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa) = 0;
+    virtual status_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa,
+                                                           product_strategy_t &productStrategy) = 0;
+
+    virtual status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups) = 0;
+    virtual status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
+                                                       volume_group_t &volumeGroup) = 0;
 };
 
 

@@ -10,6 +10,7 @@ cc_library_shared {
         "AudioAttributes.cpp",
         "AudioPolicy.cpp",
         "AudioProductStrategy.cpp",
+        "AudioVolumeGroup.cpp",
     ],
     shared_libs: [
         "libaudioutils",

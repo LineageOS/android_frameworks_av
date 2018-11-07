@@ -95,6 +95,8 @@ enum {
     GET_OFFLOAD_FORMATS_A2DP,
     LIST_AUDIO_PRODUCT_STRATEGIES,
     GET_STRATEGY_FOR_ATTRIBUTES,
+    LIST_AUDIO_VOLUME_GROUPS,
+    GET_VOLUME_GROUP_FOR_ATTRIBUTES
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -1085,35 +1087,90 @@ public:
             return status;
         }
         status = static_cast<status_t>(reply.readInt32());
-        if (status == NO_ERROR) {
-            uint32_t numStrategies = static_cast<uint32_t>(reply.readInt32());
-            for (size_t i = 0; i < numStrategies; i++) {
-                AudioProductStrategy strategy;
-                status = strategy.readFromParcel(&reply);
-                if (status != NO_ERROR) {
-                    ALOGE("%s: failed to read strategies", __FUNCTION__);
-                    strategies.clear();
-                    return status;
-                }
-                strategies.push_back(strategy);
-            }
+        if (status != NO_ERROR) {
+            return status;
         }
-        return status;
+        uint32_t numStrategies = static_cast<uint32_t>(reply.readInt32());
+        for (size_t i = 0; i < numStrategies; i++) {
+            AudioProductStrategy strategy;
+            status = strategy.readFromParcel(&reply);
+            if (status != NO_ERROR) {
+                ALOGE("%s: failed to read strategies", __FUNCTION__);
+                strategies.clear();
+                return status;
+            }
+            strategies.push_back(strategy);
+        }
+        return NO_ERROR;
     }
 
-    virtual product_strategy_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa)
+    virtual status_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa,
+                                                           product_strategy_t &productStrategy)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         status_t status = aa.writeToParcel(&data);
         if (status != NO_ERROR) {
-            return PRODUCT_STRATEGY_NONE;
+            return status;
         }
         status = remote()->transact(GET_STRATEGY_FOR_ATTRIBUTES, data, &reply);
-        if (status == NO_ERROR) {
-            return static_cast<product_strategy_t>(reply.readInt32());
+        if (status != NO_ERROR) {
+            return status;
         }
-        return PRODUCT_STRATEGY_NONE;
+        status = static_cast<status_t>(reply.readInt32());
+        if (status != NO_ERROR) {
+            return status;
+        }
+        productStrategy = static_cast<product_strategy_t>(reply.readInt32());
+        return NO_ERROR;
+    }
+
+    virtual status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(LIST_AUDIO_VOLUME_GROUPS, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = static_cast<status_t>(reply.readInt32());
+        if (status != NO_ERROR) {
+            return status;
+        }
+        uint32_t numGroups = static_cast<uint32_t>(reply.readInt32());
+        for (size_t i = 0; i < numGroups; i++) {
+            AudioVolumeGroup group;
+            status = group.readFromParcel(&reply);
+            if (status != NO_ERROR) {
+                ALOGE("%s: failed to read volume groups", __FUNCTION__);
+                groups.clear();
+                return status;
+            }
+            groups.push_back(group);
+        }
+        return NO_ERROR;
+    }
+
+    virtual status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
+                                                       volume_group_t &volumeGroup)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        status_t status = aa.writeToParcel(&data);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = remote()->transact(GET_VOLUME_GROUP_FOR_ATTRIBUTES, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = static_cast<status_t>(reply.readInt32());
+        if (status != NO_ERROR) {
+            return status;
+        }
+        volumeGroup = static_cast<volume_group_t>(reply.readInt32());
+        return NO_ERROR;
     }
 };
 
@@ -1173,7 +1230,9 @@ status_t BnAudioPolicyService::onTransact(
         case SET_A11Y_SERVICES_UIDS:
         case SET_UID_DEVICE_AFFINITY:
         case REMOVE_UID_DEVICE_AFFINITY:
-        case GET_OFFLOAD_FORMATS_A2DP: {
+        case GET_OFFLOAD_FORMATS_A2DP:
+        case LIST_AUDIO_VOLUME_GROUPS:
+        case GET_VOLUME_GROUP_FOR_ATTRIBUTES: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -1992,7 +2051,7 @@ status_t BnAudioPolicyService::onTransact(
             status_t status = listAudioProductStrategies(strategies);
             reply->writeInt32(status);
             if (status != NO_ERROR) {
-                return status;
+                return NO_ERROR;
             }
             size_t size = strategies.size();
             size_t sizePosition = reply->dataPosition();
@@ -2021,8 +2080,58 @@ status_t BnAudioPolicyService::onTransact(
             if (status != NO_ERROR) {
                 return status;
             }
-            product_strategy_t strategy = getProductStrategyFromAudioAttributes(attributes);
+            product_strategy_t strategy;
+            status = getProductStrategyFromAudioAttributes(attributes, strategy);
+            reply->writeInt32(status);
+            if (status != NO_ERROR) {
+                return NO_ERROR;
+            }
             reply->writeUint32(static_cast<int>(strategy));
+            return NO_ERROR;
+        }
+
+        case LIST_AUDIO_VOLUME_GROUPS: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            AudioVolumeGroupVector groups;
+            status_t status = listAudioVolumeGroups(groups);
+            reply->writeInt32(status);
+            if (status != NO_ERROR) {
+                return NO_ERROR;
+            }
+            size_t size = groups.size();
+            size_t sizePosition = reply->dataPosition();
+            reply->writeInt32(size);
+            size_t finalSize = size;
+            for (size_t i = 0; i < size; i++) {
+                size_t position = reply->dataPosition();
+                if (groups[i].writeToParcel(reply) != NO_ERROR) {
+                    reply->setDataPosition(position);
+                    finalSize--;
+                }
+            }
+            if (size != finalSize) {
+                size_t position = reply->dataPosition();
+                reply->setDataPosition(sizePosition);
+                reply->writeInt32(finalSize);
+                reply->setDataPosition(position);
+            }
+            return NO_ERROR;
+        }
+
+        case GET_VOLUME_GROUP_FOR_ATTRIBUTES: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            AudioAttributes attributes;
+            status_t status = attributes.readFromParcel(&data);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            volume_group_t group;
+            status = getVolumeGroupFromAudioAttributes(attributes, group);
+            reply->writeInt32(status);
+            if (status != NO_ERROR) {
+                return NO_ERROR;
+            }
+            reply->writeUint32(static_cast<int>(group));
             return NO_ERROR;
         }
 

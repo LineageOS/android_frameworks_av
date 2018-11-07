@@ -1403,12 +1403,16 @@ audio_attributes_t AudioSystem::streamTypeToAttributes(audio_stream_type_t strea
 
 audio_stream_type_t AudioSystem::attributesToStreamType(const audio_attributes_t &attr)
 {
-    product_strategy_t strategyId =
-            AudioSystem::getProductStrategyFromAudioAttributes(AudioAttributes(attr));
+    product_strategy_t psId;
+    status_t ret = AudioSystem::getProductStrategyFromAudioAttributes(AudioAttributes(attr), psId);
+    if (ret != NO_ERROR) {
+        ALOGE("no strategy found for attributes %s",  toString(attr).c_str());
+        return AUDIO_STREAM_MUSIC;
+    }
     AudioProductStrategyVector strategies;
     listAudioProductStrategies(strategies);
     for (const auto &strategy : strategies) {
-        if (strategy.getId() == strategyId) {
+        if (strategy.getId() == psId) {
             auto attrVect = strategy.getAudioAttributes();
             auto iter = std::find_if(begin(attrVect), end(attrVect), [&attr](const auto &refAttr) {
                              return AudioProductStrategy::attributesMatches(
@@ -1422,11 +1426,27 @@ audio_stream_type_t AudioSystem::attributesToStreamType(const audio_attributes_t
     return AUDIO_STREAM_MUSIC;
 }
 
-product_strategy_t AudioSystem::getProductStrategyFromAudioAttributes(const AudioAttributes &aa)
+status_t AudioSystem::getProductStrategyFromAudioAttributes(const AudioAttributes &aa,
+                                                            product_strategy_t &productStrategy)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
-    if (aps == 0) return PRODUCT_STRATEGY_NONE;
-    return aps->getProductStrategyFromAudioAttributes(aa);
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->getProductStrategyFromAudioAttributes(aa,productStrategy);
+}
+
+status_t AudioSystem::listAudioVolumeGroups(AudioVolumeGroupVector &groups)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->listAudioVolumeGroups(groups);
+}
+
+status_t AudioSystem::getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
+                                                        volume_group_t &volumeGroup)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->getVolumeGroupFromAudioAttributes(aa, volumeGroup);
 }
 
 // ---------------------------------------------------------------------------
