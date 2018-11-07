@@ -117,12 +117,6 @@ struct ATSParser::Program : public RefBase {
     void signalNewSampleAesKey(const sp<AMessage> &keyItem);
 
 private:
-    struct StreamInfo {
-        unsigned mType;
-        unsigned mTypeExt;
-        unsigned mPID;
-        int32_t mCASystemId;
-    };
 
     ATSParser *mParser;
     unsigned mProgramNumber;
@@ -143,12 +137,7 @@ private:
 };
 
 struct ATSParser::Stream : public RefBase {
-    Stream(Program *program,
-           unsigned elementaryPID,
-           unsigned streamType,
-           unsigned streamTypeExt,
-           unsigned PCR_PID,
-           int32_t CA_system_ID);
+    Stream(Program *program, unsigned PCR_PID, const StreamInfo &info);
 
     unsigned type() const { return mStreamType; }
     unsigned typeExt() const { return mStreamTypeExt; }
@@ -575,8 +564,12 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
                 mProgramNumber, info.mPID, streamCA)) {
             return ERROR_MALFORMED;
         }
-        info.mCASystemId = hasProgramCA ? programCA.mSystemID :
-                           hasStreamCA ? streamCA.mSystemID  : -1;
+        if (hasProgramCA) {
+            info.mCADescriptor = programCA;
+        } else if (hasStreamCA) {
+            info.mCADescriptor = streamCA;
+        }
+
         infos.push(info);
     }
 
@@ -635,14 +628,13 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
         ssize_t index = mStreams.indexOfKey(info.mPID);
 
         if (index < 0) {
-            sp<Stream> stream = new Stream(
-                    this, info.mPID, info.mType, info.mTypeExt, PCR_PID, info.mCASystemId);
+            sp<Stream> stream = new Stream(this, PCR_PID, info);
 
             if (mSampleAesKeyItem != NULL) {
                 stream->signalNewSampleAesKey(mSampleAesKeyItem);
             }
 
-            isAddingScrambledStream |= info.mCASystemId >= 0;
+            isAddingScrambledStream |= info.mCADescriptor.mSystemID >= 0;
             mStreams.add(info.mPID, stream);
         }
     }
@@ -751,31 +743,25 @@ void ATSParser::Program::updateCasSessions() {
 static const size_t kInitialStreamBufferSize = 192 * 1024;
 
 ATSParser::Stream::Stream(
-        Program *program,
-        unsigned elementaryPID,
-        unsigned streamType,
-        unsigned streamTypeExt,
-        unsigned PCR_PID,
-        int32_t CA_system_ID)
+        Program *program, unsigned PCR_PID, const StreamInfo &info)
     : mProgram(program),
-      mElementaryPID(elementaryPID),
-      mStreamType(streamType),
-      mStreamTypeExt(streamTypeExt),
+      mElementaryPID(info.mPID),
+      mStreamType(info.mType),
+      mStreamTypeExt(info.mTypeExt),
       mPCR_PID(PCR_PID),
       mExpectedContinuityCounter(-1),
       mPayloadStarted(false),
       mEOSReached(false),
       mPrevPTS(0),
       mQueue(NULL),
-      mScrambled(CA_system_ID >= 0) {
-
+      mScrambled(info.mCADescriptor.mSystemID >= 0) {
     mSampleEncrypted =
             mStreamType == STREAMTYPE_H264_ENCRYPTED ||
             mStreamType == STREAMTYPE_AAC_ENCRYPTED  ||
             mStreamType == STREAMTYPE_AC3_ENCRYPTED;
 
     ALOGV("new stream PID 0x%02x, type 0x%02x, scrambled %d, SampleEncrypted: %d",
-            elementaryPID, streamType, mScrambled, mSampleEncrypted);
+            info.mPID, info.mType, mScrambled, mSampleEncrypted);
 
     uint32_t flags = 0;
     if (((isVideo() || isAudio()) && mScrambled)) {
@@ -835,7 +821,7 @@ ATSParser::Stream::Stream(
 
         default:
             ALOGE("stream PID 0x%02x has invalid stream type 0x%02x",
-                    elementaryPID, streamType);
+                    info.mPID, info.mType);
             return;
     }
 
@@ -855,7 +841,13 @@ ATSParser::Stream::Stream(
                     isAudio() ? MEDIA_MIMETYPE_AUDIO_SCRAMBLED
                               : MEDIA_MIMETYPE_VIDEO_SCRAMBLED);
             // for MediaExtractor.CasInfo
-            meta->setInt32(kKeyCASystemID, CA_system_ID);
+            const CADescriptor &descriptor = info.mCADescriptor;
+            meta->setInt32(kKeyCASystemID, descriptor.mSystemID);
+
+            meta->setData(kKeyCAPrivateData, 0,
+                    descriptor.mPrivateData.data(),
+                    descriptor.mPrivateData.size());
+
             mSource = new AnotherPacketSource(meta);
         }
     }

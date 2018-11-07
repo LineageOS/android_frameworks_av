@@ -179,6 +179,7 @@ enum {
     kKeyPssh              = 'pssh',  // raw data
     kKeyCASystemID        = 'caid',  // int32_t
     kKeyCASessionID       = 'seid',  // raw data
+    kKeyCAPrivateData     = 'cadc',  // raw data
 
     kKeyEncryptedByteBlock = 'cblk',  // uint8_t
     kKeySkipByteBlock     = 'sblk',  // uint8_t
