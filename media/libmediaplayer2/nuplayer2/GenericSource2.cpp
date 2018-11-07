@@ -34,7 +34,6 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/NdkUtils.h>
 #include <media/stagefright/Utils.h>
-#include "NdkMediaDataSourceCallbacksPriv.h"
 
 namespace android {
 
@@ -137,8 +136,7 @@ status_t NuPlayer2::GenericSource2::setDataSource(const sp<DataSource>& source) 
     ALOGV("setDataSource (source: %p)", source.get());
 
     resetDataSource();
-    AMediaDataSource *aSource = convertDataSourceToAMediaDataSource(source);
-    mDataSourceWrapper = new AMediaDataSourceWrapper(aSource);
+    mDataSourceWrapper = new AMediaDataSourceWrapper(source);
     return OK;
 }
 

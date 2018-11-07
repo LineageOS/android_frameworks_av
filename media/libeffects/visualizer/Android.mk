@@ -9,6 +9,7 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_CFLAGS+= -O2 -fvisibility=hidden
 LOCAL_CFLAGS += -Wall -Werror
+LOCAL_CFLAGS += -DBUILD_FLOAT -DSUPPORT_MC
 
 LOCAL_SHARED_LIBRARIES := \
 	libcutils \

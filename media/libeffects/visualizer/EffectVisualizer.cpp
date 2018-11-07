@@ -32,8 +32,6 @@
 #include <audio_effects/effect_visualizer.h>
 #include <audio_utils/primitives.h>
 
-#define BUILD_FLOAT
-
 #ifdef BUILD_FLOAT
 
 static constexpr audio_format_t kProcessFormat = AUDIO_FORMAT_PCM_FLOAT;
@@ -157,7 +155,12 @@ int Visualizer_setConfig(VisualizerContext *pContext, effect_config_t *pConfig)
     if (pConfig->inputCfg.samplingRate != pConfig->outputCfg.samplingRate) return -EINVAL;
     if (pConfig->inputCfg.channels != pConfig->outputCfg.channels) return -EINVAL;
     if (pConfig->inputCfg.format != pConfig->outputCfg.format) return -EINVAL;
-    if (pConfig->inputCfg.channels != AUDIO_CHANNEL_OUT_STEREO) return -EINVAL;
+    const uint32_t channelCount = audio_channel_count_from_out_mask(pConfig->inputCfg.channels);
+#ifdef SUPPORT_MC
+    if (channelCount < 1 || channelCount > FCC_8) return -EINVAL;
+#else
+    if (channelCount != FCC_2) return -EINVAL;
+#endif
     if (pConfig->outputCfg.accessMode != EFFECT_BUFFER_ACCESS_WRITE &&
             pConfig->outputCfg.accessMode != EFFECT_BUFFER_ACCESS_ACCUMULATE) return -EINVAL;
     if (pConfig->inputCfg.format != kProcessFormat) return -EINVAL;
@@ -356,7 +359,7 @@ int Visualizer_process(
         // store the measurement
         pContext->mPastMeasurements[pContext->mMeasurementBufferIdx].mPeakU16 = (uint16_t)maxSample;
         pContext->mPastMeasurements[pContext->mMeasurementBufferIdx].mRmsSquared =
-                rmsSqAcc / (inBuffer->frameCount * pContext->mChannelCount);
+                rmsSqAcc / sampleLen;
         pContext->mPastMeasurements[pContext->mMeasurementBufferIdx].mIsValid = true;
         if (++pContext->mMeasurementBufferIdx >= pContext->mMeasurementWindowSizeInBuffers) {
             pContext->mMeasurementBufferIdx = 0;
@@ -375,12 +378,17 @@ int Visualizer_process(
 
 #ifdef BUILD_FLOAT
         float maxSample = 0.f;
-        for (size_t inIdx = 0; inIdx < sampleLen; ++inIdx) {
-            maxSample = fmax(maxSample, fabs(inBuffer->f32[inIdx]));
+        for (size_t inIdx = 0; inIdx < sampleLen; ) {
+            // we reconstruct the actual summed value to ensure proper normalization
+            // for multichannel outputs (channels > 2 may often be 0).
+            float smp = 0.f;
+            for (int i = 0; i < pContext->mChannelCount; ++i) {
+                smp += inBuffer->f32[inIdx++];
+            }
+            maxSample = fmax(maxSample, fabs(smp));
         }
         if (maxSample > 0.f) {
-            constexpr float halfish = 127.f / 256.f;
-            fscale = halfish / maxSample;
+            fscale = 127.f / maxSample;
             int exp; // unused
             const float significand = frexp(fscale, &exp);
             if (significand == 0.5f) {
@@ -412,7 +420,8 @@ int Visualizer_process(
     } else {
         assert(pContext->mScalingMode == VISUALIZER_SCALING_MODE_AS_PLAYED);
 #ifdef BUILD_FLOAT
-        fscale = 0.5f;  // default divide by 2 to account for sum of L + R.
+        // Note: if channels are uncorrelated, 1/sqrt(N) could be used at the risk of clipping.
+        fscale = 1.f / pContext->mChannelCount;  // account for summing all the channels together.
 #else
         shift = 9;
 #endif // BUILD_FLOAT
@@ -422,17 +431,19 @@ int Visualizer_process(
     uint32_t inIdx;
     uint8_t *buf = pContext->mCaptureBuf;
     for (inIdx = 0, captIdx = pContext->mCaptureIdx;
-         inIdx < inBuffer->frameCount;
-         inIdx++, captIdx++) {
-        if (captIdx >= CAPTURE_BUF_SIZE) {
-            // wrap around
-            captIdx = 0;
-        }
+         inIdx < sampleLen;
+         captIdx++) {
+        if (captIdx >= CAPTURE_BUF_SIZE) captIdx = 0; // wrap
+
 #ifdef BUILD_FLOAT
-        const float smp = (inBuffer->f32[2 * inIdx] + inBuffer->f32[2 * inIdx + 1]) * fscale;
-        buf[captIdx] = clamp8_from_float(smp);
+        float smp = 0.f;
+        for (uint32_t i = 0; i < pContext->mChannelCount; ++i) {
+            smp += inBuffer->f32[inIdx++];
+        }
+        buf[captIdx] = clamp8_from_float(smp * fscale);
 #else
-        const int32_t smp = (inBuffer->s16[2 * inIdx] + inBuffer->s16[2 * inIdx + 1]) >> shift;
+        const int32_t smp = (inBuffer->s16[inIdx] + inBuffer->s16[inIdx + 1]) >> shift;
+        inIdx += FCC_2;  // integer supports stereo only.
         buf[captIdx] = ((uint8_t)smp)^0x80;
 #endif // BUILD_FLOAT
     }

@@ -31,6 +31,8 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <utils/Errors.h>
 
+#include "NdkMediaDataSourceCallbacksPriv.h"
+
 namespace android {
 
 static const size_t kAESBlockSize = 16;  // AES_BLOCK_SIZE
@@ -1244,8 +1246,14 @@ sp<AMediaCodecCryptoInfoWrapper> AMediaExtractorWrapper::getSampleCryptoInfo() {
     return new AMediaCodecCryptoInfoWrapper(AMediaExtractor_getSampleCryptoInfo(mAMediaExtractor));
 }
 
+AMediaDataSourceWrapper::AMediaDataSourceWrapper(const sp<DataSource> &dataSource)
+    : mDataSource(dataSource),
+      mAMediaDataSource(convertDataSourceToAMediaDataSource(dataSource)) {
+}
+
 AMediaDataSourceWrapper::AMediaDataSourceWrapper(AMediaDataSource *aDataSource)
-    : mAMediaDataSource(aDataSource) {
+    : mDataSource(NULL),
+      mAMediaDataSource(aDataSource) {
 }
 
 AMediaDataSourceWrapper::~AMediaDataSourceWrapper() {
