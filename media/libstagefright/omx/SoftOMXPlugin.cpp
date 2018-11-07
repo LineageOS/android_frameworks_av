@@ -28,6 +28,9 @@
 
 namespace android {
 
+// Symbol needed to make libstagefright_soft_ddpdec load
+const char *MEDIA_MIMETYPE_AUDIO_EAC3_JOC = "audio/eac3-joc";
+
 static const struct {
     const char *mName;
     const char *mLibNameSuffix;
@@ -61,6 +64,7 @@ static const struct {
     { "OMX.google.flac.decoder", "flacdec", "audio_decoder.flac" },
     { "OMX.google.flac.encoder", "flacenc", "audio_encoder.flac" },
     { "OMX.google.gsm.decoder", "gsmdec", "audio_decoder.gsm" },
+    { "OMX.dolby.ac3.decoder", "ddpdec", "audio_decoder.ac3" },
 };
 
 static const size_t kNumComponents =
