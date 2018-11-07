@@ -32,7 +32,9 @@ class MemoryFileSystem {
         size_t getFileSize() const { return fileSize; }
         void setContent(const std::string& file) { content = file; }
         void setFileName(const std::string& name) { fileName = name; }
-        void setFileSize(size_t size) { fileSize = size; }
+        void setFileSize(size_t size) {
+            content.resize(size); fileSize = size;
+        }
     };
 
     MemoryFileSystem() {};
