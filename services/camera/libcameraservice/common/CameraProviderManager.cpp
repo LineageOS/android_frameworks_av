@@ -254,37 +254,7 @@ status_t CameraProviderManager::setUpVendorTags() {
     sp<VendorTagDescriptorCache> tagCache = new VendorTagDescriptorCache();
 
     for (auto& provider : mProviders) {
-        hardware::hidl_vec<VendorTagSection> vts;
-        Status status;
-        hardware::Return<void> ret;
-        ret = provider->mInterface->getVendorTags(
-            [&](auto s, const auto& vendorTagSecs) {
-                status = s;
-                if (s == Status::OK) {
-                    vts = vendorTagSecs;
-                }
-        });
-        if (!ret.isOk()) {
-            ALOGE("%s: Transaction error getting vendor tags from provider '%s': %s",
-                    __FUNCTION__, provider->mProviderName.c_str(), ret.description().c_str());
-            return DEAD_OBJECT;
-        }
-        if (status != Status::OK) {
-            return mapToStatusT(status);
-        }
-
-        // Read all vendor tag definitions into a descriptor
-        sp<VendorTagDescriptor> desc;
-        status_t res;
-        if ((res = HidlVendorTagDescriptor::createDescriptorFromHidl(vts, /*out*/desc))
-                != OK) {
-            ALOGE("%s: Could not generate descriptor from vendor tag operations,"
-                  "received error %s (%d). Camera clients will not be able to use"
-                  "vendor tags", __FUNCTION__, strerror(res), res);
-            return res;
-        }
-
-        tagCache->addVendorDescriptor(provider->mProviderTagid, desc);
+        tagCache->addVendorDescriptor(provider->mProviderTagid, provider->mVendorTagDescriptor);
     }
 
     VendorTagDescriptorCache::setAsGlobalVendorTagCache(tagCache);
@@ -750,6 +720,13 @@ status_t CameraProviderManager::ProviderInfo::initialize() {
         }
     }
 
+    res = setUpVendorTags();
+    if (res != OK) {
+        ALOGE("%s: Unable to set up vendor tags from provider '%s'",
+                __FUNCTION__, mProviderName.c_str());
+        return res;
+    }
+
     ALOGI("Camera provider %s ready with %zu camera devices",
             mProviderName.c_str(), mDevices.size());
 
@@ -992,6 +969,42 @@ void CameraProviderManager::ProviderInfo::serviceDied(uint64_t cookie,
                 __FUNCTION__, cookie, mId);
     }
     mManager->removeProvider(mProviderName);
+}
+
+status_t CameraProviderManager::ProviderInfo::setUpVendorTags() {
+    if (mVendorTagDescriptor != nullptr)
+        return OK;
+
+    hardware::hidl_vec<VendorTagSection> vts;
+    Status status;
+    hardware::Return<void> ret;
+    ret = mInterface->getVendorTags(
+        [&](auto s, const auto& vendorTagSecs) {
+            status = s;
+            if (s == Status::OK) {
+                vts = vendorTagSecs;
+            }
+    });
+    if (!ret.isOk()) {
+        ALOGE("%s: Transaction error getting vendor tags from provider '%s': %s",
+                __FUNCTION__, mProviderName.c_str(), ret.description().c_str());
+        return DEAD_OBJECT;
+    }
+    if (status != Status::OK) {
+        return mapToStatusT(status);
+    }
+
+    // Read all vendor tag definitions into a descriptor
+    status_t res;
+    if ((res = HidlVendorTagDescriptor::createDescriptorFromHidl(vts, /*out*/mVendorTagDescriptor))
+            != OK) {
+        ALOGE("%s: Could not generate descriptor from vendor tag operations,"
+                "received error %s (%d). Camera clients will not be able to use"
+                "vendor tags", __FUNCTION__, strerror(res), res);
+        return res;
+    }
+
+    return OK;
 }
 
 template<class DeviceInfoT>

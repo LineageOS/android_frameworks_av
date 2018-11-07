@@ -266,6 +266,7 @@ private:
         const std::string mProviderName;
         const sp<hardware::camera::provider::V2_4::ICameraProvider> mInterface;
         const metadata_vendor_id_t mProviderTagid;
+        sp<VendorTagDescriptor> mVendorTagDescriptor;
 
         ProviderInfo(const std::string &providerName,
                 sp<hardware::camera::provider::V2_4::ICameraProvider>& interface,
@@ -293,6 +294,11 @@ private:
 
         // hidl_death_recipient interface - this locks the parent mInterfaceMutex
         virtual void serviceDied(uint64_t cookie, const wp<hidl::base::V1_0::IBase>& who) override;
+
+        /**
+         * Setup vendor tags for this provider
+         */
+        status_t setUpVendorTags();
 
         // Basic device information, common to all camera devices
         struct DeviceInfo {
