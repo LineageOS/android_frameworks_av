@@ -499,7 +499,34 @@ enum AIMAGE_FORMATS {
      * <p>When an {@link AImage} of this format is obtained from an {@link AImageReader} or
      * {@link AImage_getNumberOfPlanes()} method will return zero.</p>
      */
-    AIMAGE_FORMAT_PRIVATE           = 0x22
+    AIMAGE_FORMAT_PRIVATE           = 0x22,
+
+    /**
+     * Android Y8 format.
+     *
+     * <p>Y8 is a planar format comprised of a WxH Y plane only, with each pixel
+     * being represented by 8 bits.</p>
+     *
+     * <p>This format assumes
+     * <ul>
+     * <li>an even width</li>
+     * <li>an even height</li>
+     * <li>a horizontal stride multiple of 16 pixels</li>
+     * </ul>
+     * </p>
+     *
+     * <pre> size = stride * height </pre>
+     *
+     * <p>For example, the {@link AImage} object can provide data
+     * in this format from a {@link ACameraDevice} (if supported) through a
+     * {@link AImageReader} object. The number of planes returned by
+     * {@link AImage_getNumberOfPlanes} will always be 1. The pixel stride returned by
+     * {@link AImage_getPlanePixelStride} will always be 1, and the
+     * {@link AImage_getPlaneRowStride} described the vertical neighboring pixel distance
+     * (in bytes) between adjacent rows.</p>
+     *
+     */
+    AIMAGE_FORMAT_Y8 = 0x20203859
 };
 
 /**
