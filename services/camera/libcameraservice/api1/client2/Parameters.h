@@ -248,6 +248,7 @@ struct Parameters {
         bool useFlexibleYuv;
         Size maxJpegSize;
         Size maxZslSize;
+        bool supportsPreferredConfigs;
     } fastInfo;
 
     // Quirks information; these are short-lived flags to enable workarounds for
@@ -418,6 +419,9 @@ private:
     // returns an empty Vector if device HAL version does support it
     Vector<StreamConfiguration> getStreamConfigurations();
 
+    // Helper function to extract the suggested stream configurations
+    Vector<StreamConfiguration> getPreferredStreamConfigurations(int32_t usecaseId) const;
+
     // Helper function to get minimum frame duration for a jpeg size
     // return -1 if input jpeg size cannot be found in supported size list
     int64_t getJpegStreamMinFrameDurationNs(Parameters::Size size);
@@ -438,6 +442,15 @@ private:
     // Helper function to get maximum size in input Size vector.
     // The maximum size is defined by comparing width first, when width ties comparing height.
     Size getMaxSize(const Vector<Size>& sizes);
+
+    // Helper function to filter and sort suggested sizes
+    Vector<Parameters::Size> getPreferredFilteredSizes(int32_t usecaseId, int32_t format) const;
+    // Helper function to get the suggested jpeg sizes
+    Vector<Size> getPreferredJpegSizes() const;
+    // Helper function to get the suggested preview sizes
+    Vector<Size> getPreferredPreviewSizes() const;
+    // Helper function to get the suggested video sizes
+    Vector<Size> getPreferredVideoSizes() const;
 
     int mDeviceVersion;
     uint8_t mDefaultSceneMode;

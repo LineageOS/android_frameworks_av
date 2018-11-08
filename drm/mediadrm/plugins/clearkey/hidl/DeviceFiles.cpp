@@ -57,6 +57,7 @@ bool DeviceFiles::StoreLicense(
             break;
         case kLicenseStateReleasing:
             license->set_state(License_LicenseState_RELEASING);
+            license->set_license(licenseResponse);
             break;
         default:
             ALOGW("StoreLicense: Unknown license state: %u", state);
@@ -106,8 +107,8 @@ bool DeviceFiles::StoreFileRaw(const std::string& fileName, const std::string& s
 
 bool DeviceFiles::RetrieveLicense(
     const std::string& keySetId, LicenseState* state, std::string* offlineLicense) {
-    OfflineFile file;
 
+    OfflineFile file;
     if (!RetrieveHashedFile(keySetId + kLicenseFileNameExt, &file)) {
         return false;
     }
@@ -128,7 +129,6 @@ bool DeviceFiles::RetrieveLicense(
     }
 
     License license = file.license();
-
     switch (license.state()) {
         case License_LicenseState_ACTIVE:
             *state = kLicenseStateActive;
@@ -142,9 +142,12 @@ bool DeviceFiles::RetrieveLicense(
             *state = kLicenseStateUnknown;
             break;
     }
-
     *offlineLicense = license.license();
     return true;
+}
+
+bool DeviceFiles::DeleteLicense(const std::string& keySetId) {
+    return mFileHandle.RemoveFile(keySetId + kLicenseFileNameExt);
 }
 
 bool DeviceFiles::DeleteAllLicenses() {

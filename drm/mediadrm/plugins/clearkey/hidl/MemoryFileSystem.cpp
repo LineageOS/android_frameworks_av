@@ -3,7 +3,6 @@
 // License Agreement.
 
 #include <utils/Log.h>
-
 #include <string>
 
 #include "MemoryFileSystem.h"
@@ -54,6 +53,10 @@ size_t MemoryFileSystem::Read(const std::string& path, std::string* buffer) {
 
 size_t MemoryFileSystem::Write(const std::string& path, const MemoryFile& memoryFile) {
     std::string key = GetFileName(path);
+    auto result = mMemoryFileSystem.find(key);
+    if (result != mMemoryFileSystem.end()) {
+        mMemoryFileSystem.erase(key);
+    }
     mMemoryFileSystem.insert(std::pair<std::string, MemoryFile>(key, memoryFile));
     return memoryFile.getFileSize();
 }

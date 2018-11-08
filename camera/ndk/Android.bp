@@ -67,5 +67,6 @@ cc_library_shared {
     export_include_dirs: ["include"],
     export_shared_lib_headers: [
         "libnativewindow",
-    ]
+    ],
+    version_script: "libcamera2ndk.map.txt",
 }
