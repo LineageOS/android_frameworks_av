@@ -479,4 +479,14 @@ void AudioPortConfig::toAudioPortConfig(struct audio_port_config *dstConfig,
             dstConfig, srcConfig, AUDIO_PORT_CONFIG_FLAGS, { AUDIO_INPUT_FLAG_NONE });
 }
 
+bool AudioPortConfig::hasGainController(bool canUseForVolume) const
+{
+    sp<AudioPort> audioport = getAudioPort();
+    if (audioport == nullptr) {
+        return false;
+    }
+    return canUseForVolume ? audioport->getGains().canUseForVolume()
+                           : audioport->getGains().size() > 0;
+}
+
 } // namespace android

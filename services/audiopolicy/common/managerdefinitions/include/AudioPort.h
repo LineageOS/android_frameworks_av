@@ -18,6 +18,7 @@
 
 #include "AudioCollections.h"
 #include "AudioProfile.h"
+#include "AudioGain.h"
 #include "HandleGenerator.h"
 #include <utils/String8.h>
 #include <utils/Vector.h>
@@ -29,9 +30,7 @@
 namespace android {
 
 class HwModule;
-class AudioGain;
 class AudioRoute;
-typedef Vector<sp<AudioGain> > AudioGainCollection;
 
 class AudioPort : public virtual RefBase, private HandleGenerator<audio_port_handle_t>
 {
@@ -49,8 +48,8 @@ public:
 
     virtual const String8 getTagName() const = 0;
 
-    void setGains(const AudioGainCollection &gains) { mGains = gains; }
-    const AudioGainCollection &getGains() const { return mGains; }
+    void setGains(const AudioGains &gains) { mGains = gains; }
+    const AudioGains &getGains() const { return mGains; }
 
     virtual void setFlags(uint32_t flags)
     {
@@ -138,7 +137,7 @@ public:
 
     void log(const char* indent) const;
 
-    AudioGainCollection mGains; // gain controllers
+    AudioGains mGains; // gain controllers
 
 private:
     void pickChannelMask(audio_channel_mask_t &channelMask, const ChannelsVector &channelMasks) const;
@@ -165,6 +164,8 @@ public:
         return (other != 0) && (other->getAudioPort() != 0) && (getAudioPort() != 0) &&
                 (other->getAudioPort()->getModuleHandle() == getAudioPort()->getModuleHandle());
     }
+    bool hasGainController(bool canUseForVolume = false) const;
+
     unsigned int mSamplingRate = 0u;
     audio_format_t mFormat = AUDIO_FORMAT_INVALID;
     audio_channel_mask_t mChannelMask = AUDIO_CHANNEL_NONE;
