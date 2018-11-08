@@ -470,8 +470,10 @@ protected:
                                             uint32_t delayMs);
 
         audio_io_handle_t selectOutput(const SortedVector<audio_io_handle_t>& outputs,
-                                       audio_output_flags_t flags,
-                                       audio_format_t format);
+                                       audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
+                                       audio_format_t format = AUDIO_FORMAT_INVALID,
+                                       audio_channel_mask_t channelMask = AUDIO_CHANNEL_NONE,
+                                       uint32_t samplingRate = 0);
         // samplingRate, format, channelMask are in/out and so may be modified
         sp<IOProfile> getInputProfile(audio_devices_t device,
                                       const String8& address,

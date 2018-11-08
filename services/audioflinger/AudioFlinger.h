@@ -365,16 +365,17 @@ private:
     static inline bool isValidPcmSinkChannelMask(audio_channel_mask_t channelMask) {
         switch (audio_channel_mask_get_representation(channelMask)) {
         case AUDIO_CHANNEL_REPRESENTATION_POSITION: {
-            uint32_t channelCount = FCC_2; // stereo is default
-            if (kEnableExtendedChannels) {
-                channelCount = audio_channel_count_from_out_mask(channelMask);
-                if (channelCount < FCC_2 // mono is not supported at this time
-                        || channelCount > AudioMixer::MAX_NUM_CHANNELS) {
-                    return false;
-                }
+            // Haptic channel mask is only applicable for channel position mask.
+            const uint32_t channelCount = audio_channel_count_from_out_mask(
+                    channelMask & ~AUDIO_CHANNEL_HAPTIC_ALL);
+            const uint32_t maxChannelCount = kEnableExtendedChannels
+                    ? AudioMixer::MAX_NUM_CHANNELS : FCC_2;
+            if (channelCount < FCC_2 // mono is not supported at this time
+                    || channelCount > maxChannelCount) {
+                return false;
             }
             // check that channelMask is the "canonical" one we expect for the channelCount.
-            return channelMask == audio_channel_out_mask_from_count(channelCount);
+            return audio_channel_position_mask_is_out_canonical(channelMask);
             }
         case AUDIO_CHANNEL_REPRESENTATION_INDEX:
             if (kEnableExtendedChannels) {
