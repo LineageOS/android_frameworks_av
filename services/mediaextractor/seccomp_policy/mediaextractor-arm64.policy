@@ -40,4 +40,7 @@ readlinkat: 1
 pread64: 1
 mremap: 1
 
+# Required by Sanitizers
+sched_yield: 1
+
 @include /system/etc/seccomp_policy/crash_dump.arm64.policy
