@@ -644,7 +644,7 @@ bool BufferPoolClient::Impl::syncReleased(uint32_t messageId) {
         } else if (messageId != 0) {
             // messages are drained.
             if (isMessageLater(messageId, mReleasing.mInvalidateId)) {
-                mReleasing.mInvalidateId = lastMsgId;
+                mReleasing.mInvalidateId = messageId;
                 mReleasing.mInvalidateAck = true;
             }
         }
@@ -653,6 +653,9 @@ bool BufferPoolClient::Impl::syncReleased(uint32_t messageId) {
             mReleasing.mStatusChannel->postBufferInvalidateAck(
                     mConnectionId,
                     mReleasing.mInvalidateId, &mReleasing.mInvalidateAck);
+            ALOGV("client %lld invalidateion ack (%d) %u",
+                (long long)mConnectionId,
+                mReleasing.mInvalidateAck, mReleasing.mInvalidateId);
         }
     }
     return cleared;
@@ -808,6 +811,7 @@ ResultStatus BufferPoolClient::getAccessor(sp<IAccessor> *accessor) {
 }
 
 void BufferPoolClient::receiveInvalidation(uint32_t msgId) {
+    ALOGV("bufferpool client recv inv %u", msgId);
     if (isValid()) {
         mImpl->receiveInvalidation(msgId);
     }

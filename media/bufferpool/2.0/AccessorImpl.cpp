@@ -177,6 +177,7 @@ ResultStatus Accessor::Impl::connect(
 
 ResultStatus Accessor::Impl::close(ConnectionId connectionId) {
     std::lock_guard<std::mutex> lock(mBufferPool.mMutex);
+    ALOGV("connection close %lld: %u", (long long)connectionId, mBufferPool.mInvalidation.mId);
     mBufferPool.processStatusMessages();
     mBufferPool.handleClose(connectionId);
     mBufferPool.mObserver.close(connectionId);
@@ -277,7 +278,7 @@ int percentage(T base, S total) {
     return int(total ? 0.5 + 100. * static_cast<S>(base) / total : 0);
 }
 
-std::atomic<std::uint32_t> Accessor::Impl::BufferPool::Invalidation::sSeqId(0);
+std::atomic<std::uint32_t> Accessor::Impl::BufferPool::Invalidation::sInvSeqId(0);
 
 Accessor::Impl::Impl::BufferPool::~BufferPool() {
     std::lock_guard<std::mutex> lock(mMutex);
@@ -316,8 +317,7 @@ void Accessor::Impl::BufferPool::Invalidation::onBufferInvalidated(
         BufferId bufferId,
         BufferInvalidationChannel &channel) {
     for (auto it = mPendings.begin(); it != mPendings.end();) {
-        if (it->invalidate(bufferId)) {
-            it = mPendings.erase(it);
+        if (it->isInvalidated(bufferId)) {
             uint32_t msgId = 0;
             if (it->mNeedsAck) {
                 msgId = ++mInvalidationId;
@@ -327,7 +327,8 @@ void Accessor::Impl::BufferPool::Invalidation::onBufferInvalidated(
                 }
             }
             channel.postInvalidation(msgId, it->mFrom, it->mTo);
-            sInvalidator.addAccessor(mId, it->mImpl);
+            sInvalidator->addAccessor(mId, it->mImpl);
+            it = mPendings.erase(it);
             continue;
         }
         ++it;
@@ -350,10 +351,12 @@ void Accessor::Impl::BufferPool::Invalidation::onInvalidationRequest(
                 msgId = ++mInvalidationId;
             }
         }
+        ALOGV("bufferpool invalidation requested and queued");
         channel.postInvalidation(msgId, from, to);
-        sInvalidator.addAccessor(mId, impl);
+        sInvalidator->addAccessor(mId, impl);
     } else {
         // TODO: sending hint message?
+        ALOGV("bufferpool invalidation requested and pending");
         Pending pending(needsAck, from, to, left, impl);
         mPendings.push_back(pending);
     }
@@ -364,10 +367,14 @@ void Accessor::Impl::BufferPool::Invalidation::onHandleAck() {
         std::set<int> deads;
         for (auto it = mAcks.begin(); it != mAcks.end(); ++it) {
             if (it->second != mInvalidationId) {
-                const sp<IObserver> observer = mObservers[it->first].promote();
+                const sp<IObserver> observer = mObservers[it->first];
                 if (observer) {
-                    observer->onMessage(it->first, mInvalidationId);
+                    ALOGV("connection %lld call observer (%u: %u)",
+                          (long long)it->first, it->second, mInvalidationId);
+                    Return<void> transResult = observer->onMessage(it->first, mInvalidationId);
+                    (void) transResult;
                 } else {
+                    ALOGV("bufferpool observer died %lld", (long long)it->first);
                     deads.insert(it->first);
                 }
             }
@@ -379,7 +386,7 @@ void Accessor::Impl::BufferPool::Invalidation::onHandleAck() {
         }
     }
     // All invalidation Ids are synced.
-    sInvalidator.delAccessor(mId);
+    sInvalidator->delAccessor(mId);
 }
 
 bool Accessor::Impl::BufferPool::handleOwnBuffer(
@@ -542,6 +549,7 @@ void Accessor::Impl::BufferPool::processStatusMessages() {
                 break;
             case BufferStatus::INVALIDATION_ACK:
                 mInvalidation.onAck(message.connectionId, message.bufferId);
+                ret = true;
                 break;
         }
         if (ret == false) {
@@ -727,6 +735,7 @@ void Accessor::Impl::BufferPool::flush(const std::shared_ptr<Accessor::Impl> &im
     BufferId to = mSeq;
     mStartSeq = mSeq;
     // TODO: needsAck params 
+    ALOGV("buffer invalidation request bp:%u %u %u", mInvalidation.mId, from, to);
     if (from != to) {
         invalidate(true, from, to, impl);
     }
@@ -791,6 +800,7 @@ void Accessor::Impl::AccessorInvalidator::addAccessor(
             notify = true;
         }
         mAccessors.insert(std::make_pair(accessorId, impl));
+        ALOGV("buffer invalidation added bp:%u %d", accessorId, notify);
     }
     lock.unlock();
     if (notify) {
@@ -801,12 +811,19 @@ void Accessor::Impl::AccessorInvalidator::addAccessor(
 void Accessor::Impl::AccessorInvalidator::delAccessor(uint32_t accessorId) {
     std::lock_guard<std::mutex> lock(mMutex);
     mAccessors.erase(accessorId);
+    ALOGV("buffer invalidation deleted bp:%u", accessorId);
     if (mAccessors.size() == 0) {
         mReady = false;
     }
 }
 
-Accessor::Impl::AccessorInvalidator Accessor::Impl::sInvalidator;
+std::unique_ptr<Accessor::Impl::AccessorInvalidator> Accessor::Impl::sInvalidator;
+
+void Accessor::Impl::createInvalidator() {
+    if (!sInvalidator) {
+        sInvalidator = std::make_unique<Accessor::Impl::AccessorInvalidator>();
+    }
+}
 
 }  // namespace implementation
 }  // namespace V2_0

@@ -185,6 +185,8 @@ struct Accessor : public IAccessor {
      */
     static sp<ConnectionDeathRecipient> getConnectionDeathRecipient();
 
+    static void createInvalidator();
+
 private:
     class Impl;
     std::shared_ptr<Impl> mImpl;

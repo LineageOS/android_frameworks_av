@@ -34,7 +34,7 @@ struct TransactionStatus;
 
 /**
  * An implementation of a buffer pool accessor(or a buffer pool implementation.) */
-class Accessor::Impl 
+class Accessor::Impl
     : public std::enable_shared_from_this<Accessor::Impl> {
 public:
     Impl(const std::shared_ptr<BufferPoolAllocator> &allocator);
@@ -68,6 +68,8 @@ public:
     bool isValid();
 
     void handleInvalidateAck();
+
+    static void createInvalidator();
 
 private:
     // ConnectionId = pid : (timestamp_created + seqId)
@@ -111,7 +113,7 @@ private:
         std::set<BufferId> mFreeBuffers;
 
         struct Invalidation {
-            static std::atomic<std::uint32_t> sSeqId;
+            static std::atomic<std::uint32_t> sInvSeqId;
 
             struct Pending {
                 bool mNeedsAck;
@@ -128,18 +130,18 @@ private:
                           mImpl(impl)
                 {}
 
-                bool invalidate(uint32_t bufferId) {
+                bool isInvalidated(uint32_t bufferId) {
                     return isBufferInRange(mFrom, mTo, bufferId) && --mLeft == 0;
                 }
             };
 
             std::list<Pending> mPendings;
             std::map<ConnectionId, uint32_t> mAcks;
-            std::map<ConnectionId, const wp<IObserver>> mObservers;
+            std::map<ConnectionId, const sp<IObserver>> mObservers;
             uint32_t mInvalidationId;
             uint32_t mId;
 
-            Invalidation() : mInvalidationId(0), mId(sSeqId.fetch_add(1)) {}
+            Invalidation() : mInvalidationId(0), mId(sInvSeqId.fetch_add(1)) {}
 
             void onConnect(ConnectionId conId, const sp<IObserver> &observer);
 
@@ -233,6 +235,8 @@ private:
 
         void invalidate(bool needsAck, BufferId from, BufferId to,
                         const std::shared_ptr<Accessor::Impl> &impl);
+
+        static void createInvalidator();
 
     public:
         /** Creates a buffer pool. */
@@ -376,7 +380,7 @@ private:
         void delAccessor(uint32_t accessorId);
     };
 
-    static AccessorInvalidator sInvalidator;
+    static std::unique_ptr<AccessorInvalidator> sInvalidator;
 
     static void invalidatorThread(
         std::map<uint32_t, const std::weak_ptr<Accessor::Impl>> &accessors,
