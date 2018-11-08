@@ -28,6 +28,7 @@
 #include <utils/Errors.h>
 #include <android/hardware/camera/common/1.0/types.h>
 #include <android/hardware/camera/provider/2.4/ICameraProvider.h>
+#include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 //#include <android/hardware/camera/provider/2.4/ICameraProviderCallbacks.h>
 #include <android/hidl/manager/1.0/IServiceNotification.h>
 #include <camera/VendorTagDescriptor.h>
@@ -164,6 +165,13 @@ public:
      */
     status_t getCameraCharacteristics(const std::string &id,
             CameraMetadata* characteristics) const;
+
+    /**
+     * Check for device support of specific stream combination.
+     */
+    status_t isSessionConfigurationSupported(const std::string& id,
+            const hardware::camera::device::V3_4::StreamConfiguration &configuration,
+            bool *status /*out*/) const;
 
     /**
      * Return the highest supported device interface version for this ID
@@ -315,6 +323,13 @@ private:
                 return INVALID_OPERATION;
             }
 
+            virtual status_t isSessionConfigurationSupported(
+                    const hardware::camera::device::V3_4::StreamConfiguration &/*configuration*/,
+                    bool * /*status*/)
+                    const {
+                return INVALID_OPERATION;
+            }
+
             DeviceInfo(const std::string& name, const metadata_vendor_id_t tagId,
                     const std::string &id, const hardware::hidl_version& version,
                     const std::vector<std::string>& publicCameraIds,
@@ -375,6 +390,10 @@ private:
                     CameraMetadata *characteristics) const override;
             virtual status_t getPhysicalCameraCharacteristics(const std::string& physicalCameraId,
                     CameraMetadata *characteristics) const override;
+            virtual status_t isSessionConfigurationSupported(
+                    const hardware::camera::device::V3_4::StreamConfiguration &configuration,
+                    bool *status /*out*/)
+                    const override;
 
             DeviceInfo3(const std::string& name, const metadata_vendor_id_t tagId,
                     const std::string &id, uint16_t minorVersion,

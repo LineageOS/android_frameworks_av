@@ -201,6 +201,11 @@ class Camera3OutputStream :
             const std::vector<size_t> &removedSurfaceIds,
             KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
 
+    /**
+     * Apply ZSL related consumer usage quirk.
+     */
+    static void applyZSLUsageQuirk(int format, uint64_t *consumerUsage /*inout*/);
+
   protected:
     Camera3OutputStream(int id, camera3_stream_type_t type,
             uint32_t width, uint32_t height, int format,
