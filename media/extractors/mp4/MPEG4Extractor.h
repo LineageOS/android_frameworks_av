@@ -85,6 +85,7 @@ private:
         bool has_elst;
         int64_t elst_media_time;
         uint64_t elst_segment_duration;
+        int32_t elstShiftStartTicks;
         bool subsample_encryption;
     };
 

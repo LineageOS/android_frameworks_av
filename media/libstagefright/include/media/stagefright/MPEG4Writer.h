@@ -110,6 +110,7 @@ private:
     uint32_t mInterleaveDurationUs;
     int32_t mTimeScale;
     int64_t mStartTimestampUs;
+    int32_t mStartTimeOffsetBFramesUs; // Start time offset when B Frames are present
     int mLatitudex10000;
     int mLongitudex10000;
     bool mAreGeoTagsAvailable;
@@ -129,6 +130,7 @@ private:
 
     void setStartTimestampUs(int64_t timeUs);
     int64_t getStartTimestampUs();  // Not const
+    int32_t getStartTimeOffsetBFramesUs();
     status_t startTracks(MetaData *params);
     size_t numTracks();
     int64_t estimateMoovBoxSize(int32_t bitRate);
