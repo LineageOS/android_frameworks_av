@@ -56,6 +56,8 @@
 #define UINT32_MAX       (4294967295U)
 #endif
 
+#define ALAC_SPECIFIC_INFO_SIZE (36)
+
 namespace android {
 
 enum {
@@ -334,6 +336,8 @@ static const char *FourCC2MIME(uint32_t fourcc) {
         case FOURCC('t', 'w', 'o', 's'):
         case FOURCC('s', 'o', 'w', 't'):
             return MEDIA_MIMETYPE_AUDIO_RAW;
+        case FOURCC('a', 'l', 'a', 'c'):
+            return MEDIA_MIMETYPE_AUDIO_ALAC;
 
         default:
             ALOGW("Unknown fourcc: %c%c%c%c",
@@ -1124,6 +1128,43 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 mLastTrack->meta.setInt32(kKeyChannelCount, num_channels);
                 mLastTrack->meta.setInt32(kKeySampleRate, sample_rate);
             }
+
+            // If format type is 'alac', it is necessary to get the parameters
+            // from a alac atom spreading behind the frma atom.
+            // See 'external/alac/ALACMagicCookieDescription.txt'.
+            if (original_fourcc == FOURCC('a', 'l', 'a', 'c')) {
+                // Store ALAC magic cookie (decoder needs it).
+                uint8_t alacInfo[12];
+                data_offset = *offset;
+                if (mDataSource->readAt(
+                        data_offset, alacInfo, sizeof(alacInfo)) < (ssize_t)sizeof(alacInfo)) {
+                    return ERROR_IO;
+                }
+                uint32_t size = U32_AT(&alacInfo[0]);
+                if ((size != ALAC_SPECIFIC_INFO_SIZE) ||
+                        (U32_AT(&alacInfo[4]) != FOURCC('a', 'l', 'a', 'c')) ||
+                        (U32_AT(&alacInfo[8]) != 0)) {
+                    return ERROR_MALFORMED;
+                }
+
+                data_offset += sizeof(alacInfo);
+                uint8_t cookie[size - sizeof(alacInfo)];
+                if (mDataSource->readAt(
+                        data_offset, cookie, sizeof(cookie)) < (ssize_t)sizeof(cookie)) {
+                    return ERROR_IO;
+                }
+
+                uint8_t bitsPerSample = cookie[5];
+                mLastTrack->meta.setInt32(kKeyBitsPerSample, bitsPerSample);
+                mLastTrack->meta.setInt32(kKeyChannelCount, cookie[9]);
+                mLastTrack->meta.setInt32(kKeySampleRate, U32_AT(&cookie[20]));
+                mLastTrack->meta.setData(
+                    kKeyAlacMagicCookie, MetaData::TYPE_NONE, cookie, sizeof(cookie));
+
+                // Add the size of ALAC Specific Info (36 bytes) and terminator
+                // atom (8 bytes).
+                *offset += (size + 8);
+            }
             break;
         }
 
@@ -1492,6 +1533,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC('s', 'a', 'w', 'b'):
         case FOURCC('t', 'w', 'o', 's'):
         case FOURCC('s', 'o', 'w', 't'):
+        case FOURCC('a', 'l', 'a', 'c'):
         {
             if (mIsQT && chunk_type == FOURCC('m', 'p', '4', 'a')
                     && depth >= 1 && mPath[depth - 1] == FOURCC('w', 'a', 'v', 'e')) {
@@ -1573,6 +1615,40 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                    chunk, num_channels, sample_size, sample_rate);
             mLastTrack->meta.setInt32(kKeyChannelCount, num_channels);
             mLastTrack->meta.setInt32(kKeySampleRate, sample_rate);
+
+            if (chunk_type == FOURCC('a', 'l', 'a', 'c')) {
+
+                // See 'external/alac/ALACMagicCookieDescription.txt for the detail'.
+                // Store ALAC magic cookie (decoder needs it).
+                uint8_t alacInfo[12];
+                data_offset += sizeof(buffer);
+                if (mDataSource->readAt(
+                        data_offset, alacInfo, sizeof(alacInfo)) < (ssize_t)sizeof(alacInfo)) {
+                    return ERROR_IO;
+                }
+                uint32_t size = U32_AT(&alacInfo[0]);
+                if ((size != ALAC_SPECIFIC_INFO_SIZE) ||
+                        (U32_AT(&alacInfo[4]) != FOURCC('a', 'l', 'a', 'c')) ||
+                        (U32_AT(&alacInfo[8]) != 0)) {
+                    return ERROR_MALFORMED;
+                }
+                data_offset += sizeof(alacInfo);
+                uint8_t cookie[size - sizeof(alacInfo)];
+                if (mDataSource->readAt(
+                        data_offset, cookie, sizeof(cookie)) < (ssize_t)sizeof(cookie)) {
+                    return ERROR_IO;
+                }
+
+                uint8_t bitsPerSample = cookie[5];
+                mLastTrack->meta.setInt32(kKeyBitsPerSample, bitsPerSample);
+                mLastTrack->meta.setInt32(kKeyChannelCount, cookie[9]);
+                mLastTrack->meta.setInt32(kKeySampleRate, U32_AT(&cookie[20]));
+                mLastTrack->meta.setData(
+                        kKeyAlacMagicCookie, MetaData::TYPE_NONE, cookie, sizeof(cookie));
+                data_offset += sizeof(cookie);
+                *offset = data_offset;
+                CHECK_EQ(*offset, stop_offset);
+            }
 
             while (*offset < stop_offset) {
                 status_t err = parseChunk(offset, depth + 1);
