@@ -19,8 +19,7 @@
 #define LOG_TAG "DeviceHalHidl"
 //#define LOG_NDEBUG 0
 
-#include <android/hardware/audio/2.0/IPrimaryDevice.h>
-#include <android/hardware/audio/4.0/IPrimaryDevice.h>
+#include PATH(android/hardware/audio/FILE_VERSION/IPrimaryDevice.h)
 #include <cutils/native_handle.h>
 #include <hwbinder/IPCThreadState.h>
 #include <utils/Log.h>

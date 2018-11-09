@@ -17,10 +17,8 @@
 #ifndef ANDROID_HARDWARE_DEVICE_HAL_HIDL_H
 #define ANDROID_HARDWARE_DEVICE_HAL_HIDL_H
 
-#include <android/hardware/audio/2.0/IDevice.h>
-#include <android/hardware/audio/4.0/IDevice.h>
-#include <android/hardware/audio/2.0/IPrimaryDevice.h>
-#include <android/hardware/audio/4.0/IPrimaryDevice.h>
+#include PATH(android/hardware/audio/FILE_VERSION/IDevice.h)
+#include PATH(android/hardware/audio/FILE_VERSION/IPrimaryDevice.h)
 #include <media/audiohal/DeviceHalInterface.h>
 
 #include "ConversionHelperHidl.h"

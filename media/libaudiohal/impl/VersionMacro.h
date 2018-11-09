@@ -21,6 +21,15 @@
 #error "MAJOR_VERSION and MINOR_VERSION must be defined"
 #endif
 
+/** Allows macro expansion for x and add surrounding `<>`.
+ * Is intended to be used for version dependant includes as
+ * `#include` do not macro expand if starting with < or "
+ * Example usage:
+ *      #include PATH(path/to/FILE_VERSION/file)
+ * @note: uses the implementation-define "Computed Includes" feature.
+ */
+#define PATH(x) <x>
+
 #define CONCAT_3(a,b,c) a##b##c
 #define EXPAND_CONCAT_3(a,b,c) CONCAT_3(a,b,c)
 /** The directory name of the version: <major>.<minor> */

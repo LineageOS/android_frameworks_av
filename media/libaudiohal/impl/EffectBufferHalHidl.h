@@ -17,8 +17,7 @@
 #ifndef ANDROID_HARDWARE_EFFECT_BUFFER_HAL_HIDL_H
 #define ANDROID_HARDWARE_EFFECT_BUFFER_HAL_HIDL_H
 
-#include <android/hardware/audio/effect/2.0/types.h>
-#include <android/hardware/audio/effect/4.0/types.h>
+#include PATH(android/hardware/audio/effect/FILE_VERSION/types.h)
 #include <android/hidl/memory/1.0/IMemory.h>
 #include <hidl/HidlSupport.h>
 #include <media/audiohal/EffectBufferHalInterface.h>

@@ -19,12 +19,9 @@
 
 #include <atomic>
 
-#include <android/hardware/audio/2.0/IStream.h>
-#include <android/hardware/audio/4.0/IStream.h>
-#include <android/hardware/audio/2.0/IStreamIn.h>
-#include <android/hardware/audio/4.0/IStreamIn.h>
-#include <android/hardware/audio/2.0/IStreamOut.h>
-#include <android/hardware/audio/4.0/IStreamOut.h>
+#include PATH(android/hardware/audio/FILE_VERSION/IStream.h)
+#include PATH(android/hardware/audio/FILE_VERSION/IStreamIn.h)
+#include PATH(android/hardware/audio/FILE_VERSION/IStreamOut.h)
 #include <fmq/EventFlag.h>
 #include <fmq/MessageQueue.h>
 #include <media/audiohal/StreamHalInterface.h>
