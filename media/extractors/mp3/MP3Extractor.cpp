@@ -546,7 +546,8 @@ media_status_t MP3Source::read(
             buffer->release();
             buffer = NULL;
 
-            return (n < 0 ? AMEDIA_ERROR_UNKNOWN : AMEDIA_ERROR_END_OF_STREAM);
+            return ((n < 0 && n != ERROR_END_OF_STREAM) ?
+                    AMEDIA_ERROR_UNKNOWN : AMEDIA_ERROR_END_OF_STREAM);
         }
 
         uint32_t header = U32_AT((const uint8_t *)buffer->data());
@@ -590,7 +591,8 @@ media_status_t MP3Source::read(
         buffer->release();
         buffer = NULL;
 
-        return (n < 0 ? AMEDIA_ERROR_UNKNOWN : AMEDIA_ERROR_END_OF_STREAM);
+        return ((n < 0 && n != ERROR_END_OF_STREAM) ?
+                AMEDIA_ERROR_UNKNOWN : AMEDIA_ERROR_END_OF_STREAM);
     }
 
     buffer->set_range(0, frame_size);
