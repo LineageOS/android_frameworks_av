@@ -82,7 +82,7 @@ class ConversionHelperHidl {
     void emitError(const char* funcName, const char* description);
 };
 
-#if MAJOR_VERSION == 4
+#if MAJOR_VERSION >= 4
 using ::android::hardware::audio::CPP_VERSION::MicrophoneInfo;
 void microphoneInfoToHal(const MicrophoneInfo& src,
                          audio_microphone_characteristic_t *pDst);

@@ -16,6 +16,7 @@
 
 #include <android/hardware/audio/2.0/IDevicesFactory.h>
 #include <android/hardware/audio/4.0/IDevicesFactory.h>
+#include <android/hardware/audio/5.0/IDevicesFactory.h>
 
 #include <libaudiohal/FactoryHalHidl.h>
 
@@ -23,6 +24,9 @@ namespace android {
 
 // static
 sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
+    if (hardware::audio::V5_0::IDevicesFactory::getService() != nullptr) {
+        return V5_0::createDevicesFactoryHal();
+    }
     if (hardware::audio::V4_0::IDevicesFactory::getService() != nullptr) {
         return V4_0::createDevicesFactoryHal();
     }

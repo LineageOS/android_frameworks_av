@@ -49,7 +49,7 @@ using ::android::hardware::audio::CPP_VERSION::Result;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 
-#if MAJOR_VERSION == 4
+#if MAJOR_VERSION >= 4
 using ::android::hardware::audio::CPP_VERSION::SinkMetadata;
 #endif
 
@@ -262,7 +262,7 @@ status_t DeviceHalHidl::openOutputStream(
             hidlDevice,
             hidlConfig,
             EnumBitfield<AudioOutputFlag>(flags),
-#if MAJOR_VERSION == 4
+#if MAJOR_VERSION >= 4
             {} /* metadata */,
 #endif
             [&](Result r, const sp<IStreamOut>& result, const AudioConfig& suggestedConfig) {
@@ -292,7 +292,7 @@ status_t DeviceHalHidl::openInputStream(
     Result retval = Result::NOT_INITIALIZED;
 #if MAJOR_VERSION == 2
     auto sourceMetadata = AudioSource(source);
-#elif MAJOR_VERSION == 4
+#elif MAJOR_VERSION >= 4
     // TODO: correctly propagate the tracks sources and volume
     //       for now, only send the main source at 1dbfs
     SinkMetadata sourceMetadata = {{{AudioSource(source), 1}}};
@@ -374,7 +374,7 @@ status_t DeviceHalHidl::getMicrophones(
     if (mDevice == 0) return NO_INIT;
     return INVALID_OPERATION;
 }
-#elif MAJOR_VERSION == 4
+#elif MAJOR_VERSION >= 4
 status_t DeviceHalHidl::getMicrophones(std::vector<media::MicrophoneInfo> *microphonesInfo) {
     if (mDevice == 0) return NO_INIT;
     Result retval;

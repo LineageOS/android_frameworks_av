@@ -44,7 +44,7 @@ using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ReadCommand = ::android::hardware::audio::CPP_VERSION::IStreamIn::ReadCommand;
 
-#if MAJOR_VERSION == 4
+#if MAJOR_VERSION >= 4
 using ::android::hardware::audio::common::CPP_VERSION::AudioContentType;
 using ::android::hardware::audio::common::CPP_VERSION::AudioSource;
 using ::android::hardware::audio::common::CPP_VERSION::AudioUsage;
@@ -192,7 +192,7 @@ status_t StreamHalHidl::createMmapBuffer(int32_t minSizeFrames,
                     const native_handle *handle = hidlInfo.sharedMemory.handle();
                     if (handle->numFds > 0) {
                         info->shared_memory_fd = handle->data[0];
-#if MAJOR_VERSION == 4
+#if MAJOR_VERSION >= 4
                         info->flags = audio_mmap_buffer_flag(hidlInfo.flags);
 #endif
                         info->buffer_size_frames = hidlInfo.bufferSizeFrames;
@@ -603,7 +603,7 @@ status_t StreamOutHalHidl::updateSourceMetadata(const SourceMetadata& /* sourceM
     // Audio HAL V2.0 does not support propagating source metadata
     return INVALID_OPERATION;
 }
-#elif MAJOR_VERSION == 4
+#elif MAJOR_VERSION >= 4
 /** Transform a standard collection to an HIDL vector. */
 template <class Values, class ElementConverter>
 static auto transformToHidlVec(const Values& values, ElementConverter converter) {
@@ -833,7 +833,7 @@ status_t StreamInHalHidl::updateSinkMetadata(const SinkMetadata& /* sinkMetadata
     return INVALID_OPERATION;
 }
 
-#elif MAJOR_VERSION == 4
+#elif MAJOR_VERSION >= 4
 status_t StreamInHalHidl::getActiveMicrophones(
         std::vector<media::MicrophoneInfo> *microphonesInfo) {
     if (!mStream) return NO_INIT;

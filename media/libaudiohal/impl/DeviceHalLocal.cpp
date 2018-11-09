@@ -190,7 +190,7 @@ status_t DeviceHalLocal::getMicrophones(
         std::vector<media::MicrophoneInfo> *microphones __unused) {
     return INVALID_OPERATION;
 }
-#elif MAJOR_VERSION == 4
+#elif MAJOR_VERSION >= 4
 status_t DeviceHalLocal::getMicrophones(std::vector<media::MicrophoneInfo> *microphones) {
     if (mDev->get_microphones == NULL) return INVALID_OPERATION;
     size_t actual_mics = AUDIO_MICROPHONE_MAX_COUNT;

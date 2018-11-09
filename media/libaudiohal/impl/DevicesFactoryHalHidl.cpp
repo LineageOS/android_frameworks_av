@@ -75,7 +75,7 @@ static IDevicesFactory::Device idFromHal(const char *name, status_t* status) {
     *status = BAD_VALUE;
     return {};
 }
-#elif MAJOR_VERSION == 4
+#elif MAJOR_VERSION >= 4
 static const char* idFromHal(const char *name, status_t* status) {
     *status = OK;
     return name;
