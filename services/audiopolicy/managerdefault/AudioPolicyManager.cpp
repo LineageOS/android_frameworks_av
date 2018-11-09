@@ -1070,8 +1070,17 @@ non_direct_output:
     return output;
 }
 
-sp<DeviceDescriptor> AudioPolicyManager::getMsdAudioInDevice() const {
+sp<HwModule> AudioPolicyManager::getMsdModule() const {
     sp<HwModule> msdModule = mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_MSD);
+    if (msdModule != 0 && property_get_bool("audio.msd.disable", false /* default_value */)) {
+        ALOGI("use of the MSD module is disabled by audio.msd.disable property");
+        return 0;
+    }
+    return msdModule;
+}
+
+sp<DeviceDescriptor> AudioPolicyManager::getMsdAudioInDevice() const {
+    sp<HwModule> msdModule = getMsdModule();
     if (msdModule != 0) {
         DeviceVector msdInputDevices = mAvailableInputDevices.getDevicesFromHwModule(
                 msdModule->getHandle());
@@ -1081,7 +1090,7 @@ sp<DeviceDescriptor> AudioPolicyManager::getMsdAudioInDevice() const {
 }
 
 audio_devices_t AudioPolicyManager::getMsdAudioOutDeviceTypes() const {
-    sp<HwModule> msdModule = mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_MSD);
+    sp<HwModule> msdModule = getMsdModule();
     if (msdModule != 0) {
         return mAvailableOutputDevices.getDeviceTypesFromHwModule(msdModule->getHandle());
     }
@@ -1090,6 +1099,7 @@ audio_devices_t AudioPolicyManager::getMsdAudioOutDeviceTypes() const {
 
 const AudioPatchCollection AudioPolicyManager::getMsdPatches() const {
     AudioPatchCollection msdPatches;
+    // This function ignores audio.msd.disable property to allow patch teardown.
     sp<HwModule> msdModule = mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_MSD);
     if (msdModule != 0) {
         for (size_t i = 0; i < mAudioPatches.size(); ++i) {
@@ -1109,7 +1119,7 @@ const AudioPatchCollection AudioPolicyManager::getMsdPatches() const {
 status_t AudioPolicyManager::getBestMsdAudioProfileFor(audio_devices_t outputDevice,
         bool hwAvSync, audio_port_config *sourceConfig, audio_port_config *sinkConfig) const
 {
-    sp<HwModule> msdModule = mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_MSD);
+    sp<HwModule> msdModule = getMsdModule();
     if (msdModule == nullptr) {
         ALOGE("%s() unable to get MSD module", __func__);
         return NO_INIT;
@@ -4627,7 +4637,7 @@ void AudioPolicyManager::checkForDeviceAndOutputChanges(std::function<bool()> on
     checkOutputForAllStrategies();
     if (onOutputsChecked != nullptr && onOutputsChecked()) checkA2dpSuspend();
     updateDevicesAndOutputs();
-    if (mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_MSD) != 0) {
+    if (getMsdModule() != 0) {
         setMsdPatch();
     }
 }
