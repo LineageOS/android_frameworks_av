@@ -51,6 +51,7 @@ const char *MEDIA_MIMETYPE_AUDIO_MSGSM = "audio/gsm";
 const char *MEDIA_MIMETYPE_AUDIO_AC3 = "audio/ac3";
 const char *MEDIA_MIMETYPE_AUDIO_EAC3 = "audio/eac3";
 const char *MEDIA_MIMETYPE_AUDIO_SCRAMBLED = "audio/scrambled";
+const char *MEDIA_MIMETYPE_AUDIO_ALAC = "audio/alac";
 
 const char *MEDIA_MIMETYPE_CONTAINER_MPEG4 = "video/mp4";
 const char *MEDIA_MIMETYPE_CONTAINER_WAV = "audio/x-wav";

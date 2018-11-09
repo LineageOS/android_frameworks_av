@@ -1135,6 +1135,17 @@ status_t convertMetaDataToMessage(
         msg->setBuffer("csd-0", buffer);
 
         parseVp9ProfileLevelFromCsd(buffer, msg);
+    } else if (meta->findData(kKeyAlacMagicCookie, &type, &data, &size)) {
+        ALOGV("convertMetaDataToMessage found kKeyAlacMagicCookie of size %zu\n", size);
+        sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
+        if (buffer.get() == NULL || buffer->base() == NULL) {
+            return NO_MEMORY;
+        }
+        memcpy(buffer->data(), data, size);
+
+        buffer->meta()->setInt32("csd", true);
+        buffer->meta()->setInt64("timeUs", 0);
+        msg->setBuffer("csd-0", buffer);
     }
 
     // TODO expose "crypto-key"/kKeyCryptoKey through public api
@@ -1546,6 +1557,8 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             if (msg->findBuffer("csd-1", &csd1)) {
                 meta->setData(kKeyVorbisBooks, 0, csd1->data(), csd1->size());
             }
+        } else if (mime == MEDIA_MIMETYPE_AUDIO_ALAC) {
+            meta->setData(kKeyAlacMagicCookie, 0, csd0->data(), csd0->size());
         }
     }
 
@@ -1628,6 +1641,7 @@ static const struct mime_conv_t mimeLookup[] = {
     { MEDIA_MIMETYPE_AUDIO_OPUS,        AUDIO_FORMAT_OPUS},
     { MEDIA_MIMETYPE_AUDIO_AC3,         AUDIO_FORMAT_AC3},
     { MEDIA_MIMETYPE_AUDIO_FLAC,        AUDIO_FORMAT_FLAC},
+    { MEDIA_MIMETYPE_AUDIO_ALAC,        AUDIO_FORMAT_ALAC },
     { 0, AUDIO_FORMAT_INVALID }
 };
 
