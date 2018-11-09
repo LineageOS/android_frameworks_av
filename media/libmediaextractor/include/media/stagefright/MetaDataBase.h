@@ -228,6 +228,9 @@ enum {
     kKeyIsExif           = 'exif', // bool (int32_t) buffer contains exif data block
 
     kKeyPcmBigEndian     = 'pcmb', // bool (int32_t)
+
+    // Key for ALAC Magic Cookie
+    kKeyAlacMagicCookie  = 'almc', // raw data
 };
 
 enum {
