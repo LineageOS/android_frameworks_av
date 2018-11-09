@@ -17,6 +17,8 @@
 #ifndef ANDROID_JAUDIOTRACK_H
 #define ANDROID_JAUDIOTRACK_H
 
+#include <vector>
+#include <utility>
 #include <jni.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
@@ -29,7 +31,7 @@
 
 namespace android {
 
-class JAudioTrack {
+class JAudioTrack : public RefBase {
 public:
 
     /* Events used by AudioTrack callback function (callback_t).
@@ -37,6 +39,8 @@ public:
      */
     enum event_type {
         EVENT_MORE_DATA = 0,        // Request to write more data to buffer.
+        EVENT_UNDERRUN = 1,         // Buffer underrun occurred. This will not occur for
+                                    // static tracks.
         EVENT_NEW_IAUDIOTRACK = 6,  // IAudioTrack was re-created, either due to re-routing and
                                     // voluntary invalidation by mediaserver, or mediaserver crash.
         EVENT_STREAM_END = 7,       // Sent after all the buffers queued in AF and HW are played
@@ -104,8 +108,7 @@ public:
      *
      * TODO: Revive removed arguments after offload mode is supported.
      */
-    JAudioTrack(audio_stream_type_t streamType,
-                uint32_t sampleRate,
+    JAudioTrack(uint32_t sampleRate,
                 audio_format_t format,
                 audio_channel_mask_t channelMask,
                 callback_t cbf,
@@ -158,10 +161,10 @@ public:
      * Caution: calling this method too often may be inefficient;
      * if you need a high resolution mapping between frame position and presentation time,
      * consider implementing that at application level, based on the low resolution timestamps.
-     * Returns true if timestamp is valid.
-     * The timestamp parameter is undefined on return, if false is returned.
+     * Returns NO_ERROR if timestamp is valid.
+     *         NO_INIT if finds error, and timestamp parameter will be undefined on return.
      */
-    bool getTimestamp(AudioTimestamp& timestamp);
+    status_t getTimestamp(AudioTimestamp& timestamp);
 
     // TODO: This doc is just copied from AudioTrack.h. Revise it after implemenation.
     /* Return the extended timestamp, with additional timebase info and improved drain behavior.
@@ -324,6 +327,8 @@ public:
 
     audio_format_t format();
 
+    size_t frameSize();
+
     /*
      * Dumps the state of an audio track.
      * Not a general-purpose API; intended only for use by media player service to dump its tracks.
@@ -355,6 +360,11 @@ public:
     /* Returns the flags */
     audio_output_flags_t getFlags() const { return mFlags; }
 
+    /* We don't keep stream type here,
+     * instead, we keep attributes and call getVolumeControlStream() to get stream type
+     */
+    audio_stream_type_t getAudioStreamType();
+
     /* Obtain the pending duration in milliseconds for playback of pure PCM data remaining in
      * AudioTrack.
      *
@@ -369,33 +379,75 @@ public:
      * Replaces any previously installed callback.
      *
      * Parameters:
-     *
-     * callback: The callback interface
+     * Listener: the listener to receive notification of rerouting events.
+     * Handler: the handler to handler the rerouting events.
      *
      * Returns NO_ERROR if successful.
-     *         INVALID_OPERATION if the same callback is already installed.
-     *         NO_INIT or PREMISSION_DENIED if AudioFlinger service is not reachable
-     *         BAD_VALUE if the callback is NULL
+     *         (TODO) INVALID_OPERATION if the same callback is already installed.
+     *         (TODO) NO_INIT or PREMISSION_DENIED if AudioFlinger service is not reachable
+     *         (TODO) BAD_VALUE if the callback is NULL
      */
-    status_t addAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
+    status_t addAudioDeviceCallback(jobject listener, jobject rd);
 
     /* Removes an AudioDeviceCallback.
      *
      * Parameters:
-     *
-     * callback: The callback interface
+     * Listener: the listener to receive notification of rerouting events.
      *
      * Returns NO_ERROR if successful.
-     *         INVALID_OPERATION if the callback is not installed
-     *         BAD_VALUE if the callback is NULL
+     *         (TODO) INVALID_OPERATION if the callback is not installed
+     *         (TODO) BAD_VALUE if the callback is NULL
      */
-    status_t removeAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
+    status_t removeAudioDeviceCallback(jobject listener);
+
+    /* Register all backed-up routing delegates.
+     *
+     * Parameters:
+     * routingDelegates: backed-up routing delegates
+     *
+     */
+    void registerRoutingDelegates(std::vector<std::pair<jobject, jobject>>& routingDelegates);
+
+    /* get listener from RoutingDelegate object
+     */
+    static jobject getListener(const jobject routingDelegateObj);
+
+    /* get handler from RoutingDelegate object
+     */
+    static jobject getHandler(const jobject routingDelegateObj);
+
+    /* convert local reference to global reference.
+     */
+    static jobject addGlobalRef(const jobject obj);
+
+    /* erase global reference.
+     *
+     * Returns NO_ERROR if succeeds
+     *         BAD_VALUE if obj is NULL
+     */
+    static status_t removeGlobalRef(const jobject obj);
+
+    /*
+     * Parameters:
+     * map and key
+     *
+     * Returns value if key is in the map
+     *         nullptr if key is not in the map
+     */
+    static jobject findByKey(std::vector<std::pair<jobject, jobject>>& mp, const jobject key);
+
+    /*
+     * Parameters:
+     * map and key
+     */
+    static void eraseByKey(std::vector<std::pair<jobject, jobject>>& mp, const jobject key);
 
 private:
     audio_output_flags_t mFlags;
 
     jclass mAudioTrackCls;
     jobject mAudioTrackObj;
+    jobject mAudioAttributesObj;
 
     /* Creates a Java VolumeShaper.Configuration object from VolumeShaper::Configuration */
     jobject createVolumeShaperConfigurationObj(

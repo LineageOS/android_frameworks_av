@@ -1848,6 +1848,7 @@ status_t NuPlayer2::Renderer::onOpenAudioSink(
         bool isStreaming) {
     ALOGV("openAudioSink: offloadOnly(%d) offloadingAudio(%d)",
             offloadOnly, offloadingAudio());
+
     bool audioSinkChanged = false;
 
     int32_t numChannels;
@@ -1989,13 +1990,6 @@ status_t NuPlayer2::Renderer::onOpenAudioSink(
         const uint32_t frameCount =
                 (unsigned long long)sampleRate * getAudioSinkPcmMsSetting() / 1000;
 
-        // The doNotReconnect means AudioSink will signal back and let NuPlayer2 to re-construct
-        // AudioSink. We don't want this when there's video because it will cause a video seek to
-        // the previous I frame. But we do want this when there's only audio because it will give
-        // NuPlayer2 a chance to switch from non-offload mode to offload mode.
-        // So we only set doNotReconnect when there's no video.
-        const bool doNotReconnect = !hasVideo;
-
         // We should always be able to set our playback settings if the sink is closed.
         LOG_ALWAYS_FATAL_IF(mAudioSink->setPlaybackRate(mPlaybackSettings) != OK,
                 "onOpenAudioSink: can't set playback rate on closed sink");
@@ -2008,7 +2002,6 @@ status_t NuPlayer2::Renderer::onOpenAudioSink(
                     mUseAudioCallback ? this : NULL,
                     (audio_output_flags_t)pcmFlags,
                     NULL,
-                    doNotReconnect,
                     frameCount);
         if (err != OK) {
             ALOGW("openAudioSink: non offloaded open failed status: %d", err);

@@ -23,6 +23,7 @@
 #include <utils/Errors.h>
 #include <utils/String8.h>
 #include <utils/RefBase.h>
+#include <jni.h>
 
 #include <media/AVSyncSettings.h>
 #include <media/AudioResamplerPublic.h>
@@ -106,7 +107,6 @@ public:
                 void *cookie = NULL,
                 audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
                 const audio_offload_info_t *offloadInfo = NULL,
-                bool doNotReconnect = false,
                 uint32_t suggestedFrameCount = 0) = 0;
 
         virtual status_t start() = 0;
@@ -144,7 +144,8 @@ public:
         // AudioRouting
         virtual status_t    setOutputDevice(audio_port_handle_t deviceId);
         virtual status_t    getRoutedDeviceId(audio_port_handle_t* deviceId);
-        virtual status_t    enableAudioDeviceCallback(bool enabled);
+        virtual status_t    addAudioDeviceCallback(jobject routingDelegate);
+        virtual status_t    removeAudioDeviceCallback(jobject listener);
     };
 
     MediaPlayer2Interface() : mListener(NULL) { }

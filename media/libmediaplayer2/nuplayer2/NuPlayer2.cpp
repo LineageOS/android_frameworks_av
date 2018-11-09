@@ -643,6 +643,7 @@ void NuPlayer2::writeTrackInfo(
 }
 
 void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
+
     switch (msg->what()) {
         case kWhatSetDataSource:
         {
@@ -1717,7 +1718,7 @@ void NuPlayer2::onStart(bool play) {
     mRenderer = new Renderer(mAudioSink, mMediaClock, notify, flags);
     mRendererLooper = new ALooper;
     mRendererLooper->setName("NuPlayerRenderer");
-    mRendererLooper->start(false, false, ANDROID_PRIORITY_AUDIO);
+    mRendererLooper->start(false, true, ANDROID_PRIORITY_AUDIO);
     mRendererLooper->registerHandler(mRenderer);
 
     status_t err = mRenderer->setPlaybackSettings(mPlaybackSettings);
