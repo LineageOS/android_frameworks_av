@@ -118,9 +118,9 @@ status_t ClearKeyCasPlugin::openSession(CasSessionId* sessionId) {
 
 status_t ClearKeyCasPlugin::closeSession(const CasSessionId &sessionId) {
     ALOGV("closeSession: sessionId=%s", sessionIdToString(sessionId).string());
-    sp<ClearKeyCasSession> session =
+    std::shared_ptr<ClearKeyCasSession> session =
             ClearKeySessionLibrary::get()->findSession(sessionId);
-    if (session == NULL) {
+    if (session.get() == nullptr) {
         return ERROR_CAS_SESSION_NOT_OPENED;
     }
 
@@ -132,9 +132,9 @@ status_t ClearKeyCasPlugin::setSessionPrivateData(
         const CasSessionId &sessionId, const CasData & /*data*/) {
     ALOGV("setSessionPrivateData: sessionId=%s",
             sessionIdToString(sessionId).string());
-    sp<ClearKeyCasSession> session =
+    std::shared_ptr<ClearKeyCasSession> session =
             ClearKeySessionLibrary::get()->findSession(sessionId);
-    if (session == NULL) {
+    if (session.get() == nullptr) {
         return ERROR_CAS_SESSION_NOT_OPENED;
     }
     return OK;
@@ -143,9 +143,9 @@ status_t ClearKeyCasPlugin::setSessionPrivateData(
 status_t ClearKeyCasPlugin::processEcm(
         const CasSessionId &sessionId, const CasEcm& ecm) {
     ALOGV("processEcm: sessionId=%s", sessionIdToString(sessionId).string());
-    sp<ClearKeyCasSession> session =
+    std::shared_ptr<ClearKeyCasSession> session =
             ClearKeySessionLibrary::get()->findSession(sessionId);
-    if (session == NULL) {
+    if (session.get() == nullptr) {
         return ERROR_CAS_SESSION_NOT_OPENED;
     }
 
@@ -415,15 +415,15 @@ status_t ClearKeyDescramblerPlugin::setMediaCasSession(
         const CasSessionId &sessionId) {
     ALOGV("setMediaCasSession: sessionId=%s", sessionIdToString(sessionId).string());
 
-    sp<ClearKeyCasSession> session =
+    std::shared_ptr<ClearKeyCasSession> session =
             ClearKeySessionLibrary::get()->findSession(sessionId);
 
-    if (session == NULL) {
+    if (session.get() == nullptr) {
         ALOGE("ClearKeyDescramblerPlugin: session not found");
         return ERROR_CAS_SESSION_NOT_OPENED;
     }
 
-    mCASSession = session;
+    std::atomic_store(&mCASSession, session);
     return OK;
 }
 
@@ -444,12 +444,14 @@ ssize_t ClearKeyDescramblerPlugin::descramble(
           subSamplesToString(subSamples, numSubSamples).string(),
           srcPtr, dstPtr, srcOffset, dstOffset);
 
-    if (mCASSession == NULL) {
+    std::shared_ptr<ClearKeyCasSession> session = std::atomic_load(&mCASSession);
+
+    if (session.get() == nullptr) {
         ALOGE("Uninitialized CAS session!");
         return ERROR_CAS_DECRYPT_UNIT_NOT_INITIALIZED;
     }
 
-    return mCASSession->decrypt(
+    return session->decrypt(
             secure, scramblingControl,
             numSubSamples, subSamples,
             (uint8_t*)srcPtr + srcOffset,
