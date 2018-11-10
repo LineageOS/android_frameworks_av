@@ -360,6 +360,11 @@ class Camera3Stream :
      */
     bool             hasOutstandingBuffers() const;
 
+    /**
+     * Get number of buffers currently handed out to HAL
+     */
+    size_t           getOutstandingBuffersCount() const;
+
     enum {
         TIMEOUT_NEVER = -1
     };
@@ -495,7 +500,7 @@ class Camera3Stream :
     virtual size_t   getBufferCountLocked() = 0;
 
     // Get handout output buffer count.
-    virtual size_t   getHandoutOutputBufferCountLocked() = 0;
+    virtual size_t   getHandoutOutputBufferCountLocked() const = 0;
 
     // Get handout input buffer count.
     virtual size_t   getHandoutInputBufferCountLocked() = 0;

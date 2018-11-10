@@ -795,6 +795,12 @@ bool Camera3Stream::hasOutstandingBuffers() const {
     return hasOutstandingBuffersLocked();
 }
 
+size_t Camera3Stream::getOutstandingBuffersCount() const {
+    ATRACE_CALL();
+    Mutex::Autolock l(mLock);
+    return getHandoutOutputBufferCountLocked();
+}
+
 status_t Camera3Stream::setStatusTracker(sp<StatusTracker> statusTracker) {
     Mutex::Autolock l(mLock);
     sp<StatusTracker> oldTracker = mStatusTracker.promote();

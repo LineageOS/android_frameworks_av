@@ -82,7 +82,7 @@ class Camera3IOStreamBase :
 
     virtual size_t   getBufferCountLocked();
 
-    virtual size_t   getHandoutOutputBufferCountLocked();
+    virtual size_t   getHandoutOutputBufferCountLocked() const;
 
     virtual size_t   getHandoutInputBufferCountLocked();
 
