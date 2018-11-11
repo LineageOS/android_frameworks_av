@@ -20,11 +20,14 @@
 
 #include <mediaplayer2/MediaPlayer2Interface.h>
 #include <mediaplayer2/JAudioTrack.h>
+#include <mediaplayer2/JObjectHolder.h>
 
 #include <vector>
 #include <utility>
 #include <utils/String16.h>
 #include <utils/Vector.h>
+
+#include "jni.h"
 
 namespace android {
 
@@ -92,8 +95,8 @@ public:
         //return mNextOutput == NULL;
     }
     // AudioRouting
-    virtual status_t setOutputDevice(audio_port_handle_t deviceId);
-    virtual status_t getRoutedDeviceId(audio_port_handle_t* deviceId);
+    virtual status_t setPreferredDevice(jobject device);
+    virtual jobject getRoutedDevice();
     virtual status_t addAudioDeviceCallback(jobject routingDelegate);
     virtual status_t removeAudioDeviceCallback(jobject listener);
     virtual void copyAudioDeviceCallback(std::vector<jobject>& routingDelegateTarget);
@@ -121,8 +124,7 @@ private:
     float                   mSendLevel;
     int                     mAuxEffectId;
     audio_output_flags_t    mFlags;
-    audio_port_handle_t     mSelectedDeviceId;
-    audio_port_handle_t     mRoutedDeviceId;
+    sp<JObjectHolder>       mPreferredDevice;
     mutable Mutex           mLock;
     std::vector<std::pair<jobject, jobject>> mRoutingDelegates; // <listener, routingDelegate>
 

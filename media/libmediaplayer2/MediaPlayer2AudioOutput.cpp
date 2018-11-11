@@ -74,9 +74,7 @@ MediaPlayer2AudioOutput::MediaPlayer2AudioOutput(audio_session_t sessionId, uid_
       mPid(pid),
       mSendLevel(0.0),
       mAuxEffectId(0),
-      mFlags(AUDIO_OUTPUT_FLAG_NONE),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE) {
+      mFlags(AUDIO_OUTPUT_FLAG_NONE) {
     ALOGV("MediaPlayer2AudioOutput(%d)", sessionId);
     if (attr != nullptr) {
         mAttributes = (audio_attributes_t *) calloc(1, sizeof(audio_attributes_t));
@@ -388,7 +386,9 @@ status_t MediaPlayer2AudioOutput::updateTrack_l() {
             res = mJAudioTrack->attachAuxEffect(mAuxEffectId);
         }
     }
-    mJAudioTrack->setOutputDevice(mSelectedDeviceId);
+    if (mPreferredDevice != nullptr) {
+        mJAudioTrack->setPreferredDevice(mPreferredDevice->getJObject());
+    }
 
     mJAudioTrack->registerRoutingDelegates(mRoutingDelegates);
 
@@ -518,24 +518,26 @@ status_t MediaPlayer2AudioOutput::attachAuxEffect(int effectId) {
     return NO_ERROR;
 }
 
-status_t MediaPlayer2AudioOutput::setOutputDevice(audio_port_handle_t deviceId) {
-    ALOGV("setOutputDevice(%d)", deviceId);
+status_t MediaPlayer2AudioOutput::setPreferredDevice(jobject device) {
+    ALOGV("setPreferredDevice");
     Mutex::Autolock lock(mLock);
-    mSelectedDeviceId = deviceId;
+    status_t ret = NO_ERROR;
     if (mJAudioTrack != nullptr) {
-        return mJAudioTrack->setOutputDevice(deviceId);
+        ret = mJAudioTrack->setPreferredDevice(device);
     }
-    return NO_ERROR;
+    if (ret == NO_ERROR) {
+        mPreferredDevice = new JObjectHolder(device);
+    }
+    return ret;
 }
 
-status_t MediaPlayer2AudioOutput::getRoutedDeviceId(audio_port_handle_t* deviceId) {
-    ALOGV("getRoutedDeviceId");
+jobject MediaPlayer2AudioOutput::getRoutedDevice() {
+    ALOGV("getRoutedDevice");
     Mutex::Autolock lock(mLock);
     if (mJAudioTrack != nullptr) {
-        mRoutedDeviceId = mJAudioTrack->getRoutedDeviceId();
+        return mJAudioTrack->getRoutedDevice();
     }
-    *deviceId = mRoutedDeviceId;
-    return NO_ERROR;
+    return nullptr;
 }
 
 status_t MediaPlayer2AudioOutput::addAudioDeviceCallback(jobject jRoutingDelegate) {

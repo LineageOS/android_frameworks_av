@@ -1264,27 +1264,22 @@ status_t MediaPlayer2::releaseDrm() {
     return status;
 }
 
-status_t MediaPlayer2::setOutputDevice(audio_port_handle_t deviceId) {
+status_t MediaPlayer2::setPreferredDevice(jobject device) {
     Mutex::Autolock _l(mLock);
     if (mAudioOutput == NULL) {
-        ALOGV("setOutputDevice: audio sink not init");
+        ALOGV("setPreferredDevice: audio sink not init");
         return NO_INIT;
     }
-    return mAudioOutput->setOutputDevice(deviceId);
+    return mAudioOutput->setPreferredDevice(device);
 }
 
-audio_port_handle_t MediaPlayer2::getRoutedDeviceId() {
+jobject MediaPlayer2::getRoutedDevice() {
     Mutex::Autolock _l(mLock);
     if (mAudioOutput == NULL) {
-        ALOGV("getRoutedDeviceId: audio sink not init");
-        return AUDIO_PORT_HANDLE_NONE;
+        ALOGV("getRoutedDevice: audio sink not init");
+        return nullptr;
     }
-    audio_port_handle_t deviceId;
-    status_t status = mAudioOutput->getRoutedDeviceId(&deviceId);
-    if (status != NO_ERROR) {
-        return AUDIO_PORT_HANDLE_NONE;
-    }
-    return deviceId;
+    return mAudioOutput->getRoutedDevice();
 }
 
 status_t MediaPlayer2::addAudioDeviceCallback(jobject routingDelegate) {
