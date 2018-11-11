@@ -59,6 +59,7 @@ cc_library_static {
         "libstagefright_player2",
         "libstagefright_rtsp",
         "libstagefright_timedtext2",
+        "libmedia2_jni_core",
     ],
 
     export_include_dirs: [

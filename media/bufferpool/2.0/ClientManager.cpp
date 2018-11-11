@@ -24,6 +24,7 @@
 #include <utils/Log.h>
 #include "BufferPoolClient.h"
 #include "Observer.h"
+#include "Accessor.h"
 
 namespace android {
 namespace hardware {
@@ -453,6 +454,7 @@ sp<ClientManager> ClientManager::getInstance() {
     if (!sInstance) {
         sInstance = new ClientManager();
     }
+    Accessor::createInvalidator();
     return sInstance;
 }
 

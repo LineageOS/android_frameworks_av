@@ -104,27 +104,6 @@ void unmarshallAudioAttributes(const Parcel& parcel, audio_attributes_t *attribu
     }
 }
 
-class AudioDeviceUpdatedNotifier: public AudioSystem::AudioDeviceCallback {
-public:
-    AudioDeviceUpdatedNotifier(const sp<MediaPlayer2Interface>& listener)
-        : mListener(listener) { }
-
-    ~AudioDeviceUpdatedNotifier() { }
-
-    virtual void onAudioDeviceUpdate(audio_io_handle_t audioIo,
-                                     audio_port_handle_t deviceId) override {
-        sp<MediaPlayer2Interface> listener = mListener.promote();
-        if (listener != NULL) {
-            listener->sendEvent(0, MEDIA2_AUDIO_ROUTING_CHANGED, audioIo, deviceId);
-        } else {
-            ALOGW("listener for process %d death is gone", MEDIA2_AUDIO_ROUTING_CHANGED);
-        }
-    }
-
-private:
-    wp<MediaPlayer2Interface> mListener;
-};
-
 class proxyListener : public MediaPlayer2InterfaceListener {
 public:
     proxyListener(const wp<MediaPlayer2> &player)
@@ -433,9 +412,13 @@ status_t MediaPlayer2::setDataSource(const sp<DataSourceDesc> &dsd) {
 
         clear_l();
 
+        if (mAudioOutput != NULL) {
+            mAudioOutput->copyAudioDeviceCallback(mRoutingDelegates);
+        }
+
         player->setListener(new proxyListener(this));
         mAudioOutput = new MediaPlayer2AudioOutput(mAudioSessionId, mUid,
-                mPid, mAudioAttributes, new AudioDeviceUpdatedNotifier(player));
+                mPid, mAudioAttributes, mRoutingDelegates);
         player->setAudioSink(mAudioOutput);
 
         err = player->setDataSource(dsd);
@@ -614,8 +597,6 @@ status_t MediaPlayer2::prepareAsync() {
             if (err != OK) {
                 return err;
             }
-        } else if (mAudioOutput != 0) {
-            mAudioOutput->setAudioStreamType(mStreamType);
         }
         mCurrentState = MEDIA_PLAYER2_PREPARING;
         return mPlayer->prepareAsync();
@@ -1306,13 +1287,23 @@ audio_port_handle_t MediaPlayer2::getRoutedDeviceId() {
     return deviceId;
 }
 
-status_t MediaPlayer2::enableAudioDeviceCallback(bool enabled) {
+status_t MediaPlayer2::addAudioDeviceCallback(jobject routingDelegate) {
+    Mutex::Autolock _l(mLock);
+    if (mAudioOutput == NULL) {
+        ALOGV("addAudioDeviceCallback: player not init");
+        mRoutingDelegates.push_back(routingDelegate);
+        return NO_INIT;
+    }
+    return mAudioOutput->addAudioDeviceCallback(routingDelegate);
+}
+
+status_t MediaPlayer2::removeAudioDeviceCallback(jobject listener) {
     Mutex::Autolock _l(mLock);
     if (mAudioOutput == NULL) {
         ALOGV("addAudioDeviceCallback: player not init");
         return NO_INIT;
     }
-    return mAudioOutput->enableAudioDeviceCallback(enabled);
+    return mAudioOutput->removeAudioDeviceCallback(listener);
 }
 
 status_t MediaPlayer2::dump(int fd, const Vector<String16>& args) {

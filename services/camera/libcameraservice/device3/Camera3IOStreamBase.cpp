@@ -116,7 +116,7 @@ size_t Camera3IOStreamBase::getBufferCountLocked() {
     return mTotalBufferCount;
 }
 
-size_t Camera3IOStreamBase::getHandoutOutputBufferCountLocked() {
+size_t Camera3IOStreamBase::getHandoutOutputBufferCountLocked() const {
     return mHandoutOutputBufferCount;
 }
 

@@ -138,6 +138,10 @@ status_t Camera3SharedOutputStream::getBufferLocked(camera3_stream_buffer *buffe
         return res;
     }
 
+    // TODO: need to refactor this to support requestStreamBuffers API
+    // Need to wait until processCaptureResult to decide the source buffer
+    // to attach to output...
+
     // Attach the buffer to the splitter output queues. This could block if
     // the output queue doesn't have any empty slot. So unlock during the course
     // of attachBufferToOutputs.

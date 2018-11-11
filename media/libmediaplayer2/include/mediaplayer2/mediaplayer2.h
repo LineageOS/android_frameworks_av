@@ -25,6 +25,8 @@
 #include <mediaplayer2/MediaPlayer2Interface.h>
 #include <mediaplayer2/MediaPlayer2Types.h>
 
+#include <vector>
+#include <jni.h>
 #include <utils/Errors.h>
 #include <utils/Mutex.h>
 #include <utils/RefBase.h>
@@ -105,7 +107,8 @@ public:
             // AudioRouting
             status_t        setOutputDevice(audio_port_handle_t deviceId);
             audio_port_handle_t getRoutedDeviceId();
-            status_t        enableAudioDeviceCallback(bool enabled);
+            status_t        addAudioDeviceCallback(jobject routingDelegate);
+            status_t        removeAudioDeviceCallback(jobject listener);
 
             status_t        dump(int fd, const Vector<String16>& args);
 
@@ -148,7 +151,7 @@ private:
     audio_session_t             mAudioSessionId;
     audio_attributes_t *        mAudioAttributes;
     float                       mSendLevel;
-
+    std::vector<jobject>        mRoutingDelegates;
     sp<ANativeWindowWrapper>    mConnectedWindow;
 };
 

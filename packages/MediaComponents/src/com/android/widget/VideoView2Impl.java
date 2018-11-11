@@ -39,6 +39,7 @@ import android.media.PlaybackParams;
 import android.media.SessionToken2;
 import android.media.SubtitleData;
 import android.media.TimedText;
+import android.media.VideoSize;
 import android.media.session.MediaController;
 import android.media.session.MediaController.PlaybackInfo;
 import android.media.session.MediaSession;
@@ -1110,12 +1111,13 @@ public class VideoView2Impl extends BaseLayout
 
                 @Override
                 public void onVideoSizeChanged(
-                        MediaPlayer2 mp, DataSourceDesc dsd, int width, int height) {
+                        MediaPlayer2 mp, DataSourceDesc dsd, VideoSize size) {
                     if (DEBUG) {
-                        Log.d(TAG, "onVideoSizeChanged(): size: " + width + "/" + height);
+                        Log.d(TAG, "onVideoSizeChanged(): size: " + size.getWidth() + "/"
+                                + size.getHeight());
                     }
-                    mVideoWidth = mp.getVideoWidth();
-                    mVideoHeight = mp.getVideoHeight();
+                    mVideoWidth = mp.getVideoSize().getWidth();
+                    mVideoHeight = mp.getVideoSize().getHeight();
                     if (DEBUG) {
                         Log.d(TAG, "onVideoSizeChanged(): mVideoSize:" + mVideoWidth + "/"
                                 + mVideoHeight);
@@ -1193,8 +1195,8 @@ public class VideoView2Impl extends BaseLayout
                     if (mMediaControlView != null) {
                         mMediaControlView.setEnabled(true);
                     }
-                    int videoWidth = mp.getVideoWidth();
-                    int videoHeight = mp.getVideoHeight();
+                    int videoWidth = mp.getVideoSize().getWidth();
+                    int videoHeight = mp.getVideoSize().getHeight();
 
                     // mSeekWhenPrepared may be changed after seekTo() call
                     long seekToPosition = mSeekWhenPrepared;

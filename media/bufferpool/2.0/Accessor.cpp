@@ -113,6 +113,10 @@ sp<ConnectionDeathRecipient> Accessor::getConnectionDeathRecipient() {
     return sConnectionDeathRecipient;
 }
 
+void Accessor::createInvalidator() {
+    Accessor::Impl::createInvalidator();
+}
+
 // Methods from ::android::hardware::media::bufferpool::V2_0::IAccessor follow.
 Return<void> Accessor::connect(
         const sp<::android::hardware::media::bufferpool::V2_0::IObserver>& observer,

@@ -26,8 +26,7 @@ class JAudioAttributes {
 public:
     /* Creates a Java AudioAttributes object. */
     static jobject createAudioAttributesObj(JNIEnv *env,
-                                            const audio_attributes_t* pAttributes,
-                                            audio_stream_type_t streamType) {
+                                            const audio_attributes_t* pAttributes) {
 
         jclass jBuilderCls = env->FindClass("android/media/AudioAttributes$Builder");
         jmethodID jBuilderCtor = env->GetMethodID(jBuilderCls, "<init>", "()V");
@@ -58,11 +57,6 @@ public:
             // TODO: Handle the 'tags' (char[] to HashSet<String>).
             // How to parse the char[]? Is there any example of it?
             // Also, the addTags() method is hidden.
-        } else {
-            // Call AudioAttributes.Builder.setLegacyStreamType().build()
-            jmethodID jSetLegacyStreamType = env->GetMethodID(jBuilderCls, "setLegacyStreamType",
-                    "(I)Landroid/media/AudioAttributes$Builder;");
-            jBuilderObj = env->CallObjectMethod(jBuilderObj, jSetLegacyStreamType, streamType);
         }
 
         jmethodID jBuild = env->GetMethodID(jBuilderCls, "build",

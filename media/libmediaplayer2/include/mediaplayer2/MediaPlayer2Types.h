@@ -42,7 +42,6 @@ enum media2_event_type {
     MEDIA2_SUBTITLE_DATA     = 201,
     MEDIA2_META_DATA         = 202,
     MEDIA2_DRM_INFO          = 210,
-    MEDIA2_AUDIO_ROUTING_CHANGED = 10000,
 };
 
 // Generic error codes for the media player framework.  Errors are fatal, the
