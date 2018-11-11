@@ -1430,6 +1430,8 @@ void MatroskaExtractor::addTracks() {
                     err = addFlacMetadata(meta, codecPrivate, codecPrivateSize);
                 } else if (!strcmp("A_AC3", codecID)) {
                     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AC3);
+                } else if (!strcmp("A_EAC3", codecID)) {
+                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_EAC3);
                 } else {
                     ALOGW("%s is not supported.", codecID);
                     continue;
