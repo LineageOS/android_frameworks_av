@@ -857,6 +857,8 @@ private:
     static sp<hardware::ICameraServiceProxy> getCameraServiceProxy();
     static void pingCameraServiceProxy();
 
+    void broadcastTorchModeStatus(const String8& cameraId,
+            hardware::camera::common::V1_0::TorchModeStatus status);
 };
 
 } // namespace android
