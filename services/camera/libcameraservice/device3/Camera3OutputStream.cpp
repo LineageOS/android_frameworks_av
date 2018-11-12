@@ -187,16 +187,17 @@ status_t Camera3OutputStream::getBufferLocked(camera3_stream_buffer *buffer,
 }
 
 status_t Camera3OutputStream::queueBufferToConsumer(sp<ANativeWindow>& consumer,
-            ANativeWindowBuffer* buffer, int anwReleaseFence) {
+            ANativeWindowBuffer* buffer, int anwReleaseFence,
+            const std::vector<size_t>&) {
     return consumer->queueBuffer(consumer.get(), buffer, anwReleaseFence);
 }
 
 status_t Camera3OutputStream::returnBufferLocked(
         const camera3_stream_buffer &buffer,
-        nsecs_t timestamp) {
+        nsecs_t timestamp, const std::vector<size_t>& surface_ids) {
     ATRACE_CALL();
 
-    status_t res = returnAnyBufferLocked(buffer, timestamp, /*output*/true);
+    status_t res = returnAnyBufferLocked(buffer, timestamp, /*output*/true, surface_ids);
 
     if (res != OK) {
         return res;
@@ -212,6 +213,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             const camera3_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
+            const std::vector<size_t>& surface_ids,
             /*out*/
             sp<Fence> *releaseFenceOut) {
 
@@ -281,7 +283,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             return res;
         }
 
-        res = queueBufferToConsumer(currentConsumer, anwBuffer, anwReleaseFence);
+        res = queueBufferToConsumer(currentConsumer, anwBuffer, anwReleaseFence, surface_ids);
         if (res != OK) {
             ALOGE("%s: Stream %d: Error queueing buffer to native window: "
                   "%s (%d)", __FUNCTION__, mId, strerror(-res), res);

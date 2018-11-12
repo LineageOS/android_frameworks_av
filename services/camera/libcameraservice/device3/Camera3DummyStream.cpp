@@ -48,7 +48,7 @@ status_t Camera3DummyStream::getBufferLocked(camera3_stream_buffer *,
 
 status_t Camera3DummyStream::returnBufferLocked(
         const camera3_stream_buffer &,
-        nsecs_t) {
+        nsecs_t, const std::vector<size_t>&) {
     ATRACE_CALL();
     ALOGE("%s: Stream %d: Dummy stream cannot return buffers!", __FUNCTION__, mId);
     return INVALID_OPERATION;
@@ -58,6 +58,7 @@ status_t Camera3DummyStream::returnBufferCheckedLocked(
             const camera3_stream_buffer &,
             nsecs_t,
             bool,
+            const std::vector<size_t>&,
             /*out*/
             sp<Fence>*) {
     ATRACE_CALL();

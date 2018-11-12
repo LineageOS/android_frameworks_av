@@ -1031,6 +1031,9 @@ class Camera3Device :
         // Indicates a ZSL capture request
         bool zslCapture;
 
+        // What shared surfaces an output should go to
+        SurfaceMap outputSurfaces;
+
         // Default constructor needed by KeyedVector
         InFlightRequest() :
                 shutterTimestamp(0),
@@ -1049,7 +1052,8 @@ class Camera3Device :
         InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
                 bool hasAppCallback, nsecs_t maxDuration,
                 const std::set<String8>& physicalCameraIdSet, bool isStillCapture,
-                bool isZslCapture) :
+                bool isZslCapture,
+                const SurfaceMap& outSurfaces = SurfaceMap{}) :
                 shutterTimestamp(0),
                 sensorTimestamp(0),
                 requestStatus(OK),
@@ -1062,7 +1066,8 @@ class Camera3Device :
                 skipResultMetadata(false),
                 physicalCameraIds(physicalCameraIdSet),
                 stillCapture(isStillCapture),
-                zslCapture(isZslCapture) {
+                zslCapture(isZslCapture),
+                outputSurfaces(outSurfaces) {
         }
     };
 
@@ -1079,7 +1084,8 @@ class Camera3Device :
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
             bool callback, nsecs_t maxExpectedDuration, std::set<String8>& physicalCameraIds,
-            bool isStillCapture, bool isZslCapture);
+            bool isStillCapture, bool isZslCapture,
+            const SurfaceMap& outputSurfaces);
 
     /**
      * Returns the maximum expected time it'll take for all currently in-flight
@@ -1189,7 +1195,11 @@ class Camera3Device :
 
     // helper function to return the output buffers to the streams.
     void returnOutputBuffers(const camera3_stream_buffer_t *outputBuffers,
-            size_t numBuffers, nsecs_t timestamp, bool timestampIncreasing = true);
+            size_t numBuffers, nsecs_t timestamp, bool timestampIncreasing = true,
+            // The following arguments are only meant for surface sharing use case
+            const SurfaceMap& outputSurfaces = SurfaceMap{},
+            // Used to send buffer error callback when failing to return buffer
+            const CaptureResultExtras &resultExtras = CaptureResultExtras{});
 
     // Send a partial capture result.
     void sendPartialCaptureResult(const camera_metadata_t * partialResult,

@@ -98,6 +98,7 @@ status_t Camera3InputStream::returnBufferCheckedLocked(
             const camera3_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
+            const std::vector<size_t>&,
             /*out*/
             sp<Fence> *releaseFenceOut) {
 
