@@ -24,7 +24,7 @@
 #include <binder/IServiceManager.h>
 
 #include <android/hardware/drm/1.2/types.h>
-#include <android/hidl/manager/1.0/IServiceManager.h>
+#include <android/hidl/manager/1.2/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
 
 #include <media/EventMetric.h>
@@ -333,10 +333,10 @@ void DrmHal::cleanup() {
 Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
     Vector<sp<IDrmFactory>> factories;
 
-    auto manager = hardware::defaultServiceManager();
+    auto manager = hardware::defaultServiceManager1_2();
 
     if (manager != NULL) {
-        manager->listByInterface(drm::V1_0::IDrmFactory::descriptor,
+        manager->listManifestByInterface(drm::V1_0::IDrmFactory::descriptor,
                 [&factories](const hidl_vec<hidl_string> &registered) {
                     for (const auto &instance : registered) {
                         auto factory = drm::V1_0::IDrmFactory::getService(instance);
@@ -346,7 +346,7 @@ Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
                     }
                 }
             );
-        manager->listByInterface(drm::V1_1::IDrmFactory::descriptor,
+        manager->listManifestByInterface(drm::V1_1::IDrmFactory::descriptor,
                 [&factories](const hidl_vec<hidl_string> &registered) {
                     for (const auto &instance : registered) {
                         auto factory = drm::V1_1::IDrmFactory::getService(instance);
