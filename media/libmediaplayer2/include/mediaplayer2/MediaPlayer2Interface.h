@@ -34,6 +34,7 @@
 #include <media/stagefright/foundation/AHandler.h>
 #include <mediaplayer2/MediaPlayer2Types.h>
 
+#include "jni.h"
 #include "mediaplayer2.pb.h"
 
 using android::media::MediaPlayer2Proto::PlayerMessage;
@@ -142,8 +143,8 @@ public:
         }
 
         // AudioRouting
-        virtual status_t    setOutputDevice(audio_port_handle_t deviceId);
-        virtual status_t    getRoutedDeviceId(audio_port_handle_t* deviceId);
+        virtual status_t    setPreferredDevice(jobject device);
+        virtual jobject     getRoutedDevice();
         virtual status_t    addAudioDeviceCallback(jobject routingDelegate);
         virtual status_t    removeAudioDeviceCallback(jobject listener);
     };

@@ -34,6 +34,8 @@
 #include <utils/Vector.h>
 #include <system/audio-base.h>
 
+#include "jni.h"
+
 namespace android {
 
 struct ANativeWindowWrapper;
@@ -105,8 +107,8 @@ public:
             status_t        prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId);
             status_t        releaseDrm();
             // AudioRouting
-            status_t        setOutputDevice(audio_port_handle_t deviceId);
-            audio_port_handle_t getRoutedDeviceId();
+            status_t        setPreferredDevice(jobject device);
+            jobject         getRoutedDevice();
             status_t        addAudioDeviceCallback(jobject routingDelegate);
             status_t        removeAudioDeviceCallback(jobject listener);
 

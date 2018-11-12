@@ -335,25 +335,24 @@ public:
      */
     status_t dump(int fd, const Vector<String16>& args) const;
 
-    /* Returns the ID of the audio device actually used by the output to which this AudioTrack is
-     * attached. When the AudioTrack is inactive, it will return AUDIO_PORT_HANDLE_NONE.
+    /* Returns the AudioDeviceInfo used by the output to which this AudioTrack is
+     * attached.
      */
-    audio_port_handle_t getRoutedDeviceId();
+    jobject getRoutedDevice();
 
     /* Returns the ID of the audio session this AudioTrack belongs to. */
     audio_session_t getAudioSessionId();
 
-    /* Selects the audio device to use for output of this AudioTrack. A value of
-     * AUDIO_PORT_HANDLE_NONE indicates default routing.
+    /* Sets the preferred audio device to use for output of this AudioTrack.
      *
      * Parameters:
-     *  The device ID of the selected device (as returned by the AudioDevicesManager API).
+     * Device: an AudioDeviceInfo object.
      *
      * Returned value:
      *  - NO_ERROR: successful operation
-     *  - BAD_VALUE: failed to find the valid output device with given device Id.
+     *  - BAD_VALUE: failed to set the device
      */
-    status_t setOutputDevice(audio_port_handle_t deviceId);
+    status_t setPreferredDevice(jobject device);
 
     // TODO: Add AUDIO_OUTPUT_FLAG_DIRECT when it is possible to check.
     // TODO: Add AUDIO_FLAG_HW_AV_SYNC when it is possible to check.
