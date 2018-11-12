@@ -25,7 +25,7 @@
 #include <media/VolumeShaper.h>
 #include <system/audio.h>
 #include <utils/Errors.h>
-
+#include <mediaplayer2/JObjectHolder.h>
 #include <media/AudioTimestamp.h>   // It has dependency on audio.h/Errors.h, but doesn't
                                     // include them in it. Therefore it is included here at last.
 
@@ -115,7 +115,7 @@ public:
                 void* user,
                 size_t frameCount = 0,
                 audio_session_t sessionId  = AUDIO_SESSION_ALLOCATE,
-                const audio_attributes_t* pAttributes = NULL,
+                const jobject pAttributes = NULL,
                 float maxRequiredSpeed = 1.0f);
 
     /*
@@ -446,7 +446,7 @@ private:
 
     jclass mAudioTrackCls;
     jobject mAudioTrackObj;
-    jobject mAudioAttributesObj;
+    sp<JObjectHolder> mAudioAttributesObj;
 
     /* Creates a Java VolumeShaper.Configuration object from VolumeShaper::Configuration */
     jobject createVolumeShaperConfigurationObj(
