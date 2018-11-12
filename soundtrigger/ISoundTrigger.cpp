@@ -114,8 +114,7 @@ public:
         return status;
     }
 
-    virtual status_t getModelState(sound_model_handle_t handle,
-                                   sp<IMemory>& eventMemory)
+    virtual status_t getModelState(sound_model_handle_t handle)
     {
         Parcel data, reply;
         data.writeInterfaceToken(ISoundTrigger::getInterfaceDescriptor());
@@ -123,9 +122,6 @@ public:
         status_t status = remote()->transact(GET_MODEL_STATE, data, &reply);
         if (status == NO_ERROR) {
             status = (status_t)reply.readInt32();
-            if (status == NO_ERROR) {
-                eventMemory = interface_cast<IMemory>(reply.readStrongBinder());
-            }
         }
         return status;
     }
@@ -192,14 +188,7 @@ status_t BnSoundTrigger::onTransact(
             status_t status = UNKNOWN_ERROR;
             status_t ret = data.read(&handle, sizeof(sound_model_handle_t));
             if (ret == NO_ERROR) {
-                sp<IMemory> eventMemory;
-                status = getModelState(handle, eventMemory);
-                if (eventMemory != NULL) {
-                    ret = reply->writeStrongBinder(
-                        IInterface::asBinder(eventMemory));
-                } else {
-                    ret = NO_MEMORY;
-                }
+                status = getModelState(handle);
             }
             reply->writeInt32(status);
             return ret;

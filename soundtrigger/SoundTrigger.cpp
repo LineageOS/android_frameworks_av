@@ -188,14 +188,13 @@ status_t SoundTrigger::stopRecognition(sound_model_handle_t handle)
     return mISoundTrigger->stopRecognition(handle);
 }
 
-status_t SoundTrigger::getModelState(sound_model_handle_t handle,
-                                     sp<IMemory>& eventMemory)
+status_t SoundTrigger::getModelState(sound_model_handle_t handle)
 {
     Mutex::Autolock _l(mLock);
     if (mISoundTrigger == 0) {
         return NO_INIT;
     }
-    return mISoundTrigger->getModelState(handle, eventMemory);
+    return mISoundTrigger->getModelState(handle);
 }
 
 // BpSoundTriggerClient

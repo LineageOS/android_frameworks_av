@@ -40,8 +40,7 @@ public:
     virtual status_t startRecognition(sound_model_handle_t handle,
                                       const sp<IMemory>& dataMemory) = 0;
     virtual status_t stopRecognition(sound_model_handle_t handle) = 0;
-    virtual status_t getModelState(sound_model_handle_t handle,
-                                   sp<IMemory>& eventMemory) = 0;
+    virtual status_t getModelState(sound_model_handle_t handle) = 0;
 
 };
 

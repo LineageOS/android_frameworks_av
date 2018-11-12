@@ -356,8 +356,7 @@ int SoundTriggerHalHidl::stopAllRecognitions()
     return hidlReturn;
 }
 
-int SoundTriggerHalHidl::getModelState(sound_model_handle_t handle,
-                                       struct sound_trigger_recognition_event** event)
+int SoundTriggerHalHidl::getModelState(sound_model_handle_t handle)
 {
     sp<ISoundTriggerHw> soundtrigger = getService();
     if (soundtrigger == 0) {
@@ -377,24 +376,13 @@ int SoundTriggerHalHidl::getModelState(sound_model_handle_t handle,
     }
 
     int ret = NO_ERROR;
-    Return<void> hidlReturn;
+    Return<int32_t> hidlReturn(0);
     {
         AutoMutex lock(mHalLock);
-        hidlReturn = soundtrigger_2_2->getModelState(
-            model->mHalHandle,
-            [&](int r, const V2_0_ISoundTriggerHwCallback::RecognitionEvent& halEvent) {
-              ret = r;
-              if (ret != 0) {
-                  ALOGE("getModelState returned error code %d", ret);
-              } else {
-                  *event = convertRecognitionEventFromHal(&halEvent);
-              }
-            });
+        hidlReturn = soundtrigger_2_2->getModelState(model->mHalHandle);
     }
     if (!hidlReturn.isOk()) {
         ALOGE("getModelState error %s", hidlReturn.description().c_str());
-        free(*event);
-        *event = nullptr;
         ret = FAILED_TRANSACTION;
     }
     return ret;
