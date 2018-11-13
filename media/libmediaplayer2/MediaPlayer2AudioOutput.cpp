@@ -60,7 +60,7 @@ status_t MediaPlayer2AudioOutput::dump(int fd, const Vector<String16>& args) con
 }
 
 MediaPlayer2AudioOutput::MediaPlayer2AudioOutput(audio_session_t sessionId, uid_t uid, int pid,
-        const audio_attributes_t* attr, std::vector<jobject>& routingDelegatesBackup)
+        const jobject attributes, std::vector<jobject>& routingDelegatesBackup)
     : mCallback(nullptr),
       mCallbackCookie(nullptr),
       mCallbackData(nullptr),
@@ -76,13 +76,12 @@ MediaPlayer2AudioOutput::MediaPlayer2AudioOutput(audio_session_t sessionId, uid_
       mAuxEffectId(0),
       mFlags(AUDIO_OUTPUT_FLAG_NONE) {
     ALOGV("MediaPlayer2AudioOutput(%d)", sessionId);
-    if (attr != nullptr) {
-        mAttributes = (audio_attributes_t *) calloc(1, sizeof(audio_attributes_t));
-        if (mAttributes != nullptr) {
-            memcpy(mAttributes, attr, sizeof(audio_attributes_t));
-        }
-    } else {
-        mAttributes = nullptr;
+
+    if (mAttributes != nullptr) {
+        mAttributes->~JObjectHolder();
+    }
+    if (attributes != nullptr) {
+        mAttributes = new JObjectHolder(attributes);
     }
 
     setMinBufferCount();
@@ -99,7 +98,6 @@ MediaPlayer2AudioOutput::~MediaPlayer2AudioOutput() {
         JAudioTrack::removeGlobalRef(routingDelegate.second);
     }
     close();
-    free(mAttributes);
     delete mCallbackData;
 }
 
@@ -251,16 +249,13 @@ status_t MediaPlayer2AudioOutput::getFramesWritten(uint32_t *frameswritten) cons
     return status;
 }
 
-void MediaPlayer2AudioOutput::setAudioAttributes(const audio_attributes_t * attributes) {
+void MediaPlayer2AudioOutput::setAudioAttributes(const jobject attributes) {
     Mutex::Autolock lock(mLock);
-    if (attributes == nullptr) {
-        free(mAttributes);
-        mAttributes = nullptr;
-    } else {
-        if (mAttributes == nullptr) {
-            mAttributes = (audio_attributes_t *) calloc(1, sizeof(audio_attributes_t));
-        }
-        memcpy(mAttributes, attributes, sizeof(audio_attributes_t));
+    if (mAttributes != nullptr) {
+        mAttributes->~JObjectHolder();
+    }
+    if (attributes != nullptr) {
+        mAttributes = new JObjectHolder(attributes);
     }
 }
 
@@ -325,7 +320,7 @@ status_t MediaPlayer2AudioOutput::open(
                  newcbd,
                  frameCount,
                  mSessionId,
-                 mAttributes,
+                 mAttributes != nullptr ? mAttributes->getJObject() : nullptr,
                  1.0f);  // default value for maxRequiredSpeed
     } else {
         // TODO: Due to buffer memory concerns, we use a max target playback speed
@@ -344,7 +339,7 @@ status_t MediaPlayer2AudioOutput::open(
                  nullptr,
                  frameCount,
                  mSessionId,
-                 mAttributes,
+                 mAttributes != nullptr ? mAttributes->getJObject() : nullptr,
                  targetSpeed);
     }
 

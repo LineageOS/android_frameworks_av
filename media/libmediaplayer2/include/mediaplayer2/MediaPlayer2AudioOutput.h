@@ -41,7 +41,7 @@ public:
     MediaPlayer2AudioOutput(audio_session_t sessionId,
                             uid_t uid,
                             int pid,
-                            const audio_attributes_t * attr,
+                            const jobject attributes,
                             std::vector<jobject>& routingDelegatesBackup);
     virtual ~MediaPlayer2AudioOutput();
 
@@ -76,7 +76,7 @@ public:
     virtual void flush();
     virtual void pause();
     virtual void close();
-    void setAudioAttributes(const audio_attributes_t * attributes);
+    void setAudioAttributes(const jobject attributes);
     virtual audio_stream_type_t getAudioStreamType() const;
 
     void setVolume(float volume);
@@ -112,7 +112,7 @@ private:
     AudioCallback           mCallback;
     void *                  mCallbackCookie;
     CallbackData *          mCallbackData;
-    audio_attributes_t *    mAttributes;
+    sp<JObjectHolder>       mAttributes;
     float                   mVolume;
     AudioPlaybackRate       mPlaybackRate;
     uint32_t                mSampleRateHz; // sample rate of the content, as set in open()
