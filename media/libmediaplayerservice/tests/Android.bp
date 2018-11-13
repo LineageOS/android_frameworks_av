@@ -11,6 +11,7 @@ cc_test {
         "libutils",
         "android.hardware.drm@1.0",
         "android.hardware.drm@1.1",
+        "android.hardware.drm@1.2",
     ],
 
     compile_multilib: "32",
