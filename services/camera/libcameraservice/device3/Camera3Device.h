@@ -1031,6 +1031,9 @@ class Camera3Device :
         // Indicates a ZSL capture request
         bool zslCapture;
 
+        // What shared surfaces an output should go to
+        SurfaceMap outputSurfaces;
+
         // Default constructor needed by KeyedVector
         InFlightRequest() :
                 shutterTimestamp(0),
@@ -1049,7 +1052,8 @@ class Camera3Device :
         InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
                 bool hasAppCallback, nsecs_t maxDuration,
                 const std::set<String8>& physicalCameraIdSet, bool isStillCapture,
-                bool isZslCapture) :
+                bool isZslCapture,
+                const SurfaceMap& outSurfaces = SurfaceMap{}) :
                 shutterTimestamp(0),
                 sensorTimestamp(0),
                 requestStatus(OK),
@@ -1062,7 +1066,8 @@ class Camera3Device :
                 skipResultMetadata(false),
                 physicalCameraIds(physicalCameraIdSet),
                 stillCapture(isStillCapture),
-                zslCapture(isZslCapture) {
+                zslCapture(isZslCapture),
+                outputSurfaces(outSurfaces) {
         }
     };
 
@@ -1079,7 +1084,8 @@ class Camera3Device :
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
             bool callback, nsecs_t maxExpectedDuration, std::set<String8>& physicalCameraIds,
-            bool isStillCapture, bool isZslCapture);
+            bool isStillCapture, bool isZslCapture,
+            const SurfaceMap& outputSurfaces);
 
     /**
      * Returns the maximum expected time it'll take for all currently in-flight
@@ -1189,7 +1195,11 @@ class Camera3Device :
 
     // helper function to return the output buffers to the streams.
     void returnOutputBuffers(const camera3_stream_buffer_t *outputBuffers,
-            size_t numBuffers, nsecs_t timestamp, bool timestampIncreasing = true);
+            size_t numBuffers, nsecs_t timestamp, bool timestampIncreasing = true,
+            // The following arguments are only meant for surface sharing use case
+            const SurfaceMap& outputSurfaces = SurfaceMap{},
+            // Used to send buffer error callback when failing to return buffer
+            const CaptureResultExtras &resultExtras = CaptureResultExtras{});
 
     // Send a partial capture result.
     void sendPartialCaptureResult(const camera_metadata_t * partialResult,
@@ -1249,11 +1259,80 @@ class Camera3Device :
     // b/79972865
     Mutex mTrackerLock;
 
-    // Whether HAL request buffers through requestStreamBuffer API
+    // Whether HAL request buffers through requestStreamBuffers API
     bool mUseHalBufManager = false;
 
     // Lock to ensure requestStreamBuffers() callbacks are serialized
     std::mutex mRequestBufferInterfaceLock;
+
+    // The state machine to control when requestStreamBuffers should allow
+    // HAL to request buffers.
+    enum RequestBufferState {
+        /**
+         * This is the initial state.
+         * requestStreamBuffers call will return FAILED_CONFIGURING in this state.
+         * Will switch to RB_STATUS_READY after a successful configureStreams or
+         * processCaptureRequest call.
+         */
+        RB_STATUS_STOPPED,
+
+        /**
+         * requestStreamBuffers call will proceed in this state.
+         * When device is asked to stay idle via waitUntilStateThenRelock() call:
+         *     - Switch to RB_STATUS_STOPPED if there is no inflight requests and
+         *       request thread is paused.
+         *     - Switch to RB_STATUS_PENDING_STOP otherwise
+         */
+        RB_STATUS_READY,
+
+        /**
+         * requestStreamBuffers call will proceed in this state.
+         * Switch to RB_STATUS_STOPPED when all inflight requests are fulfilled
+         * and request thread is paused
+         */
+        RB_STATUS_PENDING_STOP,
+    };
+
+    class RequestBufferStateMachine {
+      public:
+        status_t initialize(sp<camera3::StatusTracker> statusTracker);
+
+        // Return if the state machine currently allows for requestBuffers
+        // If the state allows for it, mRequestBufferOngoing will be set to true
+        // and caller must call endRequestBuffer() later to unset the flag
+        bool startRequestBuffer();
+        void endRequestBuffer();
+
+        // Events triggered by application API call
+        void onStreamsConfigured();
+        void onWaitUntilIdle();
+
+        // Events usually triggered by hwBinder processCaptureResult callback thread
+        // But can also be triggered on request thread for failed request, or on
+        // hwbinder notify callback thread for shutter/error callbacks
+        void onInflightMapEmpty();
+
+        // Events triggered by RequestThread
+        void onRequestSubmitted();
+        void onRequestThreadPaused();
+
+      private:
+        void notifyTrackerLocked(bool active);
+
+        // Switch to STOPPED state and return true if all conditions allows for it.
+        // Otherwise do nothing and return false.
+        bool checkSwitchToStopLocked();
+
+        std::mutex mLock;
+        RequestBufferState mStatus = RB_STATUS_STOPPED;
+
+        bool mRequestThreadPaused = true;
+        bool mInflightMapEmpty = true;
+        bool mRequestBufferOngoing = false;
+
+        wp<camera3::StatusTracker> mStatusTracker;
+        int  mRequestBufferStatusId;
+    } mRequestBufferSM;
 
 }; // class Camera3Device
 

@@ -655,7 +655,8 @@ void Camera3Stream::removeOutstandingBuffer(const camera3_stream_buffer &buffer)
 }
 
 status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
-        nsecs_t timestamp, bool timestampIncreasing) {
+        nsecs_t timestamp, bool timestampIncreasing,
+         const std::vector<size_t>& surface_ids) {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
 
@@ -684,7 +685,7 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
      *
      * Do this for getBuffer as well.
      */
-    status_t res = returnBufferLocked(b, timestamp);
+    status_t res = returnBufferLocked(b, timestamp, surface_ids);
     if (res == OK) {
         fireBufferListenersLocked(b, /*acquired*/false, /*output*/true);
     }
@@ -843,7 +844,7 @@ status_t Camera3Stream::getBufferLocked(camera3_stream_buffer *,
     return INVALID_OPERATION;
 }
 status_t Camera3Stream::returnBufferLocked(const camera3_stream_buffer &,
-                                           nsecs_t) {
+                                           nsecs_t, const std::vector<size_t>&) {
     ALOGE("%s: This type of stream does not support output", __FUNCTION__);
     return INVALID_OPERATION;
 }

@@ -67,6 +67,18 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
     virtual ssize_t getSurfaceId(const sp<Surface> &surface) = 0;
 
     /**
+     * Query the unique surface IDs of current surfaceIds.
+     * When passing unique surface IDs in returnBuffer(), if the
+     * surfaceId has been removed from the stream, the output corresponding to
+     * the unique surface ID will be ignored and not delivered to client.
+     *
+     * Return INVALID_OPERATION if and only if the stream does not support
+     * surface sharing.
+     */
+    virtual status_t getUniqueSurfaceIds(const std::vector<size_t>& surfaceIds,
+            /*out*/std::vector<size_t>* outUniqueIds) = 0;
+
+    /**
      * Update the stream output surfaces.
      */
     virtual status_t updateStream(const std::vector<sp<Surface>> &outputSurfaces,

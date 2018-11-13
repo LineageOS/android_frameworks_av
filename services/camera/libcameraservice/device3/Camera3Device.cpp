@@ -224,6 +224,17 @@ status_t Camera3Device::initializeCommonLocked() {
             ANDROID_INFO_SUPPORTED_BUFFER_MANAGEMENT_VERSION_HIDL_DEVICE_3_5);
     }
 
+    if (mUseHalBufManager) {
+        res = mRequestBufferSM.initialize(mStatusTracker);
+        if (res != OK) {
+            SET_ERR_L("Unable to start request buffer state machine: %s (%d)",
+                    strerror(-res), res);
+            mInterface->close();
+            mStatusTracker.clear();
+            return res;
+        }
+    }
+
     /** Start up request queue thread */
     mRequestThread = new RequestThread(
             this, mStatusTracker, mInterface, sessionParamKeys, mUseHalBufManager);
@@ -951,6 +962,13 @@ hardware::Return<void> Camera3Device::requestStreamBuffers(
         return hardware::Void();
     }
 
+    if (bufReqs.size() > mOutputStreams.size()) {
+        ALOGE("%s: too many buffer requests (%zu > # of output streams %zu)",
+                __FUNCTION__, bufReqs.size(), mOutputStreams.size());
+        _hidl_cb(BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS, bufRets);
+        return hardware::Void();
+    }
+
     // Check for repeated streamId
     for (const auto& bufReq : bufReqs) {
         if (streamIds.indexOf(bufReq.streamId) != NAME_NOT_FOUND) {
@@ -962,19 +980,10 @@ hardware::Return<void> Camera3Device::requestStreamBuffers(
         streamIds.add(bufReq.streamId);
     }
 
-    // TODO: check we are not configuring streams. If so return FAILED_CONFIGURING
-    // Probably need to hook CameraDeviceClient::beginConfigure and figure something
-    // out for API1 client... maybe grab mLock and check mNeedConfig but then we will
-    // need to wait until mLock is released...
-    // _hidl_cb(BufferRequestStatus::FAILED_CONFIGURING, bufRets);
-    // return hardware::Void();
-
-    // TODO: here we start accessing mOutputStreams, might need mLock, but that
-    //       might block incoming API calls. Not sure how bad is it.
-    if (bufReqs.size() > mOutputStreams.size()) {
-        ALOGE("%s: too many buffer requests (%zu > # of output streams %zu)",
-                __FUNCTION__, bufReqs.size(), mOutputStreams.size());
-        _hidl_cb(BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS, bufRets);
+    if (!mRequestBufferSM.startRequestBuffer()) {
+        ALOGE("%s: request buffer disallowed while camera service is configuring",
+                __FUNCTION__);
+        _hidl_cb(BufferRequestStatus::FAILED_CONFIGURING, bufRets);
         return hardware::Void();
     }
 
@@ -991,6 +1000,7 @@ hardware::Return<void> Camera3Device::requestStreamBuffers(
             ALOGE("%s: Output stream id %d not found!", __FUNCTION__, streamId);
             hardware::hidl_vec<StreamBufferRet> emptyBufRets;
             _hidl_cb(BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS, emptyBufRets);
+            mRequestBufferSM.endRequestBuffer();
             return hardware::Void();
         }
 
@@ -1074,15 +1084,20 @@ hardware::Return<void> Camera3Device::requestStreamBuffers(
                             __FUNCTION__, streamId, strerror(-res), res);
                 }
             }
+            for (size_t b = 0; b < numAllocatedBuffers; b++) {
+                camera3_stream_buffer_t& sb = streamBuffers[b];
+                sb.acquire_fence = -1;
+                sb.status = CAMERA3_BUFFER_STATUS_ERROR;
+            }
             returnOutputBuffers(streamBuffers.data(), numAllocatedBuffers, 0);
         }
     }
-    // End of mOutputStreams access
 
     _hidl_cb(allReqsSucceeds ? BufferRequestStatus::OK :
             oneReqSucceeds ? BufferRequestStatus::FAILED_PARTIAL :
                              BufferRequestStatus::FAILED_UNKNOWN,
             bufRets);
+    mRequestBufferSM.endRequestBuffer();
     return hardware::Void();
 }
 
@@ -1734,7 +1749,8 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
     } else if (isShared) {
         newStream = new Camera3SharedOutputStream(mNextStreamId, consumers,
                 width, height, format, consumerUsage, dataSpace, rotation,
-                mTimestampOffset, physicalCameraId, streamSetId);
+                mTimestampOffset, physicalCameraId, streamSetId,
+                mUseHalBufManager);
     } else if (consumers.size() == 0 && hasDeferredConsumer) {
         newStream = new Camera3OutputStream(mNextStreamId,
                 width, height, format, consumerUsage, dataSpace, rotation,
@@ -2132,17 +2148,20 @@ status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout) {
 
     mStatusWaiters++;
 
+    // Notify HAL to start draining. We need to notify the HalInterface layer
+    // even when the device is already IDLE, so HalInterface can reject incoming
+    // requestStreamBuffers call.
+    if (!active && mUseHalBufManager) {
+        auto streamIds = mOutputStreams.getStreamIds();
+        mRequestThread->signalPipelineDrain(streamIds);
+        mRequestBufferSM.onWaitUntilIdle();
+    }
+
     bool stateSeen = false;
     do {
         if (active == (mStatus == STATUS_ACTIVE)) {
             // Desired state is current
             break;
-        }
-
-        // Notify HAL to start draining
-        if (!active && mUseHalBufManager) {
-            auto streamIds = mOutputStreams.getStreamIds();
-            mRequestThread->signalPipelineDrain(streamIds);
         }
 
         res = mStatusChanged.waitRelative(mLock, timeout);
@@ -2889,6 +2908,10 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         return rc;
     }
 
+    if (mDummyStreamId == NO_STREAM) {
+        mRequestBufferSM.onStreamsConfigured();
+    }
+
     return OK;
 }
 
@@ -3013,13 +3036,14 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
         int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
         bool hasAppCallback, nsecs_t maxExpectedDuration,
         std::set<String8>& physicalCameraIds, bool isStillCapture,
-        bool isZslCapture) {
+        bool isZslCapture, const SurfaceMap& outputSurfaces) {
     ATRACE_CALL();
     Mutex::Autolock l(mInFlightLock);
 
     ssize_t res;
     res = mInFlightMap.add(frameNumber, InFlightRequest(numBuffers, resultExtras, hasInput,
-            hasAppCallback, maxExpectedDuration, physicalCameraIds, isStillCapture, isZslCapture));
+            hasAppCallback, maxExpectedDuration, physicalCameraIds, isStillCapture, isZslCapture,
+            outputSurfaces));
     if (res < 0) return res;
 
     if (mInFlightMap.size() == 1) {
@@ -3037,17 +3061,54 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
 
 void Camera3Device::returnOutputBuffers(
         const camera3_stream_buffer_t *outputBuffers, size_t numBuffers,
-        nsecs_t timestamp, bool timestampIncreasing) {
+        nsecs_t timestamp, bool timestampIncreasing,
+        const SurfaceMap& outputSurfaces,
+        const CaptureResultExtras &inResultExtras) {
 
     for (size_t i = 0; i < numBuffers; i++)
     {
-        Camera3Stream *stream = Camera3Stream::cast(outputBuffers[i].stream);
-        status_t res = stream->returnBuffer(outputBuffers[i], timestamp, timestampIncreasing);
+        Camera3StreamInterface *stream = Camera3Stream::cast(outputBuffers[i].stream);
+        int streamId = stream->getId();
+        const auto& it = outputSurfaces.find(streamId);
+        status_t res = OK;
+        if (it != outputSurfaces.end()) {
+            res = stream->returnBuffer(
+                    outputBuffers[i], timestamp, timestampIncreasing, it->second);
+        } else {
+            res = stream->returnBuffer(
+                    outputBuffers[i], timestamp, timestampIncreasing);
+        }
+
         // Note: stream may be deallocated at this point, if this buffer was
         // the last reference to it.
         if (res != OK) {
             ALOGE("Can't return buffer to its stream: %s (%d)",
                 strerror(-res), res);
+        }
+
+        // Long processing consumers can cause returnBuffer timeout for shared stream
+        // If that happens, cancel the buffer and send a buffer error to client
+        if (it != outputSurfaces.end() && res == TIMED_OUT &&
+                outputBuffers[i].status == CAMERA3_BUFFER_STATUS_OK) {
+            // cancel the buffer
+            camera3_stream_buffer_t sb = outputBuffers[i];
+            sb.status = CAMERA3_BUFFER_STATUS_ERROR;
+            stream->returnBuffer(sb, /*timestamp*/0, timestampIncreasing);
+
+            // notify client buffer error
+            sp<NotificationListener> listener;
+            {
+                Mutex::Autolock l(mOutputLock);
+                listener = mListener.promote();
+            }
+
+            if (listener != nullptr) {
+                CaptureResultExtras extras = inResultExtras;
+                extras.errorStreamId = streamId;
+                listener->notifyError(
+                        hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER,
+                        extras);
+            }
         }
     }
 }
@@ -3059,6 +3120,7 @@ void Camera3Device::removeInFlightMapEntryLocked(int idx) {
 
     // Indicate idle inFlightMap to the status tracker
     if (mInFlightMap.size() == 0) {
+        mRequestBufferSM.onInflightMapEmpty();
         // Hold a separate dedicated tracker lock to prevent race with disconnect and also
         // avoid a deadlock during reprocess requests.
         Mutex::Autolock l(mTrackerLock);
@@ -3106,7 +3168,8 @@ void Camera3Device::removeInFlightRequestIfReadyLocked(int idx) {
         assert(request.requestStatus != OK ||
                request.pendingOutputBuffers.size() == 0);
         returnOutputBuffers(request.pendingOutputBuffers.array(),
-            request.pendingOutputBuffers.size(), 0);
+            request.pendingOutputBuffers.size(), 0, /*timestampIncreasing*/true,
+            request.outputSurfaces, request.resultExtras);
 
         removeInFlightMapEntryLocked(idx);
         ALOGVV("%s: removed frame %d from InFlightMap", __FUNCTION__, frameNumber);
@@ -3130,7 +3193,9 @@ void Camera3Device::flushInflightRequests() {
         for (size_t idx = 0; idx < mInFlightMap.size(); idx++) {
             const InFlightRequest &request = mInFlightMap.valueAt(idx);
             returnOutputBuffers(request.pendingOutputBuffers.array(),
-                request.pendingOutputBuffers.size(), 0);
+                request.pendingOutputBuffers.size(), 0,
+                /*timestampIncreasing*/true, request.outputSurfaces,
+                request.resultExtras);
         }
         mInFlightMap.clear();
         mExpectedInflightDuration = 0;
@@ -3488,7 +3553,8 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
         } else {
             bool timestampIncreasing = !(request.zslCapture || request.hasInputBuffer);
             returnOutputBuffers(result->output_buffers,
-                result->num_output_buffers, shutterTimestamp, timestampIncreasing);
+                result->num_output_buffers, shutterTimestamp, timestampIncreasing,
+                request.outputSurfaces, request.resultExtras);
         }
 
         if (result->result != NULL && !isPartialResult) {
@@ -3621,6 +3687,9 @@ void Camera3Device::notifyError(const camera3_error_msg_t &msg,
                         // In case of missing result check whether the buffers
                         // returned. If they returned, then remove inflight
                         // request.
+                        // TODO: should we call this for ERROR_CAMERA_REQUEST as well?
+                        //       otherwise we are depending on HAL to send the buffers back after
+                        //       calling notifyError. Not sure if that's in the spec.
                         removeInFlightRequestIfReadyLocked(idx);
                     }
                 } else {
@@ -3696,7 +3765,8 @@ void Camera3Device::notifyShutter(const camera3_shutter_msg_t &msg,
             }
             bool timestampIncreasing = !(r.zslCapture || r.hasInputBuffer);
             returnOutputBuffers(r.pendingOutputBuffers.array(),
-                r.pendingOutputBuffers.size(), r.shutterTimestamp, timestampIncreasing);
+                    r.pendingOutputBuffers.size(), r.shutterTimestamp, timestampIncreasing,
+                    r.outputSurfaces, r.resultExtras);
             r.pendingOutputBuffers.clear();
 
             removeInFlightRequestIfReadyLocked(idx);
@@ -5097,6 +5167,13 @@ bool Camera3Device::RequestThread::threadLoop() {
     nsecs_t tRequestEnd = systemTime(SYSTEM_TIME_MONOTONIC);
     mRequestLatency.add(tRequestStart, tRequestEnd);
 
+    if (submitRequestSuccess) {
+        sp<Camera3Device> parent = mParent.promote();
+        if (parent != nullptr) {
+            parent->mRequestBufferSM.onRequestSubmitted();
+        }
+    }
+
     if (useFlushLock) {
         mFlushLock.unlock();
     }
@@ -5241,8 +5318,11 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         }
         nsecs_t waitDuration = kBaseGetBufferWait + parent->getExpectedInFlightDuration();
 
+        SurfaceMap uniqueSurfaceIdMap;
         for (size_t j = 0; j < captureRequest->mOutputStreams.size(); j++) {
-            sp<Camera3OutputStreamInterface> outputStream = captureRequest->mOutputStreams.editItemAt(j);
+            sp<Camera3OutputStreamInterface> outputStream =
+                    captureRequest->mOutputStreams.editItemAt(j);
+            int streamId = outputStream->getId();
 
             // Prepare video buffers for high speed recording on the first video request.
             if (mPrepareVideoStream && outputStream->isVideoStream()) {
@@ -5261,6 +5341,20 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 }
             }
 
+            std::vector<size_t> uniqueSurfaceIds;
+            res = outputStream->getUniqueSurfaceIds(
+                    captureRequest->mOutputSurfaces[streamId],
+                    &uniqueSurfaceIds);
+            // INVALID_OPERATION is normal output for streams not supporting surfaceIds
+            if (res != OK && res != INVALID_OPERATION) {
+                ALOGE("%s: failed to query stream %d unique surface IDs",
+                        __FUNCTION__, streamId);
+                return res;
+            }
+            if (res == OK) {
+                uniqueSurfaceIdMap.insert({streamId, std::move(uniqueSurfaceIds)});
+            }
+
             if (mUseHalBufManager) {
                 // HAL will request buffer through requestStreamBuffer API
                 camera3_stream_buffer_t& buffer = outputBuffers->editItemAt(j);
@@ -5272,7 +5366,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             } else {
                 res = outputStream->getBuffer(&outputBuffers->editItemAt(j),
                         waitDuration,
-                        captureRequest->mOutputSurfaces[outputStream->getId()]);
+                        captureRequest->mOutputSurfaces[streamId]);
                 if (res != OK) {
                     // Can't get output buffer from gralloc queue - this could be due to
                     // abandoned queue or other consumer misbehavior, so not a fatal
@@ -5326,7 +5420,9 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 /*hasInput*/halRequest->input_buffer != NULL,
                 hasCallback,
                 calculateMaxExpectedDuration(halRequest->settings),
-                requestedPhysicalCameras, isStillCapture, isZslCapture);
+                requestedPhysicalCameras, isStillCapture, isZslCapture,
+                (mUseHalBufManager) ? uniqueSurfaceIdMap :
+                                      SurfaceMap{});
         ALOGVV("%s: registered in flight requestId = %" PRId32 ", frameNumber = %" PRId64
                ", burstId = %" PRId32 ".",
                 __FUNCTION__,
@@ -5402,7 +5498,7 @@ bool Camera3Device::RequestThread::isOutputSurfacePending(int streamId, size_t s
             if (s.first == streamId) {
                 const auto &it = std::find(s.second.begin(), s.second.end(), surfaceId);
                 if (it != s.second.end()) {
-                  return true;
+                    return true;
                 }
             }
         }
@@ -5413,7 +5509,7 @@ bool Camera3Device::RequestThread::isOutputSurfacePending(int streamId, size_t s
             if (s.first == streamId) {
                 const auto &it = std::find(s.second.begin(), s.second.end(), surfaceId);
                 if (it != s.second.end()) {
-                  return true;
+                    return true;
                 }
             }
         }
@@ -5430,7 +5526,8 @@ void Camera3Device::RequestThread::signalPipelineDrain(const std::vector<int>& s
 
     Mutex::Autolock pl(mPauseLock);
     if (mPaused) {
-        return mInterface->signalPipelineDrain(streamIds);
+        mInterface->signalPipelineDrain(streamIds);
+        return;
     }
     // If request thread is still busy, wait until paused then notify HAL
     mNotifyPipelineDrain = true;
@@ -5619,6 +5716,10 @@ sp<Camera3Device::CaptureRequest>
                     mNotifyPipelineDrain = false;
                     mStreamIdsToBeDrained.clear();
                 }
+                sp<Camera3Device> parent = mParent.promote();
+                if (parent != nullptr) {
+                    parent->mRequestBufferSM.onRequestThreadPaused();
+                }
             }
             // Stop waiting for now and let thread management happen
             return NULL;
@@ -5707,6 +5808,10 @@ bool Camera3Device::RequestThread::waitIfPaused() {
                 mInterface->signalPipelineDrain(mStreamIdsToBeDrained);
                 mNotifyPipelineDrain = false;
                 mStreamIdsToBeDrained.clear();
+            }
+            sp<Camera3Device> parent = mParent.promote();
+            if (parent != nullptr) {
+                parent->mRequestBufferSM.onRequestThreadPaused();
             }
         }
 
@@ -6161,6 +6266,107 @@ bool Camera3Device::PreparerThread::threadLoop() {
     mCurrentPrepareComplete = true;
 
     return true;
+}
+
+status_t Camera3Device::RequestBufferStateMachine::initialize(
+        sp<camera3::StatusTracker> statusTracker) {
+    if (statusTracker == nullptr) {
+        ALOGE("%s: statusTracker is null", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    std::lock_guard<std::mutex> lock(mLock);
+    mStatusTracker = statusTracker;
+    mRequestBufferStatusId = statusTracker->addComponent();
+    return OK;
+}
+
+bool Camera3Device::RequestBufferStateMachine::startRequestBuffer() {
+    std::lock_guard<std::mutex> lock(mLock);
+    if (mStatus == RB_STATUS_READY) {
+        mRequestBufferOngoing = true;
+        return true;
+    }
+    return false;
+}
+
+void Camera3Device::RequestBufferStateMachine::endRequestBuffer() {
+    std::lock_guard<std::mutex> lock(mLock);
+    if (!mRequestBufferOngoing) {
+        ALOGE("%s called without a successful startRequestBuffer call first!", __FUNCTION__);
+        return;
+    }
+    mRequestBufferOngoing = false;
+    if (mStatus == RB_STATUS_PENDING_STOP) {
+        checkSwitchToStopLocked();
+    }
+}
+
+void Camera3Device::RequestBufferStateMachine::onStreamsConfigured() {
+    std::lock_guard<std::mutex> lock(mLock);
+    RequestBufferState oldStatus = mStatus;
+    mStatus = RB_STATUS_READY;
+    if (oldStatus != RB_STATUS_READY) {
+        notifyTrackerLocked(/*active*/true);
+    }
+    return;
+}
+
+void Camera3Device::RequestBufferStateMachine::onRequestSubmitted() {
+    std::lock_guard<std::mutex> lock(mLock);
+    mRequestThreadPaused = false;
+    mInflightMapEmpty = false;
+    if (mStatus == RB_STATUS_STOPPED) {
+        mStatus = RB_STATUS_READY;
+        notifyTrackerLocked(/*active*/true);
+    }
+    return;
+}
+
+void Camera3Device::RequestBufferStateMachine::onRequestThreadPaused() {
+    std::lock_guard<std::mutex> lock(mLock);
+    mRequestThreadPaused = true;
+    if (mStatus == RB_STATUS_PENDING_STOP) {
+        checkSwitchToStopLocked();
+    }
+    return;
+}
+
+void Camera3Device::RequestBufferStateMachine::onInflightMapEmpty() {
+    std::lock_guard<std::mutex> lock(mLock);
+    mInflightMapEmpty = true;
+    if (mStatus == RB_STATUS_PENDING_STOP) {
+        checkSwitchToStopLocked();
+    }
+    return;
+}
+
+void Camera3Device::RequestBufferStateMachine::onWaitUntilIdle() {
+    std::lock_guard<std::mutex> lock(mLock);
+    if (!checkSwitchToStopLocked()) {
+        mStatus = RB_STATUS_PENDING_STOP;
+    }
+    return;
+}
+
+void Camera3Device::RequestBufferStateMachine::notifyTrackerLocked(bool active) {
+    sp<StatusTracker> statusTracker = mStatusTracker.promote();
+    if (statusTracker != nullptr) {
+        if (active) {
+            statusTracker->markComponentActive(mRequestBufferStatusId);
+        } else {
+            statusTracker->markComponentIdle(mRequestBufferStatusId, Fence::NO_FENCE);
+        }
+    }
+}
+
+bool Camera3Device::RequestBufferStateMachine::checkSwitchToStopLocked() {
+    if (mInflightMapEmpty && mRequestThreadPaused && !mRequestBufferOngoing) {
+        mStatus = RB_STATUS_STOPPED;
+        notifyTrackerLocked(/*active*/false);
+        return true;
+    }
+    return false;
 }
 
 }; // namespace android
