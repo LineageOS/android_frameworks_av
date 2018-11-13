@@ -159,7 +159,6 @@ private:
         kWhatPrepareDrm                 = 'pDrm',
         kWhatReleaseDrm                 = 'rDrm',
         kWhatMediaClockNotify           = 'mckN',
-        kWhatGetStats                   = 'gSts',
     };
 
     wp<NuPlayerDriver> mDriver;
@@ -175,6 +174,7 @@ private:
     sp<DecoderBase> mVideoDecoder;
     bool mOffloadAudio;
     sp<DecoderBase> mAudioDecoder;
+    Mutex mDecoderLock;  // guard |mAudioDecoder| and |mVideoDecoder|.
     sp<CCDecoder> mCCDecoder;
     sp<Renderer> mRenderer;
     sp<ALooper> mRendererLooper;
