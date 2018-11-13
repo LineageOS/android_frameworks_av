@@ -258,7 +258,8 @@ TrackClientVector AudioOutputDescriptor::clientsList(bool activeOnly, product_st
     for (const auto &client : getClientIterable()) {
         if ((!activeOnly || client->active())
             && (strategy == PRODUCT_STRATEGY_NONE || strategy == client->strategy())
-            && (!preferredDeviceOnly || client->hasPreferredDevice())) {
+            && (!preferredDeviceOnly ||
+                (client->hasPreferredDevice() && !client->isPreferredDeviceForExclusiveUse()))) {
             clients.push_back(client);
         }
     }

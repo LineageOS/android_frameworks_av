@@ -916,7 +916,8 @@ status_t AudioPolicyManager::getOutputForAttrInt(audio_attributes_t *resultAttr,
                                                  uid_t uid,
                                                  const audio_config_t *config,
                                                  audio_output_flags_t *flags,
-                                                 audio_port_handle_t *selectedDeviceId)
+                                                 audio_port_handle_t *selectedDeviceId,
+                                                 bool *isRequestedDeviceForExclusiveUse)
 {
     DeviceVector outputDevices;
     const audio_port_handle_t requestedPortId = *selectedDeviceId;
@@ -980,7 +981,7 @@ status_t AudioPolicyManager::getOutputForAttrInt(audio_attributes_t *resultAttr,
         isInCall()) {
         if (requestedPortId != AUDIO_PORT_HANDLE_NONE) {
             *flags = (audio_output_flags_t)AUDIO_OUTPUT_FLAG_INCALL_MUSIC;
-            // @todo: provide another solution (separated CL)
+            *isRequestedDeviceForExclusiveUse = true;
         }
     }
 
@@ -1030,8 +1031,9 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
     }
     const audio_port_handle_t requestedPortId = *selectedDeviceId;
     audio_attributes_t resultAttr;
+    bool isRequestedDeviceForExclusiveUse = false;
     status_t status = getOutputForAttrInt(&resultAttr, output, session, attr, stream, uid,
-            config, flags, selectedDeviceId);
+            config, flags, selectedDeviceId, &isRequestedDeviceForExclusiveUse);
     if (status != NO_ERROR) {
         return status;
     }
@@ -1045,7 +1047,7 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
         new TrackClientDescriptor(*portId, uid, session, resultAttr, clientConfig,
                                   requestedPortId, *stream,
                                   mEngine->getProductStrategyForAttributes(resultAttr),
-                                  *flags);
+                                  *flags, isRequestedDeviceForExclusiveUse);
     sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(*output);
     outputDesc->addClient(clientDesc);
 
@@ -3633,8 +3635,10 @@ status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>
         config.format = sourceDesc->config().format;
         audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE;
         audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+        bool isRequestedDeviceForExclusiveUse = false;
         getOutputForAttrInt(&resultAttr, &output, AUDIO_SESSION_NONE,
-                &attributes, &stream, sourceDesc->uid(), &config, &flags, &selectedDeviceId);
+                &attributes, &stream, sourceDesc->uid(), &config, &flags,
+                &selectedDeviceId, &isRequestedDeviceForExclusiveUse);
         if (output == AUDIO_IO_HANDLE_NONE) {
             ALOGV("%s no output for device %08x", __FUNCTION__, sinkDevices.types());
             return INVALID_OPERATION;

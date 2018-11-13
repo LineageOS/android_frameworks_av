@@ -710,7 +710,8 @@ private:
                 uid_t uid,
                 const audio_config_t *config,
                 audio_output_flags_t *flags,
-                audio_port_handle_t *selectedDeviceId);
+                audio_port_handle_t *selectedDeviceId,
+                bool *isRequestedDeviceForExclusiveUse);
         // internal method to return the output handle for the given device and format
         audio_io_handle_t getOutputForDevices(
                 const DeviceVector &devices,

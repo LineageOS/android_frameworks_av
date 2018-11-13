@@ -41,10 +41,12 @@ class ClientDescriptor: public RefBase
 {
 public:
     ClientDescriptor(audio_port_handle_t portId, uid_t uid, audio_session_t sessionId,
-                   audio_attributes_t attributes, audio_config_base_t config,
-                   audio_port_handle_t preferredDeviceId) :
+                     audio_attributes_t attributes, audio_config_base_t config,
+                     audio_port_handle_t preferredDeviceId,
+                     bool isPreferredDeviceForExclusiveUse = false) :
         mPortId(portId), mUid(uid), mSessionId(sessionId), mAttributes(attributes),
-        mConfig(config), mPreferredDeviceId(preferredDeviceId), mActive(false) {}
+        mConfig(config), mPreferredDeviceId(preferredDeviceId), mActive(false),
+        mPreferredDeviceForExclusiveUse(isPreferredDeviceForExclusiveUse){}
     ~ClientDescriptor() override = default;
 
     virtual void dump(String8 *dst, int spaces, int index) const;
@@ -58,7 +60,8 @@ public:
     audio_port_handle_t preferredDeviceId() const { return mPreferredDeviceId; };
     void setPreferredDeviceId(audio_port_handle_t preferredDeviceId) {
         mPreferredDeviceId = preferredDeviceId;
-    };
+    }
+    bool isPreferredDeviceForExclusiveUse() const { return mPreferredDeviceForExclusiveUse; }
     void setActive(bool active) { mActive = active; }
     bool active() const { return mActive; }
     bool hasPreferredDevice(bool activeOnly = false) const {
@@ -73,16 +76,19 @@ private:
     const audio_config_base_t mConfig;
           audio_port_handle_t mPreferredDeviceId;  // selected input device port ID
           bool mActive;
+          bool mPreferredDeviceForExclusiveUse = false;
 };
 
 class TrackClientDescriptor: public ClientDescriptor
 {
 public:
     TrackClientDescriptor(audio_port_handle_t portId, uid_t uid, audio_session_t sessionId,
-                   audio_attributes_t attributes, audio_config_base_t config,
-                   audio_port_handle_t preferredDeviceId, audio_stream_type_t stream,
-                          product_strategy_t strategy, audio_output_flags_t flags) :
-        ClientDescriptor(portId, uid, sessionId, attributes, config, preferredDeviceId),
+                          audio_attributes_t attributes, audio_config_base_t config,
+                          audio_port_handle_t preferredDeviceId, audio_stream_type_t stream,
+                          product_strategy_t strategy, audio_output_flags_t flags,
+                          bool isPreferredDeviceForExclusiveUse) :
+        ClientDescriptor(portId, uid, sessionId, attributes, config, preferredDeviceId,
+                         isPreferredDeviceForExclusiveUse),
         mStream(stream), mStrategy(strategy), mFlags(flags) {}
     ~TrackClientDescriptor() override = default;
 
