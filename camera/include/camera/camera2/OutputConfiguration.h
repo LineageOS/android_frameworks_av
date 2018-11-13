@@ -67,6 +67,11 @@ public:
     OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int rotation,
             int surfaceSetID = INVALID_SET_ID, bool isShared = false);
 
+    OutputConfiguration(const std::vector<sp<IGraphicBufferProducer>>& gbps,
+                        int rotation, int surfaceSetID = INVALID_SET_ID,
+                        int surfaceType = OutputConfiguration::SURFACE_TYPE_UNKNOWN, int width = 0,
+                        int height = 0, bool isShared = false);
+
     bool operator == (const OutputConfiguration& other) const {
         return ( mRotation == other.mRotation &&
                 mSurfaceSetID == other.mSurfaceSetID &&

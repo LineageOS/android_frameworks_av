@@ -99,6 +99,11 @@ class VendorTagDescriptor : public Parcelable {
         void dump(int fd, int verbosity, int indentation) const;
 
         /**
+         * Get Section for corresponding tag.
+         */
+        ssize_t getSectionIndex(uint32_t tag) const;
+
+        /**
          * Read values VendorTagDescriptor object from the given parcel.
          *
          * Returns OK on success, or a negative error code.

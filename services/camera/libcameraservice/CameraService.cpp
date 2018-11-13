@@ -47,6 +47,8 @@
 #include <cutils/misc.h>
 #include <gui/Surface.h>
 #include <hardware/hardware.h>
+#include "hidl/HidlCameraService.h"
+#include <hidl/HidlTransportSupport.h>
 #include <memunreachable/memunreachable.h>
 #include <media/AudioSystem.h>
 #include <media/IMediaHTTPService.h>
@@ -78,6 +80,7 @@ namespace {
 namespace android {
 
 using binder::Status;
+using frameworks::cameraservice::service::V2_0::implementation::HidlCameraService;
 using hardware::ICamera;
 using hardware::ICameraClient;
 using hardware::ICameraServiceProxy;
@@ -142,6 +145,11 @@ void CameraService::onFirstRef()
 
     mUidPolicy = new UidPolicy(this);
     mUidPolicy->registerSelf();
+    sp<HidlCameraService> hcs = HidlCameraService::getInstance(this);
+    if (hcs->registerAsService() != android::OK) {
+        ALOGE("%s: Failed to register default android.frameworks.cameraservice.service@1.0",
+              __FUNCTION__);
+    }
 }
 
 status_t CameraService::enumerateProviders() {
