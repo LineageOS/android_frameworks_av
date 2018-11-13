@@ -467,7 +467,12 @@ extern "C"
     __inline  int32 fxp_mac_16by16(int16 var1,  int16 var2, int32 L_add)
     {
 
-        L_add += (int32)var1 * var2;
+        int32 l_orig = L_add;
+        if (__builtin_add_overflow( (int32)var1 * var2, l_orig, &L_add)) {
+            // needs saturation
+            if (l_orig > 0) L_add = MAX_32;
+            else            L_add = MIN_32;
+        }
 
         return L_add;
     }
