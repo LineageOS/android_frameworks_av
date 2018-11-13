@@ -53,57 +53,6 @@ namespace {
 const int kDumpLockRetries = 50;
 const int kDumpLockSleepUs = 20000;
 
-// marshalling tag indicating flattened utf16 tags
-// keep in sync with frameworks/base/media/java/android/media/AudioAttributes.java
-const int32_t kAudioAttributesMarshallTagFlattenTags = 1;
-
-// Audio attributes format in a parcel:
-//
-//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       usage                                   |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       content_type                            |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       source                                  |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       flags                                   |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       kAudioAttributesMarshallTagFlattenTags  | // ignore tags if not found
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       flattened tags in UTF16                 |
-// |                         ...                                   |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//
-// @param p Parcel that contains audio attributes.
-// @param[out] attributes On exit points to an initialized audio_attributes_t structure
-// @param[out] status On exit contains the status code to be returned.
-void unmarshallAudioAttributes(const Parcel& parcel, audio_attributes_t *attributes) {
-    attributes->usage = (audio_usage_t) parcel.readInt32();
-    attributes->content_type = (audio_content_type_t) parcel.readInt32();
-    attributes->source = (audio_source_t) parcel.readInt32();
-    attributes->flags = (audio_flags_mask_t) parcel.readInt32();
-    const bool hasFlattenedTag = (parcel.readInt32() == kAudioAttributesMarshallTagFlattenTags);
-    if (hasFlattenedTag) {
-        // the tags are UTF16, convert to UTF8
-        String16 tags = parcel.readString16();
-        ssize_t realTagSize = utf16_to_utf8_length(tags.string(), tags.size());
-        if (realTagSize <= 0) {
-            strcpy(attributes->tags, "");
-        } else {
-            // copy the flattened string into the attributes as the destination for the conversion:
-            // copying array size -1, array for tags was calloc'd, no need to NULL-terminate it
-            size_t tagSize = realTagSize > AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1 ?
-                    AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1 : realTagSize;
-            utf16_to_utf8(tags.string(), tagSize, attributes->tags,
-                    sizeof(attributes->tags) / sizeof(attributes->tags[0]));
-        }
-    } else {
-        ALOGE("unmarshallAudioAttributes() received unflattened tags, ignoring tag values");
-        strcpy(attributes->tags, "");
-    }
-}
-
 class proxyListener : public MediaPlayer2InterfaceListener {
 public:
     proxyListener(const wp<MediaPlayer2> &player)
@@ -293,7 +242,7 @@ MediaPlayer2::MediaPlayer2() {
     mLockThreadId = 0;
     mListener = NULL;
     mStreamType = AUDIO_STREAM_MUSIC;
-    mAudioAttributesParcel = NULL;
+    mAudioAttributes = NULL;
     mCurrentPosition = -1;
     mCurrentSeekMode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC;
     mSeekPosition = -1;
@@ -310,21 +259,14 @@ MediaPlayer2::MediaPlayer2() {
     mPid = IPCThreadState::self()->getCallingPid();
     mUid = IPCThreadState::self()->getCallingUid();
 
-    mAudioAttributes = NULL;
+    mAudioOutput = new MediaPlayer2AudioOutput(mAudioSessionId, mUid, mPid, NULL /*attributes*/);
 }
 
 MediaPlayer2::~MediaPlayer2() {
     ALOGV("destructor");
-    if (mAudioAttributesParcel != NULL) {
-        delete mAudioAttributesParcel;
-        mAudioAttributesParcel = NULL;
-    }
     AudioSystem::releaseAudioSessionId(mAudioSessionId, -1);
     disconnect();
     removePlayer(this);
-    if (mAudioAttributes != NULL) {
-        free(mAudioAttributes);
-    }
 }
 
 bool MediaPlayer2::init() {
@@ -412,13 +354,7 @@ status_t MediaPlayer2::setDataSource(const sp<DataSourceDesc> &dsd) {
 
         clear_l();
 
-        if (mAudioOutput != NULL) {
-            mAudioOutput->copyAudioDeviceCallback(mRoutingDelegates);
-        }
-
         player->setListener(new proxyListener(this));
-        mAudioOutput = new MediaPlayer2AudioOutput(mAudioSessionId, mUid,
-                mPid, mAudioAttributes, mRoutingDelegates);
         player->setAudioSink(mAudioOutput);
 
         err = player->setDataSource(dsd);
@@ -568,22 +504,9 @@ status_t MediaPlayer2::setBufferingSettings(const BufferingSettings& buffering) 
     return mPlayer->setBufferingSettings(buffering);
 }
 
-status_t MediaPlayer2::setAudioAttributes_l(const Parcel &parcel) {
-    if (mAudioAttributes != NULL) {
-        free(mAudioAttributes);
-    }
-    mAudioAttributes = (audio_attributes_t *) calloc(1, sizeof(audio_attributes_t));
-    if (mAudioAttributes == NULL) {
-        return NO_MEMORY;
-    }
-    unmarshallAudioAttributes(parcel, mAudioAttributes);
-
-    ALOGV("setAudioAttributes_l() usage=%d content=%d flags=0x%x tags=%s",
-            mAudioAttributes->usage, mAudioAttributes->content_type, mAudioAttributes->flags,
-            mAudioAttributes->tags);
-
-    if (mAudioOutput != 0) {
-        mAudioOutput->setAudioAttributes(mAudioAttributes);
+status_t MediaPlayer2::setAudioAttributes_l(const jobject attributes) {
+    if (mAudioOutput != NULL) {
+        mAudioOutput->setAudioAttributes(attributes);
     }
     return NO_ERROR;
 }
@@ -592,8 +515,8 @@ status_t MediaPlayer2::prepareAsync() {
     ALOGV("prepareAsync");
     Mutex::Autolock _l(mLock);
     if ((mPlayer != 0) && (mCurrentState & MEDIA_PLAYER2_INITIALIZED)) {
-        if (mAudioAttributesParcel != NULL) {
-            status_t err = setAudioAttributes_l(*mAudioAttributesParcel);
+        if (mAudioAttributes != NULL) {
+            status_t err = setAudioAttributes_l(mAudioAttributes->getJObject());
             if (err != OK) {
                 return err;
             }
@@ -983,6 +906,9 @@ status_t MediaPlayer2::setAudioSessionId(audio_session_t sessionId) {
         AudioSystem::releaseAudioSessionId(mAudioSessionId, -1);
         mAudioSessionId = sessionId;
     }
+    if (mAudioOutput != NULL && mAudioSessionId != mAudioOutput->getSessionId()) {
+        mAudioOutput->setSessionId(sessionId);
+    }
     return NO_ERROR;
 }
 
@@ -1015,67 +941,37 @@ status_t MediaPlayer2::attachAuxEffect(int effectId) {
 }
 
 // always call with lock held
-status_t MediaPlayer2::checkStateForKeySet_l(int key) {
-    switch(key) {
-    case MEDIA2_KEY_PARAMETER_AUDIO_ATTRIBUTES:
-        if (mCurrentState & ( MEDIA_PLAYER2_PREPARED | MEDIA_PLAYER2_STARTED |
-                MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_PLAYBACK_COMPLETE) ) {
-            // Can't change the audio attributes after prepare
-            ALOGE("trying to set audio attributes called in state %d", mCurrentState);
-            return INVALID_OPERATION;
-        }
-        break;
-    default:
-        // parameter doesn't require player state check
-        break;
+status_t MediaPlayer2::checkState_l() {
+    if (mCurrentState & ( MEDIA_PLAYER2_PREPARED | MEDIA_PLAYER2_STARTED |
+            MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_PLAYBACK_COMPLETE) ) {
+        // Can't change the audio attributes after prepare
+        ALOGE("trying to set audio attributes called in state %d", mCurrentState);
+        return INVALID_OPERATION;
     }
     return OK;
 }
 
-status_t MediaPlayer2::setParameter(int key, const Parcel& request) {
-    ALOGV("MediaPlayer2::setParameter(%d)", key);
+status_t MediaPlayer2::setAudioAttributes(const jobject attributes) {
+    ALOGV("MediaPlayer2::setAudioAttributes");
     status_t status = INVALID_OPERATION;
     Mutex::Autolock _l(mLock);
-    if (checkStateForKeySet_l(key) != OK) {
+    if (checkState_l() != OK) {
         return status;
     }
-    switch (key) {
-    case MEDIA2_KEY_PARAMETER_AUDIO_ATTRIBUTES:
-        // save the marshalled audio attributes
-        if (mAudioAttributesParcel != NULL) {
-            delete mAudioAttributesParcel;
-        }
-        mAudioAttributesParcel = new Parcel();
-        mAudioAttributesParcel->appendFrom(&request, 0, request.dataSize());
-        status = setAudioAttributes_l(request);
-        if (status != OK) {
-            return status;
-        }
-        break;
-    default:
-        ALOGV_IF(mPlayer == NULL, "setParameter: no active player");
-        break;
-    }
-
-    if (mPlayer != NULL) {
-        status = mPlayer->setParameter(key, request);
-    }
+    mAudioAttributes = new JObjectHolder(attributes);
+    status = setAudioAttributes_l(attributes);
     return status;
+}
+
+jobject MediaPlayer2::getAudioAttributes() {
+    ALOGV("MediaPlayer2::getAudioAttributes)");
+    Mutex::Autolock _l(mLock);
+    return mAudioAttributes != NULL ? mAudioAttributes->getJObject() : NULL;
 }
 
 status_t MediaPlayer2::getParameter(int key, Parcel *reply) {
     ALOGV("MediaPlayer2::getParameter(%d)", key);
     Mutex::Autolock _l(mLock);
-    if (key == MEDIA2_KEY_PARAMETER_AUDIO_ATTRIBUTES) {
-        if (reply == NULL) {
-            return BAD_VALUE;
-        }
-        if (mAudioAttributesParcel != NULL) {
-            reply->appendFrom(mAudioAttributesParcel, 0, mAudioAttributesParcel->dataSize());
-        }
-        return OK;
-    }
-
     if (mPlayer == NULL) {
         ALOGV("getParameter: no active player");
         return INVALID_OPERATION;
@@ -1286,7 +1182,6 @@ status_t MediaPlayer2::addAudioDeviceCallback(jobject routingDelegate) {
     Mutex::Autolock _l(mLock);
     if (mAudioOutput == NULL) {
         ALOGV("addAudioDeviceCallback: player not init");
-        mRoutingDelegates.push_back(routingDelegate);
         return NO_INIT;
     }
     return mAudioOutput->addAudioDeviceCallback(routingDelegate);

@@ -24,8 +24,8 @@
 #include <media/mediaplayer_common.h>
 #include <mediaplayer2/MediaPlayer2Interface.h>
 #include <mediaplayer2/MediaPlayer2Types.h>
+#include <mediaplayer2/JObjectHolder.h>
 
-#include <vector>
 #include <jni.h>
 #include <utils/Errors.h>
 #include <utils/Mutex.h>
@@ -100,7 +100,8 @@ public:
             audio_session_t getAudioSessionId();
             status_t        setAuxEffectSendLevel(float level);
             status_t        attachAuxEffect(int effectId);
-            status_t        setParameter(int key, const Parcel& request);
+            status_t        setAudioAttributes(const jobject attributes);
+            jobject         getAudioAttributes();
             status_t        getParameter(int key, Parcel* reply);
 
             // Modular DRM
@@ -121,14 +122,14 @@ private:
     // Disconnect from the currently connected ANativeWindow.
     void disconnectNativeWindow_l();
 
-    status_t setAudioAttributes_l(const Parcel &request);
+    status_t setAudioAttributes_l(const jobject attributes);
 
     void clear_l();
     status_t seekTo_l(int64_t msec, MediaPlayer2SeekMode mode);
     status_t prepareAsync_l();
     status_t getDuration_l(int64_t *msec);
     status_t reset_l();
-    status_t checkStateForKeySet_l(int key);
+    status_t checkState_l();
 
     pid_t                       mPid;
     uid_t                       mUid;
@@ -145,15 +146,13 @@ private:
     int64_t                     mSeekPosition;
     MediaPlayer2SeekMode        mSeekMode;
     audio_stream_type_t         mStreamType;
-    Parcel*                     mAudioAttributesParcel;
     bool                        mLoop;
     float                       mVolume;
     int                         mVideoWidth;
     int                         mVideoHeight;
     audio_session_t             mAudioSessionId;
-    audio_attributes_t *        mAudioAttributes;
+    sp<JObjectHolder>           mAudioAttributes;
     float                       mSendLevel;
-    std::vector<jobject>        mRoutingDelegates;
     sp<ANativeWindowWrapper>    mConnectedWindow;
 };
 
