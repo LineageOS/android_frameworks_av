@@ -180,7 +180,14 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
             });
     }
 
-    mInterface = new HalInterface(session, queue);
+    camera_metadata_entry bufMgrMode =
+            mDeviceInfo.find(ANDROID_INFO_SUPPORTED_BUFFER_MANAGEMENT_VERSION);
+    if (bufMgrMode.count > 0) {
+         mUseHalBufManager = (bufMgrMode.data.u8[0] ==
+            ANDROID_INFO_SUPPORTED_BUFFER_MANAGEMENT_VERSION_HIDL_DEVICE_3_5);
+    }
+
+    mInterface = new HalInterface(session, queue, mUseHalBufManager);
     std::string providerType;
     mVendorTagId = manager->getProviderTagIdLocked(mId.string());
     mTagMonitor.initialize(mVendorTagId);
@@ -207,23 +214,6 @@ status_t Camera3Device::initializeCommonLocked() {
     /** Register in-flight map to the status tracker */
     mInFlightStatusId = mStatusTracker->addComponent();
 
-    /** Create buffer manager */
-    mBufferManager = new Camera3BufferManager();
-
-    Vector<int32_t> sessionParamKeys;
-    camera_metadata_entry_t sessionKeysEntry = mDeviceInfo.find(
-            ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
-    if (sessionKeysEntry.count > 0) {
-        sessionParamKeys.insertArrayAt(sessionKeysEntry.data.i32, 0, sessionKeysEntry.count);
-    }
-
-    camera_metadata_entry bufMgrMode =
-            mDeviceInfo.find(ANDROID_INFO_SUPPORTED_BUFFER_MANAGEMENT_VERSION);
-    if (bufMgrMode.count > 0) {
-         mUseHalBufManager = (bufMgrMode.data.u8[0] ==
-            ANDROID_INFO_SUPPORTED_BUFFER_MANAGEMENT_VERSION_HIDL_DEVICE_3_5);
-    }
-
     if (mUseHalBufManager) {
         res = mRequestBufferSM.initialize(mStatusTracker);
         if (res != OK) {
@@ -233,6 +223,16 @@ status_t Camera3Device::initializeCommonLocked() {
             mStatusTracker.clear();
             return res;
         }
+    }
+
+    /** Create buffer manager */
+    mBufferManager = new Camera3BufferManager();
+
+    Vector<int32_t> sessionParamKeys;
+    camera_metadata_entry_t sessionKeysEntry = mDeviceInfo.find(
+            ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
+    if (sessionKeysEntry.count > 0) {
+        sessionParamKeys.insertArrayAt(sessionKeysEntry.data.i32, 0, sessionKeysEntry.count);
     }
 
     /** Start up request queue thread */
@@ -1307,14 +1307,24 @@ void Camera3Device::processOneCaptureResultLocked(
         }
         bDst.stream = stream->asHalStream();
 
-        buffer_handle_t *buffer;
+        bool noBufferReturned = false;
+        buffer_handle_t *buffer = nullptr;
         if (mUseHalBufManager) {
+            // This is suspicious most of the time but can be correct during flush where HAL
+            // has to return capture result before a buffer is requested
             if (bSrc.bufferId == HalInterface::BUFFER_ID_NO_BUFFER) {
-                ALOGE("%s: Frame %d: Buffer %zu: No bufferId for stream %d",
-                        __FUNCTION__, result.frameNumber, i, bSrc.streamId);
-                return;
+                if (bSrc.status == BufferStatus::OK) {
+                    ALOGE("%s: Frame %d: Buffer %zu: No bufferId for stream %d",
+                            __FUNCTION__, result.frameNumber, i, bSrc.streamId);
+                    // Still proceeds so other buffers can be returned
+                }
+                noBufferReturned = true;
             }
-            res = mInterface->popInflightRequestBuffer(bSrc.bufferId, &buffer);
+            if (noBufferReturned) {
+                res = OK;
+            } else {
+                res = mInterface->popInflightRequestBuffer(bSrc.bufferId, &buffer);
+            }
         } else {
             res = mInterface->popInflightBuffer(result.frameNumber, bSrc.streamId, &buffer);
         }
@@ -1331,6 +1341,9 @@ void Camera3Device::processOneCaptureResultLocked(
         if (bSrc.releaseFence == nullptr) {
             bDst.release_fence = -1;
         } else if (bSrc.releaseFence->numFds == 1) {
+            if (noBufferReturned) {
+                ALOGE("%s: got releaseFence without output buffer!", __FUNCTION__);
+            }
             bDst.release_fence = dup(bSrc.releaseFence->data[0]);
         } else {
             ALOGE("%s: Frame %d: Invalid release fence for buffer %zu, fd count is %d, not 1",
@@ -3067,6 +3080,16 @@ void Camera3Device::returnOutputBuffers(
 
     for (size_t i = 0; i < numBuffers; i++)
     {
+        if (outputBuffers[i].buffer == nullptr) {
+            if (!mUseHalBufManager) {
+                // With HAL buffer management API, HAL sometimes will have to return buffers that
+                // has not got a output buffer handle filled yet. This is though illegal if HAL
+                // buffer management API is not being used.
+                ALOGE("%s: cannot return a null buffer!", __FUNCTION__);
+            }
+            continue;
+        }
+
         Camera3StreamInterface *stream = Camera3Stream::cast(outputBuffers[i].stream);
         int streamId = stream->getId();
         const auto& it = outputSurfaces.find(streamId);
@@ -3802,9 +3825,11 @@ void Camera3Device::monitorMetadata(TagMonitor::eventSource source,
 
 Camera3Device::HalInterface::HalInterface(
             sp<ICameraDeviceSession> &session,
-            std::shared_ptr<RequestMetadataQueue> queue) :
+            std::shared_ptr<RequestMetadataQueue> queue,
+            bool useHalBufManager) :
         mHidlSession(session),
-        mRequestMetadataQueue(queue) {
+        mRequestMetadataQueue(queue),
+        mUseHalBufManager(useHalBufManager) {
     // Check with hardware service manager if we can downcast these interfaces
     // Somewhat expensive, so cache the results at startup
     auto castResult_3_5 = device::V3_5::ICameraDeviceSession::castFrom(mHidlSession);
@@ -3821,11 +3846,12 @@ Camera3Device::HalInterface::HalInterface(
     }
 }
 
-Camera3Device::HalInterface::HalInterface() {}
+Camera3Device::HalInterface::HalInterface() : mUseHalBufManager(false) {}
 
 Camera3Device::HalInterface::HalInterface(const HalInterface& other) :
         mHidlSession(other.mHidlSession),
-        mRequestMetadataQueue(other.mRequestMetadataQueue) {}
+        mRequestMetadataQueue(other.mRequestMetadataQueue),
+        mUseHalBufManager(other.mUseHalBufManager) {}
 
 bool Camera3Device::HalInterface::valid() {
     return (mHidlSession != nullptr);
@@ -4141,14 +4167,14 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
     return res;
 }
 
-void Camera3Device::HalInterface::wrapAsHidlRequest(camera3_capture_request_t* request,
+status_t Camera3Device::HalInterface::wrapAsHidlRequest(camera3_capture_request_t* request,
         /*out*/device::V3_2::CaptureRequest* captureRequest,
         /*out*/std::vector<native_handle_t*>* handlesCreated) {
     ATRACE_CALL();
     if (captureRequest == nullptr || handlesCreated == nullptr) {
         ALOGE("%s: captureRequest (%p) and handlesCreated (%p) must not be null",
                 __FUNCTION__, captureRequest, handlesCreated);
-        return;
+        return BAD_VALUE;
     }
 
     captureRequest->frameNumber = request->frame_number;
@@ -4189,26 +4215,37 @@ void Camera3Device::HalInterface::wrapAsHidlRequest(camera3_capture_request_t* r
             const camera3_stream_buffer_t *src = request->output_buffers + i;
             StreamBuffer &dst = captureRequest->outputBuffers[i];
             int32_t streamId = Camera3Stream::cast(src->stream)->getId();
-            buffer_handle_t buf = *(src->buffer);
-            auto pair = getBufferId(buf, streamId);
-            bool isNewBuffer = pair.first;
-            dst.streamId = streamId;
-            dst.bufferId = pair.second;
-            dst.buffer = isNewBuffer ? buf : nullptr;
-            dst.status = BufferStatus::OK;
-            native_handle_t *acquireFence = nullptr;
-            if (src->acquire_fence != -1) {
-                acquireFence = native_handle_create(1,0);
-                acquireFence->data[0] = src->acquire_fence;
-                handlesCreated->push_back(acquireFence);
+            if (src->buffer != nullptr) {
+                buffer_handle_t buf = *(src->buffer);
+                auto pair = getBufferId(buf, streamId);
+                bool isNewBuffer = pair.first;
+                dst.bufferId = pair.second;
+                dst.buffer = isNewBuffer ? buf : nullptr;
+                native_handle_t *acquireFence = nullptr;
+                if (src->acquire_fence != -1) {
+                    acquireFence = native_handle_create(1,0);
+                    acquireFence->data[0] = src->acquire_fence;
+                    handlesCreated->push_back(acquireFence);
+                }
+                dst.acquireFence = acquireFence;
+            } else if (mUseHalBufManager) {
+                // HAL buffer management path
+                dst.bufferId = BUFFER_ID_NO_BUFFER;
+                dst.buffer = nullptr;
+                dst.acquireFence = nullptr;
+            } else {
+                ALOGE("%s: cannot send a null buffer in capture request!", __FUNCTION__);
+                return BAD_VALUE;
             }
-            dst.acquireFence = acquireFence;
+            dst.streamId = streamId;
+            dst.status = BufferStatus::OK;
             dst.releaseFence = nullptr;
 
             pushInflightBufferLocked(captureRequest->frameNumber, streamId,
                     src->buffer, src->acquire_fence);
         }
     }
+    return OK;
 }
 
 status_t Camera3Device::HalInterface::processBatchCaptureRequests(
@@ -4232,12 +4269,17 @@ status_t Camera3Device::HalInterface::processBatchCaptureRequests(
     }
     std::vector<native_handle_t*> handlesCreated;
 
+    status_t res = OK;
     for (size_t i = 0; i < batchSize; i++) {
         if (hidlSession_3_4 != nullptr) {
-            wrapAsHidlRequest(requests[i], /*out*/&captureRequests_3_4[i].v3_2,
+            res = wrapAsHidlRequest(requests[i], /*out*/&captureRequests_3_4[i].v3_2,
                     /*out*/&handlesCreated);
         } else {
-            wrapAsHidlRequest(requests[i], /*out*/&captureRequests[i], /*out*/&handlesCreated);
+            res = wrapAsHidlRequest(requests[i],
+                    /*out*/&captureRequests[i], /*out*/&handlesCreated);
+        }
+        if (res != OK) {
+            return res;
         }
     }
 
