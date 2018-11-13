@@ -49,6 +49,7 @@ class ANDROID_API OpcodeListBuilder : public LightRefBase<OpcodeListBuilder> {
             CFA_RGGB,
             CFA_BGGR,
             CFA_GBRG,
+            CFA_NONE,
         };
 
         OpcodeListBuilder();
@@ -88,7 +89,6 @@ class ANDROID_API OpcodeListBuilder : public LightRefBase<OpcodeListBuilder> {
                                                 uint32_t activeAreaRight,
                                                 CfaLayout cfa,
                                                 const float* lensShadingMap);
-
 
         /**
          * Add a GainMap opcode with the given fields.  The mapGains array
@@ -197,6 +197,33 @@ class ANDROID_API OpcodeListBuilder : public LightRefBase<OpcodeListBuilder> {
 
         status_t addOpcodePreamble(uint32_t opcodeId);
 
+    private:
+        /**
+         * Add Bayer GainMap opcode(s) for the given metadata parameters.
+         * CFA layout must match the layout of the shading map passed into the
+         * lensShadingMap parameter.
+         *
+         * Returns OK on success, or a negative error code.
+         */
+        status_t addBayerGainMapsForMetadata(uint32_t lsmWidth,
+                                                uint32_t lsmHeight,
+                                                uint32_t activeAreaWidth,
+                                                uint32_t activeAreaHeight,
+                                                CfaLayout cfa,
+                                                const float* lensShadingMap);
+
+        /**
+         * Add Bayer GainMap opcode(s) for the given metadata parameters.
+         * CFA layout must match the layout of the shading map passed into the
+         * lensShadingMap parameter.
+         *
+         * Returns OK on success, or a negative error code.
+         */
+        status_t addMonochromeGainMapsForMetadata(uint32_t lsmWidth,
+                                                uint32_t lsmHeight,
+                                                uint32_t activeAreaWidth,
+                                                uint32_t activeAreaHeight,
+                                                const float* lensShadingMap);
 };
 
 } /*namespace img_utils*/

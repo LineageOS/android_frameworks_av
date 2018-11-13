@@ -60,34 +60,36 @@ status_t OpcodeListBuilder::addGainMapsForMetadata(uint32_t lsmWidth,
                                                    uint32_t activeAreaRight,
                                                    CfaLayout cfa,
                                                    const float* lensShadingMap) {
+    status_t err = OK;
     uint32_t activeAreaWidth = activeAreaRight - activeAreaLeft;
     uint32_t activeAreaHeight = activeAreaBottom - activeAreaTop;
-    double spacingV = 1.0 / std::max(1u, lsmHeight - 1);
-    double spacingH = 1.0 / std::max(1u, lsmWidth - 1);
 
-    std::vector<float> redMapVector(lsmWidth * lsmHeight);
-    float *redMap = redMapVector.data();
-
-    std::vector<float> greenEvenMapVector(lsmWidth * lsmHeight);
-    float *greenEvenMap = greenEvenMapVector.data();
-
-    std::vector<float> greenOddMapVector(lsmWidth * lsmHeight);
-    float *greenOddMap = greenOddMapVector.data();
-
-    std::vector<float> blueMapVector(lsmWidth * lsmHeight);
-    float *blueMap = blueMapVector.data();
-
-    size_t lsmMapSize = lsmWidth * lsmHeight * 4;
-
-    // Split lens shading map channels into separate arrays
-    size_t j = 0;
-    for (size_t i = 0; i < lsmMapSize; i += 4, ++j) {
-        redMap[j] = lensShadingMap[i + LSM_R_IND];
-        greenEvenMap[j] = lensShadingMap[i + LSM_GE_IND];
-        greenOddMap[j] = lensShadingMap[i + LSM_GO_IND];
-        blueMap[j] = lensShadingMap[i + LSM_B_IND];
+    switch (cfa) {
+        case CFA_RGGB:
+        case CFA_GRBG:
+        case CFA_GBRG:
+        case CFA_BGGR:
+            err = addBayerGainMapsForMetadata(lsmWidth, lsmHeight, activeAreaWidth,
+                    activeAreaHeight, cfa, lensShadingMap);
+            break;
+        case CFA_NONE:
+            err = addMonochromeGainMapsForMetadata(lsmWidth, lsmHeight, activeAreaWidth,
+                    activeAreaHeight, lensShadingMap);
+            break;
+        default:
+            ALOGE("%s: Unknown CFA layout %d", __FUNCTION__, cfa);
+            err = BAD_VALUE;
+            break;
     }
+    return err;
+}
 
+status_t OpcodeListBuilder::addBayerGainMapsForMetadata(uint32_t lsmWidth,
+                                                   uint32_t lsmHeight,
+                                                   uint32_t activeAreaWidth,
+                                                   uint32_t activeAreaHeight,
+                                                   CfaLayout cfa,
+                                                   const float* lensShadingMap) {
     uint32_t redTop = 0;
     uint32_t redLeft = 0;
     uint32_t greenEvenTop = 0;
@@ -141,6 +143,32 @@ status_t OpcodeListBuilder::addGainMapsForMetadata(uint32_t lsmWidth,
         default:
             ALOGE("%s: Unknown CFA layout %d", __FUNCTION__, cfa);
             return BAD_VALUE;
+    }
+
+    std::vector<float> redMapVector(lsmWidth * lsmHeight);
+    float *redMap = redMapVector.data();
+
+    std::vector<float> greenEvenMapVector(lsmWidth * lsmHeight);
+    float *greenEvenMap = greenEvenMapVector.data();
+
+    std::vector<float> greenOddMapVector(lsmWidth * lsmHeight);
+    float *greenOddMap = greenOddMapVector.data();
+
+    std::vector<float> blueMapVector(lsmWidth * lsmHeight);
+    float *blueMap = blueMapVector.data();
+
+    double spacingV = 1.0 / std::max(1u, lsmHeight - 1);
+    double spacingH = 1.0 / std::max(1u, lsmWidth - 1);
+
+    size_t lsmMapSize = lsmWidth * lsmHeight * 4;
+
+    // Split lens shading map channels into separate arrays
+    size_t j = 0;
+    for (size_t i = 0; i < lsmMapSize; i += 4, ++j) {
+        redMap[j] = lensShadingMap[i + LSM_R_IND];
+        greenEvenMap[j] = lensShadingMap[i + LSM_GE_IND];
+        greenOddMap[j] = lensShadingMap[i + LSM_GO_IND];
+        blueMap[j] = lensShadingMap[i + LSM_B_IND];
     }
 
     status_t err = addGainMap(/*top*/redTop,
@@ -213,6 +241,46 @@ status_t OpcodeListBuilder::addGainMapsForMetadata(uint32_t lsmWidth,
                      /*mapOriginH*/0,
                      /*mapPlanes*/1,
                      /*mapGains*/blueMap);
+    return err;
+}
+
+status_t OpcodeListBuilder::addMonochromeGainMapsForMetadata(uint32_t lsmWidth,
+                                                   uint32_t lsmHeight,
+                                                   uint32_t activeAreaWidth,
+                                                   uint32_t activeAreaHeight,
+                                                   const float* lensShadingMap) {
+    std::vector<float> mapVector(lsmWidth * lsmHeight);
+    float *map = mapVector.data();
+
+    double spacingV = 1.0 / std::max(1u, lsmHeight - 1);
+    double spacingH = 1.0 / std::max(1u, lsmWidth - 1);
+
+    size_t lsmMapSize = lsmWidth * lsmHeight * 4;
+
+    // Split lens shading map channels into separate arrays
+    size_t j = 0;
+    for (size_t i = 0; i < lsmMapSize; i += 4, ++j) {
+        map[j] = lensShadingMap[i];
+    }
+
+    status_t err = addGainMap(/*top*/0,
+                              /*left*/0,
+                              /*bottom*/activeAreaHeight - 1,
+                              /*right*/activeAreaWidth - 1,
+                              /*plane*/0,
+                              /*planes*/1,
+                              /*rowPitch*/1,
+                              /*colPitch*/1,
+                              /*mapPointsV*/lsmHeight,
+                              /*mapPointsH*/lsmWidth,
+                              /*mapSpacingV*/spacingV,
+                              /*mapSpacingH*/spacingH,
+                              /*mapOriginV*/0,
+                              /*mapOriginH*/0,
+                              /*mapPlanes*/1,
+                              /*mapGains*/map);
+    if (err != OK) return err;
+
     return err;
 }
 
