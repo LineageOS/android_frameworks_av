@@ -911,10 +911,10 @@ status_t MediaCodec::init(const AString &name) {
             continue;
         }
         mCodecInfo = mcl->getCodecInfo(codecIdx);
-        Vector<AString> mimes;
-        mCodecInfo->getSupportedMimes(&mimes);
-        for (size_t i = 0; i < mimes.size(); i++) {
-            if (mimes[i].startsWith("video/")) {
+        Vector<AString> mediaTypes;
+        mCodecInfo->getSupportedMediaTypes(&mediaTypes);
+        for (size_t i = 0; i < mediaTypes.size(); i++) {
+            if (mediaTypes[i].startsWith("video/")) {
                 mIsVideo = true;
                 break;
             }

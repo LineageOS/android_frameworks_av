@@ -557,6 +557,7 @@ const std::vector<C2Component::Traits>& Codec2Client::listComponents() const {
                 for (size_t i = 0; i < t.size(); ++i) {
                     c2_status_t status = objcpy(
                             &mTraitsList[i], &mAliasesBuffer[i], t[i]);
+                    mTraitsList[i].owner = mInstanceName;
                     if (status != C2_OK) {
                         ALOGE("listComponents -- corrupted output.");
                         return;

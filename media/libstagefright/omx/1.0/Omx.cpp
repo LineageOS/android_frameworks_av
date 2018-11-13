@@ -124,11 +124,11 @@ Return<void> Omx::allocateNode(
         } else {
             uint32_t quirks = 0;
             for (const auto& quirk : codec->second.quirkSet) {
-                if (quirk == "requires-allocate-on-input-ports") {
+                if (quirk == "quirk::requires-allocate-on-input-ports") {
                     quirks |= OMXNodeInstance::
                             kRequiresAllocateBufferOnInputPorts;
                 }
-                if (quirk == "requires-allocate-on-output-ports") {
+                if (quirk == "quirk::requires-allocate-on-output-ports") {
                     quirks |= OMXNodeInstance::
                             kRequiresAllocateBufferOnOutputPorts;
                 }

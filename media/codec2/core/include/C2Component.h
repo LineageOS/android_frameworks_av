@@ -409,12 +409,13 @@ public:
         kind_t kind; ///< component kind
         rank_t rank; ///< component rank
         C2String mediaType; ///< media type supported by the component
+        C2String owner; ///< name of the component store owning this component
 
         /**
          * name alias(es) for backward compatibility.
          * \note Multiple components can have the same alias as long as their media-type differs.
          */
-        std::vector<C2StringLiteral> aliases; ///< name aliases for backward compatibility
+        std::vector<C2String> aliases; ///< name aliases for backward compatibility
     };
 
     // METHODS AVAILABLE WHEN RUNNING

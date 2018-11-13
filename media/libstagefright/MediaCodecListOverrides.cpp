@@ -228,18 +228,18 @@ void profileCodecs(
             continue;
         }
 
-        Vector<AString> mimes;
-        info->getSupportedMimes(&mimes);
-        for (size_t i = 0; i < mimes.size(); ++i) {
+        Vector<AString> mediaTypes;
+        info->getSupportedMediaTypes(&mediaTypes);
+        for (size_t i = 0; i < mediaTypes.size(); ++i) {
             const sp<MediaCodecInfo::Capabilities> &caps =
-                    info->getCapabilitiesFor(mimes[i].c_str());
+                    info->getCapabilitiesFor(mediaTypes[i].c_str());
             if (!forceToMeasure &&
                 (caps->getDetails()->contains("max-supported-instances") ||
                  caps->getDetails()->contains("max-concurrent-instances"))) {
                 continue;
             }
 
-            size_t max = doProfileCodecs(info->isEncoder(), name, mimes[i], caps);
+            size_t max = doProfileCodecs(info->isEncoder(), name, mediaTypes[i], caps);
             if (max > 0) {
                 CodecSettings settings;
                 char maxStr[32];
@@ -248,7 +248,7 @@ void profileCodecs(
 
                 AString key = name;
                 key.append(" ");
-                key.append(mimes[i]);
+                key.append(mediaTypes[i]);
 
                 if (info->isEncoder()) {
                     encoder_results->add(key, settings);

@@ -65,6 +65,7 @@ public:
         size_t order;      ///< Order of appearance in the file (starting from 0)
         QuirkSet quirkSet; ///< Set of quirks requested by this codec
         TypeMap typeMap;   ///< Map of types supported by this codec
+        std::vector<std::string> aliases; ///< Name aliases for this codec
     };
 
     typedef std::pair<std::string, CodecProperties> Codec;
@@ -76,6 +77,7 @@ public:
     struct NodeInfo {
         std::string name;
         std::vector<Attribute> attributeList;
+        // note: aliases are not exposed here as they are not part of the role map
     };
 
     /**
@@ -171,8 +173,9 @@ private:
     void addMediaCodec(bool encoder, const char *name,
             const char *type = nullptr);
 
-    status_t addQuirk(const char **attrs);
+    status_t addQuirk(const char **attrs, const char *tag);
     status_t addTypeFromAttributes(const char **attrs, bool encoder);
+    status_t addAlias(const char **attrs);
     status_t addLimit(const char **attrs);
     status_t addFeature(const char **attrs);
     void addType(const char *name);

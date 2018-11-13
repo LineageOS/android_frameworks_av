@@ -215,13 +215,9 @@ MediaCodecList::MediaCodecList(std::vector<MediaCodecListBuilderBase*> builders)
             mCodecInfos.begin(),
             mCodecInfos.end(),
             [](const sp<MediaCodecInfo> &info1, const sp<MediaCodecInfo> &info2) {
-                if (info2 == nullptr) {
-                    return false;
-                } else if (info1 == nullptr) {
-                    return true;
-                } else {
-                    return info1->rank() < info2->rank();
-                }
+                // null is lowest
+                return info1 == nullptr
+                        || (info2 != nullptr && info1->getRank() < info2->getRank());
             });
 }
 
