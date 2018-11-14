@@ -1830,43 +1830,43 @@ const struct aac_format_conv_t* p = &profileLookup[0];
     return;
 }
 
-bool canOffloadStream(const sp<MetaData>& meta, bool hasVideo,
-                      bool isStreaming, audio_stream_type_t streamType)
+status_t getAudioOffloadInfo(const sp<MetaData>& meta, bool hasVideo,
+        bool isStreaming, audio_stream_type_t streamType, audio_offload_info_t *info)
 {
     const char *mime;
     if (meta == NULL) {
-        return false;
+        return BAD_VALUE;
     }
     CHECK(meta->findCString(kKeyMIMEType, &mime));
 
-    audio_offload_info_t info = AUDIO_INFO_INITIALIZER;
+    (*info) = AUDIO_INFO_INITIALIZER;
 
-    info.format = AUDIO_FORMAT_INVALID;
-    if (mapMimeToAudioFormat(info.format, mime) != OK) {
+    info->format = AUDIO_FORMAT_INVALID;
+    if (mapMimeToAudioFormat(info->format, mime) != OK) {
         ALOGE(" Couldn't map mime type \"%s\" to a valid AudioSystem::audio_format !", mime);
-        return false;
+        return BAD_VALUE;
     } else {
-        ALOGV("Mime type \"%s\" mapped to audio_format %d", mime, info.format);
+        ALOGV("Mime type \"%s\" mapped to audio_format %d", mime, info->format);
     }
 
-    if (AUDIO_FORMAT_INVALID == info.format) {
+    if (AUDIO_FORMAT_INVALID == info->format) {
         // can't offload if we don't know what the source format is
         ALOGE("mime type \"%s\" not a known audio format", mime);
-        return false;
+        return BAD_VALUE;
     }
 
     // Redefine aac format according to its profile
     // Offloading depends on audio DSP capabilities.
     int32_t aacaot = -1;
     if (meta->findInt32(kKeyAACAOT, &aacaot)) {
-        mapAACProfileToAudioFormat(info.format,(OMX_AUDIO_AACPROFILETYPE) aacaot);
+        mapAACProfileToAudioFormat(info->format,(OMX_AUDIO_AACPROFILETYPE) aacaot);
     }
 
     int32_t srate = -1;
     if (!meta->findInt32(kKeySampleRate, &srate)) {
         ALOGV("track of type '%s' does not publish sample rate", mime);
     }
-    info.sample_rate = srate;
+    info->sample_rate = srate;
 
     int32_t cmask = 0;
     if (!meta->findInt32(kKeyChannelMask, &cmask) || cmask == CHANNEL_MASK_USE_CHANNEL_ORDER) {
@@ -1880,25 +1880,34 @@ bool canOffloadStream(const sp<MetaData>& meta, bool hasVideo,
             cmask = audio_channel_out_mask_from_count(channelCount);
         }
     }
-    info.channel_mask = cmask;
+    info->channel_mask = cmask;
 
     int64_t duration = 0;
     if (!meta->findInt64(kKeyDuration, &duration)) {
         ALOGV("track of type '%s' does not publish duration", mime);
     }
-    info.duration_us = duration;
+    info->duration_us = duration;
 
     int32_t brate = -1;
     if (!meta->findInt32(kKeyBitRate, &brate)) {
         ALOGV("track of type '%s' does not publish bitrate", mime);
     }
-    info.bit_rate = brate;
+    info->bit_rate = brate;
 
 
-    info.stream_type = streamType;
-    info.has_video = hasVideo;
-    info.is_streaming = isStreaming;
+    info->stream_type = streamType;
+    info->has_video = hasVideo;
+    info->is_streaming = isStreaming;
+    return OK;
+}
 
+bool canOffloadStream(const sp<MetaData>& meta, bool hasVideo,
+                      bool isStreaming, audio_stream_type_t streamType)
+{
+    audio_offload_info_t info = AUDIO_INFO_INITIALIZER;
+    if (OK != getAudioOffloadInfo(meta, hasVideo, isStreaming, streamType, &info)) {
+        return false;
+    }
     // Check if offload is possible for given format, stream type, sample rate,
     // bit rate, duration, video and streaming
     return AudioSystem::isOffloadSupported(info);
