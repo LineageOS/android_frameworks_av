@@ -13,7 +13,7 @@
 // limitations under the License.
 
 apex {
-    name: "apex.media",
+    name: "com.android.media",
     manifest: "manifest.json",
     native_shared_libs: [
         // Extractor plugins
@@ -30,11 +30,11 @@ apex {
         // MediaPlayer2
         "libmedia2_jni",
     ],
-    key: "apex.media.key",
+    key: "com.android.media.key",
 }
 
 apex_key {
-    name: "apex.media.key",
+    name: "com.android.media.key",
     public_key: "media.avbpubkey",
     private_key: "media.pem",
 }
