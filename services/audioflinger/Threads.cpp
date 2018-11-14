@@ -3220,13 +3220,16 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                 }
                 if (status == OK) {
                     // verify downstream latency (we assume a max reasonable
-                    // latency of 1 second).
-                    if (latencyMs >= 0. && latencyMs <= 1000.) {
+                    // latency of 5 seconds).
+                    const double minLatency = 0., maxLatency = 5000.;
+                    if (latencyMs >= minLatency && latencyMs <= maxLatency) {
                         ALOGV("new downstream latency %lf ms", latencyMs);
-                        downstreamLatencyStatMs.add(latencyMs);
                     } else {
                         ALOGD("out of range downstream latency %lf ms", latencyMs);
+                        if (latencyMs < minLatency) latencyMs = minLatency;
+                        else if (latencyMs > maxLatency) latencyMs = maxLatency;
                     }
+                    downstreamLatencyStatMs.add(latencyMs);
                 }
                 mAudioFlinger->mLock.unlock();
             }

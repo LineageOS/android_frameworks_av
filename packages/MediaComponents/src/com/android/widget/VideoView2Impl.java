@@ -407,7 +407,7 @@ public class VideoView2Impl extends BaseLayout
             return;
         }
         mSpeed = speed;
-        if (mMediaPlayer != null && mMediaPlayer.isPlaying()) {
+        if (mMediaPlayer != null && mMediaPlayer.getState() == MediaPlayer2.PLAYER_STATE_PLAYING) {
             applySpeed();
         }
         updatePlaybackState();
@@ -1341,7 +1341,7 @@ public class VideoView2Impl extends BaseLayout
                 if (isRemotePlayback()) {
                     mRoutePlayer.onPause();
                     mCurrentState = STATE_PAUSED;
-                } else if (mMediaPlayer.isPlaying()) {
+                } else if (mMediaPlayer.getState() == MediaPlayer2.PLAYER_STATE_PLAYING) {
                     mMediaPlayer.pause();
                     mCurrentState = STATE_PAUSED;
                     updatePlaybackState();

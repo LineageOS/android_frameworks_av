@@ -315,6 +315,10 @@ status_t VendorTagDescriptor::lookupTag(const String8& name, const String8& sect
     return OK;
 }
 
+ssize_t VendorTagDescriptor::getSectionIndex(uint32_t tag) const {
+    return mTagToSectionMap.valueFor(tag);
+}
+
 void VendorTagDescriptor::dump(int fd, int verbosity, int indentation) const {
 
     size_t size = mTagToNameMap.size();

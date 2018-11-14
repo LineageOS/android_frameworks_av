@@ -425,6 +425,102 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::queryPhysicalCameraIds() 
     }
 }
 
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fixupMonochromeTags() {
+    status_t res = OK;
+    auto& c = mCameraCharacteristics;
+
+    // Override static metadata for MONOCHROME camera with older device version
+    if (mVersion.get_major() == 3 && mVersion.get_minor() < 5) {
+        camera_metadata_entry cap = c.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+        for (size_t i = 0; i < cap.count; i++) {
+            if (cap.data.u8[i] == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_MONOCHROME) {
+                // ANDROID_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT
+                uint8_t cfa = ANDROID_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_MONO;
+                res = c.update(ANDROID_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT, &cfa, 1);
+                if (res != OK) {
+                    ALOGE("%s: Failed to update COLOR_FILTER_ARRANGEMENT: %s (%d)",
+                          __FUNCTION__, strerror(-res), res);
+                    return res;
+                }
+
+                // ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS
+                const std::vector<uint32_t> sKeys = {
+                        ANDROID_SENSOR_REFERENCE_ILLUMINANT1,
+                        ANDROID_SENSOR_REFERENCE_ILLUMINANT2,
+                        ANDROID_SENSOR_CALIBRATION_TRANSFORM1,
+                        ANDROID_SENSOR_CALIBRATION_TRANSFORM2,
+                        ANDROID_SENSOR_COLOR_TRANSFORM1,
+                        ANDROID_SENSOR_COLOR_TRANSFORM2,
+                        ANDROID_SENSOR_FORWARD_MATRIX1,
+                        ANDROID_SENSOR_FORWARD_MATRIX2,
+                };
+                res = removeAvailableKeys(c, sKeys,
+                        ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS);
+                if (res != OK) {
+                    ALOGE("%s: Failed to update REQUEST_AVAILABLE_CHARACTERISTICS_KEYS: %s (%d)",
+                            __FUNCTION__, strerror(-res), res);
+                    return res;
+                }
+
+                // ANDROID_REQUEST_AVAILABLE_REQUEST_KEYS
+                const std::vector<uint32_t> reqKeys = {
+                        ANDROID_COLOR_CORRECTION_MODE,
+                        ANDROID_COLOR_CORRECTION_TRANSFORM,
+                        ANDROID_COLOR_CORRECTION_GAINS,
+                };
+                res = removeAvailableKeys(c, reqKeys, ANDROID_REQUEST_AVAILABLE_REQUEST_KEYS);
+                if (res != OK) {
+                    ALOGE("%s: Failed to update REQUEST_AVAILABLE_REQUEST_KEYS: %s (%d)",
+                            __FUNCTION__, strerror(-res), res);
+                    return res;
+                }
+
+                // ANDROID_REQUEST_AVAILABLE_RESULT_KEYS
+                const std::vector<uint32_t> resKeys = {
+                        ANDROID_SENSOR_GREEN_SPLIT,
+                        ANDROID_SENSOR_NEUTRAL_COLOR_POINT,
+                        ANDROID_COLOR_CORRECTION_MODE,
+                        ANDROID_COLOR_CORRECTION_TRANSFORM,
+                        ANDROID_COLOR_CORRECTION_GAINS,
+                };
+                res = removeAvailableKeys(c, resKeys, ANDROID_REQUEST_AVAILABLE_RESULT_KEYS);
+                if (res != OK) {
+                    ALOGE("%s: Failed to update REQUEST_AVAILABLE_RESULT_KEYS: %s (%d)",
+                            __FUNCTION__, strerror(-res), res);
+                    return res;
+                }
+
+                // ANDROID_SENSOR_BLACK_LEVEL_PATTERN
+                camera_metadata_entry blEntry = c.find(ANDROID_SENSOR_BLACK_LEVEL_PATTERN);
+                for (size_t j = 1; j < blEntry.count; j++) {
+                    blEntry.data.i32[j] = blEntry.data.i32[0];
+                }
+            }
+        }
+    }
+    return res;
+}
+
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::removeAvailableKeys(
+        CameraMetadata& c, const std::vector<uint32_t>& keys, uint32_t keyTag) {
+    status_t res = OK;
+
+    camera_metadata_entry keysEntry = c.find(keyTag);
+    if (keysEntry.count == 0) {
+        ALOGE("%s: Failed to find tag %u: %s (%d)", __FUNCTION__, keyTag, strerror(-res), res);
+        return res;
+    }
+    std::vector<int32_t> vKeys;
+    vKeys.reserve(keysEntry.count);
+    for (size_t i = 0; i < keysEntry.count; i++) {
+        if (std::find(keys.begin(), keys.end(), keysEntry.data.i32[i]) == keys.end()) {
+            vKeys.push_back(keysEntry.data.i32[i]);
+        }
+    }
+    res = c.update(keyTag, vKeys.data(), vKeys.size());
+    return res;
+}
+
 bool CameraProviderManager::isLogicalCamera(const std::string& id,
         std::vector<std::string>* physicalCameraIds) {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
@@ -1129,6 +1225,12 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
     if (status != Status::OK) {
         ALOGE("%s: Unable to get camera characteristics for device %s: %s (%d)",
                 __FUNCTION__, mId.c_str(), CameraProviderManager::statusToString(status), status);
+        return;
+    }
+    status_t res = fixupMonochromeTags();
+    if (OK != res) {
+        ALOGE("%s: Unable to fix up monochrome tags based for older HAL version: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
         return;
     }
     camera_metadata_entry flashAvailable =

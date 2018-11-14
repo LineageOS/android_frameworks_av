@@ -23,6 +23,8 @@
 #include <android/hardware/drm/1.0/IDrmPluginListener.h>
 #include <android/hardware/drm/1.1/IDrmFactory.h>
 #include <android/hardware/drm/1.1/IDrmPlugin.h>
+#include <android/hardware/drm/1.2/IDrmFactory.h>
+#include <android/hardware/drm/1.2/IDrmPlugin.h>
 
 #include <media/MediaAnalyticsItem.h>
 #include <mediadrm/DrmMetrics.h>
@@ -36,6 +38,7 @@ using drm::V1_0::IDrmFactory;
 using drm::V1_0::IDrmPlugin;
 using drm::V1_0::IDrmPluginListener;
 using drm::V1_0::KeyStatus;
+using drm::V1_2::OfflineLicenseState;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
@@ -113,6 +116,11 @@ struct DrmHal : public BnDrm,
     virtual status_t getSecurityLevel(Vector<uint8_t> const &sessionId,
             DrmPlugin::SecurityLevel *level) const;
 
+    virtual status_t getOfflineLicenseKeySetIds(List<Vector<uint8_t>> &keySetIds) const;
+    virtual status_t removeOfflineLicense(Vector<uint8_t> const &keySetId);
+    virtual status_t getOfflineLicenseState(Vector<uint8_t> const &keySetId,
+            DrmPlugin::OfflineLicenseState *licenseState) const;
+
     virtual status_t getPropertyString(String8 const &name, String8 &value ) const;
     virtual status_t getPropertyByteArray(String8 const &name,
                                           Vector<uint8_t> &value ) const;
@@ -182,6 +190,7 @@ private:
     const Vector<sp<IDrmFactory>> mFactories;
     sp<IDrmPlugin> mPlugin;
     sp<drm::V1_1::IDrmPlugin> mPluginV1_1;
+    sp<drm::V1_2::IDrmPlugin> mPluginV1_2;
     String8 mAppPackageName;
 
     // Mutable to allow modification within GetPropertyByteArray.

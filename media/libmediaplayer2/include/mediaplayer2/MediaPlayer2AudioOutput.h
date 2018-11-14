@@ -41,8 +41,7 @@ public:
     MediaPlayer2AudioOutput(audio_session_t sessionId,
                             uid_t uid,
                             int pid,
-                            const audio_attributes_t * attr,
-                            std::vector<jobject>& routingDelegatesBackup);
+                            const jobject attributes);
     virtual ~MediaPlayer2AudioOutput();
 
     virtual bool ready() const {
@@ -59,6 +58,7 @@ public:
     virtual int64_t getPlayedOutDurationUs(int64_t nowUs) const;
     virtual status_t getFramesWritten(uint32_t *frameswritten) const;
     virtual audio_session_t getSessionId() const;
+    virtual void setSessionId(const audio_session_t id);
     virtual uint32_t getSampleRate() const;
     virtual int64_t getBufferDurationInUs() const;
 
@@ -76,7 +76,7 @@ public:
     virtual void flush();
     virtual void pause();
     virtual void close();
-    void setAudioAttributes(const audio_attributes_t * attributes);
+    void setAudioAttributes(const jobject attributes);
     virtual audio_stream_type_t getAudioStreamType() const;
 
     void setVolume(float volume);
@@ -99,7 +99,6 @@ public:
     virtual jobject getRoutedDevice();
     virtual status_t addAudioDeviceCallback(jobject routingDelegate);
     virtual status_t removeAudioDeviceCallback(jobject listener);
-    virtual void copyAudioDeviceCallback(std::vector<jobject>& routingDelegateTarget);
 
 private:
     static void setMinBufferCount();
@@ -112,7 +111,7 @@ private:
     AudioCallback           mCallback;
     void *                  mCallbackCookie;
     CallbackData *          mCallbackData;
-    audio_attributes_t *    mAttributes;
+    sp<JObjectHolder>       mAttributes;
     float                   mVolume;
     AudioPlaybackRate       mPlaybackRate;
     uint32_t                mSampleRateHz; // sample rate of the content, as set in open()

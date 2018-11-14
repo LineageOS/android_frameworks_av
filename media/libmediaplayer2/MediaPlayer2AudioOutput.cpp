@@ -60,7 +60,7 @@ status_t MediaPlayer2AudioOutput::dump(int fd, const Vector<String16>& args) con
 }
 
 MediaPlayer2AudioOutput::MediaPlayer2AudioOutput(audio_session_t sessionId, uid_t uid, int pid,
-        const audio_attributes_t* attr, std::vector<jobject>& routingDelegatesBackup)
+        const jobject attributes)
     : mCallback(nullptr),
       mCallbackCookie(nullptr),
       mCallbackData(nullptr),
@@ -76,22 +76,13 @@ MediaPlayer2AudioOutput::MediaPlayer2AudioOutput(audio_session_t sessionId, uid_
       mAuxEffectId(0),
       mFlags(AUDIO_OUTPUT_FLAG_NONE) {
     ALOGV("MediaPlayer2AudioOutput(%d)", sessionId);
-    if (attr != nullptr) {
-        mAttributes = (audio_attributes_t *) calloc(1, sizeof(audio_attributes_t));
-        if (mAttributes != nullptr) {
-            memcpy(mAttributes, attr, sizeof(audio_attributes_t));
-        }
-    } else {
-        mAttributes = nullptr;
+
+    if (attributes != nullptr) {
+        mAttributes = new JObjectHolder(attributes);
     }
 
     setMinBufferCount();
     mRoutingDelegates.clear();
-    for (auto routingDelegate : routingDelegatesBackup) {
-        mRoutingDelegates.push_back(std::pair<jobject, jobject>(
-                JAudioTrack::getListener(routingDelegate), routingDelegate));
-    }
-    routingDelegatesBackup.clear();
 }
 
 MediaPlayer2AudioOutput::~MediaPlayer2AudioOutput() {
@@ -99,7 +90,6 @@ MediaPlayer2AudioOutput::~MediaPlayer2AudioOutput() {
         JAudioTrack::removeGlobalRef(routingDelegate.second);
     }
     close();
-    free(mAttributes);
     delete mCallbackData;
 }
 
@@ -251,16 +241,10 @@ status_t MediaPlayer2AudioOutput::getFramesWritten(uint32_t *frameswritten) cons
     return status;
 }
 
-void MediaPlayer2AudioOutput::setAudioAttributes(const audio_attributes_t * attributes) {
+void MediaPlayer2AudioOutput::setAudioAttributes(const jobject attributes) {
     Mutex::Autolock lock(mLock);
-    if (attributes == nullptr) {
-        free(mAttributes);
-        mAttributes = nullptr;
-    } else {
-        if (mAttributes == nullptr) {
-            mAttributes = (audio_attributes_t *) calloc(1, sizeof(audio_attributes_t));
-        }
-        memcpy(mAttributes, attributes, sizeof(audio_attributes_t));
+    if (attributes != nullptr) {
+        sp<JObjectHolder> x = new JObjectHolder(attributes);
     }
 }
 
@@ -325,7 +309,7 @@ status_t MediaPlayer2AudioOutput::open(
                  newcbd,
                  frameCount,
                  mSessionId,
-                 mAttributes,
+                 mAttributes != nullptr ? mAttributes->getJObject() : nullptr,
                  1.0f);  // default value for maxRequiredSpeed
     } else {
         // TODO: Due to buffer memory concerns, we use a max target playback speed
@@ -344,7 +328,7 @@ status_t MediaPlayer2AudioOutput::open(
                  nullptr,
                  frameCount,
                  mSessionId,
-                 mAttributes,
+                 mAttributes != nullptr ? mAttributes->getJObject() : nullptr,
                  targetSpeed);
     }
 
@@ -569,15 +553,6 @@ status_t MediaPlayer2AudioOutput::removeAudioDeviceCallback(jobject listener) {
     return NO_ERROR;
 }
 
-void MediaPlayer2AudioOutput::copyAudioDeviceCallback(
-        std::vector<jobject>& routingDelegateTarget) {
-    ALOGV("copyAudioDeviceCallback");
-    for (std::vector<std::pair<jobject, jobject>>::iterator it = mRoutingDelegates.begin();
-            it != mRoutingDelegates.end(); it++) {
-        routingDelegateTarget.push_back(it->second);
-    }
-}
-
 // static
 void MediaPlayer2AudioOutput::CallbackWrapper(
         int event, void *cookie, void *info) {
@@ -653,6 +628,11 @@ void MediaPlayer2AudioOutput::CallbackWrapper(
 audio_session_t MediaPlayer2AudioOutput::getSessionId() const {
     Mutex::Autolock lock(mLock);
     return mSessionId;
+}
+
+void MediaPlayer2AudioOutput::setSessionId(const audio_session_t id) {
+    Mutex::Autolock lock(mLock);
+    mSessionId = id;
 }
 
 uint32_t MediaPlayer2AudioOutput::getSampleRate() const {
