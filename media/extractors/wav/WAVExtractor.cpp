@@ -22,9 +22,7 @@
 
 #include <android/binder_ibinder.h> // for AIBinder_getCallingUid
 #include <audio_utils/primitives.h>
-#include <media/DataSourceBase.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
@@ -68,7 +66,7 @@ static uint16_t U16_LE_AT(const uint8_t *ptr) {
     return ptr[1] << 8 | ptr[0];
 }
 
-struct WAVSource : public MediaTrackHelperV2 {
+struct WAVSource : public MediaTrackHelperV3 {
     WAVSource(
             DataSourceHelper *dataSource,
             AMediaFormat *meta,
@@ -81,7 +79,7 @@ struct WAVSource : public MediaTrackHelperV2 {
     virtual media_status_t getFormat(AMediaFormat *meta);
 
     virtual media_status_t read(
-            MediaBufferBase **buffer, const ReadOptions *options = NULL);
+            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
 
     virtual bool supportNonblockingRead() { return true; }
 
@@ -101,7 +99,6 @@ private:
     off64_t mOffset;
     size_t mSize;
     bool mStarted;
-    MediaBufferGroup *mGroup;
     off64_t mCurrentPos;
 
     WAVSource(const WAVSource &);
@@ -134,7 +131,7 @@ size_t WAVExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrackHelperV2 *WAVExtractor::getTrack(size_t index) {
+MediaTrackHelperV3 *WAVExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index > 0) {
         return NULL;
     }
@@ -379,14 +376,14 @@ WAVSource::WAVSource(
       mOutputFloat(outputFloat),
       mOffset(offset),
       mSize(size),
-      mStarted(false),
-      mGroup(NULL) {
+      mStarted(false) {
     CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, &mSampleRate));
     CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, &mNumChannels));
     CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_BITS_PER_SAMPLE, &mBitsPerSample));
 }
 
 WAVSource::~WAVSource() {
+    ALOGI("~WAVSource");
     if (mStarted) {
         stop();
     }
@@ -398,7 +395,9 @@ media_status_t WAVSource::start() {
     CHECK(!mStarted);
 
     // some WAV files may have large audio buffers that use shared memory transfer.
-    mGroup = new MediaBufferGroup(4 /* buffers */, kMaxFrameSize);
+    if (!mBufferGroup->init(4 /* buffers */, kMaxFrameSize)) {
+        return AMEDIA_ERROR_UNKNOWN;
+    }
 
     mCurrentPos = mOffset;
 
@@ -411,9 +410,6 @@ media_status_t WAVSource::stop() {
     ALOGV("WAVSource::stop");
 
     CHECK(mStarted);
-
-    delete mGroup;
-    mGroup = NULL;
 
     mStarted = false;
 
@@ -433,10 +429,10 @@ media_status_t WAVSource::getFormat(AMediaFormat *meta) {
 }
 
 media_status_t WAVSource::read(
-        MediaBufferBase **out, const ReadOptions *options) {
+        MediaBufferHelperV3 **out, const ReadOptions *options) {
     *out = NULL;
 
-    if (options != nullptr && options->getNonBlocking() && !mGroup->has_buffers()) {
+    if (options != nullptr && options->getNonBlocking() && !mBufferGroup->has_buffers()) {
         return AMEDIA_ERROR_WOULD_BLOCK;
     }
 
@@ -459,10 +455,10 @@ media_status_t WAVSource::read(
         mCurrentPos = pos + mOffset;
     }
 
-    MediaBufferBase *buffer;
-    status_t err = mGroup->acquire_buffer(&buffer);
+    MediaBufferHelperV3 *buffer;
+    media_status_t err = mBufferGroup->acquire_buffer(&buffer);
     if (err != OK) {
-        return AMEDIA_ERROR_UNKNOWN;
+        return err;
     }
 
     // maxBytesToRead may be reduced so that in-place data conversion will fit in buffer size.
@@ -573,9 +569,10 @@ media_status_t WAVSource::read(
                 / (mNumChannels * bytesPerSample) / mSampleRate;
     }
 
-    buffer->meta_data().setInt64(kKeyTime, timeStampUs);
+    AMediaFormat *meta = buffer->meta_data();
+    AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_TIME_US, timeStampUs);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
 
-    buffer->meta_data().setInt32(kKeyIsSyncFrame, 1);
     mCurrentPos += n;
 
     *out = buffer;
@@ -585,13 +582,13 @@ media_status_t WAVSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static CMediaExtractorV2* CreateExtractor(
+static CMediaExtractorV3* CreateExtractor(
         CDataSource *source,
         void *) {
-    return wrapV2(new WAVExtractor(new DataSourceHelper(source)));
+    return wrapV3(new WAVExtractor(new DataSourceHelper(source)));
 }
 
-static CreatorFuncV2 Sniff(
+static CreatorFuncV3 Sniff(
         CDataSource *source,
         float *confidence,
         void **,
@@ -625,11 +622,11 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION_CURRENT,
+        EXTRACTORDEF_VERSION_CURRENT + 1,
         UUID("7d613858-5837-4a38-84c5-332d1cddee27"),
         1, // version
         "WAV Extractor",
-        { .v2 = Sniff }
+        { .v3 = Sniff }
     };
 }
 

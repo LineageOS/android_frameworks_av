@@ -155,4 +155,76 @@ bool MediaTrackCUnwrapperV2::supportNonblockingRead() {
     return wrapper->supportsNonBlockingRead(wrapper->data);
 }
 
+/* -------------- unwrapper v3 --------------- */
+
+MediaTrackCUnwrapperV3::MediaTrackCUnwrapperV3(CMediaTrackV3 *cmediatrack3) {
+    wrapper = cmediatrack3;
+    bufferGroup = nullptr;
+}
+
+MediaTrackCUnwrapperV3::~MediaTrackCUnwrapperV3() {
+    wrapper->free(wrapper->data);
+    free(wrapper);
+}
+
+status_t MediaTrackCUnwrapperV3::start() {
+    if (bufferGroup == nullptr) {
+        bufferGroup = new MediaBufferGroup();
+    }
+    return reverse_translate_error(wrapper->start(wrapper->data, bufferGroup->wrap()));
+}
+
+status_t MediaTrackCUnwrapperV3::stop() {
+    return reverse_translate_error(wrapper->stop(wrapper->data));
+}
+
+status_t MediaTrackCUnwrapperV3::getFormat(MetaDataBase& format) {
+    sp<AMessage> msg = new AMessage();
+    AMediaFormat *tmpFormat =  AMediaFormat_fromMsg(&msg);
+    media_status_t ret = wrapper->getFormat(wrapper->data, tmpFormat);
+    sp<MetaData> newMeta = new MetaData();
+    convertMessageToMetaData(msg, newMeta);
+    delete tmpFormat;
+    format = *newMeta;
+    return reverse_translate_error(ret);
+}
+
+status_t MediaTrackCUnwrapperV3::read(MediaBufferBase **buffer, const ReadOptions *options) {
+
+    uint32_t opts = 0;
+
+    if (options && options->getNonBlocking()) {
+        opts |= CMediaTrackReadOptions::NONBLOCKING;
+    }
+
+    int64_t seekPosition = 0;
+    MediaTrack::ReadOptions::SeekMode seekMode;
+    if (options && options->getSeekTo(&seekPosition, &seekMode)) {
+        opts |= SEEK;
+        opts |= (uint32_t) seekMode;
+    }
+    CMediaBufferV3 *buf = nullptr;
+    media_status_t ret = wrapper->read(wrapper->data, &buf, opts, seekPosition);
+    if (ret == AMEDIA_OK && buf != nullptr) {
+        *buffer = (MediaBufferBase*)buf->handle;
+        MetaDataBase &meta = (*buffer)->meta_data();
+        AMediaFormat *format = buf->meta_data(buf->handle);
+        // only convert the keys we're actually expecting, as doing
+        // the full convertMessageToMetadata() for every buffer is
+        // too expensive
+        int64_t val;
+        if (format->mFormat->findInt64("timeUs", &val)) {
+            meta.setInt64(kKeyTime, val);
+        }
+    } else {
+        *buffer = nullptr;
+    }
+
+    return reverse_translate_error(ret);
+}
+
+bool MediaTrackCUnwrapperV3::supportNonblockingRead() {
+    return wrapper->supportsNonBlockingRead(wrapper->data);
+}
+
 }  // namespace android

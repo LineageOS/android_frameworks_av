@@ -44,12 +44,16 @@ struct MediaBufferGroup::InternalData {
 };
 
 MediaBufferGroup::MediaBufferGroup(size_t growthLimit)
-    : mInternal(new InternalData()) {
+    : mWrapper(nullptr), mInternal(new InternalData()) {
     mInternal->mGrowthLimit = growthLimit;
 }
 
 MediaBufferGroup::MediaBufferGroup(size_t buffers, size_t buffer_size, size_t growthLimit)
-    : mInternal(new InternalData()) {
+    : mWrapper(nullptr), mInternal(new InternalData()) {
+    init(buffers, buffer_size, growthLimit);
+}
+
+void MediaBufferGroup::init(size_t buffers, size_t buffer_size, size_t growthLimit) {
     mInternal->mGrowthLimit = growthLimit;
 
     if (mInternal->mGrowthLimit > 0 && buffers > mInternal->mGrowthLimit) {

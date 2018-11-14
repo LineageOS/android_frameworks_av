@@ -17,7 +17,6 @@
 #ifndef SOFT_MPEG4_ENCODER_H_
 #define SOFT_MPEG4_ENCODER_H_
 
-#include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/omx/SoftVideoEncoderOMXComponent.h>
 #include "mp4enc_api.h"

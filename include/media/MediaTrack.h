@@ -23,6 +23,7 @@
 #include <binder/IMemory.h>
 #include <binder/MemoryDealer.h>
 #include <media/MediaExtractorPluginApi.h>
+#include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
 #include <media/MediaExtractorPluginApi.h>
@@ -173,6 +174,25 @@ protected:
 
 private:
     CMediaTrackV2 *wrapper;
+};
+
+class MediaTrackCUnwrapperV3 : public MediaTrack {
+public:
+    explicit MediaTrackCUnwrapperV3(CMediaTrackV3 *wrapper);
+
+    virtual status_t start();
+    virtual status_t stop();
+    virtual status_t getFormat(MetaDataBase& format);
+    virtual status_t read(MediaBufferBase **buffer, const ReadOptions *options = NULL);
+
+    virtual bool supportNonblockingRead();
+
+protected:
+    virtual ~MediaTrackCUnwrapperV3();
+
+private:
+    CMediaTrackV3 *wrapper;
+    MediaBufferGroup *bufferGroup;
 };
 
 }  // namespace android

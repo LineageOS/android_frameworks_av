@@ -69,6 +69,40 @@ struct CMediaTrackV2 {
     bool     (*supportsNonBlockingRead)(void *data);
 };
 
+/**
+ * only use CMediaBufferV3 allocated from the CMediaBufferGroupV3 that is
+ * provided to CMediaTrack::start()
+ */
+struct CMediaBufferV3 {
+    void *handle;
+    void (*release)(void *handle);
+    void* (*data)(void *handle);
+    size_t (*size)(void *handle);
+    size_t (*range_offset)(void *handle);
+    size_t (*range_length)(void *handle);
+    void (*set_range)(void *handle, size_t offset, size_t length);
+    AMediaFormat* (*meta_data)(void *handle);
+};
+
+struct CMediaBufferGroupV3 {
+    void *handle;
+    bool (*init)(void *handle, size_t buffers, size_t buffer_size, size_t growthLimit);
+    void (*add_buffer)(void *handle, size_t size);
+    media_status_t (*acquire_buffer)(void *handle,
+            CMediaBufferV3 **buffer, bool nonBlocking, size_t requestedSize);
+    bool (*has_buffers)(void *handle);
+};
+
+struct CMediaTrackV3 {
+    void *data;
+    void (*free)(void *data);
+
+    media_status_t (*start)(void *data, CMediaBufferGroupV3 *bufferGroup);
+    media_status_t (*stop)(void *data);
+    media_status_t (*getFormat)(void *data, AMediaFormat *format);
+    media_status_t (*read)(void *data, CMediaBufferV3 **buffer, uint32_t options, int64_t seekPosUs);
+    bool     (*supportsNonBlockingRead)(void *data);
+};
 
 struct CMediaExtractorV1 {
     void *data;
@@ -104,6 +138,23 @@ struct CMediaExtractorV2 {
     const char * (*name)(void *data);
 };
 
+struct CMediaExtractorV3 {
+    void *data;
+
+    void (*free)(void *data);
+    size_t (*countTracks)(void *data);
+    CMediaTrackV3* (*getTrack)(void *data, size_t index);
+    media_status_t (*getTrackMetaData)(
+            void *data,
+            AMediaFormat *meta,
+            size_t index, uint32_t flags);
+
+    media_status_t (*getMetaData)(void *data, AMediaFormat *meta);
+    uint32_t (*flags)(void *data);
+    media_status_t (*setMediaCas)(void *data, const uint8_t* casToken, size_t size);
+    const char * (*name)(void *data);
+};
+
 typedef CMediaExtractorV1* (*CreatorFuncV1)(CDataSource *source, void *meta);
 typedef void (*FreeMetaFunc)(void *meta);
 
@@ -118,6 +169,12 @@ typedef CreatorFuncV1 (*SnifferFuncV1)(
 typedef CMediaExtractorV2* (*CreatorFuncV2)(CDataSource *source, void *meta);
 
 typedef CreatorFuncV2 (*SnifferFuncV2)(
+        CDataSource *source, float *confidence,
+        void **meta, FreeMetaFunc *freeMeta);
+
+typedef CMediaExtractorV3* (*CreatorFuncV3)(CDataSource *source, void *meta);
+
+typedef CreatorFuncV3 (*SnifferFuncV3)(
         CDataSource *source, float *confidence,
         void **meta, FreeMetaFunc *freeMeta);
 
@@ -148,6 +205,7 @@ struct ExtractorDef {
     union {
         SnifferFuncV1 v1;
         SnifferFuncV2 v2;
+        SnifferFuncV3 v3;
     } sniff;
 };
 

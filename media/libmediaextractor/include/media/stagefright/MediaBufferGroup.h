@@ -20,6 +20,8 @@
 
 #include <list>
 
+#include <media/MediaExtractorPluginApi.h>
+#include <media/NdkMediaErrorPriv.h>
 #include <media/stagefright/MediaBufferBase.h>
 #include <utils/Errors.h>
 #include <utils/threads.h>
@@ -57,12 +59,54 @@ public:
     // If buffer is nullptr, have acquire_buffer() check for remote release.
     virtual void signalBufferReturned(MediaBufferBase *buffer);
 
+    CMediaBufferGroupV3 *wrap() {
+        if (mWrapper) {
+            return mWrapper;
+        }
+
+        mWrapper = new CMediaBufferGroupV3;
+        mWrapper->handle = this;
+
+        mWrapper->add_buffer = [](void *handle, size_t size) -> void {
+            MediaBufferBase *buf = MediaBufferBase::Create(size);
+            ((MediaBufferGroup*)handle)->add_buffer(buf);
+        };
+
+        mWrapper->init = [](void *handle,
+                size_t buffers, size_t buffer_size, size_t growthLimit) -> bool {
+            ((MediaBufferGroup*)handle)->init(buffers, buffer_size, growthLimit);
+          //  ((MediaBufferGroup*)handle)->mWrapper->init = nullptr; // enforce call-once
+            return true;
+        };
+
+        mWrapper->acquire_buffer = [](void *handle,
+                CMediaBufferV3 **buf, bool nonBlocking, size_t requestedSize) -> media_status_t {
+            MediaBufferBase *acquiredBuf = nullptr;
+            status_t err = ((MediaBufferGroup*)handle)->acquire_buffer(
+                    &acquiredBuf, nonBlocking, requestedSize);
+            if (err == OK && acquiredBuf != nullptr) {
+                *buf = acquiredBuf->wrap();
+            } else {
+                *buf = nullptr;
+            }
+            return translate_error(err);
+        };
+
+        mWrapper->has_buffers = [](void *handle) -> bool {
+            return ((MediaBufferGroup*)handle)->has_buffers();
+        };
+
+        return mWrapper;
+    }
+
 private:
+    CMediaBufferGroupV3 *mWrapper;
     struct InternalData;
     InternalData *mInternal;
 
     MediaBufferGroup(const MediaBufferGroup &);
     MediaBufferGroup &operator=(const MediaBufferGroup &);
+    void init(size_t buffers, size_t buffer_size, size_t growthLimit);
 };
 
 }  // namespace android
