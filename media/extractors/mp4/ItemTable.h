@@ -19,6 +19,8 @@
 
 #include <set>
 
+#include <media/NdkMediaFormat.h>
+
 #include <media/stagefright/foundation/ADebug.h>
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
@@ -51,7 +53,7 @@ public:
 
     bool isValid() { return mImageItemsValid; }
     uint32_t countImages() const;
-    sp<MetaData> getImageMeta(const uint32_t imageIndex);
+    AMediaFormat *getImageMeta(const uint32_t imageIndex);
     status_t findImageItem(const uint32_t imageIndex, uint32_t *itemIndex);
     status_t findThumbnailItem(const uint32_t imageIndex, uint32_t *itemIndex);
     status_t getImageOffsetAndSize(

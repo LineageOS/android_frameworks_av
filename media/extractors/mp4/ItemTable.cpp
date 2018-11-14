@@ -1477,7 +1477,7 @@ uint32_t ItemTable::countImages() const {
     return mImageItemsValid ? mDisplayables.size() : 0;
 }
 
-sp<MetaData> ItemTable::getImageMeta(const uint32_t imageIndex) {
+AMediaFormat *ItemTable::getImageMeta(const uint32_t imageIndex) {
     if (!mImageItemsValid) {
         return NULL;
     }
@@ -1502,28 +1502,31 @@ sp<MetaData> ItemTable::getImageMeta(const uint32_t imageIndex) {
         }
     }
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC);
+    AMediaFormat *meta = AMediaFormat_new();
+    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC);
 
     if (image->itemId == mPrimaryItemId) {
-        meta->setInt32(kKeyTrackIsDefault, 1);
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_DEFAULT, 1);
     }
 
     ALOGV("image[%u]: size %dx%d", imageIndex, image->width, image->height);
 
-    meta->setInt32(kKeyWidth, image->width);
-    meta->setInt32(kKeyHeight, image->height);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_WIDTH, image->width);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_HEIGHT, image->height);
     if (image->rotation != 0) {
         // Rotation angle in HEIF is CCW, convert to CW here to be
         // consistent with the other media formats.
         switch(image->rotation) {
-            case 90: meta->setInt32(kKeyRotation, 270); break;
-            case 180: meta->setInt32(kKeyRotation, 180); break;
-            case 270: meta->setInt32(kKeyRotation, 90); break;
+            case 90:
+            case 180:
+            case 270:
+                AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_ROTATION, 360 - image->rotation);
+                break;
             default: break; // don't set if invalid
         }
     }
-    meta->setInt32(kKeyMaxInputSize, image->width * image->height * 1.5);
+    AMediaFormat_setInt32(meta,
+            AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, image->width * image->height * 1.5);
 
     if (!image->thumbnails.empty()) {
         ssize_t thumbItemIndex = mItemIdToItemMap.indexOfKey(image->thumbnails[0]);
@@ -1531,10 +1534,12 @@ sp<MetaData> ItemTable::getImageMeta(const uint32_t imageIndex) {
             const ImageItem &thumbnail = mItemIdToItemMap[thumbItemIndex];
 
             if (thumbnail.hvcc != NULL) {
-                meta->setInt32(kKeyThumbnailWidth, thumbnail.width);
-                meta->setInt32(kKeyThumbnailHeight, thumbnail.height);
-                meta->setData(kKeyThumbnailHVCC, kTypeHVCC,
-                        thumbnail.hvcc->data(), thumbnail.hvcc->size());
+                AMediaFormat_setInt32(meta,
+                        AMEDIAFORMAT_KEY_THUMBNAIL_WIDTH, thumbnail.width);
+                AMediaFormat_setInt32(meta,
+                        AMEDIAFORMAT_KEY_THUMBNAIL_HEIGHT, thumbnail.height);
+                AMediaFormat_setBuffer(meta,
+                        AMEDIAFORMAT_KEY_CSD_HEVC, thumbnail.hvcc->data(), thumbnail.hvcc->size());
                 ALOGV("image[%u]: thumbnail: size %dx%d, item index %zd",
                         imageIndex, thumbnail.width, thumbnail.height, thumbItemIndex);
             } else {
@@ -1546,24 +1551,30 @@ sp<MetaData> ItemTable::getImageMeta(const uint32_t imageIndex) {
     }
 
     if (image->isGrid()) {
-        meta->setInt32(kKeyGridRows, image->rows);
-        meta->setInt32(kKeyGridCols, image->columns);
-
+        AMediaFormat_setInt32(meta,
+                AMEDIAFORMAT_KEY_GRID_ROWS, image->rows);
+        AMediaFormat_setInt32(meta,
+                AMEDIAFORMAT_KEY_GRID_COLUMNS, image->columns);
         // point image to the first tile for grid size and HVCC
         image = &mItemIdToItemMap.editValueAt(tileItemIndex);
-        meta->setInt32(kKeyTileWidth, image->width);
-        meta->setInt32(kKeyTileHeight, image->height);
-        meta->setInt32(kKeyMaxInputSize, image->width * image->height * 1.5);
+        AMediaFormat_setInt32(meta,
+                AMEDIAFORMAT_KEY_TILE_WIDTH, image->width);
+        AMediaFormat_setInt32(meta,
+                AMEDIAFORMAT_KEY_TILE_HEIGHT, image->height);
+        AMediaFormat_setInt32(meta,
+                AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, image->width * image->height * 1.5);
     }
 
     if (image->hvcc == NULL) {
         ALOGE("%s: hvcc is missing for image[%u]!", __FUNCTION__, imageIndex);
         return NULL;
     }
-    meta->setData(kKeyHVCC, kTypeHVCC, image->hvcc->data(), image->hvcc->size());
+    AMediaFormat_setBuffer(meta,
+            AMEDIAFORMAT_KEY_CSD_HEVC, image->hvcc->data(), image->hvcc->size());
 
     if (image->icc != NULL) {
-        meta->setData(kKeyIccProfile, 0, image->icc->data(), image->icc->size());
+        AMediaFormat_setBuffer(meta,
+                AMEDIAFORMAT_KEY_ICC_PROFILE, image->icc->data(), image->icc->size());
     }
     return meta;
 }
