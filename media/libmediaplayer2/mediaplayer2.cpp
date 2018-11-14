@@ -258,6 +258,8 @@ MediaPlayer2::MediaPlayer2() {
     // TODO: get pid and uid from JAVA
     mPid = IPCThreadState::self()->getCallingPid();
     mUid = IPCThreadState::self()->getCallingUid();
+
+    mAudioOutput = new MediaPlayer2AudioOutput(mAudioSessionId, mUid, mPid, NULL /*attributes*/);
 }
 
 MediaPlayer2::~MediaPlayer2() {
@@ -352,14 +354,7 @@ status_t MediaPlayer2::setDataSource(const sp<DataSourceDesc> &dsd) {
 
         clear_l();
 
-        if (mAudioOutput != NULL) {
-            mAudioOutput->copyAudioDeviceCallback(mRoutingDelegates);
-        }
-
         player->setListener(new proxyListener(this));
-        mAudioOutput = new MediaPlayer2AudioOutput(mAudioSessionId, mUid,
-                mPid, mAudioAttributes != NULL ? mAudioAttributes->getJObject() : NULL,
-                mRoutingDelegates);
         player->setAudioSink(mAudioOutput);
 
         err = player->setDataSource(dsd);
@@ -911,6 +906,9 @@ status_t MediaPlayer2::setAudioSessionId(audio_session_t sessionId) {
         AudioSystem::releaseAudioSessionId(mAudioSessionId, -1);
         mAudioSessionId = sessionId;
     }
+    if (mAudioOutput != NULL && mAudioSessionId != mAudioOutput->getSessionId()) {
+        mAudioOutput->setSessionId(sessionId);
+    }
     return NO_ERROR;
 }
 
@@ -1184,7 +1182,6 @@ status_t MediaPlayer2::addAudioDeviceCallback(jobject routingDelegate) {
     Mutex::Autolock _l(mLock);
     if (mAudioOutput == NULL) {
         ALOGV("addAudioDeviceCallback: player not init");
-        mRoutingDelegates.push_back(routingDelegate);
         return NO_INIT;
     }
     return mAudioOutput->addAudioDeviceCallback(routingDelegate);

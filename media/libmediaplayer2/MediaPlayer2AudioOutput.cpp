@@ -60,7 +60,7 @@ status_t MediaPlayer2AudioOutput::dump(int fd, const Vector<String16>& args) con
 }
 
 MediaPlayer2AudioOutput::MediaPlayer2AudioOutput(audio_session_t sessionId, uid_t uid, int pid,
-        const jobject attributes, std::vector<jobject>& routingDelegatesBackup)
+        const jobject attributes)
     : mCallback(nullptr),
       mCallbackCookie(nullptr),
       mCallbackData(nullptr),
@@ -77,20 +77,12 @@ MediaPlayer2AudioOutput::MediaPlayer2AudioOutput(audio_session_t sessionId, uid_
       mFlags(AUDIO_OUTPUT_FLAG_NONE) {
     ALOGV("MediaPlayer2AudioOutput(%d)", sessionId);
 
-    if (mAttributes != nullptr) {
-        mAttributes->~JObjectHolder();
-    }
     if (attributes != nullptr) {
         mAttributes = new JObjectHolder(attributes);
     }
 
     setMinBufferCount();
     mRoutingDelegates.clear();
-    for (auto routingDelegate : routingDelegatesBackup) {
-        mRoutingDelegates.push_back(std::pair<jobject, jobject>(
-                JAudioTrack::getListener(routingDelegate), routingDelegate));
-    }
-    routingDelegatesBackup.clear();
 }
 
 MediaPlayer2AudioOutput::~MediaPlayer2AudioOutput() {
@@ -251,11 +243,8 @@ status_t MediaPlayer2AudioOutput::getFramesWritten(uint32_t *frameswritten) cons
 
 void MediaPlayer2AudioOutput::setAudioAttributes(const jobject attributes) {
     Mutex::Autolock lock(mLock);
-    if (mAttributes != nullptr) {
-        mAttributes->~JObjectHolder();
-    }
     if (attributes != nullptr) {
-        mAttributes = new JObjectHolder(attributes);
+        sp<JObjectHolder> x = new JObjectHolder(attributes);
     }
 }
 
@@ -564,15 +553,6 @@ status_t MediaPlayer2AudioOutput::removeAudioDeviceCallback(jobject listener) {
     return NO_ERROR;
 }
 
-void MediaPlayer2AudioOutput::copyAudioDeviceCallback(
-        std::vector<jobject>& routingDelegateTarget) {
-    ALOGV("copyAudioDeviceCallback");
-    for (std::vector<std::pair<jobject, jobject>>::iterator it = mRoutingDelegates.begin();
-            it != mRoutingDelegates.end(); it++) {
-        routingDelegateTarget.push_back(it->second);
-    }
-}
-
 // static
 void MediaPlayer2AudioOutput::CallbackWrapper(
         int event, void *cookie, void *info) {
@@ -648,6 +628,11 @@ void MediaPlayer2AudioOutput::CallbackWrapper(
 audio_session_t MediaPlayer2AudioOutput::getSessionId() const {
     Mutex::Autolock lock(mLock);
     return mSessionId;
+}
+
+void MediaPlayer2AudioOutput::setSessionId(const audio_session_t id) {
+    Mutex::Autolock lock(mLock);
+    mSessionId = id;
 }
 
 uint32_t MediaPlayer2AudioOutput::getSampleRate() const {

@@ -26,7 +26,6 @@
 #include <mediaplayer2/MediaPlayer2Types.h>
 #include <mediaplayer2/JObjectHolder.h>
 
-#include <vector>
 #include <jni.h>
 #include <utils/Errors.h>
 #include <utils/Mutex.h>
@@ -154,7 +153,6 @@ private:
     audio_session_t             mAudioSessionId;
     sp<JObjectHolder>           mAudioAttributes;
     float                       mSendLevel;
-    std::vector<jobject>        mRoutingDelegates;
     sp<ANativeWindowWrapper>    mConnectedWindow;
 };
 
