@@ -243,9 +243,7 @@ status_t MediaPlayer2AudioOutput::getFramesWritten(uint32_t *frameswritten) cons
 
 void MediaPlayer2AudioOutput::setAudioAttributes(const jobject attributes) {
     Mutex::Autolock lock(mLock);
-    if (attributes != nullptr) {
-        sp<JObjectHolder> x = new JObjectHolder(attributes);
-    }
+    mAttributes = (attributes == nullptr) ? nullptr : new JObjectHolder(attributes);
 }
 
 audio_stream_type_t MediaPlayer2AudioOutput::getAudioStreamType() const {
