@@ -25,7 +25,7 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
 
 using ::android::sp;
@@ -38,7 +38,7 @@ void encodeBase64(const void *data, size_t size, std::string *out);
 void encodeBase64Url(const void *data, size_t size, std::string *out);
 
 } // namespace clearkey
-} // namespace V1_1
+} // namespace V1_2
 } // namespace drm
 } // namespace hardware
 } // namespace android

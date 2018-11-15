@@ -10,7 +10,7 @@
 //
 syntax = "proto2";
 
-package android.hardware.drm.V1_1.clearkey;
+package android.hardware.drm.V1_2.clearkey;
 
 // need this if we are using libprotobuf-cpp-2.3.0-lite
 option optimize_for = LITE_RUNTIME;

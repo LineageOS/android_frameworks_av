@@ -16,6 +16,7 @@ cc_defaults {
     shared_libs: [
         "liblog",
         "libmediaextractor",
+        "libmediandk"
     ],
 
     static_libs: [

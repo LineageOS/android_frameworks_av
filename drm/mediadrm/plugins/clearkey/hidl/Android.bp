@@ -15,7 +15,7 @@
 //
 
 cc_binary {
-    name: "android.hardware.drm@1.1-service.clearkey",
+    name: "android.hardware.drm@1.2-service.clearkey",
     vendor: true,
 
     srcs: [
@@ -39,11 +39,12 @@ cc_binary {
     relative_install_path: "hw",
 
     cflags: ["-Wall", "-Werror"],
-    init_rc: ["android.hardware.drm@1.1-service.clearkey.rc"],
+    init_rc: ["android.hardware.drm@1.2-service.clearkey.rc"],
 
     shared_libs: [
         "android.hardware.drm@1.0",
         "android.hardware.drm@1.1",
+        "android.hardware.drm@1.2",
         "libbase",
         "libbinder",
         "libcrypto",
@@ -69,7 +70,6 @@ cc_binary {
         integer_overflow: true,
     },
 }
-
 cc_library_static {
     name: "libclearkeydevicefiles-protos",
     vendor: true,

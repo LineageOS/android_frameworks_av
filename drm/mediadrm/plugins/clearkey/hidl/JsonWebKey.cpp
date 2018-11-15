@@ -36,7 +36,7 @@ const std::string kTemporaryLicenseSession("temporary");
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
 
 JsonWebKey::JsonWebKey() {
@@ -271,7 +271,7 @@ bool JsonWebKey::parseJsonWebKeySet(const std::string& jsonWebKeySet,
 }
 
 } // namespace clearkey
-} // namespace V1_1
+} // namespace V1_2
 } // namespace drm
 } // namespace hardware
 } // namespace android

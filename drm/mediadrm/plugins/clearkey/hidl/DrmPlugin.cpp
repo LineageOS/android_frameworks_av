@@ -58,8 +58,11 @@ std::vector<uint8_t> uint32ToVector(uint32_t value) {
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
+
+using ::android::hardware::drm::V1_2::KeySetId;
+using ::android::hardware::drm::V1_2::OfflineLicenseState;
 
 DrmPlugin::DrmPlugin(SessionLibrary* sessionLibrary)
         : mSessionLibrary(sessionLibrary),
@@ -625,6 +628,51 @@ Return<void> DrmPlugin::getMetrics(getMetrics_cb _hidl_cb) {
     return Void();
 }
 
+Return<void> DrmPlugin::getOfflineLicenseKeySetIds(getOfflineLicenseKeySetIds_cb _hidl_cb) {
+    std::vector<std::string> licenseNames = mFileHandle.ListLicenses();
+    std::vector<KeySetId> keySetIds;
+    for (const auto& name : licenseNames) {
+        std::vector<uint8_t> keySetId(name.begin(), name.end());
+        keySetIds.push_back(keySetId);
+    }
+    _hidl_cb(Status::OK, keySetIds);
+    return Void();
+}
+
+
+Return<Status> DrmPlugin::removeOfflineLicense(const KeySetId& keySetId) {
+    std::string licenseName(keySetId.begin(), keySetId.end());
+    if (mFileHandle.DeleteLicense(licenseName)) {
+        return Status::OK;
+    }
+    return Status::BAD_VALUE;
+}
+
+Return<void> DrmPlugin::getOfflineLicenseState(const KeySetId& keySetId,
+        getOfflineLicenseState_cb _hidl_cb) {
+    std::string licenseName(keySetId.begin(), keySetId.end());
+    DeviceFiles::LicenseState state;
+    std::string license;
+    OfflineLicenseState hLicenseState;
+    if (mFileHandle.RetrieveLicense(licenseName, &state, &license)) {
+        switch (state) {
+        case DeviceFiles::kLicenseStateActive:
+            hLicenseState = OfflineLicenseState::USABLE;
+            break;
+        case DeviceFiles::kLicenseStateReleasing:
+            hLicenseState = OfflineLicenseState::INACTIVE;
+            break;
+        case DeviceFiles::kLicenseStateUnknown:
+            hLicenseState = OfflineLicenseState::UNKNOWN;
+            break;
+        }
+        _hidl_cb(Status::OK, hLicenseState);
+    } else {
+        _hidl_cb(Status::BAD_VALUE, OfflineLicenseState::UNKNOWN);
+    }
+    return Void();
+}
+
 Return<void> DrmPlugin::getSecureStops(getSecureStops_cb _hidl_cb) {
     std::vector<SecureStop> stops;
     for (auto itr = mSecureStops.begin(); itr != mSecureStops.end(); ++itr) {
@@ -727,7 +775,7 @@ Return<Status> DrmPlugin::removeAllSecureStops() {
 }
 
 }  // namespace clearkey
-}  // namespace V1_1
+}  // namespace V1_2
 }  // namespace drm
 }  // namespace hardware
 }  // namespace android

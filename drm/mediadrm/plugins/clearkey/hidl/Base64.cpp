@@ -21,7 +21,7 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
 
 sp<Buffer> decodeBase64(const std::string &s) {
@@ -169,7 +169,7 @@ void encodeBase64Url(const void *_data, size_t size, std::string *out) {
 }
 
 } // namespace clearkey
-} // namespace V1_1
+} // namespace V1_2
 } // namespace drm
 } // namespace hardware
 } // namespace android
