@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 #include <media/NdkImageReader.h>
 #include <media/NdkImage.h>
+#include <mediautils/AImageReaderUtils.h>
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
 #include <NdkImageReaderPriv.h>
@@ -26,6 +27,8 @@
 namespace android {
 
 using hardware::graphics::bufferqueue::V1_0::utils::H2BGraphicBufferProducer;
+using aimg::AImageReader_getHGBPFromHandle;
+
 typedef IGraphicBufferProducer::QueueBufferInput QueueBufferInput;
 typedef IGraphicBufferProducer::QueueBufferOutput QueueBufferOutput;
 
