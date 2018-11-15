@@ -41,7 +41,6 @@ import android.media.SessionCommandGroup2;
 import android.media.SessionToken2;
 import android.media.VolumeProvider2;
 import android.media.update.MediaBrowser2Provider;
-import android.media.update.MediaControlView2Provider;
 import android.media.update.MediaController2Provider;
 import android.media.update.MediaItem2Provider;
 import android.media.update.MediaLibraryService2Provider.LibraryRootProvider;
@@ -54,16 +53,9 @@ import android.media.update.MediaSessionService2Provider;
 import android.media.update.MediaSessionService2Provider.MediaNotificationProvider;
 import android.media.update.SessionToken2Provider;
 import android.media.update.StaticProvider;
-import android.media.update.VideoView2Provider;
-import android.media.update.ViewGroupProvider;
 import android.media.update.VolumeProvider2Provider;
 import android.os.Bundle;
 import android.os.IInterface;
-import android.util.AttributeSet;
-import android.widget.MediaControlView2;
-import android.widget.VideoView2;
-
-import androidx.annotation.Nullable;
 
 import com.android.media.IMediaController2;
 import com.android.media.MediaBrowser2Impl;
@@ -78,8 +70,6 @@ import com.android.media.MediaSessionService2Impl;
 import com.android.media.Rating2Impl;
 import com.android.media.SessionToken2Impl;
 import com.android.media.VolumeProvider2Impl;
-import com.android.widget.MediaControlView2Impl;
-import com.android.widget.VideoView2Impl;
 
 import java.util.concurrent.Executor;
 
@@ -179,20 +169,6 @@ public final class ApiFactory implements StaticProvider {
     public LibraryRootProvider createMediaLibraryService2LibraryRoot(
             LibraryRoot instance, String rootId, Bundle extras) {
         return new LibraryRootImpl(instance, rootId, extras);
-    }
-
-    @Override
-    public MediaControlView2Provider createMediaControlView2(MediaControlView2 instance,
-            ViewGroupProvider superProvider, ViewGroupProvider privateProvider,
-            @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-        return new MediaControlView2Impl(instance, superProvider, privateProvider);
-    }
-
-    @Override
-    public VideoView2Provider createVideoView2(
-            VideoView2 instance, ViewGroupProvider superProvider, ViewGroupProvider privateProvider,
-            @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-        return new VideoView2Impl(instance, superProvider, privateProvider);
     }
 
     @Override
