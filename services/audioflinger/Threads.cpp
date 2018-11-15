@@ -3185,7 +3185,6 @@ bool AudioFlinger::PlaybackThread::threadLoop()
     if (mType == OFFLOAD || mType == DIRECT) {
         mTimestampVerifier.setDiscontinuityMode(mTimestampVerifier.DISCONTINUITY_MODE_ZERO);
     }
-    audio_utils::Statistics<double> downstreamLatencyStatMs(0.999 /* alpha */);
     audio_patch_handle_t lastDownstreamPatchHandle = AUDIO_PATCH_HANDLE_NONE;
 
     while (!exitPending())
@@ -3215,7 +3214,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                         downstreamPatchHandle = swPatches[0].getPatchHandle();
                 }
                 if (downstreamPatchHandle != lastDownstreamPatchHandle) {
-                    downstreamLatencyStatMs.reset();
+                    mDownstreamLatencyStatMs.reset();
                     lastDownstreamPatchHandle = downstreamPatchHandle;
                 }
                 if (status == OK) {
@@ -3229,14 +3228,14 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                         if (latencyMs < minLatency) latencyMs = minLatency;
                         else if (latencyMs > maxLatency) latencyMs = maxLatency;
                     }
-                    downstreamLatencyStatMs.add(latencyMs);
+                    mDownstreamLatencyStatMs.add(latencyMs);
                 }
                 mAudioFlinger->mLock.unlock();
             }
         } else {
             if (lastDownstreamPatchHandle != AUDIO_PATCH_HANDLE_NONE) {
                 // our device is no longer AUDIO_DEVICE_OUT_BUS, reset patch handle and stats.
-                downstreamLatencyStatMs.reset();
+                mDownstreamLatencyStatMs.reset();
                 lastDownstreamPatchHandle = AUDIO_PATCH_HANDLE_NONE;
             }
         }
@@ -3285,10 +3284,10 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                             (long long)timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]);
 
                     // Note: Downstream latency only added if timestamp correction enabled.
-                    if (downstreamLatencyStatMs.getN() > 0) { // we have latency info.
+                    if (mDownstreamLatencyStatMs.getN() > 0) { // we have latency info.
                         const int64_t newPosition =
                                 timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]
-                                - int64_t(downstreamLatencyStatMs.getMean() * mSampleRate * 1e-3);
+                                - int64_t(mDownstreamLatencyStatMs.getMean() * mSampleRate * 1e-3);
                         // prevent retrograde
                         timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL] = max(
                                 newPosition,
@@ -3747,6 +3746,15 @@ status_t AudioFlinger::PlaybackThread::getTimestamp_l(AudioTimestamp& timestamp)
         uint64_t position64;
         if (mOutput->getPresentationPosition(&position64, &timestamp.mTime) == OK) {
             timestamp.mPosition = (uint32_t)position64;
+            if (mDownstreamLatencyStatMs.getN() > 0) {
+                const uint32_t positionOffset =
+                    (uint32_t)(mDownstreamLatencyStatMs.getMean() * mSampleRate * 1e-3);
+                if (positionOffset > timestamp.mPosition) {
+                    timestamp.mPosition = 0;
+                } else {
+                    timestamp.mPosition -= positionOffset;
+                }
+            }
             return NO_ERROR;
         }
     }
