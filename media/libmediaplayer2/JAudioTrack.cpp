@@ -34,7 +34,7 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
         callback_t cbf,                               // Offload
         void* user,                                   // Offload
         size_t frameCount,                            // bufferSizeInBytes
-        audio_session_t sessionId,                    // AudioTrack
+        int32_t sessionId,                    // AudioTrack
         const jobject attributes,                     // AudioAttributes
         float maxRequiredSpeed) {                     // bufferSizeInBytes
 
@@ -496,11 +496,11 @@ jobject JAudioTrack::getRoutedDevice() {
     return env->CallObjectMethod(mAudioTrackObj, jGetRoutedDevice);
 }
 
-audio_session_t JAudioTrack::getAudioSessionId() {
+int32_t JAudioTrack::getAudioSessionId() {
     JNIEnv *env = JavaVMHelper::getJNIEnv();
     jmethodID jGetAudioSessionId = env->GetMethodID(mAudioTrackCls, "getAudioSessionId", "()I");
     jint sessionId = env->CallIntMethod(mAudioTrackObj, jGetAudioSessionId);
-    return (audio_session_t) sessionId;
+    return sessionId;
 }
 
 status_t JAudioTrack::setPreferredDevice(jobject device) {
