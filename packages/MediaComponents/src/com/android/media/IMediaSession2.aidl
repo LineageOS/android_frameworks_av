@@ -69,17 +69,4 @@ oneway interface IMediaSession2 {
     void skipToNextItem(IMediaController2 caller);
     void setRepeatMode(IMediaController2 caller, int repeatMode);
     void setShuffleMode(IMediaController2 caller, int shuffleMode);
-
-    //////////////////////////////////////////////////////////////////////////////////////////////
-    // library service specific
-    //////////////////////////////////////////////////////////////////////////////////////////////
-    void getLibraryRoot(IMediaController2 caller, in Bundle rootHints);
-    void getItem(IMediaController2 caller, String mediaId);
-    void getChildren(IMediaController2 caller, String parentId, int page, int pageSize,
-            in Bundle extras);
-    void search(IMediaController2 caller, String query, in Bundle extras);
-    void getSearchResult(IMediaController2 caller, String query, int page, int pageSize,
-            in Bundle extras);
-    void subscribe(IMediaController2 caller, String parentId, in Bundle extras);
-    void unsubscribe(IMediaController2 caller, String parentId);
 }

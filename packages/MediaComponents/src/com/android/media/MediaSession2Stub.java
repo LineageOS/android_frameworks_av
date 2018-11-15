@@ -20,7 +20,6 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.media.MediaController2;
 import android.media.MediaItem2;
-import android.media.MediaLibraryService2.LibraryRoot;
 import android.media.MediaMetadata2;
 import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.ControllerInfo;
@@ -43,7 +42,6 @@ import android.util.SparseArray;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.NonNull;
 
-import com.android.media.MediaLibraryService2Impl.MediaLibrarySessionImpl;
 import com.android.media.MediaSession2Impl.CommandButtonImpl;
 import com.android.media.MediaSession2Impl.CommandGroupImpl;
 import com.android.media.MediaSession2Impl.ControllerInfoImpl;
@@ -121,14 +119,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             Log.d(TAG, "Session is closed", new IllegalStateException());
         }
         return session;
-    }
-
-    private MediaLibrarySessionImpl getLibrarySession() throws IllegalStateException {
-        final MediaSession2Impl session = getSession();
-        if (!(session instanceof MediaLibrarySessionImpl)) {
-            throw new RuntimeException("Session isn't a library session");
-        }
-        return (MediaLibrarySessionImpl) session;
     }
 
     // Get controller if the command from caller to session is able to be handled.
@@ -254,24 +244,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
             runnable.run(session, controller);
         });
     }
-
-    private void onBrowserCommand(@NonNull IMediaController2 caller,
-            @NonNull LibrarySessionRunnable runnable) {
-        final MediaLibrarySessionImpl session = getLibrarySession();
-        // TODO(jaewan): Consider command code
-        final ControllerInfo controller = getControllerIfAble(caller);
-        if (session == null || controller == null) {
-            return;
-        }
-        session.getCallbackExecutor().execute(() -> {
-            // TODO(jaewan): Consider command code
-            if (getControllerIfAble(caller) == null) {
-                return;
-            }
-            runnable.run(session, controller);
-        });
-    }
-
 
     private void notifyAll(int commandCode, @NonNull NotifyRunnable runnable) {
         List<ControllerInfo> controllers = getControllers();
@@ -751,161 +723,6 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////
-    // AIDL methods for LibrarySession overrides
-    //////////////////////////////////////////////////////////////////////////////////////////////
-
-    @Override
-    public void getLibraryRoot(final IMediaController2 caller, final Bundle rootHints)
-            throws RuntimeException {
-        onBrowserCommand(caller, (session, controller) -> {
-            final LibraryRoot root = session.getCallback().onGetLibraryRoot(session.getInstance(),
-                    controller, rootHints);
-            notify(controller, (unused, iController) -> {
-                iController.onGetLibraryRootDone(rootHints,
-                        root == null ? null : root.getRootId(),
-                        root == null ? null : root.getExtras());
-            });
-        });
-    }
-
-    @Override
-    public void getItem(final IMediaController2 caller, final String mediaId)
-            throws RuntimeException {
-        onBrowserCommand(caller, (session, controller) -> {
-            if (mediaId == null) {
-                if (DEBUG) {
-                    Log.d(TAG, "mediaId shouldn't be null");
-                }
-                return;
-            }
-            final MediaItem2 result = session.getCallback().onGetItem(session.getInstance(),
-                    controller, mediaId);
-            notify(controller, (unused, iController) -> {
-                iController.onGetItemDone(mediaId, result == null ? null : result.toBundle());
-            });
-        });
-    }
-
-    @Override
-    public void getChildren(final IMediaController2 caller, final String parentId,
-            final int page, final int pageSize, final Bundle extras) throws RuntimeException {
-        onBrowserCommand(caller, (session, controller) -> {
-            if (parentId == null) {
-                if (DEBUG) {
-                    Log.d(TAG, "parentId shouldn't be null");
-                }
-                return;
-            }
-            if (page < 1 || pageSize < 1) {
-                if (DEBUG) {
-                    Log.d(TAG, "Neither page nor pageSize should be less than 1");
-                }
-                return;
-            }
-            List<MediaItem2> result = session.getCallback().onGetChildren(session.getInstance(),
-                    controller, parentId, page, pageSize, extras);
-            if (result != null && result.size() > pageSize) {
-                throw new IllegalArgumentException("onGetChildren() shouldn't return media items "
-                        + "more than pageSize. result.size()=" + result.size() + " pageSize="
-                        + pageSize);
-            }
-            final List<Bundle> bundleList;
-            if (result != null) {
-                bundleList = new ArrayList<>();
-                for (MediaItem2 item : result) {
-                    bundleList.add(item == null ? null : item.toBundle());
-                }
-            } else {
-                bundleList = null;
-            }
-            notify(controller, (unused, iController) -> {
-                iController.onGetChildrenDone(parentId, page, pageSize, bundleList, extras);
-            });
-        });
-    }
-
-    @Override
-    public void search(IMediaController2 caller, String query, Bundle extras) {
-        onBrowserCommand(caller, (session, controller) -> {
-            if (TextUtils.isEmpty(query)) {
-                Log.w(TAG, "search(): Ignoring empty query from " + controller);
-                return;
-            }
-            session.getCallback().onSearch(session.getInstance(), controller, query, extras);
-        });
-    }
-
-    @Override
-    public void getSearchResult(final IMediaController2 caller, final String query,
-            final int page, final int pageSize, final Bundle extras) {
-        onBrowserCommand(caller, (session, controller) -> {
-            if (TextUtils.isEmpty(query)) {
-                Log.w(TAG, "getSearchResult(): Ignoring empty query from " + controller);
-                return;
-            }
-            if (page < 1 || pageSize < 1) {
-                Log.w(TAG, "getSearchResult(): Ignoring negative page / pageSize."
-                        + " page=" + page + " pageSize=" + pageSize + " from " + controller);
-                return;
-            }
-            List<MediaItem2> result = session.getCallback().onGetSearchResult(session.getInstance(),
-                    controller, query, page, pageSize, extras);
-            if (result != null && result.size() > pageSize) {
-                throw new IllegalArgumentException("onGetSearchResult() shouldn't return media "
-                        + "items more than pageSize. result.size()=" + result.size() + " pageSize="
-                        + pageSize);
-            }
-            final List<Bundle> bundleList;
-            if (result != null) {
-                bundleList = new ArrayList<>();
-                for (MediaItem2 item : result) {
-                    bundleList.add(item == null ? null : item.toBundle());
-                }
-            } else {
-                bundleList = null;
-            }
-            notify(controller, (unused, iController) -> {
-                iController.onGetSearchResultDone(query, page, pageSize, bundleList, extras);
-            });
-        });
-    }
-
-    @Override
-    public void subscribe(final IMediaController2 caller, final String parentId,
-            final Bundle option) {
-        onBrowserCommand(caller, (session, controller) -> {
-            if (parentId == null) {
-                Log.w(TAG, "subscribe(): Ignoring null parentId from " + controller);
-                return;
-            }
-            session.getCallback().onSubscribe(session.getInstance(),
-                    controller, parentId, option);
-            synchronized (mLock) {
-                Set<String> subscription = mSubscriptions.get(controller);
-                if (subscription == null) {
-                    subscription = new HashSet<>();
-                    mSubscriptions.put(controller, subscription);
-                }
-                subscription.add(parentId);
-            }
-        });
-    }
-
-    @Override
-    public void unsubscribe(final IMediaController2 caller, final String parentId) {
-        onBrowserCommand(caller, (session, controller) -> {
-            if (parentId == null) {
-                Log.w(TAG, "unsubscribe(): Ignoring null parentId from " + controller);
-                return;
-            }
-            session.getCallback().onUnsubscribe(session.getInstance(), controller, parentId);
-            synchronized (mLock) {
-                mSubscriptions.remove(controller);
-            }
-        });
-    }
-
-    //////////////////////////////////////////////////////////////////////////////////////////////
     // APIs for MediaSession2Impl
     //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1055,55 +872,12 @@ public class MediaSession2Stub extends IMediaSession2.Stub {
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////
-    // APIs for MediaLibrarySessionImpl
-    //////////////////////////////////////////////////////////////////////////////////////////////
-
-    public void notifySearchResultChanged(ControllerInfo controller, String query, int itemCount,
-            Bundle extras) {
-        notify(controller, (unused, iController) -> {
-            iController.onSearchResultChanged(query, itemCount, extras);
-        });
-    }
-
-    public void notifyChildrenChangedNotLocked(ControllerInfo controller, String parentId,
-            int itemCount, Bundle extras) {
-        notify(controller, (unused, iController) -> {
-            if (isSubscribed(controller, parentId)) {
-                iController.onChildrenChanged(parentId, itemCount, extras);
-            }
-        });
-    }
-
-    public void notifyChildrenChangedNotLocked(String parentId, int itemCount, Bundle extras) {
-        notifyAll((controller, iController) -> {
-            if (isSubscribed(controller, parentId)) {
-                iController.onChildrenChanged(parentId, itemCount, extras);
-            }
-        });
-    }
-
-    private boolean isSubscribed(ControllerInfo controller, String parentId) {
-        synchronized (mLock) {
-            Set<String> subscriptions = mSubscriptions.get(controller);
-            if (subscriptions == null || !subscriptions.contains(parentId)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    //////////////////////////////////////////////////////////////////////////////////////////////
     // Misc
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     @FunctionalInterface
     private interface SessionRunnable {
         void run(final MediaSession2Impl session, final ControllerInfo controller);
-    }
-
-    @FunctionalInterface
-    private interface LibrarySessionRunnable {
-        void run(final MediaLibrarySessionImpl session, final ControllerInfo controller);
     }
 
     @FunctionalInterface

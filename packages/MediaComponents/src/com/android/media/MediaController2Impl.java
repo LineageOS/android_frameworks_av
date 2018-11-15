@@ -45,7 +45,6 @@ import android.media.MediaMetadata2;
 import android.media.MediaPlaylistAgent.RepeatMode;
 import android.media.MediaPlaylistAgent.ShuffleMode;
 import android.media.MediaSession2.CommandButton;
-import android.media.MediaSessionService2;
 import android.media.Rating2;
 import android.media.SessionCommand2;
 import android.media.SessionCommandGroup2;
@@ -154,64 +153,6 @@ public class MediaController2Impl implements MediaController2Provider {
             // Session
             mServiceConnection = null;
             connectToSession(SessionToken2Impl.from(mToken).getSessionBinder());
-        } else {
-            // Session service
-            if (Process.myUid() == Process.SYSTEM_UID) {
-                // It's system server (MediaSessionService) that wants to monitor session.
-                // Don't bind if able..
-                IMediaSession2 binder = SessionToken2Impl.from(mToken).getSessionBinder();
-                if (binder != null) {
-                    // Use binder in the session token instead of bind by its own.
-                    // Otherwise server will holds the binding to the service *forever* and service
-                    // will never stop.
-                    mServiceConnection = null;
-                    connectToSession(SessionToken2Impl.from(mToken).getSessionBinder());
-                    return;
-                } else if (DEBUG) {
-                    // Should happen only when system server wants to dispatch media key events to
-                    // a dead service.
-                    Log.d(TAG, "System server binds to a session service. Should unbind"
-                            + " immediately after the use.");
-                }
-            }
-            mServiceConnection = new SessionServiceConnection();
-            connectToService();
-        }
-    }
-
-    private void connectToService() {
-        // Service. Needs to get fresh binder whenever connection is needed.
-        SessionToken2Impl impl = SessionToken2Impl.from(mToken);
-        final Intent intent = new Intent(MediaSessionService2.SERVICE_INTERFACE);
-        intent.setClassName(mToken.getPackageName(), impl.getServiceName());
-
-        // Use bindService() instead of startForegroundService() to start session service for three
-        // reasons.
-        // 1. Prevent session service owner's stopSelf() from destroying service.
-        //    With the startForegroundService(), service's call of stopSelf() will trigger immediate
-        //    onDestroy() calls on the main thread even when onConnect() is running in another
-        //    thread.
-        // 2. Minimize APIs for developers to take care about.
-        //    With bindService(), developers only need to take care about Service.onBind()
-        //    but Service.onStartCommand() should be also taken care about with the
-        //    startForegroundService().
-        // 3. Future support for UI-less playback
-        //    If a service wants to keep running, it should be either foreground service or
-        //    bounded service. But there had been request for the feature for system apps
-        //    and using bindService() will be better fit with it.
-        boolean result;
-        if (Process.myUid() == Process.SYSTEM_UID) {
-            // Use bindServiceAsUser() for binding from system service to avoid following warning.
-            // ContextImpl: Calling a method in the system process without a qualified user
-            result = mContext.bindServiceAsUser(intent, mServiceConnection, Context.BIND_AUTO_CREATE,
-                    UserHandle.getUserHandleForUid(mToken.getUid()));
-        } else {
-            result = mContext.bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
-        }
-        if (!result) {
-            Log.w(TAG, "bind to " + mToken + " failed");
-        } else if (DEBUG) {
-            Log.d(TAG, "bind to " + mToken + " success");
         }
     }
 
