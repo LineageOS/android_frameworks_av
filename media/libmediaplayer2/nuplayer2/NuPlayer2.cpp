@@ -1994,7 +1994,7 @@ void NuPlayer2::determineAudioModeChange(const sp<AMessage> &audioFormat) {
     sp<AMessage> videoFormat = mCurrentSourceInfo.mSource->getFormat(false /* audio */);
     audio_stream_type_t streamType = mAudioSink->getAudioStreamType();
     const bool hasVideo = (videoFormat != NULL);
-    bool canOffload = canOffloadStream(
+    bool canOffload = JMediaPlayer2Utils::isOffloadedAudioPlaybackSupported(
             audioMeta, hasVideo, mCurrentSourceInfo.mSource->isStreaming(), streamType)
                     && (mPlaybackSettings.mSpeed == 1.f && mPlaybackSettings.mPitch == 1.f);
 
