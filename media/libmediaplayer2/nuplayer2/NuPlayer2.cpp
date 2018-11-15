@@ -24,6 +24,7 @@
 #include "NuPlayer2.h"
 
 #include "HTTPLiveSource2.h"
+#include "JMediaPlayer2Utils.h"
 #include "NuPlayer2CCDecoder.h"
 #include "NuPlayer2Decoder.h"
 #include "NuPlayer2DecoderBase.h"
@@ -1699,7 +1700,8 @@ void NuPlayer2::onStart(bool play) {
     }
 
     mOffloadAudio =
-        canOffloadStream(audioMeta, hasVideo, mCurrentSourceInfo.mSource->isStreaming(), streamType)
+        JMediaPlayer2Utils::isOffloadedAudioPlaybackSupported(
+                audioMeta, hasVideo, mCurrentSourceInfo.mSource->isStreaming(), streamType)
                 && (mPlaybackSettings.mSpeed == 1.f && mPlaybackSettings.mPitch == 1.f);
 
     // Modular DRM: Disabling audio offload if the source is protected
