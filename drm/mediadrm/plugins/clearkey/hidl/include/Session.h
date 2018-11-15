@@ -27,7 +27,7 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
 
 using ::android::hardware::drm::V1_0::Status;
@@ -64,7 +64,7 @@ private:
 };
 
 } // namespace clearkey
-} // namespace V1_1
+} // namespace V1_2
 } // namespace drm
 } // namespace hardware
 } // namespace android

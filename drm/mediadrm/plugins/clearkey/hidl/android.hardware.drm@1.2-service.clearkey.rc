@@ -1,4 +1,4 @@
-service vendor.drm-clearkey-hal-1-1 /vendor/bin/hw/android.hardware.drm@1.1-service.clearkey
+service vendor.drm-clearkey-hal-1-2 /vendor/bin/hw/android.hardware.drm@1.2-service.clearkey
     class hal
     user media
     group media mediadrm

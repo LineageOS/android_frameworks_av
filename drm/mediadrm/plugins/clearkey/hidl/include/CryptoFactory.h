@@ -18,17 +18,17 @@
 #define CLEARKEY_CRYPTO_FACTORY_H_
 
 #include <android/hardware/drm/1.0/ICryptoPlugin.h>
-#include <android/hardware/drm/1.1/ICryptoFactory.h>
+#include <android/hardware/drm/1.2/ICryptoFactory.h>
 
 #include "ClearKeyTypes.h"
 
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
 
-using ::android::hardware::drm::V1_1::ICryptoFactory;
+using ::android::hardware::drm::V1_2::ICryptoFactory;
 using ::android::hardware::drm::V1_0::ICryptoPlugin;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_string;
@@ -52,7 +52,7 @@ private:
 };
 
 } // namespace clearkey
-} // namespace V1_1
+} // namespace V1_2
 } // namespace drm
 } // namespace hardware
 } // namespace android

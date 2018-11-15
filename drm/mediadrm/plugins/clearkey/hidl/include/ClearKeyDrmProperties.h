@@ -22,7 +22,7 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
 
 static const std::string kVendorKey("vendor");
@@ -49,7 +49,7 @@ static const std::string kMetricsKey("metrics");
 static const uint8_t kMetricsData[] = { 0 };
 
 } // namespace clearkey
-} // namespace V1_1
+} // namespace V1_2
 } // namespace drm
 } // namespace hardware
 } // namespace android
