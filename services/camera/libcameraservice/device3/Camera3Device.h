@@ -256,7 +256,8 @@ class Camera3Device :
     class HalInterface : public camera3::Camera3StreamBufferFreedListener {
       public:
         HalInterface(sp<hardware::camera::device::V3_2::ICameraDeviceSession> &session,
-                     std::shared_ptr<RequestMetadataQueue> queue);
+                     std::shared_ptr<RequestMetadataQueue> queue,
+                     bool useHalBufManager);
         HalInterface(const HalInterface &other);
         HalInterface();
 
@@ -322,7 +323,7 @@ class Camera3Device :
 
         // The output HIDL request still depends on input camera3_capture_request_t
         // Do not free input camera3_capture_request_t before output HIDL request
-        void wrapAsHidlRequest(camera3_capture_request_t* in,
+        status_t wrapAsHidlRequest(camera3_capture_request_t* in,
                 /*out*/hardware::camera::device::V3_2::CaptureRequest* out,
                 /*out*/std::vector<native_handle_t*>* handlesCreated);
 
@@ -376,6 +377,8 @@ class Camera3Device :
         std::unordered_map<uint64_t, buffer_handle_t*> mRequestedBuffers;
 
         uint32_t mNextStreamConfigCounter = 1;
+
+        const bool mUseHalBufManager;
     };
 
     sp<HalInterface> mInterface;
