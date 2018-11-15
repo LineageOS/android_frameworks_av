@@ -616,7 +616,6 @@ private:
         void filterSurroundChannelMasks(ChannelsVector *channelMasksPtr);
 
         // Support for Multi-Stream Decoder (MSD) module
-        sp<HwModule> getMsdModule() const;
         sp<DeviceDescriptor> getMsdAudioInDevice() const;
         audio_devices_t getMsdAudioOutDeviceTypes() const;
         const AudioPatchCollection getMsdPatches() const;
