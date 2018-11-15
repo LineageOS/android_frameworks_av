@@ -16,7 +16,8 @@
 
 #include <hidl/Convert.h>
 #include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
-#include <NdkImageReaderPriv.h>
+#include <cutils/native_handle.h>
+#include <mediautils/AImageReaderUtils.h>
 
 namespace android {
 namespace hardware {
@@ -25,6 +26,7 @@ namespace utils {
 namespace conversion {
 
 using hardware::graphics::bufferqueue::V1_0::utils::H2BGraphicBufferProducer;
+using aimg::AImageReader_getHGBPFromHandle;
 
 // Note: existing data in dst will be gone. Caller still owns the memory of src
 void convertToHidl(const camera_metadata_t *src, HCameraMetadata* dst) {
