@@ -1,7 +1,7 @@
 // DO NOT DEPEND ON THIS DIRECTLY
-// use libstagefright_codec2-hidl-defaults instead
+// use libcodec2-hidl-defaults instead
 cc_library {
-    name: "libcodec2_hidl_utils@1.0",
+    name: "libcodec2_hidl@1.0",
     vendor_available: true,
 
     defaults: ["hidl_defaults"],
@@ -17,17 +17,19 @@ cc_library {
 
     header_libs: [
         "libsystem_headers",
-        "libstagefright_codec2_internal", // private
+        "libcodec2_internal", // private
     ],
 
     shared_libs: [
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hardware.graphics.common@1.0",
-        "android.hardware.media.bufferpool@1.0",
-        "android.hardware.media.omx@1.0",
         "android.hardware.media@1.0",
-        "hardware.google.media.c2@1.0",
+        "android.hardware.media.bufferpool@1.0",
+        "android.hardware.media.c2@1.0",
+        "android.hardware.media.omx@1.0",
         "libbase",
+        "libcodec2",
+        "libcodec2_vndk",
         "libcutils",
         "libhidlbase",
         "libhidltransport",
@@ -35,8 +37,6 @@ cc_library {
         "liblog",
         "libstagefright_bufferpool@1.0",
         "libstagefright_bufferqueue_helper",
-        "libstagefright_codec2",
-        "libstagefright_codec2_vndk",
         "libui",
         "libutils",
     ],
@@ -46,22 +46,22 @@ cc_library {
     ],
 
     export_shared_lib_headers: [
-        "hardware.google.media.c2@1.0",
+        "android.hardware.media.c2@1.0",
+        "libcodec2",
         "libhidlbase",
         "libstagefright_bufferpool@1.0",
         "libstagefright_bufferqueue_helper",
-        "libstagefright_codec2",
         "libui",
     ],
 }
 
 // public dependency for Codec 2.0 HAL service implementations
 cc_defaults {
-    name: "libstagefright_codec2-hidl-defaults",
-    defaults: ["libstagefright_codec2-impl-defaults"],
+    name: "libcodec2-hidl-defaults",
+    defaults: ["libcodec2-impl-defaults"],
 
     shared_libs: [
-        "hardware.google.media.c2@1.0",
-        "libcodec2_hidl_utils@1.0",
+        "android.hardware.media.c2@1.0",
+        "libcodec2_hidl@1.0",
     ],
 }

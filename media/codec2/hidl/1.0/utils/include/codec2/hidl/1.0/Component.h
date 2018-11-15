@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_COMPONENT_H
-#define HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_COMPONENT_H
+#ifndef CODEC2_HIDL_V1_0_UTILS_COMPONENT_H
+#define CODEC2_HIDL_V1_0_UTILS_COMPONENT_H
 
 #include <codec2/hidl/1.0/Configurable.h>
 #include <codec2/hidl/1.0/types.h>
 
 #include <android/hardware/media/bufferpool/1.0/IClientManager.h>
-#include <hardware/google/media/c2/1.0/IComponentListener.h>
-#include <hardware/google/media/c2/1.0/IComponentStore.h>
-#include <hardware/google/media/c2/1.0/IComponent.h>
+#include <android/hardware/media/c2/1.0/IComponentListener.h>
+#include <android/hardware/media/c2/1.0/IComponentStore.h>
+#include <android/hardware/media/c2/1.0/IComponent.h>
 #include <hidl/Status.h>
 #include <hwbinder/IBinder.h>
 
@@ -35,8 +35,8 @@
 #include <map>
 #include <memory>
 
+namespace android {
 namespace hardware {
-namespace google {
 namespace media {
 namespace c2 {
 namespace V1_0 {
@@ -105,7 +105,7 @@ protected:
     std::shared_ptr<C2ComponentInterface> mInterface;
     sp<IComponentListener> mListener;
     sp<ComponentStore> mStore;
-    ::hardware::google::media::c2::V1_0::utils::DefaultBufferPoolSender
+    ::android::hardware::media::c2::V1_0::utils::DefaultBufferPoolSender
             mBufferPoolSender;
 
     std::mutex mBlockPoolsMutex;
@@ -168,7 +168,7 @@ protected:
 }  // namespace V1_0
 }  // namespace c2
 }  // namespace media
-}  // namespace google
 }  // namespace hardware
+}  // namespace android
 
-#endif  // HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_COMPONENT_H
+#endif  // CODEC2_HIDL_V1_0_UTILS_COMPONENT_H

@@ -23,7 +23,7 @@
 #include <log/log.h>
 
 extern "C" void RegisterCodecServices() {
-    using namespace ::hardware::google::media::c2::V1_0;
+    using namespace ::android::hardware::media::c2::V1_0;
     android::sp<IComponentStore> store =
         new utils::ComponentStore(
                 android::GetCodec2PlatformComponentStore());

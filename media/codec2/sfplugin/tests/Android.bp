@@ -1,17 +1,17 @@
 cc_test {
-    name: "ccodec_test",
+    name: "ccodec_unit_test",
 
     srcs: [
         "ReflectedParamUpdater_test.cpp",
     ],
 
     include_dirs: [
-        "hardware/google/av/media/sfplugin",
+        "frameworks/av/media/codec2/sfplugin",
     ],
 
     shared_libs: [
-        "libstagefright_ccodec",
-        "libstagefright_codec2",
+        "libcodec2",
+        "libsfplugin_ccodec",
         "libstagefright_foundation",
         "libutils",
     ],
@@ -23,24 +23,24 @@ cc_test {
 }
 
 cc_test {
-    name: "mc_sanity",
+    name: "mc_sanity_test",
 
     srcs: [
         "MediaCodec_sanity_test.cpp",
     ],
 
     include_dirs: [
-        "hardware/google/av/media/sfplugin",
+        "frameworks/av/media/codec2/sfplugin",
     ],
 
     shared_libs: [
         "libbinder",
+        "libcodec2",
         "libgui",
         "libmedia",
         "libmedia_omx",
+        "libsfplugin_ccodec",
         "libstagefright",
-        "libstagefright_ccodec",
-        "libstagefright_codec2",
         "libstagefright_foundation",
         "libutils",
     ],

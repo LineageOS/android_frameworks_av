@@ -55,7 +55,7 @@ using namespace std::chrono_literals;
 using ::android::hardware::graphics::bufferqueue::V1_0::utils::H2BGraphicBufferProducer;
 using android::base::StringPrintf;
 using BGraphicBufferSource = ::android::IGraphicBufferSource;
-using ::hardware::google::media::c2::V1_0::IInputSurface;
+using ::android::hardware::media::c2::V1_0::IInputSurface;
 
 namespace {
 

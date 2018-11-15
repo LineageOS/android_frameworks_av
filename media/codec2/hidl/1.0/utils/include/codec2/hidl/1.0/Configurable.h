@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_CONFIGURABLE_H
-#define HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_CONFIGURABLE_H
+#ifndef CODEC2_HIDL_V1_0_UTILS_CONFIGURABLE_H
+#define CODEC2_HIDL_V1_0_UTILS_CONFIGURABLE_H
 
 #include <codec2/hidl/1.0/ConfigurableC2Intf.h>
 
@@ -23,13 +23,13 @@
 #include <C2Param.h>
 #include <C2.h>
 
-#include <hardware/google/media/c2/1.0/IConfigurable.h>
+#include <android/hardware/media/c2/1.0/IConfigurable.h>
 #include <hidl/Status.h>
 
 #include <memory>
 
+namespace android {
 namespace hardware {
-namespace google {
 namespace media {
 namespace c2 {
 namespace V1_0 {
@@ -151,7 +151,7 @@ protected:
 }  // namespace V1_0
 }  // namespace c2
 }  // namespace media
-}  // namespace google
 }  // namespace hardware
+}  // namespace android
 
-#endif  // HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_CONFIGURABLE_H
+#endif  // CODEC2_HIDL_V1_0_UTILS_CONFIGURABLE_H

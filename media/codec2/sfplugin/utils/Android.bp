@@ -1,5 +1,5 @@
 cc_library_shared {
-    name: "libstagefright_ccodec_utils",
+    name: "libsfplugin_ccodec_utils",
     vendor_available: true,
 
     srcs: [
@@ -18,10 +18,10 @@ cc_library_shared {
 
     shared_libs: [
         "libbase",
+        "libcodec2",
+        "libcodec2_vndk",
         "libcutils",
         "liblog",
-        "libstagefright_codec2",
-        "libstagefright_codec2_vndk",
         "libstagefright_foundation",
         "libutils",
     ],

@@ -1,5 +1,5 @@
 cc_library {
-    name: "libcodec2_hidl_client",
+    name: "libcodec2_client",
 
     srcs: [
         "client.cpp",
@@ -8,10 +8,12 @@ cc_library {
     shared_libs: [
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hardware.media.bufferpool@1.0",
-        "hardware.google.media.c2@1.0",
+        "android.hardware.media.c2@1.0",
         "libbase",
         "libbinder",
-        "libcodec2_hidl_utils@1.0",
+        "libcodec2",
+        "libcodec2_hidl@1.0",
+        "libcodec2_vndk",
         "libcutils",
         "libgui",
         "libhidlbase",
@@ -19,8 +21,6 @@ cc_library {
         "liblog",
         "libstagefright_bufferpool@1.0",
         "libstagefright_bufferqueue_helper",
-        "libstagefright_codec2",
-        "libstagefright_codec2_vndk",
         "libui",
         "libutils",
     ],
@@ -30,8 +30,8 @@ cc_library {
     ],
 
     export_shared_lib_headers: [
-        "libcodec2_hidl_utils@1.0",
-        "libstagefright_codec2",
+        "libcodec2_hidl@1.0",
+        "libcodec2",
     ],
 
 }

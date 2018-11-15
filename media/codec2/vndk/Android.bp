@@ -1,5 +1,5 @@
 cc_library_headers {
-    name: "libstagefright_codec2_internal",
+    name: "libcodec2_internal",
 
     export_include_dirs: [
         "internal",
@@ -10,9 +10,9 @@ cc_library_headers {
 }
 
 // !!!DO NOT DEPEND ON THIS SHARED LIBRARY DIRECTLY!!!
-// use libstagefright_codec2-impl-defaults instead
+// use libcodec2-impl-defaults instead
 cc_library_shared {
-    name: "libstagefright_codec2_vndk",
+    name: "libcodec2_vndk",
     vendor_available: true,
 
     srcs: [
@@ -44,7 +44,7 @@ cc_library_shared {
 
     include_dirs: [
         "frameworks/native/include/media/hardware",
-        "hardware/google/av/codec2/include",
+        "frameworks/av/media/codec2/include",
     ],
 
     shared_libs: [
@@ -76,13 +76,13 @@ cc_library_shared {
 
 // public dependency for implementing Codec 2 components
 cc_defaults {
-    name: "libstagefright_codec2-impl-defaults",
+    name: "libcodec2-impl-defaults",
 
     shared_libs: [
         "libbase", // for C2_LOG
         "liblog", // for ALOG
-        "libstagefright_codec2",
-        "libstagefright_codec2_vndk",
+        "libcodec2",
+        "libcodec2_vndk",
         "libutils",
     ],
 }
@@ -90,8 +90,8 @@ cc_defaults {
 // public dependency for implementing Codec 2 framework utilities
 // THIS IS ONLY FOR FRAMEWORK USE ONLY
 cc_defaults {
-    name: "libstagefright_codec2-internal-defaults",
-    defaults: ["libstagefright_codec2-impl-defaults"],
+    name: "libcodec2-internal-defaults",
+    defaults: ["libcodec2-impl-defaults"],
 
     shared_libs: [
         "libcutils", // for properties
@@ -100,6 +100,3 @@ cc_defaults {
     // TODO: separate internal headers so they can be exposed here
 }
 
-subdirs = [
-    "bufferpool",
-]

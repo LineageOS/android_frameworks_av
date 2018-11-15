@@ -15,7 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "hardware.google.media.c2@1.0-service"
+#define LOG_TAG "android.hardware.media.c2@1.0-service"
 
 #include <codec2/hidl/1.0/ComponentStore.h>
 #include <hidl/HidlTransportSupport.h>
@@ -97,7 +97,7 @@ public:
 };
 
 int main(int /* argc */, char** /* argv */) {
-    ALOGD("hardware.google.media.c2@1.0-service starting...");
+    ALOGD("android.hardware.media.c2@1.0-service starting...");
 
     signal(SIGPIPE, SIG_IGN);
     android::SetUpMinijail(kBaseSeccompPolicyPath, kExtSeccompPolicyPath);
@@ -112,7 +112,7 @@ int main(int /* argc */, char** /* argv */) {
 
     // Create IComponentStore service.
     {
-        using namespace ::hardware::google::media::c2::V1_0;
+        using namespace ::android::hardware::media::c2::V1_0;
         android::sp<IComponentStore> store;
 
         // Vendor's TODO: Replace this with

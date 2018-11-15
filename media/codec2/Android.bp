@@ -1,5 +1,5 @@
 cc_library_shared {
-    name: "libstagefright_codec2",
+    name: "libcodec2",
     vendor_available: true,
 
     srcs: ["C2.cpp"],

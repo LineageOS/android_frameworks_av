@@ -35,11 +35,11 @@
 #undef LOG
 
 #include <android/hardware/media/bufferpool/1.0/IClientManager.h>
-#include <hardware/google/media/c2/1.0/IComponent.h>
-#include <hardware/google/media/c2/1.0/IComponentInterface.h>
-#include <hardware/google/media/c2/1.0/IComponentListener.h>
-#include <hardware/google/media/c2/1.0/IComponentStore.h>
-#include <hardware/google/media/c2/1.0/IConfigurable.h>
+#include <android/hardware/media/c2/1.0/IComponent.h>
+#include <android/hardware/media/c2/1.0/IComponentInterface.h>
+#include <android/hardware/media/c2/1.0/IComponentListener.h>
+#include <android/hardware/media/c2/1.0/IComponentStore.h>
+#include <android/hardware/media/c2/1.0/IConfigurable.h>
 
 #include <C2Debug.h>
 #include <C2BufferPriv.h>
@@ -53,8 +53,8 @@ using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::TWGraphicBufferProducer;
 
-using namespace ::hardware::google::media::c2::V1_0;
-using namespace ::hardware::google::media::c2::V1_0::utils;
+using namespace ::android::hardware::media::c2::V1_0;
+using namespace ::android::hardware::media::c2::V1_0::utils;
 using namespace ::android::hardware::media::bufferpool::V1_0;
 using namespace ::android::hardware::media::bufferpool::V1_0::implementation;
 

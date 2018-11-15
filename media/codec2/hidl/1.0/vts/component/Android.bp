@@ -15,8 +15,8 @@
  */
 
 cc_test {
-    name: "MtsHidlC2V1_0TargetMasterTest",
-    defaults: ["MtsMediaC2V1_0Defaults"],
-    srcs: ["MtsHidlC2V1_0TargetMasterTest.cpp"],
+    name: "VtsHidlC2V1_0TargetComponentTest",
+    defaults: ["VtsMediaC2V1_0Defaults"],
+    srcs: ["VtsHidlC2V1_0TargetComponentTest.cpp"],
 }
 

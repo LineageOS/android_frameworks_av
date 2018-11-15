@@ -1,8 +1,8 @@
 // DO NOT DEPEND ON THIS DIRECTLY
-// use libstagefright_soft_c2-defaults instead
+// use libcodec2_soft-defaults instead
 cc_library_shared {
-    name: "libstagefright_soft_c2common",
-    defaults: ["libstagefright_codec2-impl-defaults"],
+    name: "libcodec2_soft_common",
+    defaults: ["libcodec2-impl-defaults"],
     vendor_available: true,
 
     srcs: [
@@ -15,13 +15,13 @@ cc_library_shared {
     ],
 
     export_shared_lib_headers: [
-        "libstagefright_ccodec_utils",
+        "libsfplugin_ccodec_utils",
     ],
 
     shared_libs: [
         "libcutils", // for properties
         "liblog",    // for ALOG
-        "libstagefright_ccodec_utils", // for ImageCopy
+        "libsfplugin_ccodec_utils", // for ImageCopy
         "libstagefright_foundation", // for Mutexed
     ],
 
@@ -42,20 +42,20 @@ cc_library_shared {
 // public dependency for software codec implementation
 // to be used by code under media/codecs/* only as its stability is not guaranteed
 cc_defaults {
-    name: "libstagefright_soft_c2-defaults",
-    defaults: ["libstagefright_codec2-impl-defaults"],
+    name: "libcodec2_soft-defaults",
+    defaults: ["libcodec2-impl-defaults"],
     vendor_available: true,
 
     export_shared_lib_headers: [
-        "libstagefright_ccodec_utils",
+        "libsfplugin_ccodec_utils",
     ],
 
     shared_libs: [
+        "libcodec2_soft_common",
         "libcutils", // for properties
         "liblog", // for ALOG
+        "libsfplugin_ccodec_utils", // for ImageCopy
         "libstagefright_foundation", // for ColorUtils and MIME
-        "libstagefright_ccodec_utils", // for ImageCopy
-        "libstagefright_soft_c2common",
     ],
 
     cflags: [
@@ -69,7 +69,7 @@ cc_defaults {
 // public dependency for software codec implementation
 // to be used by code under media/codecs/* only
 cc_defaults {
-    name: "libstagefright_soft_c2_sanitize_all-defaults",
+    name: "libcodec2_soft_sanitize_all-defaults",
 
     sanitize: {
         misc_undefined: [
@@ -86,7 +86,7 @@ cc_defaults {
 // public dependency for software codec implementation
 // to be used by code under media/codecs/* only
 cc_defaults {
-    name: "libstagefright_soft_c2_sanitize_signed-defaults",
+    name: "libcodec2_soft_sanitize_signed-defaults",
 
     sanitize: {
         misc_undefined: [
@@ -101,7 +101,7 @@ cc_defaults {
 
 // TEMP: used by cheets2 project - remove when no longer used
 cc_library_shared {
-    name: "libstagefright_simple_c2component",
+    name: "libcodec2_simple_component",
     vendor_available: true,
 
     srcs: [
@@ -117,10 +117,10 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "libcodec2",
+        "libcodec2_vndk",
         "libcutils",
         "liblog",
-        "libstagefright_codec2",
-        "libstagefright_codec2_vndk",
         "libstagefright_foundation",
         "libutils",
     ],

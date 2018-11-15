@@ -41,8 +41,8 @@
 #include <C2PlatformSupport.h>
 #include <C2Work.h>
 
+namespace android {
 namespace hardware {
-namespace google {
 namespace media {
 namespace c2 {
 namespace V1_0 {
@@ -434,6 +434,6 @@ Return<Status> InputSurfaceConnection::disconnect() {
 }  // namespace V1_0
 }  // namespace c2
 }  // namespace media
-}  // namespace google
 }  // namespace hardware
+}  // namespace android
 

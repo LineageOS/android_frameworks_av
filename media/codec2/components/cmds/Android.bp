@@ -1,6 +1,6 @@
 cc_binary {
-    name: "codec2",
-    defaults: ["libstagefright_codec2-impl-defaults"],
+    name: "codec2play",
+    defaults: ["libcodec2-impl-defaults"],
 
     srcs: [
         "codec2.cpp",

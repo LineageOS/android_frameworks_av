@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-#ifndef HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_INPUTSURFACE_H
-#define HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_INPUTSURFACE_H
+#ifndef CODEC2_HIDL_V1_0_UTILS_INPUTSURFACE_H
+#define CODEC2_HIDL_V1_0_UTILS_INPUTSURFACE_H
 
 #include <codec2/hidl/1.0/ComponentStore.h>
 
-#include <hardware/google/media/c2/1.0/IInputSurface.h>
-#include <hardware/google/media/c2/1.0/IComponent.h>
+#include <android/hardware/media/c2/1.0/IInputSurface.h>
+#include <android/hardware/media/c2/1.0/IComponent.h>
 
 #include <android/hardware/graphics/bufferqueue/1.0/IGraphicBufferProducer.h>
 #include <android/hardware/graphics/bufferqueue/1.0/IProducerListener.h>
@@ -35,8 +35,8 @@
 
 class C2ReflectorHelper;
 
+namespace android {
 namespace hardware {
-namespace google {
 namespace media {
 namespace c2 {
 namespace V1_0 {
@@ -70,7 +70,7 @@ struct InputSurface : public IInputSurface {
 
 // Type disambiguation
 
-    typedef ::hardware::google::media::c2::V1_0::Status Status;
+    typedef ::android::hardware::media::c2::V1_0::Status Status;
 
 // New methods from IInputSurface
 
@@ -194,7 +194,7 @@ protected:
 }  // namespace V1_0
 }  // namespace c2
 }  // namespace media
-}  // namespace google
 }  // namespace hardware
+}  // namespace android
 
-#endif  // HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_INPUTSURFACE_H
+#endif  // CODEC2_HIDL_V1_0_UTILS_INPUTSURFACE_H

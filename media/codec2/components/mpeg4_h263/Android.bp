@@ -1,8 +1,8 @@
 cc_library_shared {
-    name: "libstagefright_soft_c2mpeg4dec",
+    name: "libcodec2_soft_mpeg4dec",
     defaults: [
-        "libstagefright_soft_c2-defaults",
-        "libstagefright_soft_c2_sanitize_signed-defaults",
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_signed-defaults",
     ],
 
     srcs: ["C2SoftMpeg4Dec.cpp"],
@@ -16,10 +16,10 @@ cc_library_shared {
 }
 
 cc_library_shared {
-    name: "libstagefright_soft_c2h263dec",
+    name: "libcodec2_soft_h263dec",
     defaults: [
-        "libstagefright_soft_c2-defaults",
-        "libstagefright_soft_c2_sanitize_signed-defaults",
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_signed-defaults",
     ],
 
     srcs: ["C2SoftMpeg4Dec.cpp"],
@@ -32,10 +32,10 @@ cc_library_shared {
 }
 
 cc_library_shared {
-    name: "libstagefright_soft_c2mpeg4enc",
+    name: "libcodec2_soft_mpeg4enc",
     defaults: [
-        "libstagefright_soft_c2-defaults",
-        "libstagefright_soft_c2_sanitize_signed-defaults",
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_signed-defaults",
     ],
 
 
@@ -50,10 +50,10 @@ cc_library_shared {
 }
 
 cc_library_shared {
-    name: "libstagefright_soft_c2h263enc",
+    name: "libcodec2_soft_h263enc",
     defaults: [
-        "libstagefright_soft_c2-defaults",
-        "libstagefright_soft_c2_sanitize_signed-defaults",
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_signed-defaults",
     ],
 
     srcs: ["C2SoftMpeg4Enc.cpp"],

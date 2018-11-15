@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-#ifndef HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_INPUTSURFACECONNECTION_H
-#define HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_INPUTSURFACECONNECTION_H
+#ifndef CODEC2_HIDL_V1_0_UTILS_INPUTSURFACECONNECTION_H
+#define CODEC2_HIDL_V1_0_UTILS_INPUTSURFACECONNECTION_H
 
 #include <codec2/hidl/1.0/Component.h>
 
-#include <hardware/google/media/c2/1.0/IComponent.h>
-#include <hardware/google/media/c2/1.0/IInputSurfaceConnection.h>
+#include <android/hardware/media/c2/1.0/IComponent.h>
+#include <android/hardware/media/c2/1.0/IInputSurfaceConnection.h>
 
 #include <media/stagefright/bqhelper/GraphicBufferSource.h>
 
@@ -32,8 +32,8 @@
 #include <memory>
 #include <mutex>
 
+namespace android {
 namespace hardware {
-namespace google {
 namespace media {
 namespace c2 {
 namespace V1_0 {
@@ -79,7 +79,7 @@ protected:
 }  // namespace V1_0
 }  // namespace c2
 }  // namespace media
-}  // namespace google
 }  // namespace hardware
+}  // namespace android
 
-#endif  // HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_INPUTSURFACECONNECTION_H
+#endif  // CODEC2_HIDL_V1_0_UTILS_INPUTSURFACECONNECTION_H

@@ -1,8 +1,8 @@
 cc_library_shared {
-    name: "libstagefright_soft_c2avcdec",
+    name: "libcodec2_soft_avcdec",
     defaults: [
-        "libstagefright_soft_c2-defaults",
-        "libstagefright_soft_c2_sanitize_signed-defaults",
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_signed-defaults",
    ],
 
     static_libs: ["libavcdec"],
@@ -16,10 +16,10 @@ cc_library_shared {
 }
 
 cc_library_shared {
-    name: "libstagefright_soft_c2avcenc",
+    name: "libcodec2_soft_avcenc",
     defaults: [
-        "libstagefright_soft_c2-defaults",
-        "libstagefright_soft_c2_sanitize_signed-defaults",
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_signed-defaults",
    ],
 
     static_libs: ["libavcenc"],

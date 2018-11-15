@@ -19,7 +19,7 @@
 
 #include <codec2/hidl/client.h>
 
-#include <hardware/google/media/c2/1.0/types.h>
+#include <android/hardware/media/c2/1.0/types.h>
 
 #include <C2Component.h>
 #include <getopt.h>
@@ -27,8 +27,8 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/Mutexed.h>
 
-using namespace ::hardware::google::media::c2::V1_0;
-using namespace ::hardware::google::media::c2::V1_0::utils;
+using namespace ::android::hardware::media::c2::V1_0;
+using namespace ::android::hardware::media::c2::V1_0::utils;
 
 using ::android::Mutexed;
 using ::android::hardware::Void;

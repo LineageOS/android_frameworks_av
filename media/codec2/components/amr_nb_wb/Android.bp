@@ -1,8 +1,8 @@
 cc_library_shared {
-    name: "libstagefright_soft_c2amrnbdec",
+    name: "libcodec2_soft_amrnbdec",
     defaults: [
-        "libstagefright_soft_c2-defaults",
-        "libstagefright_soft_c2_sanitize_all-defaults",
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_all-defaults",
     ],
 
     srcs: ["C2SoftAmrDec.cpp"],
@@ -22,10 +22,10 @@ cc_library_shared {
 }
 
 cc_library_shared {
-    name: "libstagefright_soft_c2amrwbdec",
+    name: "libcodec2_soft_amrwbdec",
     defaults: [
-        "libstagefright_soft_c2-defaults",
-        "libstagefright_soft_c2_sanitize_all-defaults",
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_all-defaults",
     ],
 
     srcs: ["C2SoftAmrDec.cpp"],
@@ -41,10 +41,10 @@ cc_library_shared {
 }
 
 cc_library_shared {
-    name: "libstagefright_soft_c2amrnbenc",
+    name: "libcodec2_soft_amrnbenc",
     defaults: [
-        "libstagefright_soft_c2-defaults",
-        "libstagefright_soft_c2_sanitize_all-defaults",
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_all-defaults",
     ],
 
     srcs: ["C2SoftAmrNbEnc.cpp"],
@@ -59,10 +59,10 @@ cc_library_shared {
 }
 
 cc_library_shared {
-    name: "libstagefright_soft_c2amrwbenc",
+    name: "libcodec2_soft_amrwbenc",
     defaults: [
-        "libstagefright_soft_c2-defaults",
-        "libstagefright_soft_c2_sanitize_all-defaults",
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_all-defaults",
     ],
 
     srcs: ["C2SoftAmrWbEnc.cpp"],

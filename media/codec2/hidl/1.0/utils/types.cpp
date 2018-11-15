@@ -39,8 +39,8 @@
 
 #include <media/stagefright/foundation/AUtils.h>
 
+namespace android {
 namespace hardware {
-namespace google {
 namespace media {
 namespace c2 {
 namespace V1_0 {
@@ -1798,6 +1798,6 @@ void holdBufferQueueBlocks(const std::list<std::unique_ptr<C2Work>>& workList,
 }  // namespace V1_0
 }  // namespace c2
 }  // namespace media
-}  // namespace google
 }  // namespace hardware
+}  // namespace android
 

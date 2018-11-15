@@ -1,5 +1,5 @@
 cc_library_shared {
-    name: "libc2_component_wrapper",
+    name: "libcodec2_component_wrapper",
     vendor_available: true,
 
     srcs: [
@@ -8,10 +8,10 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "libcodec2",
+        "libcodec2_vndk",
         "libcutils",
         "liblog",
-        "libstagefright_codec2",
-        "libstagefright_codec2_vndk",
         "libstagefright_foundation",
         "libutils",
     ],

@@ -1,8 +1,8 @@
 cc_library_shared {
-    name: "libstagefright_soft_c2rawdec",
+    name: "libcodec2_soft_rawdec",
     defaults: [
-        "libstagefright_soft_c2-defaults",
-        "libstagefright_soft_c2_sanitize_all-defaults",
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_all-defaults",
     ],
 
     srcs: ["C2SoftRawDec.cpp"],

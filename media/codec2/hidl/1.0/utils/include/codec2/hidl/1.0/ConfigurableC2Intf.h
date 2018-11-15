@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_CONFIGURABLEC2INTF_H
-#define HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_CONFIGURABLEC2INTF_H
+#ifndef CODEC2_HIDL_V1_0_UTILS_CONFIGURABLEC2INTF_H
+#define CODEC2_HIDL_V1_0_UTILS_CONFIGURABLEC2INTF_H
 
 #include <C2Work.h>
 #include <C2Component.h>
@@ -27,8 +27,8 @@
 #include <vector>
 #include <memory>
 
+namespace android {
 namespace hardware {
-namespace google {
 namespace media {
 namespace c2 {
 namespace V1_0 {
@@ -74,7 +74,7 @@ protected:
 }  // namespace V1_0
 }  // namespace c2
 }  // namespace media
-}  // namespace google
 }  // namespace hardware
+}  // namespace android
 
-#endif  // HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_CONFIGURABLEC2INTF_H
+#endif  // CODEC2_HIDL_V1_0_UTILS_CONFIGURABLEC2INTF_H

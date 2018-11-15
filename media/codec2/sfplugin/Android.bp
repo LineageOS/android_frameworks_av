@@ -1,5 +1,5 @@
 cc_library_shared {
-    name: "libstagefright_ccodec",
+    name: "libsfplugin_ccodec",
 
     srcs: [
         "C2OMXNode.cpp",
@@ -18,17 +18,19 @@ cc_library_shared {
     ],
 
     header_libs: [
-        "libstagefright_codec2_internal",
+        "libcodec2_internal",
     ],
 
     shared_libs: [
         "android.hardware.cas.native@1.0",
         "android.hardware.graphics.bufferqueue@1.0",
+        "android.hardware.media.c2@1.0",
         "android.hardware.media.omx@1.0",
-        "hardware.google.media.c2@1.0",
         "libbase",
         "libbinder",
-        "libcodec2_hidl_client",
+        "libcodec2",
+        "libcodec2_client",
+        "libcodec2_vndk",
         "libcutils",
         "libgui",
         "libhidlallocatorutils",
@@ -36,10 +38,8 @@ cc_library_shared {
         "liblog",
         "libmedia",
         "libmedia_omx",
+        "libsfplugin_ccodec_utils",
         "libstagefright_bufferqueue_helper",
-        "libstagefright_ccodec_utils",
-        "libstagefright_codec2",
-        "libstagefright_codec2_vndk",
         "libstagefright_codecbase",
         "libstagefright_foundation",
         "libstagefright_omx_utils",

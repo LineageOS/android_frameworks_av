@@ -1,12 +1,12 @@
 cc_library_static {
-    name: "MtsMediaC2V1_0CommonUtil",
+    name: "VtsMediaC2V1_0CommonUtil",
     defaults: [
         "VtsHalTargetTestDefaults",
-        "libstagefright_codec2-hidl-defaults",
+        "libcodec2-hidl-defaults",
     ],
 
     include_dirs: [
-        "hardware/google/av/codec2/hidl/client/include",
+        "frameworks/av/media/codec2/hidl/client/include",
     ],
 
     srcs: [
@@ -17,17 +17,17 @@ cc_library_static {
 }
 
 cc_defaults {
-    name: "MtsMediaC2V1_0Defaults",
+    name: "VtsMediaC2V1_0Defaults",
     defaults: [
         "VtsHalTargetTestDefaults",
-        "libstagefright_codec2-hidl-defaults",
+        "libcodec2-hidl-defaults",
     ],
 
     static_libs: [
-        "MtsMediaC2V1_0CommonUtil",
+        "VtsMediaC2V1_0CommonUtil",
     ],
 
     shared_libs: [
-        "libcodec2_hidl_client",
+        "libcodec2_client",
     ],
 }

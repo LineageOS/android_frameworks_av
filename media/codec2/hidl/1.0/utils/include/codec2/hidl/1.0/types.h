@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_TYPES_H
-#define HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_TYPES_H
+#ifndef CODEC2_HIDL_V1_0_UTILS_TYPES_H
+#define CODEC2_HIDL_V1_0_UTILS_TYPES_H
 
 #include <chrono>
 
 #include <bufferpool/ClientManager.h>
 #include <android/hardware/media/bufferpool/1.0/IClientManager.h>
 #include <android/hardware/media/bufferpool/1.0/types.h>
-#include <hardware/google/media/c2/1.0/IComponentStore.h>
-#include <hardware/google/media/c2/1.0/types.h>
+#include <android/hardware/media/c2/1.0/IComponentStore.h>
+#include <android/hardware/media/c2/1.0/types.h>
 #include <gui/IGraphicBufferProducer.h>
 
 #include <C2Component.h>
@@ -33,8 +33,8 @@
 
 using namespace std::chrono_literals;
 
+namespace android {
 namespace hardware {
-namespace google {
 namespace media {
 namespace c2 {
 namespace V1_0 {
@@ -362,7 +362,7 @@ void holdBufferQueueBlocks(const std::list<std::unique_ptr<C2Work>>& workList,
 }  // namespace V1_0
 }  // namespace c2
 }  // namespace media
-}  // namespace google
 }  // namespace hardware
+}  // namespace android
 
-#endif  // HARDWARE_GOOGLE_MEDIA_C2_V1_0_UTILS_TYPES_H
+#endif  // CODEC2_HIDL_V1_0_UTILS_TYPES_H

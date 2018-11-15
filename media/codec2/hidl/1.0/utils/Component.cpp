@@ -33,8 +33,8 @@
 #include <chrono>
 #include <thread>
 
+namespace android {
 namespace hardware {
-namespace google {
 namespace media {
 namespace c2 {
 namespace V1_0 {
@@ -1055,5 +1055,6 @@ InputBufferManager& InputBufferManager::getInstance() {
 }  // namespace V1_0
 }  // namespace c2
 }  // namespace media
-}  // namespace google
 }  // namespace hardware
+}  // namespace android
+

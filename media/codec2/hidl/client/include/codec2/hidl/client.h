@@ -64,8 +64,8 @@
  */
 
 // Forward declaration of Codec2.0 HIDL interfaces
+namespace android {
 namespace hardware {
-namespace google {
 namespace media {
 namespace c2 {
 namespace V1_0 {
@@ -78,8 +78,8 @@ struct IInputSurfaceConnection;
 } // namespace V1_0
 } // namespace c2
 } // namespace media
-} // namespace google
 } // namespace hardware
+} // namespace android
 
 namespace android {
 namespace hardware {
@@ -119,7 +119,7 @@ namespace android {
 // declaration of an inner class is not possible.
 struct Codec2ConfigurableClient {
 
-    typedef ::hardware::google::media::c2::V1_0::IConfigurable Base;
+    typedef ::android::hardware::media::c2::V1_0::IConfigurable Base;
 
     const C2String& getName() const;
 
@@ -156,7 +156,7 @@ protected:
 
 struct Codec2Client : public Codec2ConfigurableClient {
 
-    typedef ::hardware::google::media::c2::V1_0::IComponentStore Base;
+    typedef ::android::hardware::media::c2::V1_0::IComponentStore Base;
 
     struct Listener;
 
@@ -306,7 +306,7 @@ struct Codec2Client::Listener {
 
 struct Codec2Client::Component : public Codec2Client::Configurable {
 
-    typedef ::hardware::google::media::c2::V1_0::IComponent Base;
+    typedef ::android::hardware::media::c2::V1_0::IComponent Base;
 
     c2_status_t createBlockPool(
             C2Allocator::id_t id,
@@ -405,7 +405,7 @@ protected:
     // mInputBufferCount.
     mutable std::map<uint64_t, size_t> mInputBufferCount;
 
-    ::hardware::google::media::c2::V1_0::utils::DefaultBufferPoolSender
+    ::android::hardware::media::c2::V1_0::utils::DefaultBufferPoolSender
             mBufferPoolSender;
 
     std::mutex mOutputBufferQueueMutex;
@@ -430,9 +430,9 @@ protected:
 
 struct Codec2Client::InputSurface {
 public:
-    typedef ::hardware::google::media::c2::V1_0::IInputSurface Base;
+    typedef ::android::hardware::media::c2::V1_0::IInputSurface Base;
 
-    typedef ::hardware::google::media::c2::V1_0::IInputSurfaceConnection
+    typedef ::android::hardware::media::c2::V1_0::IInputSurfaceConnection
             ConnectionBase;
 
     typedef Codec2Client::InputSurfaceConnection Connection;
@@ -465,7 +465,7 @@ protected:
 
 struct Codec2Client::InputSurfaceConnection {
 
-    typedef ::hardware::google::media::c2::V1_0::IInputSurfaceConnection Base;
+    typedef ::android::hardware::media::c2::V1_0::IInputSurfaceConnection Base;
 
     c2_status_t disconnect();
 

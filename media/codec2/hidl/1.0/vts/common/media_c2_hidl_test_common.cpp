@@ -18,7 +18,7 @@
 #include <stdio.h>
 
 #include "media_c2_hidl_test_common.h"
-using ::hardware::google::media::c2::V1_0::FieldSupportedValues;
+using ::android::hardware::media::c2::V1_0::FieldSupportedValues;
 
 void dumpFSV(const FieldSupportedValues& sv) {
     ALOGD("Dumping FSV data");
