@@ -1,0 +1,23 @@
+cc_library_shared {
+    name: "libstagefright_soft_c2g711alawdec",
+    defaults: [
+        "libstagefright_soft_c2-defaults",
+        "libstagefright_soft_c2_sanitize_all-defaults",
+    ],
+
+    srcs: ["C2SoftG711Dec.cpp"],
+
+    cflags: [
+        "-DALAW",
+    ],
+}
+
+cc_library_shared {
+    name: "libstagefright_soft_c2g711mlawdec",
+    defaults: [
+        "libstagefright_soft_c2-defaults",
+        "libstagefright_soft_c2_sanitize_all-defaults",
+    ],
+
+    srcs: ["C2SoftG711Dec.cpp"],
+}

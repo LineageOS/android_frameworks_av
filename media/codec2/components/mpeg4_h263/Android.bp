@@ -1,0 +1,66 @@
+cc_library_shared {
+    name: "libstagefright_soft_c2mpeg4dec",
+    defaults: [
+        "libstagefright_soft_c2-defaults",
+        "libstagefright_soft_c2_sanitize_signed-defaults",
+    ],
+
+    srcs: ["C2SoftMpeg4Dec.cpp"],
+
+    static_libs: ["libstagefright_m4vh263dec"],
+
+    cflags: [
+        "-DOSCL_IMPORT_REF=",
+        "-DMPEG4",
+    ],
+}
+
+cc_library_shared {
+    name: "libstagefright_soft_c2h263dec",
+    defaults: [
+        "libstagefright_soft_c2-defaults",
+        "libstagefright_soft_c2_sanitize_signed-defaults",
+    ],
+
+    srcs: ["C2SoftMpeg4Dec.cpp"],
+
+    static_libs: ["libstagefright_m4vh263dec"],
+
+    cflags: [
+        "-DOSCL_IMPORT_REF=",
+    ],
+}
+
+cc_library_shared {
+    name: "libstagefright_soft_c2mpeg4enc",
+    defaults: [
+        "libstagefright_soft_c2-defaults",
+        "libstagefright_soft_c2_sanitize_signed-defaults",
+    ],
+
+
+    srcs: ["C2SoftMpeg4Enc.cpp"],
+
+    static_libs: ["libstagefright_m4vh263enc"],
+
+    cflags: [
+        "-DMPEG4",
+        "-DOSCL_IMPORT_REF=",
+    ],
+}
+
+cc_library_shared {
+    name: "libstagefright_soft_c2h263enc",
+    defaults: [
+        "libstagefright_soft_c2-defaults",
+        "libstagefright_soft_c2_sanitize_signed-defaults",
+    ],
+
+    srcs: ["C2SoftMpeg4Enc.cpp"],
+
+    static_libs: [ "libstagefright_m4vh263enc" ],
+
+    cflags: [
+        "-DOSCL_IMPORT_REF=",
+    ],
+}
