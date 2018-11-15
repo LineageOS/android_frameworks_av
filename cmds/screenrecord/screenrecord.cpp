@@ -191,7 +191,7 @@ static status_t prepareEncoder(float displayFps, sp<MediaCodec>* pCodec,
     format->setFloat("frame-rate", displayFps);
     format->setInt32("i-frame-interval", 10);
 
-    sp<ALooper> looper = new ALooper;
+    sp<android::ALooper> looper = new android::ALooper;
     looper->setName("screenrecord_looper");
     looper->start();
     ALOGV("Creating codec");
