@@ -24,8 +24,8 @@
 // libFLAC parser
 #include "FLAC/stream_decoder.h"
 
+#include <android/binder_ibinder.h> // for AIBinder_getCallingUid
 #include <audio_utils/primitives.h>
-#include <binder/IPCThreadState.h> // for IPCThreadState
 #include <media/MediaExtractorPluginApi.h>
 #include <media/NdkMediaFormat.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -48,7 +48,7 @@ namespace android {
 // (Note: duplicated with WAVExtractor.cpp)
 static inline bool shouldExtractorOutputFloat(int bitsPerSample)
 {
-    return bitsPerSample > 16 && IPCThreadState::self()->getCallingUid() == AID_MEDIA;
+    return bitsPerSample > 16 && AIBinder_getCallingUid() == AID_MEDIA;
 }
 
 class FLACParser;

@@ -20,8 +20,8 @@
 
 #include "WAVExtractor.h"
 
+#include <android/binder_ibinder.h> // for AIBinder_getCallingUid
 #include <audio_utils/primitives.h>
-#include <binder/IPCThreadState.h> // for IPCThreadState
 #include <media/DataSourceBase.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaBufferGroup.h>
@@ -45,7 +45,7 @@ namespace android {
 // (Note: duplicated with FLACExtractor.cpp)
 static inline bool shouldExtractorOutputFloat(int bitsPerSample)
 {
-    return bitsPerSample > 16 && IPCThreadState::self()->getCallingUid() == AID_MEDIA;
+    return bitsPerSample > 16 && AIBinder_getCallingUid() == AID_MEDIA;
 }
 
 enum {
