@@ -263,9 +263,9 @@ status_t CameraProviderManager::setUpVendorTags() {
 }
 
 status_t CameraProviderManager::openSession(const std::string &id,
-        const sp<hardware::camera::device::V3_2::ICameraDeviceCallback>& callback,
+        const sp<device::V3_2::ICameraDeviceCallback>& callback,
         /*out*/
-        sp<hardware::camera::device::V3_2::ICameraDeviceSession> *session) {
+        sp<device::V3_2::ICameraDeviceSession> *session) {
 
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
@@ -293,9 +293,9 @@ status_t CameraProviderManager::openSession(const std::string &id,
 }
 
 status_t CameraProviderManager::openSession(const std::string &id,
-        const sp<hardware::camera::device::V1_0::ICameraDeviceCallback>& callback,
+        const sp<device::V1_0::ICameraDeviceCallback>& callback,
         /*out*/
-        sp<hardware::camera::device::V1_0::ICameraDevice> *session) {
+        sp<device::V1_0::ICameraDevice> *session) {
 
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
@@ -711,8 +711,7 @@ status_t CameraProviderManager::ProviderInfo::initialize() {
     sp<StatusListener> listener = mManager->getStatusListener();
     for (auto& device : devices) {
         std::string id;
-        status_t res = addDevice(device,
-                hardware::camera::common::V1_0::CameraDeviceStatus::PRESENT, &id);
+        status_t res = addDevice(device, common::V1_0::CameraDeviceStatus::PRESENT, &id);
         if (res != OK) {
             ALOGE("%s: Unable to enumerate camera device '%s': %s (%d)",
                     __FUNCTION__, device.c_str(), strerror(-res), res);
@@ -1275,7 +1274,7 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
         ALOGV("%s: Unable to convert ICameraDevice instance to version 3.5", __FUNCTION__);
         return;
     }
-    sp<hardware::camera::device::V3_5::ICameraDevice> interface_3_5 = castResult;
+    sp<device::V3_5::ICameraDevice> interface_3_5 = castResult;
     if (interface_3_5 == nullptr) {
         ALOGE("%s: Converted ICameraDevice instance to nullptr", __FUNCTION__);
         return;
@@ -1686,7 +1685,7 @@ const char* CameraProviderManager::torchStatusToString(const TorchModeStatus& s)
 
 
 status_t HidlVendorTagDescriptor::createDescriptorFromHidl(
-        const hardware::hidl_vec<hardware::camera::common::V1_0::VendorTagSection>& vts,
+        const hardware::hidl_vec<common::V1_0::VendorTagSection>& vts,
         /*out*/
         sp<VendorTagDescriptor>& descriptor) {
 
@@ -1714,7 +1713,7 @@ status_t HidlVendorTagDescriptor::createDescriptorFromHidl(
 
     int idx = 0;
     for (size_t s = 0; s < vts.size(); s++) {
-        const hardware::camera::common::V1_0::VendorTagSection& section = vts[s];
+        const common::V1_0::VendorTagSection& section = vts[s];
         const char *sectionName = section.sectionName.c_str();
         if (sectionName == NULL) {
             ALOGE("%s: no section name defined for vendor tag section %zu.", __FUNCTION__, s);
