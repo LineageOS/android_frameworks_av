@@ -1807,17 +1807,29 @@ void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
 
 status_t CCodecBufferChannel::renderOutputBuffer(
         const sp<MediaCodecBuffer> &buffer, int64_t timestampNs) {
+    ALOGV("[%s] renderOutputBuffer: %p", mName, buffer.get());
     std::shared_ptr<C2Buffer> c2Buffer;
+    bool released = false;
     {
         Mutexed<std::unique_ptr<OutputBuffers>>::Locked buffers(mOutputBuffers);
         if (*buffers) {
-            (*buffers)->releaseBuffer(buffer, &c2Buffer);
+            released = (*buffers)->releaseBuffer(buffer, &c2Buffer);
         }
     }
+    // NOTE: some apps try to releaseOutputBuffer() with timestamp and/or render
+    //       set to true.
+    sendOutputBuffers();
+    // input buffer feeding may have been gated by pending output buffers
+    feedInputBufferIfAvailable();
     if (!c2Buffer) {
+        if (released) {
+            ALOGD("[%s] The app is calling releaseOutputBuffer() with "
+                  "timestamp or render=true with non-video buffers. Apps should "
+                  "call releaseOutputBuffer() with render=false for those.",
+                  mName);
+        }
         return INVALID_OPERATION;
     }
-    sendOutputBuffers();
 
 #if 0
     const std::vector<std::shared_ptr<const C2Info>> infoParams = c2Buffer->info();
@@ -1961,8 +1973,8 @@ status_t CCodecBufferChannel::discardBuffer(const sp<MediaCodecBuffer> &buffer) 
         }
     }
     if (released) {
-        feedInputBufferIfAvailable();
         sendOutputBuffers();
+        feedInputBufferIfAvailable();
     } else {
         ALOGD("[%s] MediaCodec discarded an unknown buffer", mName);
     }

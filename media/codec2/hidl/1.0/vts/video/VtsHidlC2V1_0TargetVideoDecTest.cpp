@@ -678,8 +678,8 @@ TEST_F(Codec2VideoDecHidlTest, ThumbnailTest) {
         EXPECT_GE(mFramesReceived, 1U);
         ASSERT_EQ(mEos, true);
         ASSERT_EQ(mComponent->stop(), C2_OK);
-        ASSERT_EQ(mComponent->release(), C2_OK);
     }
+    ASSERT_EQ(mComponent->release(), C2_OK);
 }
 
 TEST_F(Codec2VideoDecHidlTest, EOSTest) {
