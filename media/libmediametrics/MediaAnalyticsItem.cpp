@@ -478,7 +478,7 @@ bool MediaAnalyticsItem::getDouble(MediaAnalyticsItem::Attr name, double *value)
 // caller responsible for the returned string
 bool MediaAnalyticsItem::getCString(MediaAnalyticsItem::Attr name, char **value) {
     Prop *prop = findProp(name);
-    if (prop == NULL || prop->mType != kTypeDouble) {
+    if (prop == NULL || prop->mType != kTypeCString) {
         return false;
     }
     if (value != NULL) {
