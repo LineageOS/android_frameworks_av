@@ -34,7 +34,7 @@ import android.media.MediaMetadata2;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer2;
 import android.media.MediaPlayer2.EventCallback;
-import android.media.MediaPlayer2Impl;
+import android.media.MediaPlayer2;
 import android.media.PlaybackParams;
 import android.media.SessionToken2;
 import android.media.SubtitleData;
@@ -719,7 +719,7 @@ public class VideoView2Impl extends BaseLayout
             final Context context = mInstance.getContext();
 
             Log.d(TAG, "openVideo(): creating new MediaPlayer2 instance.");
-            mMediaPlayer = new MediaPlayer2Impl(context);
+            mMediaPlayer = new MediaPlayer2(context);
             mSurfaceView.setMediaPlayer(mMediaPlayer);
             mTextureView.setMediaPlayer(mMediaPlayer);
             mCurrentView.assignSurfaceToMediaPlayer(mMediaPlayer);
