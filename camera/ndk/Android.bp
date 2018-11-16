@@ -70,3 +70,81 @@ cc_library_shared {
     ],
     version_script: "libcamera2ndk.map.txt",
 }
+
+cc_library_shared {
+    name: "libcamera2ndk_vendor",
+    vendor_available: true,
+    srcs: [
+        "ndk_vendor/impl/ACameraDevice.cpp",
+        "ndk_vendor/impl/ACameraManager.cpp",
+        "ndk_vendor/impl/utils.cpp",
+        "impl/ACameraMetadata.cpp",
+        "impl/ACameraCaptureSession.cpp",
+        "NdkCameraMetadata.cpp",
+        "NdkCameraCaptureSession.cpp",
+        "NdkCameraManager.cpp",
+        "NdkCameraDevice.cpp",
+        "NdkCaptureRequest.cpp",
+    ],
+
+    export_include_dirs: ["include"],
+    export_shared_lib_headers: [
+        "libcutils",
+    ],
+    local_include_dirs: [
+        ".",
+        "include",
+        "impl",
+    ],
+    cflags: [
+        "-fvisibility=hidden",
+        "-DEXPORT=__attribute__((visibility(\"default\")))",
+        "-D__ANDROID_VNDK__",
+    ],
+
+    shared_libs: [
+        "libhwbinder",
+        "libfmq",
+        "libhidlbase",
+        "libhardware",
+        "libnativewindow",
+        "liblog",
+        "libutils",
+        "libstagefright_foundation",
+        "libcutils",
+        "libcamera_metadata",
+        "libmediandk",
+        "android.frameworks.cameraservice.device@2.0",
+        "android.frameworks.cameraservice.common@2.0",
+        "android.frameworks.cameraservice.service@2.0",
+    ],
+
+    static_libs: [
+        "android.hardware.camera.common@1.0-helper",
+        "libarect",
+    ],
+    product_variables: {
+        pdk: {
+            enabled: false,
+        },
+    },
+}
+
+cc_test {
+    name: "AImageReaderVendorTest",
+    vendor: true,
+    srcs: ["ndk_vendor/tests/AImageReaderVendorTest.cpp"],
+    shared_libs: [
+        "libhwbinder",
+        "libcamera2ndk_vendor",
+        "libmediandk",
+        "libnativewindow",
+        "libutils",
+        "libui",
+        "libcutils",
+        "liblog",
+    ],
+    cflags: [
+        "-D__ANDROID_VNDK__",
+    ],
+}

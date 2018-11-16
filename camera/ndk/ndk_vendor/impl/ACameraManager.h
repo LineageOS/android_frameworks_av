@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,9 @@
 #include <camera/NdkCameraManager.h>
 
 #include <android-base/parseint.h>
-#include <android/hardware/ICameraService.h>
-#include <android/hardware/BnCameraServiceListener.h>
-#include <camera/CameraMetadata.h>
-#include <binder/IServiceManager.h>
+#include <android/frameworks/cameraservice/service/2.0/ICameraService.h>
+
+#include <CameraMetadata.h>
 #include <utils/StrongPointer.h>
 #include <utils/Mutex.h>
 
@@ -37,6 +36,17 @@
 namespace android {
 namespace acam {
 
+using ICameraService = frameworks::cameraservice::service::V2_0::ICameraService;
+using CameraDeviceStatus = frameworks::cameraservice::service::V2_0::CameraDeviceStatus;
+using ICameraServiceListener = frameworks::cameraservice::service::V2_0::ICameraServiceListener;
+using CameraStatusAndId = frameworks::cameraservice::service::V2_0::CameraStatusAndId;
+using Status = frameworks::cameraservice::common::V2_0::Status;
+using VendorTagSection = frameworks::cameraservice::common::V2_0::VendorTagSection;
+using VendorTag = frameworks::cameraservice::common::V2_0::VendorTag;
+using IBase = android::hidl::base::V1_0::IBase;
+using android::hardware::hidl_string;
+using hardware::Void;
+
 /**
  * Per-process singleton instance of CameraManger. Shared by all ACameraManager
  * instances. Created when first ACameraManager is created and destroyed when
@@ -47,7 +57,7 @@ namespace acam {
 class CameraManagerGlobal final : public RefBase {
   public:
     static CameraManagerGlobal& getInstance();
-    sp<hardware::ICameraService> getCameraService();
+    sp<ICameraService> getCameraService();
 
     void registerAvailabilityCallback(
             const ACameraManager_AvailabilityCallbacks *callback);
@@ -57,34 +67,28 @@ class CameraManagerGlobal final : public RefBase {
     /**
      * Return camera IDs that support camera2
      */
-    void getCameraIdList(std::vector<String8> *cameraIds);
+    void getCameraIdList(std::vector<hidl_string> *cameraIds);
 
   private:
-    sp<hardware::ICameraService> mCameraService;
+    sp<ICameraService> mCameraService;
     const int          kCameraServicePollDelay = 500000; // 0.5s
-    const char*        kCameraServiceName      = "media.camera";
     Mutex              mLock;
-
-    class DeathNotifier : public IBinder::DeathRecipient {
+    class DeathNotifier : public android::hardware::hidl_death_recipient {
       public:
         explicit DeathNotifier(CameraManagerGlobal* cm) : mCameraManager(cm) {}
       protected:
         // IBinder::DeathRecipient implementation
-        virtual void binderDied(const wp<IBinder>& who);
+        virtual void serviceDied(uint64_t cookie, const wp<IBase> &who);
       private:
         const wp<CameraManagerGlobal> mCameraManager;
     };
     sp<DeathNotifier> mDeathNotifier;
 
-    class CameraServiceListener final : public hardware::BnCameraServiceListener {
+    class CameraServiceListener final : public ICameraServiceListener {
       public:
         explicit CameraServiceListener(CameraManagerGlobal* cm) : mCameraManager(cm) {}
-        virtual binder::Status onStatusChanged(int32_t status, const String16& cameraId);
-
-        // Torch API not implemented yet
-        virtual binder::Status onTorchStatusChanged(int32_t, const String16&) {
-            return binder::Status::ok();
-        }
+        android::hardware::Return<void> onStatusChanged(
+            const CameraStatusAndId &statusAndId) override;
 
       private:
         const wp<CameraManagerGlobal> mCameraManager;
@@ -136,16 +140,16 @@ class CameraManagerGlobal final : public RefBase {
     sp<CallbackHandler> mHandler;
     sp<ALooper>         mCbLooper; // Looper thread where callbacks actually happen on
 
-    void onStatusChanged(int32_t status, const String8& cameraId);
-    void onStatusChangedLocked(int32_t status, const String8& cameraId);
+    void onStatusChanged(const CameraStatusAndId &statusAndId);
+    void onStatusChangedLocked(const CameraStatusAndId &statusAndId);
     // Utils for status
-    static bool validStatus(int32_t status);
-    static bool isStatusAvailable(int32_t status);
+    static bool validStatus(CameraDeviceStatus status);
+    static bool isStatusAvailable(CameraDeviceStatus status);
 
     // The sort logic must match the logic in
     // libcameraservice/common/CameraProviderManager.cpp::getAPI1CompatibleCameraDeviceIds
     struct CameraIdComparator {
-        bool operator()(const String8& a, const String8& b) const {
+        bool operator()(const hidl_string& a, const hidl_string& b) const {
             uint32_t aUint = 0, bUint = 0;
             bool aIsUint = base::ParseUint(a.c_str(), &aUint);
             bool bIsUint = base::ParseUint(b.c_str(), &bUint);
@@ -164,7 +168,7 @@ class CameraManagerGlobal final : public RefBase {
     };
 
     // Map camera_id -> status
-    std::map<String8, int32_t, CameraIdComparator> mDeviceStatusMap;
+    std::map<hidl_string, CameraDeviceStatus, CameraIdComparator> mDeviceStatusMap;
 
     // For the singleton instance
     static Mutex sLock;
@@ -189,6 +193,7 @@ struct ACameraManager {
 
     camera_status_t getCameraCharacteristics(
             const char* cameraId, android::sp<ACameraMetadata>* characteristics);
+
     camera_status_t openCamera(const char* cameraId,
                                ACameraDevice_StateCallbacks* callback,
                                /*out*/ACameraDevice** device);

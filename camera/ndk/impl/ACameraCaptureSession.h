@@ -19,12 +19,17 @@
 #include <set>
 #include <hardware/camera3.h>
 #include <camera/NdkCameraDevice.h>
+
+#ifdef __ANDROID_VNDK__
+#include "ndk_vendor/impl/ACameraDevice.h"
+#include "ndk_vendor/impl/ACameraCaptureSessionVendor.h"
+#else
 #include "ACameraDevice.h"
 
 using namespace android;
 
 struct ACaptureSessionOutput {
-    explicit ACaptureSessionOutput(ANativeWindow* window, bool isShared = false) :
+    explicit ACaptureSessionOutput(ACameraWindowType* window, bool isShared = false) :
             mWindow(window), mIsShared(isShared) {};
 
     bool operator == (const ACaptureSessionOutput& other) const {
@@ -40,11 +45,12 @@ struct ACaptureSessionOutput {
         return mWindow > other.mWindow;
     }
 
-    ANativeWindow* mWindow;
-    std::set<ANativeWindow *> mSharedWindows;
+    ACameraWindowType* mWindow;
+    std::set<ACameraWindowType *> mSharedWindows;
     bool           mIsShared;
     int            mRotation = CAMERA3_STREAM_ROTATION_0;
 };
+#endif
 
 struct ACaptureSessionOutputContainer {
     std::set<ACaptureSessionOutput> mOutputs;
@@ -60,7 +66,7 @@ struct ACameraCaptureSession : public RefBase {
             int id,
             const ACaptureSessionOutputContainer* outputs,
             const ACameraCaptureSession_stateCallbacks* cb,
-            CameraDevice* device) :
+            android::acam::CameraDevice* device) :
             mId(id), mOutput(*outputs), mUserSessionCallback(*cb),
             mDevice(device) {}
 
@@ -97,18 +103,18 @@ struct ACameraCaptureSession : public RefBase {
     ACameraDevice* getDevice();
 
   private:
-    friend class CameraDevice;
+    friend class android::acam::CameraDevice;
 
     // Close session because app close camera device, camera device got ERROR_DISCONNECTED,
     // or a new session is replacing this session.
     void closeByDevice();
 
-    sp<CameraDevice> getDeviceSp();
+    sp<android::acam::CameraDevice> getDeviceSp();
 
     const int mId;
     const ACaptureSessionOutputContainer mOutput;
     const ACameraCaptureSession_stateCallbacks mUserSessionCallback;
-    const wp<CameraDevice> mDevice;
+    const wp<android::acam::CameraDevice> mDevice;
     bool  mIsClosed = false;
     bool  mClosedByApp = false;
     Mutex mSessionLock;

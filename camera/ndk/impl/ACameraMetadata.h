@@ -22,7 +22,13 @@
 #include <utils/Mutex.h>
 #include <utils/RefBase.h>
 #include <utils/Vector.h>
+
+#ifdef __ANDROID_VNDK__
+#include <CameraMetadata.h>
+using CameraMetadata = android::hardware::camera::common::V1_0::helper::CameraMetadata;
+#else
 #include <camera/CameraMetadata.h>
+#endif
 
 #include <camera/NdkCameraMetadata.h>
 

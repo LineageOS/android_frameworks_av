@@ -24,7 +24,15 @@
 #include <camera/NdkCameraDevice.h>
 #include "impl/ACameraCaptureSession.h"
 
-using namespace android;
+using namespace android::acam;
+
+bool areWindowTypesEqual(ACameraWindowType *a, ACameraWindowType *b) {
+#ifdef __ANDROID_VNDK__
+    return utils::isWindowNativeHandleEqual(a, b);
+#else
+    return a == b;
+#endif
+}
 
 EXPORT
 camera_status_t ACameraDevice_close(ACameraDevice* device) {
@@ -96,7 +104,7 @@ void ACaptureSessionOutputContainer_free(ACaptureSessionOutputContainer* contain
 
 EXPORT
 camera_status_t ACaptureSessionOutput_create(
-        ANativeWindow* window, /*out*/ACaptureSessionOutput** out) {
+        ACameraWindowType* window, /*out*/ACaptureSessionOutput** out) {
     ATRACE_CALL();
     if (window == nullptr || out == nullptr) {
         ALOGE("%s: Error: bad argument. window %p, out %p",
@@ -109,7 +117,7 @@ camera_status_t ACaptureSessionOutput_create(
 
 EXPORT
 camera_status_t ACaptureSessionSharedOutput_create(
-        ANativeWindow* window, /*out*/ACaptureSessionOutput** out) {
+        ACameraWindowType* window, /*out*/ACaptureSessionOutput** out) {
     ATRACE_CALL();
     if (window == nullptr || out == nullptr) {
         ALOGE("%s: Error: bad argument. window %p, out %p",
@@ -122,7 +130,7 @@ camera_status_t ACaptureSessionSharedOutput_create(
 
 EXPORT
 camera_status_t ACaptureSessionSharedOutput_add(ACaptureSessionOutput *out,
-        ANativeWindow* window) {
+        ACameraWindowType* window) {
     ATRACE_CALL();
     if ((window == nullptr) || (out == nullptr)) {
         ALOGE("%s: Error: bad argument. window %p, out %p",
@@ -134,7 +142,7 @@ camera_status_t ACaptureSessionSharedOutput_add(ACaptureSessionOutput *out,
                 __FUNCTION__);
         return ACAMERA_ERROR_INVALID_OPERATION;
     }
-    if (out->mWindow == window) {
+    if (areWindowTypesEqual(out->mWindow, window)) {
         ALOGE("%s: Error trying to add the same window associated with the output configuration",
                 __FUNCTION__);
         return ACAMERA_ERROR_INVALID_PARAMETER;
@@ -147,7 +155,7 @@ camera_status_t ACaptureSessionSharedOutput_add(ACaptureSessionOutput *out,
 
 EXPORT
 camera_status_t ACaptureSessionSharedOutput_remove(ACaptureSessionOutput *out,
-        ANativeWindow* window) {
+        ACameraWindowType* window) {
     ATRACE_CALL();
     if ((window == nullptr) || (out == nullptr)) {
         ALOGE("%s: Error: bad argument. window %p, out %p",
@@ -159,7 +167,7 @@ camera_status_t ACaptureSessionSharedOutput_remove(ACaptureSessionOutput *out,
                 __FUNCTION__);
         return ACAMERA_ERROR_INVALID_OPERATION;
     }
-    if (out->mWindow == window) {
+    if (areWindowTypesEqual(out->mWindow, window)) {
         ALOGE("%s: Error trying to remove the same window associated with the output configuration",
                 __FUNCTION__);
         return ACAMERA_ERROR_INVALID_PARAMETER;
