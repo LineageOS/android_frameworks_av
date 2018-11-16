@@ -93,5 +93,12 @@
             <Limit name="complexity" range="0-8"  default="5" />
             <Feature name="bitrate-modes" value="CQ" />
         </MediaCodec>
+        <MediaCodec name="c2.android.opus.encoder" type="audio/opus">
+            <Limit name="channel-count" max="2" />
+            <Limit name="sample-rate" ranges="8000,12000,16000,24000,48000" />
+            <Limit name="bitrate" range="500-512000" />
+            <Limit name="complexity" range="0-10"  default="5" />
+            <Feature name="bitrate-modes" value="CQ" />
+        </MediaCodec>
     </Encoders>
 </Included>

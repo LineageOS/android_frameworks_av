@@ -817,6 +817,7 @@ C2PlatformComponentStore::C2PlatformComponentStore()
     emplace("c2.android.mp3.decoder", "libcodec2_soft_mp3dec.so");
     emplace("c2.android.vorbis.decoder", "libcodec2_soft_vorbisdec.so");
     emplace("c2.android.opus.decoder", "libcodec2_soft_opusdec.so");
+    emplace("c2.android.opus.encoder", "libcodec2_soft_opusenc.so");
     emplace("c2.android.vp8.decoder", "libcodec2_soft_vp8dec.so");
     emplace("c2.android.vp9.decoder", "libcodec2_soft_vp9dec.so");
     emplace("c2.android.vp8.encoder", "libcodec2_soft_vp8enc.so");
