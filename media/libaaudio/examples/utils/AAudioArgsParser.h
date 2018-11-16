@@ -130,10 +130,12 @@ public:
     }
 
     int32_t getBufferCapacity() const {
+        printf("%s() returns %d\n", __func__, mBufferCapacity);
         return mBufferCapacity;
     }
 
     void setBufferCapacity(int32_t frames) {
+        printf("%s(%d)\n", __func__, frames);
         mBufferCapacity = frames;
     }
 
@@ -197,7 +199,7 @@ public:
      * @param builder
      */
     void applyParameters(AAudioStreamBuilder *builder) const {
-        AAudioStreamBuilder_setBufferCapacityInFrames(builder, mBufferCapacity);
+        AAudioStreamBuilder_setBufferCapacityInFrames(builder, getBufferCapacity());
         AAudioStreamBuilder_setChannelCount(builder, mChannelCount);
         AAudioStreamBuilder_setDeviceId(builder, mDeviceId);
         AAudioStreamBuilder_setFormat(builder, mFormat);
@@ -281,7 +283,7 @@ public:
                     if (strlen(arg) > 2) {
                         policy = atoi(&arg[2]);
                     }
-                    if (!AAudio_setMMapPolicy(policy)) {
+                    if (AAudio_setMMapPolicy(policy) != AAUDIO_OK) {
                         printf("ERROR: invalid MMAP policy mode %i\n", policy);
                     }
                 } break;
