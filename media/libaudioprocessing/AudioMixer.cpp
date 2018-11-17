@@ -113,10 +113,10 @@ status_t AudioMixer::create(
         // Integer volume.
         // Currently integer volume is kept for the legacy integer mixer.
         // Will be removed when the legacy mixer path is removed.
-        t->volume[0] = UNITY_GAIN_INT;
-        t->volume[1] = UNITY_GAIN_INT;
-        t->prevVolume[0] = UNITY_GAIN_INT << 16;
-        t->prevVolume[1] = UNITY_GAIN_INT << 16;
+        t->volume[0] = 0;
+        t->volume[1] = 0;
+        t->prevVolume[0] = 0 << 16;
+        t->prevVolume[1] = 0 << 16;
         t->volumeInc[0] = 0;
         t->volumeInc[1] = 0;
         t->auxLevel = 0;
@@ -124,10 +124,10 @@ status_t AudioMixer::create(
         t->prevAuxLevel = 0;
 
         // Floating point volume.
-        t->mVolume[0] = UNITY_GAIN_FLOAT;
-        t->mVolume[1] = UNITY_GAIN_FLOAT;
-        t->mPrevVolume[0] = UNITY_GAIN_FLOAT;
-        t->mPrevVolume[1] = UNITY_GAIN_FLOAT;
+        t->mVolume[0] = 0.f;
+        t->mVolume[1] = 0.f;
+        t->mPrevVolume[0] = 0.f;
+        t->mPrevVolume[1] = 0.f;
         t->mVolumeInc[0] = 0.;
         t->mVolumeInc[1] = 0.;
         t->mAuxLevel = 0.;
