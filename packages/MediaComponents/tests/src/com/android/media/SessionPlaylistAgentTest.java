@@ -21,6 +21,7 @@ import static org.mockito.Mockito.*;
 import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.DataSourceDesc;
+import android.media.UriDataSourceDesc;
 import android.media.MediaItem2;
 import android.media.MediaMetadata2;
 import android.media.MediaPlayerBase;
@@ -119,7 +120,7 @@ public class SessionPlaylistAgentTest extends AndroidTestCase {
             if (item.getMediaId().contains("WITHOUT_DSD")) {
                 return null;
             }
-            return new DataSourceDesc.Builder()
+            return new UriDataSourceDesc.Builder()
                     .setDataSource(getContext(), Uri.parse("dsd://test"))
                     .setMediaId(item.getMediaId())
                     .build();
