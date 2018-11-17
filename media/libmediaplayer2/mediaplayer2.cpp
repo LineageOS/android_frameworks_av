@@ -218,8 +218,8 @@ status_t dumpPlayers(int fd, const Vector<String16>& args) {
 }  // anonymous namespace
 
 //static
-sp<MediaPlayer2> MediaPlayer2::Create() {
-    sp<MediaPlayer2> player = new MediaPlayer2();
+sp<MediaPlayer2> MediaPlayer2::Create(int32_t sessionId) {
+    sp<MediaPlayer2> player = new MediaPlayer2(sessionId);
 
     if (!player->init()) {
         return NULL;
@@ -236,7 +236,7 @@ status_t MediaPlayer2::DumpAll(int fd, const Vector<String16>& args) {
     return dumpPlayers(fd, args);
 }
 
-MediaPlayer2::MediaPlayer2() {
+MediaPlayer2::MediaPlayer2(int32_t sessionId) {
     ALOGV("constructor");
     mSrcId = 0;
     mLockThreadId = 0;
@@ -251,20 +251,17 @@ MediaPlayer2::MediaPlayer2() {
     mLoop = false;
     mVolume = 1.0;
     mVideoWidth = mVideoHeight = 0;
-    mAudioSessionId = (audio_session_t) AudioSystem::newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
-    AudioSystem::acquireAudioSessionId(mAudioSessionId, -1);
     mSendLevel = 0;
 
     // TODO: get pid and uid from JAVA
     mPid = IPCThreadState::self()->getCallingPid();
     mUid = IPCThreadState::self()->getCallingUid();
 
-    mAudioOutput = new MediaPlayer2AudioOutput(mAudioSessionId, mUid, mPid, NULL /*attributes*/);
+    mAudioOutput = new MediaPlayer2AudioOutput(sessionId, mUid, mPid, NULL /*attributes*/);
 }
 
 MediaPlayer2::~MediaPlayer2() {
     ALOGV("destructor");
-    AudioSystem::releaseAudioSessionId(mAudioSessionId, -1);
     disconnect();
     removePlayer(this);
 }
@@ -891,7 +888,7 @@ status_t MediaPlayer2::setVolume(float volume) {
     return OK;
 }
 
-status_t MediaPlayer2::setAudioSessionId(audio_session_t sessionId) {
+status_t MediaPlayer2::setAudioSessionId(int32_t sessionId) {
     ALOGV("MediaPlayer2::setAudioSessionId(%d)", sessionId);
     Mutex::Autolock _l(mLock);
     if (!(mCurrentState & MEDIA_PLAYER2_IDLE)) {
@@ -901,20 +898,18 @@ status_t MediaPlayer2::setAudioSessionId(audio_session_t sessionId) {
     if (sessionId < 0) {
         return BAD_VALUE;
     }
-    if (sessionId != mAudioSessionId) {
-        AudioSystem::acquireAudioSessionId(sessionId, -1);
-        AudioSystem::releaseAudioSessionId(mAudioSessionId, -1);
-        mAudioSessionId = sessionId;
-    }
-    if (mAudioOutput != NULL && mAudioSessionId != mAudioOutput->getSessionId()) {
+    if (mAudioOutput != NULL && sessionId != mAudioOutput->getSessionId()) {
         mAudioOutput->setSessionId(sessionId);
     }
     return NO_ERROR;
 }
 
-audio_session_t MediaPlayer2::getAudioSessionId() {
+int32_t MediaPlayer2::getAudioSessionId() {
     Mutex::Autolock _l(mLock);
-    return mAudioSessionId;
+    if (mAudioOutput != NULL) {
+        return mAudioOutput->getSessionId();
+    }
+    return 0;
 }
 
 status_t MediaPlayer2::setAuxEffectSendLevel(float level) {

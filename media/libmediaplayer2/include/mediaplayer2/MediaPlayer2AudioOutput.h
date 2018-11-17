@@ -38,7 +38,7 @@ class MediaPlayer2AudioOutput : public MediaPlayer2Interface::AudioSink
     class CallbackData;
 
 public:
-    MediaPlayer2AudioOutput(audio_session_t sessionId,
+    MediaPlayer2AudioOutput(int32_t sessionId,
                             uid_t uid,
                             int pid,
                             const jobject attributes);
@@ -57,8 +57,8 @@ public:
     virtual status_t getTimestamp(AudioTimestamp &ts) const;
     virtual int64_t getPlayedOutDurationUs(int64_t nowUs) const;
     virtual status_t getFramesWritten(uint32_t *frameswritten) const;
-    virtual audio_session_t getSessionId() const;
-    virtual void setSessionId(const audio_session_t id);
+    virtual int32_t getSessionId() const;
+    virtual void setSessionId(const int32_t id);
     virtual uint32_t getSampleRate() const;
     virtual int64_t getBufferDurationInUs() const;
 
@@ -117,7 +117,7 @@ private:
     uint32_t                mSampleRateHz; // sample rate of the content, as set in open()
     float                   mMsecsPerFrame;
     size_t                  mFrameSize;
-    audio_session_t         mSessionId;
+    int32_t                 mSessionId;
     uid_t                   mUid;
     int                     mPid;
     float                   mSendLevel;

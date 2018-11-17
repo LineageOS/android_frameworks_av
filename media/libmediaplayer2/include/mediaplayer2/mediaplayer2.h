@@ -55,7 +55,7 @@ class MediaPlayer2 : public MediaPlayer2InterfaceListener
 public:
     ~MediaPlayer2();
 
-    static sp<MediaPlayer2> Create();
+    static sp<MediaPlayer2> Create(int32_t sessionId);
     static status_t DumpAll(int fd, const Vector<String16>& args);
 
             void            disconnect();
@@ -96,8 +96,8 @@ public:
             void            notify(int64_t srcId, int msg, int ext1, int ext2,
                                    const PlayerMessage *obj = NULL);
             status_t        invoke(const PlayerMessage &request, PlayerMessage *reply);
-            status_t        setAudioSessionId(audio_session_t sessionId);
-            audio_session_t getAudioSessionId();
+            status_t        setAudioSessionId(int32_t sessionId);
+            int32_t         getAudioSessionId();
             status_t        setAuxEffectSendLevel(float level);
             status_t        attachAuxEffect(int effectId);
             status_t        setAudioAttributes(const jobject attributes);
@@ -116,7 +116,7 @@ public:
             status_t        dump(int fd, const Vector<String16>& args);
 
 private:
-    MediaPlayer2();
+    MediaPlayer2(int32_t sessionId);
     bool init();
 
     // Disconnect from the currently connected ANativeWindow.
@@ -150,7 +150,7 @@ private:
     float                       mVolume;
     int                         mVideoWidth;
     int                         mVideoHeight;
-    audio_session_t             mAudioSessionId;
+    int32_t                     mAudioSessionId;
     sp<JObjectHolder>           mAudioAttributes;
     float                       mSendLevel;
     sp<ANativeWindowWrapper>    mConnectedWindow;
