@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,28 +23,47 @@
 #include <utility>
 #include <utils/StrongPointer.h>
 #include <utils/Mutex.h>
-#include <utils/String8.h>
 #include <utils/List.h>
 #include <utils/Vector.h>
-
-#include <android/hardware/camera2/BnCameraDeviceCallbacks.h>
-#include <android/hardware/camera2/ICameraDeviceUser.h>
+#include <android/frameworks/cameraservice/device/2.0/ICameraDeviceUser.h>
+#include <android/frameworks/cameraservice/device/2.0/ICameraDeviceCallback.h>
+#include <android/frameworks/cameraservice/device/2.0/types.h>
+#include <fmq/MessageQueue.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AHandler.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <camera/CaptureResult.h>
-#include <camera/camera2/OutputConfiguration.h>
-#include <camera/camera2/CaptureRequest.h>
 
 #include <camera/NdkCameraManager.h>
 #include <camera/NdkCameraCaptureSession.h>
 #include "ACameraMetadata.h"
+#include "utils.h"
 
 namespace android {
 namespace acam {
 
+using ICameraDeviceCallback = frameworks::cameraservice::device::V2_0::ICameraDeviceCallback;
+using ICameraDeviceUser = frameworks::cameraservice::device::V2_0::ICameraDeviceUser;
+using CaptureResultExtras = frameworks::cameraservice::device::V2_0::CaptureResultExtras;
+using PhysicalCaptureResultInfo = frameworks::cameraservice::device::V2_0::PhysicalCaptureResultInfo;
+using PhysicalCameraSettings = frameworks::cameraservice::device::V2_0::PhysicalCameraSettings;
+using SubmitInfo = frameworks::cameraservice::device::V2_0::SubmitInfo;
+using CaptureResultExtras = frameworks::cameraservice::device::V2_0::CaptureResultExtras;
+using ErrorCode = frameworks::cameraservice::device::V2_0::ErrorCode;
+using FmqSizeOrMetadata = frameworks::cameraservice::device::V2_0::FmqSizeOrMetadata;
+using StreamConfigurationMode = frameworks::cameraservice::device::V2_0::StreamConfigurationMode;
+using Status = frameworks::cameraservice::common::V2_0::Status;
+using ResultMetadataQueue = hardware::MessageQueue<uint8_t, hardware::kSynchronizedReadWrite>;
+using RequestMetadataQueue = hardware::MessageQueue<uint8_t, hardware::kSynchronizedReadWrite>;
+using CameraStatusAndId = frameworks::cameraservice::service::V2_0::CameraStatusAndId;
+
+using hardware::hidl_vec;
+using hardware::hidl_string;
+using utils::native_handle_ptr_wrapper;
+using utils::CaptureRequest;
+using utils::OutputConfigurationWrapper;
+
 // Wrap ACameraCaptureFailure so it can be ref-counted
-struct CameraCaptureFailure : public RefBase, public ACameraCaptureFailure {};
+struct CameraCaptureFailure : public RefBase, public ACameraCaptureFailure { };
 
 class CameraDevice final : public RefBase {
   public:
@@ -53,7 +72,7 @@ class CameraDevice final : public RefBase {
                   ACameraDevice* wrapper);
     ~CameraDevice();
 
-    inline const char* getId() const { return mCameraId.string(); }
+    inline const char* getId() const { return mCameraId.c_str(); }
 
     camera_status_t createCaptureRequest(
             ACameraDevice_request_template templateId,
@@ -66,35 +85,35 @@ class CameraDevice final : public RefBase {
             /*out*/ACameraCaptureSession** session);
 
     // Callbacks from camera service
-    class ServiceCallback : public hardware::camera2::BnCameraDeviceCallbacks {
+    class ServiceCallback : public ICameraDeviceCallback {
       public:
         explicit ServiceCallback(CameraDevice* device) : mDevice(device) {}
-        binder::Status onDeviceError(int32_t errorCode,
+        android::hardware::Return<void> onDeviceError(ErrorCode errorCode,
                            const CaptureResultExtras& resultExtras) override;
-        binder::Status onDeviceIdle() override;
-        binder::Status onCaptureStarted(const CaptureResultExtras& resultExtras,
-                              int64_t timestamp) override;
-        binder::Status onResultReceived(const CameraMetadata& metadata,
+        android::hardware::Return<void> onDeviceIdle() override;
+        android::hardware::Return<void> onCaptureStarted(const CaptureResultExtras& resultExtras,
+                              uint64_t timestamp) override;
+        android::hardware::Return<void> onResultReceived(const FmqSizeOrMetadata& result,
                               const CaptureResultExtras& resultExtras,
-                              const std::vector<PhysicalCaptureResultInfo>& physicalResultInfos) override;
-        binder::Status onPrepared(int streamId) override;
-        binder::Status onRequestQueueEmpty() override;
-        binder::Status onRepeatingRequestError(int64_t lastFrameNumber,
+                              const hidl_vec<PhysicalCaptureResultInfo>& physicalResultInfos) override;
+        android::hardware::Return<void> onRepeatingRequestError(uint64_t lastFrameNumber,
                 int32_t stoppedSequenceId) override;
       private:
         const wp<CameraDevice> mDevice;
     };
-    inline sp<hardware::camera2::ICameraDeviceCallbacks> getServiceCallback() {
+    inline sp<ICameraDeviceCallback> getServiceCallback() {
         return mServiceCallback;
     };
 
     // Camera device is only functional after remote being set
-    void setRemoteDevice(sp<hardware::camera2::ICameraDeviceUser> remote);
+    void setRemoteDevice(sp<ICameraDeviceUser> remote);
 
+    bool setDeviceMetadataQueues();
     inline ACameraDevice* getWrapper() const { return mWrapper; };
 
   private:
     friend ACameraCaptureSession;
+
     camera_status_t checkCameraClosedOrErrorLocked() const;
 
     // device goes into fatal error state after this
@@ -148,21 +167,16 @@ class CameraDevice final : public RefBase {
     // Input message will be posted and cleared after this returns
     void postSessionMsgAndCleanup(sp<AMessage>& msg);
 
-    static camera_status_t getIGBPfromAnw(
-            ANativeWindow* anw, sp<IGraphicBufferProducer>& out);
-
-    static camera_status_t getSurfaceFromANativeWindow(
-            ANativeWindow* anw, sp<Surface>& out);
-
     mutable Mutex mDeviceLock;
-    const String8 mCameraId;                          // Camera ID
+    const hidl_string mCameraId;                          // Camera ID
     const ACameraDevice_StateCallbacks mAppCallbacks; // Callback to app
-    const sp<ACameraMetadata> mChars;                 // Camera characteristics
+    const sp<ACameraMetadata> mChars;    // Camera characteristics
     const sp<ServiceCallback> mServiceCallback;
     ACameraDevice* mWrapper;
 
-    // stream id -> pair of (ANW* from application, OutputConfiguration used for camera service)
-    std::map<int, std::pair<ANativeWindow*, OutputConfiguration>> mConfiguredOutputs;
+    // stream id -> pair of (ACameraWindowType* from application, OutputConfiguration used for
+    // camera service)
+    std::map<int, std::pair<native_handle_ptr_wrapper, OutputConfigurationWrapper>> mConfiguredOutputs;
 
     // TODO: maybe a bool will suffice for synchronous implementation?
     std::atomic_bool mClosing;
@@ -171,14 +185,14 @@ class CameraDevice final : public RefBase {
     bool mInError = false;
     camera_status_t mError = ACAMERA_OK;
     void onCaptureErrorLocked(
-            int32_t errorCode,
+            ErrorCode errorCode,
             const CaptureResultExtras& resultExtras);
 
     bool mIdle = true;
     // This will avoid a busy session being deleted before it's back to idle state
     sp<ACameraCaptureSession> mBusySession;
 
-    sp<hardware::camera2::ICameraDeviceUser> mRemote;
+    sp<ICameraDeviceUser> mRemote;
 
     // Looper thread to handle callback to app
     sp<ALooper> mCbLooper;
@@ -238,11 +252,11 @@ class CameraDevice final : public RefBase {
     int mRepeatingSequenceId = REQUEST_ID_NONE;
 
     // sequence id -> last frame number map
-    std::map<int, int64_t> mSequenceLastFrameNumberMap;
+    std::map<int32_t, int64_t> mSequenceLastFrameNumberMap;
 
     struct CallbackHolder {
         CallbackHolder(sp<ACameraCaptureSession>          session,
-                       const Vector<sp<CaptureRequest> >& requests,
+                       const Vector<sp<CaptureRequest>>&  requests,
                        bool                               isRepeating,
                        ACameraCaptureSession_captureCallbacks* cbs);
 
@@ -255,7 +269,7 @@ class CameraDevice final : public RefBase {
         }
 
         sp<ACameraCaptureSession>   mSession;
-        Vector<sp<CaptureRequest> > mRequests;
+        Vector<sp<CaptureRequest>> mRequests;
         const bool                  mIsRepeating;
         ACameraCaptureSession_captureCallbacks mCallbacks;
     };
@@ -284,7 +298,8 @@ class CameraDevice final : public RefBase {
     // Misc variables
     int32_t mShadingMapSize[2];   // const after constructor
     int32_t mPartialResultCount;  // const after constructor
-
+    std::shared_ptr<ResultMetadataQueue> mCaptureRequestMetadataQueue = nullptr;
+    std::shared_ptr<ResultMetadataQueue> mCaptureResultMetadataQueue = nullptr;
 };
 
 } // namespace acam;
@@ -297,7 +312,7 @@ class CameraDevice final : public RefBase {
 struct ACameraDevice {
     ACameraDevice(const char* id, ACameraDevice_StateCallbacks* cb,
                   sp<ACameraMetadata> chars) :
-            mDevice(new android::acam::CameraDevice(id, cb, chars, this)) {}
+            mDevice(new android::acam::CameraDevice(id, cb, std::move(chars), this)) {}
 
     ~ACameraDevice() {};
 
@@ -323,15 +338,17 @@ struct ACameraDevice {
     /***********************
      * Device interal APIs *
      ***********************/
-    inline android::sp<android::hardware::camera2::ICameraDeviceCallbacks> getServiceCallback() {
+    inline android::sp<android::acam::ICameraDeviceCallback> getServiceCallback() {
         return mDevice->getServiceCallback();
     };
 
     // Camera device is only functional after remote being set
-    inline void setRemoteDevice(android::sp<android::hardware::camera2::ICameraDeviceUser> remote) {
+    inline void setRemoteDevice(android::sp<android::acam::ICameraDeviceUser> remote) {
         mDevice->setRemoteDevice(remote);
     }
-
+    inline bool setDeviceMetadataQueues() {
+        return mDevice->setDeviceMetadataQueues();
+    }
   private:
     android::sp<android::acam::CameraDevice> mDevice;
 };

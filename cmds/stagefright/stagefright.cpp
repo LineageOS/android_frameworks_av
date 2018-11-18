@@ -716,7 +716,7 @@ int main(int argc, char **argv) {
     gWriteMP4 = false;
     gDisplayHistogram = false;
 
-    sp<ALooper> looper;
+    sp<android::ALooper> looper;
 
     int res;
     while ((res = getopt(argc, argv, "vhaqn:lm:b:ptsrow:kN:xSTd:D:")) >= 0) {

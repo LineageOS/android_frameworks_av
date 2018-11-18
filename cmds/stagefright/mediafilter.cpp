@@ -310,7 +310,7 @@ void tryDrainOutputBuffer(
 }
 
 static int decode(
-        const sp<ALooper> &looper,
+        const sp<android::ALooper> &looper,
         const char *path,
         const sp<Surface> &surface,
         bool renderSurface,
@@ -465,7 +465,7 @@ static int decode(
     filterState->mSignalledInputEOS = false;
     filterState->mSawOutputEOS = false;
 
-    int64_t startTimeUs = ALooper::GetNowUs();
+    int64_t startTimeUs = android::ALooper::GetNowUs();
     int64_t startTimeRender = -1;
 
     for (size_t i = 0; i < stateByTrack.size(); ++i) {
@@ -643,7 +643,7 @@ static int decode(
                 useTimestamp, &startTimeRender);
     }
 
-    int64_t elapsedTimeUs = ALooper::GetNowUs() - startTimeUs;
+    int64_t elapsedTimeUs = android::ALooper::GetNowUs() - startTimeUs;
 
     for (size_t i = 0; i < stateByTrack.size(); ++i) {
         CodecState *state = &stateByTrack.editValueAt(i);
@@ -737,7 +737,7 @@ int main(int argc, char **argv) {
 
     ProcessState::self()->startThreadPool();
 
-    android::sp<ALooper> looper = new ALooper;
+    android::sp<android::ALooper> looper = new android::ALooper;
     looper->start();
 
     android::sp<SurfaceComposerClient> composerClient;

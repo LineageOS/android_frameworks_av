@@ -26,6 +26,8 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/MediaClock.h>
+#include <media/stagefright/MediaCodecConstants.h>
+#include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
@@ -86,6 +88,20 @@ const NuPlayer::Renderer::PcmInfo NuPlayer::Renderer::AUDIO_PCMINFO_INITIALIZER 
 
 // static
 const int64_t NuPlayer::Renderer::kMinPositionUpdateDelayUs = 100000ll;
+
+static audio_format_t constexpr audioFormatFromEncoding(int32_t pcmEncoding) {
+    switch (pcmEncoding) {
+    case kAudioEncodingPcmFloat:
+        return AUDIO_FORMAT_PCM_FLOAT;
+    case kAudioEncodingPcm16bit:
+        return AUDIO_FORMAT_PCM_16_BIT;
+    case kAudioEncodingPcm8bit:
+        return AUDIO_FORMAT_PCM_8_BIT; // TODO: do we want to support this?
+    default:
+        ALOGE("%s: Invalid encoding: %d", __func__, pcmEncoding);
+        return AUDIO_FORMAT_INVALID;
+    }
+}
 
 NuPlayer::Renderer::Renderer(
         const sp<MediaPlayerBase::AudioSink> &sink,
@@ -1877,8 +1893,13 @@ status_t NuPlayer::Renderer::onOpenAudioSink(
     int32_t sampleRate;
     CHECK(format->findInt32("sample-rate", &sampleRate));
 
+    // read pcm encoding from MediaCodec output format, if available
+    int32_t pcmEncoding;
+    audio_format_t audioFormat =
+            format->findInt32(KEY_PCM_ENCODING, &pcmEncoding) ?
+                    audioFormatFromEncoding(pcmEncoding) : AUDIO_FORMAT_PCM_16_BIT;
+
     if (offloadingAudio()) {
-        audio_format_t audioFormat = AUDIO_FORMAT_PCM_16_BIT;
         AString mime;
         CHECK(format->findString("mime", &mime));
         status_t err = mapMimeToAudioFormat(audioFormat, mime.c_str());
@@ -1980,7 +2001,7 @@ status_t NuPlayer::Renderer::onOpenAudioSink(
         const PcmInfo info = {
                 (audio_channel_mask_t)channelMask,
                 (audio_output_flags_t)pcmFlags,
-                AUDIO_FORMAT_PCM_16_BIT, // TODO: change to audioFormat
+                audioFormat,
                 numChannels,
                 sampleRate
         };
@@ -2019,7 +2040,7 @@ status_t NuPlayer::Renderer::onOpenAudioSink(
                     sampleRate,
                     numChannels,
                     (audio_channel_mask_t)channelMask,
-                    AUDIO_FORMAT_PCM_16_BIT,
+                    audioFormat,
                     0 /* bufferCount - unused */,
                     mUseAudioCallback ? &NuPlayer::Renderer::AudioSinkCallback : NULL,
                     mUseAudioCallback ? this : NULL,
@@ -2077,4 +2098,3 @@ void NuPlayer::Renderer::onChangeAudioFormat(
 }
 
 }  // namespace android
-

@@ -59,7 +59,7 @@ status_t MediaPlayer2AudioOutput::dump(int fd, const Vector<String16>& args) con
     return NO_ERROR;
 }
 
-MediaPlayer2AudioOutput::MediaPlayer2AudioOutput(audio_session_t sessionId, uid_t uid, int pid,
+MediaPlayer2AudioOutput::MediaPlayer2AudioOutput(int32_t sessionId, uid_t uid, int pid,
         const jobject attributes)
     : mCallback(nullptr),
       mCallbackCookie(nullptr),
@@ -243,9 +243,7 @@ status_t MediaPlayer2AudioOutput::getFramesWritten(uint32_t *frameswritten) cons
 
 void MediaPlayer2AudioOutput::setAudioAttributes(const jobject attributes) {
     Mutex::Autolock lock(mLock);
-    if (attributes != nullptr) {
-        sp<JObjectHolder> x = new JObjectHolder(attributes);
-    }
+    mAttributes = (attributes == nullptr) ? nullptr : new JObjectHolder(attributes);
 }
 
 audio_stream_type_t MediaPlayer2AudioOutput::getAudioStreamType() const {
@@ -625,14 +623,14 @@ void MediaPlayer2AudioOutput::CallbackWrapper(
     data->unlock();
 }
 
-audio_session_t MediaPlayer2AudioOutput::getSessionId() const {
+int32_t MediaPlayer2AudioOutput::getSessionId() const {
     Mutex::Autolock lock(mLock);
     return mSessionId;
 }
 
-void MediaPlayer2AudioOutput::setSessionId(const audio_session_t id) {
+void MediaPlayer2AudioOutput::setSessionId(const int32_t sessionId) {
     Mutex::Autolock lock(mLock);
-    mSessionId = id;
+    mSessionId = sessionId;
 }
 
 uint32_t MediaPlayer2AudioOutput::getSampleRate() const {

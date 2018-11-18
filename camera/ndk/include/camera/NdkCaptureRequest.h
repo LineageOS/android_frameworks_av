@@ -35,9 +35,9 @@
 
 #include <sys/cdefs.h>
 
-#include <android/native_window.h>
 #include "NdkCameraError.h"
 #include "NdkCameraMetadata.h"
+#include "NdkCameraWindowType.h"
 
 #ifndef _NDK_CAPTURE_REQUEST_H
 #define _NDK_CAPTURE_REQUEST_H
@@ -101,7 +101,7 @@ typedef struct ACaptureRequest ACaptureRequest;
  *
  * @see ACaptureRequest_addTarget
  */
-camera_status_t ACameraOutputTarget_create(ANativeWindow* window,
+camera_status_t ACameraOutputTarget_create(ACameraWindowType* window,
         ACameraOutputTarget** output) __INTRODUCED_IN(24);
 
 /**

@@ -20,6 +20,7 @@
 
 #include "WAVExtractor.h"
 
+#include <android/binder_ibinder.h> // for AIBinder_getCallingUid
 #include <audio_utils/primitives.h>
 #include <media/DataSourceBase.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -27,12 +28,25 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
+#include <private/android_filesystem_config.h> // for AID_MEDIA
+#include <system/audio.h>
 #include <utils/String8.h>
 #include <cutils/bitops.h>
 
 #define CHANNEL_MASK_USE_CHANNEL_ORDER 0
 
+// NOTE: This code assumes the device processor is little endian.
+
 namespace android {
+
+// MediaServer is capable of handling float extractor output, but general processes
+// may not be able to do so.
+// TODO: Improve API to set extractor float output.
+// (Note: duplicated with FLACExtractor.cpp)
+static inline bool shouldExtractorOutputFloat(int bitsPerSample)
+{
+    return bitsPerSample > 16 && AIBinder_getCallingUid() == AID_MEDIA;
+}
 
 enum {
     WAVE_FORMAT_PCM        = 0x0001,
@@ -59,7 +73,7 @@ struct WAVSource : public MediaTrackHelperV2 {
             DataSourceHelper *dataSource,
             AMediaFormat *meta,
             uint16_t waveFormat,
-            int32_t bitsPerSample,
+            bool outputFloat,
             off64_t offset, size_t size);
 
     virtual media_status_t start();
@@ -80,6 +94,7 @@ private:
     DataSourceHelper *mDataSource;
     AMediaFormat *mMeta;
     uint16_t mWaveFormat;
+    const bool mOutputFloat;
     int32_t mSampleRate;
     int32_t mNumChannels;
     int32_t mBitsPerSample;
@@ -126,7 +141,7 @@ MediaTrackHelperV2 *WAVExtractor::getTrack(size_t index) {
 
     return new WAVSource(
             mDataSource, mTrackMeta,
-            mWaveFormat, mBitsPerSample, mDataOffset, mDataSize);
+            mWaveFormat, shouldExtractorOutputFloat(mBitsPerSample), mDataOffset, mDataSize);
 }
 
 media_status_t WAVExtractor::getTrackMetaData(
@@ -136,7 +151,13 @@ media_status_t WAVExtractor::getTrackMetaData(
         return AMEDIA_ERROR_UNKNOWN;
     }
 
-    return AMediaFormat_copy(meta, mTrackMeta);
+    const media_status_t status = AMediaFormat_copy(meta, mTrackMeta);
+    if (status == OK) {
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_PCM_ENCODING,
+                shouldExtractorOutputFloat(mBitsPerSample)
+                        ? kAudioEncodingPcmFloat : kAudioEncodingPcm16bit);
+    }
+    return status;
 }
 
 status_t WAVExtractor::init() {
@@ -199,13 +220,13 @@ status_t WAVExtractor::init() {
 
             mNumChannels = U16_LE_AT(&formatSpec[2]);
 
-            if (mNumChannels < 1 || mNumChannels > 8) {
+            if (mNumChannels < 1 || mNumChannels > FCC_8) {
                 ALOGE("Unsupported number of channels (%d)", mNumChannels);
                 return AMEDIA_ERROR_UNSUPPORTED;
             }
 
             if (mWaveFormat != WAVE_FORMAT_EXTENSIBLE) {
-                if (mNumChannels != 1 && mNumChannels != 2) {
+                if (mNumChannels != 1 && mNumChannels != FCC_2) {
                     ALOGW("More than 2 channels (%d) in non-WAVE_EXT, unknown channel mask",
                             mNumChannels);
                 }
@@ -312,9 +333,6 @@ status_t WAVExtractor::init() {
                 AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_CHANNEL_MASK, mChannelMask);
                 AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, mSampleRate);
                 AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_BITS_PER_SAMPLE, mBitsPerSample);
-                AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_PCM_ENCODING,
-                        kAudioEncodingPcm16bit);
-
                 int64_t durationUs = 0;
                 if (mWaveFormat == WAVE_FORMAT_MSGSM) {
                     // 65 bytes decode to 320 8kHz samples
@@ -353,22 +371,19 @@ WAVSource::WAVSource(
         DataSourceHelper *dataSource,
         AMediaFormat *meta,
         uint16_t waveFormat,
-        int32_t bitsPerSample,
+        bool outputFloat,
         off64_t offset, size_t size)
     : mDataSource(dataSource),
       mMeta(meta),
       mWaveFormat(waveFormat),
-      mSampleRate(0),
-      mNumChannels(0),
-      mBitsPerSample(bitsPerSample),
+      mOutputFloat(outputFloat),
       mOffset(offset),
       mSize(size),
       mStarted(false),
       mGroup(NULL) {
     CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, &mSampleRate));
     CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, &mNumChannels));
-
-    AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, kMaxFrameSize);
+    CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_BITS_PER_SAMPLE, &mBitsPerSample));
 }
 
 WAVSource::~WAVSource() {
@@ -384,11 +399,6 @@ media_status_t WAVSource::start() {
 
     // some WAV files may have large audio buffers that use shared memory transfer.
     mGroup = new MediaBufferGroup(4 /* buffers */, kMaxFrameSize);
-
-    if (mBitsPerSample == 8) {
-        // As a temporary buffer for 8->16 bit conversion.
-        mGroup->add_buffer(MediaBufferBase::Create(kMaxFrameSize));
-    }
 
     mCurrentPos = mOffset;
 
@@ -413,7 +423,13 @@ media_status_t WAVSource::stop() {
 media_status_t WAVSource::getFormat(AMediaFormat *meta) {
     ALOGV("WAVSource::getFormat");
 
-    return AMediaFormat_copy(meta, mMeta);
+    const media_status_t status = AMediaFormat_copy(meta, mMeta);
+    if (status == OK) {
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, kMaxFrameSize);
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_PCM_ENCODING,
+                mOutputFloat ? kAudioEncodingPcmFloat : kAudioEncodingPcm16bit);
+    }
+    return status;
 }
 
 media_status_t WAVSource::read(
@@ -449,12 +465,16 @@ media_status_t WAVSource::read(
         return AMEDIA_ERROR_UNKNOWN;
     }
 
-    // make sure that maxBytesToRead is multiple of 3, in 24-bit case
-    size_t maxBytesToRead =
-        mBitsPerSample == 8 ? kMaxFrameSize / 2 : 
-        (mBitsPerSample == 24 ? 3*(kMaxFrameSize/3): kMaxFrameSize);
+    // maxBytesToRead may be reduced so that in-place data conversion will fit in buffer size.
+    const size_t bufferSize = buffer->size();
+    size_t maxBytesToRead;
+    if (mOutputFloat) { // destination is float at 4 bytes per sample, source may be less.
+        maxBytesToRead = (mBitsPerSample / 8) * (bufferSize / 4);
+    } else { // destination is int16_t at 2 bytes per sample, only source of 8 bits is less.
+        maxBytesToRead = mBitsPerSample == 8 ? bufferSize / 2 : bufferSize;
+    }
 
-    size_t maxBytesAvailable =
+    const size_t maxBytesAvailable =
         (mCurrentPos - mOffset >= (off64_t)mSize)
             ? 0 : mSize - (mCurrentPos - mOffset);
 
@@ -490,38 +510,57 @@ media_status_t WAVSource::read(
 
     // TODO: add capability to return data as float PCM instead of 16 bit PCM.
     if (mWaveFormat == WAVE_FORMAT_PCM) {
-        if (mBitsPerSample == 8) {
-            // Convert 8-bit unsigned samples to 16-bit signed.
-
-            // Create new buffer with 2 byte wide samples
-            MediaBufferBase *tmp;
-            CHECK_EQ(mGroup->acquire_buffer(&tmp), (status_t)OK);
-            tmp->set_range(0, 2 * n);
-
-            memcpy_to_i16_from_u8((int16_t *)tmp->data(), (const uint8_t *)buffer->data(), n);
-            buffer->release();
-            buffer = tmp;
-        } else if (mBitsPerSample == 24) {
-            // Convert 24-bit signed samples to 16-bit signed in place
-            const size_t numSamples = n / 3;
-
-            memcpy_to_i16_from_p24((int16_t *)buffer->data(), (const uint8_t *)buffer->data(), numSamples);
-            buffer->set_range(0, 2 * numSamples);
-        }  else if (mBitsPerSample == 32) {
-            // Convert 32-bit signed samples to 16-bit signed in place
-            const size_t numSamples = n / 4;
-
-            memcpy_to_i16_from_i32((int16_t *)buffer->data(), (const int32_t *)buffer->data(), numSamples);
-            buffer->set_range(0, 2 * numSamples);
+        if (mOutputFloat) {
+            float *fdest = (float *)buffer->data();
+            switch (mBitsPerSample) {
+            case 8: {
+                buffer->set_range(0, 4 * n);
+                memcpy_to_float_from_u8(fdest, (const uint8_t *)buffer->data(), n);
+            } break;
+            case 16: {
+                const size_t numSamples = n / 2;
+                buffer->set_range(0, 4 * numSamples);
+                memcpy_to_float_from_i16(fdest, (const int16_t *)buffer->data(), numSamples);
+            } break;
+            case 24: {
+                const size_t numSamples = n / 3;
+                buffer->set_range(0, 4 * numSamples);
+                memcpy_to_float_from_p24(fdest, (const uint8_t *)buffer->data(), numSamples);
+            } break;
+            case 32: { // buffer range is correct
+                const size_t numSamples = n / 4;
+                memcpy_to_float_from_i32(fdest, (const int32_t *)buffer->data(), numSamples);
+            } break;
+            }
+        } else {
+            int16_t *idest = (int16_t *)buffer->data();
+            switch (mBitsPerSample) {
+            case 8: {
+                buffer->set_range(0, 2 * n);
+                memcpy_to_i16_from_u8(idest, (const uint8_t *)buffer->data(), n);
+            } break;
+            case 16:
+                break; // no translation needed
+            case 24: {
+                const size_t numSamples = n / 3;
+                buffer->set_range(0, 2 * numSamples);
+                memcpy_to_i16_from_p24(idest, (const uint8_t *)buffer->data(), numSamples);
+            } break;
+            case 32: {
+                const size_t numSamples = n / 4;
+                buffer->set_range(0, 2 * numSamples);
+                memcpy_to_i16_from_i32(idest, (const int32_t *)buffer->data(), numSamples);
+            } break;
+            }
         }
     } else if (mWaveFormat == WAVE_FORMAT_IEEE_FLOAT) {
-        if (mBitsPerSample == 32) {
-            // Convert 32-bit float samples to 16-bit signed in place
+        if (!mOutputFloat) { // mBitsPerSample == 32
+            int16_t *idest = (int16_t *)buffer->data();
             const size_t numSamples = n / 4;
-
-            memcpy_to_i16_from_float((int16_t *)buffer->data(), (const float *)buffer->data(), numSamples);
+            memcpy_to_i16_from_float(idest, (const float *)buffer->data(), numSamples);
             buffer->set_range(0, 2 * numSamples);
         }
+        // Note: if output encoding is float, no need to convert if source is float.
     }
 
     int64_t timeStampUs = 0;

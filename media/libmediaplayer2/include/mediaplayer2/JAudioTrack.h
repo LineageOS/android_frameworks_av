@@ -114,7 +114,7 @@ public:
                 callback_t cbf,
                 void* user,
                 size_t frameCount = 0,
-                audio_session_t sessionId  = AUDIO_SESSION_ALLOCATE,
+                int32_t sessionId  = AUDIO_SESSION_ALLOCATE,
                 const jobject pAttributes = NULL,
                 float maxRequiredSpeed = 1.0f);
 
@@ -341,7 +341,7 @@ public:
     jobject getRoutedDevice();
 
     /* Returns the ID of the audio session this AudioTrack belongs to. */
-    audio_session_t getAudioSessionId();
+    int32_t getAudioSessionId();
 
     /* Sets the preferred audio device to use for output of this AudioTrack.
      *

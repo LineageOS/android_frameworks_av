@@ -35,11 +35,14 @@
 #include "AAudioExampleUtils.h"
 #include "LoopbackAnalyzer.h"
 
+// V0.4.00 = rectify and low-pass filter the echos, use auto-correlation on entire echo
+#define APP_VERSION             "0.4.00"
+
 // Tag for machine readable results as property = value pairs
 #define RESULT_TAG              "RESULT: "
 #define FILENAME_ALL            "/data/loopback_all.wav"
 #define FILENAME_ECHOS          "/data/loopback_echos.wav"
-#define APP_VERSION             "0.3.00"
+#define FILENAME_PROCESSED      "/data/loopback_processed.wav"
 
 constexpr int kLogPeriodMillis       = 1000;
 constexpr int kNumInputChannels      = 1;
@@ -173,7 +176,8 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
         int64_t inputFramesWritten = AAudioStream_getFramesWritten(myData->inputStream);
         int64_t inputFramesRead = AAudioStream_getFramesRead(myData->inputStream);
         int64_t framesAvailable = inputFramesWritten - inputFramesRead;
-        actualFramesRead = readFormattedData(myData, numFrames);
+
+        actualFramesRead = readFormattedData(myData, numFrames); // READ
         if (actualFramesRead < 0) {
             result = AAUDIO_CALLBACK_RESULT_STOP;
         } else {
@@ -193,6 +197,7 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
                 }
                 myData->insufficientReadCount++;
                 myData->insufficientReadFrames += numFrames - actualFramesRead; // deficit
+                // printf("Error insufficientReadCount = %d\n",(int)myData->insufficientReadCount);
             }
 
             int32_t numSamples = actualFramesRead * myData->actualInputChannelCount;
@@ -355,6 +360,9 @@ int main(int argc, const char **argv)
 
     printf("%s - Audio loopback using AAudio V" APP_VERSION "\n", argv[0]);
 
+    // Use LOW_LATENCY as the default to match input default.
+    argParser.setPerformanceMode(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];
         if (argParser.parseArg(arg)) {
@@ -403,7 +411,7 @@ int main(int argc, const char **argv)
     }
 
     int32_t requestedDuration = argParser.getDurationSeconds();
-    int32_t requestedDurationMillis = requestedDuration * MILLIS_PER_SECOND;
+    int32_t requestedDurationMillis = requestedDuration * kMillisPerSecond;
     int32_t timeMillis = 0;
     int32_t recordingDuration = std::min(60 * 5, requestedDuration);
 
@@ -420,9 +428,11 @@ int main(int argc, const char **argv)
 
             loopbackData.loopbackProcessor = &loopbackData.echoAnalyzer;
             int read = loopbackData.loopbackProcessor->load(FILENAME_ECHOS);
-            printf("main() read %d mono samples from %s on Android device\n", read, FILENAME_ECHOS);
+            printf("main() read %d mono samples from %s on Android device, rate = %d\n",
+                   read, FILENAME_ECHOS,
+                   loopbackData.loopbackProcessor->getSampleRate());
             loopbackData.loopbackProcessor->report();
-            return 0;
+            goto report_result;
         }
             break;
         default:
@@ -580,45 +590,6 @@ int main(int argc, const char **argv)
     printf("input error = %d = %s\n",
            loopbackData.inputError, AAudio_convertResultToText(loopbackData.inputError));
 
-    if (loopbackData.inputError == AAUDIO_OK) {
-        if (testMode == TEST_SINE_MAGNITUDE) {
-            printAudioGraph(loopbackData.audioRecording, 200);
-            // Print again so we don't have to scroll past waveform.
-            printf("OUTPUT Stream ----------------------------------------\n");
-            argParser.compareWithStream(outputStream);
-            printf("INPUT  Stream ----------------------------------------\n");
-            argParser.compareWithStream(inputStream);
-        }
-
-        loopbackData.loopbackProcessor->report();
-    }
-
-    {
-        int32_t framesRead = AAudioStream_getFramesRead(inputStream);
-        int32_t framesWritten = AAudioStream_getFramesWritten(inputStream);
-        printf("Callback Results ---------------------------------------- INPUT\n");
-        printf("  input overruns   = %8d\n", AAudioStream_getXRunCount(inputStream));
-        printf("  framesWritten    = %8d\n", framesWritten);
-        printf("  framesRead       = %8d\n", framesRead);
-        printf("  myFramesRead     = %8d\n", (int) loopbackData.framesReadTotal);
-        printf("  written - read   = %8d\n", (int) (framesWritten - framesRead));
-        printf("  insufficient #   = %8d\n", (int) loopbackData.insufficientReadCount);
-        if (loopbackData.insufficientReadCount > 0) {
-            printf("  insuffic. frames = %8d\n", (int) loopbackData.insufficientReadFrames);
-        }
-    }
-    {
-        int32_t framesRead = AAudioStream_getFramesRead(outputStream);
-        int32_t framesWritten = AAudioStream_getFramesWritten(outputStream);
-        printf("Callback Results ---------------------------------------- OUTPUT\n");
-        printf("  output underruns = %8d\n", AAudioStream_getXRunCount(outputStream));
-        printf("  myFramesWritten  = %8d\n", (int) loopbackData.framesWrittenTotal);
-        printf("  framesWritten    = %8d\n", framesWritten);
-        printf("  framesRead       = %8d\n", framesRead);
-        printf("  min numFrames    = %8d\n", (int) loopbackData.minNumFrames);
-        printf("  max numFrames    = %8d\n", (int) loopbackData.maxNumFrames);
-    }
-
     written = loopbackData.loopbackProcessor->save(FILENAME_ECHOS);
     if (written > 0) {
         printf("main() wrote %8d mono samples to \"%s\" on Android device\n",
@@ -631,10 +602,46 @@ int main(int argc, const char **argv)
                written, FILENAME_ALL);
     }
 
-    if (loopbackData.loopbackProcessor->getResult() < 0) {
-        printf("ERROR: LOOPBACK PROCESSING FAILED. Maybe because the volume was too low.\n");
-        result = loopbackData.loopbackProcessor->getResult();
+    if (loopbackData.inputError == AAUDIO_OK) {
+        if (testMode == TEST_SINE_MAGNITUDE) {
+            printAudioGraph(loopbackData.audioRecording, 200);
+        }
+
+        loopbackData.loopbackProcessor->report();
     }
+
+    {
+        int32_t framesRead = AAudioStream_getFramesRead(inputStream);
+        int32_t framesWritten = AAudioStream_getFramesWritten(inputStream);
+        const int64_t framesAvailable = framesWritten - framesRead;
+        printf("Callback Results ---------------------------------------- INPUT\n");
+        printf("  input overruns   = %8d\n", AAudioStream_getXRunCount(inputStream));
+        printf("  framesWritten    = %8d\n", framesWritten);
+        printf("  framesRead       = %8d\n", framesRead);
+        printf("  myFramesRead     = %8d\n", (int) loopbackData.framesReadTotal);
+        printf("  written - read   = %8d\n", (int) framesAvailable);
+        printf("  insufficient #   = %8d\n", (int) loopbackData.insufficientReadCount);
+        if (loopbackData.insufficientReadCount > 0) {
+            printf("  insuffic. frames = %8d\n", (int) loopbackData.insufficientReadFrames);
+        }
+        int32_t actualInputCapacity = AAudioStream_getBufferCapacityInFrames(inputStream);
+        if (framesAvailable > 2 * actualInputCapacity) {
+            printf("  WARNING: written - read > 2*capacity !\n");
+        }
+    }
+
+    {
+        int32_t framesRead = AAudioStream_getFramesRead(outputStream);
+        int32_t framesWritten = AAudioStream_getFramesWritten(outputStream);
+        printf("Callback Results ---------------------------------------- OUTPUT\n");
+        printf("  output underruns = %8d\n", AAudioStream_getXRunCount(outputStream));
+        printf("  myFramesWritten  = %8d\n", (int) loopbackData.framesWrittenTotal);
+        printf("  framesWritten    = %8d\n", framesWritten);
+        printf("  framesRead       = %8d\n", framesRead);
+        printf("  min numFrames    = %8d\n", (int) loopbackData.minNumFrames);
+        printf("  max numFrames    = %8d\n", (int) loopbackData.maxNumFrames);
+    }
+
     if (loopbackData.insufficientReadCount > 3) {
         printf("ERROR: LOOPBACK PROCESSING FAILED. insufficientReadCount too high\n");
         result = AAUDIO_ERROR_UNAVAILABLE;
@@ -646,13 +653,23 @@ finish:
     delete[] loopbackData.inputFloatData;
     delete[] loopbackData.inputShortData;
 
+report_result:
+    written = loopbackData.loopbackProcessor->save(FILENAME_PROCESSED);
+    if (written > 0) {
+        printf("main() wrote %8d processed samples to \"%s\" on Android device\n",
+               written, FILENAME_PROCESSED);
+    }
+
+    if (loopbackData.loopbackProcessor->getResult() < 0) {
+        result = loopbackData.loopbackProcessor->getResult();
+    }
     printf(RESULT_TAG "result = %d \n", result); // machine readable
     printf("result is %s\n", AAudio_convertResultToText(result)); // human readable
     if (result != AAUDIO_OK) {
-        printf("FAILURE\n");
+        printf("TEST FAILED\n");
         return EXIT_FAILURE;
     } else {
-        printf("SUCCESS\n");
+        printf("TEST PASSED\n");
         return EXIT_SUCCESS;
     }
 }
