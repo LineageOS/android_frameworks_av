@@ -308,7 +308,11 @@ void Accessor::Impl::BufferPool::Invalidation::onAck(
         ConnectionId conId,
         uint32_t msgId) {
     auto it = mAcks.find(conId);
-    if (it == mAcks.end() || isMessageLater(msgId, it->second)) {
+    if (it == mAcks.end()) {
+        ALOGW("ACK from inconsistent connection! %lld", (long long)conId);
+        return;
+    }
+    if (isMessageLater(msgId, it->second)) {
         mAcks[conId] = msgId;
     }
 }
@@ -327,7 +331,6 @@ void Accessor::Impl::BufferPool::Invalidation::onBufferInvalidated(
                 }
             }
             channel.postInvalidation(msgId, it->mFrom, it->mTo);
-            sInvalidator->addAccessor(mId, it->mImpl);
             it = mPendings.erase(it);
             continue;
         }
@@ -342,24 +345,24 @@ void Accessor::Impl::BufferPool::Invalidation::onInvalidationRequest(
         size_t left,
         BufferInvalidationChannel &channel,
         const std::shared_ptr<Accessor::Impl> &impl) {
-    if (left == 0) {
         uint32_t msgId = 0;
-        if (needsAck) {
+    if (needsAck) {
+        msgId = ++mInvalidationId;
+        if (msgId == 0) {
+            // wrap happens
             msgId = ++mInvalidationId;
-            if (msgId == 0) {
-                // wrap happens
-                msgId = ++mInvalidationId;
-            }
         }
-        ALOGV("bufferpool invalidation requested and queued");
+    }
+    ALOGV("bufferpool invalidation requested and queued");
+    if (left == 0) {
         channel.postInvalidation(msgId, from, to);
-        sInvalidator->addAccessor(mId, impl);
     } else {
         // TODO: sending hint message?
         ALOGV("bufferpool invalidation requested and pending");
         Pending pending(needsAck, from, to, left, impl);
         mPendings.push_back(pending);
     }
+    sInvalidator->addAccessor(mId, impl);
 }
 
 void Accessor::Impl::BufferPool::Invalidation::onHandleAck() {
@@ -373,6 +376,9 @@ void Accessor::Impl::BufferPool::Invalidation::onHandleAck() {
                           (long long)it->first, it->second, mInvalidationId);
                     Return<void> transResult = observer->onMessage(it->first, mInvalidationId);
                     (void) transResult;
+                    // N.B: ignore possibility of onMessage oneway call being
+                    // lost.
+                    it->second = mInvalidationId;
                 } else {
                     ALOGV("bufferpool observer died %lld", (long long)it->first);
                     deads.insert(it->first);
@@ -385,8 +391,10 @@ void Accessor::Impl::BufferPool::Invalidation::onHandleAck() {
             }
         }
     }
-    // All invalidation Ids are synced.
-    sInvalidator->delAccessor(mId);
+    if (mPendings.size() == 0) {
+        // All invalidation Ids are synced and no more pending invalidations.
+        sInvalidator->delAccessor(mId);
+    }
 }
 
 bool Accessor::Impl::BufferPool::handleOwnBuffer(
