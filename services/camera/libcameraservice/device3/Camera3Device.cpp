@@ -5398,6 +5398,10 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             }
 
             if (mUseHalBufManager) {
+                if (outputStream->isAbandoned()) {
+                    ALOGE("%s: stream %d is abandoned.", __FUNCTION__, streamId);
+                    return TIMED_OUT;
+                }
                 // HAL will request buffer through requestStreamBuffer API
                 camera3_stream_buffer_t& buffer = outputBuffers->editItemAt(j);
                 buffer.stream = outputStream->asHalStream();
