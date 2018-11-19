@@ -253,6 +253,10 @@ status_t Camera3StreamSplitter::addOutputLocked(size_t surfaceId, const sp<Surfa
     // Add new entry into mOutputs
     mOutputs[surfaceId] = gbp;
     mConsumerBufferCount[surfaceId] = maxConsumerBuffers;
+    if (mConsumerBufferCount[surfaceId] > mMaxHalBuffers) {
+        SP_LOGW("%s: Consumer buffer count %zu larger than max. Hal buffers: %zu", __FUNCTION__,
+                mConsumerBufferCount[surfaceId], mMaxHalBuffers);
+    }
     mNotifiers[gbp] = listener;
     mOutputSlots[gbp] = std::make_unique<OutputSlots>(totalBufferCount);
 
@@ -324,11 +328,7 @@ status_t Camera3StreamSplitter::removeOutputLocked(size_t surfaceId) {
     }
 
     mNotifiers[gbp] = nullptr;
-    if (mConsumerBufferCount[surfaceId] < mMaxHalBuffers) {
-        mMaxConsumerBuffers -= mConsumerBufferCount[surfaceId];
-    } else {
-        SP_LOGE("%s: Cached consumer buffer count mismatch!", __FUNCTION__);
-    }
+    mMaxConsumerBuffers -= mConsumerBufferCount[surfaceId];
     mConsumerBufferCount[surfaceId] = 0;
 
     return res;
