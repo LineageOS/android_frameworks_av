@@ -480,8 +480,8 @@ media_status_t MPEG4Extractor::getTrackMetaData(
                   segment_duration, media_time,
                   halfscale, mHeaderTimescale, track->timescale);
 
-            if (samplerate != track->timescale){
-                ALOGV("samplerate:%d, track->timescale and samplerate are different!", samplerate);
+            if ((uint32_t)samplerate != track->timescale){
+                ALOGV("samplerate:%" PRId32 ", track->timescale and samplerate are different!", samplerate);
             }
 
             int64_t delay;
