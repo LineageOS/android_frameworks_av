@@ -224,7 +224,8 @@ status_t NuPlayer2::Renderer::onGetPlaybackSettings(AudioPlaybackRate *rate /* n
         status_t err = mAudioSink->getPlaybackRate(rate);
         if (err == OK) {
             if (!isAudioPlaybackRateEqual(*rate, mPlaybackSettings)) {
-                ALOGW("correcting mismatch in internal/external playback rate");
+                ALOGW("correcting mismatch in internal/external playback rate, %f vs %f",
+                      rate->mSpeed, mPlaybackSettings.mSpeed);
             }
             // get playback settings used by audiosink, as it may be
             // slightly off due to audiosink not taking small changes.

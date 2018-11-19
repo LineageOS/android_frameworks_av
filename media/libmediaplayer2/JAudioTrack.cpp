@@ -100,6 +100,7 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
         jBuilderObj = env->CallObjectMethod(jBuilderObj, jSetSessionId, sessionId);
     }
 
+    mFlags = AUDIO_OUTPUT_FLAG_NONE;
     if (cbf != NULL) {
         jmethodID jSetOffloadedPlayback = env->GetMethodID(jBuilderCls, "setOffloadedPlayback",
                 "(Z)Landroid/media/AudioTrack$Builder;");
