@@ -3642,7 +3642,7 @@ status_t MPEG4Extractor::parse3GPPMetaData(off64_t offset, size_t size, int dept
             if (year < 10000) {
                 sprintf(tmp, "%u", year);
 
-                AMediaFormat_setString(mFileMetaData, "year", tmp);
+                AMediaFormat_setString(mFileMetaData, AMEDIAFORMAT_KEY_YEAR, tmp);
             }
             break;
         }
@@ -4716,7 +4716,7 @@ status_t MPEG4Source::parseClearEncryptedSizes(
         off64_t offset, bool isSubsampleEncryption, uint32_t flags) {
 
     int32_t ivlength;
-    CHECK(AMediaFormat_getInt32(mFormat, "crypto-defaultivsize", &ivlength));
+    CHECK(AMediaFormat_getInt32(mFormat, AMEDIAFORMAT_KEY_CRYPTO_DEFAULT_IV_SIZE, &ivlength));
 
     // only 0, 8 and 16 byte initialization vectors are supported
     if (ivlength != 0 && ivlength != 8 && ivlength != 16) {
