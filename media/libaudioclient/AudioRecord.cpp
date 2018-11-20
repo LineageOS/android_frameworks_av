@@ -211,7 +211,7 @@ AudioRecord::~AudioRecord()
         mBufferMemory.clear();
         IPCThreadState::self()->flushCommands();
         ALOGV("%s(%d): releasing session id %d",
-                __func__, mId, mSessionId);
+                __func__, mPortId, mSessionId);
         AudioSystem::releaseAudioSessionId(mSessionId, -1 /*pid*/);
     }
 }
@@ -239,7 +239,7 @@ status_t AudioRecord::set(
     pid_t callingPid;
     pid_t myPid;
 
-    // Note mId is not valid until the track is created, so omit mId in ALOG for set.
+    // Note mPortId is not valid until the track is created, so omit mPortId in ALOG for set.
     ALOGV("%s(): inputSource %d, sampleRate %u, format %#x, channelMask %#x, frameCount %zu, "
           "notificationFrames %u, sessionId %d, transferType %d, flags %#x, opPackageName %s "
           "uid %d, pid %d",
@@ -356,7 +356,7 @@ status_t AudioRecord::set(
     // create the IAudioRecord
     status = createRecord_l(0 /*epoch*/, mOpPackageName);
 
-    ALOGV("%s(%d): status %d", __func__, mId, status);
+    ALOGV("%s(%d): status %d", __func__, mPortId, status);
 
     if (status != NO_ERROR) {
         if (mAudioRecordThread != 0) {
@@ -393,7 +393,7 @@ exit:
 
 status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t triggerSession)
 {
-    ALOGV("%s(%d): sync event %d trigger session %d", __func__, mId, event, triggerSession);
+    ALOGV("%s(%d): sync event %d trigger session %d", __func__, mPortId, event, triggerSession);
 
     AutoMutex lock(mLock);
     if (mActive) {
@@ -434,7 +434,7 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
 
     if (status != NO_ERROR) {
         mActive = false;
-        ALOGE("%s(%d): status %d", __func__, mId, status);
+        ALOGE("%s(%d): status %d", __func__, mPortId, status);
     } else {
         sp<AudioRecordThread> t = mAudioRecordThread;
         if (t != 0) {
@@ -458,7 +458,7 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
 void AudioRecord::stop()
 {
     AutoMutex lock(mLock);
-    ALOGV("%s(%d): mActive:%d\n", __func__, mId, mActive);
+    ALOGV("%s(%d): mActive:%d\n", __func__, mPortId, mActive);
     if (!mActive) {
         return;
     }
@@ -638,7 +638,7 @@ status_t AudioRecord::dump(int fd, const Vector<String16>& args __unused) const
 
     result.append(" AudioRecord::dump\n");
     result.appendFormat("  id(%d) status(%d), active(%d), session Id(%d)\n",
-                        mId, mStatus, mActive, mSessionId);
+                        mPortId, mStatus, mActive, mSessionId);
     result.appendFormat("  flags(%#x), req. flags(%#x), audio source(%d)\n",
                         mFlags, mOrigFlags, mAttributes.source);
     result.appendFormat("  format(%#x), channel mask(%#x), channel count(%u), sample rate(%u)\n",
@@ -680,7 +680,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
     status_t status;
 
     if (audioFlinger == 0) {
-        ALOGE("%s(%d): Could not get audioflinger", __func__, mId);
+        ALOGE("%s(%d): Could not get audioflinger", __func__, mPortId);
         status = NO_INIT;
         goto exit;
     }
@@ -708,7 +708,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
             (mTransfer == TRANSFER_OBTAIN);
         if (!useCaseAllowed) {
             ALOGW("%s(%d): AUDIO_INPUT_FLAG_FAST denied, incompatible transfer = %s",
-                  __func__, mId,
+                  __func__, mPortId,
                   convertTransferToText(mTransfer));
             mFlags = (audio_input_flags_t) (mFlags & ~(AUDIO_INPUT_FLAG_FAST |
                     AUDIO_INPUT_FLAG_RAW));
@@ -744,7 +744,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
 
     if (status != NO_ERROR) {
         ALOGE("%s(%d): AudioFlinger could not create record track, status: %d",
-              __func__, mId, status);
+              __func__, mPortId, status);
         goto exit;
     }
     ALOG_ASSERT(record != 0);
@@ -755,7 +755,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
     mAwaitBoost = false;
     if (output.flags & AUDIO_INPUT_FLAG_FAST) {
         ALOGI("%s(%d): AUDIO_INPUT_FLAG_FAST successful; frameCount %zu -> %zu",
-              __func__, mId,
+              __func__, mPortId,
               mReqFrameCount, output.frameCount);
         mAwaitBoost = true;
     }
@@ -765,13 +765,13 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
     mSampleRate = output.sampleRate;
 
     if (output.cblk == 0) {
-        ALOGE("%s(%d): Could not get control block", __func__, mId);
+        ALOGE("%s(%d): Could not get control block", __func__, mPortId);
         status = NO_INIT;
         goto exit;
     }
     iMemPointer = output.cblk ->pointer();
     if (iMemPointer == NULL) {
-        ALOGE("%s(%d): Could not get control block pointer", __func__, mId);
+        ALOGE("%s(%d): Could not get control block pointer", __func__, mPortId);
         status = NO_INIT;
         goto exit;
     }
@@ -786,7 +786,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
     } else {
         buffers = output.buffers->pointer();
         if (buffers == NULL) {
-            ALOGE("%s(%d): Could not get buffer pointer", __func__, mId);
+            ALOGE("%s(%d): Could not get buffer pointer", __func__, mPortId);
             status = NO_INIT;
             goto exit;
         }
@@ -800,14 +800,14 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
     mAudioRecord = record;
     mCblkMemory = output.cblk;
     mBufferMemory = output.buffers;
-    mId = output.trackId;
+    mPortId = output.portId;
     IPCThreadState::self()->flushCommands();
 
     mCblk = cblk;
     // note that output.frameCount is the (possibly revised) value of mReqFrameCount
     if (output.frameCount < mReqFrameCount || (mReqFrameCount == 0 && output.frameCount == 0)) {
         ALOGW("%s(%d): Requested frameCount %zu but received frameCount %zu",
-              __func__, mId,
+              __func__, mPortId,
               mReqFrameCount,  output.frameCount);
     }
 
@@ -815,7 +815,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
     // The computation is done on server side.
     if (mNotificationFramesReq > 0 && output.notificationFrameCount != mNotificationFramesReq) {
         ALOGW("%s(%d): Server adjusted notificationFrames from %u to %zu for frameCount %zu",
-                __func__, mId,
+                __func__, mPortId,
                 mNotificationFramesReq, output.notificationFrameCount, output.frameCount);
     }
     mNotificationFramesAct = (uint32_t)output.notificationFrameCount;
@@ -883,7 +883,7 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, int32_t waitCount, size_
         timeout.tv_nsec = (long) (ms % 1000) * 1000000;
         requested = &timeout;
     } else {
-        ALOGE("%s(%d): invalid waitCount %d", __func__, mId, waitCount);
+        ALOGE("%s(%d): invalid waitCount %d", __func__, mPortId, waitCount);
         requested = NULL;
     }
     return obtainBuffer(audioBuffer, requested, NULL /*elapsed*/, nonContig);
@@ -993,7 +993,7 @@ ssize_t AudioRecord::read(void* buffer, size_t userSize, bool blocking)
         // sanity-check. user is most-likely passing an error code, and it would
         // make the return value ambiguous (actualSize vs error).
         ALOGE("%s(%d) (buffer=%p, size=%zu (%zu)",
-                __func__, mId, buffer, userSize, userSize);
+                __func__, mPortId, buffer, userSize, userSize);
         return BAD_VALUE;
     }
 
@@ -1050,7 +1050,7 @@ nsecs_t AudioRecord::processAudioBuffer()
             pollUs <<= 1;
         } while (tryCounter-- > 0);
         if (tryCounter < 0) {
-            ALOGE("%s(%d): did not receive expected priority boost on time", __func__, mId);
+            ALOGE("%s(%d): did not receive expected priority boost on time", __func__, mPortId);
         }
         // Run again immediately
         return 0;
@@ -1174,7 +1174,7 @@ nsecs_t AudioRecord::processAudioBuffer()
         timeout.tv_sec = ns / 1000000000LL;
         timeout.tv_nsec = ns % 1000000000LL;
         ALOGV("%s(%d): timeout %ld.%03d",
-                __func__, mId, timeout.tv_sec, (int) timeout.tv_nsec / 1000000);
+                __func__, mPortId, timeout.tv_sec, (int) timeout.tv_nsec / 1000000);
         requested = &timeout;
     }
 
@@ -1187,17 +1187,17 @@ nsecs_t AudioRecord::processAudioBuffer()
         status_t err = obtainBuffer(&audioBuffer, requested, NULL, &nonContig);
         LOG_ALWAYS_FATAL_IF((err != NO_ERROR) != (audioBuffer.frameCount == 0),
                 "%s(%d): obtainBuffer() err=%d frameCount=%zu",
-                __func__, mId, err, audioBuffer.frameCount);
+                __func__, mPortId, err, audioBuffer.frameCount);
         requested = &ClientProxy::kNonBlocking;
         size_t avail = audioBuffer.frameCount + nonContig;
         ALOGV("%s(%d): obtainBuffer(%u) returned %zu = %zu + %zu err %d",
-                __func__, mId, mRemainingFrames, avail, audioBuffer.frameCount, nonContig, err);
+                __func__, mPortId, mRemainingFrames, avail, audioBuffer.frameCount, nonContig, err);
         if (err != NO_ERROR) {
             if (err == TIMED_OUT || err == WOULD_BLOCK || err == -EINTR) {
                 break;
             }
             ALOGE("%s(%d): Error %d obtaining an audio buffer, giving up.",
-                    __func__, mId, err);
+                    __func__, mPortId, err);
             return NS_NEVER;
         }
 
@@ -1220,7 +1220,7 @@ nsecs_t AudioRecord::processAudioBuffer()
         // Sanity check on returned size
         if (ssize_t(readSize) < 0 || readSize > reqSize) {
             ALOGE("%s(%d):  EVENT_MORE_DATA requested %zu bytes but callback returned %zd bytes",
-                    __func__, mId, reqSize, ssize_t(readSize));
+                    __func__, mPortId, reqSize, ssize_t(readSize));
             return NS_NEVER;
         }
 
@@ -1280,7 +1280,7 @@ nsecs_t AudioRecord::processAudioBuffer()
 
 status_t AudioRecord::restoreRecord_l(const char *from)
 {
-    ALOGW("%s(%d): dead IAudioRecord, creating a new one from %s()", __func__, mId, from);
+    ALOGW("%s(%d): dead IAudioRecord, creating a new one from %s()", __func__, mPortId, from);
     ++mSequence;
 
     const int INITIAL_RETRIES = 3;
@@ -1311,7 +1311,7 @@ retry:
     }
 
     if (result != NO_ERROR) {
-        ALOGW("%s(%d): failed status %d, retries %d", __func__, mId, result, retries);
+        ALOGW("%s(%d): failed status %d, retries %d", __func__, mPortId, result, retries);
         if (--retries > 0) {
             // leave time for an eventual race condition to clear before retrying
             usleep(500000);
@@ -1330,18 +1330,18 @@ retry:
 status_t AudioRecord::addAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback)
 {
     if (callback == 0) {
-        ALOGW("%s(%d): adding NULL callback!", __func__, mId);
+        ALOGW("%s(%d): adding NULL callback!", __func__, mPortId);
         return BAD_VALUE;
     }
     AutoMutex lock(mLock);
     if (mDeviceCallback.unsafe_get() == callback.get()) {
-        ALOGW("%s(%d): adding same callback!", __func__, mId);
+        ALOGW("%s(%d): adding same callback!", __func__, mPortId);
         return INVALID_OPERATION;
     }
     status_t status = NO_ERROR;
     if (mInput != AUDIO_IO_HANDLE_NONE) {
         if (mDeviceCallback != 0) {
-            ALOGW("%s(%d): callback already present!", __func__, mId);
+            ALOGW("%s(%d): callback already present!", __func__, mPortId);
             AudioSystem::removeAudioDeviceCallback(this, mInput);
         }
         status = AudioSystem::addAudioDeviceCallback(this, mInput);
@@ -1354,12 +1354,12 @@ status_t AudioRecord::removeAudioDeviceCallback(
         const sp<AudioSystem::AudioDeviceCallback>& callback)
 {
     if (callback == 0) {
-        ALOGW("%s(%d): removing NULL callback!", __func__, mId);
+        ALOGW("%s(%d): removing NULL callback!", __func__, mPortId);
         return BAD_VALUE;
     }
     AutoMutex lock(mLock);
     if (mDeviceCallback.unsafe_get() != callback.get()) {
-        ALOGW("%s(%d): removing different callback!", __func__, mId);
+        ALOGW("%s(%d): removing different callback!", __func__, mPortId);
         return INVALID_OPERATION;
     }
     mDeviceCallback.clear();

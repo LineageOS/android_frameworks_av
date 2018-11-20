@@ -146,7 +146,7 @@ public:
             afSampleRate = parcel->readInt64();
             afLatencyMs = parcel->readInt32();
             (void)parcel->read(&outputId, sizeof(audio_io_handle_t));
-            (void)parcel->readInt32(&trackId);
+            (void)parcel->read(&portId, sizeof(audio_port_handle_t));
             return NO_ERROR;
         }
 
@@ -164,7 +164,7 @@ public:
             (void)parcel->writeInt64(afSampleRate);
             (void)parcel->writeInt32(afLatencyMs);
             (void)parcel->write(&outputId, sizeof(audio_io_handle_t));
-            (void)parcel->writeInt32(trackId);
+            (void)parcel->write(&portId, sizeof(audio_port_handle_t));
             return NO_ERROR;
         }
 
@@ -181,7 +181,7 @@ public:
         uint32_t afSampleRate;
         uint32_t afLatencyMs;
         audio_io_handle_t outputId;
-        int32_t trackId;
+        audio_port_handle_t portId;
     };
 
     /* CreateRecordInput contains all input arguments sent by AudioRecord to AudioFlinger
@@ -274,7 +274,7 @@ public:
                     return BAD_VALUE;
                 }
             }
-            (void)parcel->readInt32(&trackId);
+            (void)parcel->read(&portId, sizeof(audio_port_handle_t));
             return NO_ERROR;
         }
 
@@ -301,7 +301,7 @@ public:
             } else {
                 (void)parcel->writeInt32(0);
             }
-            (void)parcel->writeInt32(trackId);
+            (void)parcel->write(&portId, sizeof(audio_port_handle_t));
 
             return NO_ERROR;
         }
@@ -318,7 +318,7 @@ public:
         audio_io_handle_t inputId;
         sp<IMemory> cblk;
         sp<IMemory> buffers;
-        int32_t trackId;
+        audio_port_handle_t portId;
     };
 
     // invariant on exit for all APIs that return an sp<>:
