@@ -59,6 +59,7 @@ NdkDataSource::NdkDataSource(AMediaDataSource *dataSource)
     AMediaDataSource_setGetSize(mDataSource, dataSource->getSize);
     AMediaDataSource_setClose(mDataSource, dataSource->close);
     AMediaDataSource_setUserdata(mDataSource, dataSource->userdata);
+    AMediaDataSource_setGetAvailableSize(mDataSource, dataSource->getAvailableSize);
     mDataSource->mImpl = dataSource->mImpl;
     mDataSource->mFlags = dataSource->mFlags;
 }
