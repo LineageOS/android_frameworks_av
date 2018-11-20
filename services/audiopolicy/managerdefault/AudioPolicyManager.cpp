@@ -840,8 +840,9 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
     // chosen by the engine if not.
     // FIXME: provide a more generic approach which is not device specific and move this back
     // to getOutputForDevice.
+    // TODO: Remove check of AUDIO_STREAM_MUSIC once migration is completed on the app side.
     if (device == AUDIO_DEVICE_OUT_TELEPHONY_TX &&
-        *stream == AUDIO_STREAM_MUSIC &&
+        (*stream == AUDIO_STREAM_MUSIC || attributes.usage == AUDIO_USAGE_VOICE_COMMUNICATION) &&
         audio_is_linear_pcm(config->format) &&
         isInCall()) {
         if (requestedDeviceId != AUDIO_PORT_HANDLE_NONE) {
@@ -930,7 +931,8 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
     if (stream == AUDIO_STREAM_TTS) {
         *flags = AUDIO_OUTPUT_FLAG_TTS;
     } else if (stream == AUDIO_STREAM_VOICE_CALL &&
-               audio_is_linear_pcm(config->format)) {
+               audio_is_linear_pcm(config->format) &&
+               (*flags & AUDIO_OUTPUT_FLAG_INCALL_MUSIC) == 0) {
         *flags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_VOIP_RX |
                                        AUDIO_OUTPUT_FLAG_DIRECT);
         ALOGV("Set VoIP and Direct output flags for PCM format");
