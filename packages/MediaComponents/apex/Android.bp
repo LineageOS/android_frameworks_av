@@ -1,0 +1,39 @@
+filegroup {
+    name: "media_aidl",
+    srcs: [
+        "java/android/media/**/*.aidl",
+        "java/android/service/**/*.aidl",
+    ],
+    exclude_srcs: [
+        // Exclude these aidls to avoid errors such as
+        // "Refusing to generate code with unstructured parcelables."
+        "java/android/media/MediaDescription.aidl",
+        "java/android/media/MediaMetadata.aidl",
+        "java/android/media/Rating.aidl",
+        "java/android/media/browse/MediaBrowser.aidl",
+        "java/android/media/session/MediaSession.aidl",
+        "java/android/media/session/ParcelableVolumeInfo.aidl",
+        "java/android/media/session/PlaybackState.aidl",
+    ],
+}
+
+java_library {
+    name: "media",
+    installable: true,
+    sdk_version: "current",
+    srcs: [
+        "java/android/media/**/*.java",
+        "java/android/service/**/*.java",
+        ":media_aidl",
+        ":framework-media-annotation-srcs",
+    ],
+    aidl: {
+        local_include_dirs: ["java"],
+        include_dirs: [
+            "frameworks/base/core/java",
+            // for android.graphics.Bitmap
+            // from IMediaBrowserServiceCallback
+            "frameworks/base/graphics/java",
+            ],
+    },
+}
