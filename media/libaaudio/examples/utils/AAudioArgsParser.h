@@ -272,7 +272,9 @@ public:
                     if (strlen(arg) > 2) {
                         policy = atoi(&arg[2]);
                     }
-                    AAudio_setMMapPolicy(policy);
+                    if (!AAudio_setMMapPolicy(policy)) {
+                        printf("ERROR: invalid MMAP policy mode %i\n", policy);
+                    }
                 } break;
                 case 'n':
                     setNumberOfBursts(atoi(&arg[2]));
@@ -363,7 +365,7 @@ public:
                 mode = AAUDIO_PERFORMANCE_MODE_POWER_SAVING;
                 break;
             default:
-                printf("ERROR invalid performance mode %c\n", c);
+                printf("ERROR: invalid performance mode %c\n", c);
                 break;
         }
         return mode;
