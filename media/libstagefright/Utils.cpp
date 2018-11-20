@@ -608,6 +608,7 @@ static std::vector<std::pair<const char *, uint32_t>> int32Mappings {
         { "temporal-layer-count", kKeyTemporalLayerCount },
         { "thumbnail-width", kKeyThumbnailWidth },
         { "thumbnail-height", kKeyThumbnailHeight },
+        { "frame-count", kKeyFrameCount },
     }
 };
 
