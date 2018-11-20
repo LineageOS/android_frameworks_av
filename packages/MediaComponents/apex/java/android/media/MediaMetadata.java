@@ -422,7 +422,9 @@ public final class MediaMetadata implements Parcelable {
     }
 
     private MediaMetadata(Parcel in) {
-        mBundle = Bundle.setDefusable(in.readBundle(), true);
+        //TODO(b/119789387): Resolve hidden API usage: Bundle#setDefusable
+        //mBundle = Bundle.setDefusable(in.readBundle(), true);
+        mBundle = new Bundle();  //TODO:remove this.
     }
 
     /**

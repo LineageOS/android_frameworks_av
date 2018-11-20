@@ -24,7 +24,7 @@ import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ParceledListSlice;
+//import android.content.pm.ParceledListSlice;
 import android.media.AudioAttributes;
 import android.media.MediaDescription;
 import android.media.MediaMetadata;
@@ -150,7 +150,9 @@ public final class MediaSession {
      * @param tag A short name for debugging purposes.
      */
     public MediaSession(@NonNull Context context, @NonNull String tag) {
-        this(context, tag, UserHandle.myUserId());
+        //TODO(b/119749861): Resolve hidden API usage, UserHandle.myUserId
+        //this(context, tag, UserHandle.myUserId());
+        this(context, tag, 0);  //TODO: remove this.
     }
 
     /**
@@ -171,13 +173,17 @@ public final class MediaSession {
         if (TextUtils.isEmpty(tag)) {
             throw new IllegalArgumentException("tag cannot be null or empty");
         }
-        mMaxBitmapSize = context.getResources().getDimensionPixelSize(
-                com.android.internal.R.dimen.config_mediaMetadataBitmapMaxSize);
+        //TODO(b/119749798): Resolve hidden API usage. com.android.internal.R
+        //mMaxBitmapSize = context.getResources().getDimensionPixelSize(
+                //com.android.internal.R.dimen.config_mediaMetadataBitmapMaxSize);
+        mMaxBitmapSize = 1024;  //TODO: remove this.
         mCbStub = new CallbackStub(this);
         MediaSessionManager manager = (MediaSessionManager) context
                 .getSystemService(Context.MEDIA_SESSION_SERVICE);
         try {
-            mBinder = manager.createSession(mCbStub, tag, userId);
+            //TODO(b/119749862): Resolve hidden API usage. MediaSessioManager#createSession
+            //mBinder = manager.createSession(mCbStub, tag, userId);
+            mBinder = null;  //TODO: remove this.
             mSessionToken = new Token(mBinder.getController());
             mController = new MediaController(context, mSessionToken);
         } catch (RemoteException e) {
@@ -287,11 +293,14 @@ public final class MediaSession {
         if (attributes == null) {
             throw new IllegalArgumentException("Attributes cannot be null for local playback.");
         }
+        //TODO(b/119751592): Decide if AudioAttributes should be updated.
+        /*
         try {
             mBinder.setPlaybackToLocal(attributes);
         } catch (RemoteException e) {
             Log.wtf(TAG, "Failure in setPlaybackToLocal.", e);
         }
+        */
     }
 
     /**
@@ -456,11 +465,14 @@ public final class MediaSession {
      * @param queue A list of items in the play queue.
      */
     public void setQueue(@Nullable List<QueueItem> queue) {
+        //TODO:(b/119750807) Resolve hidden API usage ParceledListSlice.
+        /*
         try {
             mBinder.setQueue(queue == null ? null : new ParceledListSlice<QueueItem>(queue));
         } catch (RemoteException e) {
             Log.wtf("Dead object in setQueue.", e);
         }
+        */
     }
 
     /**
@@ -1062,8 +1074,12 @@ public final class MediaSession {
 
         private static RemoteUserInfo createRemoteUserInfo(String packageName, int pid, int uid,
                 ISessionControllerCallback caller) {
+            //TODO(b/119752205): Resolve hidden API usage. 4-param constructor of RemoteUserInfo
+            /*
             return new RemoteUserInfo(packageName, pid, uid,
                     caller != null ? caller.asBinder() : null);
+            */
+            return new RemoteUserInfo(packageName, pid, uid);
         }
 
         @Override
@@ -1443,7 +1459,8 @@ public final class MediaSession {
         private RemoteUserInfo mCurrentControllerInfo;
 
         public CallbackMessageHandler(Looper looper, MediaSession.Callback callback) {
-            super(looper, null, true);
+            //TODO:(b/119539849) Uncomment below line and resolve the error.
+            //super(looper, null, true);
             mCallback = callback;
             mCallback.mHandler = this;
         }

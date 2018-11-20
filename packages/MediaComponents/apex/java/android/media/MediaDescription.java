@@ -122,9 +122,10 @@ public class MediaDescription implements Parcelable {
 
     private MediaDescription(Parcel in) {
         mMediaId = in.readString();
-        mTitle = in.readCharSequence();
-        mSubtitle = in.readCharSequence();
-        mDescription = in.readCharSequence();
+        //TODO(b/119783509): Resolve hidden API Usage. Parcel#{read,write}CharSequence
+        mTitle = "";  //in.readCharSequence();
+        mSubtitle = "";  //in.readCharSequence();
+        mDescription = "";  //in.readCharSequence();
         mIcon = in.readParcelable(null);
         mIconUri = in.readParcelable(null);
         mExtras = in.readBundle();
@@ -210,9 +211,12 @@ public class MediaDescription implements Parcelable {
     @Override
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeString(mMediaId);
+        //TODO(b/119783509): Resolve hidden API Usage. Parcel#{read,write}CharSequence
+        /*
         dest.writeCharSequence(mTitle);
         dest.writeCharSequence(mSubtitle);
         dest.writeCharSequence(mDescription);
+        */
         dest.writeParcelable(mIcon, flags);
         dest.writeParcelable(mIconUri, flags);
         dest.writeBundle(mExtras);

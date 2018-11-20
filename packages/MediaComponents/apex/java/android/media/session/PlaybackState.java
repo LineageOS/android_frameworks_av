@@ -318,7 +318,9 @@ public final class PlaybackState implements Parcelable {
         mActions = in.readLong();
         mCustomActions = in.createTypedArrayList(CustomAction.CREATOR);
         mActiveItemId = in.readLong();
-        mErrorMessage = in.readCharSequence();
+        //TODO(b/119783509): Resolve hidden API Usage. Parcel#{read,write}CharSequence
+        //mErrorMessage = in.readCharSequence();
+        mErrorMessage = "";  //TODO: remove this.
         mExtras = in.readBundle();
     }
 
@@ -353,7 +355,8 @@ public final class PlaybackState implements Parcelable {
         dest.writeLong(mActions);
         dest.writeTypedList(mCustomActions);
         dest.writeLong(mActiveItemId);
-        dest.writeCharSequence(mErrorMessage);
+        //TODO(b/119783509): Resolve hidden API Usage. Parcel#{read,write}CharSequence
+        //dest.writeCharSequence(mErrorMessage);
         dest.writeBundle(mExtras);
     }
 
@@ -497,7 +500,8 @@ public final class PlaybackState implements Parcelable {
                 return STATE_ERROR;
             case RemoteControlClient.PLAYSTATE_FAST_FORWARDING:
                 return STATE_FAST_FORWARDING;
-            case RemoteControlClient.PLAYSTATE_NONE:
+            //RemoteControlClient.PLAYSTATE_NONE is hidden
+            case 0:  //RemoteControlClient.PLAYSTATE_NONE:
                 return STATE_NONE;
             case RemoteControlClient.PLAYSTATE_PAUSED:
                 return STATE_PAUSED;
@@ -533,7 +537,8 @@ public final class PlaybackState implements Parcelable {
             case STATE_FAST_FORWARDING:
                 return RemoteControlClient.PLAYSTATE_FAST_FORWARDING;
             case STATE_NONE:
-                return RemoteControlClient.PLAYSTATE_NONE;
+                //RemoteControlClient.PLAYSTATE_NONE is hidden
+                return 0;  //RemoteControlClient.PLAYSTATE_NONE;
             case STATE_PAUSED:
                 return RemoteControlClient.PLAYSTATE_PAUSED;
             case STATE_PLAYING:

@@ -23,7 +23,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.content.pm.ParceledListSlice;
+//import android.content.pm.ParceledListSlice;
 import android.media.MediaDescription;
 import android.media.session.MediaController;
 import android.media.session.MediaSession;
@@ -652,6 +652,8 @@ public final class MediaBrowser {
         });
     }
 
+    //TODO:(b/119750807) Resolve hidden API usage ParceledListSlice.
+    /*
     private final void onLoadChildren(final IMediaBrowserServiceCallbacks callback,
             final String parentId, final ParceledListSlice list, final Bundle options) {
         mHandler.post(new Runnable() {
@@ -697,6 +699,7 @@ public final class MediaBrowser {
             }
         });
     }
+    */
 
     /**
      * Return true if {@code callback} is the current ServiceCallbacks. Also logs if it's not.
@@ -1106,6 +1109,8 @@ public final class MediaBrowser {
             }
         }
 
+        //TODO:(b/119750807) Resolve hidden API usage ParceledListSlice.
+        /*
         @Override
         public void onLoadChildren(String parentId, ParceledListSlice list) {
             onLoadChildrenWithOptions(parentId, list, null);
@@ -1119,6 +1124,7 @@ public final class MediaBrowser {
                 mediaBrowser.onLoadChildren(this, parentId, list, options);
             }
         }
+        */
     }
 
     private static class Subscription {

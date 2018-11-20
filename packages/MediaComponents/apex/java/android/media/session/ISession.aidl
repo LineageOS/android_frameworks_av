@@ -17,7 +17,7 @@ package android.media.session;
 
 import android.app.PendingIntent;
 import android.content.pm.ParceledListSlice;
-import android.media.AudioAttributes;
+//import android.media.AudioAttributes;
 import android.media.MediaMetadata;
 import android.media.session.ISessionController;
 import android.media.session.PlaybackState;
@@ -41,13 +41,15 @@ interface ISession {
     // These commands are for the TransportPerformer
     void setMetadata(in MediaMetadata metadata);
     void setPlaybackState(in PlaybackState state);
-    void setQueue(in ParceledListSlice queue);
+    //TODO(b/119750807): Resolve hidden API usage ParceledListSlice.
+    //void setQueue(in ParceledListSlice queue);
     void setQueueTitle(CharSequence title);
     void setExtras(in Bundle extras);
     void setRatingType(int type);
 
     // These commands relate to volume handling
-    void setPlaybackToLocal(in AudioAttributes attributes);
+    //TODO(b/119751592): Decide if AudioAttributes should be updated.
+    //void setPlaybackToLocal(in AudioAttributes attributes);
     void setPlaybackToRemote(int control, int max);
     void setCurrentVolume(int currentVolume);
 }

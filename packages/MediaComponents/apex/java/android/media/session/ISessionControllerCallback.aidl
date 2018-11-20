@@ -15,7 +15,7 @@
 
 package android.media.session;
 
-import android.content.pm.ParceledListSlice;
+//import android.content.pm.ParceledListSlice;
 import android.media.MediaMetadata;
 import android.media.session.ParcelableVolumeInfo;
 import android.media.session.PlaybackState;
@@ -32,7 +32,8 @@ oneway interface ISessionControllerCallback {
     // These callbacks are for the TransportController
     void onPlaybackStateChanged(in PlaybackState state);
     void onMetadataChanged(in MediaMetadata metadata);
-    void onQueueChanged(in ParceledListSlice queue);
+    //TODO:(b/119750807) Resolve hidden API usage ParceledListSlice.
+    //void onQueueChanged(in ParceledListSlice queue);
     void onQueueTitleChanged(CharSequence title);
     void onExtrasChanged(in Bundle extras);
     void onVolumeInfoChanged(in ParcelableVolumeInfo info);
