@@ -318,9 +318,7 @@ public final class PlaybackState implements Parcelable {
         mActions = in.readLong();
         mCustomActions = in.createTypedArrayList(CustomAction.CREATOR);
         mActiveItemId = in.readLong();
-        //TODO(b/119783509): Resolve hidden API Usage. Parcel#{read,write}CharSequence
-        //mErrorMessage = in.readCharSequence();
-        mErrorMessage = "";  //TODO: remove this.
+        mErrorMessage = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(in);
         mExtras = in.readBundle();
     }
 
@@ -355,8 +353,7 @@ public final class PlaybackState implements Parcelable {
         dest.writeLong(mActions);
         dest.writeTypedList(mCustomActions);
         dest.writeLong(mActiveItemId);
-        //TODO(b/119783509): Resolve hidden API Usage. Parcel#{read,write}CharSequence
-        //dest.writeCharSequence(mErrorMessage);
+        TextUtils.writeToParcel(mErrorMessage, dest, 0);
         dest.writeBundle(mExtras);
     }
 
