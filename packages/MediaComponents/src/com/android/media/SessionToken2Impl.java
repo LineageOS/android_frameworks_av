@@ -25,8 +25,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
-import android.media.MediaLibraryService2;
-import android.media.MediaSessionService2;
 import android.media.SessionToken2;
 import android.media.SessionToken2.TokenType;
 import android.media.update.SessionToken2Provider;
@@ -75,24 +73,8 @@ public class SessionToken2Impl implements SessionToken2Provider {
             }
         }
         mUid = uid;
-
-        // Infer id and type from package name and service name
-        // TODO(jaewan): Handle multi-user.
-        String id = getSessionIdFromService(manager, MediaLibraryService2.SERVICE_INTERFACE,
-                packageName, serviceName);
-        if (id != null) {
-            mId = id;
-            mType = TYPE_LIBRARY_SERVICE;
-        } else {
-            // retry with session service
-            mId = getSessionIdFromService(manager, MediaSessionService2.SERVICE_INTERFACE,
-                    packageName, serviceName);
-            mType = TYPE_SESSION_SERVICE;
-        }
-        if (mId == null) {
-            throw new IllegalArgumentException("service " + serviceName + " doesn't implement"
-                    + " session service nor library service. Use service's full name.");
-        }
+        mId = null;
+        mType = -1;
         mPackageName = packageName;
         mServiceName = serviceName;
         mSessionBinder = null;
@@ -110,38 +92,13 @@ public class SessionToken2Impl implements SessionToken2Provider {
         mInstance = new SessionToken2(this);
     }
 
-    private static String getSessionIdFromService(PackageManager manager, String serviceInterface,
-            String packageName, String serviceName) {
-        Intent serviceIntent = new Intent(serviceInterface);
-        serviceIntent.setPackage(packageName);
-        // Use queryIntentServices to find services with MediaLibraryService2.SERVICE_INTERFACE.
-        // We cannot use resolveService with intent specified class name, because resolveService
-        // ignores actions if Intent.setClassName() is specified.
-        List<ResolveInfo> list = manager.queryIntentServices(
-                serviceIntent, PackageManager.GET_META_DATA);
-        if (list != null) {
-            for (int i = 0; i < list.size(); i++) {
-                ResolveInfo resolveInfo = list.get(i);
-                if (resolveInfo == null || resolveInfo.serviceInfo == null) {
-                    continue;
-                }
-                if (TextUtils.equals(resolveInfo.serviceInfo.name, serviceName)) {
-                    return getSessionId(resolveInfo);
-                }
-            }
-        }
-        return null;
-    }
-
     public static String getSessionId(ResolveInfo resolveInfo) {
         if (resolveInfo == null || resolveInfo.serviceInfo == null) {
             return null;
         } else if (resolveInfo.serviceInfo.metaData == null) {
             return "";
-        } else {
-            return resolveInfo.serviceInfo.metaData.getString(
-                    MediaSessionService2.SERVICE_META_DATA, "");
         }
+        return null;
     }
 
     public SessionToken2 getInstance() {

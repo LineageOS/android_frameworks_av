@@ -19,38 +19,26 @@ package com.android.media.update;
 import android.app.Notification;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
-import android.media.MediaBrowser2;
-import android.media.MediaBrowser2.BrowserCallback;
 import android.media.MediaController2;
 import android.media.MediaController2.ControllerCallback;
 import android.media.MediaItem2;
-import android.media.MediaLibraryService2;
-import android.media.MediaLibraryService2.LibraryRoot;
-import android.media.MediaLibraryService2.MediaLibrarySession;
-import android.media.MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback;
 import android.media.MediaMetadata2;
 import android.media.MediaPlaylistAgent;
 import android.media.MediaSession2;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.SessionCallback;
-import android.media.MediaSessionService2;
-import android.media.MediaSessionService2.MediaNotification;
 import android.media.Rating2;
 import android.media.SessionCommand2;
 import android.media.SessionCommandGroup2;
 import android.media.SessionToken2;
 import android.media.VolumeProvider2;
-import android.media.update.MediaBrowser2Provider;
 import android.media.update.MediaController2Provider;
 import android.media.update.MediaItem2Provider;
-import android.media.update.MediaLibraryService2Provider.LibraryRootProvider;
 import android.media.update.MediaMetadata2Provider;
 import android.media.update.MediaPlaylistAgentProvider;
 import android.media.update.MediaSession2Provider;
 import android.media.update.MediaSession2Provider.BuilderBaseProvider;
 import android.media.update.MediaSession2Provider.CommandButtonProvider.BuilderProvider;
-import android.media.update.MediaSessionService2Provider;
-import android.media.update.MediaSessionService2Provider.MediaNotificationProvider;
 import android.media.update.SessionToken2Provider;
 import android.media.update.StaticProvider;
 import android.media.update.VolumeProvider2Provider;
@@ -58,15 +46,11 @@ import android.os.Bundle;
 import android.os.IInterface;
 
 import com.android.media.IMediaController2;
-import com.android.media.MediaBrowser2Impl;
 import com.android.media.MediaController2Impl;
 import com.android.media.MediaItem2Impl;
-import com.android.media.MediaLibraryService2Impl;
-import com.android.media.MediaLibraryService2Impl.LibraryRootImpl;
 import com.android.media.MediaMetadata2Impl;
 import com.android.media.MediaPlaylistAgentImpl;
 import com.android.media.MediaSession2Impl;
-import com.android.media.MediaSessionService2Impl;
 import com.android.media.Rating2Impl;
 import com.android.media.SessionToken2Impl;
 import com.android.media.VolumeProvider2Impl;
@@ -86,12 +70,6 @@ public final class ApiFactory implements StaticProvider {
             Context context, MediaController2 instance, SessionToken2 token,
             Executor executor, ControllerCallback callback) {
         return new MediaController2Impl(context, instance, token, executor, callback);
-    }
-
-    @Override
-    public MediaBrowser2Provider createMediaBrowser2(Context context, MediaBrowser2 instance,
-            SessionToken2 token, Executor executor, BrowserCallback callback) {
-        return new MediaBrowser2Impl(context, instance, token, executor, callback);
     }
 
     @Override
@@ -137,38 +115,6 @@ public final class ApiFactory implements StaticProvider {
     public BuilderBaseProvider<MediaSession2, SessionCallback> createMediaSession2Builder(
             Context context, MediaSession2.Builder instance) {
         return new MediaSession2Impl.BuilderImpl(context, instance);
-    }
-
-    @Override
-    public MediaSessionService2Provider createMediaSessionService2(MediaSessionService2 instance) {
-        return new MediaSessionService2Impl(instance);
-    }
-
-    @Override
-    public MediaNotificationProvider createMediaSessionService2MediaNotification(
-            MediaNotification instance, int notificationId, Notification notification) {
-        return new MediaSessionService2Impl.MediaNotificationImpl(
-                instance, notificationId, notification);
-    }
-
-    @Override
-    public MediaSessionService2Provider createMediaLibraryService2(MediaLibraryService2 instance) {
-        return new MediaLibraryService2Impl(instance);
-    }
-
-    @Override
-    public BuilderBaseProvider<MediaLibrarySession, MediaLibrarySessionCallback>
-        createMediaLibraryService2Builder(MediaLibraryService2 service,
-            MediaLibrarySession.Builder instance, Executor callbackExecutor,
-            MediaLibrarySessionCallback callback) {
-        return new MediaLibraryService2Impl.BuilderImpl(service, instance, callbackExecutor,
-                callback);
-    }
-
-    @Override
-    public LibraryRootProvider createMediaLibraryService2LibraryRoot(
-            LibraryRoot instance, String rootId, Bundle extras) {
-        return new LibraryRootImpl(instance, rootId, extras);
     }
 
     @Override

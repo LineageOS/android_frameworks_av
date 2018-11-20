@@ -35,7 +35,6 @@ import android.media.DataSourceDesc;
 import android.media.MediaController2;
 import android.media.MediaController2.PlaybackInfo;
 import android.media.MediaItem2;
-import android.media.MediaLibraryService2;
 import android.media.MediaMetadata2;
 import android.media.MediaPlayerBase;
 import android.media.MediaPlayerBase.PlayerEventCallback;
@@ -48,7 +47,6 @@ import android.media.MediaSession2.CommandButton;
 import android.media.MediaSession2.ControllerInfo;
 import android.media.MediaSession2.OnDataSourceMissingHelper;
 import android.media.MediaSession2.SessionCallback;
-import android.media.MediaSessionService2;
 import android.media.SessionCommand2;
 import android.media.SessionCommandGroup2;
 import android.media.SessionToken2;
@@ -153,21 +151,8 @@ public class MediaSession2Impl implements MediaSession2Provider {
         mPlaylistEventCallback = new MyPlaylistEventCallback(this);
 
         // Infer type from the id and package name.
-        String libraryService = getServiceName(context, MediaLibraryService2.SERVICE_INTERFACE, id);
-        String sessionService = getServiceName(context, MediaSessionService2.SERVICE_INTERFACE, id);
-        if (sessionService != null && libraryService != null) {
-            throw new IllegalArgumentException("Ambiguous session type. Multiple"
-                    + " session services define the same id=" + id);
-        } else if (libraryService != null) {
-            mSessionToken = new SessionToken2Impl(Process.myUid(), TYPE_LIBRARY_SERVICE,
-                    mContext.getPackageName(), libraryService, id, mSessionStub).getInstance();
-        } else if (sessionService != null) {
-            mSessionToken = new SessionToken2Impl(Process.myUid(), TYPE_SESSION_SERVICE,
-                    mContext.getPackageName(), sessionService, id, mSessionStub).getInstance();
-        } else {
-            mSessionToken = new SessionToken2Impl(Process.myUid(), TYPE_SESSION,
-                    mContext.getPackageName(), null, id, mSessionStub).getInstance();
-        }
+        mSessionToken = new SessionToken2Impl(Process.myUid(), TYPE_SESSION,
+                mContext.getPackageName(), null, id, mSessionStub).getInstance();
 
         updatePlayer(player, playlistAgent, volumeProvider);
 

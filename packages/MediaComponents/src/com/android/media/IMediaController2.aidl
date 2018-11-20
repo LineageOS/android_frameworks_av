@@ -52,16 +52,4 @@ oneway interface IMediaController2 {
     void onAllowedCommandsChanged(in Bundle commands);
 
     void onCustomCommand(in Bundle command, in Bundle args, in ResultReceiver receiver);
-
-    //////////////////////////////////////////////////////////////////////////////////////////////
-    // Browser sepcific
-    //////////////////////////////////////////////////////////////////////////////////////////////
-    void onGetLibraryRootDone(in Bundle rootHints, String rootMediaId, in Bundle rootExtra);
-    void onGetItemDone(String mediaId, in Bundle result);
-    void onChildrenChanged(String rootMediaId, int itemCount, in Bundle extras);
-    void onGetChildrenDone(String parentId, int page, int pageSize, in List<Bundle> result,
-            in Bundle extras);
-    void onSearchResultChanged(String query, int itemCount, in Bundle extras);
-    void onGetSearchResultDone(String query, int page, int pageSize, in List<Bundle> result,
-            in Bundle extras);
 }
