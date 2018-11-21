@@ -1592,7 +1592,8 @@ Status CameraService::notifySystemEvent(int32_t eventId,
             ALOGE("Permission Denial: cannot send updates to camera service about system"
                     " events from pid=%d, uid=%d", pid, uid);
             return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
-                            "No permission to send updates to camera service about system events from pid=%d, uid=%d", pid, uid);
+                    "No permission to send updates to camera service about system events"
+                    " from pid=%d, uid=%d", pid, uid);
         }
     }
 
