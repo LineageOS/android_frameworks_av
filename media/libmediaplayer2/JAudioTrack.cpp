@@ -755,7 +755,7 @@ jobject JAudioTrack::createVolumeShaperOperationObj(
 
 jobject JAudioTrack::createStreamEventCallback(callback_t cbf, void* user) {
     JNIEnv *env = JavaVMHelper::getJNIEnv();
-    jclass jCallbackCls = env->FindClass("android/media/MediaPlayer2Impl$StreamEventCallback");
+    jclass jCallbackCls = env->FindClass("android/media/MediaPlayer2$StreamEventCallback");
     jmethodID jCallbackCtor = env->GetMethodID(jCallbackCls, "<init>", "(JJJ)V");
     jobject jCallbackObj = env->NewObject(jCallbackCls, jCallbackCtor, this, cbf, user);
     return jCallbackObj;
