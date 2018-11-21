@@ -647,31 +647,6 @@ static native_handle_t *convertHalTokenToNativeHandle(
     return nh;
 }
 
-static sp<HGraphicBufferProducer> convertNativeHandleToHGBP (
-        const native_handle_t *handle) {
-    // Read the size of the halToken vec<uint8_t>
-    hidl_vec<uint8_t> halToken;
-    halToken.setToExternal(
-        reinterpret_cast<uint8_t *>(const_cast<int *>(&(handle->data[1]))),
-        handle->data[0]);
-    sp<HGraphicBufferProducer> hgbp =
-        HGraphicBufferProducer::castFrom(retrieveHalInterface(halToken));
-    return hgbp;
-}
-
-EXPORT
-sp<HGraphicBufferProducer> AImageReader_getHGBPFromHandle(
-    const native_handle_t *handle) {
-    if (handle == nullptr) {
-        return nullptr;
-    }
-    if (handle->numFds != 0  ||
-        handle->numInts < ceil(sizeof(size_t) / sizeof(int))) {
-        return nullptr;
-    }
-    return convertNativeHandleToHGBP(handle);
-}
-
 EXPORT
 media_status_t AImageReader_new(
         int32_t width, int32_t height, int32_t format, int32_t maxImages,

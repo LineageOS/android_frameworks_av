@@ -169,8 +169,4 @@ struct AImageReader : public RefBase {
     Mutex                      mLock;
 };
 
-// Retrieves HGraphicBufferProducer corresponding to the native_handle_t
-// provided (this native handle MUST have been obtained by AImageReader_getWindowNativeHandle()).
-sp<HGraphicBufferProducer> AImageReader_getHGBPFromHandle(const native_handle_t *handle);
-
 #endif // _NDK_IMAGE_READER_PRIV_H

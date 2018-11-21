@@ -16,6 +16,7 @@ cc_library {
     name: "libmediautils",
 
     srcs: [
+        "AImageReaderUtils.cpp",
         "BatteryNotifier.cpp",
         "ISchedulingPolicyService.cpp",
         "MemoryLeakTrackUtil.cpp",
@@ -30,6 +31,9 @@ cc_library {
         "liblog",
         "libutils",
         "libmemunreachable",
+        "libhidlbase",
+        "android.hardware.graphics.bufferqueue@1.0",
+        "android.hidl.token@1.0-utils",
     ],
 
     logtags: ["EventLogTags.logtags"],
