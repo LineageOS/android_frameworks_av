@@ -811,12 +811,9 @@ void AudioTrack::stop()
         if (!isOffloaded_l()) {
             t->pause();
         } else if (mTransfer == TRANSFER_SYNC_NOTIF_CALLBACK) {
-            const sp<AudioTrackThread> t = mAudioTrackThread;
-            if (t != 0) {
-                // causes wake up of the playback thread, that will callback the client for
-                // EVENT_STREAM_END in processAudioBuffer()
-                t->wake();
-            }
+            // causes wake up of the playback thread, that will callback the client for
+            // EVENT_STREAM_END in processAudioBuffer()
+            t->wake();
         }
     } else {
         setpriority(PRIO_PROCESS, 0, mPreviousPriority);
