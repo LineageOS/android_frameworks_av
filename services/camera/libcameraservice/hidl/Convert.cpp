@@ -134,6 +134,7 @@ HCameraDeviceStatus convertToHidlCameraDeviceStatus(int32_t status) {
 
 HCaptureResultExtras convertToHidl(const CaptureResultExtras &captureResultExtras) {
     HCaptureResultExtras hCaptureResultExtras;
+    hCaptureResultExtras.requestId = captureResultExtras.requestId;
     hCaptureResultExtras.burstId = captureResultExtras.burstId;
     hCaptureResultExtras.frameNumber = captureResultExtras.frameNumber;
     hCaptureResultExtras.partialResultCount = captureResultExtras.partialResultCount;
