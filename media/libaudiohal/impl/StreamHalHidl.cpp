@@ -49,8 +49,18 @@ using ::android::hardware::audio::common::CPP_VERSION::AudioContentType;
 using ::android::hardware::audio::common::CPP_VERSION::AudioSource;
 using ::android::hardware::audio::common::CPP_VERSION::AudioUsage;
 using ::android::hardware::audio::CPP_VERSION::MicrophoneInfo;
+#endif
+
+#if MAJOR_VERSION == 4
 using ::android::hardware::audio::CPP_VERSION::PlaybackTrackMetadata;
 using ::android::hardware::audio::CPP_VERSION::RecordTrackMetadata;
+using HalSinkMetadata = ::android::hardware::audio::CPP_VERSION::SinkMetadata;
+using HalSourceMetadata = ::android::hardware::audio::CPP_VERSION::SourceMetadata;
+#elif MAJOR_VERSION == 5
+using ::android::hardware::audio::common::CPP_VERSION::PlaybackTrackMetadata;
+using ::android::hardware::audio::common::CPP_VERSION::RecordTrackMetadata;
+using HalSinkMetadata = ::android::hardware::audio::common::CPP_VERSION::SinkMetadata;
+using HalSourceMetadata = ::android::hardware::audio::common::CPP_VERSION::SourceMetadata;
 #endif
 
 namespace android {
@@ -357,7 +367,7 @@ status_t StreamOutHalHidl::selectPresentation(int presentationId, int programId)
     parametersToHal(hidl_vec<ParameterValue>(parameters), &halParameters);
     return setParameters(halParameters);
 }
-#elif MAJOR_VERSION == 4
+#elif MAJOR_VERSION >= 4
 status_t StreamOutHalHidl::selectPresentation(int presentationId, int programId) {
     if (mStream == 0) return NO_INIT;
     return processReturn("selectPresentation",
@@ -614,7 +624,7 @@ static auto transformToHidlVec(const Values& values, ElementConverter converter)
 }
 
 status_t StreamOutHalHidl::updateSourceMetadata(const SourceMetadata& sourceMetadata) {
-    hardware::audio::CPP_VERSION::SourceMetadata halMetadata = {
+    HalSourceMetadata halMetadata = {
         .tracks = transformToHidlVec(sourceMetadata.tracks,
               [](const playback_track_metadata& metadata) -> PlaybackTrackMetadata {
                   return {
@@ -853,7 +863,7 @@ status_t StreamInHalHidl::getActiveMicrophones(
 }
 
 status_t StreamInHalHidl::updateSinkMetadata(const SinkMetadata& sinkMetadata) {
-    hardware::audio::CPP_VERSION::SinkMetadata halMetadata = {
+    HalSinkMetadata halMetadata = {
         .tracks = transformToHidlVec(sinkMetadata.tracks,
               [](const record_track_metadata& metadata) -> RecordTrackMetadata {
                   return {

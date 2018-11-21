@@ -49,8 +49,10 @@ using ::android::hardware::audio::CPP_VERSION::Result;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 
-#if MAJOR_VERSION >= 4
+#if MAJOR_VERSION == 4
 using ::android::hardware::audio::CPP_VERSION::SinkMetadata;
+#elif MAJOR_VERSION == 5
+using ::android::hardware::audio::common::CPP_VERSION::SinkMetadata;
 #endif
 
 namespace android {
