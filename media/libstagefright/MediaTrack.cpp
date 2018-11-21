@@ -110,6 +110,8 @@ MediaTrackCUnwrapperV2::MediaTrackCUnwrapperV2(CMediaTrackV2 *cmediatrack2) {
 }
 
 MediaTrackCUnwrapperV2::~MediaTrackCUnwrapperV2() {
+    wrapper->free(wrapper->data);
+    free(wrapper);
 }
 
 status_t MediaTrackCUnwrapperV2::start() {

@@ -185,9 +185,17 @@ private:
     struct PSISection;
     struct CasManager;
     struct CADescriptor {
-        int32_t mSystemID;
+        CADescriptor() : mPID(0), mSystemID(-1) {}
         unsigned mPID;
+        int32_t mSystemID;
         std::vector<uint8_t> mPrivateData;
+    };
+
+    struct StreamInfo {
+        unsigned mType;
+        unsigned mTypeExt;
+        unsigned mPID;
+        CADescriptor mCADescriptor;
     };
 
     sp<CasManager> mCasManager;

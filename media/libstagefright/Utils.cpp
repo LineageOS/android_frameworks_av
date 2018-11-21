@@ -608,6 +608,7 @@ static std::vector<std::pair<const char *, uint32_t>> int32Mappings {
         { "temporal-layer-count", kKeyTemporalLayerCount },
         { "thumbnail-width", kKeyThumbnailWidth },
         { "thumbnail-height", kKeyThumbnailHeight },
+        { "frame-count", kKeyFrameCount },
     }
 };
 
@@ -721,6 +722,16 @@ status_t convertMetaDataToMessage(
         }
 
         msg->setBuffer("ca-session-id", buffer);
+        memcpy(buffer->data(), data, size);
+    }
+
+    if (meta->findData(kKeyCAPrivateData, &type, &data, &size)) {
+        sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
+        if (buffer.get() == NULL || buffer->base() == NULL) {
+            return NO_MEMORY;
+        }
+
+        msg->setBuffer("ca-private-data", buffer);
         memcpy(buffer->data(), data, size);
     }
 
@@ -1477,6 +1488,19 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     }
 
     convertMessageToMetaDataFromMappings(msg, meta);
+
+    int32_t systemId;
+    if (msg->findInt32("ca-system-id", &systemId)) {
+        meta->setInt32(kKeyCASystemID, systemId);
+
+        sp<ABuffer> caSessionId, caPvtData;
+        if (msg->findBuffer("ca-session-id", &caSessionId)) {
+            meta->setData(kKeyCASessionID, 0, caSessionId->data(), caSessionId->size());
+        }
+        if (msg->findBuffer("ca-private-data", &caPvtData)) {
+            meta->setData(kKeyCAPrivateData, 0, caPvtData->data(), caPvtData->size());
+        }
+    }
 
     int64_t durationUs;
     if (msg->findInt64("durationUs", &durationUs)) {

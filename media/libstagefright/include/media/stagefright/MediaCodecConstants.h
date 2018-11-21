@@ -327,6 +327,7 @@ constexpr char KEY_BIT_RATE[] = "bitrate";
 constexpr char KEY_BITRATE_MODE[] = "bitrate-mode";
 constexpr char KEY_CA_SESSION_ID[] = "ca-session-id";
 constexpr char KEY_CA_SYSTEM_ID[] = "ca-system-id";
+constexpr char KEY_CA_PRIVATE_DATA[] = "ca-private-data";
 constexpr char KEY_CAPTURE_RATE[] = "capture-rate";
 constexpr char KEY_CHANNEL_COUNT[] = "channel-count";
 constexpr char KEY_CHANNEL_MASK[] = "channel-mask";

@@ -5443,6 +5443,10 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             }
 
             if (mUseHalBufManager) {
+                if (outputStream->isAbandoned()) {
+                    ALOGE("%s: stream %d is abandoned.", __FUNCTION__, streamId);
+                    return TIMED_OUT;
+                }
                 // HAL will request buffer through requestStreamBuffer API
                 camera3_stream_buffer_t& buffer = outputBuffers->editItemAt(j);
                 buffer.stream = outputStream->asHalStream();
@@ -6370,8 +6374,9 @@ status_t Camera3Device::RequestBufferStateMachine::initialize(
 
 bool Camera3Device::RequestBufferStateMachine::startRequestBuffer() {
     std::lock_guard<std::mutex> lock(mLock);
-    if (mStatus == RB_STATUS_READY) {
+    if (mStatus == RB_STATUS_READY || mStatus == RB_STATUS_PENDING_STOP) {
         mRequestBufferOngoing = true;
+        notifyTrackerLocked(/*active*/true);
         return true;
     }
     return false;
@@ -6387,15 +6392,12 @@ void Camera3Device::RequestBufferStateMachine::endRequestBuffer() {
     if (mStatus == RB_STATUS_PENDING_STOP) {
         checkSwitchToStopLocked();
     }
+    notifyTrackerLocked(/*active*/false);
 }
 
 void Camera3Device::RequestBufferStateMachine::onStreamsConfigured() {
     std::lock_guard<std::mutex> lock(mLock);
-    RequestBufferState oldStatus = mStatus;
     mStatus = RB_STATUS_READY;
-    if (oldStatus != RB_STATUS_READY) {
-        notifyTrackerLocked(/*active*/true);
-    }
     return;
 }
 
@@ -6405,7 +6407,6 @@ void Camera3Device::RequestBufferStateMachine::onRequestSubmitted() {
     mInflightMapEmpty = false;
     if (mStatus == RB_STATUS_STOPPED) {
         mStatus = RB_STATUS_READY;
-        notifyTrackerLocked(/*active*/true);
     }
     return;
 }
@@ -6450,7 +6451,6 @@ void Camera3Device::RequestBufferStateMachine::notifyTrackerLocked(bool active) 
 bool Camera3Device::RequestBufferStateMachine::checkSwitchToStopLocked() {
     if (mInflightMapEmpty && mRequestThreadPaused && !mRequestBufferOngoing) {
         mStatus = RB_STATUS_STOPPED;
-        notifyTrackerLocked(/*active*/false);
         return true;
     }
     return false;
