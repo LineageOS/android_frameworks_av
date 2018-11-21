@@ -446,7 +446,6 @@ private:
 
     jclass mAudioTrackCls;
     jobject mAudioTrackObj;
-    sp<JObjectHolder> mAudioAttributesObj;
 
     /* Creates a Java VolumeShaper.Configuration object from VolumeShaper::Configuration */
     jobject createVolumeShaperConfigurationObj(
